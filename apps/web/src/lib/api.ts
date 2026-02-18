@@ -1,13 +1,19 @@
 import {
   AppServerCollaborationModeListResponseSchema,
+  CreatePushSubscriptionBodySchema,
+  DeletePushSubscriptionBodySchema,
+  DeletePushSubscriptionResponseSchema,
   AppServerListModelsResponseSchema,
   AppServerListThreadsResponseSchema,
   AppServerReadThreadResponseSchema,
   AppServerStartThreadResponseSchema,
+  CreatePushSubscriptionResponseSchema,
+  PushStatusResponseSchema,
   type CollaborationMode,
   ThreadConversationStateSchema,
   UserInputRequestSchema,
-  UserInputResponsePayloadSchema
+  UserInputResponsePayloadSchema,
+  VapidPublicKeyResponseSchema
 } from "@farfield/protocol";
 import { z } from "zod";
 
@@ -111,8 +117,51 @@ const HistoryDetailSchema = z
   })
   .strict();
 
+const PushStatusEnvelopeSchema = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(PushStatusResponseSchema)
+  .strict();
+
+const PushVapidPublicKeyEnvelopeSchema = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(VapidPublicKeyResponseSchema)
+  .strict();
+
+const PushTestResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    dryRun: z.boolean(),
+    ready: z.boolean(),
+    reason: z.string(),
+    attempted: z.number().int().nonnegative(),
+    delivered: z.number().int().nonnegative(),
+    failures: z.number().int().nonnegative()
+  })
+  .strict();
+
+function readApiToken(): string | null {
+  const token = import.meta.env["VITE_API_TOKEN"] ?? import.meta.env["VITE_PUSH_API_TOKEN"];
+  if (typeof token !== "string") {
+    return null;
+  }
+  const trimmed = token.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 async function request(path: string, init?: RequestInit): Promise<unknown> {
-  const response = await fetch(path, init);
+  const headers = new Headers(init?.headers);
+  const token = readApiToken();
+  if (token) {
+    headers.set("X-Farfield-Token", token);
+  }
+  const response = await fetch(path, {
+    ...init,
+    headers
+  });
   const data = (await response.json()) as unknown;
   const envelope = ApiEnvelopeSchema.parse(data);
 
@@ -319,6 +368,74 @@ export async function replayHistoryEntry(input: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input)
   });
+}
+
+export async function getPushStatus(): Promise<z.infer<typeof PushStatusEnvelopeSchema>> {
+  const data = await request("/api/push/status");
+  return PushStatusEnvelopeSchema.parse(data);
+}
+
+export async function getPushVapidPublicKey(): Promise<z.infer<typeof PushVapidPublicKeyEnvelopeSchema>> {
+  const data = await request("/api/push/vapid-public-key");
+  return PushVapidPublicKeyEnvelopeSchema.parse(data);
+}
+
+export async function savePushSubscription(
+  input: z.infer<typeof CreatePushSubscriptionBodySchema>
+): Promise<z.infer<typeof CreatePushSubscriptionResponseSchema>> {
+  const body = CreatePushSubscriptionBodySchema.parse(input);
+  const data = await request("/api/push/subscriptions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  return z
+    .object({
+      ok: z.literal(true)
+    })
+    .merge(CreatePushSubscriptionResponseSchema)
+    .strict()
+    .parse(data);
+}
+
+export async function deletePushSubscription(
+  input: z.infer<typeof DeletePushSubscriptionBodySchema>
+): Promise<z.infer<typeof DeletePushSubscriptionResponseSchema>> {
+  const body = DeletePushSubscriptionBodySchema.parse(input);
+  const data = await request("/api/push/subscriptions", {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+  return z
+    .object({
+      ok: z.literal(true)
+    })
+    .merge(DeletePushSubscriptionResponseSchema)
+    .strict()
+    .parse(data);
+}
+
+export async function sendPushTestNotification(input: {
+  threadId: string;
+  turnId: string;
+  title?: string;
+  body?: string;
+  dryRun?: boolean;
+}): Promise<z.infer<typeof PushTestResponseSchema>> {
+  const data = await request("/api/push/test", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(input)
+  });
+  return PushTestResponseSchema.parse(data);
 }
 
 export function getPendingUserInputRequests(

@@ -2,7 +2,7 @@ import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
   AppServerClient,
@@ -15,8 +15,12 @@ import {
   type SendRequestOptions
 } from "@farfield/api";
 import {
+  CreatePushSubscriptionBodySchema,
+  DeletePushSubscriptionBodySchema,
   type CollaborationMode,
   type IpcFrame,
+  type PushNotificationPayload,
+  type ThreadConversationState,
   parseThreadStreamStateChangedBroadcast,
   parseUserInputResponsePayload
 } from "@farfield/protocol";
@@ -28,11 +32,15 @@ import {
   StartThreadBodySchema,
   SetModeBodySchema,
   SubmitUserInputBodySchema,
+  PushTestBodySchema,
   TraceMarkBodySchema,
   TraceStartBodySchema
 } from "./http-schemas.js";
 import { logger } from "./logger.js";
 import { resolveOwnerClientId } from "./thread-owner.js";
+import { PushStore } from "./push-store.js";
+import { CompletionDetector, type CompletionCandidate } from "./completion-detector.js";
+import { PushService } from "./push-service.js";
 
 const HOST = process.env["HOST"] ?? "127.0.0.1";
 const PORT = Number(process.env["PORT"] ?? 4311);
@@ -40,9 +48,19 @@ const HISTORY_LIMIT = 2_000;
 const USER_AGENT = "farfield/0.2.0";
 const IPC_RECONNECT_DELAY_MS = 1_000;
 const ANSI_ESCAPE_REGEX = /\u001B\[[0-?]*[ -/]*[@-~]/g;
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 const TRACE_DIR = path.resolve(process.cwd(), "traces");
 const DEFAULT_WORKSPACE = path.resolve(process.cwd());
+const PUSH_STATE_PATH = path.resolve(
+  process.env["PUSH_STATE_PATH"] ?? path.join("apps", "server", "push-state.json")
+);
+const PUSH_ENABLED = (process.env["PUSH_ENABLED"] ?? "false").toLowerCase() === "true";
+const PUSH_PRIVATE_MODE_DEFAULT = (process.env["PUSH_PRIVATE_MODE_DEFAULT"] ?? "true").toLowerCase() !== "false";
+const API_AUTH_TOKEN = (process.env["API_TOKEN"] ?? process.env["PUSH_API_TOKEN"] ?? "").trim();
+const PUSH_VAPID_PUBLIC_KEY = (process.env["PUSH_VAPID_PUBLIC_KEY"] ?? "").trim();
+const PUSH_VAPID_PRIVATE_KEY = (process.env["PUSH_VAPID_PRIVATE_KEY"] ?? "").trim();
+const PUSH_VAPID_SUBJECT = (process.env["PUSH_VAPID_SUBJECT"] ?? "").trim();
 
 function resolveCodexExecutablePath(): string {
   if (process.env["CODEX_CLI_PATH"]) {
@@ -88,8 +106,8 @@ function jsonResponse(res: ServerResponse, statusCode: number, body: unknown): v
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": encoded.length,
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "content-type",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
+    "Access-Control-Allow-Headers": "content-type,x-farfield-token",
+    "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS"
   });
   res.end(encoded);
 }
@@ -180,7 +198,9 @@ const runtimeState = {
   appReady: false,
   ipcConnected: false,
   ipcInitialized: false,
-  lastError: null as string | null
+  lastError: null as string | null,
+  pushEnabled: PUSH_ENABLED,
+  pushConfigured: false
 };
 
 let bootstrapInFlight: Promise<void> | null = null;
@@ -191,7 +211,8 @@ function getRuntimeStateSnapshot(): Record<string, unknown> {
     ...runtimeState,
     historyCount: history.length,
     threadOwnerCount: threadOwnerById.size,
-    activeTrace: activeTrace?.summary ?? null
+    activeTrace: activeTrace?.summary ?? null,
+    pushSubscriptionCount: pushStore.getSubscriptionCount()
   };
 }
 
@@ -422,23 +443,35 @@ const ipcClient = new DesktopIpcClient({
 });
 
 const service = new CodexMonitorService(ipcClient);
+const pushStore = new PushStore(PUSH_STATE_PATH);
+const pushService = new PushService({
+  enabled:
+    PUSH_ENABLED &&
+    PUSH_VAPID_PUBLIC_KEY.length > 0 &&
+    PUSH_VAPID_PRIVATE_KEY.length > 0 &&
+    PUSH_VAPID_SUBJECT.length > 0,
+  vapidPublicKey: PUSH_VAPID_PUBLIC_KEY,
+  vapidPrivateKey: PUSH_VAPID_PRIVATE_KEY,
+  vapidSubject: PUSH_VAPID_SUBJECT
+});
+let completionDetector = new CompletionDetector(new Map<string, string>());
 
-function parseInteger(value: string | null, fallback: number): number {
+function parseInteger(value: string | null, defaultValue: number): number {
   if (!value) {
-    return fallback;
+    return defaultValue;
   }
 
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    return fallback;
+    return defaultValue;
   }
 
   return parsed;
 }
 
-function parseBoolean(value: string | null, fallback: boolean): boolean {
+function parseBoolean(value: string | null, defaultValue: boolean): boolean {
   if (!value) {
-    return fallback;
+    return defaultValue;
   }
 
   if (value === "1" || value === "true") {
@@ -449,12 +482,218 @@ function parseBoolean(value: string | null, fallback: boolean): boolean {
     return false;
   }
 
-  return fallback;
+  return defaultValue;
+}
+
+function endpointHash(endpoint: string): string {
+  return createHash("sha256").update(endpoint).digest("hex").slice(0, 12);
+}
+
+function requirePushConfiguration(): void {
+  if (!PUSH_ENABLED) {
+    runtimeState.pushConfigured = false;
+    return;
+  }
+
+  const missing: string[] = [];
+  if (PUSH_VAPID_PUBLIC_KEY.length === 0) {
+    missing.push("PUSH_VAPID_PUBLIC_KEY");
+  }
+  if (PUSH_VAPID_PRIVATE_KEY.length === 0) {
+    missing.push("PUSH_VAPID_PRIVATE_KEY");
+  }
+  if (PUSH_VAPID_SUBJECT.length === 0) {
+    missing.push("PUSH_VAPID_SUBJECT");
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`Push notifications enabled but missing env vars: ${missing.join(", ")}`);
+  }
+  runtimeState.pushConfigured = true;
+}
+
+function isApiAuthRequired(): boolean {
+  return !LOOPBACK_HOSTS.has(HOST) || API_AUTH_TOKEN.length > 0;
+}
+
+function isApiAuthMisconfigured(): boolean {
+  return !LOOPBACK_HOSTS.has(HOST) && API_AUTH_TOKEN.length === 0;
+}
+
+function readApiAuthToken(req: IncomingMessage): string {
+  const rawToken = req.headers["x-farfield-token"];
+  if (typeof rawToken === "string") {
+    return rawToken;
+  }
+  return rawToken?.[0] ?? "";
+}
+
+function requireApiAuth(req: IncomingMessage, res: ServerResponse): boolean {
+  if (!isApiAuthRequired()) {
+    return true;
+  }
+
+  if (isApiAuthMisconfigured()) {
+    jsonResponse(res, 503, {
+      ok: false,
+      error: "API auth is required when HOST is non-loopback; set API_TOKEN"
+    });
+    return false;
+  }
+
+  const token = readApiAuthToken(req);
+  if (token !== API_AUTH_TOKEN) {
+    logger.warn(
+      {
+        route: req.url ?? "unknown",
+        remoteAddress: req.socket.remoteAddress ?? null
+      },
+      "api-auth-rejected"
+    );
+    jsonResponse(res, 401, {
+      ok: false,
+      error: "Unauthorized"
+    });
+    return false;
+  }
+
+  return true;
+}
+
+function summarizeAgentText(agentText: string): string {
+  const normalized = agentText.replace(/\s+/g, " ").trim();
+  if (normalized.length <= 120) {
+    return normalized;
+  }
+  return `${normalized.slice(0, 117)}...`;
+}
+
+function buildCompletionPayload(
+  candidate: CompletionCandidate,
+  privateMode: boolean
+): PushNotificationPayload {
+  return {
+    title: "Codex response ready",
+    body: privateMode ? "A response is ready in Farfield." : summarizeAgentText(candidate.agentText),
+    threadId: candidate.threadId,
+    turnId: candidate.turnId,
+    url: `/threads/${encodeURIComponent(candidate.threadId)}`,
+    createdAt: new Date().toISOString()
+  };
+}
+
+async function notifyCompletion(candidate: CompletionCandidate): Promise<{
+  attempted: number;
+  delivered: number;
+  failures: number;
+  canCommitWatermark: boolean;
+}> {
+  if (!pushService.isEnabled()) {
+    return {
+      attempted: 0,
+      delivered: 0,
+      failures: 0,
+      canCommitWatermark: true
+    };
+  }
+
+  const subscriptions = pushStore.listSubscriptions();
+  if (subscriptions.length === 0) {
+    return {
+      attempted: 0,
+      delivered: 0,
+      failures: 0,
+      canCommitWatermark: true
+    };
+  }
+
+  const privateSubscriptions = subscriptions.filter((subscription) => subscription.settings.privateMode);
+  const detailedSubscriptions = subscriptions.filter((subscription) => !subscription.settings.privateMode);
+  const batches: Array<{ privateMode: boolean; subscriptions: typeof subscriptions }> = [];
+
+  if (privateSubscriptions.length > 0) {
+    batches.push({
+      privateMode: true,
+      subscriptions: privateSubscriptions
+    });
+  }
+
+  if (detailedSubscriptions.length > 0) {
+    batches.push({
+      privateMode: false,
+      subscriptions: detailedSubscriptions
+    });
+  }
+
+  let attempted = 0;
+  let delivered = 0;
+  let failures = 0;
+
+  for (const batch of batches) {
+    const payload = buildCompletionPayload(candidate, batch.privateMode);
+    const result = await pushService.sendToSubscriptions(batch.subscriptions, payload);
+    attempted += result.attempted;
+    delivered += result.delivered;
+    failures += result.failures.length;
+
+    for (const endpoint of result.prunedEndpoints) {
+      const removed = pushStore.removeSubscriptionByEndpoint(endpoint);
+      if (removed) {
+        pushSystem("Push subscription removed after invalid endpoint", {
+          endpointHash: endpointHash(endpoint),
+          subscriptionCount: pushStore.getSubscriptionCount()
+        });
+      }
+    }
+
+    pushSystem("Push notification send result", {
+      threadId: candidate.threadId,
+      turnId: candidate.turnId,
+      privateMode: batch.privateMode,
+      attempted: result.attempted,
+      delivered: result.delivered,
+      failures: result.failures.length
+    });
+  }
+
+  return {
+    attempted,
+    delivered,
+    failures,
+    canCommitWatermark: delivered > 0
+  };
+}
+
+function getPushReadiness(): {
+  ready: boolean;
+  reason: string;
+  subscriptionCount: number;
+} {
+  const subscriptionCount = pushStore.getSubscriptionCount();
+  if (!pushService.isEnabled()) {
+    return {
+      ready: false,
+      reason: "Push notifications are disabled on the server",
+      subscriptionCount
+    };
+  }
+  if (subscriptionCount === 0) {
+    return {
+      ready: false,
+      reason: "No active push subscriptions",
+      subscriptionCount
+    };
+  }
+  return {
+    ready: true,
+    reason: "Ready to send push notifications",
+    subscriptionCount
+  };
 }
 
 function getThreadLiveState(threadId: string): {
   ownerClientId: string | null;
-  conversationState: unknown;
+  conversationState: ThreadConversationState | null;
 } {
   const rawEvents = streamEventsByThreadId.get(threadId) ?? [];
   if (rawEvents.length === 0) {
@@ -660,15 +899,20 @@ ipcClient.onFrame((frame) => {
   });
 
   if (frame.type === "broadcast" && frame.method === "thread-stream-state-changed") {
-    const params = frame.params;
-    if (!params || typeof params !== "object") {
+    let parsedBroadcast;
+    try {
+      parsedBroadcast = parseThreadStreamStateChangedBroadcast(frame);
+    } catch (error) {
+      logger.warn(
+        {
+          error: toErrorMessage(error)
+        },
+        "invalid-thread-stream-event"
+      );
       return;
     }
 
-    const conversationId = (params as Record<string, unknown>)["conversationId"];
-    if (typeof conversationId !== "string" || !conversationId.trim()) {
-      return;
-    }
+    const conversationId = parsedBroadcast.params.conversationId;
 
     if (frame.sourceClientId && frame.sourceClientId.trim()) {
       const ownerClientId = frame.sourceClientId.trim();
@@ -681,6 +925,38 @@ ipcClient.onFrame((frame) => {
       current.splice(0, current.length - 400);
     }
     streamEventsByThreadId.set(conversationId, current);
+
+    const liveState = getThreadLiveState(conversationId);
+    const candidate = completionDetector.detect(conversationId, liveState.conversationState);
+    if (!candidate) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const result = await notifyCompletion(candidate);
+        if (!result.canCommitWatermark) {
+          pushSystem("Push delivery failed for all subscriptions; completion watermark not updated", {
+            threadId: candidate.threadId,
+            turnId: candidate.turnId,
+            attempted: result.attempted,
+            failures: result.failures
+          });
+          return;
+        }
+        completionDetector.commit(candidate.threadId, candidate.marker);
+        pushStore.setCompletionWatermark(candidate.threadId, candidate.marker);
+      } catch (error) {
+        logger.error(
+          {
+            threadId: candidate.threadId,
+            turnId: candidate.turnId,
+            error: toErrorMessage(error)
+          },
+          "push-notify-failed"
+        );
+      }
+    })();
   }
 });
 
@@ -720,12 +996,135 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname.startsWith("/api/")) {
+      if (!requireApiAuth(req, res)) {
+        return;
+      }
+    }
+
     if (req.method === "GET" && pathname === "/api/health") {
       jsonResponse(res, 200, {
         ok: true,
         state: getRuntimeStateSnapshot()
       });
       return;
+    }
+
+    if (pathname.startsWith("/api/push")) {
+      if (req.method === "GET" && pathname === "/api/push/status") {
+        jsonResponse(res, 200, {
+          ok: true,
+          enabled: pushService.isEnabled(),
+          permissionRequired: true,
+          subscriptionCount: pushStore.getSubscriptionCount(),
+          privateModeDefault: PUSH_PRIVATE_MODE_DEFAULT
+        });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/push/vapid-public-key") {
+        if (!pushService.isEnabled()) {
+          jsonResponse(res, 409, {
+            ok: false,
+            error: "Push notifications are disabled"
+          });
+          return;
+        }
+
+        jsonResponse(res, 200, {
+          ok: true,
+          publicKey: pushService.getPublicKey()
+        });
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/push/subscriptions") {
+        if (!pushService.isEnabled()) {
+          jsonResponse(res, 409, {
+            ok: false,
+            error: "Push notifications are disabled"
+          });
+          return;
+        }
+
+        const body = parseBody(CreatePushSubscriptionBodySchema, await readJsonBody(req));
+        const settings = body.settings ?? {
+          privateMode: PUSH_PRIVATE_MODE_DEFAULT
+        };
+        const stored = pushStore.upsertSubscription(body.subscription, settings);
+        pushSystem("Push subscription saved", {
+          endpointHash: endpointHash(body.subscription.endpoint),
+          subscriptionId: stored.id,
+          privateMode: stored.settings.privateMode,
+          subscriptionCount: pushStore.getSubscriptionCount()
+        });
+
+        jsonResponse(res, 200, {
+          ok: true,
+          subscriptionId: stored.id
+        });
+        return;
+      }
+
+      if (req.method === "DELETE" && pathname === "/api/push/subscriptions") {
+        const body = parseBody(DeletePushSubscriptionBodySchema, await readJsonBody(req));
+        const deleted = pushStore.removeSubscriptionByEndpoint(body.endpoint);
+        pushSystem("Push subscription removed", {
+          endpointHash: endpointHash(body.endpoint),
+          deleted,
+          subscriptionCount: pushStore.getSubscriptionCount()
+        });
+
+        jsonResponse(res, 200, {
+          ok: true,
+          deleted
+        });
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/push/test") {
+        if (!pushService.isEnabled()) {
+          jsonResponse(res, 409, {
+            ok: false,
+            error: "Push notifications are disabled"
+          });
+          return;
+        }
+
+        const body = parseBody(PushTestBodySchema, await readJsonBody(req));
+        const readiness = getPushReadiness();
+        if (body.dryRun === true) {
+          jsonResponse(res, 200, {
+            ok: true,
+            dryRun: true,
+            ready: readiness.ready,
+            reason: readiness.reason,
+            attempted: readiness.subscriptionCount,
+            delivered: 0,
+            failures: 0
+          });
+          return;
+        }
+        const candidate: CompletionCandidate = {
+          threadId: body.threadId,
+          turnId: body.turnId,
+          marker: `test:${body.threadId}:${body.turnId}:${Date.now()}`,
+          agentMessageId: `test_${Date.now()}`,
+          agentText: body.body ?? "A response is ready in Farfield."
+        };
+
+        const result = await notifyCompletion(candidate);
+        jsonResponse(res, 200, {
+          ok: true,
+          dryRun: false,
+          ready: readiness.ready,
+          reason: readiness.reason,
+          attempted: result.attempted,
+          delivered: result.delivered,
+          failures: result.failures
+        });
+        return;
+      }
     }
 
     if (req.method === "POST" && pathname === "/api/threads") {
@@ -1368,10 +1767,24 @@ async function bootstrapConnections(): Promise<void> {
 
 async function start(): Promise<void> {
   ensureTraceDirectory();
+  requirePushConfiguration();
+  pushStore.load();
+  completionDetector = new CompletionDetector(
+    new Map(pushStore.listCompletionWatermarks().map((entry) => [entry.threadId, entry.marker]))
+  );
 
   pushSystem("Starting Codex monitor server", {
     appExecutable: runtimeState.appExecutable,
     socketPath: runtimeState.socketPath
+  });
+
+  pushSystem("Push subsystem ready", {
+    enabled: pushService.isEnabled(),
+    configured: runtimeState.pushConfigured,
+    requiresAuth: isApiAuthRequired(),
+    authConfigured: API_AUTH_TOKEN.length > 0 || LOOPBACK_HOSTS.has(HOST),
+    subscriptionCount: pushStore.getSubscriptionCount(),
+    watermarkCount: pushStore.listCompletionWatermarks().length
   });
 
   await new Promise<void>((resolve, reject) => {

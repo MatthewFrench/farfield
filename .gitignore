@@ -16,3 +16,9 @@ worker.js
 
 # Runtime logs
 *.log
+
+# Local environment
+.env.local
+
+# Runtime push state
+apps/server/push-state.json

@@ -3,18 +3,26 @@
   "private": true,
   "packageManager": "pnpm@10.29.3",
   "scripts": {
-    "dev": "pnpm --filter @farfield/protocol build && pnpm --filter @farfield/api build && pnpm --parallel --filter @farfield/server --filter @farfield/web dev",
-    "dev:remote": "pnpm --filter @farfield/protocol build && pnpm --filter @farfield/api build && pnpm --parallel --filter @farfield/server --filter @farfield/web dev:remote",
+    "dev": "node scripts/with-env.mjs \"pnpm --filter @farfield/protocol build && pnpm --filter @farfield/api build && pnpm --parallel --filter @farfield/server --filter @farfield/web dev\"",
+    "dev:remote": "node scripts/with-env.mjs \"pnpm --filter @farfield/protocol build && pnpm --filter @farfield/api build && pnpm --parallel --filter @farfield/server --filter @farfield/web dev:remote\"",
+    "dev:remote:https": "pnpm ios:local",
+    "ios:local": "node scripts/with-env.mjs \"node scripts/ios-local.mjs\"",
+    "setup:ios-push": "node scripts/setup-ios-push.mjs",
+    "rotate:api-token": "node scripts/rotate-api-token.mjs",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "sanitize:traces": "node scripts/sanitize-traces.mjs"
+    "sanitize:traces": "node scripts/sanitize-traces.mjs",
+    "push:keys": "node scripts/generate-vapid-keys.mjs",
+    "push:doctor": "node scripts/with-env.mjs \"node scripts/push-doctor.mjs\""
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "dotenv": "^16.6.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "web-push": "^3.6.7"
   }
 }

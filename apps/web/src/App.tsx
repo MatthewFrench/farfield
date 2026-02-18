@@ -8,6 +8,8 @@ import {
 import {
   Activity,
   ArrowDown,
+  Bell,
+  BellOff,
   Bug,
   Circle,
   CircleDot,
@@ -20,6 +22,7 @@ import {
   PanelLeft,
   Plus,
   RefreshCcw,
+  ShieldCheck,
   Sun,
   X
 } from "lucide-react";
@@ -30,6 +33,7 @@ import {
   getHistoryEntry,
   getLiveState,
   getPendingUserInputRequests,
+  getPushStatus,
   getStreamEvents,
   readThread,
   getTraceStatus,
@@ -41,6 +45,7 @@ import {
   markTrace,
   replayHistoryEntry,
   sendMessage,
+  sendPushTestNotification,
   setCollaborationMode,
   startTrace,
   stopTrace,
@@ -68,6 +73,13 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import {
+  disablePushNotifications,
+  enablePushNotifications,
+  getPushClientState,
+  updatePushSettings,
+  type PushClientState
+} from "@/lib/push";
 
 /* ── Types ─────────────────────────────────────────────────── */
 type Health = Awaited<ReturnType<typeof getHealth>>;
@@ -81,7 +93,17 @@ type TraceStatus = Awaited<ReturnType<typeof getTraceStatus>>;
 type HistoryResponse = Awaited<ReturnType<typeof listDebugHistory>>;
 type HistoryDetail = Awaited<ReturnType<typeof getHistoryEntry>>;
 type PendingRequest = ReturnType<typeof getPendingUserInputRequests>[number];
+type PushStatusResponse = Awaited<ReturnType<typeof getPushStatus>>;
+type PushTestResponse = Awaited<ReturnType<typeof sendPushTestNotification>>;
 type Thread = ThreadsResponse["data"][number];
+type AppTab = "chat" | "debug" | "preflight";
+
+interface PreflightCheck {
+  id: string;
+  label: string;
+  ready: boolean;
+  detail: string;
+}
 
 /* ── Helpers ────────────────────────────────────────────────── */
 function formatDate(value: number | string | null | undefined): string {
@@ -238,7 +260,7 @@ function writeSidebarCollapsedGroupsToStorage(value: Record<string, boolean>): v
   }
 }
 
-function parseUiStateFromPath(pathname: string): { threadId: string | null; tab: "chat" | "debug" } {
+function parseUiStateFromPath(pathname: string): { threadId: string | null; tab: AppTab } {
   const segments = pathname.split("/").filter((segment) => segment.length > 0);
   if (segments.length === 0) {
     return { threadId: null, tab: "chat" };
@@ -246,22 +268,37 @@ function parseUiStateFromPath(pathname: string): { threadId: string | null; tab:
   if (segments.length === 1 && segments[0] === "debug") {
     return { threadId: null, tab: "debug" };
   }
+  if (segments.length === 1 && segments[0] === "preflight") {
+    return { threadId: null, tab: "preflight" };
+  }
   if (segments[0] === "threads" && typeof segments[1] === "string" && segments[1].length > 0) {
     const threadId = decodeURIComponent(segments[1]);
     if (segments[2] === "debug") {
       return { threadId, tab: "debug" };
+    }
+    if (segments[2] === "preflight") {
+      return { threadId, tab: "preflight" };
     }
     return { threadId, tab: "chat" };
   }
   return { threadId: null, tab: "chat" };
 }
 
-function buildPathFromUiState(threadId: string | null, tab: "chat" | "debug"): string {
+function buildPathFromUiState(threadId: string | null, tab: AppTab): string {
   if (!threadId) {
-    return tab === "debug" ? "/debug" : "/";
+    if (tab === "debug") {
+      return "/debug";
+    }
+    if (tab === "preflight") {
+      return "/preflight";
+    }
+    return "/";
   }
   if (tab === "debug") {
     return `/threads/${encodeURIComponent(threadId)}/debug`;
+  }
+  if (tab === "preflight") {
+    return `/threads/${encodeURIComponent(threadId)}/preflight`;
   }
   return `/threads/${encodeURIComponent(threadId)}`;
 }
@@ -336,9 +373,21 @@ export function App(): React.JSX.Element {
   const [waitForReplayResponse, setWaitForReplayResponse] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
   const [answerDraft, setAnswerDraft] = useState<Record<string, { option: string; freeform: string }>>({});
+  const [pushStatus, setPushStatus] = useState<PushStatusResponse | null>(null);
+  const [pushClientState, setPushClientState] = useState<PushClientState>({
+    supported: false,
+    serviceWorkerRegistered: false,
+    permission: "unsupported",
+    subscribed: false
+  });
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushPrivateMode, setPushPrivateMode] = useState(true);
+  const [pushDryRunBusy, setPushDryRunBusy] = useState(false);
+  const [pushDryRunResult, setPushDryRunResult] = useState<PushTestResponse | null>(null);
+  const [pushDryRunError, setPushDryRunError] = useState("");
 
   /* UI state */
-  const [activeTab, setActiveTab] = useState<"chat" | "debug">(initialUiState.tab);
+  const [activeTab, setActiveTab] = useState<AppTab>(initialUiState.tab);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [isChatAtBottom, setIsChatAtBottom] = useState(true);
@@ -358,6 +407,7 @@ export function App(): React.JSX.Element {
   const chatContentRef = useRef<HTMLDivElement>(null);
   const lastAppliedModeSignatureRef = useRef("");
   const pendingMaterializationThreadIdsRef = useRef<Set<string>>(new Set());
+  const pushModeHydratedRef = useRef(false);
 
   /* Derived */
   const selectedThread = useMemo(
@@ -500,6 +550,96 @@ export function App(): React.JSX.Element {
     health?.state.ipcConnected === false ||
     health?.state.ipcInitialized === false;
   const allowEntryLayoutAnimations = !suppressEntryAnimations;
+  const pushServerEnabled = pushStatus?.enabled === true;
+  const pushSupported = pushClientState.supported;
+  const pushSubscribed = pushClientState.subscribed;
+  const pushServiceWorkerRegistered = pushClientState.serviceWorkerRegistered;
+  const pushPermission = pushClientState.permission;
+  const isSecureContextReady = typeof window !== "undefined" && window.isSecureContext;
+  const pushDryRunReady = pushDryRunResult?.ready === true;
+  const preflightChecks = useMemo<PreflightCheck[]>(() => {
+    return [
+      {
+        id: "secure-context",
+        label: "Secure origin",
+        ready: isSecureContextReady,
+        detail: isSecureContextReady
+          ? "HTTPS/secure context detected."
+          : "Open the app over HTTPS (required for iOS push)."
+      },
+      {
+        id: "push-support",
+        label: "Browser push support",
+        ready: pushSupported,
+        detail: pushSupported
+          ? "Push APIs are available."
+          : "Push APIs are unavailable in this browser context."
+      },
+      {
+        id: "service-worker",
+        label: "Service worker",
+        ready: pushServiceWorkerRegistered,
+        detail: pushServiceWorkerRegistered
+          ? "Service worker is registered."
+          : "Service worker is not registered yet."
+      },
+      {
+        id: "permission",
+        label: "Notification permission",
+        ready: pushPermission === "granted",
+        detail:
+          pushPermission === "granted"
+            ? "Notification permission granted."
+            : pushPermission === "denied"
+            ? "Permission denied in browser settings."
+            : pushPermission === "default"
+            ? "Permission has not been granted yet."
+            : "Notifications are unsupported in this browser context."
+      },
+      {
+        id: "subscription",
+        label: "Push subscription",
+        ready: pushSubscribed,
+        detail: pushSubscribed
+          ? "Browser is subscribed to push notifications."
+          : "No push subscription is active."
+      },
+      {
+        id: "server-status",
+        label: "Server push status",
+        ready: pushServerEnabled,
+        detail:
+          pushStatus === null
+            ? "Push status endpoint is unreachable or unauthorized."
+            : pushServerEnabled
+            ? "Server push is enabled."
+            : "Server push is disabled."
+      },
+      {
+        id: "server-dry-run",
+        label: "Server dry-run",
+        ready: pushDryRunReady,
+        detail: pushDryRunError
+          ? pushDryRunError
+          : pushDryRunResult
+          ? `${pushDryRunResult.reason} (subscriptions: ${String(pushDryRunResult.attempted)})`
+          : "Run dry-run check to verify server push path."
+      }
+    ];
+  }, [
+    isSecureContextReady,
+    pushDryRunError,
+    pushDryRunReady,
+    pushDryRunResult,
+    pushPermission,
+    pushServerEnabled,
+    pushServiceWorkerRegistered,
+    pushStatus,
+    pushSubscribed,
+    pushSupported
+  ]);
+  const preflightReadyCount = preflightChecks.filter((check) => check.ready).length;
+  const preflightReady = preflightChecks.every((check) => check.ready);
 
   /* Data loading */
   const loadCoreData = useCallback(async () => {
@@ -526,6 +666,31 @@ export function App(): React.JSX.Element {
       const nonPlanDefault = nm.data.find((mode) => !isPlanModeOption(mode));
       return nonPlanDefault?.mode ?? nm.data[0]?.mode ?? "";
     });
+  }, []);
+
+  const loadPushData = useCallback(async () => {
+    try {
+      const client = await getPushClientState();
+      setPushClientState(client);
+    } catch {
+      setPushClientState({
+        supported: false,
+        serviceWorkerRegistered: false,
+        permission: "unsupported",
+        subscribed: false
+      });
+    }
+
+    try {
+      const status = await getPushStatus();
+      setPushStatus(status);
+      if (!pushModeHydratedRef.current) {
+        setPushPrivateMode(status.privateModeDefault);
+        pushModeHydratedRef.current = true;
+      }
+    } catch {
+      setPushStatus(null);
+    }
   }, []);
 
   const loadSelectedThread = useCallback(async (threadId: string) => {
@@ -556,11 +721,94 @@ export function App(): React.JSX.Element {
     try {
       setError("");
       await loadCoreData();
+      await loadPushData();
       if (selectedThreadIdRef.current) await loadSelectedThread(selectedThreadIdRef.current);
     } catch (e) {
       setError(toErrorMessage(e));
     }
-  }, [loadCoreData, loadSelectedThread]);
+  }, [loadCoreData, loadPushData, loadSelectedThread]);
+
+  const togglePushSubscription = useCallback(async () => {
+    setPushBusy(true);
+    try {
+      if (pushSubscribed) {
+        await disablePushNotifications();
+      } else {
+        await enablePushNotifications({
+          privateMode: pushPrivateMode
+        });
+      }
+      await loadPushData();
+    } catch (e) {
+      setError(toErrorMessage(e));
+    } finally {
+      setPushBusy(false);
+    }
+  }, [loadPushData, pushPrivateMode, pushSubscribed]);
+
+  const togglePushPrivateMode = useCallback(async () => {
+    const nextPrivateMode = !pushPrivateMode;
+    const previousPrivateMode = pushPrivateMode;
+    setPushPrivateMode(nextPrivateMode);
+    if (!pushSubscribed) {
+      return;
+    }
+
+    setPushBusy(true);
+    try {
+      await updatePushSettings({
+        privateMode: nextPrivateMode
+      });
+      await loadPushData();
+    } catch (e) {
+      setPushPrivateMode(previousPrivateMode);
+      setError(toErrorMessage(e));
+    } finally {
+      setPushBusy(false);
+    }
+  }, [loadPushData, pushPrivateMode, pushSubscribed]);
+
+  const sendPushTest = useCallback(async () => {
+    if (!selectedThreadId) {
+      setError("Select a thread to send a test notification");
+      return;
+    }
+
+    setPushBusy(true);
+    try {
+      await sendPushTestNotification({
+        threadId: selectedThreadId,
+        turnId: `test-${Date.now()}`,
+        body: "Test notification from Farfield."
+      });
+    } catch (e) {
+      setError(toErrorMessage(e));
+    } finally {
+      setPushBusy(false);
+    }
+  }, [selectedThreadId]);
+
+  const runPushDryRunCheck = useCallback(async () => {
+    setPushDryRunBusy(true);
+    try {
+      const result = await sendPushTestNotification({
+        threadId: selectedThreadId ?? "preflight-thread",
+        turnId: `preflight-${Date.now()}`,
+        dryRun: true
+      });
+      setPushDryRunResult(result);
+      setPushDryRunError("");
+    } catch (e) {
+      setPushDryRunResult(null);
+      setPushDryRunError(toErrorMessage(e));
+    } finally {
+      setPushDryRunBusy(false);
+    }
+  }, [selectedThreadId]);
+
+  const refreshPreflightChecks = useCallback(async () => {
+    await Promise.all([loadPushData(), runPushDryRunCheck()]);
+  }, [loadPushData, runPushDryRunCheck]);
 
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
@@ -591,11 +839,19 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     coreRefreshIntervalRef.current = window.setInterval(() => {
       void loadCoreData().catch((e) => setError(toErrorMessage(e)));
+      void loadPushData();
     }, 5000);
     return () => {
       if (coreRefreshIntervalRef.current) window.clearInterval(coreRefreshIntervalRef.current);
     };
-  }, [loadCoreData]);
+  }, [loadCoreData, loadPushData]);
+
+  useEffect(() => {
+    if (activeTab !== "preflight") {
+      return;
+    }
+    void runPushDryRunCheck();
+  }, [activeTab, runPushDryRunCheck]);
 
   useEffect(() => {
     if (!selectedThreadId) {
@@ -1186,6 +1442,13 @@ export function App(): React.JSX.Element {
             >
               <Bug size={14} />
             </IconBtn>
+            <IconBtn
+              onClick={() => setActiveTab(activeTab === "preflight" ? "chat" : "preflight")}
+              active={activeTab === "preflight"}
+              title="Preflight"
+            >
+              <ShieldCheck size={14} />
+            </IconBtn>
             <IconBtn onClick={toggleTheme} title="Toggle theme">
               {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
             </IconBtn>
@@ -1430,12 +1693,107 @@ export function App(): React.JSX.Element {
                     >
                       <Loader2 size={10} className={isModeSyncing ? "animate-spin" : ""} />
                     </span>
+                    <Button
+                      type="button"
+                      onClick={() => void togglePushSubscription()}
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 shrink-0 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                      disabled={
+                        pushBusy ||
+                        !pushSupported ||
+                        (!pushServerEnabled && !pushSubscribed) ||
+                        (pushPermission === "denied" && !pushSubscribed)
+                      }
+                    >
+                      {pushSubscribed ? <BellOff size={10} /> : <Bell size={10} />}
+                      {pushSubscribed ? "Disable Notifs" : "Enable Notifs"}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void togglePushPrivateMode()}
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 shrink-0 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                      disabled={pushBusy || !pushSupported || (pushSubscribed && !pushServerEnabled)}
+                    >
+                      {pushPrivateMode ? "Private" : "Detailed"}
+                    </Button>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {pushSupported
+                        ? pushServerEnabled
+                          ? `notif:${pushPermission}`
+                          : "notif:server-off"
+                        : "notif:unsupported"}
+                    </span>
                     {pendingRequests.length > 0 && (
                       <span className="shrink-0 text-xs text-amber-500 dark:text-amber-400">
                         {pendingRequests.length} pending
                       </span>
                     )}
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Preflight tab ─────────────────────────────────── */}
+        {activeTab === "preflight" && (
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold">Push preflight</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {preflightReadyCount} of {preflightChecks.length} checks ready
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                      preflightReady
+                        ? "bg-success/15 text-success"
+                        : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                    }`}
+                  >
+                    {preflightReady ? "background push ready" : "not ready"}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={pushDryRunBusy}
+                    onClick={() => void refreshPreflightChecks()}
+                  >
+                    {pushDryRunBusy ? "Checking..." : "Refresh checks"}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-card">
+                <div className="divide-y divide-border">
+                  {preflightChecks.map((check) => (
+                    <div
+                      key={check.id}
+                      className="flex items-start justify-between gap-3 px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium">{check.label}</div>
+                        <div className="text-xs text-muted-foreground">{check.detail}</div>
+                      </div>
+                      <span
+                        className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          check.ready
+                            ? "bg-success/15 text-success"
+                            : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        {check.ready ? "ready" : "action needed"}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1587,6 +1945,16 @@ export function App(): React.JSX.Element {
                         {btn}
                       </Button>
                     ))}
+                    <Button
+                      type="button"
+                      onClick={() => void sendPushTest()}
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      disabled={pushBusy || !pushSupported || !pushServerEnabled || !selectedThreadId}
+                    >
+                      Push test
+                    </Button>
                   </div>
                 </div>
 

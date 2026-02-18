@@ -1,0 +1,69 @@
+name: iOS Setup Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  setup-scripts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run setup wizard non-interactive
+        run: pnpm setup:ios-push
+
+      - name: Validate generated env file
+        run: |
+          test -f .env.local
+          rg -n "^PUSH_ENABLED=true$" .env.local
+          rg -n "^PUSH_VAPID_PUBLIC_KEY=.+" .env.local
+          rg -n "^PUSH_VAPID_PRIVATE_KEY=.+" .env.local
+          rg -n "^PUSH_VAPID_SUBJECT=.+" .env.local
+          rg -n "^API_TOKEN=.+" .env.local
+          rg -n "^PUSH_DOCTOR_TOKEN=.+" .env.local
+
+      - name: Rotate API token
+        run: |
+          old_token="$(grep '^API_TOKEN=' .env.local | cut -d'=' -f2-)"
+          pnpm rotate:api-token
+          new_token="$(grep '^API_TOKEN=' .env.local | cut -d'=' -f2-)"
+          doctor_token="$(grep '^PUSH_DOCTOR_TOKEN=' .env.local | cut -d'=' -f2-)"
+          test -n "$old_token"
+          test -n "$new_token"
+          test "$old_token" != "$new_token"
+          test "$new_token" = "$doctor_token"
+
+      - name: Validate script syntax
+        run: |
+          node --check scripts/with-env.mjs
+          node --check scripts/setup-ios-push.mjs
+          node --check scripts/rotate-api-token.mjs
+          node --check scripts/ios-local.mjs
+          node --check scripts/push-doctor.mjs
+
+      - name: Validate Caddy local config
+        run: |
+          rg -n "^https://.+\\{$" ops/caddy/Caddyfile.local
+          rg -n "header_up X-Farfield-Token \\{env.API_TOKEN\\}" ops/caddy/Caddyfile.local
+
+      - name: Verify env autoload helper
+        run: node scripts/with-env.mjs "node -e \"if (!process.env.API_TOKEN) { process.exit(1); }\""

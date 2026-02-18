@@ -1,4 +1,8 @@
-import { CollaborationModeSchema } from "@farfield/protocol";
+import {
+  CollaborationModeSchema,
+  CreatePushSubscriptionBodySchema,
+  DeletePushSubscriptionBodySchema
+} from "@farfield/protocol";
 import { z } from "zod";
 
 export const SetModeBodySchema = z
@@ -61,6 +65,18 @@ export const ReplayBodySchema = z
     waitForResponse: z.boolean().optional()
   })
   .strict();
+
+export const PushTestBodySchema = z
+  .object({
+    threadId: z.string().min(1),
+    turnId: z.string().min(1),
+    title: z.string().min(1).max(120).optional(),
+    body: z.string().max(500).optional(),
+    dryRun: z.boolean().optional()
+  })
+  .strict();
+
+export { CreatePushSubscriptionBodySchema, DeletePushSubscriptionBodySchema };
 
 export function parseBody<Schema extends z.ZodTypeAny>(
   schema: Schema,

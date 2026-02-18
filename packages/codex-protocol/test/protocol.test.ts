@@ -4,10 +4,13 @@ import {
   parseAppServerListModelsResponse,
   parseAppServerCollaborationModeListResponse,
   parseAppServerStartThreadResponse,
+  parseCreatePushSubscriptionBody,
   parseIpcFrame,
+  parsePushStateStore,
   parseThreadConversationState,
   parseThreadStreamStateChangedBroadcast,
-  parseUserInputResponsePayload
+  parseUserInputResponsePayload,
+  parseVapidPublicKeyResponse
 } from "../src/index.js";
 
 describe("codex-protocol schemas", () => {
@@ -540,5 +543,87 @@ describe("codex-protocol schemas", () => {
 
     expect(parsed.thread.id).toBe("thread-456");
     expect(parsed.model).toBe("gpt-5.3-codex");
+  });
+
+  it("parses create push subscription body", () => {
+    const parsed = parseCreatePushSubscriptionBody({
+      subscription: {
+        endpoint: "https://example.push.service/subscription-id",
+        keys: {
+          p256dh: "BElidedKeyMaterial_123",
+          auth: "CAuthValue_456"
+        }
+      },
+      settings: {
+        privateMode: true
+      }
+    });
+
+    expect(parsed.settings?.privateMode).toBe(true);
+  });
+
+  it("rejects create push subscription body with unknown fields", () => {
+    expect(() =>
+      parseCreatePushSubscriptionBody({
+        subscription: {
+          endpoint: "https://example.push.service/subscription-id",
+          keys: {
+            p256dh: "BElidedKeyMaterial_123",
+            auth: "CAuthValue_456"
+          }
+        },
+        extra: true
+      })
+    ).toThrowError(/CreatePushSubscriptionBody did not match expected schema/);
+  });
+
+  it("parses push state store payload", () => {
+    const parsed = parsePushStateStore({
+      version: 1,
+      subscriptions: [
+        {
+          id: "sub_1",
+          subscription: {
+            endpoint: "https://example.push.service/subscription-id",
+            keys: {
+              p256dh: "BElidedKeyMaterial_123",
+              auth: "CAuthValue_456"
+            }
+          },
+          settings: {
+            privateMode: true
+          },
+          createdAt: "2026-02-18T00:00:00.000Z",
+          updatedAt: "2026-02-18T00:00:00.000Z"
+        }
+      ],
+      completionWatermarks: [
+        {
+          threadId: "thread_1",
+          marker: "turn_1:item_1"
+        }
+      ]
+    });
+
+    expect(parsed.subscriptions[0]?.id).toBe("sub_1");
+    expect(parsed.completionWatermarks[0]?.threadId).toBe("thread_1");
+  });
+
+  it("rejects unsupported push state store version", () => {
+    expect(() =>
+      parsePushStateStore({
+        version: 2,
+        subscriptions: [],
+        completionWatermarks: []
+      })
+    ).toThrowError(/Unsupported push state version/);
+  });
+
+  it("parses vapid public key response", () => {
+    const parsed = parseVapidPublicKeyResponse({
+      publicKey: "BElidedPublicKey_123"
+    });
+
+    expect(parsed.publicKey).toBe("BElidedPublicKey_123");
   });
 });
