@@ -9,6 +9,7 @@ import {
   parseIpcFrame,
   parsePushNotificationPayload,
   parsePushLocalCaStatusResponse,
+  parsePushSendLatestResponse,
   parsePushReceiptStore,
   parsePushStateStore,
   parseThreadConversationState,
@@ -722,6 +723,23 @@ describe("codex-protocol schemas", () => {
 
     expect(parsed.receipts.length).toBe(1);
     expect(parsed.receipts[0]?.event).toBe("shown");
+  });
+
+  it("parses latest push send response", () => {
+    const parsed = parsePushSendLatestResponse({
+      latest: {
+        notificationId: "notif_send_1",
+        threadId: "thread_1",
+        turnId: "turn_1",
+        sentAt: "2026-02-18T00:00:00.000Z",
+        attempted: 2,
+        delivered: 1,
+        failures: 1
+      }
+    });
+
+    expect(parsed.latest?.notificationId).toBe("notif_send_1");
+    expect(parsed.latest?.attempted).toBe(2);
   });
 
   it("migrates legacy push receipt store payload", () => {

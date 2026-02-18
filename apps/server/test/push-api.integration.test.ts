@@ -10,6 +10,7 @@ import {
   PushLocalCaStatusResponseSchema,
   PushReceiptCreateResponseSchema,
   PushReceiptLatestResponseSchema,
+  PushSendLatestResponseSchema,
   PushStatusResponseSchema
 } from "@farfield/protocol";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -89,6 +90,13 @@ const PUSH_RECEIPT_LATEST_ENVELOPE_SCHEMA = z
     ok: z.literal(true)
   })
   .merge(PushReceiptLatestResponseSchema)
+  .strict();
+
+const PUSH_SEND_LATEST_ENVELOPE_SCHEMA = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(PushSendLatestResponseSchema)
   .strict();
 
 const PUSH_LOCAL_CA_STATUS_ENVELOPE_SCHEMA = z
@@ -249,6 +257,10 @@ describe("push API auth and subscription routes", () => {
     expect(unauthenticatedPushReceiptLatest.status).toBe(401);
     API_ERROR_SCHEMA.parse(await unauthenticatedPushReceiptLatest.json());
 
+    const unauthenticatedPushSendLatest = await fetch(`${baseUrl}/api/push/sends/latest`);
+    expect(unauthenticatedPushSendLatest.status).toBe(401);
+    API_ERROR_SCHEMA.parse(await unauthenticatedPushSendLatest.json());
+
     const unauthenticatedLocalCaStatus = await fetch(`${baseUrl}/api/push/local-ca`);
     expect(unauthenticatedLocalCaStatus.status).toBe(401);
     API_ERROR_SCHEMA.parse(await unauthenticatedLocalCaStatus.json());
@@ -329,6 +341,29 @@ describe("push API auth and subscription routes", () => {
     expect(parsedDryRunAfterCreate.dryRun).toBe(true);
     expect(parsedDryRunAfterCreate.ready).toBe(true);
     expect(parsedDryRunAfterCreate.attempted).toBe(1);
+
+    const pushSendResponse = await fetch(`${baseUrl}/api/push/test`, {
+      method: "POST",
+      headers: authHeaders(true),
+      body: JSON.stringify({
+        threadId: "thread_preflight",
+        turnId: "turn_timeline"
+      })
+    });
+    expect(pushSendResponse.status).toBe(200);
+    const parsedPushSend = PUSH_TEST_ENVELOPE_SCHEMA.parse(await pushSendResponse.json());
+    expect(parsedPushSend.dryRun).toBe(false);
+    expect(parsedPushSend.attempted).toBeGreaterThanOrEqual(1);
+
+    const latestSendResponse = await fetch(`${baseUrl}/api/push/sends/latest`, {
+      headers: authHeaders(false)
+    });
+    expect(latestSendResponse.status).toBe(200);
+    const parsedLatestSend = PUSH_SEND_LATEST_ENVELOPE_SCHEMA.parse(await latestSendResponse.json());
+    expect(parsedLatestSend.latest?.notificationId.startsWith("notif_")).toBe(true);
+    expect(parsedLatestSend.latest?.threadId).toBe("thread_preflight");
+    expect(parsedLatestSend.latest?.turnId).toBe("turn_timeline");
+    expect(parsedLatestSend.latest?.attempted).toBeGreaterThanOrEqual(1);
 
     const createReceiptResponse = await fetch(`${baseUrl}/api/push/receipts`, {
       method: "POST",

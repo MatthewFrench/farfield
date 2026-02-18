@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
@@ -47,6 +48,8 @@ function commandExists(command) {
   return result.status === 0;
 }
 
+const hasLsofCommand = commandExists("lsof");
+
 function printPrerequisiteError(title, lines) {
   process.stderr.write(`[ios:local] ${title}\n`);
   for (const line of lines) {
@@ -66,7 +69,7 @@ function startChild(command, args, label, useProcessGroup = false) {
 }
 
 function listListeningProcesses(port) {
-  if (!commandExists("lsof")) {
+  if (!hasLsofCommand) {
     return [];
   }
 
@@ -84,15 +87,56 @@ function listListeningProcesses(port) {
   return lines.slice(1).map((line) => line.trim().replace(/\s+/g, " "));
 }
 
-function ensurePortIsAvailable(port, label) {
+async function probePortBinding(port) {
+  return await new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", (error) => {
+      resolve({
+        available: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+    server.listen(port, "0.0.0.0", () => {
+      server.close((closeError) => {
+        if (closeError) {
+          resolve({
+            available: false,
+            error: closeError instanceof Error ? closeError.message : String(closeError)
+          });
+          return;
+        }
+        resolve({
+          available: true,
+          error: ""
+        });
+      });
+    });
+  });
+}
+
+async function ensurePortIsAvailable(port, label) {
   const listeners = listListeningProcesses(port);
-  if (listeners.length === 0) {
+  if (listeners.length > 0) {
+    printPrerequisiteError(`${label} port ${String(port)} is already in use.`, [
+      "Stop existing listeners, then retry:",
+      ...listeners.map((line) => `  ${line}`)
+    ]);
+    process.exit(1);
+  }
+
+  if (hasLsofCommand || port < 1024) {
     return;
   }
 
-  printPrerequisiteError(`${label} port ${String(port)} is already in use.`, [
-    "Stop existing listeners, then retry:",
-    ...listeners.map((line) => `  ${line}`)
+  const probe = await probePortBinding(port);
+  if (probe.available) {
+    return;
+  }
+
+  printPrerequisiteError(`${label} port ${String(port)} appears unavailable.`, [
+    "Port probe failed before startup:",
+    `  ${probe.error}`,
+    "Stop existing listeners, then retry."
   ]);
   process.exit(1);
 }
@@ -216,10 +260,10 @@ if (caddyExecutable === "caddy" && !commandExists("caddy")) {
   process.exit(1);
 }
 
-ensurePortIsAvailable(backendPort, "Backend");
-ensurePortIsAvailable(frontendPort, "Frontend");
-ensurePortIsAvailable(caddyHttpPort, "Caddy HTTP");
-ensurePortIsAvailable(caddyHttpsPort, "Caddy HTTPS");
+await ensurePortIsAvailable(backendPort, "Backend");
+await ensurePortIsAvailable(frontendPort, "Frontend");
+await ensurePortIsAvailable(caddyHttpPort, "Caddy HTTP");
+await ensurePortIsAvailable(caddyHttpsPort, "Caddy HTTPS");
 
 const packageManagerCommand = resolvePackageManagerCommand(pnpmExecPath);
 devProcess = startChild(packageManagerCommand.command, packageManagerCommand.args, packageManagerCommand.label, true);

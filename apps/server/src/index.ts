@@ -23,6 +23,7 @@ import {
   type IpcFrame,
   type PushNotificationPayload,
   type PushReceipt,
+  type PushSendSummary,
   type ThreadConversationState,
   parseThreadStreamStateChangedBroadcast,
   parseUserInputResponsePayload
@@ -259,6 +260,7 @@ const threadOwnerById = new Map<string, string>();
 const streamEventsByThreadId = new Map<string, IpcFrame[]>();
 
 const sseClients = new Set<ServerResponse>();
+let latestPushSend: PushSendSummary | null = null;
 
 let activeTrace: ActiveTrace | null = null;
 const recentTraces: TraceSummary[] = [];
@@ -579,6 +581,12 @@ function recordPushReceipt(receipt: PushReceipt): void {
   pushReceiptStore.add(receipt);
 }
 
+function recordLatestPushSend(summary: PushSendSummary): void {
+  latestPushSend = {
+    ...summary
+  };
+}
+
 function getLocalCaStatus(): {
   available: boolean;
   downloadPath: string | null;
@@ -748,6 +756,7 @@ async function notifyCompletion(candidate: CompletionCandidate): Promise<{
   let attempted = 0;
   let delivered = 0;
   let failures = 0;
+  const sentAt = new Date().toISOString();
   const notificationId = buildNotificationId(candidate);
 
   for (const batch of batches) {
@@ -777,6 +786,16 @@ async function notifyCompletion(candidate: CompletionCandidate): Promise<{
       failures: result.failures.length
     });
   }
+
+  recordLatestPushSend({
+    notificationId,
+    threadId: candidate.threadId,
+    turnId: candidate.turnId,
+    sentAt,
+    attempted,
+    delivered,
+    failures
+  });
 
   return {
     attempted,
@@ -1262,6 +1281,14 @@ const server = http.createServer(async (req, res) => {
           ok: true,
           latest,
           count: pushReceiptStore.getCount()
+        });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/push/sends/latest") {
+        jsonResponse(res, 200, {
+          ok: true,
+          latest: latestPushSend
         });
         return;
       }

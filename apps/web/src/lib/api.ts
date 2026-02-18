@@ -9,6 +9,7 @@ import {
   AppServerStartThreadResponseSchema,
   CreatePushSubscriptionResponseSchema,
   PushLocalCaStatusResponseSchema,
+  PushSendLatestResponseSchema,
   PushStatusResponseSchema,
   PushReceiptLatestResponseSchema,
   type CollaborationMode,
@@ -138,6 +139,13 @@ const PushReceiptLatestEnvelopeSchema = z
     ok: z.literal(true)
   })
   .merge(PushReceiptLatestResponseSchema)
+  .strict();
+
+const PushSendLatestEnvelopeSchema = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(PushSendLatestResponseSchema)
   .strict();
 
 const PushLocalCaStatusEnvelopeSchema = z
@@ -399,6 +407,11 @@ export async function getPushVapidPublicKey(): Promise<z.infer<typeof PushVapidP
 export async function getLatestPushReceipt(): Promise<z.infer<typeof PushReceiptLatestEnvelopeSchema>> {
   const data = await request("/api/push/receipts/latest");
   return PushReceiptLatestEnvelopeSchema.parse(data);
+}
+
+export async function getLatestPushSend(): Promise<z.infer<typeof PushSendLatestEnvelopeSchema>> {
+  const data = await request("/api/push/sends/latest");
+  return PushSendLatestEnvelopeSchema.parse(data);
 }
 
 export async function getPushLocalCaStatus(): Promise<z.infer<typeof PushLocalCaStatusEnvelopeSchema>> {

@@ -153,6 +153,24 @@ export const PushReceiptLatestResponseSchema = z
   })
   .strict();
 
+export const PushSendSummarySchema = z
+  .object({
+    notificationId: NonEmptyStringSchema,
+    threadId: NonEmptyStringSchema,
+    turnId: NonEmptyStringSchema,
+    sentAt: z.string().datetime(),
+    attempted: NonNegativeIntSchema,
+    delivered: NonNegativeIntSchema,
+    failures: NonNegativeIntSchema
+  })
+  .strict();
+
+export const PushSendLatestResponseSchema = z
+  .object({
+    latest: PushSendSummarySchema.nullable()
+  })
+  .strict();
+
 export const PushReceiptStoreSchema = z
   .object({
     version: NonNegativeIntSchema,
@@ -225,6 +243,8 @@ export type CreatePushReceiptBody = z.infer<typeof CreatePushReceiptBodySchema>;
 export type PushReceipt = z.infer<typeof PushReceiptSchema>;
 export type PushReceiptCreateResponse = z.infer<typeof PushReceiptCreateResponseSchema>;
 export type PushReceiptLatestResponse = z.infer<typeof PushReceiptLatestResponseSchema>;
+export type PushSendSummary = z.infer<typeof PushSendSummarySchema>;
+export type PushSendLatestResponse = z.infer<typeof PushSendLatestResponseSchema>;
 export type PushReceiptStore = z.infer<typeof PushReceiptStoreSchema>;
 export type PushLocalCaStatusResponse = z.infer<typeof PushLocalCaStatusResponseSchema>;
 export type PushStatusResponse = z.infer<typeof PushStatusResponseSchema>;
@@ -267,6 +287,16 @@ export function parseCreatePushReceiptBody(value: z.input<typeof CreatePushRecei
   const result = CreatePushReceiptBodySchema.safeParse(value);
   if (!result.success) {
     throw ProtocolValidationError.fromZod("CreatePushReceiptBody", result.error);
+  }
+  return result.data;
+}
+
+export function parsePushSendLatestResponse(
+  value: z.input<typeof PushSendLatestResponseSchema>
+): PushSendLatestResponse {
+  const result = PushSendLatestResponseSchema.safeParse(value);
+  if (!result.success) {
+    throw ProtocolValidationError.fromZod("PushSendLatestResponse", result.error);
   }
   return result.data;
 }

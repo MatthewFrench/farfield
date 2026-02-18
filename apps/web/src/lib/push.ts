@@ -21,6 +21,16 @@ export interface PushSubscriptionReconcileResult {
   reason: string;
 }
 
+export interface PushRecoveryResult {
+  updatedServiceWorker: boolean;
+  subscribed: boolean;
+  subscriptionId: string;
+}
+
+interface WindowWithSwReloadSuppression extends Window {
+  __farfieldSuppressSwReload?: boolean;
+}
+
 const PUSH_AUTO_HEAL_STORAGE_KEY = "farfield.push.auto-heal-enabled.v1";
 
 function isPushSupported(): boolean {
@@ -71,6 +81,62 @@ function strictSubscriptionPayload(
       auth: raw.keys?.["auth"] ?? ""
     }
   });
+}
+
+function setServiceWorkerReloadSuppressed(suppressed: boolean): void {
+  const windowWithSuppression = window as WindowWithSwReloadSuppression;
+  if (suppressed) {
+    windowWithSuppression.__farfieldSuppressSwReload = true;
+    return;
+  }
+  delete windowWithSuppression.__farfieldSuppressSwReload;
+}
+
+async function waitForControllerChange(timeoutMs: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const onControllerChange = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      window.clearTimeout(timer);
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      resolve();
+    };
+    const timer = window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      resolve();
+    }, timeoutMs);
+
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+  });
+}
+
+async function activateWaitingServiceWorker(
+  registration: ServiceWorkerRegistration
+): Promise<boolean> {
+  const waitingWorker = registration.waiting;
+  if (!waitingWorker) {
+    return false;
+  }
+  const controllerChangePromise = waitForControllerChange(2_000);
+  waitingWorker.postMessage({ type: "SKIP_WAITING" });
+  await controllerChangePromise;
+  return true;
+}
+
+async function unregisterServiceWorkers(): Promise<void> {
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  await Promise.all(
+    registrations.map(async (registration) => {
+      await registration.unregister();
+    })
+  );
 }
 
 export async function getPushClientState(): Promise<PushClientState> {
@@ -261,4 +327,38 @@ export async function reconcilePushSubscription(input?: {
     repaired,
     reason: repaired ? "subscription-restored" : "subscription-confirmed"
   };
+}
+
+export async function recoverPushNotifications(input: {
+  privateMode: boolean;
+}): Promise<PushRecoveryResult> {
+  if (!isPushSupported()) {
+    throw new Error("Push notifications are not supported in this browser");
+  }
+
+  const registration = await registerPushServiceWorker();
+  const existingSubscription = await registration.pushManager.getSubscription();
+  if (existingSubscription) {
+    await deletePushSubscription({
+      endpoint: existingSubscription.endpoint
+    });
+    await existingSubscription.unsubscribe();
+  }
+
+  setServiceWorkerReloadSuppressed(true);
+  try {
+    const updatedServiceWorker = await activateWaitingServiceWorker(registration);
+    await unregisterServiceWorkers();
+    await registerPushServiceWorker();
+    const enabled = await enablePushNotifications({
+      privateMode: input.privateMode
+    });
+    return {
+      updatedServiceWorker,
+      subscribed: enabled.subscribed,
+      subscriptionId: enabled.subscriptionId
+    };
+  } finally {
+    setServiceWorkerReloadSuppressed(false);
+  }
 }

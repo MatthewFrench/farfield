@@ -28,6 +28,15 @@ interface NavigatorWithStandalone extends Navigator {
   standalone?: boolean;
 }
 
+interface WindowWithSwReloadSuppression extends Window {
+  __farfieldSuppressSwReload?: boolean;
+}
+
+function isServiceWorkerReloadSuppressed(): boolean {
+  const windowWithSuppression = window as WindowWithSwReloadSuppression;
+  return windowWithSuppression.__farfieldSuppressSwReload === true;
+}
+
 function publishBootStatus(detail: BootStatusDetail): void {
   window.dispatchEvent(new CustomEvent<BootStatusDetail>(BOOT_STATUS_EVENT_NAME, { detail }));
 }
@@ -188,6 +197,9 @@ if ("serviceWorker" in navigator) {
 
         navigator.serviceWorker.addEventListener("controllerchange", () => {
           if (didReloadAfterControllerChange) {
+            return;
+          }
+          if (isServiceWorkerReloadSuppressed()) {
             return;
           }
           didReloadAfterControllerChange = true;

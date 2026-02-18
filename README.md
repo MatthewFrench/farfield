@@ -106,9 +106,10 @@ Home Screen runtime behavior:
 - Push payloads include declarative metadata (`web_push.notification`) plus standard fields.
 - Push delivery uses retry with exponential backoff for transient provider/network errors.
 - Each push payload and receipt is correlated by `notificationId` for precise diagnostics.
+- Preflight shows send/receipt correlation and delivery lag for the latest `notificationId`.
 - Service worker update prompts appear in the header (`Update app`) when a new worker is ready.
 - Push receipts are recorded (`shown`, `clicked`, `error`) and surfaced in Preflight.
-- Preflight includes a `Reset push` action to re-register browser subscription state quickly.
+- Preflight includes a `Recover push` action to refresh worker + subscription state in one step.
 
 ### Local LAN HTTPS (same Wi-Fi)
 

@@ -32,6 +32,7 @@ import {
   getHealth,
   getHistoryEntry,
   getLatestPushReceipt,
+  getLatestPushSend,
   getLiveState,
   getPendingUserInputRequests,
   getPushLocalCaStatus,
@@ -80,6 +81,7 @@ import {
   enablePushNotifications,
   getPushClientState,
   reconcilePushSubscription,
+  recoverPushNotifications,
   updatePushSettings,
   type PushClientState
 } from "@/lib/push";
@@ -98,6 +100,7 @@ type HistoryDetail = Awaited<ReturnType<typeof getHistoryEntry>>;
 type PendingRequest = ReturnType<typeof getPendingUserInputRequests>[number];
 type PushStatusResponse = Awaited<ReturnType<typeof getPushStatus>>;
 type PushLatestReceiptResponse = Awaited<ReturnType<typeof getLatestPushReceipt>>;
+type PushLatestSendResponse = Awaited<ReturnType<typeof getLatestPushSend>>;
 type PushLocalCaStatusResponse = Awaited<ReturnType<typeof getPushLocalCaStatus>>;
 type PushTestResponse = Awaited<ReturnType<typeof sendPushTestNotification>>;
 type Thread = ThreadsResponse["data"][number];
@@ -119,6 +122,24 @@ function formatDate(value: number | string | null | undefined): string {
     return value;
   }
   return "";
+}
+
+function formatDurationMilliseconds(durationMs: number): string {
+  if (!Number.isFinite(durationMs) || durationMs < 0) {
+    return "unknown";
+  }
+  if (durationMs < 1_000) {
+    return `${String(Math.round(durationMs))}ms`;
+  }
+  if (durationMs < 60_000) {
+    return `${String((durationMs / 1_000).toFixed(durationMs < 10_000 ? 1 : 0))}s`;
+  }
+  const wholeMinutes = Math.floor(durationMs / 60_000);
+  const remainingSeconds = Math.round((durationMs % 60_000) / 1_000);
+  if (remainingSeconds === 0) {
+    return `${String(wholeMinutes)}m`;
+  }
+  return `${String(wholeMinutes)}m ${String(remainingSeconds)}s`;
 }
 
 function threadLabel(thread: Thread): string {
@@ -483,6 +504,7 @@ export function App(): React.JSX.Element {
   const [pushDryRunResult, setPushDryRunResult] = useState<PushTestResponse | null>(null);
   const [pushDryRunError, setPushDryRunError] = useState("");
   const [pushLatestReceipt, setPushLatestReceipt] = useState<PushLatestReceiptResponse["latest"] | null>(null);
+  const [pushLatestSend, setPushLatestSend] = useState<PushLatestSendResponse["latest"] | null>(null);
   const [pushLocalCaStatus, setPushLocalCaStatus] = useState<PushLocalCaStatusResponse | null>(null);
   const [serviceWorkerUpdateAvailable, setServiceWorkerUpdateAvailable] = useState(false);
 
@@ -685,6 +707,47 @@ export function App(): React.JSX.Element {
   const pushRequiresHomeScreenInstall = pushSupported && !isStandaloneDisplayMode;
   const requiresLocalCaTrust = isLocalPushHost(window.location.hostname);
   const pushLocalCaDownloadPath = pushLocalCaStatus?.downloadPath ?? null;
+  const pushReceiptSignal = useMemo(() => {
+    if (!pushLatestSend) {
+      if (!pushLatestReceipt) {
+        return {
+          ready: true,
+          detail: "No send recorded yet. Run Push test and tap notification."
+        };
+      }
+      return {
+        ready: pushLatestReceipt.event !== "error",
+        detail: `${pushLatestReceipt.event} [${pushLatestReceipt.notificationId}] at ${formatDate(pushLatestReceipt.createdAt)}${
+          pushLatestReceipt.message ? ` (${pushLatestReceipt.message})` : ""
+        }`
+      };
+    }
+
+    const sendSummary = `send [${pushLatestSend.notificationId}] at ${formatDate(pushLatestSend.sentAt)} (attempted: ${String(pushLatestSend.attempted)}, delivered: ${String(pushLatestSend.delivered)}, failures: ${String(pushLatestSend.failures)})`;
+    if (!pushLatestReceipt) {
+      return {
+        ready: false,
+        detail: `${sendSummary} - waiting for receipt`
+      };
+    }
+
+    if (pushLatestReceipt.notificationId !== pushLatestSend.notificationId) {
+      return {
+        ready: false,
+        detail: `${sendSummary} - latest receipt is ${pushLatestReceipt.event} [${pushLatestReceipt.notificationId}] at ${formatDate(pushLatestReceipt.createdAt)}`
+      };
+    }
+
+    const sentAtMs = Date.parse(pushLatestSend.sentAt);
+    const receiptAtMs = Date.parse(pushLatestReceipt.createdAt);
+    const lagMs = Number.isNaN(sentAtMs) || Number.isNaN(receiptAtMs) ? null : Math.max(0, receiptAtMs - sentAtMs);
+    const lagText = lagMs === null ? "" : ` after ${formatDurationMilliseconds(lagMs)}`;
+    const messageText = pushLatestReceipt.message ? ` (${pushLatestReceipt.message})` : "";
+    return {
+      ready: pushLatestReceipt.event !== "error",
+      detail: `${sendSummary} - ${pushLatestReceipt.event} at ${formatDate(pushLatestReceipt.createdAt)}${lagText}${messageText}`
+    };
+  }, [pushLatestReceipt, pushLatestSend]);
   const appShellStyle: React.CSSProperties = {
     paddingBottom: isStandaloneDisplayMode ? "env(safe-area-inset-bottom)" : "0px"
   };
@@ -780,12 +843,8 @@ export function App(): React.JSX.Element {
       {
         id: "receipt-signal",
         label: "Push receipt signal",
-        ready: pushLatestReceipt === null || pushLatestReceipt.event !== "error",
-        detail: pushLatestReceipt
-          ? `${pushLatestReceipt.event} [${pushLatestReceipt.notificationId}] at ${formatDate(pushLatestReceipt.createdAt)}${
-              pushLatestReceipt.message ? ` (${pushLatestReceipt.message})` : ""
-            }`
-          : "No receipt recorded yet. Send Push test and tap notification."
+        ready: pushReceiptSignal.ready,
+        detail: pushReceiptSignal.detail
       }
     ];
   }, [
@@ -796,6 +855,7 @@ export function App(): React.JSX.Element {
     pushDryRunResult,
     pushLocalCaStatus,
     pushLatestReceipt,
+    pushReceiptSignal,
     pushPermission,
     requiresLocalCaTrust,
     pushServerEnabled,
@@ -848,13 +908,15 @@ export function App(): React.JSX.Element {
     }
 
     try {
-      const [status, latestReceiptResponse, localCaStatus] = await Promise.all([
+      const [status, latestReceiptResponse, latestSendResponse, localCaStatus] = await Promise.all([
         getPushStatus(),
         getLatestPushReceipt(),
+        getLatestPushSend(),
         getPushLocalCaStatus()
       ]);
       setPushStatus(status);
       setPushLatestReceipt(latestReceiptResponse.latest);
+      setPushLatestSend(latestSendResponse.latest);
       setPushLocalCaStatus(localCaStatus);
       if (!pushModeHydratedRef.current) {
         setPushPrivateMode(status.privateModeDefault);
@@ -863,6 +925,7 @@ export function App(): React.JSX.Element {
     } catch {
       setPushStatus(null);
       setPushLatestReceipt(null);
+      setPushLatestSend(null);
       setPushLocalCaStatus(null);
     }
   }, []);
@@ -1004,13 +1067,11 @@ export function App(): React.JSX.Element {
     setPushResetBusy(true);
     setPushBusy(true);
     try {
-      if (pushSubscribed) {
-        await disablePushNotifications();
-      }
-      await enablePushNotifications({
+      await recoverPushNotifications({
         privateMode: pushPrivateMode
       });
       await Promise.all([loadPushData(), runPushDryRunCheck()]);
+      setServiceWorkerUpdateAvailable(false);
       setError("");
     } catch (e) {
       setError(toErrorMessage(e));
@@ -1018,7 +1079,7 @@ export function App(): React.JSX.Element {
       setPushBusy(false);
       setPushResetBusy(false);
     }
-  }, [loadPushData, pushPrivateMode, pushSubscribed, pushSupported, runPushDryRunCheck]);
+  }, [loadPushData, pushPrivateMode, pushSupported, runPushDryRunCheck]);
 
   const applyServiceWorkerUpdate = useCallback(async () => {
     if (!("serviceWorker" in navigator)) {
@@ -2120,7 +2181,7 @@ export function App(): React.JSX.Element {
                     }
                     onClick={() => void resetPushSubscription()}
                   >
-                    {pushResetBusy ? "Resetting..." : "Reset push"}
+                    {pushResetBusy ? "Recovering..." : "Recover push"}
                   </Button>
                   <Button
                     type="button"
