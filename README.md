@@ -67,6 +67,13 @@ If you want Home Screen install + iOS notifications on your iPhone:
 pnpm setup:ios-push
 ```
 
+When prompted for `Push contact subject`, use a real operator contact value:
+
+- `mailto:you@yourdomain.com` (recommended, including localhost/LAN testing)
+- or `https://yourdomain.com/contact`
+
+This value is part of VAPID Web Push identity and is not shown to end users.
+
 2. Start local HTTPS in one command:
 
 ```bash

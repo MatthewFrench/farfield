@@ -41,6 +41,28 @@ function normalizeHttpsAddress(value) {
   return `https://${trimmed}`;
 }
 
+function normalizePushContactSubject(value) {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new Error("Push contact subject cannot be empty");
+  }
+  if (trimmed.startsWith("mailto:")) {
+    const email = trimmed.slice("mailto:".length).trim();
+    if (email.length === 0 || !email.includes("@")) {
+      throw new Error(
+        "Push contact subject must be a valid mailto address, for example mailto:you@yourdomain.com"
+      );
+    }
+    return `mailto:${email}`;
+  }
+  if (trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+  throw new Error(
+    "Push contact subject must start with mailto: or https://, for example mailto:you@yourdomain.com"
+  );
+}
+
 function parseCaddySiteLine(configText) {
   const lines = configText.split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
@@ -153,7 +175,8 @@ if (fs.existsSync(caddyLocalPath)) {
 
 const detectedIp = detectLocalIpv4Address();
 const detectedAddress = detectedIp ? `https://${detectedIp}` : null;
-const defaultSubject = (existingEnv["PUSH_VAPID_SUBJECT"] ?? "mailto:you@example.com").trim() || "mailto:you@example.com";
+const defaultSubjectRaw = (existingEnv["PUSH_VAPID_SUBJECT"] ?? "mailto:you@example.com").trim() || "mailto:you@example.com";
+const defaultSubject = normalizePushContactSubject(defaultSubjectRaw);
 const currentAddress = caddySite?.address ? normalizeHttpsAddress(caddySite.address) : null;
 const sampleAddress = "https://192.168.1.50";
 const defaultAddress =
@@ -181,10 +204,14 @@ if (interactive) {
     if (detectedIp) {
       process.stdout.write(`- Detected LAN IP: ${detectedIp}\n`);
     }
+    process.stdout.write("- Push contact subject is only for Web Push operator contact and is not shown to users.\n");
+    process.stdout.write("- For localhost/LAN testing, use your real email, for example mailto:you@yourdomain.com.\n");
     selectedAddress = normalizeHttpsAddress(
       await askWithDefault(rl, "Local HTTPS host for iPhone (IP or hostname)", defaultAddress)
     );
-    selectedSubject = await askWithDefault(rl, "Push contact subject (mailto:...)", defaultSubject);
+    selectedSubject = normalizePushContactSubject(
+      await askWithDefault(rl, "Push contact subject (mailto:... or https://...)", defaultSubject)
+    );
     if (hasExistingVapid) {
       regenerateVapid = await askYesNo(rl, "Regenerate VAPID key pair", false);
     }
