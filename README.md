@@ -94,6 +94,19 @@ pnpm ios:local
 5. Add to Home Screen.
 6. Launch from Home Screen and click `Enable Notifs`.
 
+#### Trust Local Caddy Cert (one-time)
+
+1. On your Mac, open the Caddy CA folder:
+
+```bash
+open "$HOME/Library/Application Support/Caddy/pki/authorities/local"
+```
+
+2. Send `root.crt` to iPhone (AirDrop or iCloud Files).
+3. On iPhone, install the profile from `Settings` -> `General` -> `VPN & Device Management`.
+4. Enable full trust in `Settings` -> `General` -> `About` -> `Certificate Trust Settings`.
+5. Re-open your `https://...` Farfield origin and confirm no certificate warning.
+
 ### Public Domain HTTPS
 
 1. Point DNS for your domain to the machine running Farfield.
