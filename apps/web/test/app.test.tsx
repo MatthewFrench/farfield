@@ -274,7 +274,7 @@ describe("App", () => {
     });
 
     render(<App />);
-    expect(await screen.findByText("Loading threads...")).toBeTruthy();
+    expect((await screen.findAllByText("Loading threads...")).length).toBeGreaterThan(0);
 
     releaseThreadsDelay?.();
     threadsDelayPromise = null;

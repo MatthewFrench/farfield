@@ -2281,7 +2281,16 @@ export function App(): React.JSX.Element {
                 >
                   {turns.length === 0 ? (
                     <div className="text-center py-20 text-sm text-muted-foreground">
-                      {selectedThreadId ? "No messages yet" : "Select a thread from the sidebar"}
+                      {isCoreDataLoading && !selectedThread ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 size={12} className="animate-spin" />
+                          <span>Loading threads...</span>
+                        </span>
+                      ) : selectedThread ? (
+                        "No messages yet"
+                      ) : (
+                        "Select a thread from the sidebar"
+                      )}
                     </div>
                   ) : (
                     <motion.div layout={allowEntryLayoutAnimations} className="space-y-8">
