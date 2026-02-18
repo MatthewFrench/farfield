@@ -48,4 +48,14 @@ describe("API envelope parsing", () => {
 
     await expect(getDebugClientError("error_1")).rejects.toThrow("Nope");
   });
+
+  it("includes endpoint context when fetch throws before response", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(
+      new Error("The string did not match the expected pattern.")
+    );
+
+    await expect(getDebugClientError("error_1")).rejects.toThrow(
+      "Request failed for /api/debug/client-errors/error_1: The string did not match the expected pattern."
+    );
+  });
 });

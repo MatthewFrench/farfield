@@ -1070,11 +1070,18 @@ export function App(): React.JSX.Element {
   const loadCoreData = useCallback(async () => {
     setCoreDataLoadCount((current) => current + 1);
     setThreadsLoadCount((current) => current + 1);
-    const threadsPromise = listThreads({ limit: 80, archived: false, all: true, maxPages: 20 }).finally(() => {
+    const threadsPromise = listThreads({ limit: 80, archived: false, all: false, maxPages: 1 }).finally(() => {
       setThreadsLoadCount((current) => Math.max(0, current - 1));
     });
     try {
-      const [nh, nt, nmo, ntr, nhist, nce] = await Promise.all([
+      const [
+        healthResult,
+        threadsResult,
+        modelsResult,
+        traceStatusResult,
+        historyResult,
+        clientErrorsResult
+      ] = await Promise.allSettled([
         getHealth(),
         threadsPromise,
         listModels(),
@@ -1082,23 +1089,62 @@ export function App(): React.JSX.Element {
         listDebugHistory(120),
         listDebugClientErrors(120)
       ]);
-      setHealth(nh);
-      setThreads(nt.data);
-      setModels(nmo.data);
-      setTraceStatus(ntr);
-      setHistory(nhist.history);
-      setClientErrors(nce.data);
-      setClientErrorSessionLogPath(nce.sessionLogPath);
-      setSelectedThreadId((cur) => {
-        if (cur) return cur;
-        return nt.data[0]?.id ?? null;
-      });
-      setSelectedClientErrorId((cur) => {
-        if (cur && nce.data.some((entry) => entry.errorId === cur)) {
-          return cur;
-        }
-        return nce.data[0]?.errorId ?? "";
-      });
+      const errors: string[] = [];
+      const toReasonMessage = (reason: unknown): string =>
+        reason instanceof Error ? reason.message : String(reason);
+
+      if (healthResult.status === "fulfilled") {
+        setHealth(healthResult.value);
+      } else {
+        errors.push(`health: ${toReasonMessage(healthResult.reason)}`);
+      }
+
+      if (threadsResult.status === "fulfilled") {
+        const nextThreads = threadsResult.value.data;
+        setThreads(nextThreads);
+        setSelectedThreadId((cur) => {
+          if (cur) return cur;
+          return nextThreads[0]?.id ?? null;
+        });
+      } else {
+        errors.push(`threads: ${toReasonMessage(threadsResult.reason)}`);
+      }
+
+      if (modelsResult.status === "fulfilled") {
+        setModels(modelsResult.value.data);
+      } else {
+        errors.push(`models: ${toReasonMessage(modelsResult.reason)}`);
+      }
+
+      if (traceStatusResult.status === "fulfilled") {
+        setTraceStatus(traceStatusResult.value);
+      } else {
+        errors.push(`trace: ${toReasonMessage(traceStatusResult.reason)}`);
+      }
+
+      if (historyResult.status === "fulfilled") {
+        setHistory(historyResult.value.history);
+      } else {
+        errors.push(`history: ${toReasonMessage(historyResult.reason)}`);
+      }
+
+      if (clientErrorsResult.status === "fulfilled") {
+        const nextClientErrors = clientErrorsResult.value.data;
+        setClientErrors(nextClientErrors);
+        setClientErrorSessionLogPath(clientErrorsResult.value.sessionLogPath);
+        setSelectedClientErrorId((cur) => {
+          if (cur && nextClientErrors.some((entry) => entry.errorId === cur)) {
+            return cur;
+          }
+          return nextClientErrors[0]?.errorId ?? "";
+        });
+      } else {
+        errors.push(`client-errors: ${toReasonMessage(clientErrorsResult.reason)}`);
+      }
+
+      if (errors.length > 0) {
+        throw new Error(`Core data partial failure: ${errors[0]}`);
+      }
     } finally {
       setCoreDataLoadCount((current) => Math.max(0, current - 1));
     }

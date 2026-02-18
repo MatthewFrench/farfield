@@ -222,6 +222,7 @@ pnpm build       # Build all packages
 pnpm test        # Run all tests
 pnpm typecheck   # TypeScript type checking across all packages
 pnpm lint        # Lint all packages
+pnpm smoke:app   # Smoke-check key Farfield runtime endpoints
 ```
 
 Run a single app:

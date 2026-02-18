@@ -223,18 +223,43 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   const headers = new Headers(init?.headers);
   const token = readApiToken();
   if (token) {
-    headers.set("X-Farfield-Token", token);
+    try {
+      headers.set("X-Farfield-Token", token);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid X-Farfield-Token header value: ${message}`);
+    }
   }
-  const response = await fetch(path, {
-    ...init,
-    headers
-  });
-  const data = (await response.json()) as unknown;
-  const envelope = ApiEnvelopeSchema.parse(data);
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      headers
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Request failed for ${path}: ${message}`);
+  }
+
+  let data: unknown;
+  try {
+    data = (await response.json()) as unknown;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid JSON response from ${path}: ${message}`);
+  }
+
+  let envelope: z.infer<typeof ApiEnvelopeSchema>;
+  try {
+    envelope = ApiEnvelopeSchema.parse(data);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid API envelope from ${path}: ${message}`);
+  }
 
   if (!response.ok || envelope.ok === false) {
     const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
-    throw new Error(parsedError.success ? parsedError.data.error : "Request failed");
+    throw new Error(parsedError.success ? parsedError.data.error : `Request failed for ${path}`);
   }
 
   return data;
