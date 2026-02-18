@@ -1,5 +1,6 @@
 import {
   CollaborationModeSchema,
+  CreateDebugClientErrorBodySchema,
   CreatePushReceiptBodySchema,
   CreatePushSubscriptionBodySchema,
   DeletePushSubscriptionBodySchema
@@ -77,7 +78,12 @@ export const PushTestBodySchema = z
   })
   .strict();
 
-export { CreatePushReceiptBodySchema, CreatePushSubscriptionBodySchema, DeletePushSubscriptionBodySchema };
+export {
+  CreateDebugClientErrorBodySchema,
+  CreatePushReceiptBodySchema,
+  CreatePushSubscriptionBodySchema,
+  DeletePushSubscriptionBodySchema
+};
 
 export function parseBody<Schema extends z.ZodTypeAny>(
   schema: Schema,

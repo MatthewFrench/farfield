@@ -16,6 +16,7 @@ worker.js
 
 # Runtime logs
 *.log
+.runtime/
 
 # Local environment
 .env.local

@@ -1,8 +1,12 @@
 import {
   AppServerCollaborationModeListResponseSchema,
+  CreateDebugClientErrorBodySchema,
   CreatePushSubscriptionBodySchema,
   DeletePushSubscriptionBodySchema,
   DeletePushSubscriptionResponseSchema,
+  DebugErrorCreateResponseSchema,
+  DebugErrorDetailResponseSchema,
+  DebugErrorListResponseSchema,
   AppServerListModelsResponseSchema,
   AppServerListThreadsResponseSchema,
   AppServerReadThreadResponseSchema,
@@ -129,6 +133,27 @@ const HistoryDetailSchema = z
     entry: HistoryListSchema.shape.history.element,
     fullPayload: z.unknown()
   })
+  .strict();
+
+const DebugErrorCreateEnvelopeSchema = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(DebugErrorCreateResponseSchema)
+  .strict();
+
+const DebugErrorListEnvelopeSchema = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(DebugErrorListResponseSchema)
+  .strict();
+
+const DebugErrorDetailEnvelopeSchema = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(DebugErrorDetailResponseSchema)
   .strict();
 
 const PushStatusEnvelopeSchema = z
@@ -397,6 +422,32 @@ export async function listDebugHistory(limit = 120): Promise<z.infer<typeof Hist
 export async function getHistoryEntry(entryId: string): Promise<z.infer<typeof HistoryDetailSchema>> {
   const data = await request(`/api/debug/history/${encodeURIComponent(entryId)}`);
   return HistoryDetailSchema.parse(data);
+}
+
+export async function createDebugClientError(
+  input: z.infer<typeof CreateDebugClientErrorBodySchema>
+): Promise<z.infer<typeof DebugErrorCreateEnvelopeSchema>> {
+  const body = CreateDebugClientErrorBodySchema.parse(input);
+  const data = await request("/api/debug/client-errors", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  return DebugErrorCreateEnvelopeSchema.parse(data);
+}
+
+export async function listDebugClientErrors(
+  limit = 120
+): Promise<z.infer<typeof DebugErrorListEnvelopeSchema>> {
+  const data = await request(`/api/debug/client-errors?limit=${String(limit)}`);
+  return DebugErrorListEnvelopeSchema.parse(data);
+}
+
+export async function getDebugClientError(
+  errorId: string
+): Promise<z.infer<typeof DebugErrorDetailEnvelopeSchema>> {
+  const data = await request(`/api/debug/client-errors/${encodeURIComponent(errorId)}`);
+  return DebugErrorDetailEnvelopeSchema.parse(data);
 }
 
 export async function replayHistoryEntry(input: {

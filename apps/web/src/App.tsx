@@ -29,6 +29,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import {
   createThread,
+  getDebugClientError,
   getHealth,
   getHistoryEntry,
   getLatestPushReceipt,
@@ -43,6 +44,7 @@ import {
   getTraceStatus,
   interruptThread,
   listCollaborationModes,
+  listDebugClientErrors,
   listModels,
   listDebugHistory,
   listThreads,
@@ -55,6 +57,7 @@ import {
   stopTrace,
   submitUserInput
 } from "@/lib/api";
+import { reportClientError } from "@/lib/client-errors";
 import { useTheme } from "@/hooks/useTheme";
 import { ConversationItem } from "@/components/ConversationItem";
 import { ChatComposer } from "@/components/ChatComposer";
@@ -98,6 +101,8 @@ type ReadThreadResponse = Awaited<ReturnType<typeof readThread>>;
 type TraceStatus = Awaited<ReturnType<typeof getTraceStatus>>;
 type HistoryResponse = Awaited<ReturnType<typeof listDebugHistory>>;
 type HistoryDetail = Awaited<ReturnType<typeof getHistoryEntry>>;
+type ClientErrorsResponse = Awaited<ReturnType<typeof listDebugClientErrors>>;
+type ClientErrorDetailResponse = Awaited<ReturnType<typeof getDebugClientError>>;
 type PendingRequest = ReturnType<typeof getPendingUserInputRequests>[number];
 type PushStatusResponse = Awaited<ReturnType<typeof getPushStatus>>;
 type PushLatestReceiptResponse = Awaited<ReturnType<typeof getLatestPushReceipt>>;
@@ -105,6 +110,7 @@ type PushLatestSendResponse = Awaited<ReturnType<typeof getLatestPushSend>>;
 type PushLocalCaStatusResponse = Awaited<ReturnType<typeof getPushLocalCaStatus>>;
 type WebShellHealthResponse = Awaited<ReturnType<typeof getWebShellHealth>>;
 type PushTestResponse = Awaited<ReturnType<typeof sendPushTestNotification>>;
+type ClientErrorEvent = ClientErrorsResponse["data"][number];
 type Thread = ThreadsResponse["data"][number];
 type AppTab = "chat" | "debug" | "preflight";
 
@@ -113,6 +119,21 @@ interface PreflightCheck {
   label: string;
   ready: boolean;
   detail: string;
+}
+
+interface ErrorDisplayState {
+  operation: string;
+  message: string;
+  errorId: string | null;
+  requestId: string | null;
+}
+
+interface ErrorReportInput {
+  operation: string;
+  message: string;
+  requestId?: string | null;
+  threadId?: string | null;
+  details?: Record<string, string | number | boolean | null>;
 }
 
 /* ── Helpers ────────────────────────────────────────────────── */
@@ -492,9 +513,10 @@ export function App(): React.JSX.Element {
   }, []);
 
   /* State */
-  const [error, setError] = useState("");
+  const [errorState, setErrorState] = useState<ErrorDisplayState | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [threads, setThreads] = useState<ThreadsResponse["data"]>([]);
+  const [coreDataLoadCount, setCoreDataLoadCount] = useState(0);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(initialUiState.threadId);
   const [liveState, setLiveState] = useState<LiveStateResponse | null>(null);
   const [readThreadState, setReadThreadState] = useState<ReadThreadResponse | null>(null);
@@ -511,6 +533,10 @@ export function App(): React.JSX.Element {
   const [history, setHistory] = useState<HistoryResponse["history"]>([]);
   const [selectedHistoryId, setSelectedHistoryId] = useState("");
   const [historyDetail, setHistoryDetail] = useState<HistoryDetail | null>(null);
+  const [clientErrors, setClientErrors] = useState<ClientErrorsResponse["data"]>([]);
+  const [selectedClientErrorId, setSelectedClientErrorId] = useState("");
+  const [clientErrorDetail, setClientErrorDetail] = useState<ClientErrorDetailResponse["error"] | null>(null);
+  const [clientErrorSessionLogPath, setClientErrorSessionLogPath] = useState("");
   const [waitForReplayResponse, setWaitForReplayResponse] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
   const [answerDraft, setAnswerDraft] = useState<Record<string, { option: string; freeform: string }>>({});
@@ -568,6 +594,12 @@ export function App(): React.JSX.Element {
     () => threads.find((t) => t.id === selectedThreadId) ?? null,
     [threads, selectedThreadId]
   );
+  const errorMessage = errorState?.message ?? "";
+  const selectedClientErrorSummary = useMemo(
+    () => clientErrors.find((entry) => entry.errorId === selectedClientErrorId) ?? null,
+    [clientErrors, selectedClientErrorId]
+  );
+  const isCoreDataLoading = coreDataLoadCount > 0;
   const groupedThreads = useMemo(() => {
     type Group = {
       key: string;
@@ -925,31 +957,105 @@ export function App(): React.JSX.Element {
   const preflightReadyCount = preflightChecks.filter((check) => check.ready).length;
   const preflightReady = preflightChecks.every((check) => check.ready);
 
+  const clearError = useCallback(() => {
+    setErrorState(null);
+  }, []);
+
+  const showError = useCallback((input: ErrorReportInput) => {
+    setErrorState({
+      operation: input.operation,
+      message: input.message,
+      errorId: null,
+      requestId: input.requestId ?? null
+    });
+  }, []);
+
+  const reportError = useCallback(
+    (input: ErrorReportInput) => {
+      showError(input);
+      void reportClientError({
+        source: "web-app",
+        operation: input.operation,
+        message: input.message,
+        name: null,
+        stack: null,
+        requestId: input.requestId ?? null,
+        threadId: input.threadId ?? null,
+        url: window.location.pathname,
+        details: {
+          activeTab,
+          ...(input.details ?? {})
+        }
+      })
+        .then((response) => {
+          setErrorState((current) => {
+            if (!current) {
+              return current;
+            }
+            if (current.operation !== input.operation || current.message !== input.message) {
+              return current;
+            }
+            return {
+              ...current,
+              errorId: response.errorId
+            };
+          });
+          setSelectedClientErrorId(response.errorId);
+          void listDebugClientErrors(120)
+            .then((next) => {
+              setClientErrors(next.data);
+              setClientErrorSessionLogPath(next.sessionLogPath);
+            })
+            .catch(() => {
+              // Intentionally ignored: avoid recursive reporting loops for reporter failures.
+            });
+        })
+        .catch(() => {
+          // Intentionally ignored: avoid recursive reporting loops for reporter failures.
+        });
+    },
+    [activeTab, showError]
+  );
+
   /* Data loading */
   const loadCoreData = useCallback(async () => {
-    const [nh, nt, nm, nmo, ntr, nhist] = await Promise.all([
-      getHealth(),
-      listThreads({ limit: 80, archived: false, all: true, maxPages: 20 }),
-      listCollaborationModes(),
-      listModels(),
-      getTraceStatus(),
-      listDebugHistory(120)
-    ]);
-    setHealth(nh);
-    setThreads(nt.data);
-    setModes(nm.data);
-    setModels(nmo.data);
-    setTraceStatus(ntr);
-    setHistory(nhist.history);
-    setSelectedThreadId((cur) => {
-      if (cur) return cur;
-      return nt.data[0]?.id ?? null;
-    });
-    setSelectedModeKey((cur) => {
-      if (cur) return cur;
-      const nonPlanDefault = nm.data.find((mode) => !isPlanModeOption(mode));
-      return nonPlanDefault?.mode ?? nm.data[0]?.mode ?? "";
-    });
+    setCoreDataLoadCount((current) => current + 1);
+    try {
+      const [nh, nt, nm, nmo, ntr, nhist, nce] = await Promise.all([
+        getHealth(),
+        listThreads({ limit: 80, archived: false, all: true, maxPages: 20 }),
+        listCollaborationModes(),
+        listModels(),
+        getTraceStatus(),
+        listDebugHistory(120),
+        listDebugClientErrors(120)
+      ]);
+      setHealth(nh);
+      setThreads(nt.data);
+      setModes(nm.data);
+      setModels(nmo.data);
+      setTraceStatus(ntr);
+      setHistory(nhist.history);
+      setClientErrors(nce.data);
+      setClientErrorSessionLogPath(nce.sessionLogPath);
+      setSelectedThreadId((cur) => {
+        if (cur) return cur;
+        return nt.data[0]?.id ?? null;
+      });
+      setSelectedModeKey((cur) => {
+        if (cur) return cur;
+        const nonPlanDefault = nm.data.find((mode: ModesResponse["data"][number]) => !isPlanModeOption(mode));
+        return nonPlanDefault?.mode ?? nm.data[0]?.mode ?? "";
+      });
+      setSelectedClientErrorId((cur) => {
+        if (cur && nce.data.some((entry) => entry.errorId === cur)) {
+          return cur;
+        }
+        return nce.data[0]?.errorId ?? "";
+      });
+    } finally {
+      setCoreDataLoadCount((current) => Math.max(0, current - 1));
+    }
   }, []);
 
   const loadPushData = useCallback(async () => {
@@ -1020,14 +1126,18 @@ export function App(): React.JSX.Element {
 
   const refreshAll = useCallback(async () => {
     try {
-      setError("");
+      clearError();
       await loadCoreData();
       await loadPushData();
       if (selectedThreadIdRef.current) await loadSelectedThread(selectedThreadIdRef.current);
     } catch (e) {
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "refresh:all",
+        message: toErrorMessage(e),
+        threadId: selectedThreadIdRef.current
+      });
     }
-  }, [loadCoreData, loadPushData, loadSelectedThread]);
+  }, [clearError, loadCoreData, loadPushData, loadSelectedThread, reportError]);
 
   const runPushAutoHeal = useCallback(async () => {
     try {
@@ -1037,9 +1147,13 @@ export function App(): React.JSX.Element {
         await loadPushData();
       }
     } catch (e) {
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "push:auto-heal",
+        message: toErrorMessage(e),
+        threadId: selectedThreadIdRef.current
+      });
     }
-  }, [loadPushData, pushPrivateMode]);
+  }, [loadPushData, pushPrivateMode, reportError]);
 
   const togglePushSubscription = useCallback(async () => {
     setPushBusy(true);
@@ -1053,11 +1167,15 @@ export function App(): React.JSX.Element {
       }
       await loadPushData();
     } catch (e) {
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "push:toggle-subscription",
+        message: toErrorMessage(e),
+        threadId: selectedThreadIdRef.current
+      });
     } finally {
       setPushBusy(false);
     }
-  }, [loadPushData, pushPrivateMode, pushSubscribed]);
+  }, [loadPushData, pushPrivateMode, pushSubscribed, reportError]);
 
   const togglePushPrivateMode = useCallback(async () => {
     const nextPrivateMode = !pushPrivateMode;
@@ -1075,15 +1193,23 @@ export function App(): React.JSX.Element {
       await loadPushData();
     } catch (e) {
       setPushPrivateMode(previousPrivateMode);
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "push:toggle-private-mode",
+        message: toErrorMessage(e),
+        threadId: selectedThreadIdRef.current
+      });
     } finally {
       setPushBusy(false);
     }
-  }, [loadPushData, pushPrivateMode, pushSubscribed]);
+  }, [loadPushData, pushPrivateMode, pushSubscribed, reportError]);
 
   const sendPushTest = useCallback(async () => {
     if (!selectedThreadId) {
-      setError("Select a thread to send a test notification");
+      showError({
+        operation: "push:test",
+        message: "Select a thread to send a test notification",
+        threadId: null
+      });
       return;
     }
 
@@ -1095,11 +1221,15 @@ export function App(): React.JSX.Element {
         body: "Test notification from Farfield."
       });
     } catch (e) {
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "push:test",
+        message: toErrorMessage(e),
+        threadId: selectedThreadId
+      });
     } finally {
       setPushBusy(false);
     }
-  }, [selectedThreadId]);
+  }, [reportError, selectedThreadId, showError]);
 
   const runPushDryRunCheck = useCallback(async () => {
     setPushDryRunBusy(true);
@@ -1125,7 +1255,11 @@ export function App(): React.JSX.Element {
 
   const resetPushSubscription = useCallback(async () => {
     if (!pushSupported) {
-      setError("Push notifications are not supported in this browser");
+      showError({
+        operation: "push:recover",
+        message: "Push notifications are not supported in this browser",
+        threadId: selectedThreadIdRef.current
+      });
       return;
     }
 
@@ -1137,14 +1271,18 @@ export function App(): React.JSX.Element {
       });
       await Promise.all([loadPushData(), runPushDryRunCheck()]);
       setServiceWorkerUpdateAvailable(false);
-      setError("");
+      clearError();
     } catch (e) {
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "push:recover",
+        message: toErrorMessage(e),
+        threadId: selectedThreadIdRef.current
+      });
     } finally {
       setPushBusy(false);
       setPushResetBusy(false);
     }
-  }, [loadPushData, pushPrivateMode, pushSupported, runPushDryRunCheck]);
+  }, [clearError, loadPushData, pushPrivateMode, pushSupported, reportError, runPushDryRunCheck, showError]);
 
   const applyServiceWorkerUpdate = useCallback(async () => {
     if (!("serviceWorker" in navigator)) {
@@ -1229,12 +1367,22 @@ export function App(): React.JSX.Element {
         refreshTimerRef.current = null;
       }
       if (visible) {
-        void loadCoreData().catch((e) => setError(toErrorMessage(e)));
+        void loadCoreData().catch((e) =>
+          reportError({
+            operation: "core:load",
+            message: toErrorMessage(e),
+            threadId: selectedThreadIdRef.current
+          })
+        );
         void loadPushData();
         void runPushAutoHeal();
         if (selectedThreadIdRef.current) {
           void loadSelectedThread(selectedThreadIdRef.current).catch((e) =>
-            setError(toErrorMessage(e))
+            reportError({
+              operation: "thread:load-selected",
+              message: toErrorMessage(e),
+              threadId: selectedThreadIdRef.current
+            })
           );
         }
       }
@@ -1244,7 +1392,7 @@ export function App(): React.JSX.Element {
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [loadCoreData, loadPushData, loadSelectedThread, runPushAutoHeal]);
+  }, [loadCoreData, loadPushData, loadSelectedThread, reportError, runPushAutoHeal]);
 
   useEffect(() => {
     if (!isDocumentVisible) {
@@ -1275,19 +1423,31 @@ export function App(): React.JSX.Element {
 
     coreRefreshIntervalRef.current = window.setInterval(() => {
       if (isDocumentVisibleRef.current) {
-        void loadCoreData().catch((e) => setError(toErrorMessage(e)));
+        void loadCoreData().catch((e) =>
+          reportError({
+            operation: "core:load",
+            message: toErrorMessage(e),
+            threadId: selectedThreadIdRef.current
+          })
+        );
         void loadPushData();
         return;
       }
       void getHealth()
         .then(setHealth)
-        .catch((e) => setError(toErrorMessage(e)));
+        .catch((e) =>
+          reportError({
+            operation: "health:poll",
+            message: toErrorMessage(e),
+            threadId: selectedThreadIdRef.current
+          })
+        );
     }, refreshIntervalMs);
 
     return () => {
       if (coreRefreshIntervalRef.current) window.clearInterval(coreRefreshIntervalRef.current);
     };
-  }, [isDocumentVisible, loadCoreData, loadPushData]);
+  }, [isDocumentVisible, loadCoreData, loadPushData, reportError]);
 
   useEffect(() => {
     if (activeTab !== "preflight") {
@@ -1303,8 +1463,14 @@ export function App(): React.JSX.Element {
       setStreamEvents([]);
       return;
     }
-    void loadSelectedThread(selectedThreadId).catch((e) => setError(toErrorMessage(e)));
-  }, [loadSelectedThread, selectedThreadId]);
+    void loadSelectedThread(selectedThreadId).catch((e) =>
+      reportError({
+        operation: "thread:load-selected",
+        message: toErrorMessage(e),
+        threadId: selectedThreadId
+      })
+    );
+  }, [loadSelectedThread, reportError, selectedThreadId]);
 
   useEffect(() => {
     if (!isDocumentVisible) {
@@ -1316,7 +1482,13 @@ export function App(): React.JSX.Element {
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = window.setTimeout(() => {
         refreshTimerRef.current = null;
-        void loadLiveData().catch((e) => setError(toErrorMessage(e)));
+        void loadLiveData().catch((e) =>
+          reportError({
+            operation: "thread:load-live",
+            message: toErrorMessage(e),
+            threadId: selectedThreadIdRef.current
+          })
+        );
       }, STREAM_REFRESH_DEBOUNCE_MS);
     };
     source.onerror = () => {
@@ -1326,7 +1498,7 @@ export function App(): React.JSX.Element {
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
       source.close();
     };
-  }, [isDocumentVisible, loadLiveData]);
+  }, [isDocumentVisible, loadLiveData, reportError]);
 
   useEffect(() => {
     if (!activeRequest) {
@@ -1476,16 +1648,20 @@ export function App(): React.JSX.Element {
     if (!selectedThreadId || !draft.trim()) return;
     setIsBusy(true);
     try {
-      setError("");
+      clearError();
       await sendMessage({ threadId: selectedThreadId, text: draft });
       pendingMaterializationThreadIdsRef.current.delete(selectedThreadId);
       await refreshAll();
     } catch (e) {
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "thread:submit-message",
+        message: toErrorMessage(e),
+        threadId: selectedThreadId
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [refreshAll, selectedThreadId]);
+  }, [clearError, refreshAll, reportError, selectedThreadId]);
 
   const applyModeDraft = useCallback(async (draft: {
     modeKey: string;
@@ -1510,7 +1686,7 @@ export function App(): React.JSX.Element {
     lastAppliedModeSignatureRef.current = signature;
     setIsModeSyncing(true);
     try {
-      setError("");
+      clearError();
       await setCollaborationMode({
         threadId: selectedThreadId,
         collaborationMode: {
@@ -1525,11 +1701,15 @@ export function App(): React.JSX.Element {
       await loadSelectedThread(selectedThreadId);
     } catch (e) {
       lastAppliedModeSignatureRef.current = previousSignature;
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "thread:set-collaboration-mode",
+        message: toErrorMessage(e),
+        threadId: selectedThreadId
+      });
     } finally {
       setIsModeSyncing(false);
     }
-  }, [isModeSyncing, loadSelectedThread, modes, selectedThreadId]);
+  }, [clearError, isModeSyncing, loadSelectedThread, modes, reportError, selectedThreadId]);
 
   const submitPendingRequest = useCallback(async () => {
     if (!selectedThreadId || !activeRequest) return;
@@ -1541,7 +1721,7 @@ export function App(): React.JSX.Element {
     }
     setIsBusy(true);
     try {
-      setError("");
+      clearError();
       await submitUserInput({
         threadId: selectedThreadId,
         requestId: activeRequest.id,
@@ -1549,17 +1729,22 @@ export function App(): React.JSX.Element {
       });
       await refreshAll();
     } catch (e) {
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "thread:submit-user-input",
+        message: toErrorMessage(e),
+        threadId: selectedThreadId,
+        requestId: String(activeRequest.id)
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [activeRequest, answerDraft, refreshAll, selectedThreadId]);
+  }, [activeRequest, answerDraft, clearError, refreshAll, reportError, selectedThreadId]);
 
   const skipPendingRequest = useCallback(async () => {
     if (!selectedThreadId || !activeRequest) return;
     setIsBusy(true);
     try {
-      setError("");
+      clearError();
       await submitUserInput({
         threadId: selectedThreadId,
         requestId: activeRequest.id,
@@ -1567,25 +1752,34 @@ export function App(): React.JSX.Element {
       });
       await refreshAll();
     } catch (e) {
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "thread:skip-user-input",
+        message: toErrorMessage(e),
+        threadId: selectedThreadId,
+        requestId: String(activeRequest.id)
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [activeRequest, refreshAll, selectedThreadId]);
+  }, [activeRequest, clearError, refreshAll, reportError, selectedThreadId]);
 
   const runInterrupt = useCallback(async () => {
     if (!selectedThreadId) return;
     setIsBusy(true);
     try {
-      setError("");
+      clearError();
       await interruptThread({ threadId: selectedThreadId });
       await refreshAll();
     } catch (e) {
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "thread:interrupt",
+        message: toErrorMessage(e),
+        threadId: selectedThreadId
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [refreshAll, selectedThreadId]);
+  }, [clearError, refreshAll, reportError, selectedThreadId]);
 
   const loadHistoryDetail = useCallback(async (id: string) => {
     if (!id) { setHistoryDetail(null); return; }
@@ -1593,9 +1787,41 @@ export function App(): React.JSX.Element {
     setHistoryDetail(detail);
   }, []);
 
+  const loadClientErrorDetail = useCallback(async (id: string) => {
+    if (!id) {
+      setClientErrorDetail(null);
+      return;
+    }
+    const detail = await getDebugClientError(id);
+    setClientErrorDetail(detail.error);
+    setClientErrorSessionLogPath(detail.sessionLogPath);
+  }, []);
+
   useEffect(() => {
-    void loadHistoryDetail(selectedHistoryId).catch((e) => setError(toErrorMessage(e)));
-  }, [loadHistoryDetail, selectedHistoryId]);
+    void loadHistoryDetail(selectedHistoryId).catch((e) =>
+      reportError({
+        operation: "debug:history-detail",
+        message: toErrorMessage(e)
+      })
+    );
+  }, [loadHistoryDetail, reportError, selectedHistoryId]);
+
+  useEffect(() => {
+    void loadClientErrorDetail(selectedClientErrorId).catch((e) =>
+      reportError({
+        operation: "debug:client-error-detail",
+        message: toErrorMessage(e)
+      })
+    );
+  }, [loadClientErrorDetail, reportError, selectedClientErrorId]);
+
+  const openErrorInDebug = useCallback(() => {
+    const errorId = errorState?.errorId;
+    if (errorId) {
+      setSelectedClientErrorId(errorId);
+    }
+    setActiveTab("debug");
+  }, [errorState]);
 
   const handleAnswerChange = useCallback(
     (questionId: string, field: "option" | "freeform", value: string) => {
@@ -1610,12 +1836,16 @@ export function App(): React.JSX.Element {
   const createNewThread = useCallback(async (projectPath: string) => {
     const trimmedProjectPath = projectPath.trim();
     if (!trimmedProjectPath) {
-      setError("Cannot create thread: missing project path");
+      showError({
+        operation: "thread:create",
+        message: "Cannot create thread: missing project path",
+        threadId: null
+      });
       return;
     }
     setIsBusy(true);
     try {
-      setError("");
+      clearError();
       const created = await createThread({ cwd: trimmedProjectPath });
       pendingMaterializationThreadIdsRef.current.add(created.threadId);
       setSelectedThreadId(created.threadId);
@@ -1623,11 +1853,18 @@ export function App(): React.JSX.Element {
       setMobileSidebarOpen(false);
       await refreshAll();
     } catch (e) {
-      setError(toErrorMessage(e));
+      reportError({
+        operation: "thread:create",
+        message: toErrorMessage(e),
+        threadId: null,
+        details: {
+          cwd: trimmedProjectPath
+        }
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [refreshAll]);
+  }, [clearError, refreshAll, reportError, showError]);
 
   const renderSidebarContent = (viewport: "desktop" | "mobile"): React.JSX.Element => (
     <>
@@ -1655,7 +1892,16 @@ export function App(): React.JSX.Element {
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-2 pl-2 pr-0">
         {threads.length === 0 && (
-          <div className="px-4 py-6 text-xs text-muted-foreground text-center">No threads</div>
+          <div className="px-4 py-6 text-xs text-muted-foreground text-center">
+            {isCoreDataLoading ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 size={12} className="animate-spin" />
+                <span>Loading threads...</span>
+              </span>
+            ) : (
+              "No threads"
+            )}
+          </div>
         )}
         <div className="space-y-2 pr-2">
           {groupedThreads.map((group) => {
@@ -1922,24 +2168,48 @@ export function App(): React.JSX.Element {
 
         {/* Error bar */}
         <AnimatePresence>
-          {error && (
+          {errorState && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden shrink-0"
             >
-              <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-sm text-destructive">
-                <span className="truncate">{error}</span>
-                <Button
-                  type="button"
-                  onClick={() => setError("")}
-                  variant="ghost"
-                  size="icon"
-                  className="ml-3 h-6 w-6 shrink-0 opacity-60 hover:opacity-100"
-                >
-                  <X size={13} />
-                </Button>
+              <div className="flex items-start justify-between gap-3 px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-sm text-destructive">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{errorState.operation}</div>
+                  <div className="truncate">{errorMessage}</div>
+                  {(errorState.requestId || errorState.errorId) && (
+                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-destructive/80">
+                      {errorState.requestId && (
+                        <span className="font-mono">request {errorState.requestId}</span>
+                      )}
+                      {errorState.errorId && (
+                        <span className="font-mono">error {errorState.errorId}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    type="button"
+                    onClick={openErrorInDebug}
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[11px] opacity-80 hover:opacity-100"
+                  >
+                    Open in Debug
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={clearError}
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-60 hover:opacity-100"
+                  >
+                    <X size={13} />
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -2412,7 +2682,7 @@ export function App(): React.JSX.Element {
                 </div>
               </div>
 
-              {/* Right: Trace + Stream Events */}
+              {/* Right: Trace + Errors + Stream Events */}
               <div className="flex flex-col min-h-0 overflow-hidden divide-y divide-border">
 
                 {/* Trace controls */}
@@ -2473,6 +2743,158 @@ export function App(): React.JSX.Element {
                       Push test
                     </Button>
                   </div>
+                </div>
+
+                {/* Error events */}
+                <div className="flex flex-col min-h-0 overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border shrink-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-medium">Errors</span>
+                      <span className="text-xs text-muted-foreground/60">{clientErrors.length}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        void listDebugClientErrors(120)
+                          .then((next) => {
+                            setClientErrors(next.data);
+                            setClientErrorSessionLogPath(next.sessionLogPath);
+                            setSelectedClientErrorId((current) => {
+                              if (current && next.data.some((entry) => entry.errorId === current)) {
+                                return current;
+                              }
+                              return next.data[0]?.errorId ?? "";
+                            });
+                          })
+                          .catch((error) =>
+                            reportError({
+                              operation: "debug:client-errors-refresh",
+                              message: toErrorMessage(error),
+                              threadId: selectedThreadIdRef.current
+                            })
+                          );
+                      }}
+                    >
+                      Refresh
+                    </Button>
+                  </div>
+                  {clientErrors.length === 0 ? (
+                    <div className="px-4 py-3 text-xs text-muted-foreground">
+                      No errors recorded for this session.
+                    </div>
+                  ) : (
+                    <div className="flex-1 grid grid-cols-[170px_minmax(0,1fr)] min-h-0 divide-x divide-border overflow-hidden">
+                      <div className="overflow-y-auto py-1">
+                        {clientErrors
+                          .slice()
+                          .reverse()
+                          .map((entry) => (
+                            <Button
+                              key={entry.errorId}
+                              type="button"
+                              onClick={() => setSelectedClientErrorId(entry.errorId)}
+                              variant="ghost"
+                              className={`w-full h-auto flex-col items-start justify-start gap-0 rounded-none px-3 py-2 text-left transition-colors ${
+                                selectedClientErrorId === entry.errorId
+                                  ? "bg-muted text-foreground"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span
+                                  className={`text-[9px] px-1.5 py-0.5 rounded font-mono uppercase leading-4 ${
+                                    entry.origin === "server"
+                                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                                      : "bg-blue-500/15 text-blue-500 dark:text-blue-300"
+                                  }`}
+                                >
+                                  {entry.origin}
+                                </span>
+                              </div>
+                              <div className="text-[10px] font-mono truncate">{entry.errorId}</div>
+                              <div className="text-[10px] text-muted-foreground truncate">{entry.operation}</div>
+                              <div className="text-[10px] text-muted-foreground/50 truncate">
+                                {formatDate(entry.recordedAt)}
+                              </div>
+                            </Button>
+                          ))}
+                      </div>
+                      <div className="overflow-y-auto p-3 space-y-3">
+                        {!clientErrorDetail ? (
+                          <div className="text-xs text-muted-foreground py-4">
+                            {selectedClientErrorSummary ? "Loading error detail..." : "Select an error"}
+                          </div>
+                        ) : (
+                          <>
+                            <div className="text-xs font-medium break-words">{clientErrorDetail.message}</div>
+                            <div className="space-y-1 text-[11px] text-muted-foreground">
+                              <div>
+                                <span className="text-foreground">errorId:</span>{" "}
+                                <span className="font-mono">{clientErrorDetail.errorId}</span>
+                              </div>
+                              <div>
+                                <span className="text-foreground">origin:</span> {clientErrorDetail.origin}
+                              </div>
+                              <div>
+                                <span className="text-foreground">operation:</span> {clientErrorDetail.operation}
+                              </div>
+                              <div>
+                                <span className="text-foreground">source:</span> {clientErrorDetail.source}
+                              </div>
+                              {clientErrorDetail.requestId && (
+                                <div>
+                                  <span className="text-foreground">requestId:</span>{" "}
+                                  <span className="font-mono">{clientErrorDetail.requestId}</span>
+                                </div>
+                              )}
+                              {clientErrorDetail.threadId && (
+                                <div>
+                                  <span className="text-foreground">threadId:</span>{" "}
+                                  <span className="font-mono">{clientErrorDetail.threadId}</span>
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-foreground">recorded:</span>{" "}
+                                {formatDate(clientErrorDetail.recordedAt)}
+                              </div>
+                              <div>
+                                <span className="text-foreground">occurred:</span>{" "}
+                                {formatDate(clientErrorDetail.occurredAt)}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <a
+                                href="/api/debug/client-errors/session-log"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
+                              >
+                                Download session log
+                              </a>
+                              {(clientErrorSessionLogPath || selectedClientErrorSummary?.sessionId) && (
+                                <div className="text-[10px] text-muted-foreground/70 font-mono break-all">
+                                  {clientErrorSessionLogPath || selectedClientErrorSummary?.sessionId}
+                                </div>
+                              )}
+                            </div>
+                            {Object.keys(clientErrorDetail.details).length > 0 && (
+                              <pre className="font-mono text-[10px] text-muted-foreground leading-4 whitespace-pre-wrap break-words">
+                                {JSON.stringify(clientErrorDetail.details, null, 2)}
+                              </pre>
+                            )}
+                            {clientErrorDetail.stack && (
+                              <pre className="font-mono text-[10px] text-muted-foreground leading-4 whitespace-pre-wrap break-words">
+                                {clientErrorDetail.stack}
+                              </pre>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Stream events */}

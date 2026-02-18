@@ -29,6 +29,7 @@ import {
   parseUserInputResponsePayload
 } from "@farfield/protocol";
 import {
+  CreateDebugClientErrorBodySchema,
   InterruptBodySchema,
   parseBody,
   ReplayBodySchema,
@@ -48,6 +49,7 @@ import { PushSendStore } from "./push-send-store.js";
 import { CompletionDetector, type CompletionCandidate } from "./completion-detector.js";
 import { PushService } from "./push-service.js";
 import { migratePushStateFile, resolvePushStatePath } from "./push-state-path.js";
+import { ClientErrorStore } from "./client-error-store.js";
 
 const HOST = process.env["HOST"] ?? "127.0.0.1";
 const PORT = Number(process.env["PORT"] ?? 4311);
@@ -75,6 +77,7 @@ function readPositiveIntegerEnv(name: string, defaultValue: number): number {
 }
 
 const TRACE_DIR = path.resolve(process.cwd(), "traces");
+const CLIENT_ERROR_LOG_DIR = path.resolve(process.cwd(), ".runtime", "logs", "errors");
 const DEFAULT_WORKSPACE = path.resolve(process.cwd());
 const PUSH_STATE_RESOLUTION = resolvePushStatePath({
   envPath: process.env["PUSH_STATE_PATH"],
@@ -128,6 +131,12 @@ const LOCAL_CADDY_ROOT_CA_PATH = path.join(
 );
 const WEB_SHELL_SERVICE_WORKER_PATH = path.join(DEFAULT_WORKSPACE, "apps", "web", "public", "sw.js");
 const WEB_SHELL_SERVICE_WORKER_VERSION = resolveFileContentHash(WEB_SHELL_SERVICE_WORKER_PATH);
+const CLIENT_ERROR_SESSION_ID = `session_${randomUUID()}`;
+const CLIENT_ERROR_MAX_ENTRIES = 2_000;
+const CLIENT_ERROR_SESSION_LOG_PATH = path.join(
+  CLIENT_ERROR_LOG_DIR,
+  `session-${new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-")}-${process.pid}.ndjson`
+);
 
 function resolveCodexExecutablePath(): string {
   if (process.env["CODEX_CLI_PATH"]) {
@@ -289,6 +298,8 @@ const runtimeState = {
   pushStatePathSource: PUSH_STATE_RESOLUTION.source,
   pushReceiptsPath: PUSH_RECEIPTS_PATH,
   pushSendsPath: PUSH_SENDS_PATH,
+  errorLogPath: CLIENT_ERROR_SESSION_LOG_PATH,
+  errorSessionId: CLIENT_ERROR_SESSION_ID,
   pushReceiptsMaxCount: MAX_PUSH_RECEIPTS,
   pushReceiptsMaxAgeDays: PUSH_RECEIPTS_MAX_AGE_DAYS
 };
@@ -305,6 +316,7 @@ function getRuntimeStateSnapshot(): Record<string, unknown> {
     activeTrace: activeTrace?.summary ?? null,
     pushSubscriptionCount: pushStore.getSubscriptionCount(),
     pushReceiptCount: pushReceiptStore.getCount(),
+    errorCount: clientErrorStore.getCount(),
     latestPushSendNotificationId: latestPushSend?.notificationId ?? null
   };
 }
@@ -438,6 +450,20 @@ function pushActionError(
   );
   pushActionEvent(action, "error", { ...details, error: message });
   pushSystem("Action failed", { action, ...details, error: message });
+  clientErrorStore.recordServerError({
+    source: "monitor-server",
+    operation: `action:${action}`,
+    message,
+    name: error instanceof Error ? error.name : null,
+    stack: error instanceof Error ? (error.stack ?? null) : null,
+    requestId: typeof details["requestId"] === "string" ? details["requestId"] : null,
+    threadId: typeof details["threadId"] === "string" ? details["threadId"] : null,
+    url: null,
+    details: {
+      action
+    },
+    occurredAt: new Date().toISOString()
+  });
   return message;
 }
 
@@ -451,6 +477,18 @@ function broadcastRuntimeState(): void {
 function setRuntimeError(error: unknown): string {
   const message = toErrorMessage(error);
   runtimeState.lastError = message;
+  clientErrorStore.recordServerError({
+    source: "monitor-server",
+    operation: "runtime:set-error",
+    message,
+    name: error instanceof Error ? error.name : null,
+    stack: error instanceof Error ? (error.stack ?? null) : null,
+    requestId: null,
+    threadId: null,
+    url: null,
+    details: {},
+    occurredAt: new Date().toISOString()
+  });
   return message;
 }
 
@@ -543,6 +581,11 @@ const pushReceiptStore = new PushReceiptStore(
   PUSH_RECEIPTS_MAX_AGE_MS
 );
 const pushSendStore = new PushSendStore(PUSH_SENDS_PATH);
+const clientErrorStore = new ClientErrorStore(
+  CLIENT_ERROR_SESSION_LOG_PATH,
+  CLIENT_ERROR_SESSION_ID,
+  CLIENT_ERROR_MAX_ENTRIES
+);
 const pushService = new PushService({
   enabled:
     PUSH_ENABLED &&
@@ -1780,6 +1823,81 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (segments[0] === "api" && segments[1] === "debug") {
+      if (req.method === "POST" && pathname === "/api/debug/client-errors") {
+        const body = parseBody(CreateDebugClientErrorBodySchema, await readJsonBody(req));
+        const event = clientErrorStore.recordClientError(body);
+        logger.error(
+          {
+            errorId: event.errorId,
+            origin: event.origin,
+            source: event.source,
+            operation: event.operation,
+            requestId: event.requestId,
+            threadId: event.threadId,
+            message: event.message
+          },
+          "client-error-recorded"
+        );
+
+        jsonResponse(res, 200, {
+          ok: true,
+          errorId: event.errorId,
+          sessionId: clientErrorStore.getSessionId(),
+          recordedAt: event.recordedAt
+        });
+        return;
+      }
+
+      if (
+        req.method === "GET" &&
+        segments[2] === "client-errors" &&
+        segments[3] === "session-log"
+      ) {
+        const logPath = clientErrorStore.getSessionLogPath();
+        if (!fs.existsSync(logPath)) {
+          jsonResponse(res, 404, { ok: false, error: "Error session log not found" });
+          return;
+        }
+
+        const data = fs.readFileSync(logPath);
+        res.writeHead(200, {
+          "Content-Type": "application/x-ndjson",
+          "Content-Length": data.length,
+          "Content-Disposition": `attachment; filename=\"${path.basename(logPath)}\"`,
+          "Access-Control-Allow-Origin": "*"
+        });
+        res.end(data);
+        return;
+      }
+
+      if (req.method === "GET" && segments[2] === "client-errors" && segments.length === 3) {
+        const limit = parseInteger(url.searchParams.get("limit"), 120);
+        jsonResponse(res, 200, {
+          ok: true,
+          data: clientErrorStore.list(limit),
+          sessionId: clientErrorStore.getSessionId(),
+          sessionLogPath: clientErrorStore.getSessionLogPath()
+        });
+        return;
+      }
+
+      if (req.method === "GET" && segments[2] === "client-errors" && segments[3]) {
+        const errorId = decodeURIComponent(segments[3]);
+        const event = clientErrorStore.getById(errorId);
+        if (!event) {
+          jsonResponse(res, 404, { ok: false, error: "Client error not found" });
+          return;
+        }
+
+        jsonResponse(res, 200, {
+          ok: true,
+          error: event,
+          sessionId: clientErrorStore.getSessionId(),
+          sessionLogPath: clientErrorStore.getSessionLogPath()
+        });
+        return;
+      }
+
       if (req.method === "GET" && segments[2] === "history") {
         const limit = parseInteger(url.searchParams.get("limit"), 120);
         const data = history.slice(-limit);
@@ -2012,11 +2130,26 @@ const server = http.createServer(async (req, res) => {
     jsonResponse(res, 404, { ok: false, error: "Not found" });
   } catch (error) {
     runtimeState.lastError = toErrorMessage(error);
+    const requestFailedEvent = clientErrorStore.recordServerError({
+      source: "monitor-server",
+      operation: "request-failed",
+      message: runtimeState.lastError,
+      name: error instanceof Error ? error.name : null,
+      stack: error instanceof Error ? (error.stack ?? null) : null,
+      requestId: null,
+      threadId: null,
+      url: req.url ?? null,
+      details: {
+        method: req.method ?? "unknown"
+      },
+      occurredAt: new Date().toISOString()
+    });
     logger.error(
       {
         method: req.method ?? "unknown",
         url: req.url ?? "unknown",
-        error: runtimeState.lastError
+        error: runtimeState.lastError,
+        errorId: requestFailedEvent.errorId
       },
       "request-failed"
     );

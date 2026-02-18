@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CreateDebugClientErrorBodySchema,
   CreatePushReceiptBodySchema,
   CreatePushSubscriptionBodySchema,
   DeletePushSubscriptionBodySchema,
@@ -109,5 +110,22 @@ describe("server request schemas", () => {
     });
 
     expect(parsed.event).toBe("shown");
+  });
+
+  it("validates debug client error body", () => {
+    const parsed = parseBody(CreateDebugClientErrorBodySchema, {
+      source: "web-app",
+      operation: "push:auto-heal",
+      message: "The string did not match the expected pattern.",
+      requestId: "req_1",
+      threadId: "thread_1",
+      url: "/threads/thread_1",
+      details: {
+        tab: "chat"
+      }
+    });
+
+    expect(parsed.operation).toBe("push:auto-heal");
+    expect(parsed.requestId).toBe("req_1");
   });
 });

@@ -27,6 +27,14 @@ violate the rules. If you think that is impossible, STOP and ask the user.
 - `pnpm test`
 - `pnpm lint`
 
+## Error Debugging Workflow
+
+When investigating Farfield runtime issues, use:
+
+1. `docs/debug/client-error-triage.md` for the current triage flow and endpoints.
+2. `.runtime/logs/errors/session-*.ndjson` for per-session error events.
+3. Error IDs from the UI banner/Debug tab to correlate with history and stream events.
+
 ## Environment-Specific Files (Strict)
 
 Never commit machine-specific runtime config files.

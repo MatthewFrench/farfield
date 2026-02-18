@@ -4,8 +4,12 @@ import {
   parseAppServerListModelsResponse,
   parseAppServerCollaborationModeListResponse,
   parseAppServerStartThreadResponse,
+  parseCreateDebugClientErrorBody,
   parseCreatePushReceiptBody,
   parseCreatePushSubscriptionBody,
+  parseDebugErrorCreateResponse,
+  parseDebugErrorDetailResponse,
+  parseDebugErrorListResponse,
   parseIpcFrame,
   parsePushNotificationPayload,
   parsePushLocalCaStatusResponse,
@@ -549,6 +553,65 @@ describe("codex-protocol schemas", () => {
 
     expect(parsed.thread.id).toBe("thread-456");
     expect(parsed.model).toBe("gpt-5.3-codex");
+  });
+
+  it("parses debug client error create body", () => {
+    const parsed = parseCreateDebugClientErrorBody({
+      source: "web-app",
+      operation: "push:auto-heal",
+      message: "The string did not match the expected pattern.",
+      requestId: "req_1",
+      threadId: "thread_1",
+      url: "/threads/thread_1",
+      details: {
+        displayMode: "standalone"
+      }
+    });
+
+    expect(parsed.source).toBe("web-app");
+    expect(parsed.operation).toBe("push:auto-heal");
+    expect(parsed.requestId).toBe("req_1");
+  });
+
+  it("parses debug error list/create/detail responses", () => {
+    const event = {
+      errorId: "error_1",
+      sessionId: "session_1",
+      origin: "client",
+      source: "web-app",
+      operation: "push:auto-heal",
+      message: "The string did not match the expected pattern.",
+      name: "TypeError",
+      stack: "TypeError: ...",
+      requestId: "req_1",
+      threadId: "thread_1",
+      url: "/threads/thread_1",
+      occurredAt: "2026-02-18T00:00:00.000Z",
+      recordedAt: "2026-02-18T00:00:00.100Z",
+      details: {
+        tab: "chat"
+      }
+    } as const;
+
+    const parsedList = parseDebugErrorListResponse({
+      data: [event],
+      sessionId: "session_1",
+      sessionLogPath: "/tmp/session-1.ndjson"
+    });
+    const parsedCreate = parseDebugErrorCreateResponse({
+      errorId: "error_1",
+      sessionId: "session_1",
+      recordedAt: "2026-02-18T00:00:00.100Z"
+    });
+    const parsedDetail = parseDebugErrorDetailResponse({
+      error: event,
+      sessionId: "session_1",
+      sessionLogPath: "/tmp/session-1.ndjson"
+    });
+
+    expect(parsedList.data.length).toBe(1);
+    expect(parsedCreate.errorId).toBe("error_1");
+    expect(parsedDetail.error.operation).toBe("push:auto-heal");
   });
 
   it("parses create push subscription body", () => {

@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 
 class MockEventSource {
@@ -44,12 +44,16 @@ Object.defineProperty(window, "scrollTo", {
   writable: true
 });
 
+let threadsDelayPromise: Promise<void> | null = null;
+let releaseThreadsDelay: (() => void) | null = null;
+
 vi.stubGlobal(
   "fetch",
   vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
+    const parsedUrl = new URL(url, "http://127.0.0.1");
 
-    if (url.includes("/api/health")) {
+    if (parsedUrl.pathname === "/api/health") {
       return {
         ok: true,
         json: async () => ({
@@ -66,7 +70,10 @@ vi.stubGlobal(
       } as Response;
     }
 
-    if (url.includes("/api/threads") && !url.includes("/live-state")) {
+    if (parsedUrl.pathname === "/api/threads") {
+      if (threadsDelayPromise) {
+        await threadsDelayPromise;
+      }
       return {
         ok: true,
         json: async () => ({
@@ -79,7 +86,45 @@ vi.stubGlobal(
       } as Response;
     }
 
-    if (url.includes("/api/collaboration-modes")) {
+    if (parsedUrl.pathname.startsWith("/api/threads/") && parsedUrl.pathname.endsWith("/live-state")) {
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          threadId: "thread_test",
+          ownerClientId: null,
+          conversationState: null
+        })
+      } as Response;
+    }
+
+    if (parsedUrl.pathname.startsWith("/api/threads/") && parsedUrl.pathname.endsWith("/stream-events")) {
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          threadId: "thread_test",
+          ownerClientId: null,
+          events: []
+        })
+      } as Response;
+    }
+
+    if (parsedUrl.pathname.startsWith("/api/threads/")) {
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          thread: {
+            id: "thread_test",
+            turns: [],
+            requests: []
+          }
+        })
+      } as Response;
+    }
+
+    if (parsedUrl.pathname === "/api/collaboration-modes") {
       return {
         ok: true,
         json: async () => ({
@@ -97,7 +142,7 @@ vi.stubGlobal(
       } as Response;
     }
 
-    if (url.includes("/api/models")) {
+    if (parsedUrl.pathname === "/api/models") {
       return {
         ok: true,
         json: async () => ({
@@ -105,16 +150,28 @@ vi.stubGlobal(
           data: [
             {
               id: "gpt-5.3-codex",
+              model: "gpt-5.3-codex",
+              upgrade: null,
               displayName: "GPT-5.3 Codex",
-              providerId: "openai",
-              providerName: "OpenAI"
+              description: "Test model",
+              supportedReasoningEfforts: [
+                {
+                  reasoningEffort: "medium",
+                  description: "Balanced"
+                }
+              ],
+              defaultReasoningEffort: "medium",
+              inputModalities: ["text"],
+              supportsPersonality: true,
+              isDefault: true
             }
-          ]
+          ],
+          nextCursor: null
         })
       } as Response;
     }
 
-    if (url.includes("/api/debug/trace/status")) {
+    if (parsedUrl.pathname === "/api/debug/trace/status") {
       return {
         ok: true,
         json: async () => ({
@@ -125,7 +182,7 @@ vi.stubGlobal(
       } as Response;
     }
 
-    if (url.includes("/api/debug/history")) {
+    if (parsedUrl.pathname === "/api/debug/history") {
       return {
         ok: true,
         json: async () => ({
@@ -135,7 +192,46 @@ vi.stubGlobal(
       } as Response;
     }
 
-    if (url.includes("/healthz")) {
+    if (parsedUrl.pathname === "/api/debug/client-errors") {
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          data: [],
+          sessionId: "session_test",
+          sessionLogPath: ".runtime/logs/errors/session-test.ndjson"
+        })
+      } as Response;
+    }
+
+    if (parsedUrl.pathname.startsWith("/api/debug/client-errors/")) {
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          error: {
+            errorId: "error_test",
+            sessionId: "session_test",
+            origin: "client",
+            source: "web-app",
+            operation: "test",
+            message: "test",
+            name: null,
+            stack: null,
+            requestId: null,
+            threadId: null,
+            url: null,
+            occurredAt: "2026-02-18T00:00:00.000Z",
+            recordedAt: "2026-02-18T00:00:00.000Z",
+            details: {}
+          },
+          sessionId: "session_test",
+          sessionLogPath: ".runtime/logs/errors/session-test.ndjson"
+        })
+      } as Response;
+    }
+
+    if (parsedUrl.pathname === "/healthz") {
       return {
         ok: true,
         json: async () => ({
@@ -152,21 +248,38 @@ vi.stubGlobal(
     return {
       ok: true,
       json: async () => ({
-        ok: true,
-        threadId: "t",
-        ownerClientId: null,
-        conversationState: null,
-        events: []
+        ok: false,
+        error: `Unhandled test route: ${parsedUrl.pathname}`
       })
     } as Response;
   })
 );
 
 describe("App", () => {
+  beforeEach(() => {
+    threadsDelayPromise = null;
+    releaseThreadsDelay = null;
+  });
+
   it("renders core sections", async () => {
     render(<App />);
     expect(await screen.findByText("Farfield")).toBeTruthy();
     expect(await screen.findByText("No threads")).toBeTruthy();
     expect(await screen.findByText("No thread selected")).toBeTruthy();
+  });
+
+  it("shows loading threads state before empty state", async () => {
+    threadsDelayPromise = new Promise<void>((resolve) => {
+      releaseThreadsDelay = resolve;
+    });
+
+    render(<App />);
+    expect(await screen.findByText("Loading threads...")).toBeTruthy();
+
+    releaseThreadsDelay?.();
+    threadsDelayPromise = null;
+    releaseThreadsDelay = null;
+
+    expect((await screen.findAllByText("No threads")).length).toBeGreaterThan(0);
   });
 });

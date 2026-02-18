@@ -6,6 +6,9 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   CreatePushSubscriptionResponseSchema,
+  DebugErrorCreateResponseSchema,
+  DebugErrorDetailResponseSchema,
+  DebugErrorListResponseSchema,
   DeletePushSubscriptionResponseSchema,
   PushLocalCaStatusResponseSchema,
   PushReceiptCreateResponseSchema,
@@ -105,6 +108,27 @@ const PUSH_LOCAL_CA_STATUS_ENVELOPE_SCHEMA = z
     ok: z.literal(true)
   })
   .merge(PushLocalCaStatusResponseSchema)
+  .strict();
+
+const DEBUG_ERROR_CREATE_ENVELOPE_SCHEMA = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(DebugErrorCreateResponseSchema)
+  .strict();
+
+const DEBUG_ERROR_LIST_ENVELOPE_SCHEMA = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(DebugErrorListResponseSchema)
+  .strict();
+
+const DEBUG_ERROR_DETAIL_ENVELOPE_SCHEMA = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(DebugErrorDetailResponseSchema)
   .strict();
 
 const TEST_API_TOKEN = "integration-test-token";
@@ -269,6 +293,10 @@ describe("push API auth and subscription routes", () => {
     expect(unauthenticatedLocalCaStatus.status).toBe(401);
     API_ERROR_SCHEMA.parse(await unauthenticatedLocalCaStatus.json());
 
+    const unauthenticatedDebugClientErrors = await fetch(`${baseUrl}/api/debug/client-errors`);
+    expect(unauthenticatedDebugClientErrors.status).toBe(401);
+    API_ERROR_SCHEMA.parse(await unauthenticatedDebugClientErrors.json());
+
     const authenticatedHealth = await fetch(`${baseUrl}/api/health`, {
       headers: authHeaders(false)
     });
@@ -425,6 +453,62 @@ describe("push API auth and subscription routes", () => {
     expect(statusAfterDelete.status).toBe(200);
     const parsedStatusAfterDelete = PUSH_STATUS_ENVELOPE_SCHEMA.parse(await statusAfterDelete.json());
     expect(parsedStatusAfterDelete.subscriptionCount).toBe(0);
+  });
+
+  it("records and serves debug client errors with auth", async () => {
+    const createResponse = await fetch(`${baseUrl}/api/debug/client-errors`, {
+      method: "POST",
+      headers: authHeaders(true),
+      body: JSON.stringify({
+        source: "web-app",
+        operation: "push:auto-heal",
+        message: "The string did not match the expected pattern.",
+        requestId: "req_test_1",
+        threadId: "thread_test_1",
+        url: "/threads/thread_test_1",
+        details: {
+          tab: "chat"
+        }
+      })
+    });
+    expect(createResponse.status).toBe(200);
+    const parsedCreate = DEBUG_ERROR_CREATE_ENVELOPE_SCHEMA.parse(await createResponse.json());
+    expect(parsedCreate.errorId.startsWith("error_")).toBe(true);
+    expect(parsedCreate.sessionId.startsWith("session_")).toBe(true);
+
+    const listResponse = await fetch(`${baseUrl}/api/debug/client-errors?limit=20`, {
+      headers: authHeaders(false)
+    });
+    expect(listResponse.status).toBe(200);
+    const parsedList = DEBUG_ERROR_LIST_ENVELOPE_SCHEMA.parse(await listResponse.json());
+    expect(parsedList.data.length).toBeGreaterThan(0);
+
+    const matched = parsedList.data.find((entry) => entry.errorId === parsedCreate.errorId);
+    expect(matched?.operation).toBe("push:auto-heal");
+    expect(matched?.origin).toBe("client");
+    expect(matched?.requestId).toBe("req_test_1");
+
+    const detailResponse = await fetch(
+      `${baseUrl}/api/debug/client-errors/${encodeURIComponent(parsedCreate.errorId)}`,
+      {
+        headers: authHeaders(false)
+      }
+    );
+    expect(detailResponse.status).toBe(200);
+    const parsedDetail = DEBUG_ERROR_DETAIL_ENVELOPE_SCHEMA.parse(await detailResponse.json());
+    expect(parsedDetail.error.errorId).toBe(parsedCreate.errorId);
+    expect(parsedDetail.error.threadId).toBe("thread_test_1");
+    expect(parsedDetail.sessionId).toBe(parsedCreate.sessionId);
+    expect(parsedDetail.sessionLogPath).toContain(".runtime/logs/errors");
+    expect(fs.existsSync(parsedDetail.sessionLogPath)).toBe(true);
+
+    const sessionLogDownload = await fetch(`${baseUrl}/api/debug/client-errors/session-log`, {
+      headers: authHeaders(false)
+    });
+    expect(sessionLogDownload.status).toBe(200);
+    const downloadedLog = await sessionLogDownload.text();
+    expect(downloadedLog).toContain(parsedCreate.errorId);
+    expect(downloadedLog).toContain("\"origin\":\"client\"");
   });
 
   it("allows non-loopback /api routes when API_TOKEN is unset", async () => {

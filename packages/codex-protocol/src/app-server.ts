@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { NonEmptyStringSchema, NonNegativeIntSchema, NullableNonEmptyStringSchema } from "./common.js";
+import {
+  JsonValueSchema,
+  NonEmptyStringSchema,
+  NonNegativeIntSchema,
+  NullableNonEmptyStringSchema,
+  NullableStringSchema
+} from "./common.js";
 import { ProtocolValidationError } from "./errors.js";
 import { CollaborationModeSchema, ThreadConversationStateSchema } from "./thread.js";
 
@@ -130,6 +136,66 @@ export const AppServerSetModeRequestSchema = z
   })
   .strict();
 
+export const DebugErrorOriginSchema = z.enum(["client", "server"]);
+
+export const CreateDebugClientErrorBodySchema = z
+  .object({
+    source: NonEmptyStringSchema,
+    operation: NonEmptyStringSchema,
+    message: NonEmptyStringSchema,
+    name: NullableStringSchema.optional().default(null),
+    stack: NullableStringSchema.optional().default(null),
+    requestId: NullableStringSchema.optional().default(null),
+    threadId: NullableStringSchema.optional().default(null),
+    url: NullableStringSchema.optional().default(null),
+    occurredAt: z.string().datetime().optional(),
+    details: z.record(JsonValueSchema).optional().default({})
+  })
+  .strict();
+
+export const DebugErrorEventSchema = z
+  .object({
+    errorId: NonEmptyStringSchema,
+    sessionId: NonEmptyStringSchema,
+    origin: DebugErrorOriginSchema,
+    source: NonEmptyStringSchema,
+    operation: NonEmptyStringSchema,
+    message: NonEmptyStringSchema,
+    name: NullableStringSchema,
+    stack: NullableStringSchema,
+    requestId: NullableStringSchema,
+    threadId: NullableStringSchema,
+    url: NullableStringSchema,
+    occurredAt: z.string().datetime(),
+    recordedAt: z.string().datetime(),
+    details: z.record(JsonValueSchema)
+  })
+  .strict();
+
+export const DebugErrorCreateResponseSchema = z
+  .object({
+    errorId: NonEmptyStringSchema,
+    sessionId: NonEmptyStringSchema,
+    recordedAt: z.string().datetime()
+  })
+  .strict();
+
+export const DebugErrorListResponseSchema = z
+  .object({
+    data: z.array(DebugErrorEventSchema),
+    sessionId: NonEmptyStringSchema,
+    sessionLogPath: NonEmptyStringSchema
+  })
+  .strict();
+
+export const DebugErrorDetailResponseSchema = z
+  .object({
+    error: DebugErrorEventSchema,
+    sessionId: NonEmptyStringSchema,
+    sessionLogPath: NonEmptyStringSchema
+  })
+  .strict();
+
 export type AppServerListThreadsResponse = z.infer<typeof AppServerListThreadsResponseSchema>;
 export type AppServerReadThreadResponse = z.infer<typeof AppServerReadThreadResponseSchema>;
 export type AppServerListModelsResponse = z.infer<typeof AppServerListModelsResponseSchema>;
@@ -137,6 +203,11 @@ export type AppServerCollaborationModeListResponse = z.infer<
   typeof AppServerCollaborationModeListResponseSchema
 >;
 export type AppServerStartThreadResponse = z.infer<typeof AppServerStartThreadResponseSchema>;
+export type CreateDebugClientErrorBody = z.infer<typeof CreateDebugClientErrorBodySchema>;
+export type DebugErrorEvent = z.infer<typeof DebugErrorEventSchema>;
+export type DebugErrorCreateResponse = z.infer<typeof DebugErrorCreateResponseSchema>;
+export type DebugErrorListResponse = z.infer<typeof DebugErrorListResponseSchema>;
+export type DebugErrorDetailResponse = z.infer<typeof DebugErrorDetailResponseSchema>;
 
 export function parseAppServerListThreadsResponse(
   value: unknown
@@ -181,6 +252,54 @@ export function parseAppServerStartThreadResponse(value: unknown): AppServerStar
   const result = AppServerStartThreadResponseSchema.safeParse(value);
   if (!result.success) {
     throw ProtocolValidationError.fromZod("AppServerStartThreadResponse", result.error);
+  }
+  return result.data;
+}
+
+export function parseCreateDebugClientErrorBody(
+  value: z.input<typeof CreateDebugClientErrorBodySchema>
+): CreateDebugClientErrorBody {
+  const result = CreateDebugClientErrorBodySchema.safeParse(value);
+  if (!result.success) {
+    throw ProtocolValidationError.fromZod("CreateDebugClientErrorBody", result.error);
+  }
+  return result.data;
+}
+
+export function parseDebugErrorEvent(value: z.input<typeof DebugErrorEventSchema>): DebugErrorEvent {
+  const result = DebugErrorEventSchema.safeParse(value);
+  if (!result.success) {
+    throw ProtocolValidationError.fromZod("DebugErrorEvent", result.error);
+  }
+  return result.data;
+}
+
+export function parseDebugErrorCreateResponse(
+  value: z.input<typeof DebugErrorCreateResponseSchema>
+): DebugErrorCreateResponse {
+  const result = DebugErrorCreateResponseSchema.safeParse(value);
+  if (!result.success) {
+    throw ProtocolValidationError.fromZod("DebugErrorCreateResponse", result.error);
+  }
+  return result.data;
+}
+
+export function parseDebugErrorListResponse(
+  value: z.input<typeof DebugErrorListResponseSchema>
+): DebugErrorListResponse {
+  const result = DebugErrorListResponseSchema.safeParse(value);
+  if (!result.success) {
+    throw ProtocolValidationError.fromZod("DebugErrorListResponse", result.error);
+  }
+  return result.data;
+}
+
+export function parseDebugErrorDetailResponse(
+  value: z.input<typeof DebugErrorDetailResponseSchema>
+): DebugErrorDetailResponse {
+  const result = DebugErrorDetailResponseSchema.safeParse(value);
+  if (!result.success) {
+    throw ProtocolValidationError.fromZod("DebugErrorDetailResponse", result.error);
   }
   return result.data;
 }
