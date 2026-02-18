@@ -1,5 +1,6 @@
 import {
   CollaborationModeSchema,
+  CreatePushReceiptBodySchema,
   CreatePushSubscriptionBodySchema,
   DeletePushSubscriptionBodySchema
 } from "@farfield/protocol";
@@ -76,7 +77,7 @@ export const PushTestBodySchema = z
   })
   .strict();
 
-export { CreatePushSubscriptionBodySchema, DeletePushSubscriptionBodySchema };
+export { CreatePushReceiptBodySchema, CreatePushSubscriptionBodySchema, DeletePushSubscriptionBodySchema };
 
 export function parseBody<Schema extends z.ZodTypeAny>(
   schema: Schema,

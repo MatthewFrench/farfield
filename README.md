@@ -50,7 +50,15 @@ Push runtime state persists at an OS-specific app state location by default:
 - Linux: `$XDG_STATE_HOME/farfield/push-state.json` (or `~/.local/state/farfield/push-state.json`)
 - Windows: `%APPDATA%/farfield/push-state.json`
 
+Push receipt telemetry persists beside the push state file by default:
+- macOS: `~/Library/Application Support/farfield/push-receipts.json`
+- Linux: `$XDG_STATE_HOME/farfield/push-receipts.json` (or `~/.local/state/farfield/push-receipts.json`)
+- Windows: `%APPDATA%/farfield/push-receipts.json`
+
 Set `PUSH_STATE_PATH` to override this path.
+Set `PUSH_RECEIPTS_PATH` to override the receipts path.
+Set `PUSH_RECEIPTS_MAX_COUNT` to cap retained receipts (default `100`).
+Set `PUSH_RECEIPTS_MAX_AGE_DAYS` to prune old receipts by age (default `7` days).
 
 ## Make it available remotely
 
@@ -96,6 +104,11 @@ Home Screen runtime behavior:
 - While hidden, Farfield reduces live polling and reconnects live updates on foreground.
 - Farfield stores and restores your last visited route (`/threads/...`) for faster resume.
 - Push payloads include declarative metadata (`web_push.notification`) plus standard fields.
+- Push delivery uses retry with exponential backoff for transient provider/network errors.
+- Each push payload and receipt is correlated by `notificationId` for precise diagnostics.
+- Service worker update prompts appear in the header (`Update app`) when a new worker is ready.
+- Push receipts are recorded (`shown`, `clicked`, `error`) and surfaced in Preflight.
+- Preflight includes a `Reset push` action to re-register browser subscription state quickly.
 
 ### Local LAN HTTPS (same Wi-Fi)
 
@@ -105,6 +118,7 @@ Home Screen runtime behavior:
 4. If iOS shows a certificate warning, install/trust Caddy local root CA on the iPhone (one-time).
 5. Add to Home Screen.
 6. Launch from Home Screen and click `Enable Notifs`.
+7. In `Preflight`, use `Download CA cert` if iOS trust setup still needs the local root certificate.
 
 #### Trust Local Caddy Cert (one-time)
 
@@ -118,6 +132,7 @@ open "$HOME/Library/Application Support/Caddy/pki/authorities/local"
 3. On iPhone, install the profile from `Settings` -> `General` -> `VPN & Device Management`.
 4. Enable full trust in `Settings` -> `General` -> `About` -> `Certificate Trust Settings`.
 5. Re-open your `https://...` Farfield origin and confirm no certificate warning.
+6. Or open Farfield `Preflight` and use `Download CA cert` to fetch `root.crt` directly from `/api/push/local-ca/root.crt`.
 
 ### Public Domain HTTPS
 
@@ -152,6 +167,12 @@ caddy run --config ops/caddy/Caddyfile.domain
 3. Press Home, send another `Push test`, and confirm a background notification appears.
 4. Tap the notification and confirm the target thread opens.
 5. Open the `Preflight` tab and confirm `background push ready`.
+6. Confirm `Push receipt signal` shows a recent `shown`/`clicked` timestamp.
+
+### Auto-heal + Updates
+
+- After notifications are enabled once, Farfield auto-reconciles push subscription state when the app returns to foreground.
+- If a service worker update is available, click `Update app` in the header to activate it immediately.
 
 ### iOS Troubleshooting
 
@@ -160,6 +181,8 @@ caddy run --config ops/caddy/Caddyfile.domain
 | `notif:unsupported` in header | Not running from Safari/Home Screen secure context | Open the HTTPS origin in Safari, add to Home Screen, relaunch from Home Screen |
 | Permission prompt never appears | Permission was previously denied | iOS Settings -> Notifications -> Safari (or web app) and re-enable, then try `Enable Notifs` again |
 | No background notification | App is not installed to Home Screen, or no active push subscription | Install to Home Screen, ensure `Enable Notifs` is active, and verify in Preflight page |
+| Bottom gap in app shell | App is running in Safari tab mode or stale service worker assets are still active | Launch from Home Screen, then click `Update app` in header so latest layout logic takes effect |
+| Preflight receipt signal stays empty | Notification not shown/clicked yet, or service worker is stale | Run `Push test`, tap notification, then refresh Preflight; if update banner appears, click `Update app` |
 | `push:doctor` shows unauthorized | Token mismatch between server and doctor env | Set matching `API_TOKEN` and `PUSH_DOCTOR_TOKEN` values |
 | Local HTTPS page does not load on iPhone | Generated `Caddyfile.local` host is wrong or CA not trusted | Re-run `pnpm setup:ios-push`, restart `pnpm ios:local`, trust Caddy local CA on iPhone |
 

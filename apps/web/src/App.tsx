@@ -31,8 +31,10 @@ import {
   createThread,
   getHealth,
   getHistoryEntry,
+  getLatestPushReceipt,
   getLiveState,
   getPendingUserInputRequests,
+  getPushLocalCaStatus,
   getPushStatus,
   getStreamEvents,
   readThread,
@@ -77,6 +79,7 @@ import {
   disablePushNotifications,
   enablePushNotifications,
   getPushClientState,
+  reconcilePushSubscription,
   updatePushSettings,
   type PushClientState
 } from "@/lib/push";
@@ -94,6 +97,8 @@ type HistoryResponse = Awaited<ReturnType<typeof listDebugHistory>>;
 type HistoryDetail = Awaited<ReturnType<typeof getHistoryEntry>>;
 type PendingRequest = ReturnType<typeof getPendingUserInputRequests>[number];
 type PushStatusResponse = Awaited<ReturnType<typeof getPushStatus>>;
+type PushLatestReceiptResponse = Awaited<ReturnType<typeof getLatestPushReceipt>>;
+type PushLocalCaStatusResponse = Awaited<ReturnType<typeof getPushLocalCaStatus>>;
 type PushTestResponse = Awaited<ReturnType<typeof sendPushTestNotification>>;
 type Thread = ThreadsResponse["data"][number];
 type AppTab = "chat" | "debug" | "preflight";
@@ -137,6 +142,7 @@ const RESUME_PATH_STORAGE_KEY = "farfield.resume.path.v1";
 const CORE_REFRESH_INTERVAL_VISIBLE_MS = 5_000;
 const CORE_REFRESH_INTERVAL_HIDDEN_MS = 30_000;
 const STREAM_REFRESH_DEBOUNCE_MS = 800;
+const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";
 
 function isPlanModeOption(mode: { mode: string; name: string }): boolean {
   return mode.mode.toLowerCase().includes("plan") || mode.name.toLowerCase().includes("plan");
@@ -315,6 +321,31 @@ function writeResumePathToStorage(pathname: string): void {
   }
 }
 
+function isLocalPushHost(hostname: string): boolean {
+  if (!hostname) {
+    return false;
+  }
+  if (hostname === "localhost") {
+    return true;
+  }
+  if (hostname.endsWith(".local")) {
+    return true;
+  }
+  return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname);
+}
+
+interface NavigatorWithStandalone extends Navigator {
+  standalone?: boolean;
+}
+
+function detectStandaloneDisplayMode(): boolean {
+  const navigatorWithStandalone = window.navigator as NavigatorWithStandalone;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    navigatorWithStandalone.standalone === true
+  );
+}
+
 function parseUiStateFromPath(pathname: string): { threadId: string | null; tab: AppTab } {
   const segments = pathname.split("/").filter((segment) => segment.length > 0);
   if (segments.length === 0) {
@@ -446,10 +477,14 @@ export function App(): React.JSX.Element {
     subscribed: false
   });
   const [pushBusy, setPushBusy] = useState(false);
+  const [pushResetBusy, setPushResetBusy] = useState(false);
   const [pushPrivateMode, setPushPrivateMode] = useState(true);
   const [pushDryRunBusy, setPushDryRunBusy] = useState(false);
   const [pushDryRunResult, setPushDryRunResult] = useState<PushTestResponse | null>(null);
   const [pushDryRunError, setPushDryRunError] = useState("");
+  const [pushLatestReceipt, setPushLatestReceipt] = useState<PushLatestReceiptResponse["latest"] | null>(null);
+  const [pushLocalCaStatus, setPushLocalCaStatus] = useState<PushLocalCaStatusResponse | null>(null);
+  const [serviceWorkerUpdateAvailable, setServiceWorkerUpdateAvailable] = useState(false);
 
   /* UI state */
   const [activeTab, setActiveTab] = useState<AppTab>(initialUiState.tab);
@@ -460,6 +495,9 @@ export function App(): React.JSX.Element {
   const [suppressEntryAnimations, setSuppressEntryAnimations] = useState(false);
   const [hasHydratedModeFromLiveState, setHasHydratedModeFromLiveState] = useState(false);
   const [isModeSyncing, setIsModeSyncing] = useState(false);
+  const [isStandaloneDisplayMode, setIsStandaloneDisplayMode] = useState(
+    () => detectStandaloneDisplayMode()
+  );
   const [isDocumentVisible, setIsDocumentVisible] = useState(
     () => document.visibilityState === "visible"
   );
@@ -626,8 +664,40 @@ export function App(): React.JSX.Element {
   const pushPermission = pushClientState.permission;
   const isSecureContextReady = typeof window !== "undefined" && window.isSecureContext;
   const pushDryRunReady = pushDryRunResult?.ready === true;
+  const pushModeLabel = pushPrivateMode
+    ? "Notifications: Private (switch to Detailed)"
+    : "Notifications: Detailed (switch to Private)";
+  const pushStatusLabel = (() => {
+    if (!pushSupported) {
+      return "Push unsupported in this browser";
+    }
+    if (!pushServerEnabled) {
+      return "Server push disabled";
+    }
+    if (pushPermission === "granted") {
+      return "Notifications enabled";
+    }
+    if (pushPermission === "denied") {
+      return "Notifications blocked";
+    }
+    return "Notification permission needed";
+  })();
+  const pushRequiresHomeScreenInstall = pushSupported && !isStandaloneDisplayMode;
+  const requiresLocalCaTrust = isLocalPushHost(window.location.hostname);
+  const pushLocalCaDownloadPath = pushLocalCaStatus?.downloadPath ?? null;
+  const appShellStyle: React.CSSProperties = {
+    paddingBottom: isStandaloneDisplayMode ? "env(safe-area-inset-bottom)" : "0px"
+  };
   const preflightChecks = useMemo<PreflightCheck[]>(() => {
     return [
+      {
+        id: "home-screen",
+        label: "Home Screen launch mode",
+        ready: isStandaloneDisplayMode,
+        detail: isStandaloneDisplayMode
+          ? "Running as a Home Screen app."
+          : "Open this app from iOS Home Screen to allow background notifications."
+      },
       {
         id: "secure-context",
         label: "Secure origin",
@@ -693,14 +763,41 @@ export function App(): React.JSX.Element {
           : pushDryRunResult
           ? `${pushDryRunResult.reason} (subscriptions: ${String(pushDryRunResult.attempted)})`
           : "Run dry-run check to verify server push path."
+      },
+      {
+        id: "local-ca",
+        label: "Local CA helper",
+        ready: !requiresLocalCaTrust || pushLocalCaStatus?.available === true,
+        detail:
+          !requiresLocalCaTrust
+            ? "Public domain origin: local CA trust is not required."
+            : pushLocalCaStatus === null
+            ? "Local CA helper status unavailable."
+            : pushLocalCaStatus.available
+            ? "Download local root certificate from this page for iPhone trust setup."
+            : "Local Caddy root certificate not found. Run ios local HTTPS once to generate it."
+      },
+      {
+        id: "receipt-signal",
+        label: "Push receipt signal",
+        ready: pushLatestReceipt === null || pushLatestReceipt.event !== "error",
+        detail: pushLatestReceipt
+          ? `${pushLatestReceipt.event} [${pushLatestReceipt.notificationId}] at ${formatDate(pushLatestReceipt.createdAt)}${
+              pushLatestReceipt.message ? ` (${pushLatestReceipt.message})` : ""
+            }`
+          : "No receipt recorded yet. Send Push test and tap notification."
       }
     ];
   }, [
+    isStandaloneDisplayMode,
     isSecureContextReady,
     pushDryRunError,
     pushDryRunReady,
     pushDryRunResult,
+    pushLocalCaStatus,
+    pushLatestReceipt,
     pushPermission,
+    requiresLocalCaTrust,
     pushServerEnabled,
     pushServiceWorkerRegistered,
     pushStatus,
@@ -751,14 +848,22 @@ export function App(): React.JSX.Element {
     }
 
     try {
-      const status = await getPushStatus();
+      const [status, latestReceiptResponse, localCaStatus] = await Promise.all([
+        getPushStatus(),
+        getLatestPushReceipt(),
+        getPushLocalCaStatus()
+      ]);
       setPushStatus(status);
+      setPushLatestReceipt(latestReceiptResponse.latest);
+      setPushLocalCaStatus(localCaStatus);
       if (!pushModeHydratedRef.current) {
         setPushPrivateMode(status.privateModeDefault);
         pushModeHydratedRef.current = true;
       }
     } catch {
       setPushStatus(null);
+      setPushLatestReceipt(null);
+      setPushLocalCaStatus(null);
     }
   }, []);
 
@@ -795,6 +900,18 @@ export function App(): React.JSX.Element {
       setError(toErrorMessage(e));
     }
   }, [loadCoreData, loadPushData, loadSelectedThread]);
+
+  const runPushAutoHeal = useCallback(async () => {
+    try {
+      const reconcileInput = pushModeHydratedRef.current ? { privateMode: pushPrivateMode } : undefined;
+      const result = await reconcilePushSubscription(reconcileInput);
+      if (result.attempted) {
+        await loadPushData();
+      }
+    } catch (e) {
+      setError(toErrorMessage(e));
+    }
+  }, [loadPushData, pushPrivateMode]);
 
   const togglePushSubscription = useCallback(async () => {
     setPushBusy(true);
@@ -878,6 +995,44 @@ export function App(): React.JSX.Element {
     await Promise.all([loadPushData(), runPushDryRunCheck()]);
   }, [loadPushData, runPushDryRunCheck]);
 
+  const resetPushSubscription = useCallback(async () => {
+    if (!pushSupported) {
+      setError("Push notifications are not supported in this browser");
+      return;
+    }
+
+    setPushResetBusy(true);
+    setPushBusy(true);
+    try {
+      if (pushSubscribed) {
+        await disablePushNotifications();
+      }
+      await enablePushNotifications({
+        privateMode: pushPrivateMode
+      });
+      await Promise.all([loadPushData(), runPushDryRunCheck()]);
+      setError("");
+    } catch (e) {
+      setError(toErrorMessage(e));
+    } finally {
+      setPushBusy(false);
+      setPushResetBusy(false);
+    }
+  }, [loadPushData, pushPrivateMode, pushSubscribed, pushSupported, runPushDryRunCheck]);
+
+  const applyServiceWorkerUpdate = useCallback(async () => {
+    if (!("serviceWorker" in navigator)) {
+      return;
+    }
+    const registration = await navigator.serviceWorker.getRegistration();
+    const waitingWorker = registration?.waiting;
+    if (!waitingWorker) {
+      setServiceWorkerUpdateAvailable(false);
+      return;
+    }
+    waitingWorker.postMessage({ type: "SKIP_WAITING" });
+  }, []);
+
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
   }, [selectedThreadId]);
@@ -899,6 +1054,47 @@ export function App(): React.JSX.Element {
   }, []);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia("(display-mode: standalone)");
+    const syncDisplayMode = () => {
+      setIsStandaloneDisplayMode(detectStandaloneDisplayMode());
+    };
+
+    syncDisplayMode();
+    window.addEventListener("focus", syncDisplayMode);
+    window.addEventListener("pageshow", syncDisplayMode);
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncDisplayMode);
+    }
+
+    return () => {
+      window.removeEventListener("focus", syncDisplayMode);
+      window.removeEventListener("pageshow", syncDisplayMode);
+      if (typeof mediaQuery.removeEventListener === "function") {
+        mediaQuery.removeEventListener("change", syncDisplayMode);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const onServiceWorkerUpdateAvailable = () => {
+      setServiceWorkerUpdateAvailable(true);
+    };
+
+    window.addEventListener(SERVICE_WORKER_UPDATE_EVENT_NAME, onServiceWorkerUpdateAvailable);
+    if ("serviceWorker" in navigator) {
+      void navigator.serviceWorker.getRegistration().then((registration) => {
+        if (registration?.waiting && navigator.serviceWorker.controller) {
+          setServiceWorkerUpdateAvailable(true);
+        }
+      });
+    }
+
+    return () => {
+      window.removeEventListener(SERVICE_WORKER_UPDATE_EVENT_NAME, onServiceWorkerUpdateAvailable);
+    };
+  }, []);
+
+  useEffect(() => {
     const onVisibilityChange = () => {
       const visible = document.visibilityState === "visible";
       setIsDocumentVisible(visible);
@@ -909,6 +1105,7 @@ export function App(): React.JSX.Element {
       if (visible) {
         void loadCoreData().catch((e) => setError(toErrorMessage(e)));
         void loadPushData();
+        void runPushAutoHeal();
         if (selectedThreadIdRef.current) {
           void loadSelectedThread(selectedThreadIdRef.current).catch((e) =>
             setError(toErrorMessage(e))
@@ -921,7 +1118,14 @@ export function App(): React.JSX.Element {
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [loadCoreData, loadPushData, loadSelectedThread]);
+  }, [loadCoreData, loadPushData, loadSelectedThread, runPushAutoHeal]);
+
+  useEffect(() => {
+    if (!isDocumentVisible) {
+      return;
+    }
+    void runPushAutoHeal();
+  }, [isDocumentVisible, runPushAutoHeal]);
 
   useEffect(() => {
     const nextPath = buildPathFromUiState(selectedThreadId, activeTab);
@@ -1463,7 +1667,7 @@ export function App(): React.JSX.Element {
   /* ── Render ─────────────────────────────────────────────── */
   return (
     <TooltipProvider delayDuration={120}>
-      <div className="app-shell flex bg-background text-foreground font-sans">
+      <div className="app-shell flex bg-background text-foreground font-sans" style={appShellStyle}>
 
       {/* Mobile sidebar backdrop */}
       <AnimatePresence>
@@ -1543,10 +1747,26 @@ export function App(): React.JSX.Element {
                   <span>generating</span>
                 </div>
               )}
+              {pushRequiresHomeScreenInstall && (
+                <div className="text-[11px] text-amber-600 dark:text-amber-400">
+                  Open from Home Screen for background notifications
+                </div>
+              )}
             </div>
           </div>
 
           <div className="flex items-center gap-0.5 shrink-0">
+            {serviceWorkerUpdateAvailable && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                onClick={() => void applyServiceWorkerUpdate()}
+              >
+                Update app
+              </Button>
+            )}
             <IconBtn
               onClick={() => void refreshAll()}
               disabled={isBusy}
@@ -1826,7 +2046,7 @@ export function App(): React.JSX.Element {
                       }
                     >
                       {pushSubscribed ? <BellOff size={10} /> : <Bell size={10} />}
-                      {pushSubscribed ? "Disable Notifs" : "Enable Notifs"}
+                      {pushSubscribed ? "Disable Notifications" : "Enable Notifications"}
                     </Button>
                     <Button
                       type="button"
@@ -1836,14 +2056,10 @@ export function App(): React.JSX.Element {
                       className="h-8 shrink-0 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60"
                       disabled={pushBusy || !pushSupported || (pushSubscribed && !pushServerEnabled)}
                     >
-                      {pushPrivateMode ? "Private" : "Detailed"}
+                      {pushModeLabel}
                     </Button>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {pushSupported
-                        ? pushServerEnabled
-                          ? `notif:${pushPermission}`
-                          : "notif:server-off"
-                        : "notif:unsupported"}
+                      {pushStatusLabel}
                     </span>
                     {pendingRequests.length > 0 && (
                       <span className="shrink-0 text-xs text-amber-500 dark:text-amber-400">
@@ -1878,6 +2094,34 @@ export function App(): React.JSX.Element {
                   >
                     {preflightReady ? "background push ready" : "not ready"}
                   </span>
+                  {pushLocalCaDownloadPath && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        window.open(pushLocalCaDownloadPath, "_blank", "noopener,noreferrer");
+                      }}
+                    >
+                      Download CA cert
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={
+                      pushResetBusy ||
+                      pushBusy ||
+                      !pushSupported ||
+                      !pushServerEnabled
+                    }
+                    onClick={() => void resetPushSubscription()}
+                  >
+                    {pushResetBusy ? "Resetting..." : "Reset push"}
+                  </Button>
                   <Button
                     type="button"
                     variant="outline"

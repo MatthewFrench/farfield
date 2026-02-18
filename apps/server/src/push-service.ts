@@ -34,6 +34,71 @@ const WebPushErrorSchema = z
   })
   .passthrough();
 
+const MAX_PUSH_SEND_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 200;
+const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+interface DescribedPushError {
+  statusCode: number | null;
+  message: string;
+}
+
+function describePushError(error: unknown): DescribedPushError {
+  const parsedError = WebPushErrorSchema.safeParse(error);
+  if (!parsedError.success) {
+    return {
+      statusCode: null,
+      message: "Push send failed"
+    };
+  }
+
+  return {
+    statusCode: parsedError.data.statusCode ?? null,
+    message: parsedError.data.message ?? "Push send failed"
+  };
+}
+
+function shouldRetrySendFailure(statusCode: number | null): boolean {
+  if (statusCode === null) {
+    return true;
+  }
+  return RETRYABLE_STATUS_CODES.has(statusCode);
+}
+
+function sleep(delayMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+}
+
+async function sendNotificationWithRetry(
+  subscription: webPush.PushSubscription,
+  payload: string,
+  requestOptions: webPush.RequestOptions
+): Promise<void> {
+  let attempt = 0;
+  while (attempt < MAX_PUSH_SEND_ATTEMPTS) {
+    try {
+      await webPush.sendNotification(subscription, payload, requestOptions);
+      return;
+    } catch (error) {
+      attempt += 1;
+      const described = describePushError(error);
+      if (
+        attempt >= MAX_PUSH_SEND_ATTEMPTS ||
+        !shouldRetrySendFailure(described.statusCode)
+      ) {
+        throw error;
+      }
+
+      const delayMs = RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
+      await sleep(delayMs);
+    }
+  }
+
+  throw new Error("Push send retry loop exhausted");
+}
+
 function toWireSubscription(subscription: StoredPushSubscription): webPush.PushSubscription {
   return {
     endpoint: subscription.subscription.endpoint,
@@ -93,19 +158,14 @@ export class PushService {
 
     for (const subscription of subscriptions) {
       try {
-        await webPush.sendNotification(toWireSubscription(subscription), body, requestOptions);
+        await sendNotificationWithRetry(
+          toWireSubscription(subscription),
+          body,
+          requestOptions
+        );
         delivered += 1;
       } catch (error) {
-        const parsedError = WebPushErrorSchema.safeParse(error);
-        const described = parsedError.success
-          ? {
-              statusCode: parsedError.data.statusCode ?? null,
-              message: parsedError.data.message ?? "Push send failed"
-            }
-          : {
-              statusCode: null,
-              message: "Push send failed"
-            };
+        const described = describePushError(error);
         failures.push({
           endpoint: subscription.subscription.endpoint,
           statusCode: described.statusCode,

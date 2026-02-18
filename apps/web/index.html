@@ -3,12 +3,384 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#101729" />
+    <meta id="theme-color-meta" name="theme-color" content="#000000" />
+    <meta id="farfield-build-id-meta" name="farfield-build-id" content="%VITE_APP_BUILD_ID%" />
+    <meta id="farfield-commit-meta" name="farfield-commit" content="%VITE_GIT_COMMIT%" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <script>
       (() => {
         const resumePathStorageKey = "farfield.resume.path.v1";
+        const bootStatusEventName = "farfield:boot-status";
+        const bootStuckTimeoutMs = 10_000;
+        const darkBackground = "#000000";
+        const lightBackground = "#f8fafc";
+        const darkThemeColor = "#000000";
+        const lightThemeColor = "#f8fafc";
+        let bootStuckTimer = null;
+        let currentBootStatus = {
+          message: "Loading Farfield",
+          details: "",
+          isError: false,
+          showActions: false,
+          detailsOpen: false,
+          hmrStatus: ""
+        };
+
+        function normalizeMetaValue(value) {
+          if (typeof value !== "string") {
+            return "";
+          }
+          const trimmed = value.trim();
+          if (!trimmed) {
+            return "";
+          }
+          if (trimmed.startsWith("%VITE_") && trimmed.endsWith("%")) {
+            return "";
+          }
+          return trimmed;
+        }
+
+        function readMetaContent(metaId) {
+          const element = document.getElementById(metaId);
+          if (!(element instanceof HTMLMetaElement)) {
+            return "";
+          }
+          return normalizeMetaValue(element.content);
+        }
+
+        function stringifyErrorReason(reason) {
+          if (reason instanceof Error) {
+            return typeof reason.stack === "string" && reason.stack.trim().length > 0
+              ? reason.stack
+              : reason.message;
+          }
+          if (typeof reason === "string") {
+            return reason;
+          }
+          try {
+            return JSON.stringify(reason);
+          } catch {
+            return String(reason);
+          }
+        }
+
+        function getSplashElements() {
+          return {
+            splash: document.getElementById("boot-splash"),
+            message: document.getElementById("boot-splash-message"),
+            details: document.getElementById("boot-splash-details"),
+            spinner: document.getElementById("boot-splash-spinner"),
+            actions: document.getElementById("boot-splash-actions"),
+            hmrStatus: document.getElementById("boot-splash-hmr")
+          };
+        }
+
+        function scheduleBootStuckCheck() {
+          if (bootStuckTimer !== null) {
+            window.clearTimeout(bootStuckTimer);
+          }
+
+          bootStuckTimer = window.setTimeout(() => {
+            const { splash } = getSplashElements();
+            if (!(splash instanceof HTMLDivElement)) {
+              return;
+            }
+            if (splash.classList.contains("boot-splash--hidden")) {
+              return;
+            }
+
+            applyBootStatus({
+              message: "Still loading Farfield",
+              details:
+                "The app is taking longer than expected.\nUse Retry or Hard Refresh, then open diagnostics.",
+              isError: true,
+              showActions: true
+            });
+          }, bootStuckTimeoutMs);
+        }
+
+        function applyBootStatus(status) {
+          const nextStatus = {
+            message: currentBootStatus.message,
+            details: currentBootStatus.details,
+            isError: currentBootStatus.isError,
+            showActions: currentBootStatus.showActions,
+            detailsOpen: currentBootStatus.detailsOpen,
+            hmrStatus: currentBootStatus.hmrStatus
+          };
+
+          if (typeof status.message === "string" && status.message.trim().length > 0) {
+            nextStatus.message = status.message.trim();
+          }
+          if (typeof status.details === "string") {
+            nextStatus.details = status.details;
+          }
+          if (status.isError === true) {
+            nextStatus.isError = true;
+          } else if (status.isError === false) {
+            nextStatus.isError = false;
+          }
+          if (status.showActions === true) {
+            nextStatus.showActions = true;
+          } else if (status.showActions === false) {
+            nextStatus.showActions = false;
+          }
+          if (status.detailsOpen === true) {
+            nextStatus.detailsOpen = true;
+          } else if (status.detailsOpen === false) {
+            nextStatus.detailsOpen = false;
+          }
+          if (typeof status.hmrStatus === "string") {
+            nextStatus.hmrStatus = status.hmrStatus.trim();
+          }
+          if (nextStatus.isError) {
+            nextStatus.showActions = true;
+          }
+
+          currentBootStatus = nextStatus;
+
+          const { splash, message, details, spinner, actions, hmrStatus } = getSplashElements();
+          if (
+            !(splash instanceof HTMLDivElement) ||
+            !(message instanceof HTMLSpanElement) ||
+            !(details instanceof HTMLPreElement) ||
+            !(spinner instanceof HTMLDivElement)
+          ) {
+            return;
+          }
+
+          message.textContent = nextStatus.message;
+          if (nextStatus.isError) {
+            splash.classList.add("boot-splash--error");
+            spinner.style.display = "none";
+          } else {
+            splash.classList.remove("boot-splash--error");
+            spinner.style.display = "";
+          }
+
+          if (hmrStatus instanceof HTMLSpanElement) {
+            if (nextStatus.hmrStatus.length > 0) {
+              hmrStatus.hidden = false;
+              hmrStatus.textContent = `Dev status: ${nextStatus.hmrStatus}`;
+            } else {
+              hmrStatus.hidden = true;
+              hmrStatus.textContent = "";
+            }
+          }
+
+          const shouldShowDetails =
+            nextStatus.detailsOpen || (nextStatus.isError && nextStatus.details.trim().length > 0);
+          if (shouldShowDetails && nextStatus.details.trim().length > 0) {
+            details.hidden = false;
+            details.textContent = nextStatus.details;
+          } else {
+            details.hidden = true;
+            details.textContent = "";
+          }
+
+          if (actions instanceof HTMLDivElement) {
+            actions.hidden = !nextStatus.showActions;
+          }
+
+          if (!nextStatus.isError) {
+            scheduleBootStuckCheck();
+          } else if (bootStuckTimer !== null) {
+            window.clearTimeout(bootStuckTimer);
+            bootStuckTimer = null;
+          }
+        }
+
+        async function collectDiagnostics() {
+          const lines = [
+            `Captured at: ${new Date().toISOString()}`,
+            `URL: ${window.location.href}`,
+            `User agent: ${navigator.userAgent}`,
+            `Theme: ${document.documentElement.classList.contains("dark") ? "dark" : "light"}`,
+            `Visibility: ${document.visibilityState}`,
+            `Online: ${String(navigator.onLine)}`,
+            `Build id: ${readMetaContent("farfield-build-id-meta") || "unknown"}`,
+            `Commit: ${readMetaContent("farfield-commit-meta") || "unknown"}`
+          ];
+
+          if (currentBootStatus.hmrStatus.length > 0) {
+            lines.push(`HMR status: ${currentBootStatus.hmrStatus}`);
+          }
+
+          if ("serviceWorker" in navigator) {
+            try {
+              const registration = await navigator.serviceWorker.getRegistration();
+              const controller = navigator.serviceWorker.controller;
+              lines.push(`Service worker controller: ${controller ? "present" : "none"}`);
+              if (controller && typeof controller.scriptURL === "string") {
+                lines.push(`Service worker controller URL: ${controller.scriptURL}`);
+              }
+              if (registration) {
+                lines.push(`Service worker scope: ${registration.scope}`);
+                lines.push(`Service worker active: ${registration.active ? registration.active.state : "none"}`);
+                lines.push(`Service worker waiting: ${registration.waiting ? registration.waiting.state : "none"}`);
+                lines.push(
+                  `Service worker installing: ${registration.installing ? registration.installing.state : "none"}`
+                );
+              } else {
+                lines.push("Service worker registration: none");
+              }
+            } catch (error) {
+              lines.push(`Service worker check error: ${stringifyErrorReason(error)}`);
+            }
+          } else {
+            lines.push("Service worker support: unavailable");
+          }
+
+          if (currentBootStatus.details.trim().length > 0) {
+            lines.push("", "Boot status details:", currentBootStatus.details);
+          }
+
+          return lines.join("\n");
+        }
+
+        async function hardRefresh() {
+          if ("serviceWorker" in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map((registration) => registration.unregister()));
+          }
+
+          if ("caches" in window) {
+            const cacheKeys = await caches.keys();
+            await Promise.all(cacheKeys.map((cacheKey) => caches.delete(cacheKey)));
+          }
+
+          window.location.reload();
+        }
+
+        function initBootSplashActions() {
+          const retryButton = document.getElementById("boot-action-retry");
+          const hardRefreshButton = document.getElementById("boot-action-hard-refresh");
+          const diagnosticsButton = document.getElementById("boot-action-diagnostics");
+          const copyButton = document.getElementById("boot-action-copy");
+
+          if (retryButton instanceof HTMLButtonElement) {
+            retryButton.addEventListener("click", () => {
+              window.location.reload();
+            });
+          }
+
+          if (hardRefreshButton instanceof HTMLButtonElement) {
+            hardRefreshButton.addEventListener("click", () => {
+              void hardRefresh().catch((error) => {
+                applyBootStatus({
+                  message: "Hard Refresh failed",
+                  details: stringifyErrorReason(error),
+                  isError: true,
+                  showActions: true,
+                  detailsOpen: true
+                });
+              });
+            });
+          }
+
+          if (diagnosticsButton instanceof HTMLButtonElement) {
+            diagnosticsButton.addEventListener("click", () => {
+              void collectDiagnostics().then((diagnostics) => {
+                applyBootStatus({
+                  message: "Diagnostics",
+                  details: diagnostics,
+                  isError: true,
+                  showActions: true,
+                  detailsOpen: true
+                });
+              });
+            });
+          }
+
+          if (copyButton instanceof HTMLButtonElement) {
+            copyButton.addEventListener("click", () => {
+              void collectDiagnostics().then(async (diagnostics) => {
+                try {
+                  await navigator.clipboard.writeText(diagnostics);
+                  applyBootStatus({
+                    message: "Diagnostics copied",
+                    details: diagnostics,
+                    isError: true,
+                    showActions: true,
+                    detailsOpen: false
+                  });
+                } catch (error) {
+                  applyBootStatus({
+                    message: "Could not copy diagnostics",
+                    details: `${diagnostics}\n\nCopy error: ${stringifyErrorReason(error)}`,
+                    isError: true,
+                    showActions: true,
+                    detailsOpen: true
+                  });
+                }
+              });
+            });
+          }
+        }
+
+        window.addEventListener(bootStatusEventName, (event) => {
+          if (!(event instanceof CustomEvent)) {
+            return;
+          }
+
+          const detail = event.detail;
+          if (!detail || typeof detail !== "object") {
+            return;
+          }
+
+          const message = typeof detail.message === "string" ? detail.message.trim() : "";
+          if (!message) {
+            return;
+          }
+
+          const details = typeof detail.details === "string" ? detail.details : "";
+          const isError = detail.isError === true;
+          const showActions = detail.showActions === true;
+          const detailsOpen = detail.detailsOpen === true;
+          const hmrStatus = typeof detail.hmrStatus === "string" ? detail.hmrStatus : undefined;
+          applyBootStatus({ message, details, isError, showActions, detailsOpen, hmrStatus });
+        });
+
+        window.addEventListener("error", (event) => {
+          const message =
+            typeof event.message === "string" && event.message.trim().length > 0
+              ? event.message
+              : "Application failed to load";
+          const details =
+            event.error instanceof Error
+              ? stringifyErrorReason(event.error)
+              : typeof event.filename === "string" && event.filename.length > 0
+              ? `${event.filename}:${String(event.lineno)}:${String(event.colno)}`
+              : "";
+
+          applyBootStatus({
+            message: "Build/runtime error",
+            details: details || message,
+            isError: true,
+            showActions: true,
+            detailsOpen: true
+          });
+        });
+
+        window.addEventListener("unhandledrejection", (event) => {
+          const detail = stringifyErrorReason(event.reason);
+          applyBootStatus({
+            message: "Unhandled promise rejection",
+            details: detail,
+            isError: true,
+            showActions: true,
+            detailsOpen: true
+          });
+        });
+
+        scheduleBootStuckCheck();
+
+        document.addEventListener("DOMContentLoaded", () => {
+          initBootSplashActions();
+          applyBootStatus(currentBootStatus);
+        });
+
         let storedTheme = null;
         try {
           storedTheme = localStorage.getItem("theme");
@@ -17,11 +389,17 @@
         }
         const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
         const isDark = storedTheme === "dark" || (!storedTheme && prefersDark);
+        const backgroundColor = isDark ? darkBackground : lightBackground;
+        const themeColor = isDark ? darkThemeColor : lightThemeColor;
         if (isDark) {
           document.documentElement.classList.add("dark");
         }
-        document.documentElement.style.backgroundColor = isDark ? "#101729" : "#ffffff";
+        document.documentElement.style.backgroundColor = backgroundColor;
         document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+        const themeColorMeta = document.getElementById("theme-color-meta");
+        if (themeColorMeta instanceof HTMLMetaElement) {
+          themeColorMeta.setAttribute("content", themeColor);
+        }
 
         let resumePath = null;
         try {
@@ -46,12 +424,133 @@
         margin: 0;
         background-color: inherit;
       }
+
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        background-color: inherit;
+        color: color-mix(in srgb, currentColor 84%, transparent);
+        transition: opacity 180ms ease;
+      }
+
+      #boot-splash.boot-splash--hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .boot-splash__content {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.625rem;
+        width: min(92vw, 44rem);
+        font: 500 0.85rem/1.2 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        letter-spacing: 0.01em;
+      }
+
+      .boot-splash__spinner {
+        width: 0.95rem;
+        height: 0.95rem;
+        border-radius: 9999px;
+        border: 2px solid color-mix(in srgb, currentColor 24%, transparent);
+        border-top-color: currentColor;
+        animation: boot-splash-spin 650ms linear infinite;
+      }
+
+      .boot-splash__text {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+        width: 100%;
+      }
+
+      #boot-splash-message {
+        display: inline-block;
+        margin-top: 0.05rem;
+      }
+
+      #boot-splash-hmr {
+        display: inline-block;
+        margin-top: -0.1rem;
+        font: 500 0.72rem/1.25 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        opacity: 0.8;
+      }
+
+      #boot-splash-details {
+        margin: 0;
+        max-height: 38vh;
+        overflow: auto;
+        padding: 0.6rem 0.75rem;
+        border-radius: 0.5rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font: 500 0.72rem/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        background: color-mix(in srgb, currentColor 7%, transparent);
+      }
+
+      #boot-splash.boot-splash--error {
+        color: #fca5a5;
+      }
+
+      #boot-splash-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+      }
+
+      #boot-splash-actions[hidden] {
+        display: none;
+      }
+
+      .boot-splash__button {
+        border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+        background: color-mix(in srgb, currentColor 8%, transparent);
+        color: inherit;
+        border-radius: 9999px;
+        font: 600 0.7rem/1 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        padding: 0.42rem 0.65rem;
+        cursor: pointer;
+      }
+
+      .boot-splash__button:hover {
+        background: color-mix(in srgb, currentColor 14%, transparent);
+      }
+
+      .boot-splash__button:active {
+        background: color-mix(in srgb, currentColor 18%, transparent);
+      }
+
+      @keyframes boot-splash-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
     </style>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/icon-180.png" />
     <title>Codex Monitor</title>
   </head>
   <body>
+    <div id="boot-splash" aria-hidden="true">
+      <div class="boot-splash__content">
+        <div id="boot-splash-spinner" class="boot-splash__spinner"></div>
+        <div class="boot-splash__text">
+          <span id="boot-splash-message">Loading Farfield</span>
+          <span id="boot-splash-hmr" hidden></span>
+          <div id="boot-splash-actions" hidden>
+            <button id="boot-action-retry" class="boot-splash__button" type="button">Retry</button>
+            <button id="boot-action-hard-refresh" class="boot-splash__button" type="button">Hard Refresh</button>
+            <button id="boot-action-diagnostics" class="boot-splash__button" type="button">
+              Open Diagnostics
+            </button>
+            <button id="boot-action-copy" class="boot-splash__button" type="button">Copy Diagnostics</button>
+          </div>
+          <pre id="boot-splash-details" hidden></pre>
+        </div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -14,8 +14,33 @@ export interface PushClientState {
   subscribed: boolean;
 }
 
+export interface PushSubscriptionReconcileResult {
+  attempted: boolean;
+  subscribed: boolean;
+  repaired: boolean;
+  reason: string;
+}
+
+const PUSH_AUTO_HEAL_STORAGE_KEY = "farfield.push.auto-heal-enabled.v1";
+
 function isPushSupported(): boolean {
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+}
+
+function readPushAutoHealPreference(): boolean {
+  try {
+    return localStorage.getItem(PUSH_AUTO_HEAL_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writePushAutoHealPreference(enabled: boolean): void {
+  try {
+    localStorage.setItem(PUSH_AUTO_HEAL_STORAGE_KEY, enabled ? "true" : "false");
+  } catch {
+    // Ignore storage write failures.
+  }
 }
 
 function decodeBase64Url(value: string): ArrayBuffer {
@@ -105,6 +130,7 @@ export async function enablePushNotifications(input: {
       privateMode: input.privateMode
     }
   });
+  writePushAutoHealPreference(true);
 
   return {
     permission,
@@ -136,6 +162,7 @@ export async function updatePushSettings(input: { privateMode: boolean }): Promi
 }
 
 export async function disablePushNotifications(): Promise<{ unsubscribed: boolean }> {
+  writePushAutoHealPreference(false);
   if (!isPushSupported()) {
     return { unsubscribed: false };
   }
@@ -156,4 +183,82 @@ export async function disablePushNotifications(): Promise<{ unsubscribed: boolea
   await browserSubscription.unsubscribe();
 
   return { unsubscribed: true };
+}
+
+export async function reconcilePushSubscription(input?: {
+  privateMode?: boolean;
+}): Promise<PushSubscriptionReconcileResult> {
+  if (!isPushSupported()) {
+    return {
+      attempted: false,
+      subscribed: false,
+      repaired: false,
+      reason: "unsupported"
+    };
+  }
+
+  if (!readPushAutoHealPreference()) {
+    return {
+      attempted: false,
+      subscribed: false,
+      repaired: false,
+      reason: "not-enabled"
+    };
+  }
+
+  if (Notification.permission !== "granted") {
+    return {
+      attempted: false,
+      subscribed: false,
+      repaired: false,
+      reason: "permission-not-granted"
+    };
+  }
+
+  const status = await getPushStatus();
+  if (!status.enabled) {
+    return {
+      attempted: false,
+      subscribed: false,
+      repaired: false,
+      reason: "server-disabled"
+    };
+  }
+  if (status.subscriptionCount > 0) {
+    return {
+      attempted: false,
+      subscribed: true,
+      repaired: false,
+      reason: "server-subscription-present"
+    };
+  }
+
+  const registration = await registerPushServiceWorker();
+  let browserSubscription = await registration.pushManager.getSubscription();
+  let repaired = false;
+
+  if (!browserSubscription) {
+    const vapid = await getPushVapidPublicKey();
+    browserSubscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: decodeBase64Url(vapid.publicKey)
+    });
+    repaired = true;
+  }
+
+  const payload = strictSubscriptionPayload(browserSubscription);
+  const privateMode = input?.privateMode ?? status.privateModeDefault;
+  await savePushSubscription({
+    subscription: payload,
+    settings: {
+      privateMode
+    }
+  });
+
+  return {
+    attempted: true,
+    subscribed: true,
+    repaired,
+    reason: repaired ? "subscription-restored" : "subscription-confirmed"
+  };
 }

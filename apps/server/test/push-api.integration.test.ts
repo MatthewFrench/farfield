@@ -7,6 +7,9 @@ import { fileURLToPath } from "node:url";
 import {
   CreatePushSubscriptionResponseSchema,
   DeletePushSubscriptionResponseSchema,
+  PushLocalCaStatusResponseSchema,
+  PushReceiptCreateResponseSchema,
+  PushReceiptLatestResponseSchema,
   PushStatusResponseSchema
 } from "@farfield/protocol";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -27,6 +30,17 @@ const HEALTH_SCHEMA = z
         pushSubscriptionCount: z.number().int().nonnegative()
       })
       .passthrough()
+  })
+  .strict();
+
+const SHELL_HEALTHZ_SCHEMA = z
+  .object({
+    ok: z.literal(true),
+    service: z.literal("farfield-web-shell"),
+    buildId: z.string().min(1),
+    gitCommit: z.string().nullable(),
+    serviceWorkerVersion: z.string().nullable(),
+    timestamp: z.string().datetime()
   })
   .strict();
 
@@ -63,6 +77,27 @@ const PUSH_TEST_ENVELOPE_SCHEMA = z
   })
   .strict();
 
+const PUSH_RECEIPT_CREATE_ENVELOPE_SCHEMA = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(PushReceiptCreateResponseSchema)
+  .strict();
+
+const PUSH_RECEIPT_LATEST_ENVELOPE_SCHEMA = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(PushReceiptLatestResponseSchema)
+  .strict();
+
+const PUSH_LOCAL_CA_STATUS_ENVELOPE_SCHEMA = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(PushLocalCaStatusResponseSchema)
+  .strict();
+
 const TEST_API_TOKEN = "integration-test-token";
 const TEST_VAPID_PUBLIC_KEY =
   "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U";
@@ -71,6 +106,7 @@ const TEST_VAPID_PRIVATE_KEY = "tfyAO9n9LMLXTy7ZaZwfDafDifFhnKz0MLC8nOxDmds";
 let serverProcess: ChildProcessWithoutNullStreams | null = null;
 let baseUrl = "";
 let stateDirectory = "";
+let receiptsPath = "";
 const capturedOutput: string[] = [];
 
 function delay(ms: number): Promise<void> {
@@ -159,6 +195,7 @@ describe("push API auth and subscription routes", () => {
     baseUrl = `http://127.0.0.1:${String(port)}`;
     stateDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-push-api-integration-"));
     const statePath = path.join(stateDirectory, "push-state.json");
+    receiptsPath = path.join(stateDirectory, "push-receipts.json");
     const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
     const child = spawn(globalThis.process.execPath, ["--import", "tsx", "src/index.ts"], {
@@ -172,7 +209,8 @@ describe("push API auth and subscription routes", () => {
         PUSH_VAPID_PUBLIC_KEY: TEST_VAPID_PUBLIC_KEY,
         PUSH_VAPID_PRIVATE_KEY: TEST_VAPID_PRIVATE_KEY,
         PUSH_VAPID_SUBJECT: "mailto:integration@example.com",
-        PUSH_STATE_PATH: statePath
+        PUSH_STATE_PATH: statePath,
+        PUSH_RECEIPTS_PATH: receiptsPath
       },
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -207,11 +245,25 @@ describe("push API auth and subscription routes", () => {
     expect(unauthenticatedPushStatus.status).toBe(401);
     API_ERROR_SCHEMA.parse(await unauthenticatedPushStatus.json());
 
+    const unauthenticatedPushReceiptLatest = await fetch(`${baseUrl}/api/push/receipts/latest`);
+    expect(unauthenticatedPushReceiptLatest.status).toBe(401);
+    API_ERROR_SCHEMA.parse(await unauthenticatedPushReceiptLatest.json());
+
+    const unauthenticatedLocalCaStatus = await fetch(`${baseUrl}/api/push/local-ca`);
+    expect(unauthenticatedLocalCaStatus.status).toBe(401);
+    API_ERROR_SCHEMA.parse(await unauthenticatedLocalCaStatus.json());
+
     const authenticatedHealth = await fetch(`${baseUrl}/api/health`, {
       headers: authHeaders(false)
     });
     expect(authenticatedHealth.status).toBe(200);
     HEALTH_SCHEMA.parse(await authenticatedHealth.json());
+  });
+
+  it("serves /healthz without requiring API auth", async () => {
+    const shellHealth = await fetch(`${baseUrl}/healthz`);
+    expect(shellHealth.status).toBe(200);
+    SHELL_HEALTHZ_SCHEMA.parse(await shellHealth.json());
   });
 
   it("supports push subscription create/delete with auth", async () => {
@@ -257,6 +309,12 @@ describe("push API auth and subscription routes", () => {
     expect(parsedStatusAfterCreate.enabled).toBe(true);
     expect(parsedStatusAfterCreate.subscriptionCount).toBe(1);
 
+    const localCaStatusResponse = await fetch(`${baseUrl}/api/push/local-ca`, {
+      headers: authHeaders(false)
+    });
+    expect(localCaStatusResponse.status).toBe(200);
+    PUSH_LOCAL_CA_STATUS_ENVELOPE_SCHEMA.parse(await localCaStatusResponse.json());
+
     const dryRunAfterCreate = await fetch(`${baseUrl}/api/push/test`, {
       method: "POST",
       headers: authHeaders(true),
@@ -271,6 +329,37 @@ describe("push API auth and subscription routes", () => {
     expect(parsedDryRunAfterCreate.dryRun).toBe(true);
     expect(parsedDryRunAfterCreate.ready).toBe(true);
     expect(parsedDryRunAfterCreate.attempted).toBe(1);
+
+    const createReceiptResponse = await fetch(`${baseUrl}/api/push/receipts`, {
+      method: "POST",
+      headers: authHeaders(true),
+      body: JSON.stringify({
+        notificationId: "notif_test_1",
+        event: "shown",
+        url: "/threads/thread_preflight",
+        threadId: "thread_preflight",
+        turnId: "turn_preflight",
+        createdAt: "2026-02-18T00:00:00.000Z"
+      })
+    });
+    expect(createReceiptResponse.status).toBe(200);
+    PUSH_RECEIPT_CREATE_ENVELOPE_SCHEMA.parse(await createReceiptResponse.json());
+
+    const latestReceiptResponse = await fetch(`${baseUrl}/api/push/receipts/latest`, {
+      headers: authHeaders(false)
+    });
+    expect(latestReceiptResponse.status).toBe(200);
+    const parsedLatestReceipt = PUSH_RECEIPT_LATEST_ENVELOPE_SCHEMA.parse(
+      await latestReceiptResponse.json()
+    );
+    expect(parsedLatestReceipt.count).toBe(1);
+    expect(parsedLatestReceipt.latest?.notificationId).toBe("notif_test_1");
+    expect(parsedLatestReceipt.latest?.event).toBe("shown");
+    expect(parsedLatestReceipt.latest?.threadId).toBe("thread_preflight");
+    expect(fs.existsSync(receiptsPath)).toBe(true);
+    const receiptFileContent = fs.readFileSync(receiptsPath, "utf8");
+    expect(receiptFileContent).toContain("\"receipts\"");
+    expect(receiptFileContent).toContain("\"event\": \"shown\"");
 
     const deleteResponse = await fetch(`${baseUrl}/api/push/subscriptions`, {
       method: "DELETE",

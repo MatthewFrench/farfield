@@ -4,9 +4,12 @@ import {
   parseAppServerListModelsResponse,
   parseAppServerCollaborationModeListResponse,
   parseAppServerStartThreadResponse,
+  parseCreatePushReceiptBody,
   parseCreatePushSubscriptionBody,
   parseIpcFrame,
   parsePushNotificationPayload,
+  parsePushLocalCaStatusResponse,
+  parsePushReceiptStore,
   parsePushStateStore,
   parseThreadConversationState,
   parseThreadStreamStateChangedBroadcast,
@@ -622,6 +625,7 @@ describe("codex-protocol schemas", () => {
 
   it("parses push notification payload with declarative notification", () => {
     const parsed = parsePushNotificationPayload({
+      notificationId: "notif_1",
       title: "Codex response ready",
       body: "A response is ready in Farfield.",
       threadId: "thread_1",
@@ -646,6 +650,7 @@ describe("codex-protocol schemas", () => {
   it("rejects push notification payload with unknown declarative fields", () => {
     expect(() =>
       parsePushNotificationPayload({
+        notificationId: "notif_1",
         title: "Codex response ready",
         body: "A response is ready in Farfield.",
         threadId: "thread_1",
@@ -660,6 +665,92 @@ describe("codex-protocol schemas", () => {
         }
       })
     ).toThrowError(/PushNotificationPayload did not match expected schema/);
+  });
+
+  it("parses push receipt body", () => {
+    const parsed = parseCreatePushReceiptBody({
+      notificationId: "notif_1",
+      event: "shown",
+      url: "/threads/thread_1",
+      threadId: "thread_1",
+      turnId: "turn_1",
+      createdAt: "2026-02-18T00:00:00.000Z"
+    });
+
+    expect(parsed.event).toBe("shown");
+    expect(parsed.threadId).toBe("thread_1");
+  });
+
+  it("rejects push receipt body with unknown fields", () => {
+    expect(() =>
+      parseCreatePushReceiptBody({
+        notificationId: "notif_1",
+        event: "shown",
+        url: "/threads/thread_1",
+        createdAt: "2026-02-18T00:00:00.000Z",
+        extra: true
+      })
+    ).toThrowError(/CreatePushReceiptBody did not match expected schema/);
+  });
+
+  it("parses local CA status response", () => {
+    const parsed = parsePushLocalCaStatusResponse({
+      available: true,
+      downloadPath: "/api/push/local-ca/root.crt",
+      sourcePath: "/Users/test/Library/Application Support/Caddy/pki/authorities/local/root.crt"
+    });
+
+    expect(parsed.available).toBe(true);
+    expect(parsed.downloadPath).toBe("/api/push/local-ca/root.crt");
+  });
+
+  it("parses push receipt store payload", () => {
+    const parsed = parsePushReceiptStore({
+      version: 2,
+      receipts: [
+        {
+          notificationId: "notif_1",
+          event: "shown",
+          url: "/threads/thread_1",
+          threadId: "thread_1",
+          turnId: "turn_1",
+          message: null,
+          createdAt: "2026-02-18T00:00:00.000Z"
+        }
+      ]
+    });
+
+    expect(parsed.receipts.length).toBe(1);
+    expect(parsed.receipts[0]?.event).toBe("shown");
+  });
+
+  it("migrates legacy push receipt store payload", () => {
+    const parsed = parsePushReceiptStore({
+      version: 1,
+      receipts: [
+        {
+          event: "clicked",
+          url: "/threads/thread_legacy",
+          threadId: "thread_legacy",
+          turnId: "turn_legacy",
+          message: null,
+          createdAt: "2026-02-18T00:00:00.000Z"
+        }
+      ]
+    });
+
+    expect(parsed.version).toBe(2);
+    expect(parsed.receipts[0]?.notificationId.startsWith("legacy-")).toBe(true);
+    expect(parsed.receipts[0]?.event).toBe("clicked");
+  });
+
+  it("rejects unsupported push receipt store version", () => {
+    expect(() =>
+      parsePushReceiptStore({
+        version: 3,
+        receipts: []
+      })
+    ).toThrowError(/Unsupported push receipt store version/);
   });
 
   it("parses vapid public key response", () => {

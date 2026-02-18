@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CreatePushReceiptBodySchema,
   CreatePushSubscriptionBodySchema,
   DeletePushSubscriptionBodySchema,
   parseBody,
@@ -95,5 +96,18 @@ describe("server request schemas", () => {
     });
 
     expect(parsed.dryRun).toBe(true);
+  });
+
+  it("validates push receipt body", () => {
+    const parsed = parseBody(CreatePushReceiptBodySchema, {
+      notificationId: "notif_1",
+      event: "shown",
+      url: "/threads/thread_1",
+      threadId: "thread_1",
+      turnId: "turn_1",
+      createdAt: "2026-02-18T00:00:00.000Z"
+    });
+
+    expect(parsed.event).toBe("shown");
   });
 });

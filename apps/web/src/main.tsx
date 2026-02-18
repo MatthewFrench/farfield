@@ -3,9 +3,200 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./index.css";
 
+const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";
+const BOOT_STATUS_EVENT_NAME = "farfield:boot-status";
+
+interface BootStatusDetail {
+  message: string;
+  details?: string;
+  isError?: boolean;
+  showActions?: boolean;
+  detailsOpen?: boolean;
+  hmrStatus?: string;
+}
+
+interface ViteErrorPayload {
+  err: {
+    message: string;
+    stack?: string;
+    plugin?: string;
+    id?: string;
+  };
+}
+
+interface NavigatorWithStandalone extends Navigator {
+  standalone?: boolean;
+}
+
+function publishBootStatus(detail: BootStatusDetail): void {
+  window.dispatchEvent(new CustomEvent<BootStatusDetail>(BOOT_STATUS_EVENT_NAME, { detail }));
+}
+
+function syncAppViewportHeight(): void {
+  document.documentElement.style.setProperty("--app-height", `${String(window.innerHeight)}px`);
+}
+
+function isStandaloneDisplayMode(): boolean {
+  const navigatorWithStandalone = window.navigator as NavigatorWithStandalone;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    navigatorWithStandalone.standalone === true
+  );
+}
+
+function syncDisplayModeClass(): void {
+  document.documentElement.classList.toggle(
+    "standalone-display-mode",
+    isStandaloneDisplayMode()
+  );
+}
+
+function installViewportHeightSync(): void {
+  const displayModeQuery = window.matchMedia("(display-mode: standalone)");
+
+  syncAppViewportHeight();
+  syncDisplayModeClass();
+  window.addEventListener("resize", syncAppViewportHeight);
+  window.addEventListener("orientationchange", syncAppViewportHeight);
+  window.addEventListener("focus", syncDisplayModeClass);
+  window.addEventListener("pageshow", syncDisplayModeClass);
+  window.visualViewport?.addEventListener("resize", syncAppViewportHeight);
+  if (typeof displayModeQuery.addEventListener === "function") {
+    displayModeQuery.addEventListener("change", syncDisplayModeClass);
+  }
+}
+
+if (typeof window !== "undefined") {
+  installViewportHeightSync();
+}
+
+if (import.meta.env.DEV && import.meta.hot) {
+  publishBootStatus({
+    message: "Loading Farfield",
+    hmrStatus: "HMR connected"
+  });
+
+  import.meta.hot.on("vite:ws:connect", () => {
+    publishBootStatus({
+      message: "Loading Farfield",
+      isError: false,
+      showActions: false,
+      detailsOpen: false,
+      details: "",
+      hmrStatus: "HMR connected"
+    });
+  });
+
+  import.meta.hot.on("vite:ws:disconnect", () => {
+    publishBootStatus({
+      message: "Waiting for development server",
+      details: "Lost connection to Vite. Start or restart the dev server, then press Retry.",
+      isError: true,
+      showActions: true,
+      detailsOpen: true,
+      hmrStatus: "HMR disconnected"
+    });
+  });
+
+  import.meta.hot.on("vite:beforeUpdate", () => {
+    publishBootStatus({
+      message: "Applying update",
+      isError: false,
+      showActions: false,
+      detailsOpen: false,
+      details: "",
+      hmrStatus: "HMR updating"
+    });
+  });
+
+  import.meta.hot.on("vite:error", (payload: ViteErrorPayload) => {
+    const pluginLabel =
+      typeof payload.err.plugin === "string" && payload.err.plugin.length > 0
+        ? `[${payload.err.plugin}] `
+        : "";
+    const fileLabel =
+      typeof payload.err.id === "string" && payload.err.id.length > 0
+        ? `\n${payload.err.id}`
+        : "";
+    const summary = `${pluginLabel}${payload.err.message}${fileLabel}`.trim();
+    const details =
+      typeof payload.err.stack === "string" && payload.err.stack.trim().length > 0
+        ? payload.err.stack
+        : summary;
+
+    publishBootStatus({
+      message: "Vite compile error",
+      details,
+      isError: true,
+      showActions: true,
+      detailsOpen: true,
+      hmrStatus: "HMR compile failed"
+    });
+  });
+
+  import.meta.hot.on("vite:afterUpdate", () => {
+    publishBootStatus({
+      message: "Loading Farfield",
+      details: "",
+      isError: false,
+      showActions: false,
+      detailsOpen: false,
+      hmrStatus: "HMR connected"
+    });
+  });
+}
+
+function dismissBootSplash(): void {
+  const splash = document.getElementById("boot-splash");
+  if (!splash) {
+    return;
+  }
+
+  splash.classList.add("boot-splash--hidden");
+  window.setTimeout(() => {
+    splash.remove();
+  }, 220);
+}
+
+function notifyServiceWorkerUpdateAvailable(): void {
+  window.dispatchEvent(new Event(SERVICE_WORKER_UPDATE_EVENT_NAME));
+}
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js");
+    let didReloadAfterControllerChange = false;
+
+    void navigator.serviceWorker
+      .register("/sw.js")
+      .then((registration) => {
+        if (registration.waiting && navigator.serviceWorker.controller) {
+          notifyServiceWorkerUpdateAvailable();
+        }
+
+        registration.addEventListener("updatefound", () => {
+          const installing = registration.installing;
+          if (!installing) {
+            return;
+          }
+
+          installing.addEventListener("statechange", () => {
+            if (installing.state === "installed" && navigator.serviceWorker.controller) {
+              notifyServiceWorkerUpdateAvailable();
+            }
+          });
+        });
+
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (didReloadAfterControllerChange) {
+            return;
+          }
+          didReloadAfterControllerChange = true;
+          window.location.reload();
+        });
+      })
+      .catch(() => {
+        // Service worker registration failures are surfaced via app preflight checks.
+      });
   });
 }
 
@@ -14,3 +205,11 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>
 );
+
+if (typeof window !== "undefined") {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      dismissBootSplash();
+    });
+  });
+}

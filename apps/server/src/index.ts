@@ -16,11 +16,13 @@ import {
   type SendRequestOptions
 } from "@farfield/api";
 import {
+  CreatePushReceiptBodySchema,
   CreatePushSubscriptionBodySchema,
   DeletePushSubscriptionBodySchema,
   type CollaborationMode,
   type IpcFrame,
   type PushNotificationPayload,
+  type PushReceipt,
   type ThreadConversationState,
   parseThreadStreamStateChangedBroadcast,
   parseUserInputResponsePayload
@@ -40,6 +42,7 @@ import {
 import { logger } from "./logger.js";
 import { resolveOwnerClientId } from "./thread-owner.js";
 import { PushStore } from "./push-store.js";
+import { PushReceiptStore } from "./push-receipt-store.js";
 import { CompletionDetector, type CompletionCandidate } from "./completion-detector.js";
 import { PushService } from "./push-service.js";
 import { migratePushStateFile, resolvePushStatePath } from "./push-state-path.js";
@@ -52,6 +55,22 @@ const IPC_RECONNECT_DELAY_MS = 1_000;
 const ANSI_ESCAPE_REGEX = /\u001B\[[0-?]*[ -/]*[@-~]/g;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+
+function readPositiveIntegerEnv(name: string, defaultValue: number): number {
+  const rawValue = process.env[name];
+  if (typeof rawValue === "undefined") {
+    return defaultValue;
+  }
+  const trimmed = rawValue.trim();
+  if (trimmed.length === 0) {
+    throw new Error(`${name} must be a positive integer when set`);
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer when set`);
+  }
+  return parsed;
+}
 
 const TRACE_DIR = path.resolve(process.cwd(), "traces");
 const DEFAULT_WORKSPACE = path.resolve(process.cwd());
@@ -71,6 +90,32 @@ const PUSH_VAPID_PUBLIC_KEY = (process.env["PUSH_VAPID_PUBLIC_KEY"] ?? "").trim(
 const PUSH_VAPID_PRIVATE_KEY = (process.env["PUSH_VAPID_PRIVATE_KEY"] ?? "").trim();
 const PUSH_VAPID_SUBJECT = (process.env["PUSH_VAPID_SUBJECT"] ?? "").trim();
 const COMPLETION_STATE_BACKFILL_INTERVAL_MS = 2_000;
+const MAX_PUSH_RECEIPTS = readPositiveIntegerEnv("PUSH_RECEIPTS_MAX_COUNT", 100);
+const PUSH_RECEIPTS_MAX_AGE_DAYS = readPositiveIntegerEnv("PUSH_RECEIPTS_MAX_AGE_DAYS", 7);
+const PUSH_RECEIPTS_MAX_AGE_MS = PUSH_RECEIPTS_MAX_AGE_DAYS * 24 * 60 * 60 * 1_000;
+const PUSH_RECEIPTS_PATH = (() => {
+  const configuredPath = process.env["PUSH_RECEIPTS_PATH"];
+  if (typeof configuredPath === "string" && configuredPath.trim().length > 0) {
+    return path.resolve(configuredPath.trim());
+  }
+  if (typeof configuredPath === "string" && configuredPath.trim().length === 0) {
+    throw new Error("PUSH_RECEIPTS_PATH must be a non-empty path when set");
+  }
+  return path.join(path.dirname(PUSH_STATE_PATH), "push-receipts.json");
+})();
+const LOCAL_CA_DOWNLOAD_PATH = "/api/push/local-ca/root.crt";
+const LOCAL_CADDY_ROOT_CA_PATH = path.join(
+  os.homedir(),
+  "Library",
+  "Application Support",
+  "Caddy",
+  "pki",
+  "authorities",
+  "local",
+  "root.crt"
+);
+const WEB_SHELL_SERVICE_WORKER_PATH = path.join(DEFAULT_WORKSPACE, "apps", "web", "public", "sw.js");
+const WEB_SHELL_SERVICE_WORKER_VERSION = resolveFileContentHash(WEB_SHELL_SERVICE_WORKER_PATH);
 
 function resolveCodexExecutablePath(): string {
   if (process.env["CODEX_CLI_PATH"]) {
@@ -108,6 +153,23 @@ function resolveGitCommitHash(): string | null {
   } catch {
     return null;
   }
+}
+
+function resolveWebShellBuildId(gitCommit: string | null): string {
+  const configured = (process.env["WEB_BUILD_ID"] ?? "").trim();
+  if (configured.length > 0) {
+    return configured;
+  }
+  return gitCommit ?? "dev";
+}
+
+function resolveFileContentHash(filePath: string): string | null {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  const content = fs.readFileSync(filePath);
+  return createHash("sha256").update(content).digest("hex").slice(0, 12);
 }
 
 function jsonResponse(res: ServerResponse, statusCode: number, body: unknown): void {
@@ -212,7 +274,10 @@ const runtimeState = {
   pushEnabled: PUSH_ENABLED,
   pushConfigured: false,
   pushStatePath: PUSH_STATE_PATH,
-  pushStatePathSource: PUSH_STATE_RESOLUTION.source
+  pushStatePathSource: PUSH_STATE_RESOLUTION.source,
+  pushReceiptsPath: PUSH_RECEIPTS_PATH,
+  pushReceiptsMaxCount: MAX_PUSH_RECEIPTS,
+  pushReceiptsMaxAgeDays: PUSH_RECEIPTS_MAX_AGE_DAYS
 };
 
 let bootstrapInFlight: Promise<void> | null = null;
@@ -224,7 +289,8 @@ function getRuntimeStateSnapshot(): Record<string, unknown> {
     historyCount: history.length,
     threadOwnerCount: threadOwnerById.size,
     activeTrace: activeTrace?.summary ?? null,
-    pushSubscriptionCount: pushStore.getSubscriptionCount()
+    pushSubscriptionCount: pushStore.getSubscriptionCount(),
+    pushReceiptCount: pushReceiptStore.getCount()
   };
 }
 
@@ -456,6 +522,11 @@ const ipcClient = new DesktopIpcClient({
 
 const service = new CodexMonitorService(ipcClient);
 const pushStore = new PushStore(PUSH_STATE_PATH);
+const pushReceiptStore = new PushReceiptStore(
+  PUSH_RECEIPTS_PATH,
+  MAX_PUSH_RECEIPTS,
+  PUSH_RECEIPTS_MAX_AGE_MS
+);
 const pushService = new PushService({
   enabled:
     PUSH_ENABLED &&
@@ -502,6 +573,30 @@ function parseBoolean(value: string | null, defaultValue: boolean): boolean {
 
 function endpointHash(endpoint: string): string {
   return createHash("sha256").update(endpoint).digest("hex").slice(0, 12);
+}
+
+function recordPushReceipt(receipt: PushReceipt): void {
+  pushReceiptStore.add(receipt);
+}
+
+function getLocalCaStatus(): {
+  available: boolean;
+  downloadPath: string | null;
+  sourcePath: string | null;
+} {
+  const exists = fs.existsSync(LOCAL_CADDY_ROOT_CA_PATH);
+  if (!exists) {
+    return {
+      available: false,
+      downloadPath: null,
+      sourcePath: null
+    };
+  }
+  return {
+    available: true,
+    downloadPath: LOCAL_CA_DOWNLOAD_PATH,
+    sourcePath: LOCAL_CADDY_ROOT_CA_PATH
+  };
 }
 
 function requirePushConfiguration(): void {
@@ -573,12 +668,14 @@ function summarizeAgentText(agentText: string): string {
 
 function buildCompletionPayload(
   candidate: CompletionCandidate,
-  privateMode: boolean
+  privateMode: boolean,
+  notificationId: string
 ): PushNotificationPayload {
   const body = privateMode ? "A response is ready in Farfield." : summarizeAgentText(candidate.agentText);
   const url = `/threads/${encodeURIComponent(candidate.threadId)}`;
 
   return {
+    notificationId,
     title: "Codex response ready",
     body,
     threadId: candidate.threadId,
@@ -596,6 +693,13 @@ function buildCompletionPayload(
       }
     }
   };
+}
+
+function buildNotificationId(candidate: CompletionCandidate): string {
+  return `notif_${createHash("sha256")
+    .update(`${candidate.threadId}:${candidate.turnId}:${candidate.marker}`)
+    .digest("hex")
+    .slice(0, 24)}`;
 }
 
 async function notifyCompletion(candidate: CompletionCandidate): Promise<{
@@ -644,9 +748,10 @@ async function notifyCompletion(candidate: CompletionCandidate): Promise<{
   let attempted = 0;
   let delivered = 0;
   let failures = 0;
+  const notificationId = buildNotificationId(candidate);
 
   for (const batch of batches) {
-    const payload = buildCompletionPayload(candidate, batch.privateMode);
+    const payload = buildCompletionPayload(candidate, batch.privateMode, notificationId);
     const result = await pushService.sendToSubscriptions(batch.subscriptions, payload);
     attempted += result.attempted;
     delivered += result.delivered;
@@ -663,6 +768,7 @@ async function notifyCompletion(candidate: CompletionCandidate): Promise<{
     }
 
     pushSystem("Push notification send result", {
+      notificationId,
       threadId: candidate.threadId,
       turnId: candidate.turnId,
       privateMode: batch.privateMode,
@@ -1093,6 +1199,18 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && pathname === "/healthz") {
+      jsonResponse(res, 200, {
+        ok: true,
+        service: "farfield-web-shell",
+        buildId: resolveWebShellBuildId(runtimeState.gitCommit),
+        gitCommit: runtimeState.gitCommit,
+        serviceWorkerVersion: WEB_SHELL_SERVICE_WORKER_VERSION,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
     if (pathname.startsWith("/api/push")) {
       if (req.method === "GET" && pathname === "/api/push/status") {
         jsonResponse(res, 200, {
@@ -1101,6 +1219,75 @@ const server = http.createServer(async (req, res) => {
           permissionRequired: true,
           subscriptionCount: pushStore.getSubscriptionCount(),
           privateModeDefault: PUSH_PRIVATE_MODE_DEFAULT
+        });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/push/local-ca") {
+        const status = getLocalCaStatus();
+        jsonResponse(res, 200, {
+          ok: true,
+          available: status.available,
+          downloadPath: status.downloadPath,
+          sourcePath: status.sourcePath
+        });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === LOCAL_CA_DOWNLOAD_PATH) {
+        const status = getLocalCaStatus();
+        if (!status.available || !status.sourcePath) {
+          jsonResponse(res, 404, {
+            ok: false,
+            error: "Local Caddy root certificate not found"
+          });
+          return;
+        }
+
+        const data = fs.readFileSync(status.sourcePath);
+        res.writeHead(200, {
+          "Content-Type": "application/x-x509-ca-cert",
+          "Content-Length": data.length,
+          "Content-Disposition": "attachment; filename=\"farfield-local-root.crt\"",
+          "Cache-Control": "no-store",
+          "Access-Control-Allow-Origin": "*"
+        });
+        res.end(data);
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/push/receipts/latest") {
+        const latest = pushReceiptStore.getLatest();
+        jsonResponse(res, 200, {
+          ok: true,
+          latest,
+          count: pushReceiptStore.getCount()
+        });
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/push/receipts") {
+        const body = parseBody(CreatePushReceiptBodySchema, await readJsonBody(req));
+        const receipt: PushReceipt = {
+          notificationId: body.notificationId,
+          event: body.event,
+          url: body.url,
+          threadId: body.threadId ?? null,
+          turnId: body.turnId ?? null,
+          message: body.message ?? null,
+          createdAt: body.createdAt
+        };
+        recordPushReceipt(receipt);
+        pushSystem("Push receipt recorded", {
+          notificationId: receipt.notificationId,
+          event: receipt.event,
+          threadId: receipt.threadId,
+          turnId: receipt.turnId,
+          receiptCount: pushReceiptStore.getCount()
+        });
+        jsonResponse(res, 200, {
+          ok: true,
+          recorded: true
         });
         return;
       }
@@ -1859,6 +2046,7 @@ async function start(): Promise<void> {
     });
   }
   pushStore.load();
+  pushReceiptStore.load();
   completionDetector = new CompletionDetector(
     new Map(pushStore.listCompletionWatermarks().map((entry) => [entry.threadId, entry.marker]))
   );
@@ -1875,8 +2063,12 @@ async function start(): Promise<void> {
     authConfigured: API_AUTH_TOKEN.length > 0,
     statePath: PUSH_STATE_PATH,
     statePathSource: PUSH_STATE_RESOLUTION.source,
+    receiptsPath: PUSH_RECEIPTS_PATH,
+    receiptsMaxCount: MAX_PUSH_RECEIPTS,
+    receiptsMaxAgeDays: PUSH_RECEIPTS_MAX_AGE_DAYS,
     subscriptionCount: pushStore.getSubscriptionCount(),
-    watermarkCount: pushStore.listCompletionWatermarks().length
+    watermarkCount: pushStore.listCompletionWatermarks().length,
+    receiptCount: pushReceiptStore.getCount()
   });
   if (!LOOPBACK_HOSTS.has(HOST) && API_AUTH_TOKEN.length === 0) {
     pushSystem("API auth is disabled on a non-loopback host", {

@@ -92,6 +92,7 @@ export const DeclarativeWebPushSchema = z
 
 export const PushNotificationPayloadSchema = z
   .object({
+    notificationId: NonEmptyStringSchema,
     title: NonEmptyStringSchema,
     body: z.string(),
     threadId: NonEmptyStringSchema,
@@ -99,6 +100,86 @@ export const PushNotificationPayloadSchema = z
     url: z.string().min(1),
     createdAt: z.string().datetime(),
     web_push: DeclarativeWebPushSchema.optional()
+  })
+  .strict();
+
+export const PushReceiptEventSchema = z.enum(["shown", "clicked", "error"]);
+
+export const CreatePushReceiptBodySchema = z
+  .object({
+    notificationId: NonEmptyStringSchema,
+    event: PushReceiptEventSchema,
+    url: z.string().min(1),
+    threadId: NonEmptyStringSchema.nullable().optional(),
+    turnId: NonEmptyStringSchema.nullable().optional(),
+    message: z.string().max(500).optional(),
+    createdAt: z.string().datetime()
+  })
+  .strict();
+
+export const PushReceiptSchema = z
+  .object({
+    notificationId: NonEmptyStringSchema,
+    event: PushReceiptEventSchema,
+    url: z.string().min(1),
+    threadId: NonEmptyStringSchema.nullable(),
+    turnId: NonEmptyStringSchema.nullable(),
+    message: z.string().nullable(),
+    createdAt: z.string().datetime()
+  })
+  .strict();
+
+const LegacyPushReceiptSchema = z
+  .object({
+    event: PushReceiptEventSchema,
+    url: z.string().min(1),
+    threadId: NonEmptyStringSchema.nullable(),
+    turnId: NonEmptyStringSchema.nullable(),
+    message: z.string().nullable(),
+    createdAt: z.string().datetime()
+  })
+  .strict();
+
+export const PushReceiptCreateResponseSchema = z
+  .object({
+    recorded: z.literal(true)
+  })
+  .strict();
+
+export const PushReceiptLatestResponseSchema = z
+  .object({
+    latest: PushReceiptSchema.nullable(),
+    count: NonNegativeIntSchema
+  })
+  .strict();
+
+export const PushReceiptStoreSchema = z
+  .object({
+    version: NonNegativeIntSchema,
+    receipts: z.array(PushReceiptSchema)
+  })
+  .strict()
+  .superRefine((state, ctx) => {
+    if (state.version !== 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Unsupported push receipt store version: ${String(state.version)}`
+      });
+    }
+  });
+
+const LegacyPushReceiptStoreSchema = z
+  .object({
+    version: z.literal(1),
+    receipts: z.array(LegacyPushReceiptSchema)
+  })
+  .strict();
+
+export const PushLocalCaStatusResponseSchema = z
+  .object({
+    available: z.boolean(),
+    downloadPath: z.string().min(1).nullable(),
+    sourcePath: z.string().min(1).nullable()
   })
   .strict();
 
@@ -139,6 +220,13 @@ export type PushStateStore = z.infer<typeof PushStateStoreSchema>;
 export type DeclarativePushNotification = z.infer<typeof DeclarativePushNotificationSchema>;
 export type DeclarativeWebPush = z.infer<typeof DeclarativeWebPushSchema>;
 export type PushNotificationPayload = z.infer<typeof PushNotificationPayloadSchema>;
+export type PushReceiptEvent = z.infer<typeof PushReceiptEventSchema>;
+export type CreatePushReceiptBody = z.infer<typeof CreatePushReceiptBodySchema>;
+export type PushReceipt = z.infer<typeof PushReceiptSchema>;
+export type PushReceiptCreateResponse = z.infer<typeof PushReceiptCreateResponseSchema>;
+export type PushReceiptLatestResponse = z.infer<typeof PushReceiptLatestResponseSchema>;
+export type PushReceiptStore = z.infer<typeof PushReceiptStoreSchema>;
+export type PushLocalCaStatusResponse = z.infer<typeof PushLocalCaStatusResponseSchema>;
 export type PushStatusResponse = z.infer<typeof PushStatusResponseSchema>;
 export type CreatePushSubscriptionResponse = z.infer<typeof CreatePushSubscriptionResponseSchema>;
 export type DeletePushSubscriptionResponse = z.infer<typeof DeletePushSubscriptionResponseSchema>;
@@ -171,6 +259,49 @@ export function parsePushNotificationPayload(value: z.input<typeof PushNotificat
   const result = PushNotificationPayloadSchema.safeParse(value);
   if (!result.success) {
     throw ProtocolValidationError.fromZod("PushNotificationPayload", result.error);
+  }
+  return result.data;
+}
+
+export function parseCreatePushReceiptBody(value: z.input<typeof CreatePushReceiptBodySchema>): CreatePushReceiptBody {
+  const result = CreatePushReceiptBodySchema.safeParse(value);
+  if (!result.success) {
+    throw ProtocolValidationError.fromZod("CreatePushReceiptBody", result.error);
+  }
+  return result.data;
+}
+
+export function parsePushReceiptStore(value: z.input<typeof PushReceiptStoreSchema>): PushReceiptStore {
+  const currentResult = PushReceiptStoreSchema.safeParse(value);
+  if (currentResult.success) {
+    return currentResult.data;
+  }
+
+  const legacyResult = LegacyPushReceiptStoreSchema.safeParse(value);
+  if (legacyResult.success) {
+    return {
+      version: 2,
+      receipts: legacyResult.data.receipts.map((receipt, index) => ({
+        notificationId: `legacy-${index + 1}-${receipt.createdAt}`,
+        event: receipt.event,
+        url: receipt.url,
+        threadId: receipt.threadId,
+        turnId: receipt.turnId,
+        message: receipt.message,
+        createdAt: receipt.createdAt
+      }))
+    };
+  }
+
+  throw ProtocolValidationError.fromZod("PushReceiptStore", currentResult.error);
+}
+
+export function parsePushLocalCaStatusResponse(
+  value: z.input<typeof PushLocalCaStatusResponseSchema>
+): PushLocalCaStatusResponse {
+  const result = PushLocalCaStatusResponseSchema.safeParse(value);
+  if (!result.success) {
+    throw ProtocolValidationError.fromZod("PushLocalCaStatusResponse", result.error);
   }
   return result.data;
 }

@@ -8,7 +8,9 @@ import {
   AppServerReadThreadResponseSchema,
   AppServerStartThreadResponseSchema,
   CreatePushSubscriptionResponseSchema,
+  PushLocalCaStatusResponseSchema,
   PushStatusResponseSchema,
+  PushReceiptLatestResponseSchema,
   type CollaborationMode,
   ThreadConversationStateSchema,
   UserInputRequestSchema,
@@ -129,6 +131,20 @@ const PushVapidPublicKeyEnvelopeSchema = z
     ok: z.literal(true)
   })
   .merge(VapidPublicKeyResponseSchema)
+  .strict();
+
+const PushReceiptLatestEnvelopeSchema = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(PushReceiptLatestResponseSchema)
+  .strict();
+
+const PushLocalCaStatusEnvelopeSchema = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(PushLocalCaStatusResponseSchema)
   .strict();
 
 const PushTestResponseSchema = z
@@ -378,6 +394,16 @@ export async function getPushStatus(): Promise<z.infer<typeof PushStatusEnvelope
 export async function getPushVapidPublicKey(): Promise<z.infer<typeof PushVapidPublicKeyEnvelopeSchema>> {
   const data = await request("/api/push/vapid-public-key");
   return PushVapidPublicKeyEnvelopeSchema.parse(data);
+}
+
+export async function getLatestPushReceipt(): Promise<z.infer<typeof PushReceiptLatestEnvelopeSchema>> {
+  const data = await request("/api/push/receipts/latest");
+  return PushReceiptLatestEnvelopeSchema.parse(data);
+}
+
+export async function getPushLocalCaStatus(): Promise<z.infer<typeof PushLocalCaStatusEnvelopeSchema>> {
+  const data = await request("/api/push/local-ca");
+  return PushLocalCaStatusEnvelopeSchema.parse(data);
 }
 
 export async function savePushSubscription(
