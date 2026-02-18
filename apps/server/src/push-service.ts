@@ -83,13 +83,17 @@ export class PushService {
 
     const strictPayload = parsePushNotificationPayload(payload);
     const body = JSON.stringify(strictPayload);
+    const requestOptions: webPush.RequestOptions = {
+      TTL: 300,
+      urgency: "high"
+    };
     const failures: PushSendFailure[] = [];
     const prunedEndpoints: string[] = [];
     let delivered = 0;
 
     for (const subscription of subscriptions) {
       try {
-        await webPush.sendNotification(toWireSubscription(subscription), body);
+        await webPush.sendNotification(toWireSubscription(subscription), body, requestOptions);
         delivered += 1;
       } catch (error) {
         const parsedError = WebPushErrorSchema.safeParse(error);

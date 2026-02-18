@@ -22,6 +22,7 @@ worker.js
 
 # Runtime push state
 apps/server/push-state.json
+apps/server/apps/server/push-state.json
 
 # Generated local/domain Caddy configs
 ops/caddy/Caddyfile.local

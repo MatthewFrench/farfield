@@ -6,6 +6,7 @@ import {
   parseAppServerStartThreadResponse,
   parseCreatePushSubscriptionBody,
   parseIpcFrame,
+  parsePushNotificationPayload,
   parsePushStateStore,
   parseThreadConversationState,
   parseThreadStreamStateChangedBroadcast,
@@ -617,6 +618,48 @@ describe("codex-protocol schemas", () => {
         completionWatermarks: []
       })
     ).toThrowError(/Unsupported push state version/);
+  });
+
+  it("parses push notification payload with declarative notification", () => {
+    const parsed = parsePushNotificationPayload({
+      title: "Codex response ready",
+      body: "A response is ready in Farfield.",
+      threadId: "thread_1",
+      turnId: "turn_1",
+      url: "/threads/thread_1",
+      createdAt: "2026-02-18T00:00:00.000Z",
+      web_push: {
+        notification: {
+          title: "Codex response ready",
+          body: "A response is ready in Farfield.",
+          navigate: "/threads/thread_1",
+          icon: "/icons/icon-192.png",
+          badge: "/icons/icon-192.png",
+          tag: "thread:thread_1"
+        }
+      }
+    });
+
+    expect(parsed.web_push?.notification.navigate).toBe("/threads/thread_1");
+  });
+
+  it("rejects push notification payload with unknown declarative fields", () => {
+    expect(() =>
+      parsePushNotificationPayload({
+        title: "Codex response ready",
+        body: "A response is ready in Farfield.",
+        threadId: "thread_1",
+        turnId: "turn_1",
+        url: "/threads/thread_1",
+        createdAt: "2026-02-18T00:00:00.000Z",
+        web_push: {
+          notification: {
+            title: "Codex response ready",
+            unknownField: true
+          }
+        }
+      })
+    ).toThrowError(/PushNotificationPayload did not match expected schema/);
   });
 
   it("parses vapid public key response", () => {

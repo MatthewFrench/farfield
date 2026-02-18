@@ -6,6 +6,47 @@
     <meta name="theme-color" content="#101729" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <script>
+      (() => {
+        const resumePathStorageKey = "farfield.resume.path.v1";
+        let storedTheme = null;
+        try {
+          storedTheme = localStorage.getItem("theme");
+        } catch {
+          storedTheme = null;
+        }
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const isDark = storedTheme === "dark" || (!storedTheme && prefersDark);
+        if (isDark) {
+          document.documentElement.classList.add("dark");
+        }
+        document.documentElement.style.backgroundColor = isDark ? "#101729" : "#ffffff";
+        document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+
+        let resumePath = null;
+        try {
+          resumePath = localStorage.getItem(resumePathStorageKey);
+        } catch {
+          resumePath = null;
+        }
+        if (window.location.pathname !== "/" || typeof resumePath !== "string") {
+          return;
+        }
+        const trimmedPath = resumePath.trim();
+        if (trimmedPath.startsWith("/") && !trimmedPath.startsWith("//")) {
+          window.history.replaceState(null, "", trimmedPath);
+        }
+      })();
+    </script>
+    <style>
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        background-color: inherit;
+      }
+    </style>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/icon-180.png" />
     <title>Codex Monitor</title>

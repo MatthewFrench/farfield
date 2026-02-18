@@ -133,6 +133,10 @@ const APP_DEFAULT_VALUE = "__app_default__";
 const ASSUMED_APP_DEFAULT_MODEL = "gpt-5.3-codex";
 const ASSUMED_APP_DEFAULT_EFFORT = "medium";
 const SIDEBAR_COLLAPSED_GROUPS_STORAGE_KEY = "farfield.sidebar.collapsed-groups.v1";
+const RESUME_PATH_STORAGE_KEY = "farfield.resume.path.v1";
+const CORE_REFRESH_INTERVAL_VISIBLE_MS = 5_000;
+const CORE_REFRESH_INTERVAL_HIDDEN_MS = 30_000;
+const STREAM_REFRESH_DEBOUNCE_MS = 800;
 
 function isPlanModeOption(mode: { mode: string; name: string }): boolean {
   return mode.mode.toLowerCase().includes("plan") || mode.name.toLowerCase().includes("plan");
@@ -260,6 +264,57 @@ function writeSidebarCollapsedGroupsToStorage(value: Record<string, boolean>): v
   }
 }
 
+function isResumePathCandidate(pathname: string): boolean {
+  if (!pathname.startsWith("/")) {
+    return false;
+  }
+  if (pathname.startsWith("//")) {
+    return false;
+  }
+  return true;
+}
+
+function readResumePathFromStorage(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const storage = window.localStorage as Partial<Storage> | undefined;
+    if (!storage || typeof storage.getItem !== "function") {
+      return null;
+    }
+    const raw = storage.getItem(RESUME_PATH_STORAGE_KEY);
+    if (typeof raw !== "string") {
+      return null;
+    }
+    const trimmed = raw.trim();
+    if (!trimmed || !isResumePathCandidate(trimmed)) {
+      return null;
+    }
+    return trimmed;
+  } catch {
+    return null;
+  }
+}
+
+function writeResumePathToStorage(pathname: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  if (!isResumePathCandidate(pathname)) {
+    return;
+  }
+  try {
+    const storage = window.localStorage as Partial<Storage> | undefined;
+    if (!storage || typeof storage.setItem !== "function") {
+      return;
+    }
+    storage.setItem(RESUME_PATH_STORAGE_KEY, pathname);
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
 function parseUiStateFromPath(pathname: string): { threadId: string | null; tab: AppTab } {
   const segments = pathname.split("/").filter((segment) => segment.length > 0);
   if (segments.length === 0) {
@@ -348,7 +403,17 @@ function IconBtn({
 /* ── Main App ───────────────────────────────────────────────── */
 export function App(): React.JSX.Element {
   const { theme, toggle: toggleTheme } = useTheme();
-  const initialUiState = useMemo(() => parseUiStateFromPath(window.location.pathname), []);
+  const initialUiState = useMemo(() => {
+    const fromPath = parseUiStateFromPath(window.location.pathname);
+    if (fromPath.threadId || fromPath.tab !== "chat") {
+      return fromPath;
+    }
+    const resumePath = readResumePathFromStorage();
+    if (!resumePath) {
+      return fromPath;
+    }
+    return parseUiStateFromPath(resumePath);
+  }, []);
 
   /* State */
   const [error, setError] = useState("");
@@ -395,6 +460,9 @@ export function App(): React.JSX.Element {
   const [suppressEntryAnimations, setSuppressEntryAnimations] = useState(false);
   const [hasHydratedModeFromLiveState, setHasHydratedModeFromLiveState] = useState(false);
   const [isModeSyncing, setIsModeSyncing] = useState(false);
+  const [isDocumentVisible, setIsDocumentVisible] = useState(
+    () => document.visibilityState === "visible"
+  );
   const [sidebarCollapsedGroups, setSidebarCollapsedGroups] = useState<Record<string, boolean>>(
     () => readSidebarCollapsedGroupsFromStorage()
   );
@@ -408,6 +476,7 @@ export function App(): React.JSX.Element {
   const lastAppliedModeSignatureRef = useRef("");
   const pendingMaterializationThreadIdsRef = useRef<Set<string>>(new Set());
   const pushModeHydratedRef = useRef(false);
+  const isDocumentVisibleRef = useRef<boolean>(document.visibilityState === "visible");
 
   /* Derived */
   const selectedThread = useMemo(
@@ -709,9 +778,8 @@ export function App(): React.JSX.Element {
   }, []);
 
   const loadLiveData = useCallback(async () => {
-    const [nh, nhist] = await Promise.all([getHealth(), listDebugHistory(120)]);
+    const nh = await getHealth();
     setHealth(nh);
-    setHistory(nhist.history);
     if (selectedThreadIdRef.current) {
       await loadSelectedThread(selectedThreadIdRef.current);
     }
@@ -815,6 +883,10 @@ export function App(): React.JSX.Element {
   }, [selectedThreadId]);
 
   useEffect(() => {
+    isDocumentVisibleRef.current = isDocumentVisible;
+  }, [isDocumentVisible]);
+
+  useEffect(() => {
     const onPopState = () => {
       const next = parseUiStateFromPath(window.location.pathname);
       setSelectedThreadId(next.threadId);
@@ -827,9 +899,39 @@ export function App(): React.JSX.Element {
   }, []);
 
   useEffect(() => {
+    const onVisibilityChange = () => {
+      const visible = document.visibilityState === "visible";
+      setIsDocumentVisible(visible);
+      if (!visible && refreshTimerRef.current) {
+        window.clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+      if (visible) {
+        void loadCoreData().catch((e) => setError(toErrorMessage(e)));
+        void loadPushData();
+        if (selectedThreadIdRef.current) {
+          void loadSelectedThread(selectedThreadIdRef.current).catch((e) =>
+            setError(toErrorMessage(e))
+          );
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [loadCoreData, loadPushData, loadSelectedThread]);
+
+  useEffect(() => {
     const nextPath = buildPathFromUiState(selectedThreadId, activeTab);
     if (window.location.pathname === nextPath) return;
     window.history.replaceState(null, "", nextPath);
+  }, [activeTab, selectedThreadId]);
+
+  useEffect(() => {
+    const nextPath = buildPathFromUiState(selectedThreadId, activeTab);
+    writeResumePathToStorage(nextPath);
   }, [activeTab, selectedThreadId]);
 
   useEffect(() => {
@@ -837,14 +939,25 @@ export function App(): React.JSX.Element {
   }, [refreshAll]);
 
   useEffect(() => {
+    const refreshIntervalMs = isDocumentVisible
+      ? CORE_REFRESH_INTERVAL_VISIBLE_MS
+      : CORE_REFRESH_INTERVAL_HIDDEN_MS;
+
     coreRefreshIntervalRef.current = window.setInterval(() => {
-      void loadCoreData().catch((e) => setError(toErrorMessage(e)));
-      void loadPushData();
-    }, 5000);
+      if (isDocumentVisibleRef.current) {
+        void loadCoreData().catch((e) => setError(toErrorMessage(e)));
+        void loadPushData();
+        return;
+      }
+      void getHealth()
+        .then(setHealth)
+        .catch((e) => setError(toErrorMessage(e)));
+    }, refreshIntervalMs);
+
     return () => {
       if (coreRefreshIntervalRef.current) window.clearInterval(coreRefreshIntervalRef.current);
     };
-  }, [loadCoreData, loadPushData]);
+  }, [isDocumentVisible, loadCoreData, loadPushData]);
 
   useEffect(() => {
     if (activeTab !== "preflight") {
@@ -864,20 +977,26 @@ export function App(): React.JSX.Element {
   }, [loadSelectedThread, selectedThreadId]);
 
   useEffect(() => {
+    if (!isDocumentVisible) {
+      return;
+    }
+
     const source = new EventSource("/events");
     source.onmessage = () => {
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = window.setTimeout(() => {
         refreshTimerRef.current = null;
         void loadLiveData().catch((e) => setError(toErrorMessage(e)));
-      }, 800);
+      }, STREAM_REFRESH_DEBOUNCE_MS);
     };
-    source.onerror = () => source.close();
+    source.onerror = () => {
+      // Keep EventSource open so the browser can handle reconnects.
+    };
     return () => {
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
       source.close();
     };
-  }, [loadLiveData]);
+  }, [isDocumentVisible, loadLiveData]);
 
   useEffect(() => {
     if (!activeRequest) {

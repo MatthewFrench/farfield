@@ -45,6 +45,13 @@ That's it. Both the backend and frontend start in parallel.
 
 The frontend proxies `/api` and `/events` to the backend automatically.
 
+Push runtime state persists at an OS-specific app state location by default:
+- macOS: `~/Library/Application Support/farfield/push-state.json`
+- Linux: `$XDG_STATE_HOME/farfield/push-state.json` (or `~/.local/state/farfield/push-state.json`)
+- Windows: `%APPDATA%/farfield/push-state.json`
+
+Set `PUSH_STATE_PATH` to override this path.
+
 ## Make it available remotely
 
 To access Farfield from another machine (e.g. a phone or tablet on the same network), use `dev:remote`:
@@ -84,6 +91,11 @@ pnpm ios:local
 
 `ops/caddy/Caddyfile.local.template` and `ops/caddy/Caddyfile.domain.template` are tracked.
 `ops/caddy/Caddyfile.local` and `ops/caddy/Caddyfile.domain` are generated and gitignored.
+
+Home Screen runtime behavior:
+- While hidden, Farfield reduces live polling and reconnects live updates on foreground.
+- Farfield stores and restores your last visited route (`/threads/...`) for faster resume.
+- Push payloads include declarative metadata (`web_push.notification`) plus standard fields.
 
 ### Local LAN HTTPS (same Wi-Fi)
 

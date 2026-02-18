@@ -73,6 +73,23 @@ export const PushStateStoreSchema = z
     }
   });
 
+export const DeclarativePushNotificationSchema = z
+  .object({
+    title: NonEmptyStringSchema,
+    body: z.string().optional(),
+    navigate: z.string().min(1).optional(),
+    icon: z.string().min(1).optional(),
+    badge: z.string().min(1).optional(),
+    tag: z.string().min(1).optional()
+  })
+  .strict();
+
+export const DeclarativeWebPushSchema = z
+  .object({
+    notification: DeclarativePushNotificationSchema
+  })
+  .strict();
+
 export const PushNotificationPayloadSchema = z
   .object({
     title: NonEmptyStringSchema,
@@ -80,7 +97,8 @@ export const PushNotificationPayloadSchema = z
     threadId: NonEmptyStringSchema,
     turnId: NonEmptyStringSchema,
     url: z.string().min(1),
-    createdAt: z.string().datetime()
+    createdAt: z.string().datetime(),
+    web_push: DeclarativeWebPushSchema.optional()
   })
   .strict();
 
@@ -118,6 +136,8 @@ export type DeletePushSubscriptionBody = z.infer<typeof DeletePushSubscriptionBo
 export type StoredPushSubscription = z.infer<typeof StoredPushSubscriptionSchema>;
 export type CompletionWatermark = z.infer<typeof CompletionWatermarkSchema>;
 export type PushStateStore = z.infer<typeof PushStateStoreSchema>;
+export type DeclarativePushNotification = z.infer<typeof DeclarativePushNotificationSchema>;
+export type DeclarativeWebPush = z.infer<typeof DeclarativeWebPushSchema>;
 export type PushNotificationPayload = z.infer<typeof PushNotificationPayloadSchema>;
 export type PushStatusResponse = z.infer<typeof PushStatusResponseSchema>;
 export type CreatePushSubscriptionResponse = z.infer<typeof CreatePushSubscriptionResponseSchema>;
@@ -162,4 +182,3 @@ export function parseVapidPublicKeyResponse(value: z.input<typeof VapidPublicKey
   }
   return result.data;
 }
-

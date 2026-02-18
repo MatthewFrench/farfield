@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   AppServerClient,
   AppServerRpcError,
@@ -41,6 +42,7 @@ import { resolveOwnerClientId } from "./thread-owner.js";
 import { PushStore } from "./push-store.js";
 import { CompletionDetector, type CompletionCandidate } from "./completion-detector.js";
 import { PushService } from "./push-service.js";
+import { migratePushStateFile, resolvePushStatePath } from "./push-state-path.js";
 
 const HOST = process.env["HOST"] ?? "127.0.0.1";
 const PORT = Number(process.env["PORT"] ?? 4311);
@@ -49,18 +51,26 @@ const USER_AGENT = "farfield/0.2.0";
 const IPC_RECONNECT_DELAY_MS = 1_000;
 const ANSI_ESCAPE_REGEX = /\u001B\[[0-?]*[ -/]*[@-~]/g;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
+const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 
 const TRACE_DIR = path.resolve(process.cwd(), "traces");
 const DEFAULT_WORKSPACE = path.resolve(process.cwd());
-const PUSH_STATE_PATH = path.resolve(
-  process.env["PUSH_STATE_PATH"] ?? path.join("apps", "server", "push-state.json")
-);
+const PUSH_STATE_RESOLUTION = resolvePushStatePath({
+  envPath: process.env["PUSH_STATE_PATH"],
+  appDataPath: process.env["APPDATA"],
+  xdgStateHome: process.env["XDG_STATE_HOME"],
+  homeDirectory: os.homedir(),
+  platform: process.platform,
+  moduleDirectory: MODULE_DIRECTORY
+});
+const PUSH_STATE_PATH = PUSH_STATE_RESOLUTION.filePath;
 const PUSH_ENABLED = (process.env["PUSH_ENABLED"] ?? "false").toLowerCase() === "true";
 const PUSH_PRIVATE_MODE_DEFAULT = (process.env["PUSH_PRIVATE_MODE_DEFAULT"] ?? "true").toLowerCase() !== "false";
 const API_AUTH_TOKEN = (process.env["API_TOKEN"] ?? process.env["PUSH_API_TOKEN"] ?? "").trim();
 const PUSH_VAPID_PUBLIC_KEY = (process.env["PUSH_VAPID_PUBLIC_KEY"] ?? "").trim();
 const PUSH_VAPID_PRIVATE_KEY = (process.env["PUSH_VAPID_PRIVATE_KEY"] ?? "").trim();
 const PUSH_VAPID_SUBJECT = (process.env["PUSH_VAPID_SUBJECT"] ?? "").trim();
+const COMPLETION_STATE_BACKFILL_INTERVAL_MS = 2_000;
 
 function resolveCodexExecutablePath(): string {
   if (process.env["CODEX_CLI_PATH"]) {
@@ -200,7 +210,9 @@ const runtimeState = {
   ipcInitialized: false,
   lastError: null as string | null,
   pushEnabled: PUSH_ENABLED,
-  pushConfigured: false
+  pushConfigured: false,
+  pushStatePath: PUSH_STATE_PATH,
+  pushStatePathSource: PUSH_STATE_RESOLUTION.source
 };
 
 let bootstrapInFlight: Promise<void> | null = null;
@@ -456,6 +468,8 @@ const pushService = new PushService({
 });
 let completionDetector = new CompletionDetector(new Map<string, string>());
 const inFlightCompletionMarkers = new Set<string>();
+const completionStateBackfillInFlight = new Set<string>();
+const completionStateBackfillLastAt = new Map<string, number>();
 
 function parseInteger(value: string | null, defaultValue: number): number {
   if (!value) {
@@ -561,13 +575,26 @@ function buildCompletionPayload(
   candidate: CompletionCandidate,
   privateMode: boolean
 ): PushNotificationPayload {
+  const body = privateMode ? "A response is ready in Farfield." : summarizeAgentText(candidate.agentText);
+  const url = `/threads/${encodeURIComponent(candidate.threadId)}`;
+
   return {
     title: "Codex response ready",
-    body: privateMode ? "A response is ready in Farfield." : summarizeAgentText(candidate.agentText),
+    body,
     threadId: candidate.threadId,
     turnId: candidate.turnId,
-    url: `/threads/${encodeURIComponent(candidate.threadId)}`,
-    createdAt: new Date().toISOString()
+    url,
+    createdAt: new Date().toISOString(),
+    web_push: {
+      notification: {
+        title: "Codex response ready",
+        body,
+        navigate: url,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: `thread:${candidate.threadId}`
+      }
+    }
   };
 }
 
@@ -678,6 +705,80 @@ function getPushReadiness(): {
     reason: "Ready to send push notifications",
     subscriptionCount
   };
+}
+
+function shouldBackfillConversationState(threadId: string): boolean {
+  if (completionStateBackfillInFlight.has(threadId)) {
+    return false;
+  }
+
+  const now = Date.now();
+  const previous = completionStateBackfillLastAt.get(threadId) ?? 0;
+  if (now - previous < COMPLETION_STATE_BACKFILL_INTERVAL_MS) {
+    return false;
+  }
+
+  completionStateBackfillLastAt.set(threadId, now);
+  return true;
+}
+
+async function readThreadConversationStateForCompletion(
+  threadId: string
+): Promise<ThreadConversationState | null> {
+  if (!shouldBackfillConversationState(threadId)) {
+    return null;
+  }
+
+  completionStateBackfillInFlight.add(threadId);
+  try {
+    const result = await appClient.readThread(threadId, true);
+    return result.thread;
+  } catch (error) {
+    logger.debug(
+      {
+        threadId,
+        error: toErrorMessage(error)
+      },
+      "completion-state-backfill-failed"
+    );
+    return null;
+  } finally {
+    completionStateBackfillInFlight.delete(threadId);
+  }
+}
+
+async function processCompletionCandidate(candidate: CompletionCandidate): Promise<void> {
+  if (inFlightCompletionMarkers.has(candidate.marker)) {
+    return;
+  }
+  inFlightCompletionMarkers.add(candidate.marker);
+
+  try {
+    const result = await notifyCompletion(candidate);
+    if (!result.canCommitWatermark) {
+      pushSystem("Push delivery failed for all subscriptions; completion watermark not updated", {
+        threadId: candidate.threadId,
+        turnId: candidate.turnId,
+        attempted: result.attempted,
+        failures: result.failures
+      });
+      return;
+    }
+
+    completionDetector.commit(candidate.threadId, candidate.marker);
+    pushStore.setCompletionWatermark(candidate.threadId, candidate.marker);
+  } catch (error) {
+    logger.error(
+      {
+        threadId: candidate.threadId,
+        turnId: candidate.turnId,
+        error: toErrorMessage(error)
+      },
+      "push-notify-failed"
+    );
+  } finally {
+    inFlightCompletionMarkers.delete(candidate.marker);
+  }
 }
 
 function getThreadLiveState(threadId: string): {
@@ -916,41 +1017,28 @@ ipcClient.onFrame((frame) => {
     streamEventsByThreadId.set(conversationId, current);
 
     const liveState = getThreadLiveState(conversationId);
-    const candidate = completionDetector.detect(conversationId, liveState.conversationState);
-    if (!candidate) {
+    const candidateFromLiveState = completionDetector.detect(conversationId, liveState.conversationState);
+    if (candidateFromLiveState) {
+      void processCompletionCandidate(candidateFromLiveState);
       return;
     }
-    if (inFlightCompletionMarkers.has(candidate.marker)) {
+
+    if (liveState.conversationState !== null) {
       return;
     }
-    inFlightCompletionMarkers.add(candidate.marker);
 
     void (async () => {
-      try {
-        const result = await notifyCompletion(candidate);
-        if (!result.canCommitWatermark) {
-          pushSystem("Push delivery failed for all subscriptions; completion watermark not updated", {
-            threadId: candidate.threadId,
-            turnId: candidate.turnId,
-            attempted: result.attempted,
-            failures: result.failures
-          });
-          return;
-        }
-        completionDetector.commit(candidate.threadId, candidate.marker);
-        pushStore.setCompletionWatermark(candidate.threadId, candidate.marker);
-      } catch (error) {
-        logger.error(
-          {
-            threadId: candidate.threadId,
-            turnId: candidate.turnId,
-            error: toErrorMessage(error)
-          },
-          "push-notify-failed"
-        );
-      } finally {
-        inFlightCompletionMarkers.delete(candidate.marker);
+      const backfilledState = await readThreadConversationStateForCompletion(conversationId);
+      if (!backfilledState) {
+        return;
       }
+
+      const candidateFromBackfill = completionDetector.detect(conversationId, backfilledState);
+      if (!candidateFromBackfill) {
+        return;
+      }
+
+      await processCompletionCandidate(candidateFromBackfill);
     })();
   }
 });
@@ -1763,6 +1851,13 @@ async function bootstrapConnections(): Promise<void> {
 async function start(): Promise<void> {
   ensureTraceDirectory();
   requirePushConfiguration();
+  const migrationResult = migratePushStateFile(PUSH_STATE_RESOLUTION);
+  if (migrationResult.migrated && migrationResult.fromPath) {
+    pushSystem("Push state file migrated", {
+      fromPath: migrationResult.fromPath,
+      toPath: migrationResult.toPath
+    });
+  }
   pushStore.load();
   completionDetector = new CompletionDetector(
     new Map(pushStore.listCompletionWatermarks().map((entry) => [entry.threadId, entry.marker]))
@@ -1778,6 +1873,8 @@ async function start(): Promise<void> {
     configured: runtimeState.pushConfigured,
     requiresAuth: isApiAuthRequired(),
     authConfigured: API_AUTH_TOKEN.length > 0,
+    statePath: PUSH_STATE_PATH,
+    statePathSource: PUSH_STATE_RESOLUTION.source,
     subscriptionCount: pushStore.getSubscriptionCount(),
     watermarkCount: pushStore.listCompletionWatermarks().length
   });
