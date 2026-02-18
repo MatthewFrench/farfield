@@ -27,6 +27,18 @@ violate the rules. If you think that is impossible, STOP and ask the user.
 - `pnpm test`
 - `pnpm lint`
 
+## Environment-Specific Files (Strict)
+
+Never commit machine-specific runtime config files.
+
+1. Commit templates only for environment-specific config.
+2. Generate runtime files from templates via setup scripts.
+3. Keep generated runtime files gitignored.
+4. Current Caddy pattern:
+   - Commit: `ops/caddy/Caddyfile.local.template`, `ops/caddy/Caddyfile.domain.template`
+   - Generate + ignore: `ops/caddy/Caddyfile.local`, `ops/caddy/Caddyfile.domain`
+5. If you add another environment-specific config, follow this same template + generated + gitignored model.
+
 ## Trace Privacy Rules (Strict)
 
 Never commit raw traces from `traces/`.

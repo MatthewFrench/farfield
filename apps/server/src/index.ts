@@ -455,6 +455,7 @@ const pushService = new PushService({
   vapidSubject: PUSH_VAPID_SUBJECT
 });
 let completionDetector = new CompletionDetector(new Map<string, string>());
+const inFlightCompletionMarkers = new Set<string>();
 
 function parseInteger(value: string | null, defaultValue: number): number {
   if (!value) {
@@ -513,11 +514,7 @@ function requirePushConfiguration(): void {
 }
 
 function isApiAuthRequired(): boolean {
-  return !LOOPBACK_HOSTS.has(HOST) || API_AUTH_TOKEN.length > 0;
-}
-
-function isApiAuthMisconfigured(): boolean {
-  return !LOOPBACK_HOSTS.has(HOST) && API_AUTH_TOKEN.length === 0;
+  return API_AUTH_TOKEN.length > 0;
 }
 
 function readApiAuthToken(req: IncomingMessage): string {
@@ -531,14 +528,6 @@ function readApiAuthToken(req: IncomingMessage): string {
 function requireApiAuth(req: IncomingMessage, res: ServerResponse): boolean {
   if (!isApiAuthRequired()) {
     return true;
-  }
-
-  if (isApiAuthMisconfigured()) {
-    jsonResponse(res, 503, {
-      ok: false,
-      error: "API auth is required when HOST is non-loopback; set API_TOKEN"
-    });
-    return false;
   }
 
   const token = readApiAuthToken(req);
@@ -931,6 +920,10 @@ ipcClient.onFrame((frame) => {
     if (!candidate) {
       return;
     }
+    if (inFlightCompletionMarkers.has(candidate.marker)) {
+      return;
+    }
+    inFlightCompletionMarkers.add(candidate.marker);
 
     void (async () => {
       try {
@@ -955,6 +948,8 @@ ipcClient.onFrame((frame) => {
           },
           "push-notify-failed"
         );
+      } finally {
+        inFlightCompletionMarkers.delete(candidate.marker);
       }
     })();
   }
@@ -1782,10 +1777,22 @@ async function start(): Promise<void> {
     enabled: pushService.isEnabled(),
     configured: runtimeState.pushConfigured,
     requiresAuth: isApiAuthRequired(),
-    authConfigured: API_AUTH_TOKEN.length > 0 || LOOPBACK_HOSTS.has(HOST),
+    authConfigured: API_AUTH_TOKEN.length > 0,
     subscriptionCount: pushStore.getSubscriptionCount(),
     watermarkCount: pushStore.listCompletionWatermarks().length
   });
+  if (!LOOPBACK_HOSTS.has(HOST) && API_AUTH_TOKEN.length === 0) {
+    pushSystem("API auth is disabled on a non-loopback host", {
+      host: HOST,
+      recommendation: "Set API_TOKEN to require X-Farfield-Token for /api routes."
+    });
+    logger.warn(
+      {
+        host: HOST
+      },
+      "api-auth-disabled-non-loopback"
+    );
+  }
 
   await new Promise<void>((resolve, reject) => {
     const onError = (error: Error): void => {

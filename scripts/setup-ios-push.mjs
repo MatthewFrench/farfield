@@ -8,7 +8,9 @@ import webPush from "web-push";
 
 const cwd = process.cwd();
 const envLocalPath = path.join(cwd, ".env.local");
-const caddyLocalPath = path.join(cwd, "ops", "caddy", "Caddyfile.local");
+const caddyLocalTemplatePath = path.join(cwd, "ops", "caddy", "Caddyfile.local.template");
+const caddyLocalOutputPath = path.join(cwd, "ops", "caddy", "Caddyfile.local");
+const localSitePlaceholder = "{{SITE_ADDRESS}}";
 const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
 
 const managedKeys = new Set([
@@ -19,6 +21,13 @@ const managedKeys = new Set([
   "API_TOKEN",
   "PUSH_DOCTOR_TOKEN"
 ]);
+
+function toErrorMessage(error) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
 
 function maskSecret(value) {
   if (value.length <= 10) {
@@ -120,10 +129,40 @@ function detectLocalIpv4Address() {
   return candidates[0]?.address ?? null;
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderTemplate(templateText, placeholder, replacement, templatePath) {
+  const pattern = new RegExp(escapeRegExp(placeholder), "g");
+  const matches = templateText.match(pattern) ?? [];
+  if (matches.length !== 1) {
+    throw new Error(
+      `Template ${templatePath} must contain placeholder ${placeholder} exactly once (found ${String(matches.length)})`
+    );
+  }
+  return templateText.replace(placeholder, replacement);
+}
+
+function withTrailingNewline(value) {
+  return value.endsWith("\n") ? value : `${value}\n`;
+}
+
 async function askWithDefault(rl, prompt, defaultValue) {
   const raw = await rl.question(`${prompt} [${defaultValue}]: `);
   const value = raw.trim();
   return value.length > 0 ? value : defaultValue;
+}
+
+async function askNormalizedWithDefault(rl, prompt, defaultValue, normalize) {
+  while (true) {
+    const rawValue = await askWithDefault(rl, prompt, defaultValue);
+    try {
+      return normalize(rawValue);
+    } catch (error) {
+      process.stdout.write(`Invalid value: ${toErrorMessage(error)}\n`);
+    }
+  }
 }
 
 async function askYesNo(rl, prompt, defaultValue) {
@@ -142,34 +181,19 @@ async function askYesNo(rl, prompt, defaultValue) {
   return defaultValue;
 }
 
-function renderDefaultCaddyLocalConfig(siteAddress) {
-  return `${siteAddress} {
-  tls internal
-
-  @api path /api/*
-  reverse_proxy @api 127.0.0.1:4311 {
-    header_up X-Farfield-Token {env.API_TOKEN}
-  }
-
-  @events path /events
-  reverse_proxy @events 127.0.0.1:4311 {
-    flush_interval -1
-  }
-
-  reverse_proxy 127.0.0.1:4312
+if (!fs.existsSync(caddyLocalTemplatePath)) {
+  throw new Error(`Missing Caddy local template: ${caddyLocalTemplatePath}`);
 }
-`;
-}
+const caddyLocalTemplate = fs.readFileSync(caddyLocalTemplatePath, "utf8");
 
 const existingEnv = fs.existsSync(envLocalPath) ? parse(fs.readFileSync(envLocalPath, "utf8")) : {};
 const existingPublic = (existingEnv["PUSH_VAPID_PUBLIC_KEY"] ?? "").trim();
 const existingPrivate = (existingEnv["PUSH_VAPID_PRIVATE_KEY"] ?? "").trim();
 const hasExistingVapid = existingPublic.length > 0 && existingPrivate.length > 0;
 
-let existingCaddyConfig = "";
 let caddySite = null;
-if (fs.existsSync(caddyLocalPath)) {
-  existingCaddyConfig = fs.readFileSync(caddyLocalPath, "utf8");
+if (fs.existsSync(caddyLocalOutputPath)) {
+  const existingCaddyConfig = fs.readFileSync(caddyLocalOutputPath, "utf8");
   caddySite = parseCaddySiteLine(existingCaddyConfig);
 }
 
@@ -200,25 +224,57 @@ if (interactive) {
   });
   try {
     process.stdout.write("Farfield iOS push setup\n");
-    process.stdout.write(`- Suggested HTTPS host: ${defaultAddress}\n`);
+    process.stdout.write("This wizard configures local HTTPS and Web Push for iPhone Home Screen use.\n");
+    process.stdout.write("It writes .env.local and generates ops/caddy/Caddyfile.local from template.\n");
+    process.stdout.write("\n1) HTTPS host for iPhone\n");
+    process.stdout.write("- What it is: the exact HTTPS origin your iPhone will open.\n");
+    process.stdout.write("- Why needed: service workers and push only work on secure HTTPS origins.\n");
+    process.stdout.write(`- Suggested value: ${defaultAddress}\n`);
     if (detectedIp) {
-      process.stdout.write(`- Detected LAN IP: ${detectedIp}\n`);
+      process.stdout.write(`- Detected LAN IP on this Mac: ${detectedIp}\n`);
     }
-    process.stdout.write("- Push contact subject is only for Web Push operator contact and is not shown to users.\n");
-    process.stdout.write("- For localhost/LAN testing, use your real email, for example mailto:you@yourdomain.com.\n");
-    selectedAddress = normalizeHttpsAddress(
-      await askWithDefault(rl, "Local HTTPS host for iPhone (IP or hostname)", defaultAddress)
+    selectedAddress = await askNormalizedWithDefault(
+      rl,
+      "Enter local HTTPS host (IP or hostname)",
+      defaultAddress,
+      normalizeHttpsAddress
     );
-    selectedSubject = normalizePushContactSubject(
-      await askWithDefault(rl, "Push contact subject (mailto:... or https://...)", defaultSubject)
+    process.stdout.write(`- Selected HTTPS origin: ${selectedAddress}\n`);
+
+    process.stdout.write("\n2) Push contact subject (VAPID subject)\n");
+    process.stdout.write("- What it is: operator contact identity included in Web Push auth.\n");
+    process.stdout.write("- Why needed: push providers require a contact for security/abuse operations.\n");
+    process.stdout.write("- User visibility: not shown in your app UI.\n");
+    process.stdout.write("- For localhost/LAN testing: use your real email.\n");
+    selectedSubject = await askNormalizedWithDefault(
+      rl,
+      "Enter push contact subject (mailto:... or https://...)",
+      defaultSubject,
+      normalizePushContactSubject
     );
+
+    process.stdout.write("\n3) VAPID key pair\n");
+    process.stdout.write("- What it is: public/private keys used to sign Web Push requests.\n");
+    process.stdout.write("- Why needed: browser push services reject unsigned requests.\n");
+    process.stdout.write("- Impact of rotation: old push subscriptions stop working until users re-enable notifications.\n");
     if (hasExistingVapid) {
-      regenerateVapid = await askYesNo(rl, "Regenerate VAPID key pair", false);
+      regenerateVapid = await askYesNo(rl, "Generate a new VAPID key pair now", false);
+    } else {
+      process.stdout.write("- No existing key pair found, so a new one will be generated.\n");
     }
-    regenerateApiToken = await askYesNo(rl, "Regenerate API token", regenerateApiToken);
+
+    process.stdout.write("\n4) API token for /api requests\n");
+    process.stdout.write("- What it is: shared secret used to protect Farfield HTTP API.\n");
+    process.stdout.write("- Why needed: prevents random devices on LAN/domain from calling your API.\n");
+    process.stdout.write("- Caddy forwards this token upstream automatically.\n");
+    process.stdout.write("- Impact of rotation: restart running services and any external checks using old token.\n");
+    regenerateApiToken = await askYesNo(rl, "Generate a new API token now", regenerateApiToken);
   } finally {
     rl.close();
   }
+} else {
+  process.stdout.write("Farfield iOS push setup (non-interactive mode)\n");
+  process.stdout.write("- Using defaults from current config and environment values.\n");
 }
 
 const vapid = hasExistingVapid && !regenerateVapid
@@ -261,26 +317,23 @@ if (preservedEntries.length > 0) {
 }
 fs.writeFileSync(envLocalPath, `${envLines.join("\n")}\n`, "utf8");
 
-if (existingCaddyConfig.length === 0) {
-  fs.mkdirSync(path.dirname(caddyLocalPath), { recursive: true });
-  fs.writeFileSync(caddyLocalPath, renderDefaultCaddyLocalConfig(selectedAddress), "utf8");
-} else if (caddySite) {
-  const caddyLines = existingCaddyConfig.split(/\r?\n/);
-  const siteLine = `${caddySite.indent}${selectedAddress} {`;
-  caddyLines[caddySite.lineIndex] = siteLine;
-  fs.writeFileSync(caddyLocalPath, `${caddyLines.join("\n")}\n`, "utf8");
-} else {
-  throw new Error(`Could not update site address in ${caddyLocalPath}`);
-}
+const renderedCaddyLocal = renderTemplate(
+  caddyLocalTemplate,
+  localSitePlaceholder,
+  selectedAddress,
+  caddyLocalTemplatePath
+);
+fs.mkdirSync(path.dirname(caddyLocalOutputPath), { recursive: true });
+fs.writeFileSync(caddyLocalOutputPath, withTrailingNewline(renderedCaddyLocal), "utf8");
 
 process.stdout.write(`Wrote ${envLocalPath}\n`);
-process.stdout.write(`Updated ${caddyLocalPath}\n`);
+process.stdout.write(`Generated ${caddyLocalOutputPath} from ${caddyLocalTemplatePath}\n`);
 process.stdout.write("Managed values:\n");
-process.stdout.write("- PUSH_ENABLED=true\n");
-process.stdout.write(`- PUSH_VAPID_PUBLIC_KEY=${vapid.publicKey}\n`);
-process.stdout.write(`- PUSH_VAPID_PRIVATE_KEY=${maskSecret(vapid.privateKey)}\n`);
-process.stdout.write(`- PUSH_VAPID_SUBJECT=${selectedSubject}\n`);
-process.stdout.write(`- API_TOKEN=${maskSecret(apiToken)}\n`);
-process.stdout.write(`- PUSH_DOCTOR_TOKEN=${maskSecret(doctorToken)}\n`);
-process.stdout.write(`- Local HTTPS origin=${selectedAddress}\n`);
+process.stdout.write("- PUSH_ENABLED=true (enables push endpoints)\n");
+process.stdout.write(`- PUSH_VAPID_PUBLIC_KEY=${vapid.publicKey} (sent to browser during subscribe)\n`);
+process.stdout.write(`- PUSH_VAPID_PRIVATE_KEY=${maskSecret(vapid.privateKey)} (server-only signing key)\n`);
+process.stdout.write(`- PUSH_VAPID_SUBJECT=${selectedSubject} (operator contact for push providers)\n`);
+process.stdout.write(`- API_TOKEN=${maskSecret(apiToken)} (protects API access)\n`);
+process.stdout.write(`- PUSH_DOCTOR_TOKEN=${maskSecret(doctorToken)} (auth token used by push doctor checks)\n`);
+process.stdout.write(`- Local HTTPS origin=${selectedAddress} (use this on iPhone Safari)\n`);
 process.stdout.write("\nNext step: pnpm ios:local\n");

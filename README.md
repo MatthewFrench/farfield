@@ -61,7 +61,7 @@ This binds both the backend and frontend to `0.0.0.0` instead of `127.0.0.1`, ma
 
 If you want Home Screen install + iOS notifications on your iPhone:
 
-1. Run setup once (interactive; writes `.env.local` and updates `ops/caddy/Caddyfile.local` host):
+1. Run setup once (interactive; writes `.env.local` and generates `ops/caddy/Caddyfile.local` from template):
 
 ```bash
 pnpm setup:ios-push
@@ -82,9 +82,12 @@ pnpm ios:local
 
 `pnpm dev`, `pnpm dev:remote`, `pnpm ios:local`, and `pnpm push:doctor` auto-load `.env.local`.
 
+`ops/caddy/Caddyfile.local.template` and `ops/caddy/Caddyfile.domain.template` are tracked.
+`ops/caddy/Caddyfile.local` and `ops/caddy/Caddyfile.domain` are generated and gitignored.
+
 ### Local LAN HTTPS (same Wi-Fi)
 
-1. Set the HTTPS host in `ops/caddy/Caddyfile.local` (IP or LAN hostname).
+1. Run `pnpm setup:ios-push` to regenerate `ops/caddy/Caddyfile.local` with the correct host.
 2. Run `pnpm ios:local` (it starts Farfield + Caddy and prints the exact HTTPS origin).
 3. Open that HTTPS origin in iPhone Safari.
 4. If iOS shows a certificate warning, install/trust Caddy local root CA on the iPhone (one-time).
@@ -94,7 +97,11 @@ pnpm ios:local
 ### Public Domain HTTPS
 
 1. Point DNS for your domain to the machine running Farfield.
-2. Set the domain in `ops/caddy/Caddyfile.domain`.
+2. Generate the domain Caddy config:
+
+```bash
+pnpm setup:domain-https
+```
 3. Start Farfield:
 
 ```bash
@@ -129,7 +136,7 @@ caddy run --config ops/caddy/Caddyfile.domain
 | Permission prompt never appears | Permission was previously denied | iOS Settings -> Notifications -> Safari (or web app) and re-enable, then try `Enable Notifs` again |
 | No background notification | App is not installed to Home Screen, or no active push subscription | Install to Home Screen, ensure `Enable Notifs` is active, and verify in Preflight page |
 | `push:doctor` shows unauthorized | Token mismatch between server and doctor env | Set matching `API_TOKEN` and `PUSH_DOCTOR_TOKEN` values |
-| Local HTTPS page does not load on iPhone | `Caddyfile.local` host is wrong or CA not trusted | Set correct LAN host/IP in `Caddyfile.local`, restart `pnpm ios:local`, trust Caddy local CA on iPhone |
+| Local HTTPS page does not load on iPhone | Generated `Caddyfile.local` host is wrong or CA not trusted | Re-run `pnpm setup:ios-push`, restart `pnpm ios:local`, trust Caddy local CA on iPhone |
 
 Use `pnpm push:doctor` to validate env + Caddy files + live `/api/health` and `/api/push/status` checks.
 

@@ -8,6 +8,7 @@
     "dev:remote:https": "pnpm ios:local",
     "ios:local": "node scripts/with-env.mjs \"node scripts/ios-local.mjs\"",
     "setup:ios-push": "node scripts/setup-ios-push.mjs",
+    "setup:domain-https": "node scripts/setup-domain-https.mjs",
     "rotate:api-token": "node scripts/rotate-api-token.mjs",
     "build": "pnpm -r build",
     "test": "pnpm -r test",

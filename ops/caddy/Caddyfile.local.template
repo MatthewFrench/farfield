@@ -1,0 +1,15 @@
+{{SITE_ADDRESS}} {
+  tls internal
+
+  @api path /api/*
+  reverse_proxy @api 127.0.0.1:4311 {
+    header_up X-Farfield-Token {env.API_TOKEN}
+  }
+
+  @events path /events
+  reverse_proxy @events 127.0.0.1:4311 {
+    flush_interval -1
+  }
+
+  reverse_proxy 127.0.0.1:4312
+}

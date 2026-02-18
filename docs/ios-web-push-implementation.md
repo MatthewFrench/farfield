@@ -228,13 +228,13 @@ Error envelope:
 
 ### API auth
 
-Protect `/api/*` with a simple shared secret header when `HOST` is not loopback.
+Protect `/api/*` with an optional shared secret header.
 
 1. Env: `API_TOKEN` (`PUSH_API_TOKEN` remains accepted as a compatibility alias).
 2. Header: `X-Farfield-Token: <token>`
 3. Behavior:
-   - Missing/invalid token returns `401` with strict JSON envelope.
-   - Local loopback development can be exempted when no API token is set.
+   - When `API_TOKEN` is set, missing/invalid token returns `401` with strict JSON envelope.
+   - When `API_TOKEN` is unset, `/api/*` remains open for development compatibility.
 4. Validation remains strict and explicit; auth check happens before body parsing.
 5. `/events` remains unauthenticated to keep browser `EventSource` simple; keep it on the same HTTPS origin and trusted network boundary.
 
@@ -305,10 +305,11 @@ Use Caddy as the single entrypoint for both local LAN and real domain deployment
 
 ### Local LAN (trusted internal CA)
 
-`ops/caddy/Caddyfile.local`:
+Tracked template: `ops/caddy/Caddyfile.local.template`  
+Generated runtime file (gitignored): `ops/caddy/Caddyfile.local`
 
 ```caddyfile
-https://192.168.1.50 {
+{{SITE_ADDRESS}} {
   tls internal
 
   @api path /api/*
@@ -333,10 +334,11 @@ Notes:
 
 ### Real Domain (public CA)
 
-`ops/caddy/Caddyfile.domain`:
+Tracked template: `ops/caddy/Caddyfile.domain.template`  
+Generated runtime file (gitignored): `ops/caddy/Caddyfile.domain`
 
 ```caddyfile
-farfield.example.com {
+{{DOMAIN_HOST}} {
   @api path /api/*
   reverse_proxy @api 127.0.0.1:4311 {
     header_up X-Farfield-Token {env.API_TOKEN}
@@ -370,9 +372,10 @@ Local HTTPS:
 Domain HTTPS:
 
 1. Point DNS to host IP.
-2. Start Farfield: `pnpm dev`
-3. Start Caddy with domain config: `caddy run --config ops/caddy/Caddyfile.domain`
-4. Open domain in Safari, add to Home Screen, enable notifications.
+2. Generate domain config: `pnpm setup:domain-https`
+3. Start Farfield: `pnpm dev`
+4. Start Caddy with domain config: `caddy run --config ops/caddy/Caddyfile.domain`
+5. Open domain in Safari, add to Home Screen, enable notifications.
 
 Incident quick checks:
 
@@ -388,10 +391,11 @@ Incident quick checks:
 Add convenience scripts in root `package.json`:
 
 1. `setup:ios-push` (writes `.env.local` with generated keys/token)
-2. `ios:local` (starts app stack + Caddy local config)
-3. `push:keys` (generate VAPID keypair)
-4. `push:doctor` (checks env vars, Caddy config presence, and live `/api/health` + `/api/push/status` reachability)
-5. `rotate:api-token` (rotates `API_TOKEN` and `PUSH_DOCTOR_TOKEN` in `.env.local`)
+2. `setup:domain-https` (generates `ops/caddy/Caddyfile.domain` from template)
+3. `ios:local` (starts app stack + Caddy local config)
+4. `push:keys` (generate VAPID keypair)
+5. `push:doctor` (checks env vars, Caddy template/runtime config presence, and live `/api/health` + `/api/push/status` reachability)
+6. `rotate:api-token` (rotates `API_TOKEN` and `PUSH_DOCTOR_TOKEN` in `.env.local`)
 
 Provide `.env.example` entries for push config.
 
@@ -418,7 +422,7 @@ Keep README onboarding minimal:
 
 1. Default notification mode is `Private`.
 2. `Private` mode body must not include assistant content snippets.
-3. Require `API_TOKEN` whenever binding to non-loopback host.
+3. Recommend `API_TOKEN` whenever binding to non-loopback host.
 4. Do not log full subscription payloads; log redacted endpoint hash only.
 5. Keep subscription store file out of git and restricted to process owner permissions.
 
@@ -536,7 +540,7 @@ Pass all items before merge:
 
 ## Priority Improvements (Ranked)
 
-1. Add auth for `/api/*` on non-loopback hosts.
+1. Add optional auth for `/api/*` via `API_TOKEN` with secure defaults in HTTPS deployments.
 2. Commit completion watermark only after notification send success.
 3. Allow privacy-mode updates while already subscribed.
 4. Add integration tests for auth + push endpoints.
@@ -557,5 +561,5 @@ Pass all items before merge:
 1. Global opt-in only.
 2. Completion notifications only.
 3. Single notification template.
-4. Caddy local + domain configs committed under `ops/caddy/`.
+4. Caddy local + domain templates committed under `ops/caddy/`; generated runtime files are gitignored.
 5. Expand preferences after first production validation.

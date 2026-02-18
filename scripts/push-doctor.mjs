@@ -50,15 +50,33 @@ if (pushEnabled) {
 if (!loopbackHosts.has(host)) {
   check(
     "API token",
-    apiToken.length > 0,
-    apiToken.length > 0 ? "present" : "missing (required for non-loopback HOST)"
+    true,
+    apiToken.length > 0
+      ? "present"
+      : "missing (recommended for non-loopback HOST; set API_TOKEN to enforce /api auth)"
   );
 }
 
+const localCaddyTemplate = path.join(cwd, "ops", "caddy", "Caddyfile.local.template");
+const domainCaddyTemplate = path.join(cwd, "ops", "caddy", "Caddyfile.domain.template");
 const localCaddy = path.join(cwd, "ops", "caddy", "Caddyfile.local");
 const domainCaddy = path.join(cwd, "ops", "caddy", "Caddyfile.domain");
-check("Caddy local config", fs.existsSync(localCaddy), localCaddy);
-check("Caddy domain config", fs.existsSync(domainCaddy), domainCaddy);
+check("Caddy local template", fs.existsSync(localCaddyTemplate), localCaddyTemplate);
+check("Caddy domain template", fs.existsSync(domainCaddyTemplate), domainCaddyTemplate);
+check(
+  "Caddy local runtime config",
+  true,
+  fs.existsSync(localCaddy)
+    ? `present (${localCaddy})`
+    : `missing (${localCaddy}); run pnpm setup:ios-push`
+);
+check(
+  "Caddy domain runtime config",
+  true,
+  fs.existsSync(domainCaddy)
+    ? `present (${domainCaddy})`
+    : `missing (${domainCaddy}); run pnpm setup:domain-https when using a real domain`
+);
 
 async function checkEndpoint(pathname, expectedLabel) {
   const headers = new Headers();

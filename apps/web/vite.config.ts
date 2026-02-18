@@ -26,6 +26,7 @@ export default defineConfig({
     host: true,
     allowedHosts: true,
     port: 4312,
+    strictPort: true,
     proxy: {
       "/api": apiProxyTarget,
       "/events": "http://127.0.0.1:4311"

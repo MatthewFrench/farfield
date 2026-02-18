@@ -290,4 +290,69 @@ describe("push API auth and subscription routes", () => {
     const parsedStatusAfterDelete = PUSH_STATUS_ENVELOPE_SCHEMA.parse(await statusAfterDelete.json());
     expect(parsedStatusAfterDelete.subscriptionCount).toBe(0);
   });
+
+  it("allows non-loopback /api routes when API_TOKEN is unset", async () => {
+    const port = await reservePort();
+    const localBaseUrl = `http://127.0.0.1:${String(port)}`;
+    const localStateDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-push-api-no-auth-"));
+    const localStatePath = path.join(localStateDirectory, "push-state.json");
+    const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+    const localOutput: string[] = [];
+
+    const child = spawn(globalThis.process.execPath, ["--import", "tsx", "src/index.ts"], {
+      cwd: serverRoot,
+      env: {
+        ...globalThis.process.env,
+        HOST: "0.0.0.0",
+        PORT: String(port),
+        PUSH_ENABLED: "false",
+        PUSH_STATE_PATH: localStatePath
+      },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+
+    child.stdout.on("data", (chunk) => {
+      localOutput.push(chunk.toString());
+    });
+    child.stderr.on("data", (chunk) => {
+      localOutput.push(chunk.toString());
+    });
+
+    try {
+      const deadline = Date.now() + 20_000;
+      let ready = false;
+      while (Date.now() < deadline) {
+        if (child.exitCode !== null) {
+          throw new Error(`Server exited before ready.\n${localOutput.join("")}`);
+        }
+        try {
+          const response = await fetch(`${localBaseUrl}/api/health`);
+          if (response.status === 200) {
+            ready = true;
+            break;
+          }
+        } catch {
+          // Server has not started listening yet.
+        }
+        await delay(125);
+      }
+      if (!ready) {
+        throw new Error(`Timed out waiting for server readiness.\n${localOutput.join("")}`);
+      }
+
+      const health = await fetch(`${localBaseUrl}/api/health`);
+      expect(health.status).toBe(200);
+      HEALTH_SCHEMA.parse(await health.json());
+
+      const pushStatus = await fetch(`${localBaseUrl}/api/push/status`);
+      expect(pushStatus.status).toBe(200);
+      const parsedPushStatus = PUSH_STATUS_ENVELOPE_SCHEMA.parse(await pushStatus.json());
+      expect(parsedPushStatus.enabled).toBe(false);
+    } finally {
+      await stopServerProcess(child);
+      if (fs.existsSync(localStateDirectory)) {
+        fs.rmSync(localStateDirectory, { recursive: true, force: true });
+      }
+    }
+  });
 });

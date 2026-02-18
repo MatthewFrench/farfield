@@ -3,7 +3,10 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
 const cwd = process.cwd();
+const caddyConfigTemplatePath = path.join(cwd, "ops", "caddy", "Caddyfile.local.template");
 const caddyConfigPath = path.join(cwd, "ops", "caddy", "Caddyfile.local");
+const backendPort = Number(process.env["PORT"] ?? "4311");
+const frontendPort = 4312;
 
 function parseHttpsOrigin(configText) {
   const siteLine = configText
@@ -49,17 +52,98 @@ function printPrerequisiteError(title, lines) {
   }
 }
 
-function startChild(command, args, label) {
+function startChild(command, args, label, useProcessGroup = false) {
+  const detached = useProcessGroup && process.platform !== "win32";
   const child = spawn(command, args, {
     cwd,
     env: process.env,
-    stdio: "inherit"
+    stdio: "inherit",
+    detached
   });
   return child;
 }
 
+function listListeningProcesses(port) {
+  if (!commandExists("lsof")) {
+    return [];
+  }
+
+  const result = spawnSync("lsof", ["-nP", `-iTCP:${String(port)}`, "-sTCP:LISTEN"], {
+    encoding: "utf8"
+  });
+  if (result.status !== 0 || result.stdout.trim().length === 0) {
+    return [];
+  }
+
+  const lines = result.stdout.trim().split(/\r?\n/);
+  if (lines.length <= 1) {
+    return [];
+  }
+  return lines.slice(1).map((line) => line.trim().replace(/\s+/g, " "));
+}
+
+function ensurePortIsAvailable(port, label) {
+  const listeners = listListeningProcesses(port);
+  if (listeners.length === 0) {
+    return;
+  }
+
+  printPrerequisiteError(`${label} port ${String(port)} is already in use.`, [
+    "Stop existing listeners, then retry:",
+    ...listeners.map((line) => `  ${line}`)
+  ]);
+  process.exit(1);
+}
+
+function stopChild(child, signal, useProcessGroup = false) {
+  if (!child || child.exitCode !== null) {
+    return;
+  }
+
+  if (useProcessGroup && process.platform !== "win32") {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+      // Fall through to single-process kill if process group is unavailable.
+    }
+  }
+
+  child.kill(signal);
+}
+
+function resolvePackageManagerCommand(pnpmPathFromEnv) {
+  if (pnpmPathFromEnv.length === 0) {
+    return {
+      command: "pnpm",
+      args: ["dev"],
+      label: "pnpm dev"
+    };
+  }
+
+  const extension = path.extname(pnpmPathFromEnv).toLowerCase();
+  if (extension === ".js" || extension === ".cjs" || extension === ".mjs") {
+    return {
+      command: process.execPath,
+      args: [pnpmPathFromEnv, "dev"],
+      label: "pnpm dev"
+    };
+  }
+
+  return {
+    command: pnpmPathFromEnv,
+    args: ["dev"],
+    label: "pnpm dev"
+  };
+}
+
 if (!fs.existsSync(caddyConfigPath)) {
-  process.stderr.write(`[ios:local] missing config: ${caddyConfigPath}\n`);
+  printPrerequisiteError("missing generated Caddy local config.", [
+    `Missing: ${caddyConfigPath}`,
+    "Run:",
+    "  pnpm setup:ios-push",
+    `Template source: ${caddyConfigTemplatePath}`
+  ]);
   process.exit(1);
 }
 
@@ -86,12 +170,8 @@ let devProcess = null;
 let caddyProcess = null;
 
 function stopChildren(signal) {
-  if (devProcess && devProcess.exitCode === null) {
-    devProcess.kill(signal);
-  }
-  if (caddyProcess && caddyProcess.exitCode === null) {
-    caddyProcess.kill(signal);
-  }
+  stopChild(devProcess, signal, true);
+  stopChild(caddyProcess, signal, false);
 }
 
 function exitFromStartError(label, error) {
@@ -134,12 +214,12 @@ if (caddyExecutable === "caddy" && !commandExists("caddy")) {
   process.exit(1);
 }
 
-if (pnpmExecPath.length > 0) {
-  devProcess = startChild(process.execPath, [pnpmExecPath, "dev"], "pnpm dev");
-} else {
-  devProcess = startChild("pnpm", ["dev"], "pnpm dev");
-}
-caddyProcess = startChild(caddyExecutable, ["run", "--config", caddyConfigPath], "caddy");
+ensurePortIsAvailable(backendPort, "Backend");
+ensurePortIsAvailable(frontendPort, "Frontend");
+
+const packageManagerCommand = resolvePackageManagerCommand(pnpmExecPath);
+devProcess = startChild(packageManagerCommand.command, packageManagerCommand.args, packageManagerCommand.label, true);
+caddyProcess = startChild(caddyExecutable, ["run", "--config", caddyConfigPath], "caddy", false);
 
 devProcess.on("error", (error) => {
   exitFromStartError("pnpm dev", error);

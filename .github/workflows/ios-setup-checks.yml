@@ -31,15 +31,18 @@ jobs:
       - name: Run setup wizard non-interactive
         run: pnpm setup:ios-push
 
+      - name: Run domain setup non-interactive
+        run: pnpm setup:domain-https
+
       - name: Validate generated env file
         run: |
           test -f .env.local
-          rg -n "^PUSH_ENABLED=true$" .env.local
-          rg -n "^PUSH_VAPID_PUBLIC_KEY=.+" .env.local
-          rg -n "^PUSH_VAPID_PRIVATE_KEY=.+" .env.local
-          rg -n "^PUSH_VAPID_SUBJECT=.+" .env.local
-          rg -n "^API_TOKEN=.+" .env.local
-          rg -n "^PUSH_DOCTOR_TOKEN=.+" .env.local
+          grep -nE "^PUSH_ENABLED=true$" .env.local
+          grep -nE "^PUSH_VAPID_PUBLIC_KEY=.+" .env.local
+          grep -nE "^PUSH_VAPID_PRIVATE_KEY=.+" .env.local
+          grep -nE "^PUSH_VAPID_SUBJECT=.+" .env.local
+          grep -nE "^API_TOKEN=.+" .env.local
+          grep -nE "^PUSH_DOCTOR_TOKEN=.+" .env.local
 
       - name: Rotate API token
         run: |
@@ -56,14 +59,19 @@ jobs:
         run: |
           node --check scripts/with-env.mjs
           node --check scripts/setup-ios-push.mjs
+          node --check scripts/setup-domain-https.mjs
           node --check scripts/rotate-api-token.mjs
           node --check scripts/ios-local.mjs
           node --check scripts/push-doctor.mjs
 
-      - name: Validate Caddy local config
+      - name: Validate Caddy templates and generated configs
         run: |
-          rg -n "^https://.+\\{$" ops/caddy/Caddyfile.local
-          rg -n "header_up X-Farfield-Token \\{env.API_TOKEN\\}" ops/caddy/Caddyfile.local
+          grep -nE "\\{\\{SITE_ADDRESS\\}\\}" ops/caddy/Caddyfile.local.template
+          grep -nE "\\{\\{DOMAIN_HOST\\}\\}" ops/caddy/Caddyfile.domain.template
+          grep -nE "^https://.+\\{$" ops/caddy/Caddyfile.local
+          grep -nE "header_up X-Farfield-Token \\{env.API_TOKEN\\}" ops/caddy/Caddyfile.local
+          grep -nE "^[-*.A-Za-z0-9]+(:[0-9]+)? \\{$" ops/caddy/Caddyfile.domain
+          grep -nE "header_up X-Farfield-Token \\{env.API_TOKEN\\}" ops/caddy/Caddyfile.domain
 
       - name: Verify env autoload helper
         run: node scripts/with-env.mjs "node -e \"if (!process.env.API_TOKEN) { process.exit(1); }\""
