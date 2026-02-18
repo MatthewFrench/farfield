@@ -73,6 +73,62 @@ describe("codex-protocol schemas", () => {
     expect(parsed.params.change.type).toBe("patches");
   });
 
+  it("parses thread stream patch paths expressed as JSON Pointer strings", () => {
+    const parsed = parseThreadStreamStateChangedBroadcast({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "client-123",
+      version: 4,
+      params: {
+        conversationId: "thread-123",
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "patches",
+          patches: [
+            {
+              op: "replace",
+              path: "/turns/0/status",
+              value: "completed"
+            }
+          ]
+        }
+      }
+    });
+
+    expect(parsed.params.change.type).toBe("patches");
+    expect(parsed.params.change.patches[0]?.path).toEqual(["turns", 0, "status"]);
+  });
+
+  it("parses thread stream patches provided as a single patch object", () => {
+    const parsed = parseThreadStreamStateChangedBroadcast({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "client-123",
+      version: 4,
+      params: {
+        conversationId: "thread-123",
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "patches",
+          patches: {
+            op: "add",
+            path: ["turns", 0],
+            value: {
+              turnId: "turn-1",
+              status: "in_progress",
+              items: []
+            }
+          }
+        }
+      }
+    });
+
+    expect(parsed.params.change.type).toBe("patches");
+    expect(parsed.params.change.patches).toHaveLength(1);
+  });
+
   it("parses snapshot broadcast with null title and empty model defaults", () => {
     const parsed = parseThreadStreamStateChangedBroadcast({
       type: "broadcast",
@@ -141,7 +197,7 @@ describe("codex-protocol schemas", () => {
           }
         }
       })
-    ).toThrowError(/remove patches must not include value/);
+    ).toThrowError(/params\.change: Invalid input/);
   });
 
   it("parses thread conversation state with userInputResponse item", () => {

@@ -10,11 +10,13 @@ import {
   DebugErrorDetailResponseSchema,
   DebugErrorListResponseSchema,
   DeletePushSubscriptionResponseSchema,
+  IpcFrameSchema,
   PushLocalCaStatusResponseSchema,
   PushReceiptCreateResponseSchema,
   PushReceiptLatestResponseSchema,
   PushSendLatestResponseSchema,
-  PushStatusResponseSchema
+  PushStatusResponseSchema,
+  ThreadConversationStateSchema
 } from "@farfield/protocol";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -31,7 +33,10 @@ const HEALTH_SCHEMA = z
     ok: z.literal(true),
     state: z
       .object({
-        pushSubscriptionCount: z.number().int().nonnegative()
+        ipcInitialized: z.boolean(),
+        pushSubscriptionCount: z.number().int().nonnegative(),
+        invalidThreadStreamEventsLast5m: z.number().int().nonnegative(),
+        suppressedClientErrorReportsLast5m: z.number().int().nonnegative()
       })
       .passthrough()
   })
@@ -131,6 +136,15 @@ const DEBUG_ERROR_DETAIL_ENVELOPE_SCHEMA = z
   .merge(DebugErrorDetailResponseSchema)
   .strict();
 
+const LIVE_STATE_SCHEMA = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string(),
+    ownerClientId: z.string().nullable(),
+    conversationState: z.union([ThreadConversationStateSchema, z.null()])
+  })
+  .strict();
+
 const TEST_API_TOKEN = "integration-test-token";
 const TEST_VAPID_PUBLIC_KEY =
   "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U";
@@ -141,6 +155,10 @@ let baseUrl = "";
 let stateDirectory = "";
 let receiptsPath = "";
 let sendsPath = "";
+let ipcSocketPath = "";
+let fakeIpcServer: net.Server | null = null;
+let fakeIpcConnection: net.Socket | null = null;
+let fakeIpcBuffer = Buffer.alloc(0);
 const capturedOutput: string[] = [];
 
 function delay(ms: number): Promise<void> {
@@ -167,6 +185,117 @@ async function reservePort(): Promise<number> {
       });
     });
   });
+}
+
+function encodeIpcFrame(frame: z.input<typeof IpcFrameSchema>): Buffer {
+  const parsed = IpcFrameSchema.parse(frame);
+  const encoded = Buffer.from(JSON.stringify(parsed), "utf8");
+  const header = Buffer.alloc(4);
+  header.writeUInt32LE(encoded.length, 0);
+  return Buffer.concat([header, encoded]);
+}
+
+function sendFakeIpcFrame(frame: z.input<typeof IpcFrameSchema>): void {
+  if (!fakeIpcConnection) {
+    throw new Error("Fake IPC connection is not available");
+  }
+  fakeIpcConnection.write(encodeIpcFrame(frame));
+}
+
+function handleFakeIpcData(chunk: Buffer): void {
+  fakeIpcBuffer = Buffer.concat([fakeIpcBuffer, chunk]);
+
+  while (fakeIpcBuffer.length >= 4) {
+    const frameSize = fakeIpcBuffer.readUInt32LE(0);
+    if (fakeIpcBuffer.length < frameSize + 4) {
+      return;
+    }
+
+    const payload = fakeIpcBuffer.slice(4, frameSize + 4).toString("utf8");
+    fakeIpcBuffer = fakeIpcBuffer.slice(frameSize + 4);
+    const frame = IpcFrameSchema.parse(JSON.parse(payload));
+
+    if (frame.type !== "request") {
+      continue;
+    }
+
+    if (frame.method === "initialize") {
+      sendFakeIpcFrame({
+        type: "response",
+        requestId: frame.requestId,
+        method: "initialize",
+        handledByClientId: "fake-ipc-server",
+        resultType: "success",
+        result: {
+          clientId: "fake-ipc-client"
+        }
+      });
+      continue;
+    }
+
+    sendFakeIpcFrame({
+      type: "response",
+      requestId: frame.requestId,
+      method: frame.method,
+      handledByClientId: "fake-ipc-server",
+      resultType: "error",
+      error: "no-handler-for-request"
+    });
+  }
+}
+
+async function startFakeIpcServer(socketPath: string): Promise<void> {
+  if (fs.existsSync(socketPath)) {
+    fs.rmSync(socketPath, { force: true });
+  }
+
+  fakeIpcServer = net.createServer((socket) => {
+    fakeIpcConnection = socket;
+    fakeIpcBuffer = Buffer.alloc(0);
+
+    socket.on("data", handleFakeIpcData);
+    socket.on("close", () => {
+      if (fakeIpcConnection === socket) {
+        fakeIpcConnection = null;
+      }
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    if (!fakeIpcServer) {
+      reject(new Error("Fake IPC server was not created"));
+      return;
+    }
+    fakeIpcServer.once("error", reject);
+    fakeIpcServer.listen(socketPath, () => resolve());
+  });
+}
+
+async function stopFakeIpcServer(): Promise<void> {
+  fakeIpcConnection?.destroy();
+  fakeIpcConnection = null;
+  fakeIpcBuffer = Buffer.alloc(0);
+
+  if (fakeIpcServer) {
+    await new Promise<void>((resolve, reject) => {
+      if (!fakeIpcServer) {
+        resolve();
+        return;
+      }
+      fakeIpcServer.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+    fakeIpcServer = null;
+  }
+
+  if (ipcSocketPath && fs.existsSync(ipcSocketPath)) {
+    fs.rmSync(ipcSocketPath, { force: true });
+  }
 }
 
 function authHeaders(includeJsonContentType = false): HeadersInit {
@@ -201,6 +330,27 @@ async function waitForServerReady(process: ChildProcessWithoutNullStreams, timeo
   throw new Error(`Timed out waiting for server readiness.\n${capturedOutput.join("")}`);
 }
 
+async function waitForIpcInitialized(timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (serverProcess && serverProcess.exitCode !== null) {
+      throw new Error(`Server exited before IPC initialized.\n${capturedOutput.join("")}`);
+    }
+    const response = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    if (response.status === 200) {
+      const parsed = HEALTH_SCHEMA.parse(await response.json());
+      if (parsed.state.ipcInitialized === true) {
+        return;
+      }
+    }
+    await delay(125);
+  }
+
+  throw new Error(`Timed out waiting for IPC initialization.\n${capturedOutput.join("")}`);
+}
+
 async function stopServerProcess(process: ChildProcessWithoutNullStreams): Promise<void> {
   if (process.exitCode !== null) {
     return;
@@ -231,6 +381,8 @@ describe("push API auth and subscription routes", () => {
     const statePath = path.join(stateDirectory, "push-state.json");
     receiptsPath = path.join(stateDirectory, "push-receipts.json");
     sendsPath = path.join(stateDirectory, "push-sends.json");
+    ipcSocketPath = path.join(stateDirectory, "codex-ipc.sock");
+    await startFakeIpcServer(ipcSocketPath);
     const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
     const child = spawn(globalThis.process.execPath, ["--import", "tsx", "src/index.ts"], {
@@ -246,7 +398,8 @@ describe("push API auth and subscription routes", () => {
         PUSH_VAPID_SUBJECT: "mailto:integration@example.com",
         PUSH_STATE_PATH: statePath,
         PUSH_RECEIPTS_PATH: receiptsPath,
-        PUSH_SENDS_PATH: sendsPath
+        PUSH_SENDS_PATH: sendsPath,
+        CODEX_IPC_SOCKET: ipcSocketPath
       },
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -267,6 +420,7 @@ describe("push API auth and subscription routes", () => {
       await stopServerProcess(serverProcess);
       serverProcess = null;
     }
+    await stopFakeIpcServer();
     if (stateDirectory && fs.existsSync(stateDirectory)) {
       fs.rmSync(stateDirectory, { recursive: true, force: true });
     }
@@ -456,25 +610,45 @@ describe("push API auth and subscription routes", () => {
   });
 
   it("records and serves debug client errors with auth", async () => {
+    const healthBeforeResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthBeforeResponse.status).toBe(200);
+    const healthBefore = HEALTH_SCHEMA.parse(await healthBeforeResponse.json());
+
+    const clientErrorPayload = {
+      source: "web-app",
+      operation: "push:auto-heal",
+      message: "The string did not match the expected pattern.",
+      requestId: "req_test_1",
+      threadId: "thread_test_1",
+      url: "/threads/thread_test_1",
+      details: {
+        tab: "chat"
+      }
+    };
+
     const createResponse = await fetch(`${baseUrl}/api/debug/client-errors`, {
       method: "POST",
       headers: authHeaders(true),
-      body: JSON.stringify({
-        source: "web-app",
-        operation: "push:auto-heal",
-        message: "The string did not match the expected pattern.",
-        requestId: "req_test_1",
-        threadId: "thread_test_1",
-        url: "/threads/thread_test_1",
-        details: {
-          tab: "chat"
-        }
-      })
+      body: JSON.stringify(clientErrorPayload)
     });
     expect(createResponse.status).toBe(200);
     const parsedCreate = DEBUG_ERROR_CREATE_ENVELOPE_SCHEMA.parse(await createResponse.json());
     expect(parsedCreate.errorId.startsWith("error_")).toBe(true);
     expect(parsedCreate.sessionId.startsWith("session_")).toBe(true);
+
+    const duplicateCreateResponse = await fetch(`${baseUrl}/api/debug/client-errors`, {
+      method: "POST",
+      headers: authHeaders(true),
+      body: JSON.stringify(clientErrorPayload)
+    });
+    expect(duplicateCreateResponse.status).toBe(200);
+    const parsedDuplicateCreate = DEBUG_ERROR_CREATE_ENVELOPE_SCHEMA.parse(
+      await duplicateCreateResponse.json()
+    );
+    expect(parsedDuplicateCreate.errorId).toBe(parsedCreate.errorId);
+    expect(parsedDuplicateCreate.sessionId).toBe(parsedCreate.sessionId);
 
     const listResponse = await fetch(`${baseUrl}/api/debug/client-errors?limit=20`, {
       headers: authHeaders(false)
@@ -509,6 +683,99 @@ describe("push API auth and subscription routes", () => {
     const downloadedLog = await sessionLogDownload.text();
     expect(downloadedLog).toContain(parsedCreate.errorId);
     expect(downloadedLog).toContain("\"origin\":\"client\"");
+
+    const healthAfterResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthAfterResponse.status).toBe(200);
+    const healthAfter = HEALTH_SCHEMA.parse(await healthAfterResponse.json());
+    expect(healthAfter.state.suppressedClientErrorReportsLast5m).toBeGreaterThanOrEqual(
+      healthBefore.state.suppressedClientErrorReportsLast5m + 1
+    );
+  });
+
+  it("reduces json-pointer single-patch thread stream broadcasts without invalid warnings", async () => {
+    await waitForIpcInitialized(20_000);
+
+    const outputStart = capturedOutput.length;
+    const healthBeforeResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthBeforeResponse.status).toBe(200);
+    const healthBefore = HEALTH_SCHEMA.parse(await healthBeforeResponse.json());
+
+    const threadId = "thread_stream_json_pointer";
+
+    sendFakeIpcFrame({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "fake-ipc-client",
+      version: 4,
+      params: {
+        conversationId: threadId,
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "snapshot",
+          conversationState: {
+            id: threadId,
+            turns: [],
+            requests: []
+          }
+        }
+      }
+    });
+
+    sendFakeIpcFrame({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "fake-ipc-client",
+      version: 4,
+      params: {
+        conversationId: threadId,
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "patches",
+          patches: {
+            op: "add",
+            path: "/turns/-",
+            value: {
+              params: {
+                threadId,
+                input: [{ type: "text", text: "hello" }],
+                attachments: []
+              },
+              status: "completed",
+              items: []
+            }
+          }
+        }
+      }
+    });
+
+    await delay(300);
+
+    const liveStateResponse = await fetch(`${baseUrl}/api/threads/${encodeURIComponent(threadId)}/live-state`, {
+      headers: authHeaders(false)
+    });
+    expect(liveStateResponse.status).toBe(200);
+    const parsedLiveState = LIVE_STATE_SCHEMA.parse(await liveStateResponse.json());
+    expect(parsedLiveState.threadId).toBe(threadId);
+    expect(parsedLiveState.conversationState?.turns.length).toBe(1);
+    expect(parsedLiveState.conversationState?.turns[0]?.status).toBe("completed");
+
+    const healthAfterResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthAfterResponse.status).toBe(200);
+    const healthAfter = HEALTH_SCHEMA.parse(await healthAfterResponse.json());
+    expect(healthAfter.state.invalidThreadStreamEventsLast5m).toBe(
+      healthBefore.state.invalidThreadStreamEventsLast5m
+    );
+
+    const outputAfter = capturedOutput.slice(outputStart).join("");
+    expect(outputAfter).not.toContain("invalid-thread-stream-event");
   });
 
   it("allows non-loopback /api routes when API_TOKEN is unset", async () => {

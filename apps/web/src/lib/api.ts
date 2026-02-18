@@ -26,8 +26,14 @@ import { z } from "zod";
 
 const ApiEnvelopeSchema = z
   .object({
-    ok: z.boolean(),
-    error: z.string().optional()
+    ok: z.boolean()
+  })
+  .passthrough();
+
+const ApiErrorEnvelopeSchema = z
+  .object({
+    ok: z.literal(false),
+    error: z.string()
   })
   .passthrough();
 
@@ -226,8 +232,9 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   const data = (await response.json()) as unknown;
   const envelope = ApiEnvelopeSchema.parse(data);
 
-  if (!response.ok || !envelope.ok) {
-    throw new Error(typeof envelope.error === "string" ? envelope.error : "Request failed");
+  if (!response.ok || envelope.ok === false) {
+    const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
+    throw new Error(parsedError.success ? parsedError.data.error : "Request failed");
   }
 
   return data;

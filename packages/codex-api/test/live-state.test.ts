@@ -87,6 +87,63 @@ describe("live-state reducer", () => {
     expect(thread?.conversationState?.requests.length).toBe(1);
   });
 
+  it("applies JSON Pointer patch paths including array append", () => {
+    const snapshotEvent = parseThreadStreamStateChangedBroadcast({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "client-a",
+      version: 4,
+      params: {
+        conversationId: "thread-append",
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "snapshot",
+          conversationState: {
+            id: "thread-append",
+            turns: [],
+            requests: []
+          }
+        }
+      }
+    });
+
+    const patchEvent = parseThreadStreamStateChangedBroadcast({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "client-a",
+      version: 4,
+      params: {
+        conversationId: "thread-append",
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "patches",
+          patches: [
+            {
+              op: "add",
+              path: "/turns/-",
+              value: {
+                params: {
+                  threadId: "thread-append",
+                  input: [{ type: "text", text: "hello" }],
+                  attachments: []
+                },
+                status: "completed",
+                items: []
+              }
+            }
+          ]
+        }
+      }
+    });
+
+    const state = reduceThreadStreamEvents([snapshotEvent, patchEvent]);
+    const thread = state.get("thread-append");
+
+    expect(thread?.conversationState?.turns.length).toBe(1);
+  });
+
   it("keeps reducer alive when patches arrive before snapshot", () => {
     const patchEvent = parseThreadStreamStateChangedBroadcast({
       type: "broadcast",

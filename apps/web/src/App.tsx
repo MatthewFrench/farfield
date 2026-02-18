@@ -209,6 +209,7 @@ const CORE_REFRESH_INTERVAL_VISIBLE_MS = 5_000;
 const CORE_REFRESH_INTERVAL_HIDDEN_MS = 30_000;
 const STREAM_REFRESH_DEBOUNCE_MS = 800;
 const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";
+const CLIENT_ERROR_DEDUP_WINDOW_MS = 10_000;
 
 function isPlanModeOption(mode: { mode: string; name: string }): boolean {
   return mode.mode.toLowerCase().includes("plan") || mode.name.toLowerCase().includes("plan");
@@ -281,6 +282,10 @@ function readModeSelectionFromConversationState(state: NonNullable<ReadThreadRes
     modelId: normalizeModeSettingValue(state.latestModel, ASSUMED_APP_DEFAULT_MODEL),
     reasoningEffort: normalizeModeSettingValue(state.latestReasoningEffort, ASSUMED_APP_DEFAULT_EFFORT)
   };
+}
+
+function isThreadNotLoadedMessage(message: string): boolean {
+  return message.includes("Thread not loaded in app-server:");
 }
 
 function basenameFromPath(value: string): string {
@@ -588,6 +593,7 @@ export function App(): React.JSX.Element {
   const pendingMaterializationThreadIdsRef = useRef<Set<string>>(new Set());
   const pushModeHydratedRef = useRef(false);
   const isDocumentVisibleRef = useRef<boolean>(document.visibilityState === "visible");
+  const recentClientErrorByFingerprintRef = useRef<Map<string, number>>(new Map());
 
   /* Derived */
   const selectedThread = useMemo(
@@ -972,7 +978,49 @@ export function App(): React.JSX.Element {
 
   const reportError = useCallback(
     (input: ErrorReportInput) => {
+      const transientThreadNotLoaded = isThreadNotLoadedMessage(input.message);
+      const transientLoadOperation =
+        transientThreadNotLoaded &&
+        (input.operation === "thread:load-live" || input.operation === "thread:load-selected");
+
+      if (transientLoadOperation) {
+        clearError();
+        return;
+      }
+
       showError(input);
+      if (transientThreadNotLoaded) {
+        return;
+      }
+
+      const fingerprint = [
+        input.operation,
+        input.message,
+        input.threadId ?? "",
+        input.requestId ?? "",
+        activeTab
+      ].join("|");
+      const now = Date.now();
+      const recentByFingerprint = recentClientErrorByFingerprintRef.current;
+      const lastReportedAt = recentByFingerprint.get(fingerprint) ?? 0;
+      if (now - lastReportedAt < CLIENT_ERROR_DEDUP_WINDOW_MS) {
+        return;
+      }
+      recentByFingerprint.set(fingerprint, now);
+      if (recentByFingerprint.size > 300) {
+        for (const [key, ts] of recentByFingerprint) {
+          if (now - ts > CLIENT_ERROR_DEDUP_WINDOW_MS) {
+            recentByFingerprint.delete(key);
+          }
+        }
+        if (recentByFingerprint.size > 300) {
+          const oldestKey = recentByFingerprint.keys().next().value;
+          if (typeof oldestKey === "string") {
+            recentByFingerprint.delete(oldestKey);
+          }
+        }
+      }
+
       void reportClientError({
         source: "web-app",
         operation: input.operation,
@@ -1014,7 +1062,7 @@ export function App(): React.JSX.Element {
           // Intentionally ignored: avoid recursive reporting loops for reporter failures.
         });
     },
-    [activeTab, showError]
+    [activeTab, clearError, showError]
   );
 
   /* Data loading */
@@ -1808,12 +1856,12 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     void loadClientErrorDetail(selectedClientErrorId).catch((e) =>
-      reportError({
+      showError({
         operation: "debug:client-error-detail",
         message: toErrorMessage(e)
       })
     );
-  }, [loadClientErrorDetail, reportError, selectedClientErrorId]);
+  }, [loadClientErrorDetail, selectedClientErrorId, showError]);
 
   const openErrorInDebug = useCallback(() => {
     const errorId = errorState?.errorId;

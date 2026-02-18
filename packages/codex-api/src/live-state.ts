@@ -66,7 +66,16 @@ export function applyStrictPatch(
     parent = (parent as Record<string, unknown>)[segment];
   }
 
-  if (Array.isArray(parent) && typeof last === "number") {
+  if (Array.isArray(parent)) {
+    if (patch.op === "add" && last === "-") {
+      parent.push(patch.value);
+      return parseThreadConversationState(state);
+    }
+
+    if (typeof last !== "number") {
+      throw new Error(`Patch array index invalid: ${String(last)}`);
+    }
+
     if (patch.op === "add") {
       parent.splice(last, 0, patch.value);
       return parseThreadConversationState(state);

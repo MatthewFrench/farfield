@@ -3,6 +3,9 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+process.env["VITE_APP_BUILD_ID"] ??= "dev";
+process.env["VITE_GIT_COMMIT"] ??= "dev";
+
 const apiToken = (process.env["API_TOKEN"] ?? process.env["PUSH_API_TOKEN"] ?? "").trim();
 
 const apiProxyTarget =

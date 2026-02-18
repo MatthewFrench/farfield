@@ -314,10 +314,74 @@ export const ThreadStreamPatchPathSegmentSchema = z.union([
   NonEmptyStringSchema
 ]);
 
+function decodeJsonPointerSegment(segment: string): string {
+  let decoded = "";
+  for (let index = 0; index < segment.length; index += 1) {
+    const char = segment[index];
+    if (char !== "~") {
+      decoded += char;
+      continue;
+    }
+
+    const next = segment[index + 1];
+    if (next === "0") {
+      decoded += "~";
+      index += 1;
+      continue;
+    }
+    if (next === "1") {
+      decoded += "/";
+      index += 1;
+      continue;
+    }
+
+    throw new Error("Invalid JSON Pointer escape sequence");
+  }
+  return decoded;
+}
+
+function decodeJsonPointerPath(pointer: string): Array<number | string> {
+  if (!pointer.startsWith("/")) {
+    throw new Error("JSON Pointer path must start with '/'");
+  }
+
+  const rawSegments = pointer.slice(1).split("/");
+  const decodedSegments = rawSegments.map(decodeJsonPointerSegment);
+  return decodedSegments.map((segment) => {
+    if (segment === "-") {
+      return segment;
+    }
+    if (/^\d+$/.test(segment)) {
+      return Number(segment);
+    }
+    return segment;
+  });
+}
+
+const ThreadStreamPatchPathArraySchema = z.array(ThreadStreamPatchPathSegmentSchema).min(1);
+const ThreadStreamPatchPathPointerSchema = z
+  .string()
+  .min(1)
+  .transform((value, ctx): Array<number | string> => {
+    try {
+      return decodeJsonPointerPath(value);
+    } catch (error) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: error instanceof Error ? error.message : String(error)
+      });
+      return z.NEVER;
+    }
+  });
+const ThreadStreamPatchPathSchema = z.union([
+  ThreadStreamPatchPathArraySchema,
+  ThreadStreamPatchPathPointerSchema
+]);
+
 export const ThreadStreamPatchSchema = z
   .object({
     op: z.enum(["add", "replace", "remove"]),
-    path: z.array(ThreadStreamPatchPathSegmentSchema).min(1),
+    path: ThreadStreamPatchPathSchema,
     value: JsonValueSchema.optional()
   })
   .strict()
@@ -349,9 +413,13 @@ export const ThreadStreamSnapshotChangeSchema = z
 export const ThreadStreamPatchesChangeSchema = z
   .object({
     type: z.literal("patches"),
-    patches: z.array(ThreadStreamPatchSchema)
+    patches: z.union([z.array(ThreadStreamPatchSchema), ThreadStreamPatchSchema])
   })
-  .strict();
+  .strict()
+  .transform((value) => ({
+    type: value.type,
+    patches: Array.isArray(value.patches) ? value.patches : [value.patches]
+  }));
 
 export const ThreadStreamChangeSchema = z.union([
   ThreadStreamSnapshotChangeSchema,

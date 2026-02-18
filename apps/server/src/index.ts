@@ -19,6 +19,7 @@ import {
   CreatePushReceiptBodySchema,
   CreatePushSubscriptionBodySchema,
   DeletePushSubscriptionBodySchema,
+  type CreateDebugClientErrorBody,
   type CollaborationMode,
   type IpcFrame,
   type PushNotificationPayload,
@@ -59,6 +60,9 @@ const IPC_RECONNECT_DELAY_MS = 1_000;
 const ANSI_ESCAPE_REGEX = /\u001B\[[0-?]*[ -/]*[@-~]/g;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+const INVALID_THREAD_STREAM_LOG_INTERVAL_MS = 30_000;
+const ERROR_BUDGET_WINDOW_MS = 5 * 60_000;
+const SERVER_CLIENT_ERROR_DEDUP_WINDOW_MS = 10_000;
 
 function readPositiveIntegerEnv(name: string, defaultValue: number): number {
   const rawValue = process.env[name];
@@ -278,11 +282,60 @@ const historyById = new Map<string, unknown>();
 
 const threadOwnerById = new Map<string, string>();
 const streamEventsByThreadId = new Map<string, IpcFrame[]>();
+const recentClientErrorByFingerprint = new Map<
+  string,
+  {
+    timestampMs: number;
+    errorId: string;
+    recordedAt: string;
+  }
+>();
+const invalidThreadStreamEventTimestampsMs: number[] = [];
+const suppressedClientErrorReportTimestampsMs: number[] = [];
 
 const sseClients = new Set<ServerResponse>();
 
 let activeTrace: ActiveTrace | null = null;
 const recentTraces: TraceSummary[] = [];
+const invalidThreadStreamLastLoggedAtBySignature = new Map<string, number>();
+
+function pruneTimestampWindow(timestamps: number[], nowMs: number, windowMs: number): void {
+  const cutoff = nowMs - windowMs;
+  while (timestamps.length > 0 && timestamps[0]! < cutoff) {
+    timestamps.shift();
+  }
+}
+
+function recordInvalidThreadStreamEvent(nowMs: number): void {
+  invalidThreadStreamEventTimestampsMs.push(nowMs);
+  pruneTimestampWindow(invalidThreadStreamEventTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+}
+
+function recordSuppressedClientErrorReport(nowMs: number): void {
+  suppressedClientErrorReportTimestampsMs.push(nowMs);
+  pruneTimestampWindow(suppressedClientErrorReportTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+}
+
+function pruneRecentClientErrorFingerprints(nowMs: number): void {
+  const cutoff = nowMs - SERVER_CLIENT_ERROR_DEDUP_WINDOW_MS;
+  for (const [fingerprint, entry] of recentClientErrorByFingerprint) {
+    if (entry.timestampMs < cutoff) {
+      recentClientErrorByFingerprint.delete(fingerprint);
+    }
+  }
+}
+
+function buildClientErrorFingerprint(input: CreateDebugClientErrorBody): string {
+  return [
+    input.source,
+    input.operation,
+    input.message,
+    input.requestId ?? "",
+    input.threadId ?? "",
+    input.url ?? "",
+    JSON.stringify(input.details)
+  ].join("\u001f");
+}
 
 const runtimeState = {
   appExecutable: resolveCodexExecutablePath(),
@@ -308,6 +361,9 @@ let bootstrapInFlight: Promise<void> | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 
 function getRuntimeStateSnapshot(): Record<string, unknown> {
+  const nowMs = Date.now();
+  pruneTimestampWindow(invalidThreadStreamEventTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+  pruneTimestampWindow(suppressedClientErrorReportTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
   const latestPushSend = pushSendStore.getLatest();
   return {
     ...runtimeState,
@@ -317,6 +373,8 @@ function getRuntimeStateSnapshot(): Record<string, unknown> {
     pushSubscriptionCount: pushStore.getSubscriptionCount(),
     pushReceiptCount: pushReceiptStore.getCount(),
     errorCount: clientErrorStore.getCount(),
+    invalidThreadStreamEventsLast5m: invalidThreadStreamEventTimestampsMs.length,
+    suppressedClientErrorReportsLast5m: suppressedClientErrorReportTimestampsMs.length,
     latestPushSendNotificationId: latestPushSend?.notificationId ?? null
   };
 }
@@ -498,6 +556,33 @@ function setAppReady(next: boolean): void {
   }
   runtimeState.appReady = next;
   broadcastRuntimeState();
+}
+
+function maybeLogInvalidThreadStreamEvent(
+  phase: "on-frame" | "live-state",
+  threadId: string | null,
+  payload: IpcFrame,
+  error: unknown
+): void {
+  const now = Date.now();
+  recordInvalidThreadStreamEvent(now);
+  const message = toErrorMessage(error);
+  const signature = `${phase}|${threadId ?? "unknown"}|${message}`;
+  const lastLoggedAt = invalidThreadStreamLastLoggedAtBySignature.get(signature) ?? 0;
+  if (now - lastLoggedAt < INVALID_THREAD_STREAM_LOG_INTERVAL_MS) {
+    return;
+  }
+  invalidThreadStreamLastLoggedAtBySignature.set(signature, now);
+
+  logger.warn(
+    {
+      phase,
+      threadId,
+      error: message,
+      rawPayload: payload
+    },
+    "invalid-thread-stream-event"
+  );
 }
 
 function isThreadNotLoadedError(error: unknown): boolean {
@@ -981,14 +1066,7 @@ function getThreadLiveState(threadId: string): {
     try {
       return [parseThreadStreamStateChangedBroadcast(event)];
     } catch (error) {
-      logger.warn(
-        {
-          threadId,
-          error: toErrorMessage(error),
-          rawPayload: event
-        },
-        "invalid-thread-stream-event"
-      );
+      maybeLogInvalidThreadStreamEvent("live-state", threadId, event, error);
       return [];
     }
   });
@@ -1177,12 +1255,7 @@ ipcClient.onFrame((frame) => {
     try {
       parsedBroadcast = parseThreadStreamStateChangedBroadcast(frame);
     } catch (error) {
-      logger.warn(
-        {
-          error: toErrorMessage(error)
-        },
-        "invalid-thread-stream-event"
-      );
+      maybeLogInvalidThreadStreamEvent("on-frame", threadId, frame, error);
       return;
     }
 
@@ -1825,19 +1898,54 @@ const server = http.createServer(async (req, res) => {
     if (segments[0] === "api" && segments[1] === "debug") {
       if (req.method === "POST" && pathname === "/api/debug/client-errors") {
         const body = parseBody(CreateDebugClientErrorBodySchema, await readJsonBody(req));
+        const nowMs = Date.now();
+        pruneRecentClientErrorFingerprints(nowMs);
+        const dedupFingerprint = buildClientErrorFingerprint(body);
+        const previous = recentClientErrorByFingerprint.get(dedupFingerprint) ?? null;
+        if (previous && nowMs - previous.timestampMs < SERVER_CLIENT_ERROR_DEDUP_WINDOW_MS) {
+          recordSuppressedClientErrorReport(nowMs);
+          logger.info(
+            {
+              errorId: previous.errorId,
+              source: body.source,
+              operation: body.operation,
+              requestId: body.requestId,
+              threadId: body.threadId
+            },
+            "client-error-report-suppressed"
+          );
+          jsonResponse(res, 200, {
+            ok: true,
+            errorId: previous.errorId,
+            sessionId: clientErrorStore.getSessionId(),
+            recordedAt: previous.recordedAt
+          });
+          return;
+        }
+
         const event = clientErrorStore.recordClientError(body);
-        logger.error(
-          {
-            errorId: event.errorId,
-            origin: event.origin,
-            source: event.source,
-            operation: event.operation,
-            requestId: event.requestId,
-            threadId: event.threadId,
-            message: event.message
-          },
-          "client-error-recorded"
-        );
+        recentClientErrorByFingerprint.set(dedupFingerprint, {
+          timestampMs: nowMs,
+          errorId: event.errorId,
+          recordedAt: event.recordedAt
+        });
+        const transientThreadNotLoaded =
+          event.operation.startsWith("thread:load-") &&
+          event.message.includes("Thread not loaded in app-server:");
+        const logPayload = {
+          errorId: event.errorId,
+          origin: event.origin,
+          source: event.source,
+          operation: event.operation,
+          requestId: event.requestId,
+          threadId: event.threadId,
+          message: event.message
+        };
+        if (transientThreadNotLoaded) {
+          logger.warn(logPayload, "client-error-recorded-transient");
+        } else {
+          logger.error(logPayload, "client-error-recorded");
+        }
 
         jsonResponse(res, 200, {
           ok: true,
