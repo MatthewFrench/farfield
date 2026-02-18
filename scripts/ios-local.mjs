@@ -7,6 +7,8 @@ const caddyConfigTemplatePath = path.join(cwd, "ops", "caddy", "Caddyfile.local.
 const caddyConfigPath = path.join(cwd, "ops", "caddy", "Caddyfile.local");
 const backendPort = Number(process.env["PORT"] ?? "4311");
 const frontendPort = 4312;
+const caddyHttpPort = 80;
+const caddyHttpsPort = 443;
 
 function parseHttpsOrigin(configText) {
   const siteLine = configText
@@ -216,6 +218,8 @@ if (caddyExecutable === "caddy" && !commandExists("caddy")) {
 
 ensurePortIsAvailable(backendPort, "Backend");
 ensurePortIsAvailable(frontendPort, "Frontend");
+ensurePortIsAvailable(caddyHttpPort, "Caddy HTTP");
+ensurePortIsAvailable(caddyHttpsPort, "Caddy HTTPS");
 
 const packageManagerCommand = resolvePackageManagerCommand(pnpmExecPath);
 devProcess = startChild(packageManagerCommand.command, packageManagerCommand.args, packageManagerCommand.label, true);
