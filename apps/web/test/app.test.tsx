@@ -135,6 +135,20 @@ vi.stubGlobal(
       } as Response;
     }
 
+    if (url.includes("/healthz")) {
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          service: "farfield-web-shell",
+          buildId: "test-build",
+          gitCommit: "abc1234",
+          serviceWorkerVersion: "sw1234567890",
+          timestamp: new Date().toISOString()
+        })
+      } as Response;
+    }
+
     return {
       ok: true,
       json: async () => ({

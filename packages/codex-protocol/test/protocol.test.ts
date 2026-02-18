@@ -10,6 +10,7 @@ import {
   parsePushNotificationPayload,
   parsePushLocalCaStatusResponse,
   parsePushSendLatestResponse,
+  parsePushSendStore,
   parsePushReceiptStore,
   parsePushStateStore,
   parseThreadConversationState,
@@ -740,6 +741,33 @@ describe("codex-protocol schemas", () => {
 
     expect(parsed.latest?.notificationId).toBe("notif_send_1");
     expect(parsed.latest?.attempted).toBe(2);
+  });
+
+  it("parses push send store payload", () => {
+    const parsed = parsePushSendStore({
+      version: 1,
+      latest: {
+        notificationId: "notif_send_1",
+        threadId: "thread_1",
+        turnId: "turn_1",
+        sentAt: "2026-02-18T00:00:00.000Z",
+        attempted: 2,
+        delivered: 1,
+        failures: 1
+      }
+    });
+
+    expect(parsed.latest?.notificationId).toBe("notif_send_1");
+    expect(parsed.latest?.delivered).toBe(1);
+  });
+
+  it("rejects unsupported push send store version", () => {
+    expect(() =>
+      parsePushSendStore({
+        version: 2,
+        latest: null
+      })
+    ).toThrowError(/Unsupported push send store version/);
   });
 
   it("migrates legacy push receipt store payload", () => {

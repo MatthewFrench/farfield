@@ -171,6 +171,21 @@ export const PushSendLatestResponseSchema = z
   })
   .strict();
 
+export const PushSendStoreSchema = z
+  .object({
+    version: NonNegativeIntSchema,
+    latest: PushSendSummarySchema.nullable()
+  })
+  .strict()
+  .superRefine((state, ctx) => {
+    if (state.version !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Unsupported push send store version: ${String(state.version)}`
+      });
+    }
+  });
+
 export const PushReceiptStoreSchema = z
   .object({
     version: NonNegativeIntSchema,
@@ -245,6 +260,7 @@ export type PushReceiptCreateResponse = z.infer<typeof PushReceiptCreateResponse
 export type PushReceiptLatestResponse = z.infer<typeof PushReceiptLatestResponseSchema>;
 export type PushSendSummary = z.infer<typeof PushSendSummarySchema>;
 export type PushSendLatestResponse = z.infer<typeof PushSendLatestResponseSchema>;
+export type PushSendStore = z.infer<typeof PushSendStoreSchema>;
 export type PushReceiptStore = z.infer<typeof PushReceiptStoreSchema>;
 export type PushLocalCaStatusResponse = z.infer<typeof PushLocalCaStatusResponseSchema>;
 export type PushStatusResponse = z.infer<typeof PushStatusResponseSchema>;
@@ -297,6 +313,14 @@ export function parsePushSendLatestResponse(
   const result = PushSendLatestResponseSchema.safeParse(value);
   if (!result.success) {
     throw ProtocolValidationError.fromZod("PushSendLatestResponse", result.error);
+  }
+  return result.data;
+}
+
+export function parsePushSendStore(value: z.input<typeof PushSendStoreSchema>): PushSendStore {
+  const result = PushSendStoreSchema.safeParse(value);
+  if (!result.success) {
+    throw ProtocolValidationError.fromZod("PushSendStore", result.error);
   }
   return result.data;
 }

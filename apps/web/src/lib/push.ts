@@ -139,6 +139,18 @@ async function unregisterServiceWorkers(): Promise<void> {
   );
 }
 
+async function clearServiceWorkerCaches(): Promise<void> {
+  if (!("caches" in window)) {
+    return;
+  }
+  const cacheKeys = await window.caches.keys();
+  await Promise.all(
+    cacheKeys.map(async (cacheKey) => {
+      await window.caches.delete(cacheKey);
+    })
+  );
+}
+
 export async function getPushClientState(): Promise<PushClientState> {
   if (!isPushSupported()) {
     return {
@@ -349,6 +361,7 @@ export async function recoverPushNotifications(input: {
   try {
     const updatedServiceWorker = await activateWaitingServiceWorker(registration);
     await unregisterServiceWorkers();
+    await clearServiceWorkerCaches();
     await registerPushServiceWorker();
     const enabled = await enablePushNotifications({
       privateMode: input.privateMode

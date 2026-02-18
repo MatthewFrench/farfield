@@ -37,6 +37,7 @@ type ServiceWorkerHandlers = {
 interface ClientLike {
   url: string;
   focus: () => Promise<void>;
+  navigate?: (url: string) => Promise<void>;
 }
 
 interface ServiceWorkerHarness {
@@ -199,6 +200,84 @@ describe("service worker notifications", () => {
     expect(receipt.notificationId).toBe("notif_1");
     expect(receipt.event).toBe("clicked");
     expect(receipt.url).toBe("/threads/thread_1");
+  });
+
+  it("navigates existing client when no matching path is open", async () => {
+    const harness = loadServiceWorkerHarness();
+    const clickHandler = harness.handlers.notificationclick;
+    expect(clickHandler).toBeDefined();
+
+    const focusMock = vi.fn(async () => undefined);
+    const navigateMock = vi.fn(async () => undefined);
+    harness.matchAllMock.mockResolvedValueOnce([
+      {
+        url: "https://example.test/threads/thread_2",
+        focus: focusMock,
+        navigate: navigateMock
+      }
+    ]);
+
+    const waitUntilPromises: Promise<void>[] = [];
+    clickHandler?.({
+      notification: {
+        close: vi.fn(),
+        data: {
+          notificationId: "notif_2",
+          url: "/threads/thread_1",
+          threadId: "thread_1",
+          turnId: "turn_1"
+        }
+      },
+      waitUntil: (promise) => {
+        waitUntilPromises.push(promise.then(() => undefined));
+      }
+    });
+
+    await Promise.all(waitUntilPromises);
+
+    expect(navigateMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenCalledWith("https://example.test/threads/thread_1");
+    expect(focusMock).toHaveBeenCalledTimes(1);
+    expect(harness.openWindowMock).not.toHaveBeenCalled();
+    expect(harness.fetchMock).toHaveBeenCalledTimes(1);
+    const receipt = receiptFromFetchCall(harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined);
+    expect(receipt.notificationId).toBe("notif_2");
+    expect(receipt.event).toBe("clicked");
+    expect(receipt.url).toBe("/threads/thread_1");
+  });
+
+  it("opens a new window when no existing clients are available", async () => {
+    const harness = loadServiceWorkerHarness();
+    const clickHandler = harness.handlers.notificationclick;
+    expect(clickHandler).toBeDefined();
+
+    harness.matchAllMock.mockResolvedValueOnce([]);
+
+    const waitUntilPromises: Promise<void>[] = [];
+    clickHandler?.({
+      notification: {
+        close: vi.fn(),
+        data: {
+          notificationId: "notif_3",
+          url: "/threads/thread_3",
+          threadId: "thread_3",
+          turnId: "turn_3"
+        }
+      },
+      waitUntil: (promise) => {
+        waitUntilPromises.push(promise.then(() => undefined));
+      }
+    });
+
+    await Promise.all(waitUntilPromises);
+
+    expect(harness.openWindowMock).toHaveBeenCalledTimes(1);
+    expect(harness.openWindowMock).toHaveBeenCalledWith("https://example.test/threads/thread_3");
+    expect(harness.fetchMock).toHaveBeenCalledTimes(1);
+    const receipt = receiptFromFetchCall(harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined);
+    expect(receipt.notificationId).toBe("notif_3");
+    expect(receipt.event).toBe("clicked");
+    expect(receipt.url).toBe("/threads/thread_3");
   });
 
   it("applies skip waiting command from message event", async () => {

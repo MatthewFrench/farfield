@@ -12,6 +12,7 @@
       (() => {
         const resumePathStorageKey = "farfield.resume.path.v1";
         const bootStatusEventName = "farfield:boot-status";
+        const bootFailureStorageKey = "farfield.boot.last-failure.v1";
         const bootStuckTimeoutMs = 10_000;
         const darkBackground = "#000000";
         const lightBackground = "#f8fafc";
@@ -65,6 +66,37 @@
           }
         }
 
+        function readLastBootFailure() {
+          try {
+            const value = localStorage.getItem(bootFailureStorageKey);
+            if (typeof value !== "string") {
+              return "";
+            }
+            const trimmed = value.trim();
+            return trimmed.length > 0 ? trimmed : "";
+          } catch {
+            return "";
+          }
+        }
+
+        function persistBootFailure(status) {
+          try {
+            const lines = [
+              `Timestamp: ${new Date().toISOString()}`,
+              `Message: ${status.message}`
+            ];
+            if (status.hmrStatus) {
+              lines.push(`HMR status: ${status.hmrStatus}`);
+            }
+            if (status.details.trim().length > 0) {
+              lines.push("Details:", status.details);
+            }
+            localStorage.setItem(bootFailureStorageKey, lines.join("\n"));
+          } catch {
+            // Ignore storage write failures.
+          }
+        }
+
         function getSplashElements() {
           return {
             splash: document.getElementById("boot-splash"),
@@ -90,10 +122,15 @@
               return;
             }
 
+            const lastBootFailure = readLastBootFailure();
+            const stuckDetails =
+              lastBootFailure.length > 0
+                ? `The app is taking longer than expected.\nUse Retry or Hard Refresh, then open diagnostics.\n\nLast boot failure:\n${lastBootFailure}`
+                : "The app is taking longer than expected.\nUse Retry or Hard Refresh, then open diagnostics.";
+
             applyBootStatus({
               message: "Still loading Farfield",
-              details:
-                "The app is taking longer than expected.\nUse Retry or Hard Refresh, then open diagnostics.",
+              details: stuckDetails,
               isError: true,
               showActions: true
             });
@@ -139,6 +176,9 @@
           }
 
           currentBootStatus = nextStatus;
+          if (nextStatus.isError) {
+            persistBootFailure(nextStatus);
+          }
 
           const { splash, message, details, spinner, actions, hmrStatus } = getSplashElements();
           if (
@@ -234,6 +274,11 @@
 
           if (currentBootStatus.details.trim().length > 0) {
             lines.push("", "Boot status details:", currentBootStatus.details);
+          }
+
+          const lastBootFailure = readLastBootFailure();
+          if (lastBootFailure.length > 0) {
+            lines.push("", "Last boot failure:", lastBootFailure);
           }
 
           return lines.join("\n");

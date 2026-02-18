@@ -44,6 +44,17 @@ const HealthResponseSchema = z
   })
   .strict();
 
+const WebShellHealthResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    service: z.literal("farfield-web-shell"),
+    buildId: z.string().min(1),
+    gitCommit: z.string().nullable(),
+    serviceWorkerVersion: z.string().nullable(),
+    timestamp: z.string().datetime()
+  })
+  .strict();
+
 const LiveStateResponseSchema = z
   .object({
     ok: z.literal(true),
@@ -159,6 +170,7 @@ const PushTestResponseSchema = z
   .object({
     ok: z.literal(true),
     dryRun: z.boolean(),
+    notificationId: z.string().nullable(),
     ready: z.boolean(),
     reason: z.string(),
     attempted: z.number().int().nonnegative(),
@@ -207,6 +219,10 @@ function stripOk(value: unknown): unknown {
 
 export async function getHealth(): Promise<z.infer<typeof HealthResponseSchema>> {
   return HealthResponseSchema.parse(await request("/api/health"));
+}
+
+export async function getWebShellHealth(): Promise<z.infer<typeof WebShellHealthResponseSchema>> {
+  return WebShellHealthResponseSchema.parse(await request("/healthz"));
 }
 
 export async function listThreads(options: {

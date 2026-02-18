@@ -44,6 +44,7 @@ import { logger } from "./logger.js";
 import { resolveOwnerClientId } from "./thread-owner.js";
 import { PushStore } from "./push-store.js";
 import { PushReceiptStore } from "./push-receipt-store.js";
+import { PushSendStore } from "./push-send-store.js";
 import { CompletionDetector, type CompletionCandidate } from "./completion-detector.js";
 import { PushService } from "./push-service.js";
 import { migratePushStateFile, resolvePushStatePath } from "./push-state-path.js";
@@ -103,6 +104,16 @@ const PUSH_RECEIPTS_PATH = (() => {
     throw new Error("PUSH_RECEIPTS_PATH must be a non-empty path when set");
   }
   return path.join(path.dirname(PUSH_STATE_PATH), "push-receipts.json");
+})();
+const PUSH_SENDS_PATH = (() => {
+  const configuredPath = process.env["PUSH_SENDS_PATH"];
+  if (typeof configuredPath === "string" && configuredPath.trim().length > 0) {
+    return path.resolve(configuredPath.trim());
+  }
+  if (typeof configuredPath === "string" && configuredPath.trim().length === 0) {
+    throw new Error("PUSH_SENDS_PATH must be a non-empty path when set");
+  }
+  return path.join(path.dirname(PUSH_STATE_PATH), "push-sends.json");
 })();
 const LOCAL_CA_DOWNLOAD_PATH = "/api/push/local-ca/root.crt";
 const LOCAL_CADDY_ROOT_CA_PATH = path.join(
@@ -260,7 +271,6 @@ const threadOwnerById = new Map<string, string>();
 const streamEventsByThreadId = new Map<string, IpcFrame[]>();
 
 const sseClients = new Set<ServerResponse>();
-let latestPushSend: PushSendSummary | null = null;
 
 let activeTrace: ActiveTrace | null = null;
 const recentTraces: TraceSummary[] = [];
@@ -278,6 +288,7 @@ const runtimeState = {
   pushStatePath: PUSH_STATE_PATH,
   pushStatePathSource: PUSH_STATE_RESOLUTION.source,
   pushReceiptsPath: PUSH_RECEIPTS_PATH,
+  pushSendsPath: PUSH_SENDS_PATH,
   pushReceiptsMaxCount: MAX_PUSH_RECEIPTS,
   pushReceiptsMaxAgeDays: PUSH_RECEIPTS_MAX_AGE_DAYS
 };
@@ -286,13 +297,15 @@ let bootstrapInFlight: Promise<void> | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 
 function getRuntimeStateSnapshot(): Record<string, unknown> {
+  const latestPushSend = pushSendStore.getLatest();
   return {
     ...runtimeState,
     historyCount: history.length,
     threadOwnerCount: threadOwnerById.size,
     activeTrace: activeTrace?.summary ?? null,
     pushSubscriptionCount: pushStore.getSubscriptionCount(),
-    pushReceiptCount: pushReceiptStore.getCount()
+    pushReceiptCount: pushReceiptStore.getCount(),
+    latestPushSendNotificationId: latestPushSend?.notificationId ?? null
   };
 }
 
@@ -529,6 +542,7 @@ const pushReceiptStore = new PushReceiptStore(
   MAX_PUSH_RECEIPTS,
   PUSH_RECEIPTS_MAX_AGE_MS
 );
+const pushSendStore = new PushSendStore(PUSH_SENDS_PATH);
 const pushService = new PushService({
   enabled:
     PUSH_ENABLED &&
@@ -582,9 +596,7 @@ function recordPushReceipt(receipt: PushReceipt): void {
 }
 
 function recordLatestPushSend(summary: PushSendSummary): void {
-  latestPushSend = {
-    ...summary
-  };
+  pushSendStore.setLatest(summary);
 }
 
 function getLocalCaStatus(): {
@@ -711,6 +723,7 @@ function buildNotificationId(candidate: CompletionCandidate): string {
 }
 
 async function notifyCompletion(candidate: CompletionCandidate): Promise<{
+  notificationId: string | null;
   attempted: number;
   delivered: number;
   failures: number;
@@ -718,6 +731,7 @@ async function notifyCompletion(candidate: CompletionCandidate): Promise<{
 }> {
   if (!pushService.isEnabled()) {
     return {
+      notificationId: null,
       attempted: 0,
       delivered: 0,
       failures: 0,
@@ -728,6 +742,7 @@ async function notifyCompletion(candidate: CompletionCandidate): Promise<{
   const subscriptions = pushStore.listSubscriptions();
   if (subscriptions.length === 0) {
     return {
+      notificationId: null,
       attempted: 0,
       delivered: 0,
       failures: 0,
@@ -798,6 +813,7 @@ async function notifyCompletion(candidate: CompletionCandidate): Promise<{
   });
 
   return {
+    notificationId,
     attempted,
     delivered,
     failures,
@@ -1288,7 +1304,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "GET" && pathname === "/api/push/sends/latest") {
         jsonResponse(res, 200, {
           ok: true,
-          latest: latestPushSend
+          latest: pushSendStore.getLatest()
         });
         return;
       }
@@ -1394,6 +1410,7 @@ const server = http.createServer(async (req, res) => {
           jsonResponse(res, 200, {
             ok: true,
             dryRun: true,
+            notificationId: null,
             ready: readiness.ready,
             reason: readiness.reason,
             attempted: readiness.subscriptionCount,
@@ -1414,6 +1431,7 @@ const server = http.createServer(async (req, res) => {
         jsonResponse(res, 200, {
           ok: true,
           dryRun: false,
+          notificationId: result.notificationId,
           ready: readiness.ready,
           reason: readiness.reason,
           attempted: result.attempted,
@@ -2074,6 +2092,7 @@ async function start(): Promise<void> {
   }
   pushStore.load();
   pushReceiptStore.load();
+  pushSendStore.load();
   completionDetector = new CompletionDetector(
     new Map(pushStore.listCompletionWatermarks().map((entry) => [entry.threadId, entry.marker]))
   );
@@ -2091,6 +2110,7 @@ async function start(): Promise<void> {
     statePath: PUSH_STATE_PATH,
     statePathSource: PUSH_STATE_RESOLUTION.source,
     receiptsPath: PUSH_RECEIPTS_PATH,
+    sendsPath: PUSH_SENDS_PATH,
     receiptsMaxCount: MAX_PUSH_RECEIPTS,
     receiptsMaxAgeDays: PUSH_RECEIPTS_MAX_AGE_DAYS,
     subscriptionCount: pushStore.getSubscriptionCount(),

@@ -70,6 +70,7 @@ const PUSH_TEST_ENVELOPE_SCHEMA = z
   .object({
     ok: z.literal(true),
     dryRun: z.boolean(),
+    notificationId: z.string().nullable(),
     ready: z.boolean(),
     reason: z.string(),
     attempted: z.number().int().nonnegative(),
@@ -115,6 +116,7 @@ let serverProcess: ChildProcessWithoutNullStreams | null = null;
 let baseUrl = "";
 let stateDirectory = "";
 let receiptsPath = "";
+let sendsPath = "";
 const capturedOutput: string[] = [];
 
 function delay(ms: number): Promise<void> {
@@ -204,6 +206,7 @@ describe("push API auth and subscription routes", () => {
     stateDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-push-api-integration-"));
     const statePath = path.join(stateDirectory, "push-state.json");
     receiptsPath = path.join(stateDirectory, "push-receipts.json");
+    sendsPath = path.join(stateDirectory, "push-sends.json");
     const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
     const child = spawn(globalThis.process.execPath, ["--import", "tsx", "src/index.ts"], {
@@ -218,7 +221,8 @@ describe("push API auth and subscription routes", () => {
         PUSH_VAPID_PRIVATE_KEY: TEST_VAPID_PRIVATE_KEY,
         PUSH_VAPID_SUBJECT: "mailto:integration@example.com",
         PUSH_STATE_PATH: statePath,
-        PUSH_RECEIPTS_PATH: receiptsPath
+        PUSH_RECEIPTS_PATH: receiptsPath,
+        PUSH_SENDS_PATH: sendsPath
       },
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -291,6 +295,7 @@ describe("push API auth and subscription routes", () => {
     expect(dryRunBeforeCreate.status).toBe(200);
     const parsedDryRunBeforeCreate = PUSH_TEST_ENVELOPE_SCHEMA.parse(await dryRunBeforeCreate.json());
     expect(parsedDryRunBeforeCreate.dryRun).toBe(true);
+    expect(parsedDryRunBeforeCreate.notificationId).toBeNull();
     expect(parsedDryRunBeforeCreate.ready).toBe(false);
     expect(parsedDryRunBeforeCreate.attempted).toBe(0);
 
@@ -339,6 +344,7 @@ describe("push API auth and subscription routes", () => {
     expect(dryRunAfterCreate.status).toBe(200);
     const parsedDryRunAfterCreate = PUSH_TEST_ENVELOPE_SCHEMA.parse(await dryRunAfterCreate.json());
     expect(parsedDryRunAfterCreate.dryRun).toBe(true);
+    expect(parsedDryRunAfterCreate.notificationId).toBeNull();
     expect(parsedDryRunAfterCreate.ready).toBe(true);
     expect(parsedDryRunAfterCreate.attempted).toBe(1);
 
@@ -353,6 +359,7 @@ describe("push API auth and subscription routes", () => {
     expect(pushSendResponse.status).toBe(200);
     const parsedPushSend = PUSH_TEST_ENVELOPE_SCHEMA.parse(await pushSendResponse.json());
     expect(parsedPushSend.dryRun).toBe(false);
+    expect(parsedPushSend.notificationId).not.toBeNull();
     expect(parsedPushSend.attempted).toBeGreaterThanOrEqual(1);
 
     const latestSendResponse = await fetch(`${baseUrl}/api/push/sends/latest`, {
@@ -361,9 +368,14 @@ describe("push API auth and subscription routes", () => {
     expect(latestSendResponse.status).toBe(200);
     const parsedLatestSend = PUSH_SEND_LATEST_ENVELOPE_SCHEMA.parse(await latestSendResponse.json());
     expect(parsedLatestSend.latest?.notificationId.startsWith("notif_")).toBe(true);
+    expect(parsedLatestSend.latest?.notificationId).toBe(parsedPushSend.notificationId);
     expect(parsedLatestSend.latest?.threadId).toBe("thread_preflight");
     expect(parsedLatestSend.latest?.turnId).toBe("turn_timeline");
     expect(parsedLatestSend.latest?.attempted).toBeGreaterThanOrEqual(1);
+    expect(fs.existsSync(sendsPath)).toBe(true);
+    const sendFileContent = fs.readFileSync(sendsPath, "utf8");
+    expect(sendFileContent).toContain("\"latest\"");
+    expect(sendFileContent).toContain(String(parsedPushSend.notificationId));
 
     const createReceiptResponse = await fetch(`${baseUrl}/api/push/receipts`, {
       method: "POST",

@@ -96,7 +96,7 @@ async function checkEndpoint(pathname, expectedLabel) {
     });
     if (!response.ok) {
       check(expectedLabel, false, `HTTP ${String(response.status)} from ${baseUrl}${pathname}`);
-      return;
+      return null;
     }
 
     const text = await response.text();
@@ -105,22 +105,108 @@ async function checkEndpoint(pathname, expectedLabel) {
       parsed = JSON.parse(text);
     } catch {
       check(expectedLabel, false, `non-JSON response from ${baseUrl}${pathname}`);
-      return;
+      return null;
     }
 
     const ok = !!parsed && typeof parsed === "object" && parsed.ok === true;
     check(expectedLabel, ok, ok ? `ok from ${baseUrl}${pathname}` : `unexpected body from ${baseUrl}${pathname}`);
+    if (!ok) {
+      return null;
+    }
+    return parsed;
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     check(expectedLabel, false, `${detail} (${baseUrl}${pathname})`);
+    return null;
   } finally {
     clearTimeout(timeoutHandle);
   }
 }
 
+function readIsoTimestamp(value) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return null;
+  }
+  const timestampMs = Date.parse(value);
+  if (Number.isNaN(timestampMs)) {
+    return null;
+  }
+  return timestampMs;
+}
+
 async function main() {
   await checkEndpoint("/api/health", "Runtime /api/health");
   await checkEndpoint("/api/push/status", "Runtime /api/push/status");
+  const latestSendResponse = await checkEndpoint("/api/push/sends/latest", "Runtime /api/push/sends/latest");
+  const latestReceiptResponse = await checkEndpoint("/api/push/receipts/latest", "Runtime /api/push/receipts/latest");
+
+  const latestSend =
+    latestSendResponse && typeof latestSendResponse === "object" && "latest" in latestSendResponse
+      ? latestSendResponse.latest
+      : null;
+  const latestReceipt =
+    latestReceiptResponse && typeof latestReceiptResponse === "object" && "latest" in latestReceiptResponse
+      ? latestReceiptResponse.latest
+      : null;
+
+  if (!latestSend && !latestReceipt) {
+    check("Push timeline correlation", true, "No send/receipt records yet");
+  } else if (latestSend && !latestReceipt) {
+    check("Push timeline correlation", true, "Latest send recorded; waiting for receipt");
+  } else if (!latestSend && latestReceipt) {
+    check("Push timeline correlation", true, "Latest receipt recorded without send history");
+  } else {
+    const sendNotificationId =
+      latestSend && typeof latestSend === "object" && "notificationId" in latestSend
+        ? latestSend.notificationId
+        : null;
+    const receiptNotificationId =
+      latestReceipt && typeof latestReceipt === "object" && "notificationId" in latestReceipt
+        ? latestReceipt.notificationId
+        : null;
+    const sendAt =
+      latestSend && typeof latestSend === "object" && "sentAt" in latestSend
+        ? latestSend.sentAt
+        : null;
+    const receiptAt =
+      latestReceipt && typeof latestReceipt === "object" && "createdAt" in latestReceipt
+        ? latestReceipt.createdAt
+        : null;
+
+    if (
+      typeof sendNotificationId !== "string" ||
+      typeof receiptNotificationId !== "string" ||
+      typeof sendAt !== "string" ||
+      typeof receiptAt !== "string"
+    ) {
+      check("Push timeline correlation", false, "Latest send/receipt payload shape is invalid");
+    } else if (sendNotificationId !== receiptNotificationId) {
+      check(
+        "Push timeline correlation",
+        true,
+        `Latest send (${sendNotificationId}) is waiting for matching receipt; latest receipt is ${receiptNotificationId}`
+      );
+    } else {
+      const sendMs = readIsoTimestamp(sendAt);
+      const receiptMs = readIsoTimestamp(receiptAt);
+      if (sendMs === null || receiptMs === null) {
+        check("Push timeline correlation", false, "Could not parse send/receipt timestamps");
+      } else if (receiptMs < sendMs) {
+        check(
+          "Push timeline correlation",
+          false,
+          `Receipt timestamp is earlier than send timestamp (${sendAt} -> ${receiptAt})`
+        );
+      } else {
+        const lagMs = receiptMs - sendMs;
+        check(
+          "Push timeline correlation",
+          true,
+          `notificationId ${sendNotificationId} lag ${String(lagMs)}ms`
+        );
+      }
+    }
+  }
 
   if (hasFailure) {
     process.exitCode = 1;

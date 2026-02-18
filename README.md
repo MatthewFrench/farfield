@@ -55,8 +55,14 @@ Push receipt telemetry persists beside the push state file by default:
 - Linux: `$XDG_STATE_HOME/farfield/push-receipts.json` (or `~/.local/state/farfield/push-receipts.json`)
 - Windows: `%APPDATA%/farfield/push-receipts.json`
 
+Latest push send telemetry persists beside the push state file by default:
+- macOS: `~/Library/Application Support/farfield/push-sends.json`
+- Linux: `$XDG_STATE_HOME/farfield/push-sends.json` (or `~/.local/state/farfield/push-sends.json`)
+- Windows: `%APPDATA%/farfield/push-sends.json`
+
 Set `PUSH_STATE_PATH` to override this path.
 Set `PUSH_RECEIPTS_PATH` to override the receipts path.
+Set `PUSH_SENDS_PATH` to override the latest sends path.
 Set `PUSH_RECEIPTS_MAX_COUNT` to cap retained receipts (default `100`).
 Set `PUSH_RECEIPTS_MAX_AGE_DAYS` to prune old receipts by age (default `7` days).
 

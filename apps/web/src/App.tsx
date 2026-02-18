@@ -33,6 +33,7 @@ import {
   getHistoryEntry,
   getLatestPushReceipt,
   getLatestPushSend,
+  getWebShellHealth,
   getLiveState,
   getPendingUserInputRequests,
   getPushLocalCaStatus,
@@ -102,6 +103,7 @@ type PushStatusResponse = Awaited<ReturnType<typeof getPushStatus>>;
 type PushLatestReceiptResponse = Awaited<ReturnType<typeof getLatestPushReceipt>>;
 type PushLatestSendResponse = Awaited<ReturnType<typeof getLatestPushSend>>;
 type PushLocalCaStatusResponse = Awaited<ReturnType<typeof getPushLocalCaStatus>>;
+type WebShellHealthResponse = Awaited<ReturnType<typeof getWebShellHealth>>;
 type PushTestResponse = Awaited<ReturnType<typeof sendPushTestNotification>>;
 type Thread = ThreadsResponse["data"][number];
 type AppTab = "chat" | "debug" | "preflight";
@@ -150,6 +152,28 @@ function threadLabel(thread: Thread): string {
 
 function toErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+function normalizeBuildMetaValue(value: string | null): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (trimmed.startsWith("%VITE_") && trimmed.endsWith("%")) {
+    return "";
+  }
+  return trimmed;
+}
+
+function readMetaTagContent(metaId: string): string {
+  const element = document.getElementById(metaId);
+  if (!(element instanceof HTMLMetaElement)) {
+    return "";
+  }
+  return normalizeBuildMetaValue(element.content);
 }
 
 const DEFAULT_EFFORT_OPTIONS = ["minimal", "low", "medium", "high", "xhigh"] as const;
@@ -506,6 +530,7 @@ export function App(): React.JSX.Element {
   const [pushLatestReceipt, setPushLatestReceipt] = useState<PushLatestReceiptResponse["latest"] | null>(null);
   const [pushLatestSend, setPushLatestSend] = useState<PushLatestSendResponse["latest"] | null>(null);
   const [pushLocalCaStatus, setPushLocalCaStatus] = useState<PushLocalCaStatusResponse | null>(null);
+  const [webShellHealth, setWebShellHealth] = useState<WebShellHealthResponse | null>(null);
   const [serviceWorkerUpdateAvailable, setServiceWorkerUpdateAvailable] = useState(false);
 
   /* UI state */
@@ -686,6 +711,25 @@ export function App(): React.JSX.Element {
   const pushPermission = pushClientState.permission;
   const isSecureContextReady = typeof window !== "undefined" && window.isSecureContext;
   const pushDryRunReady = pushDryRunResult?.ready === true;
+  const clientBuildId = useMemo(() => readMetaTagContent("farfield-build-id-meta"), []);
+  const clientCommit = useMemo(() => readMetaTagContent("farfield-commit-meta"), []);
+  const webShellBuildMismatch = useMemo(() => {
+    if (!webShellHealth) {
+      return false;
+    }
+    if (clientBuildId.length > 0 && webShellHealth.buildId !== clientBuildId) {
+      return true;
+    }
+    if (
+      clientCommit.length > 0 &&
+      typeof webShellHealth.gitCommit === "string" &&
+      webShellHealth.gitCommit.length > 0 &&
+      webShellHealth.gitCommit !== clientCommit
+    ) {
+      return true;
+    }
+    return false;
+  }, [clientBuildId, clientCommit, webShellHealth]);
   const pushModeLabel = pushPrivateMode
     ? "Notifications: Private (switch to Detailed)"
     : "Notifications: Detailed (switch to Private)";
@@ -818,6 +862,17 @@ export function App(): React.JSX.Element {
             : "Server push is disabled."
       },
       {
+        id: "shell-build",
+        label: "Web shell build parity",
+        ready: webShellHealth !== null && !webShellBuildMismatch,
+        detail:
+          webShellHealth === null
+            ? "Unable to read /healthz from the web shell."
+            : webShellBuildMismatch
+            ? `Build mismatch detected. Client build: ${clientBuildId || "unknown"}; server build: ${webShellHealth.buildId}.`
+            : `Build ${webShellHealth.buildId}; commit ${webShellHealth.gitCommit ?? "unknown"}; service worker ${webShellHealth.serviceWorkerVersion ?? "unknown"}.`
+      },
+      {
         id: "server-dry-run",
         label: "Server dry-run",
         ready: pushDryRunReady,
@@ -858,11 +913,14 @@ export function App(): React.JSX.Element {
     pushReceiptSignal,
     pushPermission,
     requiresLocalCaTrust,
+    clientBuildId,
     pushServerEnabled,
     pushServiceWorkerRegistered,
     pushStatus,
     pushSubscribed,
-    pushSupported
+    pushSupported,
+    webShellBuildMismatch,
+    webShellHealth
   ]);
   const preflightReadyCount = preflightChecks.filter((check) => check.ready).length;
   const preflightReady = preflightChecks.every((check) => check.ready);
@@ -927,6 +985,13 @@ export function App(): React.JSX.Element {
       setPushLatestReceipt(null);
       setPushLatestSend(null);
       setPushLocalCaStatus(null);
+    }
+
+    try {
+      const shellHealth = await getWebShellHealth();
+      setWebShellHealth(shellHealth);
+    } catch {
+      setWebShellHealth(null);
     }
   }, []);
 
@@ -2181,7 +2246,7 @@ export function App(): React.JSX.Element {
                     }
                     onClick={() => void resetPushSubscription()}
                   >
-                    {pushResetBusy ? "Recovering..." : "Recover push"}
+                    {pushResetBusy ? "Resetting..." : "Reset Notifications"}
                   </Button>
                   <Button
                     type="button"
@@ -2194,6 +2259,34 @@ export function App(): React.JSX.Element {
                     {pushDryRunBusy ? "Checking..." : "Refresh checks"}
                   </Button>
                 </div>
+              </div>
+
+              <div
+                className={`rounded-xl border px-4 py-3 text-xs ${
+                  webShellBuildMismatch
+                    ? "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                    : "border-border bg-card text-muted-foreground"
+                }`}
+              >
+                {webShellHealth ? (
+                  <>
+                    <div className="font-medium text-foreground">
+                      Web shell build: {webShellHealth.buildId}
+                    </div>
+                    <div className="mt-1">
+                      Client build: {clientBuildId || "unknown"}; service worker:{" "}
+                      {webShellHealth.serviceWorkerVersion ?? "unknown"}; updated:{" "}
+                      {formatDate(webShellHealth.timestamp)}
+                    </div>
+                    {webShellBuildMismatch && (
+                      <div className="mt-1">
+                        Build mismatch detected. Run Reset Notifications, then Hard Refresh.
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  "Web shell health endpoint unavailable."
+                )}
               </div>
 
               <div className="rounded-xl border border-border bg-card">
