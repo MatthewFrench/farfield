@@ -521,6 +521,7 @@ export function App(): React.JSX.Element {
   const [errorState, setErrorState] = useState<ErrorDisplayState | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [threads, setThreads] = useState<ThreadsResponse["data"]>([]);
+  const [threadsLoadCount, setThreadsLoadCount] = useState(0);
   const [coreDataLoadCount, setCoreDataLoadCount] = useState(0);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(initialUiState.threadId);
   const [liveState, setLiveState] = useState<LiveStateResponse | null>(null);
@@ -605,7 +606,7 @@ export function App(): React.JSX.Element {
     () => clientErrors.find((entry) => entry.errorId === selectedClientErrorId) ?? null,
     [clientErrors, selectedClientErrorId]
   );
-  const isCoreDataLoading = coreDataLoadCount > 0;
+  const isThreadsLoading = threadsLoadCount > 0;
   const groupedThreads = useMemo(() => {
     type Group = {
       key: string;
@@ -1068,11 +1069,14 @@ export function App(): React.JSX.Element {
   /* Data loading */
   const loadCoreData = useCallback(async () => {
     setCoreDataLoadCount((current) => current + 1);
+    setThreadsLoadCount((current) => current + 1);
+    const threadsPromise = listThreads({ limit: 80, archived: false, all: true, maxPages: 20 }).finally(() => {
+      setThreadsLoadCount((current) => Math.max(0, current - 1));
+    });
     try {
-      const [nh, nt, nm, nmo, ntr, nhist, nce] = await Promise.all([
+      const [nh, nt, nmo, ntr, nhist, nce] = await Promise.all([
         getHealth(),
-        listThreads({ limit: 80, archived: false, all: true, maxPages: 20 }),
-        listCollaborationModes(),
+        threadsPromise,
         listModels(),
         getTraceStatus(),
         listDebugHistory(120),
@@ -1080,7 +1084,6 @@ export function App(): React.JSX.Element {
       ]);
       setHealth(nh);
       setThreads(nt.data);
-      setModes(nm.data);
       setModels(nmo.data);
       setTraceStatus(ntr);
       setHistory(nhist.history);
@@ -1089,11 +1092,6 @@ export function App(): React.JSX.Element {
       setSelectedThreadId((cur) => {
         if (cur) return cur;
         return nt.data[0]?.id ?? null;
-      });
-      setSelectedModeKey((cur) => {
-        if (cur) return cur;
-        const nonPlanDefault = nm.data.find((mode: ModesResponse["data"][number]) => !isPlanModeOption(mode));
-        return nonPlanDefault?.mode ?? nm.data[0]?.mode ?? "";
       });
       setSelectedClientErrorId((cur) => {
         if (cur && nce.data.some((entry) => entry.errorId === cur)) {
@@ -1104,6 +1102,16 @@ export function App(): React.JSX.Element {
     } finally {
       setCoreDataLoadCount((current) => Math.max(0, current - 1));
     }
+  }, []);
+
+  const loadCollaborationModes = useCallback(async () => {
+    const nm = await listCollaborationModes();
+    setModes(nm.data);
+    setSelectedModeKey((cur) => {
+      if (cur) return cur;
+      const nonPlanDefault = nm.data.find((mode: ModesResponse["data"][number]) => !isPlanModeOption(mode));
+      return nonPlanDefault?.mode ?? nm.data[0]?.mode ?? "";
+    });
   }, []);
 
   const loadPushData = useCallback(async () => {
@@ -1177,6 +1185,15 @@ export function App(): React.JSX.Element {
       clearError();
       await loadCoreData();
       await loadPushData();
+      if (modes.length === 0) {
+        void loadCollaborationModes().catch((e) =>
+          reportError({
+            operation: "collaboration-modes:load",
+            message: toErrorMessage(e),
+            threadId: selectedThreadIdRef.current
+          })
+        );
+      }
       if (selectedThreadIdRef.current) await loadSelectedThread(selectedThreadIdRef.current);
     } catch (e) {
       reportError({
@@ -1185,7 +1202,7 @@ export function App(): React.JSX.Element {
         threadId: selectedThreadIdRef.current
       });
     }
-  }, [clearError, loadCoreData, loadPushData, loadSelectedThread, reportError]);
+  }, [clearError, loadCollaborationModes, loadCoreData, loadPushData, loadSelectedThread, modes.length, reportError]);
 
   const runPushAutoHeal = useCallback(async () => {
     try {
@@ -1941,7 +1958,7 @@ export function App(): React.JSX.Element {
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-2 pl-2 pr-0">
         {threads.length === 0 && (
           <div className="px-4 py-6 text-xs text-muted-foreground text-center">
-            {isCoreDataLoading ? (
+            {isThreadsLoading ? (
               <span className="inline-flex items-center gap-2">
                 <Loader2 size={12} className="animate-spin" />
                 <span>Loading threads...</span>
@@ -2281,7 +2298,7 @@ export function App(): React.JSX.Element {
                 >
                   {turns.length === 0 ? (
                     <div className="text-center py-20 text-sm text-muted-foreground">
-                      {isCoreDataLoading && !selectedThread ? (
+                      {isThreadsLoading && !selectedThread ? (
                         <span className="inline-flex items-center gap-2">
                           <Loader2 size={12} className="animate-spin" />
                           <span>Loading threads...</span>

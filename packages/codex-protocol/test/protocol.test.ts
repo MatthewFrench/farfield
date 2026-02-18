@@ -544,7 +544,8 @@ describe("codex-protocol schemas", () => {
           defaultReasoningEffort: "xhigh",
           inputModalities: ["text", "image"],
           supportsPersonality: true,
-          isDefault: true
+          isDefault: true,
+          hidden: false
         }
       ],
       nextCursor: null

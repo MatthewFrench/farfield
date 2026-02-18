@@ -58,7 +58,8 @@ export const AppServerModelSchema = z
     defaultReasoningEffort: NonEmptyStringSchema,
     inputModalities: z.array(NonEmptyStringSchema),
     supportsPersonality: z.boolean(),
-    isDefault: z.boolean()
+    isDefault: z.boolean(),
+    hidden: z.boolean().optional()
   })
   .strict();
 
