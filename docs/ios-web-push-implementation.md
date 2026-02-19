@@ -364,10 +364,11 @@ Notes:
 Local HTTPS:
 
 1. Run setup once: `pnpm setup:ios-push`.
-2. Start stack: `pnpm ios:local`.
-3. On iOS, trust Caddy root CA once.
-4. Open HTTPS origin in Safari, then add to Home Screen.
-5. Launch from Home Screen and enable notifications.
+2. Trust local Caddy CA on macOS: `pnpm ios:trust-local-ca`.
+3. Start stack: `pnpm ios:local`.
+4. On iOS, trust Caddy root CA once.
+5. Open HTTPS origin in Safari, then add to Home Screen.
+6. Launch from Home Screen and enable notifications.
 
 Domain HTTPS:
 
@@ -392,9 +393,10 @@ Add convenience scripts in root `package.json`:
 
 1. `setup:ios-push` (writes `.env.local` with generated keys/token)
 2. `setup:domain-https` (generates `ops/caddy/Caddyfile.domain` from template)
-3. `ios:local` (starts app stack + Caddy local config)
-4. `push:keys` (generate VAPID keypair)
-5. `push:doctor` (checks env vars, Caddy template/runtime config presence, and live `/api/health` + `/api/push/status` reachability)
+3. `ios:trust-local-ca` (runs explicit local CA trust setup before launching local HTTPS stack)
+4. `ios:local` (starts app stack + Caddy local config)
+5. `push:keys` (generate VAPID keypair)
+6. `push:doctor` (checks env vars, Caddy template/runtime config presence, and live `/api/health` + `/api/push/status` reachability)
 6. `rotate:api-token` (rotates `API_TOKEN` and `PUSH_DOCTOR_TOKEN` in `.env.local`)
 
 Provide `.env.example` entries for push config.

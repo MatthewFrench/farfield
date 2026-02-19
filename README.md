@@ -102,13 +102,19 @@ When prompted for `Push contact subject`, use a real operator contact value:
 
 This value is part of VAPID Web Push identity and is not shown to end users.
 
-2. Start local HTTPS in one command:
+2. Install/trust local Caddy CA on macOS (one-time; may prompt for password):
+
+```bash
+pnpm ios:trust-local-ca
+```
+
+3. Start local HTTPS in one command:
 
 ```bash
 pnpm ios:local
 ```
 
-`pnpm dev`, `pnpm dev:remote`, `pnpm ios:local`, and `pnpm push:doctor` auto-load `.env.local`.
+`pnpm dev`, `pnpm dev:remote`, `pnpm ios:trust-local-ca`, `pnpm ios:local`, and `pnpm push:doctor` auto-load `.env.local`.
 
 `ops/caddy/Caddyfile.local.template` and `ops/caddy/Caddyfile.domain.template` are tracked.
 `ops/caddy/Caddyfile.local` and `ops/caddy/Caddyfile.domain` are generated and gitignored.
@@ -127,12 +133,13 @@ Home Screen runtime behavior:
 ### Local LAN HTTPS (same Wi-Fi)
 
 1. Run `pnpm setup:ios-push` to regenerate `ops/caddy/Caddyfile.local` with the correct host.
-2. Run `pnpm ios:local` (it starts Farfield + Caddy and prints the exact HTTPS origin).
-3. Open that HTTPS origin in iPhone Safari.
-4. If iOS shows a certificate warning, install/trust Caddy local root CA on the iPhone (one-time).
-5. Add to Home Screen.
-6. Launch from Home Screen and click `Enable Notifs`.
-7. In `Preflight`, use `Download CA cert` if iOS trust setup still needs the local root certificate.
+2. Run `pnpm ios:trust-local-ca` (macOS trust step; prompt is expected on first run).
+3. Run `pnpm ios:local` (it starts Farfield + Caddy and prints the exact HTTPS origin).
+4. Open that HTTPS origin in iPhone Safari.
+5. If iOS shows a certificate warning, install/trust Caddy local root CA on the iPhone (one-time).
+6. Add to Home Screen.
+7. Launch from Home Screen and click `Enable Notifs`.
+8. In `Preflight`, use `Download CA cert` if iOS trust setup still needs the local root certificate.
 
 #### Trust Local Caddy Cert (one-time)
 
@@ -147,6 +154,7 @@ open "$HOME/Library/Application Support/Caddy/pki/authorities/local"
 4. Enable full trust in `Settings` -> `General` -> `About` -> `Certificate Trust Settings`.
 5. Re-open your `https://...` Farfield origin and confirm no certificate warning.
 6. Or open Farfield `Preflight` and use `Download CA cert` to fetch `root.crt` directly from `/api/push/local-ca/root.crt`.
+7. If Caddy prints `certutil is not available`, install it with `brew install nss`.
 
 ### Public Domain HTTPS
 
@@ -197,6 +205,8 @@ caddy run --config ops/caddy/Caddyfile.domain
 | No background notification | App is not installed to Home Screen, or no active push subscription | Install to Home Screen, ensure `Enable Notifs` is active, and verify in Preflight page |
 | Bottom gap in app shell | App is running in Safari tab mode or stale service worker assets are still active | Launch from Home Screen, then click `Update app` in header so latest layout logic takes effect |
 | Preflight receipt signal stays empty | Notification not shown/clicked yet, or service worker is stale | Run `Push test`, tap notification, then refresh Preflight; if update banner appears, click `Update app` |
+| `Password:` appears in `pnpm ios:local` logs | Caddy is trying to install/trust local CA in keychain | Stop the run, execute `pnpm ios:trust-local-ca`, then rerun `pnpm ios:local` |
+| `certutil is not available` appears in Caddy logs | NSS tools are missing on macOS | Install once with `brew install nss` |
 | `push:doctor` shows unauthorized | Token mismatch between server and doctor env | Set matching `API_TOKEN` and `PUSH_DOCTOR_TOKEN` values |
 | Local HTTPS page does not load on iPhone | Generated `Caddyfile.local` host is wrong or CA not trusted | Re-run `pnpm setup:ios-push`, restart `pnpm ios:local`, trust Caddy local CA on iPhone |
 
@@ -224,6 +234,7 @@ pnpm test        # Run all tests
 pnpm typecheck   # TypeScript type checking across all packages
 pnpm lint        # Lint all packages
 pnpm smoke:app   # Smoke-check key Farfield runtime endpoints
+pnpm ios:trust-local-ca  # One-time macOS local CA trust setup for Caddy
 pnpm stress:stream-burst  # Burst /stream-events load + health latency budget check
 pnpm e2e:real:governance  # Validate coverage matrix/open-gap governance
 pnpm e2e:real:install  # Install Playwright Chromium for real-app scenarios

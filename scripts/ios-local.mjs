@@ -10,6 +10,7 @@ const backendPort = Number(process.env["PORT"] ?? "4311");
 const frontendPort = 4312;
 const caddyHttpPort = 80;
 const caddyHttpsPort = 443;
+const caddyReadyTimeoutMs = Number(process.env["IOS_LOCAL_CADDY_READY_TIMEOUT_MS"] ?? "180000");
 
 function parseHttpsOrigin(configText) {
   const siteLine = configText
@@ -49,6 +50,12 @@ function commandExists(command) {
 }
 
 const hasLsofCommand = commandExists("lsof");
+
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 function printPrerequisiteError(title, lines) {
   process.stderr.write(`[ios:local] ${title}\n`);
@@ -183,6 +190,41 @@ function resolvePackageManagerCommand(pnpmPathFromEnv) {
   };
 }
 
+async function isPortAcceptingConnections(port, host = "127.0.0.1") {
+  return await new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+
+    const finalize = (value) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      socket.destroy();
+      resolve(value);
+    };
+
+    socket.setTimeout(500);
+    socket.once("connect", () => finalize(true));
+    socket.once("timeout", () => finalize(false));
+    socket.once("error", () => finalize(false));
+    socket.connect(port, host);
+  });
+}
+
+async function waitForCaddyReady(port, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await isPortAcceptingConnections(port)) {
+      return;
+    }
+    await delay(250);
+  }
+  throw new Error(
+    `Caddy HTTPS listener was not ready on port ${String(port)} within ${String(timeoutMs)}ms`
+  );
+}
+
 if (!fs.existsSync(caddyConfigPath)) {
   printPrerequisiteError("missing generated Caddy local config.", [
     `Missing: ${caddyConfigPath}`,
@@ -209,7 +251,7 @@ if (webToken.length > 0) {
 } else {
   process.stdout.write("[ios:local] web token env: not set\n");
 }
-process.stdout.write("[ios:local] starting dev server and caddy...\n");
+process.stdout.write("[ios:local] starting caddy, then dev server after HTTPS is ready...\n");
 
 let shuttingDown = false;
 let devProcess = null;
@@ -260,20 +302,61 @@ if (caddyExecutable === "caddy" && !commandExists("caddy")) {
   process.exit(1);
 }
 
+if (process.platform === "darwin" && !commandExists("certutil")) {
+  process.stdout.write(
+    "[ios:local] notice: certutil is not installed (brew install nss). This is optional for iOS Safari but removes NSS trust-store warnings.\n"
+  );
+}
+
 await ensurePortIsAvailable(backendPort, "Backend");
 await ensurePortIsAvailable(frontendPort, "Frontend");
 await ensurePortIsAvailable(caddyHttpPort, "Caddy HTTP");
 await ensurePortIsAvailable(caddyHttpsPort, "Caddy HTTPS");
 
 const packageManagerCommand = resolvePackageManagerCommand(pnpmExecPath);
-devProcess = startChild(packageManagerCommand.command, packageManagerCommand.args, packageManagerCommand.label, true);
 caddyProcess = startChild(caddyExecutable, ["run", "--config", caddyConfigPath], "caddy", false);
-
-devProcess.on("error", (error) => {
-  exitFromStartError("pnpm dev", error);
-});
 caddyProcess.on("error", (error) => {
   exitFromStartError("caddy", error);
+});
+caddyProcess.on("exit", (code, signal) => {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+  if (!devProcess) {
+    process.stderr.write(
+      `[ios:local] caddy exited (${signal ?? `code ${String(code ?? 0)}`}) before HTTPS startup completed.\n`
+    );
+    process.exit(code ?? 1);
+    return;
+  }
+  process.stderr.write(
+    `[ios:local] caddy exited (${signal ?? `code ${String(code ?? 0)}`}); stopping dev server.\n`
+  );
+  stopChildren("SIGTERM");
+  process.exit(code ?? 1);
+});
+
+try {
+  await waitForCaddyReady(caddyHttpsPort, caddyReadyTimeoutMs);
+} catch (error) {
+  if (!shuttingDown) {
+    const detail = error instanceof Error ? error.message : String(error);
+    printPrerequisiteError("caddy did not become ready.", [
+      detail,
+      "If a password prompt is waiting, finish it or run:",
+      "  pnpm ios:trust-local-ca",
+      "Then run:",
+      "  pnpm ios:local"
+    ]);
+  }
+  stopChildren("SIGTERM");
+  process.exit(1);
+}
+
+devProcess = startChild(packageManagerCommand.command, packageManagerCommand.args, packageManagerCommand.label, true);
+devProcess.on("error", (error) => {
+  exitFromStartError("pnpm dev", error);
 });
 
 devProcess.on("exit", (code, signal) => {
@@ -283,18 +366,6 @@ devProcess.on("exit", (code, signal) => {
   shuttingDown = true;
   process.stderr.write(
     `[ios:local] pnpm dev exited (${signal ?? `code ${String(code ?? 0)}`}); stopping caddy.\n`
-  );
-  stopChildren("SIGTERM");
-  process.exit(code ?? 1);
-});
-
-caddyProcess.on("exit", (code, signal) => {
-  if (shuttingDown) {
-    return;
-  }
-  shuttingDown = true;
-  process.stderr.write(
-    `[ios:local] caddy exited (${signal ?? `code ${String(code ?? 0)}`}); stopping dev server.\n`
   );
   stopChildren("SIGTERM");
   process.exit(code ?? 1);

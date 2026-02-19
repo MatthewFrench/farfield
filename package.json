@@ -6,6 +6,7 @@
     "dev": "node scripts/with-env.mjs \"pnpm --filter @farfield/protocol build && pnpm --filter @farfield/api build && pnpm --parallel --filter @farfield/server --filter @farfield/web dev\"",
     "dev:remote": "node scripts/with-env.mjs \"pnpm --filter @farfield/protocol build && pnpm --filter @farfield/api build && pnpm --parallel --filter @farfield/server --filter @farfield/web dev:remote\"",
     "dev:remote:https": "pnpm ios:local",
+    "ios:trust-local-ca": "node scripts/with-env.mjs \"node scripts/ios-trust-local-ca.mjs\"",
     "ios:local": "node scripts/with-env.mjs \"node scripts/ios-local.mjs\"",
     "setup:ios-push": "node scripts/setup-ios-push.mjs",
     "setup:domain-https": "node scripts/setup-domain-https.mjs",

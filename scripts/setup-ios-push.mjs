@@ -336,4 +336,6 @@ process.stdout.write(`- PUSH_VAPID_SUBJECT=${selectedSubject} (operator contact 
 process.stdout.write(`- API_TOKEN=${maskSecret(apiToken)} (protects API access)\n`);
 process.stdout.write(`- PUSH_DOCTOR_TOKEN=${maskSecret(doctorToken)} (auth token used by push doctor checks)\n`);
 process.stdout.write(`- Local HTTPS origin=${selectedAddress} (use this on iPhone Safari)\n`);
-process.stdout.write("\nNext step: pnpm ios:local\n");
+process.stdout.write("\nNext steps:\n");
+process.stdout.write("- pnpm ios:trust-local-ca\n");
+process.stdout.write("- pnpm ios:local\n");
