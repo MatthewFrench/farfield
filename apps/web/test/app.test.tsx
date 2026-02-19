@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { App } from "../src/App";
+import { App, isPlaceholderCommitValue } from "../src/App";
 
 class MockEventSource {
   public onmessage: ((event: MessageEvent<string>) => void) | null = null;
@@ -281,5 +281,20 @@ describe("App", () => {
     releaseThreadsDelay = null;
 
     expect((await screen.findAllByText("No threads")).length).toBeGreaterThan(0);
+  });
+});
+
+describe("build metadata helpers", () => {
+  it("treats dev commit markers as placeholders", () => {
+    expect(isPlaceholderCommitValue("dev")).toBe(true);
+    expect(isPlaceholderCommitValue(" DEV ")).toBe(true);
+    expect(isPlaceholderCommitValue("unknown")).toBe(true);
+    expect(isPlaceholderCommitValue("null")).toBe(true);
+    expect(isPlaceholderCommitValue("none")).toBe(true);
+  });
+
+  it("keeps real commit hashes as non-placeholders", () => {
+    expect(isPlaceholderCommitValue("a1b2c3d")).toBe(false);
+    expect(isPlaceholderCommitValue("f0e1d2c3b4")).toBe(false);
   });
 });

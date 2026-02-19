@@ -1183,6 +1183,58 @@ function readApiAuthToken(req: IncomingMessage): string {
 
 type ApiAuthRouteType = "api" | "events" | "push-receipts";
 
+function recordApiAuthRejected(routeType: ApiAuthRouteType, nowMs: number): void {
+  if (routeType === "events") {
+    recordEventsAuthRejected(nowMs);
+    return;
+  }
+  if (routeType === "push-receipts") {
+    recordPushReceiptAuthRejected(nowMs);
+  }
+}
+
+function readOriginHeader(req: IncomingMessage): string | null {
+  const rawOrigin = req.headers.origin;
+  if (typeof rawOrigin !== "string") {
+    return null;
+  }
+  const trimmed = rawOrigin.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function readRequestHost(req: IncomingMessage): string | null {
+  const rawHost = req.headers.host;
+  if (typeof rawHost !== "string") {
+    return null;
+  }
+  const trimmed = rawHost.trim();
+  return trimmed.length > 0 ? trimmed.toLowerCase() : null;
+}
+
+function hasAuthorizedBrowserOrigin(req: IncomingMessage): boolean {
+  const origin = readOriginHeader(req);
+  if (!origin) {
+    return true;
+  }
+  if (origin.toLowerCase() === "null") {
+    return false;
+  }
+  const requestHost = readRequestHost(req);
+  if (!requestHost) {
+    return false;
+  }
+
+  try {
+    const parsedOrigin = new URL(origin);
+    if (parsedOrigin.protocol !== "http:" && parsedOrigin.protocol !== "https:") {
+      return false;
+    }
+    return parsedOrigin.host.toLowerCase() === requestHost;
+  } catch {
+    return false;
+  }
+}
+
 function requireApiAuth(
   req: IncomingMessage,
   res: ServerResponse,
@@ -1195,24 +1247,40 @@ function requireApiAuth(
   const token = readApiAuthToken(req);
   if (token !== API_AUTH_TOKEN) {
     const nowMs = Date.now();
-    if (routeType === "events") {
-      recordEventsAuthRejected(nowMs);
-    }
-    if (routeType === "push-receipts") {
-      recordPushReceiptAuthRejected(nowMs);
-    }
-
+    recordApiAuthRejected(routeType, nowMs);
     logger.warn(
       {
         route: req.url ?? "unknown",
         remoteAddress: req.socket.remoteAddress ?? null,
-        routeType
+        routeType,
+        reason: "token"
       },
       "api-auth-rejected"
     );
     jsonResponse(res, 401, {
       ok: false,
       error: "Unauthorized"
+    });
+    return false;
+  }
+
+  if (!hasAuthorizedBrowserOrigin(req)) {
+    const nowMs = Date.now();
+    recordApiAuthRejected(routeType, nowMs);
+    logger.warn(
+      {
+        route: req.url ?? "unknown",
+        remoteAddress: req.socket.remoteAddress ?? null,
+        routeType,
+        origin: readOriginHeader(req),
+        host: readRequestHost(req),
+        reason: "origin"
+      },
+      "api-auth-origin-rejected"
+    );
+    jsonResponse(res, 403, {
+      ok: false,
+      error: "Forbidden origin"
     });
     return false;
   }

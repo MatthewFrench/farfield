@@ -181,6 +181,7 @@ node scripts/with-env.mjs "caddy run --config ops/caddy/Caddyfile.domain"
 7. Launch from Home Screen and click `Enable Notifs`.
 
 `Caddyfile.domain` injects `X-Farfield-Token` upstream from `API_TOKEN`, so browser-side token env is not required.
+When `API_TOKEN` is enabled, the server only accepts browser requests whose `Origin` matches the request host.
 
 ### Manual iOS Verification
 

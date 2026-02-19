@@ -301,13 +301,19 @@ async function stopFakeIpcServer(): Promise<void> {
   }
 }
 
-function authHeaders(includeJsonContentType = false): HeadersInit {
+function authHeaders(includeJsonContentType = false): Record<string, string> {
   const headers: Record<string, string> = {
     "X-Farfield-Token": TEST_API_TOKEN
   };
   if (includeJsonContentType) {
     headers["Content-Type"] = "application/json";
   }
+  return headers;
+}
+
+function authHeadersWithOrigin(origin: string, includeJsonContentType = false): Record<string, string> {
+  const headers = authHeaders(includeJsonContentType);
+  headers["Origin"] = origin;
   return headers;
 }
 
@@ -492,6 +498,58 @@ describe("push API auth and subscription routes", () => {
     const healthAfter = HEALTH_SCHEMA.parse(await healthAfterResponse.json());
     expect(healthAfter.state.eventsAuthRejectsLast5m).toBeGreaterThanOrEqual(
       healthBefore.state.eventsAuthRejectsLast5m + 1
+    );
+  });
+
+  it("rejects browser cross-origin requests even with a valid token", async () => {
+    const healthBeforeResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthBeforeResponse.status).toBe(200);
+    const healthBefore = HEALTH_SCHEMA.parse(await healthBeforeResponse.json());
+
+    const crossOriginApiHealth = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeadersWithOrigin("https://evil.example")
+    });
+    expect(crossOriginApiHealth.status).toBe(403);
+    API_ERROR_SCHEMA.parse(await crossOriginApiHealth.json());
+
+    const crossOriginEvents = await fetch(`${baseUrl}/events`, {
+      headers: authHeadersWithOrigin("https://evil.example")
+    });
+    expect(crossOriginEvents.status).toBe(403);
+    API_ERROR_SCHEMA.parse(await crossOriginEvents.json());
+
+    const sameOriginEvents = await fetch(`${baseUrl}/events`, {
+      headers: authHeadersWithOrigin(baseUrl)
+    });
+    expect(sameOriginEvents.status).toBe(200);
+    expect(sameOriginEvents.headers.get("content-type")).toContain("text/event-stream");
+    await sameOriginEvents.body?.cancel();
+
+    const crossOriginReceipt = await fetch(`${baseUrl}/api/push/receipts`, {
+      method: "POST",
+      headers: authHeadersWithOrigin("https://evil.example", true),
+      body: JSON.stringify({
+        notificationId: "notif_cross_origin_reject",
+        event: "shown",
+        url: "/threads/thread_preflight",
+        createdAt: "2026-02-19T00:00:00.000Z"
+      })
+    });
+    expect(crossOriginReceipt.status).toBe(403);
+    API_ERROR_SCHEMA.parse(await crossOriginReceipt.json());
+
+    const healthAfterResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthAfterResponse.status).toBe(200);
+    const healthAfter = HEALTH_SCHEMA.parse(await healthAfterResponse.json());
+    expect(healthAfter.state.eventsAuthRejectsLast5m).toBeGreaterThanOrEqual(
+      healthBefore.state.eventsAuthRejectsLast5m + 1
+    );
+    expect(healthAfter.state.pushReceiptAuthRejectsLast5m).toBeGreaterThanOrEqual(
+      healthBefore.state.pushReceiptAuthRejectsLast5m + 1
     );
   });
 

@@ -198,6 +198,14 @@ function readMetaTagContent(metaId: string): string {
   return normalizeBuildMetaValue(element.content);
 }
 
+export function isPlaceholderCommitValue(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (normalized.length === 0) {
+    return true;
+  }
+  return normalized === "dev" || normalized === "unknown" || normalized === "none" || normalized === "null";
+}
+
 const DEFAULT_EFFORT_OPTIONS = ["minimal", "low", "medium", "high", "xhigh"] as const;
 const INITIAL_VISIBLE_CHAT_ITEMS = 180;
 const VISIBLE_CHAT_ITEMS_STEP = 120;
@@ -776,11 +784,12 @@ export function App(): React.JSX.Element {
     if (clientBuildId.length > 0 && webShellHealth.buildId !== clientBuildId) {
       return true;
     }
+    const normalizedClientCommit = clientCommit.trim();
+    const normalizedServerCommit = typeof webShellHealth.gitCommit === "string" ? webShellHealth.gitCommit.trim() : "";
     if (
-      clientCommit.length > 0 &&
-      typeof webShellHealth.gitCommit === "string" &&
-      webShellHealth.gitCommit.length > 0 &&
-      webShellHealth.gitCommit !== clientCommit
+      !isPlaceholderCommitValue(normalizedClientCommit) &&
+      !isPlaceholderCommitValue(normalizedServerCommit) &&
+      normalizedServerCommit !== normalizedClientCommit
     ) {
       return true;
     }
