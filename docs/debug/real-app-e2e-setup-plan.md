@@ -573,3 +573,13 @@ Implementation is complete when:
 ## Definition of Done
 
 Developers can run one command for runtime health (`pnpm smoke:app`), one command for headless real UI checks (`pnpm e2e:real:run`), and one interactive command for live repro/debug (`pnpm e2e:real:ui`), with continuous warning/error surveillance, enforced loading-settle timeouts, maintained coverage mapping, and failure diagnostics that directly point to root cause.
+
+## Potential Ideas (Estimated Value)
+
+These are candidate improvements prioritized by estimated practical return on value.
+
+1. Auto e2e failure diagnostics attachments (sentinel + health snapshot on fail): `90%`
+2. Debug UI runtime counters (health + queue/rate-limit visibility): `80%`
+3. `smoke:app` latency budgets (warn/fail modes): `72%`
+4. Server integration tests for queue/rate-limit/observability fields: `68%`
+5. Stream-burst stress command for thread/event pressure: `58%`
