@@ -996,7 +996,6 @@ export function App(): React.JSX.Element {
         (input.operation === "thread:load-live" || input.operation === "thread:load-selected");
 
       if (transientLoadOperation) {
-        clearError();
         return;
       }
 
@@ -1074,7 +1073,7 @@ export function App(): React.JSX.Element {
           // Intentionally ignored: avoid recursive reporting loops for reporter failures.
         });
     },
-    [activeTab, clearError, showError]
+    [activeTab, showError]
   );
 
   /* Data loading */
@@ -1250,7 +1249,6 @@ export function App(): React.JSX.Element {
 
   const refreshAll = useCallback(async () => {
     try {
-      clearError();
       try {
         await loadCoreData();
       } catch {
@@ -1277,7 +1275,7 @@ export function App(): React.JSX.Element {
         threadId: selectedThreadIdRef.current
       });
     }
-  }, [clearError, loadCollaborationModes, loadCoreData, loadPushData, loadSelectedThread, modes.length, reportError]);
+  }, [loadCollaborationModes, loadCoreData, loadPushData, loadSelectedThread, modes.length, reportError]);
 
   const runPushAutoHeal = useCallback(async () => {
     try {
@@ -1411,7 +1409,6 @@ export function App(): React.JSX.Element {
       });
       await Promise.all([loadPushData(), runPushDryRunCheck()]);
       setServiceWorkerUpdateAvailable(false);
-      clearError();
     } catch (e) {
       reportError({
         operation: "push:recover",
@@ -1422,7 +1419,7 @@ export function App(): React.JSX.Element {
       setPushBusy(false);
       setPushResetBusy(false);
     }
-  }, [clearError, loadPushData, pushPrivateMode, pushSupported, reportError, runPushDryRunCheck, showError]);
+  }, [loadPushData, pushPrivateMode, pushSupported, reportError, runPushDryRunCheck, showError]);
 
   const applyServiceWorkerUpdate = useCallback(async () => {
     if (!("serviceWorker" in navigator)) {
@@ -1788,7 +1785,6 @@ export function App(): React.JSX.Element {
     if (!selectedThreadId || !draft.trim()) return;
     setIsBusy(true);
     try {
-      clearError();
       await sendMessage({ threadId: selectedThreadId, text: draft });
       pendingMaterializationThreadIdsRef.current.delete(selectedThreadId);
       await refreshAll();
@@ -1801,7 +1797,7 @@ export function App(): React.JSX.Element {
     } finally {
       setIsBusy(false);
     }
-  }, [clearError, refreshAll, reportError, selectedThreadId]);
+  }, [refreshAll, reportError, selectedThreadId]);
 
   const applyModeDraft = useCallback(async (draft: {
     modeKey: string;
@@ -1826,7 +1822,6 @@ export function App(): React.JSX.Element {
     lastAppliedModeSignatureRef.current = signature;
     setIsModeSyncing(true);
     try {
-      clearError();
       await setCollaborationMode({
         threadId: selectedThreadId,
         collaborationMode: {
@@ -1849,7 +1844,7 @@ export function App(): React.JSX.Element {
     } finally {
       setIsModeSyncing(false);
     }
-  }, [clearError, isModeSyncing, loadSelectedThread, modes, reportError, selectedThreadId]);
+  }, [isModeSyncing, loadSelectedThread, modes, reportError, selectedThreadId]);
 
   const submitPendingRequest = useCallback(async () => {
     if (!selectedThreadId || !activeRequest) return;
@@ -1861,7 +1856,6 @@ export function App(): React.JSX.Element {
     }
     setIsBusy(true);
     try {
-      clearError();
       await submitUserInput({
         threadId: selectedThreadId,
         requestId: activeRequest.id,
@@ -1878,13 +1872,12 @@ export function App(): React.JSX.Element {
     } finally {
       setIsBusy(false);
     }
-  }, [activeRequest, answerDraft, clearError, refreshAll, reportError, selectedThreadId]);
+  }, [activeRequest, answerDraft, refreshAll, reportError, selectedThreadId]);
 
   const skipPendingRequest = useCallback(async () => {
     if (!selectedThreadId || !activeRequest) return;
     setIsBusy(true);
     try {
-      clearError();
       await submitUserInput({
         threadId: selectedThreadId,
         requestId: activeRequest.id,
@@ -1901,13 +1894,12 @@ export function App(): React.JSX.Element {
     } finally {
       setIsBusy(false);
     }
-  }, [activeRequest, clearError, refreshAll, reportError, selectedThreadId]);
+  }, [activeRequest, refreshAll, reportError, selectedThreadId]);
 
   const runInterrupt = useCallback(async () => {
     if (!selectedThreadId) return;
     setIsBusy(true);
     try {
-      clearError();
       await interruptThread({ threadId: selectedThreadId });
       await refreshAll();
     } catch (e) {
@@ -1919,7 +1911,7 @@ export function App(): React.JSX.Element {
     } finally {
       setIsBusy(false);
     }
-  }, [clearError, refreshAll, reportError, selectedThreadId]);
+  }, [refreshAll, reportError, selectedThreadId]);
 
   const loadHistoryDetail = useCallback(async (id: string) => {
     if (!id) { setHistoryDetail(null); return; }
@@ -1985,7 +1977,6 @@ export function App(): React.JSX.Element {
     }
     setIsBusy(true);
     try {
-      clearError();
       const created = await createThread({ cwd: trimmedProjectPath });
       pendingMaterializationThreadIdsRef.current.add(created.threadId);
       setSelectedThreadId(created.threadId);
@@ -2004,7 +1995,7 @@ export function App(): React.JSX.Element {
     } finally {
       setIsBusy(false);
     }
-  }, [clearError, refreshAll, reportError, showError]);
+  }, [refreshAll, reportError, showError]);
 
   const renderSidebarContent = (viewport: "desktop" | "mobile"): React.JSX.Element => (
     <>
