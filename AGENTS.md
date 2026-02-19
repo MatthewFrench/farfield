@@ -35,6 +35,20 @@ When investigating Farfield runtime issues, use:
 2. `.runtime/logs/errors/session-*.ndjson` for per-session error events.
 3. Error IDs from the UI banner/Debug tab to correlate with history and stream events.
 
+## Real App Debug Loop (Agent)
+
+When a user reports UI/runtime breakage, validate against the real running app before saying it is fixed.
+
+1. Start/reuse the live stack (`pnpm dev`).
+2. Run `pnpm smoke:app` and resolve failures first.
+3. Use Playwright MCP tools to drive the real UI (not mocked tests) and reproduce the issue.
+4. For Playwright control, use MCP browser tool calls (`browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_press_key`, `browser_console_messages`, `browser_network_requests`).
+5. After a fix, rerun the same real UI flow and `pnpm smoke:app`.
+6. Include in your final report:
+   - exact real-user flow validated
+   - whether red banner / `Load failed` / client-error logging reproduced
+   - which command/tool checks passed
+
 ## Environment-Specific Files (Strict)
 
 Never commit machine-specific runtime config files.

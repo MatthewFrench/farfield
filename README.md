@@ -225,6 +225,38 @@ pnpm lint        # Lint all packages
 pnpm smoke:app   # Smoke-check key Farfield runtime endpoints
 ```
 
+## Real App Debug Loop (Codex + Playwright MCP)
+
+Use this loop when debugging "app is broken" reports and when validating UI fixes against the real runtime.
+
+1. Start the real stack:
+
+```bash
+pnpm dev
+```
+
+2. Run runtime endpoint smoke checks:
+
+```bash
+pnpm smoke:app
+```
+
+3. Drive the live UI with Playwright MCP in Codex:
+   - Navigate + inspect: `browser_navigate`, `browser_snapshot`
+   - Interact: `browser_click`, `browser_type`, `browser_press_key`
+   - Inspect failures: `browser_console_messages`, `browser_network_requests`, `browser_take_screenshot`
+
+4. Apply code change, let Vite HMR update, rerun the same Playwright flow.
+
+5. Confirm both:
+   - expected UI behavior is present
+   - `pnpm smoke:app` passes
+
+Important:
+- `pnpm ...` commands run your app/tests.
+- Playwright MCP browser actions are tool calls from Codex, not shell commands.
+- Validate both empty-state and has-threads states when possible.
+
 Run a single app:
 
 ```bash
@@ -243,6 +275,7 @@ packages/
   api/          Typed clients for the Codex app-server and desktop IPC
 scripts/
   sanitize-traces.mjs   Redact trace files for safe fixture use
+  app-smoke.mjs         Runtime endpoint smoke checks for real app flow
 ```
 
 - **`packages/protocol`** is the single source of truth for all data shapes. Everything is Zod — no silent coercion, no shape drift, hard failures on unknown payloads.
