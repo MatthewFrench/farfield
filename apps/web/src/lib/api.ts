@@ -30,12 +30,60 @@ const ApiEnvelopeSchema = z
   })
   .passthrough();
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
 const ApiErrorEnvelopeSchema = z
   .object({
     ok: z.literal(false),
     error: z.string()
   })
   .passthrough();
+
+const AppServerOperationStatsSchema = z
+  .object({
+    totalCount: z.number().int().nonnegative(),
+    successCount: z.number().int().nonnegative(),
+    errorCount: z.number().int().nonnegative(),
+    timeoutCount: z.number().int().nonnegative(),
+    inFlightCount: z.number().int().nonnegative(),
+    lastStartedAt: z.string().nullable(),
+    lastCompletedAt: z.string().nullable(),
+    lastDurationMs: z.number().int().nonnegative().nullable(),
+    lastStatus: z.union([z.literal("ok"), z.literal("error"), z.null()]),
+    lastError: z.string().nullable()
+  })
+  .strict();
+
+const AppServerOperationsSchema = z
+  .object({
+    "thread/list": AppServerOperationStatsSchema,
+    "model/list": AppServerOperationStatsSchema,
+    "collaborationMode/list": AppServerOperationStatsSchema
+  })
+  .strict();
+
+const AppServerStderrStatsSchema = z
+  .object({
+    benignSuppressedCount: z.number().int().nonnegative(),
+    emittedInWindow: z.number().int().nonnegative(),
+    maxEventsPerWindow: z.number().int().positive(),
+    rateLimitedSuppressedCount: z.number().int().nonnegative(),
+    rateLimitedSuppressedInWindow: z.number().int().nonnegative(),
+    windowMs: z.number().int().positive(),
+    windowStartedAt: z.string().datetime()
+  })
+  .strict();
+
+const IpcHistoryRateLimitSchema = z
+  .object({
+    maxEventsPerWindow: z.number().int().positive(),
+    recordedInWindow: z.number().int().nonnegative(),
+    suppressedInWindow: z.number().int().nonnegative(),
+    totalSuppressedCount: z.number().int().nonnegative(),
+    windowMs: z.number().int().positive(),
+    windowStartedAt: z.string().datetime()
+  })
+  .strict();
 
 const HealthResponseSchema = z
   .object({
@@ -48,7 +96,13 @@ const HealthResponseSchema = z
         gitCommit: z.string().nullable().optional(),
         lastError: z.string().nullable(),
         historyCount: z.number().int().nonnegative(),
-        threadOwnerCount: z.number().int().nonnegative()
+        threadOwnerCount: z.number().int().nonnegative(),
+        trackedThreadEventCount: z.number().int().nonnegative().optional(),
+        untrackedThreadEventCount: z.number().int().nonnegative().optional(),
+        appServerRequestTimeoutMs: z.number().int().positive().optional(),
+        appServerOperations: AppServerOperationsSchema.optional(),
+        appServerStderr: AppServerStderrStatsSchema.optional(),
+        ipcHistoryRateLimit: IpcHistoryRateLimitSchema.optional()
       })
       .passthrough()
   })
@@ -231,14 +285,38 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
     }
   }
   let response: Response;
+  const timeoutController = new AbortController();
+  const timeoutHandle = setTimeout(() => {
+    timeoutController.abort();
+  }, REQUEST_TIMEOUT_MS);
+  const inheritedSignal = init?.signal;
+  const onAbortInheritedSignal = () => {
+    timeoutController.abort();
+  };
+  if (inheritedSignal) {
+    if (inheritedSignal.aborted) {
+      timeoutController.abort();
+    } else {
+      inheritedSignal.addEventListener("abort", onAbortInheritedSignal, { once: true });
+    }
+  }
   try {
     response = await fetch(path, {
       ...init,
-      headers
+      headers,
+      signal: timeoutController.signal
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Request timed out for ${path} after ${String(REQUEST_TIMEOUT_MS)}ms`);
+    }
     throw new Error(`Request failed for ${path}: ${message}`);
+  } finally {
+    clearTimeout(timeoutHandle);
+    if (inheritedSignal) {
+      inheritedSignal.removeEventListener("abort", onAbortInheritedSignal);
+    }
   }
 
   let data: unknown;

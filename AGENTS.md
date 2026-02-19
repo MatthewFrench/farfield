@@ -26,6 +26,15 @@ violate the rules. If you think that is impossible, STOP and ask the user.
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm lint`
+- `pnpm verify:real`
+- `pnpm premerge:check`
+
+## Required Pre-Merge Gate
+
+For changes touching `apps/web`, `apps/server`, `packages/codex-protocol`, or `e2e/real`, the local gate is mandatory before merge:
+
+1. `pnpm premerge:check`
+2. If it fails, fix all failures and rerun until clean.
 
 ## Error Debugging Workflow
 
@@ -41,10 +50,13 @@ When a user reports UI/runtime breakage, validate against the real running app b
 
 1. Start/reuse the live stack (`pnpm dev`).
 2. Run `pnpm smoke:app` and resolve failures first.
-3. Use Playwright MCP tools to drive the real UI (not mocked tests) and reproduce the issue.
-4. For Playwright control, use MCP browser tool calls (`browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_press_key`, `browser_console_messages`, `browser_network_requests`).
-5. After a fix, rerun the same real UI flow and `pnpm smoke:app`.
-6. Include in your final report:
+3. Keep sentinel output visible during the loop (`tail -f .runtime/e2e-sentinel/latest.ndjson` when available).
+4. Use Playwright MCP tools to drive the real UI (not mocked tests) and reproduce the issue.
+5. Run the standard manual script in `docs/debug/playwright-mcp-smoke.md`.
+6. For Playwright control, use MCP browser tool calls (`browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_press_key`, `browser_console_messages`, `browser_network_requests`, `browser_evaluate`).
+7. After a fix, rerun the same real UI flow, `pnpm smoke:app`, and targeted real-app scenario checks (`pnpm e2e:real:run -- --grep "<scenario>"`).
+8. Treat unexpected warning/error signals as blocking; fix and rerun before reporting done.
+9. Include in your final report:
    - exact real-user flow validated
    - whether red banner / `Load failed` / client-error logging reproduced
    - which command/tool checks passed

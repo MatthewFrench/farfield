@@ -193,7 +193,7 @@ export const ContextCompactionItemSchema = z
   .object({
     type: z.literal("contextCompaction"),
     id: NonEmptyStringSchema,
-    completed: z.boolean()
+    completed: z.boolean().optional().default(false)
   })
   .strict();
 
@@ -201,7 +201,9 @@ export const WebSearchActionSchema = z
   .object({
     type: NonEmptyStringSchema,
     query: z.string().optional(),
-    queries: z.array(z.string()).optional()
+    queries: z.array(z.string()).optional(),
+    url: z.string().optional(),
+    pattern: z.string().optional()
   })
   .strict();
 
@@ -223,6 +225,56 @@ export const ModelChangedItemSchema = z
   })
   .strict();
 
+export const TodoPlanEntrySchema = z
+  .object({
+    step: z.string(),
+    status: NonEmptyStringSchema
+  })
+  .strict();
+
+export const TodoListItemSchema = z
+  .object({
+    type: z.literal("todo-list"),
+    id: NonEmptyStringSchema,
+    explanation: z.string(),
+    plan: z.array(TodoPlanEntrySchema)
+  })
+  .strict();
+
+export const CollabAgentStateSchema = z
+  .object({
+    status: NonEmptyStringSchema,
+    message: z.union([z.string(), z.null()])
+  })
+  .strict();
+
+export const CollabAgentToolCallItemSchema = z
+  .object({
+    type: z.literal("collabAgentToolCall"),
+    id: NonEmptyStringSchema,
+    tool: NonEmptyStringSchema,
+    status: NonEmptyStringSchema,
+    senderThreadId: NonEmptyStringSchema,
+    receiverThreadIds: z.array(NonEmptyStringSchema),
+    prompt: z.union([z.string(), z.null()]),
+    agentsStates: z.record(CollabAgentStateSchema)
+  })
+  .strict();
+
+export const McpToolCallItemSchema = z
+  .object({
+    type: z.literal("mcpToolCall"),
+    id: NonEmptyStringSchema,
+    server: NonEmptyStringSchema,
+    tool: NonEmptyStringSchema,
+    status: NonEmptyStringSchema,
+    arguments: JsonValueSchema,
+    result: z.union([JsonValueSchema, z.null()]),
+    error: z.union([JsonValueSchema, z.null()]),
+    durationMs: z.union([NonNegativeIntSchema, z.null()])
+  })
+  .strict();
+
 export const TurnItemSchema = z.discriminatedUnion("type", [
   UserMessageItemSchema,
   SteeringUserMessageItemSchema,
@@ -234,7 +286,10 @@ export const TurnItemSchema = z.discriminatedUnion("type", [
   FileChangeItemSchema,
   ContextCompactionItemSchema,
   WebSearchItemSchema,
-  ModelChangedItemSchema
+  ModelChangedItemSchema,
+  TodoListItemSchema,
+  CollabAgentToolCallItemSchema,
+  McpToolCallItemSchema
 ]);
 
 export const UserInputOptionSchema = z

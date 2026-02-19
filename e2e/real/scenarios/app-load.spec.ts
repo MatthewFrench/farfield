@@ -1,0 +1,24 @@
+import {
+  openAppHome
+} from "../helpers/app-actions";
+import {
+  expectChatSurfaceSettled,
+  expectNoErrorBanner,
+  expectNoFailedApiResponses,
+  expectNoLoadFailedText,
+  expectNoUnexpectedClientErrors,
+  expectNoUnexpectedWarningsOrErrors,
+  expectThreadListSettled
+} from "../helpers/app-assertions";
+import { test } from "../fixtures/real-app.fixture";
+
+test("app load health", async ({ page, sentinel }) => {
+  await openAppHome(page);
+  await expectThreadListSettled(page, sentinel);
+  await expectChatSurfaceSettled(page, sentinel);
+  await expectNoErrorBanner(page);
+  await expectNoLoadFailedText(page);
+  await expectNoUnexpectedClientErrors(sentinel);
+  await expectNoFailedApiResponses(sentinel);
+  await expectNoUnexpectedWarningsOrErrors(sentinel);
+});

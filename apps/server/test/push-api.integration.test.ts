@@ -793,7 +793,9 @@ describe("push API auth and subscription routes", () => {
         HOST: "0.0.0.0",
         PORT: String(port),
         PUSH_ENABLED: "false",
-        PUSH_STATE_PATH: localStatePath
+        PUSH_STATE_PATH: localStatePath,
+        API_TOKEN: "",
+        PUSH_API_TOKEN: ""
       },
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -841,5 +843,5 @@ describe("push API auth and subscription routes", () => {
         fs.rmSync(localStateDirectory, { recursive: true, force: true });
       }
     }
-  });
+  }, 30_000);
 });

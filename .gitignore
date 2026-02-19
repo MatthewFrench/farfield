@@ -5,6 +5,8 @@ node_modules
 dist
 coverage
 *.tsbuildinfo
+playwright-report/
+test-results/
 
 # Local traces and extracted desktop artifacts
 traces/

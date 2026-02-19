@@ -425,7 +425,9 @@ describe("codex-protocol schemas", () => {
               action: {
                 type: "search",
                 query: "example query",
-                queries: ["example query"]
+                queries: ["example query"],
+                url: "https://example.com",
+                pattern: "example"
               }
             }
           ]
@@ -435,7 +437,33 @@ describe("codex-protocol schemas", () => {
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("contextCompaction");
+    if (parsed.turns[0]?.items[0]?.type === "contextCompaction") {
+      expect(parsed.turns[0]?.items[0]?.completed).toBe(true);
+    }
     expect(parsed.turns[0]?.items[1]?.type).toBe("webSearch");
+  });
+
+  it("parses thread conversation state with contextCompaction item missing completed", () => {
+    const parsed = parseThreadConversationState({
+      id: "thread-123",
+      turns: [
+        {
+          status: "completed",
+          items: [
+            {
+              id: "item-compact",
+              type: "contextCompaction"
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    if (parsed.turns[0]?.items[0]?.type !== "contextCompaction") {
+      throw new Error("expected contextCompaction item");
+    }
+    expect(parsed.turns[0]?.items[0]?.completed).toBe(false);
   });
 
   it("parses thread conversation state with modelChanged item", () => {
@@ -458,6 +486,134 @@ describe("codex-protocol schemas", () => {
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("modelChanged");
+  });
+
+  it("parses thread conversation state with todo-list, collab agent, and mcp tool call items", () => {
+    const parsed = parseThreadConversationState({
+      id: "thread-123",
+      turns: [
+        {
+          status: "completed",
+          items: [
+            {
+              id: "item-todo",
+              type: "todo-list",
+              explanation: "Deliver feature",
+              plan: [
+                {
+                  step: "Implement",
+                  status: "inProgress"
+                }
+              ]
+            },
+            {
+              id: "item-collab",
+              type: "collabAgentToolCall",
+              tool: "spawnAgent",
+              status: "completed",
+              senderThreadId: "thread-123",
+              receiverThreadIds: ["thread-456"],
+              prompt: null,
+              agentsStates: {
+                "thread-456": {
+                  status: "completed",
+                  message: null
+                }
+              }
+            },
+            {
+              id: "item-mcp",
+              type: "mcpToolCall",
+              server: "playwright",
+              tool: "browser_snapshot",
+              status: "inProgress",
+              arguments: {
+                include: "visible"
+              },
+              result: null,
+              error: null,
+              durationMs: null
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    expect(parsed.turns[0]?.items[0]?.type).toBe("todo-list");
+    expect(parsed.turns[0]?.items[1]?.type).toBe("collabAgentToolCall");
+    expect(parsed.turns[0]?.items[2]?.type).toBe("mcpToolCall");
+  });
+
+  it("parses snapshot broadcast containing todo-list and tool call items", () => {
+    const parsed = parseThreadStreamStateChangedBroadcast({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "client-123",
+      version: 4,
+      params: {
+        conversationId: "thread-123",
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "snapshot",
+          conversationState: {
+            id: "thread-123",
+            turns: [
+              {
+                status: "completed",
+                items: [
+                  {
+                    id: "item-todo",
+                    type: "todo-list",
+                    explanation: "Deliver feature",
+                    plan: [
+                      {
+                        step: "Implement",
+                        status: "completed"
+                      }
+                    ]
+                  },
+                  {
+                    id: "item-collab",
+                    type: "collabAgentToolCall",
+                    tool: "spawnAgent",
+                    status: "completed",
+                    senderThreadId: "thread-123",
+                    receiverThreadIds: ["thread-456"],
+                    prompt: "Inspect file layout",
+                    agentsStates: {
+                      "thread-456": {
+                        status: "completed",
+                        message: null
+                      }
+                    }
+                  },
+                  {
+                    id: "item-mcp",
+                    type: "mcpToolCall",
+                    server: "playwright",
+                    tool: "browser_snapshot",
+                    status: "completed",
+                    arguments: {
+                      include: "visible"
+                    },
+                    result: {
+                      ok: true
+                    },
+                    error: null,
+                    durationMs: 18
+                  }
+                ]
+              }
+            ],
+            requests: []
+          }
+        }
+      }
+    });
+
+    expect(parsed.params.change.type).toBe("snapshot");
   });
 
   it("parses generic ipc request frames", () => {

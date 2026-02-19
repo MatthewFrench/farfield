@@ -465,12 +465,14 @@ function IconBtn({
   disabled,
   title,
   active,
+  testId,
   children
 }: {
   onClick?: () => void;
   disabled?: boolean;
   title?: string;
   active?: boolean;
+  testId?: string;
   children: React.ReactNode;
 }) {
   const buttonNode = (
@@ -478,6 +480,7 @@ function IconBtn({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-testid={testId}
       variant="ghost"
       size="icon"
       className={`h-8 w-8 rounded-lg ${
@@ -607,6 +610,7 @@ export function App(): React.JSX.Element {
     [clientErrors, selectedClientErrorId]
   );
   const isThreadsLoading = threadsLoadCount > 0;
+  const threadListState = isThreadsLoading ? "loading" : threads.length === 0 ? "empty" : "ready";
   const groupedThreads = useMemo(() => {
     type Group = {
       key: string;
@@ -708,6 +712,13 @@ export function App(): React.JSX.Element {
   );
 
   const turns = conversationState?.turns ?? [];
+  const chatSurfaceState = turns.length > 0
+    ? "messages"
+    : isThreadsLoading
+    ? "loading-threads"
+    : selectedThread
+    ? "no-messages"
+    : "no-thread";
   const conversationItemCount = useMemo(
     () => turns.reduce((count, turn) => count + (turn.items?.length ?? 0), 0),
     [turns]
@@ -1204,18 +1215,29 @@ export function App(): React.JSX.Element {
   }, []);
 
   const loadSelectedThread = useCallback(async (threadId: string) => {
-    const includeTurns = !pendingMaterializationThreadIdsRef.current.has(threadId);
-    const [live, stream, read] = await Promise.all([
-      getLiveState(threadId),
-      getStreamEvents(threadId),
-      readThread(threadId, { includeTurns })
-    ]);
-    if ((live.conversationState?.turns.length ?? 0) > 0 || read.thread.turns.length > 0) {
-      pendingMaterializationThreadIdsRef.current.delete(threadId);
+    const runLoad = async (): Promise<void> => {
+      const includeTurns = !pendingMaterializationThreadIdsRef.current.has(threadId);
+      const [live, stream, read] = await Promise.all([
+        getLiveState(threadId),
+        getStreamEvents(threadId),
+        readThread(threadId, { includeTurns })
+      ]);
+      if ((live.conversationState?.turns.length ?? 0) > 0 || read.thread.turns.length > 0) {
+        pendingMaterializationThreadIdsRef.current.delete(threadId);
+      }
+      setLiveState(live);
+      setReadThreadState(read);
+      setStreamEvents(stream.events);
+    };
+
+    try {
+      await runLoad();
+    } catch {
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 250);
+      });
+      await runLoad();
     }
-    setLiveState(live);
-    setReadThreadState(read);
-    setStreamEvents(stream.events);
   }, []);
 
   const loadLiveData = useCallback(async () => {
@@ -1229,7 +1251,14 @@ export function App(): React.JSX.Element {
   const refreshAll = useCallback(async () => {
     try {
       clearError();
-      await loadCoreData();
+      try {
+        await loadCoreData();
+      } catch {
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 250);
+        });
+        await loadCoreData();
+      }
       await loadPushData();
       if (modes.length === 0) {
         void loadCollaborationModes().catch((e) =>
@@ -1983,7 +2012,11 @@ export function App(): React.JSX.Element {
         <span className="text-sm font-semibold">Farfield</span>
         <div className="flex items-center gap-1">
           {viewport === "desktop" && (
-            <IconBtn onClick={() => setDesktopSidebarOpen(false)} title="Hide sidebar">
+            <IconBtn
+              onClick={() => setDesktopSidebarOpen(false)}
+              title="Hide sidebar"
+              testId="sidebar-toggle-close"
+            >
               <PanelLeft size={15} />
             </IconBtn>
           )}
@@ -1991,6 +2024,7 @@ export function App(): React.JSX.Element {
             <Button
               type="button"
               onClick={() => setMobileSidebarOpen(false)}
+              data-testid="sidebar-toggle-close"
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-foreground"
@@ -2002,15 +2036,18 @@ export function App(): React.JSX.Element {
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-2 pl-2 pr-0">
+        <div data-testid="thread-list-status" data-state={threadListState} className="sr-only">
+          {threadListState}
+        </div>
         {threads.length === 0 && (
           <div className="px-4 py-6 text-xs text-muted-foreground text-center">
             {isThreadsLoading ? (
-              <span className="inline-flex items-center gap-2">
+              <span data-testid="thread-list-loading" className="inline-flex items-center gap-2">
                 <Loader2 size={12} className="animate-spin" />
                 <span>Loading threads...</span>
               </span>
             ) : (
-              "No threads"
+              <span data-testid="thread-list-empty">No threads</span>
             )}
           </div>
         )}
@@ -2072,6 +2109,8 @@ export function App(): React.JSX.Element {
                             <Button
                               key={thread.id}
                               type="button"
+                              data-testid="thread-list-item"
+                              data-thread-id={thread.id}
                               onClick={() => {
                                 setSelectedThreadId(thread.id);
                                 setMobileSidebarOpen(false);
@@ -2150,7 +2189,11 @@ export function App(): React.JSX.Element {
   /* ── Render ─────────────────────────────────────────────── */
   return (
     <TooltipProvider delayDuration={120}>
-      <div className="app-shell flex bg-background text-foreground font-sans" style={appShellStyle}>
+      <div
+        className="app-shell flex bg-background text-foreground font-sans"
+        style={appShellStyle}
+        data-testid="app-shell"
+      >
 
       {/* Mobile sidebar backdrop */}
       <AnimatePresence>
@@ -2209,19 +2252,23 @@ export function App(): React.JSX.Element {
         <header className="flex items-center justify-between px-3 h-14 border-b border-border shrink-0 gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <div className="md:hidden">
-              <IconBtn onClick={() => setMobileSidebarOpen(true)} title="Threads">
+              <IconBtn onClick={() => setMobileSidebarOpen(true)} title="Threads" testId="sidebar-toggle-open">
                 <Menu size={15} />
               </IconBtn>
             </div>
             {!desktopSidebarOpen && (
               <div className="hidden md:block">
-                <IconBtn onClick={() => setDesktopSidebarOpen(true)} title="Show sidebar">
+                <IconBtn
+                  onClick={() => setDesktopSidebarOpen(true)}
+                  title="Show sidebar"
+                  testId="sidebar-toggle-open"
+                >
                   <PanelLeft size={15} />
                 </IconBtn>
               </div>
             )}
             <div className="min-w-0">
-              <div className="text-sm font-medium truncate leading-5">
+              <div className="text-sm font-medium truncate leading-5" data-testid="selected-thread-label">
                 {selectedThread ? threadLabel(selectedThread) : "No thread selected"}
               </div>
               {isGenerating && (
@@ -2254,6 +2301,7 @@ export function App(): React.JSX.Element {
               onClick={() => void refreshAll()}
               disabled={isBusy}
               title="Refresh"
+              testId="refresh-button"
             >
               <RefreshCcw size={14} className={isBusy ? "animate-spin" : ""} />
             </IconBtn>
@@ -2261,6 +2309,7 @@ export function App(): React.JSX.Element {
               onClick={() => setActiveTab(activeTab === "debug" ? "chat" : "debug")}
               active={activeTab === "debug"}
               title="Debug"
+              testId="tab-debug"
             >
               <Bug size={14} />
             </IconBtn>
@@ -2268,6 +2317,7 @@ export function App(): React.JSX.Element {
               onClick={() => setActiveTab(activeTab === "preflight" ? "chat" : "preflight")}
               active={activeTab === "preflight"}
               title="Preflight"
+              testId="tab-preflight"
             >
               <ShieldCheck size={14} />
             </IconBtn>
@@ -2286,17 +2336,26 @@ export function App(): React.JSX.Element {
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden shrink-0"
             >
-              <div className="flex items-start justify-between gap-3 px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-sm text-destructive">
+              <div
+                className="flex items-start justify-between gap-3 px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-sm text-destructive"
+                data-testid="error-banner"
+              >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{errorState.operation}</div>
-                  <div className="truncate">{errorMessage}</div>
+                  <div className="truncate font-medium" data-testid="error-banner-operation">
+                    {errorState.operation}
+                  </div>
+                  <div className="truncate" data-testid="error-banner-message">{errorMessage}</div>
                   {(errorState.requestId || errorState.errorId) && (
                     <div className="mt-0.5 flex items-center gap-2 text-[11px] text-destructive/80">
                       {errorState.requestId && (
-                        <span className="font-mono">request {errorState.requestId}</span>
+                        <span className="font-mono" data-testid="error-banner-request-id">
+                          request {errorState.requestId}
+                        </span>
                       )}
                       {errorState.errorId && (
-                        <span className="font-mono">error {errorState.errorId}</span>
+                        <span className="font-mono" data-testid="error-banner-error-id">
+                          error {errorState.errorId}
+                        </span>
                       )}
                     </div>
                   )}
@@ -2305,6 +2364,7 @@ export function App(): React.JSX.Element {
                   <Button
                     type="button"
                     onClick={openErrorInDebug}
+                    data-testid="error-banner-open-debug"
                     variant="ghost"
                     size="sm"
                     className="h-6 px-2 text-[11px] opacity-80 hover:opacity-100"
@@ -2314,6 +2374,7 @@ export function App(): React.JSX.Element {
                   <Button
                     type="button"
                     onClick={clearError}
+                    data-testid="error-banner-dismiss"
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 opacity-60 hover:opacity-100"
@@ -2328,10 +2389,15 @@ export function App(): React.JSX.Element {
 
         {/* ── Chat tab ──────────────────────────────────────── */}
         {activeTab === "chat" && (
-          <div className="relative flex-1 flex flex-col min-h-0">
+          <div className="relative flex-1 flex flex-col min-h-0" data-testid="tab-chat">
 
             {/* Conversation */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto">
+            <div
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto"
+              data-testid="chat-surface"
+              data-state={chatSurfaceState}
+            >
               <AnimatePresence initial={false} mode="wait">
                 <motion.div
                   key={selectedThreadId ?? "__no_thread__"}
@@ -2343,16 +2409,16 @@ export function App(): React.JSX.Element {
                   className="max-w-3xl mx-auto px-4 py-8"
                 >
                   {turns.length === 0 ? (
-                    <div className="text-center py-20 text-sm text-muted-foreground">
-                      {isThreadsLoading && !selectedThread ? (
-                        <span className="inline-flex items-center gap-2">
+                    <div className="text-center py-20 text-sm text-muted-foreground" data-testid="chat-empty-state">
+                      {isThreadsLoading ? (
+                        <span data-testid="chat-empty-loading-threads" className="inline-flex items-center gap-2">
                           <Loader2 size={12} className="animate-spin" />
                           <span>Loading threads...</span>
                         </span>
                       ) : selectedThread ? (
-                        "No messages yet"
+                        <span data-testid="chat-empty-no-messages">No messages yet</span>
                       ) : (
-                        "Select a thread from the sidebar"
+                        <span data-testid="chat-empty-no-thread">Select a thread from the sidebar</span>
                       )}
                     </div>
                   ) : (
@@ -2713,7 +2779,7 @@ export function App(): React.JSX.Element {
             <div className="flex-1 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] min-h-0 divide-y md:divide-y-0 md:divide-x divide-border overflow-hidden">
 
               {/* Left: History */}
-              <div className="flex flex-col min-h-0 overflow-hidden">
+              <div className="flex flex-col min-h-0 overflow-hidden" data-testid="debug-history-panel">
                 <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
                   <Activity size={13} className="text-muted-foreground" />
                   <span className="text-sm font-medium">History</span>
@@ -2866,7 +2932,7 @@ export function App(): React.JSX.Element {
                 </div>
 
                 {/* Error events */}
-                <div className="flex flex-col min-h-0 overflow-hidden">
+                <div className="flex flex-col min-h-0 overflow-hidden" data-testid="debug-errors-panel">
                   <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border shrink-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xs font-medium">Errors</span>
@@ -2876,6 +2942,7 @@ export function App(): React.JSX.Element {
                       type="button"
                       variant="outline"
                       size="sm"
+                      data-testid="debug-errors-refresh"
                       className="h-7 text-xs"
                       onClick={() => {
                         void listDebugClientErrors(120)
@@ -2902,8 +2969,17 @@ export function App(): React.JSX.Element {
                     </Button>
                   </div>
                   {clientErrors.length === 0 ? (
-                    <div className="px-4 py-3 text-xs text-muted-foreground">
-                      No errors recorded for this session.
+                    <div className="px-4 py-3 text-xs text-muted-foreground space-y-2" data-testid="debug-errors-empty">
+                      <div>No errors recorded for this session.</div>
+                      <a
+                        href="/api/debug/client-errors/session-log"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid="debug-errors-session-log-link"
+                        className="inline-block text-xs text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
+                      >
+                        Download session log
+                      </a>
                     </div>
                   ) : (
                     <div className="flex-1 grid grid-cols-[170px_minmax(0,1fr)] min-h-0 divide-x divide-border overflow-hidden">
@@ -2915,6 +2991,7 @@ export function App(): React.JSX.Element {
                             <Button
                               key={entry.errorId}
                               type="button"
+                              data-testid="debug-error-row"
                               onClick={() => setSelectedClientErrorId(entry.errorId)}
                               variant="ghost"
                               className={`w-full h-auto flex-col items-start justify-start gap-0 rounded-none px-3 py-2 text-left transition-colors ${
@@ -2942,7 +3019,7 @@ export function App(): React.JSX.Element {
                             </Button>
                           ))}
                       </div>
-                      <div className="overflow-y-auto p-3 space-y-3">
+                      <div className="overflow-y-auto p-3 space-y-3" data-testid="debug-error-detail">
                         {!clientErrorDetail ? (
                           <div className="text-xs text-muted-foreground py-4">
                             {selectedClientErrorSummary ? "Loading error detail..." : "Select an error"}
@@ -2990,6 +3067,7 @@ export function App(): React.JSX.Element {
                                 href="/api/debug/client-errors/session-log"
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                data-testid="debug-errors-session-log-link"
                                 className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
                               >
                                 Download session log

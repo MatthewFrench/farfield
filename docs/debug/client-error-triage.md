@@ -24,6 +24,16 @@ Farfield records both client-side and server-side errors to a session NDJSON log
   - Returns one error event by `errorId`.
 - `GET /api/debug/client-errors/session-log`
   - Downloads the session NDJSON file.
+- `GET /api/health`
+  - Includes `state.appServerOperations` with live per-operation stats for:
+    - `thread/list`
+    - `model/list`
+    - `collaborationMode/list`
+  - Each operation includes counts + last latency/error fields (`lastDurationMs`, `lastStatus`, `lastError`, `timeoutCount`).
+  - Includes `state.appServerStderr` with stderr suppression/rate-limit counters (`benignSuppressedCount`, `rateLimitedSuppressedCount`, `rateLimitedSuppressedInWindow`).
+  - Includes `state.ipcHistoryRateLimit` with incoming IPC history suppression counters and current window stats.
+  - Includes `state.trackedThreadEventCount` and `state.untrackedThreadEventCount` for stream-event capture pressure and tracking behavior.
+  - Includes `state.appServerRequestTimeoutMs` for current app-server RPC timeout configuration.
 
 ## Useful local commands
 
@@ -39,6 +49,9 @@ rg '"operation":"push:auto-heal"' .runtime/logs/errors/session-*.ndjson
 
 # Filter by a known errorId
 rg '"errorId":"error_' .runtime/logs/errors/session-*.ndjson
+
+# Real-app e2e sentinel summary (latest scenario)
+tail -n 200 .runtime/e2e-sentinel/latest.ndjson
 ```
 
 ## Event fields

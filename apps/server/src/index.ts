@@ -63,6 +63,74 @@ const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const INVALID_THREAD_STREAM_LOG_INTERVAL_MS = 30_000;
 const ERROR_BUDGET_WINDOW_MS = 5 * 60_000;
 const SERVER_CLIENT_ERROR_DEDUP_WINDOW_MS = 10_000;
+const APP_SERVER_STDERR_LINE_MAX_LENGTH = 1_200;
+const APP_SERVER_STDERR_WINDOW_MS = 10_000;
+const APP_SERVER_STDERR_MAX_EVENTS_PER_WINDOW = 40;
+const APP_SERVER_STDERR_BENIGN_SUMMARY_INTERVAL = 250;
+const HISTORY_SSE_DEBOUNCE_MS = 100;
+const IPC_HISTORY_WINDOW_MS = 1_000;
+const IPC_HISTORY_MAX_EVENTS_PER_WINDOW = 120;
+const TRACKED_THREAD_EVENTS_TTL_MS = 10 * 60_000;
+const TRACKED_THREAD_EVENTS_MAX = 24;
+const UNTRACKED_THREAD_EVENTS_MAX_PER_THREAD = 8;
+const UNTRACKED_THREAD_EVENTS_MAX_THREADS = 128;
+type AppServerOperationName = "thread/list" | "model/list" | "collaborationMode/list";
+
+interface AppServerOperationStats {
+  totalCount: number;
+  successCount: number;
+  errorCount: number;
+  timeoutCount: number;
+  inFlightCount: number;
+  lastStartedAt: string | null;
+  lastCompletedAt: string | null;
+  lastDurationMs: number | null;
+  lastStatus: "ok" | "error" | null;
+  lastError: string | null;
+}
+
+type AppServerOperationStatsByName = Record<AppServerOperationName, AppServerOperationStats>;
+
+function createAppServerOperationStats(): AppServerOperationStatsByName {
+  return {
+    "thread/list": {
+      totalCount: 0,
+      successCount: 0,
+      errorCount: 0,
+      timeoutCount: 0,
+      inFlightCount: 0,
+      lastStartedAt: null,
+      lastCompletedAt: null,
+      lastDurationMs: null,
+      lastStatus: null,
+      lastError: null
+    },
+    "model/list": {
+      totalCount: 0,
+      successCount: 0,
+      errorCount: 0,
+      timeoutCount: 0,
+      inFlightCount: 0,
+      lastStartedAt: null,
+      lastCompletedAt: null,
+      lastDurationMs: null,
+      lastStatus: null,
+      lastError: null
+    },
+    "collaborationMode/list": {
+      totalCount: 0,
+      successCount: 0,
+      errorCount: 0,
+      timeoutCount: 0,
+      inFlightCount: 0,
+      lastStartedAt: null,
+      lastCompletedAt: null,
+      lastDurationMs: null,
+      lastStatus: null,
+      lastError: null
+    }
+  };
+}
 
 function readPositiveIntegerEnv(name: string, defaultValue: number): number {
   const rawValue = process.env[name];
@@ -102,6 +170,7 @@ const COMPLETION_STATE_BACKFILL_INTERVAL_MS = 2_000;
 const MAX_PUSH_RECEIPTS = readPositiveIntegerEnv("PUSH_RECEIPTS_MAX_COUNT", 100);
 const PUSH_RECEIPTS_MAX_AGE_DAYS = readPositiveIntegerEnv("PUSH_RECEIPTS_MAX_AGE_DAYS", 7);
 const PUSH_RECEIPTS_MAX_AGE_MS = PUSH_RECEIPTS_MAX_AGE_DAYS * 24 * 60 * 60 * 1_000;
+const APP_SERVER_REQUEST_TIMEOUT_MS = readPositiveIntegerEnv("APP_SERVER_REQUEST_TIMEOUT_MS", 60_000);
 const PUSH_RECEIPTS_PATH = (() => {
   const configuredPath = process.env["PUSH_RECEIPTS_PATH"];
   if (typeof configuredPath === "string" && configuredPath.trim().length > 0) {
@@ -246,12 +315,55 @@ function normalizeStderrLine(line: string): string {
   return line.replace(ANSI_ESCAPE_REGEX, "").trim();
 }
 
+interface AppServerStderrLineSummary {
+  line: string;
+  originalLength: number;
+  truncated: boolean;
+}
+
 function isKnownBenignAppServerStderr(line: string): boolean {
   const normalized = normalizeStderrLine(line);
   return (
     normalized.includes("codex_core::rollout::list") &&
     normalized.includes("state db missing rollout path for thread")
+  ) || (
+    normalized.includes("codex_core::state_db: state db record_discrepancy:") &&
+    normalized.includes("falling_back")
   );
+}
+
+function summarizeStderrLine(line: string): AppServerStderrLineSummary {
+  const originalLength = line.length;
+  if (originalLength <= APP_SERVER_STDERR_LINE_MAX_LENGTH) {
+    return {
+      line,
+      originalLength,
+      truncated: false
+    };
+  }
+
+  return {
+    line: `${line.slice(0, APP_SERVER_STDERR_LINE_MAX_LENGTH)}...`,
+    originalLength,
+    truncated: true
+  };
+}
+
+interface AppServerStderrState {
+  benignSuppressedCount: number;
+  emittedInWindow: number;
+  rateLimitedSuppressedCount: number;
+  rateLimitedSuppressedInWindow: number;
+  rateLimitNoticeEmitted: boolean;
+  windowStartedAtMs: number;
+}
+
+interface IpcHistoryRateState {
+  recordedInWindow: number;
+  suppressedInWindow: number;
+  totalSuppressedCount: number;
+  windowNoticeEmitted: boolean;
+  windowStartedAtMs: number;
 }
 
 interface HistoryEntry {
@@ -282,6 +394,8 @@ const historyById = new Map<string, unknown>();
 
 const threadOwnerById = new Map<string, string>();
 const streamEventsByThreadId = new Map<string, IpcFrame[]>();
+const trackedThreadEventsLastAccessById = new Map<string, number>();
+const untrackedThreadEventsByThreadId = new Map<string, IpcFrame[]>();
 const recentClientErrorByFingerprint = new Map<
   string,
   {
@@ -292,17 +406,96 @@ const recentClientErrorByFingerprint = new Map<
 >();
 const invalidThreadStreamEventTimestampsMs: number[] = [];
 const suppressedClientErrorReportTimestampsMs: number[] = [];
+const appServerOperationStats = createAppServerOperationStats();
+const appServerStderrState: AppServerStderrState = {
+  benignSuppressedCount: 0,
+  emittedInWindow: 0,
+  rateLimitedSuppressedCount: 0,
+  rateLimitedSuppressedInWindow: 0,
+  rateLimitNoticeEmitted: false,
+  windowStartedAtMs: Date.now()
+};
+const ipcHistoryRateState: IpcHistoryRateState = {
+  recordedInWindow: 0,
+  suppressedInWindow: 0,
+  totalSuppressedCount: 0,
+  windowNoticeEmitted: false,
+  windowStartedAtMs: Date.now()
+};
 
 const sseClients = new Set<ServerResponse>();
 
 let activeTrace: ActiveTrace | null = null;
 const recentTraces: TraceSummary[] = [];
 const invalidThreadStreamLastLoggedAtBySignature = new Map<string, number>();
+let historySseBroadcastTimer: NodeJS.Timeout | null = null;
 
 function pruneTimestampWindow(timestamps: number[], nowMs: number, windowMs: number): void {
   const cutoff = nowMs - windowMs;
   while (timestamps.length > 0 && timestamps[0]! < cutoff) {
     timestamps.shift();
+  }
+}
+
+function pruneTrackedThreadEvents(nowMs: number): void {
+  const cutoff = nowMs - TRACKED_THREAD_EVENTS_TTL_MS;
+  for (const [threadId, lastAccessMs] of trackedThreadEventsLastAccessById) {
+    if (lastAccessMs < cutoff) {
+      trackedThreadEventsLastAccessById.delete(threadId);
+    }
+  }
+
+  if (trackedThreadEventsLastAccessById.size <= TRACKED_THREAD_EVENTS_MAX) {
+    return;
+  }
+
+  const byLastAccess = [...trackedThreadEventsLastAccessById.entries()].sort((left, right) => left[1] - right[1]);
+  const overflowCount = byLastAccess.length - TRACKED_THREAD_EVENTS_MAX;
+  for (const [threadId] of byLastAccess.slice(0, overflowCount)) {
+    trackedThreadEventsLastAccessById.delete(threadId);
+    streamEventsByThreadId.delete(threadId);
+  }
+}
+
+function markThreadEventsTracked(threadId: string, nowMs: number = Date.now()): void {
+  trackedThreadEventsLastAccessById.set(threadId, nowMs);
+  pruneTrackedThreadEvents(nowMs);
+  const pendingEvents = untrackedThreadEventsByThreadId.get(threadId);
+  if (!pendingEvents || pendingEvents.length === 0) {
+    return;
+  }
+  const currentEvents = streamEventsByThreadId.get(threadId) ?? [];
+  currentEvents.push(...pendingEvents);
+  if (currentEvents.length > 400) {
+    currentEvents.splice(0, currentEvents.length - 400);
+  }
+  streamEventsByThreadId.set(threadId, currentEvents);
+  untrackedThreadEventsByThreadId.delete(threadId);
+}
+
+function shouldCaptureThreadStreamEvent(threadId: string, nowMs: number): boolean {
+  const lastAccessMs = trackedThreadEventsLastAccessById.get(threadId);
+  if (typeof lastAccessMs !== "number") {
+    return false;
+  }
+  trackedThreadEventsLastAccessById.set(threadId, nowMs);
+  pruneTrackedThreadEvents(nowMs);
+  return true;
+}
+
+function recordUntrackedThreadEvent(threadId: string, frame: IpcFrame): void {
+  const pendingEvents = untrackedThreadEventsByThreadId.get(threadId) ?? [];
+  pendingEvents.push(frame);
+  if (pendingEvents.length > UNTRACKED_THREAD_EVENTS_MAX_PER_THREAD) {
+    pendingEvents.splice(0, pendingEvents.length - UNTRACKED_THREAD_EVENTS_MAX_PER_THREAD);
+  }
+  untrackedThreadEventsByThreadId.set(threadId, pendingEvents);
+  if (untrackedThreadEventsByThreadId.size <= UNTRACKED_THREAD_EVENTS_MAX_THREADS) {
+    return;
+  }
+  const oldestThreadId = untrackedThreadEventsByThreadId.keys().next().value;
+  if (typeof oldestThreadId === "string") {
+    untrackedThreadEventsByThreadId.delete(oldestThreadId);
   }
 }
 
@@ -337,6 +530,57 @@ function buildClientErrorFingerprint(input: CreateDebugClientErrorBody): string 
   ].join("\u001f");
 }
 
+function isAppServerTimeoutError(error: unknown): boolean {
+  if (!(error instanceof AppServerTransportError)) {
+    return false;
+  }
+  return error.message.toLowerCase().includes("timed out");
+}
+
+function resetAppServerStderrWindow(nowMs: number): void {
+  appServerStderrState.windowStartedAtMs = nowMs;
+  appServerStderrState.emittedInWindow = 0;
+  appServerStderrState.rateLimitedSuppressedInWindow = 0;
+  appServerStderrState.rateLimitNoticeEmitted = false;
+}
+
+function shouldEmitAppServerStderr(nowMs: number): boolean {
+  if (nowMs - appServerStderrState.windowStartedAtMs >= APP_SERVER_STDERR_WINDOW_MS) {
+    resetAppServerStderrWindow(nowMs);
+  }
+
+  if (appServerStderrState.emittedInWindow < APP_SERVER_STDERR_MAX_EVENTS_PER_WINDOW) {
+    appServerStderrState.emittedInWindow += 1;
+    return true;
+  }
+
+  appServerStderrState.rateLimitedSuppressedCount += 1;
+  appServerStderrState.rateLimitedSuppressedInWindow += 1;
+  return false;
+}
+
+function resetIpcHistoryWindow(nowMs: number): void {
+  ipcHistoryRateState.recordedInWindow = 0;
+  ipcHistoryRateState.suppressedInWindow = 0;
+  ipcHistoryRateState.windowNoticeEmitted = false;
+  ipcHistoryRateState.windowStartedAtMs = nowMs;
+}
+
+function shouldRecordIpcHistory(nowMs: number): boolean {
+  if (nowMs - ipcHistoryRateState.windowStartedAtMs >= IPC_HISTORY_WINDOW_MS) {
+    resetIpcHistoryWindow(nowMs);
+  }
+
+  if (ipcHistoryRateState.recordedInWindow < IPC_HISTORY_MAX_EVENTS_PER_WINDOW) {
+    ipcHistoryRateState.recordedInWindow += 1;
+    return true;
+  }
+
+  ipcHistoryRateState.suppressedInWindow += 1;
+  ipcHistoryRateState.totalSuppressedCount += 1;
+  return false;
+}
+
 const runtimeState = {
   appExecutable: resolveCodexExecutablePath(),
   socketPath: resolveIpcSocketPath(),
@@ -354,7 +598,8 @@ const runtimeState = {
   errorLogPath: CLIENT_ERROR_SESSION_LOG_PATH,
   errorSessionId: CLIENT_ERROR_SESSION_ID,
   pushReceiptsMaxCount: MAX_PUSH_RECEIPTS,
-  pushReceiptsMaxAgeDays: PUSH_RECEIPTS_MAX_AGE_DAYS
+  pushReceiptsMaxAgeDays: PUSH_RECEIPTS_MAX_AGE_DAYS,
+  appServerRequestTimeoutMs: APP_SERVER_REQUEST_TIMEOUT_MS
 };
 
 let bootstrapInFlight: Promise<void> | null = null;
@@ -369,10 +614,30 @@ function getRuntimeStateSnapshot(): Record<string, unknown> {
     ...runtimeState,
     historyCount: history.length,
     threadOwnerCount: threadOwnerById.size,
+    trackedThreadEventCount: trackedThreadEventsLastAccessById.size,
+    untrackedThreadEventCount: untrackedThreadEventsByThreadId.size,
     activeTrace: activeTrace?.summary ?? null,
     pushSubscriptionCount: pushStore.getSubscriptionCount(),
     pushReceiptCount: pushReceiptStore.getCount(),
     errorCount: clientErrorStore.getCount(),
+    appServerOperations: appServerOperationStats,
+    appServerStderr: {
+      benignSuppressedCount: appServerStderrState.benignSuppressedCount,
+      emittedInWindow: appServerStderrState.emittedInWindow,
+      maxEventsPerWindow: APP_SERVER_STDERR_MAX_EVENTS_PER_WINDOW,
+      rateLimitedSuppressedCount: appServerStderrState.rateLimitedSuppressedCount,
+      rateLimitedSuppressedInWindow: appServerStderrState.rateLimitedSuppressedInWindow,
+      windowMs: APP_SERVER_STDERR_WINDOW_MS,
+      windowStartedAt: new Date(appServerStderrState.windowStartedAtMs).toISOString()
+    },
+    ipcHistoryRateLimit: {
+      maxEventsPerWindow: IPC_HISTORY_MAX_EVENTS_PER_WINDOW,
+      recordedInWindow: ipcHistoryRateState.recordedInWindow,
+      suppressedInWindow: ipcHistoryRateState.suppressedInWindow,
+      totalSuppressedCount: ipcHistoryRateState.totalSuppressedCount,
+      windowMs: IPC_HISTORY_WINDOW_MS,
+      windowStartedAt: new Date(ipcHistoryRateState.windowStartedAtMs).toISOString()
+    },
     invalidThreadStreamEventsLast5m: invalidThreadStreamEventTimestampsMs.length,
     suppressedClientErrorReportsLast5m: suppressedClientErrorReportTimestampsMs.length,
     latestPushSendNotificationId: latestPushSend?.notificationId ?? null
@@ -398,6 +663,17 @@ function broadcastSse(payload: unknown): void {
   for (const client of sseClients) {
     eventResponse(client, payload);
   }
+}
+
+function scheduleHistorySseBroadcast(): void {
+  if (historySseBroadcastTimer) {
+    return;
+  }
+
+  historySseBroadcastTimer = setTimeout(() => {
+    historySseBroadcastTimer = null;
+    broadcastSse({ type: "history" });
+  }, HISTORY_SSE_DEBOUNCE_MS);
 }
 
 function pushHistory(
@@ -426,7 +702,7 @@ function pushHistory(
   }
 
   recordTraceEvent({ type: "history", ...entry });
-  broadcastSse({ type: "history", entry });
+  scheduleHistorySseBroadcast();
   return entry;
 }
 
@@ -574,12 +850,22 @@ function maybeLogInvalidThreadStreamEvent(
   }
   invalidThreadStreamLastLoggedAtBySignature.set(signature, now);
 
+  const payloadMeta =
+    payload.type === "broadcast" || payload.type === "request"
+      ? {
+          payloadType: payload.type,
+          payloadMethod: payload.method
+        }
+      : {
+          payloadType: payload.type
+        };
+
   logger.warn(
     {
       phase,
       threadId,
       error: message,
-      rawPayload: payload
+      ...payloadMeta
     },
     "invalid-thread-stream-event"
   );
@@ -612,6 +898,41 @@ async function runAppServerCall<T>(operation: () => Promise<T>): Promise<T> {
   }
 }
 
+async function runTrackedAppServerCall<T>(
+  operationName: AppServerOperationName,
+  operation: () => Promise<T>
+): Promise<T> {
+  const stats = appServerOperationStats[operationName];
+  const startedAtMs = Date.now();
+  stats.totalCount += 1;
+  stats.inFlightCount += 1;
+  stats.lastStartedAt = new Date(startedAtMs).toISOString();
+
+  try {
+    const result = await runAppServerCall(operation);
+    const completedAtMs = Date.now();
+    stats.successCount += 1;
+    stats.lastCompletedAt = new Date(completedAtMs).toISOString();
+    stats.lastDurationMs = completedAtMs - startedAtMs;
+    stats.lastStatus = "ok";
+    stats.lastError = null;
+    return result;
+  } catch (error) {
+    const completedAtMs = Date.now();
+    stats.errorCount += 1;
+    if (isAppServerTimeoutError(error)) {
+      stats.timeoutCount += 1;
+    }
+    stats.lastCompletedAt = new Date(completedAtMs).toISOString();
+    stats.lastDurationMs = completedAtMs - startedAtMs;
+    stats.lastStatus = "error";
+    stats.lastError = toErrorMessage(error);
+    throw error;
+  } finally {
+    stats.inFlightCount = Math.max(0, stats.inFlightCount - 1);
+  }
+}
+
 function requireIpcReady(res: ServerResponse): boolean {
   if (runtimeState.ipcConnected && runtimeState.ipcInitialized) {
     return true;
@@ -639,17 +960,68 @@ const appClient = new AppServerClient({
   executablePath: runtimeState.appExecutable,
   userAgent: USER_AGENT,
   cwd: DEFAULT_WORKSPACE,
+  requestTimeoutMs: APP_SERVER_REQUEST_TIMEOUT_MS,
   onStderr: (line) => {
     const normalized = normalizeStderrLine(line);
+    if (normalized.length === 0) {
+      return;
+    }
+    const lineSummary = summarizeStderrLine(normalized);
+
     if (isKnownBenignAppServerStderr(normalized)) {
-      logger.debug({ line: normalized }, "app-server-stderr-ignored");
+      appServerStderrState.benignSuppressedCount += 1;
+      if (
+        appServerStderrState.benignSuppressedCount === 1 ||
+        appServerStderrState.benignSuppressedCount % APP_SERVER_STDERR_BENIGN_SUMMARY_INTERVAL === 0
+      ) {
+        logger.info(
+          {
+            line: lineSummary.line,
+            originalLength: lineSummary.originalLength,
+            suppressedCount: appServerStderrState.benignSuppressedCount,
+            truncated: lineSummary.truncated
+          },
+          "app-server-stderr-ignored-summary"
+        );
+      }
       return;
     }
 
-    logger.error({ line: normalized }, "app-server-stderr");
+    const nowMs = Date.now();
+    if (!shouldEmitAppServerStderr(nowMs)) {
+      if (!appServerStderrState.rateLimitNoticeEmitted) {
+        appServerStderrState.rateLimitNoticeEmitted = true;
+        logger.warn(
+          {
+            maxEventsPerWindow: APP_SERVER_STDERR_MAX_EVENTS_PER_WINDOW,
+            suppressedInWindow: appServerStderrState.rateLimitedSuppressedInWindow,
+            windowMs: APP_SERVER_STDERR_WINDOW_MS
+          },
+          "app-server-stderr-rate-limited"
+        );
+        pushHistory("app", "system", {
+          maxEventsPerWindow: APP_SERVER_STDERR_MAX_EVENTS_PER_WINDOW,
+          suppressedInWindow: appServerStderrState.rateLimitedSuppressedInWindow,
+          type: "stderr-rate-limited",
+          windowMs: APP_SERVER_STDERR_WINDOW_MS
+        });
+      }
+      return;
+    }
+
+    logger.error(
+      {
+        line: lineSummary.line,
+        originalLength: lineSummary.originalLength,
+        truncated: lineSummary.truncated
+      },
+      "app-server-stderr"
+    );
     pushHistory("app", "system", {
       type: "stderr",
-      line: normalized
+      line: lineSummary.line,
+      originalLength: lineSummary.originalLength,
+      truncated: lineSummary.truncated
     });
   }
 });
@@ -1236,6 +1608,18 @@ ipcClient.onConnectionState((state) => {
 
 ipcClient.onFrame((frame) => {
   const threadId = extractThreadId(frame);
+  const isHighVolumeThreadStreamBroadcast =
+    frame.type === "broadcast" && frame.method === "thread-stream-state-changed";
+  const historyPayload = isHighVolumeThreadStreamBroadcast
+    ? {
+        type: frame.type,
+        method: frame.method,
+        sourceClientId: frame.sourceClientId ?? null,
+        targetClientId: frame.targetClientId ?? null,
+        version: frame.version ?? null,
+        omittedParams: true
+      }
+    : frame;
   logger.debug(
     {
       frameType: frame.type,
@@ -1245,12 +1629,39 @@ ipcClient.onFrame((frame) => {
     "ipc-frame"
   );
 
-  pushHistory("ipc", "in", frame, {
-    method: frame.type === "request" || frame.type === "broadcast" ? frame.method : "response",
-    threadId
-  });
+  const nowMs = Date.now();
+  if (shouldRecordIpcHistory(nowMs)) {
+    pushHistory("ipc", "in", historyPayload, {
+      method: frame.type === "request" || frame.type === "broadcast" ? frame.method : "response",
+      threadId
+    });
+  } else if (!ipcHistoryRateState.windowNoticeEmitted) {
+    ipcHistoryRateState.windowNoticeEmitted = true;
+    logger.warn(
+      {
+        maxEventsPerWindow: IPC_HISTORY_MAX_EVENTS_PER_WINDOW,
+        suppressedInWindow: ipcHistoryRateState.suppressedInWindow,
+        windowMs: IPC_HISTORY_WINDOW_MS
+      },
+      "ipc-history-rate-limited"
+    );
+  }
 
   if (frame.type === "broadcast" && frame.method === "thread-stream-state-changed") {
+    if (!threadId) {
+      return;
+    }
+
+    if (frame.sourceClientId && frame.sourceClientId.trim()) {
+      const ownerClientId = frame.sourceClientId.trim();
+      threadOwnerById.set(threadId, ownerClientId);
+    }
+
+    if (!shouldCaptureThreadStreamEvent(threadId, nowMs)) {
+      recordUntrackedThreadEvent(threadId, frame);
+      return;
+    }
+
     let parsedBroadcast;
     try {
       parsedBroadcast = parseThreadStreamStateChangedBroadcast(frame);
@@ -1260,11 +1671,6 @@ ipcClient.onFrame((frame) => {
     }
 
     const conversationId = parsedBroadcast.params.conversationId;
-
-    if (frame.sourceClientId && frame.sourceClientId.trim()) {
-      const ownerClientId = frame.sourceClientId.trim();
-      threadOwnerById.set(conversationId, ownerClientId);
-    }
 
     const current = streamEventsByThreadId.get(conversationId) ?? [];
     current.push(frame);
@@ -1609,7 +2015,7 @@ const server = http.createServer(async (req, res) => {
       const maxPages = parseInteger(url.searchParams.get("maxPages"), 20);
       const cursor = url.searchParams.get("cursor") ?? null;
 
-      const result = await runAppServerCall(() =>
+      const result = await runTrackedAppServerCall("thread/list", () =>
         all
           ? appClient.listThreadsAll(
               cursor
@@ -1645,13 +2051,15 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && pathname === "/api/models") {
       const limit = parseInteger(url.searchParams.get("limit"), 100);
-      const result = await runAppServerCall(() => appClient.listModels(limit));
+      const result = await runTrackedAppServerCall("model/list", () => appClient.listModels(limit));
       jsonResponse(res, 200, { ok: true, ...result });
       return;
     }
 
     if (req.method === "GET" && pathname === "/api/collaboration-modes") {
-      const result = await runAppServerCall(() => appClient.listCollaborationModes());
+      const result = await runTrackedAppServerCall("collaborationMode/list", () =>
+        appClient.listCollaborationModes()
+      );
       jsonResponse(res, 200, { ok: true, ...result });
       return;
     }
@@ -1660,6 +2068,7 @@ const server = http.createServer(async (req, res) => {
       const threadId = decodeURIComponent(segments[2]);
 
       if (req.method === "GET" && segments.length === 3) {
+        markThreadEventsTracked(threadId);
         const includeTurns = parseBoolean(url.searchParams.get("includeTurns"), true);
         let result;
         try {
@@ -1680,6 +2089,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (req.method === "GET" && segments[3] === "live-state") {
+        markThreadEventsTracked(threadId);
         const live = getThreadLiveState(threadId);
         jsonResponse(res, 200, {
           ok: true,
@@ -1691,6 +2101,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (req.method === "GET" && segments[3] === "stream-events") {
+        markThreadEventsTracked(threadId);
         const limit = parseInteger(url.searchParams.get("limit"), 60);
         const events = (streamEventsByThreadId.get(threadId) ?? []).slice(-limit);
         jsonResponse(res, 200, {

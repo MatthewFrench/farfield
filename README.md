@@ -71,6 +71,7 @@ Set `PUSH_RECEIPTS_PATH` to override the receipts path.
 Set `PUSH_SENDS_PATH` to override the latest sends path.
 Set `PUSH_RECEIPTS_MAX_COUNT` to cap retained receipts (default `100`).
 Set `PUSH_RECEIPTS_MAX_AGE_DAYS` to prune old receipts by age (default `7` days).
+Set `APP_SERVER_REQUEST_TIMEOUT_MS` to override app-server RPC timeout (default `60000`).
 
 ## Make it available remotely
 
@@ -223,7 +224,25 @@ pnpm test        # Run all tests
 pnpm typecheck   # TypeScript type checking across all packages
 pnpm lint        # Lint all packages
 pnpm smoke:app   # Smoke-check key Farfield runtime endpoints
+pnpm stress:stream-burst  # Burst /stream-events load + health latency budget check
+pnpm e2e:real:governance  # Validate coverage matrix/open-gap governance
+pnpm e2e:real:install  # Install Playwright Chromium for real-app scenarios
+pnpm e2e:real:run      # Headless real-app Playwright scenarios
+pnpm e2e:real:ui       # Interactive Playwright UI for real-app scenarios
+pnpm e2e:real:debug -- --grep "thread"  # Debug targeted scenario
+pnpm verify:real       # smoke:app + governance checks + real-app scenarios
+pnpm premerge:check    # required local gate: lint + test + verify:real
 ```
+
+Real-app test env knobs:
+- `E2E_REAL_BASE_URL` (default `http://127.0.0.1:4312`) for UI navigation host.
+- `E2E_REAL_API_URL` (default `http://127.0.0.1:4311`) for sentinel API checks.
+- `E2E_REAL_API_TOKEN` for sentinel API auth (defaults to `API_TOKEN`).
+- `APP_SMOKE_TIMEOUT_MS` (default `120000`) to tune `pnpm smoke:app` per-request timeout.
+- `APP_SMOKE_RETRIES` (default `2`) to tune retry count per `pnpm smoke:app` endpoint call.
+- `APP_SMOKE_BUDGET_MODE` (`fail` or `warn`, default `fail`) to control latency budget enforcement.
+- `APP_SMOKE_BUDGET_HEALTH_MS` (default `5000`) and `APP_SMOKE_BUDGET_*` endpoint-specific budgets.
+- `STREAM_BURST_DURATION_MS`, `STREAM_BURST_WORKERS`, `STREAM_BURST_HEALTH_BUDGET_P95_MS` to tune stream burst stress checks.
 
 ## Real App Debug Loop (Codex + Playwright MCP)
 
@@ -245,6 +264,8 @@ pnpm smoke:app
    - Navigate + inspect: `browser_navigate`, `browser_snapshot`
    - Interact: `browser_click`, `browser_type`, `browser_press_key`
    - Inspect failures: `browser_console_messages`, `browser_network_requests`, `browser_take_screenshot`
+   - Read transient banner events: `browser_evaluate` for `window.__farfieldBannerEvents`
+   - Follow the standard manual smoke flow: `docs/debug/playwright-mcp-smoke.md`
 
 4. Apply code change, let Vite HMR update, rerun the same Playwright flow.
 
@@ -252,10 +273,20 @@ pnpm smoke:app
    - expected UI behavior is present
    - `pnpm smoke:app` passes
 
+## Required pre-merge gate
+
+Before merging any change that touches `apps/web`, `apps/server`, `packages/codex-protocol`, or `e2e/real`, run:
+
+```bash
+pnpm premerge:check
+```
+   - no unexpected warning/error signals from sentinel output
+
 Important:
 - `pnpm ...` commands run your app/tests.
 - Playwright MCP browser actions are tool calls from Codex, not shell commands.
 - Validate both empty-state and has-threads states when possible.
+- Sentinel summaries are written to `.runtime/e2e-sentinel/<scenario>.ndjson` and `.runtime/e2e-sentinel/latest.ndjson`.
 
 Run a single app:
 
@@ -276,6 +307,10 @@ packages/
 scripts/
   sanitize-traces.mjs   Redact trace files for safe fixture use
   app-smoke.mjs         Runtime endpoint smoke checks for real app flow
+  stream-burst.mjs      Stream-event burst stress + health latency budget checks
+  validate-e2e-governance.mjs  Coverage matrix/open-gap checks for real-app E2E
+e2e/
+  real/         Real-runtime Playwright scenarios + sentinel helpers
 ```
 
 - **`packages/protocol`** is the single source of truth for all data shapes. Everything is Zod — no silent coercion, no shape drift, hard failures on unknown payloads.

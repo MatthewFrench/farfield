@@ -19,7 +19,9 @@ interface Props {
 const TOOL_BLOCK_TYPES: readonly TurnItem["type"][] = [
   "commandExecution",
   "fileChange",
-  "webSearch"
+  "webSearch",
+  "collabAgentToolCall",
+  "mcpToolCall"
 ];
 
 function isToolBlockType(type: TurnItem["type"] | undefined): boolean {
@@ -160,6 +162,72 @@ export function ConversationItem({
         <div className="text-xs text-foreground/80 whitespace-pre-wrap break-words">
           {item.query}
         </div>
+      </div>
+    );
+  }
+
+  /* ── Model changed ──────────────────────────────────── */
+  if (item.type === "modelChanged") {
+    return (
+      <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+        Model changed: {item.fromModel ?? "unknown"} to {item.toModel ?? "unknown"}
+      </div>
+    );
+  }
+
+  /* ── Todo list ──────────────────────────────────────── */
+  if (item.type === "todo-list") {
+    return (
+      <div className="my-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+          Todo
+        </div>
+        <div className="text-xs text-foreground/80 whitespace-pre-wrap break-words leading-relaxed mb-2">
+          {item.explanation}
+        </div>
+        <div className="space-y-1">
+          {item.plan.map((entry, index) => (
+            <div key={`${item.id}-${String(index)}`} className="text-xs text-foreground/90">
+              {entry.status}: {entry.step}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Collab agent tool call ─────────────────────────── */
+  if (item.type === "collabAgentToolCall") {
+    return (
+      <div className={`${toolSpacing} rounded-lg border border-border bg-muted/20 px-3 py-2`}>
+        <div className="text-[10px] text-muted-foreground font-mono mb-1 uppercase tracking-wider">
+          Collab tool call
+        </div>
+        <div className="text-xs text-foreground/80 whitespace-pre-wrap break-words">
+          {item.tool} ({item.status})
+        </div>
+        <div className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap break-words">
+          Agents: {item.receiverThreadIds.length}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── MCP tool call ──────────────────────────────────── */
+  if (item.type === "mcpToolCall") {
+    return (
+      <div className={`${toolSpacing} rounded-lg border border-border bg-muted/20 px-3 py-2`}>
+        <div className="text-[10px] text-muted-foreground font-mono mb-1 uppercase tracking-wider">
+          MCP tool call
+        </div>
+        <div className="text-xs text-foreground/80 whitespace-pre-wrap break-words">
+          {item.server}.{item.tool} ({item.status})
+        </div>
+        {item.durationMs !== null ? (
+          <div className="mt-1 text-xs text-muted-foreground">
+            Duration: {String(item.durationMs)}ms
+          </div>
+        ) : null}
       </div>
     );
   }
