@@ -395,22 +395,13 @@ function decodeJsonPointerSegment(segment: string): string {
   return decoded;
 }
 
-function decodeJsonPointerPath(pointer: string): Array<number | string> {
+function decodeJsonPointerPath(pointer: string): string[] {
   if (!pointer.startsWith("/")) {
     throw new Error("JSON Pointer path must start with '/'");
   }
 
   const rawSegments = pointer.slice(1).split("/");
-  const decodedSegments = rawSegments.map(decodeJsonPointerSegment);
-  return decodedSegments.map((segment) => {
-    if (segment === "-") {
-      return segment;
-    }
-    if (/^\d+$/.test(segment)) {
-      return Number(segment);
-    }
-    return segment;
-  });
+  return rawSegments.map(decodeJsonPointerSegment);
 }
 
 const ThreadStreamPatchPathArraySchema = z.array(ThreadStreamPatchPathSegmentSchema).min(1);

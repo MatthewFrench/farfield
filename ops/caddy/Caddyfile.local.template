@@ -8,8 +8,12 @@
 
   @events path /events
   reverse_proxy @events 127.0.0.1:4311 {
+    header_up X-Farfield-Token {env.API_TOKEN}
     flush_interval -1
   }
+
+  @healthz path /healthz
+  reverse_proxy @healthz 127.0.0.1:4311
 
   reverse_proxy 127.0.0.1:4312
 }

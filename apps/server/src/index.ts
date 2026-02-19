@@ -254,7 +254,10 @@ function resolveWebShellBuildId(gitCommit: string | null): string {
   if (configured.length > 0) {
     return configured;
   }
-  return gitCommit ?? "dev";
+  if (process.env["NODE_ENV"] === "production") {
+    return gitCommit ?? "dev";
+  }
+  return "dev";
 }
 
 function resolveFileContentHash(filePath: string): string | null {
@@ -406,6 +409,9 @@ const recentClientErrorByFingerprint = new Map<
 >();
 const invalidThreadStreamEventTimestampsMs: number[] = [];
 const suppressedClientErrorReportTimestampsMs: number[] = [];
+const invalidPushPayloadTimestampsMs: number[] = [];
+const eventsAuthRejectedTimestampsMs: number[] = [];
+const pushReceiptAuthRejectedTimestampsMs: number[] = [];
 const appServerOperationStats = createAppServerOperationStats();
 const appServerStderrState: AppServerStderrState = {
   benignSuppressedCount: 0,
@@ -509,6 +515,21 @@ function recordSuppressedClientErrorReport(nowMs: number): void {
   pruneTimestampWindow(suppressedClientErrorReportTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
 }
 
+function recordInvalidPushPayload(nowMs: number): void {
+  invalidPushPayloadTimestampsMs.push(nowMs);
+  pruneTimestampWindow(invalidPushPayloadTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+}
+
+function recordEventsAuthRejected(nowMs: number): void {
+  eventsAuthRejectedTimestampsMs.push(nowMs);
+  pruneTimestampWindow(eventsAuthRejectedTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+}
+
+function recordPushReceiptAuthRejected(nowMs: number): void {
+  pushReceiptAuthRejectedTimestampsMs.push(nowMs);
+  pruneTimestampWindow(pushReceiptAuthRejectedTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+}
+
 function pruneRecentClientErrorFingerprints(nowMs: number): void {
   const cutoff = nowMs - SERVER_CLIENT_ERROR_DEDUP_WINDOW_MS;
   for (const [fingerprint, entry] of recentClientErrorByFingerprint) {
@@ -609,6 +630,9 @@ function getRuntimeStateSnapshot(): Record<string, unknown> {
   const nowMs = Date.now();
   pruneTimestampWindow(invalidThreadStreamEventTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
   pruneTimestampWindow(suppressedClientErrorReportTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+  pruneTimestampWindow(invalidPushPayloadTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+  pruneTimestampWindow(eventsAuthRejectedTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+  pruneTimestampWindow(pushReceiptAuthRejectedTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
   const latestPushSend = pushSendStore.getLatest();
   return {
     ...runtimeState,
@@ -640,6 +664,9 @@ function getRuntimeStateSnapshot(): Record<string, unknown> {
     },
     invalidThreadStreamEventsLast5m: invalidThreadStreamEventTimestampsMs.length,
     suppressedClientErrorReportsLast5m: suppressedClientErrorReportTimestampsMs.length,
+    invalidPushPayloadsLast5m: invalidPushPayloadTimestampsMs.length,
+    eventsAuthRejectsLast5m: eventsAuthRejectedTimestampsMs.length,
+    pushReceiptAuthRejectsLast5m: pushReceiptAuthRejectedTimestampsMs.length,
     latestPushSendNotificationId: latestPushSend?.notificationId ?? null
   };
 }
@@ -1154,17 +1181,32 @@ function readApiAuthToken(req: IncomingMessage): string {
   return rawToken?.[0] ?? "";
 }
 
-function requireApiAuth(req: IncomingMessage, res: ServerResponse): boolean {
+type ApiAuthRouteType = "api" | "events" | "push-receipts";
+
+function requireApiAuth(
+  req: IncomingMessage,
+  res: ServerResponse,
+  routeType: ApiAuthRouteType
+): boolean {
   if (!isApiAuthRequired()) {
     return true;
   }
 
   const token = readApiAuthToken(req);
   if (token !== API_AUTH_TOKEN) {
+    const nowMs = Date.now();
+    if (routeType === "events") {
+      recordEventsAuthRejected(nowMs);
+    }
+    if (routeType === "push-receipts") {
+      recordPushReceiptAuthRejected(nowMs);
+    }
+
     logger.warn(
       {
         route: req.url ?? "unknown",
-        remoteAddress: req.socket.remoteAddress ?? null
+        remoteAddress: req.socket.remoteAddress ?? null,
+        routeType
       },
       "api-auth-rejected"
     );
@@ -1176,6 +1218,13 @@ function requireApiAuth(req: IncomingMessage, res: ServerResponse): boolean {
   }
 
   return true;
+}
+
+function isInvalidPushPayloadReceipt(receipt: PushReceipt): boolean {
+  if (receipt.event !== "error") {
+    return false;
+  }
+  return typeof receipt.message === "string" && receipt.message.startsWith("Push payload validation failed:");
 }
 
 function summarizeAgentText(agentText: string): string {
@@ -1422,6 +1471,22 @@ async function processCompletionCandidate(candidate: CompletionCandidate): Promi
   }
 }
 
+function queueCompletionBackfillCheck(threadId: string): void {
+  void (async () => {
+    const backfilledState = await readThreadConversationStateForCompletion(threadId);
+    if (!backfilledState) {
+      return;
+    }
+
+    const candidateFromBackfill = completionDetector.detect(threadId, backfilledState);
+    if (!candidateFromBackfill) {
+      return;
+    }
+
+    await processCompletionCandidate(candidateFromBackfill);
+  })();
+}
+
 function getThreadLiveState(threadId: string): {
   ownerClientId: string | null;
   conversationState: ThreadConversationState | null;
@@ -1659,6 +1724,7 @@ ipcClient.onFrame((frame) => {
 
     if (!shouldCaptureThreadStreamEvent(threadId, nowMs)) {
       recordUntrackedThreadEvent(threadId, frame);
+      queueCompletionBackfillCheck(threadId);
       return;
     }
 
@@ -1690,19 +1756,7 @@ ipcClient.onFrame((frame) => {
       return;
     }
 
-    void (async () => {
-      const backfilledState = await readThreadConversationStateForCompletion(conversationId);
-      if (!backfilledState) {
-        return;
-      }
-
-      const candidateFromBackfill = completionDetector.detect(conversationId, backfilledState);
-      if (!candidateFromBackfill) {
-        return;
-      }
-
-      await processCompletionCandidate(candidateFromBackfill);
-    })();
+    queueCompletionBackfillCheck(conversationId);
   }
 });
 
@@ -1723,6 +1777,9 @@ const server = http.createServer(async (req, res) => {
     const segments = pathname.split("/").filter(Boolean);
 
     if (req.method === "GET" && pathname === "/events") {
+      if (!requireApiAuth(req, res, "events")) {
+        return;
+      }
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
@@ -1743,7 +1800,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith("/api/")) {
-      if (!requireApiAuth(req, res)) {
+      const routeType: ApiAuthRouteType =
+        pathname === "/api/push/receipts" ? "push-receipts" : "api";
+      if (!requireApiAuth(req, res, routeType)) {
         return;
       }
     }
@@ -1843,6 +1902,9 @@ const server = http.createServer(async (req, res) => {
           createdAt: body.createdAt
         };
         recordPushReceipt(receipt);
+        if (isInvalidPushPayloadReceipt(receipt)) {
+          recordInvalidPushPayload(Date.now());
+        }
         pushSystem("Push receipt recorded", {
           notificationId: receipt.notificationId,
           event: receipt.event,

@@ -86,6 +86,7 @@ import {
   getPushClientState,
   reconcilePushSubscription,
   recoverPushNotifications,
+  synchronizePushServiceWorkerApiToken,
   updatePushSettings,
   type PushClientState
 } from "@/lib/push";
@@ -429,7 +430,12 @@ function parseUiStateFromPath(pathname: string): { threadId: string | null; tab:
     return { threadId: null, tab: "preflight" };
   }
   if (segments[0] === "threads" && typeof segments[1] === "string" && segments[1].length > 0) {
-    const threadId = decodeURIComponent(segments[1]);
+    let threadId: string;
+    try {
+      threadId = decodeURIComponent(segments[1]);
+    } catch {
+      return { threadId: null, tab: "chat" };
+    }
     if (segments[2] === "debug") {
       return { threadId, tab: "debug" };
     }
@@ -1080,7 +1086,7 @@ export function App(): React.JSX.Element {
   const loadCoreData = useCallback(async () => {
     setCoreDataLoadCount((current) => current + 1);
     setThreadsLoadCount((current) => current + 1);
-    const threadsPromise = listThreads({ limit: 80, archived: false, all: false, maxPages: 1 }).finally(() => {
+    const threadsPromise = listThreads({ limit: 80, archived: false, all: true, maxPages: 20 }).finally(() => {
       setThreadsLoadCount((current) => Math.max(0, current - 1));
     });
     try {
@@ -1171,6 +1177,12 @@ export function App(): React.JSX.Element {
   }, []);
 
   const loadPushData = useCallback(async () => {
+    try {
+      await synchronizePushServiceWorkerApiToken();
+    } catch {
+      // Ignore token sync errors here; push state probing below still drives UI diagnostics.
+    }
+
     try {
       const client = await getPushClientState();
       setPushClientState(client);
@@ -2153,6 +2165,15 @@ export function App(): React.JSX.Element {
             <div>App: {health?.state.appReady ? "ok" : "not ready"}</div>
             <div>IPC: {health?.state.ipcConnected ? "connected" : "disconnected"}</div>
             <div>Init: {health?.state.ipcInitialized ? "ready" : "not ready"}</div>
+            {typeof health?.state.invalidPushPayloadsLast5m === "number" && (
+              <div>Invalid push payloads (5m): {String(health.state.invalidPushPayloadsLast5m)}</div>
+            )}
+            {typeof health?.state.eventsAuthRejectsLast5m === "number" && (
+              <div>/events auth rejects (5m): {String(health.state.eventsAuthRejectsLast5m)}</div>
+            )}
+            {typeof health?.state.pushReceiptAuthRejectsLast5m === "number" && (
+              <div>/api/push/receipts auth rejects (5m): {String(health.state.pushReceiptAuthRejectsLast5m)}</div>
+            )}
             {health?.state.lastError && (
               <div className="max-w-64 break-words text-destructive">
                 Error: {health.state.lastError}

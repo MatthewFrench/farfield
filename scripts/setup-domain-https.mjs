@@ -150,4 +150,6 @@ fs.writeFileSync(caddyDomainOutputPath, withTrailingNewline(renderedDomainConfig
 
 process.stdout.write(`Generated ${caddyDomainOutputPath} from ${caddyDomainTemplatePath}\n`);
 process.stdout.write(`Domain host: ${selectedDomainHost}\n`);
-process.stdout.write("Next step: caddy run --config ops/caddy/Caddyfile.domain\n");
+process.stdout.write(
+  'Next step: node scripts/with-env.mjs "caddy run --config ops/caddy/Caddyfile.domain"\n'
+);

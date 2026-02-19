@@ -27,7 +27,11 @@ function check(label, pass, detail) {
   }
 }
 
-check("Push enabled flag", true, `PUSH_ENABLED=${String(pushEnabled)}`);
+check(
+  "Push enabled flag",
+  pushEnabled,
+  pushEnabled ? "PUSH_ENABLED=true" : "PUSH_ENABLED=false (set PUSH_ENABLED=true to enable push delivery)"
+);
 
 if (pushEnabled) {
   check(

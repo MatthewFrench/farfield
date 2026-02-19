@@ -18,6 +18,16 @@ const apiProxyTarget =
       }
     : "http://127.0.0.1:4311";
 
+const eventsProxyTarget =
+  apiToken.length > 0
+    ? {
+        target: "http://127.0.0.1:4311",
+        headers: {
+          "X-Farfield-Token": apiToken
+        }
+      }
+    : "http://127.0.0.1:4311";
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -32,7 +42,8 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/api": apiProxyTarget,
-      "/events": "http://127.0.0.1:4311"
+      "/events": eventsProxyTarget,
+      "/healthz": "http://127.0.0.1:4311"
     }
   },
   test: {

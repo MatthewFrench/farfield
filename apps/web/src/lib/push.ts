@@ -32,6 +32,124 @@ interface WindowWithSwReloadSuppression extends Window {
 }
 
 const PUSH_AUTO_HEAL_STORAGE_KEY = "farfield.push.auto-heal-enabled.v1";
+const SW_SET_API_TOKEN_ACK_TIMEOUT_MS = 5_000;
+
+interface ServiceWorkerSetApiTokenMessage {
+  type: "SET_API_TOKEN";
+  token: string | null;
+}
+
+interface ServiceWorkerSetApiTokenAckMessage {
+  type: "SET_API_TOKEN_ACK";
+}
+
+function readServiceWorkerApiToken(): string | null {
+  const token = import.meta.env["VITE_API_TOKEN"] ?? import.meta.env["VITE_PUSH_API_TOKEN"];
+  if (typeof token !== "string") {
+    return null;
+  }
+  const trimmed = token.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  return trimmed;
+}
+
+function collectRegistrationWorkers(registration: ServiceWorkerRegistration): ServiceWorker[] {
+  const workers: ServiceWorker[] = [];
+  const seen = new Set<ServiceWorker>();
+  for (const candidate of [registration.active, registration.waiting, registration.installing]) {
+    if (!candidate || seen.has(candidate)) {
+      continue;
+    }
+    workers.push(candidate);
+    seen.add(candidate);
+  }
+  return workers;
+}
+
+async function postApiTokenToServiceWorker(
+  worker: ServiceWorker,
+  token: string | null
+): Promise<void> {
+  const message: ServiceWorkerSetApiTokenMessage = {
+    type: "SET_API_TOKEN",
+    token
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    const channel = new MessageChannel();
+    let settled = false;
+    const timeoutHandle = window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      reject(new Error("Timed out waiting for service worker token sync acknowledgement"));
+    }, SW_SET_API_TOKEN_ACK_TIMEOUT_MS);
+
+    channel.port1.onmessage = (event) => {
+      if (settled) {
+        return;
+      }
+
+      const data = event.data as ServiceWorkerSetApiTokenAckMessage | null;
+      if (!data || data.type !== "SET_API_TOKEN_ACK") {
+        settled = true;
+        window.clearTimeout(timeoutHandle);
+        reject(new Error("Service worker returned an invalid token sync acknowledgement"));
+        return;
+      }
+
+      settled = true;
+      window.clearTimeout(timeoutHandle);
+      resolve();
+    };
+
+    try {
+      worker.postMessage(message, [channel.port2]);
+    } catch (error) {
+      settled = true;
+      window.clearTimeout(timeoutHandle);
+      reject(error);
+    }
+  });
+}
+
+async function synchronizeApiTokenForRegistration(
+  registration: ServiceWorkerRegistration
+): Promise<boolean> {
+  const token = readServiceWorkerApiToken();
+  const workers = collectRegistrationWorkers(registration);
+  if (workers.length === 0) {
+    return true;
+  }
+
+  let syncedCount = 0;
+  await Promise.all(
+    workers.map(async (worker) => {
+      try {
+        await postApiTokenToServiceWorker(worker, token);
+        syncedCount += 1;
+      } catch {
+        // Ignore worker token sync errors; workers can update independently.
+      }
+    })
+  );
+  return syncedCount > 0;
+}
+
+export async function synchronizePushServiceWorkerApiToken(): Promise<void> {
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  const registration = await navigator.serviceWorker.getRegistration();
+  if (!registration) {
+    return;
+  }
+  await synchronizeApiTokenForRegistration(registration);
+}
 
 function isPushSupported(): boolean {
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -66,8 +184,12 @@ function decodeBase64Url(value: string): ArrayBuffer {
 
 async function registerPushServiceWorker(): Promise<ServiceWorkerRegistration> {
   const registration = await navigator.serviceWorker.register("/sw.js");
-  await navigator.serviceWorker.ready;
-  return registration;
+  const readyRegistration = await navigator.serviceWorker.ready;
+  await synchronizeApiTokenForRegistration(registration);
+  if (readyRegistration !== registration) {
+    await synchronizeApiTokenForRegistration(readyRegistration);
+  }
+  return readyRegistration;
 }
 
 function strictSubscriptionPayload(
@@ -302,15 +424,6 @@ export async function reconcilePushSubscription(input?: {
       reason: "server-disabled"
     };
   }
-  if (status.subscriptionCount > 0) {
-    return {
-      attempted: false,
-      subscribed: true,
-      repaired: false,
-      reason: "server-subscription-present"
-    };
-  }
-
   const registration = await registerPushServiceWorker();
   let browserSubscription = await registration.pushManager.getSubscription();
   let repaired = false;

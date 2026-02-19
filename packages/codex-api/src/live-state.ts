@@ -13,27 +13,41 @@ function patchPathSegmentLabel(segment: number | string): string {
   return typeof segment === "number" ? `[${segment}]` : segment;
 }
 
+function parseArrayIndex(segment: number | string): number {
+  if (typeof segment === "number") {
+    if (!Number.isInteger(segment) || segment < 0) {
+      throw new Error(`Patch array index invalid: ${String(segment)}`);
+    }
+    return segment;
+  }
+  if (!/^(0|[1-9]\d*)$/.test(segment)) {
+    throw new Error(`Patch array index invalid: ${String(segment)}`);
+  }
+  return Number(segment);
+}
+
 function assertPathExists(target: unknown, path: (number | string)[]): void {
   let cursor = target;
   for (const segment of path) {
-    if (Array.isArray(cursor) && typeof segment === "number") {
-      if (segment < 0 || segment >= cursor.length) {
+    if (Array.isArray(cursor)) {
+      const index = parseArrayIndex(segment);
+      if (index < 0 || index >= cursor.length) {
         throw new Error(`Patch path segment out of range: ${patchPathSegmentLabel(segment)}`);
       }
-      cursor = cursor[segment];
+      cursor = cursor[index];
       continue;
     }
 
     if (
       cursor &&
       typeof cursor === "object" &&
-      !Array.isArray(cursor) &&
-      typeof segment === "string"
+      !Array.isArray(cursor)
     ) {
-      if (!(segment in cursor)) {
+      const key = typeof segment === "number" ? String(segment) : segment;
+      if (!(key in cursor)) {
         throw new Error(`Patch path segment missing: ${patchPathSegmentLabel(segment)}`);
       }
-      cursor = (cursor as Record<string, unknown>)[segment];
+      cursor = (cursor as Record<string, unknown>)[key];
       continue;
     }
 
@@ -53,17 +67,22 @@ export function applyStrictPatch(
 
   const parentPath = patch.path.slice(0, -1);
   const last = patch.path[patch.path.length - 1];
+  if (last === undefined) {
+    throw new Error("Patch path cannot be empty");
+  }
 
   assertPathExists(state, parentPath);
 
   let parent: unknown = state;
   for (const segment of parentPath) {
-    if (typeof segment === "number") {
-      parent = (parent as unknown[])[segment];
+    if (Array.isArray(parent)) {
+      const index = parseArrayIndex(segment);
+      parent = parent[index];
       continue;
     }
 
-    parent = (parent as Record<string, unknown>)[segment];
+    const key = typeof segment === "number" ? String(segment) : segment;
+    parent = (parent as Record<string, unknown>)[key];
   }
 
   if (Array.isArray(parent)) {
@@ -72,28 +91,29 @@ export function applyStrictPatch(
       return parseThreadConversationState(state);
     }
 
-    if (typeof last !== "number") {
-      throw new Error(`Patch array index invalid: ${String(last)}`);
-    }
+    const arrayIndex = parseArrayIndex(last);
 
     if (patch.op === "add") {
-      parent.splice(last, 0, patch.value);
+      if (arrayIndex < 0 || arrayIndex > parent.length) {
+        throw new Error(`Patch add index out of range: ${String(last)}`);
+      }
+      parent.splice(arrayIndex, 0, patch.value);
       return parseThreadConversationState(state);
     }
 
     if (patch.op === "replace") {
-      if (last < 0 || last >= parent.length) {
+      if (arrayIndex < 0 || arrayIndex >= parent.length) {
         throw new Error(`Patch replace index out of range: ${String(last)}`);
       }
-      parent[last] = patch.value;
+      parent[arrayIndex] = patch.value;
       return parseThreadConversationState(state);
     }
 
     if (patch.op === "remove") {
-      if (last < 0 || last >= parent.length) {
+      if (arrayIndex < 0 || arrayIndex >= parent.length) {
         throw new Error(`Patch remove index out of range: ${String(last)}`);
       }
-      parent.splice(last, 1);
+      parent.splice(arrayIndex, 1);
       return parseThreadConversationState(state);
     }
   }
@@ -101,18 +121,18 @@ export function applyStrictPatch(
   if (
     parent &&
     typeof parent === "object" &&
-    !Array.isArray(parent) &&
-    typeof last === "string"
+    !Array.isArray(parent)
   ) {
+    const key = typeof last === "number" ? String(last) : last;
     if (patch.op === "remove") {
-      if (!(last in parent)) {
-        throw new Error(`Patch remove key missing: ${last}`);
+      if (!(key in parent)) {
+        throw new Error(`Patch remove key missing: ${key}`);
       }
-      delete (parent as Record<string, unknown>)[last];
+      delete (parent as Record<string, unknown>)[key];
       return parseThreadConversationState(state);
     }
 
-    (parent as Record<string, unknown>)[last] = patch.value;
+    (parent as Record<string, unknown>)[key] = patch.value;
     return parseThreadConversationState(state);
   }
 

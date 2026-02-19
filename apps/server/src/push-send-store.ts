@@ -73,11 +73,13 @@ export class PushSendStore {
       throw error;
     }
 
-    const dirFd = fs.openSync(directory, "r");
-    try {
-      fs.fsyncSync(dirFd);
-    } finally {
-      fs.closeSync(dirFd);
+    if (process.platform !== "win32") {
+      const dirFd = fs.openSync(directory, "r");
+      try {
+        fs.fsyncSync(dirFd);
+      } finally {
+        fs.closeSync(dirFd);
+      }
     }
   }
 }

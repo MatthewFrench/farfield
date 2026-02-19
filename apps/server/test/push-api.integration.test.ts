@@ -36,7 +36,10 @@ const HEALTH_SCHEMA = z
         ipcInitialized: z.boolean(),
         pushSubscriptionCount: z.number().int().nonnegative(),
         invalidThreadStreamEventsLast5m: z.number().int().nonnegative(),
-        suppressedClientErrorReportsLast5m: z.number().int().nonnegative()
+        suppressedClientErrorReportsLast5m: z.number().int().nonnegative(),
+        invalidPushPayloadsLast5m: z.number().int().nonnegative(),
+        eventsAuthRejectsLast5m: z.number().int().nonnegative(),
+        pushReceiptAuthRejectsLast5m: z.number().int().nonnegative()
       })
       .passthrough()
   })
@@ -464,6 +467,34 @@ describe("push API auth and subscription routes", () => {
     SHELL_HEALTHZ_SCHEMA.parse(await shellHealth.json());
   });
 
+  it("requires auth token for /events when API auth is configured", async () => {
+    const healthBeforeResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthBeforeResponse.status).toBe(200);
+    const healthBefore = HEALTH_SCHEMA.parse(await healthBeforeResponse.json());
+
+    const unauthenticatedEvents = await fetch(`${baseUrl}/events`);
+    expect(unauthenticatedEvents.status).toBe(401);
+    API_ERROR_SCHEMA.parse(await unauthenticatedEvents.json());
+
+    const authenticatedEvents = await fetch(`${baseUrl}/events`, {
+      headers: authHeaders(false)
+    });
+    expect(authenticatedEvents.status).toBe(200);
+    expect(authenticatedEvents.headers.get("content-type")).toContain("text/event-stream");
+    await authenticatedEvents.body?.cancel();
+
+    const healthAfterResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthAfterResponse.status).toBe(200);
+    const healthAfter = HEALTH_SCHEMA.parse(await healthAfterResponse.json());
+    expect(healthAfter.state.eventsAuthRejectsLast5m).toBeGreaterThanOrEqual(
+      healthBefore.state.eventsAuthRejectsLast5m + 1
+    );
+  });
+
   it("supports push subscription create/delete with auth", async () => {
     const dryRunBeforeCreate = await fetch(`${baseUrl}/api/push/test`, {
       method: "POST",
@@ -607,6 +638,57 @@ describe("push API auth and subscription routes", () => {
     expect(statusAfterDelete.status).toBe(200);
     const parsedStatusAfterDelete = PUSH_STATUS_ENVELOPE_SCHEMA.parse(await statusAfterDelete.json());
     expect(parsedStatusAfterDelete.subscriptionCount).toBe(0);
+  });
+
+  it("tracks push receipt auth rejects and invalid payload counters", async () => {
+    const healthBeforeResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthBeforeResponse.status).toBe(200);
+    const healthBefore = HEALTH_SCHEMA.parse(await healthBeforeResponse.json());
+
+    const unauthorizedReceiptResponse = await fetch(`${baseUrl}/api/push/receipts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        notificationId: "notif_unauthorized_receipt",
+        event: "shown",
+        url: "/threads/thread_preflight",
+        createdAt: "2026-02-18T00:00:00.000Z"
+      })
+    });
+    expect(unauthorizedReceiptResponse.status).toBe(401);
+    API_ERROR_SCHEMA.parse(await unauthorizedReceiptResponse.json());
+
+    const invalidPayloadReceiptResponse = await fetch(`${baseUrl}/api/push/receipts`, {
+      method: "POST",
+      headers: authHeaders(true),
+      body: JSON.stringify({
+        notificationId: "notif_invalid_payload",
+        event: "error",
+        url: "/threads/thread_preflight",
+        threadId: "thread_preflight",
+        turnId: "turn_preflight",
+        message: "Push payload validation failed: malformed payload shape",
+        createdAt: "2026-02-18T00:00:00.000Z"
+      })
+    });
+    expect(invalidPayloadReceiptResponse.status).toBe(200);
+    PUSH_RECEIPT_CREATE_ENVELOPE_SCHEMA.parse(await invalidPayloadReceiptResponse.json());
+
+    const healthAfterResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthAfterResponse.status).toBe(200);
+    const healthAfter = HEALTH_SCHEMA.parse(await healthAfterResponse.json());
+    expect(healthAfter.state.pushReceiptAuthRejectsLast5m).toBeGreaterThanOrEqual(
+      healthBefore.state.pushReceiptAuthRejectsLast5m + 1
+    );
+    expect(healthAfter.state.invalidPushPayloadsLast5m).toBeGreaterThanOrEqual(
+      healthBefore.state.invalidPushPayloadsLast5m + 1
+    );
   });
 
   it("records and serves debug client errors with auth", async () => {

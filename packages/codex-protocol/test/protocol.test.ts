@@ -97,7 +97,34 @@ describe("codex-protocol schemas", () => {
     });
 
     expect(parsed.params.change.type).toBe("patches");
-    expect(parsed.params.change.patches[0]?.path).toEqual(["turns", 0, "status"]);
+    expect(parsed.params.change.patches[0]?.path).toEqual(["turns", "0", "status"]);
+  });
+
+  it("keeps numeric JSON pointer object keys as strings", () => {
+    const parsed = parseThreadStreamStateChangedBroadcast({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "client-123",
+      version: 4,
+      params: {
+        conversationId: "thread-123",
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "patches",
+          patches: [
+            {
+              op: "replace",
+              path: "/turns/0/diff/1",
+              value: "ok"
+            }
+          ]
+        }
+      }
+    });
+
+    expect(parsed.params.change.type).toBe("patches");
+    expect(parsed.params.change.patches[0]?.path).toEqual(["turns", "0", "diff", "1"]);
   });
 
   it("parses thread stream patches provided as a single patch object", () => {

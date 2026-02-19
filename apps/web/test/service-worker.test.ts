@@ -24,7 +24,11 @@ type NotificationClickEventLike = {
 type MessageEventLike = {
   data?: {
     type?: string;
+    token?: string | null;
   };
+  ports?: Array<{
+    postMessage: (message: { type?: string }) => void;
+  }>;
   waitUntil: (promise: Promise<void>) => void;
 };
 
@@ -47,6 +51,7 @@ interface ServiceWorkerHarness {
   openWindowMock: ReturnType<typeof vi.fn>;
   skipWaitingMock: ReturnType<typeof vi.fn>;
   matchAllMock: ReturnType<typeof vi.fn>;
+  cacheOpenMock: ReturnType<typeof vi.fn>;
 }
 
 function loadServiceWorkerHarness(): ServiceWorkerHarness {
@@ -56,6 +61,29 @@ function loadServiceWorkerHarness(): ServiceWorkerHarness {
   const openWindowMock = vi.fn(async () => undefined);
   const skipWaitingMock = vi.fn(async () => undefined);
   const matchAllMock = vi.fn(async (): Promise<ClientLike[]> => []);
+  const cacheStore = new Map<string, string>();
+  const cacheOpenMock = vi.fn(async () => ({
+    match: async (request: Request | string) => {
+      const requestUrl = typeof request === "string" ? request : request.url;
+      const matched = cacheStore.get(requestUrl);
+      if (typeof matched !== "string") {
+        return undefined;
+      }
+      return new Response(matched, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8"
+        }
+      });
+    },
+    put: async (request: Request | string, response: Response) => {
+      const requestUrl = typeof request === "string" ? request : request.url;
+      cacheStore.set(requestUrl, await response.text());
+    },
+    delete: async (request: Request | string) => {
+      const requestUrl = typeof request === "string" ? request : request.url;
+      return cacheStore.delete(requestUrl);
+    }
+  }));
 
   const scriptPath = path.resolve(process.cwd(), "public/sw.js");
   const scriptSource = fs.readFileSync(scriptPath, "utf8");
@@ -84,9 +112,13 @@ function loadServiceWorkerHarness(): ServiceWorkerHarness {
       matchAll: matchAllMock,
       openWindow: openWindowMock
     },
+    caches: {
+      open: cacheOpenMock
+    },
     skipWaiting: skipWaitingMock,
     location: {
-      origin: "https://example.test"
+      origin: "https://example.test",
+      href: "https://example.test/sw.js"
     }
   };
 
@@ -94,6 +126,9 @@ function loadServiceWorkerHarness(): ServiceWorkerHarness {
     self: selfScope,
     fetch: fetchMock,
     URL,
+    Request,
+    Response,
+    Headers,
     Date,
     Promise,
     String
@@ -105,7 +140,8 @@ function loadServiceWorkerHarness(): ServiceWorkerHarness {
     showNotificationMock,
     openWindowMock,
     skipWaitingMock,
-    matchAllMock
+    matchAllMock,
+    cacheOpenMock
   };
 }
 
@@ -115,10 +151,44 @@ function receiptFromFetchCall(fetchCall: [string, RequestInit?] | undefined): {
   url: string;
   threadId?: string | null;
   turnId?: string | null;
+  message?: string | null;
 } {
   const init = fetchCall?.[1];
   const body = String(init?.body ?? "{}");
   return JSON.parse(body);
+}
+
+function headersFromFetchCall(fetchCall: [string, RequestInit?] | undefined): Headers {
+  return new Headers(fetchCall?.[1]?.headers);
+}
+
+async function syncServiceWorkerApiToken(
+  messageHandler: ((event: MessageEventLike) => void) | undefined,
+  token: string | null
+): Promise<void> {
+  expect(messageHandler).toBeDefined();
+
+  const waitUntilPromises: Promise<void>[] = [];
+  const ackMessages: Array<{ type?: string }> = [];
+  messageHandler?.({
+    data: {
+      type: "SET_API_TOKEN",
+      token
+    },
+    ports: [
+      {
+        postMessage: (message) => {
+          ackMessages.push(message);
+        }
+      }
+    ],
+    waitUntil: (promise) => {
+      waitUntilPromises.push(promise.then(() => undefined));
+    }
+  });
+
+  await Promise.all(waitUntilPromises);
+  expect(ackMessages[0]?.type).toBe("SET_API_TOKEN_ACK");
 }
 
 describe("service worker notifications", () => {
@@ -138,6 +208,7 @@ describe("service worker notifications", () => {
             url: "/threads/thread_1",
             threadId: "thread_1",
             turnId: "turn_1",
+            createdAt: "2026-01-01T00:00:00.000Z",
             web_push: {
               notification: {
                 title: "Codex response ready",
@@ -162,6 +233,68 @@ describe("service worker notifications", () => {
     expect(receipt.url).toBe("/threads/thread_1");
     expect(receipt.threadId).toBe("thread_1");
     expect(receipt.turnId).toBe("turn_1");
+  });
+
+  it("records error receipt and skips notification for malformed push payloads", async () => {
+    const harness = loadServiceWorkerHarness();
+    const pushHandler = harness.handlers.push;
+    expect(pushHandler).toBeDefined();
+
+    const waitUntilPromises: Promise<void>[] = [];
+    pushHandler?.({
+      data: {
+        text: () =>
+          JSON.stringify({
+            notificationId: "notif_bad",
+            title: "Codex response ready",
+            body: "missing required fields"
+          })
+      },
+      waitUntil: (promise) => {
+        waitUntilPromises.push(promise.then(() => undefined));
+      }
+    });
+
+    await Promise.all(waitUntilPromises);
+
+    expect(harness.showNotificationMock).not.toHaveBeenCalled();
+    expect(harness.fetchMock).toHaveBeenCalledTimes(1);
+    const receipt = receiptFromFetchCall(harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined);
+    expect(receipt.event).toBe("error");
+    expect(receipt.message).toContain("Push payload validation failed");
+  });
+
+  it("includes API token header in push receipt posts when configured", async () => {
+    const harness = loadServiceWorkerHarness();
+    const pushHandler = harness.handlers.push;
+    await syncServiceWorkerApiToken(harness.handlers.message, "token_123");
+    expect(pushHandler).toBeDefined();
+
+    const waitUntilPromises: Promise<void>[] = [];
+    pushHandler?.({
+      data: {
+        text: () =>
+          JSON.stringify({
+            notificationId: "notif_1",
+            title: "Codex response ready",
+            body: "A response is ready in Farfield.",
+            url: "/threads/thread_1",
+            threadId: "thread_1",
+            turnId: "turn_1",
+            createdAt: "2026-01-01T00:00:00.000Z"
+          })
+      },
+      waitUntil: (promise) => {
+        waitUntilPromises.push(promise.then(() => undefined));
+      }
+    });
+
+    await Promise.all(waitUntilPromises);
+
+    const headers = headersFromFetchCall(
+      harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined
+    );
+    expect(headers.get("X-Farfield-Token")).toBe("token_123");
   });
 
   it("focuses matching path on notification click and records clicked receipt", async () => {

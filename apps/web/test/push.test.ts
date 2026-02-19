@@ -95,7 +95,15 @@ function installPushRecoveryHarness(options: { waitingWorker: boolean }): PushRe
   const registrationEvents = new EventTarget();
   const waitingWorker = options.waitingWorker
     ? ({
-        postMessage: (message: { type?: string }) => {
+        postMessage: (
+          message: { type?: string; token?: string | null },
+          transfer?: Array<MessagePort>
+        ) => {
+          if (message.type === "SET_API_TOKEN") {
+            const ackPort = transfer && transfer[0] ? transfer[0] : null;
+            ackPort?.postMessage({ type: "SET_API_TOKEN_ACK" });
+            return;
+          }
           if (message.type === "SKIP_WAITING") {
             serviceWorkerContainerEvents.dispatchEvent(new Event("controllerchange"));
           }

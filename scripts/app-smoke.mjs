@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 const host = process.env["HOST"] ?? "127.0.0.1";
 const port = Number(process.env["PORT"] ?? "4311");
 const baseUrl = (process.env["APP_SMOKE_URL"] ?? `http://${host}:${String(port)}`).trim();
@@ -26,6 +28,14 @@ const LABEL_DEBUG_HISTORY = "Runtime /api/debug/history";
 const LABEL_DEBUG_CLIENT_ERRORS = "Runtime /api/debug/client-errors";
 const LABEL_THREAD_LIVE_STATE = "Runtime /api/threads/:id/live-state";
 const LABEL_THREAD_STREAM_EVENTS = "Runtime /api/threads/:id/stream-events";
+
+const HealthCountersSchema = z
+  .object({
+    invalidPushPayloadsLast5m: z.number().int().nonnegative(),
+    eventsAuthRejectsLast5m: z.number().int().nonnegative(),
+    pushReceiptAuthRejectsLast5m: z.number().int().nonnegative()
+  })
+  .strict();
 
 function readPositiveIntegerEnv(name, defaultValue) {
   const rawValue = process.env[name];
@@ -188,6 +198,27 @@ async function main() {
 
   if (health && typeof health === "object" && "state" in health) {
     check("Health state shape", true, "state present");
+    const countersResult = HealthCountersSchema.safeParse(health.state);
+    if (!countersResult.success) {
+      check("Health observability counters", false, "invalid or missing observability counters in /api/health");
+    } else {
+      const counters = countersResult.data;
+      check(
+        "Health counter invalidPushPayloadsLast5m",
+        counters.invalidPushPayloadsLast5m === 0,
+        String(counters.invalidPushPayloadsLast5m)
+      );
+      check(
+        "Health counter eventsAuthRejectsLast5m",
+        counters.eventsAuthRejectsLast5m === 0,
+        String(counters.eventsAuthRejectsLast5m)
+      );
+      check(
+        "Health counter pushReceiptAuthRejectsLast5m",
+        counters.pushReceiptAuthRejectsLast5m === 0,
+        String(counters.pushReceiptAuthRejectsLast5m)
+      );
+    }
   } else {
     check("Health state shape", false, "state missing");
   }

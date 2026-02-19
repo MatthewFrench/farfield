@@ -173,7 +173,7 @@ pnpm dev
 4. In another terminal, run:
 
 ```bash
-caddy run --config ops/caddy/Caddyfile.domain
+node scripts/with-env.mjs "caddy run --config ops/caddy/Caddyfile.domain"
 ```
 
 5. Open your domain in iPhone Safari.
@@ -190,6 +190,22 @@ caddy run --config ops/caddy/Caddyfile.domain
 4. Tap the notification and confirm the target thread opens.
 5. Open the `Preflight` tab and confirm `background push ready`.
 6. Confirm `Push receipt signal` shows a recent `shown`/`clicked` timestamp.
+
+### Assisted iOS Device Smoke
+
+Run this after `pnpm ios:local` when validating real-device push behavior with auth enforced:
+
+```bash
+pnpm smoke:ios-device
+```
+
+The script validates:
+- unauthenticated `/api/health` is rejected,
+- authenticated runtime/thread endpoints are healthy,
+- push send telemetry is recorded,
+- push `shown` and `clicked` receipts arrive for the same `notificationId`.
+
+It prompts for iPhone actions at key checkpoints (cold start, backgrounding, notification tap).
 
 ### Auto-heal + Updates
 
@@ -234,6 +250,7 @@ pnpm test        # Run all tests
 pnpm typecheck   # TypeScript type checking across all packages
 pnpm lint        # Lint all packages
 pnpm smoke:app   # Smoke-check key Farfield runtime endpoints
+pnpm smoke:ios-device  # Assisted real-device iOS PWA push smoke (auth + shown/clicked receipts)
 pnpm ios:trust-local-ca  # One-time macOS local CA trust setup for Caddy
 pnpm stress:stream-burst  # Burst /stream-events load + health latency budget check
 pnpm e2e:real:governance  # Validate coverage matrix/open-gap governance
@@ -254,6 +271,7 @@ Real-app test env knobs:
 - `APP_SMOKE_BUDGET_MODE` (`fail` or `warn`, default `fail`) to control latency budget enforcement.
 - `APP_SMOKE_BUDGET_HEALTH_MS` (default `5000`) and `APP_SMOKE_BUDGET_*` endpoint-specific budgets.
 - `STREAM_BURST_DURATION_MS`, `STREAM_BURST_WORKERS`, `STREAM_BURST_HEALTH_BUDGET_P95_MS` to tune stream burst stress checks.
+- `IOS_DEVICE_SMOKE_API_URL`, `IOS_DEVICE_SMOKE_TOKEN`, `IOS_DEVICE_SMOKE_PUSH_SHOWN_TIMEOUT_MS`, `IOS_DEVICE_SMOKE_PUSH_CLICKED_TIMEOUT_MS` to tune `pnpm smoke:ios-device`.
 
 ## Real App Debug Loop (Codex + Playwright MCP)
 
@@ -318,6 +336,7 @@ packages/
 scripts/
   sanitize-traces.mjs   Redact trace files for safe fixture use
   app-smoke.mjs         Runtime endpoint smoke checks for real app flow
+  ios-device-smoke.mjs  Assisted real-device iOS push smoke (cold start + shown/clicked receipts)
   stream-burst.mjs      Stream-event burst stress + health latency budget checks
   validate-e2e-governance.mjs  Coverage matrix/open-gap checks for real-app E2E
 e2e/
