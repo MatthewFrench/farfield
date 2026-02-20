@@ -3,7 +3,8 @@ import {
   bootstrapEventsSession,
   getConfigDefaults,
   getDebugClientError,
-  listThreads
+  listThreads,
+  unarchiveThread
 } from "../src/lib/api";
 
 afterEach(() => {
@@ -122,5 +123,21 @@ describe("API envelope parsing", () => {
     const result = await getConfigDefaults({ agentId: "codex" });
     expect(result.agentId).toBe("codex");
     expect(result.reasoningEffort).toBe("xhigh");
+  });
+
+  it("posts thread unarchive endpoint", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        threadId: "thread_123"
+      })
+    } as Response);
+
+    await unarchiveThread("thread_123");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
+    expect(requestUrl).toBe("/api/threads/thread_123/unarchive");
   });
 });

@@ -99,6 +99,10 @@ export interface AgentArchiveThreadInput {
   threadId: string;
 }
 
+export interface AgentUnarchiveThreadInput {
+  threadId: string;
+}
+
 export interface AgentThreadLiveState {
   ownerClientId: string | null;
   conversationState: AppServerReadThreadResponse["thread"] | null;
@@ -145,6 +149,7 @@ export interface AgentAdapter {
   sendMessage(input: AgentSendMessageInput): Promise<void>;
   interrupt(input: AgentInterruptInput): Promise<void>;
   archiveThread?(input: AgentArchiveThreadInput): Promise<void>;
+  unarchiveThread?(input: AgentUnarchiveThreadInput): Promise<void>;
 
   listModels?(limit: number): Promise<AppServerListModelsResponse>;
   listCollaborationModes?(): Promise<AppServerCollaborationModeListResponse>;

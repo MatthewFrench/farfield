@@ -9,6 +9,7 @@ import {
   AppServerReadThreadResponseSchema,
   AppServerSendUserMessageRequestSchema,
   AppServerSendUserMessageResponseSchema,
+  AppServerThreadListItemSchema,
   type AppServerStartThreadResponse,
   AppServerStartThreadRequestSchema,
   AppServerStartThreadResponseSchema
@@ -72,6 +73,16 @@ const AppServerArchiveThreadRequestSchema = z
   })
   .passthrough();
 const AppServerArchiveThreadResponseSchema = z.object({}).passthrough();
+const AppServerUnarchiveThreadRequestSchema = z
+  .object({
+    threadId: z.string().min(1)
+  })
+  .passthrough();
+const AppServerUnarchiveThreadResponseSchema = z
+  .object({
+    thread: AppServerThreadListItemSchema
+  })
+  .passthrough();
 
 const AppServerReasoningEffortSchema = z.enum([
   "none",
@@ -250,5 +261,18 @@ export class AppServerClient {
     });
     const result = await this.transport.request("thread/archive", request);
     parseWithSchema(AppServerArchiveThreadResponseSchema, result, "AppServerArchiveThreadResponse");
+  }
+
+  public async unarchiveThread(threadId: string): Promise<AppServerStartThreadResponse["thread"]> {
+    const request = AppServerUnarchiveThreadRequestSchema.parse({
+      threadId
+    });
+    const result = await this.transport.request("thread/unarchive", request);
+    const parsed = parseWithSchema(
+      AppServerUnarchiveThreadResponseSchema,
+      result,
+      "AppServerUnarchiveThreadResponse"
+    );
+    return parsed.thread;
   }
 }

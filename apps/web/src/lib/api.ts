@@ -47,6 +47,7 @@ const HealthResponseSchema = z
         appReady: z.boolean(),
         ipcConnected: z.boolean(),
         ipcInitialized: z.boolean(),
+        workspaceDir: z.string().nullable().optional(),
         gitCommit: z.string().nullable().optional(),
         lastError: z.string().nullable(),
         historyCount: z.number().int().nonnegative(),
@@ -108,6 +109,13 @@ const CreateThreadResponseSchema = z
   .passthrough();
 
 const ArchiveThreadResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1)
+  })
+  .strict();
+
+const UnarchiveThreadResponseSchema = z
   .object({
     ok: z.literal(true),
     threadId: z.string().min(1)
@@ -496,6 +504,13 @@ export async function archiveThread(threadId: string): Promise<void> {
     method: "POST"
   });
   ArchiveThreadResponseSchema.parse(data);
+}
+
+export async function unarchiveThread(threadId: string): Promise<void> {
+  const data = await request(`/api/threads/${encodeURIComponent(threadId)}/unarchive`, {
+    method: "POST"
+  });
+  UnarchiveThreadResponseSchema.parse(data);
 }
 
 export async function listCollaborationModes(): Promise<

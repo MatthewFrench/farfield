@@ -800,6 +800,7 @@ function getRuntimeStateSnapshot(): Record<string, unknown> {
   return {
     appExecutable: codexExecutable,
     socketPath: ipcSocketPath,
+    workspaceDir: DEFAULT_WORKSPACE,
     gitCommit,
     appReady: codexRuntimeState?.appReady ?? false,
     ipcConnected: codexRuntimeState?.ipcConnected ?? false,
@@ -1583,6 +1584,45 @@ const server = http.createServer(async (req, res) => {
           });
         } catch (error) {
           const message = pushActionError("thread-archive", error, {
+            agentId: resolved.agentId,
+            threadId
+          });
+          jsonResponse(res, 500, {
+            ok: false,
+            error: message,
+            threadId
+          });
+        }
+        return;
+      }
+
+      if (req.method === "POST" && segments[3] === "unarchive") {
+        if (!adapter.unarchiveThread) {
+          jsonResponse(res, 400, {
+            ok: false,
+            error: `Agent ${resolved.agentId} does not support thread unarchive`,
+            threadId
+          });
+          return;
+        }
+
+        pushActionEvent("thread-unarchive", "attempt", {
+          agentId: resolved.agentId,
+          threadId
+        });
+
+        try {
+          await adapter.unarchiveThread({ threadId });
+          pushActionEvent("thread-unarchive", "success", {
+            agentId: resolved.agentId,
+            threadId
+          });
+          jsonResponse(res, 200, {
+            ok: true,
+            threadId
+          });
+        } catch (error) {
+          const message = pushActionError("thread-unarchive", error, {
             agentId: resolved.agentId,
             threadId
           });

@@ -52,6 +52,8 @@ Farfield reads Codex app defaults using `config/read` and uses those values for:
 - the "app default" reasoning effort shown in the effort picker
 
 Thread listing requests now use `sortKey=updated_at`, and the server applies deterministic merged ordering across enabled agents.
+Unarchived thread loading now follows first-page listing behavior (Codex-style), while archived threads load on demand when expanded.
+Codex app-server currently exposes local conversation/thread records (for example rollout sessions on disk), not a dedicated cloud-thread list endpoint.
 
 ## Remote Auth Notes
 

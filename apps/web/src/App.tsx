@@ -9,8 +9,11 @@ import {
 } from "react";
 import {
   Activity,
+  Archive,
   ArrowDown,
   Bug,
+  ChevronDown,
+  ChevronRight,
   Circle,
   CircleDot,
   Folder,
@@ -48,6 +51,7 @@ import {
   setCollaborationMode,
   startTrace,
   stopTrace,
+  unarchiveThread,
   submitUserInput,
   type AgentId
 } from "@/lib/api";
@@ -236,6 +240,8 @@ const APP_DEFAULT_VALUE = "__app_default__";
 const ASSUMED_APP_DEFAULT_MODEL = "gpt-5.3-codex";
 const ASSUMED_APP_DEFAULT_EFFORT = "medium";
 const SIDEBAR_COLLAPSED_GROUPS_STORAGE_KEY = "farfield.sidebar.collapsed-groups.v1";
+const THREAD_LIST_LIMIT = 80;
+const THREAD_LIST_MAX_PAGES = 1;
 const AGENT_FAVICON_BY_ID: Record<AgentId, string> = {
   codex: "https://openai.com/favicon.ico",
   opencode: "https://opencode.ai/favicon.ico"
@@ -569,6 +575,9 @@ export function App(): React.JSX.Element {
   const [health, setHealth] = useState<Health | null>(null);
   const [configDefaults, setConfigDefaults] = useState<ConfigDefaults | null>(null);
   const [threads, setThreads] = useState<ThreadsResponse["data"]>([]);
+  const [archivedThreads, setArchivedThreads] = useState<ThreadsResponse["data"]>([]);
+  const [isArchivedThreadsOpen, setIsArchivedThreadsOpen] = useState(false);
+  const [isArchivedThreadsLoading, setIsArchivedThreadsLoading] = useState(false);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(initialUiState.threadId);
   const [liveState, setLiveState] = useState<LiveStateResponse | null>(null);
   const [readThreadState, setReadThreadState] = useState<ReadThreadResponse | null>(null);
@@ -623,8 +632,11 @@ export function App(): React.JSX.Element {
   const hasHydratedAgentSelectionRef = useRef(false);
   const pendingMaterializationThreadIdsRef = useRef<Set<string>>(new Set());
   const threadsSignatureRef = useRef<string[]>([]);
+  const archivedThreadsSignatureRef = useRef<string[]>([]);
   const modesSignatureRef = useRef<string[]>([]);
   const modelsSignatureRef = useRef<string[]>([]);
+  const isArchivedThreadsOpenRef = useRef(false);
+  const threadListWorkspaceDirRef = useRef<string | null>(null);
 
   /* Derived */
   const selectedThread = useMemo(
@@ -714,6 +726,52 @@ export function App(): React.JSX.Element {
 
     return Array.from(groups.values()).sort((left, right) => right.latestUpdatedAt - left.latestUpdatedAt);
   }, [agentDescriptors, threads]);
+  const groupedArchivedThreads = useMemo(() => {
+    type ArchivedGroup = {
+      key: string;
+      label: string;
+      latestUpdatedAt: number;
+      threads: Thread[];
+    };
+    const groups = new Map<string, ArchivedGroup>();
+
+    for (const thread of archivedThreads) {
+      const cwd = typeof thread.cwd === "string" && thread.cwd.trim() ? thread.cwd.trim() : null;
+      const path = typeof thread.path === "string" && thread.path.trim() ? thread.path.trim() : null;
+      const projectPath = cwd ?? path;
+      const key = projectPath ? `archived:${projectPath}` : "archived:unknown";
+      const label = projectPath ? basenameFromPath(projectPath) : "Unknown";
+      const updatedAt = typeof thread.updatedAt === "number" ? thread.updatedAt : 0;
+
+      const existing = groups.get(key);
+      if (existing) {
+        existing.threads.push(thread);
+        if (updatedAt > existing.latestUpdatedAt) {
+          existing.latestUpdatedAt = updatedAt;
+        }
+      } else {
+        groups.set(key, {
+          key,
+          label,
+          latestUpdatedAt: updatedAt,
+          threads: [thread]
+        });
+      }
+    }
+
+    for (const group of groups.values()) {
+      group.threads.sort((left, right) => {
+        const leftUpdatedAt = typeof left.updatedAt === "number" ? left.updatedAt : 0;
+        const rightUpdatedAt = typeof right.updatedAt === "number" ? right.updatedAt : 0;
+        if (leftUpdatedAt !== rightUpdatedAt) {
+          return rightUpdatedAt - leftUpdatedAt;
+        }
+        return left.id.localeCompare(right.id);
+      });
+    }
+
+    return Array.from(groups.values()).sort((left, right) => right.latestUpdatedAt - left.latestUpdatedAt);
+  }, [archivedThreads]);
   const conversationState = useMemo(() => {
     const liveConversationState = liveState?.conversationState ?? null;
     const readConversationState = readThreadState?.thread ?? null;
@@ -877,14 +935,18 @@ export function App(): React.JSX.Element {
     : !openCodeConnected;
   /* Data loading */
   const loadCoreData = useCallback(async () => {
-    const [nh, nt, nm, nmo, ntr, nhist, nag, ncfg] = await Promise.all([
-      getHealth(),
+    const nh = await getHealth();
+    const workspaceDir = nh.state.workspaceDir ?? null;
+    threadListWorkspaceDirRef.current = workspaceDir;
+
+    const [nt, nm, nmo, ntr, nhist, nag, ncfg] = await Promise.all([
       listThreads({
-        limit: 80,
+        limit: THREAD_LIST_LIMIT,
         archived: false,
-        all: true,
-        maxPages: 20,
-        sortKey: "updated_at"
+        all: false,
+        maxPages: THREAD_LIST_MAX_PAGES,
+        sortKey: "updated_at",
+        ...(workspaceDir ? { cwd: workspaceDir } : {})
       }),
       listCollaborationModes(),
       listModels(),
@@ -1025,10 +1087,50 @@ export function App(): React.JSX.Element {
     });
   }, []);
 
+  const loadArchivedThreads = useCallback(async () => {
+    setIsArchivedThreadsLoading(true);
+    try {
+      const workspaceDir = threadListWorkspaceDirRef.current;
+      const archived = await listThreads({
+        limit: THREAD_LIST_LIMIT,
+        archived: true,
+        all: false,
+        maxPages: THREAD_LIST_MAX_PAGES,
+        sortKey: "updated_at",
+        ...(workspaceDir ? { cwd: workspaceDir } : {})
+      });
+
+      const nextArchivedThreadsSignature = archived.data.map((thread) =>
+        [
+          thread.id,
+          String(thread.updatedAt ?? 0),
+          thread.preview,
+          thread.agentId,
+          thread.cwd ?? "",
+          thread.path ?? ""
+        ].join("|")
+      );
+
+      startTransition(() => {
+        if (!signaturesMatch(archivedThreadsSignatureRef.current, nextArchivedThreadsSignature)) {
+          archivedThreadsSignatureRef.current = nextArchivedThreadsSignature;
+          setArchivedThreads(archived.data);
+        }
+      });
+    } catch (e) {
+      setError(toErrorMessage(e));
+    } finally {
+      setIsArchivedThreadsLoading(false);
+    }
+  }, []);
+
   const loadCoreDataTracked = useCallback(async () => {
     await loadCoreData();
+    if (isArchivedThreadsOpenRef.current) {
+      await loadArchivedThreads();
+    }
     lastCoreRefreshAtRef.current = Date.now();
-  }, [loadCoreData]);
+  }, [loadArchivedThreads, loadCoreData]);
 
   const loadSelectedThread = useCallback(async (threadId: string) => {
     const includeTurns = !pendingMaterializationThreadIdsRef.current.has(threadId);
@@ -1114,6 +1216,10 @@ export function App(): React.JSX.Element {
   }, [activeTab]);
 
   useEffect(() => {
+    isArchivedThreadsOpenRef.current = isArchivedThreadsOpen;
+  }, [isArchivedThreadsOpen]);
+
+  useEffect(() => {
     const onPopState = () => {
       const next = parseUiStateFromPath(window.location.pathname);
       setSelectedThreadId(next.threadId);
@@ -1134,6 +1240,13 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     void refreshAll();
   }, [refreshAll]);
+
+  useEffect(() => {
+    if (!isArchivedThreadsOpen) {
+      return;
+    }
+    void loadArchivedThreads();
+  }, [isArchivedThreadsOpen, loadArchivedThreads]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -1673,6 +1786,21 @@ export function App(): React.JSX.Element {
     void createNewThread(projectPath, onlyAgentId);
   }, [availableAgentIds, createNewThread]);
 
+  const runUnarchiveThread = useCallback(async (threadId: string) => {
+    setIsBusy(true);
+    try {
+      await unarchiveThread(threadId);
+      setSelectedThreadId(threadId);
+      selectedThreadIdRef.current = threadId;
+      setMobileSidebarOpen(false);
+      await loadCoreDataTracked();
+    } catch (e) {
+      setError(toErrorMessage(e));
+    } finally {
+      setIsBusy(false);
+    }
+  }, [loadCoreDataTracked]);
+
   const renderSidebarContent = (viewport: "desktop" | "mobile"): React.JSX.Element => (
     <>
       <div className="relative z-20 h-14 shrink-0 px-4">
@@ -1923,6 +2051,100 @@ export function App(): React.JSX.Element {
                 </div>
               );
             })}
+            <div className="space-y-1 pt-1">
+              <Button
+                type="button"
+                data-testid="archived-threads-toggle"
+                onClick={() => setIsArchivedThreadsOpen((prev) => !prev)}
+                variant="ghost"
+                className="h-7 w-full justify-start gap-2 rounded-lg px-2 py-1 text-left text-[12px] tracking-tight font-normal text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              >
+                {isArchivedThreadsOpen ? (
+                  <ChevronDown size={13} className="shrink-0" />
+                ) : (
+                  <ChevronRight size={13} className="shrink-0" />
+                )}
+                <Archive size={13} className="shrink-0" />
+                <span className="flex-1 truncate">Archived threads</span>
+                {isArchivedThreadsLoading ? (
+                  <Loader2 size={11} className="animate-spin text-muted-foreground/70" />
+                ) : (
+                  <span className="text-[10px] text-muted-foreground/60">
+                    {String(archivedThreads.length)}
+                  </span>
+                )}
+              </Button>
+              {isArchivedThreadsOpen && (
+                <div data-testid="archived-thread-list" className="space-y-2 pl-4">
+                  {isArchivedThreadsLoading && archivedThreads.length === 0 && (
+                    <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] text-muted-foreground/70">
+                      <Loader2 size={11} className="animate-spin" />
+                      <span>Loading archived threads...</span>
+                    </div>
+                  )}
+                  {!isArchivedThreadsLoading && archivedThreads.length === 0 && (
+                    <div className="px-2 py-1 text-[11px] text-muted-foreground/70">
+                      No archived threads
+                    </div>
+                  )}
+                  {groupedArchivedThreads.map((group) => (
+                    <div key={group.key} className="space-y-1">
+                      <div className="px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground/60 truncate">
+                        {group.label}
+                      </div>
+                      <div className="space-y-1">
+                        {group.threads.map((thread) => {
+                          const canUnarchive = thread.agentId === "codex";
+                          return (
+                            <div
+                              key={thread.id}
+                              data-testid="archived-thread-list-item"
+                              className="w-full min-w-0 rounded-xl border border-border/60 bg-muted/20 px-2 py-1.5 text-[12px] text-muted-foreground"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                {thread.agentId && (
+                                  <span className="shrink-0 h-4 w-4 rounded-sm bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
+                                    <AgentFavicon
+                                      agentId={thread.agentId}
+                                      label={agentsById[thread.agentId]?.label ?? "Agent"}
+                                      className="h-3.5 w-3.5"
+                                    />
+                                  </span>
+                                )}
+                                <span className="min-w-0 flex-1 truncate">{threadLabel(thread)}</span>
+                                {thread.updatedAt && (
+                                  <span className="shrink-0 text-[10px] text-muted-foreground/60">
+                                    {formatDate(thread.updatedAt)}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1.5 flex justify-end">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 rounded-full px-2 text-[10px]"
+                                  disabled={isBusy || !canUnarchive}
+                                  onClick={() => {
+                                    if (!canUnarchive) {
+                                      return;
+                                    }
+                                    void runUnarchiveThread(thread.id);
+                                  }}
+                                  title={canUnarchive ? "Unarchive thread" : "Unarchive is not supported for this agent"}
+                                >
+                                  Unarchive
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

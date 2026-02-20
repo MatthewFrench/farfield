@@ -36,6 +36,7 @@ import type {
   AgentSendMessageInput,
   AgentSetCollaborationModeInput,
   AgentSubmitUserInputInput,
+  AgentUnarchiveThreadInput,
   AgentThreadLiveState,
   AgentThreadStreamEvents
 } from "../types.js";
@@ -83,6 +84,7 @@ export class CodexAgentAdapter implements AgentAdapter {
   private readonly appClient: AppServerClient;
   private readonly ipcClient: DesktopIpcClient;
   private readonly service: CodexMonitorService;
+  private readonly workspaceDir: string;
   private readonly onStateChange: (() => void) | null;
   private readonly reconnectDelayMs: number;
 
@@ -103,6 +105,7 @@ export class CodexAgentAdapter implements AgentAdapter {
   private started = false;
 
   public constructor(options: CodexAgentOptions) {
+    this.workspaceDir = options.workspaceDir;
     this.onStateChange = options.onStateChange ?? null;
     this.reconnectDelayMs = options.reconnectDelayMs;
 
@@ -248,6 +251,10 @@ export class CodexAgentAdapter implements AgentAdapter {
 
     await this.ipcClient.disconnect();
     await this.appClient.close();
+  }
+
+  public async listProjectDirectories(): Promise<string[]> {
+    return [this.workspaceDir];
   }
 
   public async listThreads(input: AgentListThreadsInput): Promise<AgentListThreadsResult> {
@@ -418,6 +425,11 @@ export class CodexAgentAdapter implements AgentAdapter {
   public async archiveThread(input: AgentArchiveThreadInput): Promise<void> {
     this.ensureCodexAvailable();
     await this.runAppServerCall(() => this.appClient.archiveThread(input.threadId));
+  }
+
+  public async unarchiveThread(input: AgentUnarchiveThreadInput): Promise<void> {
+    this.ensureCodexAvailable();
+    await this.runAppServerCall(() => this.appClient.unarchiveThread(input.threadId));
   }
 
   public async listModels(limit: number) {

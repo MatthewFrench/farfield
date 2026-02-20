@@ -125,3 +125,30 @@ describe("AppServerClient.readConfig", () => {
     });
   });
 });
+
+describe("AppServerClient.unarchiveThread", () => {
+  it("sends thread/unarchive and parses response", async () => {
+    const transport: AppServerTransport = {
+      request: vi.fn().mockResolvedValue({
+        thread: {
+          id: "thread-1",
+          preview: "Recovered thread",
+          createdAt: 1,
+          updatedAt: 2,
+          source: "opencode",
+          cwd: "/tmp/workspace"
+        }
+      }),
+      close: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const client = new AppServerClient(transport);
+    const thread = await client.unarchiveThread("thread-1");
+
+    expect(transport.request).toHaveBeenCalledWith("thread/unarchive", {
+      threadId: "thread-1"
+    });
+    expect(thread.id).toBe("thread-1");
+    expect(thread.preview).toBe("Recovered thread");
+  });
+});
