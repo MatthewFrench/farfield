@@ -59,6 +59,31 @@ describe("CompletionDetector", () => {
     expect(second).toBeNull();
   });
 
+  it("suppresses duplicate completion markers from initial watermarks", () => {
+    const marker = "thread_1:turn_1:item_agent_1";
+    const detector = new CompletionDetector(new Map([["thread_1", marker]]));
+    const state = parseThreadConversationState({
+      id: "thread_1",
+      turns: [
+        {
+          turnId: "turn_1",
+          status: "completed",
+          items: [
+            {
+              id: "item_agent_1",
+              type: "agentMessage",
+              text: "done"
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    const candidate = detector.detect("thread_1", state);
+    expect(candidate).toBeNull();
+  });
+
   it("does not emit candidate for non-completed turn", () => {
     const detector = new CompletionDetector(new Map());
     const state = parseThreadConversationState({

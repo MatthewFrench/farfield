@@ -450,6 +450,60 @@ function buildPushTestPayload(
   };
 }
 
+function trimNotificationText(value: string, maxLength: number): string {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength - 3)}...`;
+}
+
+function buildThreadCompletionPushPayload(input: {
+  threadId: string;
+  turnId: string;
+  preview: string;
+  agentText: string;
+  privateMode: boolean;
+}): PushNotificationPayload {
+  const createdAt = new Date().toISOString();
+  const notificationId = `notif_${randomUUID()}`;
+  const url = `/threads/${encodeURIComponent(input.threadId)}`;
+
+  const title = input.privateMode
+    ? "Farfield thread completed"
+    : (() => {
+      const candidate = trimNotificationText(input.preview, 120);
+      return candidate.length > 0 ? candidate : "Farfield thread completed";
+    })();
+
+  const body = input.privateMode
+    ? "A response is ready in Farfield."
+    : (() => {
+      const candidate = trimNotificationText(input.agentText, 320);
+      return candidate.length > 0 ? candidate : "A response is ready in Farfield.";
+    })();
+
+  return {
+    notificationId,
+    title,
+    body,
+    threadId: input.threadId,
+    turnId: input.turnId,
+    url,
+    createdAt,
+    web_push: {
+      notification: {
+        title,
+        body,
+        navigate: url,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: `thread:${input.threadId}`
+      }
+    }
+  };
+}
+
 const parsedCli = (() => {
   try {
     return parseServerCliOptions(process.argv.slice(2));
@@ -544,7 +598,11 @@ const threadIndex = new ThreadIndex();
 let activeTrace: ActiveTrace | null = null;
 const recentTraces: TraceSummary[] = [];
 let runtimeLastError: string | null = null;
-const completionDetector = new CompletionDetector(new Map());
+const completionWatermarks = new Map<string, string>();
+for (const entry of pushStore.listCompletionWatermarks()) {
+  completionWatermarks.set(entry.threadId, entry.marker);
+}
+const completionDetector = new CompletionDetector(completionWatermarks);
 const ntfyNotifier = new NtfyNotifier(parseNtfyConfigFromEnv(process.env));
 const completionCheckTimers = new Map<string, NodeJS.Timeout>();
 const completionChecksInFlight = new Set<string>();
@@ -691,7 +749,7 @@ let openCodeAdapter: OpenCodeAgentAdapter | null = null;
 const adapters: AgentAdapter[] = [];
 
 async function checkAndNotifyThreadCompletion(threadId: string): Promise<void> {
-  if (!codexAdapter || !ntfyNotifier.isEnabled()) {
+  if (!codexAdapter) {
     return;
   }
 
@@ -707,16 +765,102 @@ async function checkAndNotifyThreadCompletion(threadId: string): Promise<void> {
       return;
     }
 
-    const publishResult = await ntfyNotifier.publishThreadCompleted({
-      threadId: completionCandidate.threadId,
-      preview: readThreadPreview(liveState.conversationState),
-      agentText: completionCandidate.agentText
-    });
+    const hasNtfyTarget = ntfyNotifier.isEnabled();
+    const subscriptions = pushService.isEnabled() ? pushStore.listSubscriptions() : [];
+    const hasWebPushTarget = subscriptions.length > 0;
+    if (!hasNtfyTarget && !hasWebPushTarget) {
+      return;
+    }
 
+    const preview = readThreadPreview(liveState.conversationState);
+
+    let ntfyDelivered = false;
+    let ntfyMessageId: string | null = null;
+    if (hasNtfyTarget) {
+      try {
+        const publishResult = await ntfyNotifier.publishThreadCompleted({
+          threadId: completionCandidate.threadId,
+          preview,
+          agentText: completionCandidate.agentText
+        });
+        ntfyDelivered = true;
+        ntfyMessageId = publishResult.messageId;
+      } catch (error) {
+        logger.warn(
+          {
+            threadId,
+            error: toErrorMessage(error)
+          },
+          "ntfy-publish-failed"
+        );
+      }
+    }
+
+    let webPushAttempted = 0;
+    let webPushDelivered = 0;
+    let webPushFailures = 0;
+    if (hasWebPushTarget) {
+      const payload = buildThreadCompletionPushPayload({
+        threadId: completionCandidate.threadId,
+        turnId: completionCandidate.turnId,
+        preview,
+        agentText: completionCandidate.agentText,
+        privateMode: subscriptions.some((subscription) => subscription.settings.privateMode)
+      });
+
+      try {
+        const sendResult = await pushService.sendToSubscriptions(subscriptions, payload);
+        webPushAttempted = sendResult.attempted;
+        webPushDelivered = sendResult.delivered;
+        webPushFailures = sendResult.failures.length;
+
+        for (const endpoint of sendResult.prunedEndpoints) {
+          pushStore.removeSubscriptionByEndpoint(endpoint);
+        }
+
+        pushSendStore.setLatest({
+          notificationId: payload.notificationId,
+          threadId: completionCandidate.threadId,
+          turnId: completionCandidate.turnId,
+          sentAt: payload.createdAt,
+          attempted: sendResult.attempted,
+          delivered: sendResult.delivered,
+          failures: sendResult.failures.length
+        });
+
+        if (sendResult.failures.length > 0) {
+          logger.warn(
+            {
+              threadId,
+              failures: sendResult.failures
+            },
+            "push-completion-send-failed"
+          );
+        }
+      } catch (error) {
+        logger.warn(
+          {
+            threadId,
+            error: toErrorMessage(error)
+          },
+          "push-completion-send-threw"
+        );
+      }
+    }
+
+    if (!ntfyDelivered && webPushDelivered === 0) {
+      return;
+    }
+
+    pushStore.setCompletionWatermark(threadId, completionCandidate.marker);
     completionDetector.commit(threadId, completionCandidate.marker);
-    pushSystem("ntfy notification sent", {
+    pushSystem("thread completion notification sent", {
       threadId,
-      ...(publishResult.messageId ? { messageId: publishResult.messageId } : {})
+      ntfyDelivered,
+      ...(ntfyMessageId ? { ntfyMessageId } : {}),
+      webPushAttempted,
+      webPushDelivered,
+      webPushFailures
     });
   } catch (error) {
     logger.warn(
@@ -724,7 +868,7 @@ async function checkAndNotifyThreadCompletion(threadId: string): Promise<void> {
         threadId,
         error: toErrorMessage(error)
       },
-      "ntfy-publish-failed"
+      "completion-notification-check-failed"
     );
   } finally {
     completionChecksInFlight.delete(threadId);
@@ -732,7 +876,10 @@ async function checkAndNotifyThreadCompletion(threadId: string): Promise<void> {
 }
 
 function scheduleThreadCompletionCheck(threadId: string): void {
-  if (!ntfyNotifier.isEnabled()) {
+  const shouldRunCompletionCheck = ntfyNotifier.isEnabled()
+    || (pushService.isEnabled() && pushStore.getSubscriptionCount() > 0);
+
+  if (!shouldRunCompletionCheck) {
     return;
   }
 

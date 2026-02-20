@@ -68,9 +68,13 @@ function shouldInjectApiToken(req: IncomingMessage): boolean {
     return false;
   }
 
+  if (!isLoopbackAddress(req.socket.remoteAddress)) {
+    return false;
+  }
+
   const originHeader = req.headers.origin;
   if (typeof originHeader !== "string") {
-    return isLoopbackAddress(req.socket.remoteAddress);
+    return true;
   }
 
   const normalizedOrigin = normalizeOriginHeader(originHeader);

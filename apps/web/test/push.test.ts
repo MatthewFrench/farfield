@@ -13,7 +13,7 @@ import {
   getPushVapidPublicKey,
   savePushSubscription
 } from "../src/lib/api";
-import { recoverPushNotifications } from "../src/lib/push";
+import { disablePushNotifications, recoverPushNotifications } from "../src/lib/push";
 
 interface PushRecoveryHarness {
   registerMock: ReturnType<typeof vi.fn>;
@@ -277,5 +277,37 @@ describe("recoverPushNotifications", () => {
       throw new Error("Expected savePushSubscription payload to include settings");
     }
     expect(firstSaveSettings.privateMode).toBe(true);
+  });
+});
+
+describe("disablePushNotifications", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(deletePushSubscription).mockResolvedValue({
+      deleted: true
+    });
+  });
+
+  it("unsubscribes browser even when server deletion fails", async () => {
+    const harness = installPushRecoveryHarness({ waitingWorker: false });
+    vi.mocked(deletePushSubscription).mockRejectedValue(new Error("server request failed"));
+
+    const result = await disablePushNotifications();
+
+    expect(result.unsubscribed).toBe(true);
+    expect(harness.existingSubscriptionUnsubscribeMock).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(deletePushSubscription)).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails when browser unsubscribe and server deletion both fail", async () => {
+    const harness = installPushRecoveryHarness({ waitingWorker: false });
+    harness.existingSubscriptionUnsubscribeMock.mockRejectedValue(new Error("unsubscribe failed"));
+    vi.mocked(deletePushSubscription).mockRejectedValue(new Error("server request failed"));
+
+    await expect(disablePushNotifications()).rejects.toThrowError(
+      "Failed to disable push notifications"
+    );
+    expect(harness.existingSubscriptionUnsubscribeMock).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(deletePushSubscription)).toHaveBeenCalledTimes(1);
   });
 });

@@ -377,12 +377,28 @@ export async function disablePushNotifications(): Promise<{ unsubscribed: boolea
     return { unsubscribed: false };
   }
 
-  await deletePushSubscription({
-    endpoint: browserSubscription.endpoint
-  });
-  await browserSubscription.unsubscribe();
+  let browserUnsubscribed = false;
+  try {
+    browserUnsubscribed = await browserSubscription.unsubscribe();
+  } catch {
+    browserUnsubscribed = false;
+  }
 
-  return { unsubscribed: true };
+  let serverDeleted = false;
+  try {
+    const deleteResponse = await deletePushSubscription({
+      endpoint: browserSubscription.endpoint
+    });
+    serverDeleted = deleteResponse.deleted;
+  } catch {
+    serverDeleted = false;
+  }
+
+  if (!browserUnsubscribed && !serverDeleted) {
+    throw new Error("Failed to disable push notifications");
+  }
+
+  return { unsubscribed: browserUnsubscribed || serverDeleted };
 }
 
 export async function reconcilePushSubscription(input?: {
