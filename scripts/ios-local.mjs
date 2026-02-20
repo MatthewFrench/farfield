@@ -165,28 +165,11 @@ function stopChild(child, signal, useProcessGroup = false) {
   child.kill(signal);
 }
 
-function resolvePackageManagerCommand(pnpmPathFromEnv) {
-  if (pnpmPathFromEnv.length === 0) {
-    return {
-      command: "pnpm",
-      args: ["dev"],
-      label: "pnpm dev"
-    };
-  }
-
-  const extension = path.extname(pnpmPathFromEnv).toLowerCase();
-  if (extension === ".js" || extension === ".cjs" || extension === ".mjs") {
-    return {
-      command: process.execPath,
-      args: [pnpmPathFromEnv, "dev"],
-      label: "pnpm dev"
-    };
-  }
-
+function resolvePackageManagerCommand() {
   return {
-    command: pnpmPathFromEnv,
-    args: ["dev"],
-    label: "pnpm dev"
+    command: "bun",
+    args: ["run", "dev"],
+    label: "bun run dev"
   };
 }
 
@@ -229,7 +212,7 @@ if (!fs.existsSync(caddyConfigPath)) {
   printPrerequisiteError("missing generated Caddy local config.", [
     `Missing: ${caddyConfigPath}`,
     "Run:",
-    "  pnpm setup:ios-push",
+    "  bun run setup:ios-push",
     `Template source: ${caddyConfigTemplatePath}`
   ]);
   process.exit(1);
@@ -281,14 +264,13 @@ function handleTerminationSignal(signal) {
   process.exit(0);
 }
 
-const pnpmExecPath = (process.env["npm_execpath"] ?? "").trim();
 const caddyExecutable = (process.env["CADDY_BIN"] ?? "caddy").trim();
 
-if (pnpmExecPath.length === 0 && !commandExists("pnpm")) {
-  printPrerequisiteError("pnpm is not available on PATH.", [
-    "Install with corepack:",
-    "  corepack enable",
-    "  corepack prepare pnpm@10 --activate"
+if (!commandExists("bun")) {
+  printPrerequisiteError("bun is not available on PATH.", [
+    "Install Bun:",
+    "  curl -fsSL https://bun.sh/install | bash",
+    "Then reopen your shell and retry."
   ]);
   process.exit(1);
 }
@@ -313,7 +295,7 @@ await ensurePortIsAvailable(frontendPort, "Frontend");
 await ensurePortIsAvailable(caddyHttpPort, "Caddy HTTP");
 await ensurePortIsAvailable(caddyHttpsPort, "Caddy HTTPS");
 
-const packageManagerCommand = resolvePackageManagerCommand(pnpmExecPath);
+const packageManagerCommand = resolvePackageManagerCommand();
 caddyProcess = startChild(caddyExecutable, ["run", "--config", caddyConfigPath], "caddy", false);
 caddyProcess.on("error", (error) => {
   exitFromStartError("caddy", error);
@@ -345,9 +327,9 @@ try {
     printPrerequisiteError("caddy did not become ready.", [
       detail,
       "If a password prompt is waiting, finish it or run:",
-      "  pnpm ios:trust-local-ca",
+      "  bun run ios:trust-local-ca",
       "Then run:",
-      "  pnpm ios:local"
+      "  bun run ios:local"
     ]);
   }
   stopChildren("SIGTERM");
@@ -356,7 +338,7 @@ try {
 
 devProcess = startChild(packageManagerCommand.command, packageManagerCommand.args, packageManagerCommand.label, true);
 devProcess.on("error", (error) => {
-  exitFromStartError("pnpm dev", error);
+  exitFromStartError("bun run dev", error);
 });
 
 devProcess.on("exit", (code, signal) => {
@@ -365,7 +347,7 @@ devProcess.on("exit", (code, signal) => {
   }
   shuttingDown = true;
   process.stderr.write(
-    `[ios:local] pnpm dev exited (${signal ?? `code ${String(code ?? 0)}`}); stopping caddy.\n`
+    `[ios:local] bun run dev exited (${signal ?? `code ${String(code ?? 0)}`}); stopping caddy.\n`
   );
   stopChildren("SIGTERM");
   process.exit(code ?? 1);

@@ -8,7 +8,7 @@
     "dev:remote": "vite --host 0.0.0.0 --port 4312",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run --passWithNoTests",
+    "test": "mkdir -p .runtime && NODE_OPTIONS=--localstorage-file=.runtime/vitest-localstorage vitest run --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

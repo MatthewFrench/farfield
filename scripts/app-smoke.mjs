@@ -25,17 +25,40 @@ const LABEL_THREADS = "Runtime /api/threads";
 const LABEL_MODELS = "Runtime /api/models";
 const LABEL_COLLABORATION_MODES = "Runtime /api/collaboration-modes";
 const LABEL_DEBUG_HISTORY = "Runtime /api/debug/history";
-const LABEL_DEBUG_CLIENT_ERRORS = "Runtime /api/debug/client-errors";
+const LABEL_DEBUG_TRACE_STATUS = "Runtime /api/debug/trace/status";
 const LABEL_THREAD_LIVE_STATE = "Runtime /api/threads/:id/live-state";
 const LABEL_THREAD_STREAM_EVENTS = "Runtime /api/threads/:id/stream-events";
 
-const HealthCountersSchema = z
+const HealthStateSchema = z
   .object({
-    invalidPushPayloadsLast5m: z.number().int().nonnegative(),
-    eventsAuthRejectsLast5m: z.number().int().nonnegative(),
-    pushReceiptAuthRejectsLast5m: z.number().int().nonnegative()
+    appReady: z.boolean(),
+    ipcConnected: z.boolean(),
+    ipcInitialized: z.boolean(),
+    historyCount: z.number().int().nonnegative(),
+    threadOwnerCount: z.number().int().nonnegative(),
+    codexAvailable: z.boolean().optional(),
+    gitCommit: z.union([z.string(), z.null()]).optional(),
+    lastError: z.union([z.string(), z.null()]).optional(),
+    activeTrace: z.unknown().optional()
   })
-  .strict();
+  .passthrough();
+
+const ThreadListResponseSchema = z
+  .object({
+    data: z.array(
+      z.object({
+        id: z.string().min(1)
+      })
+    )
+  })
+  .passthrough();
+
+const HealthResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    state: HealthStateSchema
+  })
+  .passthrough();
 
 function readPositiveIntegerEnv(name, defaultValue) {
   const rawValue = process.env[name];
@@ -64,8 +87,8 @@ const latencyBudgetByLabel = new Map([
   ],
   [LABEL_DEBUG_HISTORY, readPositiveIntegerEnv("APP_SMOKE_BUDGET_DEBUG_HISTORY_MS", defaultLatencyBudgetMs)],
   [
-    LABEL_DEBUG_CLIENT_ERRORS,
-    readPositiveIntegerEnv("APP_SMOKE_BUDGET_DEBUG_CLIENT_ERRORS_MS", defaultLatencyBudgetMs)
+    LABEL_DEBUG_TRACE_STATUS,
+    readPositiveIntegerEnv("APP_SMOKE_BUDGET_DEBUG_TRACE_STATUS_MS", defaultLatencyBudgetMs)
   ],
   [LABEL_THREAD_LIVE_STATE, readPositiveIntegerEnv("APP_SMOKE_BUDGET_THREAD_LIVE_STATE_MS", defaultLatencyBudgetMs)],
   [
@@ -170,18 +193,10 @@ async function main() {
   await getJson("/api/models?limit=200", LABEL_MODELS);
   await getJson("/api/collaboration-modes", LABEL_COLLABORATION_MODES);
   await getJson("/api/debug/history?limit=20", LABEL_DEBUG_HISTORY);
-  await getJson("/api/debug/client-errors?limit=20", LABEL_DEBUG_CLIENT_ERRORS);
+  await getJson("/api/debug/trace/status", LABEL_DEBUG_TRACE_STATUS);
 
-  const threadId =
-    threads &&
-    typeof threads === "object" &&
-    Array.isArray(threads.data) &&
-    threads.data.length > 0 &&
-    threads.data[0] &&
-    typeof threads.data[0] === "object" &&
-    typeof threads.data[0].id === "string"
-      ? threads.data[0].id
-      : null;
+  const threadListResult = ThreadListResponseSchema.safeParse(threads);
+  const threadId = threadListResult.success ? (threadListResult.data.data[0]?.id ?? null) : null;
 
   if (threadId) {
     await getJson(
@@ -196,31 +211,17 @@ async function main() {
     check("Runtime thread detail checks", true, "Skipped (no threads returned)");
   }
 
-  if (health && typeof health === "object" && "state" in health) {
-    check("Health state shape", true, "state present");
-    const countersResult = HealthCountersSchema.safeParse(health.state);
-    if (!countersResult.success) {
-      check("Health observability counters", false, "invalid or missing observability counters in /api/health");
-    } else {
-      const counters = countersResult.data;
-      check(
-        "Health counter invalidPushPayloadsLast5m",
-        counters.invalidPushPayloadsLast5m === 0,
-        String(counters.invalidPushPayloadsLast5m)
-      );
-      check(
-        "Health counter eventsAuthRejectsLast5m",
-        counters.eventsAuthRejectsLast5m === 0,
-        String(counters.eventsAuthRejectsLast5m)
-      );
-      check(
-        "Health counter pushReceiptAuthRejectsLast5m",
-        counters.pushReceiptAuthRejectsLast5m === 0,
-        String(counters.pushReceiptAuthRejectsLast5m)
-      );
-    }
+  const healthResult = HealthResponseSchema.safeParse(health);
+  if (!healthResult.success) {
+    check("Health state shape", false, "state missing or invalid");
   } else {
-    check("Health state shape", false, "state missing");
+    const state = healthResult.data.state;
+    check("Health state shape", true, "state present");
+    check("Health appReady", state.appReady, String(state.appReady));
+    check("Health ipcConnected", state.ipcConnected, String(state.ipcConnected));
+    check("Health ipcInitialized", state.ipcInitialized, String(state.ipcInitialized));
+    check("Health historyCount", state.historyCount >= 0, String(state.historyCount));
+    check("Health threadOwnerCount", state.threadOwnerCount >= 0, String(state.threadOwnerCount));
   }
 
   if (hasFailure) {

@@ -7,7 +7,7 @@ const cwd = process.cwd();
 const envLocalPath = path.join(cwd, ".env.local");
 
 if (!fs.existsSync(envLocalPath)) {
-  process.stderr.write(`Missing ${envLocalPath}. Run pnpm setup:ios-push first.\n`);
+  process.stderr.write(`Missing ${envLocalPath}. Run bun run setup:ios-push first.\n`);
   process.exit(1);
 }
 
@@ -26,7 +26,7 @@ existing["PUSH_DOCTOR_TOKEN"] = nextToken;
 delete existing["PUSH_API_TOKEN"];
 
 const entries = Object.entries(existing);
-const lines = ["# Updated by: pnpm rotate:api-token", ""];
+const lines = ["# Updated by: bun run rotate:api-token", ""];
 for (const [key, value] of entries) {
   lines.push(`${key}=${value}`);
 }

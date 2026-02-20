@@ -72,14 +72,14 @@ check(
   true,
   fs.existsSync(localCaddy)
     ? `present (${localCaddy})`
-    : `missing (${localCaddy}); run pnpm setup:ios-push`
+    : `missing (${localCaddy}); run bun run setup:ios-push`
 );
 check(
   "Caddy domain runtime config",
   true,
   fs.existsSync(domainCaddy)
     ? `present (${domainCaddy})`
-    : `missing (${domainCaddy}); run pnpm setup:domain-https when using a real domain`
+    : `missing (${domainCaddy}); run bun run setup:domain-https when using a real domain`
 );
 
 async function checkEndpoint(pathname, expectedLabel) {

@@ -13,14 +13,27 @@
     "test": "bun run --workspaces test",
     "lint": "bun run --workspaces lint",
     "typecheck": "bun run --workspaces typecheck",
+    "premerge:check": "bun run lint && bun run typecheck && bun run test",
+    "setup:ios-push": "node scripts/setup-ios-push.mjs",
+    "setup:domain-https": "node scripts/setup-domain-https.mjs",
+    "ios:trust-local-ca": "node scripts/with-env.mjs \"node scripts/ios-trust-local-ca.mjs\"",
+    "ios:local": "node scripts/with-env.mjs \"node scripts/ios-local.mjs\"",
+    "rotate:api-token": "node scripts/with-env.mjs \"node scripts/rotate-api-token.mjs\"",
+    "push:doctor": "node scripts/with-env.mjs \"node scripts/push-doctor.mjs\"",
+    "smoke:app": "node scripts/with-env.mjs \"node scripts/app-smoke.mjs\"",
+    "smoke:ios-device": "node scripts/with-env.mjs \"node scripts/ios-device-smoke.mjs\"",
+    "stress:stream-burst": "node scripts/with-env.mjs \"node scripts/stream-burst.mjs\"",
+    "verify:real": "bun run smoke:app",
     "sanitize:traces": "node scripts/sanitize-traces.mjs",
     "generate:codex-schema": "node scripts/generate-codex-schema.mjs",
     "screenshot:codex": "node skills/codex-window-debug/tools/codex-window-screenshot.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "dotenv": "^17.2.3",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "zod": "^3.24.1"
   }
 }

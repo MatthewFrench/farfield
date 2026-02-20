@@ -4,10 +4,10 @@
 
 ## Validation
 
-- [ ] `pnpm lint`
-- [ ] `pnpm test`
-- [ ] `pnpm verify:real`
-- [ ] `pnpm premerge:check`
+- [ ] `bun run lint`
+- [ ] `bun run typecheck`
+- [ ] `bun run test`
+- [ ] `bun run verify:real`
 
 ## Real app validation notes
 

@@ -14,25 +14,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: 10.29.3
+          bun-version: 1.3.6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Run setup wizard non-interactive
-        run: pnpm setup:ios-push
+        run: bun run setup:ios-push
 
       - name: Run domain setup non-interactive
-        run: pnpm setup:domain-https
+        run: bun run setup:domain-https
 
       - name: Validate generated env file
         run: |
@@ -47,7 +46,7 @@ jobs:
       - name: Rotate API token
         run: |
           old_token="$(grep '^API_TOKEN=' .env.local | cut -d'=' -f2-)"
-          pnpm rotate:api-token
+          bun run rotate:api-token
           new_token="$(grep '^API_TOKEN=' .env.local | cut -d'=' -f2-)"
           doctor_token="$(grep '^PUSH_DOCTOR_TOKEN=' .env.local | cut -d'=' -f2-)"
           test -n "$old_token"

@@ -18,6 +18,7 @@ worker.js
 # Runtime logs
 *.log
 .runtime/
+apps/server/invalid-thread-stream-events.jsonl
 
 # Local environment
 .env.local

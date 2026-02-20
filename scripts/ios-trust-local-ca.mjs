@@ -36,7 +36,7 @@ if (!fs.existsSync(caddyConfigPath)) {
   printError("missing generated Caddy local config.", [
     `Missing: ${caddyConfigPath}`,
     "Run:",
-    "  pnpm setup:ios-push",
+    "  bun run setup:ios-push",
     `Template source: ${caddyConfigTemplatePath}`
   ]);
   process.exit(1);
@@ -71,7 +71,7 @@ if (trustResult.status !== 0) {
   printError("caddy trust failed.", [
     `Exit status: ${String(trustResult.status ?? 1)}`,
     "Resolve the error above, then rerun:",
-    "  pnpm ios:trust-local-ca"
+    "  bun run ios:trust-local-ca"
   ]);
   process.exit(trustResult.status ?? 1);
 }
@@ -92,11 +92,11 @@ if (process.platform === "darwin" && commandExists("security")) {
   if (verifyResult.status !== 0) {
     printError("could not verify Caddy Local Authority in macOS keychains.", [
       "Run again and complete keychain trust prompts:",
-      "  pnpm ios:trust-local-ca"
+      "  bun run ios:trust-local-ca"
     ]);
     process.exit(1);
   }
 }
 
 process.stdout.write(`[ios:trust-local-ca] trusted certificate path: ${caddyRootCertificatePath}\n`);
-process.stdout.write("[ios:trust-local-ca] success. Next step: pnpm ios:local\n");
+process.stdout.write("[ios:trust-local-ca] success. Next step: bun run ios:local\n");
