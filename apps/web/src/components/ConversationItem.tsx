@@ -22,7 +22,8 @@ const TOOL_BLOCK_TYPES: readonly TurnItem["type"][] = [
   "fileChange",
   "webSearch",
   "mcpToolCall",
-  "collabAgentToolCall"
+  "collabAgentToolCall",
+  "collabToolCall"
 ];
 
 function isToolBlockType(type: TurnItem["type"] | undefined): boolean {
@@ -222,6 +223,7 @@ function ConversationItemComponent({
     }
 
     case "collabAgentToolCall":
+    case "collabToolCall":
       return (
         <div className={`${toolSpacing} rounded-lg border border-border bg-muted/20 px-3 py-2`}>
           <div className="text-[10px] text-muted-foreground font-mono mb-1 uppercase tracking-wider">
@@ -241,6 +243,30 @@ function ConversationItemComponent({
               {item.prompt}
             </div>
           )}
+        </div>
+      );
+
+    case "todo-list":
+      return (
+        <div className="my-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+            Plan Steps
+          </div>
+          {item.explanation && (
+            <div className="mb-2 text-sm text-foreground/90 whitespace-pre-wrap break-words leading-relaxed">
+              {item.explanation}
+            </div>
+          )}
+          <ul className="space-y-1.5">
+            {item.plan.map((step, index) => (
+              <li key={`${step.step}-${String(index)}`} className="text-sm text-foreground/90">
+                <span className="mr-2 rounded border border-border/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {step.status}
+                </span>
+                <span className="whitespace-pre-wrap break-words">{step.step}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       );
 

@@ -304,6 +304,41 @@ describe("codex-protocol schemas", () => {
     expect(parsed.turns[0]?.items[0]?.type).toBe("planImplementation");
   });
 
+  it("parses todo-list item with turn plan step statuses", () => {
+    const parsed = parseThreadConversationState({
+      id: "thread-123",
+      turns: [
+        {
+          status: "inProgress",
+          items: [
+            {
+              id: "todo-1",
+              type: "todo-list",
+              explanation: "Executing a multi-step plan",
+              plan: [
+                {
+                  step: "Collect context",
+                  status: "completed"
+                },
+                {
+                  step: "Apply patch",
+                  status: "inProgress"
+                },
+                {
+                  step: "Run tests",
+                  status: "pending"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    expect(parsed.turns[0]?.items[0]?.type).toBe("todo-list");
+  });
+
   it("rejects thread conversation state with unknown item types", () => {
     expect(() =>
       parseThreadConversationState({
@@ -517,6 +552,37 @@ describe("codex-protocol schemas", () => {
     expect(parsed.turns[0]?.items[2]?.type).toBe("imageView");
     expect(parsed.turns[0]?.items[3]?.type).toBe("enteredReviewMode");
     expect(parsed.turns[0]?.items[4]?.type).toBe("exitedReviewMode");
+  });
+
+  it("parses thread conversation state with collabToolCall item", () => {
+    const parsed = parseThreadConversationState({
+      id: "thread-123",
+      turns: [
+        {
+          status: "completed",
+          items: [
+            {
+              id: "item-collab",
+              type: "collabToolCall",
+              tool: "sendInput",
+              status: "inProgress",
+              senderThreadId: "thread-123",
+              receiverThreadIds: ["thread-124"],
+              prompt: "Check this file",
+              agentsStates: {
+                "thread-124": {
+                  status: "running",
+                  message: null
+                }
+              }
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    expect(parsed.turns[0]?.items[0]?.type).toBe("collabToolCall");
   });
 
   it("parses contextCompaction item when completed is omitted", () => {

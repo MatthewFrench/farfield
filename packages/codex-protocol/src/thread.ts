@@ -142,6 +142,25 @@ export const PlanImplementationItemSchema = z
   })
   .passthrough();
 
+// Mirrors app-server TurnPlanStepStatus values used by turn/plan updates.
+export const TurnPlanStepStatusSchema = z.enum(["pending", "inProgress", "completed"]);
+
+export const TodoListPlanStepSchema = z
+  .object({
+    step: z.string(),
+    status: TurnPlanStepStatusSchema
+  })
+  .passthrough();
+
+export const TodoListItemSchema = z
+  .object({
+    id: NonEmptyStringSchema,
+    type: z.literal("todo-list"),
+    explanation: z.union([z.string(), z.null()]).optional(),
+    plan: z.array(TodoListPlanStepSchema)
+  })
+  .passthrough();
+
 export const UserInputAnsweredQuestionSchema = z
   .object({
     id: NonEmptyStringSchema,
@@ -300,9 +319,8 @@ export const CollabAgentStateSchema = z
 
 export const CollabAgentToolCallStatusSchema = z.enum(["inProgress", "completed", "failed"]);
 
-export const CollabAgentToolCallItemSchema = z
+const CollabToolCallItemSharedSchema = z
   .object({
-    type: z.literal("collabAgentToolCall"),
     id: NonEmptyStringSchema,
     tool: CollabAgentToolSchema,
     status: CollabAgentToolCallStatusSchema,
@@ -312,6 +330,14 @@ export const CollabAgentToolCallItemSchema = z
     agentsStates: z.record(CollabAgentStateSchema)
   })
   .passthrough();
+
+export const CollabAgentToolCallItemSchema = CollabToolCallItemSharedSchema.extend({
+  type: z.literal("collabAgentToolCall")
+}).passthrough();
+
+export const CollabToolCallItemSchema = CollabToolCallItemSharedSchema.extend({
+  type: z.literal("collabToolCall")
+}).passthrough();
 
 export const ImageViewItemSchema = z
   .object({
@@ -345,6 +371,7 @@ export const TurnItemSchema = z.discriminatedUnion("type", [
   ReasoningItemSchema,
   PlanItemSchema,
   PlanImplementationItemSchema,
+  TodoListItemSchema,
   UserInputResponseItemSchema,
   CommandExecutionItemSchema,
   FileChangeItemSchema,
@@ -352,6 +379,7 @@ export const TurnItemSchema = z.discriminatedUnion("type", [
   WebSearchItemSchema,
   McpToolCallItemSchema,
   CollabAgentToolCallItemSchema,
+  CollabToolCallItemSchema,
   ImageViewItemSchema,
   EnteredReviewModeItemSchema,
   ExitedReviewModeItemSchema,
