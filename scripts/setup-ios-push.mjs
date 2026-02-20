@@ -205,9 +205,7 @@ const currentAddress = caddySite?.address ? normalizeHttpsAddress(caddySite.addr
 const sampleAddress = "https://192.168.1.50";
 const defaultAddress =
   currentAddress === null
-    ? interactive
-      ? detectedAddress ?? sampleAddress
-      : sampleAddress
+    ? detectedAddress ?? sampleAddress
     : interactive && currentAddress === sampleAddress && detectedAddress
     ? detectedAddress
     : currentAddress;

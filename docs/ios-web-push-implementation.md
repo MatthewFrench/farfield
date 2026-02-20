@@ -42,7 +42,7 @@ Add standards-compliant iOS Home Screen web app support and background push noti
 3. Add Web Push subscription API + persistence + send pipeline in `apps/server`.
 4. Trigger push on strict completion transition detection from `thread-stream-state-changed` events.
 5. Put Caddy in front as the single HTTPS origin for web + API + SSE.
-6. Add lightweight API auth for `/api/*` when remote access is enabled.
+6. Add lightweight API auth for `/api/*` and `/events` when remote access is enabled.
 
 ## Implementation Scope by Package
 
@@ -236,7 +236,7 @@ Protect `/api/*` with an optional shared secret header.
    - When `API_TOKEN` is set, missing/invalid token returns `401` with strict JSON envelope.
    - When `API_TOKEN` is unset, `/api/*` remains open for development compatibility.
 4. Validation remains strict and explicit; auth check happens before body parsing.
-5. `/events` remains unauthenticated to keep browser `EventSource` simple; keep it on the same HTTPS origin and trusted network boundary.
+5. `/events` uses the same token requirement when `API_TOKEN` is set. In browser flows, trusted reverse proxies inject `X-Farfield-Token` upstream.
 
 ### Event hook integration
 
@@ -247,7 +247,7 @@ In the existing IPC frame handler where `thread-stream-state-changed` is process
 3. Run completion detector.
 4. On trigger, send push payload using push service.
 
-The `/events` SSE path remains as-is.
+The `/events` SSE path remains the same endpoint and stream contract.
 
 ## `apps/web`
 
@@ -257,11 +257,7 @@ Add:
 
 1. `apps/web/public/manifest.webmanifest`
 2. `apps/web/public/icons/*` (maskable + standard sizes)
-3. Service worker entry:
-   - Option A: `apps/web/src/sw.ts` + `vite-plugin-pwa`
-   - Option B: `apps/web/public/sw.js` (manual registration)
-
-Preferred for this repo: Option A (`vite-plugin-pwa`) for idiomatic Vite integration and predictable build output.
+3. Service worker entry: `apps/web/public/sw.js` (manual registration, current implementation).
 
 ### Service worker behavior
 
@@ -540,16 +536,11 @@ Pass all items before merge:
 4. Treat push as additive capability; existing UX remains functional without push permission.
 5. Keep README default quick start unchanged.
 
-## Priority Improvements (Ranked)
+## Remaining Priority Improvements (Ranked)
 
-1. Add optional auth for `/api/*` via `API_TOKEN` with secure defaults in HTTPS deployments.
-2. Commit completion watermark only after notification send success.
-3. Allow privacy-mode updates while already subscribed.
-4. Add integration tests for auth + push endpoints.
-5. Expand `push:doctor` to include runtime endpoint checks.
-6. Enforce service worker no-cache policy for `/api/*` and `/events`.
-7. Configure Caddy SSE flush behavior explicitly.
-8. Prefer local hostname docs before raw IP examples.
+1. Add explicit integration tests for auth + push endpoint contracts (`/api/push/*`, `/api/events/session`, `/api/debug/client-errors/*`).
+2. Add explicit iOS-version/device-matrix smoke coverage (real device).
+3. Expand docs for non-localhost trusted dev origins (`VITE_DEV_PROXY_TRUSTED_ORIGINS`) with concrete examples.
 
 ## Open Decisions
 

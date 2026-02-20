@@ -41,7 +41,8 @@ bun run dev:remote                           # network-accessible (codex)
 bun run dev:remote -- --agents=opencode      # network-accessible (opencode)
 ```
 
-> **Warning:** `dev:remote` exposes Farfield with no authentication. Only use on trusted networks.
+> **Warning:** `dev:remote` is network-exposed. If `API_TOKEN` is unset, `/api/*` and `/events` are unauthenticated.
+> Set `API_TOKEN` in `.env.local` for remote use.
 
 ## Settings Parity
 
@@ -51,6 +52,12 @@ Farfield reads Codex app defaults using `config/read` and uses those values for:
 - the "app default" reasoning effort shown in the effort picker
 
 Thread listing requests now use `sortKey=updated_at`, and the server applies deterministic merged ordering across enabled agents.
+
+## Remote Auth Notes
+
+- API auth header: `X-Farfield-Token` (configured by `API_TOKEN`; `PUSH_API_TOKEN` also accepted).
+- In dev proxy mode, token injection is limited to trusted origins.
+- To allow non-localhost dev origins, set `VITE_DEV_PROXY_TRUSTED_ORIGINS` as a comma-separated list of `http(s)://host:port` origins.
 
 ## Optional ntfy Notifications
 

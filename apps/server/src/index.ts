@@ -4,8 +4,19 @@ import fs from "node:fs";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { AppServerRpcError, type SendRequestOptions } from "@farfield/api";
-import type { AppServerListThreadsResponse, IpcFrame, IpcRequestFrame } from "@farfield/protocol";
+import {
+  type AppServerListThreadsResponse,
+  CreateDebugClientErrorBodySchema,
+  CreatePushReceiptBodySchema,
+  CreatePushSubscriptionBodySchema,
+  type CreatePushReceiptBody,
+  DeletePushSubscriptionBodySchema,
+  type IpcFrame,
+  type IpcRequestFrame,
+  type PushNotificationPayload
+} from "@farfield/protocol";
 import { z } from "zod";
 import {
   InterruptBodySchema,
@@ -27,8 +38,14 @@ import { AgentRegistry } from "./agents/registry.js";
 import { ThreadIndex } from "./agents/thread-index.js";
 import { CodexAgentAdapter } from "./agents/adapters/codex-agent.js";
 import { OpenCodeAgentAdapter } from "./agents/adapters/opencode-agent.js";
+import { ClientErrorStore } from "./client-error-store.js";
 import { CompletionDetector } from "./completion-detector.js";
 import { NtfyNotifier, parseNtfyConfigFromEnv } from "./ntfy-notifier.js";
+import { PushReceiptStore } from "./push-receipt-store.js";
+import { PushSendStore } from "./push-send-store.js";
+import { PushService } from "./push-service.js";
+import { migratePushStateFile, resolvePushStatePath } from "./push-state-path.js";
+import { PushStore } from "./push-store.js";
 import type { AgentAdapter, AgentDescriptor, AgentId, AgentThreadLiveState } from "./agents/types.js";
 
 const HOST = process.env["HOST"] ?? "127.0.0.1";
@@ -81,6 +98,24 @@ const ThreadPreviewSchema = z
   .passthrough();
 const AgentIdParamSchema = z.enum(["codex", "opencode"]);
 const ThreadSortKeyParamSchema = z.enum(["created_at", "updated_at"]);
+const PushReceiptEventSchema = z.enum(["shown", "clicked", "error"]);
+const PushTestBodySchema = z
+  .object({
+    threadId: z.string().min(1),
+    turnId: z.string().min(1),
+    title: z.string().min(1).optional(),
+    body: z.string().optional(),
+    dryRun: z.boolean().optional()
+  })
+  .strict();
+const EventsSessionResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    authRequired: z.boolean(),
+    bootstrapped: z.boolean(),
+    expiresAt: z.string().datetime().nullable()
+  })
+  .strict();
 
 function resolveCodexExecutablePath(): string {
   if (process.env["CODEX_CLI_PATH"]) {
@@ -149,6 +184,67 @@ function parseBoolean(value: string | null, fallback: boolean): boolean {
   return fallback;
 }
 
+const OptionalPathEnvSchema = z.string().trim().min(1).optional();
+const API_TOKEN_HEADER_NAME = "x-farfield-token";
+const API_TOKEN_RESPONSE_HEADER = "X-Farfield-Token";
+const API_TOKEN = (process.env["API_TOKEN"] ?? process.env["PUSH_API_TOKEN"] ?? "").trim();
+const API_AUTH_REQUIRED = API_TOKEN.length > 0;
+const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+const PUSH_ENABLED = parseBoolean(process.env["PUSH_ENABLED"] ?? null, false);
+const PUSH_PRIVATE_MODE_DEFAULT = parseBoolean(process.env["PUSH_PRIVATE_MODE_DEFAULT"] ?? null, true);
+const PUSH_RECEIPTS_MAX_COUNT = parseInteger(process.env["PUSH_RECEIPTS_MAX_COUNT"] ?? null, 100);
+const PUSH_RECEIPTS_MAX_AGE_DAYS = parseInteger(process.env["PUSH_RECEIPTS_MAX_AGE_DAYS"] ?? null, 7);
+const WEB_HEALTH_BUILD_ID = (process.env["WEB_BUILD_ID"] ?? process.env["VITE_APP_BUILD_ID"] ?? "dev").trim() || "dev";
+const WEB_HEALTH_SERVICE_WORKER_VERSION = (process.env["WEB_SERVICE_WORKER_VERSION"] ?? "").trim() || null;
+
+function parseOptionalPathEnv(label: string, value: string | undefined): string | null {
+  const parsed = OptionalPathEnvSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error(`${label} must be a non-empty path when set`);
+  }
+  if (!parsed.data) {
+    return null;
+  }
+  return path.resolve(parsed.data);
+}
+
+function readHeader(req: IncomingMessage, name: string): string | null {
+  const raw = req.headers[name];
+  if (typeof raw === "string") {
+    return raw;
+  }
+  if (Array.isArray(raw)) {
+    const value = raw[0];
+    return typeof value === "string" ? value : null;
+  }
+  return null;
+}
+
+function isAuthenticatedRequest(req: IncomingMessage): boolean {
+  if (!API_AUTH_REQUIRED) {
+    return true;
+  }
+  const providedToken = readHeader(req, API_TOKEN_HEADER_NAME);
+  if (!providedToken) {
+    return false;
+  }
+  return providedToken === API_TOKEN;
+}
+
+function requireApiAuth(req: IncomingMessage, res: ServerResponse, pathname: string): boolean {
+  if (!pathname.startsWith("/api/") && pathname !== "/events") {
+    return true;
+  }
+  if (!isAuthenticatedRequest(req)) {
+    jsonResponse(res, 401, {
+      ok: false,
+      error: `Unauthorized: missing or invalid ${API_TOKEN_RESPONSE_HEADER}`
+    });
+    return false;
+  }
+  return true;
+}
+
 function parseAgentId(value: string | null): AgentId | null {
   if (!value) {
     return null;
@@ -215,8 +311,8 @@ function jsonResponse(res: ServerResponse, statusCode: number, body: unknown): v
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": encoded.length,
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "content-type",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
+    "Access-Control-Allow-Headers": "content-type, x-farfield-token",
+    "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS"
   });
   res.end(encoded);
 }
@@ -288,6 +384,72 @@ function parseReplayFrame(payload: unknown): ParsedReplayFrame {
   };
 }
 
+function resolvePushLocalCaSourcePath(): string {
+  const configuredPath = parseOptionalPathEnv("PUSH_LOCAL_CA_PATH", process.env["PUSH_LOCAL_CA_PATH"]);
+  if (configuredPath) {
+    return configuredPath;
+  }
+
+  const homeDirectory = os.homedir();
+  if (process.platform === "darwin") {
+    return path.join(
+      homeDirectory,
+      "Library",
+      "Application Support",
+      "Caddy",
+      "pki",
+      "authorities",
+      "local",
+      "root.crt"
+    );
+  }
+
+  if (process.platform === "win32") {
+    const appDataDirectory =
+      parseOptionalPathEnv("APPDATA", process.env["APPDATA"]) ??
+      path.join(homeDirectory, "AppData", "Roaming");
+    return path.join(appDataDirectory, "Caddy", "pki", "authorities", "local", "root.crt");
+  }
+
+  const xdgDataHome =
+    parseOptionalPathEnv("XDG_DATA_HOME", process.env["XDG_DATA_HOME"]) ??
+    path.join(homeDirectory, ".local", "share");
+  return path.join(xdgDataHome, "caddy", "pki", "authorities", "local", "root.crt");
+}
+
+function buildPushTestPayload(
+  input: z.infer<typeof PushTestBodySchema>,
+  privateMode: boolean
+): PushNotificationPayload {
+  const now = new Date().toISOString();
+  const notificationId = `notif_${randomUUID()}`;
+  const url = `/threads/${encodeURIComponent(input.threadId)}`;
+  const title = input.title ?? "Farfield notification";
+  const body = privateMode
+    ? "A response is ready in Farfield."
+    : (input.body ?? "A response is ready in Farfield.");
+
+  return {
+    notificationId,
+    title,
+    body,
+    threadId: input.threadId,
+    turnId: input.turnId,
+    url,
+    createdAt: now,
+    web_push: {
+      notification: {
+        title,
+        body,
+        navigate: url,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: `thread:${input.threadId}`
+      }
+    }
+  };
+}
+
 const parsedCli = (() => {
   try {
     return parseServerCliOptions(process.argv.slice(2));
@@ -309,6 +471,67 @@ const configuredAgentIds = parsedCli.agentIds;
 const codexExecutable = resolveCodexExecutablePath();
 const ipcSocketPath = resolveIpcSocketPath();
 const gitCommit = resolveGitCommitHash();
+const pushStatePathResolution = resolvePushStatePath({
+  envPath: process.env["PUSH_STATE_PATH"],
+  appDataPath: process.env["APPDATA"],
+  xdgStateHome: process.env["XDG_STATE_HOME"],
+  homeDirectory: os.homedir(),
+  platform: process.platform,
+  moduleDirectory: MODULE_DIRECTORY
+});
+const pushStateMigration = migratePushStateFile(pushStatePathResolution);
+const pushReceiptsPath =
+  parseOptionalPathEnv("PUSH_RECEIPTS_PATH", process.env["PUSH_RECEIPTS_PATH"]) ??
+  path.join(path.dirname(pushStatePathResolution.filePath), "push-receipts.json");
+const pushSendsPath =
+  parseOptionalPathEnv("PUSH_SENDS_PATH", process.env["PUSH_SENDS_PATH"]) ??
+  path.join(path.dirname(pushStatePathResolution.filePath), "push-sends.json");
+const pushLocalCaSourcePath = resolvePushLocalCaSourcePath();
+const pushVapidPublicKey = (process.env["PUSH_VAPID_PUBLIC_KEY"] ?? "").trim();
+const pushVapidPrivateKey = (process.env["PUSH_VAPID_PRIVATE_KEY"] ?? "").trim();
+const pushVapidSubject = (process.env["PUSH_VAPID_SUBJECT"] ?? "").trim();
+
+if (
+  PUSH_ENABLED &&
+  (pushVapidPublicKey.length === 0 || pushVapidPrivateKey.length === 0 || pushVapidSubject.length === 0)
+) {
+  throw new Error(
+    "PUSH_ENABLED=true requires PUSH_VAPID_PUBLIC_KEY, PUSH_VAPID_PRIVATE_KEY, and PUSH_VAPID_SUBJECT"
+  );
+}
+
+const pushStore = new PushStore(pushStatePathResolution.filePath);
+pushStore.load();
+const pushReceiptStore = new PushReceiptStore(
+  pushReceiptsPath,
+  PUSH_RECEIPTS_MAX_COUNT,
+  PUSH_RECEIPTS_MAX_AGE_DAYS * 24 * 60 * 60 * 1000
+);
+pushReceiptStore.load();
+const pushSendStore = new PushSendStore(pushSendsPath);
+pushSendStore.load();
+const pushService = new PushService({
+  enabled: PUSH_ENABLED,
+  vapidPublicKey: pushVapidPublicKey,
+  vapidPrivateKey: pushVapidPrivateKey,
+  vapidSubject: pushVapidSubject
+});
+const clientErrorSessionStartedAt = new Date().toISOString();
+const clientErrorSessionTimestamp = clientErrorSessionStartedAt.replace(/[:.]/g, "-");
+const clientErrorSessionId = `session-${clientErrorSessionTimestamp}-${String(process.pid)}`;
+const clientErrorLogPath = path.join(
+  DEFAULT_WORKSPACE,
+  ".runtime",
+  "logs",
+  "errors",
+  `${clientErrorSessionId}.ndjson`
+);
+const clientErrorMaxEntries = parseInteger(process.env["DEBUG_CLIENT_ERROR_MAX_ENTRIES"] ?? null, 2000);
+const clientErrorStore = new ClientErrorStore(
+  clientErrorLogPath,
+  clientErrorSessionId,
+  clientErrorMaxEntries
+);
 
 const history: HistoryEntry[] = [];
 const historyById = new Map<string, unknown>();
@@ -420,6 +643,45 @@ function pushActionError(
 function pushSystem(message: string, details: Record<string, unknown> = {}): void {
   logger.info({ message, ...details }, "system-event");
   pushHistory("system", "system", { message, details });
+}
+
+function recordServerErrorEvent(input: {
+  source: string;
+  operation: string;
+  message: string;
+  name: string | null;
+  stack: string | null;
+  requestId: string | null;
+  threadId: string | null;
+  url: string | null;
+  details: Record<string, string | number | boolean | null>;
+}): void {
+  const occurredAt = new Date().toISOString();
+  const event = clientErrorStore.recordServerError({
+    source: input.source,
+    operation: input.operation,
+    message: input.message,
+    name: input.name,
+    stack: input.stack,
+    requestId: input.requestId,
+    threadId: input.threadId,
+    url: input.url,
+    details: input.details,
+    occurredAt
+  });
+
+  logger.error(
+    {
+      errorId: event.errorId,
+      origin: event.origin,
+      source: event.source,
+      operation: event.operation,
+      requestId: event.requestId,
+      threadId: event.threadId,
+      message: event.message
+    },
+    "client-error-recorded"
+  );
 }
 
 let codexAdapter: CodexAgentAdapter | null = null;
@@ -544,6 +806,10 @@ function getRuntimeStateSnapshot(): Record<string, unknown> {
     lastError: runtimeLastError ?? codexRuntimeState?.lastError ?? null,
     historyCount: history.length,
     threadOwnerCount: codexAdapter?.getThreadOwnerCount() ?? 0,
+    pushEnabled: pushService.isEnabled(),
+    pushSubscriptionCount: pushStore.getSubscriptionCount(),
+    pushReceiptCount: pushReceiptStore.getCount(),
+    clientErrorCount: clientErrorStore.getCount(),
     activeTrace: activeTrace?.summary ?? null
   };
 }
@@ -649,13 +915,30 @@ const server = http.createServer(async (req, res) => {
     const pathname = url.pathname;
     const segments = pathname.split("/").filter(Boolean);
 
+    if (req.method === "GET" && pathname === "/healthz") {
+      jsonResponse(res, 200, {
+        ok: true,
+        service: "farfield-web-shell",
+        buildId: WEB_HEALTH_BUILD_ID,
+        gitCommit,
+        serviceWorkerVersion: WEB_HEALTH_SERVICE_WORKER_VERSION,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    if (!requireApiAuth(req, res, pathname)) {
+      return;
+    }
+
     if (req.method === "GET" && pathname === "/events") {
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
         "X-Accel-Buffering": "no",
-        "Access-Control-Allow-Origin": "*"
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "x-farfield-token"
       });
       res.write("retry: 1000\n\n");
 
@@ -676,6 +959,17 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         state: getRuntimeStateSnapshot()
       });
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/events/session") {
+      const response = EventsSessionResponseSchema.parse({
+        ok: true,
+        authRequired: API_AUTH_REQUIRED,
+        bootstrapped: true,
+        expiresAt: null
+      });
+      jsonResponse(res, 200, response);
       return;
     }
 
@@ -927,6 +1221,214 @@ const server = http.createServer(async (req, res) => {
       const result = await adapter.listCollaborationModes();
       jsonResponse(res, 200, { ok: true, ...result });
       return;
+    }
+
+    if (segments[0] === "api" && segments[1] === "push") {
+      if (req.method === "GET" && pathname === "/api/push/status") {
+        jsonResponse(res, 200, {
+          ok: true,
+          enabled: pushService.isEnabled(),
+          permissionRequired: true,
+          subscriptionCount: pushStore.getSubscriptionCount(),
+          privateModeDefault: PUSH_PRIVATE_MODE_DEFAULT
+        });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/push/vapid-public-key") {
+        if (!pushService.isEnabled()) {
+          jsonResponse(res, 503, {
+            ok: false,
+            error: "Push notifications are disabled"
+          });
+          return;
+        }
+
+        jsonResponse(res, 200, {
+          ok: true,
+          publicKey: pushService.getPublicKey()
+        });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/push/receipts/latest") {
+        jsonResponse(res, 200, {
+          ok: true,
+          latest: pushReceiptStore.getLatest(),
+          count: pushReceiptStore.getCount()
+        });
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/push/receipts") {
+        const body = parseBody(CreatePushReceiptBodySchema, await readJsonBody(req));
+        const event = PushReceiptEventSchema.parse(body.event);
+        const normalizedBody: CreatePushReceiptBody = {
+          notificationId: body.notificationId,
+          event,
+          url: body.url,
+          threadId: body.threadId ?? null,
+          turnId: body.turnId ?? null,
+          ...(body.message ? { message: body.message } : {}),
+          createdAt: body.createdAt
+        };
+
+        pushReceiptStore.add({
+          notificationId: normalizedBody.notificationId,
+          event: normalizedBody.event,
+          url: normalizedBody.url,
+          threadId: normalizedBody.threadId ?? null,
+          turnId: normalizedBody.turnId ?? null,
+          message: normalizedBody.message ?? null,
+          createdAt: normalizedBody.createdAt
+        });
+
+        jsonResponse(res, 200, {
+          ok: true,
+          recorded: true
+        });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/push/sends/latest") {
+        jsonResponse(res, 200, {
+          ok: true,
+          latest: pushSendStore.getLatest()
+        });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/push/local-ca") {
+        const available = fs.existsSync(pushLocalCaSourcePath);
+        jsonResponse(res, 200, {
+          ok: true,
+          available,
+          downloadPath: available ? "/api/push/local-ca/download" : null,
+          sourcePath: available ? pushLocalCaSourcePath : null
+        });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/push/local-ca/download") {
+        if (!fs.existsSync(pushLocalCaSourcePath)) {
+          jsonResponse(res, 404, {
+            ok: false,
+            error: "Local Caddy root certificate not found"
+          });
+          return;
+        }
+
+        const fileName = path.basename(pushLocalCaSourcePath);
+        const data = fs.readFileSync(pushLocalCaSourcePath);
+        res.writeHead(200, {
+          "Content-Type": "application/x-pem-file",
+          "Content-Length": data.length,
+          "Content-Disposition": `attachment; filename="${fileName}"`,
+          "Access-Control-Allow-Origin": "*"
+        });
+        res.end(data);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/push/subscriptions") {
+        const body = parseBody(CreatePushSubscriptionBodySchema, await readJsonBody(req));
+        const subscription = pushStore.upsertSubscription(body.subscription, {
+          privateMode: body.settings?.privateMode ?? PUSH_PRIVATE_MODE_DEFAULT
+        });
+        jsonResponse(res, 200, {
+          ok: true,
+          subscriptionId: subscription.id
+        });
+        return;
+      }
+
+      if (req.method === "DELETE" && pathname === "/api/push/subscriptions") {
+        const body = parseBody(DeletePushSubscriptionBodySchema, await readJsonBody(req));
+        const deleted = pushStore.removeSubscriptionByEndpoint(body.endpoint);
+        jsonResponse(res, 200, {
+          ok: true,
+          deleted
+        });
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/push/test") {
+        const body = parseBody(PushTestBodySchema, await readJsonBody(req));
+        const subscriptions = pushStore.listSubscriptions();
+        const dryRun = body.dryRun === true;
+
+        if (!pushService.isEnabled()) {
+          jsonResponse(res, 200, {
+            ok: true,
+            dryRun,
+            notificationId: null,
+            ready: false,
+            reason: "Push notifications are disabled",
+            attempted: 0,
+            delivered: 0,
+            failures: 0
+          });
+          return;
+        }
+
+        if (subscriptions.length === 0) {
+          jsonResponse(res, 200, {
+            ok: true,
+            dryRun,
+            notificationId: null,
+            ready: false,
+            reason: "No push subscriptions registered",
+            attempted: 0,
+            delivered: 0,
+            failures: 0
+          });
+          return;
+        }
+
+        if (dryRun) {
+          jsonResponse(res, 200, {
+            ok: true,
+            dryRun: true,
+            notificationId: null,
+            ready: true,
+            reason: "Push notifications are configured and subscriptions are present",
+            attempted: subscriptions.length,
+            delivered: 0,
+            failures: 0
+          });
+          return;
+        }
+
+        const privateMode = subscriptions.every((subscription) => subscription.settings.privateMode);
+        const payload = buildPushTestPayload(body, privateMode);
+        const sendResult = await pushService.sendToSubscriptions(subscriptions, payload);
+
+        for (const endpoint of sendResult.prunedEndpoints) {
+          pushStore.removeSubscriptionByEndpoint(endpoint);
+        }
+
+        pushSendStore.setLatest({
+          notificationId: payload.notificationId,
+          threadId: payload.threadId,
+          turnId: payload.turnId,
+          sentAt: payload.createdAt,
+          attempted: sendResult.attempted,
+          delivered: sendResult.delivered,
+          failures: sendResult.failures.length
+        });
+
+        jsonResponse(res, 200, {
+          ok: true,
+          dryRun: false,
+          notificationId: payload.notificationId,
+          ready: true,
+          reason: "Push notification attempted",
+          attempted: sendResult.attempted,
+          delivered: sendResult.delivered,
+          failures: sendResult.failures.length
+        });
+        return;
+      }
     }
 
     if (segments[0] === "api" && segments[1] === "threads" && segments[2]) {
@@ -1193,6 +1695,90 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (segments[0] === "api" && segments[1] === "debug") {
+      if (req.method === "POST" && pathname === "/api/debug/client-errors") {
+        const body = parseBody(CreateDebugClientErrorBodySchema, await readJsonBody(req));
+        const event = clientErrorStore.recordClientError(body);
+        logger.error(
+          {
+            errorId: event.errorId,
+            origin: event.origin,
+            source: event.source,
+            operation: event.operation,
+            requestId: event.requestId,
+            threadId: event.threadId,
+            message: event.message
+          },
+          "client-error-recorded"
+        );
+        jsonResponse(res, 200, {
+          ok: true,
+          errorId: event.errorId,
+          sessionId: event.sessionId,
+          recordedAt: event.recordedAt
+        });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/debug/client-errors") {
+        const limit = parseInteger(url.searchParams.get("limit"), 120);
+        const data = clientErrorStore.list(limit);
+        jsonResponse(res, 200, {
+          ok: true,
+          data,
+          sessionId: clientErrorStore.getSessionId(),
+          sessionLogPath: clientErrorStore.getSessionLogPath()
+        });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/debug/client-errors/session-log") {
+        const filePath = clientErrorStore.getSessionLogPath();
+        if (!fs.existsSync(filePath)) {
+          jsonResponse(res, 404, {
+            ok: false,
+            error: "Client error session log not found"
+          });
+          return;
+        }
+
+        const fileName = path.basename(filePath);
+        const data = fs.readFileSync(filePath);
+        res.writeHead(200, {
+          "Content-Type": "application/x-ndjson",
+          "Content-Length": data.length,
+          "Content-Disposition": `attachment; filename="${fileName}"`,
+          "Access-Control-Allow-Origin": "*"
+        });
+        res.end(data);
+        return;
+      }
+
+      const clientErrorIdSegment = segments[3];
+      if (
+        req.method === "GET" &&
+        segments[2] === "client-errors" &&
+        segments.length === 4 &&
+        typeof clientErrorIdSegment === "string"
+      ) {
+        const errorId = decodeURIComponent(clientErrorIdSegment);
+        const errorEvent = clientErrorStore.getById(errorId);
+        if (!errorEvent) {
+          jsonResponse(res, 404, {
+            ok: false,
+            error: "Client error not found"
+          });
+          return;
+        }
+
+        jsonResponse(res, 200, {
+          ok: true,
+          error: errorEvent,
+          sessionId: clientErrorStore.getSessionId(),
+          sessionLogPath: clientErrorStore.getSessionLogPath()
+        });
+        return;
+      }
+
       const historyEntrySegment = segments[3];
       if (
         req.method === "GET" &&
@@ -1420,6 +2006,31 @@ const server = http.createServer(async (req, res) => {
     jsonResponse(res, 404, { ok: false, error: "Not found" });
   } catch (error) {
     runtimeLastError = toErrorMessage(error);
+    if (error instanceof Error) {
+      try {
+        recordServerErrorEvent({
+          source: "farfield-server",
+          operation: "http:request",
+          message: runtimeLastError,
+          name: error.name,
+          stack: error.stack ?? null,
+          requestId: null,
+          threadId: null,
+          url: req.url ?? null,
+          details: {
+            method: req.method ?? "unknown"
+          }
+        });
+      } catch (recordError) {
+        logger.error(
+          {
+            error: toErrorMessage(recordError),
+            originalError: runtimeLastError
+          },
+          "server-error-record-failed"
+        );
+      }
+    }
     logger.error(
       {
         method: req.method ?? "unknown",
@@ -1467,6 +2078,35 @@ async function start(): Promise<void> {
     appExecutable: codexExecutable,
     socketPath: ipcSocketPath,
     agentIds: configuredAgentIds
+  });
+
+  if (pushStateMigration.migrated) {
+    pushSystem("Push state migrated", {
+      fromPath: pushStateMigration.fromPath,
+      toPath: pushStateMigration.toPath
+    });
+  }
+
+  pushSystem("Push subsystem ready", {
+    enabled: pushService.isEnabled(),
+    configured: PUSH_ENABLED,
+    requiresAuth: API_AUTH_REQUIRED,
+    authConfigured: API_AUTH_REQUIRED,
+    statePath: pushStatePathResolution.filePath,
+    statePathSource: pushStatePathResolution.source,
+    receiptsPath: pushReceiptsPath,
+    sendsPath: pushSendsPath,
+    receiptsMaxCount: PUSH_RECEIPTS_MAX_COUNT,
+    receiptsMaxAgeDays: PUSH_RECEIPTS_MAX_AGE_DAYS,
+    subscriptionCount: pushStore.getSubscriptionCount(),
+    watermarkCount: pushStore.listCompletionWatermarks().length,
+    receiptCount: pushReceiptStore.getCount()
+  });
+
+  pushSystem("Client error store ready", {
+    sessionId: clientErrorStore.getSessionId(),
+    sessionLogPath: clientErrorStore.getSessionLogPath(),
+    maxEntries: clientErrorMaxEntries
   });
 
   pushSystem("ntfy notifier ready", ntfyNotifier.getSummary());
