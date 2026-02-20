@@ -393,7 +393,9 @@ Add convenience scripts in root `package.json`:
 4. `ios:local` (starts app stack + Caddy local config)
 5. `push:keys` (generate VAPID keypair)
 6. `push:doctor` (checks env vars, Caddy template/runtime config presence, and live `/api/health` + `/api/push/status` reachability)
-6. `rotate:api-token` (rotates `API_TOKEN` and `PUSH_DOCTOR_TOKEN` in `.env.local`)
+7. `rotate:api-token` (rotates `API_TOKEN` and `PUSH_DOCTOR_TOKEN` in `.env.local`)
+8. `smoke:ios-device` (single-device interactive push smoke using an isolated ephemeral thread, archived on completion)
+9. `smoke:ios-matrix` (run the same smoke flow across two or more iOS targets using `IOS_DEVICE_SMOKE_MATRIX`)
 
 Provide `.env.example` entries for push config.
 

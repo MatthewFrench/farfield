@@ -23,6 +23,7 @@
     "push:doctor": "node scripts/with-env.mjs \"node scripts/push-doctor.mjs\"",
     "smoke:app": "node scripts/with-env.mjs \"node scripts/app-smoke.mjs\"",
     "smoke:ios-device": "node scripts/with-env.mjs \"node scripts/ios-device-smoke.mjs\"",
+    "smoke:ios-matrix": "node scripts/with-env.mjs \"node scripts/ios-device-smoke-matrix.mjs\"",
     "stress:stream-burst": "node scripts/with-env.mjs \"node scripts/stream-burst.mjs\"",
     "verify:real": "bun run smoke:app",
     "sanitize:traces": "node scripts/sanitize-traces.mjs",
@@ -35,6 +36,7 @@
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4",
+    "web-push": "^3.6.7",
     "zod": "^3.24.1"
   }
 }

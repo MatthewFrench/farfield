@@ -3,6 +3,8 @@ import { z } from "zod";
 
 const host = process.env["HOST"] ?? "127.0.0.1";
 const port = Number(process.env["PORT"] ?? "4311");
+const smokeLabelRaw = (process.env["IOS_DEVICE_SMOKE_LABEL"] ?? "").trim();
+const smokeLabel = smokeLabelRaw.length > 0 ? smokeLabelRaw : "default";
 const apiBaseUrl = (process.env["IOS_DEVICE_SMOKE_API_URL"] ?? `http://${host}:${String(port)}`).trim();
 const apiToken = (
   process.env["IOS_DEVICE_SMOKE_TOKEN"] ??
@@ -13,7 +15,6 @@ const apiToken = (
 const pushShownTimeoutMsRaw = Number(process.env["IOS_DEVICE_SMOKE_PUSH_SHOWN_TIMEOUT_MS"] ?? "90000");
 const pushClickedTimeoutMsRaw = Number(process.env["IOS_DEVICE_SMOKE_PUSH_CLICKED_TIMEOUT_MS"] ?? "90000");
 const pollIntervalMsRaw = Number(process.env["IOS_DEVICE_SMOKE_POLL_INTERVAL_MS"] ?? "1000");
-const threadLimitRaw = Number(process.env["IOS_DEVICE_SMOKE_THREAD_LIMIT"] ?? "80");
 const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
 
 const pushShownTimeoutMs =
@@ -22,7 +23,6 @@ const pushClickedTimeoutMs =
   Number.isFinite(pushClickedTimeoutMsRaw) && pushClickedTimeoutMsRaw > 0 ? pushClickedTimeoutMsRaw : 90000;
 const pollIntervalMs =
   Number.isFinite(pollIntervalMsRaw) && pollIntervalMsRaw > 0 ? pollIntervalMsRaw : 1000;
-const threadLimit = Number.isInteger(threadLimitRaw) && threadLimitRaw > 0 ? threadLimitRaw : 80;
 
 const ApiErrorSchema = z
   .object({
@@ -45,16 +45,20 @@ const HealthSchema = z
   })
   .strict();
 
-const ThreadsSchema = z
+const CreateThreadSchema = z
   .object({
     ok: z.literal(true),
-    data: z.array(
-      z.object({
-        id: z.string().min(1)
-      })
-    )
+    threadId: z.string().min(1),
+    agentId: z.enum(["codex", "opencode"])
   })
   .passthrough();
+
+const ArchiveThreadSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1)
+  })
+  .strict();
 
 const PushTestSchema = z
   .object({
@@ -107,7 +111,7 @@ const PushReceiptLatestSchema = z
 let hasFailure = false;
 
 function report(level, label, detail) {
-  process.stdout.write(`${level}  ${label}: ${detail}\n`);
+  process.stdout.write(`${level}  [${smokeLabel}] ${label}: ${detail}\n`);
 }
 
 function pass(label, detail) {
@@ -206,6 +210,40 @@ async function waitForReceiptEvent(notificationId, acceptedEvents, timeoutMs) {
   );
 }
 
+async function createIsolatedThread() {
+  const response = await requestJson("/api/threads", {
+    method: "POST",
+    useAuth: true,
+    body: {
+      agentId: "codex",
+      ephemeral: true
+    }
+  });
+
+  if (response.status !== 200) {
+    throw new Error(`Expected /api/threads to return 200, got ${String(response.status)}`);
+  }
+
+  return CreateThreadSchema.parse(response.body);
+}
+
+async function archiveThread(threadId) {
+  const response = await requestJson(`/api/threads/${encodeURIComponent(threadId)}/archive`, {
+    method: "POST",
+    useAuth: true
+  });
+  if (response.status !== 200) {
+    throw new Error(
+      `Expected /api/threads/${threadId}/archive to return 200, got ${String(response.status)}`
+    );
+  }
+
+  const parsed = ArchiveThreadSchema.parse(response.body);
+  if (parsed.threadId !== threadId) {
+    throw new Error(`Archive thread mismatch. expected=${threadId} actual=${parsed.threadId}`);
+  }
+}
+
 async function main() {
   if (!interactive) {
     throw new Error("ios-device-smoke requires an interactive terminal");
@@ -217,6 +255,7 @@ async function main() {
     );
   }
 
+  let isolatedThreadId = null;
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout
@@ -257,31 +296,18 @@ async function main() {
       `appReady=${String(health.state.appReady)} ipcConnected=${String(health.state.ipcConnected)} ipcInitialized=${String(health.state.ipcInitialized)}`
     );
 
-    const threadsResponse = await requestJson(
-      `/api/threads?limit=${String(threadLimit)}&archived=0&all=1&maxPages=20`,
-      {
-        method: "GET",
-        useAuth: true
-      }
+    const createdThread = await createIsolatedThread();
+    isolatedThreadId = createdThread.threadId;
+    const threadId = createdThread.threadId;
+    pass(
+      "Isolated smoke thread",
+      `threadId=${threadId} agentId=${createdThread.agentId} ephemeral=true`
     );
-    if (threadsResponse.status !== 200) {
-      fail("Thread list", `Expected /api/threads to return 200, got ${String(threadsResponse.status)}`);
-      process.exitCode = 1;
-      return;
-    }
-    const threads = ThreadsSchema.parse(threadsResponse.body);
-    if (threads.data.length === 0) {
-      fail("Thread list", "No threads available. Create at least one thread before running ios-device-smoke.");
-      process.exitCode = 1;
-      return;
-    }
-    const threadId = threads.data[0].id;
-    pass("Thread list", `Loaded ${String(threads.data.length)} threads`);
 
     await promptStep(rl, "Step 1: Cold start + thread load", [
       "- On iPhone, force-close the Farfield Home Screen app.",
       "- Re-open the app from Home Screen.",
-      "- Confirm threads load and open any thread in the app.",
+      `- Open thread ${threadId} in the app.`,
       "- Keep the app open on that thread, then continue here."
     ]);
 
@@ -383,8 +409,22 @@ async function main() {
       "Push clicked receipt",
       `event=${clickedReceipt.event} at ${clickedReceipt.createdAt} notificationId=${clickedReceipt.notificationId}`
     );
+
+    await archiveThread(threadId);
+    isolatedThreadId = null;
+    pass("Isolated smoke thread cleanup", `Archived ${threadId}`);
   } finally {
     rl.close();
+
+    if (isolatedThreadId) {
+      try {
+        await archiveThread(isolatedThreadId);
+        pass("Isolated smoke thread cleanup", `Archived ${isolatedThreadId}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        fail("Isolated smoke thread cleanup", message);
+      }
+    }
   }
 }
 

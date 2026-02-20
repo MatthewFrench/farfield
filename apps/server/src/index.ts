@@ -519,13 +519,15 @@ const pushService = new PushService({
 const clientErrorSessionStartedAt = new Date().toISOString();
 const clientErrorSessionTimestamp = clientErrorSessionStartedAt.replace(/[:.]/g, "-");
 const clientErrorSessionId = `session-${clientErrorSessionTimestamp}-${String(process.pid)}`;
-const clientErrorLogPath = path.join(
-  DEFAULT_WORKSPACE,
-  ".runtime",
-  "logs",
-  "errors",
-  `${clientErrorSessionId}.ndjson`
-);
+const clientErrorLogPath =
+  parseOptionalPathEnv("DEBUG_CLIENT_ERROR_LOG_PATH", process.env["DEBUG_CLIENT_ERROR_LOG_PATH"]) ??
+  path.join(
+    DEFAULT_WORKSPACE,
+    ".runtime",
+    "logs",
+    "errors",
+    `${clientErrorSessionId}.ndjson`
+  );
 const clientErrorMaxEntries = parseInteger(process.env["DEBUG_CLIENT_ERROR_MAX_ENTRIES"] ?? null, 2000);
 const clientErrorStore = new ClientErrorStore(
   clientErrorLogPath,
@@ -1551,6 +1553,45 @@ const server = http.createServer(async (req, res) => {
           ok: true,
           threadId
         });
+        return;
+      }
+
+      if (req.method === "POST" && segments[3] === "archive") {
+        if (!adapter.archiveThread) {
+          jsonResponse(res, 400, {
+            ok: false,
+            error: `Agent ${resolved.agentId} does not support thread archive`,
+            threadId
+          });
+          return;
+        }
+
+        pushActionEvent("thread-archive", "attempt", {
+          agentId: resolved.agentId,
+          threadId
+        });
+
+        try {
+          await adapter.archiveThread({ threadId });
+          pushActionEvent("thread-archive", "success", {
+            agentId: resolved.agentId,
+            threadId
+          });
+          jsonResponse(res, 200, {
+            ok: true,
+            threadId
+          });
+        } catch (error) {
+          const message = pushActionError("thread-archive", error, {
+            agentId: resolved.agentId,
+            threadId
+          });
+          jsonResponse(res, 500, {
+            ok: false,
+            error: message,
+            threadId
+          });
+        }
         return;
       }
 

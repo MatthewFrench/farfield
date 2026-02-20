@@ -84,6 +84,14 @@ Environment keys:
 
 When enabled, Farfield watches Codex thread stream updates and publishes a message when a thread reaches a completed turn with a new agent message.
 
+## iOS Device Smoke
+
+- Single-device interactive smoke: `bun run smoke:ios-device`
+- Multi-version matrix smoke (real devices): `bun run smoke:ios-matrix`
+  - Optional labels via `IOS_DEVICE_SMOKE_MATRIX`, for example:
+    - `IOS_DEVICE_SMOKE_MATRIX="iOS-17.7,iOS-18.3" bun run smoke:ios-matrix`
+- The smoke flow creates an isolated ephemeral thread and archives it at the end, so existing threads are not mutated.
+
 ## Requirements
 
 - Node.js 20+

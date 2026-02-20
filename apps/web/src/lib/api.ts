@@ -107,6 +107,13 @@ const CreateThreadResponseSchema = z
   .merge(AppServerStartThreadResponseSchema)
   .passthrough();
 
+const ArchiveThreadResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1)
+  })
+  .strict();
+
 const TraceStatusSchema = z
   .object({
     ok: z.literal(true),
@@ -482,6 +489,13 @@ export async function createThread(input?: {
     body: JSON.stringify(input ?? {})
   });
   return CreateThreadResponseSchema.parse(data);
+}
+
+export async function archiveThread(threadId: string): Promise<void> {
+  const data = await request(`/api/threads/${encodeURIComponent(threadId)}/archive`, {
+    method: "POST"
+  });
+  ArchiveThreadResponseSchema.parse(data);
 }
 
 export async function listCollaborationModes(): Promise<

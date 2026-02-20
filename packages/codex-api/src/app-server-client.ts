@@ -66,6 +66,12 @@ const AppServerResumeThreadRequestSchema = z
     persistExtendedHistory: z.boolean()
   })
   .passthrough();
+const AppServerArchiveThreadRequestSchema = z
+  .object({
+    threadId: z.string().min(1)
+  })
+  .passthrough();
+const AppServerArchiveThreadResponseSchema = z.object({}).passthrough();
 
 const AppServerReasoningEffortSchema = z.enum([
   "none",
@@ -236,5 +242,13 @@ export class AppServerClient {
     });
     const result = await this.transport.request("thread/resume", request);
     return parseWithSchema(AppServerReadThreadResponseSchema, result, "AppServerResumeThreadResponse");
+  }
+
+  public async archiveThread(threadId: string): Promise<void> {
+    const request = AppServerArchiveThreadRequestSchema.parse({
+      threadId
+    });
+    const result = await this.transport.request("thread/archive", request);
+    parseWithSchema(AppServerArchiveThreadResponseSchema, result, "AppServerArchiveThreadResponse");
   }
 }

@@ -2,6 +2,15 @@
 
 These scenarios validate Farfield against a running real stack.
 
+## State isolation rule
+
+- Real-e2e scenarios must not mutate pre-existing threads.
+- If a scenario needs to send messages, set mode, submit input, or interrupt:
+  - create a managed ephemeral thread via `stateGuard.createManagedThread()`
+  - run all mutations only on that managed thread
+  - allow fixture teardown to archive that managed thread
+- Browser-side `POST /api/threads` is disallowed in scenarios. Use `stateGuard.createManagedThread()` instead so cleanup is deterministic.
+
 ## Prerequisites
 
 1. Start the app stack:

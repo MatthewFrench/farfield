@@ -24,6 +24,14 @@ This plan is setup and workflow only. It does not include turning manual session
 ### Existing observability and smoke checks
 
 - Runtime endpoint smoke command exists: `pnpm smoke:app` (`scripts/app-smoke.mjs`).
+- Real-device iOS smoke commands exist:
+  - `pnpm smoke:ios-device` (single target)
+  - `pnpm smoke:ios-matrix` (multi-target matrix via `IOS_DEVICE_SMOKE_MATRIX`)
+- Real-runtime mutation safety is enforced in e2e fixture:
+  - baseline thread IDs are captured at test start
+  - browser mutations on pre-existing threads fail the scenario
+  - managed test threads must be created via `stateGuard.createManagedThread()`
+  - managed test threads are archived during fixture teardown (`POST /api/threads/:threadId/archive`)
 - Backend already exposes debug error endpoints:
   - `POST /api/debug/client-errors`
   - `GET /api/debug/client-errors`

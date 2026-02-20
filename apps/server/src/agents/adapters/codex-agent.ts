@@ -23,6 +23,7 @@ import { logger } from "../../logger.js";
 import { resolveOwnerClientId } from "../../thread-owner.js";
 import type {
   AgentAdapter,
+  AgentArchiveThreadInput,
   AgentConfigDefaults,
   AgentCapabilities,
   AgentCreateThreadInput,
@@ -412,6 +413,11 @@ export class CodexAgentAdapter implements AgentAdapter {
       threadId: input.threadId,
       ownerClientId
     });
+  }
+
+  public async archiveThread(input: AgentArchiveThreadInput): Promise<void> {
+    this.ensureCodexAvailable();
+    await this.runAppServerCall(() => this.appClient.archiveThread(input.threadId));
   }
 
   public async listModels(limit: number) {
