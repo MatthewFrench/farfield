@@ -151,6 +151,32 @@ const DEBUG_ERROR_DETAIL_ENVELOPE_SCHEMA = z
   .merge(DebugErrorDetailResponseSchema)
   .strict();
 
+const DEBUG_HISTORY_ENTRY_SCHEMA = z
+  .object({
+    id: z.string(),
+    at: z.string().datetime(),
+    source: z.enum(["ipc", "app", "system"]),
+    direction: z.enum(["in", "out", "system"]),
+    payload: z.object({}).passthrough(),
+    meta: z.object({}).passthrough()
+  })
+  .strict();
+
+const DEBUG_HISTORY_LIST_ENVELOPE_SCHEMA = z
+  .object({
+    ok: z.literal(true),
+    history: z.array(DEBUG_HISTORY_ENTRY_SCHEMA)
+  })
+  .strict();
+
+const DEBUG_HISTORY_DETAIL_ENVELOPE_SCHEMA = z
+  .object({
+    ok: z.literal(true),
+    entry: DEBUG_HISTORY_ENTRY_SCHEMA,
+    fullPayload: z.object({}).passthrough().nullable()
+  })
+  .strict();
+
 const LIVE_STATE_SCHEMA = z
   .object({
     ok: z.literal(true),
@@ -966,6 +992,53 @@ describe("push API auth and subscription routes", () => {
     expect(healthAfter.state.suppressedClientErrorReportsLast5m).toBeGreaterThanOrEqual(
       healthBefore.state.suppressedClientErrorReportsLast5m + 1
     );
+  });
+
+  it("serves debug history details from /api/debug/history/:id", async () => {
+    await waitForIpcInitialized(20_000);
+
+    const threadId = `thread_debug_history_${Date.now()}`;
+    sendFakeIpcFrame({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "fake-ipc-client",
+      version: 4,
+      params: {
+        conversationId: threadId,
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "snapshot",
+          conversationState: {
+            id: threadId,
+            turns: [],
+            requests: []
+          }
+        }
+      }
+    });
+    await delay(200);
+
+    const listResponse = await fetch(`${baseUrl}/api/debug/history?limit=120`, {
+      headers: authHeaders(false)
+    });
+    expect(listResponse.status).toBe(200);
+    const parsedList = DEBUG_HISTORY_LIST_ENVELOPE_SCHEMA.parse(await listResponse.json());
+    expect(parsedList.history.length).toBeGreaterThan(0);
+    const targetEntry = parsedList.history[parsedList.history.length - 1];
+    if (!targetEntry) {
+      throw new Error("Expected debug history list to contain at least one entry");
+    }
+
+    const detailResponse = await fetch(`${baseUrl}/api/debug/history/${encodeURIComponent(targetEntry.id)}`, {
+      headers: authHeaders(false)
+    });
+    expect(detailResponse.status).toBe(200);
+    const parsedDetail = DEBUG_HISTORY_DETAIL_ENVELOPE_SCHEMA.parse(await detailResponse.json());
+    expect(parsedDetail.entry.id).toBe(targetEntry.id);
+    expect(parsedDetail.entry.at).toBe(targetEntry.at);
+    expect(parsedDetail.entry.source).toBe(targetEntry.source);
+    expect(parsedDetail.entry.direction).toBe(targetEntry.direction);
   });
 
   it("reduces json-pointer single-patch thread stream broadcasts without invalid warnings", async () => {

@@ -2761,15 +2761,14 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      if (req.method === "GET" && segments[2] === "history") {
-        const limit = parseInteger(url.searchParams.get("limit"), 120);
-        const data = history.slice(-limit);
-        jsonResponse(res, 200, { ok: true, history: data });
-        return;
-      }
-
-      if (req.method === "GET" && segments[2] === "history" && segments[3]) {
-        const entryId = decodeURIComponent(segments[3]);
+      const historyEntrySegment = segments[3];
+      if (
+        req.method === "GET" &&
+        segments[2] === "history" &&
+        segments.length === 4 &&
+        typeof historyEntrySegment === "string"
+      ) {
+        const entryId = decodeURIComponent(historyEntrySegment);
         const entry = history.find((item) => item.id === entryId) ?? null;
         if (!entry) {
           jsonResponse(res, 404, { ok: false, error: "History entry not found" });
@@ -2781,6 +2780,13 @@ const server = http.createServer(async (req, res) => {
           entry,
           fullPayload: historyById.get(entryId) ?? null
         });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/debug/history") {
+        const limit = parseInteger(url.searchParams.get("limit"), 120);
+        const data = history.slice(-limit);
+        jsonResponse(res, 200, { ok: true, history: data });
         return;
       }
 
