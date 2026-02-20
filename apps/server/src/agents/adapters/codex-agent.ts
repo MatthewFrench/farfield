@@ -777,6 +777,10 @@ function isKnownBenignAppServerStderr(line: string): boolean {
   return (
     line.includes("codex_core::rollout::list") &&
     line.includes("state db missing rollout path for thread")
+  ) || (
+    line.includes("codex_core::state_db") &&
+    line.includes("state db record_discrepancy: find_thread_path_by_id_str_in_subdir") &&
+    line.includes("falling_back")
   );
 }
 

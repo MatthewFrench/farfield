@@ -989,7 +989,6 @@ export function App(): React.JSX.Element {
   const refreshAll = useCallback(async () => {
     setIsCoreLoading(true);
     try {
-      setError("");
       await loadCoreData();
       if (selectedThreadIdRef.current) await loadSelectedThread(selectedThreadIdRef.current);
     } catch (e) {
@@ -1359,8 +1358,6 @@ export function App(): React.JSX.Element {
 
     setIsBusy(true);
     try {
-      setError("");
-
       let threadId = selectedThreadId;
 
       // Auto-create a thread if none is selected.
@@ -1407,7 +1404,6 @@ export function App(): React.JSX.Element {
     lastAppliedModeSignatureRef.current = signature;
     setIsModeSyncing(true);
     try {
-      setError("");
       await setCollaborationMode({
         threadId: selectedThreadId,
         collaborationMode: {
@@ -1438,7 +1434,6 @@ export function App(): React.JSX.Element {
     }
     setIsBusy(true);
     try {
-      setError("");
       await submitUserInput({
         threadId: selectedThreadId,
         requestId: activeRequest.id,
@@ -1456,7 +1451,6 @@ export function App(): React.JSX.Element {
     if (!selectedThreadId || !activeRequest) return;
     setIsBusy(true);
     try {
-      setError("");
       await submitUserInput({
         threadId: selectedThreadId,
         requestId: activeRequest.id,
@@ -1474,7 +1468,6 @@ export function App(): React.JSX.Element {
     if (!selectedThreadId) return;
     setIsBusy(true);
     try {
-      setError("");
       await interruptThread({ threadId: selectedThreadId });
       await refreshAll();
     } catch (e) {
@@ -1512,7 +1505,6 @@ export function App(): React.JSX.Element {
     }
     setIsBusy(true);
     try {
-      setError("");
       const created = await createThread({
         cwd: trimmedProjectPath,
         ...(agentId ? { agentId } : {})
@@ -1972,7 +1964,7 @@ export function App(): React.JSX.Element {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden shrink-0"
+              className="relative z-30 overflow-hidden shrink-0"
             >
               <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-sm text-destructive">
                 <span className="truncate">{error}</span>
@@ -1995,7 +1987,7 @@ export function App(): React.JSX.Element {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden shrink-0"
+              className="relative z-30 overflow-hidden shrink-0"
             >
               <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 text-sm text-amber-200">
                 Live updates failed for this thread. Showing saved messages only.
