@@ -26,6 +26,8 @@ export interface AgentListThreadsInput {
   all: boolean;
   maxPages: number;
   cursor: string | null;
+  sortKey: "created_at" | "updated_at";
+  cwd: string | null;
 }
 
 export interface AgentCreateThreadInput {
@@ -118,6 +120,11 @@ export interface AgentDescriptor {
   projectDirectories: string[];
 }
 
+export interface AgentConfigDefaults {
+  model: string | null;
+  reasoningEffort: string | null;
+}
+
 export interface AgentAdapter {
   readonly id: AgentId;
   readonly label: string;
@@ -143,4 +150,5 @@ export interface AgentAdapter {
   readLiveState?(threadId: string): Promise<AgentThreadLiveState>;
   readStreamEvents?(threadId: string, limit: number): Promise<AgentThreadStreamEvents>;
   listProjectDirectories?(): Promise<string[]>;
+  readConfigDefaults?(): Promise<AgentConfigDefaults>;
 }

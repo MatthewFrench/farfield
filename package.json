@@ -15,6 +15,7 @@
     "typecheck": "bun run --workspaces typecheck",
     "premerge:check": "bun run lint && bun run typecheck && bun run test",
     "setup:ios-push": "node scripts/setup-ios-push.mjs",
+    "setup:ntfy": "node scripts/setup-ntfy.mjs",
     "setup:domain-https": "node scripts/setup-domain-https.mjs",
     "ios:trust-local-ca": "node scripts/with-env.mjs \"node scripts/ios-trust-local-ca.mjs\"",
     "ios:local": "node scripts/with-env.mjs \"node scripts/ios-local.mjs\"",

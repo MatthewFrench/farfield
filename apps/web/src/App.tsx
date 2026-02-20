@@ -28,6 +28,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import {
   createThread,
+  getConfigDefaults,
   getHealth,
   getHistoryEntry,
   getLiveState,
@@ -82,6 +83,7 @@ import { z } from "zod";
 
 /* ── Types ─────────────────────────────────────────────────── */
 type Health = Awaited<ReturnType<typeof getHealth>>;
+type ConfigDefaults = Awaited<ReturnType<typeof getConfigDefaults>>;
 type ThreadsResponse = Awaited<ReturnType<typeof listThreads>>;
 type ModesResponse = Awaited<ReturnType<typeof listCollaborationModes>>;
 type ModelsResponse = Awaited<ReturnType<typeof listModels>>;
@@ -315,7 +317,11 @@ function normalizeModeSettingValue(
   return normalized;
 }
 
-function readModeSelectionFromConversationState(state: NonNullable<ReadThreadResponse["thread"]> | null): {
+function readModeSelectionFromConversationState(
+  state: NonNullable<ReadThreadResponse["thread"]> | null,
+  appDefaultModel: string,
+  appDefaultEffort: string
+): {
   modeKey: string;
   modelId: string;
   reasoningEffort: string;
@@ -333,26 +339,32 @@ function readModeSelectionFromConversationState(state: NonNullable<ReadThreadRes
       modeKey: state.latestCollaborationMode.mode,
       modelId: normalizeModeSettingValue(
         state.latestCollaborationMode.settings.model,
-        ASSUMED_APP_DEFAULT_MODEL
+        appDefaultModel
       ),
       reasoningEffort: normalizeModeSettingValue(
         state.latestCollaborationMode.settings.reasoning_effort,
-        ASSUMED_APP_DEFAULT_EFFORT
+        appDefaultEffort
       )
     };
   }
 
   return {
     modeKey: "",
-    modelId: normalizeModeSettingValue(state.latestModel, ASSUMED_APP_DEFAULT_MODEL),
-    reasoningEffort: normalizeModeSettingValue(state.latestReasoningEffort, ASSUMED_APP_DEFAULT_EFFORT)
+    modelId: normalizeModeSettingValue(state.latestModel, appDefaultModel),
+    reasoningEffort: normalizeModeSettingValue(state.latestReasoningEffort, appDefaultEffort)
   };
 }
 
 function modeSelectionSignatureFromConversationState(
-  state: NonNullable<ReadThreadResponse["thread"]> | null | undefined
+  state: NonNullable<ReadThreadResponse["thread"]> | null | undefined,
+  appDefaultModel: string,
+  appDefaultEffort: string
 ): string {
-  const selection = readModeSelectionFromConversationState(state ?? null);
+  const selection = readModeSelectionFromConversationState(
+    state ?? null,
+    appDefaultModel,
+    appDefaultEffort
+  );
   return buildModeSignature(selection.modeKey, selection.modelId, selection.reasoningEffort);
 }
 
@@ -382,7 +394,11 @@ function conversationProgressSignature(
   ].join("|");
 }
 
-function buildLiveStateSyncSignature(state: LiveStateResponse | null | undefined): string {
+function buildLiveStateSyncSignature(
+  state: LiveStateResponse | null | undefined,
+  appDefaultModel: string,
+  appDefaultEffort: string
+): string {
   if (!state) {
     return "";
   }
@@ -393,12 +409,16 @@ function buildLiveStateSyncSignature(state: LiveStateResponse | null | undefined
     state.ownerClientId ?? "",
     String(getConversationStateUpdatedAt(conversationState)),
     String(conversationState?.turns.length ?? -1),
-    modeSelectionSignatureFromConversationState(conversationState),
+    modeSelectionSignatureFromConversationState(conversationState, appDefaultModel, appDefaultEffort),
     conversationProgressSignature(conversationState)
   ].join("|");
 }
 
-function buildReadThreadSyncSignature(state: ReadThreadResponse | null | undefined): string {
+function buildReadThreadSyncSignature(
+  state: ReadThreadResponse | null | undefined,
+  appDefaultModel: string,
+  appDefaultEffort: string
+): string {
   if (!state) {
     return "";
   }
@@ -408,7 +428,7 @@ function buildReadThreadSyncSignature(state: ReadThreadResponse | null | undefin
     conversationState.id,
     String(getConversationStateUpdatedAt(conversationState)),
     String(conversationState.turns.length),
-    modeSelectionSignatureFromConversationState(conversationState),
+    modeSelectionSignatureFromConversationState(conversationState, appDefaultModel, appDefaultEffort),
     conversationProgressSignature(conversationState)
   ].join("|");
 }
@@ -547,6 +567,7 @@ export function App(): React.JSX.Element {
   /* State */
   const [error, setError] = useState("");
   const [health, setHealth] = useState<Health | null>(null);
+  const [configDefaults, setConfigDefaults] = useState<ConfigDefaults | null>(null);
   const [threads, setThreads] = useState<ThreadsResponse["data"]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(initialUiState.threadId);
   const [liveState, setLiveState] = useState<LiveStateResponse | null>(null);
@@ -625,6 +646,8 @@ export function App(): React.JSX.Element {
     () => agentsById[selectedAgentId] ?? null,
     [agentsById, selectedAgentId]
   );
+  const appDefaultModel = configDefaults?.model ?? ASSUMED_APP_DEFAULT_MODEL;
+  const appDefaultReasoningEffort = configDefaults?.reasoningEffort ?? ASSUMED_APP_DEFAULT_EFFORT;
   const selectedAgentLabel = selectedAgentDescriptor?.label ?? "Agent";
   const selectedAgentCapabilities = selectedAgentDescriptor?.capabilities ?? null;
   const groupedThreads = useMemo(() => {
@@ -753,8 +776,8 @@ export function App(): React.JSX.Element {
     return Array.from(vals);
   }, [conversationState?.latestReasoningEffort, modes, selectedReasoningEffort]);
   const effortOptionsWithoutAssumedDefault = useMemo(
-    () => effortOptions.filter((option) => option !== ASSUMED_APP_DEFAULT_EFFORT),
-    [effortOptions]
+    () => effortOptions.filter((option) => option !== appDefaultReasoningEffort),
+    [appDefaultReasoningEffort, effortOptions]
   );
 
   const modelOptions = useMemo(() => {
@@ -772,8 +795,8 @@ export function App(): React.JSX.Element {
     return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
   }, [conversationState?.latestModel, models, selectedModelId]);
   const modelOptionsWithoutAssumedDefault = useMemo(
-    () => modelOptions.filter((option) => option.id !== ASSUMED_APP_DEFAULT_MODEL),
-    [modelOptions]
+    () => modelOptions.filter((option) => option.id !== appDefaultModel),
+    [appDefaultModel, modelOptions]
   );
 
   const deferredConversationState = useDeferredValue(conversationState);
@@ -854,14 +877,21 @@ export function App(): React.JSX.Element {
     : !openCodeConnected;
   /* Data loading */
   const loadCoreData = useCallback(async () => {
-    const [nh, nt, nm, nmo, ntr, nhist, nag] = await Promise.all([
+    const [nh, nt, nm, nmo, ntr, nhist, nag, ncfg] = await Promise.all([
       getHealth(),
-      listThreads({ limit: 80, archived: false, all: true, maxPages: 20 }),
+      listThreads({
+        limit: 80,
+        archived: false,
+        all: true,
+        maxPages: 20,
+        sortKey: "updated_at"
+      }),
       listCollaborationModes(),
       listModels(),
       getTraceStatus(),
       listDebugHistory(120),
-      listAgents().catch(() => null)
+      listAgents().catch(() => null),
+      getConfigDefaults({ agentId: "codex" }).catch(() => null)
     ]);
     let preferredAgentId: AgentId | null = null;
     const nextThreadsSignature = nt.data.map((thread) =>
@@ -908,6 +938,19 @@ export function App(): React.JSX.Element {
       if (!signaturesMatch(modelsSignatureRef.current, nextModelsSignature)) {
         modelsSignatureRef.current = nextModelsSignature;
         setModels(nmo.data);
+      }
+      if (ncfg) {
+        setConfigDefaults((prev) => {
+          if (
+            prev &&
+            prev.agentId === ncfg.agentId &&
+            prev.model === ncfg.model &&
+            prev.reasoningEffort === ncfg.reasoningEffort
+          ) {
+            return prev;
+          }
+          return ncfg;
+        });
       }
       setTraceStatus((prev) => {
         if (
@@ -1020,13 +1063,19 @@ export function App(): React.JSX.Element {
     }
     startTransition(() => {
       setLiveState((prev) => {
-        if (buildLiveStateSyncSignature(prev) === buildLiveStateSyncSignature(live)) {
+        if (
+          buildLiveStateSyncSignature(prev, appDefaultModel, appDefaultReasoningEffort)
+          === buildLiveStateSyncSignature(live, appDefaultModel, appDefaultReasoningEffort)
+        ) {
           return prev;
         }
         return live;
       });
       setReadThreadState((prev) => {
-        if (buildReadThreadSyncSignature(prev) === buildReadThreadSyncSignature(read)) {
+        if (
+          buildReadThreadSyncSignature(prev, appDefaultModel, appDefaultReasoningEffort)
+          === buildReadThreadSyncSignature(read, appDefaultModel, appDefaultReasoningEffort)
+        ) {
           return prev;
         }
         return read;
@@ -1042,7 +1091,7 @@ export function App(): React.JSX.Element {
         return stream.events;
       });
     });
-  }, [agentsById, selectedAgentId, threads]);
+  }, [agentsById, appDefaultModel, appDefaultReasoningEffort, selectedAgentId, threads]);
 
   const refreshAll = useCallback(async () => {
     setIsCoreLoading(true);
@@ -1291,7 +1340,11 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     const cs = conversationState;
     if (!cs) return;
-    const remoteSelection = readModeSelectionFromConversationState(cs);
+    const remoteSelection = readModeSelectionFromConversationState(
+      cs,
+      appDefaultModel,
+      appDefaultReasoningEffort
+    );
     const remoteModeKey = remoteSelection.modeKey || selectedModeKey || defaultModeOption?.mode || "";
     const remoteSignature = buildModeSignature(
       remoteModeKey,
@@ -1337,6 +1390,8 @@ export function App(): React.JSX.Element {
       setIsModeSyncing(false);
     }
   }, [
+    appDefaultModel,
+    appDefaultReasoningEffort,
     conversationState,
     defaultModeOption?.mode,
     hasHydratedModeFromLiveState,
@@ -2347,7 +2402,7 @@ export function App(): React.JSX.Element {
                           <SelectValue placeholder="Model" />
                         </SelectTrigger>
                         <SelectContent position="popper">
-                          <SelectItem value={APP_DEFAULT_VALUE}>{ASSUMED_APP_DEFAULT_MODEL}</SelectItem>
+                          <SelectItem value={APP_DEFAULT_VALUE}>{appDefaultModel}</SelectItem>
                           {modelOptionsWithoutAssumedDefault.map((option) => (
                             <SelectItem key={option.id} value={option.id}>
                               {option.label}
@@ -2374,7 +2429,7 @@ export function App(): React.JSX.Element {
                           <SelectValue placeholder="Effort" />
                         </SelectTrigger>
                         <SelectContent position="popper">
-                          <SelectItem value={APP_DEFAULT_VALUE}>{ASSUMED_APP_DEFAULT_EFFORT}</SelectItem>
+                          <SelectItem value={APP_DEFAULT_VALUE}>{appDefaultReasoningEffort}</SelectItem>
                           {effortOptionsWithoutAssumedDefault.map((option) => (
                             <SelectItem key={option} value={option}>
                               {option}

@@ -58,3 +58,70 @@ describe("AppServerClient.resumeThread", () => {
     });
   });
 });
+
+describe("AppServerClient.listThreads", () => {
+  it("passes sortKey and cwd when provided", async () => {
+    const transport: AppServerTransport = {
+      request: vi.fn().mockResolvedValue({
+        data: [],
+        nextCursor: null
+      }),
+      close: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const client = new AppServerClient(transport);
+    await client.listThreads({
+      limit: 50,
+      archived: false,
+      sortKey: "updated_at",
+      cwd: "/tmp/workspace"
+    });
+
+    expect(transport.request).toHaveBeenCalledWith("thread/list", {
+      limit: 50,
+      archived: false,
+      cursor: null,
+      sortKey: "updated_at",
+      cwd: "/tmp/workspace"
+    });
+  });
+});
+
+describe("AppServerClient.readConfig", () => {
+  it("requests config/read with includeLayers=false by default", async () => {
+    const transport: AppServerTransport = {
+      request: vi.fn().mockResolvedValue({
+        config: {}
+      }),
+      close: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const client = new AppServerClient(transport);
+    await client.readConfig();
+
+    expect(transport.request).toHaveBeenCalledWith("config/read", {
+      includeLayers: false
+    });
+  });
+
+  it("passes includeLayers=true when requested", async () => {
+    const transport: AppServerTransport = {
+      request: vi.fn().mockResolvedValue({
+        config: {
+          model: "gpt-5.3-codex",
+          model_reasoning_effort: "medium",
+          profile: "default",
+          profiles: {}
+        }
+      }),
+      close: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const client = new AppServerClient(transport);
+    await client.readConfig({ includeLayers: true });
+
+    expect(transport.request).toHaveBeenCalledWith("config/read", {
+      includeLayers: true
+    });
+  });
+});

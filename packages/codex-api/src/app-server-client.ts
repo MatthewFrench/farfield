@@ -37,6 +37,8 @@ export interface ListThreadsOptions {
   limit: number;
   archived: boolean;
   cursor?: string;
+  sortKey?: "created_at" | "updated_at";
+  cwd?: string;
 }
 
 export interface ListThreadsAllOptions {
@@ -44,6 +46,8 @@ export interface ListThreadsAllOptions {
   archived: boolean;
   cursor?: string;
   maxPages: number;
+  sortKey?: "created_at" | "updated_at";
+  cwd?: string;
 }
 
 export interface StartThreadOptions {
@@ -62,6 +66,37 @@ const AppServerResumeThreadRequestSchema = z
     persistExtendedHistory: z.boolean()
   })
   .passthrough();
+
+const AppServerReasoningEffortSchema = z.enum([
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh"
+]);
+
+const AppServerConfigProfileSchema = z
+  .object({
+    model: z.union([z.string(), z.null()]).optional().default(null),
+    model_reasoning_effort: z.union([AppServerReasoningEffortSchema, z.null()]).optional().default(null)
+  })
+  .passthrough();
+
+const AppServerConfigReadResponseSchema = z
+  .object({
+    config: z
+      .object({
+        profile: z.union([z.string(), z.null()]).optional().default(null),
+        model: z.union([z.string(), z.null()]).optional().default(null),
+        model_reasoning_effort: z.union([AppServerReasoningEffortSchema, z.null()]).optional().default(null),
+        profiles: z.record(AppServerConfigProfileSchema).optional().default({})
+      })
+      .passthrough()
+  })
+  .passthrough();
+
+export type AppServerConfigReadResponse = z.infer<typeof AppServerConfigReadResponseSchema>;
 
 export class AppServerClient {
   private readonly transport: AppServerTransport;
@@ -83,7 +118,9 @@ export class AppServerClient {
     const result = await this.transport.request("thread/list", {
       limit: options.limit,
       archived: options.archived,
-      cursor: options.cursor ?? null
+      cursor: options.cursor ?? null,
+      ...(options.sortKey ? { sortKey: options.sortKey } : {}),
+      ...(options.cwd ? { cwd: options.cwd } : {})
     });
 
     return parseWithSchema(AppServerListThreadsResponseSchema, result, "AppServerListThreadsResponse");
@@ -101,11 +138,15 @@ export class AppServerClient {
           ? {
               limit: options.limit,
               archived: options.archived,
-              cursor
+              cursor,
+              ...(options.sortKey ? { sortKey: options.sortKey } : {}),
+              ...(options.cwd ? { cwd: options.cwd } : {})
             }
           : {
               limit: options.limit,
-              archived: options.archived
+              archived: options.archived,
+              ...(options.sortKey ? { sortKey: options.sortKey } : {}),
+              ...(options.cwd ? { cwd: options.cwd } : {})
             }
       );
 
@@ -154,6 +195,13 @@ export class AppServerClient {
       result,
       "AppServerCollaborationModeListResponse"
     );
+  }
+
+  public async readConfig(options?: { includeLayers?: boolean }): Promise<AppServerConfigReadResponse> {
+    const result = await this.transport.request("config/read", {
+      includeLayers: options?.includeLayers ?? false
+    });
+    return parseWithSchema(AppServerConfigReadResponseSchema, result, "AppServerConfigReadResponse");
   }
 
   public async startThread(options: StartThreadOptions): Promise<AppServerStartThreadResponse> {

@@ -352,6 +352,7 @@ export async function getWebShellHealth(): Promise<z.infer<typeof WebShellHealth
 
 const AgentIdSchema = z.enum(["codex", "opencode"]);
 export type AgentId = z.infer<typeof AgentIdSchema>;
+const ReasoningEffortSchema = z.enum(["none", "minimal", "low", "medium", "high", "xhigh"]);
 
 const AgentCapabilitiesSchema = z
   .object({
@@ -385,6 +386,28 @@ export async function listAgents(): Promise<z.infer<typeof AgentsResponseSchema>
   return AgentsResponseSchema.parse(await request("/api/agents"));
 }
 
+const ConfigDefaultsResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    agentId: z.union([AgentIdSchema, z.null()]),
+    model: z.union([z.string(), z.null()]),
+    reasoningEffort: z.union([ReasoningEffortSchema, z.null()])
+  })
+  .strict();
+
+export async function getConfigDefaults(options?: {
+  agentId?: AgentId;
+}): Promise<z.infer<typeof ConfigDefaultsResponseSchema>> {
+  const params = new URLSearchParams();
+  if (options?.agentId) {
+    params.set("agentId", options.agentId);
+  }
+  const suffix = params.toString();
+  return ConfigDefaultsResponseSchema.parse(
+    await request(suffix.length > 0 ? `/api/config/defaults?${suffix}` : "/api/config/defaults")
+  );
+}
+
 const ThreadListItemWithAgentSchema = AppServerListThreadsResponseSchema.shape.data.element.and(
   z
     .object({
@@ -407,12 +430,20 @@ export async function listThreads(options: {
   archived: boolean;
   all: boolean;
   maxPages: number;
+  sortKey?: "created_at" | "updated_at";
+  cwd?: string;
 }): Promise<z.infer<typeof ThreadListResponseSchema>> {
   const params = new URLSearchParams();
   params.set("limit", String(options.limit));
   params.set("archived", options.archived ? "1" : "0");
   params.set("all", options.all ? "1" : "0");
   params.set("maxPages", String(options.maxPages));
+  if (options.sortKey) {
+    params.set("sortKey", options.sortKey);
+  }
+  if (options.cwd) {
+    params.set("cwd", options.cwd);
+  }
 
   const data = await request(`/api/threads?${params.toString()}`);
   return ThreadListResponseSchema.parse(stripOk(data));

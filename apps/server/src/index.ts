@@ -5,7 +5,8 @@ import os from "node:os";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { AppServerRpcError, type SendRequestOptions } from "@farfield/api";
-import type { IpcFrame, IpcRequestFrame } from "@farfield/protocol";
+import type { AppServerListThreadsResponse, IpcFrame, IpcRequestFrame } from "@farfield/protocol";
+import { z } from "zod";
 import {
   InterruptBodySchema,
   parseBody,
@@ -26,16 +27,21 @@ import { AgentRegistry } from "./agents/registry.js";
 import { ThreadIndex } from "./agents/thread-index.js";
 import { CodexAgentAdapter } from "./agents/adapters/codex-agent.js";
 import { OpenCodeAgentAdapter } from "./agents/adapters/opencode-agent.js";
-import type { AgentAdapter, AgentDescriptor, AgentId } from "./agents/types.js";
+import { CompletionDetector } from "./completion-detector.js";
+import { NtfyNotifier, parseNtfyConfigFromEnv } from "./ntfy-notifier.js";
+import type { AgentAdapter, AgentDescriptor, AgentId, AgentThreadLiveState } from "./agents/types.js";
 
 const HOST = process.env["HOST"] ?? "127.0.0.1";
 const PORT = Number(process.env["PORT"] ?? 4311);
 const HISTORY_LIMIT = 2_000;
 const USER_AGENT = "farfield/0.2.0";
 const IPC_RECONNECT_DELAY_MS = 1_000;
+const NTFY_COMPLETION_DEBOUNCE_MS = 250;
 
 const TRACE_DIR = path.resolve(process.cwd(), "traces");
 const DEFAULT_WORKSPACE = path.resolve(process.cwd());
+type ThreadSortKey = "created_at" | "updated_at";
+type ThreadListItemWithAgentId = AppServerListThreadsResponse["data"][number] & { agentId: AgentId };
 
 interface HistoryEntry {
   id: string;
@@ -67,6 +73,14 @@ interface ParsedReplayFrame {
   targetClientId?: string;
   version?: number;
 }
+
+const ThreadPreviewSchema = z
+  .object({
+    preview: z.string()
+  })
+  .passthrough();
+const AgentIdParamSchema = z.enum(["codex", "opencode"]);
+const ThreadSortKeyParamSchema = z.enum(["created_at", "updated_at"]);
 
 function resolveCodexExecutablePath(): string {
   if (process.env["CODEX_CLI_PATH"]) {
@@ -133,6 +147,66 @@ function parseBoolean(value: string | null, fallback: boolean): boolean {
   }
 
   return fallback;
+}
+
+function parseAgentId(value: string | null): AgentId | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = AgentIdParamSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+function parseThreadSortKey(value: string | null): ThreadSortKey | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = ThreadSortKeyParamSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+function normalizeOptionalString(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function compareThreadListItems(
+  left: ThreadListItemWithAgentId,
+  right: ThreadListItemWithAgentId,
+  sortKey: ThreadSortKey
+): number {
+  const leftSortValue = sortKey === "created_at" ? left.createdAt : left.updatedAt;
+  const rightSortValue = sortKey === "created_at" ? right.createdAt : right.updatedAt;
+
+  if (leftSortValue !== rightSortValue) {
+    return rightSortValue - leftSortValue;
+  }
+
+  if (left.updatedAt !== right.updatedAt) {
+    return right.updatedAt - left.updatedAt;
+  }
+
+  if (left.createdAt !== right.createdAt) {
+    return right.createdAt - left.createdAt;
+  }
+
+  const previewCompare = left.preview.localeCompare(right.preview);
+  if (previewCompare !== 0) {
+    return previewCompare;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+function readThreadPreview(value: AgentThreadLiveState["conversationState"]): string {
+  const parsed = ThreadPreviewSchema.safeParse(value);
+  if (!parsed.success) {
+    return "";
+  }
+  return parsed.data.preview;
 }
 
 function jsonResponse(res: ServerResponse, statusCode: number, body: unknown): void {
@@ -245,6 +319,10 @@ const threadIndex = new ThreadIndex();
 let activeTrace: ActiveTrace | null = null;
 const recentTraces: TraceSummary[] = [];
 let runtimeLastError: string | null = null;
+const completionDetector = new CompletionDetector(new Map());
+const ntfyNotifier = new NtfyNotifier(parseNtfyConfigFromEnv(process.env));
+const completionCheckTimers = new Map<string, NodeJS.Timeout>();
+const completionChecksInFlight = new Set<string>();
 
 function recordTraceEvent(event: unknown): void {
   if (!activeTrace) {
@@ -348,6 +426,64 @@ let codexAdapter: CodexAgentAdapter | null = null;
 let openCodeAdapter: OpenCodeAgentAdapter | null = null;
 const adapters: AgentAdapter[] = [];
 
+async function checkAndNotifyThreadCompletion(threadId: string): Promise<void> {
+  if (!codexAdapter || !ntfyNotifier.isEnabled()) {
+    return;
+  }
+
+  if (completionChecksInFlight.has(threadId)) {
+    return;
+  }
+  completionChecksInFlight.add(threadId);
+
+  try {
+    const liveState = await codexAdapter.readLiveState(threadId);
+    const completionCandidate = completionDetector.detect(threadId, liveState.conversationState);
+    if (!completionCandidate) {
+      return;
+    }
+
+    const publishResult = await ntfyNotifier.publishThreadCompleted({
+      threadId: completionCandidate.threadId,
+      preview: readThreadPreview(liveState.conversationState),
+      agentText: completionCandidate.agentText
+    });
+
+    completionDetector.commit(threadId, completionCandidate.marker);
+    pushSystem("ntfy notification sent", {
+      threadId,
+      ...(publishResult.messageId ? { messageId: publishResult.messageId } : {})
+    });
+  } catch (error) {
+    logger.warn(
+      {
+        threadId,
+        error: toErrorMessage(error)
+      },
+      "ntfy-publish-failed"
+    );
+  } finally {
+    completionChecksInFlight.delete(threadId);
+  }
+}
+
+function scheduleThreadCompletionCheck(threadId: string): void {
+  if (!ntfyNotifier.isEnabled()) {
+    return;
+  }
+
+  const existingTimer = completionCheckTimers.get(threadId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+  }
+
+  const timer = setTimeout(() => {
+    completionCheckTimers.delete(threadId);
+    void checkAndNotifyThreadCompletion(threadId);
+  }, NTFY_COMPLETION_DEBOUNCE_MS);
+  completionCheckTimers.set(threadId, timer);
+}
+
 for (const agentId of configuredAgentIds) {
   if (agentId === "codex") {
     codexAdapter = new CodexAgentAdapter({
@@ -366,6 +502,9 @@ for (const agentId of configuredAgentIds) {
         method: event.method,
         threadId: event.threadId
       });
+      if (event.method === "thread-stream-state-changed" && event.threadId) {
+        scheduleThreadCompletionCheck(event.threadId);
+      }
     });
 
     adapters.push(codexAdapter);
@@ -639,9 +778,20 @@ const server = http.createServer(async (req, res) => {
       const all = parseBoolean(url.searchParams.get("all"), false);
       const maxPages = parseInteger(url.searchParams.get("maxPages"), 20);
       const cursor = url.searchParams.get("cursor") ?? null;
+      const requestedSortKey = url.searchParams.get("sortKey");
+      const parsedSortKey = parseThreadSortKey(requestedSortKey);
+      if (requestedSortKey && !parsedSortKey) {
+        jsonResponse(res, 400, {
+          ok: false,
+          error: `Invalid sortKey: ${requestedSortKey}`
+        });
+        return;
+      }
+      const sortKey: ThreadSortKey = parsedSortKey ?? "updated_at";
+      const cwd = normalizeOptionalString(url.searchParams.get("cwd"));
 
       const enabledAdapters = registry.listEnabled();
-      const mergedData: Array<Record<string, unknown>> = [];
+      const mergedData: ThreadListItemWithAgentId[] = [];
       let nextCursor: string | null = null;
 
       for (const adapter of enabledAdapters) {
@@ -651,7 +801,9 @@ const server = http.createServer(async (req, res) => {
             archived,
             all,
             maxPages,
-            cursor
+            cursor,
+            sortKey,
+            cwd
           });
 
           if (!nextCursor && result.nextCursor) {
@@ -676,11 +828,72 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      mergedData.sort((left, right) => compareThreadListItems(left, right, sortKey));
+
       jsonResponse(res, 200, {
         ok: true,
         data: mergedData,
         nextCursor
       });
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/config/defaults") {
+      const requestedAgentRaw = url.searchParams.get("agentId");
+      const requestedAgentId = parseAgentId(requestedAgentRaw);
+      if (requestedAgentRaw && !requestedAgentId) {
+        jsonResponse(res, 400, {
+          ok: false,
+          error: `Invalid agentId: ${requestedAgentRaw}`
+        });
+        return;
+      }
+
+      const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+      if (!resolvedAgentId) {
+        jsonResponse(res, 200, {
+          ok: true,
+          agentId: null,
+          model: null,
+          reasoningEffort: null
+        });
+        return;
+      }
+
+      const adapter = registry.getAdapter(resolvedAgentId);
+      if (!adapter || !adapter.isEnabled() || !adapter.readConfigDefaults) {
+        jsonResponse(res, 200, {
+          ok: true,
+          agentId: resolvedAgentId,
+          model: null,
+          reasoningEffort: null
+        });
+        return;
+      }
+
+      try {
+        const defaults = await adapter.readConfigDefaults();
+        jsonResponse(res, 200, {
+          ok: true,
+          agentId: resolvedAgentId,
+          model: defaults.model,
+          reasoningEffort: defaults.reasoningEffort
+        });
+      } catch (error) {
+        logger.warn(
+          {
+            agentId: resolvedAgentId,
+            error: toErrorMessage(error)
+          },
+          "agent-config-defaults-read-failed"
+        );
+        jsonResponse(res, 200, {
+          ok: true,
+          agentId: resolvedAgentId,
+          model: null,
+          reasoningEffort: null
+        });
+      }
       return;
     }
 
@@ -1256,6 +1469,8 @@ async function start(): Promise<void> {
     agentIds: configuredAgentIds
   });
 
+  pushSystem("ntfy notifier ready", ntfyNotifier.getSummary());
+
   for (const adapter of registry.listAdapters()) {
     try {
       await adapter.start();
@@ -1293,6 +1508,11 @@ async function shutdown(): Promise<void> {
     activeTrace.stream.end();
     activeTrace = null;
   }
+
+  for (const timer of completionCheckTimers.values()) {
+    clearTimeout(timer);
+  }
+  completionCheckTimers.clear();
 
   await registry.stopAll();
   await new Promise<void>((resolve) => server.close(() => resolve()));

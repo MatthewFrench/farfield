@@ -23,6 +23,7 @@ import { logger } from "../../logger.js";
 import { resolveOwnerClientId } from "../../thread-owner.js";
 import type {
   AgentAdapter,
+  AgentConfigDefaults,
   AgentCapabilities,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
@@ -256,27 +257,35 @@ export class CodexAgentAdapter implements AgentAdapter {
         ? this.appClient.listThreadsAll(
             input.cursor
               ? {
-                  limit: input.limit,
-                  archived: input.archived,
-                  cursor: input.cursor,
-                  maxPages: input.maxPages
-                }
-              : {
-                  limit: input.limit,
-                  archived: input.archived,
-                  maxPages: input.maxPages
-                }
+              limit: input.limit,
+              archived: input.archived,
+              cursor: input.cursor,
+              sortKey: input.sortKey,
+              ...(input.cwd ? { cwd: input.cwd } : {}),
+              maxPages: input.maxPages
+            }
+          : {
+              limit: input.limit,
+              archived: input.archived,
+              sortKey: input.sortKey,
+              ...(input.cwd ? { cwd: input.cwd } : {}),
+              maxPages: input.maxPages
+            }
           )
         : this.appClient.listThreads(
             input.cursor
               ? {
                   limit: input.limit,
                   archived: input.archived,
-                  cursor: input.cursor
+                  cursor: input.cursor,
+                  sortKey: input.sortKey,
+                  ...(input.cwd ? { cwd: input.cwd } : {})
                 }
               : {
                   limit: input.limit,
-                  archived: input.archived
+                  archived: input.archived,
+                  sortKey: input.sortKey,
+                  ...(input.cwd ? { cwd: input.cwd } : {})
                 }
           )
     );
@@ -413,6 +422,22 @@ export class CodexAgentAdapter implements AgentAdapter {
   public async listCollaborationModes() {
     this.ensureCodexAvailable();
     return this.runAppServerCall(() => this.appClient.listCollaborationModes());
+  }
+
+  public async readConfigDefaults(): Promise<AgentConfigDefaults> {
+    this.ensureCodexAvailable();
+    const config = await this.runAppServerCall(() =>
+      this.appClient.readConfig({ includeLayers: false })
+    );
+
+    const activeProfileName = config.config.profile;
+    const activeProfile = activeProfileName ? config.config.profiles[activeProfileName] : undefined;
+
+    return {
+      model: activeProfile?.model ?? config.config.model ?? null,
+      reasoningEffort:
+        activeProfile?.model_reasoning_effort ?? config.config.model_reasoning_effort ?? null
+    };
   }
 
   public async setCollaborationMode(input: AgentSetCollaborationModeInput): Promise<{ ownerClientId: string }> {
@@ -708,7 +733,7 @@ export class CodexAgentAdapter implements AgentAdapter {
     this.bootstrapInFlight = (async () => {
       try {
         await this.runAppServerCall(() =>
-          this.appClient.listThreads({ limit: 1, archived: false })
+          this.appClient.listThreads({ limit: 1, archived: false, sortKey: "updated_at" })
         );
       } catch (error) {
         const message = toErrorMessage(error);

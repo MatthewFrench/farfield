@@ -16,9 +16,11 @@ This is an independent project and is not affiliated with, endorsed by, or spons
 
 - Thread browser grouped by project
 - Chat view with model/reasoning controls
+- App-default model/reasoning values synced from Codex `config/read`
 - Plan mode toggle
 - Live agent monitoring and interrupts
 - Debug tab with full IPC history
+- Optional completion notifications via `ntfy`
 
 ## Install & Run
 
@@ -40,6 +42,40 @@ bun run dev:remote -- --agents=opencode      # network-accessible (opencode)
 ```
 
 > **Warning:** `dev:remote` exposes Farfield with no authentication. Only use on trusted networks.
+
+## Settings Parity
+
+Farfield reads Codex app defaults using `config/read` and uses those values for:
+
+- the "app default" model shown in the model picker
+- the "app default" reasoning effort shown in the effort picker
+
+Thread listing requests now use `sortKey=updated_at`, and the server applies deterministic merged ordering across enabled agents.
+
+## Optional ntfy Notifications
+
+Configure optional thread-completion notifications:
+
+```bash
+bun run setup:ntfy
+```
+
+Non-interactive examples:
+
+```bash
+bun run setup:ntfy -- --topic=farfield
+bun run setup:ntfy -- --topic=farfield --base-url=https://ntfy.sh
+bun run setup:ntfy -- --disable
+```
+
+Environment keys:
+
+- `NTFY_ENABLED` (`true` or `false`)
+- `NTFY_TOPIC` (required when enabled)
+- `NTFY_BASE_URL` (optional, defaults to `https://ntfy.sh`)
+- `NTFY_BEARER_TOKEN` (optional)
+
+When enabled, Farfield watches Codex thread stream updates and publishes a message when a thread reaches a completed turn with a new agent message.
 
 ## Requirements
 

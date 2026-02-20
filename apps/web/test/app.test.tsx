@@ -153,6 +153,13 @@ let modelsFixture: {
   nextCursor: null;
 };
 
+let configDefaultsFixture: {
+  ok: true;
+  agentId: "codex" | "opencode" | null;
+  model: string | null;
+  reasoningEffort: "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | null;
+};
+
 let readThreadResolver: (threadId: string) => {
   ok: true;
   thread: Record<string, object | string | number | boolean | null | undefined>;
@@ -282,6 +289,13 @@ beforeEach(() => {
     nextCursor: null
   };
 
+  configDefaultsFixture = {
+    ok: true,
+    agentId: "codex",
+    model: "gpt-5.3-codex",
+    reasoningEffort: "medium"
+  };
+
   readThreadResolver = (_threadId: string) => null;
   liveStateResolver = (threadId: string) => ({
     ok: true,
@@ -369,6 +383,13 @@ vi.stubGlobal(
       return {
         ok: true,
         json: async () => modelsFixture
+      } as Response;
+    }
+
+    if (pathname === "/api/config/defaults") {
+      return {
+        ok: true,
+        json: async () => configDefaultsFixture
       } as Response;
     }
 

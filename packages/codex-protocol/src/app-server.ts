@@ -68,6 +68,15 @@ export const AppServerModelSchema = AppServerModelListResponseBaseSchema.shape.d
 export const AppServerModelReasoningEffortSchema =
   AppServerModelSchema.shape.supportedReasoningEfforts.element;
 
+export const AppServerReasoningEffortSchema = z.enum([
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh"
+]);
+
 export const AppServerListModelsResponseSchema = AppServerModelListResponseBaseSchema;
 
 export const AppServerCollaborationModeListItemSchema =
@@ -93,6 +102,30 @@ export const AppServerStartThreadResponseSchema = z
 export const AppServerSendUserMessageRequestSchema = AppServerSendUserMessageRequestBaseSchema;
 
 export const AppServerSendUserMessageResponseSchema = AppServerSendUserMessageResponseBaseSchema;
+
+const NullableAppServerReasoningEffortSchema = z.union([AppServerReasoningEffortSchema, z.null()]);
+
+export const AppServerConfigProfileSchema = z
+  .object({
+    model: z.union([z.string(), z.null()]).optional().default(null),
+    model_reasoning_effort: NullableAppServerReasoningEffortSchema.optional().default(null)
+  })
+  .passthrough();
+
+export const AppServerConfigReadConfigSchema = z
+  .object({
+    profile: z.union([z.string(), z.null()]).optional().default(null),
+    model: z.union([z.string(), z.null()]).optional().default(null),
+    model_reasoning_effort: NullableAppServerReasoningEffortSchema.optional().default(null),
+    profiles: z.record(AppServerConfigProfileSchema).optional().default({})
+  })
+  .passthrough();
+
+export const AppServerConfigReadResponseSchema = z
+  .object({
+    config: AppServerConfigReadConfigSchema
+  })
+  .passthrough();
 
 export const AppServerSetModeRequestSchema = z
   .object({
@@ -168,6 +201,7 @@ export type AppServerCollaborationModeListResponse = z.infer<
   typeof AppServerCollaborationModeListResponseSchema
 >;
 export type AppServerStartThreadResponse = z.infer<typeof AppServerStartThreadResponseSchema>;
+export type AppServerConfigReadResponse = z.infer<typeof AppServerConfigReadResponseSchema>;
 export type CreateDebugClientErrorBody = z.infer<typeof CreateDebugClientErrorBodySchema>;
 export type DebugErrorEvent = z.infer<typeof DebugErrorEventSchema>;
 export type DebugErrorCreateResponse = z.infer<typeof DebugErrorCreateResponseSchema>;
@@ -229,6 +263,12 @@ export function parseAppServerStartThreadResponse(
   value: z.input<typeof AppServerStartThreadResponseSchema>
 ): AppServerStartThreadResponse {
   return parseWithSchema(AppServerStartThreadResponseSchema, value, "AppServerStartThreadResponse");
+}
+
+export function parseAppServerConfigReadResponse(
+  value: z.input<typeof AppServerConfigReadResponseSchema>
+): AppServerConfigReadResponse {
+  return parseWithSchema(AppServerConfigReadResponseSchema, value, "AppServerConfigReadResponse");
 }
 
 export function parseCreateDebugClientErrorBody(

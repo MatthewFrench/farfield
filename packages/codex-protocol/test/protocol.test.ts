@@ -5,6 +5,7 @@ import {
   parseAppServerListModelsResponse,
   parseAppServerCollaborationModeListResponse,
   parseAppServerStartThreadResponse,
+  parseAppServerConfigReadResponse,
   parseIpcFrame,
   parseThreadConversationState,
   parseThreadStreamStateChangedBroadcast,
@@ -845,5 +846,27 @@ describe("codex-protocol schemas", () => {
     });
 
     expect(parsed.thread.id).toBe("sess-2");
+  });
+
+  it("parses app-server config/read response for effective defaults", () => {
+    const parsed = parseAppServerConfigReadResponse({
+      config: {
+        profile: "personal",
+        model: "gpt-5.3-codex",
+        model_reasoning_effort: "medium",
+        profiles: {
+          personal: {
+            model: "gpt-5.3-codex",
+            model_reasoning_effort: "xhigh"
+          }
+        }
+      },
+      origins: {},
+      layers: null
+    });
+
+    expect(parsed.config.profile).toBe("personal");
+    expect(parsed.config.model_reasoning_effort).toBe("medium");
+    expect(parsed.config.profiles["personal"]?.model_reasoning_effort).toBe("xhigh");
   });
 });

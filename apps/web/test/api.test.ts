@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { bootstrapEventsSession, getDebugClientError } from "../src/lib/api";
+import {
+  bootstrapEventsSession,
+  getConfigDefaults,
+  getDebugClientError,
+  listThreads
+} from "../src/lib/api";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -74,5 +79,48 @@ describe("API envelope parsing", () => {
     expect(result.authRequired).toBe(true);
     expect(result.bootstrapped).toBe(true);
     expect(result.expiresAt).toBe("2026-02-19T00:00:00.000Z");
+  });
+
+  it("requests thread list with sortKey and cwd", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        data: [],
+        nextCursor: null
+      })
+    } as Response);
+
+    await listThreads({
+      limit: 80,
+      archived: false,
+      all: true,
+      maxPages: 20,
+      sortKey: "updated_at",
+      cwd: "/tmp/workspace"
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
+    const parsedUrl = new URL(requestUrl, "http://localhost");
+    expect(parsedUrl.pathname).toBe("/api/threads");
+    expect(parsedUrl.searchParams.get("sortKey")).toBe("updated_at");
+    expect(parsedUrl.searchParams.get("cwd")).toBe("/tmp/workspace");
+  });
+
+  it("parses config defaults response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        agentId: "codex",
+        model: "gpt-5.3-codex",
+        reasoningEffort: "xhigh"
+      })
+    } as Response);
+
+    const result = await getConfigDefaults({ agentId: "codex" });
+    expect(result.agentId).toBe("codex");
+    expect(result.reasoningEffort).toBe("xhigh");
   });
 });

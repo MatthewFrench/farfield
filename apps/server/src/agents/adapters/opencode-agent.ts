@@ -67,11 +67,13 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
     await this.connection.stop();
   }
 
-  public async listThreads(_input: AgentListThreadsInput): Promise<AgentListThreadsResult> {
+  public async listThreads(input: AgentListThreadsInput): Promise<AgentListThreadsResult> {
     this.ensureConnected();
 
     const sessions = new Map<string, Awaited<ReturnType<OpenCodeMonitorService["listSessions"]>>["data"][number]>();
-    const directories = await this.listProjectDirectories();
+    const directories = input.cwd && input.cwd.trim().length > 0
+      ? [normalizeDirectoryInput(input.cwd)]
+      : await this.listProjectDirectories();
 
     if (directories.length > 0) {
       await Promise.all(
@@ -95,9 +97,9 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
       }
     }
 
-    const mappedData = Array.from(sessions.values()).map((session) =>
-      AppServerThreadListItemSchema.parse(session)
-    );
+    const mappedData = Array.from(sessions.values())
+      .map((session) => AppServerThreadListItemSchema.parse(session))
+      .sort((left, right) => compareThreadsBySortKey(left, right, input.sortKey));
 
     return {
       data: mappedData,
@@ -210,4 +212,17 @@ function normalizeDirectoryList(directories: string[]): string[] {
     }
   }
   return Array.from(deduped).sort((left, right) => left.localeCompare(right));
+}
+
+function compareThreadsBySortKey(
+  left: AgentListThreadsResult["data"][number],
+  right: AgentListThreadsResult["data"][number],
+  sortKey: "created_at" | "updated_at"
+): number {
+  const leftValue = sortKey === "created_at" ? left.createdAt : left.updatedAt;
+  const rightValue = sortKey === "created_at" ? right.createdAt : right.updatedAt;
+  if (leftValue !== rightValue) {
+    return rightValue - leftValue;
+  }
+  return left.id.localeCompare(right.id);
 }
