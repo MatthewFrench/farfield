@@ -29,6 +29,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import {
   createThread,
+  bootstrapEventsSession,
   getDebugClientError,
   getHealth,
   getHistoryEntry,
@@ -1589,6 +1590,16 @@ export function App(): React.JSX.Element {
           })
         );
         void loadPushData();
+        const currentThreadId = selectedThreadIdRef.current;
+        if (currentThreadId) {
+          void loadSelectedThread(currentThreadId).catch((e) =>
+            reportError({
+              operation: "thread:load-selected",
+              message: toErrorMessage(e),
+              threadId: currentThreadId
+            })
+          );
+        }
         return;
       }
       void getHealth()
@@ -1605,7 +1616,7 @@ export function App(): React.JSX.Element {
     return () => {
       if (coreRefreshIntervalRef.current) window.clearInterval(coreRefreshIntervalRef.current);
     };
-  }, [isDocumentVisible, loadCoreData, loadPushData, reportError]);
+  }, [isDocumentVisible, loadCoreData, loadPushData, loadSelectedThread, reportError]);
 
   useEffect(() => {
     if (activeTab !== "preflight") {
@@ -1635,8 +1646,11 @@ export function App(): React.JSX.Element {
       return;
     }
 
-    const source = new EventSource("/events");
-    source.onmessage = () => {
+    let disposed = false;
+    let source: EventSource | null = null;
+    let reconnectTimer: number | null = null;
+
+    const scheduleLiveRefresh = () => {
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = window.setTimeout(() => {
         refreshTimerRef.current = null;
@@ -1649,12 +1663,62 @@ export function App(): React.JSX.Element {
         );
       }, STREAM_REFRESH_DEBOUNCE_MS);
     };
-    source.onerror = () => {
-      // Keep EventSource open so the browser can handle reconnects.
+
+    const scheduleReconnect = () => {
+      if (disposed || reconnectTimer !== null) {
+        return;
+      }
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        void connectEventStream();
+      }, 1_000);
     };
+
+    const connectEventStream = async () => {
+      try {
+        await bootstrapEventsSession();
+      } catch (error) {
+        if (!disposed) {
+          reportError({
+            operation: "events:session-bootstrap",
+            message: toErrorMessage(error),
+            threadId: selectedThreadIdRef.current
+          });
+          scheduleLiveRefresh();
+          scheduleReconnect();
+        }
+        return;
+      }
+
+      if (disposed) {
+        return;
+      }
+
+      source = new EventSource("/events");
+      source.onmessage = () => {
+        scheduleLiveRefresh();
+      };
+      source.onerror = () => {
+        if (source) {
+          source.close();
+          source = null;
+        }
+        scheduleLiveRefresh();
+        scheduleReconnect();
+      };
+    };
+
+    void connectEventStream();
+
     return () => {
+      disposed = true;
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
-      source.close();
+      if (source) {
+        source.close();
+      }
     };
   }, [isDocumentVisible, loadLiveData, reportError]);
 
@@ -2182,6 +2246,15 @@ export function App(): React.JSX.Element {
             )}
             {typeof health?.state.pushReceiptAuthRejectsLast5m === "number" && (
               <div>/api/push/receipts auth rejects (5m): {String(health.state.pushReceiptAuthRejectsLast5m)}</div>
+            )}
+            {typeof health?.state.eventsSessionBootstrapsLast5m === "number" && (
+              <div>/events session bootstraps (5m): {String(health.state.eventsSessionBootstrapsLast5m)}</div>
+            )}
+            {typeof health?.state.eventsSessionRejectsLast5m === "number" && (
+              <div>/events session rejects (5m): {String(health.state.eventsSessionRejectsLast5m)}</div>
+            )}
+            {typeof health?.state.activeEventsSessions === "number" && (
+              <div>Active /events sessions: {String(health.state.activeEventsSessions)}</div>
             )}
             {health?.state.lastError && (
               <div className="max-w-64 break-words text-destructive">

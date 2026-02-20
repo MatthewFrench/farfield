@@ -167,6 +167,9 @@ const PUSH_VAPID_PUBLIC_KEY = (process.env["PUSH_VAPID_PUBLIC_KEY"] ?? "").trim(
 const PUSH_VAPID_PRIVATE_KEY = (process.env["PUSH_VAPID_PRIVATE_KEY"] ?? "").trim();
 const PUSH_VAPID_SUBJECT = (process.env["PUSH_VAPID_SUBJECT"] ?? "").trim();
 const COMPLETION_STATE_BACKFILL_INTERVAL_MS = 2_000;
+const EVENTS_AUTH_SESSION_TTL_MS = readPositiveIntegerEnv("EVENTS_AUTH_SESSION_TTL_MS", 5 * 60_000);
+const EVENTS_AUTH_SESSION_MAX = readPositiveIntegerEnv("EVENTS_AUTH_SESSION_MAX", 512);
+const EVENTS_AUTH_COOKIE_NAME = "farfield_events_session";
 const MAX_PUSH_RECEIPTS = readPositiveIntegerEnv("PUSH_RECEIPTS_MAX_COUNT", 100);
 const PUSH_RECEIPTS_MAX_AGE_DAYS = readPositiveIntegerEnv("PUSH_RECEIPTS_MAX_AGE_DAYS", 7);
 const PUSH_RECEIPTS_MAX_AGE_MS = PUSH_RECEIPTS_MAX_AGE_DAYS * 24 * 60 * 60 * 1_000;
@@ -269,14 +272,20 @@ function resolveFileContentHash(filePath: string): string | null {
   return createHash("sha256").update(content).digest("hex").slice(0, 12);
 }
 
-function jsonResponse(res: ServerResponse, statusCode: number, body: unknown): void {
+function jsonResponse(
+  res: ServerResponse,
+  statusCode: number,
+  body: unknown,
+  extraHeaders: Record<string, string> = {}
+): void {
   const encoded = Buffer.from(JSON.stringify(body), "utf8");
   res.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": encoded.length,
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "content-type,x-farfield-token",
-    "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS"
+    "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+    ...extraHeaders
   });
   res.end(encoded);
 }
@@ -392,6 +401,11 @@ interface ActiveTrace {
   stream: fs.WriteStream;
 }
 
+interface EventsAuthSession {
+  id: string;
+  expiresAtMs: number;
+}
+
 const history: HistoryEntry[] = [];
 const historyById = new Map<string, unknown>();
 
@@ -412,6 +426,9 @@ const suppressedClientErrorReportTimestampsMs: number[] = [];
 const invalidPushPayloadTimestampsMs: number[] = [];
 const eventsAuthRejectedTimestampsMs: number[] = [];
 const pushReceiptAuthRejectedTimestampsMs: number[] = [];
+const eventsSessionBootstrapTimestampsMs: number[] = [];
+const eventsSessionRejectTimestampsMs: number[] = [];
+const eventsAuthSessions = new Map<string, EventsAuthSession>();
 const appServerOperationStats = createAppServerOperationStats();
 const appServerStderrState: AppServerStderrState = {
   benignSuppressedCount: 0,
@@ -530,6 +547,16 @@ function recordPushReceiptAuthRejected(nowMs: number): void {
   pruneTimestampWindow(pushReceiptAuthRejectedTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
 }
 
+function recordEventsSessionBootstrap(nowMs: number): void {
+  eventsSessionBootstrapTimestampsMs.push(nowMs);
+  pruneTimestampWindow(eventsSessionBootstrapTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+}
+
+function recordEventsSessionReject(nowMs: number): void {
+  eventsSessionRejectTimestampsMs.push(nowMs);
+  pruneTimestampWindow(eventsSessionRejectTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+}
+
 function pruneRecentClientErrorFingerprints(nowMs: number): void {
   const cutoff = nowMs - SERVER_CLIENT_ERROR_DEDUP_WINDOW_MS;
   for (const [fingerprint, entry] of recentClientErrorByFingerprint) {
@@ -633,6 +660,9 @@ function getRuntimeStateSnapshot(): Record<string, unknown> {
   pruneTimestampWindow(invalidPushPayloadTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
   pruneTimestampWindow(eventsAuthRejectedTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
   pruneTimestampWindow(pushReceiptAuthRejectedTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+  pruneTimestampWindow(eventsSessionBootstrapTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+  pruneTimestampWindow(eventsSessionRejectTimestampsMs, nowMs, ERROR_BUDGET_WINDOW_MS);
+  pruneEventsAuthSessions(nowMs);
   const latestPushSend = pushSendStore.getLatest();
   return {
     ...runtimeState,
@@ -667,6 +697,9 @@ function getRuntimeStateSnapshot(): Record<string, unknown> {
     invalidPushPayloadsLast5m: invalidPushPayloadTimestampsMs.length,
     eventsAuthRejectsLast5m: eventsAuthRejectedTimestampsMs.length,
     pushReceiptAuthRejectsLast5m: pushReceiptAuthRejectedTimestampsMs.length,
+    eventsSessionBootstrapsLast5m: eventsSessionBootstrapTimestampsMs.length,
+    eventsSessionRejectsLast5m: eventsSessionRejectTimestampsMs.length,
+    activeEventsSessions: eventsAuthSessions.size,
     latestPushSendNotificationId: latestPushSend?.notificationId ?? null
   };
 }
@@ -1235,6 +1268,103 @@ function hasAuthorizedBrowserOrigin(req: IncomingMessage): boolean {
   }
 }
 
+function pruneEventsAuthSessions(nowMs: number): void {
+  for (const [sessionId, session] of eventsAuthSessions) {
+    if (session.expiresAtMs <= nowMs) {
+      eventsAuthSessions.delete(sessionId);
+    }
+  }
+
+  while (eventsAuthSessions.size > EVENTS_AUTH_SESSION_MAX) {
+    const oldest = eventsAuthSessions.keys().next().value;
+    if (typeof oldest !== "string") {
+      break;
+    }
+    eventsAuthSessions.delete(oldest);
+  }
+}
+
+function createEventsAuthSession(nowMs: number): EventsAuthSession {
+  pruneEventsAuthSessions(nowMs);
+  const session: EventsAuthSession = {
+    id: `evt_${randomUUID()}`,
+    expiresAtMs: nowMs + EVENTS_AUTH_SESSION_TTL_MS
+  };
+  eventsAuthSessions.set(session.id, session);
+  return session;
+}
+
+function readCookieValue(req: IncomingMessage, cookieName: string): string | null {
+  const rawCookie = req.headers.cookie;
+  if (typeof rawCookie !== "string" || rawCookie.trim().length === 0) {
+    return null;
+  }
+
+  const segments = rawCookie.split(";");
+  for (const segment of segments) {
+    const separatorIndex = segment.indexOf("=");
+    if (separatorIndex < 0) {
+      continue;
+    }
+    const name = segment.slice(0, separatorIndex).trim();
+    if (name !== cookieName) {
+      continue;
+    }
+    const encodedValue = segment.slice(separatorIndex + 1).trim();
+    if (encodedValue.length === 0) {
+      return null;
+    }
+    try {
+      const decoded = decodeURIComponent(encodedValue);
+      return decoded.length > 0 ? decoded : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function hasValidEventsAuthSession(req: IncomingMessage, nowMs: number): boolean {
+  pruneEventsAuthSessions(nowMs);
+  const sessionId = readCookieValue(req, EVENTS_AUTH_COOKIE_NAME);
+  if (!sessionId) {
+    return false;
+  }
+  const session = eventsAuthSessions.get(sessionId);
+  if (!session) {
+    return false;
+  }
+  if (session.expiresAtMs <= nowMs) {
+    eventsAuthSessions.delete(session.id);
+    return false;
+  }
+  return true;
+}
+
+function isSecureForwardedRequest(req: IncomingMessage): boolean {
+  const rawForwardedProto = req.headers["x-forwarded-proto"];
+  if (typeof rawForwardedProto !== "string") {
+    return false;
+  }
+  const firstValue = rawForwardedProto.split(",")[0]?.trim().toLowerCase();
+  return firstValue === "https";
+}
+
+function buildEventsAuthSetCookie(req: IncomingMessage, session: EventsAuthSession): string {
+  const maxAgeSeconds = Math.max(1, Math.ceil(EVENTS_AUTH_SESSION_TTL_MS / 1_000));
+  const attributes = [
+    `${EVENTS_AUTH_COOKIE_NAME}=${encodeURIComponent(session.id)}`,
+    "Path=/events",
+    "HttpOnly",
+    "SameSite=Strict",
+    `Max-Age=${String(maxAgeSeconds)}`
+  ];
+  if (isSecureForwardedRequest(req)) {
+    attributes.push("Secure");
+  }
+  return attributes.join("; ");
+}
+
 function requireApiAuth(
   req: IncomingMessage,
   res: ServerResponse,
@@ -1286,6 +1416,60 @@ function requireApiAuth(
   }
 
   return true;
+}
+
+function requireEventsAuth(req: IncomingMessage, res: ServerResponse): boolean {
+  if (!isApiAuthRequired()) {
+    return true;
+  }
+
+  if (!hasAuthorizedBrowserOrigin(req)) {
+    const nowMs = Date.now();
+    recordApiAuthRejected("events", nowMs);
+    logger.warn(
+      {
+        route: req.url ?? "unknown",
+        remoteAddress: req.socket.remoteAddress ?? null,
+        routeType: "events",
+        origin: readOriginHeader(req),
+        host: readRequestHost(req),
+        reason: "origin"
+      },
+      "api-auth-origin-rejected"
+    );
+    jsonResponse(res, 403, {
+      ok: false,
+      error: "Forbidden origin"
+    });
+    return false;
+  }
+
+  const token = readApiAuthToken(req);
+  if (token === API_AUTH_TOKEN) {
+    return true;
+  }
+
+  const nowMs = Date.now();
+  if (hasValidEventsAuthSession(req, nowMs)) {
+    return true;
+  }
+
+  recordEventsSessionReject(nowMs);
+  recordApiAuthRejected("events", nowMs);
+  logger.warn(
+    {
+      route: req.url ?? "unknown",
+      remoteAddress: req.socket.remoteAddress ?? null,
+      routeType: "events",
+      reason: "token-or-session"
+    },
+    "api-auth-rejected"
+  );
+  jsonResponse(res, 401, {
+    ok: false,
+    error: "Unauthorized"
+  });
+  return false;
 }
 
 function isInvalidPushPayloadReceipt(receipt: PushReceipt): boolean {
@@ -1845,7 +2029,7 @@ const server = http.createServer(async (req, res) => {
     const segments = pathname.split("/").filter(Boolean);
 
     if (req.method === "GET" && pathname === "/events") {
-      if (!requireApiAuth(req, res, "events")) {
+      if (!requireEventsAuth(req, res)) {
         return;
       }
       res.writeHead(200, {
@@ -1880,6 +2064,36 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         state: getRuntimeStateSnapshot()
       });
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/events/session") {
+      if (!isApiAuthRequired()) {
+        jsonResponse(res, 200, {
+          ok: true,
+          authRequired: false,
+          bootstrapped: false,
+          expiresAt: null
+        });
+        return;
+      }
+
+      const nowMs = Date.now();
+      const session = createEventsAuthSession(nowMs);
+      recordEventsSessionBootstrap(nowMs);
+      jsonResponse(
+        res,
+        200,
+        {
+          ok: true,
+          authRequired: true,
+          bootstrapped: true,
+          expiresAt: new Date(session.expiresAtMs).toISOString()
+        },
+        {
+          "Set-Cookie": buildEventsAuthSetCookie(req, session)
+        }
+      );
       return;
     }
 

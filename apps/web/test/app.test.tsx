@@ -70,6 +70,18 @@ vi.stubGlobal(
       } as Response;
     }
 
+    if (parsedUrl.pathname === "/api/events/session") {
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          authRequired: true,
+          bootstrapped: true,
+          expiresAt: "2026-02-19T00:00:00.000Z"
+        })
+      } as Response;
+    }
+
     if (parsedUrl.pathname === "/api/threads") {
       if (threadsDelayPromise) {
         await threadsDelayPromise;

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getDebugClientError } from "../src/lib/api";
+import { bootstrapEventsSession, getDebugClientError } from "../src/lib/api";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -57,5 +57,22 @@ describe("API envelope parsing", () => {
     await expect(getDebugClientError("error_1")).rejects.toThrow(
       "Request failed for /api/debug/client-errors/error_1: The string did not match the expected pattern."
     );
+  });
+
+  it("parses events session bootstrap response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        authRequired: true,
+        bootstrapped: true,
+        expiresAt: "2026-02-19T00:00:00.000Z"
+      })
+    } as Response);
+
+    const result = await bootstrapEventsSession();
+    expect(result.authRequired).toBe(true);
+    expect(result.bootstrapped).toBe(true);
+    expect(result.expiresAt).toBe("2026-02-19T00:00:00.000Z");
   });
 });

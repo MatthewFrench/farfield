@@ -44,6 +44,7 @@ That's it. Both the backend and frontend start in parallel.
 - Frontend: `http://127.0.0.1:4312` — open this in your browser
 
 The frontend proxies `/api` and `/events` to the backend automatically.
+When API auth is enabled, the web app bootstraps an HttpOnly `/events` session via `POST /api/events/session` before opening SSE.
 
 Push runtime state persists at an OS-specific app state location by default:
 - macOS: `~/Library/Application Support/farfield/push-state.json`
@@ -273,6 +274,7 @@ Real-app test env knobs:
 - `APP_SMOKE_BUDGET_HEALTH_MS` (default `5000`) and `APP_SMOKE_BUDGET_*` endpoint-specific budgets.
 - `STREAM_BURST_DURATION_MS`, `STREAM_BURST_WORKERS`, `STREAM_BURST_HEALTH_BUDGET_P95_MS` to tune stream burst stress checks.
 - `IOS_DEVICE_SMOKE_API_URL`, `IOS_DEVICE_SMOKE_TOKEN`, `IOS_DEVICE_SMOKE_PUSH_SHOWN_TIMEOUT_MS`, `IOS_DEVICE_SMOKE_PUSH_CLICKED_TIMEOUT_MS` to tune `pnpm smoke:ios-device`.
+- `EVENTS_AUTH_SESSION_TTL_MS` (default `300000`) and `EVENTS_AUTH_SESSION_MAX` (default `512`) to tune `/api/events/session` auth-cookie lifetime and in-memory session cap.
 
 ## Real App Debug Loop (Codex + Playwright MCP)
 

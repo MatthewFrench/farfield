@@ -102,6 +102,9 @@ const HealthResponseSchema = z
         invalidPushPayloadsLast5m: z.number().int().nonnegative().optional(),
         eventsAuthRejectsLast5m: z.number().int().nonnegative().optional(),
         pushReceiptAuthRejectsLast5m: z.number().int().nonnegative().optional(),
+        eventsSessionBootstrapsLast5m: z.number().int().nonnegative().optional(),
+        eventsSessionRejectsLast5m: z.number().int().nonnegative().optional(),
+        activeEventsSessions: z.number().int().nonnegative().optional(),
         appServerRequestTimeoutMs: z.number().int().positive().optional(),
         appServerOperations: AppServerOperationsSchema.optional(),
         appServerStderr: AppServerStderrStatsSchema.optional(),
@@ -267,6 +270,15 @@ const PushTestResponseSchema = z
   })
   .strict();
 
+const EventsSessionBootstrapResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    authRequired: z.boolean(),
+    bootstrapped: z.boolean(),
+    expiresAt: z.string().datetime().nullable()
+  })
+  .strict();
+
 function readApiToken(): string | null {
   const token = import.meta.env["VITE_API_TOKEN"] ?? import.meta.env["VITE_PUSH_API_TOKEN"];
   if (typeof token !== "string") {
@@ -357,6 +369,14 @@ function stripOk(value: unknown): unknown {
 
 export async function getHealth(): Promise<z.infer<typeof HealthResponseSchema>> {
   return HealthResponseSchema.parse(await request("/api/health"));
+}
+
+export async function bootstrapEventsSession(): Promise<z.infer<typeof EventsSessionBootstrapResponseSchema>> {
+  return EventsSessionBootstrapResponseSchema.parse(
+    await request("/api/events/session", {
+      method: "POST"
+    })
+  );
 }
 
 export async function getWebShellHealth(): Promise<z.infer<typeof WebShellHealthResponseSchema>> {

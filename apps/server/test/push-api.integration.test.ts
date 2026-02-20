@@ -39,7 +39,10 @@ const HEALTH_SCHEMA = z
         suppressedClientErrorReportsLast5m: z.number().int().nonnegative(),
         invalidPushPayloadsLast5m: z.number().int().nonnegative(),
         eventsAuthRejectsLast5m: z.number().int().nonnegative(),
-        pushReceiptAuthRejectsLast5m: z.number().int().nonnegative()
+        pushReceiptAuthRejectsLast5m: z.number().int().nonnegative(),
+        eventsSessionBootstrapsLast5m: z.number().int().nonnegative(),
+        eventsSessionRejectsLast5m: z.number().int().nonnegative(),
+        activeEventsSessions: z.number().int().nonnegative()
       })
       .passthrough()
   })
@@ -53,6 +56,15 @@ const SHELL_HEALTHZ_SCHEMA = z
     gitCommit: z.string().nullable(),
     serviceWorkerVersion: z.string().nullable(),
     timestamp: z.string().datetime()
+  })
+  .strict();
+
+const EVENTS_SESSION_BOOTSTRAP_SCHEMA = z
+  .object({
+    ok: z.literal(true),
+    authRequired: z.boolean(),
+    bootstrapped: z.boolean(),
+    expiresAt: z.string().datetime().nullable()
   })
   .strict();
 
@@ -317,6 +329,14 @@ function authHeadersWithOrigin(origin: string, includeJsonContentType = false): 
   return headers;
 }
 
+function parseCookieHeaderFromSetCookie(setCookieHeader: string): string {
+  const cookieValue = setCookieHeader.split(";")[0]?.trim() ?? "";
+  if (!cookieValue.includes("=")) {
+    throw new Error("Set-Cookie header did not contain a cookie pair");
+  }
+  return cookieValue;
+}
+
 async function waitForServerReady(process: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -408,6 +428,8 @@ describe("push API auth and subscription routes", () => {
         PUSH_STATE_PATH: statePath,
         PUSH_RECEIPTS_PATH: receiptsPath,
         PUSH_SENDS_PATH: sendsPath,
+        EVENTS_AUTH_SESSION_TTL_MS: "750",
+        EVENTS_AUTH_SESSION_MAX: "256",
         CODEX_IPC_SOCKET: ipcSocketPath
       },
       stdio: ["ignore", "pipe", "pipe"]
@@ -499,6 +521,118 @@ describe("push API auth and subscription routes", () => {
     expect(healthAfter.state.eventsAuthRejectsLast5m).toBeGreaterThanOrEqual(
       healthBefore.state.eventsAuthRejectsLast5m + 1
     );
+  });
+
+  it("supports events auth session bootstrap for SSE", async () => {
+    const healthBeforeResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthBeforeResponse.status).toBe(200);
+    const healthBefore = HEALTH_SCHEMA.parse(await healthBeforeResponse.json());
+
+    const bootstrap = await fetch(`${baseUrl}/api/events/session`, {
+      method: "POST",
+      headers: authHeaders(false)
+    });
+    expect(bootstrap.status).toBe(200);
+    const parsedBootstrap = EVENTS_SESSION_BOOTSTRAP_SCHEMA.parse(await bootstrap.json());
+    expect(parsedBootstrap.authRequired).toBe(true);
+    expect(parsedBootstrap.bootstrapped).toBe(true);
+    expect(parsedBootstrap.expiresAt).not.toBeNull();
+
+    const setCookieHeader = bootstrap.headers.get("set-cookie");
+    expect(setCookieHeader).toBeTruthy();
+    const cookieHeader = parseCookieHeaderFromSetCookie(setCookieHeader ?? "");
+
+    const eventsWithCookie = await fetch(`${baseUrl}/events`, {
+      headers: {
+        Cookie: cookieHeader
+      }
+    });
+    expect(eventsWithCookie.status).toBe(200);
+    expect(eventsWithCookie.headers.get("content-type")).toContain("text/event-stream");
+    await eventsWithCookie.body?.cancel();
+
+    const eventsWithInvalidCookie = await fetch(`${baseUrl}/events`, {
+      headers: {
+        Cookie: "farfield_events_session=invalid"
+      }
+    });
+    expect(eventsWithInvalidCookie.status).toBe(401);
+    API_ERROR_SCHEMA.parse(await eventsWithInvalidCookie.json());
+
+    const eventsWithCookieAndCrossOrigin = await fetch(`${baseUrl}/events`, {
+      headers: {
+        Cookie: cookieHeader,
+        Origin: "https://evil.example"
+      }
+    });
+    expect(eventsWithCookieAndCrossOrigin.status).toBe(403);
+    API_ERROR_SCHEMA.parse(await eventsWithCookieAndCrossOrigin.json());
+
+    const healthAfterResponse = await fetch(`${baseUrl}/api/health`, {
+      headers: authHeaders(false)
+    });
+    expect(healthAfterResponse.status).toBe(200);
+    const healthAfter = HEALTH_SCHEMA.parse(await healthAfterResponse.json());
+    expect(healthAfter.state.eventsSessionBootstrapsLast5m).toBeGreaterThanOrEqual(
+      healthBefore.state.eventsSessionBootstrapsLast5m + 1
+    );
+    expect(healthAfter.state.eventsSessionRejectsLast5m).toBeGreaterThanOrEqual(
+      healthBefore.state.eventsSessionRejectsLast5m + 1
+    );
+    expect(healthAfter.state.activeEventsSessions).toBeGreaterThanOrEqual(1);
+  });
+
+  it("expires events auth sessions and requires re-bootstrap", async () => {
+    const bootstrap = await fetch(`${baseUrl}/api/events/session`, {
+      method: "POST",
+      headers: authHeaders(false)
+    });
+    expect(bootstrap.status).toBe(200);
+    EVENTS_SESSION_BOOTSTRAP_SCHEMA.parse(await bootstrap.json());
+
+    const firstSetCookieHeader = bootstrap.headers.get("set-cookie");
+    expect(firstSetCookieHeader).toBeTruthy();
+    const firstCookieHeader = parseCookieHeaderFromSetCookie(firstSetCookieHeader ?? "");
+
+    const eventsBeforeExpiry = await fetch(`${baseUrl}/events`, {
+      headers: {
+        Cookie: firstCookieHeader
+      }
+    });
+    expect(eventsBeforeExpiry.status).toBe(200);
+    await eventsBeforeExpiry.body?.cancel();
+
+    await delay(900);
+
+    const eventsAfterExpiry = await fetch(`${baseUrl}/events`, {
+      headers: {
+        Cookie: firstCookieHeader
+      }
+    });
+    expect(eventsAfterExpiry.status).toBe(401);
+    API_ERROR_SCHEMA.parse(await eventsAfterExpiry.json());
+
+    const secondBootstrap = await fetch(`${baseUrl}/api/events/session`, {
+      method: "POST",
+      headers: authHeaders(false)
+    });
+    expect(secondBootstrap.status).toBe(200);
+    EVENTS_SESSION_BOOTSTRAP_SCHEMA.parse(await secondBootstrap.json());
+
+    const secondSetCookieHeader = secondBootstrap.headers.get("set-cookie");
+    expect(secondSetCookieHeader).toBeTruthy();
+    const secondCookieHeader = parseCookieHeaderFromSetCookie(secondSetCookieHeader ?? "");
+    expect(secondCookieHeader).not.toBe(firstCookieHeader);
+
+    const eventsAfterRebootstrap = await fetch(`${baseUrl}/events`, {
+      headers: {
+        Cookie: secondCookieHeader
+      }
+    });
+    expect(eventsAfterRebootstrap.status).toBe(200);
+    await eventsAfterRebootstrap.body?.cancel();
   });
 
   it("rejects browser cross-origin requests even with a valid token", async () => {
