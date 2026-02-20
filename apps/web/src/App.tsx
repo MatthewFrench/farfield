@@ -141,6 +141,13 @@ interface RefreshFlags {
   refreshSelectedThread: boolean;
 }
 
+interface ErrorBannerDetails {
+  operation: string;
+  message: string;
+  requestId: string | null;
+  errorId: string | null;
+}
+
 /* ── Helpers ────────────────────────────────────────────────── */
 function formatDate(value: number | string | null | undefined): string {
   if (typeof value === "number") return new Date(value * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -160,6 +167,32 @@ function threadLabel(thread: Thread): string {
 
 function toErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+function toErrorBannerDetails(rawError: string): ErrorBannerDetails {
+  const raw = rawError.trim();
+  if (raw.length === 0) {
+    return {
+      operation: "",
+      message: "",
+      requestId: null,
+      errorId: null
+    };
+  }
+
+  const operationMatch = raw.match(/^([a-z][a-z0-9._-]{1,64}):\s*(.+)$/i);
+  const operation = operationMatch?.[1] ?? "";
+  const message = operationMatch?.[2] ?? raw;
+
+  const requestIdMatch = raw.match(/\brequest(?:Id)?[ =:]+([a-z0-9._-]+)/i);
+  const errorIdMatch = raw.match(/\berror(?:Id)?[ =:]+([a-z0-9._-]+)/i);
+
+  return {
+    operation,
+    message,
+    requestId: requestIdMatch?.[1] ?? null,
+    errorId: errorIdMatch?.[1] ?? null
+  };
 }
 
 function shouldRenderConversationItem(item: ConversationTurnItem): boolean {
@@ -195,6 +228,8 @@ function signaturesMatch(prev: string[], next: string[]): boolean {
 const DEFAULT_EFFORT_OPTIONS = ["minimal", "low", "medium", "high", "xhigh"] as const;
 const INITIAL_VISIBLE_CHAT_ITEMS = 90;
 const VISIBLE_CHAT_ITEMS_STEP = 80;
+const CORE_REFRESH_INTERVAL_MS = 5_000;
+const CORE_REFRESH_CONNECTED_MIN_INTERVAL_MS = 60_000;
 const APP_DEFAULT_VALUE = "__app_default__";
 const ASSUMED_APP_DEFAULT_MODEL = "gpt-5.3-codex";
 const ASSUMED_APP_DEFAULT_EFFORT = "medium";
@@ -464,12 +499,14 @@ function IconBtn({
   disabled,
   title,
   active,
+  testId,
   children
 }: {
   onClick?: () => void;
   disabled?: boolean;
   title?: string;
   active?: boolean;
+  testId?: string;
   children: React.ReactNode;
 }) {
   const buttonNode = (
@@ -477,6 +514,7 @@ function IconBtn({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-testid={testId}
       variant="ghost"
       size="icon"
       className={`h-8 w-8 rounded-lg ${
@@ -555,6 +593,8 @@ export function App(): React.JSX.Element {
     refreshSelectedThread: false
   });
   const coreRefreshIntervalRef = useRef<number | null>(null);
+  const eventsConnectedRef = useRef(false);
+  const lastCoreRefreshAtRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatContentRef = useRef<HTMLDivElement>(null);
   const isChatAtBottomRef = useRef(true);
@@ -740,6 +780,19 @@ export function App(): React.JSX.Element {
   const turns = deferredConversationState?.turns ?? [];
   const lastTurn = turns[turns.length - 1];
   const isGenerating = isTurnInProgressStatus(lastTurn?.status);
+  const threadListState = isCoreLoading
+    ? "loading"
+    : threads.length === 0
+      ? "empty"
+      : "ready";
+  const chatSurfaceState = !selectedThreadId && isCoreLoading
+    ? "loading-threads"
+    : turns.length === 0
+      ? selectedThreadId
+        ? "no-messages"
+        : "no-thread"
+      : "ready";
+  const errorBannerDetails = useMemo(() => toErrorBannerDetails(error), [error]);
   const flatConversationItems = useMemo(() => {
     const flattened: FlatConversationItem[] = [];
     let previousRenderedTurnIndex = -1;
@@ -929,6 +982,11 @@ export function App(): React.JSX.Element {
     });
   }, []);
 
+  const loadCoreDataTracked = useCallback(async () => {
+    await loadCoreData();
+    lastCoreRefreshAtRef.current = Date.now();
+  }, [loadCoreData]);
+
   const loadSelectedThread = useCallback(async (threadId: string) => {
     const includeTurns = !pendingMaterializationThreadIdsRef.current.has(threadId);
     const thread = threads.find((entry) => entry.id === threadId) ?? null;
@@ -989,14 +1047,14 @@ export function App(): React.JSX.Element {
   const refreshAll = useCallback(async () => {
     setIsCoreLoading(true);
     try {
-      await loadCoreData();
+      await loadCoreDataTracked();
       if (selectedThreadIdRef.current) await loadSelectedThread(selectedThreadIdRef.current);
     } catch (e) {
       setError(toErrorMessage(e));
     } finally {
       setIsCoreLoading(false);
     }
-  }, [loadCoreData, loadSelectedThread]);
+  }, [loadCoreDataTracked, loadSelectedThread]);
 
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
@@ -1029,13 +1087,37 @@ export function App(): React.JSX.Element {
   }, [refreshAll]);
 
   useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      void loadCoreDataTracked().catch((e) => setError(toErrorMessage(e)));
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [loadCoreDataTracked]);
+
+  useEffect(() => {
     coreRefreshIntervalRef.current = window.setInterval(() => {
-      void loadCoreData().catch((e) => setError(toErrorMessage(e)));
-    }, 5000);
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      const now = Date.now();
+      if (
+        eventsConnectedRef.current &&
+        now - lastCoreRefreshAtRef.current < CORE_REFRESH_CONNECTED_MIN_INTERVAL_MS
+      ) {
+        return;
+      }
+      void loadCoreDataTracked().catch((e) => setError(toErrorMessage(e)));
+    }, CORE_REFRESH_INTERVAL_MS);
     return () => {
       if (coreRefreshIntervalRef.current) window.clearInterval(coreRefreshIntervalRef.current);
     };
-  }, [loadCoreData]);
+  }, [loadCoreDataTracked]);
 
   useEffect(() => {
     if (!selectedThreadId) {
@@ -1073,9 +1155,12 @@ export function App(): React.JSX.Element {
           refreshSelectedThread: false
         };
         void (async () => {
+          if (document.visibilityState !== "visible") {
+            return;
+          }
           try {
             if (flags.refreshCore) {
-              await loadCoreData();
+              await loadCoreDataTracked();
             } else if (flags.refreshHistory && activeTabRef.current === "debug") {
               const nextHistory = await listDebugHistory(120);
               startTransition(() => {
@@ -1118,6 +1203,7 @@ export function App(): React.JSX.Element {
 
       source = new EventSource("/events");
       source.onopen = () => {
+        eventsConnectedRef.current = true;
         reconnectDelayMs = 1000;
         scheduleRefresh(true, activeTabRef.current === "debug", Boolean(selectedThreadIdRef.current));
       };
@@ -1157,6 +1243,7 @@ export function App(): React.JSX.Element {
       };
 
       source.onerror = () => {
+        eventsConnectedRef.current = false;
         if (source) {
           source.close();
           source = null;
@@ -1178,11 +1265,12 @@ export function App(): React.JSX.Element {
         refreshHistory: false,
         refreshSelectedThread: false
       };
+      eventsConnectedRef.current = false;
       if (source) {
         source.close();
       }
     };
-  }, [loadCoreData, loadSelectedThread]);
+  }, [loadCoreDataTracked, loadSelectedThread]);
 
   useEffect(() => {
     if (!activeRequest) {
@@ -1541,7 +1629,11 @@ export function App(): React.JSX.Element {
           <span className="text-sm font-semibold">Farfield</span>
           <div className="flex items-center gap-1">
             {viewport === "desktop" && (
-              <IconBtn onClick={() => setDesktopSidebarOpen(false)} title="Hide sidebar">
+              <IconBtn
+                onClick={() => setDesktopSidebarOpen(false)}
+                title="Hide sidebar"
+                testId="sidebar-toggle-close"
+              >
                 <PanelLeft size={15} />
               </IconBtn>
             )}
@@ -1549,6 +1641,7 @@ export function App(): React.JSX.Element {
               <Button
                 type="button"
                 onClick={() => setMobileSidebarOpen(false)}
+                data-testid="sidebar-toggle-close"
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-foreground"
@@ -1561,11 +1654,15 @@ export function App(): React.JSX.Element {
       </div>
 
       <div className="relative flex-1 min-h-0">
-        <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden py-2 pl-2 pr-0">
+        <div
+          data-testid="thread-list-status"
+          data-state={threadListState}
+          className="h-full min-h-0 overflow-y-auto overflow-x-hidden py-2 pl-2 pr-0"
+        >
           {threads.length === 0 && (
-            <div className="px-4 py-6 text-xs text-muted-foreground text-center space-y-3">
+            <div data-testid="thread-list-empty" className="px-4 py-6 text-xs text-muted-foreground text-center space-y-3">
               {isCoreLoading ? (
-                <div className="flex items-center justify-center gap-2">
+                <div data-testid="thread-list-loading" className="flex items-center justify-center gap-2">
                   <Loader2 size={14} className="animate-spin" />
                   <span>Loading threads...</span>
                 </div>
@@ -1728,6 +1825,8 @@ export function App(): React.JSX.Element {
                           <Button
                             key={thread.id}
                             type="button"
+                            data-testid="thread-list-item"
+                            data-thread-id={thread.id}
                             onClick={() => {
                               setSelectedThreadId(thread.id);
                               setMobileSidebarOpen(false);
@@ -1838,7 +1937,7 @@ export function App(): React.JSX.Element {
   /* ── Render ─────────────────────────────────────────────── */
   return (
     <TooltipProvider delayDuration={120}>
-      <div className="app-shell flex bg-background text-foreground font-sans">
+      <div data-testid="app-shell" className="app-shell flex bg-background text-foreground font-sans">
 
       {/* Mobile sidebar backdrop */}
       <AnimatePresence>
@@ -1848,6 +1947,7 @@ export function App(): React.JSX.Element {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
+            data-testid="sidebar-backdrop"
             className="md:hidden fixed inset-0 bg-black/50 z-40"
             onClick={() => setMobileSidebarOpen(false)}
           />
@@ -1863,6 +1963,7 @@ export function App(): React.JSX.Element {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -280, opacity: 0.94 }}
             transition={{ type: "spring", stiffness: 380, damping: 36, mass: 0.7 }}
+            data-testid="sidebar-desktop"
             className="hidden md:flex fixed left-0 top-[env(safe-area-inset-top)] bottom-[env(safe-area-inset-bottom)] z-30 w-64 flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
           >
             {renderSidebarContent("desktop")}
@@ -1879,6 +1980,7 @@ export function App(): React.JSX.Element {
             animate={{ x: 0 }}
             exit={{ x: -280 }}
             transition={{ type: "spring", stiffness: 380, damping: 36, mass: 0.7 }}
+            data-testid="sidebar-mobile"
             className="md:hidden fixed left-0 top-[env(safe-area-inset-top)] bottom-[env(safe-area-inset-bottom)] z-50 w-64 flex flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
           >
             {renderSidebarContent("mobile")}
@@ -1903,19 +2005,27 @@ export function App(): React.JSX.Element {
         >
           <div className="flex items-center gap-2 min-w-0">
             <div className="md:hidden">
-              <IconBtn onClick={() => setMobileSidebarOpen(true)} title="Threads">
+              <IconBtn
+                onClick={() => setMobileSidebarOpen(true)}
+                title="Threads"
+                testId="sidebar-toggle-open"
+              >
                 <Menu size={15} />
               </IconBtn>
             </div>
             {!desktopSidebarOpen && (
               <div className="hidden md:block">
-                <IconBtn onClick={() => setDesktopSidebarOpen(true)} title="Show sidebar">
+                <IconBtn
+                  onClick={() => setDesktopSidebarOpen(true)}
+                  title="Show sidebar"
+                  testId="sidebar-toggle-open"
+                >
                   <PanelLeft size={15} />
                 </IconBtn>
               </div>
             )}
             <div className="min-w-0">
-              <div className="text-sm font-medium truncate leading-5 flex items-center gap-1.5">
+              <div data-testid="selected-thread-label" className="text-sm font-medium truncate leading-5 flex items-center gap-1.5">
                 {selectedThread ? threadLabel(selectedThread) : "No thread selected"}
                 {selectedThread && activeAgentLabel && (
                   <span className="shrink-0 h-5 w-5 rounded-md bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
@@ -1941,6 +2051,7 @@ export function App(): React.JSX.Element {
               onClick={() => void refreshAll()}
               disabled={isBusy}
               title="Refresh"
+              testId="refresh-button"
             >
               <RefreshCcw size={14} className={isBusy ? "animate-spin" : ""} />
             </IconBtn>
@@ -1948,6 +2059,7 @@ export function App(): React.JSX.Element {
               onClick={() => setActiveTab(activeTab === "debug" ? "chat" : "debug")}
               active={activeTab === "debug"}
               title="Debug"
+              testId="tab-debug"
             >
               <Bug size={14} />
             </IconBtn>
@@ -1964,19 +2076,52 @@ export function App(): React.JSX.Element {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
+              data-testid="error-banner"
               className="relative z-30 overflow-hidden shrink-0"
             >
               <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-sm text-destructive">
-                <span className="truncate">{error}</span>
-                <Button
-                  type="button"
-                  onClick={() => setError("")}
-                  variant="ghost"
-                  size="icon"
-                  className="ml-3 h-6 w-6 shrink-0 opacity-60 hover:opacity-100"
-                >
-                  <X size={13} />
-                </Button>
+                <div className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
+                  {errorBannerDetails.operation.length > 0 && (
+                    <span data-testid="error-banner-operation" className="shrink-0 font-semibold">
+                      {errorBannerDetails.operation}:
+                    </span>
+                  )}
+                  <span data-testid="error-banner-message" className="truncate">
+                    {errorBannerDetails.message}
+                  </span>
+                  {errorBannerDetails.requestId && (
+                    <span data-testid="error-banner-request-id" className="hidden">
+                      request {errorBannerDetails.requestId}
+                    </span>
+                  )}
+                  {errorBannerDetails.errorId && (
+                    <span data-testid="error-banner-error-id" className="hidden">
+                      error {errorBannerDetails.errorId}
+                    </span>
+                  )}
+                </div>
+                <div className="ml-3 flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    data-testid="error-banner-open-debug"
+                    onClick={() => setActiveTab("debug")}
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-destructive/90 hover:text-destructive"
+                  >
+                    Open in Debug
+                  </Button>
+                  <Button
+                    type="button"
+                    data-testid="error-banner-dismiss"
+                    onClick={() => setError("")}
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0 opacity-60 hover:opacity-100"
+                  >
+                    <X size={13} />
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -2008,7 +2153,7 @@ export function App(): React.JSX.Element {
 
         {/* ── Chat tab ──────────────────────────────────────── */}
         {activeTab === "chat" && (
-          <div className="relative flex-1 flex flex-col min-h-0">
+          <div data-testid="chat-surface" data-state={chatSurfaceState} className="relative flex-1 flex flex-col min-h-0">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-x-0 -top-4 z-10 h-[5.5rem] bg-gradient-to-b from-background from-52% via-background/78 via-82% to-transparent to-100%"
@@ -2026,19 +2171,19 @@ export function App(): React.JSX.Element {
                   className="max-w-3xl mx-auto px-4 pt-8 pb-6"
                 >
                   {turns.length === 0 ? (
-                    <div className="text-center py-20 text-sm text-muted-foreground">
+                    <div data-testid="chat-empty-state" className="text-center py-20 text-sm text-muted-foreground">
                       {!selectedThreadId && isCoreLoading
                         ? (
-                          <span className="inline-flex items-center gap-2">
+                          <span data-testid="chat-empty-loading-threads" className="inline-flex items-center gap-2">
                             <Loader2 size={14} className="animate-spin" />
                             Loading threads...
                           </span>
                         )
                         : selectedThreadId
-                        ? "No messages yet"
+                        ? <span data-testid="chat-empty-no-messages">No messages yet</span>
                         : availableAgentIds.length > 0
-                          ? "Start typing to create a new thread"
-                          : "Select a thread from the sidebar"}
+                          ? <span data-testid="chat-empty-no-thread">Start typing to create a new thread</span>
+                          : <span data-testid="chat-empty-no-thread">Select a thread from the sidebar</span>}
                     </div>
                   ) : (
                     <div ref={chatContentRef} className="space-y-0">
@@ -2265,7 +2410,7 @@ export function App(): React.JSX.Element {
             <div className="flex-1 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] min-h-0 divide-y md:divide-y-0 md:divide-x divide-border overflow-hidden">
 
               {/* Left: History */}
-              <div className="flex flex-col min-h-0 overflow-hidden">
+              <div data-testid="debug-history-panel" className="flex flex-col min-h-0 overflow-hidden">
                 <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
                   <Activity size={13} className="text-muted-foreground" />
                   <span className="text-sm font-medium">History</span>
@@ -2355,10 +2500,10 @@ export function App(): React.JSX.Element {
               </div>
 
               {/* Right: Trace + Stream Events */}
-              <div className="flex flex-col min-h-0 overflow-hidden divide-y divide-border">
+              <div data-testid="debug-stream-panel" className="flex flex-col min-h-0 overflow-hidden divide-y divide-border">
 
                 {/* Trace controls */}
-                <div className="p-4 space-y-3 shrink-0">
+                <div data-testid="debug-trace-panel" className="p-4 space-y-3 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">Trace</span>
                     <span
@@ -2408,7 +2553,7 @@ export function App(): React.JSX.Element {
                 </div>
 
                 {/* Stream events */}
-                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div data-testid="debug-stream-events-panel" className="flex-1 flex flex-col min-h-0 overflow-hidden">
                   <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border shrink-0">
                     <span className="text-xs font-medium">Stream Events</span>
                     <span className="text-xs text-muted-foreground/60">{streamEvents.length}</span>

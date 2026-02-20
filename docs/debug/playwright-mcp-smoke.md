@@ -25,8 +25,8 @@ Run these MCP browser tool calls in order:
 3. `browser_snapshot` and locate the first visible thread row (`data-testid="thread-list-item"`).
 4. `browser_click` on that thread row.
 5. `browser_snapshot` and confirm chat area is no longer `No thread selected`.
-6. `browser_click` on Debug tab (`data-testid="debug-tab-trigger"`).
-7. `browser_snapshot` and confirm debug panels are visible (`data-testid="debug-history-panel"` and `data-testid="debug-client-errors-panel"`).
+6. `browser_click` on Debug tab (`data-testid="tab-debug"`).
+7. `browser_snapshot` and confirm debug panels are visible (`data-testid="debug-history-panel"` and `data-testid="debug-stream-events-panel"`).
 8. `browser_evaluate` with:
 
 ```ts

@@ -28,7 +28,7 @@ test("thread list and open behavior", async ({ page, sentinel }) => {
   } else {
     await expect(page.getByTestId("thread-list-empty")).toBeVisible();
     await expect(
-      page.getByTestId("chat-empty-no-thread").or(page.getByTestId("chat-empty-loading"))
+      page.getByTestId("chat-empty-no-thread").or(page.getByTestId("chat-empty-loading-threads"))
     ).toBeVisible();
   }
 
