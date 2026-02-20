@@ -32,6 +32,21 @@ const ArchiveThreadEnvelopeSchema = z
   })
   .strict();
 
+const ApiErrorEnvelopeSchema = z
+  .object({
+    ok: z.literal(false),
+    error: z.string().min(1)
+  })
+  .strict();
+
+function isManagedThreadAlreadyGone(errorMessage: string): boolean {
+  return (
+    /no rollout found for thread id/i.test(errorMessage)
+    || /thread .* is not registered/i.test(errorMessage)
+    || /thread not loaded in app-server/i.test(errorMessage)
+  );
+}
+
 function parseApiPath(url: string): string | null {
   try {
     return new URL(url).pathname;
@@ -198,15 +213,19 @@ export class RealAppStateIsolationGuard {
       const response = await this.request.post(
         `/api/threads/${encodeURIComponent(threadId)}/archive`
       );
+      const payload = await response.json();
 
       if (!response.ok()) {
+        const parsedError = ApiErrorEnvelopeSchema.safeParse(payload);
+        if (parsedError.success && isManagedThreadAlreadyGone(parsedError.data.error)) {
+          continue;
+        }
         this.violations.push(
           `Managed thread cleanup failed: POST /api/threads/${threadId}/archive -> HTTP ${String(response.status())}`
         );
         continue;
       }
 
-      const payload = await response.json();
       const parsed = ArchiveThreadEnvelopeSchema.parse(payload);
       if (parsed.threadId !== threadId) {
         this.violations.push(

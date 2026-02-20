@@ -15,18 +15,33 @@ async function waitForState(
   sentinel: ErrorSentinel,
   timeoutMs: number
 ): Promise<void> {
-  const stateLocator = page.getByTestId(testId);
-  await expect(stateLocator).toBeVisible({ timeout: timeoutMs });
+  const readVisibleState = async (): Promise<string> => {
+    const stateLocators = page.getByTestId(testId);
+    const count = await stateLocators.count();
+    for (let index = 0; index < count; index += 1) {
+      const candidate = stateLocators.nth(index);
+      if (await candidate.isVisible()) {
+        return (await candidate.getAttribute("data-state")) ?? "";
+      }
+    }
+    return "__hidden__";
+  };
 
   try {
     await expect
-      .poll(async () => (await stateLocator.getAttribute("data-state")) ?? "", {
+      .poll(readVisibleState, {
+        timeout: timeoutMs,
+        message: `${surface} did not become visible within ${String(timeoutMs)}ms`
+      })
+      .not.toBe("__hidden__");
+    await expect
+      .poll(readVisibleState, {
         timeout: timeoutMs,
         message: `${surface} did not settle within ${String(timeoutMs)}ms`
       })
       .not.toBe(disallowedState);
   } catch (error) {
-    const observedState = (await stateLocator.getAttribute("data-state")) ?? "missing";
+    const observedState = await readVisibleState();
     sentinel.recordLoadingTimeoutBreach({
       surface,
       timeoutMs,
@@ -59,7 +74,43 @@ export async function expectChatSurfaceSettled(
   options?: SettleOptions
 ): Promise<void> {
   const timeoutMs = options?.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
-  await waitForState(page, "chat-surface", "loading-threads", "chat-surface", sentinel, timeoutMs);
+  const readVisibleState = async (): Promise<string> => {
+    const stateLocators = page.getByTestId("chat-surface");
+    const count = await stateLocators.count();
+    for (let index = 0; index < count; index += 1) {
+      const candidate = stateLocators.nth(index);
+      if (await candidate.isVisible()) {
+        return (await candidate.getAttribute("data-state")) ?? "";
+      }
+    }
+    return "__hidden__";
+  };
+
+  try {
+    await expect
+      .poll(readVisibleState, {
+        timeout: timeoutMs,
+        message: `chat-surface did not become visible within ${String(timeoutMs)}ms`
+      })
+      .not.toBe("__hidden__");
+    await expect
+      .poll(async () => {
+        const state = await readVisibleState();
+        return state === "loading-threads" || state === "loading-thread";
+      }, {
+        timeout: timeoutMs,
+        message: `chat-surface did not settle within ${String(timeoutMs)}ms`
+      })
+      .toBe(false);
+  } catch (error) {
+    const observedState = await readVisibleState();
+    sentinel.recordLoadingTimeoutBreach({
+      surface: "chat-surface",
+      timeoutMs,
+      observedState
+    });
+    throw error;
+  }
 }
 
 export async function expectNoUnexpectedClientErrors(sentinel: ErrorSentinel): Promise<void> {

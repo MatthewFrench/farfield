@@ -109,6 +109,30 @@ describe("API envelope parsing", () => {
     expect(parsedUrl.searchParams.get("cwd")).toBe("/tmp/workspace");
   });
 
+  it("parses pagination metadata for thread list", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        data: [],
+        nextCursor: "cursor_2",
+        pages: 3,
+        truncated: true
+      })
+    } as Response);
+
+    const result = await listThreads({
+      limit: 80,
+      archived: true,
+      all: true,
+      maxPages: 20
+    });
+
+    expect(result.nextCursor).toBe("cursor_2");
+    expect(result.pages).toBe(3);
+    expect(result.truncated).toBe(true);
+  });
+
   it("parses config defaults response", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,

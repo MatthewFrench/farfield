@@ -24,6 +24,10 @@
     "smoke:app": "node scripts/with-env.mjs \"node scripts/app-smoke.mjs\"",
     "smoke:ios-device": "node scripts/with-env.mjs \"node scripts/ios-device-smoke.mjs\"",
     "smoke:ios-matrix": "node scripts/with-env.mjs \"node scripts/ios-device-smoke-matrix.mjs\"",
+    "e2e:real:install": "bunx playwright install chromium",
+    "e2e:real:run": "node scripts/with-env.mjs \"bun run --filter @farfield/protocol build && bunx playwright test -c playwright.real.config.ts\"",
+    "e2e:real:ui": "node scripts/with-env.mjs \"bun run --filter @farfield/protocol build && bunx playwright test -c playwright.real.config.ts --ui\"",
+    "e2e:real:debug": "node scripts/with-env.mjs \"bun run --filter @farfield/protocol build && bunx playwright test -c playwright.real.config.ts --debug\"",
     "stress:stream-burst": "node scripts/with-env.mjs \"node scripts/stream-burst.mjs\"",
     "verify:real": "bun run smoke:app",
     "sanitize:traces": "node scripts/sanitize-traces.mjs",
@@ -31,6 +35,8 @@
     "screenshot:codex": "node skills/codex-window-debug/tools/codex-window-screenshot.mjs"
   },
   "devDependencies": {
+    "@farfield/protocol": "workspace:*",
+    "@playwright/test": "^1.55.0",
     "@types/node": "^24.3.0",
     "dotenv": "^17.2.3",
     "tsx": "^4.20.5",

@@ -1090,6 +1090,10 @@ const server = http.createServer(async (req, res) => {
       const enabledAdapters = registry.listEnabled();
       const mergedData: ThreadListItemWithAgentId[] = [];
       let nextCursor: string | null = null;
+      let combinedPages = 0;
+      let hasPages = false;
+      let combinedTruncated = false;
+      let hasTruncated = false;
 
       for (const adapter of enabledAdapters) {
         try {
@@ -1105,6 +1109,14 @@ const server = http.createServer(async (req, res) => {
 
           if (!nextCursor && result.nextCursor) {
             nextCursor = result.nextCursor;
+          }
+          if (typeof result.pages === "number") {
+            combinedPages += result.pages;
+            hasPages = true;
+          }
+          if (typeof result.truncated === "boolean") {
+            combinedTruncated = combinedTruncated || result.truncated;
+            hasTruncated = true;
           }
 
           for (const thread of result.data) {
@@ -1130,7 +1142,9 @@ const server = http.createServer(async (req, res) => {
       jsonResponse(res, 200, {
         ok: true,
         data: mergedData,
-        nextCursor
+        nextCursor,
+        ...(hasPages ? { pages: combinedPages } : {}),
+        ...(hasTruncated ? { truncated: combinedTruncated } : {})
       });
       return;
     }

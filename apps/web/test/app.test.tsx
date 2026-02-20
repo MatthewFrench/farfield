@@ -174,6 +174,8 @@ let liveStateResolver: (threadId: string) => {
   liveStateError: null;
 };
 
+let readThreadDelayMs = 0;
+
 function buildConversationStateFixture(threadId: string, modelId: string): {
   id: string;
   turns: Array<{
@@ -219,6 +221,7 @@ function buildConversationStateFixture(threadId: string, modelId: string): {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/");
   MockEventSource.reset();
   localStorageState.clear();
   agentsFixture = {
@@ -304,6 +307,7 @@ beforeEach(() => {
     conversationState: null,
     liveStateError: null
   });
+  readThreadDelayMs = 0;
 });
 
 afterEach(() => {
@@ -358,6 +362,11 @@ vi.stubGlobal(
     if (pathname.startsWith("/api/threads/") && parsedUrl.searchParams.has("includeTurns")) {
       const readThread = readThreadResolver(threadId);
       if (readThread) {
+        if (readThreadDelayMs > 0) {
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, readThreadDelayMs);
+          });
+        }
         return {
           ok: true,
           json: async () => readThread
@@ -440,6 +449,52 @@ describe("App", () => {
     render(<App />);
     expect((await screen.findAllByText("Farfield")).length).toBeGreaterThan(0);
     expect(await screen.findByText("No thread selected")).toBeTruthy();
+  });
+
+  it("shows selected-thread loading state before thread hydrate completes", async () => {
+    const threadId = "thread-loading";
+    window.history.replaceState(null, "", `/threads/${threadId}`);
+
+    threadsFixture = {
+      ok: true,
+      data: [
+        {
+          id: threadId,
+          preview: "loading thread preview",
+          createdAt: 1700000000,
+          updatedAt: 1700000000,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex"
+        }
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false
+    };
+
+    const conversationState = buildConversationStateFixture(threadId, "gpt-5.3-codex");
+    conversationState.turns = [];
+    readThreadResolver = (targetThreadId: string) => ({
+      ok: true,
+      thread: {
+        ...conversationState,
+        id: targetThreadId
+      },
+      agentId: "codex"
+    });
+    readThreadDelayMs = 220;
+
+    render(<App />);
+
+    expect(await screen.findByTestId("chat-empty-loading-thread")).toBeTruthy();
+    expect(screen.queryByTestId("chat-empty-no-messages")).toBeNull();
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("chat-empty-loading-thread")).toBeNull();
+    });
+
+    expect(await screen.findByTestId("chat-empty-no-messages")).toBeTruthy();
   });
 
   it("hides mode controls when capability is disabled", async () => {

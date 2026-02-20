@@ -201,6 +201,24 @@ function toErrorBannerDetails(rawError: string): ErrorBannerDetails {
   };
 }
 
+function isTransientReadThreadError(errorMessage: string): boolean {
+  return (
+    /failed to load rollout .* is empty/i.test(errorMessage)
+    || /thread not loaded in app-server/i.test(errorMessage)
+    || /conversation not found/i.test(errorMessage)
+  );
+}
+
+function isThreadNotLoadedReadError(errorMessage: string): boolean {
+  return /thread not loaded in app-server/i.test(errorMessage);
+}
+
+async function waitForMs(durationMs: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
+}
+
 function shouldRenderConversationItem(item: ConversationTurnItem): boolean {
   switch (item.type) {
     case "userMessage":
@@ -236,12 +254,16 @@ const INITIAL_VISIBLE_CHAT_ITEMS = 90;
 const VISIBLE_CHAT_ITEMS_STEP = 80;
 const CORE_REFRESH_INTERVAL_MS = 5_000;
 const CORE_REFRESH_CONNECTED_MIN_INTERVAL_MS = 60_000;
+const READ_THREAD_RETRY_ATTEMPTS = 6;
+const READ_THREAD_RETRY_BASE_DELAY_MS = 140;
+const READ_THREAD_RETRY_MAX_DELAY_MS = 1_000;
 const APP_DEFAULT_VALUE = "__app_default__";
 const ASSUMED_APP_DEFAULT_MODEL = "gpt-5.3-codex";
 const ASSUMED_APP_DEFAULT_EFFORT = "medium";
 const SIDEBAR_COLLAPSED_GROUPS_STORAGE_KEY = "farfield.sidebar.collapsed-groups.v1";
 const THREAD_LIST_LIMIT = 80;
 const THREAD_LIST_MAX_PAGES = 1;
+const ARCHIVED_THREAD_LIST_MAX_PAGES = 20;
 const AGENT_FAVICON_BY_ID: Record<AgentId, string> = {
   codex: "https://openai.com/favicon.ico",
   opencode: "https://opencode.ai/favicon.ico"
@@ -576,11 +598,16 @@ export function App(): React.JSX.Element {
   const [configDefaults, setConfigDefaults] = useState<ConfigDefaults | null>(null);
   const [threads, setThreads] = useState<ThreadsResponse["data"]>([]);
   const [archivedThreads, setArchivedThreads] = useState<ThreadsResponse["data"]>([]);
+  const [hasLoadedArchivedThreads, setHasLoadedArchivedThreads] = useState(false);
+  const [archivedThreadsTruncated, setArchivedThreadsTruncated] = useState(false);
   const [isArchivedThreadsOpen, setIsArchivedThreadsOpen] = useState(false);
   const [isArchivedThreadsLoading, setIsArchivedThreadsLoading] = useState(false);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(initialUiState.threadId);
   const [liveState, setLiveState] = useState<LiveStateResponse | null>(null);
   const [readThreadState, setReadThreadState] = useState<ReadThreadResponse | null>(null);
+  const [isSelectedThreadLoading, setIsSelectedThreadLoading] = useState(
+    Boolean(initialUiState.threadId)
+  );
   const [streamEvents, setStreamEvents] = useState<StreamEventsResponse["events"]>([]);
   const [modes, setModes] = useState<ModesResponse["data"]>([]);
   const [models, setModels] = useState<ModelsResponse["data"]>([]);
@@ -637,6 +664,7 @@ export function App(): React.JSX.Element {
   const modelsSignatureRef = useRef<string[]>([]);
   const isArchivedThreadsOpenRef = useRef(false);
   const threadListWorkspaceDirRef = useRef<string | null>(null);
+  const selectedThreadLoadTokenRef = useRef(0);
 
   /* Derived */
   const selectedThread = useMemo(
@@ -868,6 +896,8 @@ export function App(): React.JSX.Element {
       : "ready";
   const chatSurfaceState = !selectedThreadId && isCoreLoading
     ? "loading-threads"
+    : selectedThreadId && isSelectedThreadLoading
+      ? "loading-thread"
     : turns.length === 0
       ? selectedThreadId
         ? "no-messages"
@@ -937,6 +967,7 @@ export function App(): React.JSX.Element {
   const loadCoreData = useCallback(async () => {
     const nh = await getHealth();
     const workspaceDir = nh.state.workspaceDir ?? null;
+    const previousWorkspaceDir = threadListWorkspaceDirRef.current;
     threadListWorkspaceDirRef.current = workspaceDir;
 
     const [nt, nm, nmo, ntr, nhist, nag, ncfg] = await Promise.all([
@@ -974,6 +1005,12 @@ export function App(): React.JSX.Element {
     );
 
     startTransition(() => {
+      if (previousWorkspaceDir !== workspaceDir) {
+        archivedThreadsSignatureRef.current = [];
+        setArchivedThreads([]);
+        setHasLoadedArchivedThreads(false);
+        setArchivedThreadsTruncated(false);
+      }
       setHealth((prev) => {
         if (
           prev &&
@@ -1094,8 +1131,8 @@ export function App(): React.JSX.Element {
       const archived = await listThreads({
         limit: THREAD_LIST_LIMIT,
         archived: true,
-        all: false,
-        maxPages: THREAD_LIST_MAX_PAGES,
+        all: true,
+        maxPages: ARCHIVED_THREAD_LIST_MAX_PAGES,
         sortKey: "updated_at",
         ...(workspaceDir ? { cwd: workspaceDir } : {})
       });
@@ -1116,6 +1153,9 @@ export function App(): React.JSX.Element {
           archivedThreadsSignatureRef.current = nextArchivedThreadsSignature;
           setArchivedThreads(archived.data);
         }
+        const isTruncated = (archived.truncated ?? false) || archived.nextCursor !== null;
+        setArchivedThreadsTruncated(isTruncated);
+        setHasLoadedArchivedThreads(true);
       });
     } catch (e) {
       setError(toErrorMessage(e));
@@ -1126,11 +1166,11 @@ export function App(): React.JSX.Element {
 
   const loadCoreDataTracked = useCallback(async () => {
     await loadCoreData();
-    if (isArchivedThreadsOpenRef.current) {
+    if (isArchivedThreadsOpenRef.current || hasLoadedArchivedThreads) {
       await loadArchivedThreads();
     }
     lastCoreRefreshAtRef.current = Date.now();
-  }, [loadArchivedThreads, loadCoreData]);
+  }, [hasLoadedArchivedThreads, loadArchivedThreads, loadCoreData]);
 
   const loadSelectedThread = useCallback(async (threadId: string) => {
     const includeTurns = !pendingMaterializationThreadIdsRef.current.has(threadId);
@@ -1139,6 +1179,27 @@ export function App(): React.JSX.Element {
     const descriptor = agentsById[threadAgentId];
     const canReadLiveState = descriptor?.capabilities.canReadLiveState ?? (threadAgentId === "codex");
     const canReadStreamEvents = descriptor?.capabilities.canReadStreamEvents ?? (threadAgentId === "codex");
+
+    let includeTurnsForRead = includeTurns;
+    let readRetryDelayMs = READ_THREAD_RETRY_BASE_DELAY_MS;
+    const readThreadWithRetry = async (): Promise<ReadThreadResponse> => {
+      for (let attempt = 0; attempt < READ_THREAD_RETRY_ATTEMPTS; attempt += 1) {
+        try {
+          return await readThread(threadId, { includeTurns: includeTurnsForRead });
+        } catch (error) {
+          const message = toErrorMessage(error);
+          const canRetry = isTransientReadThreadError(message) && attempt < READ_THREAD_RETRY_ATTEMPTS - 1;
+          if (!canRetry) {
+            throw error;
+          }
+          includeTurnsForRead = true;
+          await waitForMs(readRetryDelayMs);
+          readRetryDelayMs = Math.min(readRetryDelayMs * 2, READ_THREAD_RETRY_MAX_DELAY_MS);
+        }
+      }
+
+      throw new Error(`Failed to read thread after ${String(READ_THREAD_RETRY_ATTEMPTS)} attempts`);
+    };
 
     const [live, stream, read] = await Promise.all([
       canReadLiveState
@@ -1158,7 +1219,7 @@ export function App(): React.JSX.Element {
             ownerClientId: null,
             events: []
           }),
-      readThread(threadId, { includeTurns })
+      readThreadWithRetry()
     ]);
     if ((live.conversationState?.turns.length ?? 0) > 0 || read.thread.turns.length > 0) {
       pendingMaterializationThreadIdsRef.current.delete(threadId);
@@ -1282,13 +1343,37 @@ export function App(): React.JSX.Element {
   }, [loadCoreDataTracked]);
 
   useEffect(() => {
+    selectedThreadLoadTokenRef.current += 1;
+    const loadToken = selectedThreadLoadTokenRef.current;
+
     if (!selectedThreadId) {
       setLiveState(null);
       setReadThreadState(null);
       setStreamEvents([]);
+      setIsSelectedThreadLoading(false);
       return;
     }
-    void loadSelectedThread(selectedThreadId).catch((e) => setError(toErrorMessage(e)));
+
+    setLiveState(null);
+    setReadThreadState(null);
+    setStreamEvents([]);
+    setIsSelectedThreadLoading(true);
+
+    void loadSelectedThread(selectedThreadId)
+      .catch((e) => {
+        const message = toErrorMessage(e);
+        if (isThreadNotLoadedReadError(message)) {
+          setSelectedThreadId(null);
+          selectedThreadIdRef.current = null;
+        }
+        setError(message);
+      })
+      .finally(() => {
+        if (selectedThreadLoadTokenRef.current !== loadToken) {
+          return;
+        }
+        setIsSelectedThreadLoading(false);
+      });
   }, [loadSelectedThread, selectedThreadId]);
 
   useEffect(() => {
@@ -2068,9 +2153,13 @@ export function App(): React.JSX.Element {
                 <span className="flex-1 truncate">Archived threads</span>
                 {isArchivedThreadsLoading ? (
                   <Loader2 size={11} className="animate-spin text-muted-foreground/70" />
+                ) : !hasLoadedArchivedThreads ? (
+                  <span className="text-[10px] text-muted-foreground/60">—</span>
                 ) : (
                   <span className="text-[10px] text-muted-foreground/60">
-                    {String(archivedThreads.length)}
+                    {archivedThreadsTruncated
+                      ? `${String(archivedThreads.length)}+`
+                      : String(archivedThreads.length)}
                   </span>
                 )}
               </Button>
@@ -2142,6 +2231,14 @@ export function App(): React.JSX.Element {
                       </div>
                     </div>
                   ))}
+                  {archivedThreadsTruncated && (
+                    <div
+                      data-testid="archived-thread-list-truncated"
+                      className="px-2 py-1 text-[10px] text-muted-foreground/70"
+                    >
+                      Showing latest archived threads only.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2303,7 +2400,11 @@ export function App(): React.JSX.Element {
             )}
             <div className="min-w-0">
               <div data-testid="selected-thread-label" className="text-sm font-medium truncate leading-5 flex items-center gap-1.5">
-                {selectedThread ? threadLabel(selectedThread) : "No thread selected"}
+                {selectedThread
+                  ? threadLabel(selectedThread)
+                  : selectedThreadId && isSelectedThreadLoading
+                    ? "Loading thread..."
+                    : "No thread selected"}
                 {selectedThread && activeAgentLabel && (
                   <span className="shrink-0 h-5 w-5 rounded-md bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
                     <AgentFavicon
@@ -2456,6 +2557,13 @@ export function App(): React.JSX.Element {
                             Loading threads...
                           </span>
                         )
+                        : selectedThreadId && isSelectedThreadLoading
+                          ? (
+                            <span data-testid="chat-empty-loading-thread" className="inline-flex items-center gap-2">
+                              <Loader2 size={14} className="animate-spin" />
+                              Loading thread...
+                            </span>
+                          )
                         : selectedThreadId
                         ? <span data-testid="chat-empty-no-messages">No messages yet</span>
                         : availableAgentIds.length > 0
