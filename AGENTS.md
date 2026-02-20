@@ -22,56 +22,10 @@ violate the rules. If you think that is impossible, STOP and ask the user.
 
 ## Commands You Will Use Often
 
-- `pnpm dev`
-- `pnpm typecheck`
-- `pnpm test`
-- `pnpm lint`
-- `pnpm verify:real`
-- `pnpm premerge:check`
-
-## Required Pre-Merge Gate
-
-For changes touching `apps/web`, `apps/server`, `packages/codex-protocol`, or `e2e/real`, the local gate is mandatory before merge:
-
-1. `pnpm premerge:check`
-2. If it fails, fix all failures and rerun until clean.
-
-## Error Debugging Workflow
-
-When investigating Farfield runtime issues, use:
-
-1. `docs/debug/client-error-triage.md` for the current triage flow and endpoints.
-2. `.runtime/logs/errors/session-*.ndjson` for per-session error events.
-3. Error IDs from the UI banner/Debug tab to correlate with history and stream events.
-
-## Real App Debug Loop (Agent)
-
-When a user reports UI/runtime breakage, validate against the real running app before saying it is fixed.
-
-1. Start/reuse the live stack (`pnpm dev`).
-2. Run `pnpm smoke:app` and resolve failures first.
-3. Keep sentinel output visible during the loop (`tail -f .runtime/e2e-sentinel/latest.ndjson` when available).
-4. Use Playwright MCP tools to drive the real UI (not mocked tests) and reproduce the issue.
-5. Run the standard manual script in `docs/debug/playwright-mcp-smoke.md`.
-6. For Playwright control, use MCP browser tool calls (`browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_press_key`, `browser_console_messages`, `browser_network_requests`, `browser_evaluate`).
-7. After a fix, rerun the same real UI flow, `pnpm smoke:app`, and targeted real-app scenario checks (`pnpm e2e:real:run -- --grep "<scenario>"`).
-8. Treat unexpected warning/error signals as blocking; fix and rerun before reporting done.
-9. Include in your final report:
-   - exact real-user flow validated
-   - whether red banner / `Load failed` / client-error logging reproduced
-   - which command/tool checks passed
-
-## Environment-Specific Files (Strict)
-
-Never commit machine-specific runtime config files.
-
-1. Commit templates only for environment-specific config.
-2. Generate runtime files from templates via setup scripts.
-3. Keep generated runtime files gitignored.
-4. Current Caddy pattern:
-   - Commit: `ops/caddy/Caddyfile.local.template`, `ops/caddy/Caddyfile.domain.template`
-   - Generate + ignore: `ops/caddy/Caddyfile.local`, `ops/caddy/Caddyfile.domain`
-5. If you add another environment-specific config, follow this same template + generated + gitignored model.
+- `bun run dev`
+- `bun run typecheck`
+- `bun run test`
+- `bun run lint`
 
 ## Trace Privacy Rules (Strict)
 
@@ -80,7 +34,7 @@ Never commit raw traces from `traces/`.
 If you need traces for tests:
 
 1. Put raw trace files in `traces/` only.
-2. Run `pnpm sanitize:traces`.
+2. Run `bun run sanitize:traces`.
 3. Use only sanitized files from:
    - `packages/codex-protocol/test/fixtures/sanitized/`
 4. Manually inspect sanitized files before any commit.

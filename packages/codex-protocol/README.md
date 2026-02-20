@@ -46,13 +46,28 @@ All helpers throw `ProtocolValidationError` with issue paths.
 
 ## Strictness Policy
 
-- Schemas use `.strict()` by default.
-- Unknown fields are rejected unless explicitly allowed.
-- No fallback parsing and no shape coercion.
+- Schemas use `.passthrough()` by default.
+- Unknown fields are allowed and preserved.
+- Required known fields are still validated with exact types.
 
 ## Development
 
 ```bash
-pnpm --filter @farfield/protocol build
-pnpm --filter @farfield/protocol test
+bun run --filter @farfield/protocol build
+bun run --filter @farfield/protocol test
 ```
+
+## Generated App-Server Schemas
+
+The app-server schemas in this package are generated from the official Codex app-server schema output.
+
+From repo root:
+
+```bash
+bun run generate:codex-schema
+```
+
+This regenerates:
+
+- `packages/codex-protocol/vendor/codex-app-server-schema/`
+- `packages/codex-protocol/src/generated/app-server/`

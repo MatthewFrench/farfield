@@ -1,42 +1,26 @@
 {
   "name": "farfield",
   "private": true,
-  "packageManager": "pnpm@10.29.3",
+  "packageManager": "bun@1.3.6",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "node scripts/with-env.mjs \"pnpm --filter @farfield/protocol build && pnpm --filter @farfield/api build && pnpm --parallel --filter @farfield/server --filter @farfield/web dev\"",
-    "dev:remote": "node scripts/with-env.mjs \"pnpm --filter @farfield/protocol build && pnpm --filter @farfield/api build && pnpm --parallel --filter @farfield/server --filter @farfield/web dev:remote\"",
-    "dev:remote:https": "pnpm ios:local",
-    "ios:trust-local-ca": "node scripts/with-env.mjs \"node scripts/ios-trust-local-ca.mjs\"",
-    "ios:local": "node scripts/with-env.mjs \"node scripts/ios-local.mjs\"",
-    "smoke:ios-device": "node scripts/with-env.mjs \"node scripts/ios-device-smoke.mjs\"",
-    "setup:ios-push": "node scripts/setup-ios-push.mjs",
-    "setup:domain-https": "node scripts/setup-domain-https.mjs",
-    "rotate:api-token": "node scripts/rotate-api-token.mjs",
-    "smoke:app": "node scripts/with-env.mjs \"node scripts/app-smoke.mjs\"",
-    "stress:stream-burst": "node scripts/with-env.mjs \"node scripts/stream-burst.mjs\"",
-    "e2e:real:governance": "node scripts/validate-e2e-governance.mjs",
-    "e2e:real:install": "node scripts/with-env.mjs \"pnpm exec playwright install chromium\"",
-    "e2e:real:run": "node scripts/with-env.mjs \"node scripts/validate-e2e-governance.mjs && pnpm exec playwright test --config=playwright.real.config.ts\"",
-    "e2e:real:ui": "node scripts/with-env.mjs \"node scripts/validate-e2e-governance.mjs && pnpm exec playwright test --config=playwright.real.config.ts --ui\"",
-    "e2e:real:debug": "node scripts/with-env.mjs \"node scripts/validate-e2e-governance.mjs && pnpm exec playwright test --config=playwright.real.config.ts --debug\"",
-    "verify:real": "node scripts/with-env.mjs \"node scripts/app-smoke.mjs && node scripts/validate-e2e-governance.mjs && pnpm exec playwright test --config=playwright.real.config.ts\"",
-    "premerge:check": "pnpm --filter @farfield/protocol build && pnpm --filter @farfield/api build && pnpm lint && pnpm test && pnpm verify:real",
-    "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
+    "dev": "node scripts/dev.mjs",
+    "dev:remote": "node scripts/dev.mjs --remote",
+    "build": "bun run --workspaces build",
+    "test": "bun run --workspaces test",
+    "lint": "bun run --workspaces lint",
+    "typecheck": "bun run --workspaces typecheck",
     "sanitize:traces": "node scripts/sanitize-traces.mjs",
-    "push:keys": "node scripts/generate-vapid-keys.mjs",
-    "push:doctor": "node scripts/with-env.mjs \"node scripts/push-doctor.mjs\""
+    "generate:codex-schema": "node scripts/generate-codex-schema.mjs",
+    "screenshot:codex": "node skills/codex-window-debug/tools/codex-window-screenshot.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
     "@types/node": "^24.3.0",
-    "dotenv": "^16.6.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
-    "web-push": "^3.6.7",
-    "zod": "^3.25.76"
+    "vitest": "^3.2.4"
   }
 }

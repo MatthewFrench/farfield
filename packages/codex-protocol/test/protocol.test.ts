@@ -1,26 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  parseAppServerListThreadsResponse,
   parseAppServerReadThreadResponse,
   parseAppServerListModelsResponse,
   parseAppServerCollaborationModeListResponse,
   parseAppServerStartThreadResponse,
-  parseCreateDebugClientErrorBody,
-  parseCreatePushReceiptBody,
-  parseCreatePushSubscriptionBody,
-  parseDebugErrorCreateResponse,
-  parseDebugErrorDetailResponse,
-  parseDebugErrorListResponse,
   parseIpcFrame,
-  parsePushNotificationPayload,
-  parsePushLocalCaStatusResponse,
-  parsePushSendLatestResponse,
-  parsePushSendStore,
-  parsePushReceiptStore,
-  parsePushStateStore,
   parseThreadConversationState,
   parseThreadStreamStateChangedBroadcast,
-  parseUserInputResponsePayload,
-  parseVapidPublicKeyResponse
+  parseUserInputResponsePayload
 } from "../src/index.js";
 
 describe("codex-protocol schemas", () => {
@@ -73,89 +61,6 @@ describe("codex-protocol schemas", () => {
     expect(parsed.params.change.type).toBe("patches");
   });
 
-  it("parses thread stream patch paths expressed as JSON Pointer strings", () => {
-    const parsed = parseThreadStreamStateChangedBroadcast({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
-      sourceClientId: "client-123",
-      version: 4,
-      params: {
-        conversationId: "thread-123",
-        type: "thread-stream-state-changed",
-        version: 4,
-        change: {
-          type: "patches",
-          patches: [
-            {
-              op: "replace",
-              path: "/turns/0/status",
-              value: "completed"
-            }
-          ]
-        }
-      }
-    });
-
-    expect(parsed.params.change.type).toBe("patches");
-    expect(parsed.params.change.patches[0]?.path).toEqual(["turns", "0", "status"]);
-  });
-
-  it("keeps numeric JSON pointer object keys as strings", () => {
-    const parsed = parseThreadStreamStateChangedBroadcast({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
-      sourceClientId: "client-123",
-      version: 4,
-      params: {
-        conversationId: "thread-123",
-        type: "thread-stream-state-changed",
-        version: 4,
-        change: {
-          type: "patches",
-          patches: [
-            {
-              op: "replace",
-              path: "/turns/0/diff/1",
-              value: "ok"
-            }
-          ]
-        }
-      }
-    });
-
-    expect(parsed.params.change.type).toBe("patches");
-    expect(parsed.params.change.patches[0]?.path).toEqual(["turns", "0", "diff", "1"]);
-  });
-
-  it("parses thread stream patches provided as a single patch object", () => {
-    const parsed = parseThreadStreamStateChangedBroadcast({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
-      sourceClientId: "client-123",
-      version: 4,
-      params: {
-        conversationId: "thread-123",
-        type: "thread-stream-state-changed",
-        version: 4,
-        change: {
-          type: "patches",
-          patches: {
-            op: "add",
-            path: ["turns", 0],
-            value: {
-              turnId: "turn-1",
-              status: "in_progress",
-              items: []
-            }
-          }
-        }
-      }
-    });
-
-    expect(parsed.params.change.type).toBe("patches");
-    expect(parsed.params.change.patches).toHaveLength(1);
-  });
-
   it("parses snapshot broadcast with null title and empty model defaults", () => {
     const parsed = parseThreadStreamStateChangedBroadcast({
       type: "broadcast",
@@ -201,6 +106,44 @@ describe("codex-protocol schemas", () => {
     expect(parsed.params.change.type).toBe("snapshot");
   });
 
+  it("parses snapshot broadcast when turn includes error item", () => {
+    const parsed = parseThreadStreamStateChangedBroadcast({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "client-123",
+      version: 4,
+      params: {
+        conversationId: "thread-123",
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "snapshot",
+          conversationState: {
+            id: "thread-123",
+            turns: [
+              {
+                status: "completed",
+                items: [
+                  {
+                    id: "err-1",
+                    type: "error",
+                    message: "contextWindowExceeded",
+                    willRetry: false,
+                    errorInfo: "contextWindowExceeded",
+                    additionalDetails: null
+                  }
+                ]
+              }
+            ],
+            requests: []
+          }
+        }
+      }
+    });
+
+    expect(parsed.params.change.type).toBe("snapshot");
+  });
+
   it("rejects invalid patch value for remove operation", () => {
     expect(() =>
       parseThreadStreamStateChangedBroadcast({
@@ -224,7 +167,7 @@ describe("codex-protocol schemas", () => {
           }
         }
       })
-    ).toThrowError(/params\.change: Invalid input/);
+    ).toThrowError(/remove patches must not include value/);
   });
 
   it("parses thread conversation state with userInputResponse item", () => {
@@ -247,6 +190,30 @@ describe("codex-protocol schemas", () => {
               questions: [{ id: "q", header: "H", question: "Q" }],
               answers: { q: ["A"] },
               completed: true
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    expect(parsed.turns[0]?.items[0]?.type).toBe("userInputResponse");
+  });
+
+  it("parses userInputResponse item when completed is omitted", () => {
+    const parsed = parseThreadConversationState({
+      id: "thread-123",
+      turns: [
+        {
+          status: "completed",
+          items: [
+            {
+              id: "item-1",
+              type: "userInputResponse",
+              requestId: 12,
+              turnId: "turn-1",
+              questions: [{ id: "q", header: "H", question: "Q" }],
+              answers: { q: ["A"] }
             }
           ]
         }
@@ -312,6 +279,29 @@ describe("codex-protocol schemas", () => {
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("steeringUserMessage");
+  });
+
+  it("parses planImplementation item", () => {
+    const parsed = parseThreadConversationState({
+      id: "thread-123",
+      turns: [
+        {
+          status: "completed",
+          items: [
+            {
+              id: "implement-plan:turn-1",
+              type: "planImplementation",
+              turnId: "turn-1",
+              planContent: "# Plan\n\nDo the thing",
+              isCompleted: true
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    expect(parsed.turns[0]?.items[0]?.type).toBe("planImplementation");
   });
 
   it("rejects thread conversation state with unknown item types", () => {
@@ -452,9 +442,7 @@ describe("codex-protocol schemas", () => {
               action: {
                 type: "search",
                 query: "example query",
-                queries: ["example query"],
-                url: "https://example.com",
-                pattern: "example"
+                queries: ["example query"]
               }
             }
           ]
@@ -464,13 +452,74 @@ describe("codex-protocol schemas", () => {
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("contextCompaction");
-    if (parsed.turns[0]?.items[0]?.type === "contextCompaction") {
-      expect(parsed.turns[0]?.items[0]?.completed).toBe(true);
-    }
     expect(parsed.turns[0]?.items[1]?.type).toBe("webSearch");
   });
 
-  it("parses thread conversation state with contextCompaction item missing completed", () => {
+  it("parses thread conversation state with mcp and collab tool call items", () => {
+    const parsed = parseThreadConversationState({
+      id: "thread-123",
+      turns: [
+        {
+          status: "completed",
+          items: [
+            {
+              id: "item-mcp",
+              type: "mcpToolCall",
+              server: "filesystem",
+              tool: "read_file",
+              status: "completed",
+              arguments: { path: "README.md" },
+              result: {
+                content: ["ok"],
+                structuredContent: null
+              },
+              error: null,
+              durationMs: 18
+            },
+            {
+              id: "item-collab",
+              type: "collabAgentToolCall",
+              tool: "sendInput",
+              status: "inProgress",
+              senderThreadId: "thread-123",
+              receiverThreadIds: ["thread-124"],
+              prompt: "Check this file",
+              agentsStates: {
+                "thread-124": {
+                  status: "running",
+                  message: null
+                }
+              }
+            },
+            {
+              id: "item-image-view",
+              type: "imageView",
+              path: "/tmp/example.png"
+            },
+            {
+              id: "item-review-enter",
+              type: "enteredReviewMode",
+              review: "review-1"
+            },
+            {
+              id: "item-review-exit",
+              type: "exitedReviewMode",
+              review: "review-1"
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    expect(parsed.turns[0]?.items[0]?.type).toBe("mcpToolCall");
+    expect(parsed.turns[0]?.items[1]?.type).toBe("collabAgentToolCall");
+    expect(parsed.turns[0]?.items[2]?.type).toBe("imageView");
+    expect(parsed.turns[0]?.items[3]?.type).toBe("enteredReviewMode");
+    expect(parsed.turns[0]?.items[4]?.type).toBe("exitedReviewMode");
+  });
+
+  it("parses contextCompaction item when completed is omitted", () => {
     const parsed = parseThreadConversationState({
       id: "thread-123",
       turns: [
@@ -487,10 +536,7 @@ describe("codex-protocol schemas", () => {
       requests: []
     });
 
-    if (parsed.turns[0]?.items[0]?.type !== "contextCompaction") {
-      throw new Error("expected contextCompaction item");
-    }
-    expect(parsed.turns[0]?.items[0]?.completed).toBe(false);
+    expect(parsed.turns[0]?.items[0]?.type).toBe("contextCompaction");
   });
 
   it("parses thread conversation state with modelChanged item", () => {
@@ -513,134 +559,6 @@ describe("codex-protocol schemas", () => {
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("modelChanged");
-  });
-
-  it("parses thread conversation state with todo-list, collab agent, and mcp tool call items", () => {
-    const parsed = parseThreadConversationState({
-      id: "thread-123",
-      turns: [
-        {
-          status: "completed",
-          items: [
-            {
-              id: "item-todo",
-              type: "todo-list",
-              explanation: "Deliver feature",
-              plan: [
-                {
-                  step: "Implement",
-                  status: "inProgress"
-                }
-              ]
-            },
-            {
-              id: "item-collab",
-              type: "collabAgentToolCall",
-              tool: "spawnAgent",
-              status: "completed",
-              senderThreadId: "thread-123",
-              receiverThreadIds: ["thread-456"],
-              prompt: null,
-              agentsStates: {
-                "thread-456": {
-                  status: "completed",
-                  message: null
-                }
-              }
-            },
-            {
-              id: "item-mcp",
-              type: "mcpToolCall",
-              server: "playwright",
-              tool: "browser_snapshot",
-              status: "inProgress",
-              arguments: {
-                include: "visible"
-              },
-              result: null,
-              error: null,
-              durationMs: null
-            }
-          ]
-        }
-      ],
-      requests: []
-    });
-
-    expect(parsed.turns[0]?.items[0]?.type).toBe("todo-list");
-    expect(parsed.turns[0]?.items[1]?.type).toBe("collabAgentToolCall");
-    expect(parsed.turns[0]?.items[2]?.type).toBe("mcpToolCall");
-  });
-
-  it("parses snapshot broadcast containing todo-list and tool call items", () => {
-    const parsed = parseThreadStreamStateChangedBroadcast({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
-      sourceClientId: "client-123",
-      version: 4,
-      params: {
-        conversationId: "thread-123",
-        type: "thread-stream-state-changed",
-        version: 4,
-        change: {
-          type: "snapshot",
-          conversationState: {
-            id: "thread-123",
-            turns: [
-              {
-                status: "completed",
-                items: [
-                  {
-                    id: "item-todo",
-                    type: "todo-list",
-                    explanation: "Deliver feature",
-                    plan: [
-                      {
-                        step: "Implement",
-                        status: "completed"
-                      }
-                    ]
-                  },
-                  {
-                    id: "item-collab",
-                    type: "collabAgentToolCall",
-                    tool: "spawnAgent",
-                    status: "completed",
-                    senderThreadId: "thread-123",
-                    receiverThreadIds: ["thread-456"],
-                    prompt: "Inspect file layout",
-                    agentsStates: {
-                      "thread-456": {
-                        status: "completed",
-                        message: null
-                      }
-                    }
-                  },
-                  {
-                    id: "item-mcp",
-                    type: "mcpToolCall",
-                    server: "playwright",
-                    tool: "browser_snapshot",
-                    status: "completed",
-                    arguments: {
-                      include: "visible"
-                    },
-                    result: {
-                      ok: true
-                    },
-                    error: null,
-                    durationMs: 18
-                  }
-                ]
-              }
-            ],
-            requests: []
-          }
-        }
-      }
-    });
-
-    expect(parsed.params.change.type).toBe("snapshot");
   });
 
   it("parses generic ipc request frames", () => {
@@ -682,11 +600,11 @@ describe("codex-protocol schemas", () => {
       parseUserInputResponsePayload({
         answers: {
           q: {
-            answers: [""]
+            answers: [1]
           }
         }
       })
-    ).toThrowError(/String must contain at least 1 character/);
+    ).toThrowError(/Expected string, received number/);
   });
 
   it("parses collaboration mode list response", () => {
@@ -728,13 +646,61 @@ describe("codex-protocol schemas", () => {
           inputModalities: ["text", "image"],
           supportsPersonality: true,
           isDefault: true,
-          hidden: false
+          hidden: true
         }
       ],
       nextCursor: null
     });
 
     expect(parsed.data[0]?.id).toBe("gpt-5.3-codex");
+    expect(parsed.data[0]?.["hidden"]).toBe(true);
+  });
+
+  it("parses unknown top-level keys in app-server model/list response", () => {
+    const parsed = parseAppServerListModelsResponse({
+      data: [
+        {
+          id: "gpt-5.3-codex",
+          model: "gpt-5.3-codex",
+          upgrade: null,
+          displayName: "GPT-5.3 Codex",
+          description: "Latest frontier agentic coding model.",
+          supportedReasoningEfforts: [
+            {
+              reasoningEffort: "medium",
+              description: "Balanced"
+            }
+          ],
+          defaultReasoningEffort: "medium",
+          inputModalities: ["text"],
+          supportsPersonality: true,
+          isDefault: true,
+          hidden: false
+        }
+      ],
+      nextCursor: null,
+      hidden: true
+    });
+
+    expect(parsed["hidden"]).toBe(true);
+  });
+
+  it("parses app-server thread/list response from opencode agent", () => {
+    const parsed = parseAppServerListThreadsResponse({
+      data: [
+        {
+          id: "sess-1",
+          preview: "Test Session",
+          createdAt: 1700000000,
+          updatedAt: 1700000100,
+          cwd: "/tmp/project",
+          source: "opencode"
+        }
+      ],
+      nextCursor: null
+    });
+
+    expect(parsed.data[0]?.id).toBe("sess-1");
   });
 
   it("parses app-server thread/read response with subset validation", () => {
@@ -743,6 +709,10 @@ describe("codex-protocol schemas", () => {
         id: "thread-123",
         preview: "hello",
         modelProvider: "openai",
+        createdAt: 1700000000,
+        updatedAt: 1700000000,
+        cwd: "/tmp/workspace",
+        source: "cli",
         path: "/tmp/thread.jsonl",
         cliVersion: "0.1.0",
         turns: [
@@ -795,318 +765,19 @@ describe("codex-protocol schemas", () => {
     expect(parsed.model).toBe("gpt-5.3-codex");
   });
 
-  it("parses debug client error create body", () => {
-    const parsed = parseCreateDebugClientErrorBody({
-      source: "web-app",
-      operation: "push:auto-heal",
-      message: "The string did not match the expected pattern.",
-      requestId: "req_1",
-      threadId: "thread_1",
-      url: "/threads/thread_1",
-      details: {
-        displayMode: "standalone"
-      }
-    });
-
-    expect(parsed.source).toBe("web-app");
-    expect(parsed.operation).toBe("push:auto-heal");
-    expect(parsed.requestId).toBe("req_1");
-  });
-
-  it("parses debug error list/create/detail responses", () => {
-    const event = {
-      errorId: "error_1",
-      sessionId: "session_1",
-      origin: "client",
-      source: "web-app",
-      operation: "push:auto-heal",
-      message: "The string did not match the expected pattern.",
-      name: "TypeError",
-      stack: "TypeError: ...",
-      requestId: "req_1",
-      threadId: "thread_1",
-      url: "/threads/thread_1",
-      occurredAt: "2026-02-18T00:00:00.000Z",
-      recordedAt: "2026-02-18T00:00:00.100Z",
-      details: {
-        tab: "chat"
-      }
-    } as const;
-
-    const parsedList = parseDebugErrorListResponse({
-      data: [event],
-      sessionId: "session_1",
-      sessionLogPath: "/tmp/session-1.ndjson"
-    });
-    const parsedCreate = parseDebugErrorCreateResponse({
-      errorId: "error_1",
-      sessionId: "session_1",
-      recordedAt: "2026-02-18T00:00:00.100Z"
-    });
-    const parsedDetail = parseDebugErrorDetailResponse({
-      error: event,
-      sessionId: "session_1",
-      sessionLogPath: "/tmp/session-1.ndjson"
-    });
-
-    expect(parsedList.data.length).toBe(1);
-    expect(parsedCreate.errorId).toBe("error_1");
-    expect(parsedDetail.error.operation).toBe("push:auto-heal");
-  });
-
-  it("parses create push subscription body", () => {
-    const parsed = parseCreatePushSubscriptionBody({
-      subscription: {
-        endpoint: "https://example.push.service/subscription-id",
-        keys: {
-          p256dh: "BElidedKeyMaterial_123",
-          auth: "CAuthValue_456"
-        }
+  it("parses app-server thread/start response from opencode agent", () => {
+    const parsed = parseAppServerStartThreadResponse({
+      thread: {
+        id: "sess-2",
+        preview: "(untitled)",
+        createdAt: 1700000000,
+        updatedAt: 1700000000,
+        cwd: "/tmp/project",
+        source: "opencode"
       },
-      settings: {
-        privateMode: true
-      }
+      cwd: "/tmp/project"
     });
 
-    expect(parsed.settings?.privateMode).toBe(true);
-  });
-
-  it("rejects create push subscription body with unknown fields", () => {
-    expect(() =>
-      parseCreatePushSubscriptionBody({
-        subscription: {
-          endpoint: "https://example.push.service/subscription-id",
-          keys: {
-            p256dh: "BElidedKeyMaterial_123",
-            auth: "CAuthValue_456"
-          }
-        },
-        extra: true
-      })
-    ).toThrowError(/CreatePushSubscriptionBody did not match expected schema/);
-  });
-
-  it("parses push state store payload", () => {
-    const parsed = parsePushStateStore({
-      version: 1,
-      subscriptions: [
-        {
-          id: "sub_1",
-          subscription: {
-            endpoint: "https://example.push.service/subscription-id",
-            keys: {
-              p256dh: "BElidedKeyMaterial_123",
-              auth: "CAuthValue_456"
-            }
-          },
-          settings: {
-            privateMode: true
-          },
-          createdAt: "2026-02-18T00:00:00.000Z",
-          updatedAt: "2026-02-18T00:00:00.000Z"
-        }
-      ],
-      completionWatermarks: [
-        {
-          threadId: "thread_1",
-          marker: "turn_1:item_1"
-        }
-      ]
-    });
-
-    expect(parsed.subscriptions[0]?.id).toBe("sub_1");
-    expect(parsed.completionWatermarks[0]?.threadId).toBe("thread_1");
-  });
-
-  it("rejects unsupported push state store version", () => {
-    expect(() =>
-      parsePushStateStore({
-        version: 2,
-        subscriptions: [],
-        completionWatermarks: []
-      })
-    ).toThrowError(/Unsupported push state version/);
-  });
-
-  it("parses push notification payload with declarative notification", () => {
-    const parsed = parsePushNotificationPayload({
-      notificationId: "notif_1",
-      title: "Codex response ready",
-      body: "A response is ready in Farfield.",
-      threadId: "thread_1",
-      turnId: "turn_1",
-      url: "/threads/thread_1",
-      createdAt: "2026-02-18T00:00:00.000Z",
-      web_push: {
-        notification: {
-          title: "Codex response ready",
-          body: "A response is ready in Farfield.",
-          navigate: "/threads/thread_1",
-          icon: "/icons/icon-192.png",
-          badge: "/icons/icon-192.png",
-          tag: "thread:thread_1"
-        }
-      }
-    });
-
-    expect(parsed.web_push?.notification.navigate).toBe("/threads/thread_1");
-  });
-
-  it("rejects push notification payload with unknown declarative fields", () => {
-    expect(() =>
-      parsePushNotificationPayload({
-        notificationId: "notif_1",
-        title: "Codex response ready",
-        body: "A response is ready in Farfield.",
-        threadId: "thread_1",
-        turnId: "turn_1",
-        url: "/threads/thread_1",
-        createdAt: "2026-02-18T00:00:00.000Z",
-        web_push: {
-          notification: {
-            title: "Codex response ready",
-            unknownField: true
-          }
-        }
-      })
-    ).toThrowError(/PushNotificationPayload did not match expected schema/);
-  });
-
-  it("parses push receipt body", () => {
-    const parsed = parseCreatePushReceiptBody({
-      notificationId: "notif_1",
-      event: "shown",
-      url: "/threads/thread_1",
-      threadId: "thread_1",
-      turnId: "turn_1",
-      createdAt: "2026-02-18T00:00:00.000Z"
-    });
-
-    expect(parsed.event).toBe("shown");
-    expect(parsed.threadId).toBe("thread_1");
-  });
-
-  it("rejects push receipt body with unknown fields", () => {
-    expect(() =>
-      parseCreatePushReceiptBody({
-        notificationId: "notif_1",
-        event: "shown",
-        url: "/threads/thread_1",
-        createdAt: "2026-02-18T00:00:00.000Z",
-        extra: true
-      })
-    ).toThrowError(/CreatePushReceiptBody did not match expected schema/);
-  });
-
-  it("parses local CA status response", () => {
-    const parsed = parsePushLocalCaStatusResponse({
-      available: true,
-      downloadPath: "/api/push/local-ca/root.crt",
-      sourcePath: "/Users/test/Library/Application Support/Caddy/pki/authorities/local/root.crt"
-    });
-
-    expect(parsed.available).toBe(true);
-    expect(parsed.downloadPath).toBe("/api/push/local-ca/root.crt");
-  });
-
-  it("parses push receipt store payload", () => {
-    const parsed = parsePushReceiptStore({
-      version: 2,
-      receipts: [
-        {
-          notificationId: "notif_1",
-          event: "shown",
-          url: "/threads/thread_1",
-          threadId: "thread_1",
-          turnId: "turn_1",
-          message: null,
-          createdAt: "2026-02-18T00:00:00.000Z"
-        }
-      ]
-    });
-
-    expect(parsed.receipts.length).toBe(1);
-    expect(parsed.receipts[0]?.event).toBe("shown");
-  });
-
-  it("parses latest push send response", () => {
-    const parsed = parsePushSendLatestResponse({
-      latest: {
-        notificationId: "notif_send_1",
-        threadId: "thread_1",
-        turnId: "turn_1",
-        sentAt: "2026-02-18T00:00:00.000Z",
-        attempted: 2,
-        delivered: 1,
-        failures: 1
-      }
-    });
-
-    expect(parsed.latest?.notificationId).toBe("notif_send_1");
-    expect(parsed.latest?.attempted).toBe(2);
-  });
-
-  it("parses push send store payload", () => {
-    const parsed = parsePushSendStore({
-      version: 1,
-      latest: {
-        notificationId: "notif_send_1",
-        threadId: "thread_1",
-        turnId: "turn_1",
-        sentAt: "2026-02-18T00:00:00.000Z",
-        attempted: 2,
-        delivered: 1,
-        failures: 1
-      }
-    });
-
-    expect(parsed.latest?.notificationId).toBe("notif_send_1");
-    expect(parsed.latest?.delivered).toBe(1);
-  });
-
-  it("rejects unsupported push send store version", () => {
-    expect(() =>
-      parsePushSendStore({
-        version: 2,
-        latest: null
-      })
-    ).toThrowError(/Unsupported push send store version/);
-  });
-
-  it("migrates legacy push receipt store payload", () => {
-    const parsed = parsePushReceiptStore({
-      version: 1,
-      receipts: [
-        {
-          event: "clicked",
-          url: "/threads/thread_legacy",
-          threadId: "thread_legacy",
-          turnId: "turn_legacy",
-          message: null,
-          createdAt: "2026-02-18T00:00:00.000Z"
-        }
-      ]
-    });
-
-    expect(parsed.version).toBe(2);
-    expect(parsed.receipts[0]?.notificationId.startsWith("legacy-")).toBe(true);
-    expect(parsed.receipts[0]?.event).toBe("clicked");
-  });
-
-  it("rejects unsupported push receipt store version", () => {
-    expect(() =>
-      parsePushReceiptStore({
-        version: 3,
-        receipts: []
-      })
-    ).toThrowError(/Unsupported push receipt store version/);
-  });
-
-  it("parses vapid public key response", () => {
-    const parsed = parseVapidPublicKeyResponse({
-      publicKey: "BElidedPublicKey_123"
-    });
-
-    expect(parsed.publicKey).toBe("BElidedPublicKey_123");
+    expect(parsed.thread.id).toBe("sess-2");
   });
 });

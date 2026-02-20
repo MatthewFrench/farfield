@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  CreateDebugClientErrorBodySchema,
-  CreatePushReceiptBodySchema,
-  CreatePushSubscriptionBodySchema,
-  DeletePushSubscriptionBodySchema,
   parseBody,
-  PushTestBodySchema,
   ReplayBodySchema,
   SendMessageBodySchema,
+  StartThreadBodySchema,
   SetModeBodySchema,
   SubmitUserInputBodySchema
 } from "../src/http-schemas.js";
@@ -64,68 +60,20 @@ describe("server request schemas", () => {
     expect(parsed.waitForResponse).toBe(true);
   });
 
-  it("validates push subscription body", () => {
-    const parsed = parseBody(CreatePushSubscriptionBodySchema, {
-      subscription: {
-        endpoint: "https://example.push.service/subscription-id",
-        keys: {
-          p256dh: "BElidedKeyMaterial_123",
-          auth: "CAuthValue_456"
-        }
-      },
-      settings: {
-        privateMode: true
-      }
+  it("validates start thread body with agentId", () => {
+    const parsed = parseBody(StartThreadBodySchema, {
+      agentId: "opencode",
+      cwd: "/tmp/workspace"
     });
 
-    expect(parsed.subscription.keys.auth).toBe("CAuthValue_456");
+    expect(parsed.agentId).toBe("opencode");
   });
 
-  it("validates push unsubscription body", () => {
-    const parsed = parseBody(DeletePushSubscriptionBodySchema, {
-      endpoint: "https://example.push.service/subscription-id"
-    });
-
-    expect(parsed.endpoint).toContain("example.push.service");
-  });
-
-  it("validates push test body with dry-run option", () => {
-    const parsed = parseBody(PushTestBodySchema, {
-      threadId: "thread_1",
-      turnId: "turn_1",
-      dryRun: true
-    });
-
-    expect(parsed.dryRun).toBe(true);
-  });
-
-  it("validates push receipt body", () => {
-    const parsed = parseBody(CreatePushReceiptBodySchema, {
-      notificationId: "notif_1",
-      event: "shown",
-      url: "/threads/thread_1",
-      threadId: "thread_1",
-      turnId: "turn_1",
-      createdAt: "2026-02-18T00:00:00.000Z"
-    });
-
-    expect(parsed.event).toBe("shown");
-  });
-
-  it("validates debug client error body", () => {
-    const parsed = parseBody(CreateDebugClientErrorBodySchema, {
-      source: "web-app",
-      operation: "push:auto-heal",
-      message: "The string did not match the expected pattern.",
-      requestId: "req_1",
-      threadId: "thread_1",
-      url: "/threads/thread_1",
-      details: {
-        tab: "chat"
-      }
-    });
-
-    expect(parsed.operation).toBe("push:auto-heal");
-    expect(parsed.requestId).toBe("req_1");
+  it("rejects deprecated agentKind field", () => {
+    expect(() =>
+      parseBody(StartThreadBodySchema, {
+        agentKind: "opencode"
+      })
+    ).toThrowError(/Unrecognized key/);
   });
 });

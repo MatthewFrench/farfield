@@ -1,10 +1,4 @@
-import {
-  CollaborationModeSchema,
-  CreateDebugClientErrorBodySchema,
-  CreatePushReceiptBodySchema,
-  CreatePushSubscriptionBodySchema,
-  DeletePushSubscriptionBodySchema
-} from "@farfield/protocol";
+import { CollaborationModeSchema, UserInputResponsePayloadSchema } from "@farfield/protocol";
 import { z } from "zod";
 
 export const SetModeBodySchema = z
@@ -16,6 +10,7 @@ export const SetModeBodySchema = z
 
 export const StartThreadBodySchema = z
   .object({
+    agentId: z.enum(["codex", "opencode"]).optional(),
     cwd: z.string().optional(),
     model: z.string().optional(),
     modelProvider: z.string().optional(),
@@ -39,7 +34,7 @@ export const SubmitUserInputBodySchema = z
   .object({
     ownerClientId: z.string().optional(),
     requestId: z.number().int().nonnegative(),
-    response: z.unknown()
+    response: UserInputResponsePayloadSchema
   })
   .strict();
 
@@ -67,23 +62,6 @@ export const ReplayBodySchema = z
     waitForResponse: z.boolean().optional()
   })
   .strict();
-
-export const PushTestBodySchema = z
-  .object({
-    threadId: z.string().min(1),
-    turnId: z.string().min(1),
-    title: z.string().min(1).max(120).optional(),
-    body: z.string().max(500).optional(),
-    dryRun: z.boolean().optional()
-  })
-  .strict();
-
-export {
-  CreateDebugClientErrorBodySchema,
-  CreatePushReceiptBodySchema,
-  CreatePushSubscriptionBodySchema,
-  DeletePushSubscriptionBodySchema
-};
 
 export function parseBody<Schema extends z.ZodTypeAny>(
   schema: Schema,

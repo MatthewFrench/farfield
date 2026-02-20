@@ -39,52 +39,6 @@ const ApiErrorEnvelopeSchema = z
   })
   .passthrough();
 
-const AppServerOperationStatsSchema = z
-  .object({
-    totalCount: z.number().int().nonnegative(),
-    successCount: z.number().int().nonnegative(),
-    errorCount: z.number().int().nonnegative(),
-    timeoutCount: z.number().int().nonnegative(),
-    inFlightCount: z.number().int().nonnegative(),
-    lastStartedAt: z.string().nullable(),
-    lastCompletedAt: z.string().nullable(),
-    lastDurationMs: z.number().int().nonnegative().nullable(),
-    lastStatus: z.union([z.literal("ok"), z.literal("error"), z.null()]),
-    lastError: z.string().nullable()
-  })
-  .strict();
-
-const AppServerOperationsSchema = z
-  .object({
-    "thread/list": AppServerOperationStatsSchema,
-    "model/list": AppServerOperationStatsSchema,
-    "collaborationMode/list": AppServerOperationStatsSchema
-  })
-  .strict();
-
-const AppServerStderrStatsSchema = z
-  .object({
-    benignSuppressedCount: z.number().int().nonnegative(),
-    emittedInWindow: z.number().int().nonnegative(),
-    maxEventsPerWindow: z.number().int().positive(),
-    rateLimitedSuppressedCount: z.number().int().nonnegative(),
-    rateLimitedSuppressedInWindow: z.number().int().nonnegative(),
-    windowMs: z.number().int().positive(),
-    windowStartedAt: z.string().datetime()
-  })
-  .strict();
-
-const IpcHistoryRateLimitSchema = z
-  .object({
-    maxEventsPerWindow: z.number().int().positive(),
-    recordedInWindow: z.number().int().nonnegative(),
-    suppressedInWindow: z.number().int().nonnegative(),
-    totalSuppressedCount: z.number().int().nonnegative(),
-    windowMs: z.number().int().positive(),
-    windowStartedAt: z.string().datetime()
-  })
-  .strict();
-
 const HealthResponseSchema = z
   .object({
     ok: z.literal(true),
@@ -96,43 +50,44 @@ const HealthResponseSchema = z
         gitCommit: z.string().nullable().optional(),
         lastError: z.string().nullable(),
         historyCount: z.number().int().nonnegative(),
-        threadOwnerCount: z.number().int().nonnegative(),
-        trackedThreadEventCount: z.number().int().nonnegative().optional(),
-        untrackedThreadEventCount: z.number().int().nonnegative().optional(),
-        invalidPushPayloadsLast5m: z.number().int().nonnegative().optional(),
-        eventsAuthRejectsLast5m: z.number().int().nonnegative().optional(),
-        pushReceiptAuthRejectsLast5m: z.number().int().nonnegative().optional(),
-        eventsSessionBootstrapsLast5m: z.number().int().nonnegative().optional(),
-        eventsSessionRejectsLast5m: z.number().int().nonnegative().optional(),
-        activeEventsSessions: z.number().int().nonnegative().optional(),
-        appServerRequestTimeoutMs: z.number().int().positive().optional(),
-        appServerOperations: AppServerOperationsSchema.optional(),
-        appServerStderr: AppServerStderrStatsSchema.optional(),
-        ipcHistoryRateLimit: IpcHistoryRateLimitSchema.optional()
+        threadOwnerCount: z.number().int().nonnegative()
       })
       .passthrough()
   })
-  .strict();
+  .passthrough();
 
-const WebShellHealthResponseSchema = z
-  .object({
-    ok: z.literal(true),
-    service: z.literal("farfield-web-shell"),
-    buildId: z.string().min(1),
-    gitCommit: z.string().nullable(),
-    serviceWorkerVersion: z.string().nullable(),
-    timestamp: z.string().datetime()
-  })
-  .strict();
-
-const LiveStateResponseSchema = z
+const LiveStateResponseSchema: z.ZodObject<
+  {
+    ok: z.ZodLiteral<true>;
+    threadId: z.ZodString;
+    ownerClientId: z.ZodNullable<z.ZodString>;
+    conversationState: z.ZodUnion<[typeof ThreadConversationStateSchema, z.ZodNull]>;
+    liveStateError: z.ZodNullable<
+      z.ZodObject<{
+        kind: z.ZodLiteral<"reductionFailed">;
+        message: z.ZodString;
+        eventIndex: z.ZodNullable<z.ZodNumber>;
+        patchIndex: z.ZodNullable<z.ZodNumber>;
+      }>
+    >;
+  },
+  "passthrough"
+> = z
   .object({
     ok: z.literal(true),
     threadId: z.string(),
     ownerClientId: z.string().nullable(),
-    conversationState: z.union([ThreadConversationStateSchema, z.null()])
+    conversationState: z.union([ThreadConversationStateSchema, z.null()]),
+    liveStateError: z
+      .object({
+        kind: z.literal("reductionFailed"),
+        message: z.string(),
+        eventIndex: z.number().int().nonnegative().nullable(),
+        patchIndex: z.number().int().nonnegative().nullable()
+      })
+      .nullable()
   })
-  .strict();
+  .passthrough();
 
 const StreamEventsResponseSchema = z
   .object({
@@ -141,15 +96,16 @@ const StreamEventsResponseSchema = z
     ownerClientId: z.string().nullable(),
     events: z.array(z.unknown())
   })
-  .strict();
+  .passthrough();
 
 const CreateThreadResponseSchema = z
   .object({
     ok: z.literal(true),
-    threadId: z.string()
+    threadId: z.string(),
+    agentId: z.enum(["codex", "opencode"])
   })
   .merge(AppServerStartThreadResponseSchema)
-  .strict();
+  .passthrough();
 
 const TraceStatusSchema = z
   .object({
@@ -175,6 +131,17 @@ const TraceStatusSchema = z
       })
     )
   })
+  .passthrough();
+
+const WebShellHealthResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    service: z.literal("farfield-web-shell"),
+    buildId: z.string().min(1),
+    gitCommit: z.string().nullable(),
+    serviceWorkerVersion: z.string().nullable(),
+    timestamp: z.string().datetime()
+  })
   .strict();
 
 const HistoryListSchema = z
@@ -191,7 +158,7 @@ const HistoryListSchema = z
       })
     )
   })
-  .strict();
+  .passthrough();
 
 const HistoryDetailSchema = z
   .object({
@@ -199,7 +166,7 @@ const HistoryDetailSchema = z
     entry: HistoryListSchema.shape.history.element,
     fullPayload: z.unknown()
   })
-  .strict();
+  .passthrough();
 
 const DebugErrorCreateEnvelopeSchema = z
   .object({
@@ -383,12 +350,64 @@ export async function getWebShellHealth(): Promise<z.infer<typeof WebShellHealth
   return WebShellHealthResponseSchema.parse(await request("/healthz"));
 }
 
+const AgentIdSchema = z.enum(["codex", "opencode"]);
+export type AgentId = z.infer<typeof AgentIdSchema>;
+
+const AgentCapabilitiesSchema = z
+  .object({
+    canListModels: z.boolean(),
+    canListCollaborationModes: z.boolean(),
+    canSetCollaborationMode: z.boolean(),
+    canSubmitUserInput: z.boolean(),
+    canReadLiveState: z.boolean(),
+    canReadStreamEvents: z.boolean()
+  })
+  .strict();
+
+const AgentsResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    agents: z.array(
+      z.object({
+        id: AgentIdSchema,
+        label: z.string(),
+        enabled: z.boolean(),
+        connected: z.boolean(),
+        capabilities: AgentCapabilitiesSchema,
+        projectDirectories: z.array(z.string())
+      })
+    ),
+    defaultAgentId: AgentIdSchema
+  })
+  .strict();
+
+export async function listAgents(): Promise<z.infer<typeof AgentsResponseSchema>> {
+  return AgentsResponseSchema.parse(await request("/api/agents"));
+}
+
+const ThreadListItemWithAgentSchema = AppServerListThreadsResponseSchema.shape.data.element.and(
+  z
+    .object({
+      agentId: z.enum(["codex", "opencode"]),
+      source: z.string().optional()
+    })
+    .passthrough()
+);
+
+const ThreadListResponseSchema = z
+  .object({
+    data: z.array(ThreadListItemWithAgentSchema),
+    nextCursor: z.union([z.string(), z.null(), z.undefined()]).transform((v) => v ?? null),
+    pages: z.number().int().nonnegative().optional(),
+    truncated: z.boolean().optional()
+  });
+
 export async function listThreads(options: {
   limit: number;
   archived: boolean;
   all: boolean;
   maxPages: number;
-}): Promise<z.infer<typeof AppServerListThreadsResponseSchema>> {
+}): Promise<z.infer<typeof ThreadListResponseSchema>> {
   const params = new URLSearchParams();
   params.set("limit", String(options.limit));
   params.set("archived", options.archived ? "1" : "0");
@@ -396,21 +415,26 @@ export async function listThreads(options: {
   params.set("maxPages", String(options.maxPages));
 
   const data = await request(`/api/threads?${params.toString()}`);
-  return AppServerListThreadsResponseSchema.parse(stripOk(data));
+  return ThreadListResponseSchema.parse(stripOk(data));
 }
+
+const ReadThreadResponseWithAgentSchema = AppServerReadThreadResponseSchema.extend({
+  agentId: z.enum(["codex", "opencode"])
+});
 
 export async function readThread(
   threadId: string,
   options?: { includeTurns?: boolean }
-): Promise<z.infer<typeof AppServerReadThreadResponseSchema>> {
+): Promise<z.infer<typeof ReadThreadResponseWithAgentSchema>> {
   const includeTurns = options?.includeTurns ?? true;
   const data = await request(
     `/api/threads/${encodeURIComponent(threadId)}?includeTurns=${includeTurns ? "true" : "false"}`
   );
-  return AppServerReadThreadResponseSchema.parse(stripOk(data));
+  return ReadThreadResponseWithAgentSchema.parse(stripOk(data));
 }
 
 export async function createThread(input?: {
+  agentId?: AgentId;
   cwd?: string;
   model?: string;
   modelProvider?: string;

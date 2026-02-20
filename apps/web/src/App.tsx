@@ -1,5 +1,7 @@
 import {
+  startTransition,
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -8,8 +10,6 @@ import {
 import {
   Activity,
   ArrowDown,
-  Bell,
-  BellOff,
   Bug,
   Circle,
   CircleDot,
@@ -22,43 +22,34 @@ import {
   PanelLeft,
   Plus,
   RefreshCcw,
-  ShieldCheck,
   Sun,
   X
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   createThread,
-  bootstrapEventsSession,
-  getDebugClientError,
   getHealth,
   getHistoryEntry,
-  getLatestPushReceipt,
-  getLatestPushSend,
-  getWebShellHealth,
   getLiveState,
   getPendingUserInputRequests,
-  getPushLocalCaStatus,
-  getPushStatus,
   getStreamEvents,
   readThread,
   getTraceStatus,
   interruptThread,
+  listAgents,
   listCollaborationModes,
-  listDebugClientErrors,
   listModels,
   listDebugHistory,
   listThreads,
   markTrace,
   replayHistoryEntry,
   sendMessage,
-  sendPushTestNotification,
   setCollaborationMode,
   startTrace,
   stopTrace,
-  submitUserInput
+  submitUserInput,
+  type AgentId
 } from "@/lib/api";
-import { reportClientError } from "@/lib/client-errors";
 import { useTheme } from "@/hooks/useTheme";
 import { ConversationItem } from "@/components/ConversationItem";
 import { ChatComposer } from "@/components/ChatComposer";
@@ -68,6 +59,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -81,16 +78,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import {
-  disablePushNotifications,
-  enablePushNotifications,
-  getPushClientState,
-  reconcilePushSubscription,
-  recoverPushNotifications,
-  synchronizePushServiceWorkerApiToken,
-  updatePushSettings,
-  type PushClientState
-} from "@/lib/push";
+import { z } from "zod";
 
 /* ── Types ─────────────────────────────────────────────────── */
 type Health = Awaited<ReturnType<typeof getHealth>>;
@@ -100,42 +88,57 @@ type ModelsResponse = Awaited<ReturnType<typeof listModels>>;
 type LiveStateResponse = Awaited<ReturnType<typeof getLiveState>>;
 type StreamEventsResponse = Awaited<ReturnType<typeof getStreamEvents>>;
 type ReadThreadResponse = Awaited<ReturnType<typeof readThread>>;
+type AgentsResponse = Awaited<ReturnType<typeof listAgents>>;
 type TraceStatus = Awaited<ReturnType<typeof getTraceStatus>>;
 type HistoryResponse = Awaited<ReturnType<typeof listDebugHistory>>;
 type HistoryDetail = Awaited<ReturnType<typeof getHistoryEntry>>;
-type ClientErrorsResponse = Awaited<ReturnType<typeof listDebugClientErrors>>;
-type ClientErrorDetailResponse = Awaited<ReturnType<typeof getDebugClientError>>;
 type PendingRequest = ReturnType<typeof getPendingUserInputRequests>[number];
-type PushStatusResponse = Awaited<ReturnType<typeof getPushStatus>>;
-type PushLatestReceiptResponse = Awaited<ReturnType<typeof getLatestPushReceipt>>;
-type PushLatestSendResponse = Awaited<ReturnType<typeof getLatestPushSend>>;
-type PushLocalCaStatusResponse = Awaited<ReturnType<typeof getPushLocalCaStatus>>;
-type WebShellHealthResponse = Awaited<ReturnType<typeof getWebShellHealth>>;
-type PushTestResponse = Awaited<ReturnType<typeof sendPushTestNotification>>;
-type ClientErrorEvent = ClientErrorsResponse["data"][number];
 type Thread = ThreadsResponse["data"][number];
-type AppTab = "chat" | "debug" | "preflight";
+type AgentDescriptor = AgentsResponse["agents"][number];
+type ConversationTurn = NonNullable<ReadThreadResponse["thread"]>["turns"][number];
+type ConversationTurnItem = NonNullable<ConversationTurn["items"]>[number];
+type ConversationItemType = ConversationTurnItem["type"];
 
-interface PreflightCheck {
-  id: string;
-  label: string;
-  ready: boolean;
-  detail: string;
+interface FlatConversationItem {
+  key: string;
+  item: ConversationTurnItem;
+  isLast: boolean;
+  turnIsInProgress: boolean;
+  previousItemType: ConversationItemType | undefined;
+  nextItemType: ConversationItemType | undefined;
+  spacingTop: number;
 }
 
-interface ErrorDisplayState {
-  operation: string;
-  message: string;
-  errorId: string | null;
-  requestId: string | null;
-}
+const SseStateEventSchema = z
+  .object({
+    type: z.literal("state"),
+    state: z.object({}).passthrough()
+  })
+  .passthrough();
 
-interface ErrorReportInput {
-  operation: string;
-  message: string;
-  requestId?: string | null;
-  threadId?: string | null;
-  details?: Record<string, string | number | boolean | null>;
+const SseHistoryEventSchema = z
+  .object({
+    type: z.literal("history"),
+    entry: z
+      .object({
+        source: z.enum(["ipc", "app", "system"]),
+        meta: z
+          .object({
+            method: z.string().optional(),
+            threadId: z.string().optional()
+          })
+          .passthrough()
+      })
+      .passthrough()
+  })
+  .passthrough();
+
+const SseEventSchema = z.union([SseStateEventSchema, SseHistoryEventSchema]);
+
+interface RefreshFlags {
+  refreshCore: boolean;
+  refreshHistory: boolean;
+  refreshSelectedThread: boolean;
 }
 
 /* ── Helpers ────────────────────────────────────────────────── */
@@ -149,24 +152,6 @@ function formatDate(value: number | string | null | undefined): string {
   return "";
 }
 
-function formatDurationMilliseconds(durationMs: number): string {
-  if (!Number.isFinite(durationMs) || durationMs < 0) {
-    return "unknown";
-  }
-  if (durationMs < 1_000) {
-    return `${String(Math.round(durationMs))}ms`;
-  }
-  if (durationMs < 60_000) {
-    return `${String((durationMs / 1_000).toFixed(durationMs < 10_000 ? 1 : 0))}s`;
-  }
-  const wholeMinutes = Math.floor(durationMs / 60_000);
-  const remainingSeconds = Math.round((durationMs % 60_000) / 1_000);
-  if (remainingSeconds === 0) {
-    return `${String(wholeMinutes)}m`;
-  }
-  return `${String(wholeMinutes)}m ${String(remainingSeconds)}s`;
-}
-
 function threadLabel(thread: Thread): string {
   const text = thread.preview.trim();
   if (!text) return `thread ${thread.id.slice(0, 8)}`;
@@ -177,52 +162,87 @@ function toErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function normalizeBuildMetaValue(value: string | null): string {
-  if (typeof value !== "string") {
-    return "";
+function shouldRenderConversationItem(item: ConversationTurnItem): boolean {
+  switch (item.type) {
+    case "userMessage":
+    case "steeringUserMessage":
+      return item.content.some((part) => part.type === "text" && part.text.length > 0);
+    case "agentMessage":
+      return item.text.length > 0;
+    case "reasoning": {
+      const hasSummary = Array.isArray(item.summary)
+        && item.summary.some((line) => typeof line === "string");
+      return hasSummary || Boolean(item.text);
+    }
+    case "userInputResponse":
+      return Object.values(item.answers).some((answers) => answers.length > 0);
+    default:
+      return true;
   }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return "";
-  }
-  if (trimmed.startsWith("%VITE_") && trimmed.endsWith("%")) {
-    return "";
-  }
-  return trimmed;
 }
 
-function readMetaTagContent(metaId: string): string {
-  const element = document.getElementById(metaId);
-  if (!(element instanceof HTMLMetaElement)) {
-    return "";
-  }
-  return normalizeBuildMetaValue(element.content);
+function isTurnInProgressStatus(status: string | undefined): boolean {
+  return status === "in-progress" || status === "inProgress";
 }
 
-export function isPlaceholderCommitValue(value: string): boolean {
-  const normalized = value.trim().toLowerCase();
-  if (normalized.length === 0) {
-    return true;
+function signaturesMatch(prev: string[], next: string[]): boolean {
+  if (prev.length !== next.length) {
+    return false;
   }
-  return normalized === "dev" || normalized === "unknown" || normalized === "none" || normalized === "null";
+  return prev.every((value, index) => value === next[index]);
 }
 
 const DEFAULT_EFFORT_OPTIONS = ["minimal", "low", "medium", "high", "xhigh"] as const;
-const INITIAL_VISIBLE_CHAT_ITEMS = 180;
-const VISIBLE_CHAT_ITEMS_STEP = 120;
+const INITIAL_VISIBLE_CHAT_ITEMS = 90;
+const VISIBLE_CHAT_ITEMS_STEP = 80;
 const APP_DEFAULT_VALUE = "__app_default__";
 const ASSUMED_APP_DEFAULT_MODEL = "gpt-5.3-codex";
 const ASSUMED_APP_DEFAULT_EFFORT = "medium";
 const SIDEBAR_COLLAPSED_GROUPS_STORAGE_KEY = "farfield.sidebar.collapsed-groups.v1";
-const RESUME_PATH_STORAGE_KEY = "farfield.resume.path.v1";
-const CORE_REFRESH_INTERVAL_VISIBLE_MS = 5_000;
-const CORE_REFRESH_INTERVAL_HIDDEN_MS = 30_000;
-const STREAM_REFRESH_DEBOUNCE_MS = 800;
-const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";
-const CLIENT_ERROR_DEDUP_WINDOW_MS = 10_000;
+const AGENT_FAVICON_BY_ID: Record<AgentId, string> = {
+  codex: "https://openai.com/favicon.ico",
+  opencode: "https://opencode.ai/favicon.ico"
+};
 
-function isPlanModeOption(mode: { mode: string; name: string }): boolean {
-  return mode.mode.toLowerCase().includes("plan") || mode.name.toLowerCase().includes("plan");
+function agentFavicon(agentId: AgentId | null | undefined): string | null {
+  if (!agentId) {
+    return null;
+  }
+  return AGENT_FAVICON_BY_ID[agentId] ?? null;
+}
+
+function AgentFavicon({
+  agentId,
+  label,
+  className
+}: {
+  agentId: AgentId;
+  label: string;
+  className?: string;
+}) {
+  const faviconUrl = agentFavicon(agentId);
+  if (!faviconUrl) {
+    return null;
+  }
+
+  return (
+    <img
+      src={faviconUrl}
+      alt={label}
+      title={label}
+      className={className}
+      loading="lazy"
+      decoding="async"
+    />
+  );
+}
+
+function isPlanModeOption(mode: {
+  mode?: string | null | undefined;
+  name: string;
+}): boolean {
+  const modeKey = typeof mode.mode === "string" ? mode.mode : "";
+  return modeKey.toLowerCase().includes("plan") || mode.name.toLowerCase().includes("plan");
 }
 
 function getConversationStateUpdatedAt(
@@ -294,8 +314,68 @@ function readModeSelectionFromConversationState(state: NonNullable<ReadThreadRes
   };
 }
 
-function isThreadNotLoadedMessage(message: string): boolean {
-  return message.includes("Thread not loaded in app-server:");
+function modeSelectionSignatureFromConversationState(
+  state: NonNullable<ReadThreadResponse["thread"]> | null | undefined
+): string {
+  const selection = readModeSelectionFromConversationState(state ?? null);
+  return buildModeSignature(selection.modeKey, selection.modelId, selection.reasoningEffort);
+}
+
+function conversationProgressSignature(
+  state: NonNullable<ReadThreadResponse["thread"]> | null | undefined
+): string {
+  if (!state) {
+    return "";
+  }
+
+  const lastTurn = state.turns[state.turns.length - 1];
+  if (!lastTurn) {
+    return "no-turns";
+  }
+
+  const lastTurnId = lastTurn.id ?? lastTurn.turnId ?? "";
+  const items = lastTurn.items ?? [];
+  const lastItem = items[items.length - 1];
+
+  return [
+    String(state.turns.length),
+    lastTurnId,
+    lastTurn.status,
+    String(items.length),
+    lastItem?.id ?? "",
+    lastItem?.type ?? ""
+  ].join("|");
+}
+
+function buildLiveStateSyncSignature(state: LiveStateResponse | null | undefined): string {
+  if (!state) {
+    return "";
+  }
+
+  const conversationState = state.conversationState;
+  return [
+    state.threadId,
+    state.ownerClientId ?? "",
+    String(getConversationStateUpdatedAt(conversationState)),
+    String(conversationState?.turns.length ?? -1),
+    modeSelectionSignatureFromConversationState(conversationState),
+    conversationProgressSignature(conversationState)
+  ].join("|");
+}
+
+function buildReadThreadSyncSignature(state: ReadThreadResponse | null | undefined): string {
+  if (!state) {
+    return "";
+  }
+
+  const conversationState = state.thread;
+  return [
+    conversationState.id,
+    String(getConversationStateUpdatedAt(conversationState)),
+    String(conversationState.turns.length),
+    modeSelectionSignatureFromConversationState(conversationState),
+    conversationProgressSignature(conversationState)
+  ].join("|");
 }
 
 function basenameFromPath(value: string): string {
@@ -351,83 +431,7 @@ function writeSidebarCollapsedGroupsToStorage(value: Record<string, boolean>): v
   }
 }
 
-function isResumePathCandidate(pathname: string): boolean {
-  if (!pathname.startsWith("/")) {
-    return false;
-  }
-  if (pathname.startsWith("//")) {
-    return false;
-  }
-  return true;
-}
-
-function readResumePathFromStorage(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  try {
-    const storage = window.localStorage as Partial<Storage> | undefined;
-    if (!storage || typeof storage.getItem !== "function") {
-      return null;
-    }
-    const raw = storage.getItem(RESUME_PATH_STORAGE_KEY);
-    if (typeof raw !== "string") {
-      return null;
-    }
-    const trimmed = raw.trim();
-    if (!trimmed || !isResumePathCandidate(trimmed)) {
-      return null;
-    }
-    return trimmed;
-  } catch {
-    return null;
-  }
-}
-
-function writeResumePathToStorage(pathname: string): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  if (!isResumePathCandidate(pathname)) {
-    return;
-  }
-  try {
-    const storage = window.localStorage as Partial<Storage> | undefined;
-    if (!storage || typeof storage.setItem !== "function") {
-      return;
-    }
-    storage.setItem(RESUME_PATH_STORAGE_KEY, pathname);
-  } catch {
-    // Ignore storage errors.
-  }
-}
-
-function isLocalPushHost(hostname: string): boolean {
-  if (!hostname) {
-    return false;
-  }
-  if (hostname === "localhost") {
-    return true;
-  }
-  if (hostname.endsWith(".local")) {
-    return true;
-  }
-  return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname);
-}
-
-interface NavigatorWithStandalone extends Navigator {
-  standalone?: boolean;
-}
-
-function detectStandaloneDisplayMode(): boolean {
-  const navigatorWithStandalone = window.navigator as NavigatorWithStandalone;
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    navigatorWithStandalone.standalone === true
-  );
-}
-
-function parseUiStateFromPath(pathname: string): { threadId: string | null; tab: AppTab } {
+function parseUiStateFromPath(pathname: string): { threadId: string | null; tab: "chat" | "debug" } {
   const segments = pathname.split("/").filter((segment) => segment.length > 0);
   if (segments.length === 0) {
     return { threadId: null, tab: "chat" };
@@ -435,42 +439,22 @@ function parseUiStateFromPath(pathname: string): { threadId: string | null; tab:
   if (segments.length === 1 && segments[0] === "debug") {
     return { threadId: null, tab: "debug" };
   }
-  if (segments.length === 1 && segments[0] === "preflight") {
-    return { threadId: null, tab: "preflight" };
-  }
   if (segments[0] === "threads" && typeof segments[1] === "string" && segments[1].length > 0) {
-    let threadId: string;
-    try {
-      threadId = decodeURIComponent(segments[1]);
-    } catch {
-      return { threadId: null, tab: "chat" };
-    }
+    const threadId = decodeURIComponent(segments[1]);
     if (segments[2] === "debug") {
       return { threadId, tab: "debug" };
-    }
-    if (segments[2] === "preflight") {
-      return { threadId, tab: "preflight" };
     }
     return { threadId, tab: "chat" };
   }
   return { threadId: null, tab: "chat" };
 }
 
-function buildPathFromUiState(threadId: string | null, tab: AppTab): string {
+function buildPathFromUiState(threadId: string | null, tab: "chat" | "debug"): string {
   if (!threadId) {
-    if (tab === "debug") {
-      return "/debug";
-    }
-    if (tab === "preflight") {
-      return "/preflight";
-    }
-    return "/";
+    return tab === "debug" ? "/debug" : "/";
   }
   if (tab === "debug") {
     return `/threads/${encodeURIComponent(threadId)}/debug`;
-  }
-  if (tab === "preflight") {
-    return `/threads/${encodeURIComponent(threadId)}/preflight`;
   }
   return `/threads/${encodeURIComponent(threadId)}`;
 }
@@ -480,14 +464,12 @@ function IconBtn({
   disabled,
   title,
   active,
-  testId,
   children
 }: {
   onClick?: () => void;
   disabled?: boolean;
   title?: string;
   active?: boolean;
-  testId?: string;
   children: React.ReactNode;
 }) {
   const buttonNode = (
@@ -495,7 +477,6 @@ function IconBtn({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      data-testid={testId}
       variant="ghost"
       size="icon"
       className={`h-8 w-8 rounded-lg ${
@@ -523,24 +504,12 @@ function IconBtn({
 /* ── Main App ───────────────────────────────────────────────── */
 export function App(): React.JSX.Element {
   const { theme, toggle: toggleTheme } = useTheme();
-  const initialUiState = useMemo(() => {
-    const fromPath = parseUiStateFromPath(window.location.pathname);
-    if (fromPath.threadId || fromPath.tab !== "chat") {
-      return fromPath;
-    }
-    const resumePath = readResumePathFromStorage();
-    if (!resumePath) {
-      return fromPath;
-    }
-    return parseUiStateFromPath(resumePath);
-  }, []);
+  const initialUiState = useMemo(() => parseUiStateFromPath(window.location.pathname), []);
 
   /* State */
-  const [errorState, setErrorState] = useState<ErrorDisplayState | null>(null);
+  const [error, setError] = useState("");
   const [health, setHealth] = useState<Health | null>(null);
   const [threads, setThreads] = useState<ThreadsResponse["data"]>([]);
-  const [threadsLoadCount, setThreadsLoadCount] = useState(0);
-  const [coreDataLoadCount, setCoreDataLoadCount] = useState(0);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(initialUiState.threadId);
   const [liveState, setLiveState] = useState<LiveStateResponse | null>(null);
   const [readThreadState, setReadThreadState] = useState<ReadThreadResponse | null>(null);
@@ -557,81 +526,74 @@ export function App(): React.JSX.Element {
   const [history, setHistory] = useState<HistoryResponse["history"]>([]);
   const [selectedHistoryId, setSelectedHistoryId] = useState("");
   const [historyDetail, setHistoryDetail] = useState<HistoryDetail | null>(null);
-  const [clientErrors, setClientErrors] = useState<ClientErrorsResponse["data"]>([]);
-  const [selectedClientErrorId, setSelectedClientErrorId] = useState("");
-  const [clientErrorDetail, setClientErrorDetail] = useState<ClientErrorDetailResponse["error"] | null>(null);
-  const [clientErrorSessionLogPath, setClientErrorSessionLogPath] = useState("");
+  const [isCoreLoading, setIsCoreLoading] = useState(true);
   const [waitForReplayResponse, setWaitForReplayResponse] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
   const [answerDraft, setAnswerDraft] = useState<Record<string, { option: string; freeform: string }>>({});
-  const [pushStatus, setPushStatus] = useState<PushStatusResponse | null>(null);
-  const [pushClientState, setPushClientState] = useState<PushClientState>({
-    supported: false,
-    serviceWorkerRegistered: false,
-    permission: "unsupported",
-    subscribed: false
-  });
-  const [pushBusy, setPushBusy] = useState(false);
-  const [pushResetBusy, setPushResetBusy] = useState(false);
-  const [pushPrivateMode, setPushPrivateMode] = useState(true);
-  const [pushDryRunBusy, setPushDryRunBusy] = useState(false);
-  const [pushDryRunResult, setPushDryRunResult] = useState<PushTestResponse | null>(null);
-  const [pushDryRunError, setPushDryRunError] = useState("");
-  const [pushLatestReceipt, setPushLatestReceipt] = useState<PushLatestReceiptResponse["latest"] | null>(null);
-  const [pushLatestSend, setPushLatestSend] = useState<PushLatestSendResponse["latest"] | null>(null);
-  const [pushLocalCaStatus, setPushLocalCaStatus] = useState<PushLocalCaStatusResponse | null>(null);
-  const [webShellHealth, setWebShellHealth] = useState<WebShellHealthResponse | null>(null);
-  const [serviceWorkerUpdateAvailable, setServiceWorkerUpdateAvailable] = useState(false);
+  const [agentDescriptors, setAgentDescriptors] = useState<AgentDescriptor[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<AgentId>("codex");
 
   /* UI state */
-  const [activeTab, setActiveTab] = useState<AppTab>(initialUiState.tab);
+  const [activeTab, setActiveTab] = useState<"chat" | "debug">(initialUiState.tab);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [isChatAtBottom, setIsChatAtBottom] = useState(true);
   const [visibleChatItemLimit, setVisibleChatItemLimit] = useState(INITIAL_VISIBLE_CHAT_ITEMS);
-  const [suppressEntryAnimations, setSuppressEntryAnimations] = useState(false);
   const [hasHydratedModeFromLiveState, setHasHydratedModeFromLiveState] = useState(false);
   const [isModeSyncing, setIsModeSyncing] = useState(false);
-  const [isStandaloneDisplayMode, setIsStandaloneDisplayMode] = useState(
-    () => detectStandaloneDisplayMode()
-  );
-  const [isDocumentVisible, setIsDocumentVisible] = useState(
-    () => document.visibilityState === "visible"
-  );
   const [sidebarCollapsedGroups, setSidebarCollapsedGroups] = useState<Record<string, boolean>>(
     () => readSidebarCollapsedGroupsFromStorage()
   );
 
   /* Refs */
   const selectedThreadIdRef = useRef<string | null>(null);
+  const activeTabRef = useRef<"chat" | "debug">(initialUiState.tab);
   const refreshTimerRef = useRef<number | null>(null);
+  const pendingRefreshFlagsRef = useRef<RefreshFlags>({
+    refreshCore: false,
+    refreshHistory: false,
+    refreshSelectedThread: false
+  });
   const coreRefreshIntervalRef = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatContentRef = useRef<HTMLDivElement>(null);
+  const isChatAtBottomRef = useRef(true);
   const lastAppliedModeSignatureRef = useRef("");
+  const hasHydratedAgentSelectionRef = useRef(false);
   const pendingMaterializationThreadIdsRef = useRef<Set<string>>(new Set());
-  const pushModeHydratedRef = useRef(false);
-  const isDocumentVisibleRef = useRef<boolean>(document.visibilityState === "visible");
-  const recentClientErrorByFingerprintRef = useRef<Map<string, number>>(new Map());
+  const threadsSignatureRef = useRef<string[]>([]);
+  const modesSignatureRef = useRef<string[]>([]);
+  const modelsSignatureRef = useRef<string[]>([]);
 
   /* Derived */
   const selectedThread = useMemo(
     () => threads.find((t) => t.id === selectedThreadId) ?? null,
     [threads, selectedThreadId]
   );
-  const errorMessage = errorState?.message ?? "";
-  const selectedClientErrorSummary = useMemo(
-    () => clientErrors.find((entry) => entry.errorId === selectedClientErrorId) ?? null,
-    [clientErrors, selectedClientErrorId]
+  const agentsById = useMemo(() => {
+    const map: Partial<Record<AgentId, AgentDescriptor>> = {};
+    for (const descriptor of agentDescriptors) {
+      map[descriptor.id] = descriptor;
+    }
+    return map;
+  }, [agentDescriptors]);
+  const availableAgentIds = useMemo(
+    () => agentDescriptors.filter((descriptor) => descriptor.enabled).map((descriptor) => descriptor.id),
+    [agentDescriptors]
   );
-  const isThreadsLoading = threadsLoadCount > 0;
-  const threadListState = isThreadsLoading ? "loading" : threads.length === 0 ? "empty" : "ready";
+  const selectedAgentDescriptor = useMemo(
+    () => agentsById[selectedAgentId] ?? null,
+    [agentsById, selectedAgentId]
+  );
+  const selectedAgentLabel = selectedAgentDescriptor?.label ?? "Agent";
+  const selectedAgentCapabilities = selectedAgentDescriptor?.capabilities ?? null;
   const groupedThreads = useMemo(() => {
     type Group = {
       key: string;
       label: string;
       projectPath: string | null;
       latestUpdatedAt: number;
+      preferredAgentId: AgentId | null;
       threads: Thread[];
     };
     const groups = new Map<string, Group>();
@@ -643,10 +605,14 @@ export function App(): React.JSX.Element {
       const key = projectPath ? `project:${projectPath}` : "project:unknown";
       const label = projectPath ? basenameFromPath(projectPath) : "Unknown";
       const updatedAt = typeof thread.updatedAt === "number" ? thread.updatedAt : 0;
+      const threadAgentId = thread.agentId;
 
       const existing = groups.get(key);
       if (existing) {
         existing.threads.push(thread);
+        if (!existing.preferredAgentId) {
+          existing.preferredAgentId = threadAgentId;
+        }
         if (updatedAt > existing.latestUpdatedAt) {
           existing.latestUpdatedAt = updatedAt;
         }
@@ -656,13 +622,35 @@ export function App(): React.JSX.Element {
           label,
           projectPath,
           latestUpdatedAt: updatedAt,
+          preferredAgentId: threadAgentId,
           threads: [thread]
         });
       }
     }
 
+    for (const descriptor of agentDescriptors) {
+      for (const directory of descriptor.projectDirectories) {
+        const normalized = directory.trim();
+        if (!normalized) {
+          continue;
+        }
+        const key = `project:${normalized}`;
+        if (groups.has(key)) {
+          continue;
+        }
+        groups.set(key, {
+          key,
+          label: basenameFromPath(normalized),
+          projectPath: normalized,
+          latestUpdatedAt: 0,
+          preferredAgentId: descriptor.id,
+          threads: []
+        });
+      }
+    }
+
     return Array.from(groups.values()).sort((left, right) => right.latestUpdatedAt - left.latestUpdatedAt);
-  }, [threads]);
+  }, [agentDescriptors, threads]);
   const conversationState = useMemo(() => {
     const liveConversationState = liveState?.conversationState ?? null;
     const readConversationState = readThreadState?.thread ?? null;
@@ -677,12 +665,34 @@ export function App(): React.JSX.Element {
     if (!conversationState) return [] as PendingRequest[];
     return getPendingUserInputRequests(conversationState);
   }, [conversationState]);
+  const liveStateReductionError = useMemo(() => {
+    const errorState = liveState?.liveStateError;
+    if (!errorState || errorState.kind !== "reductionFailed") {
+      return null;
+    }
+    return errorState;
+  }, [liveState?.liveStateError]);
 
   const activeRequest = useMemo(() => {
     if (!pendingRequests.length) return null;
     if (selectedRequestId === null) return pendingRequests[0];
     return pendingRequests.find((r) => r.id === selectedRequestId) ?? pendingRequests[0];
   }, [pendingRequests, selectedRequestId]);
+
+  const activeThreadAgentId: AgentId = useMemo(
+    () => selectedThread?.agentId ?? selectedAgentId,
+    [selectedAgentId, selectedThread]
+  );
+  const activeAgentDescriptor = useMemo(
+    () => agentsById[activeThreadAgentId] ?? selectedAgentDescriptor,
+    [activeThreadAgentId, agentsById, selectedAgentDescriptor]
+  );
+  const activeAgentLabel = activeAgentDescriptor?.label ?? selectedAgentLabel;
+  const activeAgentCapabilities = activeAgentDescriptor?.capabilities ?? selectedAgentCapabilities;
+  const canSetCollaborationMode = Boolean(activeAgentCapabilities?.canSetCollaborationMode);
+  const canListModels = Boolean(activeAgentCapabilities?.canListModels);
+  const canListCollaborationModes = Boolean(activeAgentCapabilities?.canListCollaborationModes);
+  const canSubmitUserInputForActiveAgent = Boolean(activeAgentCapabilities?.canSubmitUserInput);
 
   const planModeOption = useMemo(
     () => modes.find((mode) => isPlanModeOption(mode)) ?? null,
@@ -726,743 +736,276 @@ export function App(): React.JSX.Element {
     [modelOptions]
   );
 
-  const turns = conversationState?.turns ?? [];
-  const chatSurfaceState = turns.length > 0
-    ? "messages"
-    : isThreadsLoading
-    ? "loading-threads"
-    : selectedThread
-    ? "no-messages"
-    : "no-thread";
-  const conversationItemCount = useMemo(
-    () => turns.reduce((count, turn) => count + (turn.items?.length ?? 0), 0),
-    [turns]
-  );
+  const deferredConversationState = useDeferredValue(conversationState);
+  const turns = deferredConversationState?.turns ?? [];
+  const lastTurn = turns[turns.length - 1];
+  const isGenerating = isTurnInProgressStatus(lastTurn?.status);
+  const flatConversationItems = useMemo(() => {
+    const flattened: FlatConversationItem[] = [];
+    let previousRenderedTurnIndex = -1;
+
+    turns.forEach((turn, turnIndex) => {
+      const items = turn.items ?? [];
+      const isLastTurn = turnIndex === turns.length - 1;
+      const turnInProgress = isLastTurn && isGenerating;
+
+      items.forEach((item, itemIndexInTurn) => {
+        if (!shouldRenderConversationItem(item)) {
+          return;
+        }
+        const isFirstRenderedItem = flattened.length === 0;
+        const startsNewTurn = previousRenderedTurnIndex !== turnIndex;
+        const spacingTop = isFirstRenderedItem ? 0 : startsNewTurn ? 16 : 10;
+        flattened.push({
+          key: item.id ?? `${turnIndex}-${itemIndexInTurn}`,
+          item,
+          isLast: false,
+          turnIsInProgress: turnInProgress,
+          previousItemType: items[itemIndexInTurn - 1]?.type,
+          nextItemType: items[itemIndexInTurn + 1]?.type,
+          spacingTop
+        });
+        previousRenderedTurnIndex = turnIndex;
+      });
+    });
+
+    if (flattened.length > 0) {
+      flattened[flattened.length - 1]!.isLast = true;
+    }
+
+    return flattened;
+  }, [isGenerating, turns]);
+  const conversationItemCount = flatConversationItems.length;
   const firstVisibleChatItemIndex = Math.max(0, conversationItemCount - visibleChatItemLimit);
   const hasHiddenChatItems = firstVisibleChatItemIndex > 0;
-  const visibleTurns = useMemo(() => {
-    let globalItemIndex = 0;
-    return turns
-      .map((turn, ti) => {
-        const items = turn.items ?? [];
-        const visibleItems: Array<{ item: (typeof items)[number]; itemIndexInTurn: number; globalItemIndex: number }> = [];
-        items.forEach((item, itemIndexInTurn) => {
-          const itemGlobalIndex = globalItemIndex;
-          globalItemIndex += 1;
-          if (itemGlobalIndex >= firstVisibleChatItemIndex) {
-            visibleItems.push({ item, itemIndexInTurn, globalItemIndex: itemGlobalIndex });
-          }
-        });
-        return { turn, turnIndex: ti, visibleItems };
-      })
-      .filter((entry) => entry.visibleItems.length > 0);
-  }, [firstVisibleChatItemIndex, turns]);
-  const lastTurn = turns[turns.length - 1];
-  const isGenerating = lastTurn?.status === "in-progress";
-  const commitLabel = health?.state.gitCommit ?? "unknown";
-  const allSystemsReady =
-    health?.state.appReady === true &&
-    health?.state.ipcConnected === true &&
-    health?.state.ipcInitialized === true;
-  const hasAnySystemFailure =
-    health?.state.appReady === false ||
-    health?.state.ipcConnected === false ||
-    health?.state.ipcInitialized === false;
-  const allowEntryLayoutAnimations = !suppressEntryAnimations;
-  const pushServerEnabled = pushStatus?.enabled === true;
-  const pushSupported = pushClientState.supported;
-  const pushSubscribed = pushClientState.subscribed;
-  const pushServiceWorkerRegistered = pushClientState.serviceWorkerRegistered;
-  const pushPermission = pushClientState.permission;
-  const isSecureContextReady = typeof window !== "undefined" && window.isSecureContext;
-  const pushDryRunReady = pushDryRunResult?.ready === true;
-  const clientBuildId = useMemo(() => readMetaTagContent("farfield-build-id-meta"), []);
-  const clientCommit = useMemo(() => readMetaTagContent("farfield-commit-meta"), []);
-  const webShellBuildMismatch = useMemo(() => {
-    if (!webShellHealth) {
-      return false;
-    }
-    if (clientBuildId.length > 0 && webShellHealth.buildId !== clientBuildId) {
-      return true;
-    }
-    const normalizedClientCommit = clientCommit.trim();
-    const normalizedServerCommit = typeof webShellHealth.gitCommit === "string" ? webShellHealth.gitCommit.trim() : "";
-    if (
-      !isPlaceholderCommitValue(normalizedClientCommit) &&
-      !isPlaceholderCommitValue(normalizedServerCommit) &&
-      normalizedServerCommit !== normalizedClientCommit
-    ) {
-      return true;
-    }
-    return false;
-  }, [clientBuildId, clientCommit, webShellHealth]);
-  const pushModeLabel = pushPrivateMode
-    ? "Notifications: Private (switch to Detailed)"
-    : "Notifications: Detailed (switch to Private)";
-  const pushStatusLabel = (() => {
-    if (!pushSupported) {
-      return "Push unsupported in this browser";
-    }
-    if (!pushServerEnabled) {
-      return "Server push disabled";
-    }
-    if (pushPermission === "granted") {
-      return "Notifications enabled";
-    }
-    if (pushPermission === "denied") {
-      return "Notifications blocked";
-    }
-    return "Notification permission needed";
-  })();
-  const pushRequiresHomeScreenInstall = pushSupported && !isStandaloneDisplayMode;
-  const requiresLocalCaTrust = isLocalPushHost(window.location.hostname);
-  const pushLocalCaDownloadPath = pushLocalCaStatus?.downloadPath ?? null;
-  const pushReceiptSignal = useMemo(() => {
-    if (!pushLatestSend) {
-      if (!pushLatestReceipt) {
-        return {
-          ready: true,
-          detail: "No send recorded yet. Run Push test and tap notification."
-        };
-      }
-      return {
-        ready: pushLatestReceipt.event !== "error",
-        detail: `${pushLatestReceipt.event} [${pushLatestReceipt.notificationId}] at ${formatDate(pushLatestReceipt.createdAt)}${
-          pushLatestReceipt.message ? ` (${pushLatestReceipt.message})` : ""
-        }`
-      };
-    }
-
-    const sendSummary = `send [${pushLatestSend.notificationId}] at ${formatDate(pushLatestSend.sentAt)} (attempted: ${String(pushLatestSend.attempted)}, delivered: ${String(pushLatestSend.delivered)}, failures: ${String(pushLatestSend.failures)})`;
-    if (!pushLatestReceipt) {
-      return {
-        ready: false,
-        detail: `${sendSummary} - waiting for receipt`
-      };
-    }
-
-    if (pushLatestReceipt.notificationId !== pushLatestSend.notificationId) {
-      return {
-        ready: false,
-        detail: `${sendSummary} - latest receipt is ${pushLatestReceipt.event} [${pushLatestReceipt.notificationId}] at ${formatDate(pushLatestReceipt.createdAt)}`
-      };
-    }
-
-    const sentAtMs = Date.parse(pushLatestSend.sentAt);
-    const receiptAtMs = Date.parse(pushLatestReceipt.createdAt);
-    const lagMs = Number.isNaN(sentAtMs) || Number.isNaN(receiptAtMs) ? null : Math.max(0, receiptAtMs - sentAtMs);
-    const lagText = lagMs === null ? "" : ` after ${formatDurationMilliseconds(lagMs)}`;
-    const messageText = pushLatestReceipt.message ? ` (${pushLatestReceipt.message})` : "";
-    return {
-      ready: pushLatestReceipt.event !== "error",
-      detail: `${sendSummary} - ${pushLatestReceipt.event} at ${formatDate(pushLatestReceipt.createdAt)}${lagText}${messageText}`
-    };
-  }, [pushLatestReceipt, pushLatestSend]);
-  const appShellStyle: React.CSSProperties = {
-    paddingBottom: isStandaloneDisplayMode ? "env(safe-area-inset-bottom)" : "0px"
-  };
-  const preflightChecks = useMemo<PreflightCheck[]>(() => {
-    return [
-      {
-        id: "home-screen",
-        label: "Home Screen launch mode",
-        ready: isStandaloneDisplayMode,
-        detail: isStandaloneDisplayMode
-          ? "Running as a Home Screen app."
-          : "Open this app from iOS Home Screen to allow background notifications."
-      },
-      {
-        id: "secure-context",
-        label: "Secure origin",
-        ready: isSecureContextReady,
-        detail: isSecureContextReady
-          ? "HTTPS/secure context detected."
-          : "Open the app over HTTPS (required for iOS push)."
-      },
-      {
-        id: "push-support",
-        label: "Browser push support",
-        ready: pushSupported,
-        detail: pushSupported
-          ? "Push APIs are available."
-          : "Push APIs are unavailable in this browser context."
-      },
-      {
-        id: "service-worker",
-        label: "Service worker",
-        ready: pushServiceWorkerRegistered,
-        detail: pushServiceWorkerRegistered
-          ? "Service worker is registered."
-          : "Service worker is not registered yet."
-      },
-      {
-        id: "permission",
-        label: "Notification permission",
-        ready: pushPermission === "granted",
-        detail:
-          pushPermission === "granted"
-            ? "Notification permission granted."
-            : pushPermission === "denied"
-            ? "Permission denied in browser settings."
-            : pushPermission === "default"
-            ? "Permission has not been granted yet."
-            : "Notifications are unsupported in this browser context."
-      },
-      {
-        id: "subscription",
-        label: "Push subscription",
-        ready: pushSubscribed,
-        detail: pushSubscribed
-          ? "Browser is subscribed to push notifications."
-          : "No push subscription is active."
-      },
-      {
-        id: "server-status",
-        label: "Server push status",
-        ready: pushServerEnabled,
-        detail:
-          pushStatus === null
-            ? "Push status endpoint is unreachable or unauthorized."
-            : pushServerEnabled
-            ? "Server push is enabled."
-            : "Server push is disabled."
-      },
-      {
-        id: "shell-build",
-        label: "Web shell build parity",
-        ready: webShellHealth !== null && !webShellBuildMismatch,
-        detail:
-          webShellHealth === null
-            ? "Unable to read /healthz from the web shell."
-            : webShellBuildMismatch
-            ? `Build mismatch detected. Client build: ${clientBuildId || "unknown"}; server build: ${webShellHealth.buildId}.`
-            : `Build ${webShellHealth.buildId}; commit ${webShellHealth.gitCommit ?? "unknown"}; service worker ${webShellHealth.serviceWorkerVersion ?? "unknown"}.`
-      },
-      {
-        id: "server-dry-run",
-        label: "Server dry-run",
-        ready: pushDryRunReady,
-        detail: pushDryRunError
-          ? pushDryRunError
-          : pushDryRunResult
-          ? `${pushDryRunResult.reason} (subscriptions: ${String(pushDryRunResult.attempted)})`
-          : "Run dry-run check to verify server push path."
-      },
-      {
-        id: "local-ca",
-        label: "Local CA helper",
-        ready: !requiresLocalCaTrust || pushLocalCaStatus?.available === true,
-        detail:
-          !requiresLocalCaTrust
-            ? "Public domain origin: local CA trust is not required."
-            : pushLocalCaStatus === null
-            ? "Local CA helper status unavailable."
-            : pushLocalCaStatus.available
-            ? "Download local root certificate from this page for iPhone trust setup."
-            : "Local Caddy root certificate not found. Run ios local HTTPS once to generate it."
-      },
-      {
-        id: "receipt-signal",
-        label: "Push receipt signal",
-        ready: pushReceiptSignal.ready,
-        detail: pushReceiptSignal.detail
-      }
-    ];
-  }, [
-    isStandaloneDisplayMode,
-    isSecureContextReady,
-    pushDryRunError,
-    pushDryRunReady,
-    pushDryRunResult,
-    pushLocalCaStatus,
-    pushLatestReceipt,
-    pushReceiptSignal,
-    pushPermission,
-    requiresLocalCaTrust,
-    clientBuildId,
-    pushServerEnabled,
-    pushServiceWorkerRegistered,
-    pushStatus,
-    pushSubscribed,
-    pushSupported,
-    webShellBuildMismatch,
-    webShellHealth
-  ]);
-  const preflightReadyCount = preflightChecks.filter((check) => check.ready).length;
-  const preflightReady = preflightChecks.every((check) => check.ready);
-
-  const clearError = useCallback(() => {
-    setErrorState(null);
-  }, []);
-
-  const showError = useCallback((input: ErrorReportInput) => {
-    setErrorState({
-      operation: input.operation,
-      message: input.message,
-      errorId: null,
-      requestId: input.requestId ?? null
-    });
-  }, []);
-
-  const reportError = useCallback(
-    (input: ErrorReportInput) => {
-      const transientThreadNotLoaded = isThreadNotLoadedMessage(input.message);
-      const transientLoadOperation =
-        transientThreadNotLoaded &&
-        (input.operation === "thread:load-live" || input.operation === "thread:load-selected");
-
-      if (transientLoadOperation) {
-        return;
-      }
-
-      showError(input);
-      if (transientThreadNotLoaded) {
-        return;
-      }
-
-      const fingerprint = [
-        input.operation,
-        input.message,
-        input.threadId ?? "",
-        input.requestId ?? "",
-        activeTab
-      ].join("|");
-      const now = Date.now();
-      const recentByFingerprint = recentClientErrorByFingerprintRef.current;
-      const lastReportedAt = recentByFingerprint.get(fingerprint) ?? 0;
-      if (now - lastReportedAt < CLIENT_ERROR_DEDUP_WINDOW_MS) {
-        return;
-      }
-      recentByFingerprint.set(fingerprint, now);
-      if (recentByFingerprint.size > 300) {
-        for (const [key, ts] of recentByFingerprint) {
-          if (now - ts > CLIENT_ERROR_DEDUP_WINDOW_MS) {
-            recentByFingerprint.delete(key);
-          }
-        }
-        if (recentByFingerprint.size > 300) {
-          const oldestKey = recentByFingerprint.keys().next().value;
-          if (typeof oldestKey === "string") {
-            recentByFingerprint.delete(oldestKey);
-          }
-        }
-      }
-
-      void reportClientError({
-        source: "web-app",
-        operation: input.operation,
-        message: input.message,
-        name: null,
-        stack: null,
-        requestId: input.requestId ?? null,
-        threadId: input.threadId ?? null,
-        url: window.location.pathname,
-        details: {
-          activeTab,
-          ...(input.details ?? {})
-        }
-      })
-        .then((response) => {
-          setErrorState((current) => {
-            if (!current) {
-              return current;
-            }
-            if (current.operation !== input.operation || current.message !== input.message) {
-              return current;
-            }
-            return {
-              ...current,
-              errorId: response.errorId
-            };
-          });
-          setSelectedClientErrorId(response.errorId);
-          void listDebugClientErrors(120)
-            .then((next) => {
-              setClientErrors(next.data);
-              setClientErrorSessionLogPath(next.sessionLogPath);
-            })
-            .catch(() => {
-              // Intentionally ignored: avoid recursive reporting loops for reporter failures.
-            });
-        })
-        .catch(() => {
-          // Intentionally ignored: avoid recursive reporting loops for reporter failures.
-        });
-    },
-    [activeTab, showError]
+  const visibleConversationItems = useMemo(
+    () => flatConversationItems.slice(firstVisibleChatItemIndex),
+    [flatConversationItems, firstVisibleChatItemIndex]
   );
-
+  const commitLabel = health?.state.gitCommit ?? "unknown";
+  const codexConfigured = agentsById.codex?.enabled === true;
+  const openCodeConnected = agentsById.opencode?.connected === true;
+  const allSystemsReady = codexConfigured
+    ? (
+      health?.state.appReady === true &&
+      health?.state.ipcConnected === true &&
+      health?.state.ipcInitialized === true
+    )
+    : openCodeConnected;
+  const hasAnySystemFailure = codexConfigured
+    ? (
+      health?.state.appReady === false ||
+      health?.state.ipcConnected === false ||
+      health?.state.ipcInitialized === false
+    )
+    : !openCodeConnected;
   /* Data loading */
   const loadCoreData = useCallback(async () => {
-    setCoreDataLoadCount((current) => current + 1);
-    setThreadsLoadCount((current) => current + 1);
-    const threadsPromise = listThreads({ limit: 80, archived: false, all: true, maxPages: 20 }).finally(() => {
-      setThreadsLoadCount((current) => Math.max(0, current - 1));
-    });
-    try {
-      const [
-        healthResult,
-        threadsResult,
-        modelsResult,
-        traceStatusResult,
-        historyResult,
-        clientErrorsResult
-      ] = await Promise.allSettled([
-        getHealth(),
-        threadsPromise,
-        listModels(),
-        getTraceStatus(),
-        listDebugHistory(120),
-        listDebugClientErrors(120)
-      ]);
-      const errors: string[] = [];
-      const toReasonMessage = (reason: unknown): string =>
-        reason instanceof Error ? reason.message : String(reason);
+    const [nh, nt, nm, nmo, ntr, nhist, nag] = await Promise.all([
+      getHealth(),
+      listThreads({ limit: 80, archived: false, all: true, maxPages: 20 }),
+      listCollaborationModes(),
+      listModels(),
+      getTraceStatus(),
+      listDebugHistory(120),
+      listAgents().catch(() => null)
+    ]);
+    let preferredAgentId: AgentId | null = null;
+    const nextThreadsSignature = nt.data.map((thread) =>
+      [
+        thread.id,
+        String(thread.updatedAt ?? 0),
+        thread.preview,
+        thread.agentId,
+        thread.cwd ?? "",
+        thread.path ?? ""
+      ].join("|")
+    );
+    const nextModesSignature = nm.data.map((mode) =>
+      [mode.mode, mode.name, mode.reasoning_effort ?? ""].join("|")
+    );
+    const nextModelsSignature = nmo.data.map((model) =>
+      [model.id, model.displayName ?? ""].join("|")
+    );
 
-      if (healthResult.status === "fulfilled") {
-        setHealth(healthResult.value);
-      } else {
-        errors.push(`health: ${toReasonMessage(healthResult.reason)}`);
-      }
-
-      if (threadsResult.status === "fulfilled") {
-        const nextThreads = threadsResult.value.data;
-        setThreads(nextThreads);
-        setSelectedThreadId((cur) => {
-          if (cur) return cur;
-          return nextThreads[0]?.id ?? null;
-        });
-      } else {
-        errors.push(`threads: ${toReasonMessage(threadsResult.reason)}`);
-      }
-
-      if (modelsResult.status === "fulfilled") {
-        setModels(modelsResult.value.data);
-      } else {
-        errors.push(`models: ${toReasonMessage(modelsResult.reason)}`);
-      }
-
-      if (traceStatusResult.status === "fulfilled") {
-        setTraceStatus(traceStatusResult.value);
-      } else {
-        errors.push(`trace: ${toReasonMessage(traceStatusResult.reason)}`);
-      }
-
-      if (historyResult.status === "fulfilled") {
-        setHistory(historyResult.value.history);
-      } else {
-        errors.push(`history: ${toReasonMessage(historyResult.reason)}`);
-      }
-
-      if (clientErrorsResult.status === "fulfilled") {
-        const nextClientErrors = clientErrorsResult.value.data;
-        setClientErrors(nextClientErrors);
-        setClientErrorSessionLogPath(clientErrorsResult.value.sessionLogPath);
-        setSelectedClientErrorId((cur) => {
-          if (cur && nextClientErrors.some((entry) => entry.errorId === cur)) {
-            return cur;
-          }
-          return nextClientErrors[0]?.errorId ?? "";
-        });
-      } else {
-        errors.push(`client-errors: ${toReasonMessage(clientErrorsResult.reason)}`);
-      }
-
-      if (errors.length > 0) {
-        throw new Error(`Core data partial failure: ${errors[0]}`);
-      }
-    } finally {
-      setCoreDataLoadCount((current) => Math.max(0, current - 1));
-    }
-  }, []);
-
-  const loadCollaborationModes = useCallback(async () => {
-    const nm = await listCollaborationModes();
-    setModes(nm.data);
-    setSelectedModeKey((cur) => {
-      if (cur) return cur;
-      const nonPlanDefault = nm.data.find((mode: ModesResponse["data"][number]) => !isPlanModeOption(mode));
-      return nonPlanDefault?.mode ?? nm.data[0]?.mode ?? "";
-    });
-  }, []);
-
-  const loadPushData = useCallback(async () => {
-    try {
-      await synchronizePushServiceWorkerApiToken();
-    } catch {
-      // Ignore token sync errors here; push state probing below still drives UI diagnostics.
-    }
-
-    try {
-      const client = await getPushClientState();
-      setPushClientState(client);
-    } catch {
-      setPushClientState({
-        supported: false,
-        serviceWorkerRegistered: false,
-        permission: "unsupported",
-        subscribed: false
+    startTransition(() => {
+      setHealth((prev) => {
+        if (
+          prev &&
+          prev.state.appReady === nh.state.appReady &&
+          prev.state.ipcConnected === nh.state.ipcConnected &&
+          prev.state.ipcInitialized === nh.state.ipcInitialized &&
+          prev.state.gitCommit === nh.state.gitCommit &&
+          prev.state.lastError === nh.state.lastError &&
+          prev.state.historyCount === nh.state.historyCount &&
+          prev.state.threadOwnerCount === nh.state.threadOwnerCount
+        ) {
+          return prev;
+        }
+        return nh;
       });
-    }
-
-    try {
-      const [status, latestReceiptResponse, latestSendResponse, localCaStatus] = await Promise.all([
-        getPushStatus(),
-        getLatestPushReceipt(),
-        getLatestPushSend(),
-        getPushLocalCaStatus()
-      ]);
-      setPushStatus(status);
-      setPushLatestReceipt(latestReceiptResponse.latest);
-      setPushLatestSend(latestSendResponse.latest);
-      setPushLocalCaStatus(localCaStatus);
-      if (!pushModeHydratedRef.current) {
-        setPushPrivateMode(status.privateModeDefault);
-        pushModeHydratedRef.current = true;
+      if (!signaturesMatch(threadsSignatureRef.current, nextThreadsSignature)) {
+        threadsSignatureRef.current = nextThreadsSignature;
+        setThreads(nt.data);
       }
-    } catch {
-      setPushStatus(null);
-      setPushLatestReceipt(null);
-      setPushLatestSend(null);
-      setPushLocalCaStatus(null);
-    }
-
-    try {
-      const shellHealth = await getWebShellHealth();
-      setWebShellHealth(shellHealth);
-    } catch {
-      setWebShellHealth(null);
-    }
+      if (!signaturesMatch(modesSignatureRef.current, nextModesSignature)) {
+        modesSignatureRef.current = nextModesSignature;
+        setModes(nm.data);
+      }
+      if (!signaturesMatch(modelsSignatureRef.current, nextModelsSignature)) {
+        modelsSignatureRef.current = nextModelsSignature;
+        setModels(nmo.data);
+      }
+      setTraceStatus((prev) => {
+        if (
+          prev &&
+          prev.active?.id === ntr.active?.id &&
+          prev.active?.eventCount === ntr.active?.eventCount &&
+          prev.recent.length === ntr.recent.length &&
+          prev.recent[0]?.id === ntr.recent[0]?.id &&
+          prev.recent[0]?.eventCount === ntr.recent[0]?.eventCount
+        ) {
+          return prev;
+        }
+        return ntr;
+      });
+      setHistory((prev) => {
+        if (
+          prev.length === nhist.history.length &&
+          prev[prev.length - 1]?.id === nhist.history[nhist.history.length - 1]?.id
+        ) {
+          return prev;
+        }
+        return nhist.history;
+      });
+      if (nag) {
+        setAgentDescriptors((prev) => {
+          if (
+            prev.length === nag.agents.length &&
+            prev.every((agent, index) => {
+              const nextAgent = nag.agents[index];
+              if (!nextAgent) {
+                return false;
+              }
+              return (
+                agent.id === nextAgent.id &&
+                agent.enabled === nextAgent.enabled &&
+                agent.connected === nextAgent.connected
+              );
+            })
+          ) {
+            return prev;
+          }
+          return nag.agents;
+        });
+        const enabledAgents = nag.agents.filter((agent) => agent.enabled).map((agent) => agent.id);
+        const nextDefaultAgent = enabledAgents.includes(nag.defaultAgentId)
+          ? nag.defaultAgentId
+          : (enabledAgents[0] ?? nag.defaultAgentId);
+        preferredAgentId = nextDefaultAgent;
+        setSelectedAgentId((cur) => {
+          if (!hasHydratedAgentSelectionRef.current) {
+            hasHydratedAgentSelectionRef.current = true;
+            return nextDefaultAgent;
+          }
+          return enabledAgents.includes(cur) ? cur : nextDefaultAgent;
+        });
+      }
+      setSelectedThreadId((cur) => {
+        if (cur) return cur;
+        if (preferredAgentId) {
+          const preferredThread = nt.data.find((thread) => thread.agentId === preferredAgentId);
+          if (preferredThread) {
+            return preferredThread.id;
+          }
+        }
+        return nt.data[0]?.id ?? null;
+      });
+      setSelectedModeKey((cur) => {
+        if (cur) return cur;
+        const nonPlanDefault = nm.data.find((mode) => !isPlanModeOption(mode));
+        return nonPlanDefault?.mode ?? nm.data[0]?.mode ?? "";
+      });
+    });
   }, []);
 
   const loadSelectedThread = useCallback(async (threadId: string) => {
-    const runLoad = async (): Promise<void> => {
-      const includeTurns = !pendingMaterializationThreadIdsRef.current.has(threadId);
-      const [live, stream, read] = await Promise.all([
-        getLiveState(threadId),
-        getStreamEvents(threadId),
-        readThread(threadId, { includeTurns })
-      ]);
-      if ((live.conversationState?.turns.length ?? 0) > 0 || read.thread.turns.length > 0) {
-        pendingMaterializationThreadIdsRef.current.delete(threadId);
-      }
-      setLiveState(live);
-      setReadThreadState(read);
-      setStreamEvents(stream.events);
-    };
+    const includeTurns = !pendingMaterializationThreadIdsRef.current.has(threadId);
+    const thread = threads.find((entry) => entry.id === threadId) ?? null;
+    const threadAgentId = thread?.agentId ?? selectedAgentId;
+    const descriptor = agentsById[threadAgentId];
+    const canReadLiveState = descriptor?.capabilities.canReadLiveState ?? (threadAgentId === "codex");
+    const canReadStreamEvents = descriptor?.capabilities.canReadStreamEvents ?? (threadAgentId === "codex");
 
-    try {
-      await runLoad();
-    } catch {
-      await new Promise<void>((resolve) => {
-        window.setTimeout(resolve, 250);
+    const [live, stream, read] = await Promise.all([
+      canReadLiveState
+        ? getLiveState(threadId)
+        : Promise.resolve({
+            ok: true as const,
+            threadId,
+            ownerClientId: null,
+            conversationState: null,
+            liveStateError: null
+          }),
+      canReadStreamEvents
+        ? getStreamEvents(threadId)
+        : Promise.resolve({
+            ok: true as const,
+            threadId,
+            ownerClientId: null,
+            events: []
+          }),
+      readThread(threadId, { includeTurns })
+    ]);
+    if ((live.conversationState?.turns.length ?? 0) > 0 || read.thread.turns.length > 0) {
+      pendingMaterializationThreadIdsRef.current.delete(threadId);
+    }
+    startTransition(() => {
+      setLiveState((prev) => {
+        if (buildLiveStateSyncSignature(prev) === buildLiveStateSyncSignature(live)) {
+          return prev;
+        }
+        return live;
       });
-      await runLoad();
-    }
-  }, []);
-
-  const loadLiveData = useCallback(async () => {
-    const nh = await getHealth();
-    setHealth(nh);
-    if (selectedThreadIdRef.current) {
-      await loadSelectedThread(selectedThreadIdRef.current);
-    }
-  }, [loadSelectedThread]);
+      setReadThreadState((prev) => {
+        if (buildReadThreadSyncSignature(prev) === buildReadThreadSyncSignature(read)) {
+          return prev;
+        }
+        return read;
+      });
+      setStreamEvents((prev) => {
+        const prevLast = prev[prev.length - 1];
+        const nextLast = stream.events[stream.events.length - 1];
+        const prevLastSignature = prevLast ? JSON.stringify(prevLast) : "";
+        const nextLastSignature = nextLast ? JSON.stringify(nextLast) : "";
+        if (prev.length === stream.events.length && prevLastSignature === nextLastSignature) {
+          return prev;
+        }
+        return stream.events;
+      });
+    });
+  }, [agentsById, selectedAgentId, threads]);
 
   const refreshAll = useCallback(async () => {
+    setIsCoreLoading(true);
     try {
-      try {
-        await loadCoreData();
-      } catch {
-        await new Promise<void>((resolve) => {
-          window.setTimeout(resolve, 250);
-        });
-        await loadCoreData();
-      }
-      await loadPushData();
-      if (modes.length === 0) {
-        void loadCollaborationModes().catch((e) =>
-          reportError({
-            operation: "collaboration-modes:load",
-            message: toErrorMessage(e),
-            threadId: selectedThreadIdRef.current
-          })
-        );
-      }
+      setError("");
+      await loadCoreData();
       if (selectedThreadIdRef.current) await loadSelectedThread(selectedThreadIdRef.current);
     } catch (e) {
-      reportError({
-        operation: "refresh:all",
-        message: toErrorMessage(e),
-        threadId: selectedThreadIdRef.current
-      });
-    }
-  }, [loadCollaborationModes, loadCoreData, loadPushData, loadSelectedThread, modes.length, reportError]);
-
-  const runPushAutoHeal = useCallback(async () => {
-    try {
-      const reconcileInput = pushModeHydratedRef.current ? { privateMode: pushPrivateMode } : undefined;
-      const result = await reconcilePushSubscription(reconcileInput);
-      if (result.attempted) {
-        await loadPushData();
-      }
-    } catch (e) {
-      reportError({
-        operation: "push:auto-heal",
-        message: toErrorMessage(e),
-        threadId: selectedThreadIdRef.current
-      });
-    }
-  }, [loadPushData, pushPrivateMode, reportError]);
-
-  const togglePushSubscription = useCallback(async () => {
-    setPushBusy(true);
-    try {
-      if (pushSubscribed) {
-        await disablePushNotifications();
-      } else {
-        await enablePushNotifications({
-          privateMode: pushPrivateMode
-        });
-      }
-      await loadPushData();
-    } catch (e) {
-      reportError({
-        operation: "push:toggle-subscription",
-        message: toErrorMessage(e),
-        threadId: selectedThreadIdRef.current
-      });
+      setError(toErrorMessage(e));
     } finally {
-      setPushBusy(false);
+      setIsCoreLoading(false);
     }
-  }, [loadPushData, pushPrivateMode, pushSubscribed, reportError]);
-
-  const togglePushPrivateMode = useCallback(async () => {
-    const nextPrivateMode = !pushPrivateMode;
-    const previousPrivateMode = pushPrivateMode;
-    setPushPrivateMode(nextPrivateMode);
-    if (!pushSubscribed) {
-      return;
-    }
-
-    setPushBusy(true);
-    try {
-      await updatePushSettings({
-        privateMode: nextPrivateMode
-      });
-      await loadPushData();
-    } catch (e) {
-      setPushPrivateMode(previousPrivateMode);
-      reportError({
-        operation: "push:toggle-private-mode",
-        message: toErrorMessage(e),
-        threadId: selectedThreadIdRef.current
-      });
-    } finally {
-      setPushBusy(false);
-    }
-  }, [loadPushData, pushPrivateMode, pushSubscribed, reportError]);
-
-  const sendPushTest = useCallback(async () => {
-    if (!selectedThreadId) {
-      showError({
-        operation: "push:test",
-        message: "Select a thread to send a test notification",
-        threadId: null
-      });
-      return;
-    }
-
-    setPushBusy(true);
-    try {
-      await sendPushTestNotification({
-        threadId: selectedThreadId,
-        turnId: `test-${Date.now()}`,
-        body: "Test notification from Farfield."
-      });
-    } catch (e) {
-      reportError({
-        operation: "push:test",
-        message: toErrorMessage(e),
-        threadId: selectedThreadId
-      });
-    } finally {
-      setPushBusy(false);
-    }
-  }, [reportError, selectedThreadId, showError]);
-
-  const runPushDryRunCheck = useCallback(async () => {
-    setPushDryRunBusy(true);
-    try {
-      const result = await sendPushTestNotification({
-        threadId: selectedThreadId ?? "preflight-thread",
-        turnId: `preflight-${Date.now()}`,
-        dryRun: true
-      });
-      setPushDryRunResult(result);
-      setPushDryRunError("");
-    } catch (e) {
-      setPushDryRunResult(null);
-      setPushDryRunError(toErrorMessage(e));
-    } finally {
-      setPushDryRunBusy(false);
-    }
-  }, [selectedThreadId]);
-
-  const refreshPreflightChecks = useCallback(async () => {
-    await Promise.all([loadPushData(), runPushDryRunCheck()]);
-  }, [loadPushData, runPushDryRunCheck]);
-
-  const resetPushSubscription = useCallback(async () => {
-    if (!pushSupported) {
-      showError({
-        operation: "push:recover",
-        message: "Push notifications are not supported in this browser",
-        threadId: selectedThreadIdRef.current
-      });
-      return;
-    }
-
-    setPushResetBusy(true);
-    setPushBusy(true);
-    try {
-      await recoverPushNotifications({
-        privateMode: pushPrivateMode
-      });
-      await Promise.all([loadPushData(), runPushDryRunCheck()]);
-      setServiceWorkerUpdateAvailable(false);
-    } catch (e) {
-      reportError({
-        operation: "push:recover",
-        message: toErrorMessage(e),
-        threadId: selectedThreadIdRef.current
-      });
-    } finally {
-      setPushBusy(false);
-      setPushResetBusy(false);
-    }
-  }, [loadPushData, pushPrivateMode, pushSupported, reportError, runPushDryRunCheck, showError]);
-
-  const applyServiceWorkerUpdate = useCallback(async () => {
-    if (!("serviceWorker" in navigator)) {
-      return;
-    }
-    const registration = await navigator.serviceWorker.getRegistration();
-    const waitingWorker = registration?.waiting;
-    if (!waitingWorker) {
-      setServiceWorkerUpdateAvailable(false);
-      return;
-    }
-    waitingWorker.postMessage({ type: "SKIP_WAITING" });
-  }, []);
+  }, [loadCoreData, loadSelectedThread]);
 
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
   }, [selectedThreadId]);
 
   useEffect(() => {
-    isDocumentVisibleRef.current = isDocumentVisible;
-  }, [isDocumentVisible]);
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -1477,98 +1020,9 @@ export function App(): React.JSX.Element {
   }, []);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(display-mode: standalone)");
-    const syncDisplayMode = () => {
-      setIsStandaloneDisplayMode(detectStandaloneDisplayMode());
-    };
-
-    syncDisplayMode();
-    window.addEventListener("focus", syncDisplayMode);
-    window.addEventListener("pageshow", syncDisplayMode);
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", syncDisplayMode);
-    }
-
-    return () => {
-      window.removeEventListener("focus", syncDisplayMode);
-      window.removeEventListener("pageshow", syncDisplayMode);
-      if (typeof mediaQuery.removeEventListener === "function") {
-        mediaQuery.removeEventListener("change", syncDisplayMode);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const onServiceWorkerUpdateAvailable = () => {
-      setServiceWorkerUpdateAvailable(true);
-    };
-
-    window.addEventListener(SERVICE_WORKER_UPDATE_EVENT_NAME, onServiceWorkerUpdateAvailable);
-    if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker.getRegistration().then((registration) => {
-        if (registration?.waiting && navigator.serviceWorker.controller) {
-          setServiceWorkerUpdateAvailable(true);
-        }
-      });
-    }
-
-    return () => {
-      window.removeEventListener(SERVICE_WORKER_UPDATE_EVENT_NAME, onServiceWorkerUpdateAvailable);
-    };
-  }, []);
-
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      const visible = document.visibilityState === "visible";
-      setIsDocumentVisible(visible);
-      if (!visible && refreshTimerRef.current) {
-        window.clearTimeout(refreshTimerRef.current);
-        refreshTimerRef.current = null;
-      }
-      if (visible) {
-        void loadCoreData().catch((e) =>
-          reportError({
-            operation: "core:load",
-            message: toErrorMessage(e),
-            threadId: selectedThreadIdRef.current
-          })
-        );
-        void loadPushData();
-        void runPushAutoHeal();
-        if (selectedThreadIdRef.current) {
-          void loadSelectedThread(selectedThreadIdRef.current).catch((e) =>
-            reportError({
-              operation: "thread:load-selected",
-              message: toErrorMessage(e),
-              threadId: selectedThreadIdRef.current
-            })
-          );
-        }
-      }
-    };
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [loadCoreData, loadPushData, loadSelectedThread, reportError, runPushAutoHeal]);
-
-  useEffect(() => {
-    if (!isDocumentVisible) {
-      return;
-    }
-    void runPushAutoHeal();
-  }, [isDocumentVisible, runPushAutoHeal]);
-
-  useEffect(() => {
     const nextPath = buildPathFromUiState(selectedThreadId, activeTab);
     if (window.location.pathname === nextPath) return;
     window.history.replaceState(null, "", nextPath);
-  }, [activeTab, selectedThreadId]);
-
-  useEffect(() => {
-    const nextPath = buildPathFromUiState(selectedThreadId, activeTab);
-    writeResumePathToStorage(nextPath);
   }, [activeTab, selectedThreadId]);
 
   useEffect(() => {
@@ -1576,54 +1030,13 @@ export function App(): React.JSX.Element {
   }, [refreshAll]);
 
   useEffect(() => {
-    const refreshIntervalMs = isDocumentVisible
-      ? CORE_REFRESH_INTERVAL_VISIBLE_MS
-      : CORE_REFRESH_INTERVAL_HIDDEN_MS;
-
     coreRefreshIntervalRef.current = window.setInterval(() => {
-      if (isDocumentVisibleRef.current) {
-        void loadCoreData().catch((e) =>
-          reportError({
-            operation: "core:load",
-            message: toErrorMessage(e),
-            threadId: selectedThreadIdRef.current
-          })
-        );
-        void loadPushData();
-        const currentThreadId = selectedThreadIdRef.current;
-        if (currentThreadId) {
-          void loadSelectedThread(currentThreadId).catch((e) =>
-            reportError({
-              operation: "thread:load-selected",
-              message: toErrorMessage(e),
-              threadId: currentThreadId
-            })
-          );
-        }
-        return;
-      }
-      void getHealth()
-        .then(setHealth)
-        .catch((e) =>
-          reportError({
-            operation: "health:poll",
-            message: toErrorMessage(e),
-            threadId: selectedThreadIdRef.current
-          })
-        );
-    }, refreshIntervalMs);
-
+      void loadCoreData().catch((e) => setError(toErrorMessage(e)));
+    }, 5000);
     return () => {
       if (coreRefreshIntervalRef.current) window.clearInterval(coreRefreshIntervalRef.current);
     };
-  }, [isDocumentVisible, loadCoreData, loadPushData, loadSelectedThread, reportError]);
-
-  useEffect(() => {
-    if (activeTab !== "preflight") {
-      return;
-    }
-    void runPushDryRunCheck();
-  }, [activeTab, runPushDryRunCheck]);
+  }, [loadCoreData]);
 
   useEffect(() => {
     if (!selectedThreadId) {
@@ -1632,36 +1045,60 @@ export function App(): React.JSX.Element {
       setStreamEvents([]);
       return;
     }
-    void loadSelectedThread(selectedThreadId).catch((e) =>
-      reportError({
-        operation: "thread:load-selected",
-        message: toErrorMessage(e),
-        threadId: selectedThreadId
-      })
-    );
-  }, [loadSelectedThread, reportError, selectedThreadId]);
+    void loadSelectedThread(selectedThreadId).catch((e) => setError(toErrorMessage(e)));
+  }, [loadSelectedThread, selectedThreadId]);
 
   useEffect(() => {
-    if (!isDocumentVisible) {
-      return;
-    }
-
     let disposed = false;
     let source: EventSource | null = null;
     let reconnectTimer: number | null = null;
+    let reconnectDelayMs = 1000;
 
-    const scheduleLiveRefresh = () => {
-      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+    const scheduleRefresh = (refreshCore: boolean, refreshHistory: boolean, refreshSelectedThread: boolean) => {
+      const previousFlags = pendingRefreshFlagsRef.current;
+      pendingRefreshFlagsRef.current = {
+        refreshCore: previousFlags.refreshCore || refreshCore,
+        refreshHistory: previousFlags.refreshHistory || refreshHistory,
+        refreshSelectedThread: previousFlags.refreshSelectedThread || refreshSelectedThread
+      };
+
+      if (refreshTimerRef.current) {
+        window.clearTimeout(refreshTimerRef.current);
+      }
       refreshTimerRef.current = window.setTimeout(() => {
         refreshTimerRef.current = null;
-        void loadLiveData().catch((e) =>
-          reportError({
-            operation: "thread:load-live",
-            message: toErrorMessage(e),
-            threadId: selectedThreadIdRef.current
-          })
-        );
-      }, STREAM_REFRESH_DEBOUNCE_MS);
+        const flags = pendingRefreshFlagsRef.current;
+        pendingRefreshFlagsRef.current = {
+          refreshCore: false,
+          refreshHistory: false,
+          refreshSelectedThread: false
+        };
+        void (async () => {
+          try {
+            if (flags.refreshCore) {
+              await loadCoreData();
+            } else if (flags.refreshHistory && activeTabRef.current === "debug") {
+              const nextHistory = await listDebugHistory(120);
+              startTransition(() => {
+                setHistory((prev) => {
+                  if (
+                    prev.length === nextHistory.history.length &&
+                    prev[prev.length - 1]?.id === nextHistory.history[nextHistory.history.length - 1]?.id
+                  ) {
+                    return prev;
+                  }
+                  return nextHistory.history;
+                });
+              });
+            }
+            if (flags.refreshSelectedThread && selectedThreadIdRef.current) {
+              await loadSelectedThread(selectedThreadIdRef.current);
+            }
+          } catch (e) {
+            setError(toErrorMessage(e));
+          }
+        })();
+      }, 200);
     };
 
     const scheduleReconnect = () => {
@@ -1670,45 +1107,66 @@ export function App(): React.JSX.Element {
       }
       reconnectTimer = window.setTimeout(() => {
         reconnectTimer = null;
-        void connectEventStream();
-      }, 1_000);
+        connectEvents();
+      }, reconnectDelayMs);
+      reconnectDelayMs = Math.min(reconnectDelayMs * 2, 10_000);
     };
 
-    const connectEventStream = async () => {
-      try {
-        await bootstrapEventsSession();
-      } catch (error) {
-        if (!disposed) {
-          reportError({
-            operation: "events:session-bootstrap",
-            message: toErrorMessage(error),
-            threadId: selectedThreadIdRef.current
-          });
-          scheduleLiveRefresh();
-          scheduleReconnect();
-        }
-        return;
-      }
-
+    const connectEvents = () => {
       if (disposed) {
         return;
       }
 
       source = new EventSource("/events");
-      source.onmessage = () => {
-        scheduleLiveRefresh();
+      source.onopen = () => {
+        reconnectDelayMs = 1000;
+        scheduleRefresh(true, activeTabRef.current === "debug", Boolean(selectedThreadIdRef.current));
       };
+
+      source.onmessage = (event: MessageEvent<string>) => {
+        let refreshCore = false;
+        const refreshHistory = activeTabRef.current === "debug";
+        let refreshSelectedThread = false;
+
+        try {
+          const parsedEventResult = SseEventSchema.safeParse(JSON.parse(event.data));
+          if (!parsedEventResult.success) {
+            refreshCore = true;
+          } else {
+            const parsedEvent = parsedEventResult.data;
+            if (parsedEvent.type === "state") {
+              refreshCore = true;
+            } else if (parsedEvent.type === "history") {
+              if (parsedEvent.entry.source === "app" || parsedEvent.entry.source === "system") {
+                refreshCore = true;
+              }
+              const eventThreadId = parsedEvent.entry.meta.threadId;
+              if (
+                eventThreadId &&
+                selectedThreadIdRef.current &&
+                eventThreadId === selectedThreadIdRef.current
+              ) {
+                refreshSelectedThread = true;
+              }
+            }
+          }
+        } catch {
+          refreshCore = true;
+        }
+
+        scheduleRefresh(refreshCore, refreshHistory, refreshSelectedThread);
+      };
+
       source.onerror = () => {
         if (source) {
           source.close();
           source = null;
         }
-        scheduleLiveRefresh();
         scheduleReconnect();
       };
     };
 
-    void connectEventStream();
+    connectEvents();
 
     return () => {
       disposed = true;
@@ -1716,11 +1174,16 @@ export function App(): React.JSX.Element {
         window.clearTimeout(reconnectTimer);
       }
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+      pendingRefreshFlagsRef.current = {
+        refreshCore: false,
+        refreshHistory: false,
+        refreshSelectedThread: false
+      };
       if (source) {
         source.close();
       }
     };
-  }, [isDocumentVisible, loadLiveData, reportError]);
+  }, [loadCoreData, loadSelectedThread]);
 
   useEffect(() => {
     if (!activeRequest) {
@@ -1767,6 +1230,14 @@ export function App(): React.JSX.Element {
       return;
     }
 
+    if (
+      isModeSyncing &&
+      localSignature === lastAppliedModeSignatureRef.current &&
+      remoteSignature !== lastAppliedModeSignatureRef.current
+    ) {
+      return;
+    }
+
     if (remoteSelection.modeKey) {
       setSelectedModeKey(remoteSelection.modeKey);
     } else if (!selectedModeKey && remoteModeKey) {
@@ -1798,6 +1269,10 @@ export function App(): React.JSX.Element {
     writeSidebarCollapsedGroupsToStorage(sidebarCollapsedGroups);
   }, [sidebarCollapsedGroups]);
 
+  useEffect(() => {
+    isChatAtBottomRef.current = isChatAtBottom;
+  }, [isChatAtBottom]);
+
   // Track whether chat view is at the bottom.
   useEffect(() => {
     if (activeTab !== "chat" || !scrollRef.current) {
@@ -1805,84 +1280,109 @@ export function App(): React.JSX.Element {
     }
 
     const scroller = scrollRef.current;
-    const updateBottomState = () => {
+    let rafId: number | null = null;
+
+    const syncBottomState = () => {
       const distanceFromBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
-      setIsChatAtBottom(distanceFromBottom <= 48);
+      const nextIsBottom = distanceFromBottom <= 48;
+      if (nextIsBottom !== isChatAtBottomRef.current) {
+        isChatAtBottomRef.current = nextIsBottom;
+        setIsChatAtBottom(nextIsBottom);
+      }
+      rafId = null;
     };
 
-    updateBottomState();
-    scroller.addEventListener("scroll", updateBottomState, { passive: true });
+    const handleScroll = () => {
+      if (rafId !== null) {
+        return;
+      }
+      rafId = window.requestAnimationFrame(syncBottomState);
+    };
+
+    syncBottomState();
+    scroller.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
-      scroller.removeEventListener("scroll", updateBottomState);
+      scroller.removeEventListener("scroll", handleScroll);
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
     };
   }, [activeTab, selectedThreadId]);
 
   // Keep chat pinned to bottom only if user is already at the bottom.
   useEffect(() => {
-    if (activeTab === "chat" && isChatAtBottom && scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    if (activeTab === "chat" && isChatAtBottomRef.current && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [activeTab, conversationItemCount, isChatAtBottom]);
+  }, [activeTab, conversationItemCount]);
 
   // Keep bottom pinned when expanded/collapsed blocks change chat height.
   useEffect(() => {
     if (activeTab !== "chat" || !scrollRef.current || !chatContentRef.current) return;
     const scroller = scrollRef.current;
     const content = chatContentRef.current;
+    let rafId: number | null = null;
+
     const observer = new ResizeObserver(() => {
-      if (!isChatAtBottom) return;
-      scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+      if (!isChatAtBottomRef.current) {
+        return;
+      }
+      if (rafId !== null) {
+        return;
+      }
+      rafId = window.requestAnimationFrame(() => {
+        scroller.scrollTop = scroller.scrollHeight;
+        rafId = null;
+      });
     });
     observer.observe(content);
     return () => {
       observer.disconnect();
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
     };
-  }, [activeTab, isChatAtBottom, selectedThreadId]);
+  }, [activeTab, selectedThreadId]);
 
   // New thread selection starts at the bottom.
   useEffect(() => {
     if (activeTab !== "chat" || !scrollRef.current) return;
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    isChatAtBottomRef.current = true;
     setIsChatAtBottom(true);
     setVisibleChatItemLimit(INITIAL_VISIBLE_CHAT_ITEMS);
   }, [activeTab, selectedThreadId]);
 
-  // Prevent sliding animations when switching chats.
-  useEffect(() => {
-    setSuppressEntryAnimations(true);
-  }, [selectedThreadId]);
-
-  useEffect(() => {
-    if (!suppressEntryAnimations) return;
-    if (!selectedThreadId) {
-      setSuppressEntryAnimations(false);
-      return;
-    }
-    if (!conversationState) return;
-    const timer = window.setTimeout(() => setSuppressEntryAnimations(false), 0);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [conversationState, selectedThreadId, suppressEntryAnimations]);
-
   /* Actions */
   const submitMessage = useCallback(async (draft: string) => {
-    if (!selectedThreadId || !draft.trim()) return;
+    if (!draft.trim()) return;
+
     setIsBusy(true);
     try {
-      await sendMessage({ threadId: selectedThreadId, text: draft });
-      pendingMaterializationThreadIdsRef.current.delete(selectedThreadId);
+      setError("");
+
+      let threadId = selectedThreadId;
+
+      // Auto-create a thread if none is selected.
+      if (!threadId) {
+        const created = await createThread({
+          agentId: selectedAgentId
+        });
+        threadId = created.threadId;
+        pendingMaterializationThreadIdsRef.current.add(threadId);
+        setSelectedThreadId(threadId);
+        selectedThreadIdRef.current = threadId;
+      }
+
+      await sendMessage({ threadId, text: draft });
+      pendingMaterializationThreadIdsRef.current.delete(threadId);
       await refreshAll();
     } catch (e) {
-      reportError({
-        operation: "thread:submit-message",
-        message: toErrorMessage(e),
-        threadId: selectedThreadId
-      });
+      setError(toErrorMessage(e));
     } finally {
       setIsBusy(false);
     }
-  }, [refreshAll, reportError, selectedThreadId]);
+  }, [refreshAll, selectedAgentId, selectedThreadId]);
 
   const applyModeDraft = useCallback(async (draft: {
     modeKey: string;
@@ -1894,7 +1394,7 @@ export function App(): React.JSX.Element {
     }
 
     const mode = modes.find((entry) => entry.mode === draft.modeKey) ?? null;
-    if (!mode) {
+    if (!mode || typeof mode.mode !== "string") {
       return;
     }
 
@@ -1907,6 +1407,7 @@ export function App(): React.JSX.Element {
     lastAppliedModeSignatureRef.current = signature;
     setIsModeSyncing(true);
     try {
+      setError("");
       await setCollaborationMode({
         threadId: selectedThreadId,
         collaborationMode: {
@@ -1921,15 +1422,11 @@ export function App(): React.JSX.Element {
       await loadSelectedThread(selectedThreadId);
     } catch (e) {
       lastAppliedModeSignatureRef.current = previousSignature;
-      reportError({
-        operation: "thread:set-collaboration-mode",
-        message: toErrorMessage(e),
-        threadId: selectedThreadId
-      });
+      setError(toErrorMessage(e));
     } finally {
       setIsModeSyncing(false);
     }
-  }, [isModeSyncing, loadSelectedThread, modes, reportError, selectedThreadId]);
+  }, [isModeSyncing, loadSelectedThread, modes, selectedThreadId]);
 
   const submitPendingRequest = useCallback(async () => {
     if (!selectedThreadId || !activeRequest) return;
@@ -1941,6 +1438,7 @@ export function App(): React.JSX.Element {
     }
     setIsBusy(true);
     try {
+      setError("");
       await submitUserInput({
         threadId: selectedThreadId,
         requestId: activeRequest.id,
@@ -1948,21 +1446,17 @@ export function App(): React.JSX.Element {
       });
       await refreshAll();
     } catch (e) {
-      reportError({
-        operation: "thread:submit-user-input",
-        message: toErrorMessage(e),
-        threadId: selectedThreadId,
-        requestId: String(activeRequest.id)
-      });
+      setError(toErrorMessage(e));
     } finally {
       setIsBusy(false);
     }
-  }, [activeRequest, answerDraft, refreshAll, reportError, selectedThreadId]);
+  }, [activeRequest, answerDraft, refreshAll, selectedThreadId]);
 
   const skipPendingRequest = useCallback(async () => {
     if (!selectedThreadId || !activeRequest) return;
     setIsBusy(true);
     try {
+      setError("");
       await submitUserInput({
         threadId: selectedThreadId,
         requestId: activeRequest.id,
@@ -1970,33 +1464,25 @@ export function App(): React.JSX.Element {
       });
       await refreshAll();
     } catch (e) {
-      reportError({
-        operation: "thread:skip-user-input",
-        message: toErrorMessage(e),
-        threadId: selectedThreadId,
-        requestId: String(activeRequest.id)
-      });
+      setError(toErrorMessage(e));
     } finally {
       setIsBusy(false);
     }
-  }, [activeRequest, refreshAll, reportError, selectedThreadId]);
+  }, [activeRequest, refreshAll, selectedThreadId]);
 
   const runInterrupt = useCallback(async () => {
     if (!selectedThreadId) return;
     setIsBusy(true);
     try {
+      setError("");
       await interruptThread({ threadId: selectedThreadId });
       await refreshAll();
     } catch (e) {
-      reportError({
-        operation: "thread:interrupt",
-        message: toErrorMessage(e),
-        threadId: selectedThreadId
-      });
+      setError(toErrorMessage(e));
     } finally {
       setIsBusy(false);
     }
-  }, [refreshAll, reportError, selectedThreadId]);
+  }, [refreshAll, selectedThreadId]);
 
   const loadHistoryDetail = useCallback(async (id: string) => {
     if (!id) { setHistoryDetail(null); return; }
@@ -2004,41 +1490,9 @@ export function App(): React.JSX.Element {
     setHistoryDetail(detail);
   }, []);
 
-  const loadClientErrorDetail = useCallback(async (id: string) => {
-    if (!id) {
-      setClientErrorDetail(null);
-      return;
-    }
-    const detail = await getDebugClientError(id);
-    setClientErrorDetail(detail.error);
-    setClientErrorSessionLogPath(detail.sessionLogPath);
-  }, []);
-
   useEffect(() => {
-    void loadHistoryDetail(selectedHistoryId).catch((e) =>
-      reportError({
-        operation: "debug:history-detail",
-        message: toErrorMessage(e)
-      })
-    );
-  }, [loadHistoryDetail, reportError, selectedHistoryId]);
-
-  useEffect(() => {
-    void loadClientErrorDetail(selectedClientErrorId).catch((e) =>
-      showError({
-        operation: "debug:client-error-detail",
-        message: toErrorMessage(e)
-      })
-    );
-  }, [loadClientErrorDetail, selectedClientErrorId, showError]);
-
-  const openErrorInDebug = useCallback(() => {
-    const errorId = errorState?.errorId;
-    if (errorId) {
-      setSelectedClientErrorId(errorId);
-    }
-    setActiveTab("debug");
-  }, [errorState]);
+    void loadHistoryDetail(selectedHistoryId).catch((e) => setError(toErrorMessage(e)));
+  }, [loadHistoryDetail, selectedHistoryId]);
 
   const handleAnswerChange = useCallback(
     (questionId: string, field: "option" | "freeform", value: string) => {
@@ -2050,232 +1504,341 @@ export function App(): React.JSX.Element {
     []
   );
 
-  const createNewThread = useCallback(async (projectPath: string) => {
+  const createNewThread = useCallback(async (projectPath: string, agentId?: AgentId) => {
     const trimmedProjectPath = projectPath.trim();
     if (!trimmedProjectPath) {
-      showError({
-        operation: "thread:create",
-        message: "Cannot create thread: missing project path",
-        threadId: null
-      });
+      setError("Cannot create thread: missing project path");
       return;
     }
     setIsBusy(true);
     try {
-      const created = await createThread({ cwd: trimmedProjectPath });
+      setError("");
+      const created = await createThread({
+        cwd: trimmedProjectPath,
+        ...(agentId ? { agentId } : {})
+      });
       pendingMaterializationThreadIdsRef.current.add(created.threadId);
       setSelectedThreadId(created.threadId);
       selectedThreadIdRef.current = created.threadId;
       setMobileSidebarOpen(false);
       await refreshAll();
     } catch (e) {
-      reportError({
-        operation: "thread:create",
-        message: toErrorMessage(e),
-        threadId: null,
-        details: {
-          cwd: trimmedProjectPath
-        }
-      });
+      setError(toErrorMessage(e));
     } finally {
       setIsBusy(false);
     }
-  }, [refreshAll, reportError, showError]);
+  }, [refreshAll]);
+
+  const createThreadForSingleAgent = useCallback((projectPath: string) => {
+    const onlyAgentId = availableAgentIds[0];
+    if (!onlyAgentId) {
+      setError("Cannot create thread: no enabled agent");
+      return;
+    }
+    void createNewThread(projectPath, onlyAgentId);
+  }, [availableAgentIds, createNewThread]);
 
   const renderSidebarContent = (viewport: "desktop" | "mobile"): React.JSX.Element => (
     <>
-      <div className="flex items-center justify-between px-4 h-14 border-b border-sidebar-border shrink-0">
-        <span className="text-sm font-semibold">Farfield</span>
-        <div className="flex items-center gap-1">
-          {viewport === "desktop" && (
-            <IconBtn
-              onClick={() => setDesktopSidebarOpen(false)}
-              title="Hide sidebar"
-              testId="sidebar-toggle-close"
-            >
-              <PanelLeft size={15} />
-            </IconBtn>
-          )}
-          {viewport === "mobile" && (
-            <Button
-              type="button"
-              onClick={() => setMobileSidebarOpen(false)}
-              data-testid="sidebar-toggle-close"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            >
-              <X size={14} />
-            </Button>
-          )}
+      <div className="relative z-20 h-14 shrink-0 px-4">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 -bottom-3 bg-gradient-to-b from-sidebar from-58% via-sidebar/88 via-80% to-transparent to-100%"
+        />
+        <div className="relative z-10 flex items-center justify-between h-full">
+          <span className="text-sm font-semibold">Farfield</span>
+          <div className="flex items-center gap-1">
+            {viewport === "desktop" && (
+              <IconBtn onClick={() => setDesktopSidebarOpen(false)} title="Hide sidebar">
+                <PanelLeft size={15} />
+              </IconBtn>
+            )}
+            {viewport === "mobile" && (
+              <Button
+                type="button"
+                onClick={() => setMobileSidebarOpen(false)}
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              >
+                <X size={14} />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden py-2 pl-2 pr-0">
-        <div data-testid="thread-list-status" data-state={threadListState} className="sr-only">
-          {threadListState}
-        </div>
-        {threads.length === 0 && (
-          <div className="px-4 py-6 text-xs text-muted-foreground text-center">
-            {isThreadsLoading ? (
-              <span data-testid="thread-list-loading" className="inline-flex items-center gap-2">
-                <Loader2 size={12} className="animate-spin" />
-                <span>Loading threads...</span>
-              </span>
-            ) : (
-              <span data-testid="thread-list-empty">No threads</span>
-            )}
-          </div>
-        )}
-        <div className="space-y-2 pr-2">
-          {groupedThreads.map((group) => {
-            const hasSelectedThread = group.threads.some((thread) => thread.id === selectedThreadId);
-            const isCollapsed = hasSelectedThread ? false : Boolean(sidebarCollapsedGroups[group.key]);
-            return (
-              <div key={group.key} className="space-y-1">
-                <div className="flex items-center gap-1">
+      <div className="relative flex-1 min-h-0">
+        <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden py-2 pl-2 pr-0">
+          {threads.length === 0 && (
+            <div className="px-4 py-6 text-xs text-muted-foreground text-center space-y-3">
+              {isCoreLoading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Loading threads...</span>
+                </div>
+              ) : (
+                <div>No threads</div>
+              )}
+              {availableAgentIds.length > 0 && (
+                availableAgentIds.length === 1 ? (
                   <Button
                     type="button"
-                    onClick={() =>
-                      setSidebarCollapsedGroups((prev) => ({
-                        ...prev,
-                        [group.key]: !isCollapsed
-                      }))
-                    }
-                    variant="ghost"
-                    className="h-6 flex-1 justify-start gap-2 rounded-lg px-2 py-1 text-left text-[13px] tracking-tight font-normal text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                  >
-                    {isCollapsed ? (
-                      <Folder size={13} className="shrink-0" />
-                    ) : (
-                      <FolderOpen size={13} className="shrink-0" />
-                    )}
-                    <span className="min-w-0 truncate">{group.label}</span>
-                  </Button>
-                  <IconBtn
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full"
+                    disabled={isBusy}
                     onClick={() => {
-                      if (!group.projectPath) {
-                        return;
-                      }
-                      void createNewThread(group.projectPath);
+                      const defaultProjectPath = selectedAgentDescriptor?.projectDirectories[0] ?? ".";
+                      createThreadForSingleAgent(defaultProjectPath);
                     }}
-                    title={
-                      group.projectPath
-                        ? `New thread in ${group.label}`
-                        : "Cannot create thread: missing project path"
-                    }
-                    disabled={isBusy || !group.projectPath}
                   >
-                    <Plus size={14} />
-                  </IconBtn>
-                </div>
-                <AnimatePresence initial={false}>
-                  {!isCollapsed && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.16, ease: "easeInOut" }}
-                      className="overflow-hidden"
+                    <Plus size={13} className="mr-1.5" />
+                    New {selectedAgentLabel} thread
+                  </Button>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full"
+                        disabled={isBusy}
+                      >
+                        <Plus size={13} className="mr-1.5" />
+                        New thread
+                      </Button>
+                    </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center" sideOffset={6}>
+                      {availableAgentIds.map((agentId) => (
+                        <DropdownMenuItem
+                          key={agentId}
+                          onSelect={() => {
+                            const defaultProjectPath = agentsById[agentId]?.projectDirectories[0] ?? ".";
+                            void createNewThread(defaultProjectPath, agentId);
+                          }}
+                        >
+                          <span className="shrink-0 h-4 w-4 rounded-sm bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
+                            <AgentFavicon
+                              agentId={agentId}
+                              label={agentsById[agentId]?.label ?? "Agent"}
+                              className="h-3.5 w-3.5"
+                            />
+                          </span>
+                          New {agentsById[agentId]?.label ?? agentId} thread
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )
+              )}
+            </div>
+          )}
+          <div className="space-y-2 pr-2">
+            {groupedThreads.map((group) => {
+              const hasSelectedThread = group.threads.some((thread) => thread.id === selectedThreadId);
+              const isCollapsed = hasSelectedThread ? false : Boolean(sidebarCollapsedGroups[group.key]);
+              const nextAgentId = group.preferredAgentId ?? selectedAgentId;
+              const nextAgentLabel = agentsById[nextAgentId]?.label ?? nextAgentId;
+              return (
+                <div key={group.key} className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      onClick={() =>
+                        setSidebarCollapsedGroups((prev) => ({
+                          ...prev,
+                          [group.key]: !isCollapsed
+                        }))
+                      }
+                      variant="ghost"
+                      className="h-6 flex-1 justify-start gap-2 rounded-lg px-2 py-1 text-left text-[13px] tracking-tight font-normal text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                     >
-                      <div className="space-y-1 pl-4 pt-0.5">
-                        {group.threads.map((thread) => {
-                          const isSelected = thread.id === selectedThreadId;
-                          return (
-                            <Button
-                              key={thread.id}
-                              type="button"
-                              data-testid="thread-list-item"
-                              data-thread-id={thread.id}
-                              onClick={() => {
-                                setSelectedThreadId(thread.id);
-                                setMobileSidebarOpen(false);
+                      {isCollapsed ? (
+                        <Folder size={13} className="shrink-0" />
+                      ) : (
+                        <FolderOpen size={13} className="shrink-0" />
+                      )}
+                      <span className="min-w-0 truncate">{group.label}</span>
+                    </Button>
+                    {availableAgentIds.length <= 1 ? (
+                      <IconBtn
+                        onClick={() => {
+                          if (!group.projectPath) {
+                            return;
+                          }
+                          createThreadForSingleAgent(group.projectPath);
+                        }}
+                        title={
+                          group.projectPath
+                            ? `New ${nextAgentLabel} thread in ${group.label}`
+                            : "Cannot create thread: missing project path"
+                        }
+                        disabled={isBusy || !group.projectPath}
+                      >
+                        <Plus size={14} />
+                      </IconBtn>
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            disabled={isBusy || !group.projectPath}
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+                            title={
+                              group.projectPath
+                                ? `New thread in ${group.label}`
+                                : "Cannot create thread: missing project path"
+                            }
+                          >
+                            <Plus size={14} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" sideOffset={6}>
+                          {availableAgentIds.map((agentId) => (
+                            <DropdownMenuItem
+                              key={agentId}
+                              onSelect={() => {
+                                if (!group.projectPath) {
+                                  return;
+                                }
+                                void createNewThread(group.projectPath, agentId);
                               }}
-                              variant="ghost"
-                              className={`w-full min-w-0 h-auto flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 text-left text-[13px] tracking-tight font-normal transition-colors ${
-                                isSelected
-                                  ? "bg-muted/90 text-foreground shadow-sm"
-                                  : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-                              }`}
                             >
-                              <span className="min-w-0 flex-1 truncate leading-5">{threadLabel(thread)}</span>
+                              <span className="shrink-0 h-4 w-4 rounded-sm bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
+                                <AgentFavicon
+                                  agentId={agentId}
+                                  label={agentsById[agentId]?.label ?? "Agent"}
+                                  className="h-3.5 w-3.5"
+                                />
+                              </span>
+                              New {agentsById[agentId]?.label ?? agentId} thread
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+                  {!isCollapsed && (
+                    <div className="space-y-1 pl-4 pt-0.5">
+                      {group.threads.length === 0 && (
+                        <div className="px-2.5 py-1 text-[11px] text-muted-foreground/70">
+                          No threads yet
+                        </div>
+                      )}
+                      {group.threads.map((thread) => {
+                        const isSelected = thread.id === selectedThreadId;
+                        const threadIsGenerating = isSelected && isGenerating;
+                        return (
+                          <Button
+                            key={thread.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedThreadId(thread.id);
+                              setMobileSidebarOpen(false);
+                            }}
+                            variant="ghost"
+                            className={`w-full min-w-0 h-auto flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 text-left text-[13px] tracking-tight font-normal transition-colors ${
+                              isSelected
+                                ? "bg-muted/90 text-foreground shadow-sm"
+                                : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                            }`}
+                            >
+                              <span className="min-w-0 flex-1 flex items-center gap-1.5 truncate leading-5">
+                              {thread.agentId && (
+                                <span className="shrink-0 h-4 w-4 rounded-sm bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
+                                  <AgentFavicon
+                                    agentId={thread.agentId}
+                                    label={agentsById[thread.agentId]?.label ?? "Agent"}
+                                    className="h-3.5 w-3.5"
+                                  />
+                                </span>
+                              )}
+                                <span className="truncate">{threadLabel(thread)}</span>
+                              </span>
+                            <span className="shrink-0 flex items-center gap-1.5">
+                              {threadIsGenerating && (
+                                <Loader2 size={11} className="animate-spin text-muted-foreground/70" />
+                              )}
                               {thread.updatedAt && (
-                                <span className="shrink-0 text-[10px] text-muted-foreground/50">
+                                <span className="text-[10px] text-muted-foreground/50">
                                   {formatDate(thread.updatedAt)}
                                 </span>
                               )}
-                            </Button>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
+                            </span>
+                          </Button>
+                        );
+                      })}
+                    </div>
                   )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <div className="p-3 border-t border-sidebar-border shrink-0 flex items-center justify-between gap-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/40 transition-colors cursor-default min-w-0">
-              <span
-                className={`h-2 w-2 rounded-full shrink-0 ${
-                  allSystemsReady
-                    ? "bg-success"
-                    : hasAnySystemFailure
-                      ? "bg-danger"
-                      : "bg-muted-foreground/40"
-                }`}
-              />
-              <span className="font-mono truncate">commit {commitLabel}</span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="top" align="start" className="space-y-1 text-xs">
-            <div className="font-mono text-[11px]">commit {commitLabel}</div>
-            <div>App: {health?.state.appReady ? "ok" : "not ready"}</div>
-            <div>IPC: {health?.state.ipcConnected ? "connected" : "disconnected"}</div>
-            <div>Init: {health?.state.ipcInitialized ? "ready" : "not ready"}</div>
-            {typeof health?.state.invalidPushPayloadsLast5m === "number" && (
-              <div>Invalid push payloads (5m): {String(health.state.invalidPushPayloadsLast5m)}</div>
-            )}
-            {typeof health?.state.eventsAuthRejectsLast5m === "number" && (
-              <div>/events auth rejects (5m): {String(health.state.eventsAuthRejectsLast5m)}</div>
-            )}
-            {typeof health?.state.pushReceiptAuthRejectsLast5m === "number" && (
-              <div>/api/push/receipts auth rejects (5m): {String(health.state.pushReceiptAuthRejectsLast5m)}</div>
-            )}
-            {typeof health?.state.eventsSessionBootstrapsLast5m === "number" && (
-              <div>/events session bootstraps (5m): {String(health.state.eventsSessionBootstrapsLast5m)}</div>
-            )}
-            {typeof health?.state.eventsSessionRejectsLast5m === "number" && (
-              <div>/events session rejects (5m): {String(health.state.eventsSessionRejectsLast5m)}</div>
-            )}
-            {typeof health?.state.activeEventsSessions === "number" && (
-              <div>Active /events sessions: {String(health.state.activeEventsSessions)}</div>
-            )}
-            {health?.state.lastError && (
-              <div className="max-w-64 break-words text-destructive">
-                Error: {health.state.lastError}
+      <div className="relative z-20 shrink-0 p-3">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 -top-3 bottom-0 bg-gradient-to-t from-sidebar from-58% via-sidebar/88 via-80% to-transparent to-100%"
+        />
+        <div className="relative z-10 flex items-center justify-between gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/40 transition-colors cursor-default min-w-0">
+                <span
+                  className={`h-2 w-2 rounded-full shrink-0 ${
+                    allSystemsReady
+                      ? "bg-success"
+                      : hasAnySystemFailure
+                        ? "bg-danger"
+                        : "bg-muted-foreground/40"
+                  }`}
+                />
+                <span className="font-mono truncate">commit {commitLabel}</span>
               </div>
-            )}
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <a
-              href="https://github.com/achimala/farfield"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-            >
-              <Github size={14} />
-            </a>
-          </TooltipTrigger>
-          <TooltipContent side="top" align="end">GitHub</TooltipContent>
-        </Tooltip>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="start" className="space-y-1 text-xs">
+              <div className="font-mono text-[11px]">commit {commitLabel}</div>
+              {agentDescriptors
+                .filter((descriptor) => descriptor.enabled)
+                .map((descriptor) => (
+                  <div key={descriptor.id}>
+                    {descriptor.label}: {descriptor.connected ? "connected" : "disconnected"}
+                  </div>
+                ))}
+              {codexConfigured ? (
+                <>
+                  <div>App: {health?.state.appReady ? "ok" : "not ready"}</div>
+                  <div>IPC: {health?.state.ipcConnected ? "connected" : "disconnected"}</div>
+                  <div>Init: {health?.state.ipcInitialized ? "ready" : "not ready"}</div>
+                </>
+              ) : null}
+              {health?.state.lastError && (
+                <div className="max-w-64 break-words text-destructive">
+                  Error: {health.state.lastError}
+                </div>
+              )}
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href="https://github.com/achimala/farfield"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+              >
+                <Github size={14} />
+              </a>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="end">GitHub</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
     </>
   );
@@ -2283,11 +1846,7 @@ export function App(): React.JSX.Element {
   /* ── Render ─────────────────────────────────────────────── */
   return (
     <TooltipProvider delayDuration={120}>
-      <div
-        className="app-shell flex bg-background text-foreground font-sans"
-        style={appShellStyle}
-        data-testid="app-shell"
-      >
+      <div className="app-shell flex bg-background text-foreground font-sans">
 
       {/* Mobile sidebar backdrop */}
       <AnimatePresence>
@@ -2337,33 +1896,44 @@ export function App(): React.JSX.Element {
 
       {/* ── Main area ───────────────────────────────────────── */}
       <div
-        className={`flex-1 flex flex-col min-w-0 transition-[margin] duration-200 ${
+        className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-200 ${
           desktopSidebarOpen ? "md:ml-64" : "md:ml-0"
         }`}
       >
 
         {/* Header */}
-        <header className="flex items-center justify-between px-3 h-14 border-b border-border shrink-0 gap-2">
+        <header
+          className={`flex items-center justify-between px-3 h-14 shrink-0 gap-2 ${
+            activeTab === "chat"
+              ? "absolute inset-x-0 top-0 z-20 bg-transparent"
+              : "border-b border-border"
+          }`}
+        >
           <div className="flex items-center gap-2 min-w-0">
             <div className="md:hidden">
-              <IconBtn onClick={() => setMobileSidebarOpen(true)} title="Threads" testId="sidebar-toggle-open">
+              <IconBtn onClick={() => setMobileSidebarOpen(true)} title="Threads">
                 <Menu size={15} />
               </IconBtn>
             </div>
             {!desktopSidebarOpen && (
               <div className="hidden md:block">
-                <IconBtn
-                  onClick={() => setDesktopSidebarOpen(true)}
-                  title="Show sidebar"
-                  testId="sidebar-toggle-open"
-                >
+                <IconBtn onClick={() => setDesktopSidebarOpen(true)} title="Show sidebar">
                   <PanelLeft size={15} />
                 </IconBtn>
               </div>
             )}
             <div className="min-w-0">
-              <div className="text-sm font-medium truncate leading-5" data-testid="selected-thread-label">
+              <div className="text-sm font-medium truncate leading-5 flex items-center gap-1.5">
                 {selectedThread ? threadLabel(selectedThread) : "No thread selected"}
+                {selectedThread && activeAgentLabel && (
+                  <span className="shrink-0 h-5 w-5 rounded-md bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
+                    <AgentFavicon
+                      agentId={activeThreadAgentId}
+                      label={activeAgentLabel}
+                      className="h-4 w-4"
+                    />
+                  </span>
+                )}
               </div>
               {isGenerating && (
                 <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
@@ -2371,31 +1941,14 @@ export function App(): React.JSX.Element {
                   <span>generating</span>
                 </div>
               )}
-              {pushRequiresHomeScreenInstall && (
-                <div className="text-[11px] text-amber-600 dark:text-amber-400">
-                  Open from Home Screen for background notifications
-                </div>
-              )}
             </div>
           </div>
 
           <div className="flex items-center gap-0.5 shrink-0">
-            {serviceWorkerUpdateAvailable && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                onClick={() => void applyServiceWorkerUpdate()}
-              >
-                Update app
-              </Button>
-            )}
             <IconBtn
               onClick={() => void refreshAll()}
               disabled={isBusy}
               title="Refresh"
-              testId="refresh-button"
             >
               <RefreshCcw size={14} className={isBusy ? "animate-spin" : ""} />
             </IconBtn>
@@ -2403,17 +1956,8 @@ export function App(): React.JSX.Element {
               onClick={() => setActiveTab(activeTab === "debug" ? "chat" : "debug")}
               active={activeTab === "debug"}
               title="Debug"
-              testId="tab-debug"
             >
               <Bug size={14} />
-            </IconBtn>
-            <IconBtn
-              onClick={() => setActiveTab(activeTab === "preflight" ? "chat" : "preflight")}
-              active={activeTab === "preflight"}
-              title="Preflight"
-              testId="tab-preflight"
-            >
-              <ShieldCheck size={14} />
             </IconBtn>
             <IconBtn onClick={toggleTheme} title="Toggle theme">
               {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
@@ -2423,59 +1967,48 @@ export function App(): React.JSX.Element {
 
         {/* Error bar */}
         <AnimatePresence>
-          {errorState && (
+          {error && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden shrink-0"
             >
-              <div
-                className="flex items-start justify-between gap-3 px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-sm text-destructive"
-                data-testid="error-banner"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium" data-testid="error-banner-operation">
-                    {errorState.operation}
-                  </div>
-                  <div className="truncate" data-testid="error-banner-message">{errorMessage}</div>
-                  {(errorState.requestId || errorState.errorId) && (
-                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-destructive/80">
-                      {errorState.requestId && (
-                        <span className="font-mono" data-testid="error-banner-request-id">
-                          request {errorState.requestId}
-                        </span>
-                      )}
-                      {errorState.errorId && (
-                        <span className="font-mono" data-testid="error-banner-error-id">
-                          error {errorState.errorId}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Button
-                    type="button"
-                    onClick={openErrorInDebug}
-                    data-testid="error-banner-open-debug"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-[11px] opacity-80 hover:opacity-100"
-                  >
-                    Open in Debug
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={clearError}
-                    data-testid="error-banner-dismiss"
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 opacity-60 hover:opacity-100"
-                  >
-                    <X size={13} />
-                  </Button>
-                </div>
+              <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-sm text-destructive">
+                <span className="truncate">{error}</span>
+                <Button
+                  type="button"
+                  onClick={() => setError("")}
+                  variant="ghost"
+                  size="icon"
+                  className="ml-3 h-6 w-6 shrink-0 opacity-60 hover:opacity-100"
+                >
+                  <X size={13} />
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {liveStateReductionError && activeTab === "chat" && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden shrink-0"
+            >
+              <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 text-sm text-amber-200">
+                Live updates failed for this thread. Showing saved messages only.
+                {liveStateReductionError.eventIndex !== null && (
+                  <span className="ml-2 text-xs text-amber-300/90">
+                    event {liveStateReductionError.eventIndex}
+                  </span>
+                )}
+                {liveStateReductionError.patchIndex !== null && (
+                  <span className="ml-1 text-xs text-amber-300/90">
+                    patch {liveStateReductionError.patchIndex}
+                  </span>
+                )}
               </div>
             </motion.div>
           )}
@@ -2483,42 +2016,42 @@ export function App(): React.JSX.Element {
 
         {/* ── Chat tab ──────────────────────────────────────── */}
         {activeTab === "chat" && (
-          <div className="relative flex-1 flex flex-col min-h-0" data-testid="tab-chat">
+          <div className="relative flex-1 flex flex-col min-h-0">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 -top-4 z-10 h-[5.5rem] bg-gradient-to-b from-background from-52% via-background/78 via-82% to-transparent to-100%"
+            />
 
             {/* Conversation */}
-            <div
-              ref={scrollRef}
-              className="flex-1 overflow-y-auto"
-              data-testid="chat-surface"
-              data-state={chatSurfaceState}
-            >
+            <div ref={scrollRef} className="flex-1 overflow-y-auto">
               <AnimatePresence initial={false} mode="wait">
                 <motion.div
                   key={selectedThreadId ?? "__no_thread__"}
-                  ref={chatContentRef}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.14, ease: "easeOut" }}
-                  className="max-w-3xl mx-auto px-4 py-8"
+                  className="max-w-3xl mx-auto px-4 pt-8 pb-6"
                 >
                   {turns.length === 0 ? (
-                    <div className="text-center py-20 text-sm text-muted-foreground" data-testid="chat-empty-state">
-                      {isThreadsLoading ? (
-                        <span data-testid="chat-empty-loading-threads" className="inline-flex items-center gap-2">
-                          <Loader2 size={12} className="animate-spin" />
-                          <span>Loading threads...</span>
-                        </span>
-                      ) : selectedThread ? (
-                        <span data-testid="chat-empty-no-messages">No messages yet</span>
-                      ) : (
-                        <span data-testid="chat-empty-no-thread">Select a thread from the sidebar</span>
-                      )}
+                    <div className="text-center py-20 text-sm text-muted-foreground">
+                      {!selectedThreadId && isCoreLoading
+                        ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Loader2 size={14} className="animate-spin" />
+                            Loading threads...
+                          </span>
+                        )
+                        : selectedThreadId
+                        ? "No messages yet"
+                        : availableAgentIds.length > 0
+                          ? "Start typing to create a new thread"
+                          : "Select a thread from the sidebar"}
                     </div>
                   ) : (
-                    <motion.div layout={allowEntryLayoutAnimations} className="space-y-8">
+                    <div ref={chatContentRef} className="space-y-0">
                       {hasHiddenChatItems && (
-                        <div className="flex justify-center">
+                        <div className="flex justify-center pb-3">
                           <Button
                             type="button"
                             variant="outline"
@@ -2534,36 +2067,18 @@ export function App(): React.JSX.Element {
                           </Button>
                         </div>
                       )}
-                      {visibleTurns.map(({ turn, turnIndex, visibleItems }) => {
-                        const isLastTurn = turnIndex === turns.length - 1;
-                        const turnInProgress = isLastTurn && isGenerating;
-                        const items = turn.items ?? [];
-                        return (
-                          <motion.div layout={allowEntryLayoutAnimations} key={turn.turnId ?? turnIndex} className="space-y-5">
-                            <AnimatePresence initial={false}>
-                            {visibleItems.map(({ item, itemIndexInTurn, globalItemIndex }) => (
-                              <motion.div
-                                layout={allowEntryLayoutAnimations}
-                                key={item.id ?? `${turnIndex}-${itemIndexInTurn}`}
-                                initial={suppressEntryAnimations ? false : { opacity: 0, y: 12 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -8 }}
-                                transition={{ duration: 0.2, ease: "easeOut" }}
-                              >
-                                <ConversationItem
-                                  item={item}
-                                  isLast={globalItemIndex === conversationItemCount - 1}
-                                  turnIsInProgress={turnInProgress}
-                                  previousItemType={items[itemIndexInTurn - 1]?.type}
-                                  nextItemType={items[itemIndexInTurn + 1]?.type}
-                                />
-                              </motion.div>
-                            ))}
-                            </AnimatePresence>
-                          </motion.div>
-                        );
-                      })}
-                    </motion.div>
+                      {visibleConversationItems.map((entry) => (
+                        <div key={entry.key} style={{ paddingTop: `${entry.spacingTop}px` }}>
+                          <ConversationItem
+                            item={entry.item}
+                            isLast={entry.isLast}
+                            turnIsInProgress={entry.turnIsInProgress}
+                            previousItemType={entry.previousItemType}
+                            nextItemType={entry.nextItemType}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </motion.div>
               </AnimatePresence>
@@ -2582,7 +2097,7 @@ export function App(): React.JSX.Element {
                     type="button"
                     onClick={() => {
                       if (!scrollRef.current) return;
-                      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+                      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
                       setIsChatAtBottom(true);
                     }}
                     size="icon"
@@ -2595,12 +2110,16 @@ export function App(): React.JSX.Element {
             </AnimatePresence>
 
             {/* Input area */}
-            <div className="border-t border-border px-4 py-4 shrink-0">
-              <div className="max-w-3xl mx-auto space-y-2">
+            <div className="relative z-10 -mt-6 px-4 pt-6 pb-4 shrink-0">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-transparent via-background/85 to-background"
+              />
+              <div className="relative max-w-3xl mx-auto space-y-2">
 
                 {/* Pending user input */}
                 <AnimatePresence>
-                  {activeRequest && (
+                  {activeRequest && canSubmitUserInputForActiveAgent && (
                     <PendingRequestCard
                       request={activeRequest}
                       answerDraft={answerDraft}
@@ -2612,131 +2131,130 @@ export function App(): React.JSX.Element {
                   )}
                 </AnimatePresence>
 
+                <AnimatePresence initial={false}>
+                  {isGenerating && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.15 }}
+                      className="px-1 flex items-center gap-1.5 text-xs text-muted-foreground"
+                    >
+                      <Loader2 size={11} className="animate-spin" />
+                      <span className="reasoning-shimmer font-medium">Thinking…</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 {/* Composer */}
                 <div className="flex flex-col gap-2">
                   <ChatComposer
-                    canSend={Boolean(selectedThreadId)}
+                    canSend={Boolean(selectedThreadId) || availableAgentIds.length > 0}
                     isBusy={isBusy}
                     isGenerating={isGenerating}
+                    placeholder={
+                      selectedThreadId
+                        ? `Message ${activeAgentLabel}…`
+                        : `Message ${selectedAgentLabel}…`
+                    }
                     onInterrupt={runInterrupt}
                     onSend={submitMessage}
                   />
 
                   {/* Toolbar */}
                   <div className="flex items-center gap-1 min-w-0 overflow-x-auto overflow-y-hidden whitespace-nowrap">
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        if (!planModeOption) return;
-                        const nextModeKey = isPlanModeEnabled
-                          ? (defaultModeOption?.mode ?? selectedModeKey)
-                          : planModeOption.mode;
-                        if (!nextModeKey) return;
-                        setSelectedModeKey(nextModeKey);
-                        void applyModeDraft({
-                          modeKey: nextModeKey,
-                          modelId: selectedModelId,
-                          reasoningEffort: selectedReasoningEffort
-                        });
-                      }}
-                      variant="ghost"
-                      size="sm"
-                      className={`h-8 shrink-0 rounded-full px-2 text-xs ${
-                        isPlanModeEnabled
-                          ? "bg-blue-500/15 text-blue-600 hover:bg-blue-500/20 dark:text-blue-300"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                      }`}
-                      disabled={!selectedThreadId || !planModeOption}
-                    >
-                      {isPlanModeEnabled ? <CircleDot size={10} /> : <Circle size={10} />}
-                      Plan
-                    </Button>
-                    <Select
-                      value={selectedModelId || APP_DEFAULT_VALUE}
-                      onValueChange={(value) => {
-                        const nextModelId = value === APP_DEFAULT_VALUE ? "" : value;
-                        setSelectedModelId(nextModelId);
-                        void applyModeDraft({
-                          modeKey: selectedModeKey,
-                          modelId: nextModelId,
-                          reasoningEffort: selectedReasoningEffort
-                        });
-                      }}
-                      disabled={!selectedThreadId || !selectedModeKey}
-                    >
-                      <SelectTrigger className="h-8 w-[132px] sm:w-[176px] shrink-0 rounded-full border-0 bg-transparent dark:bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:text-foreground focus-visible:ring-0">
-                        <SelectValue placeholder="Model" />
-                      </SelectTrigger>
-                      <SelectContent position="popper">
-                        <SelectItem value={APP_DEFAULT_VALUE}>{ASSUMED_APP_DEFAULT_MODEL}</SelectItem>
-                        {modelOptionsWithoutAssumedDefault.map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={selectedReasoningEffort || APP_DEFAULT_VALUE}
-                      onValueChange={(value) => {
-                        const nextReasoningEffort = value === APP_DEFAULT_VALUE ? "" : value;
-                        setSelectedReasoningEffort(nextReasoningEffort);
-                        void applyModeDraft({
-                          modeKey: selectedModeKey,
-                          modelId: selectedModelId,
-                          reasoningEffort: nextReasoningEffort
-                        });
-                      }}
-                      disabled={!selectedThreadId || !selectedModeKey}
-                    >
-                      <SelectTrigger className="h-8 w-[104px] sm:w-[148px] shrink-0 rounded-full border-0 bg-transparent dark:bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:text-foreground focus-visible:ring-0">
-                        <SelectValue placeholder="Effort" />
-                      </SelectTrigger>
-                      <SelectContent position="popper">
-                        <SelectItem value={APP_DEFAULT_VALUE}>{ASSUMED_APP_DEFAULT_EFFORT}</SelectItem>
-                        {effortOptionsWithoutAssumedDefault.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <span
-                      className={`inline-flex w-3 items-center justify-center text-xs text-muted-foreground transition-opacity ${
-                        isModeSyncing ? "opacity-100" : "opacity-0"
-                      }`}
-                    >
-                      <Loader2 size={10} className={isModeSyncing ? "animate-spin" : ""} />
-                    </span>
-                    <Button
-                      type="button"
-                      onClick={() => void togglePushSubscription()}
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 shrink-0 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                      disabled={
-                        pushBusy ||
-                        !pushSupported ||
-                        (!pushServerEnabled && !pushSubscribed) ||
-                        (pushPermission === "denied" && !pushSubscribed)
-                      }
-                    >
-                      {pushSubscribed ? <BellOff size={10} /> : <Bell size={10} />}
-                      {pushSubscribed ? "Disable Notifications" : "Enable Notifications"}
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => void togglePushPrivateMode()}
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 shrink-0 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                      disabled={pushBusy || !pushSupported || (pushSubscribed && !pushServerEnabled)}
-                    >
-                      {pushModeLabel}
-                    </Button>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {pushStatusLabel}
-                    </span>
+                    {canSetCollaborationMode && canListCollaborationModes && (
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (!planModeOption) return;
+                          const nextModeKey = isPlanModeEnabled
+                            ? (defaultModeOption?.mode ?? selectedModeKey)
+                            : planModeOption.mode;
+                          if (!nextModeKey) return;
+                          setSelectedModeKey(nextModeKey);
+                          void applyModeDraft({
+                            modeKey: nextModeKey,
+                            modelId: selectedModelId,
+                            reasoningEffort: selectedReasoningEffort
+                          });
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        className={`h-8 shrink-0 rounded-full px-2 text-xs ${
+                          isPlanModeEnabled
+                            ? "bg-blue-500/15 text-blue-600 hover:bg-blue-500/20 dark:text-blue-300"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                        }`}
+                        disabled={!selectedThreadId || !planModeOption}
+                      >
+                        {isPlanModeEnabled ? <CircleDot size={10} /> : <Circle size={10} />}
+                        Plan
+                      </Button>
+                    )}
+                    {canSetCollaborationMode && canListModels && (
+                      <Select
+                        value={selectedModelId || APP_DEFAULT_VALUE}
+                        onValueChange={(value) => {
+                          const nextModelId = value === APP_DEFAULT_VALUE ? "" : value;
+                          setSelectedModelId(nextModelId);
+                          void applyModeDraft({
+                            modeKey: selectedModeKey,
+                            modelId: nextModelId,
+                            reasoningEffort: selectedReasoningEffort
+                          });
+                        }}
+                        disabled={!selectedThreadId || !selectedModeKey}
+                      >
+                        <SelectTrigger className="h-8 w-[132px] sm:w-[176px] shrink-0 rounded-full border-0 bg-transparent dark:bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:text-foreground focus-visible:ring-0">
+                          <SelectValue placeholder="Model" />
+                        </SelectTrigger>
+                        <SelectContent position="popper">
+                          <SelectItem value={APP_DEFAULT_VALUE}>{ASSUMED_APP_DEFAULT_MODEL}</SelectItem>
+                          {modelOptionsWithoutAssumedDefault.map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {canSetCollaborationMode && canListCollaborationModes && (
+                      <Select
+                        value={selectedReasoningEffort || APP_DEFAULT_VALUE}
+                        onValueChange={(value) => {
+                          const nextReasoningEffort = value === APP_DEFAULT_VALUE ? "" : value;
+                          setSelectedReasoningEffort(nextReasoningEffort);
+                          void applyModeDraft({
+                            modeKey: selectedModeKey,
+                            modelId: selectedModelId,
+                            reasoningEffort: nextReasoningEffort
+                          });
+                        }}
+                        disabled={!selectedThreadId || !selectedModeKey}
+                      >
+                        <SelectTrigger className="h-8 w-[104px] sm:w-[148px] shrink-0 rounded-full border-0 bg-transparent dark:bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:text-foreground focus-visible:ring-0">
+                          <SelectValue placeholder="Effort" />
+                        </SelectTrigger>
+                        <SelectContent position="popper">
+                          <SelectItem value={APP_DEFAULT_VALUE}>{ASSUMED_APP_DEFAULT_EFFORT}</SelectItem>
+                          {effortOptionsWithoutAssumedDefault.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {canSetCollaborationMode && (
+                      <span
+                        className={`inline-flex w-3 items-center justify-center text-xs text-muted-foreground transition-opacity ${
+                          isModeSyncing ? "opacity-100" : "opacity-0"
+                        }`}
+                      >
+                        <Loader2 size={10} className={isModeSyncing ? "animate-spin" : ""} />
+                      </span>
+                    )}
                     {pendingRequests.length > 0 && (
                       <span className="shrink-0 text-xs text-amber-500 dark:text-amber-400">
                         {pendingRequests.length} pending
@@ -2749,131 +2267,13 @@ export function App(): React.JSX.Element {
           </div>
         )}
 
-        {/* ── Preflight tab ─────────────────────────────────── */}
-        {activeTab === "preflight" && (
-          <div className="flex-1 overflow-y-auto">
-            <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold">Push preflight</h2>
-                  <p className="text-xs text-muted-foreground">
-                    {preflightReadyCount} of {preflightChecks.length} checks ready
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                      preflightReady
-                        ? "bg-success/15 text-success"
-                        : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                    }`}
-                  >
-                    {preflightReady ? "background push ready" : "not ready"}
-                  </span>
-                  {pushLocalCaDownloadPath && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => {
-                        window.open(pushLocalCaDownloadPath, "_blank", "noopener,noreferrer");
-                      }}
-                    >
-                      Download CA cert
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    disabled={
-                      pushResetBusy ||
-                      pushBusy ||
-                      !pushSupported ||
-                      !pushServerEnabled
-                    }
-                    onClick={() => void resetPushSubscription()}
-                  >
-                    {pushResetBusy ? "Resetting..." : "Reset Notifications"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    disabled={pushDryRunBusy}
-                    onClick={() => void refreshPreflightChecks()}
-                  >
-                    {pushDryRunBusy ? "Checking..." : "Refresh checks"}
-                  </Button>
-                </div>
-              </div>
-
-              <div
-                className={`rounded-xl border px-4 py-3 text-xs ${
-                  webShellBuildMismatch
-                    ? "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                    : "border-border bg-card text-muted-foreground"
-                }`}
-              >
-                {webShellHealth ? (
-                  <>
-                    <div className="font-medium text-foreground">
-                      Web shell build: {webShellHealth.buildId}
-                    </div>
-                    <div className="mt-1">
-                      Client build: {clientBuildId || "unknown"}; service worker:{" "}
-                      {webShellHealth.serviceWorkerVersion ?? "unknown"}; updated:{" "}
-                      {formatDate(webShellHealth.timestamp)}
-                    </div>
-                    {webShellBuildMismatch && (
-                      <div className="mt-1">
-                        Build mismatch detected. Run Reset Notifications, then Hard Refresh.
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  "Web shell health endpoint unavailable."
-                )}
-              </div>
-
-              <div className="rounded-xl border border-border bg-card">
-                <div className="divide-y divide-border">
-                  {preflightChecks.map((check) => (
-                    <div
-                      key={check.id}
-                      className="flex items-start justify-between gap-3 px-4 py-3"
-                    >
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium">{check.label}</div>
-                        <div className="text-xs text-muted-foreground">{check.detail}</div>
-                      </div>
-                      <span
-                        className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                          check.ready
-                            ? "bg-success/15 text-success"
-                            : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                        }`}
-                      >
-                        {check.ready ? "ready" : "action needed"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* ── Debug tab ─────────────────────────────────────── */}
         {activeTab === "debug" && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div className="flex-1 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] min-h-0 divide-y md:divide-y-0 md:divide-x divide-border overflow-hidden">
 
               {/* Left: History */}
-              <div className="flex flex-col min-h-0 overflow-hidden" data-testid="debug-history-panel">
+              <div className="flex flex-col min-h-0 overflow-hidden">
                 <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
                   <Activity size={13} className="text-muted-foreground" />
                   <span className="text-sm font-medium">History</span>
@@ -2962,7 +2362,7 @@ export function App(): React.JSX.Element {
                 </div>
               </div>
 
-              {/* Right: Trace + Errors + Stream Events */}
+              {/* Right: Trace + Stream Events */}
               <div className="flex flex-col min-h-0 overflow-hidden divide-y divide-border">
 
                 {/* Trace controls */}
@@ -3012,181 +2412,7 @@ export function App(): React.JSX.Element {
                         {btn}
                       </Button>
                     ))}
-                    <Button
-                      type="button"
-                      onClick={() => void sendPushTest()}
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs"
-                      disabled={pushBusy || !pushSupported || !pushServerEnabled || !selectedThreadId}
-                    >
-                      Push test
-                    </Button>
                   </div>
-                </div>
-
-                {/* Error events */}
-                <div className="flex flex-col min-h-0 overflow-hidden" data-testid="debug-errors-panel">
-                  <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border shrink-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-medium">Errors</span>
-                      <span className="text-xs text-muted-foreground/60">{clientErrors.length}</span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      data-testid="debug-errors-refresh"
-                      className="h-7 text-xs"
-                      onClick={() => {
-                        void listDebugClientErrors(120)
-                          .then((next) => {
-                            setClientErrors(next.data);
-                            setClientErrorSessionLogPath(next.sessionLogPath);
-                            setSelectedClientErrorId((current) => {
-                              if (current && next.data.some((entry) => entry.errorId === current)) {
-                                return current;
-                              }
-                              return next.data[0]?.errorId ?? "";
-                            });
-                          })
-                          .catch((error) =>
-                            reportError({
-                              operation: "debug:client-errors-refresh",
-                              message: toErrorMessage(error),
-                              threadId: selectedThreadIdRef.current
-                            })
-                          );
-                      }}
-                    >
-                      Refresh
-                    </Button>
-                  </div>
-                  {clientErrors.length === 0 ? (
-                    <div className="px-4 py-3 text-xs text-muted-foreground space-y-2" data-testid="debug-errors-empty">
-                      <div>No errors recorded for this session.</div>
-                      <a
-                        href="/api/debug/client-errors/session-log"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        data-testid="debug-errors-session-log-link"
-                        className="inline-block text-xs text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
-                      >
-                        Download session log
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="flex-1 grid grid-cols-[170px_minmax(0,1fr)] min-h-0 divide-x divide-border overflow-hidden">
-                      <div className="overflow-y-auto py-1">
-                        {clientErrors
-                          .slice()
-                          .reverse()
-                          .map((entry) => (
-                            <Button
-                              key={entry.errorId}
-                              type="button"
-                              data-testid="debug-error-row"
-                              onClick={() => setSelectedClientErrorId(entry.errorId)}
-                              variant="ghost"
-                              className={`w-full h-auto flex-col items-start justify-start gap-0 rounded-none px-3 py-2 text-left transition-colors ${
-                                selectedClientErrorId === entry.errorId
-                                  ? "bg-muted text-foreground"
-                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                              }`}
-                            >
-                              <div className="flex items-center gap-1.5 mb-0.5">
-                                <span
-                                  className={`text-[9px] px-1.5 py-0.5 rounded font-mono uppercase leading-4 ${
-                                    entry.origin === "server"
-                                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                                      : "bg-blue-500/15 text-blue-500 dark:text-blue-300"
-                                  }`}
-                                >
-                                  {entry.origin}
-                                </span>
-                              </div>
-                              <div className="text-[10px] font-mono truncate">{entry.errorId}</div>
-                              <div className="text-[10px] text-muted-foreground truncate">{entry.operation}</div>
-                              <div className="text-[10px] text-muted-foreground/50 truncate">
-                                {formatDate(entry.recordedAt)}
-                              </div>
-                            </Button>
-                          ))}
-                      </div>
-                      <div className="overflow-y-auto p-3 space-y-3" data-testid="debug-error-detail">
-                        {!clientErrorDetail ? (
-                          <div className="text-xs text-muted-foreground py-4">
-                            {selectedClientErrorSummary ? "Loading error detail..." : "Select an error"}
-                          </div>
-                        ) : (
-                          <>
-                            <div className="text-xs font-medium break-words">{clientErrorDetail.message}</div>
-                            <div className="space-y-1 text-[11px] text-muted-foreground">
-                              <div>
-                                <span className="text-foreground">errorId:</span>{" "}
-                                <span className="font-mono">{clientErrorDetail.errorId}</span>
-                              </div>
-                              <div>
-                                <span className="text-foreground">origin:</span> {clientErrorDetail.origin}
-                              </div>
-                              <div>
-                                <span className="text-foreground">operation:</span> {clientErrorDetail.operation}
-                              </div>
-                              <div>
-                                <span className="text-foreground">source:</span> {clientErrorDetail.source}
-                              </div>
-                              {clientErrorDetail.requestId && (
-                                <div>
-                                  <span className="text-foreground">requestId:</span>{" "}
-                                  <span className="font-mono">{clientErrorDetail.requestId}</span>
-                                </div>
-                              )}
-                              {clientErrorDetail.threadId && (
-                                <div>
-                                  <span className="text-foreground">threadId:</span>{" "}
-                                  <span className="font-mono">{clientErrorDetail.threadId}</span>
-                                </div>
-                              )}
-                              <div>
-                                <span className="text-foreground">recorded:</span>{" "}
-                                {formatDate(clientErrorDetail.recordedAt)}
-                              </div>
-                              <div>
-                                <span className="text-foreground">occurred:</span>{" "}
-                                {formatDate(clientErrorDetail.occurredAt)}
-                              </div>
-                            </div>
-                            <div className="space-y-1">
-                              <a
-                                href="/api/debug/client-errors/session-log"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                data-testid="debug-errors-session-log-link"
-                                className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
-                              >
-                                Download session log
-                              </a>
-                              {(clientErrorSessionLogPath || selectedClientErrorSummary?.sessionId) && (
-                                <div className="text-[10px] text-muted-foreground/70 font-mono break-all">
-                                  {clientErrorSessionLogPath || selectedClientErrorSummary?.sessionId}
-                                </div>
-                              )}
-                            </div>
-                            {Object.keys(clientErrorDetail.details).length > 0 && (
-                              <pre className="font-mono text-[10px] text-muted-foreground leading-4 whitespace-pre-wrap break-words">
-                                {JSON.stringify(clientErrorDetail.details, null, 2)}
-                              </pre>
-                            )}
-                            {clientErrorDetail.stack && (
-                              <pre className="font-mono text-[10px] text-muted-foreground leading-4 whitespace-pre-wrap break-words">
-                                {clientErrorDetail.stack}
-                              </pre>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Stream events */}

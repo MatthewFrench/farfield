@@ -7,6 +7,7 @@ import {
   NullableStringSchema
 } from "./common.js";
 import { ProtocolValidationError } from "./errors.js";
+import { ToolRequestUserInputResponseSchema } from "./generated/app-server/index.js";
 
 export const CollaborationModeSettingsSchema = z
   .object({
@@ -14,14 +15,14 @@ export const CollaborationModeSettingsSchema = z
     reasoning_effort: NullableStringSchema.optional(),
     developer_instructions: z.union([z.string(), z.null()]).optional()
   })
-  .strict();
+  .passthrough();
 
 export const CollaborationModeSchema = z
   .object({
     mode: NonEmptyStringSchema,
     settings: CollaborationModeSettingsSchema
   })
-  .strict();
+  .passthrough();
 
 export const InputTextPartSchema = z
   .object({
@@ -29,7 +30,7 @@ export const InputTextPartSchema = z
     text: z.string(),
     text_elements: z.array(JsonValueSchema).optional()
   })
-  .strict();
+  .passthrough();
 
 export const InputImagePartSchema = z
   .object({
@@ -55,7 +56,7 @@ export const TurnStartParamsSchema = z
     personality: z.union([JsonValueSchema, z.null()]).optional(),
     outputSchema: z.union([JsonValueSchema, z.null()]).optional()
   })
-  .strict();
+  .passthrough();
 
 export const UserMessageContentPartSchema = z
   .object({
@@ -63,7 +64,7 @@ export const UserMessageContentPartSchema = z
     text: z.string(),
     text_elements: z.array(JsonValueSchema).optional()
   })
-  .strict();
+  .passthrough();
 
 export const UserMessageImageContentPartSchema = z
   .object({
@@ -83,7 +84,7 @@ export const UserMessageItemSchema = z
     type: z.literal("userMessage"),
     content: z.array(UserMessagePartSchema)
   })
-  .strict();
+  .passthrough();
 
 export const SteeringUserMessageItemSchema = z
   .object({
@@ -92,7 +93,7 @@ export const SteeringUserMessageItemSchema = z
     content: z.array(UserMessagePartSchema),
     attachments: z.array(JsonValueSchema).optional()
   })
-  .strict();
+  .passthrough();
 
 export const AgentMessageItemSchema = z
   .object({
@@ -100,7 +101,18 @@ export const AgentMessageItemSchema = z
     type: z.literal("agentMessage"),
     text: z.string()
   })
-  .strict();
+  .passthrough();
+
+export const ErrorItemSchema = z
+  .object({
+    id: NonEmptyStringSchema,
+    type: z.literal("error"),
+    message: z.string(),
+    willRetry: z.boolean().optional(),
+    errorInfo: z.union([z.string(), z.null()]).optional(),
+    additionalDetails: z.union([JsonValueSchema, z.null()]).optional()
+  })
+  .passthrough();
 
 export const ReasoningItemSchema = z
   .object({
@@ -110,7 +122,7 @@ export const ReasoningItemSchema = z
     content: z.array(JsonValueSchema).optional(),
     text: z.string().optional()
   })
-  .strict();
+  .passthrough();
 
 export const PlanItemSchema = z
   .object({
@@ -118,7 +130,17 @@ export const PlanItemSchema = z
     type: z.literal("plan"),
     text: z.string()
   })
-  .strict();
+  .passthrough();
+
+export const PlanImplementationItemSchema = z
+  .object({
+    id: NonEmptyStringSchema,
+    type: z.literal("planImplementation"),
+    turnId: NonEmptyStringSchema,
+    planContent: z.string(),
+    isCompleted: z.boolean().optional()
+  })
+  .passthrough();
 
 export const UserInputAnsweredQuestionSchema = z
   .object({
@@ -126,7 +148,7 @@ export const UserInputAnsweredQuestionSchema = z
     header: z.string().optional(),
     question: z.string().optional()
   })
-  .strict();
+  .passthrough();
 
 export const UserInputResponseItemSchema = z
   .object({
@@ -136,9 +158,9 @@ export const UserInputResponseItemSchema = z
     turnId: NonEmptyStringSchema,
     questions: z.array(UserInputAnsweredQuestionSchema),
     answers: z.record(z.array(z.string())),
-    completed: z.boolean()
+    completed: z.boolean().optional()
   })
-  .strict();
+  .passthrough();
 
 export const CommandActionSchema = z
   .object({
@@ -148,7 +170,7 @@ export const CommandActionSchema = z
     path: z.union([z.string(), z.null()]).optional(),
     query: z.string().optional()
   })
-  .strict();
+  .passthrough();
 
 export const CommandExecutionItemSchema = z
   .object({
@@ -163,14 +185,14 @@ export const CommandExecutionItemSchema = z
     exitCode: z.union([z.number().int(), z.null()]).optional(),
     durationMs: z.union([NonNegativeIntSchema, z.null()]).optional()
   })
-  .strict();
+  .passthrough();
 
 export const FileChangeKindSchema = z
   .object({
     type: NonEmptyStringSchema,
     move_path: z.union([z.string(), z.null()]).optional()
   })
-  .strict();
+  .passthrough();
 
 export const FileChangeEntrySchema = z
   .object({
@@ -178,7 +200,7 @@ export const FileChangeEntrySchema = z
     kind: FileChangeKindSchema,
     diff: z.string().optional()
   })
-  .strict();
+  .passthrough();
 
 export const FileChangeItemSchema = z
   .object({
@@ -187,25 +209,23 @@ export const FileChangeItemSchema = z
     changes: z.array(FileChangeEntrySchema),
     status: NonEmptyStringSchema
   })
-  .strict();
+  .passthrough();
 
 export const ContextCompactionItemSchema = z
   .object({
     type: z.literal("contextCompaction"),
     id: NonEmptyStringSchema,
-    completed: z.boolean().optional().default(false)
+    completed: z.boolean().optional()
   })
-  .strict();
+  .passthrough();
 
 export const WebSearchActionSchema = z
   .object({
     type: NonEmptyStringSchema,
     query: z.string().optional(),
-    queries: z.array(z.string()).optional(),
-    url: z.string().optional(),
-    pattern: z.string().optional()
+    queries: z.array(z.string()).optional()
   })
-  .strict();
+  .passthrough();
 
 export const WebSearchItemSchema = z
   .object({
@@ -214,7 +234,7 @@ export const WebSearchItemSchema = z
     query: z.string(),
     action: WebSearchActionSchema
   })
-  .strict();
+  .passthrough();
 
 export const ModelChangedItemSchema = z
   .object({
@@ -223,73 +243,119 @@ export const ModelChangedItemSchema = z
     fromModel: NullableStringSchema.optional(),
     toModel: NullableStringSchema.optional()
   })
-  .strict();
+  .passthrough();
 
-export const TodoPlanEntrySchema = z
-  .object({
-    step: z.string(),
-    status: NonEmptyStringSchema
-  })
-  .strict();
+export const McpToolCallStatusSchema = z.enum(["inProgress", "completed", "failed"]);
 
-export const TodoListItemSchema = z
+export const McpToolCallResultSchema = z
   .object({
-    type: z.literal("todo-list"),
-    id: NonEmptyStringSchema,
-    explanation: z.string(),
-    plan: z.array(TodoPlanEntrySchema)
+    content: z.array(JsonValueSchema),
+    structuredContent: z.union([JsonValueSchema, z.null()]).optional()
   })
-  .strict();
+  .passthrough();
 
-export const CollabAgentStateSchema = z
+export const McpToolCallErrorSchema = z
   .object({
-    status: NonEmptyStringSchema,
-    message: z.union([z.string(), z.null()])
+    message: z.string()
   })
-  .strict();
-
-export const CollabAgentToolCallItemSchema = z
-  .object({
-    type: z.literal("collabAgentToolCall"),
-    id: NonEmptyStringSchema,
-    tool: NonEmptyStringSchema,
-    status: NonEmptyStringSchema,
-    senderThreadId: NonEmptyStringSchema,
-    receiverThreadIds: z.array(NonEmptyStringSchema),
-    prompt: z.union([z.string(), z.null()]),
-    agentsStates: z.record(CollabAgentStateSchema)
-  })
-  .strict();
+  .passthrough();
 
 export const McpToolCallItemSchema = z
   .object({
     type: z.literal("mcpToolCall"),
     id: NonEmptyStringSchema,
-    server: NonEmptyStringSchema,
-    tool: NonEmptyStringSchema,
-    status: NonEmptyStringSchema,
+    server: z.string(),
+    tool: z.string(),
+    status: McpToolCallStatusSchema,
     arguments: JsonValueSchema,
-    result: z.union([JsonValueSchema, z.null()]),
-    error: z.union([JsonValueSchema, z.null()]),
-    durationMs: z.union([NonNegativeIntSchema, z.null()])
+    result: z.union([McpToolCallResultSchema, z.null()]).optional(),
+    error: z.union([McpToolCallErrorSchema, z.null()]).optional(),
+    durationMs: z.union([NonNegativeIntSchema, z.null()]).optional()
   })
-  .strict();
+  .passthrough();
+
+export const CollabAgentToolSchema = z.enum([
+  "spawnAgent",
+  "sendInput",
+  "resumeAgent",
+  "wait",
+  "closeAgent"
+]);
+
+export const CollabAgentStatusSchema = z.enum([
+  "pendingInit",
+  "running",
+  "completed",
+  "errored",
+  "shutdown",
+  "notFound"
+]);
+
+export const CollabAgentStateSchema = z
+  .object({
+    status: CollabAgentStatusSchema,
+    message: z.union([z.string(), z.null()]).optional()
+  })
+  .passthrough();
+
+export const CollabAgentToolCallStatusSchema = z.enum(["inProgress", "completed", "failed"]);
+
+export const CollabAgentToolCallItemSchema = z
+  .object({
+    type: z.literal("collabAgentToolCall"),
+    id: NonEmptyStringSchema,
+    tool: CollabAgentToolSchema,
+    status: CollabAgentToolCallStatusSchema,
+    senderThreadId: z.string(),
+    receiverThreadIds: z.array(z.string()),
+    prompt: z.union([z.string(), z.null()]).optional(),
+    agentsStates: z.record(CollabAgentStateSchema)
+  })
+  .passthrough();
+
+export const ImageViewItemSchema = z
+  .object({
+    type: z.literal("imageView"),
+    id: NonEmptyStringSchema,
+    path: z.string()
+  })
+  .passthrough();
+
+export const EnteredReviewModeItemSchema = z
+  .object({
+    type: z.literal("enteredReviewMode"),
+    id: NonEmptyStringSchema,
+    review: z.string()
+  })
+  .passthrough();
+
+export const ExitedReviewModeItemSchema = z
+  .object({
+    type: z.literal("exitedReviewMode"),
+    id: NonEmptyStringSchema,
+    review: z.string()
+  })
+  .passthrough();
 
 export const TurnItemSchema = z.discriminatedUnion("type", [
   UserMessageItemSchema,
   SteeringUserMessageItemSchema,
   AgentMessageItemSchema,
+  ErrorItemSchema,
   ReasoningItemSchema,
   PlanItemSchema,
+  PlanImplementationItemSchema,
   UserInputResponseItemSchema,
   CommandExecutionItemSchema,
   FileChangeItemSchema,
   ContextCompactionItemSchema,
   WebSearchItemSchema,
-  ModelChangedItemSchema,
-  TodoListItemSchema,
+  McpToolCallItemSchema,
   CollabAgentToolCallItemSchema,
-  McpToolCallItemSchema
+  ImageViewItemSchema,
+  EnteredReviewModeItemSchema,
+  ExitedReviewModeItemSchema,
+  ModelChangedItemSchema
 ]);
 
 export const UserInputOptionSchema = z
@@ -297,7 +363,7 @@ export const UserInputOptionSchema = z
     label: z.string(),
     description: z.string()
   })
-  .strict();
+  .passthrough();
 
 export const UserInputQuestionSchema = z
   .object({
@@ -308,7 +374,7 @@ export const UserInputQuestionSchema = z
     isSecret: z.boolean(),
     options: z.array(UserInputOptionSchema)
   })
-  .strict();
+  .passthrough();
 
 export const UserInputRequestParamsSchema = z
   .object({
@@ -317,7 +383,7 @@ export const UserInputRequestParamsSchema = z
     itemId: NonEmptyStringSchema,
     questions: z.array(UserInputQuestionSchema)
   })
-  .strict();
+  .passthrough();
 
 export const UserInputRequestSchema = z
   .object({
@@ -326,7 +392,7 @@ export const UserInputRequestSchema = z
     params: UserInputRequestParamsSchema,
     completed: z.boolean().optional()
   })
-  .strict();
+  .passthrough();
 
 export const ThreadTurnSchema = z
   .object({
@@ -369,68 +435,13 @@ export const ThreadStreamPatchPathSegmentSchema = z.union([
   NonEmptyStringSchema
 ]);
 
-function decodeJsonPointerSegment(segment: string): string {
-  let decoded = "";
-  for (let index = 0; index < segment.length; index += 1) {
-    const char = segment[index];
-    if (char !== "~") {
-      decoded += char;
-      continue;
-    }
-
-    const next = segment[index + 1];
-    if (next === "0") {
-      decoded += "~";
-      index += 1;
-      continue;
-    }
-    if (next === "1") {
-      decoded += "/";
-      index += 1;
-      continue;
-    }
-
-    throw new Error("Invalid JSON Pointer escape sequence");
-  }
-  return decoded;
-}
-
-function decodeJsonPointerPath(pointer: string): string[] {
-  if (!pointer.startsWith("/")) {
-    throw new Error("JSON Pointer path must start with '/'");
-  }
-
-  const rawSegments = pointer.slice(1).split("/");
-  return rawSegments.map(decodeJsonPointerSegment);
-}
-
-const ThreadStreamPatchPathArraySchema = z.array(ThreadStreamPatchPathSegmentSchema).min(1);
-const ThreadStreamPatchPathPointerSchema = z
-  .string()
-  .min(1)
-  .transform((value, ctx): Array<number | string> => {
-    try {
-      return decodeJsonPointerPath(value);
-    } catch (error) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: error instanceof Error ? error.message : String(error)
-      });
-      return z.NEVER;
-    }
-  });
-const ThreadStreamPatchPathSchema = z.union([
-  ThreadStreamPatchPathArraySchema,
-  ThreadStreamPatchPathPointerSchema
-]);
-
 export const ThreadStreamPatchSchema = z
   .object({
     op: z.enum(["add", "replace", "remove"]),
-    path: ThreadStreamPatchPathSchema,
+    path: z.array(ThreadStreamPatchPathSegmentSchema).min(1),
     value: JsonValueSchema.optional()
   })
-  .strict()
+  .passthrough()
   .superRefine((patch, ctx) => {
     const hasValue = Object.prototype.hasOwnProperty.call(patch, "value");
 
@@ -449,37 +460,52 @@ export const ThreadStreamPatchSchema = z
     }
   });
 
-export const ThreadStreamSnapshotChangeSchema = z
+export const ThreadStreamSnapshotChangeSchema: z.ZodObject<
+  {
+    type: z.ZodLiteral<"snapshot">;
+    conversationState: typeof ThreadConversationStateSchema;
+  },
+  "passthrough"
+> = z
   .object({
     type: z.literal("snapshot"),
     conversationState: ThreadConversationStateSchema
   })
-  .strict();
+  .passthrough();
 
-export const ThreadStreamPatchesChangeSchema = z
+export const ThreadStreamPatchesChangeSchema: z.ZodObject<
+  {
+    type: z.ZodLiteral<"patches">;
+    patches: z.ZodArray<typeof ThreadStreamPatchSchema>;
+  },
+  "passthrough"
+> = z
   .object({
     type: z.literal("patches"),
-    patches: z.union([z.array(ThreadStreamPatchSchema), ThreadStreamPatchSchema])
+    patches: z.array(ThreadStreamPatchSchema)
   })
-  .strict()
-  .transform((value) => ({
-    type: value.type,
-    patches: Array.isArray(value.patches) ? value.patches : [value.patches]
-  }));
+  .passthrough();
 
-export const ThreadStreamChangeSchema = z.union([
-  ThreadStreamSnapshotChangeSchema,
-  ThreadStreamPatchesChangeSchema
-]);
+export const ThreadStreamChangeSchema: z.ZodUnion<
+  [typeof ThreadStreamSnapshotChangeSchema, typeof ThreadStreamPatchesChangeSchema]
+> = z.union([ThreadStreamSnapshotChangeSchema, ThreadStreamPatchesChangeSchema]);
 
-export const ThreadStreamStateChangedParamsSchema = z
+export const ThreadStreamStateChangedParamsSchema: z.ZodObject<
+  {
+    conversationId: typeof NonEmptyStringSchema;
+    change: typeof ThreadStreamChangeSchema;
+    version: typeof NonNegativeIntSchema;
+    type: z.ZodLiteral<"thread-stream-state-changed">;
+  },
+  "passthrough"
+> = z
   .object({
     conversationId: NonEmptyStringSchema,
     change: ThreadStreamChangeSchema,
     version: NonNegativeIntSchema,
     type: z.literal("thread-stream-state-changed")
   })
-  .strict();
+  .passthrough();
 
 export type CollaborationMode = z.infer<typeof CollaborationModeSchema>;
 export type TurnStartParams = z.infer<typeof TurnStartParamsSchema>;
@@ -508,15 +534,11 @@ export function parseThreadStreamStateChangedParams(
 
 export const UserInputAnswerSchema = z
   .object({
-    answers: z.array(z.string().min(1))
+    answers: z.array(z.string())
   })
-  .strict();
+  .passthrough();
 
-export const UserInputResponsePayloadSchema = z
-  .object({
-    answers: z.record(UserInputAnswerSchema)
-  })
-  .strict();
+export const UserInputResponsePayloadSchema = ToolRequestUserInputResponseSchema.passthrough();
 
 export type UserInputResponsePayload = z.infer<typeof UserInputResponsePayloadSchema>;
 

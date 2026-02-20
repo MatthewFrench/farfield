@@ -25,15 +25,36 @@ describe("AppServerClient.sendUserMessage", () => {
     });
   });
 
-  it("fails fast when response schema drifts", async () => {
+  it("accepts response when server adds extra keys", async () => {
     const transport: AppServerTransport = {
       request: vi.fn().mockResolvedValue({ ok: true }),
       close: vi.fn().mockResolvedValue(undefined)
     };
 
     const client = new AppServerClient(transport);
-    await expect(client.sendUserMessage("thread-1", "hello")).rejects.toThrow(
-      /AppServerSendUserMessageResponse/
-    );
+    await expect(client.sendUserMessage("thread-1", "hello")).resolves.toBeUndefined();
+  });
+});
+
+describe("AppServerClient.resumeThread", () => {
+  it("sends the expected resume request payload", async () => {
+    const transport: AppServerTransport = {
+      request: vi.fn().mockResolvedValue({
+        thread: {
+          id: "thread-1",
+          turns: [],
+          requests: []
+        }
+      }),
+      close: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const client = new AppServerClient(transport);
+    await client.resumeThread("thread-1");
+
+    expect(transport.request).toHaveBeenCalledWith("thread/resume", {
+      threadId: "thread-1",
+      persistExtendedHistory: true
+    });
   });
 });

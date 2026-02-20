@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, CirclePause, Loader2 } from "lucide-react";
+import { ArrowUp, Loader2, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -7,6 +7,7 @@ type ChatComposerProps = {
   canSend: boolean;
   isBusy: boolean;
   isGenerating: boolean;
+  placeholder?: string;
   onInterrupt: () => void | Promise<void>;
   onSend: (text: string) => void | Promise<void>;
 };
@@ -15,6 +16,7 @@ export function ChatComposer({
   canSend,
   isBusy,
   isGenerating,
+  placeholder = "Message Codex…",
   onInterrupt,
   onSend
 }: ChatComposerProps): React.JSX.Element {
@@ -104,7 +106,7 @@ export function ChatComposer({
             void sendDraft();
           }
         }}
-        placeholder="Message Codex…"
+        placeholder={placeholder}
         rows={1}
         className="flex-1 min-h-9 max-h-[200px] resize-none overflow-y-auto border-0 bg-transparent px-0 py-2 text-base leading-5 shadow-none transition-[height] duration-90 ease-out focus-visible:ring-0 md:text-sm"
       />
@@ -114,6 +116,8 @@ export function ChatComposer({
           void sendDraft();
         }}
         disabled={disableSend}
+        title={isGenerating ? "Stop" : "Send"}
+        aria-label={isGenerating ? "Stop" : "Send"}
         size="icon"
         className={`h-9 w-9 shrink-0 self-end rounded-full disabled:opacity-30 ${
           isGenerating
@@ -122,7 +126,7 @@ export function ChatComposer({
         }`}
       >
         {isGenerating ? (
-          <CirclePause size={13} />
+          <Square size={11} />
         ) : isBusy ? (
           <Loader2 size={13} className="animate-spin" />
         ) : (

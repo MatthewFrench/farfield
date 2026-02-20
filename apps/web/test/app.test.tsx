@@ -1,59 +1,311 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { App, isPlaceholderCommitValue } from "../src/App";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { App } from "../src/App";
 
 class MockEventSource {
+  private static instances: MockEventSource[] = [];
   public onmessage: ((event: MessageEvent<string>) => void) | null = null;
   public onerror: ((event: Event) => void) | null = null;
 
-  public constructor(_url: string) {}
+  public constructor(_url: string) {
+    MockEventSource.instances.push(this);
+  }
 
-  public close(): void {}
+  public close(): void {
+    MockEventSource.instances = MockEventSource.instances.filter((instance) => instance !== this);
+  }
+
+  public static emit(payload: Record<string, object | string | number | boolean | null | undefined>): void {
+    const event = new MessageEvent<string>("message", {
+      data: JSON.stringify(payload)
+    });
+    for (const instance of MockEventSource.instances) {
+      instance.onmessage?.(event);
+    }
+  }
+
+  public static reset(): void {
+    MockEventSource.instances = [];
+  }
 }
 
 vi.stubGlobal("EventSource", MockEventSource);
-vi.stubGlobal(
-  "ResizeObserver",
-  class {
-    public observe(): void {}
-    public disconnect(): void {}
-    public unobserve(): void {}
-  }
-);
-vi.stubGlobal("matchMedia", () => ({
-  matches: false,
-  media: "(prefers-color-scheme: dark)",
-  onchange: null,
-  addListener: () => undefined,
-  removeListener: () => undefined,
-  addEventListener: () => undefined,
-  removeEventListener: () => undefined,
-  dispatchEvent: () => false
-}));
-vi.stubGlobal("localStorage", {
-  getItem: () => null,
-  setItem: () => undefined,
-  removeItem: () => undefined
-});
-Object.defineProperty(window.HTMLElement.prototype, "scrollTo", {
-  value: () => undefined,
-  writable: true
-});
-Object.defineProperty(window, "scrollTo", {
-  value: () => undefined,
-  writable: true
+
+// jsdom doesn't implement scrollTo or ResizeObserver.
+Element.prototype.scrollTo = vi.fn();
+window.scrollTo = vi.fn();
+vi.stubGlobal("ResizeObserver", class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
 });
 
-let threadsDelayPromise: Promise<void> | null = null;
-let releaseThreadsDelay: (() => void) | null = null;
+vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
+  matches: query === "(prefers-color-scheme: dark)",
+  media: query,
+  onchange: null,
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn()
+})));
+
+const localStorageState = new Map<string, string>();
+vi.stubGlobal("localStorage", {
+  getItem: vi.fn((key: string) => localStorageState.get(key) ?? null),
+  setItem: vi.fn((key: string, value: string) => {
+    localStorageState.set(key, value);
+  }),
+  removeItem: vi.fn((key: string) => {
+    localStorageState.delete(key);
+  }),
+  clear: vi.fn(() => {
+    localStorageState.clear();
+  })
+});
+
+const codexCapabilities = {
+  canListModels: true,
+  canListCollaborationModes: true,
+  canSetCollaborationMode: true,
+  canSubmitUserInput: true,
+  canReadLiveState: true,
+  canReadStreamEvents: true
+};
+
+const opencodeCapabilities = {
+  canListModels: false,
+  canListCollaborationModes: false,
+  canSetCollaborationMode: false,
+  canSubmitUserInput: false,
+  canReadLiveState: false,
+  canReadStreamEvents: false
+};
+
+type CapabilityFixture = {
+  canListModels: boolean;
+  canListCollaborationModes: boolean;
+  canSetCollaborationMode: boolean;
+  canSubmitUserInput: boolean;
+  canReadLiveState: boolean;
+  canReadStreamEvents: boolean;
+};
+
+let agentsFixture: {
+  ok: true;
+  agents: Array<{
+    id: "codex" | "opencode";
+    label: string;
+    enabled: boolean;
+    connected: boolean;
+    capabilities: CapabilityFixture;
+    projectDirectories: string[];
+  }>;
+  defaultAgentId: "codex" | "opencode";
+};
+
+let threadsFixture: {
+  ok: true;
+  data: Array<{
+    id: string;
+    preview: string;
+    createdAt: number;
+    updatedAt: number;
+    cwd?: string;
+    source: "opencode";
+    agentId: "codex" | "opencode";
+  }>;
+  nextCursor: null;
+  pages: number;
+  truncated: boolean;
+};
+
+let collaborationModesFixture: {
+  ok: true;
+  data: Array<{
+    name: string;
+    mode: string;
+    model: string | null;
+    reasoning_effort: string;
+    developer_instructions: string | null;
+  }>;
+};
+
+let modelsFixture: {
+  ok: true;
+  data: Array<{
+    id: string;
+    model: string;
+    upgrade: null;
+    displayName: string;
+    description: string;
+    supportedReasoningEfforts: Array<{
+      reasoningEffort: string;
+      description: string;
+    }>;
+    defaultReasoningEffort: string;
+    inputModalities: string[];
+    supportsPersonality: boolean;
+    isDefault: boolean;
+    hidden: boolean;
+  }>;
+  nextCursor: null;
+};
+
+let readThreadResolver: (threadId: string) => {
+  ok: true;
+  thread: Record<string, object | string | number | boolean | null | undefined>;
+  agentId: "codex" | "opencode";
+} | null;
+
+let liveStateResolver: (threadId: string) => {
+  ok: true;
+  threadId: string;
+  ownerClientId: string | null;
+  conversationState: Record<string, object | string | number | boolean | null | undefined> | null;
+  liveStateError: null;
+};
+
+function buildConversationStateFixture(threadId: string, modelId: string): {
+  id: string;
+  turns: Array<{
+    id: string;
+    status: string;
+    items: [];
+  }>;
+  requests: [];
+  updatedAt: number;
+  latestModel: string;
+  latestReasoningEffort: string;
+  latestCollaborationMode: {
+    mode: string;
+    settings: {
+      model: string;
+      reasoning_effort: string;
+      developer_instructions: null;
+    };
+  };
+} {
+  return {
+    id: threadId,
+    turns: [
+      {
+        id: "turn-1",
+        status: "completed",
+        items: []
+      }
+    ],
+    requests: [],
+    updatedAt: 1700000000,
+    latestModel: modelId,
+    latestReasoningEffort: "medium",
+    latestCollaborationMode: {
+      mode: "default",
+      settings: {
+        model: modelId,
+        reasoning_effort: "medium",
+        developer_instructions: null
+      }
+    }
+  };
+}
+
+beforeEach(() => {
+  MockEventSource.reset();
+  localStorageState.clear();
+  agentsFixture = {
+    ok: true,
+    agents: [
+      {
+        id: "codex",
+        label: "Codex",
+        enabled: true,
+        connected: true,
+        capabilities: codexCapabilities,
+        projectDirectories: []
+      }
+    ],
+    defaultAgentId: "codex"
+  };
+
+  threadsFixture = {
+    ok: true,
+    data: [],
+    nextCursor: null,
+    pages: 0,
+    truncated: false
+  };
+
+  collaborationModesFixture = {
+    ok: true,
+    data: [
+      {
+        name: "Default",
+        mode: "default",
+        model: null,
+        reasoning_effort: "medium",
+        developer_instructions: null
+      },
+      {
+        name: "Plan",
+        mode: "plan",
+        model: null,
+        reasoning_effort: "medium",
+        developer_instructions: "x"
+      }
+    ]
+  };
+
+  modelsFixture = {
+    ok: true,
+    data: [
+      {
+        id: "gpt-5.3-codex",
+        model: "gpt-5.3-codex",
+        upgrade: null,
+        displayName: "gpt-5.3-codex",
+        description: "Test model",
+        supportedReasoningEfforts: [
+          {
+            reasoningEffort: "medium",
+            description: "Balanced"
+          }
+        ],
+        defaultReasoningEffort: "medium",
+        inputModalities: ["text"],
+        supportsPersonality: true,
+        isDefault: true,
+        hidden: false
+      }
+    ],
+    nextCursor: null
+  };
+
+  readThreadResolver = (_threadId: string) => null;
+  liveStateResolver = (threadId: string) => ({
+    ok: true,
+    threadId,
+    ownerClientId: null,
+    conversationState: null,
+    liveStateError: null
+  });
+});
+
+afterEach(() => {
+  cleanup();
+});
 
 vi.stubGlobal(
   "fetch",
   vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
-    const parsedUrl = new URL(url, "http://127.0.0.1");
+    const parsedUrl = new URL(url, "http://localhost");
+    const pathname = parsedUrl.pathname;
+    const segments = pathname.split("/").filter((segment) => segment.length > 0);
+    const threadId = segments[2] ? decodeURIComponent(segments[2]) : "";
 
-    if (parsedUrl.pathname === "/api/health") {
+    if (pathname === "/api/health") {
       return {
         ok: true,
         json: async () => ({
@@ -70,120 +322,57 @@ vi.stubGlobal(
       } as Response;
     }
 
-    if (parsedUrl.pathname === "/api/events/session") {
+    if (pathname.startsWith("/api/threads/") && pathname.endsWith("/live-state")) {
       return {
         ok: true,
-        json: async () => ({
-          ok: true,
-          authRequired: true,
-          bootstrapped: true,
-          expiresAt: "2026-02-19T00:00:00.000Z"
-        })
+        json: async () => liveStateResolver(threadId)
       } as Response;
     }
 
-    if (parsedUrl.pathname === "/api/threads") {
-      if (threadsDelayPromise) {
-        await threadsDelayPromise;
-      }
+    if (pathname.startsWith("/api/threads/") && pathname.endsWith("/stream-events")) {
       return {
         ok: true,
         json: async () => ({
           ok: true,
-          data: [],
-          nextCursor: null,
-          pages: 0,
-          truncated: false
-        })
-      } as Response;
-    }
-
-    if (parsedUrl.pathname.startsWith("/api/threads/") && parsedUrl.pathname.endsWith("/live-state")) {
-      return {
-        ok: true,
-        json: async () => ({
-          ok: true,
-          threadId: "thread_test",
-          ownerClientId: null,
-          conversationState: null
-        })
-      } as Response;
-    }
-
-    if (parsedUrl.pathname.startsWith("/api/threads/") && parsedUrl.pathname.endsWith("/stream-events")) {
-      return {
-        ok: true,
-        json: async () => ({
-          ok: true,
-          threadId: "thread_test",
+          threadId,
           ownerClientId: null,
           events: []
         })
       } as Response;
     }
 
-    if (parsedUrl.pathname.startsWith("/api/threads/")) {
+    if (pathname.startsWith("/api/threads/") && parsedUrl.searchParams.has("includeTurns")) {
+      const readThread = readThreadResolver(threadId);
+      if (readThread) {
+        return {
+          ok: true,
+          json: async () => readThread
+        } as Response;
+      }
+    }
+
+    if (pathname === "/api/threads") {
       return {
         ok: true,
-        json: async () => ({
-          ok: true,
-          thread: {
-            id: "thread_test",
-            turns: [],
-            requests: []
-          }
-        })
+        json: async () => threadsFixture
       } as Response;
     }
 
-    if (parsedUrl.pathname === "/api/collaboration-modes") {
+    if (pathname === "/api/collaboration-modes") {
       return {
         ok: true,
-        json: async () => ({
-          ok: true,
-          data: [
-            {
-              name: "Plan",
-              mode: "plan",
-              model: null,
-              reasoning_effort: "medium",
-              developer_instructions: "x"
-            }
-          ]
-        })
+        json: async () => collaborationModesFixture
       } as Response;
     }
 
-    if (parsedUrl.pathname === "/api/models") {
+    if (pathname === "/api/models") {
       return {
         ok: true,
-        json: async () => ({
-          ok: true,
-          data: [
-            {
-              id: "gpt-5.3-codex",
-              model: "gpt-5.3-codex",
-              upgrade: null,
-              displayName: "GPT-5.3 Codex",
-              description: "Test model",
-              supportedReasoningEfforts: [
-                {
-                  reasoningEffort: "medium",
-                  description: "Balanced"
-                }
-              ],
-              defaultReasoningEffort: "medium",
-              inputModalities: ["text"],
-              supportsPersonality: true,
-              isDefault: true
-            }
-          ],
-          nextCursor: null
-        })
+        json: async () => modelsFixture
       } as Response;
     }
 
-    if (parsedUrl.pathname === "/api/debug/trace/status") {
+    if (pathname === "/api/debug/trace/status") {
       return {
         ok: true,
         json: async () => ({
@@ -194,7 +383,7 @@ vi.stubGlobal(
       } as Response;
     }
 
-    if (parsedUrl.pathname === "/api/debug/history") {
+    if (pathname === "/api/debug/history") {
       return {
         ok: true,
         json: async () => ({
@@ -204,109 +393,158 @@ vi.stubGlobal(
       } as Response;
     }
 
-    if (parsedUrl.pathname === "/api/debug/client-errors") {
+    if (pathname === "/api/agents") {
       return {
         ok: true,
-        json: async () => ({
-          ok: true,
-          data: [],
-          sessionId: "session_test",
-          sessionLogPath: ".runtime/logs/errors/session-test.ndjson"
-        })
-      } as Response;
-    }
-
-    if (parsedUrl.pathname.startsWith("/api/debug/client-errors/")) {
-      return {
-        ok: true,
-        json: async () => ({
-          ok: true,
-          error: {
-            errorId: "error_test",
-            sessionId: "session_test",
-            origin: "client",
-            source: "web-app",
-            operation: "test",
-            message: "test",
-            name: null,
-            stack: null,
-            requestId: null,
-            threadId: null,
-            url: null,
-            occurredAt: "2026-02-18T00:00:00.000Z",
-            recordedAt: "2026-02-18T00:00:00.000Z",
-            details: {}
-          },
-          sessionId: "session_test",
-          sessionLogPath: ".runtime/logs/errors/session-test.ndjson"
-        })
-      } as Response;
-    }
-
-    if (parsedUrl.pathname === "/healthz") {
-      return {
-        ok: true,
-        json: async () => ({
-          ok: true,
-          service: "farfield-web-shell",
-          buildId: "test-build",
-          gitCommit: "abc1234",
-          serviceWorkerVersion: "sw1234567890",
-          timestamp: new Date().toISOString()
-        })
+        json: async () => agentsFixture
       } as Response;
     }
 
     return {
       ok: true,
       json: async () => ({
-        ok: false,
-        error: `Unhandled test route: ${parsedUrl.pathname}`
+        ok: true,
+        threadId: "t",
+        ownerClientId: null,
+        conversationState: null,
+        liveStateError: null,
+        events: []
       })
     } as Response;
   })
 );
 
 describe("App", () => {
-  beforeEach(() => {
-    threadsDelayPromise = null;
-    releaseThreadsDelay = null;
-  });
-
   it("renders core sections", async () => {
     render(<App />);
-    expect(await screen.findByText("Farfield")).toBeTruthy();
-    expect(await screen.findByText("No threads")).toBeTruthy();
+    expect((await screen.findAllByText("Farfield")).length).toBeGreaterThan(0);
     expect(await screen.findByText("No thread selected")).toBeTruthy();
   });
 
-  it("shows loading threads state before empty state", async () => {
-    threadsDelayPromise = new Promise<void>((resolve) => {
-      releaseThreadsDelay = resolve;
+  it("hides mode controls when capability is disabled", async () => {
+    agentsFixture = {
+      ok: true,
+      agents: [
+        {
+          id: "opencode",
+          label: "OpenCode",
+          enabled: true,
+          connected: true,
+          capabilities: opencodeCapabilities,
+          projectDirectories: []
+        }
+      ],
+      defaultAgentId: "opencode"
+    };
+
+    render(<App />);
+    await screen.findAllByText("Farfield");
+    expect(screen.queryByText("Plan")).toBeNull();
+  });
+
+  it("shows mode controls when capability is enabled", async () => {
+    render(<App />);
+    expect(await screen.findByText("Plan")).toBeTruthy();
+  });
+
+  it("updates the picker when remote model changes with same updatedAt and turns", async () => {
+    const threadId = "thread-1";
+    let modelId = "gpt-old-codex";
+
+    threadsFixture = {
+      ok: true,
+      data: [
+        {
+          id: threadId,
+          preview: "thread preview",
+          createdAt: 1700000000,
+          updatedAt: 1700000000,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex"
+        }
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false
+    };
+
+    modelsFixture = {
+      ok: true,
+      data: [
+        {
+          id: "gpt-old-codex",
+          model: "gpt-old-codex",
+          upgrade: null,
+          displayName: "gpt-old-codex",
+          description: "Old model",
+          supportedReasoningEfforts: [
+            {
+              reasoningEffort: "medium",
+              description: "Balanced"
+            }
+          ],
+          defaultReasoningEffort: "medium",
+          inputModalities: ["text"],
+          supportsPersonality: true,
+          isDefault: false,
+          hidden: false
+        },
+        {
+          id: "gpt-new-codex",
+          model: "gpt-new-codex",
+          upgrade: null,
+          displayName: "gpt-new-codex",
+          description: "New model",
+          supportedReasoningEfforts: [
+            {
+              reasoningEffort: "medium",
+              description: "Balanced"
+            }
+          ],
+          defaultReasoningEffort: "medium",
+          inputModalities: ["text"],
+          supportsPersonality: true,
+          isDefault: true,
+          hidden: false
+        }
+      ],
+      nextCursor: null
+    };
+
+    readThreadResolver = (targetThreadId: string) => ({
+      ok: true,
+      thread: buildConversationStateFixture(targetThreadId, modelId),
+      agentId: "codex"
+    });
+
+    liveStateResolver = (targetThreadId: string) => ({
+      ok: true,
+      threadId: targetThreadId,
+      ownerClientId: "client-1",
+      conversationState: buildConversationStateFixture(targetThreadId, modelId),
+      liveStateError: null
     });
 
     render(<App />);
-    expect((await screen.findAllByText("Loading threads...")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("gpt-old-codex")).toBeTruthy();
 
-    releaseThreadsDelay?.();
-    threadsDelayPromise = null;
-    releaseThreadsDelay = null;
+    modelId = "gpt-new-codex";
 
-    expect((await screen.findAllByText("No threads")).length).toBeGreaterThan(0);
-  });
-});
+    MockEventSource.emit({
+      type: "history",
+      entry: {
+        source: "app",
+        meta: {
+          threadId
+        }
+      }
+    });
 
-describe("build metadata helpers", () => {
-  it("treats dev commit markers as placeholders", () => {
-    expect(isPlaceholderCommitValue("dev")).toBe(true);
-    expect(isPlaceholderCommitValue(" DEV ")).toBe(true);
-    expect(isPlaceholderCommitValue("unknown")).toBe(true);
-    expect(isPlaceholderCommitValue("null")).toBe(true);
-    expect(isPlaceholderCommitValue("none")).toBe(true);
-  });
+    await waitFor(() => {
+      expect(screen.queryByText("gpt-old-codex")).toBeNull();
+    });
 
-  it("keeps real commit hashes as non-placeholders", () => {
-    expect(isPlaceholderCommitValue("a1b2c3d")).toBe(false);
-    expect(isPlaceholderCommitValue("f0e1d2c3b4")).toBe(false);
+    expect(await screen.findByText("gpt-new-codex")).toBeTruthy();
   });
 });

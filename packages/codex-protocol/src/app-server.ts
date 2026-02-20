@@ -2,101 +2,81 @@ import { z } from "zod";
 import {
   JsonValueSchema,
   NonEmptyStringSchema,
-  NonNegativeIntSchema,
-  NullableNonEmptyStringSchema,
   NullableStringSchema
 } from "./common.js";
 import { ProtocolValidationError } from "./errors.js";
 import { CollaborationModeSchema, ThreadConversationStateSchema } from "./thread.js";
+import {
+  CollaborationModeListResponseSchema as GeneratedCollaborationModeListResponseSchema,
+  ModelListResponseSchema as GeneratedModelListResponseSchema,
+  SendUserMessageParamsSchema as GeneratedSendUserMessageParamsSchema,
+  SendUserMessageResponseSchema as GeneratedSendUserMessageResponseSchema,
+  ThreadListResponseSchema as GeneratedThreadListResponseSchema,
+  ThreadReadResponseSchema as GeneratedThreadReadResponseSchema,
+  ThreadStartParamsSchema as GeneratedThreadStartParamsSchema
+} from "./generated/app-server/index.js";
 
-export const AppServerThreadListItemSchema = z
+const AppServerThreadListResponseBaseSchema = GeneratedThreadListResponseSchema.passthrough();
+const AppServerThreadReadResponseBaseSchema = GeneratedThreadReadResponseSchema.passthrough();
+const AppServerModelListResponseBaseSchema = GeneratedModelListResponseSchema.passthrough();
+const AppServerCollaborationModeListResponseBaseSchema =
+  GeneratedCollaborationModeListResponseSchema.passthrough();
+const AppServerStartThreadRequestBaseSchema = GeneratedThreadStartParamsSchema.passthrough();
+const AppServerSendUserMessageRequestBaseSchema = GeneratedSendUserMessageParamsSchema.passthrough();
+const AppServerSendUserMessageResponseBaseSchema = GeneratedSendUserMessageResponseSchema;
+
+const AppServerGeneratedThreadListItemSchema = AppServerThreadListResponseBaseSchema.shape.data.element;
+
+const OpenCodeThreadListItemSchema = z
   .object({
-    id: NonEmptyStringSchema,
+    id: z.string().min(1),
     preview: z.string(),
-    modelProvider: z.string().optional(),
-    createdAt: NonNegativeIntSchema,
-    updatedAt: NonNegativeIntSchema,
-    path: z.string().optional(),
+    createdAt: z.number().int().nonnegative(),
+    updatedAt: z.number().int().nonnegative(),
     cwd: z.string().optional(),
-    cliVersion: z.string().optional(),
-    source: z.string().optional(),
-    gitInfo: z.unknown().nullable().optional(),
-    turns: z.array(z.unknown()).optional()
+    source: z.literal("opencode")
   })
-  .strict();
+  .passthrough();
+
+export const AppServerThreadListItemSchema = z.union([
+  AppServerGeneratedThreadListItemSchema,
+  OpenCodeThreadListItemSchema
+]);
 
 export const AppServerListThreadsResponseSchema = z
   .object({
     data: z.array(AppServerThreadListItemSchema),
-    nextCursor: z.string().nullable().optional(),
-    pages: NonNegativeIntSchema.optional(),
+    nextCursor: z.union([z.string(), z.null()]).optional(),
+    pages: z.number().int().nonnegative().optional(),
     truncated: z.boolean().optional()
   })
-  .strict();
+  .passthrough();
 
-export const AppServerReadThreadResponseSchema = z
+export const AppServerReadThreadResponseSchema: z.ZodObject<
+  {
+    thread: typeof ThreadConversationStateSchema;
+  },
+  "passthrough"
+> = z
   .object({
     thread: ThreadConversationStateSchema
   })
-  .strict();
+  .passthrough();
 
-export const AppServerModelReasoningEffortSchema = z
-  .object({
-    reasoningEffort: NonEmptyStringSchema,
-    description: z.string()
-  })
-  .strict();
+export const AppServerModelSchema = AppServerModelListResponseBaseSchema.shape.data.element;
 
-export const AppServerModelSchema = z
-  .object({
-    id: NonEmptyStringSchema,
-    model: NonEmptyStringSchema,
-    upgrade: z.union([NonEmptyStringSchema, z.null()]),
-    displayName: z.string(),
-    description: z.string(),
-    supportedReasoningEfforts: z.array(AppServerModelReasoningEffortSchema),
-    defaultReasoningEffort: NonEmptyStringSchema,
-    inputModalities: z.array(NonEmptyStringSchema),
-    supportsPersonality: z.boolean(),
-    isDefault: z.boolean(),
-    hidden: z.boolean().optional()
-  })
-  .strict();
+export const AppServerModelReasoningEffortSchema =
+  AppServerModelSchema.shape.supportedReasoningEfforts.element;
 
-export const AppServerListModelsResponseSchema = z
-  .object({
-    data: z.array(AppServerModelSchema),
-    nextCursor: z.union([z.string(), z.null()])
-  })
-  .strict();
+export const AppServerListModelsResponseSchema = AppServerModelListResponseBaseSchema;
 
-export const AppServerCollaborationModeListItemSchema = z
-  .object({
-    name: z.string(),
-    mode: NonEmptyStringSchema,
-    model: NullableNonEmptyStringSchema,
-    reasoning_effort: NullableNonEmptyStringSchema,
-    developer_instructions: z.union([z.string(), z.null()])
-  })
-  .strict();
+export const AppServerCollaborationModeListItemSchema =
+  AppServerCollaborationModeListResponseBaseSchema.shape.data.element;
 
-export const AppServerCollaborationModeListResponseSchema = z
-  .object({
-    data: z.array(AppServerCollaborationModeListItemSchema)
-  })
-  .strict();
+export const AppServerCollaborationModeListResponseSchema =
+  AppServerCollaborationModeListResponseBaseSchema;
 
-export const AppServerStartThreadRequestSchema = z
-  .object({
-    cwd: z.string(),
-    model: z.string().optional(),
-    modelProvider: z.string().optional(),
-    personality: z.string().optional(),
-    sandbox: z.string().optional(),
-    approvalPolicy: z.string().optional(),
-    ephemeral: z.boolean().optional()
-  })
-  .strict();
+export const AppServerStartThreadRequestSchema = AppServerStartThreadRequestBaseSchema;
 
 export const AppServerStartThreadResponseSchema = z
   .object({
@@ -105,37 +85,21 @@ export const AppServerStartThreadResponseSchema = z
     modelProvider: z.string().optional(),
     cwd: z.string().optional(),
     approvalPolicy: z.string().optional(),
-    sandbox: z.unknown().optional(),
-    reasoningEffort: z.string().optional()
+    sandbox: z.any().optional(),
+    reasoningEffort: z.union([z.string(), z.null()]).optional()
   })
-  .strict();
+  .passthrough();
 
-export const AppServerSendUserMessageItemSchema = z
-  .object({
-    type: z.literal("text"),
-    data: z
-      .object({
-        text: z.string()
-      })
-      .strict()
-  })
-  .strict();
+export const AppServerSendUserMessageRequestSchema = AppServerSendUserMessageRequestBaseSchema;
 
-export const AppServerSendUserMessageRequestSchema = z
-  .object({
-    conversationId: NonEmptyStringSchema,
-    items: z.array(AppServerSendUserMessageItemSchema).min(1)
-  })
-  .strict();
-
-export const AppServerSendUserMessageResponseSchema = z.object({}).strict();
+export const AppServerSendUserMessageResponseSchema = AppServerSendUserMessageResponseBaseSchema;
 
 export const AppServerSetModeRequestSchema = z
   .object({
-    conversationId: NonEmptyStringSchema,
+    conversationId: z.string().min(1),
     collaborationMode: CollaborationModeSchema
   })
-  .strict();
+  .passthrough();
 
 export const DebugErrorOriginSchema = z.enum(["client", "server"]);
 
@@ -210,97 +174,87 @@ export type DebugErrorCreateResponse = z.infer<typeof DebugErrorCreateResponseSc
 export type DebugErrorListResponse = z.infer<typeof DebugErrorListResponseSchema>;
 export type DebugErrorDetailResponse = z.infer<typeof DebugErrorDetailResponseSchema>;
 
+function parseWithSchema<Schema extends z.ZodTypeAny>(
+  schema: Schema,
+  value: z.input<Schema>,
+  context: string
+): z.output<Schema> {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    throw ProtocolValidationError.fromZod(context, result.error);
+  }
+  return result.data;
+}
+
 export function parseAppServerListThreadsResponse(
-  value: unknown
+  value: z.input<typeof AppServerListThreadsResponseSchema>
 ): AppServerListThreadsResponse {
-  const result = AppServerListThreadsResponseSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("AppServerListThreadsResponse", result.error);
-  }
-  return result.data;
+  return parseWithSchema(AppServerListThreadsResponseSchema, value, "AppServerListThreadsResponse");
 }
 
-export function parseAppServerReadThreadResponse(value: unknown): AppServerReadThreadResponse {
-  const result = AppServerReadThreadResponseSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("AppServerReadThreadResponse", result.error);
-  }
-  return result.data;
+export function parseAppServerReadThreadResponse(
+  value: z.input<typeof AppServerThreadReadResponseBaseSchema>
+): AppServerReadThreadResponse {
+  const parsed = parseWithSchema(
+    AppServerThreadReadResponseBaseSchema,
+    value,
+    "GeneratedAppServerReadThreadResponse"
+  );
+  return {
+    thread: parseWithSchema(
+      ThreadConversationStateSchema,
+      parsed.thread,
+      "AppServerReadThreadResponse.thread"
+    )
+  };
 }
 
-export function parseAppServerListModelsResponse(value: unknown): AppServerListModelsResponse {
-  const result = AppServerListModelsResponseSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("AppServerListModelsResponse", result.error);
-  }
-  return result.data;
+export function parseAppServerListModelsResponse(
+  value: z.input<typeof AppServerListModelsResponseSchema>
+): AppServerListModelsResponse {
+  return parseWithSchema(AppServerListModelsResponseSchema, value, "AppServerListModelsResponse");
 }
 
 export function parseAppServerCollaborationModeListResponse(
-  value: unknown
+  value: z.input<typeof AppServerCollaborationModeListResponseSchema>
 ): AppServerCollaborationModeListResponse {
-  const result = AppServerCollaborationModeListResponseSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod(
-      "AppServerCollaborationModeListResponse",
-      result.error
-    );
-  }
-  return result.data;
+  return parseWithSchema(
+    AppServerCollaborationModeListResponseSchema,
+    value,
+    "AppServerCollaborationModeListResponse"
+  );
 }
 
-export function parseAppServerStartThreadResponse(value: unknown): AppServerStartThreadResponse {
-  const result = AppServerStartThreadResponseSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("AppServerStartThreadResponse", result.error);
-  }
-  return result.data;
+export function parseAppServerStartThreadResponse(
+  value: z.input<typeof AppServerStartThreadResponseSchema>
+): AppServerStartThreadResponse {
+  return parseWithSchema(AppServerStartThreadResponseSchema, value, "AppServerStartThreadResponse");
 }
 
 export function parseCreateDebugClientErrorBody(
   value: z.input<typeof CreateDebugClientErrorBodySchema>
 ): CreateDebugClientErrorBody {
-  const result = CreateDebugClientErrorBodySchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("CreateDebugClientErrorBody", result.error);
-  }
-  return result.data;
+  return parseWithSchema(CreateDebugClientErrorBodySchema, value, "CreateDebugClientErrorBody");
 }
 
 export function parseDebugErrorEvent(value: z.input<typeof DebugErrorEventSchema>): DebugErrorEvent {
-  const result = DebugErrorEventSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("DebugErrorEvent", result.error);
-  }
-  return result.data;
+  return parseWithSchema(DebugErrorEventSchema, value, "DebugErrorEvent");
 }
 
 export function parseDebugErrorCreateResponse(
   value: z.input<typeof DebugErrorCreateResponseSchema>
 ): DebugErrorCreateResponse {
-  const result = DebugErrorCreateResponseSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("DebugErrorCreateResponse", result.error);
-  }
-  return result.data;
+  return parseWithSchema(DebugErrorCreateResponseSchema, value, "DebugErrorCreateResponse");
 }
 
 export function parseDebugErrorListResponse(
   value: z.input<typeof DebugErrorListResponseSchema>
 ): DebugErrorListResponse {
-  const result = DebugErrorListResponseSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("DebugErrorListResponse", result.error);
-  }
-  return result.data;
+  return parseWithSchema(DebugErrorListResponseSchema, value, "DebugErrorListResponse");
 }
 
 export function parseDebugErrorDetailResponse(
   value: z.input<typeof DebugErrorDetailResponseSchema>
 ): DebugErrorDetailResponse {
-  const result = DebugErrorDetailResponseSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("DebugErrorDetailResponse", result.error);
-  }
-  return result.data;
+  return parseWithSchema(DebugErrorDetailResponseSchema, value, "DebugErrorDetailResponse");
 }
