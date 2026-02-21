@@ -110,6 +110,12 @@ type AgentDescriptor = AgentsResponse["agents"][number];
 type ConversationTurn = NonNullable<ReadThreadResponse["thread"]>["turns"][number];
 type ConversationTurnItem = NonNullable<ConversationTurn["items"]>[number];
 type ConversationItemType = ConversationTurnItem["type"];
+type CapabilitySnapshot = {
+  modes: ModesResponse;
+  models: ModelsResponse;
+  defaults: ConfigDefaults | null;
+  fetchedAt: number;
+};
 
 interface FlatConversationItem {
   key: string;
@@ -151,6 +157,11 @@ interface RefreshFlags {
   refreshCore: boolean;
   refreshHistory: boolean;
   refreshSelectedThread: boolean;
+}
+
+interface LoadSelectedThreadOptions {
+  includeTurns?: boolean;
+  includeReadThread?: boolean;
 }
 
 interface ErrorBannerDetails {
@@ -413,6 +424,7 @@ const INITIAL_VISIBLE_CHAT_ITEMS = 90;
 const VISIBLE_CHAT_ITEMS_STEP = 80;
 const CORE_REFRESH_INTERVAL_MS = 5_000;
 const CORE_REFRESH_CONNECTED_MIN_INTERVAL_MS = 60_000;
+const CAPABILITIES_REFRESH_INTERVAL_MS = 5 * 60_000;
 const READ_THREAD_RETRY_ATTEMPTS = 6;
 const READ_THREAD_RETRY_BASE_DELAY_MS = 140;
 const READ_THREAD_RETRY_MAX_DELAY_MS = 1_000;
@@ -777,9 +789,15 @@ export function App(): React.JSX.Element {
   const modesSignatureRef = useRef<string[]>([]);
   const modelsSignatureRef = useRef<string[]>([]);
   const isArchivedThreadsOpenRef = useRef(false);
+  const hasLoadedArchivedThreadsRef = useRef(false);
   const selectedThreadLoadTokenRef = useRef(0);
+  const capabilitySnapshotRef = useRef<CapabilitySnapshot | null>(null);
+  const coreDataRefreshInFlightRef = useRef<Promise<void> | null>(null);
+  const coreDataRefreshQueuedRef = useRef(false);
   const loadCoreDataTrackedRef = useRef<(() => Promise<void>) | null>(null);
-  const loadSelectedThreadRef = useRef<((threadId: string) => Promise<void>) | null>(null);
+  const loadSelectedThreadRef = useRef<((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null>(
+    null
+  );
 
   /* Derived */
   const selectedThread = useMemo(
@@ -1003,7 +1021,28 @@ export function App(): React.JSX.Element {
     : !openCodeConnected;
   /* Data loading */
   const loadCoreData = useCallback(async () => {
-    const [nh, nt, nm, nmo, ntr, nhist, nag, ncfg] = await Promise.all([
+    const now = Date.now();
+    const cachedCapabilities = capabilitySnapshotRef.current;
+    let capabilitiesPromise: Promise<CapabilitySnapshot>;
+    if (
+      cachedCapabilities &&
+      now - cachedCapabilities.fetchedAt < CAPABILITIES_REFRESH_INTERVAL_MS
+    ) {
+      capabilitiesPromise = Promise.resolve(cachedCapabilities);
+    } else {
+      capabilitiesPromise = Promise.all([
+        listCollaborationModes(),
+        listModels(),
+        getConfigDefaults({ agentId: "codex" }).catch(() => null)
+      ]).then(([modesResponse, modelsResponse, defaultsResponse]) => ({
+        modes: modesResponse,
+        models: modelsResponse,
+        defaults: defaultsResponse,
+        fetchedAt: Date.now()
+      }));
+    }
+
+    const [nh, nt, ntr, nhist, nag, capabilities] = await Promise.all([
       getHealth(),
       listThreads({
         limit: THREAD_LIST_LIMIT,
@@ -1012,13 +1051,15 @@ export function App(): React.JSX.Element {
         maxPages: THREAD_LIST_MAX_PAGES,
         sortKey: "updated_at"
       }),
-      listCollaborationModes(),
-      listModels(),
       getTraceStatus(),
       listDebugHistory(120),
       listAgents().catch(() => null),
-      getConfigDefaults({ agentId: "codex" }).catch(() => null)
+      capabilitiesPromise
     ]);
+    capabilitySnapshotRef.current = capabilities;
+    const nm = capabilities.modes;
+    const nmo = capabilities.models;
+    const ncfg = capabilities.defaults;
     let preferredAgentId: AgentId | null = null;
     const nextThreadsSignature = nt.data.map((thread) =>
       [
@@ -1190,15 +1231,33 @@ export function App(): React.JSX.Element {
   }, []);
 
   const loadCoreDataTracked = useCallback(async () => {
-    await loadCoreData();
-    if (isArchivedThreadsOpenRef.current || hasLoadedArchivedThreads) {
-      await loadArchivedThreads();
+    if (coreDataRefreshInFlightRef.current) {
+      coreDataRefreshQueuedRef.current = true;
+      await coreDataRefreshInFlightRef.current;
+      return;
     }
-    lastCoreRefreshAtRef.current = Date.now();
-  }, [hasLoadedArchivedThreads, loadArchivedThreads, loadCoreData]);
 
-  const loadSelectedThread = useCallback(async (threadId: string) => {
-    const includeTurns = !pendingMaterializationThreadIdsRef.current.has(threadId);
+    const runRefreshLoop = async () => {
+      do {
+        coreDataRefreshQueuedRef.current = false;
+        await loadCoreData();
+        if (isArchivedThreadsOpenRef.current || hasLoadedArchivedThreadsRef.current) {
+          await loadArchivedThreads();
+        }
+        lastCoreRefreshAtRef.current = Date.now();
+      } while (coreDataRefreshQueuedRef.current);
+    };
+
+    const inFlight = runRefreshLoop().finally(() => {
+      coreDataRefreshInFlightRef.current = null;
+    });
+    coreDataRefreshInFlightRef.current = inFlight;
+    await inFlight;
+  }, [loadArchivedThreads, loadCoreData]);
+
+  const loadSelectedThread = useCallback(async (threadId: string, options?: LoadSelectedThreadOptions) => {
+    const includeTurns = options?.includeTurns ?? !pendingMaterializationThreadIdsRef.current.has(threadId);
+    const includeReadThread = options?.includeReadThread ?? true;
     const thread = threads.find((entry) => entry.id === threadId) ?? null;
     const threadAgentId = thread?.agentId ?? selectedAgentId;
     const descriptor = agentsById[threadAgentId];
@@ -1244,9 +1303,9 @@ export function App(): React.JSX.Element {
             ownerClientId: null,
             events: []
           }),
-      readThreadWithRetry()
+      includeReadThread ? readThreadWithRetry() : Promise.resolve(null)
     ]);
-    if ((live.conversationState?.turns.length ?? 0) > 0 || read.thread.turns.length > 0) {
+    if ((live.conversationState?.turns.length ?? 0) > 0 || (read?.thread.turns.length ?? 0) > 0) {
       pendingMaterializationThreadIdsRef.current.delete(threadId);
     }
     startTransition(() => {
@@ -1259,15 +1318,17 @@ export function App(): React.JSX.Element {
         }
         return live;
       });
-      setReadThreadState((prev) => {
-        if (
-          buildReadThreadSyncSignature(prev, appDefaultModel, appDefaultReasoningEffort)
-          === buildReadThreadSyncSignature(read, appDefaultModel, appDefaultReasoningEffort)
-        ) {
-          return prev;
-        }
-        return read;
-      });
+      if (read) {
+        setReadThreadState((prev) => {
+          if (
+            buildReadThreadSyncSignature(prev, appDefaultModel, appDefaultReasoningEffort)
+            === buildReadThreadSyncSignature(read, appDefaultModel, appDefaultReasoningEffort)
+          ) {
+            return prev;
+          }
+          return read;
+        });
+      }
       setStreamEvents((prev) => {
         const prevLast = prev[prev.length - 1];
         const nextLast = stream.events[stream.events.length - 1];
@@ -1284,14 +1345,20 @@ export function App(): React.JSX.Element {
   const refreshAll = useCallback(async () => {
     setIsCoreLoading(true);
     try {
-      await loadCoreDataTracked();
-      if (selectedThreadIdRef.current) await loadSelectedThread(selectedThreadIdRef.current);
+      const loadCoreDataFn = loadCoreDataTrackedRef.current;
+      const loadSelectedThreadFn = loadSelectedThreadRef.current;
+      if (loadCoreDataFn) {
+        await loadCoreDataFn();
+      }
+      if (selectedThreadIdRef.current && loadSelectedThreadFn) {
+        await loadSelectedThreadFn(selectedThreadIdRef.current);
+      }
     } catch (e) {
       setError(toErrorMessage(e));
     } finally {
       setIsCoreLoading(false);
     }
-  }, [loadCoreDataTracked, loadSelectedThread]);
+  }, []);
 
   useEffect(() => {
     loadCoreDataTrackedRef.current = loadCoreDataTracked;
@@ -1335,6 +1402,10 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     isArchivedThreadsOpenRef.current = isArchivedThreadsOpen;
   }, [isArchivedThreadsOpen]);
+
+  useEffect(() => {
+    hasLoadedArchivedThreadsRef.current = hasLoadedArchivedThreads;
+  }, [hasLoadedArchivedThreads]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -1419,7 +1490,13 @@ export function App(): React.JSX.Element {
     setStreamEvents([]);
     setIsSelectedThreadLoading(true);
 
-    void loadSelectedThread(selectedThreadId)
+    const loadSelectedThreadFn = loadSelectedThreadRef.current;
+    if (!loadSelectedThreadFn) {
+      setIsSelectedThreadLoading(false);
+      return;
+    }
+
+    void loadSelectedThreadFn(selectedThreadId)
       .catch((e) => {
         const message = toErrorMessage(e);
         if (isThreadNotLoadedReadError(message)) {
@@ -1434,7 +1511,7 @@ export function App(): React.JSX.Element {
         }
         setIsSelectedThreadLoading(false);
       });
-  }, [loadSelectedThread, selectedThreadId]);
+  }, [selectedThreadId]);
 
   useEffect(() => {
     let disposed = false;
@@ -1487,7 +1564,10 @@ export function App(): React.JSX.Element {
               });
             }
             if (flags.refreshSelectedThread && selectedThreadIdRef.current && loadSelectedThreadFn) {
-              await loadSelectedThreadFn(selectedThreadIdRef.current);
+              await loadSelectedThreadFn(selectedThreadIdRef.current, {
+                includeReadThread: true,
+                includeTurns: false
+              });
             }
           } catch (e) {
             setError(toErrorMessage(e));
