@@ -17,11 +17,10 @@ import {
   ChevronRight,
   Circle,
   CircleDot,
-  Folder,
-  FolderOpen,
   Github,
   Loader2,
   Menu,
+  MoreHorizontal,
   Moon,
   PanelLeft,
   Plus,
@@ -31,6 +30,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  archiveThread,
   createThread,
   getConfigDefaults,
   getHealth,
@@ -159,6 +159,15 @@ interface ErrorBannerDetails {
   requestId: string | null;
   errorId: string | null;
 }
+interface ProjectThreadGroup {
+  key: string;
+  label: string;
+  projectPath: string | null;
+  projectCreatedAt: number;
+  latestUpdatedAt: number;
+  threads: Thread[];
+  isRemoved: boolean;
+}
 
 /* ── Helpers ────────────────────────────────────────────────── */
 function formatDate(value: number | string | null | undefined): string {
@@ -255,6 +264,150 @@ function signaturesMatch(prev: string[], next: string[]): boolean {
   return prev.every((value, index) => value === next[index]);
 }
 
+function normalizeProjectPath(path: string): string {
+  const trimmed = path.trim();
+  if (trimmed.length === 0) {
+    return "";
+  }
+  const normalized = trimmed.replaceAll("\\", "/").replace(/\/+$/, "");
+  return normalized.length > 0 ? normalized : trimmed.replaceAll("\\", "/");
+}
+
+function normalizeProjectPathFromThread(thread: Thread): string | null {
+  const cwd = typeof thread.cwd === "string" ? thread.cwd.trim() : "";
+  if (cwd.length > 0) {
+    const normalizedCwd = normalizeProjectPath(cwd);
+    return normalizedCwd.length > 0 ? normalizedCwd : cwd;
+  }
+  const path = typeof thread.path === "string" ? thread.path.trim() : "";
+  if (path.length > 0) {
+    const normalizedPath = normalizeProjectPath(path);
+    return normalizedPath.length > 0 ? normalizedPath : path;
+  }
+  return null;
+}
+
+function projectLabelFromPath(path: string): string {
+  const normalized = normalizeProjectPath(path);
+  if (!normalized) {
+    return path;
+  }
+  const parts = normalized.split("/").filter((part) => part.length > 0);
+  return parts[parts.length - 1] ?? normalized;
+}
+
+function threadProjectIsMarkedRemoved(thread: Thread): boolean {
+  return thread.projectRemoved === true || thread.removed === true || thread.projectState === "removed";
+}
+
+function sortThreadsByUpdatedAt(left: Thread, right: Thread): number {
+  const leftUpdatedAt = typeof left.updatedAt === "number" ? left.updatedAt : 0;
+  const rightUpdatedAt = typeof right.updatedAt === "number" ? right.updatedAt : 0;
+  if (leftUpdatedAt !== rightUpdatedAt) {
+    return rightUpdatedAt - leftUpdatedAt;
+  }
+  return left.id.localeCompare(right.id);
+}
+
+function sortProjectGroups(left: ProjectThreadGroup, right: ProjectThreadGroup): number {
+  const leftIsNoProject = left.projectPath === null;
+  const rightIsNoProject = right.projectPath === null;
+  if (leftIsNoProject !== rightIsNoProject) {
+    return leftIsNoProject ? 1 : -1;
+  }
+  if (left.projectCreatedAt !== right.projectCreatedAt) {
+    return right.projectCreatedAt - left.projectCreatedAt;
+  }
+  if (left.latestUpdatedAt !== right.latestUpdatedAt) {
+    return right.latestUpdatedAt - left.latestUpdatedAt;
+  }
+  return left.label.localeCompare(right.label);
+}
+
+function groupThreadsByProject(threads: Thread[]): ProjectThreadGroup[] {
+  const groups = new Map<string, ProjectThreadGroup>();
+
+  for (const thread of threads) {
+    const projectPath = normalizeProjectPathFromThread(thread);
+    const key = projectPath ? `project:${projectPath}` : "project:unknown";
+    const label = projectPath ? projectLabelFromPath(projectPath) : "No project";
+    const createdAt = typeof thread.createdAt === "number" ? thread.createdAt : 0;
+    const updatedAt = typeof thread.updatedAt === "number" ? thread.updatedAt : 0;
+    const markedRemoved = threadProjectIsMarkedRemoved(thread);
+
+    const existing = groups.get(key);
+    if (existing) {
+      existing.threads.push(thread);
+      if (createdAt > existing.projectCreatedAt) {
+        existing.projectCreatedAt = createdAt;
+      }
+      if (updatedAt > existing.latestUpdatedAt) {
+        existing.latestUpdatedAt = updatedAt;
+      }
+      if (markedRemoved) {
+        existing.isRemoved = true;
+      }
+      continue;
+    }
+
+    groups.set(key, {
+      key,
+      label,
+      projectPath,
+      projectCreatedAt: createdAt,
+      latestUpdatedAt: updatedAt,
+      threads: [thread],
+      isRemoved: markedRemoved
+    });
+  }
+
+  for (const group of groups.values()) {
+    group.threads.sort(sortThreadsByUpdatedAt);
+  }
+
+  return Array.from(groups.values()).sort(sortProjectGroups);
+}
+
+function mergeProjectGroups(
+  primaryGroups: ProjectThreadGroup[],
+  secondaryGroups: ProjectThreadGroup[]
+): ProjectThreadGroup[] {
+  const mergedGroups = new Map<string, ProjectThreadGroup>();
+
+  for (const sourceGroup of [...primaryGroups, ...secondaryGroups]) {
+    const existing = mergedGroups.get(sourceGroup.key);
+    if (!existing) {
+      mergedGroups.set(sourceGroup.key, {
+        key: sourceGroup.key,
+        label: sourceGroup.label,
+        projectPath: sourceGroup.projectPath,
+        projectCreatedAt: sourceGroup.projectCreatedAt,
+        latestUpdatedAt: sourceGroup.latestUpdatedAt,
+        threads: [...sourceGroup.threads],
+        isRemoved: sourceGroup.isRemoved
+      });
+      continue;
+    }
+
+    existing.threads.push(...sourceGroup.threads);
+    if (sourceGroup.projectCreatedAt > existing.projectCreatedAt) {
+      existing.projectCreatedAt = sourceGroup.projectCreatedAt;
+    }
+    if (sourceGroup.latestUpdatedAt > existing.latestUpdatedAt) {
+      existing.latestUpdatedAt = sourceGroup.latestUpdatedAt;
+    }
+    if (sourceGroup.isRemoved) {
+      existing.isRemoved = true;
+    }
+  }
+
+  for (const group of mergedGroups.values()) {
+    group.threads.sort(sortThreadsByUpdatedAt);
+  }
+
+  return Array.from(mergedGroups.values()).sort(sortProjectGroups);
+}
+
 const DEFAULT_EFFORT_OPTIONS = ["minimal", "low", "medium", "high", "xhigh"] as const;
 const INITIAL_VISIBLE_CHAT_ITEMS = 90;
 const VISIBLE_CHAT_ITEMS_STEP = 80;
@@ -266,9 +419,8 @@ const READ_THREAD_RETRY_MAX_DELAY_MS = 1_000;
 const APP_DEFAULT_VALUE = "__app_default__";
 const ASSUMED_APP_DEFAULT_MODEL = "gpt-5.3-codex";
 const ASSUMED_APP_DEFAULT_EFFORT = "medium";
-const SIDEBAR_COLLAPSED_GROUPS_STORAGE_KEY = "farfield.sidebar.collapsed-groups.v1";
 const THREAD_LIST_LIMIT = 80;
-const THREAD_LIST_MAX_PAGES = 1;
+const THREAD_LIST_MAX_PAGES = 20;
 const ARCHIVED_THREAD_LIST_MAX_PAGES = 20;
 const AGENT_FAVICON_BY_ID: Record<AgentId, string> = {
   codex: "https://openai.com/favicon.ico",
@@ -473,59 +625,6 @@ function buildReadThreadSyncSignature(
   ].join("|");
 }
 
-function basenameFromPath(value: string): string {
-  const normalized = value.replaceAll("\\", "/").replace(/\/+$/, "");
-  if (!normalized) {
-    return value;
-  }
-  const parts = normalized.split("/").filter((part) => part.length > 0);
-  return parts[parts.length - 1] ?? normalized;
-}
-
-function readSidebarCollapsedGroupsFromStorage(): Record<string, boolean> {
-  if (typeof window === "undefined") {
-    return {};
-  }
-  try {
-    const storage = window.localStorage as Partial<Storage> | undefined;
-    if (!storage || typeof storage.getItem !== "function") {
-      return {};
-    }
-    const raw = storage.getItem(SIDEBAR_COLLAPSED_GROUPS_STORAGE_KEY);
-    if (!raw) {
-      return {};
-    }
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-    const collapsed: Record<string, boolean> = {};
-    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof value === "boolean") {
-        collapsed[key] = value;
-      }
-    }
-    return collapsed;
-  } catch {
-    return {};
-  }
-}
-
-function writeSidebarCollapsedGroupsToStorage(value: Record<string, boolean>): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    const storage = window.localStorage as Partial<Storage> | undefined;
-    if (!storage || typeof storage.setItem !== "function") {
-      return;
-    }
-    storage.setItem(SIDEBAR_COLLAPSED_GROUPS_STORAGE_KEY, JSON.stringify(value));
-  } catch {
-    // Ignore storage errors.
-  }
-}
-
 function parseUiStateFromPath(pathname: string): { threadId: string | null; tab: "chat" | "debug" } {
   const segments = pathname.split("/").filter((segment) => segment.length > 0);
   if (segments.length === 0) {
@@ -652,9 +751,8 @@ export function App(): React.JSX.Element {
   const [visibleChatItemLimit, setVisibleChatItemLimit] = useState(INITIAL_VISIBLE_CHAT_ITEMS);
   const [hasHydratedModeFromLiveState, setHasHydratedModeFromLiveState] = useState(false);
   const [isModeSyncing, setIsModeSyncing] = useState(false);
-  const [sidebarCollapsedGroups, setSidebarCollapsedGroups] = useState<Record<string, boolean>>(
-    () => readSidebarCollapsedGroupsFromStorage()
-  );
+  const [collapsedThreadProjectGroups, setCollapsedThreadProjectGroups] = useState<Record<string, boolean>>({});
+  const [collapsedArchivedProjectGroups, setCollapsedArchivedProjectGroups] = useState<Record<string, boolean>>({});
 
   /* Refs */
   const selectedThreadIdRef = useRef<string | null>(null);
@@ -679,8 +777,9 @@ export function App(): React.JSX.Element {
   const modesSignatureRef = useRef<string[]>([]);
   const modelsSignatureRef = useRef<string[]>([]);
   const isArchivedThreadsOpenRef = useRef(false);
-  const threadListWorkspaceDirRef = useRef<string | null>(null);
   const selectedThreadLoadTokenRef = useRef(0);
+  const loadCoreDataTrackedRef = useRef<(() => Promise<void>) | null>(null);
+  const loadSelectedThreadRef = useRef<((threadId: string) => Promise<void>) | null>(null);
 
   /* Derived */
   const selectedThread = useMemo(
@@ -706,116 +805,39 @@ export function App(): React.JSX.Element {
   const appDefaultReasoningEffort = configDefaults?.reasoningEffort ?? ASSUMED_APP_DEFAULT_EFFORT;
   const selectedAgentLabel = selectedAgentDescriptor?.label ?? "Agent";
   const selectedAgentCapabilities = selectedAgentDescriptor?.capabilities ?? null;
-  const groupedThreads = useMemo(() => {
-    type Group = {
-      key: string;
-      label: string;
-      projectPath: string | null;
-      latestUpdatedAt: number;
-      preferredAgentId: AgentId | null;
-      threads: Thread[];
-    };
-    const groups = new Map<string, Group>();
-
-    for (const thread of threads) {
-      const cwd = typeof thread.cwd === "string" && thread.cwd.trim() ? thread.cwd.trim() : null;
-      const path = typeof thread.path === "string" && thread.path.trim() ? thread.path.trim() : null;
-      const projectPath = cwd ?? path;
-      const key = projectPath ? `project:${projectPath}` : "project:unknown";
-      const label = projectPath ? basenameFromPath(projectPath) : "Unknown";
-      const updatedAt = typeof thread.updatedAt === "number" ? thread.updatedAt : 0;
-      const threadAgentId = thread.agentId;
-
-      const existing = groups.get(key);
-      if (existing) {
-        existing.threads.push(thread);
-        if (!existing.preferredAgentId) {
-          existing.preferredAgentId = threadAgentId;
-        }
-        if (updatedAt > existing.latestUpdatedAt) {
-          existing.latestUpdatedAt = updatedAt;
-        }
-      } else {
-        groups.set(key, {
-          key,
-          label,
-          projectPath,
-          latestUpdatedAt: updatedAt,
-          preferredAgentId: threadAgentId,
-          threads: [thread]
-        });
-      }
-    }
-
-    for (const descriptor of agentDescriptors) {
-      for (const directory of descriptor.projectDirectories) {
-        const normalized = directory.trim();
-        if (!normalized) {
-          continue;
-        }
-        const key = `project:${normalized}`;
-        if (groups.has(key)) {
-          continue;
-        }
-        groups.set(key, {
-          key,
-          label: basenameFromPath(normalized),
-          projectPath: normalized,
-          latestUpdatedAt: 0,
-          preferredAgentId: descriptor.id,
-          threads: []
-        });
-      }
-    }
-
-    return Array.from(groups.values()).sort((left, right) => right.latestUpdatedAt - left.latestUpdatedAt);
-  }, [agentDescriptors, threads]);
-  const groupedArchivedThreads = useMemo(() => {
-    type ArchivedGroup = {
-      key: string;
-      label: string;
-      latestUpdatedAt: number;
-      threads: Thread[];
-    };
-    const groups = new Map<string, ArchivedGroup>();
-
+  const groupedThreadsByProject = useMemo(() => groupThreadsByProject(threads), [threads]);
+  const groupedArchivedThreadsByProject = useMemo(
+    () => groupThreadsByProject(archivedThreads),
+    [archivedThreads]
+  );
+  const activeProjectGroups = useMemo(
+    () => groupedThreadsByProject.filter((group) => !group.isRemoved),
+    [groupedThreadsByProject]
+  );
+  const removedProjectGroups = useMemo(
+    () => groupedThreadsByProject.filter((group) => group.isRemoved),
+    [groupedThreadsByProject]
+  );
+  const archivedProjectGroups = useMemo(
+    () => mergeProjectGroups(groupedArchivedThreadsByProject, removedProjectGroups),
+    [groupedArchivedThreadsByProject, removedProjectGroups]
+  );
+  const archivedThreadIds = useMemo(() => {
+    const ids = new Set<string>();
     for (const thread of archivedThreads) {
-      const cwd = typeof thread.cwd === "string" && thread.cwd.trim() ? thread.cwd.trim() : null;
-      const path = typeof thread.path === "string" && thread.path.trim() ? thread.path.trim() : null;
-      const projectPath = cwd ?? path;
-      const key = projectPath ? `archived:${projectPath}` : "archived:unknown";
-      const label = projectPath ? basenameFromPath(projectPath) : "Unknown";
-      const updatedAt = typeof thread.updatedAt === "number" ? thread.updatedAt : 0;
-
-      const existing = groups.get(key);
-      if (existing) {
-        existing.threads.push(thread);
-        if (updatedAt > existing.latestUpdatedAt) {
-          existing.latestUpdatedAt = updatedAt;
-        }
-      } else {
-        groups.set(key, {
-          key,
-          label,
-          latestUpdatedAt: updatedAt,
-          threads: [thread]
-        });
+      ids.add(thread.id);
+    }
+    return ids;
+  }, [archivedThreads]);
+  const archivedSectionThreadCount = useMemo(() => {
+    const ids = new Set<string>();
+    for (const group of archivedProjectGroups) {
+      for (const thread of group.threads) {
+        ids.add(thread.id);
       }
     }
-
-    for (const group of groups.values()) {
-      group.threads.sort((left, right) => {
-        const leftUpdatedAt = typeof left.updatedAt === "number" ? left.updatedAt : 0;
-        const rightUpdatedAt = typeof right.updatedAt === "number" ? right.updatedAt : 0;
-        if (leftUpdatedAt !== rightUpdatedAt) {
-          return rightUpdatedAt - leftUpdatedAt;
-        }
-        return left.id.localeCompare(right.id);
-      });
-    }
-
-    return Array.from(groups.values()).sort((left, right) => right.latestUpdatedAt - left.latestUpdatedAt);
-  }, [archivedThreads]);
+    return ids.size;
+  }, [archivedProjectGroups]);
   const conversationState = useMemo(() => {
     const liveConversationState = liveState?.conversationState ?? null;
     const readConversationState = readThreadState?.thread ?? null;
@@ -981,19 +1003,14 @@ export function App(): React.JSX.Element {
     : !openCodeConnected;
   /* Data loading */
   const loadCoreData = useCallback(async () => {
-    const nh = await getHealth();
-    const workspaceDir = nh.state.workspaceDir ?? null;
-    const previousWorkspaceDir = threadListWorkspaceDirRef.current;
-    threadListWorkspaceDirRef.current = workspaceDir;
-
-    const [nt, nm, nmo, ntr, nhist, nag, ncfg] = await Promise.all([
+    const [nh, nt, nm, nmo, ntr, nhist, nag, ncfg] = await Promise.all([
+      getHealth(),
       listThreads({
         limit: THREAD_LIST_LIMIT,
         archived: false,
-        all: false,
+        all: true,
         maxPages: THREAD_LIST_MAX_PAGES,
-        sortKey: "updated_at",
-        ...(workspaceDir ? { cwd: workspaceDir } : {})
+        sortKey: "updated_at"
       }),
       listCollaborationModes(),
       listModels(),
@@ -1021,12 +1038,6 @@ export function App(): React.JSX.Element {
     );
 
     startTransition(() => {
-      if (previousWorkspaceDir !== workspaceDir) {
-        archivedThreadsSignatureRef.current = [];
-        setArchivedThreads([]);
-        setHasLoadedArchivedThreads(false);
-        setArchivedThreadsTruncated(false);
-      }
       setHealth((prev) => {
         if (
           prev &&
@@ -1143,14 +1154,12 @@ export function App(): React.JSX.Element {
   const loadArchivedThreads = useCallback(async () => {
     setIsArchivedThreadsLoading(true);
     try {
-      const workspaceDir = threadListWorkspaceDirRef.current;
       const archived = await listThreads({
         limit: THREAD_LIST_LIMIT,
         archived: true,
         all: true,
         maxPages: ARCHIVED_THREAD_LIST_MAX_PAGES,
-        sortKey: "updated_at",
-        ...(workspaceDir ? { cwd: workspaceDir } : {})
+        sortKey: "updated_at"
       });
 
       const nextArchivedThreadsSignature = archived.data.map((thread) =>
@@ -1283,6 +1292,14 @@ export function App(): React.JSX.Element {
       setIsCoreLoading(false);
     }
   }, [loadCoreDataTracked, loadSelectedThread]);
+
+  useEffect(() => {
+    loadCoreDataTrackedRef.current = loadCoreDataTracked;
+  }, [loadCoreDataTracked]);
+
+  useEffect(() => {
+    loadSelectedThreadRef.current = loadSelectedThread;
+  }, [loadSelectedThread]);
 
   const refreshPushClientState = useCallback(async () => {
     try {
@@ -1449,8 +1466,12 @@ export function App(): React.JSX.Element {
             return;
           }
           try {
+            const loadCoreDataFn = loadCoreDataTrackedRef.current;
+            const loadSelectedThreadFn = loadSelectedThreadRef.current;
             if (flags.refreshCore) {
-              await loadCoreDataTracked();
+              if (loadCoreDataFn) {
+                await loadCoreDataFn();
+              }
             } else if (flags.refreshHistory && activeTabRef.current === "debug") {
               const nextHistory = await listDebugHistory(120);
               startTransition(() => {
@@ -1465,8 +1486,8 @@ export function App(): React.JSX.Element {
                 });
               });
             }
-            if (flags.refreshSelectedThread && selectedThreadIdRef.current) {
-              await loadSelectedThread(selectedThreadIdRef.current);
+            if (flags.refreshSelectedThread && selectedThreadIdRef.current && loadSelectedThreadFn) {
+              await loadSelectedThreadFn(selectedThreadIdRef.current);
             }
           } catch (e) {
             setError(toErrorMessage(e));
@@ -1560,7 +1581,7 @@ export function App(): React.JSX.Element {
         source.close();
       }
     };
-  }, [loadCoreDataTracked, loadSelectedThread]);
+  }, []);
 
   useEffect(() => {
     if (!activeRequest) {
@@ -1647,10 +1668,6 @@ export function App(): React.JSX.Element {
     setHasHydratedModeFromLiveState(false);
     setIsModeSyncing(false);
   }, [selectedThreadId]);
-
-  useEffect(() => {
-    writeSidebarCollapsedGroupsToStorage(sidebarCollapsedGroups);
-  }, [sidebarCollapsedGroups]);
 
   useEffect(() => {
     isChatAtBottomRef.current = isChatAtBottom;
@@ -1914,6 +1931,23 @@ export function App(): React.JSX.Element {
     void createNewThread(projectPath, onlyAgentId);
   }, [availableAgentIds, createNewThread]);
 
+  const runArchiveThread = useCallback(async (threadId: string) => {
+    setIsBusy(true);
+    try {
+      const nextSelectedThreadId = selectedThreadIdRef.current === threadId
+        ? (threads.find((thread) => thread.id !== threadId)?.id ?? null)
+        : selectedThreadIdRef.current;
+      await archiveThread(threadId);
+      setSelectedThreadId(nextSelectedThreadId);
+      selectedThreadIdRef.current = nextSelectedThreadId;
+      await loadCoreDataTracked();
+    } catch (e) {
+      setError(toErrorMessage(e));
+    } finally {
+      setIsBusy(false);
+    }
+  }, [loadCoreDataTracked, threads]);
+
   const runUnarchiveThread = useCallback(async (threadId: string) => {
     setIsBusy(true);
     try {
@@ -2036,149 +2070,156 @@ export function App(): React.JSX.Element {
             </div>
           )}
           <div className="space-y-2 pr-2">
-            {groupedThreads.map((group) => {
-              const hasSelectedThread = group.threads.some((thread) => thread.id === selectedThreadId);
-              const isCollapsed = hasSelectedThread ? false : Boolean(sidebarCollapsedGroups[group.key]);
-              const nextAgentId = group.preferredAgentId ?? selectedAgentId;
-              const nextAgentLabel = agentsById[nextAgentId]?.label ?? nextAgentId;
-              return (
-                <div key={group.key} className="space-y-1">
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      onClick={() =>
-                        setSidebarCollapsedGroups((prev) => ({
-                          ...prev,
-                          [group.key]: !isCollapsed
-                        }))
-                      }
-                      variant="ghost"
-                      className="h-6 flex-1 justify-start gap-2 rounded-lg px-2 py-1 text-left text-[13px] tracking-tight font-normal text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                    >
-                      {isCollapsed ? (
-                        <Folder size={13} className="shrink-0" />
-                      ) : (
-                        <FolderOpen size={13} className="shrink-0" />
-                      )}
-                      <span className="min-w-0 truncate">{group.label}</span>
-                    </Button>
-                    {availableAgentIds.length <= 1 ? (
-                      <IconBtn
-                        onClick={() => {
-                          if (!group.projectPath) {
-                            return;
-                          }
-                          createThreadForSingleAgent(group.projectPath);
-                        }}
-                        title={
-                          group.projectPath
-                            ? `New ${nextAgentLabel} thread in ${group.label}`
-                            : "Cannot create thread: missing project path"
-                        }
-                        disabled={isBusy || !group.projectPath}
-                      >
-                        <Plus size={14} />
-                      </IconBtn>
-                    ) : (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+            <div className="space-y-1">
+              <div className="px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground/60 flex items-center justify-between">
+                <span>Threads</span>
+                <span>{String(threads.length)}</span>
+              </div>
+              {activeProjectGroups.length > 0 && (
+                <div className="space-y-2">
+                  {activeProjectGroups.map((group) => {
+                    const hasSelectedThread = group.threads.some((thread) => thread.id === selectedThreadId);
+                    const isCollapsed = hasSelectedThread ? false : Boolean(collapsedThreadProjectGroups[group.key]);
+                    const groupProjectPath = group.projectPath ?? selectedAgentDescriptor?.projectDirectories[0] ?? ".";
+                    const groupPreferredAgentId = group.threads.find((thread) =>
+                      availableAgentIds.includes(thread.agentId)
+                    )?.agentId ?? availableAgentIds[0] ?? null;
+                    return (
+                      <div key={group.key} className="space-y-1">
+                        <div className="flex items-center gap-1">
                           <Button
                             type="button"
-                            disabled={isBusy || !group.projectPath}
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
-                            title={
-                              group.projectPath
-                                ? `New thread in ${group.label}`
-                                : "Cannot create thread: missing project path"
+                            data-testid="thread-project-group-toggle"
+                            data-project-key={group.key}
+                            onClick={() =>
+                              setCollapsedThreadProjectGroups((previous) => ({
+                                ...previous,
+                                [group.key]: !isCollapsed
+                              }))
                             }
-                          >
-                            <Plus size={14} />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" sideOffset={6}>
-                          {availableAgentIds.map((agentId) => (
-                            <DropdownMenuItem
-                              key={agentId}
-                              onSelect={() => {
-                                if (!group.projectPath) {
-                                  return;
-                                }
-                                void createNewThread(group.projectPath, agentId);
-                              }}
-                            >
-                              <span className="shrink-0 h-4 w-4 rounded-sm bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
-                                <AgentFavicon
-                                  agentId={agentId}
-                                  label={agentsById[agentId]?.label ?? "Agent"}
-                                  className="h-3.5 w-3.5"
-                                />
-                              </span>
-                              New {agentsById[agentId]?.label ?? agentId} thread
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                  {!isCollapsed && (
-                    <div className="space-y-1 pl-4 pt-0.5">
-                      {group.threads.length === 0 && (
-                        <div className="px-2.5 py-1 text-[11px] text-muted-foreground/70">
-                          No threads yet
-                        </div>
-                      )}
-                      {group.threads.map((thread) => {
-                        const isSelected = thread.id === selectedThreadId;
-                        const threadIsGenerating = isSelected && isGenerating;
-                        return (
-                          <Button
-                            key={thread.id}
-                            type="button"
-                            data-testid="thread-list-item"
-                            data-thread-id={thread.id}
-                            onClick={() => {
-                              setSelectedThreadId(thread.id);
-                              setMobileSidebarOpen(false);
-                            }}
                             variant="ghost"
-                            className={`w-full min-w-0 h-auto flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 text-left text-[13px] tracking-tight font-normal transition-colors ${
-                              isSelected
-                                ? "bg-muted/90 text-foreground shadow-sm"
-                                : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-                            }`}
-                            >
-                              <span className="min-w-0 flex-1 flex items-center gap-1.5 truncate leading-5">
-                              {thread.agentId && (
-                                <span className="shrink-0 h-4 w-4 rounded-sm bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
-                                  <AgentFavicon
-                                    agentId={thread.agentId}
-                                    label={agentsById[thread.agentId]?.label ?? "Agent"}
-                                    className="h-3.5 w-3.5"
-                                  />
-                                </span>
-                              )}
-                                <span className="truncate">{threadLabel(thread)}</span>
-                              </span>
-                            <span className="shrink-0 flex items-center gap-1.5">
-                              {threadIsGenerating && (
-                                <Loader2 size={11} className="animate-spin text-muted-foreground/70" />
-                              )}
-                              {thread.updatedAt && (
-                                <span className="text-[10px] text-muted-foreground/50">
-                                  {formatDate(thread.updatedAt)}
-                                </span>
-                              )}
+                            className="h-7 flex-1 justify-start gap-2 rounded-lg px-2 py-1 text-left text-[12px] tracking-tight font-normal text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight size={13} className="shrink-0" />
+                            ) : (
+                              <ChevronDown size={13} className="shrink-0" />
+                            )}
+                            <span className="flex-1 truncate" title={group.projectPath ?? "No project"}>
+                              {group.label}
                             </span>
+                            <span className="text-[10px] text-muted-foreground/60">{String(group.threads.length)}</span>
                           </Button>
-                        );
-                      })}
-                    </div>
-                  )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                data-testid="thread-project-group-menu-trigger"
+                                data-project-key={group.key}
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 rounded-lg text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                disabled={isBusy || groupPreferredAgentId === null}
+                              >
+                                <MoreHorizontal size={13} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" sideOffset={6}>
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  if (!groupPreferredAgentId) {
+                                    setError("Cannot create thread: no enabled agent");
+                                    return;
+                                  }
+                                  void createNewThread(groupProjectPath, groupPreferredAgentId);
+                                }}
+                                disabled={isBusy || groupPreferredAgentId === null}
+                              >
+                                <Plus size={13} />
+                                New thread
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        {!isCollapsed && (
+                          <div className="space-y-1 pl-4">
+                            {group.threads.map((thread) => {
+                              const isSelected = thread.id === selectedThreadId;
+                              const threadIsGenerating = isSelected && isGenerating;
+                              const canArchive = thread.agentId === "codex";
+                              return (
+                                <div key={thread.id} className="flex items-stretch gap-1">
+                                  <Button
+                                    type="button"
+                                    data-testid="thread-list-item"
+                                    data-thread-id={thread.id}
+                                    onClick={() => {
+                                      setSelectedThreadId(thread.id);
+                                      setMobileSidebarOpen(false);
+                                    }}
+                                    variant="ghost"
+                                    className={`min-w-0 flex-1 h-auto flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 text-left text-[13px] tracking-tight font-normal transition-colors ${
+                                      isSelected
+                                        ? "bg-muted/90 text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                                    }`}
+                                  >
+                                    <span className="min-w-0 flex-1 truncate leading-5">{threadLabel(thread)}</span>
+                                    <span className="shrink-0 flex items-center gap-1.5">
+                                      {threadIsGenerating && (
+                                        <Loader2 size={11} className="animate-spin text-muted-foreground/70" />
+                                      )}
+                                      {thread.updatedAt && (
+                                        <span className="text-[10px] text-muted-foreground/50">
+                                          {formatDate(thread.updatedAt)}
+                                        </span>
+                                      )}
+                                    </span>
+                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        data-testid="thread-row-menu-trigger"
+                                        data-thread-id={thread.id}
+                                        variant="ghost"
+                                        size="icon"
+                                        className={`h-auto min-h-[34px] w-7 shrink-0 rounded-lg ${
+                                          isSelected
+                                            ? "bg-muted/90 text-foreground hover:bg-muted"
+                                            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                                        }`}
+                                        disabled={isBusy}
+                                      >
+                                        <MoreHorizontal size={13} />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" sideOffset={6}>
+                                      <DropdownMenuItem
+                                        onSelect={() => {
+                                          if (!canArchive) {
+                                            return;
+                                          }
+                                          void runArchiveThread(thread.id);
+                                        }}
+                                        disabled={isBusy || !canArchive}
+                                      >
+                                        <Archive size={13} />
+                                        Archive thread
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              )}
+            </div>
             <div className="space-y-1 pt-1">
               <Button
                 type="button"
@@ -2196,84 +2237,113 @@ export function App(): React.JSX.Element {
                 <span className="flex-1 truncate">Archived threads</span>
                 {isArchivedThreadsLoading ? (
                   <Loader2 size={11} className="animate-spin text-muted-foreground/70" />
-                ) : !hasLoadedArchivedThreads ? (
+                ) : !hasLoadedArchivedThreads && archivedSectionThreadCount === 0 ? (
                   <span className="text-[10px] text-muted-foreground/60">—</span>
                 ) : (
                   <span className="text-[10px] text-muted-foreground/60">
-                    {archivedThreadsTruncated
-                      ? `${String(archivedThreads.length)}+`
-                      : String(archivedThreads.length)}
+                    {hasLoadedArchivedThreads && archivedThreadsTruncated
+                      ? `${String(archivedSectionThreadCount)}+`
+                      : String(archivedSectionThreadCount)}
                   </span>
                 )}
               </Button>
               {isArchivedThreadsOpen && (
-                <div data-testid="archived-thread-list" className="space-y-2 pl-4">
-                  {isArchivedThreadsLoading && archivedThreads.length === 0 && (
+                <div data-testid="archived-thread-list" className="space-y-1 pl-4">
+                  {isArchivedThreadsLoading && archivedProjectGroups.length === 0 && (
                     <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] text-muted-foreground/70">
                       <Loader2 size={11} className="animate-spin" />
                       <span>Loading archived threads...</span>
                     </div>
                   )}
-                  {!isArchivedThreadsLoading && archivedThreads.length === 0 && (
+                  {!isArchivedThreadsLoading && archivedProjectGroups.length === 0 && (
                     <div className="px-2 py-1 text-[11px] text-muted-foreground/70">
                       No archived threads
                     </div>
                   )}
-                  {groupedArchivedThreads.map((group) => (
-                    <div key={group.key} className="space-y-1">
-                      <div className="px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground/60 truncate">
-                        {group.label}
-                      </div>
-                      <div className="space-y-1">
-                        {group.threads.map((thread) => {
-                          const canUnarchive = thread.agentId === "codex";
-                          return (
-                            <div
-                              key={thread.id}
-                              data-testid="archived-thread-list-item"
-                              className="w-full min-w-0 rounded-xl border border-border/60 bg-muted/20 px-2 py-1.5 text-[12px] text-muted-foreground"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                {thread.agentId && (
-                                  <span className="shrink-0 h-4 w-4 rounded-sm bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
-                                    <AgentFavicon
-                                      agentId={thread.agentId}
-                                      label={agentsById[thread.agentId]?.label ?? "Agent"}
-                                      className="h-3.5 w-3.5"
-                                    />
-                                  </span>
-                                )}
-                                <span className="min-w-0 flex-1 truncate">{threadLabel(thread)}</span>
-                                {thread.updatedAt && (
-                                  <span className="shrink-0 text-[10px] text-muted-foreground/60">
-                                    {formatDate(thread.updatedAt)}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="mt-1.5 flex justify-end">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-6 rounded-full px-2 text-[10px]"
-                                  disabled={isBusy || !canUnarchive}
-                                  onClick={() => {
-                                    if (!canUnarchive) {
-                                      return;
-                                    }
-                                    void runUnarchiveThread(thread.id);
-                                  }}
-                                  title={canUnarchive ? "Unarchive thread" : "Unarchive is not supported for this agent"}
+                  {archivedProjectGroups.map((group) => {
+                    const hasSelectedThread = group.threads.some((thread) => thread.id === selectedThreadId);
+                    const isCollapsed = hasSelectedThread ? false : Boolean(collapsedArchivedProjectGroups[group.key]);
+                    return (
+                      <div key={group.key} className="space-y-1">
+                        <Button
+                          type="button"
+                          data-testid="archived-project-group-toggle"
+                          data-project-key={group.key}
+                          onClick={() =>
+                            setCollapsedArchivedProjectGroups((previous) => ({
+                              ...previous,
+                              [group.key]: !isCollapsed
+                            }))
+                          }
+                          variant="ghost"
+                          className="h-7 w-full justify-start gap-2 rounded-lg px-2 py-1 text-left text-[12px] tracking-tight font-normal text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        >
+                          {isCollapsed ? (
+                            <ChevronRight size={13} className="shrink-0" />
+                          ) : (
+                            <ChevronDown size={13} className="shrink-0" />
+                          )}
+                          <span className="flex-1 truncate" title={group.projectPath ?? "No project"}>
+                            {group.label}
+                          </span>
+                          {group.isRemoved && (
+                            <span className="rounded-full border border-border/70 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground/70">
+                              Removed
+                            </span>
+                          )}
+                          <span className="text-[10px] text-muted-foreground/60">{String(group.threads.length)}</span>
+                        </Button>
+                        {!isCollapsed && (
+                          <div className="space-y-1 pl-4">
+                            {group.threads.map((thread) => {
+                              const isArchivedThread = archivedThreadIds.has(thread.id);
+                              const canUnarchive = isArchivedThread && thread.agentId === "codex";
+                              return (
+                                <div
+                                  key={thread.id}
+                                  data-testid="archived-thread-list-item"
+                                  className="w-full min-w-0 rounded-xl border border-border/60 bg-muted/20 px-2 py-1.5 text-[12px] text-muted-foreground"
                                 >
-                                  Unarchive
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })}
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="min-w-0 flex-1 truncate">{threadLabel(thread)}</span>
+                                    {thread.updatedAt && (
+                                      <span className="shrink-0 text-[10px] text-muted-foreground/60">
+                                        {formatDate(thread.updatedAt)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="mt-1.5 flex justify-end">
+                                    {isArchivedThread ? (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-6 rounded-full px-2 text-[10px]"
+                                        disabled={isBusy || !canUnarchive}
+                                        onClick={() => {
+                                          if (!canUnarchive) {
+                                            return;
+                                          }
+                                          void runUnarchiveThread(thread.id);
+                                        }}
+                                        title={canUnarchive ? "Unarchive thread" : "Unarchive is not supported for this agent"}
+                                      >
+                                        Unarchive
+                                      </Button>
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground/60">
+                                        Project removed
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {archivedThreadsTruncated && (
                     <div
                       data-testid="archived-thread-list-truncated"
@@ -2381,7 +2451,7 @@ export function App(): React.JSX.Element {
             exit={{ x: -280, opacity: 0.94 }}
             transition={{ type: "spring", stiffness: 380, damping: 36, mass: 0.7 }}
             data-testid="sidebar-desktop"
-            className="hidden md:flex fixed left-0 top-[env(safe-area-inset-top)] bottom-[env(safe-area-inset-bottom)] z-30 w-64 flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
+            className="hidden md:flex fixed left-0 top-0 bottom-0 z-30 w-64 flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
           >
             {renderSidebarContent("desktop")}
           </motion.aside>
@@ -2398,7 +2468,7 @@ export function App(): React.JSX.Element {
             exit={{ x: -280 }}
             transition={{ type: "spring", stiffness: 380, damping: 36, mass: 0.7 }}
             data-testid="sidebar-mobile"
-            className="md:hidden fixed left-0 top-[env(safe-area-inset-top)] bottom-[env(safe-area-inset-bottom)] z-50 w-64 flex flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
+            className="md:hidden fixed left-0 top-0 bottom-0 z-50 w-64 flex flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
           >
             {renderSidebarContent("mobile")}
           </motion.aside>
@@ -2409,7 +2479,7 @@ export function App(): React.JSX.Element {
       <div
         className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-200 ${
           desktopSidebarOpen ? "md:ml-64" : "md:ml-0"
-        }`}
+        } h-full`}
       >
 
         {/* Header */}
@@ -2614,7 +2684,7 @@ export function App(): React.JSX.Element {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.14, ease: "easeOut" }}
-                  className="max-w-3xl mx-auto px-4 pt-8 pb-6"
+                  className="w-full px-4 md:px-6 lg:px-8 pt-8 pb-6"
                 >
                   {turns.length === 0 ? (
                     <div data-testid="chat-empty-state" className="text-center py-20 text-sm text-muted-foreground">
@@ -2705,7 +2775,7 @@ export function App(): React.JSX.Element {
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-transparent via-background/85 to-background"
               />
-              <div className="relative max-w-3xl mx-auto space-y-2">
+              <div className="relative w-full px-0 md:px-2 lg:px-4 space-y-2">
 
                 {/* Pending user input */}
                 <AnimatePresence>

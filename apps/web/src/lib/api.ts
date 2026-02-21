@@ -427,7 +427,10 @@ const ThreadListItemWithAgentSchema = AppServerListThreadsResponseSchema.shape.d
   z
     .object({
       agentId: z.enum(["codex", "opencode"]),
-      source: z.string().optional()
+      source: z.string().optional(),
+      removed: z.boolean().optional(),
+      projectRemoved: z.boolean().optional(),
+      projectState: z.enum(["active", "removed"]).optional()
     })
     .passthrough()
 );

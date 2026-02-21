@@ -54,6 +54,7 @@ const HISTORY_LIMIT = 2_000;
 const USER_AGENT = "farfield/0.2.0";
 const IPC_RECONNECT_DELAY_MS = 1_000;
 const NTFY_COMPLETION_DEBOUNCE_MS = 250;
+const CAPABILITY_LIST_TIMEOUT_MS = 8_000;
 
 const TRACE_DIR = path.resolve(process.cwd(), "traces");
 const DEFAULT_WORKSPACE = path.resolve(process.cwd());
@@ -182,6 +183,23 @@ function parseBoolean(value: string | null, fallback: boolean): boolean {
   }
 
   return fallback;
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeoutHandle: NodeJS.Timeout | null = null;
+  const timeoutPromise = new Promise<T>((_resolve, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${String(timeoutMs)}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
 }
 
 const OptionalPathEnvSchema = z.string().trim().min(1).optional();
@@ -1367,8 +1385,26 @@ const server = http.createServer(async (req, res) => {
       }
 
       const limit = parseInteger(url.searchParams.get("limit"), 100);
-      const result = await adapter.listModels(limit);
-      jsonResponse(res, 200, { ok: true, ...result });
+      try {
+        const result = await withTimeout(
+          adapter.listModels(limit),
+          CAPABILITY_LIST_TIMEOUT_MS,
+          "models listing"
+        );
+        jsonResponse(res, 200, { ok: true, ...result });
+      } catch (error) {
+        const message = toErrorMessage(error);
+        logger.warn(
+          {
+            error: message
+          },
+          "models-list-timeout"
+        );
+        jsonResponse(res, 503, {
+          ok: false,
+          error: `Failed to list models: ${message}`
+        });
+      }
       return;
     }
 
@@ -1382,8 +1418,26 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const result = await adapter.listCollaborationModes();
-      jsonResponse(res, 200, { ok: true, ...result });
+      try {
+        const result = await withTimeout(
+          adapter.listCollaborationModes(),
+          CAPABILITY_LIST_TIMEOUT_MS,
+          "collaboration modes listing"
+        );
+        jsonResponse(res, 200, { ok: true, ...result });
+      } catch (error) {
+        const message = toErrorMessage(error);
+        logger.warn(
+          {
+            error: message
+          },
+          "collaboration-modes-list-timeout"
+        );
+        jsonResponse(res, 503, {
+          ok: false,
+          error: `Failed to list collaboration modes: ${message}`
+        });
+      }
       return;
     }
 
