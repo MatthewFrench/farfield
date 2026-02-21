@@ -208,6 +208,12 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
 const OptionalPathEnvSchema = z.string().trim().min(1).optional();
 const API_TOKEN_HEADER_NAME = "x-farfield-token";
 const API_TOKEN_RESPONSE_HEADER = "X-Farfield-Token";
+const CLIENT_REQUEST_ID_HEADER_NAME = "x-farfield-request-id";
+const CLIENT_REQUEST_ID_RESPONSE_HEADER = "X-Farfield-Request-Id";
+const CLIENT_ACTION_ID_HEADER_NAME = "x-farfield-action-id";
+const CLIENT_ACTION_ID_RESPONSE_HEADER = "X-Farfield-Action-Id";
+const CLIENT_ACTION_NAME_HEADER_NAME = "x-farfield-action-name";
+const CLIENT_ACTION_NAME_RESPONSE_HEADER = "X-Farfield-Action-Name";
 const API_TOKEN = (process.env["API_TOKEN"] ?? process.env["PUSH_API_TOKEN"] ?? "").trim();
 const API_AUTH_REQUIRED = API_TOKEN.length > 0;
 const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
@@ -365,7 +371,7 @@ function jsonResponse(res: ServerResponse, statusCode: number, body: unknown): v
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": encoded.length,
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "content-type, x-farfield-token",
+    "Access-Control-Allow-Headers": "content-type, x-farfield-token, x-farfield-request-id, x-farfield-action-id, x-farfield-action-name",
     "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS"
   });
   res.end(encoded);
@@ -720,7 +726,7 @@ function pushActionEvent(
   stage: "attempt" | "success" | "error",
   details: Record<string, unknown>
 ): void {
-  logger.info(
+  logger.debug(
     {
       action,
       stage,
@@ -756,7 +762,7 @@ function pushActionError(
 }
 
 function pushSystem(message: string, details: Record<string, unknown> = {}): void {
-  logger.info({ message, ...details }, "system-event");
+  logger.debug({ message, ...details }, "system-event");
   pushHistory("system", "system", { message, details });
 }
 
@@ -1123,6 +1129,47 @@ function resolveAdapterForThread(threadId: string):
 }
 
 const server = http.createServer(async (req, res) => {
+  const requestId = normalizeOptionalString(readHeader(req, CLIENT_REQUEST_ID_HEADER_NAME))
+    ?? `request_${randomUUID()}`;
+  const requestActionId = normalizeOptionalString(readHeader(req, CLIENT_ACTION_ID_HEADER_NAME));
+  const requestActionName = normalizeOptionalString(readHeader(req, CLIENT_ACTION_NAME_HEADER_NAME));
+
+  res.setHeader(CLIENT_REQUEST_ID_RESPONSE_HEADER, requestId);
+  if (requestActionId) {
+    res.setHeader(CLIENT_ACTION_ID_RESPONSE_HEADER, requestActionId);
+  }
+  if (requestActionName) {
+    res.setHeader(CLIENT_ACTION_NAME_RESPONSE_HEADER, requestActionName);
+  }
+
+  const requestContextDetails: Record<string, string> = {
+    requestId,
+    ...(requestActionId ? { actionId: requestActionId } : {}),
+    ...(requestActionName ? { actionName: requestActionName } : {})
+  };
+
+  const pushActionEventWithRequestContext = (
+    action: string,
+    stage: "attempt" | "success" | "error",
+    details: Record<string, unknown>
+  ): void => {
+    pushActionEvent(action, stage, {
+      ...requestContextDetails,
+      ...details
+    });
+  };
+
+  const pushActionErrorWithRequestContext = (
+    action: string,
+    error: unknown,
+    details: Record<string, unknown>
+  ): string => {
+    return pushActionError(action, error, {
+      ...requestContextDetails,
+      ...details
+    });
+  };
+
   try {
     if (!req.url) {
       jsonResponse(res, 400, { ok: false, error: "Missing request URL" });
@@ -1141,7 +1188,10 @@ const server = http.createServer(async (req, res) => {
     if (isShuttingDown && pathname !== "/healthz") {
       jsonResponse(res, 503, {
         ok: false,
-        error: "Server is shutting down"
+        error: "Server is shutting down",
+        requestId,
+        actionId: requestActionId,
+        actionName: requestActionName
       });
       return;
     }
@@ -1169,7 +1219,7 @@ const server = http.createServer(async (req, res) => {
         Connection: "keep-alive",
         "X-Accel-Buffering": "no",
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "x-farfield-token"
+        "Access-Control-Allow-Headers": "x-farfield-token, x-farfield-request-id, x-farfield-action-id, x-farfield-action-name"
       });
       res.write("retry: 1000\n\n");
 
@@ -1251,7 +1301,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      pushActionEvent("thread-create", "attempt", {
+      pushActionEventWithRequestContext("thread-create", "attempt", {
         agentId: adapter.id,
         cwd: body.cwd ?? null,
         model: body.model ?? null
@@ -1275,7 +1325,7 @@ const server = http.createServer(async (req, res) => {
 
         threadIndex.register(result.threadId, adapter.id);
 
-        pushActionEvent("thread-create", "success", {
+        pushActionEventWithRequestContext("thread-create", "success", {
           agentId: adapter.id,
           threadId: result.threadId,
           cwd: result.cwd ?? result.thread.cwd ?? null
@@ -1288,7 +1338,7 @@ const server = http.createServer(async (req, res) => {
           agentId: adapter.id
         });
       } catch (error) {
-        const message = pushActionError("thread-create", error, {
+        const message = pushActionErrorWithRequestContext("thread-create", error, {
           agentId: adapter.id,
           cwd: body.cwd ?? null
         });
@@ -1800,7 +1850,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "POST" && segments[3] === "messages") {
         const body = parseBody(SendMessageBodySchema, await readJsonBody(req));
 
-        pushActionEvent("messages", "attempt", {
+        pushActionEventWithRequestContext("messages", "attempt", {
           agentId: resolved.agentId,
           threadId,
           textLength: body.text.length
@@ -1815,7 +1865,7 @@ const server = http.createServer(async (req, res) => {
             ...(typeof body.isSteering === "boolean" ? { isSteering: body.isSteering } : {})
           });
         } catch (error) {
-          const message = pushActionError("messages", error, {
+          const message = pushActionErrorWithRequestContext("messages", error, {
             agentId: resolved.agentId,
             threadId
           });
@@ -1823,7 +1873,7 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        pushActionEvent("messages", "success", {
+        pushActionEventWithRequestContext("messages", "success", {
           agentId: resolved.agentId,
           threadId
         });
@@ -1845,14 +1895,14 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        pushActionEvent("thread-archive", "attempt", {
+        pushActionEventWithRequestContext("thread-archive", "attempt", {
           agentId: resolved.agentId,
           threadId
         });
 
         try {
           await adapter.archiveThread({ threadId });
-          pushActionEvent("thread-archive", "success", {
+          pushActionEventWithRequestContext("thread-archive", "success", {
             agentId: resolved.agentId,
             threadId
           });
@@ -1861,7 +1911,7 @@ const server = http.createServer(async (req, res) => {
             threadId
           });
         } catch (error) {
-          const message = pushActionError("thread-archive", error, {
+          const message = pushActionErrorWithRequestContext("thread-archive", error, {
             agentId: resolved.agentId,
             threadId
           });
@@ -1884,14 +1934,14 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        pushActionEvent("thread-unarchive", "attempt", {
+        pushActionEventWithRequestContext("thread-unarchive", "attempt", {
           agentId: resolved.agentId,
           threadId
         });
 
         try {
           await adapter.unarchiveThread({ threadId });
-          pushActionEvent("thread-unarchive", "success", {
+          pushActionEventWithRequestContext("thread-unarchive", "success", {
             agentId: resolved.agentId,
             threadId
           });
@@ -1900,7 +1950,7 @@ const server = http.createServer(async (req, res) => {
             threadId
           });
         } catch (error) {
-          const message = pushActionError("thread-unarchive", error, {
+          const message = pushActionErrorWithRequestContext("thread-unarchive", error, {
             agentId: resolved.agentId,
             threadId
           });
@@ -1925,7 +1975,7 @@ const server = http.createServer(async (req, res) => {
 
         const body = parseBody(SetModeBodySchema, await readJsonBody(req));
 
-        pushActionEvent("collaboration-mode", "attempt", {
+        pushActionEventWithRequestContext("collaboration-mode", "attempt", {
           agentId: resolved.agentId,
           threadId,
           collaborationMode: body.collaborationMode
@@ -1938,7 +1988,7 @@ const server = http.createServer(async (req, res) => {
             collaborationMode: body.collaborationMode
           });
 
-          pushActionEvent("collaboration-mode", "success", {
+          pushActionEventWithRequestContext("collaboration-mode", "success", {
             agentId: resolved.agentId,
             threadId,
             ownerClientId: result.ownerClientId
@@ -1950,7 +2000,7 @@ const server = http.createServer(async (req, res) => {
             ownerClientId: result.ownerClientId
           });
         } catch (error) {
-          const message = pushActionError("collaboration-mode", error, {
+          const message = pushActionErrorWithRequestContext("collaboration-mode", error, {
             agentId: resolved.agentId,
             threadId
           });
@@ -1975,7 +2025,7 @@ const server = http.createServer(async (req, res) => {
 
         const body = parseBody(SubmitUserInputBodySchema, await readJsonBody(req));
 
-        pushActionEvent("user-input", "attempt", {
+        pushActionEventWithRequestContext("user-input", "attempt", {
           agentId: resolved.agentId,
           threadId,
           requestId: body.requestId
@@ -1989,7 +2039,7 @@ const server = http.createServer(async (req, res) => {
             response: body.response
           });
 
-          pushActionEvent("user-input", "success", {
+          pushActionEventWithRequestContext("user-input", "success", {
             agentId: resolved.agentId,
             threadId,
             ownerClientId: result.ownerClientId,
@@ -2003,7 +2053,7 @@ const server = http.createServer(async (req, res) => {
             requestId: result.requestId
           });
         } catch (error) {
-          const message = pushActionError("user-input", error, {
+          const message = pushActionErrorWithRequestContext("user-input", error, {
             agentId: resolved.agentId,
             threadId,
             requestId: body.requestId
@@ -2021,7 +2071,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "POST" && segments[3] === "interrupt") {
         const body = parseBody(InterruptBodySchema, await readJsonBody(req));
 
-        pushActionEvent("interrupt", "attempt", {
+        pushActionEventWithRequestContext("interrupt", "attempt", {
           agentId: resolved.agentId,
           threadId
         });
@@ -2032,7 +2082,7 @@ const server = http.createServer(async (req, res) => {
             ...(body.ownerClientId ? { ownerClientId: body.ownerClientId } : {})
           });
         } catch (error) {
-          const message = pushActionError("interrupt", error, {
+          const message = pushActionErrorWithRequestContext("interrupt", error, {
             agentId: resolved.agentId,
             threadId
           });
@@ -2040,7 +2090,7 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        pushActionEvent("interrupt", "success", {
+        pushActionEventWithRequestContext("interrupt", "success", {
           agentId: resolved.agentId,
           threadId
         });
@@ -2364,6 +2414,35 @@ const server = http.createServer(async (req, res) => {
 
     jsonResponse(res, 404, { ok: false, error: "Not found" });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      const requestMethod = req.method ?? "unknown";
+      const requestUrl = req.url ?? "unknown";
+      const validationErrorMessage = error.message;
+
+      logger.warn(
+        {
+          method: requestMethod,
+          url: requestUrl,
+          error: validationErrorMessage,
+          requestId,
+          actionId: requestActionId,
+          actionName: requestActionName
+        },
+        "request-validation-failed"
+      );
+
+      if (!res.headersSent) {
+        jsonResponse(res, 400, {
+          ok: false,
+          error: validationErrorMessage,
+          requestId,
+          actionId: requestActionId,
+          actionName: requestActionName
+        });
+      }
+      return;
+    }
+
     const suppressServerErrorRecording = error instanceof Error && isExpectedShutdownTransportError(error);
     runtimeLastError = suppressServerErrorRecording ? "Server is shutting down" : toErrorMessage(error);
     if (error instanceof Error && !suppressServerErrorRecording) {
@@ -2374,11 +2453,13 @@ const server = http.createServer(async (req, res) => {
           message: runtimeLastError,
           name: error.name,
           stack: error.stack ?? null,
-          requestId: null,
+          requestId,
           threadId: null,
           url: req.url ?? null,
           details: {
-            method: req.method ?? "unknown"
+            method: req.method ?? "unknown",
+            actionId: requestActionId,
+            actionName: requestActionName
           }
         });
       } catch (recordError) {
@@ -2400,7 +2481,10 @@ const server = http.createServer(async (req, res) => {
         {
           method: requestMethod,
           url: requestUrl,
-          error: runtimeLastError
+          error: runtimeLastError,
+          requestId,
+          actionId: requestActionId,
+          actionName: requestActionName
         },
         "request-closed-during-shutdown"
       );
@@ -2409,14 +2493,20 @@ const server = http.createServer(async (req, res) => {
         {
           method: requestMethod,
           url: requestUrl,
-          error: runtimeLastError
+          error: runtimeLastError,
+          requestId,
+          actionId: requestActionId,
+          actionName: requestActionName
         },
         "request-failed"
       );
       pushSystem("Request failed", {
         error: runtimeLastError,
         method: requestMethod,
-        url: requestUrl
+        url: requestUrl,
+        requestId,
+        actionId: requestActionId,
+        actionName: requestActionName
       });
       broadcastRuntimeState();
     }
@@ -2424,7 +2514,10 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) {
       jsonResponse(res, suppressServerErrorRecording ? 503 : 500, {
         ok: false,
-        error: runtimeLastError
+        error: runtimeLastError,
+        requestId,
+        actionId: requestActionId,
+        actionName: requestActionName
       });
     }
   }

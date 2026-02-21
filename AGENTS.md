@@ -27,6 +27,25 @@ violate the rules. If you think that is impossible, STOP and ask the user.
 - `bun run test`
 - `bun run lint`
 
+## Client Error Session Log
+
+Browser crash reports and server-side runtime debug errors are written to an NDJSON session log.
+
+- Default path: `<workspace>/.runtime/logs/errors/session-<timestamp>-<pid>.ndjson`
+- Override path: set `DEBUG_CLIENT_ERROR_LOG_PATH`
+- Entry limit: set `DEBUG_CLIENT_ERROR_MAX_ENTRIES` (default `2000`)
+
+How to use this log:
+
+1. Trigger or reproduce the issue.
+2. Open the current session file above, or download it from `GET /api/debug/client-errors/session-log`.
+3. Correlate by `requestId`, `threadId`, `operation`, and `recordedAt`.
+
+Why this file is valuable:
+
+- Captures uncaught browser crashes (`window` error and unhandled promise rejection) plus server runtime debug errors in one timeline.
+- Preserves structured context needed to trace action flows without scraping terminal output.
+
 ## Trace Privacy Rules (Strict)
 
 Never commit raw traces from `traces/`.

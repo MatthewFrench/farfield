@@ -68,6 +68,8 @@ export interface CodexAgentOptions {
 const ANSI_ESCAPE_REGEX = /\u001B\[[0-?]*[ -/]*[@-~]/g;
 const INVALID_STREAM_EVENTS_LOG_PATH = process.env["FARFIELD_INVALID_STREAM_LOG_PATH"] ??
   path.resolve(process.cwd(), "invalid-thread-stream-events.jsonl");
+const APP_SERVER_STDERR_ERROR_PATTERN = /\b(error|fatal|panic)\b/i;
+const APP_SERVER_STDERR_WARN_PATTERN = /\bwarn(?:ing)?\b/i;
 
 export class CodexAgentAdapter implements AgentAdapter {
   public readonly id = "codex";
@@ -119,7 +121,16 @@ export class CodexAgentAdapter implements AgentAdapter {
           logger.debug({ line: normalized }, "codex-app-server-stderr-ignored");
           return;
         }
-        logger.error({ line: normalized }, "codex-app-server-stderr");
+        const severity = classifyAppServerStderrSeverity(normalized);
+        if (severity === "error") {
+          logger.error({ line: normalized }, "codex-app-server-stderr");
+          return;
+        }
+        if (severity === "warn") {
+          logger.warn({ line: normalized }, "codex-app-server-stderr");
+          return;
+        }
+        logger.debug({ line: normalized }, "codex-app-server-stderr");
       }
     });
 
@@ -825,6 +836,16 @@ function isKnownBenignAppServerStderr(line: string): boolean {
     line.includes("state db record_discrepancy: find_thread_path_by_id_str_in_subdir") &&
     line.includes("falling_back")
   );
+}
+
+function classifyAppServerStderrSeverity(line: string): "error" | "warn" | "debug" {
+  if (APP_SERVER_STDERR_ERROR_PATTERN.test(line)) {
+    return "error";
+  }
+  if (APP_SERVER_STDERR_WARN_PATTERN.test(line)) {
+    return "warn";
+  }
+  return "debug";
 }
 
 function writeInvalidStreamEventDetail(detail: Record<string, unknown>): void {

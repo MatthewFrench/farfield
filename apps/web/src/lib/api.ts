@@ -31,6 +31,9 @@ const ApiEnvelopeSchema = z
   .passthrough();
 
 const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_ID_HEADER_NAME = "X-Farfield-Request-Id";
+const ACTION_ID_HEADER_NAME = "X-Farfield-Action-Id";
+const ACTION_NAME_HEADER_NAME = "X-Farfield-Action-Name";
 
 export class RequestCanceledError extends Error {
   constructor(path: string) {
@@ -281,8 +284,37 @@ function readApiToken(): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function createClientRequestId(): string {
+  return `req_${String(Date.now())}_${Math.floor(Math.random() * 1_000_000_000).toString(16)}`;
+}
+
+function readResponseRequestId(response: Response): string | null {
+  if (!response.headers || typeof response.headers.get !== "function") {
+    return null;
+  }
+
+  const rawValue = response.headers.get(REQUEST_ID_HEADER_NAME);
+  if (!rawValue) {
+    return null;
+  }
+  const normalized = rawValue.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function appendRequestId(message: string, requestId: string | null): string {
+  if (!requestId) {
+    return message;
+  }
+  if (/\brequest(?:Id)?[ =:]+[a-z0-9._-]+/i.test(message)) {
+    return message;
+  }
+  return `${message} requestId ${requestId}`;
+}
+
 async function performRequest(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
+  const requestId = createClientRequestId();
+  headers.set(REQUEST_ID_HEADER_NAME, requestId);
   const token = readApiToken();
   if (token) {
     try {
@@ -320,11 +352,13 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
     const message = error instanceof Error ? error.message : String(error);
     if (error instanceof Error && error.name === "AbortError") {
       if (didTimeout) {
-        throw new Error(`Request timed out for ${path} after ${String(REQUEST_TIMEOUT_MS)}ms`);
+        throw new Error(
+          `Request timed out for ${path} after ${String(REQUEST_TIMEOUT_MS)}ms requestId ${requestId}`
+        );
       }
       throw new RequestCanceledError(path);
     }
-    throw new Error(`Request failed for ${path}: ${message}`);
+    throw new Error(`Request failed for ${path}: ${message} requestId ${requestId}`);
   } finally {
     clearTimeout(timeoutHandle);
     if (inheritedSignal) {
@@ -336,13 +370,14 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
 
 async function request(path: string, init?: RequestInit): Promise<unknown> {
   const response = await performRequest(path, init);
+  const responseRequestId = readResponseRequestId(response);
 
   let data: unknown;
   try {
     data = (await response.json()) as unknown;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid JSON response from ${path}: ${message}`);
+    throw new Error(appendRequestId(`Invalid JSON response from ${path}: ${message}`, responseRequestId));
   }
 
   let envelope: z.infer<typeof ApiEnvelopeSchema>;
@@ -350,12 +385,14 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
     envelope = ApiEnvelopeSchema.parse(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid API envelope from ${path}: ${message}`);
+    throw new Error(appendRequestId(`Invalid API envelope from ${path}: ${message}`, responseRequestId));
   }
 
   if (!response.ok || envelope.ok === false) {
     const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
-    throw new Error(parsedError.success ? parsedError.data.error : `Request failed for ${path}`);
+    throw new Error(
+      appendRequestId(parsedError.success ? parsedError.data.error : `Request failed for ${path}`, responseRequestId)
+    );
   }
 
   return data;
@@ -363,6 +400,7 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
 
 async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
   const response = await performRequest(path, init);
+  const responseRequestId = readResponseRequestId(response);
   if (response.ok) {
     return;
   }
@@ -375,18 +413,54 @@ async function requestNoContent(path: string, init?: RequestInit): Promise<void>
   }
 
   const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
-  throw new Error(parsedError.success ? parsedError.data.error : `Request failed for ${path}`);
+  throw new Error(
+    appendRequestId(parsedError.success ? parsedError.data.error : `Request failed for ${path}`, responseRequestId)
+  );
 }
 
-interface ApiRequestOptions {
+export interface ApiRequestOptions {
   signal?: AbortSignal;
+  actionId?: string;
+  actionName?: string;
 }
 
-function requestInitWithSignal(signal: AbortSignal | undefined): RequestInit | undefined {
-  if (!signal) {
+function applyRequestOptions(init: RequestInit, options?: ApiRequestOptions): RequestInit {
+  if (!options) {
+    return init;
+  }
+
+  const nextHeaders = new Headers(init.headers);
+  if (options.actionId && options.actionId.trim().length > 0) {
+    nextHeaders.set(ACTION_ID_HEADER_NAME, options.actionId.trim());
+  }
+  if (options.actionName && options.actionName.trim().length > 0) {
+    nextHeaders.set(ACTION_NAME_HEADER_NAME, options.actionName.trim());
+  }
+
+  const nextInit: RequestInit = {
+    ...init
+  };
+  if (options.signal) {
+    nextInit.signal = options.signal;
+  }
+
+  let hasHeaders = false;
+  nextHeaders.forEach(() => {
+    hasHeaders = true;
+  });
+  if (hasHeaders) {
+    nextInit.headers = nextHeaders;
+  }
+
+  return nextInit;
+}
+
+function requestInitWithOptions(options?: ApiRequestOptions): RequestInit | undefined {
+  if (!options) {
     return undefined;
   }
-  return { signal };
+  const nextInit = applyRequestOptions({}, options);
+  return Object.keys(nextInit).length > 0 ? nextInit : undefined;
 }
 
 function stripOk(value: unknown): unknown {
@@ -399,7 +473,7 @@ function stripOk(value: unknown): unknown {
 }
 
 export async function getHealth(options?: ApiRequestOptions): Promise<z.infer<typeof HealthResponseSchema>> {
-  return HealthResponseSchema.parse(await request("/api/health", requestInitWithSignal(options?.signal)));
+  return HealthResponseSchema.parse(await request("/api/health", requestInitWithOptions(options)));
 }
 
 export async function bootstrapEventsSession(): Promise<z.infer<typeof EventsSessionBootstrapResponseSchema>> {
@@ -447,7 +521,7 @@ const AgentsResponseSchema = z
   .strict();
 
 export async function listAgents(options?: ApiRequestOptions): Promise<z.infer<typeof AgentsResponseSchema>> {
-  return AgentsResponseSchema.parse(await request("/api/agents", requestInitWithSignal(options?.signal)));
+  return AgentsResponseSchema.parse(await request("/api/agents", requestInitWithOptions(options)));
 }
 
 const ConfigDefaultsResponseSchema = z
@@ -462,6 +536,8 @@ const ConfigDefaultsResponseSchema = z
 export async function getConfigDefaults(options?: {
   agentId?: AgentId;
   signal?: AbortSignal;
+  actionId?: string;
+  actionName?: string;
 }): Promise<z.infer<typeof ConfigDefaultsResponseSchema>> {
   const params = new URLSearchParams();
   if (options?.agentId) {
@@ -471,7 +547,7 @@ export async function getConfigDefaults(options?: {
   return ConfigDefaultsResponseSchema.parse(
     await request(
       suffix.length > 0 ? `/api/config/defaults?${suffix}` : "/api/config/defaults",
-      requestInitWithSignal(options?.signal)
+      requestInitWithOptions(options)
     )
   );
 }
@@ -504,6 +580,8 @@ export async function listThreads(options: {
   sortKey?: "created_at" | "updated_at";
   cwd?: string;
   signal?: AbortSignal;
+  actionId?: string;
+  actionName?: string;
 }): Promise<z.infer<typeof ThreadListResponseSchema>> {
   const params = new URLSearchParams();
   params.set("limit", String(options.limit));
@@ -517,7 +595,7 @@ export async function listThreads(options: {
     params.set("cwd", options.cwd);
   }
 
-  const data = await request(`/api/threads?${params.toString()}`, requestInitWithSignal(options.signal));
+  const data = await request(`/api/threads?${params.toString()}`, requestInitWithOptions(options));
   return ThreadListResponseSchema.parse(stripOk(data));
 }
 
@@ -527,12 +605,12 @@ const ReadThreadResponseWithAgentSchema = AppServerReadThreadResponseSchema.exte
 
 export async function readThread(
   threadId: string,
-  options?: { includeTurns?: boolean; signal?: AbortSignal }
+  options?: { includeTurns?: boolean; signal?: AbortSignal; actionId?: string; actionName?: string }
 ): Promise<z.infer<typeof ReadThreadResponseWithAgentSchema>> {
   const includeTurns = options?.includeTurns ?? true;
   const data = await request(
     `/api/threads/${encodeURIComponent(threadId)}?includeTurns=${includeTurns ? "true" : "false"}`,
-    requestInitWithSignal(options?.signal)
+    requestInitWithOptions(options)
   );
   return ReadThreadResponseWithAgentSchema.parse(stripOk(data));
 }
@@ -546,40 +624,58 @@ export async function createThread(input?: {
   sandbox?: string;
   approvalPolicy?: string;
   ephemeral?: boolean;
-}): Promise<z.infer<typeof CreateThreadResponseSchema>> {
-  const data = await request("/api/threads", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(input ?? {})
-  });
+}, options?: ApiRequestOptions): Promise<z.infer<typeof CreateThreadResponseSchema>> {
+  const data = await request(
+    "/api/threads",
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input ?? {})
+      },
+      options
+    )
+  );
   return CreateThreadResponseSchema.parse(data);
 }
 
-export async function archiveThread(threadId: string): Promise<void> {
-  const data = await request(`/api/threads/${encodeURIComponent(threadId)}/archive`, {
-    method: "POST"
-  });
+export async function archiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {
+  const data = await request(
+    `/api/threads/${encodeURIComponent(threadId)}/archive`,
+    applyRequestOptions(
+      {
+        method: "POST"
+      },
+      options
+    )
+  );
   ArchiveThreadResponseSchema.parse(data);
 }
 
-export async function unarchiveThread(threadId: string): Promise<void> {
-  const data = await request(`/api/threads/${encodeURIComponent(threadId)}/unarchive`, {
-    method: "POST"
-  });
+export async function unarchiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {
+  const data = await request(
+    `/api/threads/${encodeURIComponent(threadId)}/unarchive`,
+    applyRequestOptions(
+      {
+        method: "POST"
+      },
+      options
+    )
+  );
   UnarchiveThreadResponseSchema.parse(data);
 }
 
 export async function listCollaborationModes(
   options?: ApiRequestOptions
 ): Promise<z.infer<typeof AppServerCollaborationModeListResponseSchema>> {
-  const data = await request("/api/collaboration-modes", requestInitWithSignal(options?.signal));
+  const data = await request("/api/collaboration-modes", requestInitWithOptions(options));
   return AppServerCollaborationModeListResponseSchema.parse(stripOk(data));
 }
 
 export async function listModels(options?: ApiRequestOptions): Promise<z.infer<typeof AppServerListModelsResponseSchema>> {
-  const data = await request("/api/models?limit=200", requestInitWithSignal(options?.signal));
+  const data = await request("/api/models?limit=200", requestInitWithOptions(options));
   return AppServerListModelsResponseSchema.parse(stripOk(data));
 }
 
@@ -589,7 +685,7 @@ export async function getLiveState(
 ): Promise<z.infer<typeof LiveStateResponseSchema>> {
   const data = await request(
     `/api/threads/${encodeURIComponent(threadId)}/live-state`,
-    requestInitWithSignal(options?.signal)
+    requestInitWithOptions(options)
   );
   return LiveStateResponseSchema.parse(data);
 }
@@ -600,7 +696,7 @@ export async function getStreamEvents(
 ): Promise<z.infer<typeof StreamEventsResponseSchema>> {
   const data = await request(
     `/api/threads/${encodeURIComponent(threadId)}/stream-events?limit=80`,
-    requestInitWithSignal(options?.signal)
+    requestInitWithOptions(options)
   );
   return StreamEventsResponseSchema.parse(data);
 }
@@ -610,32 +706,44 @@ export async function sendMessage(input: {
   ownerClientId?: string;
   text: string;
   cwd?: string;
-}): Promise<void> {
+}, options?: ApiRequestOptions): Promise<void> {
   const { threadId, ...body } = input;
 
-  await requestNoContent(`/api/threads/${encodeURIComponent(threadId)}/messages`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
+  await requestNoContent(
+    `/api/threads/${encodeURIComponent(threadId)}/messages`,
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      },
+      options
+    )
+  );
 }
 
 export async function setCollaborationMode(input: {
   threadId: string;
   ownerClientId?: string;
   collaborationMode: CollaborationMode;
-}): Promise<void> {
+}, options?: ApiRequestOptions): Promise<void> {
   const { threadId, ...body } = input;
 
-  await requestNoContent(`/api/threads/${encodeURIComponent(threadId)}/collaboration-mode`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
+  await requestNoContent(
+    `/api/threads/${encodeURIComponent(threadId)}/collaboration-mode`,
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      },
+      options
+    )
+  );
 }
 
 export async function submitUserInput(input: {
@@ -643,153 +751,214 @@ export async function submitUserInput(input: {
   ownerClientId?: string;
   requestId: number;
   response: z.infer<typeof UserInputResponsePayloadSchema>;
-}): Promise<void> {
+}, options?: ApiRequestOptions): Promise<void> {
   UserInputResponsePayloadSchema.parse(input.response);
 
   const { threadId, ...body } = input;
 
-  await requestNoContent(`/api/threads/${encodeURIComponent(threadId)}/user-input`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
+  await requestNoContent(
+    `/api/threads/${encodeURIComponent(threadId)}/user-input`,
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      },
+      options
+    )
+  );
 }
 
 export async function interruptThread(input: {
   threadId: string;
   ownerClientId?: string;
-}): Promise<void> {
+}, options?: ApiRequestOptions): Promise<void> {
   const { threadId, ...body } = input;
 
-  await requestNoContent(`/api/threads/${encodeURIComponent(threadId)}/interrupt`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
+  await requestNoContent(
+    `/api/threads/${encodeURIComponent(threadId)}/interrupt`,
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      },
+      options
+    )
+  );
 }
 
 export async function getTraceStatus(options?: ApiRequestOptions): Promise<z.infer<typeof TraceStatusSchema>> {
-  const data = await request("/api/debug/trace/status", requestInitWithSignal(options?.signal));
+  const data = await request("/api/debug/trace/status", requestInitWithOptions(options));
   return TraceStatusSchema.parse(data);
 }
 
-export async function startTrace(label: string): Promise<void> {
-  await requestNoContent("/api/debug/trace/start", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label })
-  });
+export async function startTrace(label: string, options?: ApiRequestOptions): Promise<void> {
+  await requestNoContent(
+    "/api/debug/trace/start",
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label })
+      },
+      options
+    )
+  );
 }
 
-export async function markTrace(note: string): Promise<void> {
-  await requestNoContent("/api/debug/trace/mark", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ note })
-  });
+export async function markTrace(note: string, options?: ApiRequestOptions): Promise<void> {
+  await requestNoContent(
+    "/api/debug/trace/mark",
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note })
+      },
+      options
+    )
+  );
 }
 
-export async function stopTrace(): Promise<void> {
-  await requestNoContent("/api/debug/trace/stop", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({})
-  });
+export async function stopTrace(options?: ApiRequestOptions): Promise<void> {
+  await requestNoContent(
+    "/api/debug/trace/stop",
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      },
+      options
+    )
+  );
 }
 
 export async function listDebugHistory(
   limit = 120,
   options?: ApiRequestOptions
 ): Promise<z.infer<typeof HistoryListSchema>> {
-  const data = await request(
-    `/api/debug/history?limit=${String(limit)}`,
-    requestInitWithSignal(options?.signal)
-  );
+  const data = await request(`/api/debug/history?limit=${String(limit)}`, requestInitWithOptions(options));
   return HistoryListSchema.parse(data);
 }
 
-export async function getHistoryEntry(entryId: string): Promise<z.infer<typeof HistoryDetailSchema>> {
-  const data = await request(`/api/debug/history/${encodeURIComponent(entryId)}`);
+export async function getHistoryEntry(
+  entryId: string,
+  options?: ApiRequestOptions
+): Promise<z.infer<typeof HistoryDetailSchema>> {
+  const data = await request(`/api/debug/history/${encodeURIComponent(entryId)}`, requestInitWithOptions(options));
   return HistoryDetailSchema.parse(data);
 }
 
 export async function createDebugClientError(
-  input: z.infer<typeof CreateDebugClientErrorBodySchema>
+  input: z.infer<typeof CreateDebugClientErrorBodySchema>,
+  options?: ApiRequestOptions
 ): Promise<z.infer<typeof DebugErrorCreateEnvelopeSchema>> {
   const body = CreateDebugClientErrorBodySchema.parse(input);
-  const data = await request("/api/debug/client-errors", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
+  const data = await request(
+    "/api/debug/client-errors",
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      },
+      options
+    )
+  );
   return DebugErrorCreateEnvelopeSchema.parse(data);
 }
 
 export async function listDebugClientErrors(
-  limit = 120
+  limit = 120,
+  options?: ApiRequestOptions
 ): Promise<z.infer<typeof DebugErrorListEnvelopeSchema>> {
-  const data = await request(`/api/debug/client-errors?limit=${String(limit)}`);
+  const data = await request(`/api/debug/client-errors?limit=${String(limit)}`, requestInitWithOptions(options));
   return DebugErrorListEnvelopeSchema.parse(data);
 }
 
 export async function getDebugClientError(
-  errorId: string
+  errorId: string,
+  options?: ApiRequestOptions
 ): Promise<z.infer<typeof DebugErrorDetailEnvelopeSchema>> {
-  const data = await request(`/api/debug/client-errors/${encodeURIComponent(errorId)}`);
+  const data = await request(
+    `/api/debug/client-errors/${encodeURIComponent(errorId)}`,
+    requestInitWithOptions(options)
+  );
   return DebugErrorDetailEnvelopeSchema.parse(data);
 }
 
 export async function replayHistoryEntry(input: {
   entryId: string;
   waitForResponse: boolean;
-}): Promise<unknown> {
-  return request("/api/debug/replay", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input)
-  });
+}, options?: ApiRequestOptions): Promise<unknown> {
+  return request(
+    "/api/debug/replay",
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input)
+      },
+      options
+    )
+  );
 }
 
-export async function getPushStatus(): Promise<z.infer<typeof PushStatusEnvelopeSchema>> {
-  const data = await request("/api/push/status");
+export async function getPushStatus(options?: ApiRequestOptions): Promise<z.infer<typeof PushStatusEnvelopeSchema>> {
+  const data = await request("/api/push/status", requestInitWithOptions(options));
   return PushStatusEnvelopeSchema.parse(data);
 }
 
-export async function getPushVapidPublicKey(): Promise<z.infer<typeof PushVapidPublicKeyEnvelopeSchema>> {
-  const data = await request("/api/push/vapid-public-key");
+export async function getPushVapidPublicKey(
+  options?: ApiRequestOptions
+): Promise<z.infer<typeof PushVapidPublicKeyEnvelopeSchema>> {
+  const data = await request("/api/push/vapid-public-key", requestInitWithOptions(options));
   return PushVapidPublicKeyEnvelopeSchema.parse(data);
 }
 
-export async function getLatestPushReceipt(): Promise<z.infer<typeof PushReceiptLatestEnvelopeSchema>> {
-  const data = await request("/api/push/receipts/latest");
+export async function getLatestPushReceipt(
+  options?: ApiRequestOptions
+): Promise<z.infer<typeof PushReceiptLatestEnvelopeSchema>> {
+  const data = await request("/api/push/receipts/latest", requestInitWithOptions(options));
   return PushReceiptLatestEnvelopeSchema.parse(data);
 }
 
-export async function getLatestPushSend(): Promise<z.infer<typeof PushSendLatestEnvelopeSchema>> {
-  const data = await request("/api/push/sends/latest");
+export async function getLatestPushSend(options?: ApiRequestOptions): Promise<z.infer<typeof PushSendLatestEnvelopeSchema>> {
+  const data = await request("/api/push/sends/latest", requestInitWithOptions(options));
   return PushSendLatestEnvelopeSchema.parse(data);
 }
 
-export async function getPushLocalCaStatus(): Promise<z.infer<typeof PushLocalCaStatusEnvelopeSchema>> {
-  const data = await request("/api/push/local-ca");
+export async function getPushLocalCaStatus(
+  options?: ApiRequestOptions
+): Promise<z.infer<typeof PushLocalCaStatusEnvelopeSchema>> {
+  const data = await request("/api/push/local-ca", requestInitWithOptions(options));
   return PushLocalCaStatusEnvelopeSchema.parse(data);
 }
 
 export async function savePushSubscription(
-  input: z.infer<typeof CreatePushSubscriptionBodySchema>
+  input: z.infer<typeof CreatePushSubscriptionBodySchema>,
+  options?: ApiRequestOptions
 ): Promise<z.infer<typeof CreatePushSubscriptionResponseSchema>> {
   const body = CreatePushSubscriptionBodySchema.parse(input);
-  const data = await request("/api/push/subscriptions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
+  const data = await request(
+    "/api/push/subscriptions",
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      },
+      options
+    )
+  );
 
   return z
     .object({
@@ -801,16 +970,23 @@ export async function savePushSubscription(
 }
 
 export async function deletePushSubscription(
-  input: z.infer<typeof DeletePushSubscriptionBodySchema>
+  input: z.infer<typeof DeletePushSubscriptionBodySchema>,
+  options?: ApiRequestOptions
 ): Promise<z.infer<typeof DeletePushSubscriptionResponseSchema>> {
   const body = DeletePushSubscriptionBodySchema.parse(input);
-  const data = await request("/api/push/subscriptions", {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
+  const data = await request(
+    "/api/push/subscriptions",
+    applyRequestOptions(
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      },
+      options
+    )
+  );
   return z
     .object({
       ok: z.literal(true)
@@ -826,14 +1002,20 @@ export async function sendPushTestNotification(input: {
   title?: string;
   body?: string;
   dryRun?: boolean;
-}): Promise<z.infer<typeof PushTestResponseSchema>> {
-  const data = await request("/api/push/test", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(input)
-  });
+}, options?: ApiRequestOptions): Promise<z.infer<typeof PushTestResponseSchema>> {
+  const data = await request(
+    "/api/push/test",
+    applyRequestOptions(
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      },
+      options
+    )
+  );
   return PushTestResponseSchema.parse(data);
 }
 

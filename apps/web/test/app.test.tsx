@@ -153,6 +153,28 @@ let modelsFixture: {
   nextCursor: null;
 };
 
+let debugErrorsFixture: {
+  ok: true;
+  data: Array<{
+    errorId: string;
+    sessionId: string;
+    origin: "client" | "server";
+    source: string;
+    operation: string;
+    message: string;
+    name: string | null;
+    stack: string | null;
+    requestId: string | null;
+    threadId: string | null;
+    url: string | null;
+    occurredAt: string;
+    recordedAt: string;
+    details: Record<string, string | number | boolean | null>;
+  }>;
+  sessionId: string;
+  sessionLogPath: string;
+};
+
 let configDefaultsFixture: {
   ok: true;
   agentId: "codex" | "opencode" | null;
@@ -292,6 +314,13 @@ beforeEach(() => {
     nextCursor: null
   };
 
+  debugErrorsFixture = {
+    ok: true,
+    data: [],
+    sessionId: "session-test",
+    sessionLogPath: "/tmp/session-test.ndjson"
+  };
+
   configDefaultsFixture = {
     ok: true,
     agentId: "codex",
@@ -424,6 +453,13 @@ vi.stubGlobal(
       } as Response;
     }
 
+    if (pathname === "/api/debug/client-errors") {
+      return {
+        ok: true,
+        json: async () => debugErrorsFixture
+      } as Response;
+    }
+
     if (pathname === "/api/agents") {
       return {
         ok: true,
@@ -450,6 +486,42 @@ describe("App", () => {
     render(<App />);
     expect((await screen.findAllByText("Farfield")).length).toBeGreaterThan(0);
     expect(await screen.findByText("No thread selected")).toBeTruthy();
+  });
+
+  it("shows client errors in the debug issues panel", async () => {
+    debugErrorsFixture = {
+      ok: true,
+      data: [
+        {
+          errorId: "error_1",
+          sessionId: "session-test",
+          origin: "client",
+          source: "farfield-web",
+          operation: "send-message",
+          message: "Invalid JSON response from /api/threads/thread-1/messages",
+          name: "Error",
+          stack: null,
+          requestId: "req_123",
+          threadId: "thread-1",
+          url: "/threads/thread-1",
+          occurredAt: "2026-02-21T00:00:00.000Z",
+          recordedAt: "2026-02-21T00:00:01.000Z",
+          details: {
+            actionId: "action_abc",
+            actionName: "send-message"
+          }
+        }
+      ],
+      sessionId: "session-test",
+      sessionLogPath: "/tmp/session-test.ndjson"
+    };
+
+    render(<App />);
+    fireEvent.click(await screen.findByTestId("tab-debug"));
+
+    expect(await screen.findByTestId("debug-issues-panel")).toBeTruthy();
+    expect((await screen.findAllByText("Invalid JSON response from /api/threads/thread-1/messages")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("session log")).toBeTruthy();
   });
 
   it("shows selected-thread loading state before thread hydrate completes", async () => {

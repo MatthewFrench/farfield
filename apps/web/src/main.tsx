@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./index.css";
 import { reconcilePushSubscription } from "./lib/push";
+import { installGlobalClientCrashReporter } from "./lib/client-errors";
 
 const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";
 const BOOT_STATUS_EVENT_NAME = "farfield:boot-status";
@@ -61,6 +62,20 @@ function syncDisplayModeClass(): void {
   );
 }
 
+function readThreadIdFromPathname(pathname: string): string | null {
+  const threadMatch = /^\/threads\/([^/?#]+)/.exec(pathname);
+  const encodedThreadId = threadMatch?.[1];
+  if (!encodedThreadId) {
+    return null;
+  }
+  try {
+    const decodedThreadId = decodeURIComponent(encodedThreadId).trim();
+    return decodedThreadId.length > 0 ? decodedThreadId : null;
+  } catch {
+    return null;
+  }
+}
+
 function installViewportHeightSync(): void {
   const displayModeQuery = window.matchMedia("(display-mode: standalone)");
 
@@ -78,6 +93,11 @@ function installViewportHeightSync(): void {
 
 if (typeof window !== "undefined") {
   installViewportHeightSync();
+  installGlobalClientCrashReporter({
+    source: "farfield-web",
+    readThreadId: () => readThreadIdFromPathname(window.location.pathname),
+    readUrl: () => window.location.pathname + window.location.search
+  });
 }
 
 if (import.meta.env.DEV && import.meta.hot) {

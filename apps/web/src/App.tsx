@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   Activity,
+  AlertTriangle,
   Archive,
   ArrowDown,
   Bell,
@@ -45,6 +46,7 @@ import {
   interruptThread,
   listAgents,
   listCollaborationModes,
+  listDebugClientErrors,
   listModels,
   listDebugHistory,
   listThreads,
@@ -56,8 +58,10 @@ import {
   stopTrace,
   unarchiveThread,
   submitUserInput,
-  type AgentId
+  type AgentId,
+  type ApiRequestOptions
 } from "@/lib/api";
+import { reportClientError } from "@/lib/client-errors";
 import {
   enablePushNotifications,
   getPushClientState,
@@ -68,6 +72,7 @@ import { ConversationItem } from "@/components/ConversationItem";
 import { ChatComposer } from "@/components/ChatComposer";
 import { PendingRequestCard } from "@/components/PendingRequestCard";
 import { StreamEventCard } from "@/components/StreamEventCard";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -91,6 +96,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { z } from "zod";
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -106,6 +112,9 @@ type AgentsResponse = Awaited<ReturnType<typeof listAgents>>;
 type TraceStatus = Awaited<ReturnType<typeof getTraceStatus>>;
 type HistoryResponse = Awaited<ReturnType<typeof listDebugHistory>>;
 type HistoryDetail = Awaited<ReturnType<typeof getHistoryEntry>>;
+type DebugErrorsResponse = Awaited<ReturnType<typeof listDebugClientErrors>>;
+type DebugErrorEvent = DebugErrorsResponse["data"][number];
+type DebugHistoryEntry = HistoryResponse["history"][number];
 type PendingRequest = ReturnType<typeof getPendingUserInputRequests>[number];
 type Thread = ThreadsResponse["data"][number];
 type AgentDescriptor = AgentsResponse["agents"][number];
@@ -159,6 +168,21 @@ const ThreadUnreadStateSchema = z
     hasUnreadTurn: z.boolean().optional()
   })
   .passthrough();
+const SystemHistoryPayloadSchema = z
+  .object({
+    message: z.string().trim().min(1)
+  })
+  .passthrough();
+const HistoryWarningMetaSchema = z
+  .object({
+    method: z.string().trim().min(1).optional(),
+    threadId: z.string().trim().min(1).optional(),
+    requestId: z.string().trim().min(1).optional(),
+    actionId: z.string().trim().min(1).optional(),
+    actionName: z.string().trim().min(1).optional()
+  })
+  .passthrough();
+const DebugWorkspaceSectionSchema = z.enum(["issues", "history", "stream", "trace"]);
 
 interface RefreshFlags {
   refreshCore: boolean;
@@ -180,6 +204,7 @@ interface LoadSelectedThreadRequest {
 interface ErrorBannerDetails {
   operation: string;
   message: string;
+  actionId: string | null;
   requestId: string | null;
   errorId: string | null;
 }
@@ -198,6 +223,42 @@ interface SidebarSwipeState {
   startX: number;
   startY: number;
 }
+
+type DebugWorkspaceSection = "issues" | "history" | "stream" | "trace";
+type DebugIssueSeverityFilter = "all" | "error" | "warning";
+
+interface DebugIssueBase {
+  id: string;
+  severity: "error" | "warning";
+  occurredAt: string;
+  message: string;
+  sourceLabel: string;
+  threadId: string | null;
+  requestId: string | null;
+  actionId: string | null;
+  actionName: string | null;
+  searchText: string;
+}
+
+interface DebugErrorIssue extends DebugIssueBase {
+  severity: "error";
+  errorId: string;
+  origin: DebugErrorEvent["origin"];
+  source: string;
+  operation: string;
+  name: string | null;
+  stack: string | null;
+  detailsText: string;
+}
+
+interface DebugWarningIssue extends DebugIssueBase {
+  severity: "warning";
+  warningType: "ipc-method" | "system-message";
+  historyEntryId: string;
+  payloadText: string;
+}
+
+type DebugIssue = DebugErrorIssue | DebugWarningIssue;
 
 /* ── Helpers ────────────────────────────────────────────────── */
 function formatDate(value: number | string | null | undefined): string {
@@ -218,6 +279,138 @@ function threadLabel(thread: Thread): string {
 
 function toErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+function parseOptionalNonEmptyString(value: DebugErrorEvent["details"][string] | undefined): string | null {
+  const parsed = z.string().trim().min(1).safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+function toTimestampMs(value: string): number {
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function sortDebugIssuesByTimeDesc(left: DebugIssue, right: DebugIssue): number {
+  const leftMs = toTimestampMs(left.occurredAt);
+  const rightMs = toTimestampMs(right.occurredAt);
+  if (leftMs !== rightMs) {
+    return rightMs - leftMs;
+  }
+  return right.id.localeCompare(left.id);
+}
+
+function buildDebugErrorIssue(event: DebugErrorEvent): DebugErrorIssue {
+  const actionId = parseOptionalNonEmptyString(event.details["actionId"]);
+  const actionName = parseOptionalNonEmptyString(event.details["actionName"]);
+  const sourceLabel = event.origin === "server"
+    ? `Server (${event.operation})`
+    : `Client (${event.operation})`;
+  const searchText = [
+    event.errorId,
+    event.origin,
+    event.source,
+    event.operation,
+    event.message,
+    event.requestId ?? "",
+    event.threadId ?? "",
+    actionId ?? "",
+    actionName ?? ""
+  ].join(" ").toLowerCase();
+
+  return {
+    id: `error:${event.errorId}`,
+    severity: "error",
+    occurredAt: event.occurredAt,
+    message: event.message,
+    sourceLabel,
+    threadId: event.threadId,
+    requestId: event.requestId,
+    actionId,
+    actionName,
+    searchText,
+    errorId: event.errorId,
+    origin: event.origin,
+    source: event.source,
+    operation: event.operation,
+    name: event.name,
+    stack: event.stack,
+    detailsText: JSON.stringify(event.details, null, 2)
+  };
+}
+
+function buildDebugWarningIssuesFromHistory(history: DebugHistoryEntry[]): DebugWarningIssue[] {
+  const warningIssues: DebugWarningIssue[] = [];
+
+  for (const entry of history) {
+    const parsedMeta = HistoryWarningMetaSchema.safeParse(entry.meta);
+    const method = parsedMeta.success ? parsedMeta.data.method ?? null : null;
+
+    if (method && /warning|deprecat/i.test(method)) {
+      const searchText = [
+        entry.id,
+        method,
+        parsedMeta.success ? parsedMeta.data.threadId ?? "" : "",
+        parsedMeta.success ? parsedMeta.data.requestId ?? "" : "",
+        parsedMeta.success ? parsedMeta.data.actionId ?? "" : ""
+      ].join(" ").toLowerCase();
+      warningIssues.push({
+        id: `warning:history-method:${entry.id}`,
+        severity: "warning",
+        warningType: "ipc-method",
+        historyEntryId: entry.id,
+        occurredAt: entry.at,
+        message: `IPC method ${method}`,
+        sourceLabel: "IPC warning",
+        threadId: parsedMeta.success ? parsedMeta.data.threadId ?? null : null,
+        requestId: parsedMeta.success ? parsedMeta.data.requestId ?? null : null,
+        actionId: parsedMeta.success ? parsedMeta.data.actionId ?? null : null,
+        actionName: parsedMeta.success ? parsedMeta.data.actionName ?? null : null,
+        payloadText: JSON.stringify(entry.payload, null, 2),
+        searchText
+      });
+      continue;
+    }
+
+    if (entry.source !== "system") {
+      continue;
+    }
+
+    const parsedPayload = SystemHistoryPayloadSchema.safeParse(entry.payload);
+    if (!parsedPayload.success) {
+      continue;
+    }
+    const systemMessage = parsedPayload.data.message;
+    if (!/warning|deprecat/i.test(systemMessage)) {
+      continue;
+    }
+
+    const searchText = [
+      entry.id,
+      systemMessage,
+      parsedMeta.success ? parsedMeta.data.threadId ?? "" : "",
+      parsedMeta.success ? parsedMeta.data.requestId ?? "" : "",
+      parsedMeta.success ? parsedMeta.data.actionId ?? "" : ""
+    ].join(" ").toLowerCase();
+    warningIssues.push({
+      id: `warning:system:${entry.id}`,
+      severity: "warning",
+      warningType: "system-message",
+      historyEntryId: entry.id,
+      occurredAt: entry.at,
+      message: systemMessage,
+      sourceLabel: "System warning",
+      threadId: parsedMeta.success ? parsedMeta.data.threadId ?? null : null,
+      requestId: parsedMeta.success ? parsedMeta.data.requestId ?? null : null,
+      actionId: parsedMeta.success ? parsedMeta.data.actionId ?? null : null,
+      actionName: parsedMeta.success ? parsedMeta.data.actionName ?? null : null,
+      payloadText: JSON.stringify(entry.payload, null, 2),
+      searchText
+    });
+  }
+
+  warningIssues.sort(sortDebugIssuesByTimeDesc);
+  return warningIssues;
 }
 
 function escapeRegExp(value: string): string {
@@ -248,6 +441,7 @@ function toErrorBannerDetails(rawError: string): ErrorBannerDetails {
     return {
       operation: "",
       message: "",
+      actionId: null,
       requestId: null,
       errorId: null
     };
@@ -258,15 +452,53 @@ function toErrorBannerDetails(rawError: string): ErrorBannerDetails {
   const messageBody = operationMatch?.[2] ?? raw;
   const message = stripRepeatedOperationPrefix(messageBody, operation);
 
+  const actionIdMatch = raw.match(/\baction(?:Id)?[ =:]+([a-z0-9._-]+)/i);
   const requestIdMatch = raw.match(/\brequest(?:Id)?[ =:]+([a-z0-9._-]+)/i);
   const errorIdMatch = raw.match(/\berror(?:Id)?[ =:]+([a-z0-9._-]+)/i);
 
   return {
     operation,
     message,
+    actionId: actionIdMatch?.[1] ?? null,
     requestId: requestIdMatch?.[1] ?? null,
     errorId: errorIdMatch?.[1] ?? null
   };
+}
+
+function createUiActionId(): string {
+  return `action_${String(Date.now())}_${Math.floor(Math.random() * 1_000_000_000).toString(16)}`;
+}
+
+function extractRequestIdFromErrorMessage(errorMessage: string): string | null {
+  const requestIdMatch = errorMessage.match(/\brequest(?:Id)?[ =:]+([a-z0-9._-]+)/i);
+  return requestIdMatch?.[1] ?? null;
+}
+
+function shouldIgnoreUiErrorMessage(errorMessage: string): boolean {
+  return (
+    /^Request canceled for /i.test(errorMessage.trim())
+    || /Server is shutting down/i.test(errorMessage)
+  );
+}
+
+function formatTrackedUiErrorMessage(input: {
+  operation: string;
+  errorMessage: string;
+  actionId: string;
+  requestId: string | null;
+  errorId: string | null;
+}): string {
+  const tags = [
+    `actionId=${input.actionId}`,
+    input.requestId ? `requestId=${input.requestId}` : "",
+    input.errorId ? `errorId=${input.errorId}` : ""
+  ].filter((value) => value.length > 0);
+
+  if (tags.length === 0) {
+    return `${input.operation}: ${input.errorMessage}`;
+  }
+
+  return `${input.operation}: ${input.errorMessage} ${tags.join(" ")}`;
 }
 
 function isTransientReadThreadError(errorMessage: string): boolean {
@@ -557,15 +789,48 @@ function readSafeAreaInsetLeftPx(): number {
   return readCssPixelVariable("--safe-area-inset-left");
 }
 
+interface RuntimeViewportSizingState {
+  maxInnerHeightPortrait: number;
+  maxInnerHeightLandscape: number;
+}
+
+const runtimeViewportSizingState: RuntimeViewportSizingState = {
+  maxInnerHeightPortrait: 0,
+  maxInnerHeightLandscape: 0
+};
+
+function readKeyboardBaselineHeight(innerHeight: number): number {
+  const isLandscape = window.matchMedia("(orientation: landscape)").matches;
+  if (isLandscape) {
+    runtimeViewportSizingState.maxInnerHeightLandscape = Math.max(
+      runtimeViewportSizingState.maxInnerHeightLandscape,
+      innerHeight
+    );
+    return runtimeViewportSizingState.maxInnerHeightLandscape;
+  }
+
+  runtimeViewportSizingState.maxInnerHeightPortrait = Math.max(
+    runtimeViewportSizingState.maxInnerHeightPortrait,
+    innerHeight
+  );
+  return runtimeViewportSizingState.maxInnerHeightPortrait;
+}
+
 function applyRuntimeViewportSizingVariables(): void {
   const root = document.documentElement;
   const visualViewport = window.visualViewport;
-  const viewportHeight = visualViewport?.height ?? window.innerHeight;
-  root.style.setProperty("--app-height", `${Math.round(viewportHeight)}px`);
+  const layoutViewportHeight = window.innerHeight;
+  const viewportHeight = visualViewport?.height ?? layoutViewportHeight;
+  const viewportOffsetTop = Math.max(0, visualViewport?.offsetTop ?? 0);
+  const appHeight = viewportHeight + viewportOffsetTop;
+  root.style.setProperty("--app-height", `${Math.round(appHeight)}px`);
 
-  const viewportOffsetTop = visualViewport?.offsetTop ?? 0;
-  const keyboardInsetBottom = Math.max(0, window.innerHeight - (viewportHeight + viewportOffsetTop));
-  const safeAreaInsetBottom = readCssPixelVariable("--safe-area-inset-bottom");
+  const keyboardBaselineHeight = readKeyboardBaselineHeight(layoutViewportHeight);
+  const keyboardInsetBottom = Math.max(0, keyboardBaselineHeight - appHeight);
+  const safeAreaInsetBottom = Math.min(
+    readCssPixelVariable("--safe-area-inset-bottom"),
+    MOBILE_SAFE_AREA_INSET_BOTTOM_MAX_PX
+  );
   const composerSafeBottomInset = keyboardInsetBottom > MOBILE_KEYBOARD_INSET_OPEN_THRESHOLD_PX
     ? 0
     : safeAreaInsetBottom;
@@ -585,6 +850,8 @@ const READ_THREAD_RETRY_MAX_DELAY_MS = 1_000;
 const APP_DEFAULT_VALUE = "__app_default__";
 const ASSUMED_APP_DEFAULT_MODEL = "gpt-5.3-codex";
 const ASSUMED_APP_DEFAULT_EFFORT = "medium";
+const DEBUG_HISTORY_LIMIT = 120;
+const DEBUG_ERROR_LIST_LIMIT = 240;
 const THREAD_LIST_LIMIT = 80;
 const THREAD_LIST_MAX_PAGES = 20;
 const ARCHIVED_THREAD_LIST_MAX_PAGES = 20;
@@ -594,6 +861,7 @@ const MOBILE_SIDEBAR_SWIPE_TRIGGER_PX = 56;
 const MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX = 36;
 const MOBILE_SIDEBAR_SWIPE_CANCEL_NEGATIVE_PX = -14;
 const MOBILE_KEYBOARD_INSET_OPEN_THRESHOLD_PX = 72;
+const MOBILE_SAFE_AREA_INSET_BOTTOM_MAX_PX = 40;
 const AGENT_FAVICON_BY_ID: Record<AgentId, string> = {
   codex: "https://openai.com/favicon.ico",
   opencode: "https://opencode.ai/favicon.ico"
@@ -903,6 +1171,9 @@ export function App(): React.JSX.Element {
   const [traceLabel, setTraceLabel] = useState("capture");
   const [traceNote, setTraceNote] = useState("");
   const [history, setHistory] = useState<HistoryResponse["history"]>([]);
+  const [debugErrors, setDebugErrors] = useState<DebugErrorsResponse["data"]>([]);
+  const [debugErrorSessionId, setDebugErrorSessionId] = useState("");
+  const [debugErrorSessionLogPath, setDebugErrorSessionLogPath] = useState("");
   const [selectedHistoryId, setSelectedHistoryId] = useState("");
   const [historyDetail, setHistoryDetail] = useState<HistoryDetail | null>(null);
   const [isCoreLoading, setIsCoreLoading] = useState(true);
@@ -926,6 +1197,10 @@ export function App(): React.JSX.Element {
   const [isModeSyncing, setIsModeSyncing] = useState(false);
   const [collapsedThreadProjectGroups, setCollapsedThreadProjectGroups] = useState<Record<string, boolean>>({});
   const [collapsedArchivedProjectGroups, setCollapsedArchivedProjectGroups] = useState<Record<string, boolean>>({});
+  const [debugWorkspaceSection, setDebugWorkspaceSection] = useState<DebugWorkspaceSection>("issues");
+  const [selectedDebugIssueId, setSelectedDebugIssueId] = useState("");
+  const [debugIssueSeverityFilter, setDebugIssueSeverityFilter] = useState<DebugIssueSeverityFilter>("all");
+  const [debugIssueFilterQuery, setDebugIssueFilterQuery] = useState("");
 
   /* Refs */
   const selectedThreadIdRef = useRef<string | null>(null);
@@ -949,6 +1224,7 @@ export function App(): React.JSX.Element {
   const threadUpdatedAtByIdRef = useRef<Record<string, number>>({});
   const threadsSignatureRef = useRef<string[]>([]);
   const archivedThreadsSignatureRef = useRef<string[]>([]);
+  const debugErrorsSignatureRef = useRef<string[]>([]);
   const modesSignatureRef = useRef<string[]>([]);
   const modelsSignatureRef = useRef<string[]>([]);
   const isArchivedThreadsOpenRef = useRef(false);
@@ -1132,6 +1408,94 @@ export function App(): React.JSX.Element {
         : "no-thread"
       : "ready";
   const errorBannerDetails = useMemo(() => toErrorBannerDetails(error), [error]);
+  const debugErrorIssues = useMemo(() => {
+    const issues = debugErrors.map(buildDebugErrorIssue);
+    issues.sort(sortDebugIssuesByTimeDesc);
+    return issues;
+  }, [debugErrors]);
+  const debugWarningIssues = useMemo(
+    () => buildDebugWarningIssuesFromHistory(history),
+    [history]
+  );
+  const debugIssues = useMemo(() => {
+    const issues: DebugIssue[] = [...debugErrorIssues, ...debugWarningIssues];
+    issues.sort(sortDebugIssuesByTimeDesc);
+    return issues;
+  }, [debugErrorIssues, debugWarningIssues]);
+  const filteredDebugIssues = useMemo(() => {
+    const normalizedQuery = debugIssueFilterQuery.trim().toLowerCase();
+    return debugIssues.filter((issue) => {
+      if (debugIssueSeverityFilter !== "all" && issue.severity !== debugIssueSeverityFilter) {
+        return false;
+      }
+      if (normalizedQuery.length === 0) {
+        return true;
+      }
+      return issue.searchText.includes(normalizedQuery);
+    });
+  }, [debugIssueFilterQuery, debugIssueSeverityFilter, debugIssues]);
+  const selectedDebugIssue = useMemo(
+    () => filteredDebugIssues.find((issue) => issue.id === selectedDebugIssueId) ?? null,
+    [filteredDebugIssues, selectedDebugIssueId]
+  );
+  const reportTrackedUiError = useCallback(async (input: {
+    operation: string;
+    actionId: string;
+    threadId: string | null;
+    error: Parameters<typeof toErrorMessage>[0];
+    details?: Record<string, string | number | boolean | null>;
+  }): Promise<void> => {
+    const errorMessage = toErrorMessage(input.error);
+    if (shouldIgnoreUiErrorMessage(errorMessage)) {
+      return;
+    }
+
+    const requestId = extractRequestIdFromErrorMessage(errorMessage);
+    let errorId: string | null = null;
+    try {
+      const report = await reportClientError({
+        source: "farfield-web",
+        operation: input.operation,
+        message: errorMessage,
+        name: null,
+        stack: null,
+        requestId,
+        threadId: input.threadId,
+        url: window.location.pathname + window.location.search,
+        details: {
+          actionId: input.actionId,
+          actionName: input.operation,
+          ...(input.details ?? {})
+        }
+      });
+      errorId = report.errorId;
+    } catch {
+      errorId = null;
+    }
+
+    setError(formatTrackedUiErrorMessage({
+      operation: input.operation,
+      errorMessage,
+      actionId: input.actionId,
+      requestId,
+      errorId
+    }));
+  }, []);
+
+  const buildActionRequestOptions = useCallback((actionName: string): {
+    actionId: string;
+    requestOptions: ApiRequestOptions;
+  } => {
+    const actionId = createUiActionId();
+    return {
+      actionId,
+      requestOptions: {
+        actionId,
+        actionName
+      }
+    };
+  }, []);
+
   const flatConversationItems = useMemo(() => {
     const flattened: FlatConversationItem[] = [];
     let previousRenderedTurnIndex = -1;
@@ -1214,7 +1578,7 @@ export function App(): React.JSX.Element {
       }));
     }
 
-    const [nh, nt, ntr, nhist, nag, capabilities] = await Promise.all([
+    const [nh, nt, ntr, nhist, nerrs, nag, capabilities] = await Promise.all([
       getHealth(),
       listThreads({
         limit: THREAD_LIST_LIMIT,
@@ -1224,7 +1588,8 @@ export function App(): React.JSX.Element {
         sortKey: "updated_at"
       }),
       getTraceStatus(),
-      listDebugHistory(120),
+      listDebugHistory(DEBUG_HISTORY_LIMIT),
+      listDebugClientErrors(DEBUG_ERROR_LIST_LIMIT),
       listAgents().catch(() => null),
       capabilitiesPromise
     ]);
@@ -1248,6 +1613,9 @@ export function App(): React.JSX.Element {
     );
     const nextModelsSignature = nmo.data.map((model) =>
       [model.id, model.displayName ?? ""].join("|")
+    );
+    const nextDebugErrorsSignature = nerrs.data.map((entry) =>
+      [entry.errorId, entry.recordedAt, entry.message].join("|")
     );
 
     startTransition(() => {
@@ -1324,6 +1692,12 @@ export function App(): React.JSX.Element {
         }
         return nhist.history;
       });
+      if (!signaturesMatch(debugErrorsSignatureRef.current, nextDebugErrorsSignature)) {
+        debugErrorsSignatureRef.current = nextDebugErrorsSignature;
+        setDebugErrors(nerrs.data);
+      }
+      setDebugErrorSessionId(nerrs.sessionId);
+      setDebugErrorSessionLogPath(nerrs.sessionLogPath);
       if (nag) {
         setAgentDescriptors((prev) => {
           if (
@@ -1731,6 +2105,19 @@ export function App(): React.JSX.Element {
   }, [activeTab]);
 
   useEffect(() => {
+    if (filteredDebugIssues.length === 0) {
+      if (selectedDebugIssueId !== "") {
+        setSelectedDebugIssueId("");
+      }
+      return;
+    }
+    const hasSelectedIssue = filteredDebugIssues.some((issue) => issue.id === selectedDebugIssueId);
+    if (!hasSelectedIssue) {
+      setSelectedDebugIssueId(filteredDebugIssues[0]!.id);
+    }
+  }, [filteredDebugIssues, selectedDebugIssueId]);
+
+  useEffect(() => {
     isArchivedThreadsOpenRef.current = isArchivedThreadsOpen;
   }, [isArchivedThreadsOpen]);
 
@@ -1891,7 +2278,13 @@ export function App(): React.JSX.Element {
                 await loadCoreDataFn();
               }
             } else if (flags.refreshHistory && activeTabRef.current === "debug") {
-              const nextHistory = await listDebugHistory(120);
+              const [nextHistory, nextDebugErrors] = await Promise.all([
+                listDebugHistory(DEBUG_HISTORY_LIMIT),
+                listDebugClientErrors(DEBUG_ERROR_LIST_LIMIT)
+              ]);
+              const nextDebugErrorsSignature = nextDebugErrors.data.map((entry) =>
+                [entry.errorId, entry.recordedAt, entry.message].join("|")
+              );
               startTransition(() => {
                 setHistory((prev) => {
                   if (
@@ -1902,6 +2295,12 @@ export function App(): React.JSX.Element {
                   }
                   return nextHistory.history;
                 });
+                if (!signaturesMatch(debugErrorsSignatureRef.current, nextDebugErrorsSignature)) {
+                  debugErrorsSignatureRef.current = nextDebugErrorsSignature;
+                  setDebugErrors(nextDebugErrors.data);
+                }
+                setDebugErrorSessionId(nextDebugErrors.sessionId);
+                setDebugErrorSessionLogPath(nextDebugErrors.sessionLogPath);
               });
             }
             if (flags.refreshSelectedThread && selectedThreadIdRef.current && loadSelectedThreadFn) {
@@ -2188,30 +2587,42 @@ export function App(): React.JSX.Element {
   const submitMessage = useCallback(async (draft: string) => {
     if (!draft.trim()) return;
 
+    const { actionId, requestOptions } = buildActionRequestOptions("send-message");
+    let threadId: string | null = selectedThreadId;
     setIsBusy(true);
     try {
-      let threadId = selectedThreadId;
-
       // Auto-create a thread if none is selected.
       if (!threadId) {
         const created = await createThread({
           agentId: selectedAgentId
-        });
+        }, requestOptions);
         threadId = created.threadId;
         pendingMaterializationThreadIdsRef.current.add(threadId);
         setSelectedThreadId(threadId);
         selectedThreadIdRef.current = threadId;
       }
 
-      await sendMessage({ threadId, text: draft });
+      if (!threadId) {
+        throw new Error("No thread available for send-message");
+      }
+
+      await sendMessage({ threadId, text: draft }, requestOptions);
       pendingMaterializationThreadIdsRef.current.delete(threadId);
       await refreshAll();
     } catch (e) {
-      setError(toErrorMessage(e));
+      await reportTrackedUiError({
+        operation: "send-message",
+        actionId,
+        threadId,
+        error: e,
+        details: {
+          draftLength: draft.trim().length
+        }
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [refreshAll, selectedAgentId, selectedThreadId]);
+  }, [buildActionRequestOptions, refreshAll, reportTrackedUiError, selectedAgentId, selectedThreadId]);
 
   const applyModeDraft = useCallback(async (draft: {
     modeKey: string;
@@ -2233,6 +2644,7 @@ export function App(): React.JSX.Element {
     }
 
     const previousSignature = lastAppliedModeSignatureRef.current;
+    const { actionId, requestOptions } = buildActionRequestOptions("set-collaboration-mode");
     lastAppliedModeSignatureRef.current = signature;
     setIsModeSyncing(true);
     try {
@@ -2246,21 +2658,37 @@ export function App(): React.JSX.Element {
             developer_instructions: mode.developer_instructions ?? null
           }
         }
-      });
+      }, requestOptions);
       await loadSelectedThreadTracked(selectedThreadId);
     } catch (e) {
       lastAppliedModeSignatureRef.current = previousSignature;
       if (e instanceof Error && isRequestCanceledError(e)) {
         return;
       }
-      setError(toErrorMessage(e));
+      await reportTrackedUiError({
+        operation: "set-collaboration-mode",
+        actionId,
+        threadId: selectedThreadId,
+        error: e,
+        details: {
+          modeKey: draft.modeKey
+        }
+      });
     } finally {
       setIsModeSyncing(false);
     }
-  }, [isModeSyncing, loadSelectedThreadTracked, modes, selectedThreadId]);
+  }, [
+    buildActionRequestOptions,
+    isModeSyncing,
+    loadSelectedThreadTracked,
+    modes,
+    reportTrackedUiError,
+    selectedThreadId
+  ]);
 
   const submitPendingRequest = useCallback(async () => {
     if (!selectedThreadId || !activeRequest) return;
+    const { actionId, requestOptions } = buildActionRequestOptions("submit-user-input");
     const answers: Record<string, { answers: string[] }> = {};
     for (const q of activeRequest.params.questions) {
       const cur = answerDraft[q.id] ?? { option: "", freeform: "" };
@@ -2273,44 +2701,67 @@ export function App(): React.JSX.Element {
         threadId: selectedThreadId,
         requestId: activeRequest.id,
         response: { answers }
-      });
+      }, requestOptions);
       await refreshAll();
     } catch (e) {
-      setError(toErrorMessage(e));
+      await reportTrackedUiError({
+        operation: "submit-user-input",
+        actionId,
+        threadId: selectedThreadId,
+        error: e,
+        details: {
+          requestId: activeRequest.id
+        }
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [activeRequest, answerDraft, refreshAll, selectedThreadId]);
+  }, [activeRequest, answerDraft, buildActionRequestOptions, refreshAll, reportTrackedUiError, selectedThreadId]);
 
   const skipPendingRequest = useCallback(async () => {
     if (!selectedThreadId || !activeRequest) return;
+    const { actionId, requestOptions } = buildActionRequestOptions("skip-user-input");
     setIsBusy(true);
     try {
       await submitUserInput({
         threadId: selectedThreadId,
         requestId: activeRequest.id,
         response: { answers: {} }
-      });
+      }, requestOptions);
       await refreshAll();
     } catch (e) {
-      setError(toErrorMessage(e));
+      await reportTrackedUiError({
+        operation: "skip-user-input",
+        actionId,
+        threadId: selectedThreadId,
+        error: e,
+        details: {
+          requestId: activeRequest.id
+        }
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [activeRequest, refreshAll, selectedThreadId]);
+  }, [activeRequest, buildActionRequestOptions, refreshAll, reportTrackedUiError, selectedThreadId]);
 
   const runInterrupt = useCallback(async () => {
     if (!selectedThreadId) return;
+    const { actionId, requestOptions } = buildActionRequestOptions("interrupt-thread");
     setIsBusy(true);
     try {
-      await interruptThread({ threadId: selectedThreadId });
+      await interruptThread({ threadId: selectedThreadId }, requestOptions);
       await refreshAll();
     } catch (e) {
-      setError(toErrorMessage(e));
+      await reportTrackedUiError({
+        operation: "interrupt-thread",
+        actionId,
+        threadId: selectedThreadId,
+        error: e
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [refreshAll, selectedThreadId]);
+  }, [buildActionRequestOptions, refreshAll, reportTrackedUiError, selectedThreadId]);
 
   const loadHistoryDetail = useCallback(async (id: string) => {
     if (!id) { setHistoryDetail(null); return; }
@@ -2338,23 +2789,33 @@ export function App(): React.JSX.Element {
       setError("Cannot create thread: missing project path");
       return;
     }
+
+    const { actionId, requestOptions } = buildActionRequestOptions("create-thread");
     setIsBusy(true);
     try {
       const created = await createThread({
         cwd: trimmedProjectPath,
         ...(agentId ? { agentId } : {})
-      });
+      }, requestOptions);
       pendingMaterializationThreadIdsRef.current.add(created.threadId);
       setSelectedThreadId(created.threadId);
       selectedThreadIdRef.current = created.threadId;
       setMobileSidebarOpen(false);
       await refreshAll();
     } catch (e) {
-      setError(toErrorMessage(e));
+      await reportTrackedUiError({
+        operation: "create-thread",
+        actionId,
+        threadId: null,
+        error: e,
+        details: {
+          projectPath: trimmedProjectPath
+        }
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [refreshAll]);
+  }, [buildActionRequestOptions, refreshAll, reportTrackedUiError]);
 
   const createThreadForSingleAgent = useCallback((projectPath: string) => {
     const onlyAgentId = availableAgentIds[0];
@@ -2366,36 +2827,66 @@ export function App(): React.JSX.Element {
   }, [availableAgentIds, createNewThread]);
 
   const runArchiveThread = useCallback(async (threadId: string) => {
+    const { actionId, requestOptions } = buildActionRequestOptions("archive-thread");
     setIsBusy(true);
     try {
       const nextSelectedThreadId = selectedThreadIdRef.current === threadId
         ? (threads.find((thread) => thread.id !== threadId)?.id ?? null)
         : selectedThreadIdRef.current;
-      await archiveThread(threadId);
+      await archiveThread(threadId, requestOptions);
       setSelectedThreadId(nextSelectedThreadId);
       selectedThreadIdRef.current = nextSelectedThreadId;
       await loadCoreDataTracked();
     } catch (e) {
-      setError(toErrorMessage(e));
+      await reportTrackedUiError({
+        operation: "archive-thread",
+        actionId,
+        threadId,
+        error: e
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [loadCoreDataTracked, threads]);
+  }, [buildActionRequestOptions, loadCoreDataTracked, reportTrackedUiError, threads]);
 
   const runUnarchiveThread = useCallback(async (threadId: string) => {
+    const { actionId, requestOptions } = buildActionRequestOptions("unarchive-thread");
     setIsBusy(true);
     try {
-      await unarchiveThread(threadId);
+      await unarchiveThread(threadId, requestOptions);
       setSelectedThreadId(threadId);
       selectedThreadIdRef.current = threadId;
       setMobileSidebarOpen(false);
       await loadCoreDataTracked();
     } catch (e) {
-      setError(toErrorMessage(e));
+      await reportTrackedUiError({
+        operation: "unarchive-thread",
+        actionId,
+        threadId,
+        error: e
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [loadCoreDataTracked]);
+  }, [buildActionRequestOptions, loadCoreDataTracked, reportTrackedUiError]);
+
+  const openDebugFromErrorBanner = useCallback(() => {
+    setActiveTab("debug");
+    setDebugWorkspaceSection("issues");
+    setDebugIssueSeverityFilter("all");
+
+    if (errorBannerDetails.errorId) {
+      setSelectedDebugIssueId(`error:${errorBannerDetails.errorId}`);
+      setDebugIssueFilterQuery(errorBannerDetails.errorId);
+      return;
+    }
+
+    const nextFilterQuery = errorBannerDetails.requestId
+      ?? errorBannerDetails.actionId
+      ?? errorBannerDetails.operation
+      ?? "";
+    setDebugIssueFilterQuery(nextFilterQuery);
+  }, [errorBannerDetails.actionId, errorBannerDetails.errorId, errorBannerDetails.operation, errorBannerDetails.requestId]);
 
   const endSidebarSwipeTracking = useCallback(() => {
     sidebarSwipeStateRef.current.isTracking = false;
@@ -3123,13 +3614,27 @@ export function App(): React.JSX.Element {
                   <span data-testid="error-banner-message" className="truncate">
                     {errorBannerDetails.message}
                   </span>
+                  {errorBannerDetails.actionId && (
+                    <span
+                      data-testid="error-banner-action-id"
+                      className="hidden sm:inline-flex font-mono text-[11px] px-1 py-0.5 rounded bg-black/15"
+                    >
+                      action {errorBannerDetails.actionId}
+                    </span>
+                  )}
                   {errorBannerDetails.requestId && (
-                    <span data-testid="error-banner-request-id" className="hidden">
+                    <span
+                      data-testid="error-banner-request-id"
+                      className="hidden sm:inline-flex font-mono text-[11px] px-1 py-0.5 rounded bg-black/15"
+                    >
                       request {errorBannerDetails.requestId}
                     </span>
                   )}
                   {errorBannerDetails.errorId && (
-                    <span data-testid="error-banner-error-id" className="hidden">
+                    <span
+                      data-testid="error-banner-error-id"
+                      className="hidden sm:inline-flex font-mono text-[11px] px-1 py-0.5 rounded bg-black/15"
+                    >
                       error {errorBannerDetails.errorId}
                     </span>
                   )}
@@ -3138,7 +3643,7 @@ export function App(): React.JSX.Element {
                   <Button
                     type="button"
                     data-testid="error-banner-open-debug"
-                    onClick={() => setActiveTab("debug")}
+                    onClick={openDebugFromErrorBanner}
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-xs text-destructive-foreground/90 hover:text-destructive-foreground hover:bg-black/10"
@@ -3451,18 +3956,211 @@ export function App(): React.JSX.Element {
         {/* ── Debug tab ─────────────────────────────────────── */}
         {activeTab === "debug" && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] min-h-0 divide-y md:divide-y-0 md:divide-x divide-border overflow-hidden">
+            <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Bug size={14} className="text-muted-foreground shrink-0" />
+                <span className="text-sm font-medium truncate">Debug Workspace</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{debugErrorIssues.length} errors</span>
+                <span>{debugWarningIssues.length} warnings</span>
+              </div>
+            </div>
 
-              {/* Left: History */}
-              <div data-testid="debug-history-panel" className="flex flex-col min-h-0 overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
-                  <Activity size={13} className="text-muted-foreground" />
-                  <span className="text-sm font-medium">History</span>
-                  <span className="text-xs text-muted-foreground/60">{history.length} entries</span>
+            <Tabs
+              value={debugWorkspaceSection}
+              onValueChange={(value) => {
+                const parsedSection = DebugWorkspaceSectionSchema.safeParse(value);
+                if (parsedSection.success) {
+                  setDebugWorkspaceSection(parsedSection.data);
+                }
+              }}
+              className="flex-1 min-h-0 flex flex-col overflow-hidden"
+            >
+              <div className="shrink-0 px-4 py-2 border-b border-border">
+                <TabsList className="h-8">
+                  <TabsTrigger value="issues" className="text-xs h-7 px-2.5">Issues</TabsTrigger>
+                  <TabsTrigger value="history" className="text-xs h-7 px-2.5">History</TabsTrigger>
+                  <TabsTrigger value="stream" className="text-xs h-7 px-2.5">Stream</TabsTrigger>
+                  <TabsTrigger value="trace" className="text-xs h-7 px-2.5">Trace</TabsTrigger>
+                </TabsList>
+              </div>
+
+              {debugWorkspaceSection === "issues" && (
+                <div data-testid="debug-issues-panel" className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[330px_minmax(0,1fr)] divide-y md:divide-y-0 md:divide-x divide-border overflow-hidden">
+                  <div className="flex flex-col min-h-0 overflow-hidden">
+                    <div className="shrink-0 p-3 border-b border-border space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle size={13} className="text-muted-foreground" />
+                          <span className="text-sm font-medium">Issues</span>
+                          <span className="text-xs text-muted-foreground/70">{filteredDebugIssues.length}</span>
+                        </div>
+                        {debugErrorSessionLogPath.length > 0 && (
+                          <a
+                            href="/api/debug/client-errors/session-log"
+                            className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                          >
+                            session log
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          variant={debugIssueSeverityFilter === "all" ? "secondary" : "ghost"}
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setDebugIssueSeverityFilter("all")}
+                        >
+                          All
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={debugIssueSeverityFilter === "error" ? "secondary" : "ghost"}
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setDebugIssueSeverityFilter("error")}
+                        >
+                          Errors
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={debugIssueSeverityFilter === "warning" ? "secondary" : "ghost"}
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setDebugIssueSeverityFilter("warning")}
+                        >
+                          Warnings
+                        </Button>
+                      </div>
+                      <Input
+                        value={debugIssueFilterQuery}
+                        onChange={(event) => setDebugIssueFilterQuery(event.target.value)}
+                        placeholder="Filter by action/request/error/thread/message"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto">
+                      {filteredDebugIssues.map((issue) => (
+                        <Button
+                          key={issue.id}
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setSelectedDebugIssueId(issue.id)}
+                          className={`w-full h-auto rounded-none px-3 py-2.5 justify-start text-left ${
+                            selectedDebugIssueId === issue.id
+                              ? "bg-muted text-foreground"
+                              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                          }`}
+                        >
+                          <div className="w-full space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <Badge
+                                variant={issue.severity === "error" ? "danger" : "default"}
+                                className={issue.severity === "warning" ? "border-amber-300 bg-amber-50 text-amber-700" : ""}
+                              >
+                                {issue.severity}
+                              </Badge>
+                              <span className="font-mono text-[10px] text-muted-foreground/70 truncate">
+                                {issue.occurredAt}
+                              </span>
+                            </div>
+                            <div className="text-[11px] font-medium leading-4 line-clamp-2">
+                              {issue.message}
+                            </div>
+                            <div className="font-mono text-[10px] text-muted-foreground/70 truncate">
+                              {issue.sourceLabel}
+                            </div>
+                          </div>
+                        </Button>
+                      ))}
+                      {filteredDebugIssues.length === 0 && (
+                        <div className="px-3 py-6 text-xs text-muted-foreground">
+                          No matching issues.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col min-h-0 overflow-hidden">
+                    <div className="shrink-0 p-3 border-b border-border flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">Issue Detail</span>
+                      {debugErrorSessionId.length > 0 && (
+                        <span className="font-mono text-[10px] text-muted-foreground/70 truncate">
+                          {debugErrorSessionId}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-3">
+                      {!selectedDebugIssue ? (
+                        <div className="text-xs text-muted-foreground py-4">Select an issue</div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant={selectedDebugIssue.severity === "error" ? "danger" : "default"}
+                              className={selectedDebugIssue.severity === "warning" ? "border-amber-300 bg-amber-50 text-amber-700" : ""}
+                            >
+                              {selectedDebugIssue.severity}
+                            </Badge>
+                            <span className="font-mono text-[10px] text-muted-foreground/70">
+                              {selectedDebugIssue.occurredAt}
+                            </span>
+                          </div>
+                          <div className="text-sm leading-5">{selectedDebugIssue.message}</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                            <div><span className="text-muted-foreground">source:</span> {selectedDebugIssue.sourceLabel}</div>
+                            <div><span className="text-muted-foreground">thread:</span> {selectedDebugIssue.threadId ?? "n/a"}</div>
+                            <div><span className="text-muted-foreground">request:</span> {selectedDebugIssue.requestId ?? "n/a"}</div>
+                            <div><span className="text-muted-foreground">action:</span> {selectedDebugIssue.actionId ?? "n/a"}</div>
+                            <div className="sm:col-span-2"><span className="text-muted-foreground">actionName:</span> {selectedDebugIssue.actionName ?? "n/a"}</div>
+                          </div>
+
+                          {selectedDebugIssue.severity === "error" && (
+                            <>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                                <div><span className="text-muted-foreground">errorId:</span> {selectedDebugIssue.errorId}</div>
+                                <div><span className="text-muted-foreground">origin:</span> {selectedDebugIssue.origin}</div>
+                                <div><span className="text-muted-foreground">operation:</span> {selectedDebugIssue.operation}</div>
+                                <div><span className="text-muted-foreground">source:</span> {selectedDebugIssue.source}</div>
+                                <div className="sm:col-span-2"><span className="text-muted-foreground">name:</span> {selectedDebugIssue.name ?? "n/a"}</div>
+                              </div>
+                              {selectedDebugIssue.stack && (
+                                <div className="space-y-1">
+                                  <div className="text-xs font-medium text-muted-foreground">Stack</div>
+                                  <pre className="font-mono text-[11px] leading-5 whitespace-pre-wrap break-words text-muted-foreground">
+                                    {selectedDebugIssue.stack}
+                                  </pre>
+                                </div>
+                              )}
+                              <div className="space-y-1">
+                                <div className="text-xs font-medium text-muted-foreground">Details</div>
+                                <pre className="font-mono text-[11px] leading-5 whitespace-pre-wrap break-words text-muted-foreground">
+                                  {selectedDebugIssue.detailsText}
+                                </pre>
+                              </div>
+                            </>
+                          )}
+
+                          {selectedDebugIssue.severity === "warning" && (
+                            <div className="space-y-1">
+                              <div className="text-xs font-medium text-muted-foreground">Payload</div>
+                              <pre className="font-mono text-[11px] leading-5 whitespace-pre-wrap break-words text-muted-foreground">
+                                {selectedDebugIssue.payloadText}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              )}
 
-                <div className="flex-1 grid grid-cols-[200px_minmax(0,1fr)] min-h-0 divide-x divide-border overflow-hidden">
-                  {/* Entry list */}
+              {debugWorkspaceSection === "history" && (
+                <div data-testid="debug-history-panel" className="flex-1 grid grid-cols-[200px_minmax(0,1fr)] min-h-0 divide-x divide-border overflow-hidden">
                   <div className="overflow-y-auto py-1">
                     {history
                       .slice()
@@ -3499,7 +4197,6 @@ export function App(): React.JSX.Element {
                       ))}
                   </div>
 
-                  {/* Payload detail */}
                   <div className="overflow-y-auto p-3 space-y-3">
                     {!historyDetail ? (
                       <div className="text-xs text-muted-foreground py-4">Select an entry</div>
@@ -3541,13 +4238,28 @@ export function App(): React.JSX.Element {
                     )}
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Right: Trace + Stream Events */}
-              <div data-testid="debug-stream-panel" className="flex flex-col min-h-0 overflow-hidden divide-y divide-border">
+              {debugWorkspaceSection === "stream" && (
+                <div data-testid="debug-stream-events-panel" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border shrink-0">
+                    <Activity size={13} className="text-muted-foreground" />
+                    <span className="text-xs font-medium">Stream Events</span>
+                    <span className="text-xs text-muted-foreground/60">{streamEvents.length}</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+                    {streamEvents
+                      .slice()
+                      .reverse()
+                      .map((evt, index) => (
+                        <StreamEventCard key={index} event={evt} />
+                      ))}
+                  </div>
+                </div>
+              )}
 
-                {/* Trace controls */}
-                <div data-testid="debug-trace-panel" className="p-4 space-y-3 shrink-0">
+              {debugWorkspaceSection === "trace" && (
+                <div data-testid="debug-trace-panel" className="flex-1 overflow-y-auto p-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">Trace</span>
                     <span
@@ -3564,13 +4276,13 @@ export function App(): React.JSX.Element {
                     value={traceLabel}
                     onChange={(e) => setTraceLabel(e.target.value)}
                     placeholder="label"
-                    className="h-7 text-base md:text-xs"
+                    className="h-8 text-base md:text-xs"
                   />
                   <Input
                     value={traceNote}
                     onChange={(e) => setTraceNote(e.target.value)}
                     placeholder="marker note"
-                    className="h-7 text-base md:text-xs"
+                    className="h-8 text-base md:text-xs"
                   />
                   <div className="flex gap-1.5">
                     {(["Start", "Mark", "Stop"] as const).map((btn) => (
@@ -3588,31 +4300,30 @@ export function App(): React.JSX.Element {
                         }}
                         variant="outline"
                         size="sm"
-                        className="h-7 text-xs"
+                        className="h-8 text-xs"
                       >
                         {btn}
                       </Button>
                     ))}
                   </div>
-                </div>
-
-                {/* Stream events */}
-                <div data-testid="debug-stream-events-panel" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border shrink-0">
-                    <span className="text-xs font-medium">Stream Events</span>
-                    <span className="text-xs text-muted-foreground/60">{streamEvents.length}</span>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-                    {streamEvents
-                      .slice()
-                      .reverse()
-                      .map((evt, i) => (
-                        <StreamEventCard key={i} event={evt} />
+                  <div className="pt-2 border-t border-border">
+                    <div className="text-xs font-medium text-muted-foreground mb-1.5">Recent traces</div>
+                    <div className="space-y-1.5">
+                      {traceStatus?.recent.map((trace) => (
+                        <div key={trace.id} className="rounded-md border border-border px-2.5 py-2 text-[11px]">
+                          <div className="font-mono truncate">{trace.label}</div>
+                          <div className="text-muted-foreground">events {trace.eventCount}</div>
+                          <div className="text-muted-foreground/80 font-mono truncate">{trace.path}</div>
+                        </div>
                       ))}
+                      {(traceStatus?.recent.length ?? 0) === 0 && (
+                        <div className="text-xs text-muted-foreground">No traces yet.</div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              )}
+            </Tabs>
           </div>
         )}
       </div>
