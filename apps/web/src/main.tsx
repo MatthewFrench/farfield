@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./index.css";
+import { reconcilePushSubscription } from "./lib/push";
 
 const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";
 const BOOT_STATUS_EVENT_NAME = "farfield:boot-status";
@@ -171,6 +172,12 @@ function notifyServiceWorkerUpdateAvailable(): void {
   window.dispatchEvent(new Event(SERVICE_WORKER_UPDATE_EVENT_NAME));
 }
 
+function reconcilePushSubscriptionOnStartup(): void {
+  void reconcilePushSubscription().catch(() => {
+    // Startup should continue even if push subscription reconciliation fails.
+  });
+}
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     let didReloadAfterControllerChange = false;
@@ -205,6 +212,8 @@ if ("serviceWorker" in navigator) {
           didReloadAfterControllerChange = true;
           window.location.reload();
         });
+
+        reconcilePushSubscriptionOnStartup();
       })
       .catch(() => {
         // Service worker registration failures are surfaced via app preflight checks.

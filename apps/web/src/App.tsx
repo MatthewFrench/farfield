@@ -11,6 +11,7 @@ import {
   Activity,
   Archive,
   ArrowDown,
+  Bell,
   Bug,
   ChevronDown,
   ChevronRight,
@@ -55,6 +56,11 @@ import {
   submitUserInput,
   type AgentId
 } from "@/lib/api";
+import {
+  enablePushNotifications,
+  getPushClientState,
+  type PushClientState
+} from "@/lib/push";
 import { useTheme } from "@/hooks/useTheme";
 import { ConversationItem } from "@/components/ConversationItem";
 import { ChatComposer } from "@/components/ChatComposer";
@@ -267,6 +273,12 @@ const ARCHIVED_THREAD_LIST_MAX_PAGES = 20;
 const AGENT_FAVICON_BY_ID: Record<AgentId, string> = {
   codex: "https://openai.com/favicon.ico",
   opencode: "https://opencode.ai/favicon.ico"
+};
+const UNSUPPORTED_PUSH_CLIENT_STATE: PushClientState = {
+  supported: false,
+  serviceWorkerRegistered: false,
+  permission: "unsupported",
+  subscribed: false
 };
 
 function agentFavicon(agentId: AgentId | null | undefined): string | null {
@@ -627,6 +639,10 @@ export function App(): React.JSX.Element {
   const [answerDraft, setAnswerDraft] = useState<Record<string, { option: string; freeform: string }>>({});
   const [agentDescriptors, setAgentDescriptors] = useState<AgentDescriptor[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<AgentId>("codex");
+  const [pushClientState, setPushClientState] = useState<PushClientState>(
+    UNSUPPORTED_PUSH_CLIENT_STATE
+  );
+  const [isEnablingPushNotifications, setIsEnablingPushNotifications] = useState(false);
 
   /* UI state */
   const [activeTab, setActiveTab] = useState<"chat" | "debug">(initialUiState.tab);
@@ -1268,6 +1284,29 @@ export function App(): React.JSX.Element {
     }
   }, [loadCoreDataTracked, loadSelectedThread]);
 
+  const refreshPushClientState = useCallback(async () => {
+    try {
+      const nextState = await getPushClientState();
+      setPushClientState(nextState);
+    } catch {
+      setPushClientState(UNSUPPORTED_PUSH_CLIENT_STATE);
+    }
+  }, []);
+
+  const enablePushNotificationsFromToolbar = useCallback(async () => {
+    setIsEnablingPushNotifications(true);
+    try {
+      await enablePushNotifications({
+        privateMode: true
+      });
+      await refreshPushClientState();
+    } catch (e) {
+      setError(`push.enable: ${toErrorMessage(e)}`);
+    } finally {
+      setIsEnablingPushNotifications(false);
+    }
+  }, [refreshPushClientState]);
+
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
   }, [selectedThreadId]);
@@ -1301,6 +1340,10 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     void refreshAll();
   }, [refreshAll]);
+
+  useEffect(() => {
+    void refreshPushClientState();
+  }, [refreshPushClientState]);
 
   useEffect(() => {
     if (!isArchivedThreadsOpen) {
@@ -2425,6 +2468,31 @@ export function App(): React.JSX.Element {
           </div>
 
           <div className="flex items-center gap-0.5 shrink-0">
+            {pushClientState.supported && (
+              <IconBtn
+                onClick={() => void enablePushNotificationsFromToolbar()}
+                disabled={
+                  isEnablingPushNotifications ||
+                  pushClientState.subscribed ||
+                  pushClientState.permission === "denied"
+                }
+                active={pushClientState.subscribed}
+                title={
+                  pushClientState.subscribed
+                    ? "Notifications enabled"
+                    : pushClientState.permission === "denied"
+                      ? "Notifications blocked by browser settings"
+                      : "Enable notifications"
+                }
+                testId="enable-notifications-button"
+              >
+                {isEnablingPushNotifications ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Bell size={14} />
+                )}
+              </IconBtn>
+            )}
             <IconBtn
               onClick={() => void refreshAll()}
               disabled={isBusy}
