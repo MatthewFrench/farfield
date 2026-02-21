@@ -87,6 +87,52 @@ describe("AppServerClient.listThreads", () => {
   });
 });
 
+describe("AppServerClient.readThread", () => {
+  it("uses an extended timeout when includeTurns is true", async () => {
+    const request = vi.fn().mockResolvedValue({
+      thread: {
+        id: "thread-1",
+        turns: [],
+        requests: []
+      }
+    });
+    const transport: AppServerTransport = {
+      request,
+      close: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const client = new AppServerClient(transport);
+    await client.readThread("thread-1", true);
+
+    expect(request).toHaveBeenCalledWith("thread/read", {
+      threadId: "thread-1",
+      includeTurns: true
+    }, 90_000);
+  });
+
+  it("uses default timeout when includeTurns is false", async () => {
+    const request = vi.fn().mockResolvedValue({
+      thread: {
+        id: "thread-1",
+        turns: [],
+        requests: []
+      }
+    });
+    const transport: AppServerTransport = {
+      request,
+      close: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const client = new AppServerClient(transport);
+    await client.readThread("thread-1", false);
+
+    expect(request).toHaveBeenCalledWith("thread/read", {
+      threadId: "thread-1",
+      includeTurns: false
+    }, undefined);
+  });
+});
+
 describe("AppServerClient.readConfig", () => {
   it("requests config/read with includeLayers=false by default", async () => {
     const transport: AppServerTransport = {

@@ -53,6 +53,8 @@ describe("NtfyNotifier.publishThreadCompleted", () => {
     const result = await notifier.publishThreadCompleted({
       threadId: "thread-1",
       preview: "Fix tests",
+      projectName: "Farfield",
+      threadName: "Fix tests",
       agentText: "Completed"
     });
 
@@ -79,6 +81,8 @@ describe("NtfyNotifier.publishThreadCompleted", () => {
     const result = await notifier.publishThreadCompleted({
       threadId: "thread-1",
       preview: "Fix flaky tests",
+      projectName: "Farfield",
+      threadName: "Fix flaky tests",
       agentText: "Done and green."
     });
 
@@ -91,7 +95,7 @@ describe("NtfyNotifier.publishThreadCompleted", () => {
     expect(requestInit?.method).toBe("POST");
     expect(headers.Authorization).toBe("Bearer token-123");
     expect(headers.Priority).toBe("4");
-    expect(headers.Title).toBe("Farfield thread completed");
-    expect(String(requestInit?.body ?? "")).toContain("Fix flaky tests");
+    expect(headers.Title).toBe("Farfield - Fix flaky tests");
+    expect(String(requestInit?.body ?? "")).toBe("Done and green.");
   });
 });

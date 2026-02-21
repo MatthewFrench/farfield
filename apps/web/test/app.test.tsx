@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 
@@ -160,7 +160,7 @@ let configDefaultsFixture: {
   reasoningEffort: "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | null;
 };
 
-let readThreadResolver: (threadId: string) => {
+let readThreadResolver: (threadId: string, includeTurns: boolean) => {
   ok: true;
   thread: Record<string, object | string | number | boolean | null | undefined>;
   agentId: "codex" | "opencode";
@@ -299,7 +299,7 @@ beforeEach(() => {
     reasoningEffort: "medium"
   };
 
-  readThreadResolver = (_threadId: string) => null;
+  readThreadResolver = (_threadId: string, _includeTurns: boolean) => null;
   liveStateResolver = (threadId: string) => ({
     ok: true,
     threadId,
@@ -360,7 +360,8 @@ vi.stubGlobal(
     }
 
     if (pathname.startsWith("/api/threads/") && parsedUrl.searchParams.has("includeTurns")) {
-      const readThread = readThreadResolver(threadId);
+      const includeTurns = parsedUrl.searchParams.get("includeTurns") === "true";
+      const readThread = readThreadResolver(threadId, includeTurns);
       if (readThread) {
         if (readThreadDelayMs > 0) {
           await new Promise<void>((resolve) => {
@@ -475,7 +476,7 @@ describe("App", () => {
 
     const conversationState = buildConversationStateFixture(threadId, "gpt-5.3-codex");
     conversationState.turns = [];
-    readThreadResolver = (targetThreadId: string) => ({
+    readThreadResolver = (targetThreadId: string, _includeTurns: boolean) => ({
       ok: true,
       thread: {
         ...conversationState,
@@ -588,7 +589,7 @@ describe("App", () => {
       nextCursor: null
     };
 
-    readThreadResolver = (targetThreadId: string) => ({
+    readThreadResolver = (targetThreadId: string, _includeTurns: boolean) => ({
       ok: true,
       thread: buildConversationStateFixture(targetThreadId, modelId),
       agentId: "codex"
@@ -622,5 +623,260 @@ describe("App", () => {
     });
 
     expect(await screen.findByText("gpt-new-codex")).toBeTruthy();
+  });
+
+  it("keeps loaded turns when thread refresh skips turns payload", async () => {
+    const threadId = "thread-preserve-turns";
+    let includeTurnsFalseReadCount = 0;
+    window.history.replaceState(null, "", `/threads/${threadId}`);
+
+    threadsFixture = {
+      ok: true,
+      data: [
+        {
+          id: threadId,
+          preview: "thread preserve turns",
+          createdAt: 1700000000,
+          updatedAt: 1700000000,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex"
+        }
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false
+    };
+
+    readThreadResolver = (targetThreadId: string, includeTurns: boolean) => {
+      const fullState = buildConversationStateFixture(targetThreadId, "gpt-5.3-codex");
+      if (!includeTurns) {
+        includeTurnsFalseReadCount += 1;
+        return {
+          ok: true,
+          thread: {
+            ...fullState,
+            updatedAt: fullState.updatedAt + 1,
+            turns: []
+          },
+          agentId: "codex"
+        };
+      }
+      return {
+        ok: true,
+        thread: fullState,
+        agentId: "codex"
+      };
+    };
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(
+        document.querySelector(`[data-testid="thread-list-item"][data-thread-id="${threadId}"]`)
+      ).toBeTruthy();
+    });
+    expect(screen.queryByTestId("chat-empty-no-messages")).toBeNull();
+
+    MockEventSource.emit({
+      type: "history",
+      entry: {
+        source: "app",
+        meta: {
+          threadId
+        }
+      }
+    });
+
+    await waitFor(() => {
+      expect(includeTurnsFalseReadCount).toBeGreaterThan(0);
+    });
+    expect(screen.queryByTestId("chat-empty-no-messages")).toBeNull();
+  });
+
+  it("opens mobile sidebar with a left-edge swipe gesture", async () => {
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", {
+      value: 390,
+      configurable: true,
+      writable: true
+    });
+
+    try {
+      render(<App />);
+      await screen.findByText("No thread selected");
+      expect(screen.queryByTestId("sidebar-mobile")).toBeNull();
+
+      const appShell = await screen.findByTestId("app-shell");
+      fireEvent.touchStart(appShell, {
+        touches: [{ clientX: 8, clientY: 110 }]
+      });
+      fireEvent.touchMove(appShell, {
+        touches: [{ clientX: 92, clientY: 116 }]
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("sidebar-mobile")).toBeTruthy();
+      });
+    } finally {
+      Object.defineProperty(window, "innerWidth", {
+        value: originalInnerWidth,
+        configurable: true,
+        writable: true
+      });
+    }
+  });
+
+  it("does not auto-select another thread after selection is cleared", async () => {
+    const selectedThreadId = "thread-selected";
+    const otherThreadId = "thread-other";
+    window.history.replaceState(null, "", `/threads/${selectedThreadId}`);
+
+    threadsFixture = {
+      ok: true,
+      data: [
+        {
+          id: selectedThreadId,
+          preview: "selected thread",
+          createdAt: 1700000000,
+          updatedAt: 1700000000,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex"
+        },
+        {
+          id: otherThreadId,
+          preview: "other thread",
+          createdAt: 1700000001,
+          updatedAt: 1700000001,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex"
+        }
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false
+    };
+
+    readThreadResolver = (threadId: string, _includeTurns: boolean) => ({
+      ok: true,
+      thread: buildConversationStateFixture(threadId, "gpt-5.3-codex"),
+      agentId: "codex"
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe(`/threads/${selectedThreadId}`);
+    });
+
+    window.history.replaceState(null, "", "/");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/");
+    });
+    expect(await screen.findByText("No thread selected")).toBeTruthy();
+
+    MockEventSource.emit({
+      type: "history",
+      entry: {
+        source: "app",
+        meta: {
+          threadId: otherThreadId
+        }
+      }
+    });
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/");
+    });
+    expect(screen.getByText("No thread selected")).toBeTruthy();
+  });
+
+  it("shows unread marker for a newly updated thread and clears it when opened", async () => {
+    const selectedId = "thread-1";
+    const updatedId = "thread-2";
+    window.history.replaceState(null, "", `/threads/${selectedId}`);
+
+    threadsFixture = {
+      ok: true,
+      data: [
+        {
+          id: selectedId,
+          preview: "selected thread",
+          createdAt: 1700000000,
+          updatedAt: 1700000000,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex"
+        },
+        {
+          id: updatedId,
+          preview: "updated thread",
+          createdAt: 1700000001,
+          updatedAt: 1700000000,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex"
+        }
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false
+    };
+
+    readThreadResolver = (threadId: string, _includeTurns: boolean) => ({
+      ok: true,
+      thread: buildConversationStateFixture(threadId, "gpt-5.3-codex"),
+      agentId: "codex"
+    });
+
+    render(<App />);
+    await waitFor(() => {
+      expect(
+        document.querySelector(`[data-testid="thread-list-item"][data-thread-id="${selectedId}"]`)
+      ).toBeTruthy();
+    });
+    expect(screen.queryByTestId(`thread-unread-indicator-${updatedId}`)).toBeNull();
+
+    threadsFixture = {
+      ...threadsFixture,
+      data: threadsFixture.data.map((thread) =>
+        thread.id === updatedId
+          ? {
+            ...thread,
+            updatedAt: 1700000050
+          }
+          : thread
+      )
+    };
+
+    MockEventSource.emit({
+      type: "history",
+      entry: {
+        source: "app",
+        meta: {
+          threadId: updatedId
+        }
+      }
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId(`thread-unread-indicator-${updatedId}`)).toBeTruthy();
+    });
+
+    const updatedThreadButton = document.querySelector(
+      `[data-testid="thread-list-item"][data-thread-id="${updatedId}"]`
+    );
+    if (!updatedThreadButton) {
+      throw new Error("Expected updated thread button to exist");
+    }
+    fireEvent.click(updatedThreadButton);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId(`thread-unread-indicator-${updatedId}`)).toBeNull();
+    });
   });
 });

@@ -359,12 +359,13 @@ Notes:
 
 Local HTTPS:
 
-1. Run setup once: `pnpm setup:ios-push`.
-2. Trust local Caddy CA on macOS: `pnpm ios:trust-local-ca`.
-3. Start stack: `pnpm ios:local`.
-4. On iOS, trust Caddy root CA once.
-5. Open HTTPS origin in Safari, then add to Home Screen.
-6. Launch from Home Screen and enable notifications.
+1. Run setup once: `bun run setup:ios-push`.
+2. Trust local Caddy CA on macOS: `bun run ios:trust-local-ca`.
+3. Start Caddy local HTTPS proxy (terminal 1): `bun run caddy:local`.
+4. Start Farfield app server + web dev server (terminal 2): `bun run dev`.
+5. On iOS, trust Caddy root CA once.
+6. Open HTTPS origin in Safari, then add to Home Screen.
+7. Launch from Home Screen and enable notifications.
 
 Domain HTTPS:
 
@@ -390,7 +391,7 @@ Add convenience scripts in root `package.json`:
 1. `setup:ios-push` (writes `.env.local` with generated keys/token)
 2. `setup:domain-https` (generates `ops/caddy/Caddyfile.domain` from template)
 3. `ios:trust-local-ca` (runs explicit local CA trust setup before launching local HTTPS stack)
-4. `ios:local` (starts app stack + Caddy local config)
+4. `caddy:local` (starts Caddy local HTTPS proxy using generated local config)
 5. `push:keys` (generate VAPID keypair)
 6. `push:doctor` (checks env vars, Caddy template/runtime config presence, and live `/api/health` + `/api/push/status` reachability)
 7. `rotate:api-token` (rotates `API_TOKEN` and `PUSH_DOCTOR_TOKEN` in `.env.local`)

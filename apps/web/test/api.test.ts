@@ -4,6 +4,7 @@ import {
   getConfigDefaults,
   getDebugClientError,
   listThreads,
+  sendMessage,
   unarchiveThread
 } from "../src/lib/api";
 
@@ -163,5 +164,21 @@ describe("API envelope parsing", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
     expect(requestUrl).toBe("/api/threads/thread_123/unarchive");
+  });
+
+  it("succeeds for sendMessage when response has no JSON body", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200
+    } as Response);
+
+    await sendMessage({
+      threadId: "thread_123",
+      text: "hello"
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
+    expect(requestUrl).toBe("/api/threads/thread_123/messages");
   });
 });

@@ -114,6 +114,7 @@ const AppServerConfigReadResponseSchema = z
   .passthrough();
 
 export type AppServerConfigReadResponse = z.infer<typeof AppServerConfigReadResponseSchema>;
+const READ_THREAD_WITH_TURNS_TIMEOUT_MS = 90_000;
 
 export class AppServerClient {
   private readonly transport: AppServerTransport;
@@ -195,7 +196,7 @@ export class AppServerClient {
     const result = await this.transport.request("thread/read", {
       threadId,
       includeTurns
-    });
+    }, includeTurns ? READ_THREAD_WITH_TURNS_TIMEOUT_MS : undefined);
 
     return parseWithSchema(AppServerReadThreadResponseSchema, result, "AppServerReadThreadResponse");
   }

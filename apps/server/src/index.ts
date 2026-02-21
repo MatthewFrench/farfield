@@ -5,7 +5,7 @@ import os from "node:os";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { AppServerRpcError, type SendRequestOptions } from "@farfield/api";
+import { AppServerRpcError, AppServerTransportError, type SendRequestOptions } from "@farfield/api";
 import {
   type AppServerListThreadsResponse,
   CreateDebugClientErrorBodySchema,
@@ -92,9 +92,12 @@ interface ParsedReplayFrame {
   version?: number;
 }
 
-const ThreadPreviewSchema = z
+const ThreadNotificationContextSchema = z
   .object({
-    preview: z.string()
+    preview: z.string().optional(),
+    title: z.union([z.string(), z.null()]).optional(),
+    cwd: z.string().optional(),
+    path: z.string().optional()
   })
   .passthrough();
 const AgentIdParamSchema = z.enum(["codex", "opencode"]);
@@ -315,12 +318,45 @@ function compareThreadListItems(
   return left.id.localeCompare(right.id);
 }
 
-function readThreadPreview(value: AgentThreadLiveState["conversationState"]): string {
-  const parsed = ThreadPreviewSchema.safeParse(value);
-  if (!parsed.success) {
-    return "";
+function normalizeProjectPathForLabel(value: string): string {
+  return value.trim().replaceAll("\\", "/").replace(/\/+$/, "");
+}
+
+function projectLabelFromPath(value: string): string {
+  const normalized = normalizeProjectPathForLabel(value);
+  if (normalized.length === 0) {
+    return "No project";
   }
-  return parsed.data.preview;
+  const segments = normalized.split("/").filter((segment) => segment.length > 0);
+  return segments[segments.length - 1] ?? normalized;
+}
+
+function readThreadNotificationContext(
+  value: AgentThreadLiveState["conversationState"]
+): {
+  preview: string;
+  threadName: string;
+  projectName: string;
+} {
+  const parsed = ThreadNotificationContextSchema.safeParse(value);
+  if (!parsed.success) {
+    return {
+      preview: "",
+      threadName: "",
+      projectName: "No project"
+    };
+  }
+
+  const preview = normalizeOptionalString(parsed.data.preview ?? null) ?? "";
+  const title = normalizeOptionalString(parsed.data.title ?? null) ?? "";
+  const cwd = normalizeOptionalString(parsed.data.cwd ?? null);
+  const pathValue = normalizeOptionalString(parsed.data.path ?? null);
+
+  return {
+    preview,
+    threadName: preview.length > 0 ? preview : title,
+    projectName: cwd ? projectLabelFromPath(cwd) : (pathValue ? projectLabelFromPath(pathValue) : "No project")
+  };
 }
 
 function jsonResponse(res: ServerResponse, statusCode: number, body: unknown): void {
@@ -616,6 +652,7 @@ const threadIndex = new ThreadIndex();
 let activeTrace: ActiveTrace | null = null;
 const recentTraces: TraceSummary[] = [];
 let runtimeLastError: string | null = null;
+let isShuttingDown = false;
 const completionWatermarks = new Map<string, string>();
 for (const entry of pushStore.listCompletionWatermarks()) {
   completionWatermarks.set(entry.threadId, entry.marker);
@@ -762,6 +799,21 @@ function recordServerErrorEvent(input: {
   );
 }
 
+function isExpectedShutdownTransportError(error: Error): boolean {
+  if (!isShuttingDown) {
+    return false;
+  }
+
+  if (!(error instanceof AppServerTransportError)) {
+    return false;
+  }
+
+  return (
+    error.message === "app-server transport closed"
+    || error.message.startsWith("app-server exited (")
+  );
+}
+
 let codexAdapter: CodexAgentAdapter | null = null;
 let openCodeAdapter: OpenCodeAgentAdapter | null = null;
 const adapters: AgentAdapter[] = [];
@@ -790,7 +842,8 @@ async function checkAndNotifyThreadCompletion(threadId: string): Promise<void> {
       return;
     }
 
-    const preview = readThreadPreview(liveState.conversationState);
+    const threadNotificationContext = readThreadNotificationContext(liveState.conversationState);
+    const preview = threadNotificationContext.preview;
 
     let ntfyDelivered = false;
     let ntfyMessageId: string | null = null;
@@ -799,6 +852,8 @@ async function checkAndNotifyThreadCompletion(threadId: string): Promise<void> {
         const publishResult = await ntfyNotifier.publishThreadCompleted({
           threadId: completionCandidate.threadId,
           preview,
+          projectName: threadNotificationContext.projectName,
+          threadName: threadNotificationContext.threadName,
           agentText: completionCandidate.agentText
         });
         ntfyDelivered = true;
@@ -1082,6 +1137,14 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${HOST}:${PORT}`);
     const pathname = url.pathname;
     const segments = pathname.split("/").filter(Boolean);
+
+    if (isShuttingDown && pathname !== "/healthz") {
+      jsonResponse(res, 503, {
+        ok: false,
+        error: "Server is shutting down"
+      });
+      return;
+    }
 
     if (req.method === "GET" && pathname === "/healthz") {
       jsonResponse(res, 200, {
@@ -2301,8 +2364,9 @@ const server = http.createServer(async (req, res) => {
 
     jsonResponse(res, 404, { ok: false, error: "Not found" });
   } catch (error) {
-    runtimeLastError = toErrorMessage(error);
-    if (error instanceof Error) {
+    const suppressServerErrorRecording = error instanceof Error && isExpectedShutdownTransportError(error);
+    runtimeLastError = suppressServerErrorRecording ? "Server is shutting down" : toErrorMessage(error);
+    if (error instanceof Error && !suppressServerErrorRecording) {
       try {
         recordServerErrorEvent({
           source: "farfield-server",
@@ -2327,24 +2391,42 @@ const server = http.createServer(async (req, res) => {
         );
       }
     }
-    logger.error(
-      {
-        method: req.method ?? "unknown",
-        url: req.url ?? "unknown",
+
+    const requestMethod = req.method ?? "unknown";
+    const requestUrl = req.url ?? "unknown";
+
+    if (suppressServerErrorRecording) {
+      logger.info(
+        {
+          method: requestMethod,
+          url: requestUrl,
+          error: runtimeLastError
+        },
+        "request-closed-during-shutdown"
+      );
+    } else {
+      logger.error(
+        {
+          method: requestMethod,
+          url: requestUrl,
+          error: runtimeLastError
+        },
+        "request-failed"
+      );
+      pushSystem("Request failed", {
+        error: runtimeLastError,
+        method: requestMethod,
+        url: requestUrl
+      });
+      broadcastRuntimeState();
+    }
+
+    if (!res.headersSent) {
+      jsonResponse(res, suppressServerErrorRecording ? 503 : 500, {
+        ok: false,
         error: runtimeLastError
-      },
-      "request-failed"
-    );
-    pushSystem("Request failed", {
-      error: runtimeLastError,
-      method: req.method ?? "unknown",
-      url: req.url ?? "unknown"
-    });
-    broadcastRuntimeState();
-    jsonResponse(res, 500, {
-      ok: false,
-      error: runtimeLastError
-    });
+      });
+    }
   }
 });
 
@@ -2440,6 +2522,11 @@ async function start(): Promise<void> {
 }
 
 async function shutdown(): Promise<void> {
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+
   if (activeTrace) {
     activeTrace.stream.end();
     activeTrace = null;

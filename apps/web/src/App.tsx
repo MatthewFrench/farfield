@@ -5,7 +5,8 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState
+  useState,
+  type TouchEvent as ReactTouchEvent
 } from "react";
 import {
   Activity,
@@ -153,6 +154,11 @@ const SseHistoryEventSchema = z
   .passthrough();
 
 const SseEventSchema = z.union([SseStateEventSchema, SseHistoryEventSchema]);
+const ThreadUnreadStateSchema = z
+  .object({
+    hasUnreadTurn: z.boolean().optional()
+  })
+  .passthrough();
 
 interface RefreshFlags {
   refreshCore: boolean;
@@ -187,6 +193,12 @@ interface ProjectThreadGroup {
   isRemoved: boolean;
 }
 
+interface SidebarSwipeState {
+  isTracking: boolean;
+  startX: number;
+  startY: number;
+}
+
 /* ── Helpers ────────────────────────────────────────────────── */
 function formatDate(value: number | string | null | undefined): string {
   if (typeof value === "number") return new Date(value * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -208,6 +220,28 @@ function toErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stripRepeatedOperationPrefix(message: string, operation: string): string {
+  const normalizedMessage = message.trim();
+  const normalizedOperation = operation.trim();
+  if (normalizedMessage.length === 0 || normalizedOperation.length === 0) {
+    return normalizedMessage;
+  }
+
+  const operationPattern = new RegExp(`^${escapeRegExp(normalizedOperation)}\\s*[:\\-]\\s*`, "i");
+  let nextMessage = normalizedMessage;
+  for (let index = 0; index < 3; index += 1) {
+    if (!operationPattern.test(nextMessage)) {
+      break;
+    }
+    nextMessage = nextMessage.replace(operationPattern, "").trim();
+  }
+  return nextMessage.length > 0 ? nextMessage : normalizedMessage;
+}
+
 function toErrorBannerDetails(rawError: string): ErrorBannerDetails {
   const raw = rawError.trim();
   if (raw.length === 0) {
@@ -221,7 +255,8 @@ function toErrorBannerDetails(rawError: string): ErrorBannerDetails {
 
   const operationMatch = raw.match(/^([a-z][a-z0-9._-]{1,64}):\s*(.+)$/i);
   const operation = operationMatch?.[1] ?? "";
-  const message = operationMatch?.[2] ?? raw;
+  const messageBody = operationMatch?.[2] ?? raw;
+  const message = stripRepeatedOperationPrefix(messageBody, operation);
 
   const requestIdMatch = raw.match(/\brequest(?:Id)?[ =:]+([a-z0-9._-]+)/i);
   const errorIdMatch = raw.match(/\berror(?:Id)?[ =:]+([a-z0-9._-]+)/i);
@@ -280,6 +315,48 @@ function signaturesMatch(prev: string[], next: string[]): boolean {
     return false;
   }
   return prev.every((value, index) => value === next[index]);
+}
+
+function readThreadUpdatedAtTimestamp(thread: Thread): number {
+  return thread.updatedAt ?? 0;
+}
+
+function mapThreadUpdatedAtById(threads: Thread[]): Record<string, number> {
+  const mapped: Record<string, number> = {};
+  for (const thread of threads) {
+    mapped[thread.id] = readThreadUpdatedAtTimestamp(thread);
+  }
+  return mapped;
+}
+
+function computeUnreadThreadIds(input: {
+  previousUnreadThreadIds: Record<string, true>;
+  previousThreadUpdatedAtById: Record<string, number>;
+  nextThreads: Thread[];
+  selectedThreadId: string | null;
+}): Record<string, true> {
+  const nextUnreadThreadIds: Record<string, true> = {};
+  for (const thread of input.nextThreads) {
+    if (thread.id === input.selectedThreadId) {
+      continue;
+    }
+    const parsedUnreadState = ThreadUnreadStateSchema.parse(thread);
+    if (parsedUnreadState.hasUnreadTurn === true) {
+      nextUnreadThreadIds[thread.id] = true;
+      continue;
+    }
+    if (parsedUnreadState.hasUnreadTurn === false) {
+      continue;
+    }
+    const wasUnread = input.previousUnreadThreadIds[thread.id] === true;
+    const previousUpdatedAt = input.previousThreadUpdatedAtById[thread.id];
+    const hasNewUpdate = previousUpdatedAt !== undefined
+      && readThreadUpdatedAtTimestamp(thread) > previousUpdatedAt;
+    if (wasUnread || hasNewUpdate) {
+      nextUnreadThreadIds[thread.id] = true;
+    }
+  }
+  return nextUnreadThreadIds;
 }
 
 function normalizeProjectPath(path: string): string {
@@ -441,6 +518,60 @@ function mergeLoadSelectedThreadRequest(
   };
 }
 
+function mergeReadThreadState(input: {
+  previous: ReadThreadResponse | null;
+  incoming: ReadThreadResponse;
+  includeTurns: boolean;
+}): ReadThreadResponse {
+  if (input.includeTurns) {
+    return input.incoming;
+  }
+  if (!input.previous) {
+    return input.incoming;
+  }
+  if (input.previous.thread.id !== input.incoming.thread.id) {
+    return input.incoming;
+  }
+  if (input.incoming.thread.turns.length > 0 || input.previous.thread.turns.length === 0) {
+    return input.incoming;
+  }
+  return {
+    ...input.incoming,
+    thread: {
+      ...input.incoming.thread,
+      turns: input.previous.thread.turns
+    }
+  };
+}
+
+function readCssPixelVariable(variableName: string): number {
+  const raw = window.getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+  if (raw.length === 0) {
+    return 0;
+  }
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function readSafeAreaInsetLeftPx(): number {
+  return readCssPixelVariable("--safe-area-inset-left");
+}
+
+function applyRuntimeViewportSizingVariables(): void {
+  const root = document.documentElement;
+  const visualViewport = window.visualViewport;
+  const viewportHeight = visualViewport?.height ?? window.innerHeight;
+  root.style.setProperty("--app-height", `${Math.round(viewportHeight)}px`);
+
+  const viewportOffsetTop = visualViewport?.offsetTop ?? 0;
+  const keyboardInsetBottom = Math.max(0, window.innerHeight - (viewportHeight + viewportOffsetTop));
+  const safeAreaInsetBottom = readCssPixelVariable("--safe-area-inset-bottom");
+  const composerSafeBottomInset = keyboardInsetBottom > MOBILE_KEYBOARD_INSET_OPEN_THRESHOLD_PX
+    ? 0
+    : safeAreaInsetBottom;
+  root.style.setProperty("--composer-safe-bottom-inset", `${Math.round(composerSafeBottomInset)}px`);
+}
+
 const DEFAULT_EFFORT_OPTIONS = ["minimal", "low", "medium", "high", "xhigh"] as const;
 const INITIAL_VISIBLE_CHAT_ITEMS = 90;
 const VISIBLE_CHAT_ITEMS_STEP = 80;
@@ -457,6 +588,12 @@ const ASSUMED_APP_DEFAULT_EFFORT = "medium";
 const THREAD_LIST_LIMIT = 80;
 const THREAD_LIST_MAX_PAGES = 20;
 const ARCHIVED_THREAD_LIST_MAX_PAGES = 20;
+const MOBILE_LAYOUT_MAX_WIDTH_PX = 768;
+const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32;
+const MOBILE_SIDEBAR_SWIPE_TRIGGER_PX = 56;
+const MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX = 36;
+const MOBILE_SIDEBAR_SWIPE_CANCEL_NEGATIVE_PX = -14;
+const MOBILE_KEYBOARD_INSET_OPEN_THRESHOLD_PX = 72;
 const AGENT_FAVICON_BY_ID: Record<AgentId, string> = {
   codex: "https://openai.com/favicon.ico",
   opencode: "https://opencode.ai/favicon.ico"
@@ -743,6 +880,7 @@ export function App(): React.JSX.Element {
   const [health, setHealth] = useState<Health | null>(null);
   const [configDefaults, setConfigDefaults] = useState<ConfigDefaults | null>(null);
   const [threads, setThreads] = useState<ThreadsResponse["data"]>([]);
+  const [unreadThreadIds, setUnreadThreadIds] = useState<Record<string, true>>({});
   const [archivedThreads, setArchivedThreads] = useState<ThreadsResponse["data"]>([]);
   const [hasLoadedArchivedThreads, setHasLoadedArchivedThreads] = useState(false);
   const [archivedThreadsTruncated, setArchivedThreadsTruncated] = useState(false);
@@ -806,7 +944,9 @@ export function App(): React.JSX.Element {
   const isChatAtBottomRef = useRef(true);
   const lastAppliedModeSignatureRef = useRef("");
   const hasHydratedAgentSelectionRef = useRef(false);
+  const hasHydratedInitialThreadSelectionRef = useRef(Boolean(initialUiState.threadId));
   const pendingMaterializationThreadIdsRef = useRef<Set<string>>(new Set());
+  const threadUpdatedAtByIdRef = useRef<Record<string, number>>({});
   const threadsSignatureRef = useRef<string[]>([]);
   const archivedThreadsSignatureRef = useRef<string[]>([]);
   const modesSignatureRef = useRef<string[]>([]);
@@ -821,6 +961,11 @@ export function App(): React.JSX.Element {
   const selectedThreadRefreshQueuedRef = useRef<LoadSelectedThreadRequest | null>(null);
   const selectedThreadRefreshAbortControllerRef = useRef<AbortController | null>(null);
   const selectedThreadRefreshActiveThreadIdRef = useRef<string | null>(null);
+  const sidebarSwipeStateRef = useRef<SidebarSwipeState>({
+    isTracking: false,
+    startX: 0,
+    startY: 0
+  });
   const loadCoreDataTrackedRef = useRef<(() => Promise<void>) | null>(null);
   const loadSelectedThreadRef = useRef<((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null>(
     null
@@ -1123,6 +1268,17 @@ export function App(): React.JSX.Element {
       });
       if (!signaturesMatch(threadsSignatureRef.current, nextThreadsSignature)) {
         threadsSignatureRef.current = nextThreadsSignature;
+        const previousThreadUpdatedAtById = threadUpdatedAtByIdRef.current;
+        const nextThreadUpdatedAtById = mapThreadUpdatedAtById(nt.data);
+        setUnreadThreadIds((previousUnreadThreadIds) =>
+          computeUnreadThreadIds({
+            previousUnreadThreadIds,
+            previousThreadUpdatedAtById,
+            nextThreads: nt.data,
+            selectedThreadId: selectedThreadIdRef.current
+          })
+        );
+        threadUpdatedAtByIdRef.current = nextThreadUpdatedAtById;
         setThreads(nt.data);
       }
       if (!signaturesMatch(modesSignatureRef.current, nextModesSignature)) {
@@ -1202,14 +1358,27 @@ export function App(): React.JSX.Element {
         });
       }
       setSelectedThreadId((cur) => {
-        if (cur) return cur;
+        if (cur) {
+          hasHydratedInitialThreadSelectionRef.current = true;
+          return cur;
+        }
+        if (hasHydratedInitialThreadSelectionRef.current) {
+          return cur;
+        }
+        let nextThreadId: string | null = null;
         if (preferredAgentId) {
           const preferredThread = nt.data.find((thread) => thread.agentId === preferredAgentId);
           if (preferredThread) {
-            return preferredThread.id;
+            nextThreadId = preferredThread.id;
           }
         }
-        return nt.data[0]?.id ?? null;
+        if (!nextThreadId) {
+          nextThreadId = nt.data[0]?.id ?? null;
+        }
+        if (nextThreadId) {
+          hasHydratedInitialThreadSelectionRef.current = true;
+        }
+        return nextThreadId;
       });
       setSelectedModeKey((cur) => {
         if (cur) return cur;
@@ -1357,13 +1526,18 @@ export function App(): React.JSX.Element {
       });
       if (read) {
         setReadThreadState((prev) => {
+          const mergedReadThread = mergeReadThreadState({
+            previous: prev,
+            incoming: read,
+            includeTurns: includeTurnsForRead
+          });
           if (
             buildReadThreadSyncSignature(prev, appDefaultModel, appDefaultReasoningEffort)
-            === buildReadThreadSyncSignature(read, appDefaultModel, appDefaultReasoningEffort)
+            === buildReadThreadSyncSignature(mergedReadThread, appDefaultModel, appDefaultReasoningEffort)
           ) {
             return prev;
           }
-          return read;
+          return mergedReadThread;
         });
       }
       setStreamEvents((prev) => {
@@ -1474,6 +1648,43 @@ export function App(): React.JSX.Element {
     loadSelectedThreadRef.current = loadSelectedThreadTracked;
   }, [loadSelectedThreadTracked]);
 
+  useEffect(() => {
+    let rafId: number | null = null;
+    const scheduleApply = () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+      rafId = window.requestAnimationFrame(() => {
+        applyRuntimeViewportSizingVariables();
+        rafId = null;
+      });
+    };
+
+    scheduleApply();
+
+    const visualViewport = window.visualViewport;
+    window.addEventListener("resize", scheduleApply);
+    window.addEventListener("orientationchange", scheduleApply);
+    document.addEventListener("focusin", scheduleApply);
+    document.addEventListener("focusout", scheduleApply);
+    visualViewport?.addEventListener("resize", scheduleApply);
+    visualViewport?.addEventListener("scroll", scheduleApply);
+
+    return () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+      window.removeEventListener("resize", scheduleApply);
+      window.removeEventListener("orientationchange", scheduleApply);
+      document.removeEventListener("focusin", scheduleApply);
+      document.removeEventListener("focusout", scheduleApply);
+      visualViewport?.removeEventListener("resize", scheduleApply);
+      visualViewport?.removeEventListener("scroll", scheduleApply);
+      document.documentElement.style.removeProperty("--app-height");
+      document.documentElement.style.removeProperty("--composer-safe-bottom-inset");
+    };
+  }, []);
+
   const refreshPushClientState = useCallback(async () => {
     try {
       const nextState = await getPushClientState();
@@ -1499,6 +1710,20 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
+    if (selectedThreadId) {
+      hasHydratedInitialThreadSelectionRef.current = true;
+    }
+    if (!selectedThreadId) {
+      return;
+    }
+    setUnreadThreadIds((previousUnreadThreadIds) => {
+      if (previousUnreadThreadIds[selectedThreadId] !== true) {
+        return previousUnreadThreadIds;
+      }
+      const remainingUnreadThreadIds = { ...previousUnreadThreadIds };
+      delete remainingUnreadThreadIds[selectedThreadId];
+      return remainingUnreadThreadIds;
+    });
   }, [selectedThreadId]);
 
   useEffect(() => {
@@ -2172,6 +2397,74 @@ export function App(): React.JSX.Element {
     }
   }, [loadCoreDataTracked]);
 
+  const endSidebarSwipeTracking = useCallback(() => {
+    sidebarSwipeStateRef.current.isTracking = false;
+  }, []);
+
+  const handleAppShellTouchStart = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
+    const nextState = sidebarSwipeStateRef.current;
+    nextState.isTracking = false;
+
+    if (mobileSidebarOpen || window.innerWidth >= MOBILE_LAYOUT_MAX_WIDTH_PX) {
+      return;
+    }
+    if (event.touches.length !== 1) {
+      return;
+    }
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+
+    const edgeThresholdPx = readSafeAreaInsetLeftPx() + MOBILE_SIDEBAR_SWIPE_EDGE_PX;
+    if (touch.clientX > edgeThresholdPx) {
+      return;
+    }
+
+    nextState.isTracking = true;
+    nextState.startX = touch.clientX;
+    nextState.startY = touch.clientY;
+  }, [mobileSidebarOpen]);
+
+  const handleAppShellTouchMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
+    const swipeState = sidebarSwipeStateRef.current;
+    if (!swipeState.isTracking) {
+      return;
+    }
+    if (event.touches.length !== 1) {
+      swipeState.isTracking = false;
+      return;
+    }
+    const touch = event.touches[0];
+    if (!touch) {
+      swipeState.isTracking = false;
+      return;
+    }
+
+    const deltaX = touch.clientX - swipeState.startX;
+    const deltaY = touch.clientY - swipeState.startY;
+    const absoluteDeltaY = Math.abs(deltaY);
+    const absoluteDeltaX = Math.abs(deltaX);
+    if (
+      absoluteDeltaY > MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX
+      && absoluteDeltaY > absoluteDeltaX
+    ) {
+      swipeState.isTracking = false;
+      return;
+    }
+    if (deltaX < MOBILE_SIDEBAR_SWIPE_CANCEL_NEGATIVE_PX) {
+      swipeState.isTracking = false;
+      return;
+    }
+    if (
+      deltaX >= MOBILE_SIDEBAR_SWIPE_TRIGGER_PX
+      && absoluteDeltaY <= MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX
+    ) {
+      swipeState.isTracking = false;
+      setMobileSidebarOpen(true);
+    }
+  }, []);
+
   const renderSidebarContent = (viewport: "desktop" | "mobile"): React.JSX.Element => (
     <>
       <div className="relative z-20 h-14 shrink-0 px-4">
@@ -2354,6 +2647,7 @@ export function App(): React.JSX.Element {
                           <div className="space-y-1 pl-4">
                             {group.threads.map((thread) => {
                               const isSelected = thread.id === selectedThreadId;
+                              const hasUnread = unreadThreadIds[thread.id] === true && !isSelected;
                               const threadIsGenerating = isSelected && isGenerating;
                               const canArchive = thread.agentId === "codex";
                               return (
@@ -2375,6 +2669,14 @@ export function App(): React.JSX.Element {
                                   >
                                     <span className="min-w-0 flex-1 truncate leading-5">{threadLabel(thread)}</span>
                                     <span className="shrink-0 flex items-center gap-1.5">
+                                      {hasUnread && (
+                                        <span
+                                          data-testid={`thread-unread-indicator-${thread.id}`}
+                                          aria-label="Unread message"
+                                          title="Unread message"
+                                          className="h-2 w-2 rounded-full bg-sky-500"
+                                        />
+                                      )}
                                       {threadIsGenerating && (
                                         <Loader2 size={11} className="animate-spin text-muted-foreground/70" />
                                       )}
@@ -2633,7 +2935,14 @@ export function App(): React.JSX.Element {
   /* ── Render ─────────────────────────────────────────────── */
   return (
     <TooltipProvider delayDuration={120}>
-      <div data-testid="app-shell" className="app-shell flex bg-background text-foreground font-sans">
+      <div
+        data-testid="app-shell"
+        className="app-shell flex bg-background text-foreground font-sans"
+        onTouchStart={handleAppShellTouchStart}
+        onTouchMove={handleAppShellTouchMove}
+        onTouchEnd={endSidebarSwipeTracking}
+        onTouchCancel={endSidebarSwipeTracking}
+      >
 
       {/* Mobile sidebar backdrop */}
       <AnimatePresence>
@@ -2660,7 +2969,7 @@ export function App(): React.JSX.Element {
             exit={{ x: -280, opacity: 0.94 }}
             transition={{ type: "spring", stiffness: 380, damping: 36, mass: 0.7 }}
             data-testid="sidebar-desktop"
-            className="hidden md:flex fixed left-0 top-0 bottom-0 z-30 w-64 flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
+            className="hidden md:flex fixed safe-area-fixed-left z-30 w-64 flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
           >
             {renderSidebarContent("desktop")}
           </motion.aside>
@@ -2677,7 +2986,7 @@ export function App(): React.JSX.Element {
             exit={{ x: -280 }}
             transition={{ type: "spring", stiffness: 380, damping: 36, mass: 0.7 }}
             data-testid="sidebar-mobile"
-            className="md:hidden fixed left-0 top-0 bottom-0 z-50 w-64 flex flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
+            className="md:hidden fixed safe-area-fixed-left z-50 w-64 flex flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
           >
             {renderSidebarContent("mobile")}
           </motion.aside>
@@ -2804,7 +3113,7 @@ export function App(): React.JSX.Element {
               data-testid="error-banner"
               className="relative z-30 overflow-hidden shrink-0"
             >
-              <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-sm text-destructive">
+              <div className="flex items-center justify-between px-4 py-2 bg-destructive border-b border-destructive/80 text-sm text-destructive-foreground">
                 <div className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
                   {errorBannerDetails.operation.length > 0 && (
                     <span data-testid="error-banner-operation" className="shrink-0 font-semibold">
@@ -2832,7 +3141,7 @@ export function App(): React.JSX.Element {
                     onClick={() => setActiveTab("debug")}
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 text-xs text-destructive/90 hover:text-destructive"
+                    className="h-7 px-2 text-xs text-destructive-foreground/90 hover:text-destructive-foreground hover:bg-black/10"
                   >
                     Open in Debug
                   </Button>
@@ -2842,7 +3151,7 @@ export function App(): React.JSX.Element {
                     onClick={() => setError("")}
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 shrink-0 opacity-60 hover:opacity-100"
+                    className="h-6 w-6 shrink-0 text-destructive-foreground/70 hover:text-destructive-foreground hover:bg-black/10"
                   >
                     <X size={13} />
                   </Button>
@@ -2979,7 +3288,10 @@ export function App(): React.JSX.Element {
             </AnimatePresence>
 
             {/* Input area */}
-            <div className="relative z-10 -mt-6 px-4 pt-6 pb-4 shrink-0">
+            <div
+              className="relative z-10 -mt-6 px-4 pt-6 shrink-0"
+              style={{ paddingBottom: "calc(0.5rem + var(--composer-safe-bottom-inset))" }}
+            >
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-transparent via-background/85 to-background"

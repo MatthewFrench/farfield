@@ -6,8 +6,6 @@ import { spawn, spawnSync } from "node:child_process";
 const cwd = process.cwd();
 const caddyConfigTemplatePath = path.join(cwd, "ops", "caddy", "Caddyfile.local.template");
 const caddyConfigPath = path.join(cwd, "ops", "caddy", "Caddyfile.local");
-const backendPort = Number(process.env["PORT"] ?? "4311");
-const frontendPort = 4312;
 const caddyHttpPort = 80;
 const caddyHttpsPort = 443;
 const caddyReadyTimeoutMs = Number(process.env["IOS_LOCAL_CADDY_READY_TIMEOUT_MS"] ?? "180000");
@@ -58,21 +56,10 @@ function delay(ms) {
 }
 
 function printPrerequisiteError(title, lines) {
-  process.stderr.write(`[ios:local] ${title}\n`);
+  process.stderr.write(`[caddy:local] ${title}\n`);
   for (const line of lines) {
-    process.stderr.write(`[ios:local] ${line}\n`);
+    process.stderr.write(`[caddy:local] ${line}\n`);
   }
-}
-
-function startChild(command, args, label, useProcessGroup = false) {
-  const detached = useProcessGroup && process.platform !== "win32";
-  const child = spawn(command, args, {
-    cwd,
-    env: process.env,
-    stdio: "inherit",
-    detached
-  });
-  return child;
 }
 
 function listListeningProcesses(port) {
@@ -148,31 +135,6 @@ async function ensurePortIsAvailable(port, label) {
   process.exit(1);
 }
 
-function stopChild(child, signal, useProcessGroup = false) {
-  if (!child || child.exitCode !== null) {
-    return;
-  }
-
-  if (useProcessGroup && process.platform !== "win32") {
-    try {
-      process.kill(-child.pid, signal);
-      return;
-    } catch {
-      // Fall through to single-process kill if process group is unavailable.
-    }
-  }
-
-  child.kill(signal);
-}
-
-function resolvePackageManagerCommand() {
-  return {
-    command: "bun",
-    args: ["run", "dev"],
-    label: "bun run dev"
-  };
-}
-
 async function isPortAcceptingConnections(port, host = "127.0.0.1") {
   return await new Promise((resolve) => {
     const socket = new net.Socket();
@@ -223,58 +185,21 @@ const origin = parseHttpsOrigin(caddyConfigText);
 const apiToken = (process.env["API_TOKEN"] ?? process.env["PUSH_API_TOKEN"] ?? "").trim();
 const webToken = (process.env["VITE_API_TOKEN"] ?? process.env["VITE_PUSH_API_TOKEN"] ?? "").trim();
 
-process.stdout.write(`[ios:local] origin: ${origin}\n`);
+process.stdout.write(`[caddy:local] origin: ${origin}\n`);
 if (apiToken.length > 0) {
-  process.stdout.write(`[ios:local] API token header: X-Farfield-Token: ${maskSecret(apiToken)}\n`);
+  process.stdout.write(`[caddy:local] API token header: X-Farfield-Token: ${maskSecret(apiToken)}\n`);
 } else {
-  process.stdout.write("[ios:local] API token header: not set (loopback-only safe; set for remote hosts)\n");
+  process.stdout.write(
+    "[caddy:local] API token header: not set (loopback-only safe; set for remote hosts)\n"
+  );
 }
 if (webToken.length > 0) {
-  process.stdout.write("[ios:local] web token env: configured\n");
+  process.stdout.write("[caddy:local] web token env: configured\n");
 } else {
-  process.stdout.write("[ios:local] web token env: not set\n");
-}
-process.stdout.write("[ios:local] starting caddy, then dev server after HTTPS is ready...\n");
-
-let shuttingDown = false;
-let devProcess = null;
-let caddyProcess = null;
-
-function stopChildren(signal) {
-  stopChild(devProcess, signal, true);
-  stopChild(caddyProcess, signal, false);
-}
-
-function exitFromStartError(label, error) {
-  if (shuttingDown) {
-    return;
-  }
-  shuttingDown = true;
-  process.stderr.write(`[ios:local] failed to start ${label}: ${error.message}\n`);
-  stopChildren("SIGTERM");
-  process.exit(1);
-}
-
-function handleTerminationSignal(signal) {
-  if (shuttingDown) {
-    return;
-  }
-  shuttingDown = true;
-  stopChildren(signal);
-  process.exit(0);
+  process.stdout.write("[caddy:local] web token env: not set\n");
 }
 
 const caddyExecutable = (process.env["CADDY_BIN"] ?? "caddy").trim();
-
-if (!commandExists("bun")) {
-  printPrerequisiteError("bun is not available on PATH.", [
-    "Install Bun:",
-    "  curl -fsSL https://bun.sh/install | bash",
-    "Then reopen your shell and retry."
-  ]);
-  process.exit(1);
-}
-
 if (caddyExecutable === "caddy" && !commandExists("caddy")) {
   printPrerequisiteError("caddy is not available on PATH.", [
     "Install on macOS with Homebrew:",
@@ -286,36 +211,51 @@ if (caddyExecutable === "caddy" && !commandExists("caddy")) {
 
 if (process.platform === "darwin" && !commandExists("certutil")) {
   process.stdout.write(
-    "[ios:local] notice: certutil is not installed (brew install nss). This is optional for iOS Safari but removes NSS trust-store warnings.\n"
+    "[caddy:local] notice: certutil is not installed (brew install nss). This is optional for iOS Safari but removes NSS trust-store warnings.\n"
   );
 }
 
-await ensurePortIsAvailable(backendPort, "Backend");
-await ensurePortIsAvailable(frontendPort, "Frontend");
 await ensurePortIsAvailable(caddyHttpPort, "Caddy HTTP");
 await ensurePortIsAvailable(caddyHttpsPort, "Caddy HTTPS");
 
-const packageManagerCommand = resolvePackageManagerCommand();
-caddyProcess = startChild(caddyExecutable, ["run", "--config", caddyConfigPath], "caddy", false);
-caddyProcess.on("error", (error) => {
-  exitFromStartError("caddy", error);
+let shuttingDown = false;
+const caddyProcess = spawn(caddyExecutable, ["run", "--config", caddyConfigPath], {
+  cwd,
+  env: process.env,
+  stdio: "inherit"
 });
+
+function stopCaddy(signal) {
+  if (caddyProcess.exitCode !== null) {
+    return;
+  }
+  caddyProcess.kill(signal);
+}
+
+function terminate(signal) {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+  stopCaddy(signal);
+  process.exit(0);
+}
+
+caddyProcess.on("error", (error) => {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+  process.stderr.write(`[caddy:local] failed to start caddy: ${error.message}\n`);
+  process.exit(1);
+});
+
 caddyProcess.on("exit", (code, signal) => {
   if (shuttingDown) {
     return;
   }
   shuttingDown = true;
-  if (!devProcess) {
-    process.stderr.write(
-      `[ios:local] caddy exited (${signal ?? `code ${String(code ?? 0)}`}) before HTTPS startup completed.\n`
-    );
-    process.exit(code ?? 1);
-    return;
-  }
-  process.stderr.write(
-    `[ios:local] caddy exited (${signal ?? `code ${String(code ?? 0)}`}); stopping dev server.\n`
-  );
-  stopChildren("SIGTERM");
+  process.stderr.write(`[caddy:local] caddy exited (${signal ?? `code ${String(code ?? 0)}`}).\n`);
   process.exit(code ?? 1);
 });
 
@@ -328,34 +268,20 @@ try {
       detail,
       "If a password prompt is waiting, finish it or run:",
       "  bun run ios:trust-local-ca",
-      "Then run:",
-      "  bun run ios:local"
+      "Then rerun:",
+      "  bun run caddy:local"
     ]);
   }
-  stopChildren("SIGTERM");
+  stopCaddy("SIGTERM");
   process.exit(1);
 }
 
-devProcess = startChild(packageManagerCommand.command, packageManagerCommand.args, packageManagerCommand.label, true);
-devProcess.on("error", (error) => {
-  exitFromStartError("bun run dev", error);
-});
-
-devProcess.on("exit", (code, signal) => {
-  if (shuttingDown) {
-    return;
-  }
-  shuttingDown = true;
-  process.stderr.write(
-    `[ios:local] bun run dev exited (${signal ?? `code ${String(code ?? 0)}`}); stopping caddy.\n`
-  );
-  stopChildren("SIGTERM");
-  process.exit(code ?? 1);
-});
+process.stdout.write("[caddy:local] HTTPS proxy is ready.\n");
+process.stdout.write("[caddy:local] Keep this running, then start app dev server in another terminal: bun run dev\n");
 
 process.on("SIGINT", () => {
-  handleTerminationSignal("SIGINT");
+  terminate("SIGINT");
 });
 process.on("SIGTERM", () => {
-  handleTerminationSignal("SIGTERM");
+  terminate("SIGTERM");
 });

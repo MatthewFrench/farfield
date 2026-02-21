@@ -46,6 +46,8 @@ export interface NtfyPublishResult {
 export interface NtfyThreadCompletedPayload {
   threadId: string;
   preview: string;
+  projectName: string;
+  threadName: string;
   agentText: string;
 }
 
@@ -72,11 +74,17 @@ function normalizeBaseUrl(value: string | undefined): string {
   return z.string().url().parse(normalized);
 }
 
+function buildNotificationTitle(payload: NtfyThreadCompletedPayload): string {
+  const projectName = payload.projectName.trim();
+  const threadName = payload.threadName.trim();
+  const normalizedProjectName = projectName.length > 0 ? projectName : "No project";
+  const normalizedThreadName = threadName.length > 0 ? threadName : "Thread";
+  return `${normalizedProjectName} - ${normalizedThreadName}`;
+}
+
 function buildNotificationBody(payload: NtfyThreadCompletedPayload): string {
-  const preview = payload.preview.trim();
-  const titleLine = preview.length > 0 ? preview : `Thread ${payload.threadId.slice(0, 8)}`;
   const agentText = payload.agentText.trim();
-  const body = agentText.length > 0 ? `${titleLine}\n\n${agentText}` : titleLine;
+  const body = agentText.length > 0 ? agentText : "Response ready.";
   if (body.length <= 3_000) {
     return body;
   }
@@ -140,7 +148,7 @@ export class NtfyNotifier {
       method: "POST",
       headers: {
         ...(this.config.bearerToken ? { Authorization: `Bearer ${this.config.bearerToken}` } : {}),
-        Title: "Farfield thread completed",
+        Title: buildNotificationTitle(payload),
         Priority: this.config.priority,
         Tags: "white_check_mark,robot_face",
         "Content-Type": "text/plain; charset=utf-8"

@@ -336,4 +336,5 @@ process.stdout.write(`- PUSH_DOCTOR_TOKEN=${maskSecret(doctorToken)} (auth token
 process.stdout.write(`- Local HTTPS origin=${selectedAddress} (use this on iPhone Safari)\n`);
 process.stdout.write("\nNext steps:\n");
 process.stdout.write("- bun run ios:trust-local-ca\n");
-process.stdout.write("- bun run ios:local\n");
+process.stdout.write("- bun run caddy:local (terminal 1)\n");
+process.stdout.write("- bun run dev (terminal 2)\n");

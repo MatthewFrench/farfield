@@ -281,7 +281,7 @@ function readApiToken(): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-async function request(path: string, init?: RequestInit): Promise<unknown> {
+async function performRequest(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
   const token = readApiToken();
   if (token) {
@@ -331,6 +331,11 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
       inheritedSignal.removeEventListener("abort", onAbortInheritedSignal);
     }
   }
+  return response;
+}
+
+async function request(path: string, init?: RequestInit): Promise<unknown> {
+  const response = await performRequest(path, init);
 
   let data: unknown;
   try {
@@ -354,6 +359,23 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   }
 
   return data;
+}
+
+async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
+  const response = await performRequest(path, init);
+  if (response.ok) {
+    return;
+  }
+
+  let data: unknown = null;
+  try {
+    data = (await response.json()) as unknown;
+  } catch {
+    // Ignore parse failures here and surface status-based failure below.
+  }
+
+  const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
+  throw new Error(parsedError.success ? parsedError.data.error : `Request failed for ${path}`);
 }
 
 interface ApiRequestOptions {
@@ -591,7 +613,7 @@ export async function sendMessage(input: {
 }): Promise<void> {
   const { threadId, ...body } = input;
 
-  await request(`/api/threads/${encodeURIComponent(threadId)}/messages`, {
+  await requestNoContent(`/api/threads/${encodeURIComponent(threadId)}/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -607,7 +629,7 @@ export async function setCollaborationMode(input: {
 }): Promise<void> {
   const { threadId, ...body } = input;
 
-  await request(`/api/threads/${encodeURIComponent(threadId)}/collaboration-mode`, {
+  await requestNoContent(`/api/threads/${encodeURIComponent(threadId)}/collaboration-mode`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -626,7 +648,7 @@ export async function submitUserInput(input: {
 
   const { threadId, ...body } = input;
 
-  await request(`/api/threads/${encodeURIComponent(threadId)}/user-input`, {
+  await requestNoContent(`/api/threads/${encodeURIComponent(threadId)}/user-input`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -641,7 +663,7 @@ export async function interruptThread(input: {
 }): Promise<void> {
   const { threadId, ...body } = input;
 
-  await request(`/api/threads/${encodeURIComponent(threadId)}/interrupt`, {
+  await requestNoContent(`/api/threads/${encodeURIComponent(threadId)}/interrupt`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -656,7 +678,7 @@ export async function getTraceStatus(options?: ApiRequestOptions): Promise<z.inf
 }
 
 export async function startTrace(label: string): Promise<void> {
-  await request("/api/debug/trace/start", {
+  await requestNoContent("/api/debug/trace/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ label })
@@ -664,7 +686,7 @@ export async function startTrace(label: string): Promise<void> {
 }
 
 export async function markTrace(note: string): Promise<void> {
-  await request("/api/debug/trace/mark", {
+  await requestNoContent("/api/debug/trace/mark", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ note })
@@ -672,7 +694,7 @@ export async function markTrace(note: string): Promise<void> {
 }
 
 export async function stopTrace(): Promise<void> {
-  await request("/api/debug/trace/stop", {
+  await requestNoContent("/api/debug/trace/stop", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({})

@@ -7,8 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "node scripts/dev.mjs",
-    "dev:remote": "node scripts/dev.mjs --remote",
+    "dev": "node scripts/with-env.mjs \"node scripts/dev.mjs\"",
+    "dev:remote": "node scripts/with-env.mjs \"node scripts/dev.mjs --remote\"",
     "build": "bun run --workspaces build",
     "test": "bun run --workspaces test",
     "lint": "bun run --workspaces lint",
@@ -18,7 +18,7 @@
     "setup:ntfy": "node scripts/setup-ntfy.mjs",
     "setup:domain-https": "node scripts/setup-domain-https.mjs",
     "ios:trust-local-ca": "node scripts/with-env.mjs \"node scripts/ios-trust-local-ca.mjs\"",
-    "ios:local": "node scripts/with-env.mjs \"node scripts/ios-local.mjs\"",
+    "caddy:local": "node scripts/with-env.mjs \"node scripts/caddy-local.mjs\"",
     "rotate:api-token": "node scripts/with-env.mjs \"node scripts/rotate-api-token.mjs\"",
     "push:doctor": "node scripts/with-env.mjs \"node scripts/push-doctor.mjs\"",
     "smoke:app": "node scripts/with-env.mjs \"node scripts/app-smoke.mjs\"",
