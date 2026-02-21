@@ -224,6 +224,12 @@ interface SidebarSwipeState {
   startY: number;
 }
 
+interface PageTouchScrollState {
+  startX: number;
+  startY: number;
+  scrollElement: HTMLElement | null;
+}
+
 type DebugWorkspaceSection = "issues" | "history" | "stream" | "trace";
 type DebugIssueSeverityFilter = "all" | "error" | "warning";
 
@@ -789,52 +795,87 @@ function readSafeAreaInsetLeftPx(): number {
   return readCssPixelVariable("--safe-area-inset-left");
 }
 
+type ViewportOrientation = "portrait" | "landscape";
+
 interface RuntimeViewportSizingState {
-  maxInnerHeightPortrait: number;
-  maxInnerHeightLandscape: number;
+  maxVisualHeightPortrait: number;
+  maxVisualHeightLandscape: number;
+}
+
+interface RuntimeViewportMetrics {
+  orientation: ViewportOrientation;
+  appHeight: number;
+  visualViewportHeight: number;
+  layoutViewportHeight: number;
+  keyboardDelta: number;
+  keyboardOpen: boolean;
+  safeAreaInsetBottom: number;
 }
 
 const runtimeViewportSizingState: RuntimeViewportSizingState = {
-  maxInnerHeightPortrait: 0,
-  maxInnerHeightLandscape: 0
+  maxVisualHeightPortrait: 0,
+  maxVisualHeightLandscape: 0
 };
 
-function readKeyboardBaselineHeight(innerHeight: number): number {
-  const isLandscape = window.matchMedia("(orientation: landscape)").matches;
-  if (isLandscape) {
-    runtimeViewportSizingState.maxInnerHeightLandscape = Math.max(
-      runtimeViewportSizingState.maxInnerHeightLandscape,
-      innerHeight
-    );
-    return runtimeViewportSizingState.maxInnerHeightLandscape;
-  }
-
-  runtimeViewportSizingState.maxInnerHeightPortrait = Math.max(
-    runtimeViewportSizingState.maxInnerHeightPortrait,
-    innerHeight
-  );
-  return runtimeViewportSizingState.maxInnerHeightPortrait;
+function readViewportOrientation(): ViewportOrientation {
+  return window.matchMedia("(orientation: landscape)").matches ? "landscape" : "portrait";
 }
 
-function applyRuntimeViewportSizingVariables(): void {
-  const root = document.documentElement;
-  const visualViewport = window.visualViewport;
-  const layoutViewportHeight = window.innerHeight;
-  const viewportHeight = visualViewport?.height ?? layoutViewportHeight;
-  const viewportOffsetTop = Math.max(0, visualViewport?.offsetTop ?? 0);
-  const appHeight = viewportHeight + viewportOffsetTop;
-  root.style.setProperty("--app-height", `${Math.round(appHeight)}px`);
+function readVisualViewportHeightPx(): number {
+  const positiveFiniteNumber = z.number().finite().positive();
+  const visualViewportHeightResult = positiveFiniteNumber.safeParse(window.visualViewport?.height);
+  if (visualViewportHeightResult.success) {
+    return visualViewportHeightResult.data;
+  }
+  const innerHeightResult = positiveFiniteNumber.safeParse(window.innerHeight);
+  if (innerHeightResult.success) {
+    return innerHeightResult.data;
+  }
+  return 1;
+}
 
-  const keyboardBaselineHeight = readKeyboardBaselineHeight(layoutViewportHeight);
-  const keyboardInsetBottom = Math.max(0, keyboardBaselineHeight - appHeight);
-  const safeAreaInsetBottom = Math.min(
-    readCssPixelVariable("--safe-area-inset-bottom"),
-    MOBILE_SAFE_AREA_INSET_BOTTOM_MAX_PX
+function updateRuntimeViewportSizingVariables(): RuntimeViewportMetrics {
+  const root = document.documentElement;
+  const layoutViewportHeight = window.innerHeight;
+  const visualViewportHeight = readVisualViewportHeightPx();
+  const orientation = readViewportOrientation();
+
+  if (orientation === "landscape") {
+    runtimeViewportSizingState.maxVisualHeightLandscape = Math.max(
+      runtimeViewportSizingState.maxVisualHeightLandscape,
+      visualViewportHeight
+    );
+  } else {
+    runtimeViewportSizingState.maxVisualHeightPortrait = Math.max(
+      runtimeViewportSizingState.maxVisualHeightPortrait,
+      visualViewportHeight
+    );
+  }
+
+  const baselineHeight = orientation === "landscape"
+    ? runtimeViewportSizingState.maxVisualHeightLandscape
+    : runtimeViewportSizingState.maxVisualHeightPortrait;
+  const keyboardDelta = Math.max(0, baselineHeight - visualViewportHeight);
+  const keyboardOpen = keyboardDelta >= MOBILE_VISUAL_VIEWPORT_KEYBOARD_OPEN_DELTA_PX;
+  const safeAreaInsetBottom = readCssPixelVariable("--safe-area-inset-bottom-clamped");
+  const composerSafeBottomInset = keyboardOpen ? 0 : safeAreaInsetBottom;
+  const appHeight = Math.max(1, Math.round(visualViewportHeight));
+
+  root.style.setProperty("--app-height", `${String(appHeight)}px`);
+  root.style.setProperty(
+    "--composer-safe-bottom-inset",
+    `${String(Math.max(0, Math.round(composerSafeBottomInset)))}px`
   );
-  const composerSafeBottomInset = keyboardInsetBottom > MOBILE_KEYBOARD_INSET_OPEN_THRESHOLD_PX
-    ? 0
-    : safeAreaInsetBottom;
-  root.style.setProperty("--composer-safe-bottom-inset", `${Math.round(composerSafeBottomInset)}px`);
+
+  return {
+    orientation,
+    appHeight,
+    visualViewportHeight,
+    layoutViewportHeight,
+    keyboardDelta,
+    keyboardOpen,
+    safeAreaInsetBottom
+  };
 }
 
 const DEFAULT_EFFORT_OPTIONS = ["minimal", "low", "medium", "high", "xhigh"] as const;
@@ -860,8 +901,7 @@ const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32;
 const MOBILE_SIDEBAR_SWIPE_TRIGGER_PX = 56;
 const MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX = 36;
 const MOBILE_SIDEBAR_SWIPE_CANCEL_NEGATIVE_PX = -14;
-const MOBILE_KEYBOARD_INSET_OPEN_THRESHOLD_PX = 72;
-const MOBILE_SAFE_AREA_INSET_BOTTOM_MAX_PX = 40;
+const MOBILE_VISUAL_VIEWPORT_KEYBOARD_OPEN_DELTA_PX = 120;
 const AGENT_FAVICON_BY_ID: Record<AgentId, string> = {
   codex: "https://openai.com/favicon.ico",
   opencode: "https://opencode.ai/favicon.ico"
@@ -1242,10 +1282,17 @@ export function App(): React.JSX.Element {
     startX: 0,
     startY: 0
   });
+  const pageTouchScrollStateRef = useRef<PageTouchScrollState>({
+    startX: 0,
+    startY: 0,
+    scrollElement: null
+  });
   const loadCoreDataTrackedRef = useRef<(() => Promise<void>) | null>(null);
   const loadSelectedThreadRef = useRef<((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null>(
     null
   );
+  const viewportKeyboardStateRef = useRef<boolean | null>(null);
+  const viewportTelemetryLastReportedAtRef = useRef(0);
 
   /* Derived */
   const selectedThread = useMemo(
@@ -2024,12 +2071,63 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     let rafId: number | null = null;
+
+    const applyRuntimeViewportSizing = () => {
+      const metrics = updateRuntimeViewportSizingVariables();
+      const rootElement = document.getElementById("root");
+      const rootClientHeight = rootElement ? rootElement.clientHeight : null;
+
+      if (window.scrollY !== 0 || window.pageYOffset !== 0) {
+        window.scrollTo(0, 0);
+      }
+
+      const previousKeyboardState = viewportKeyboardStateRef.current;
+      viewportKeyboardStateRef.current = metrics.keyboardOpen;
+
+      if (previousKeyboardState === metrics.keyboardOpen) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - viewportTelemetryLastReportedAtRef.current < 250) {
+        return;
+      }
+      viewportTelemetryLastReportedAtRef.current = now;
+
+      void reportClientError({
+        source: "farfield-web",
+        operation: "viewport-keyboard-transition",
+        message: metrics.keyboardOpen ? "viewport keyboard opened" : "viewport keyboard closed",
+        name: null,
+        stack: null,
+        requestId: null,
+        threadId: selectedThreadIdRef.current,
+        url: window.location.pathname + window.location.search,
+        details: {
+          eventType: "viewport-keyboard-transition",
+          keyboardOpen: metrics.keyboardOpen,
+          orientation: metrics.orientation,
+          appHeightPx: metrics.appHeight,
+          visualViewportHeightPx: Math.round(metrics.visualViewportHeight),
+          layoutViewportHeightPx: Math.round(metrics.layoutViewportHeight),
+          keyboardDeltaPx: Math.round(metrics.keyboardDelta),
+          safeAreaInsetBottomPx: Math.round(metrics.safeAreaInsetBottom),
+          documentClientHeightPx: document.documentElement.clientHeight,
+          bodyClientHeightPx: document.body.clientHeight,
+          rootClientHeightPx: rootClientHeight,
+          pageYOffsetPx: window.pageYOffset,
+          scrollYPx: window.scrollY
+        },
+        occurredAt: new Date(now).toISOString()
+      }).catch(() => {});
+    };
+
     const scheduleApply = () => {
       if (rafId !== null) {
         window.cancelAnimationFrame(rafId);
       }
       rafId = window.requestAnimationFrame(() => {
-        applyRuntimeViewportSizingVariables();
+        applyRuntimeViewportSizing();
         rafId = null;
       });
     };
@@ -2039,6 +2137,7 @@ export function App(): React.JSX.Element {
     const visualViewport = window.visualViewport;
     window.addEventListener("resize", scheduleApply);
     window.addEventListener("orientationchange", scheduleApply);
+    window.addEventListener("pageshow", scheduleApply);
     document.addEventListener("focusin", scheduleApply);
     document.addEventListener("focusout", scheduleApply);
     visualViewport?.addEventListener("resize", scheduleApply);
@@ -2050,12 +2149,108 @@ export function App(): React.JSX.Element {
       }
       window.removeEventListener("resize", scheduleApply);
       window.removeEventListener("orientationchange", scheduleApply);
+      window.removeEventListener("pageshow", scheduleApply);
       document.removeEventListener("focusin", scheduleApply);
       document.removeEventListener("focusout", scheduleApply);
       visualViewport?.removeEventListener("resize", scheduleApply);
       visualViewport?.removeEventListener("scroll", scheduleApply);
       document.documentElement.style.removeProperty("--app-height");
       document.documentElement.style.removeProperty("--composer-safe-bottom-inset");
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!window.matchMedia("(pointer: coarse)").matches) {
+      return;
+    }
+
+    const rootElement = document.getElementById("root");
+    if (!rootElement) {
+      return;
+    }
+
+    const readsVerticalScrollableOverflow = (element: HTMLElement): boolean => (
+      element.scrollHeight > element.clientHeight + 1
+    );
+
+    const canElementScrollVertically = (element: HTMLElement): boolean => {
+      const overflowY = window.getComputedStyle(element).overflowY;
+      if (overflowY !== "auto" && overflowY !== "scroll" && overflowY !== "overlay") {
+        return false;
+      }
+      return readsVerticalScrollableOverflow(element);
+    };
+
+    const findScrollableAncestor = (target: EventTarget | null): HTMLElement | null => {
+      if (!(target instanceof HTMLElement)) {
+        return null;
+      }
+
+      let node: HTMLElement | null = target;
+      while (node && node !== rootElement) {
+        if (canElementScrollVertically(node)) {
+          return node;
+        }
+        node = node.parentElement;
+      }
+      return canElementScrollVertically(rootElement) ? rootElement : null;
+    };
+
+    const onTouchStart = (event: TouchEvent): void => {
+      const touch = event.touches[0];
+      if (!touch) {
+        return;
+      }
+      pageTouchScrollStateRef.current.startX = touch.clientX;
+      pageTouchScrollStateRef.current.startY = touch.clientY;
+      pageTouchScrollStateRef.current.scrollElement = findScrollableAncestor(event.target);
+    };
+
+    const onTouchMove = (event: TouchEvent): void => {
+      const touch = event.touches[0];
+      if (!touch) {
+        return;
+      }
+
+      const deltaX = touch.clientX - pageTouchScrollStateRef.current.startX;
+      const deltaY = touch.clientY - pageTouchScrollStateRef.current.startY;
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        return;
+      }
+
+      const scrollElement = pageTouchScrollStateRef.current.scrollElement;
+      if (!scrollElement) {
+        event.preventDefault();
+        return;
+      }
+
+      const atTop = scrollElement.scrollTop <= 0;
+      const atBottom = (
+        scrollElement.scrollTop + scrollElement.clientHeight
+        >= scrollElement.scrollHeight - 1
+      );
+      const movingDown = deltaY > 0;
+      const movingUp = deltaY < 0;
+
+      if ((atTop && movingDown) || (atBottom && movingUp)) {
+        event.preventDefault();
+      }
+    };
+
+    const clearTouchState = (): void => {
+      pageTouchScrollStateRef.current.scrollElement = null;
+    };
+
+    rootElement.addEventListener("touchstart", onTouchStart, { passive: true });
+    rootElement.addEventListener("touchmove", onTouchMove, { passive: false });
+    rootElement.addEventListener("touchend", clearTouchState, { passive: true });
+    rootElement.addEventListener("touchcancel", clearTouchState, { passive: true });
+
+    return () => {
+      rootElement.removeEventListener("touchstart", onTouchStart);
+      rootElement.removeEventListener("touchmove", onTouchMove);
+      rootElement.removeEventListener("touchend", clearTouchState);
+      rootElement.removeEventListener("touchcancel", clearTouchState);
     };
   }, []);
 
@@ -2995,7 +3190,7 @@ export function App(): React.JSX.Element {
         <div
           data-testid="thread-list-status"
           data-state={threadListState}
-          className="h-full min-h-0 overflow-y-auto overflow-x-hidden py-2 pl-2 pr-0"
+          className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain py-2 pl-2 pr-0"
         >
           {threads.length === 0 && (
             <div data-testid="thread-list-empty" className="px-4 py-6 text-xs text-muted-foreground text-center space-y-3">
@@ -3488,7 +3683,7 @@ export function App(): React.JSX.Element {
       <div
         className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-200 ${
           desktopSidebarOpen ? "md:ml-64" : "md:ml-0"
-        } h-full`}
+        } h-full overflow-hidden`}
       >
 
         {/* Header */}
@@ -3692,14 +3887,18 @@ export function App(): React.JSX.Element {
 
         {/* ── Chat tab ──────────────────────────────────────── */}
         {activeTab === "chat" && (
-          <div data-testid="chat-surface" data-state={chatSurfaceState} className="relative flex-1 flex flex-col min-h-0">
+          <div
+            data-testid="chat-surface"
+            data-state={chatSurfaceState}
+            className="relative flex-1 flex flex-col min-h-0 overflow-hidden"
+          >
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-x-0 -top-4 z-10 h-[5.5rem] bg-gradient-to-b from-background from-52% via-background/78 via-82% to-transparent to-100%"
             />
 
             {/* Conversation */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-y-contain">
               <AnimatePresence initial={false} mode="wait">
                 <motion.div
                   key={selectedThreadId ?? "__no_thread__"}
@@ -3795,7 +3994,7 @@ export function App(): React.JSX.Element {
             {/* Input area */}
             <div
               className="relative z-10 -mt-6 px-4 pt-6 shrink-0"
-              style={{ paddingBottom: "calc(0.5rem + var(--composer-safe-bottom-inset))" }}
+              style={{ paddingBottom: "calc(var(--composer-bottom-spacing) + var(--composer-safe-bottom-inset))" }}
             >
               <div
                 aria-hidden="true"

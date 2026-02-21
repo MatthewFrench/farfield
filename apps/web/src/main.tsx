@@ -43,10 +43,6 @@ function publishBootStatus(detail: BootStatusDetail): void {
   window.dispatchEvent(new CustomEvent<BootStatusDetail>(BOOT_STATUS_EVENT_NAME, { detail }));
 }
 
-function syncAppViewportHeight(): void {
-  document.documentElement.style.setProperty("--app-height", `${String(window.innerHeight)}px`);
-}
-
 function isStandaloneDisplayMode(): boolean {
   const navigatorWithStandalone = window.navigator as NavigatorWithStandalone;
   return (
@@ -76,23 +72,19 @@ function readThreadIdFromPathname(pathname: string): string | null {
   }
 }
 
-function installViewportHeightSync(): void {
+function installDisplayModeSync(): void {
   const displayModeQuery = window.matchMedia("(display-mode: standalone)");
 
-  syncAppViewportHeight();
   syncDisplayModeClass();
-  window.addEventListener("resize", syncAppViewportHeight);
-  window.addEventListener("orientationchange", syncAppViewportHeight);
   window.addEventListener("focus", syncDisplayModeClass);
   window.addEventListener("pageshow", syncDisplayModeClass);
-  window.visualViewport?.addEventListener("resize", syncAppViewportHeight);
   if (typeof displayModeQuery.addEventListener === "function") {
     displayModeQuery.addEventListener("change", syncDisplayModeClass);
   }
 }
 
 if (typeof window !== "undefined") {
-  installViewportHeightSync();
+  installDisplayModeSync();
   installGlobalClientCrashReporter({
     source: "farfield-web",
     readThreadId: () => readThreadIdFromPathname(window.location.pathname),
