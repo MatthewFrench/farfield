@@ -38,6 +38,7 @@ import {
   getLiveState,
   getPendingUserInputRequests,
   getStreamEvents,
+  isRequestCanceledError,
   readThread,
   getTraceStatus,
   interruptThread,
@@ -162,6 +163,12 @@ interface RefreshFlags {
 interface LoadSelectedThreadOptions {
   includeTurns?: boolean;
   includeReadThread?: boolean;
+}
+
+interface LoadSelectedThreadRequest {
+  threadId: string;
+  includeTurns: boolean;
+  includeReadThread: boolean;
 }
 
 interface ErrorBannerDetails {
@@ -419,12 +426,28 @@ function mergeProjectGroups(
   return Array.from(mergedGroups.values()).sort(sortProjectGroups);
 }
 
+function mergeLoadSelectedThreadRequest(
+  existing: LoadSelectedThreadRequest,
+  incoming: LoadSelectedThreadRequest
+): LoadSelectedThreadRequest {
+  if (existing.threadId !== incoming.threadId) {
+    return incoming;
+  }
+
+  return {
+    threadId: existing.threadId,
+    includeTurns: existing.includeTurns || incoming.includeTurns,
+    includeReadThread: existing.includeReadThread || incoming.includeReadThread
+  };
+}
+
 const DEFAULT_EFFORT_OPTIONS = ["minimal", "low", "medium", "high", "xhigh"] as const;
 const INITIAL_VISIBLE_CHAT_ITEMS = 90;
 const VISIBLE_CHAT_ITEMS_STEP = 80;
 const CORE_REFRESH_INTERVAL_MS = 5_000;
 const CORE_REFRESH_CONNECTED_MIN_INTERVAL_MS = 60_000;
 const CAPABILITIES_REFRESH_INTERVAL_MS = 5 * 60_000;
+const THREAD_ONLY_HISTORY_METHODS = new Set(["thread-stream-state-changed", "thread-queued-followups-changed"]);
 const READ_THREAD_RETRY_ATTEMPTS = 6;
 const READ_THREAD_RETRY_BASE_DELAY_MS = 140;
 const READ_THREAD_RETRY_MAX_DELAY_MS = 1_000;
@@ -794,6 +817,10 @@ export function App(): React.JSX.Element {
   const capabilitySnapshotRef = useRef<CapabilitySnapshot | null>(null);
   const coreDataRefreshInFlightRef = useRef<Promise<void> | null>(null);
   const coreDataRefreshQueuedRef = useRef(false);
+  const selectedThreadRefreshInFlightRef = useRef<Promise<void> | null>(null);
+  const selectedThreadRefreshQueuedRef = useRef<LoadSelectedThreadRequest | null>(null);
+  const selectedThreadRefreshAbortControllerRef = useRef<AbortController | null>(null);
+  const selectedThreadRefreshActiveThreadIdRef = useRef<string | null>(null);
   const loadCoreDataTrackedRef = useRef<(() => Promise<void>) | null>(null);
   const loadSelectedThreadRef = useRef<((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null>(
     null
@@ -1255,7 +1282,11 @@ export function App(): React.JSX.Element {
     await inFlight;
   }, [loadArchivedThreads, loadCoreData]);
 
-  const loadSelectedThread = useCallback(async (threadId: string, options?: LoadSelectedThreadOptions) => {
+  const loadSelectedThread = useCallback(async (
+    threadId: string,
+    options?: LoadSelectedThreadOptions,
+    signal?: AbortSignal
+  ) => {
     const includeTurns = options?.includeTurns ?? !pendingMaterializationThreadIdsRef.current.has(threadId);
     const includeReadThread = options?.includeReadThread ?? true;
     const thread = threads.find((entry) => entry.id === threadId) ?? null;
@@ -1269,7 +1300,10 @@ export function App(): React.JSX.Element {
     const readThreadWithRetry = async (): Promise<ReadThreadResponse> => {
       for (let attempt = 0; attempt < READ_THREAD_RETRY_ATTEMPTS; attempt += 1) {
         try {
-          return await readThread(threadId, { includeTurns: includeTurnsForRead });
+          const readOptions = signal
+            ? { includeTurns: includeTurnsForRead, signal }
+            : { includeTurns: includeTurnsForRead };
+          return await readThread(threadId, readOptions);
         } catch (error) {
           const message = toErrorMessage(error);
           const canRetry = isTransientReadThreadError(message) && attempt < READ_THREAD_RETRY_ATTEMPTS - 1;
@@ -1287,7 +1321,7 @@ export function App(): React.JSX.Element {
 
     const [live, stream, read] = await Promise.all([
       canReadLiveState
-        ? getLiveState(threadId)
+        ? (signal ? getLiveState(threadId, { signal }) : getLiveState(threadId))
         : Promise.resolve({
             ok: true as const,
             threadId,
@@ -1296,7 +1330,7 @@ export function App(): React.JSX.Element {
             liveStateError: null
           }),
       canReadStreamEvents
-        ? getStreamEvents(threadId)
+        ? (signal ? getStreamEvents(threadId, { signal }) : getStreamEvents(threadId))
         : Promise.resolve({
             ok: true as const,
             threadId,
@@ -1305,6 +1339,9 @@ export function App(): React.JSX.Element {
           }),
       includeReadThread ? readThreadWithRetry() : Promise.resolve(null)
     ]);
+    if (signal?.aborted || selectedThreadIdRef.current !== threadId) {
+      return;
+    }
     if ((live.conversationState?.turns.length ?? 0) > 0 || (read?.thread.turns.length ?? 0) > 0) {
       pendingMaterializationThreadIdsRef.current.delete(threadId);
     }
@@ -1342,6 +1379,72 @@ export function App(): React.JSX.Element {
     });
   }, [agentsById, appDefaultModel, appDefaultReasoningEffort, selectedAgentId, threads]);
 
+  const loadSelectedThreadTracked = useCallback(async (threadId: string, options?: LoadSelectedThreadOptions) => {
+    const request: LoadSelectedThreadRequest = {
+      threadId,
+      includeTurns: options?.includeTurns ?? !pendingMaterializationThreadIdsRef.current.has(threadId),
+      includeReadThread: options?.includeReadThread ?? true
+    };
+
+    if (selectedThreadRefreshInFlightRef.current) {
+      const queuedRequest = selectedThreadRefreshQueuedRef.current;
+      selectedThreadRefreshQueuedRef.current = queuedRequest
+        ? mergeLoadSelectedThreadRequest(queuedRequest, request)
+        : request;
+      if (
+        selectedThreadRefreshActiveThreadIdRef.current
+        && selectedThreadRefreshActiveThreadIdRef.current !== request.threadId
+      ) {
+        selectedThreadRefreshAbortControllerRef.current?.abort();
+      }
+      await selectedThreadRefreshInFlightRef.current;
+      return;
+    }
+
+    const runRefreshLoop = async () => {
+      let nextRequest: LoadSelectedThreadRequest | null = request;
+      while (nextRequest) {
+        selectedThreadRefreshQueuedRef.current = null;
+        selectedThreadRefreshActiveThreadIdRef.current = nextRequest.threadId;
+
+        const abortController = new AbortController();
+        selectedThreadRefreshAbortControllerRef.current = abortController;
+
+        try {
+          await loadSelectedThread(
+            nextRequest.threadId,
+            {
+              includeTurns: nextRequest.includeTurns,
+              includeReadThread: nextRequest.includeReadThread
+            },
+            abortController.signal
+          );
+        } catch (error) {
+          if (
+            error instanceof Error
+            && isRequestCanceledError(error)
+            && selectedThreadRefreshQueuedRef.current
+          ) {
+            nextRequest = selectedThreadRefreshQueuedRef.current;
+            continue;
+          }
+          throw error;
+        }
+
+        nextRequest = selectedThreadRefreshQueuedRef.current;
+      }
+    };
+
+    const inFlight = runRefreshLoop().finally(() => {
+      selectedThreadRefreshInFlightRef.current = null;
+      selectedThreadRefreshQueuedRef.current = null;
+      selectedThreadRefreshAbortControllerRef.current = null;
+      selectedThreadRefreshActiveThreadIdRef.current = null;
+    });
+    selectedThreadRefreshInFlightRef.current = inFlight;
+    await inFlight;
+  }, [loadSelectedThread]);
+
   const refreshAll = useCallback(async () => {
     setIsCoreLoading(true);
     try {
@@ -1354,6 +1457,9 @@ export function App(): React.JSX.Element {
         await loadSelectedThreadFn(selectedThreadIdRef.current);
       }
     } catch (e) {
+      if (e instanceof Error && isRequestCanceledError(e)) {
+        return;
+      }
       setError(toErrorMessage(e));
     } finally {
       setIsCoreLoading(false);
@@ -1365,8 +1471,8 @@ export function App(): React.JSX.Element {
   }, [loadCoreDataTracked]);
 
   useEffect(() => {
-    loadSelectedThreadRef.current = loadSelectedThread;
-  }, [loadSelectedThread]);
+    loadSelectedThreadRef.current = loadSelectedThreadTracked;
+  }, [loadSelectedThreadTracked]);
 
   const refreshPushClientState = useCallback(async () => {
     try {
@@ -1406,6 +1512,12 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     hasLoadedArchivedThreadsRef.current = hasLoadedArchivedThreads;
   }, [hasLoadedArchivedThreads]);
+
+  useEffect(() => {
+    return () => {
+      selectedThreadRefreshAbortControllerRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     const onPopState = () => {
@@ -1478,6 +1590,7 @@ export function App(): React.JSX.Element {
     const loadToken = selectedThreadLoadTokenRef.current;
 
     if (!selectedThreadId) {
+      selectedThreadRefreshAbortControllerRef.current?.abort();
       setLiveState(null);
       setReadThreadState(null);
       setStreamEvents([]);
@@ -1498,6 +1611,9 @@ export function App(): React.JSX.Element {
 
     void loadSelectedThreadFn(selectedThreadId)
       .catch((e) => {
+        if (e instanceof Error && isRequestCanceledError(e)) {
+          return;
+        }
         const message = toErrorMessage(e);
         if (isThreadNotLoadedReadError(message)) {
           setSelectedThreadId(null);
@@ -1570,6 +1686,9 @@ export function App(): React.JSX.Element {
               });
             }
           } catch (e) {
+            if (e instanceof Error && isRequestCanceledError(e)) {
+              return;
+            }
             setError(toErrorMessage(e));
           }
         })();
@@ -1613,16 +1732,23 @@ export function App(): React.JSX.Element {
             if (parsedEvent.type === "state") {
               refreshCore = true;
             } else if (parsedEvent.type === "history") {
-              if (parsedEvent.entry.source === "app" || parsedEvent.entry.source === "system") {
+              const eventMethod = parsedEvent.entry.meta.method;
+              const eventThreadId = parsedEvent.entry.meta.threadId;
+              const isThreadOnlyMethod = typeof eventMethod === "string"
+                && THREAD_ONLY_HISTORY_METHODS.has(eventMethod);
+
+              if (!isThreadOnlyMethod && (parsedEvent.entry.source === "app" || parsedEvent.entry.source === "system")) {
                 refreshCore = true;
               }
-              const eventThreadId = parsedEvent.entry.meta.threadId;
               if (
                 eventThreadId &&
                 selectedThreadIdRef.current &&
                 eventThreadId === selectedThreadIdRef.current
               ) {
                 refreshSelectedThread = true;
+              }
+              if (!eventThreadId && !isThreadOnlyMethod) {
+                refreshCore = true;
               }
             }
           }
@@ -1896,14 +2022,17 @@ export function App(): React.JSX.Element {
           }
         }
       });
-      await loadSelectedThread(selectedThreadId);
+      await loadSelectedThreadTracked(selectedThreadId);
     } catch (e) {
       lastAppliedModeSignatureRef.current = previousSignature;
+      if (e instanceof Error && isRequestCanceledError(e)) {
+        return;
+      }
       setError(toErrorMessage(e));
     } finally {
       setIsModeSyncing(false);
     }
-  }, [isModeSyncing, loadSelectedThread, modes, selectedThreadId]);
+  }, [isModeSyncing, loadSelectedThreadTracked, modes, selectedThreadId]);
 
   const submitPendingRequest = useCallback(async () => {
     if (!selectedThreadId || !activeRequest) return;

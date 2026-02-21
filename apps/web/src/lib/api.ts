@@ -32,6 +32,17 @@ const ApiEnvelopeSchema = z
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
+export class RequestCanceledError extends Error {
+  constructor(path: string) {
+    super(`Request canceled for ${path}`);
+    this.name = "RequestCanceledError";
+  }
+}
+
+export function isRequestCanceledError(error: Error): boolean {
+  return error instanceof RequestCanceledError;
+}
+
 const ApiErrorEnvelopeSchema = z
   .object({
     ok: z.literal(false),
@@ -283,7 +294,9 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   }
   let response: Response;
   const timeoutController = new AbortController();
+  let didTimeout = false;
   const timeoutHandle = setTimeout(() => {
+    didTimeout = true;
     timeoutController.abort();
   }, REQUEST_TIMEOUT_MS);
   const inheritedSignal = init?.signal;
@@ -306,7 +319,10 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`Request timed out for ${path} after ${String(REQUEST_TIMEOUT_MS)}ms`);
+      if (didTimeout) {
+        throw new Error(`Request timed out for ${path} after ${String(REQUEST_TIMEOUT_MS)}ms`);
+      }
+      throw new RequestCanceledError(path);
     }
     throw new Error(`Request failed for ${path}: ${message}`);
   } finally {
@@ -340,6 +356,17 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   return data;
 }
 
+interface ApiRequestOptions {
+  signal?: AbortSignal;
+}
+
+function requestInitWithSignal(signal: AbortSignal | undefined): RequestInit | undefined {
+  if (!signal) {
+    return undefined;
+  }
+  return { signal };
+}
+
 function stripOk(value: unknown): unknown {
   if (!value || typeof value !== "object") {
     return value;
@@ -349,8 +376,8 @@ function stripOk(value: unknown): unknown {
   return rest;
 }
 
-export async function getHealth(): Promise<z.infer<typeof HealthResponseSchema>> {
-  return HealthResponseSchema.parse(await request("/api/health"));
+export async function getHealth(options?: ApiRequestOptions): Promise<z.infer<typeof HealthResponseSchema>> {
+  return HealthResponseSchema.parse(await request("/api/health", requestInitWithSignal(options?.signal)));
 }
 
 export async function bootstrapEventsSession(): Promise<z.infer<typeof EventsSessionBootstrapResponseSchema>> {
@@ -397,8 +424,8 @@ const AgentsResponseSchema = z
   })
   .strict();
 
-export async function listAgents(): Promise<z.infer<typeof AgentsResponseSchema>> {
-  return AgentsResponseSchema.parse(await request("/api/agents"));
+export async function listAgents(options?: ApiRequestOptions): Promise<z.infer<typeof AgentsResponseSchema>> {
+  return AgentsResponseSchema.parse(await request("/api/agents", requestInitWithSignal(options?.signal)));
 }
 
 const ConfigDefaultsResponseSchema = z
@@ -412,6 +439,7 @@ const ConfigDefaultsResponseSchema = z
 
 export async function getConfigDefaults(options?: {
   agentId?: AgentId;
+  signal?: AbortSignal;
 }): Promise<z.infer<typeof ConfigDefaultsResponseSchema>> {
   const params = new URLSearchParams();
   if (options?.agentId) {
@@ -419,7 +447,10 @@ export async function getConfigDefaults(options?: {
   }
   const suffix = params.toString();
   return ConfigDefaultsResponseSchema.parse(
-    await request(suffix.length > 0 ? `/api/config/defaults?${suffix}` : "/api/config/defaults")
+    await request(
+      suffix.length > 0 ? `/api/config/defaults?${suffix}` : "/api/config/defaults",
+      requestInitWithSignal(options?.signal)
+    )
   );
 }
 
@@ -450,6 +481,7 @@ export async function listThreads(options: {
   maxPages: number;
   sortKey?: "created_at" | "updated_at";
   cwd?: string;
+  signal?: AbortSignal;
 }): Promise<z.infer<typeof ThreadListResponseSchema>> {
   const params = new URLSearchParams();
   params.set("limit", String(options.limit));
@@ -463,7 +495,7 @@ export async function listThreads(options: {
     params.set("cwd", options.cwd);
   }
 
-  const data = await request(`/api/threads?${params.toString()}`);
+  const data = await request(`/api/threads?${params.toString()}`, requestInitWithSignal(options.signal));
   return ThreadListResponseSchema.parse(stripOk(data));
 }
 
@@ -473,11 +505,12 @@ const ReadThreadResponseWithAgentSchema = AppServerReadThreadResponseSchema.exte
 
 export async function readThread(
   threadId: string,
-  options?: { includeTurns?: boolean }
+  options?: { includeTurns?: boolean; signal?: AbortSignal }
 ): Promise<z.infer<typeof ReadThreadResponseWithAgentSchema>> {
   const includeTurns = options?.includeTurns ?? true;
   const data = await request(
-    `/api/threads/${encodeURIComponent(threadId)}?includeTurns=${includeTurns ? "true" : "false"}`
+    `/api/threads/${encodeURIComponent(threadId)}?includeTurns=${includeTurns ? "true" : "false"}`,
+    requestInitWithSignal(options?.signal)
   );
   return ReadThreadResponseWithAgentSchema.parse(stripOk(data));
 }
@@ -516,25 +549,37 @@ export async function unarchiveThread(threadId: string): Promise<void> {
   UnarchiveThreadResponseSchema.parse(data);
 }
 
-export async function listCollaborationModes(): Promise<
-  z.infer<typeof AppServerCollaborationModeListResponseSchema>
-> {
-  const data = await request("/api/collaboration-modes");
+export async function listCollaborationModes(
+  options?: ApiRequestOptions
+): Promise<z.infer<typeof AppServerCollaborationModeListResponseSchema>> {
+  const data = await request("/api/collaboration-modes", requestInitWithSignal(options?.signal));
   return AppServerCollaborationModeListResponseSchema.parse(stripOk(data));
 }
 
-export async function listModels(): Promise<z.infer<typeof AppServerListModelsResponseSchema>> {
-  const data = await request("/api/models?limit=200");
+export async function listModels(options?: ApiRequestOptions): Promise<z.infer<typeof AppServerListModelsResponseSchema>> {
+  const data = await request("/api/models?limit=200", requestInitWithSignal(options?.signal));
   return AppServerListModelsResponseSchema.parse(stripOk(data));
 }
 
-export async function getLiveState(threadId: string): Promise<z.infer<typeof LiveStateResponseSchema>> {
-  const data = await request(`/api/threads/${encodeURIComponent(threadId)}/live-state`);
+export async function getLiveState(
+  threadId: string,
+  options?: ApiRequestOptions
+): Promise<z.infer<typeof LiveStateResponseSchema>> {
+  const data = await request(
+    `/api/threads/${encodeURIComponent(threadId)}/live-state`,
+    requestInitWithSignal(options?.signal)
+  );
   return LiveStateResponseSchema.parse(data);
 }
 
-export async function getStreamEvents(threadId: string): Promise<z.infer<typeof StreamEventsResponseSchema>> {
-  const data = await request(`/api/threads/${encodeURIComponent(threadId)}/stream-events?limit=80`);
+export async function getStreamEvents(
+  threadId: string,
+  options?: ApiRequestOptions
+): Promise<z.infer<typeof StreamEventsResponseSchema>> {
+  const data = await request(
+    `/api/threads/${encodeURIComponent(threadId)}/stream-events?limit=80`,
+    requestInitWithSignal(options?.signal)
+  );
   return StreamEventsResponseSchema.parse(data);
 }
 
@@ -605,8 +650,8 @@ export async function interruptThread(input: {
   });
 }
 
-export async function getTraceStatus(): Promise<z.infer<typeof TraceStatusSchema>> {
-  const data = await request("/api/debug/trace/status");
+export async function getTraceStatus(options?: ApiRequestOptions): Promise<z.infer<typeof TraceStatusSchema>> {
+  const data = await request("/api/debug/trace/status", requestInitWithSignal(options?.signal));
   return TraceStatusSchema.parse(data);
 }
 
@@ -634,8 +679,14 @@ export async function stopTrace(): Promise<void> {
   });
 }
 
-export async function listDebugHistory(limit = 120): Promise<z.infer<typeof HistoryListSchema>> {
-  const data = await request(`/api/debug/history?limit=${String(limit)}`);
+export async function listDebugHistory(
+  limit = 120,
+  options?: ApiRequestOptions
+): Promise<z.infer<typeof HistoryListSchema>> {
+  const data = await request(
+    `/api/debug/history?limit=${String(limit)}`,
+    requestInitWithSignal(options?.signal)
+  );
   return HistoryListSchema.parse(data);
 }
 
