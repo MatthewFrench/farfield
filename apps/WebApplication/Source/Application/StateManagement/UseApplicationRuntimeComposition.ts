@@ -89,10 +89,8 @@ export function useApplicationRuntimeComposition(
     applicationShellElementRef: input.applicationShellState.applicationShellElementRef,
     scrollRef: input.applicationShellState.scrollRef,
     activeTabRef: input.applicationShellState.activeTabRef,
-    selectedThreadIdRef: input.applicationShellState.selectedThreadIdRef,
     isChatAtBottomRef: input.applicationShellState.isChatAtBottomRef,
     viewportKeyboardStateRef: input.applicationShellState.viewportKeyboardStateRef,
-    viewportTelemetryLastReportedAtRef: input.applicationShellState.viewportTelemetryLastReportedAtRef,
     keyboardOpenScrollRafRef: input.applicationShellState.keyboardOpenScrollRafRef,
     setIsChatAtBottom: input.applicationShellState.setIsChatAtBottom,
     runtimeViewportSizingCoordinator: input.applicationOwnerDependencies.runtimeViewportSizingCoordinator,
@@ -227,6 +225,9 @@ export function useApplicationRuntimeComposition(
       chatClient: input.applicationOwnerDependencies.chatServerClient,
       threadMutationClient: input.applicationOwnerDependencies.threadMutationServerClient,
       pendingUserInputAnswerBuilder: input.applicationOwnerDependencies.pendingUserInputAnswerBuilder,
+      onInvalidateActiveThreadQuery: () => {
+        input.applicationOwnerDependencies.threadListStateController.invalidateActiveThreadQuery();
+      },
       refreshAll: input.coreDataLoaders.refreshAll,
       onReloadSelectedThread: input.loadSelectedThreadTracked,
       reportTrackedUserInterfaceError: input.runtimeRequestHandlers.reportTrackedUserInterfaceError

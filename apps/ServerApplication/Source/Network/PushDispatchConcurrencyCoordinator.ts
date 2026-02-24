@@ -13,10 +13,12 @@ export class PushDispatchConcurrencyCoordinator {
   private readonly runCheck: (threadId: string) => Promise<void>;
   private readonly timerByThreadId: Map<string, NodeJS.Timeout>;
   private readonly inFlightThreadIdSet: Set<string>;
+  private readonly pendingRerunThreadIdSet: Set<string>;
   private scheduledCheckCount: number;
   private startedCheckCount: number;
   private completedCheckCount: number;
   private skippedWhileInFlightCount: number;
+  private isStopped: boolean;
 
   public constructor(
     debounceMs: number,
@@ -32,13 +34,19 @@ export class PushDispatchConcurrencyCoordinator {
     this.runCheck = runCheck;
     this.timerByThreadId = new Map<string, NodeJS.Timeout>();
     this.inFlightThreadIdSet = new Set<string>();
+    this.pendingRerunThreadIdSet = new Set<string>();
     this.scheduledCheckCount = 0;
     this.startedCheckCount = 0;
     this.completedCheckCount = 0;
     this.skippedWhileInFlightCount = 0;
+    this.isStopped = false;
   }
 
   public schedule(threadId: string): void {
+    if (this.isStopped) {
+      return;
+    }
+
     if (!this.shouldSchedule()) {
       return;
     }
@@ -62,10 +70,12 @@ export class PushDispatchConcurrencyCoordinator {
   }
 
   public stop(): void {
+    this.isStopped = true;
     for (const timer of this.timerByThreadId.values()) {
       clearTimeout(timer);
     }
     this.timerByThreadId.clear();
+    this.pendingRerunThreadIdSet.clear();
   }
 
   public readStatistics(): PushDispatchConcurrencyCoordinatorStatistics {
@@ -82,6 +92,7 @@ export class PushDispatchConcurrencyCoordinator {
   private async executeCheck(threadId: string): Promise<void> {
     if (this.inFlightThreadIdSet.has(threadId)) {
       this.skippedWhileInFlightCount += 1;
+      this.pendingRerunThreadIdSet.add(threadId);
       return;
     }
 
@@ -92,6 +103,10 @@ export class PushDispatchConcurrencyCoordinator {
       this.completedCheckCount += 1;
     } finally {
       this.inFlightThreadIdSet.delete(threadId);
+
+      if (this.pendingRerunThreadIdSet.delete(threadId) && !this.isStopped) {
+        this.schedule(threadId);
+      }
     }
   }
 }

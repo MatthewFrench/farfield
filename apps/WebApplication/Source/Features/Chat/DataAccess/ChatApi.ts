@@ -53,10 +53,18 @@ const StreamEventsResponseSchema = z
     ok: z.literal(true),
     threadId: z.string(),
     ownerClientId: z.string().nullable(),
-    events: z.array(IpcFrameSchema)
+    events: z.array(IpcFrameSchema),
+    nextSequence: z.number().int().nonnegative(),
+    firstAvailableSequence: z.number().int().nonnegative(),
+    resetRequired: z.boolean()
   })
   .passthrough();
 export type ApiStreamEventsResponse = z.infer<typeof StreamEventsResponseSchema>;
+
+export interface ApiReadStreamEventsOptions extends ApiRequestOptions {
+  // Cursor to request only stream events after this sequence number.
+  sinceSequence?: number | null;
+}
 
 export interface ApiSendMessageInput {
   threadId: string;
@@ -98,10 +106,17 @@ export async function getLiveState(
 
 export async function getStreamEvents(
   threadId: string,
-  options?: ApiRequestOptions
+  options?: ApiReadStreamEventsOptions
 ): Promise<ApiStreamEventsResponse> {
+  const queryParameters = new URLSearchParams({
+    limit: "80"
+  });
+  if (options?.sinceSequence !== undefined && options.sinceSequence !== null) {
+    queryParameters.set("sinceSequence", String(options.sinceSequence));
+  }
+
   const data = await request(
-    `/api/threads/${encodeURIComponent(threadId)}/stream-events?limit=80`,
+    `/api/threads/${encodeURIComponent(threadId)}/stream-events?${queryParameters.toString()}`,
     requestInitWithOptions(options)
   );
   return StreamEventsResponseSchema.parse(data);

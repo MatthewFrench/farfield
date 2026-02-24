@@ -123,7 +123,17 @@ export class DebugClientErrorRouteOwner {
       return false;
     }
 
-    const errorId = decodeURIComponent(clientErrorIdSegment);
+    let errorId: string;
+    try {
+      errorId = decodeURIComponent(clientErrorIdSegment);
+    } catch {
+      jsonResponse(res, 400, {
+        ok: false,
+        error: "Invalid client error identifier"
+      });
+      return true;
+    }
+
     const errorEvent = clientErrorStore.getById(errorId);
     if (!errorEvent) {
       jsonResponse(res, 404, {

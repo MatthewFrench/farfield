@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { ThreadMemberRouteDependencies, ThreadMemberResolvedRouteContext } from "./ThreadMemberRouteContracts.js";
 
 export interface ThreadMemberReadRouteOwnerOptions {
@@ -15,7 +16,7 @@ export class ThreadMemberReadRouteOwner {
   }
 
   public async handle(): Promise<boolean> {
-    const { req, res, segments, url, codexAdapter, parseBoolean, parseInteger, jsonResponse } = this.dependencies;
+    const { req, res, segments, url, codexAdapter, parseBoolean, jsonResponse } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
     if (req.method === "GET" && segments.length === 3) {
@@ -78,13 +79,28 @@ export class ThreadMemberReadRouteOwner {
         return true;
       }
 
-      const limit = parseInteger(url.searchParams.get("limit"), 60);
-      const streamEvents = await adapter.readStreamEvents(threadId, limit);
+      const parsedStreamEventsQuery = StreamEventsQuerySchema.safeParse({
+        limit: url.searchParams.get("limit") ?? undefined,
+        sinceSequence: url.searchParams.get("sinceSequence") ?? undefined
+      });
+      if (!parsedStreamEventsQuery.success) {
+        jsonResponse(res, 400, {
+          ok: false,
+          error: "Invalid stream event query parameters",
+          details: parsedStreamEventsQuery.error.issues
+        });
+        return true;
+      }
+
+      const streamEvents = await adapter.readStreamEvents(threadId, parsedStreamEventsQuery.data);
       jsonResponse(res, 200, {
         ok: true,
         threadId,
         ownerClientId: streamEvents.ownerClientId,
-        events: streamEvents.events
+        events: streamEvents.events,
+        nextSequence: streamEvents.nextSequence,
+        firstAvailableSequence: streamEvents.firstAvailableSequence,
+        resetRequired: streamEvents.resetRequired
       });
       return true;
     }
@@ -92,3 +108,19 @@ export class ThreadMemberReadRouteOwner {
     return false;
   }
 }
+
+const STREAM_EVENT_QUERY_LIMIT_MAXIMUM = 400;
+
+// Cursor query parsing is schema-owned so stream synchronization cannot drift between routes and clients.
+const StreamEventsQuerySchema = z
+  .object({
+    limit: z.preprocess(
+      (value) => value === undefined ? 60 : value,
+      z.coerce.number().int().positive().max(STREAM_EVENT_QUERY_LIMIT_MAXIMUM)
+    ),
+    sinceSequence: z.preprocess(
+      (value) => value === undefined ? null : value,
+      z.union([z.null(), z.coerce.number().int().nonnegative()])
+    )
+  })
+  .strict();

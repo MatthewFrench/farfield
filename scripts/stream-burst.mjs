@@ -205,7 +205,7 @@ async function main() {
   );
 
   const { parsed: threadsResponse } = await fetchJson(
-    `/api/threads?limit=${String(threadsLimit)}&archived=0&all=0&maxPages=1`,
+    `/api/threads?limit=${String(threadsLimit)}&archived=false&all=false&maxPages=1`,
     ThreadsResponseSchema,
     "threads"
   );

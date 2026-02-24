@@ -60,6 +60,9 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         input.selectedThreadIdRef.current = threadId;
       },
       onSetMobileSidebarOpen: input.setMobileSidebarOpen,
+      onInvalidateActiveThreadQuery: () => {
+        input.threadListStateController.invalidateActiveThreadQuery();
+      },
       threadMutationClient: input.threadMutationServerClient,
       refreshAll: input.refreshAll,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
@@ -98,8 +101,11 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         input.setSelectedThreadId(nextThreadId);
         input.selectedThreadIdRef.current = nextThreadId;
       },
-      onInvalidateThreadQueries: () => {
-        input.threadListStateController.invalidateThreadQueries();
+      onInvalidateActiveThreadQuery: () => {
+        input.threadListStateController.invalidateActiveThreadQuery();
+      },
+      onInvalidateArchivedThreadQuery: () => {
+        input.threadListStateController.invalidateArchivedThreadQuery();
       },
       loadCoreData: input.loadCoreDataTracked,
       threadMutationClient: input.threadMutationServerClient,
@@ -128,8 +134,11 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         input.selectedThreadIdRef.current = nextThreadId;
       },
       onSetMobileSidebarOpen: input.setMobileSidebarOpen,
-      onInvalidateThreadQueries: () => {
-        input.threadListStateController.invalidateThreadQueries();
+      onInvalidateActiveThreadQuery: () => {
+        input.threadListStateController.invalidateActiveThreadQuery();
+      },
+      onInvalidateArchivedThreadQuery: () => {
+        input.threadListStateController.invalidateArchivedThreadQuery();
       },
       loadCoreData: input.loadCoreDataTracked,
       threadMutationClient: input.threadMutationServerClient,

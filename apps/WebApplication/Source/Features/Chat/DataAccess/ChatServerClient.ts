@@ -2,6 +2,7 @@ import {
   type ApiInterruptThreadInput,
   type ApiLiveStateResponse,
   type ApiReadThreadOptions,
+  type ApiReadStreamEventsOptions,
   type ApiReadThreadResponse,
   type ApiSendMessageInput,
   type ApiSetCollaborationModeInput,
@@ -18,6 +19,7 @@ import {
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
 export type ChatReadThreadOptions = ApiReadThreadOptions;
+export type ChatReadStreamEventsOptions = ApiReadStreamEventsOptions;
 export type ChatReadThreadResponse = ApiReadThreadResponse;
 export type ChatLiveStateResponse = ApiLiveStateResponse;
 export type ChatStreamEventsResponse = ApiStreamEventsResponse;
@@ -41,7 +43,7 @@ export class ChatServerClient {
 
   public async readStreamEvents(
     threadId: string,
-    options?: ApiRequestOptions
+    options?: ApiReadStreamEventsOptions
   ): Promise<ApiStreamEventsResponse> {
     return getStreamEvents(threadId, options);
   }

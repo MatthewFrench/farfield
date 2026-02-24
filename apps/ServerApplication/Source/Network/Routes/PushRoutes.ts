@@ -16,6 +16,9 @@ import type { PushReceiptStore } from "../../Modules/PushNotifications/PushRecei
 import type { PushSendStore } from "../../Modules/PushNotifications/PushSendStore.js";
 import type { PushService } from "../../Modules/PushNotifications/PushService.js";
 import type { PushStore } from "../../Modules/PushNotifications/PushStore.js";
+import type { PushMutationConcurrencyCoordinator } from "../PushMutationConcurrencyCoordinator.js";
+import type { PushSendResult } from "../../Modules/PushNotifications/PushService.js";
+import type { StoredPushSubscription } from "@farfield/protocol";
 
 const PushReceiptEventSchema = z.enum(["shown", "clicked", "error"]);
 const FileSystemErrorSchema = z
@@ -71,6 +74,7 @@ export interface PushRouteDependencies {
   pushStore: PushStore;
   pushReceiptStore: PushReceiptStore;
   pushSendStore: PushSendStore;
+  pushMutationConcurrencyCoordinator: PushMutationConcurrencyCoordinator;
   pushTestBodySchema: typeof FarfieldPushTestBodySchema;
   readJsonBody: (req: IncomingMessage) => Promise<JsonValue>;
   jsonResponse: (res: ServerResponse, statusCode: number, body: object) => void;
@@ -78,6 +82,83 @@ export interface PushRouteDependencies {
     input: z.infer<typeof FarfieldPushTestBodySchema>,
     privateMode: boolean
   ) => PushNotificationPayload;
+}
+
+interface PushDispatchAttempt {
+  payload: PushNotificationPayload;
+  sendResult: PushSendResult;
+}
+
+function aggregatePushDispatchAttempts(attempts: PushDispatchAttempt[]): {
+  attempted: number;
+  delivered: number;
+  failures: number;
+  prunedEndpoints: string[];
+} {
+  const prunedEndpointSet = new Set<string>();
+  let attempted = 0;
+  let delivered = 0;
+  let failures = 0;
+
+  for (const attempt of attempts) {
+    attempted += attempt.sendResult.attempted;
+    delivered += attempt.sendResult.delivered;
+    failures += attempt.sendResult.failures.length;
+    for (const endpoint of attempt.sendResult.prunedEndpoints) {
+      prunedEndpointSet.add(endpoint);
+    }
+  }
+
+  return {
+    attempted,
+    delivered,
+    failures,
+    prunedEndpoints: Array.from(prunedEndpointSet)
+  };
+}
+
+async function sendPushTestNotificationsByPrivacyMode(input: {
+  subscriptions: StoredPushSubscription[];
+  body: z.infer<typeof FarfieldPushTestBodySchema>;
+  pushService: PushService;
+  buildPushTestPayload: (
+    input: z.infer<typeof FarfieldPushTestBodySchema>,
+    privateMode: boolean
+  ) => PushNotificationPayload;
+}): Promise<PushDispatchAttempt[]> {
+  const privateModeSubscriptions = input.subscriptions.filter(
+    (subscription) => subscription.settings.privateMode
+  );
+  const detailedModeSubscriptions = input.subscriptions.filter(
+    (subscription) => !subscription.settings.privateMode
+  );
+
+  const pushDispatchAttempts: PushDispatchAttempt[] = [];
+  if (privateModeSubscriptions.length > 0) {
+    const privatePayload = input.buildPushTestPayload(input.body, true);
+    const privateSendResult = await input.pushService.sendToSubscriptions(
+      privateModeSubscriptions,
+      privatePayload
+    );
+    pushDispatchAttempts.push({
+      payload: privatePayload,
+      sendResult: privateSendResult
+    });
+  }
+
+  if (detailedModeSubscriptions.length > 0) {
+    const detailedPayload = input.buildPushTestPayload(input.body, false);
+    const detailedSendResult = await input.pushService.sendToSubscriptions(
+      detailedModeSubscriptions,
+      detailedPayload
+    );
+    pushDispatchAttempts.push({
+      payload: detailedPayload,
+      sendResult: detailedSendResult
+    });
+  }
+
+  return pushDispatchAttempts;
 }
 
 export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boolean> {
@@ -92,6 +173,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     pushStore,
     pushReceiptStore,
     pushSendStore,
+    pushMutationConcurrencyCoordinator,
     pushTestBodySchema,
     readJsonBody,
     jsonResponse,
@@ -216,8 +298,10 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
 
   if (req.method === "POST" && pathname === "/api/push/subscriptions") {
     const body = parseBody(CreatePushSubscriptionBodySchema, await readJsonBody(req));
-    const subscription = await pushStore.upsertSubscription(body.subscription, {
-      privateMode: body.settings?.privateMode ?? pushPrivateModeDefault
+    const subscription = await pushMutationConcurrencyCoordinator.runExclusive(async () => {
+      return pushStore.upsertSubscription(body.subscription, {
+        privateMode: body.settings?.privateMode ?? pushPrivateModeDefault
+      });
     });
     jsonResponse(res, 200, {
       ok: true,
@@ -228,7 +312,9 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
 
   if (req.method === "DELETE" && pathname === "/api/push/subscriptions") {
     const body = parseBody(DeletePushSubscriptionBodySchema, await readJsonBody(req));
-    const deleted = await pushStore.removeSubscriptionByEndpoint(body.endpoint);
+    const deleted = await pushMutationConcurrencyCoordinator.runExclusive(async () => {
+      return pushStore.removeSubscriptionByEndpoint(body.endpoint);
+    });
     jsonResponse(res, 200, {
       ok: true,
       deleted
@@ -238,7 +324,9 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
 
   if (req.method === "POST" && pathname === "/api/push/test") {
     const body = parseBody(pushTestBodySchema, await readJsonBody(req));
-    const subscriptions = pushStore.listSubscriptions();
+    const subscriptions = await pushMutationConcurrencyCoordinator.runExclusive(async () => {
+      return pushStore.listSubscriptions();
+    });
     const dryRun = body.dryRun === true;
 
     if (!pushService.isEnabled()) {
@@ -283,33 +371,47 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       return true;
     }
 
-    const privateMode = subscriptions.every((subscription) => subscription.settings.privateMode);
-    const payload = buildPushTestPayload(body, privateMode);
-    const sendResult = await pushService.sendToSubscriptions(subscriptions, payload);
+    const pushDispatchAttempts = await sendPushTestNotificationsByPrivacyMode({
+      subscriptions,
+      body,
+      pushService,
+      buildPushTestPayload
+    });
+    const aggregatedSendResult = aggregatePushDispatchAttempts(pushDispatchAttempts);
+    const selectedPayload = pushDispatchAttempts[0]?.payload;
+    if (!selectedPayload) {
+      jsonResponse(res, 500, {
+        ok: false,
+        error: "Push test dispatch did not produce a payload"
+      });
+      return true;
+    }
 
-    await Promise.all(
-      sendResult.prunedEndpoints.map(async (endpoint) => pushStore.removeSubscriptionByEndpoint(endpoint))
-    );
+    await pushMutationConcurrencyCoordinator.runExclusive(async () => {
+      await Promise.all(
+        aggregatedSendResult.prunedEndpoints.map(async (endpoint) => pushStore.removeSubscriptionByEndpoint(endpoint))
+      );
 
-    pushSendStore.setLatest({
-      notificationId: payload.notificationId,
-      threadId: payload.threadId,
-      turnId: payload.turnId,
-      sentAt: payload.createdAt,
-      attempted: sendResult.attempted,
-      delivered: sendResult.delivered,
-      failures: sendResult.failures.length
+      pushSendStore.setLatest({
+        notificationId: selectedPayload.notificationId,
+        threadId: selectedPayload.threadId,
+        turnId: selectedPayload.turnId,
+        sentAt: selectedPayload.createdAt,
+        attempted: aggregatedSendResult.attempted,
+        delivered: aggregatedSendResult.delivered,
+        failures: aggregatedSendResult.failures
+      });
     });
 
     jsonResponse(res, 200, {
       ok: true,
       dryRun: false,
-      notificationId: payload.notificationId,
+      notificationId: selectedPayload.notificationId,
       ready: true,
       reason: "Push notification attempted",
-      attempted: sendResult.attempted,
-      delivered: sendResult.delivered,
-      failures: sendResult.failures.length
+      attempted: aggregatedSendResult.attempted,
+      delivered: aggregatedSendResult.delivered,
+      failures: aggregatedSendResult.failures
     });
     return true;
   }

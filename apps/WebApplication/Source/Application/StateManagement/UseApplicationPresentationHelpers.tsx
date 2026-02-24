@@ -12,13 +12,26 @@ export interface UseStreamEventCardsInput {
   streamEvents: ChatStreamEventsResponse["events"];
 }
 
+interface IndexedStreamEvent {
+  streamEvent: ChatStreamEventsResponse["events"][number];
+  stableIndex: number;
+}
+
 export function useStreamEventCards(input: UseStreamEventCardsInput): React.JSX.Element[] {
   return useMemo<React.JSX.Element[]>(() => (
     input.streamEvents
-      .slice()
+      // Preserve each event's original index as a stable key seed so appends do not
+      // remount every existing card (which would reset local expand/collapse state).
+      .map<IndexedStreamEvent>((streamEvent, stableIndex) => ({
+        streamEvent,
+        stableIndex
+      }))
       .reverse()
-      .map((streamEvent, streamEventIndex) => (
-        <StreamEventCard key={streamEventIndex} event={streamEvent} />
+      .map((indexedStreamEvent) => (
+        <StreamEventCard
+          key={`stream-event-${String(indexedStreamEvent.stableIndex)}`}
+          event={indexedStreamEvent.streamEvent}
+        />
       ))
   ), [input.streamEvents]);
 }

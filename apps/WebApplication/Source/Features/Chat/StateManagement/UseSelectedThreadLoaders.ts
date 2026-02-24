@@ -1,6 +1,7 @@
 import {
   startTransition,
   useCallback,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction
@@ -68,9 +69,13 @@ export interface SelectedThreadLoaders {
   loadSelectedThreadTracked: (threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>;
 }
 
+const STREAM_EVENT_RETENTION_LIMIT = 400;
+
 export function useSelectedThreadLoaders(
   input: UseSelectedThreadLoadersInput
 ): SelectedThreadLoaders {
+  const nextStreamSequenceByThreadReference = useRef<Map<string, number>>(new Map());
+
   const loadSelectedThread = useCallback(async (
     threadId: string,
     options?: LoadSelectedThreadOptions,
@@ -84,6 +89,9 @@ export function useSelectedThreadLoaders(
     const descriptor = input.agentsById[threadAgentId];
     const canReadLiveState = descriptor?.capabilities.canReadLiveState ?? (threadAgentId === "codex");
     const canReadStreamEvents = descriptor?.capabilities.canReadStreamEvents ?? (threadAgentId === "codex");
+    const streamEventsSinceSequence = canReadStreamEvents
+      ? (nextStreamSequenceByThreadReference.current.get(threadId) ?? null)
+      : null;
 
     const snapshot = await input.selectedThreadDataRefreshCoordinator.readSnapshot({
       threadId,
@@ -91,6 +99,7 @@ export function useSelectedThreadLoaders(
       includeReadThread,
       canReadLiveState,
       canReadStreamEvents,
+      streamEventsSinceSequence,
       chatClient: input.chatServerClient,
       ...(signal ? { signal } : {})
     });
@@ -101,6 +110,12 @@ export function useSelectedThreadLoaders(
 
     if (snapshot.containsAnyTurns) {
       input.pendingThreadMaterializationCoordinator.clearPending(threadId);
+    }
+    if (canReadStreamEvents) {
+      nextStreamSequenceByThreadReference.current.set(
+        threadId,
+        snapshot.streamEventsSnapshot.nextSequence
+      );
     }
 
     startTransition(() => {
@@ -151,18 +166,28 @@ export function useSelectedThreadLoaders(
       }
 
       input.setStreamEvents((previousStreamEvents) => {
-        const previousLastEvent = previousStreamEvents[previousStreamEvents.length - 1];
-        const nextLastEvent = snapshot.streamEventsSnapshot.events[snapshot.streamEventsSnapshot.events.length - 1];
-        const previousLastSignature = previousLastEvent ? JSON.stringify(previousLastEvent) : "";
-        const nextLastSignature = nextLastEvent ? JSON.stringify(nextLastEvent) : "";
-
-        if (
-          previousStreamEvents.length === snapshot.streamEventsSnapshot.events.length
-          && previousLastSignature === nextLastSignature
-        ) {
-          return previousStreamEvents;
+        if (snapshot.streamEventsSnapshot.resetRequired) {
+          if (matchesStreamEventTail(previousStreamEvents, snapshot.streamEventsSnapshot.events)) {
+            return previousStreamEvents;
+          }
+          return snapshot.streamEventsSnapshot.events;
         }
 
+        if (snapshot.streamEventsSinceSequenceUsed !== null) {
+          if (snapshot.streamEventsSnapshot.events.length === 0) {
+            return previousStreamEvents;
+          }
+
+          // Cursor-based reads return only unseen events, so state can append deterministically.
+          const mergedEvents = previousStreamEvents.concat(snapshot.streamEventsSnapshot.events);
+          return mergedEvents.length > STREAM_EVENT_RETENTION_LIMIT
+            ? mergedEvents.slice(-STREAM_EVENT_RETENTION_LIMIT)
+            : mergedEvents;
+        }
+
+        if (matchesStreamEventTail(previousStreamEvents, snapshot.streamEventsSnapshot.events)) {
+          return previousStreamEvents;
+        }
         return snapshot.streamEventsSnapshot.events;
       });
     });
@@ -214,4 +239,12 @@ export function useSelectedThreadLoaders(
     loadSelectedThread,
     loadSelectedThreadTracked
   };
+}
+
+function matchesStreamEventTail(previousEvents: StreamEventsResponse["events"], nextEvents: StreamEventsResponse["events"]): boolean {
+  const previousLastEvent = previousEvents[previousEvents.length - 1];
+  const nextLastEvent = nextEvents[nextEvents.length - 1];
+  const previousLastSignature = previousLastEvent ? JSON.stringify(previousLastEvent) : "";
+  const nextLastSignature = nextLastEvent ? JSON.stringify(nextLastEvent) : "";
+  return previousEvents.length === nextEvents.length && previousLastSignature === nextLastSignature;
 }

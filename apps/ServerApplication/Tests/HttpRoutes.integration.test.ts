@@ -70,6 +70,12 @@ const DebugObservabilityEnvelopeSchema = z
               skippedWhileInFlightCount: z.number().int().nonnegative(),
               activeTimerCount: z.number().int().nonnegative(),
               inFlightThreadCount: z.number().int().nonnegative()
+            }),
+            pushMutation: z.object({
+              queuedExecutionCount: z.number().int().nonnegative(),
+              completedExecutionCount: z.number().int().nonnegative(),
+              failedExecutionCount: z.number().int().nonnegative(),
+              hasInFlightOperation: z.boolean()
             })
           }),
         streaming: z
@@ -448,6 +454,43 @@ describe("server route integration", () => {
     expect(sessionLogResponse.status).toBe(200);
     const sessionLog = await sessionLogResponse.text();
     expect(sessionLog.includes(created.errorId)).toBe(true);
+  });
+
+  it("returns 400 for malformed debug identifier segments", async () => {
+    const malformedIdentifier = "%E0%A4%A";
+
+    const malformedClientErrorResponse = await fetch(
+      `${baseUrl}/api/debug/client-errors/${malformedIdentifier}`,
+      {
+        headers: {
+          "X-Farfield-Token": apiToken
+        }
+      }
+    );
+    expect(malformedClientErrorResponse.status).toBe(400);
+    ApiErrorEnvelopeSchema.parse(await malformedClientErrorResponse.json());
+
+    const malformedHistoryResponse = await fetch(
+      `${baseUrl}/api/debug/history/${malformedIdentifier}`,
+      {
+        headers: {
+          "X-Farfield-Token": apiToken
+        }
+      }
+    );
+    expect(malformedHistoryResponse.status).toBe(400);
+    ApiErrorEnvelopeSchema.parse(await malformedHistoryResponse.json());
+
+    const malformedTraceResponse = await fetch(
+      `${baseUrl}/api/debug/trace/${malformedIdentifier}/download`,
+      {
+        headers: {
+          "X-Farfield-Token": apiToken
+        }
+      }
+    );
+    expect(malformedTraceResponse.status).toBe(400);
+    ApiErrorEnvelopeSchema.parse(await malformedTraceResponse.json());
   });
 
   it("supports debug observability snapshot contracts", async () => {

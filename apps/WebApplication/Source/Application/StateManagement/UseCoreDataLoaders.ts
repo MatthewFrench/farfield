@@ -28,6 +28,7 @@ import {
 } from "@/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
 import type { ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import type { AgentId } from "@/Shared/Contracts/ApiContracts";
 import { applyCoreDataSnapshotState } from "./CoreDataSnapshotStateApplier";
@@ -160,7 +161,9 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
         sortKey: "updated_at",
         previousUnreadThreadIdentifiers: input.unreadThreadIdsRef.current,
         selectedThreadIdentifier: input.selectedThreadIdRef.current,
-        readFromCache: false
+        // Prefer hot cache reads for event-driven refresh responsiveness.
+        // Mutation owners invalidate this cache key before invoking refresh.
+        readFromCache: true
       }),
       input.debugServerClient.readTraceStatus(),
       input.capabilityServerClient.listAgents().catch(() => null),
@@ -200,6 +203,35 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
         readInitialModeKey: input.readInitialModeKey
       });
     });
+
+    if (nextActiveThreadState.loadedFromCache) {
+      // Keep cache-first responsiveness but revalidate active threads in the background so
+      // external updates (for example event-stream-driven updates) still converge quickly.
+      void input.threadListStateController.loadActiveThreadState({
+        limit: input.threadListLimit,
+        maxPages: input.threadListMaxPages,
+        sortKey: "updated_at",
+        previousUnreadThreadIdentifiers: nextActiveThreadState.nextUnreadThreadIdentifiers,
+        selectedThreadIdentifier: input.selectedThreadIdRef.current,
+        readFromCache: false
+      }).then((networkActiveThreadState) => {
+        startTransition(() => {
+          if (networkActiveThreadState.didChangeThreads) {
+            input.setThreads(networkActiveThreadState.nextThreads);
+          }
+          input.setUnreadThreadIds((previousUnreadThreadIdentifiers) =>
+            ThreadGroupSelectors.unreadThreadIdentifierMapsMatch(
+              previousUnreadThreadIdentifiers,
+              networkActiveThreadState.nextUnreadThreadIdentifiers
+            )
+              ? previousUnreadThreadIdentifiers
+              : networkActiveThreadState.nextUnreadThreadIdentifiers
+          );
+        });
+      }).catch((error) => {
+        input.handleRuntimeRequestError(error);
+      });
+    }
   }, [
     input.activeTabRef,
     input.capabilityServerClient,

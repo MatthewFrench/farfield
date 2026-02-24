@@ -2,6 +2,7 @@ import { isTransientReadThreadError } from "@/Features/Chat/DomainModel/ReadThre
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import type {
   ChatLiveStateResponse,
+  ChatReadStreamEventsOptions,
   ChatReadThreadOptions,
   ChatReadThreadResponse,
   ChatStreamEventsResponse
@@ -25,7 +26,7 @@ export interface SelectedThreadDataRefreshChatClient {
   ): Promise<SelectedThreadLiveStateSnapshot>;
   readStreamEvents(
     threadId: string,
-    options?: ApiRequestOptions
+    options?: ChatReadStreamEventsOptions
   ): Promise<SelectedThreadStreamEventsSnapshot>;
 }
 
@@ -41,6 +42,7 @@ export interface SelectedThreadDataRefreshInput {
   includeReadThread: boolean;
   canReadLiveState: boolean;
   canReadStreamEvents: boolean;
+  streamEventsSinceSequence: number | null;
   chatClient: SelectedThreadDataRefreshChatClient;
   signal?: AbortSignal;
 }
@@ -48,6 +50,7 @@ export interface SelectedThreadDataRefreshInput {
 export interface SelectedThreadDataRefreshResult {
   liveStateSnapshot: SelectedThreadLiveStateSnapshot;
   streamEventsSnapshot: SelectedThreadStreamEventsSnapshot;
+  streamEventsSinceSequenceUsed: number | null;
   readThreadSnapshot: SelectedThreadReadThreadSnapshot | null;
   includeTurnsUsedForRead: boolean;
   containsAnyTurns: boolean;
@@ -139,16 +142,18 @@ export class SelectedThreadDataRefreshCoordinator {
           liveStateError: null
         }),
       input.canReadStreamEvents
-        ? (
-          input.signal
-            ? input.chatClient.readStreamEvents(input.threadId, { signal: input.signal })
-            : input.chatClient.readStreamEvents(input.threadId)
+        ? input.chatClient.readStreamEvents(
+          input.threadId,
+          this.buildStreamEventsRequestOptions(input.streamEventsSinceSequence, input.signal)
         )
         : Promise.resolve({
           ok: true as const,
           threadId: input.threadId,
           ownerClientId: null,
-          events: []
+          events: [],
+          nextSequence: 0,
+          firstAvailableSequence: 0,
+          resetRequired: false
         }),
       input.includeReadThread ? readThreadWithRetry() : Promise.resolve(null)
     ]);
@@ -161,9 +166,20 @@ export class SelectedThreadDataRefreshCoordinator {
     return {
       liveStateSnapshot,
       streamEventsSnapshot,
+      streamEventsSinceSequenceUsed: input.streamEventsSinceSequence,
       readThreadSnapshot,
       includeTurnsUsedForRead: includeTurnsForRead,
       containsAnyTurns
+    };
+  }
+
+  private buildStreamEventsRequestOptions(
+    streamEventsSinceSequence: number | null,
+    signal: AbortSignal | undefined
+  ): ChatReadStreamEventsOptions {
+    return {
+      ...(streamEventsSinceSequence !== null ? { sinceSequence: streamEventsSinceSequence } : {}),
+      ...(signal ? { signal } : {})
     };
   }
 }

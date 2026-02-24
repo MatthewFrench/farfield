@@ -36,7 +36,7 @@ test("error banner persists until manual dismiss", async ({ page }) => {
   await expect(banner).toBeVisible();
 
   await page.getByTestId("error-banner-open-debug").click();
-  await expect(page.getByTestId("debug-history-panel")).toBeVisible();
+  await expect(page.getByTestId("debug-issues-panel")).toBeVisible();
   await expect(banner).toBeVisible();
 
   await page.getByTestId("error-banner-dismiss").click();

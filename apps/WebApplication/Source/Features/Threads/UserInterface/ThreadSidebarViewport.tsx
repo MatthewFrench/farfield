@@ -1,4 +1,5 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import {
   ThreadSidebarPanel,
   type ThreadSidebarPanelProps
@@ -22,63 +23,71 @@ export function ThreadSidebarViewport({
   codexConfigured,
   healthState
 }: ThreadSidebarViewportProps): React.JSX.Element {
+  // Keep the sidebar mounted after first open so thread-list scroll position and
+  // panel-local state survive open/close transitions.
+  const [hasOpened, setHasOpened] = useState<boolean>(isOpen);
+
+  useEffect(() => {
+    if (isOpen) {
+      setHasOpened(true);
+    }
+  }, [isOpen]);
+
+  if (!hasOpened) {
+    return <></>;
+  }
+
   if (viewport === "desktop") {
     return (
-      <AnimatePresence initial={false}>
-        {isOpen && (
-          <motion.aside
-            key="desktop-sidebar"
-            initial={{ x: -280, opacity: 0.94 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -280, opacity: 0.94 }}
-            transition={{ type: "spring", stiffness: 380, damping: 36, mass: 0.7 }}
-            data-testid="sidebar-desktop"
-            className="hidden md:flex fixed safe-area-fixed-left z-30 w-64 flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
-          >
-            <ThreadSidebarPanel
-              viewport={viewport}
-              threadListPaneProperties={threadListPaneProperties}
-              onHideDesktopSidebar={onHideDesktopSidebar}
-              onCloseMobileSidebar={onCloseMobileSidebar}
-              allSystemsReady={allSystemsReady}
-              hasAnySystemFailure={hasAnySystemFailure}
-              commitLabel={commitLabel}
-              agentDescriptors={agentDescriptors}
-              codexConfigured={codexConfigured}
-              healthState={healthState}
-            />
-          </motion.aside>
-        )}
-      </AnimatePresence>
+      <motion.aside
+        initial={false}
+        animate={{ x: isOpen ? 0 : -280, opacity: isOpen ? 1 : 0.94 }}
+        transition={{ type: "spring", stiffness: 380, damping: 36, mass: 0.7 }}
+        data-testid="sidebar-desktop"
+        aria-hidden={!isOpen}
+        className={`hidden md:flex fixed safe-area-fixed-left z-30 w-64 flex-col border-r border-sidebar-border bg-sidebar shadow-xl ${
+          isOpen ? "pointer-events-auto" : "pointer-events-none"
+        }`}
+      >
+        <ThreadSidebarPanel
+          viewport={viewport}
+          threadListPaneProperties={threadListPaneProperties}
+          onHideDesktopSidebar={onHideDesktopSidebar}
+          onCloseMobileSidebar={onCloseMobileSidebar}
+          allSystemsReady={allSystemsReady}
+          hasAnySystemFailure={hasAnySystemFailure}
+          commitLabel={commitLabel}
+          agentDescriptors={agentDescriptors}
+          codexConfigured={codexConfigured}
+          healthState={healthState}
+        />
+      </motion.aside>
     );
   }
 
   return (
-    <AnimatePresence initial={false}>
-      {isOpen && (
-        <motion.aside
-          key="mobile-sidebar"
-          initial={{ x: -280 }}
-          animate={{ x: 0 }}
-          exit={{ x: -280 }}
-          transition={{ type: "spring", stiffness: 380, damping: 36, mass: 0.7 }}
-          data-testid="sidebar-mobile"
-          className="md:hidden fixed safe-area-fixed-left z-50 w-64 flex flex-col border-r border-sidebar-border bg-sidebar shadow-xl"
-        >
-          <ThreadSidebarPanel
-            viewport={viewport}
-            threadListPaneProperties={threadListPaneProperties}
-            onHideDesktopSidebar={onHideDesktopSidebar}
-            onCloseMobileSidebar={onCloseMobileSidebar}
-            allSystemsReady={allSystemsReady}
-            hasAnySystemFailure={hasAnySystemFailure}
-            commitLabel={commitLabel}
-            agentDescriptors={agentDescriptors}
-            codexConfigured={codexConfigured}
-            healthState={healthState}
-          />
-        </motion.aside>
-      )}
-    </AnimatePresence>
+    <motion.aside
+      initial={false}
+      animate={{ x: isOpen ? 0 : -280 }}
+      transition={{ type: "spring", stiffness: 380, damping: 36, mass: 0.7 }}
+      data-testid="sidebar-mobile"
+      aria-hidden={!isOpen}
+      className={`md:hidden fixed safe-area-fixed-left z-50 w-64 flex flex-col border-r border-sidebar-border bg-sidebar shadow-xl ${
+        isOpen ? "pointer-events-auto" : "pointer-events-none"
+      }`}
+    >
+      <ThreadSidebarPanel
+        viewport={viewport}
+        threadListPaneProperties={threadListPaneProperties}
+        onHideDesktopSidebar={onHideDesktopSidebar}
+        onCloseMobileSidebar={onCloseMobileSidebar}
+        allSystemsReady={allSystemsReady}
+        hasAnySystemFailure={hasAnySystemFailure}
+        commitLabel={commitLabel}
+        agentDescriptors={agentDescriptors}
+        codexConfigured={codexConfigured}
+        healthState={healthState}
+      />
+    </motion.aside>
   );
 }

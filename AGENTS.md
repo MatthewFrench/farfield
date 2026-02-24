@@ -22,15 +22,17 @@ violate the rules. If you think that is impossible, STOP and ask the user.
 
 ## Architecture Rules For Agents
 
-Agents must follow both architecture docs for all code changes:
+Agents must follow architecture governance docs for all code changes:
 
 1. `/Users/matthewfrench/GitHub/farfield/docs/architecture.md`
 2. `/Users/matthewfrench/GitHub/farfield/docs/proposed-structure-and-migration.md`
+3. `/Users/matthewfrench/GitHub/farfield/docs/decisions/README.md`
 
 Architecture standards quick links:
 
 1. `/Users/matthewfrench/GitHub/farfield/docs/architecture.md` (`Repository Surface Ownership`, `Module Dependency Matrix`, `Type System Rules`, `User Interface, Logic, and Data Separation`, `Data Ownership Rules`, `Cache Architecture`, `Concurrency Architecture`)
 2. `/Users/matthewfrench/GitHub/farfield/docs/proposed-structure-and-migration.md` (`Naming Baseline`, `Index File Policy (End-State)`, `Ownership Contracts (End-State)`, ownership registries, cleanup tracker)
+3. `/Users/matthewfrench/GitHub/farfield/docs/decisions/README.md` (`Architecture Decisions`, decision record template expectations)
 
 Mandatory rules:
 
@@ -79,10 +81,11 @@ Mandatory rules:
 43. Test file names in every `Tests` folder must use PascalCase and explicit owner-aligned names.
 44. Test naming format is `<OwnerName>.test.ts` or `<OwnerName>.test.tsx`; integration tests use `<OwnerName>.integration.test.ts`.
 45. When modifying logic in a code function, ensure high-value unit tests exist for behavior/contracts/edge cases and add or update tests when coverage is insufficient.
-46. When modifying a non-trivial class or function, ensure high-value comments exist where needed (purpose, context, edge cases, caveats, and key tribal knowledge); avoid low-value commentary.
+46. When modifying a code file, ensure the file has a high-value top comment when needed (purpose, context, edge cases, caveats, and key tribal knowledge); do not add low-value or unnecessary comments. Apply the same standard to modified non-trivial classes and functions.
 47. Child-process environment construction must use explicit allowlisted schema-owned contracts; never spread `process.env` directly into spawned-process configuration.
 48. Generic refresh paths must not invalidate all caches; cache invalidation must be explicit, scoped, and owned by mutation paths.
 49. Data-access and subscription lifecycle owners must include high-value ownership comments that explain boundary contract, caching/refresh ownership, and important caveats.
+50. Stream-event read contracts must use explicit cursor metadata (`nextSequence`, `firstAvailableSequence`, `resetRequired`) and client owners must apply deterministic append-or-reset merge behavior from that contract.
 
 Before finalizing a change, agents must confirm:
 
@@ -109,14 +112,16 @@ Before finalizing a change, agents must confirm:
 21. Test code does not rely on type-introspection utilities.
 22. Test file naming matches source naming style and owner naming contracts.
 23. Modified function logic has necessary high-value unit test coverage.
-24. Modified non-trivial functions/classes include necessary high-value comments only where useful.
+24. Modified code files include necessary high-value top comments where useful, and modified non-trivial functions/classes include necessary high-value comments where useful.
 25. Spawned-process environment contracts are schema-owned and allowlisted (no direct full-environment propagation).
 26. Cache invalidation remains mutation-scoped and is not triggered by broad refresh helpers.
 27. External data-source and subscription owner modules have high-value ownership comments where needed.
+28. Stream-event cursor ownership remains explicit from route/data-access contracts through client merge policy (no ad-hoc event-shape checks for synchronization).
 
 ## Repository Structure Guide For Agents
 
 Use this tree and ownership summary to locate code quickly and keep changes in the right place.
+This tree and file map are intentionally non-exhaustive; not every file is listed.
 
 ```text
 /
@@ -198,6 +203,45 @@ Folder ownership and purpose:
    - Root legacy static surface only; do not introduce new product behavior here.
 17. `traces`
    - Runtime artifacts only; never commit raw trace data.
+
+Important files (non-exhaustive) and why they matter:
+
+1. `/Users/matthewfrench/GitHub/farfield/AGENTS.md`
+   - Agent operating contract for architecture, naming, typing, testing, and workflow expectations.
+2. `/Users/matthewfrench/GitHub/farfield/docs/architecture.md`
+   - Normative architecture standard; source of truth for boundaries and ownership rules.
+3. `/Users/matthewfrench/GitHub/farfield/docs/proposed-structure-and-migration.md`
+   - End-state structure, ownership mapping, and migration checklist/progress tracker.
+4. `/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Main.tsx`
+   - Web runtime entry point and bootstrap wiring.
+5. `/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationRuntimeComposition.ts`
+   - Primary application composition owner that wires feature coordinators and effects.
+6. `/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationShellState.ts`
+   - Central web application state owner surface and state reference wiring.
+7. `/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseCoreDataLoaders.ts`
+   - Core web refresh/data-loading orchestration and caching entry points.
+8. `/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Threads/DataAccess/ThreadApi.ts`
+   - Thread HTTP contract boundary for list/read/mutation calls.
+9. `/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/DataAccess/ChatApi.ts`
+   - Chat HTTP contract boundary for thread actions and message sends.
+10. `/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Application/ServerBootstrap.ts`
+    - Server runtime bootstrap/composition root.
+11. `/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ServerRequestHandler.ts`
+    - Top-level HTTP routing and request lifecycle orchestration.
+12. `/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/ThreadCollectionRoutes.ts`
+    - Thread list/create endpoint ownership and query contract enforcement.
+13. `/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/ThreadMemberRoutes.ts`
+    - Thread member endpoint ownership for read and mutation route dispatch.
+14. `/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/PushRoutes.ts`
+    - Push registration/status/test/receipt endpoint ownership and payload policies.
+15. `/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/PushDispatchConcurrencyCoordinator.ts`
+    - Concurrency owner for completion-triggered notification dispatch scheduling.
+16. `/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Modules/Threads/ThreadCompletionNotificationService.ts`
+    - Completion detection and notification side-effect orchestration.
+17. `/Users/matthewfrench/GitHub/farfield/packages/CodexProtocol/Source/Index.ts`
+    - Public protocol package entry boundary and shared schema contract exports.
+18. `/Users/matthewfrench/GitHub/farfield/.github/workflows/ios-setup-checks.yml`
+    - iOS setup CI guardrail for script/Caddy path validation.
 
 ## Commands You Will Use Often
 

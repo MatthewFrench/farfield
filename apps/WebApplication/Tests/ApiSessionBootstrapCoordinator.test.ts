@@ -90,6 +90,37 @@ describe("ApiSessionBootstrapCoordinator", () => {
     expect(nearExpiryRead).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps session ready inside refresh lead-time while triggering non-blocking refresh", async () => {
+    const refreshLeadTimeMs = 30_000;
+    const coordinator = new ApiSessionBootstrapCoordinator(refreshLeadTimeMs);
+    const expiresAt = "2099-01-01T00:00:20.000Z";
+    const expiresAtEpochMs = Date.parse(expiresAt);
+
+    const initializeRead = vi.fn(async () => ({
+      authRequired: true,
+      bootstrapped: true,
+      expiresAt
+    }));
+    const nearExpiryRefreshRead = vi.fn(async () => ({
+      authRequired: true,
+      bootstrapped: true,
+      expiresAt
+    }));
+
+    expect(await coordinator.ensureSession(initializeRead, expiresAtEpochMs - refreshLeadTimeMs - 1)).toEqual({
+      isReady: true,
+      requiresApiToken: false
+    });
+
+    expect(await coordinator.ensureSession(nearExpiryRefreshRead, expiresAtEpochMs - refreshLeadTimeMs + 1)).toEqual({
+      isReady: true,
+      requiresApiToken: false
+    });
+
+    expect(initializeRead).toHaveBeenCalledTimes(1);
+    expect(nearExpiryRefreshRead).toHaveBeenCalledTimes(1);
+  });
+
   it("honors explicit api-token-required marker without issuing requests", async () => {
     const coordinator = new ApiSessionBootstrapCoordinator();
     const readSession = vi.fn(async () => ({

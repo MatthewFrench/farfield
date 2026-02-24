@@ -32,7 +32,14 @@ export class DebugHistoryRouteOwner {
       return false;
     }
 
-    const entryId = decodeURIComponent(historyEntrySegment);
+    let entryId: string;
+    try {
+      entryId = decodeURIComponent(historyEntrySegment);
+    } catch {
+      jsonResponse(res, 400, { ok: false, error: "Invalid history entry identifier" });
+      return true;
+    }
+
     const entry = activityHistoryService.readHistoryEntries().find((item) => item.id === entryId) ?? null;
     if (!entry) {
       jsonResponse(res, 404, { ok: false, error: "History entry not found" });

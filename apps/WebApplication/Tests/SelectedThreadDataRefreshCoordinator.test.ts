@@ -25,7 +25,10 @@ function buildStreamEventsSnapshot(threadId: string): SelectedThreadStreamEvents
     ok: true,
     threadId,
     ownerClientId: null,
-    events: []
+    events: [],
+    nextSequence: 0,
+    firstAvailableSequence: 0,
+    resetRequired: false
   };
 }
 
@@ -117,11 +120,12 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       includeReadThread: true,
       canReadLiveState: true,
       canReadStreamEvents: true,
+      streamEventsSinceSequence: null,
       chatClient
     });
 
     expect(chatClient.readLiveState).toHaveBeenCalledWith("thread-1");
-    expect(chatClient.readStreamEvents).toHaveBeenCalledWith("thread-1");
+    expect(chatClient.readStreamEvents).toHaveBeenCalledWith("thread-1", {});
     expect(chatClient.readThread).toHaveBeenCalledWith("thread-1", { includeTurns: true });
     expect(snapshot.readThreadSnapshot).not.toBeNull();
     expect(snapshot.includeTurnsUsedForRead).toBe(true);
@@ -165,6 +169,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       includeReadThread: true,
       canReadLiveState: false,
       canReadStreamEvents: false,
+      streamEventsSinceSequence: null,
       chatClient
     });
 
@@ -184,6 +189,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       includeReadThread: false,
       canReadLiveState: false,
       canReadStreamEvents: false,
+      streamEventsSinceSequence: null,
       chatClient
     });
 
@@ -201,10 +207,35 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       ok: true,
       threadId: "thread-3",
       ownerClientId: null,
-      events: []
+      events: [],
+      nextSequence: 0,
+      firstAvailableSequence: 0,
+      resetRequired: false
     });
     expect(snapshot.readThreadSnapshot).toBeNull();
     expect(snapshot.containsAnyTurns).toBe(false);
+  });
+
+  it("passes stream event cursor options to stream-event reads", async () => {
+    const coordinator = new SelectedThreadDataRefreshCoordinator();
+    const chatClient = createChatClient({
+      readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId))
+    });
+
+    await coordinator.readSnapshot({
+      threadId: "thread-5",
+      includeTurns: false,
+      includeReadThread: false,
+      canReadLiveState: true,
+      canReadStreamEvents: true,
+      streamEventsSinceSequence: 44,
+      chatClient
+    });
+
+    expect(chatClient.readStreamEvents).toHaveBeenCalledWith("thread-5", {
+      sinceSequence: 44
+    });
   });
 
   it("throws non-transient read-thread errors without retrying", async () => {
@@ -227,6 +258,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
         includeReadThread: true,
         canReadLiveState: false,
         canReadStreamEvents: false,
+        streamEventsSinceSequence: null,
         chatClient
       })
     ).rejects.toThrow("permission denied");

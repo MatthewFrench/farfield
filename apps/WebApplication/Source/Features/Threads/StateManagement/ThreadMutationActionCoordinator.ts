@@ -33,6 +33,7 @@ export interface CreateThreadActionInput {
   onMarkThreadPendingMaterialization: (threadId: string) => void;
   onThreadSelected: (threadId: string) => void;
   onSetMobileSidebarOpen: (isOpen: boolean) => void;
+  onInvalidateActiveThreadQuery: () => void;
   threadMutationClient: ThreadMutationActionClient;
   refreshAll: () => Promise<void>;
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
@@ -51,7 +52,8 @@ export interface ArchiveThreadActionInput {
   buildActionRequestOptions: (actionName: string) => ThreadMutationActionRequestOptions;
   onSetBusy: (isBusy: boolean) => void;
   onThreadSelected: (threadId: string | null) => void;
-  onInvalidateThreadQueries: () => void;
+  onInvalidateActiveThreadQuery: () => void;
+  onInvalidateArchivedThreadQuery: () => void;
   loadCoreData: () => Promise<void>;
   threadMutationClient: ThreadMutationActionClient;
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
@@ -63,7 +65,8 @@ export interface UnarchiveThreadActionInput {
   onSetBusy: (isBusy: boolean) => void;
   onThreadSelected: (threadId: string) => void;
   onSetMobileSidebarOpen: (isOpen: boolean) => void;
-  onInvalidateThreadQueries: () => void;
+  onInvalidateActiveThreadQuery: () => void;
+  onInvalidateArchivedThreadQuery: () => void;
   loadCoreData: () => Promise<void>;
   threadMutationClient: ThreadMutationActionClient;
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
@@ -87,6 +90,7 @@ export class ThreadMutationActionCoordinator {
       input.onMarkThreadPendingMaterialization(created.threadId);
       input.onThreadSelected(created.threadId);
       input.onSetMobileSidebarOpen(false);
+      input.onInvalidateActiveThreadQuery();
       await input.refreshAll();
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
@@ -114,7 +118,8 @@ export class ThreadMutationActionCoordinator {
       });
       await input.threadMutationClient.archiveThread(input.threadId, requestOptions);
       input.onThreadSelected(nextSelectedThreadIdentifier);
-      input.onInvalidateThreadQueries();
+      input.onInvalidateActiveThreadQuery();
+      input.onInvalidateArchivedThreadQuery();
       await input.loadCoreData();
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
@@ -135,7 +140,8 @@ export class ThreadMutationActionCoordinator {
       await input.threadMutationClient.unarchiveThread(input.threadId, requestOptions);
       input.onThreadSelected(input.threadId);
       input.onSetMobileSidebarOpen(false);
-      input.onInvalidateThreadQueries();
+      input.onInvalidateActiveThreadQuery();
+      input.onInvalidateArchivedThreadQuery();
       await input.loadCoreData();
     } catch (error) {
       await input.reportTrackedUserInterfaceError({

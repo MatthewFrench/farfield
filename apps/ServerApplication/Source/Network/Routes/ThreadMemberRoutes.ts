@@ -19,7 +19,17 @@ export async function handleThreadMemberRoutes(
     return false;
   }
 
-  const threadId = decodeURIComponent(segments[2]);
+  let threadId: string;
+  try {
+    threadId = decodeURIComponent(segments[2]);
+  } catch {
+    jsonResponse(res, 400, {
+      ok: false,
+      error: "Invalid thread identifier"
+    });
+    return true;
+  }
+
   const resolved = resolveAdapterForThread(threadId);
   if (!resolved.ok) {
     jsonResponse(res, resolved.status, {

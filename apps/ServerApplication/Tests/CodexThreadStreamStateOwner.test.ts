@@ -135,7 +135,10 @@ describe("CodexThreadStreamStateOwner", () => {
     expect(owner.getThreadOwnerCount()).toBe(1);
     expect(owner.resolveKnownOwnerClientId("thread-1", null)).toBe("client-a");
     expect(owner.resolveRequiredOwnerClientId("thread-1", null)).toBe("client-a");
-    expect(owner.readStreamEvents("thread-1", 1).events.length).toBe(1);
+    expect(owner.readStreamEvents("thread-1", {
+      limit: 1,
+      sinceSequence: null
+    }).events.length).toBe(1);
     expect(owner.readLiveState("thread-1").conversationState?.requests.length).toBe(1);
   });
 
@@ -177,6 +180,51 @@ describe("CodexThreadStreamStateOwner", () => {
     expect(projectedState.conversationState).toBeNull();
     expect(projectedState.liveStateError?.kind).toBe("reductionFailed");
     expect(projectedState.liveStateError?.patchIndex).toBe(0);
+  });
+
+  it("returns sequence metadata and incremental stream slices for cursor-based reads", () => {
+    const owner = new CodexThreadStreamStateOwner();
+    owner.ingestInboundFrame(createSnapshotEvent());
+    owner.ingestInboundFrame(createPatchEvent());
+
+    const fullSlice = owner.readStreamEvents("thread-1", {
+      limit: 80,
+      sinceSequence: null
+    });
+    expect(fullSlice.resetRequired).toBe(false);
+    expect(fullSlice.firstAvailableSequence).toBe(0);
+    expect(fullSlice.nextSequence).toBe(2);
+    expect(fullSlice.events.length).toBe(2);
+
+    const incrementalSlice = owner.readStreamEvents("thread-1", {
+      limit: 80,
+      sinceSequence: 0
+    });
+    expect(incrementalSlice.resetRequired).toBe(false);
+    expect(incrementalSlice.events.length).toBe(1);
+
+    const noChangeSlice = owner.readStreamEvents("thread-1", {
+      limit: 80,
+      sinceSequence: 1
+    });
+    expect(noChangeSlice.resetRequired).toBe(false);
+    expect(noChangeSlice.events.length).toBe(0);
+  });
+
+  it("marks stream reads for reset when cursor history has been evicted", () => {
+    const owner = new CodexThreadStreamStateOwner();
+    owner.ingestInboundFrame(createSnapshotEvent());
+    for (let eventIndex = 0; eventIndex < 450; eventIndex += 1) {
+      owner.ingestInboundFrame(createPatchEvent());
+    }
+
+    const staleCursorSlice = owner.readStreamEvents("thread-1", {
+      limit: 20,
+      sinceSequence: 0
+    });
+    expect(staleCursorSlice.resetRequired).toBe(true);
+    expect(staleCursorSlice.firstAvailableSequence).toBeGreaterThan(0);
+    expect(staleCursorSlice.events.length).toBe(20);
   });
 
   it("writes malformed stream events to the invalid-event detail log", () => {

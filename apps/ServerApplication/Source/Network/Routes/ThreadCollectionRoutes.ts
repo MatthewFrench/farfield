@@ -17,6 +17,37 @@ const ThreadListCursorSchema = z
     offset: z.number().int().nonnegative()
   })
   .strict();
+const ThreadListLimitMaximum = 200;
+const ThreadListMaxPagesMaximum = 40;
+interface ThreadListQuery {
+  limit: number;
+  archived: boolean;
+  all: boolean;
+  maxPages: number;
+  cursor: string | null;
+  sortKey: ThreadListSortKey | null;
+  cwd: string | null;
+}
+
+const RawThreadListQuerySchema = z
+  .object({
+    limit: z.string().nullable(),
+    archived: z.string().nullable(),
+    all: z.string().nullable(),
+    maxPages: z.string().nullable(),
+    cursor: z.string().nullable(),
+    sortKey: z.string().nullable(),
+    cwd: z.string().nullable()
+  })
+  .strict();
+const ThreadListLimitQueryValueSchema = z.coerce.number().int().positive().max(ThreadListLimitMaximum);
+const ThreadListMaxPagesQueryValueSchema = z
+  .coerce
+  .number()
+  .int()
+  .positive()
+  .max(ThreadListMaxPagesMaximum);
+const BooleanQueryValueSchema = z.enum(["true", "false"]).transform((value) => value === "true");
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {
   if (error instanceof Error) {
@@ -28,12 +59,95 @@ function toErrorMessage<ErrorType>(error: ErrorType): string {
   return String(error);
 }
 
-function parseThreadSortKey(value: string | null): ThreadListSortKey | null {
-  if (!value) {
+interface ThreadListQueryIssue {
+  path: string;
+  message: string;
+}
+
+function parseThreadListQuery(rawQuery: z.infer<typeof RawThreadListQuerySchema>):
+  | { ok: true; query: ThreadListQuery }
+  | { ok: false; issues: ThreadListQueryIssue[] } {
+  // Parse and validate each query field independently so callers receive precise
+  // field-level issues instead of one collapsed parsing failure.
+  const issues: ThreadListQueryIssue[] = [];
+
+  const parseBoundedInteger = (
+    value: string | null,
+    defaultValue: number,
+    path: string,
+    schema: typeof ThreadListLimitQueryValueSchema | typeof ThreadListMaxPagesQueryValueSchema
+  ): number => {
+    if (value === null || value.length === 0) {
+      return defaultValue;
+    }
+    const parsedValue = schema.safeParse(value);
+    if (parsedValue.success) {
+      return parsedValue.data;
+    }
+    for (const issue of parsedValue.error.issues) {
+      issues.push({
+        path,
+        message: issue.message
+      });
+    }
+    return defaultValue;
+  };
+
+  const parseBoolean = (value: string | null, defaultValue: boolean, path: string): boolean => {
+    if (value === null || value.length === 0) {
+      return defaultValue;
+    }
+    const parsedValue = BooleanQueryValueSchema.safeParse(value);
+    if (parsedValue.success) {
+      return parsedValue.data;
+    }
+    for (const issue of parsedValue.error.issues) {
+      issues.push({
+        path,
+        message: issue.message
+      });
+    }
+    return defaultValue;
+  };
+
+  const parseSortKey = (value: string | null): ThreadListSortKey | null => {
+    if (value === null || value.length === 0) {
+      return null;
+    }
+    const parsedValue = ThreadSortKeyParamSchema.safeParse(value);
+    if (parsedValue.success) {
+      return parsedValue.data;
+    }
+    for (const issue of parsedValue.error.issues) {
+      issues.push({
+        path: "sortKey",
+        message: issue.message
+      });
+    }
     return null;
+  };
+
+  const parsedQuery: ThreadListQuery = {
+    limit: parseBoundedInteger(rawQuery.limit, 80, "limit", ThreadListLimitQueryValueSchema),
+    archived: parseBoolean(rawQuery.archived, false, "archived"),
+    all: parseBoolean(rawQuery.all, false, "all"),
+    maxPages: parseBoundedInteger(rawQuery.maxPages, 20, "maxPages", ThreadListMaxPagesQueryValueSchema),
+    cursor: rawQuery.cursor,
+    sortKey: parseSortKey(rawQuery.sortKey),
+    cwd: rawQuery.cwd
+  };
+
+  if (issues.length > 0) {
+    return {
+      ok: false,
+      issues
+    };
   }
-  const parsed = ThreadSortKeyParamSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
+
+  return {
+    ok: true,
+    query: parsedQuery
+  };
 }
 
 function encodeThreadListCursor(offset: number): string {
@@ -124,8 +238,6 @@ export async function handleThreadCollectionRoutes(
     threadListAggregationCache,
     listEnabledAdapters,
     registerThreadAdapterOwnership,
-    parseInteger,
-    parseBoolean,
     normalizeOptionalString,
     resolveCreateThreadAdapter,
     readJsonBody,
@@ -200,11 +312,47 @@ export async function handleThreadCollectionRoutes(
   }
 
   if (req.method === "GET" && pathname === "/api/threads") {
-    const limit = parseInteger(url.searchParams.get("limit"), 80);
-    const archived = parseBoolean(url.searchParams.get("archived"), false);
-    const all = parseBoolean(url.searchParams.get("all"), false);
-    const maxPages = parseInteger(url.searchParams.get("maxPages"), 20);
-    const cursor = url.searchParams.get("cursor") ?? null;
+    const parsedRawThreadListQuery = RawThreadListQuerySchema.safeParse({
+      limit: url.searchParams.get("limit"),
+      archived: url.searchParams.get("archived"),
+      all: url.searchParams.get("all"),
+      maxPages: url.searchParams.get("maxPages"),
+      cursor: url.searchParams.get("cursor"),
+      sortKey: url.searchParams.get("sortKey"),
+      cwd: url.searchParams.get("cwd")
+    });
+    if (!parsedRawThreadListQuery.success) {
+      jsonResponse(res, 400, {
+        ok: false,
+        error: "Invalid thread list query parameters",
+        issues: parsedRawThreadListQuery.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message
+        }))
+      });
+      return true;
+    }
+
+    const parsedThreadListQuery = parseThreadListQuery(parsedRawThreadListQuery.data);
+    if (!parsedThreadListQuery.ok) {
+      jsonResponse(res, 400, {
+        ok: false,
+        error: "Invalid thread list query parameters",
+        issues: parsedThreadListQuery.issues
+      });
+      return true;
+    }
+
+    const {
+      limit,
+      archived,
+      all,
+      maxPages,
+      cursor,
+      sortKey: requestedSortKey,
+      cwd: rawCwd
+    } = parsedThreadListQuery.query;
+
     let cursorOffset = 0;
     try {
       cursorOffset = decodeThreadListCursor(cursor);
@@ -215,18 +363,8 @@ export async function handleThreadCollectionRoutes(
       });
       return true;
     }
-
-    const requestedSortKey = url.searchParams.get("sortKey");
-    const parsedSortKey = parseThreadSortKey(requestedSortKey);
-    if (requestedSortKey && !parsedSortKey) {
-      jsonResponse(res, 400, {
-        ok: false,
-        error: `Invalid sortKey: ${requestedSortKey}`
-      });
-      return true;
-    }
-    const sortKey: ThreadListSortKey = parsedSortKey ?? "updated_at";
-    const cwd = normalizeOptionalString(url.searchParams.get("cwd"));
+    const sortKey: ThreadListSortKey = requestedSortKey ?? "updated_at";
+    const cwd = normalizeOptionalString(rawCwd);
 
     const enabledAdapterList = listEnabledAdapters();
 

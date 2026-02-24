@@ -17,6 +17,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const onMarkThreadPendingMaterialization = vi.fn();
     const onThreadSelected = vi.fn();
     const onSetMobileSidebarOpen = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
     const refreshAll = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
@@ -33,6 +34,7 @@ describe("ThreadMutationActionCoordinator", () => {
       onMarkThreadPendingMaterialization,
       onThreadSelected,
       onSetMobileSidebarOpen,
+      onInvalidateActiveThreadQuery,
       threadMutationClient,
       refreshAll,
       reportTrackedUserInterfaceError
@@ -41,6 +43,7 @@ describe("ThreadMutationActionCoordinator", () => {
     expect(onSetErrorMessage).toHaveBeenCalledWith("Cannot create thread: missing project path");
     expect(onSetBusy).not.toHaveBeenCalled();
     expect(threadMutationClient.createThread).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
     expect(refreshAll).not.toHaveBeenCalled();
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
   });
@@ -52,6 +55,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const selectedThreadIdentifiers: string[] = [];
     const mobileSidebarOpenStates: boolean[] = [];
     const onSetErrorMessage = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
     const refreshAll = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
@@ -77,6 +81,7 @@ describe("ThreadMutationActionCoordinator", () => {
       onSetMobileSidebarOpen: (isOpen) => {
         mobileSidebarOpenStates.push(isOpen);
       },
+      onInvalidateActiveThreadQuery,
       threadMutationClient,
       refreshAll,
       reportTrackedUserInterfaceError
@@ -96,6 +101,7 @@ describe("ThreadMutationActionCoordinator", () => {
     expect(markedThreadIdentifiers).toEqual(["thread-55"]);
     expect(selectedThreadIdentifiers).toEqual(["thread-55"]);
     expect(mobileSidebarOpenStates).toEqual([false]);
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
     expect(refreshAll).toHaveBeenCalledTimes(1);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(busyStates).toEqual([true, false]);
@@ -105,7 +111,8 @@ describe("ThreadMutationActionCoordinator", () => {
     const coordinator = new ThreadMutationActionCoordinator();
     const busyStates: boolean[] = [];
     const selectedThreadIdentifiers: Array<string | null> = [];
-    const onInvalidateThreadQueries = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onInvalidateArchivedThreadQuery = vi.fn();
     const loadCoreData = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
@@ -125,7 +132,8 @@ describe("ThreadMutationActionCoordinator", () => {
       onThreadSelected: (threadId) => {
         selectedThreadIdentifiers.push(threadId);
       },
-      onInvalidateThreadQueries,
+      onInvalidateActiveThreadQuery,
+      onInvalidateArchivedThreadQuery,
       loadCoreData,
       threadMutationClient,
       reportTrackedUserInterfaceError
@@ -139,7 +147,8 @@ describe("ThreadMutationActionCoordinator", () => {
       }
     );
     expect(selectedThreadIdentifiers).toEqual(["thread-2"]);
-    expect(onInvalidateThreadQueries).toHaveBeenCalledTimes(1);
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onInvalidateArchivedThreadQuery).toHaveBeenCalledTimes(1);
     expect(loadCoreData).toHaveBeenCalledTimes(1);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(busyStates).toEqual([true, false]);
@@ -149,7 +158,8 @@ describe("ThreadMutationActionCoordinator", () => {
     const coordinator = new ThreadMutationActionCoordinator();
     const onSetBusy = vi.fn();
     const onThreadSelected = vi.fn();
-    const onInvalidateThreadQueries = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onInvalidateArchivedThreadQuery = vi.fn();
     const loadCoreData = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
@@ -167,7 +177,8 @@ describe("ThreadMutationActionCoordinator", () => {
       buildActionRequestOptions,
       onSetBusy,
       onThreadSelected,
-      onInvalidateThreadQueries,
+      onInvalidateActiveThreadQuery,
+      onInvalidateArchivedThreadQuery,
       loadCoreData,
       threadMutationClient,
       reportTrackedUserInterfaceError
@@ -175,7 +186,8 @@ describe("ThreadMutationActionCoordinator", () => {
 
     expect(onSetBusy.mock.calls).toEqual([[true], [false]]);
     expect(onThreadSelected).not.toHaveBeenCalled();
-    expect(onInvalidateThreadQueries).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
+    expect(onInvalidateArchivedThreadQuery).not.toHaveBeenCalled();
     expect(loadCoreData).not.toHaveBeenCalled();
     expect(reportTrackedUserInterfaceError).toHaveBeenCalledWith({
       operation: "archive-thread",
@@ -190,7 +202,8 @@ describe("ThreadMutationActionCoordinator", () => {
     const busyStates: boolean[] = [];
     const selectedThreadIdentifiers: string[] = [];
     const mobileSidebarOpenStates: boolean[] = [];
-    const onInvalidateThreadQueries = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onInvalidateArchivedThreadQuery = vi.fn();
     const loadCoreData = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
@@ -211,7 +224,8 @@ describe("ThreadMutationActionCoordinator", () => {
       onSetMobileSidebarOpen: (isOpen) => {
         mobileSidebarOpenStates.push(isOpen);
       },
-      onInvalidateThreadQueries,
+      onInvalidateActiveThreadQuery,
+      onInvalidateArchivedThreadQuery,
       loadCoreData,
       threadMutationClient,
       reportTrackedUserInterfaceError
@@ -226,7 +240,8 @@ describe("ThreadMutationActionCoordinator", () => {
     );
     expect(selectedThreadIdentifiers).toEqual(["thread-7"]);
     expect(mobileSidebarOpenStates).toEqual([false]);
-    expect(onInvalidateThreadQueries).toHaveBeenCalledTimes(1);
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onInvalidateArchivedThreadQuery).toHaveBeenCalledTimes(1);
     expect(loadCoreData).toHaveBeenCalledTimes(1);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(busyStates).toEqual([true, false]);

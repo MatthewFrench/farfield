@@ -146,7 +146,14 @@ export class DebugTraceRouteOwner {
       return false;
     }
 
-    const traceId = decodeURIComponent(segments[3]);
+    let traceId: string;
+    try {
+      traceId = decodeURIComponent(segments[3]);
+    } catch {
+      jsonResponse(res, 400, { ok: false, error: "Invalid trace identifier" });
+      return true;
+    }
+
     const trace = activityHistoryService.readTraceById(traceId);
 
     if (!trace) {

@@ -233,7 +233,12 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-createRoot(document.getElementById("root")!).render(
+const applicationRootElement = document.getElementById("root");
+if (!applicationRootElement) {
+  throw new Error("Failed to mount Farfield: missing #root element");
+}
+
+createRoot(applicationRootElement).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>

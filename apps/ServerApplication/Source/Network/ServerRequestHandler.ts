@@ -33,6 +33,7 @@ import { handleThreadRoutes } from "./Routes/ThreadRoutes.js";
 import type { EventStreamClientRegistry } from "./EventStreamClientRegistry.js";
 import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinator.js";
 import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js";
+import type { PushMutationConcurrencyCoordinator } from "./PushMutationConcurrencyCoordinator.js";
 
 export interface ServerRequestHandlerDependencies {
   host: string;
@@ -70,6 +71,7 @@ export interface ServerRequestHandlerDependencies {
   pushStore: PushStore;
   pushReceiptStore: PushReceiptStore;
   pushSendStore: PushSendStore;
+  pushMutationConcurrencyCoordinator: PushMutationConcurrencyCoordinator;
   readObservabilitySnapshot: () => ServerObservabilitySnapshot;
   pushTestBodySchema: typeof FarfieldPushTestBodySchema;
   buildPushTestPayload: (
@@ -294,6 +296,7 @@ export class ServerRequestHandler {
         pushStore: this.deps.pushStore,
         pushReceiptStore: this.deps.pushReceiptStore,
         pushSendStore: this.deps.pushSendStore,
+        pushMutationConcurrencyCoordinator: this.deps.pushMutationConcurrencyCoordinator,
         pushTestBodySchema: this.deps.pushTestBodySchema,
         readJsonBody: this.deps.readJsonBody,
         jsonResponse: this.deps.jsonResponse,

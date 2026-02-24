@@ -422,7 +422,10 @@ vi.stubGlobal(
           ok: true,
           threadId,
           ownerClientId: null,
-          events: []
+          events: [],
+          nextSequence: 0,
+          firstAvailableSequence: 0,
+          resetRequired: false
         })
       } as Response;
     }

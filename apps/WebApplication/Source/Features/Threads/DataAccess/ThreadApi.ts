@@ -149,8 +149,8 @@ export interface ApiCreateThreadInput {
 export async function listThreads(options: ApiListThreadsOptions): Promise<ApiThreadListResponse> {
   const params = new URLSearchParams();
   params.set("limit", String(options.limit));
-  params.set("archived", options.archived ? "1" : "0");
-  params.set("all", options.all ? "1" : "0");
+  params.set("archived", options.archived ? "true" : "false");
+  params.set("all", options.all ? "true" : "false");
   params.set("maxPages", String(options.maxPages));
   if (options.sortKey) {
     params.set("sortKey", options.sortKey);

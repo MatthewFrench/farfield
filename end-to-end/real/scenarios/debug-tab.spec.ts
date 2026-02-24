@@ -17,8 +17,15 @@ test("debug tab accessibility", async ({ page, sentinel }) => {
 
   await openDebugTab(page);
 
+  await expect(page.getByTestId("debug-issues-panel")).toBeVisible();
+
+  await page.getByRole("tab", { name: "History" }).click();
   await expect(page.getByTestId("debug-history-panel")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Trace" }).click();
   await expect(page.getByTestId("debug-trace-panel")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Stream" }).click();
   await expect(page.getByTestId("debug-stream-events-panel")).toBeVisible();
 
   await expectNoUnexpectedClientErrors(sentinel);

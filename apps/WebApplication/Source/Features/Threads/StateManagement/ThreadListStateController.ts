@@ -29,6 +29,8 @@ export interface LoadActiveThreadStateResult {
   didChangeThreads: boolean;
   nextThreads: ThreadListResponse["data"];
   nextUnreadThreadIdentifiers: Record<string, true>;
+  // Indicates the read was served from the in-memory query cache.
+  loadedFromCache: boolean;
 }
 
 export interface LoadArchivedThreadStateInput {
@@ -42,6 +44,13 @@ export interface LoadArchivedThreadStateResult {
   didChangeArchivedThreads: boolean;
   nextArchivedThreads: ThreadListResponse["data"];
   isTruncated: boolean;
+  // Indicates the read was served from the in-memory query cache.
+  loadedFromCache: boolean;
+}
+
+interface LoadThreadListResult {
+  response: ThreadListResponse;
+  loadedFromCache: boolean;
 }
 
 export interface ComputeInitialSelectedThreadIdentifierInput
@@ -68,6 +77,10 @@ export class ThreadListStateController {
   private readonly threadListStateStore: ThreadListStateStore;
   private readonly threadListPresentationStateResolver: ThreadListPresentationStateResolver;
 
+  /**
+   * Owns active and archived thread list loading policy, including cache keys and
+   * mutation-scoped invalidation boundaries consumed by action coordinators.
+   */
   public constructor(dependencies: ThreadListStateControllerDependencies) {
     this.threadServerClient = dependencies.threadServerClient;
     this.threadQueryCache = dependencies.threadQueryCache;
@@ -77,7 +90,7 @@ export class ThreadListStateController {
   }
 
   public async loadActiveThreadState(input: LoadActiveThreadStateInput): Promise<LoadActiveThreadStateResult> {
-    const response = await this.loadThreadList(
+    const threadListResult = await this.loadThreadList(
       ACTIVE_THREADS_CACHE_KEY,
       {
         archived: false,
@@ -89,7 +102,7 @@ export class ThreadListStateController {
     );
 
     const stateResult = this.threadListStateStore.computeActiveThreadState({
-      nextThreads: response.data,
+      nextThreads: threadListResult.response.data,
       previousUnreadThreadIdentifiers: input.previousUnreadThreadIdentifiers,
       selectedThreadIdentifier: input.selectedThreadIdentifier
     });
@@ -97,12 +110,13 @@ export class ThreadListStateController {
     return {
       didChangeThreads: stateResult.didChangeThreads,
       nextThreads: stateResult.nextThreads,
-      nextUnreadThreadIdentifiers: stateResult.nextUnreadThreadIdentifiers
+      nextUnreadThreadIdentifiers: stateResult.nextUnreadThreadIdentifiers,
+      loadedFromCache: threadListResult.loadedFromCache
     };
   }
 
   public async loadArchivedThreadState(input: LoadArchivedThreadStateInput): Promise<LoadArchivedThreadStateResult> {
-    const response = await this.loadThreadList(
+    const threadListResult = await this.loadThreadList(
       ARCHIVED_THREADS_CACHE_KEY,
       {
         archived: true,
@@ -114,18 +128,31 @@ export class ThreadListStateController {
     );
 
     const stateResult = this.threadListStateStore.computeArchivedThreadState({
-      nextArchivedThreads: response.data
+      nextArchivedThreads: threadListResult.response.data
     });
 
     return {
       didChangeArchivedThreads: stateResult.didChangeArchivedThreads,
       nextArchivedThreads: stateResult.nextArchivedThreads,
-      isTruncated: (response.truncated ?? false) || response.nextCursor !== null
+      isTruncated: (
+        (threadListResult.response.truncated ?? false)
+        || threadListResult.response.nextCursor !== null
+      ),
+      loadedFromCache: threadListResult.loadedFromCache
     };
   }
 
+  public invalidateActiveThreadQuery(): void {
+    this.threadQueryCache.invalidate(ACTIVE_THREADS_CACHE_KEY);
+  }
+
+  public invalidateArchivedThreadQuery(): void {
+    this.threadQueryCache.invalidate(ARCHIVED_THREADS_CACHE_KEY);
+  }
+
   public invalidateThreadQueries(): void {
-    this.threadQueryCache.invalidateAll();
+    this.invalidateActiveThreadQuery();
+    this.invalidateArchivedThreadQuery();
   }
 
   public computeInitialSelectedThreadIdentifier(
@@ -154,11 +181,14 @@ export class ThreadListStateController {
     cacheKey: string,
     loadOptions: ThreadListLoadOptions,
     readFromCache: boolean
-  ): Promise<ThreadListResponse> {
+  ): Promise<LoadThreadListResult> {
     if (readFromCache) {
       const cachedResponse = this.threadQueryCache.readFresh(cacheKey);
       if (cachedResponse) {
-        return cachedResponse;
+        return {
+          response: cachedResponse,
+          loadedFromCache: true
+        };
       }
     }
 
@@ -168,6 +198,9 @@ export class ThreadListStateController {
       return nextResponse;
     });
 
-    return response;
+    return {
+      response,
+      loadedFromCache: false
+    };
   }
 }

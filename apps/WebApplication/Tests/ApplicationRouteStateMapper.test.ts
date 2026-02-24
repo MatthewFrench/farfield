@@ -19,6 +19,16 @@ describe("ApplicationRouteStateMapper", () => {
     });
   });
 
+  it("returns neutral route state for malformed encoded thread identifiers", () => {
+    const mapper = new ApplicationRouteStateMapper();
+    const parsed = mapper.parseFromPathname("/threads/%E0%A4%A");
+
+    expect(parsed).toEqual({
+      threadId: null,
+      tab: "chat"
+    });
+  });
+
   it("builds routes for thread and non-thread state", () => {
     const mapper = new ApplicationRouteStateMapper();
 

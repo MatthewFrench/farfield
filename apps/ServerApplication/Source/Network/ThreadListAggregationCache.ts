@@ -37,15 +37,22 @@ export interface ThreadListAggregationCacheStatistics {
 }
 
 interface ThreadListAggregationCacheEntry {
+  query: ThreadListAggregationQuery;
   snapshot: ThreadListAggregationSnapshot;
   expiresAtEpochMs: number;
+}
+
+interface ThreadListAggregationInFlightSnapshot {
+  query: ThreadListAggregationQuery;
+  writeVersion: number;
+  snapshotPromise: Promise<ThreadListAggregationSnapshot>;
 }
 
 export class ThreadListAggregationCache {
   private readonly timeToLiveMs: number;
   private readonly maximumEntries: number;
   private readonly entryByKey: Map<string, ThreadListAggregationCacheEntry>;
-  private readonly inFlightSnapshotByKey: Map<string, Promise<ThreadListAggregationSnapshot>>;
+  private readonly inFlightSnapshotByKey: Map<string, ThreadListAggregationInFlightSnapshot>;
   private hitCount: number;
   private missCount: number;
   private coalescedCount: number;
@@ -63,7 +70,7 @@ export class ThreadListAggregationCache {
     this.timeToLiveMs = timeToLiveMs;
     this.maximumEntries = maximumEntries;
     this.entryByKey = new Map<string, ThreadListAggregationCacheEntry>();
-    this.inFlightSnapshotByKey = new Map<string, Promise<ThreadListAggregationSnapshot>>();
+    this.inFlightSnapshotByKey = new Map<string, ThreadListAggregationInFlightSnapshot>();
     this.hitCount = 0;
     this.missCount = 0;
     this.coalescedCount = 0;
@@ -73,7 +80,8 @@ export class ThreadListAggregationCache {
   }
 
   public readFresh(query: ThreadListAggregationQuery): ThreadListAggregationSnapshot | null {
-    const key = this.buildKey(query);
+    const normalizedQuery = this.normalizeQuery(query);
+    const key = this.buildKey(normalizedQuery);
     const entry = this.readFreshByKey(key);
     return entry ? this.cloneSnapshot(entry.snapshot) : null;
   }
@@ -82,7 +90,8 @@ export class ThreadListAggregationCache {
     query: ThreadListAggregationQuery,
     loadSnapshot: () => Promise<ThreadListAggregationSnapshot>
   ): Promise<ThreadListAggregationCacheReadResult> {
-    const key = this.buildKey(query);
+    const normalizedQuery = this.normalizeQuery(query);
+    const key = this.buildKey(normalizedQuery);
     const cachedEntry = this.readFreshByKey(key);
     if (cachedEntry) {
       this.hitCount += 1;
@@ -93,30 +102,40 @@ export class ThreadListAggregationCache {
     }
 
     const existingInFlightSnapshot = this.inFlightSnapshotByKey.get(key);
-    if (existingInFlightSnapshot) {
+    if (existingInFlightSnapshot && existingInFlightSnapshot.writeVersion === this.writeVersion) {
       this.coalescedCount += 1;
-      const loadedSnapshot = await existingInFlightSnapshot;
+      const loadedSnapshot = await existingInFlightSnapshot.snapshotPromise;
       return {
         snapshot: this.cloneSnapshot(loadedSnapshot),
         readState: "coalesced"
       };
     }
+    if (existingInFlightSnapshot) {
+      this.inFlightSnapshotByKey.delete(key);
+    }
 
     this.missCount += 1;
     const writeVersion = this.writeVersion;
-    const inFlightSnapshot = loadSnapshot()
+    const inFlightSnapshotPromise = loadSnapshot()
       .then((loadedSnapshot) => {
         if (writeVersion === this.writeVersion) {
-          this.writeByKey(key, loadedSnapshot);
+          this.writeByKey(normalizedQuery, key, loadedSnapshot);
         }
         return this.cloneSnapshot(loadedSnapshot);
       })
       .finally(() => {
-        this.inFlightSnapshotByKey.delete(key);
+        const inFlightSnapshot = this.inFlightSnapshotByKey.get(key);
+        if (inFlightSnapshot?.snapshotPromise === inFlightSnapshotPromise) {
+          this.inFlightSnapshotByKey.delete(key);
+        }
       });
 
-    this.inFlightSnapshotByKey.set(key, inFlightSnapshot);
-    const loadedSnapshot = await inFlightSnapshot;
+    this.inFlightSnapshotByKey.set(key, {
+      query: normalizedQuery,
+      writeVersion,
+      snapshotPromise: inFlightSnapshotPromise
+    });
+    const loadedSnapshot = await inFlightSnapshotPromise;
     return {
       snapshot: this.cloneSnapshot(loadedSnapshot),
       readState: "miss"
@@ -136,15 +155,38 @@ export class ThreadListAggregationCache {
   }
 
   public write(query: ThreadListAggregationQuery, snapshot: ThreadListAggregationSnapshot): void {
-    const key = this.buildKey(query);
-    this.writeByKey(key, snapshot);
+    const normalizedQuery = this.normalizeQuery(query);
+    const key = this.buildKey(normalizedQuery);
+    this.writeByKey(normalizedQuery, key, snapshot);
   }
 
   public invalidateAll(): void {
-    this.entryByKey.clear();
-    this.inFlightSnapshotByKey.clear();
-    this.invalidationCount += 1;
-    this.writeVersion += 1;
+    this.invalidateWhere(() => true);
+  }
+
+  public invalidateWhere(predicate: (query: ThreadListAggregationQuery) => boolean): void {
+    let invalidated = false;
+
+    for (const [key, entry] of this.entryByKey.entries()) {
+      if (!predicate(entry.query)) {
+        continue;
+      }
+      this.entryByKey.delete(key);
+      invalidated = true;
+    }
+
+    for (const [key, inFlightSnapshot] of this.inFlightSnapshotByKey.entries()) {
+      if (!predicate(inFlightSnapshot.query)) {
+        continue;
+      }
+      this.inFlightSnapshotByKey.delete(key);
+      invalidated = true;
+    }
+
+    if (invalidated) {
+      this.invalidationCount += 1;
+      this.writeVersion += 1;
+    }
   }
 
   private readFreshByKey(key: string): ThreadListAggregationCacheEntry | null {
@@ -170,12 +212,17 @@ export class ThreadListAggregationCache {
     };
   }
 
-  private writeByKey(key: string, snapshot: ThreadListAggregationSnapshot): void {
+  private writeByKey(
+    query: ThreadListAggregationQuery,
+    key: string,
+    snapshot: ThreadListAggregationSnapshot
+  ): void {
     if (this.entryByKey.has(key)) {
       this.entryByKey.delete(key);
     }
 
     this.entryByKey.set(key, {
+      query: this.cloneQuery(query),
       snapshot: this.cloneSnapshot(snapshot),
       expiresAtEpochMs: Date.now() + this.timeToLiveMs
     });
@@ -194,10 +241,33 @@ export class ThreadListAggregationCache {
     }
   }
 
+  private normalizeQuery(query: ThreadListAggregationQuery): ThreadListAggregationQuery {
+    return {
+      enabledAgentIds: [...query.enabledAgentIds].sort((left, right) => left.localeCompare(right)),
+      limit: query.limit,
+      archived: query.archived,
+      all: query.all,
+      maxPages: query.maxPages,
+      sortKey: query.sortKey,
+      cwd: query.cwd
+    };
+  }
+
+  private cloneQuery(query: ThreadListAggregationQuery): ThreadListAggregationQuery {
+    return {
+      enabledAgentIds: [...query.enabledAgentIds],
+      limit: query.limit,
+      archived: query.archived,
+      all: query.all,
+      maxPages: query.maxPages,
+      sortKey: query.sortKey,
+      cwd: query.cwd
+    };
+  }
+
   private buildKey(query: ThreadListAggregationQuery): string {
-    const sortedAgentIds = [...query.enabledAgentIds].sort((left, right) => left.localeCompare(right));
     return JSON.stringify({
-      enabledAgentIds: sortedAgentIds,
+      enabledAgentIds: query.enabledAgentIds,
       limit: query.limit,
       archived: query.archived,
       all: query.all,

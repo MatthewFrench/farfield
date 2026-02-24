@@ -11,7 +11,11 @@ import {
 } from "@farfield/protocol";
 import { logger } from "../../Shared/Logging/Logger.js";
 import { resolveOwnerClientId } from "../../Modules/Threads/ThreadOwner.js";
-import type { AgentThreadLiveState, AgentThreadStreamEvents } from "../Types.js";
+import type {
+  AgentReadStreamEventsInput,
+  AgentThreadLiveState,
+  AgentThreadStreamEvents
+} from "../Types.js";
 
 interface ThreadLiveStateProjection {
   ownerClientId: string | null;
@@ -24,6 +28,11 @@ interface InvalidThreadStreamEventDetail {
   issues?: string[];
   rawPayload: IpcFrame;
   loggedAt: string;
+}
+
+interface ThreadStreamEventEntry {
+  sequence: number;
+  frame: IpcFrame;
 }
 
 export interface CodexIpcFrameDescription {
@@ -43,18 +52,25 @@ const THREAD_IDENTIFIER_CANDIDATES_SCHEMA = z
     turnId: z.string().optional()
   })
   .passthrough();
+const DEFAULT_INVALID_STREAM_EVENT_LOG_PATH = path.resolve(
+  process.cwd(),
+  ".runtime",
+  "logs",
+  "threads",
+  "invalid-thread-stream-events.ndjson"
+);
 
 export class CodexThreadStreamStateOwner {
   private readonly invalidStreamEventsLogPath: string;
   private readonly threadOwnerById = new Map<string, string>();
-  private readonly streamEventsByThreadId = new Map<string, IpcFrame[]>();
+  private readonly streamEventEntriesByThreadId = new Map<string, ThreadStreamEventEntry[]>();
   private readonly liveStateProjectionByThreadId = new Map<string, ThreadLiveStateProjection>();
 
   public constructor(options: CodexThreadStreamStateOwnerOptions = {}) {
     // Invalid event logs are intentionally routed through one owner path so malformed
     // stream payloads can be audited without coupling to transport pipeline internals.
-    this.invalidStreamEventsLogPath = options.invalidStreamEventsLogPath ??
-      path.resolve(process.cwd(), "invalid-thread-stream-events.jsonl");
+    this.invalidStreamEventsLogPath = options.invalidStreamEventsLogPath
+      ?? DEFAULT_INVALID_STREAM_EVENT_LOG_PATH;
     this.ensureInvalidStreamEventLogDirectoryExists();
   }
 
@@ -164,20 +180,54 @@ export class CodexThreadStreamStateOwner {
     };
   }
 
-  public readStreamEvents(threadId: string, limit: number): AgentThreadStreamEvents {
+  public readStreamEvents(threadId: string, input: AgentReadStreamEventsInput): AgentThreadStreamEvents {
+    const threadStreamEntries = this.streamEventEntriesByThreadId.get(threadId) ?? [];
+    const nextSequence = this.readNextSequence(threadStreamEntries);
+    const firstAvailableSequence = threadStreamEntries.length > 0
+      ? threadStreamEntries[0]!.sequence
+      : nextSequence;
+    const { sinceSequence } = input;
+
+    // If caller cursor is older than retained history, the client must reset from the returned slice.
+    if (sinceSequence !== null && sinceSequence < firstAvailableSequence - 1) {
+      return {
+        ownerClientId: this.threadOwnerById.get(threadId) ?? null,
+        events: threadStreamEntries.slice(-input.limit).map((entry) => entry.frame),
+        nextSequence,
+        firstAvailableSequence,
+        resetRequired: true
+      };
+    }
+
+    const selectedEntries = sinceSequence === null
+      ? threadStreamEntries.slice(-input.limit)
+      : threadStreamEntries.filter((entry) => entry.sequence > sinceSequence);
+
     return {
       ownerClientId: this.threadOwnerById.get(threadId) ?? null,
-      events: (this.streamEventsByThreadId.get(threadId) ?? []).slice(-limit)
+      events: selectedEntries.map((entry) => entry.frame),
+      nextSequence,
+      firstAvailableSequence,
+      resetRequired: false
     };
   }
 
   private appendStreamEvent(conversationId: string, frame: IpcFrame): void {
-    const currentEvents = this.streamEventsByThreadId.get(conversationId) ?? [];
-    currentEvents.push(frame);
-    if (currentEvents.length > STREAM_EVENT_LIMIT) {
-      currentEvents.splice(0, currentEvents.length - STREAM_EVENT_LIMIT);
+    const currentEntries = this.streamEventEntriesByThreadId.get(conversationId) ?? [];
+    const sequence = this.readNextSequence(currentEntries);
+    currentEntries.push({
+      sequence,
+      frame
+    });
+    if (currentEntries.length > STREAM_EVENT_LIMIT) {
+      currentEntries.splice(0, currentEntries.length - STREAM_EVENT_LIMIT);
     }
-    this.streamEventsByThreadId.set(conversationId, currentEvents);
+    this.streamEventEntriesByThreadId.set(conversationId, currentEntries);
+  }
+
+  private readNextSequence(entries: ThreadStreamEventEntry[]): number {
+    const lastEntry = entries[entries.length - 1];
+    return lastEntry ? lastEntry.sequence + 1 : 0;
   }
 
   private projectThreadLiveState(event: ThreadStreamStateChangedBroadcast): void {

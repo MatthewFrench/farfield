@@ -9,6 +9,7 @@ describe("ChatRequestActionCoordinator", () => {
     const clearedThreads: string[] = [];
     const selectedThreads: string[] = [];
     const refreshAll = vi.fn(async () => {});
+    const onInvalidateActiveThreadQuery = vi.fn();
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const chatClient = {
       sendMessage: vi.fn(async () => {}),
@@ -44,6 +45,7 @@ describe("ChatRequestActionCoordinator", () => {
       },
       chatClient,
       threadMutationClient,
+      onInvalidateActiveThreadQuery,
       refreshAll,
       reportTrackedUserInterfaceError
     });
@@ -59,6 +61,7 @@ describe("ChatRequestActionCoordinator", () => {
     expect(markedThreads).toEqual(["thread-1"]);
     expect(selectedThreads).toEqual(["thread-1"]);
     expect(clearedThreads).toEqual(["thread-1"]);
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
     expect(refreshAll).toHaveBeenCalledTimes(1);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(busyStates).toEqual([true, false]);
@@ -72,6 +75,7 @@ describe("ChatRequestActionCoordinator", () => {
       interruptThread: vi.fn(async () => {})
     };
     const refreshAll = vi.fn(async () => {});
+    const onInvalidateActiveThreadQuery = vi.fn();
     const onSetBusy = vi.fn();
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
 
@@ -88,12 +92,14 @@ describe("ChatRequestActionCoordinator", () => {
       }),
       onSetBusy,
       chatClient,
+      onInvalidateActiveThreadQuery,
       refreshAll,
       reportTrackedUserInterfaceError
     });
 
     expect(onSetBusy).not.toHaveBeenCalled();
     expect(chatClient.submitUserInput).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
     expect(refreshAll).not.toHaveBeenCalled();
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
   });
@@ -101,6 +107,7 @@ describe("ChatRequestActionCoordinator", () => {
   it("reports skip-user-input errors and resets busy state", async () => {
     const coordinator = new ChatRequestActionCoordinator();
     const onSetBusy = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
     const refreshAll = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const chatClient = {
@@ -123,6 +130,7 @@ describe("ChatRequestActionCoordinator", () => {
       }),
       onSetBusy,
       chatClient,
+      onInvalidateActiveThreadQuery,
       refreshAll,
       reportTrackedUserInterfaceError
     });
@@ -138,6 +146,7 @@ describe("ChatRequestActionCoordinator", () => {
         actionName: "skip-user-input"
       }
     );
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
     expect(refreshAll).not.toHaveBeenCalled();
     expect(reportTrackedUserInterfaceError).toHaveBeenCalledWith({
       operation: "skip-user-input",
@@ -154,6 +163,7 @@ describe("ChatRequestActionCoordinator", () => {
   it("interrupts selected thread and refreshes data", async () => {
     const coordinator = new ChatRequestActionCoordinator();
     const onSetBusy = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
     const refreshAll = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const chatClient = {
@@ -173,6 +183,7 @@ describe("ChatRequestActionCoordinator", () => {
       }),
       onSetBusy,
       chatClient,
+      onInvalidateActiveThreadQuery,
       refreshAll,
       reportTrackedUserInterfaceError
     });
@@ -181,6 +192,7 @@ describe("ChatRequestActionCoordinator", () => {
       { threadId: "thread-4" },
       { actionId: "action-interrupt-thread", actionName: "interrupt-thread" }
     );
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
     expect(refreshAll).toHaveBeenCalledTimes(1);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(onSetBusy.mock.calls).toEqual([[true], [false]]);

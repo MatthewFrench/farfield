@@ -227,7 +227,7 @@ describe("Thread ownership modules", () => {
       threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
     });
 
-    await controller.loadActiveThreadState({
+    const firstRead = await controller.loadActiveThreadState({
       limit: 80,
       maxPages: 20,
       sortKey: "updated_at",
@@ -236,7 +236,7 @@ describe("Thread ownership modules", () => {
       readFromCache: true
     });
 
-    await controller.loadActiveThreadState({
+    const secondRead = await controller.loadActiveThreadState({
       limit: 80,
       maxPages: 20,
       sortKey: "updated_at",
@@ -245,6 +245,8 @@ describe("Thread ownership modules", () => {
       readFromCache: true
     });
 
+    expect(firstRead.loadedFromCache).toBe(false);
+    expect(secondRead.loadedFromCache).toBe(true);
     expect(serverClient.getListRequestCount()).toBe(1);
   });
 });

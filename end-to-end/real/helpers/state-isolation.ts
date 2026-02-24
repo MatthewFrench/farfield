@@ -193,7 +193,7 @@ export class RealAppStateIsolationGuard {
 
   private async fetchThreadIds(): Promise<string[]> {
     const response = await this.request.get(
-      "/api/threads?limit=200&archived=0&all=1&maxPages=20"
+      "/api/threads?limit=200&archived=false&all=true&maxPages=20"
     );
     if (!response.ok()) {
       throw new Error(

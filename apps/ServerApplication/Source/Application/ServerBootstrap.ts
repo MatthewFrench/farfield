@@ -33,10 +33,12 @@ import { ServerRequestHandler } from "../Network/ServerRequestHandler.js";
 import { BrowserSessionAuthOwner } from "../Network/BrowserSessionAuthOwner.js";
 import {
   ThreadListAggregationCache,
+  type ThreadListAggregationQuery
 } from "../Network/ThreadListAggregationCache.js";
 import { ThreadConcurrencyCoordinator } from "../Network/ThreadConcurrencyCoordinator.js";
 import { RuntimeStateOwner } from "./StateManagement/RuntimeStateOwner.js";
 import { ServerBootstrapUtilityOwner } from "./Bootstrap/ServerBootstrapUtilityOwner.js";
+import { PushMutationConcurrencyCoordinator } from "../Network/PushMutationConcurrencyCoordinator.js";
 
 const PushTestBodySchema = FarfieldPushTestBodySchema;
 const runtimeConfiguration = readServerRuntimeConfiguration(process.env);
@@ -141,8 +143,11 @@ const runtimeStateOwner = new RuntimeStateOwner({
   readActiveTraceSummary: () => activityHistoryService.readActiveTraceSummary()
 });
 const ntfyNotifier = new NtfyNotifier(runtimeConfiguration.ntfyConfiguration);
+const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
 const threadCompletionNotificationService = new ThreadCompletionNotificationService({
   readCodexAdapter: () => agentRuntimeOwner?.readCodexAdapter() ?? null,
+  threadConcurrencyCoordinator,
+  pushMutationConcurrencyCoordinator,
   ntfyNotifier,
   pushService,
   pushStore,
@@ -164,6 +169,7 @@ const serverObservabilitySnapshotOwner = new ServerObservabilitySnapshotOwner({
   threadListAggregationCache,
   threadConcurrencyCoordinator,
   pushDispatchConcurrencyCoordinator,
+  pushMutationConcurrencyCoordinator,
   eventStreamClientRegistry
 });
 
@@ -171,15 +177,80 @@ function pushSystem(message: string, details: HistoryEntry["meta"] = {}): void {
   activityHistoryService.pushSystem(message, details);
 }
 
+type ThreadListInvalidationScope = "all" | "active" | "archived";
+const ThreadStreamCacheInvalidationMinimumIntervalMilliseconds = 2_000;
+const lastThreadStreamCacheInvalidationByThreadId = new Map<string, number>();
+
+function readThreadListInvalidationScope(reason: string): ThreadListInvalidationScope {
+  if (reason === "thread-archived" || reason === "thread-unarchived") {
+    return "all";
+  }
+  return "active";
+}
+
+function shouldInvalidateForThreadStreamStateChange(details: Record<string, JsonValue>): boolean {
+  const threadIdValue = details["threadId"];
+  if (typeof threadIdValue !== "string") {
+    return true;
+  }
+
+  const threadId = threadIdValue.trim();
+  if (threadId.length === 0) {
+    return true;
+  }
+
+  const now = Date.now();
+  const lastInvalidationAt = lastThreadStreamCacheInvalidationByThreadId.get(threadId);
+  // Stream state events can arrive in tight bursts; debounce invalidation per
+  // thread to avoid repeatedly blowing hot cache entries during active generation.
+  if (
+    typeof lastInvalidationAt === "number"
+    && now - lastInvalidationAt < ThreadStreamCacheInvalidationMinimumIntervalMilliseconds
+  ) {
+    return false;
+  }
+
+  lastThreadStreamCacheInvalidationByThreadId.set(threadId, now);
+  return true;
+}
+
+function buildThreadListInvalidationPredicate(
+  scope: ThreadListInvalidationScope
+): (query: ThreadListAggregationQuery) => boolean {
+  if (scope === "all") {
+    return () => true;
+  }
+  if (scope === "archived") {
+    return (query) => query.archived;
+  }
+  return (query) => !query.archived;
+}
+
 function invalidateThreadListAggregationCache(
   reason: string,
   details: Record<string, JsonValue> = {}
 ): void {
-  threadListAggregationCache.invalidateAll();
+  if (
+    reason === "thread-stream-state-changed"
+    && !shouldInvalidateForThreadStreamStateChange(details)
+  ) {
+    logger.debug(
+      {
+        reason,
+        ...details
+      },
+      "thread-list-aggregation-cache-invalidation-skipped"
+    );
+    return;
+  }
+
+  const invalidationScope = readThreadListInvalidationScope(reason);
+  threadListAggregationCache.invalidateWhere(buildThreadListInvalidationPredicate(invalidationScope));
   const statistics = threadListAggregationCache.readStatistics();
   logger.debug(
     {
       reason,
+      invalidationScope,
       ...details,
       statistics
     },
@@ -260,6 +331,7 @@ const serverRequestHandler = new ServerRequestHandler({
   pushStore,
   pushReceiptStore,
   pushSendStore,
+  pushMutationConcurrencyCoordinator,
   readObservabilitySnapshot: () => {
     return serverObservabilitySnapshotOwner.readSnapshot();
   },

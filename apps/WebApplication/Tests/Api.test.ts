@@ -131,6 +131,8 @@ describe("API envelope parsing", () => {
     const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
     const parsedUrl = new URL(requestUrl, "http://localhost");
     expect(parsedUrl.pathname).toBe("/api/threads");
+    expect(parsedUrl.searchParams.get("archived")).toBe("false");
+    expect(parsedUrl.searchParams.get("all")).toBe("true");
     expect(parsedUrl.searchParams.get("sortKey")).toBe("updated_at");
     expect(parsedUrl.searchParams.get("cwd")).toBe("/tmp/workspace");
   });

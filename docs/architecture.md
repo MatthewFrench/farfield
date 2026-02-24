@@ -102,6 +102,7 @@ This is the normative architecture contract for Farfield code.
 8. Request-body ingress parsing uses explicit structured-data contracts (`JsonValue` + strict boundary schemas), and parsed route inputs must never remain untyped after boundary parsing.
 9. Route response writers accept explicit object contracts from owner modules; response typing must not force index-signature coupling onto domain response contracts.
 10. IPC and JSON-RPC transport payloads must use schema-owned structured-data contracts (`JsonValueSchema`) at decode and encode boundaries, with explicit parse failures for contract mismatches.
+11. Stream-event read routes must expose explicit cursor metadata contracts (`nextSequence`, `firstAvailableSequence`, `resetRequired`) so clients can append incrementally without ad-hoc payload introspection.
 
 ## Configuration Ownership Rules
 
@@ -311,6 +312,8 @@ This is the normative architecture contract for Farfield code.
 7. Stale data behavior must be explicit and testable.
 8. Observability for cache hit/miss/invalidation paths must be available in debug flows.
 9. Generic refresh paths must not invalidate all caches; invalidation must be explicit and scoped to mutation owners.
+10. Thread-list-affecting mutations (message send/submit/skip/interrupt and thread create/archive/unarchive) must invalidate active or archived list cache keys explicitly before triggering refresh flows.
+11. High-frequency stream events must not trigger per-event global cache clears; cache owners must debounce event-triggered invalidation and scope invalidation to affected query families.
 
 ## Browser Persistence Tier Rules
 
@@ -343,6 +346,15 @@ This is the normative architecture contract for Farfield code.
 10. User-interface refresh flows that can retarget entities (for example selected-thread changes) must use explicit concurrency owner classes that merge queued intent and cancel stale in-flight work.
 11. Periodic or event-triggered refresh loops must use explicit concurrency owner modules/classes instead of ad-hoc in-flight/queued refs in composition components.
 12. Debounced refresh scheduling and flag accumulation must be owned by scheduler modules/classes rather than inline timer/ref logic in large components.
+13. Incremental stream refresh must use explicit cursor contracts and reset signaling; client merge behavior must append only cursor-confirmed deltas and replace state when reset is required.
+14. Push-subscription and completion-watermark mutations must execute through an explicit concurrency owner so subscription pruning and send-watermark writes remain deterministic across routes and background services.
+
+## Route Query Contract Rules
+
+1. Route query parsing is untrusted input parsing and must use strict Zod schemas.
+2. Numeric query parameters must declare explicit minimum and maximum bounds.
+3. Boolean query parameters must parse from explicit accepted wire values.
+4. Route handlers must reject invalid query payloads with clear validation issue details.
 
 ## Observability Rules
 

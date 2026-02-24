@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, type RenderResult } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPane";
 import { ThreadSidebarViewport } from "@/Features/Threads/UserInterface/ThreadSidebarViewport";
@@ -42,9 +42,9 @@ function renderThreadSidebarViewport(input: {
   viewport: "desktop" | "mobile";
   isOpen: boolean;
   onCloseMobileSidebar?: () => void;
-}): void {
+}): RenderResult {
   cleanup();
-  render(
+  return render(
     <TooltipProvider>
       <ThreadSidebarViewport
         viewport={input.viewport}
@@ -104,5 +104,45 @@ describe("ThreadSidebarViewport", () => {
 
     fireEvent.click(screen.getByTestId("sidebar-toggle-close"));
     expect(onCloseMobileSidebar).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps desktop sidebar mounted after it has been opened once", () => {
+    const renderResult = renderThreadSidebarViewport({
+      viewport: "desktop",
+      isOpen: true
+    });
+    expect(screen.getByTestId("sidebar-desktop")).toBeDefined();
+
+    renderResult.rerender(
+      <TooltipProvider>
+        <ThreadSidebarViewport
+          viewport="desktop"
+          isOpen={false}
+          threadListPaneProperties={BASE_THREAD_LIST_PANE_PROPERTIES}
+          onHideDesktopSidebar={() => {}}
+          onCloseMobileSidebar={() => {}}
+          allSystemsReady={true}
+          hasAnySystemFailure={false}
+          commitLabel="abc123"
+          agentDescriptors={[
+            {
+              id: "codex",
+              label: "Codex",
+              enabled: true,
+              connected: true
+            }
+          ]}
+          codexConfigured={true}
+          healthState={{
+            appReady: true,
+            ipcConnected: true,
+            ipcInitialized: true,
+            lastError: null
+          }}
+        />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByTestId("sidebar-desktop")).toBeDefined();
   });
 });

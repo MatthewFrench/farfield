@@ -187,7 +187,7 @@ async function getJson(pathname, label) {
 async function main() {
   const health = await getJson("/api/health", LABEL_HEALTH);
   const threads = await getJson(
-    "/api/threads?limit=80&archived=0&all=0&maxPages=1",
+    "/api/threads?limit=80&archived=false&all=false&maxPages=1",
     LABEL_THREADS
   );
   await getJson("/api/models?limit=200", LABEL_MODELS);

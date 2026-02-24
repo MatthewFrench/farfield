@@ -12,6 +12,7 @@ import {
 } from "@farfield/protocol";
 import type {
   AgentInterruptInput,
+  AgentReadStreamEventsInput,
   AgentSetCollaborationModeInput,
   AgentSubmitUserInputInput,
   AgentThreadLiveState,
@@ -113,8 +114,11 @@ export class CodexThreadInteractionOwner {
     return this.threadStreamStateOwner.readLiveState(threadId);
   }
 
-  public async readStreamEvents(threadId: string, limit: number): Promise<AgentThreadStreamEvents> {
-    return this.threadStreamStateOwner.readStreamEvents(threadId, limit);
+  public async readStreamEvents(
+    threadId: string,
+    input: AgentReadStreamEventsInput
+  ): Promise<AgentThreadStreamEvents> {
+    return this.threadStreamStateOwner.readStreamEvents(threadId, input);
   }
 
   public async replayRequest(

@@ -114,4 +114,19 @@ describe("ThreadListAggregationCache", () => {
     expect(cache.readFresh(query)).toBeNull();
     expect(cache.readStatistics().invalidationCount).toBe(1);
   });
+
+  it("invalidates matching query scopes without evicting unrelated entries", () => {
+    const cache = new ThreadListAggregationCache(1_000, 8);
+    const activeQuery = buildQuery({ archived: false });
+    const archivedQuery = buildQuery({ archived: true });
+
+    cache.write(activeQuery, buildSnapshot({ combinedTruncated: true }));
+    cache.write(archivedQuery, buildSnapshot({ combinedTruncated: false }));
+
+    cache.invalidateWhere((query) => !query.archived);
+
+    expect(cache.readFresh(activeQuery)).toBeNull();
+    expect(cache.readFresh(archivedQuery)).toEqual(buildSnapshot({ combinedTruncated: false }));
+    expect(cache.readStatistics().invalidationCount).toBe(1);
+  });
 });

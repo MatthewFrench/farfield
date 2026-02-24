@@ -18,11 +18,12 @@ import type {
   AgentConfigDefaults,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
-  AgentInterruptInput,
-  AgentListThreadsInput,
-  AgentListThreadsResult,
-  AgentReadThreadInput,
-  AgentReadThreadResult,
+    AgentInterruptInput,
+    AgentListThreadsInput,
+    AgentListThreadsResult,
+    AgentReadStreamEventsInput,
+    AgentReadThreadInput,
+    AgentReadThreadResult,
   AgentSendMessageInput,
   AgentSetCollaborationModeInput,
   AgentSubmitUserInputInput,
@@ -289,8 +290,11 @@ export class CodexAgentAdapter implements AgentAdapter {
     return this.threadInteractionOwner.readLiveState(threadId);
   }
 
-  public async readStreamEvents(threadId: string, limit: number): Promise<AgentThreadStreamEvents> {
-    return this.threadInteractionOwner.readStreamEvents(threadId, limit);
+  public async readStreamEvents(
+    threadId: string,
+    input: AgentReadStreamEventsInput
+  ): Promise<AgentThreadStreamEvents> {
+    return this.threadInteractionOwner.readStreamEvents(threadId, input);
   }
 
   public async replayRequest(

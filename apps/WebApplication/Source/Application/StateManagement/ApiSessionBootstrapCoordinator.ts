@@ -45,6 +45,17 @@ export class ApiSessionBootstrapCoordinator {
     if (currentDecision.isReady || currentDecision.requiresApiToken) {
       return currentDecision;
     }
+
+    // Keep the app interactive while proactively refreshing a still-valid session.
+    // The lead-time window is for refresh scheduling, not for blocking reads.
+    if (this.hasValidSessionAt(nowEpochMs)) {
+      void this.executeBootstrapRequest(loadSession);
+      return {
+        isReady: true,
+        requiresApiToken: false
+      };
+    }
+
     return this.executeBootstrapRequest(loadSession);
   }
 
@@ -147,5 +158,15 @@ export class ApiSessionBootstrapCoordinator {
       return null;
     }
     return expiresAtEpochMs;
+  }
+
+  private hasValidSessionAt(nowEpochMs: number): boolean {
+    if (this.authRequired !== true || this.isApiTokenRequired) {
+      return false;
+    }
+    if (this.sessionExpiresAtEpochMs === null) {
+      return false;
+    }
+    return nowEpochMs < this.sessionExpiresAtEpochMs;
   }
 }

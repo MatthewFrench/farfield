@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
 import { PushDispatchConcurrencyCoordinator } from "../Source/Network/PushDispatchConcurrencyCoordinator.js";
+import { PushMutationConcurrencyCoordinator } from "../Source/Network/PushMutationConcurrencyCoordinator.js";
 import { ServerObservabilitySnapshotOwner } from "../Source/Network/ServerObservabilitySnapshotOwner.js";
 import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 import { ThreadListAggregationCache } from "../Source/Network/ThreadListAggregationCache.js";
@@ -14,6 +15,7 @@ describe("ServerObservabilitySnapshotOwner", () => {
       () => true,
       async () => {}
     );
+    const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
     const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
 
     threadListAggregationCache.write(
@@ -39,6 +41,7 @@ describe("ServerObservabilitySnapshotOwner", () => {
       threadListAggregationCache,
       threadConcurrencyCoordinator,
       pushDispatchConcurrencyCoordinator,
+      pushMutationConcurrencyCoordinator,
       eventStreamClientRegistry
     });
     const snapshot = owner.readSnapshot();
@@ -47,6 +50,7 @@ describe("ServerObservabilitySnapshotOwner", () => {
     expect(snapshot.cache.threadListAggregation.entryCount).toBeGreaterThanOrEqual(1);
     expect(snapshot.concurrency.thread.queuedExecutionCount).toBeGreaterThanOrEqual(1);
     expect(snapshot.concurrency.pushDispatch.scheduledCheckCount).toBeGreaterThanOrEqual(1);
+    expect(snapshot.concurrency.pushMutation.queuedExecutionCount).toBeGreaterThanOrEqual(0);
     expect(snapshot.streaming.eventStream.activeClientCount).toBe(0);
 
     pushDispatchConcurrencyCoordinator.stop();

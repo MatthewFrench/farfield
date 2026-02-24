@@ -549,6 +549,7 @@ This document defines the target folder/file structure and end-state ownership m
 5. Cache mutation occurs only through owner APIs.
 6. Cache observability is available for debugging and diagnostics.
 7. Broad refresh helpers do not invalidate cache entries; invalidation is mutation-scoped and owned by mutation flows.
+8. Stream-event owners must expose cursor metadata (`nextSequence`, `firstAvailableSequence`, `resetRequired`) so client owners can apply deterministic append-or-reset merge behavior.
 
 ## Web Caching, Persistence, and Background Refresh Strategy (End-State)
 
@@ -556,6 +557,7 @@ This document defines the target folder/file structure and end-state ownership m
 | --- | --- | --- | --- | --- |
 | Thread list query results | `ThreadQueryCache` | Render from in-memory cache when available | `ThreadRefreshConcurrencyCoordinator` performs background refresh and applies diff-only state updates | process memory |
 | Thread conversation live state | `UseApplicationShellState` + `SelectedThreadDataRefreshCoordinator` | Render latest owner state snapshot | event-stream processing and selected-thread refresh coordinators update state incrementally | process memory |
+| Thread stream-event timeline state | `UseSelectedThreadLoaders` + `SelectedThreadDataRefreshCoordinator` | Reuse in-memory event timeline and cursor for immediate render | cursor-based `stream-events` reads append unseen deltas and issue full reset only when `resetRequired` is returned | process memory |
 | Models, collaboration modes, and defaults | `CapabilitySnapshotCache` with `CapabilityServerClient` | Reuse short-lived in-memory capability snapshot | periodic background revalidation with single-flight per capability query | process memory |
 | API session bootstrap state | `ApiSessionBootstrapCoordinator` | Reuse in-memory auth/session bootstrap decision snapshot | refresh bootstrap only when session freshness threshold is reached or token challenge is resolved | process memory |
 | Debug issue list and history list | `DebugWorkspaceStateStore` + `DebugWorkspaceDataReader` | Render cached debug view state when debug workspace is active | background refresh only when debug workspace is visible or explicitly requested | process memory |
@@ -729,7 +731,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 
 ### Realistic End-State Estimate (Holistic)
 
-- Estimated overall completion: `100%`
+- Estimated overall completion: `98%`
 - Basis:
   - Checklist execution is complete (`296 / 296`) with no open checklist items.
   - Detailed tree is illustrative; completion is tracked against the verified ownership mapping and checklist entries.
@@ -738,11 +740,18 @@ Use this checklist as the single at-a-glance cleanup tracker.
   - Root-folder abbreviation cleanup is complete for structural roots (`e2e` -> `end-to-end`, `ops` -> `operations`).
   - Test-file PascalCase conformance is complete across `apps/*/Tests` and `packages/*/Tests`, including owner-aligned naming.
   - `apps/WebApplication/Source/App.tsx` runtime orchestration ownership was further extracted into `UseApplicationRuntimeComposition.ts`, reducing `App.tsx` from 552 to 298 lines while keeping feature/effect/shell assembly under explicit application state-management ownership.
-  - Source-size conformance now satisfies both hard and preferred thresholds (`0` source files over 600 lines and `0` source files over 400 lines).
+  - Source-size hard threshold is satisfied (`0` source files over 600 lines), while the preferred threshold has `4` remaining source files over 400 lines:
+    - `apps/ServerApplication/Source/Network/Routes/ThreadCollectionRoutes.ts` (478)
+    - `apps/ServerApplication/Source/Application/ServerBootstrap.ts` (433)
+    - `apps/ServerApplication/Source/Network/Routes/PushRoutes.ts` (420)
+    - `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushClientStateManager.ts` (404)
 
 ### Remaining Work Themes (Share of Remaining Effort)
 
-1. `100%` Migration completion and governance:
+1. `65%` Preferred-size budget normalization:
+   - split remaining source files above the 400-line preferred threshold while preserving ownership boundaries
+   - keep route modules orchestration-only by extracting focused owner modules where size pressure remains
+2. `35%` Ongoing governance and drift control:
    - keep architecture/proposal documents synchronized with future refactors
    - enforce owner boundaries and naming rules during new feature work
 
@@ -863,9 +872,10 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Extract event stream ownership into `EventStreamClientRegistry`.
 - [x] Extract thread concurrency ownership into `ThreadConcurrencyCoordinator`.
 - [x] Extract push dispatch concurrency into `PushDispatchConcurrencyCoordinator`.
+- [x] Add `PushMutationConcurrencyCoordinator` and route/service wiring so push-subscription mutations and completion-watermark mutations execute through one explicit concurrency owner.
 - [x] Move push-subscription and completion-watermark persistence writes to async queued file ownership in `PushStore` to avoid request-path event-loop blocking.
 - [x] Move push notification fan-out in `PushService` from sequential send loops to bounded concurrent send workers with the existing retry/backoff policy.
-- [x] Invalidate thread list aggregation cache on thread-stream state-change events in `ServerBootstrap` to avoid stale list snapshots during active stream updates.
+- [x] Shift thread-list cache invalidation to scoped mutation ownership (`active` vs `all`) and apply debounced stream-event invalidation in `ServerBootstrap` to avoid high-frequency full-cache churn.
 - [x] Extract HTTP request routing + transport error mapping into `ServerRequestHandler`.
 - [x] Extract server lifecycle ownership (`start`, `shutdown`, signals) into `ServerLifecycleCoordinator`.
 - [x] Extract agent adapter composition and IPC event wiring ownership into `AgentRuntimeOwner`.
@@ -883,6 +893,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Replace remaining broad `unknown`-typed server and package contract surfaces with explicit schema-owned structured-data contracts where behavior allows strict typing.
 - [x] Centralize `LOG_LEVEL`, ntfy settings, and invalid thread-stream log-path parsing under `Application/Configuration/ServerRuntimeConfiguration.ts`, and remove direct server-side environment reads from logging and stream-state owners.
 - [x] Move default invalid thread-stream event logging from repository source roots into `.runtime/logs/threads` and ensure log-directory creation is owned by `CodexThreadStreamStateOwner`.
+- [x] Enforce strict bounded `/api/threads` query parsing with Zod in `ThreadCollectionRoutes` (typed boolean/integer parsing and hard upper bounds for `limit` and `maxPages`).
 
 ### Package Cleanup
 
@@ -895,6 +906,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Ensure typed error categories are mapped at transport boundaries.
 - [x] Ensure cache/concurrency owners expose structured observability.
 - [x] Document and preserve two supported auth modes: direct browser-to-server with `API_TOKEN` unset, and protected mode with trusted server-side `X-Farfield-Token` header injection.
+- [x] Create `docs/decisions/README.md` to make architecture decision-record storage explicit and actionable.
 
 ### Tooling Direction
 
@@ -919,6 +931,9 @@ Use this checklist as the single at-a-glance cleanup tracker.
 
 ### Recent Implementation Progress Notes
 
+- [x] `scripts/with-env.mjs` now builds spawned-process environment from a schema-owned allowlist instead of propagating the full `process.env` surface, while still loading explicit `.env` and `.env.local` values.
+- [x] `CodexThreadStreamStateOwner` default invalid stream-event log path now resolves to `.runtime/logs/threads/invalid-thread-stream-events.ndjson` to keep runtime artifacts out of source roots.
+- [x] Real scenario verification remains green on the current structure (`bun run end-to-end:real:run` -> `6/6` Playwright scenarios passing).
 - [x] Codex app-server spawn environment ownership now uses strict allowlisted schema parsing in `packages/CodexInterfaceAdapter/Source/AppServerTransport.ts` (`buildAppServerSpawnEnvironment`), removing direct full-environment propagation to child process startup.
 - [x] `apps/WebApplication/Source/Application/StateManagement/UseCoreDataLoaders.ts` refresh-all behavior now preserves cache state during generic refresh paths; thread-query invalidation remains mutation-scoped in thread mutation owners.
 - [x] Event-stream scheduled refresh execution in `apps/WebApplication/Source/Application/StateManagement/UseEventStreamEffects.ts` now runs independent refresh operations concurrently, reducing blocked refresh latency while preserving owner boundaries.
@@ -978,6 +993,9 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Push client refresh and toolbar enable action orchestration extracted from `App.tsx` into `PushNotificationToolbarActionCoordinator` with `PushClientStateManager` data-access ownership and focused action-coordinator tests.
 - [x] Push toolbar notification enable/status button rendering extracted from `App.tsx` into `PushStatusButton` with focused user-interface tests.
 - [x] Top header bar rendering and header action wiring extracted from `App.tsx` into `ApplicationHeaderBar` with focused user-interface tests.
+- Stream-events now use explicit cursor contract ownership end-to-end (`sinceSequence` request + `nextSequence`/`firstAvailableSequence`/`resetRequired` response) across `ThreadMemberReadRouteOwner`, `CodexThreadStreamStateOwner`, `ChatApi`, and selected-thread refresh owners.
+- Active-thread cache reads are now cache-preferred in core refresh paths, while mutation owners perform explicit active/archived key invalidation before refresh orchestration (`ChatRequestActionCoordinator`, `ThreadMutationActionCoordinator`, `UseThreadActionHandlers`, `UseChatActionHandlers`).
+- Web bootstrap root mount now fails fast with explicit error ownership when `#root` is missing, removing non-null assertion risk in `Main.tsx`.
 - [x] Chat mode/model/reasoning toolbar rendering and typed interaction wiring extracted from `App.tsx` into `ChatModeToolbar` with focused user-interface tests.
 - [x] Thread sidebar shell composition (header + list panel + footer status) extracted from `App.tsx` into `ThreadSidebarPanel` with focused user-interface tests.
 - [x] Thread sidebar viewport wrapper composition for desktop/mobile animation shells extracted from `App.tsx` into `ThreadSidebarViewport` with focused user-interface tests.

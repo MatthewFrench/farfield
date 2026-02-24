@@ -49,6 +49,7 @@ export interface UseChatActionHandlersInput {
   chatClient: ChatRequestActionChatClient & CollaborationModeActionChatClient;
   threadMutationClient: ChatRequestActionThreadMutationClient;
   pendingUserInputAnswerBuilder: PendingUserInputAnswerBuilder;
+  onInvalidateActiveThreadQuery: () => void;
   refreshAll: () => Promise<void>;
   onReloadSelectedThread: (threadId: string) => Promise<void>;
   reportTrackedUserInterfaceError: (input: ChatActionErrorReportInput) => Promise<void>;
@@ -87,6 +88,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       },
       chatClient: input.chatClient,
       threadMutationClient: input.threadMutationClient,
+      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
       refreshAll: input.refreshAll,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
     });
@@ -95,6 +97,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.chatClient,
     input.chatRequestActionCoordinator,
     input.pendingThreadMaterializationCoordinator,
+    input.onInvalidateActiveThreadQuery,
     input.refreshAll,
     input.reportTrackedUserInterfaceError,
     input.selectedAgentId,
@@ -152,6 +155,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       buildActionRequestOptions: input.buildActionRequestOptions,
       onSetBusy: input.setIsBusy,
       chatClient: input.chatClient,
+      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
       refreshAll: input.refreshAll,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
     });
@@ -161,6 +165,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.buildActionRequestOptions,
     input.chatClient,
     input.chatRequestActionCoordinator,
+    input.onInvalidateActiveThreadQuery,
     input.pendingUserInputAnswerBuilder,
     input.refreshAll,
     input.reportTrackedUserInterfaceError,
@@ -178,6 +183,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       buildActionRequestOptions: input.buildActionRequestOptions,
       onSetBusy: input.setIsBusy,
       chatClient: input.chatClient,
+      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
       refreshAll: input.refreshAll,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
     });
@@ -186,6 +192,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.buildActionRequestOptions,
     input.chatClient,
     input.chatRequestActionCoordinator,
+    input.onInvalidateActiveThreadQuery,
     input.refreshAll,
     input.reportTrackedUserInterfaceError,
     input.selectedThreadId,
@@ -198,6 +205,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       buildActionRequestOptions: input.buildActionRequestOptions,
       onSetBusy: input.setIsBusy,
       chatClient: input.chatClient,
+      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
       refreshAll: input.refreshAll,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
     });
@@ -205,6 +213,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.buildActionRequestOptions,
     input.chatClient,
     input.chatRequestActionCoordinator,
+    input.onInvalidateActiveThreadQuery,
     input.refreshAll,
     input.reportTrackedUserInterfaceError,
     input.selectedThreadId,

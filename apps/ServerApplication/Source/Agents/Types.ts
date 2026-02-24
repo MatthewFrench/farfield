@@ -117,6 +117,14 @@ export interface AgentThreadLiveState {
 export interface AgentThreadStreamEvents {
   ownerClientId: string | null;
   events: IpcFrame[];
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+}
+
+export interface AgentReadStreamEventsInput {
+  limit: number;
+  sinceSequence: number | null;
 }
 
 export interface AgentDescriptor {
@@ -158,7 +166,7 @@ export interface AgentAdapter {
     input: AgentSubmitUserInputInput
   ): Promise<{ ownerClientId: string; requestId: number }>;
   readLiveState?(threadId: string): Promise<AgentThreadLiveState>;
-  readStreamEvents?(threadId: string, limit: number): Promise<AgentThreadStreamEvents>;
+  readStreamEvents?(threadId: string, input: AgentReadStreamEventsInput): Promise<AgentThreadStreamEvents>;
   listProjectDirectories?(): Promise<string[]>;
   readConfigDefaults?(): Promise<AgentConfigDefaults>;
 }

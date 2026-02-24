@@ -5,7 +5,6 @@ import {
   type RefObject,
   type SetStateAction
 } from "react";
-import { reportClientError } from "@/Features/Debugging/DataAccess/ClientErrorReporter";
 import { ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { PageTouchOverscrollGuardCoordinator } from "./PageTouchOverscrollGuardCoordinator";
 import { RuntimeViewportSizingCoordinator } from "./RuntimeViewportSizingCoordinator";
@@ -14,10 +13,8 @@ export interface UseViewportShellEffectsInput {
   applicationShellElementRef: RefObject<HTMLDivElement | null>;
   scrollRef: RefObject<HTMLDivElement | null>;
   activeTabRef: MutableRefObject<"chat" | "debug">;
-  selectedThreadIdRef: MutableRefObject<string | null>;
   isChatAtBottomRef: MutableRefObject<boolean>;
   viewportKeyboardStateRef: MutableRefObject<boolean | null>;
-  viewportTelemetryLastReportedAtRef: MutableRefObject<number>;
   keyboardOpenScrollRafRef: MutableRefObject<number | null>;
   setIsChatAtBottom: Dispatch<SetStateAction<boolean>>;
   runtimeViewportSizingCoordinator: RuntimeViewportSizingCoordinator;
@@ -31,7 +28,6 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
 
     const applyRuntimeViewportSizing = () => {
       const metrics = input.runtimeViewportSizingCoordinator.applyViewportSizingVariables();
-      const rootClientHeight = input.applicationShellElementRef.current?.clientHeight ?? null;
 
       if (window.scrollY !== 0 || window.pageYOffset !== 0) {
         window.scrollTo(0, 0);
@@ -68,39 +64,6 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
       if (previousKeyboardState === metrics.keyboardOpen) {
         return;
       }
-
-      const now = Date.now();
-      if (now - input.viewportTelemetryLastReportedAtRef.current < 250) {
-        return;
-      }
-      input.viewportTelemetryLastReportedAtRef.current = now;
-
-      void reportClientError({
-        source: "farfield-web",
-        operation: "viewport-keyboard-transition",
-        message: metrics.keyboardOpen ? "viewport keyboard opened" : "viewport keyboard closed",
-        name: null,
-        stack: null,
-        requestId: null,
-        threadId: input.selectedThreadIdRef.current,
-        url: window.location.pathname + window.location.search,
-        details: {
-          eventType: "viewport-keyboard-transition",
-          keyboardOpen: metrics.keyboardOpen,
-          orientation: metrics.orientation,
-          appHeightPx: metrics.appHeight,
-          visualViewportHeightPx: Math.round(metrics.visualViewportHeight),
-          layoutViewportHeightPx: Math.round(metrics.layoutViewportHeight),
-          keyboardDeltaPx: Math.round(metrics.keyboardDelta),
-          safeAreaInsetBottomPx: Math.round(metrics.safeAreaInsetBottom),
-          documentClientHeightPx: document.documentElement.clientHeight,
-          bodyClientHeightPx: document.body.clientHeight,
-          rootClientHeightPx: rootClientHeight,
-          pageYOffsetPx: window.pageYOffset,
-          scrollYPx: window.scrollY
-        },
-        occurredAt: new Date(now).toISOString()
-      }).catch(() => {});
     };
 
     const scheduleApply = () => {
@@ -148,10 +111,8 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
     input.keyboardOpenScrollRafRef,
     input.runtimeViewportSizingCoordinator,
     input.scrollRef,
-    input.selectedThreadIdRef,
     input.setIsChatAtBottom,
-    input.viewportKeyboardStateRef,
-    input.viewportTelemetryLastReportedAtRef
+    input.viewportKeyboardStateRef
   ]);
 
   useEffect(() => {

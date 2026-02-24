@@ -3,6 +3,14 @@ export interface ApplicationRouteState {
   tab: "chat" | "debug";
 }
 
+function decodeRouteThreadId(segment: string): string | null {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+}
+
 export class ApplicationRouteStateMapper {
   public parseFromPathname(pathname: string): ApplicationRouteState {
     const segments = pathname.split("/").filter((segment) => segment.length > 0);
@@ -13,7 +21,10 @@ export class ApplicationRouteStateMapper {
       return { threadId: null, tab: "debug" };
     }
     if (segments[0] === "threads" && typeof segments[1] === "string" && segments[1].length > 0) {
-      const threadId = decodeURIComponent(segments[1]);
+      const threadId = decodeRouteThreadId(segments[1]);
+      if (threadId === null) {
+        return { threadId: null, tab: "chat" };
+      }
       if (segments[2] === "debug") {
         return { threadId, tab: "debug" };
       }

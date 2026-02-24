@@ -9,6 +9,8 @@ import type { NtfyNotifier } from "../PushNotifications/NtfyNotifier.js";
 import type { PushSendStore } from "../PushNotifications/PushSendStore.js";
 import type { PushService } from "../PushNotifications/PushService.js";
 import type { PushStore } from "../PushNotifications/PushStore.js";
+import type { ThreadConcurrencyCoordinator } from "../../Network/ThreadConcurrencyCoordinator.js";
+import type { PushMutationConcurrencyCoordinator } from "../../Network/PushMutationConcurrencyCoordinator.js";
 
 type CompletionNotificationContext = {
   preview: string;
@@ -27,6 +29,8 @@ const ThreadNotificationContextSchema = z
 
 export interface ThreadCompletionNotificationServiceDependencies {
   readCodexAdapter: () => CodexAgentAdapter | null;
+  threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
+  pushMutationConcurrencyCoordinator: PushMutationConcurrencyCoordinator;
   ntfyNotifier: NtfyNotifier;
   pushService: PushService;
   pushStore: PushStore;
@@ -34,8 +38,20 @@ export interface ThreadCompletionNotificationServiceDependencies {
   pushSystem: (message: string, details?: Record<string, string | number | boolean | null>) => void;
 }
 
+interface CompletionPushSendAggregate {
+  notificationId: string;
+  sentAt: string;
+  attempted: number;
+  delivered: number;
+  failures: number;
+  failureDetails: Array<{ endpoint: string; statusCode: number | null; message: string }>;
+  prunedEndpoints: string[];
+}
+
 export class ThreadCompletionNotificationService {
   private readonly readCodexAdapter: () => CodexAgentAdapter | null;
+  private readonly threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
+  private readonly pushMutationConcurrencyCoordinator: PushMutationConcurrencyCoordinator;
   private readonly ntfyNotifier: NtfyNotifier;
   private readonly pushService: PushService;
   private readonly pushStore: PushStore;
@@ -45,6 +61,8 @@ export class ThreadCompletionNotificationService {
 
   public constructor(deps: ThreadCompletionNotificationServiceDependencies) {
     this.readCodexAdapter = deps.readCodexAdapter;
+    this.threadConcurrencyCoordinator = deps.threadConcurrencyCoordinator;
+    this.pushMutationConcurrencyCoordinator = deps.pushMutationConcurrencyCoordinator;
     this.ntfyNotifier = deps.ntfyNotifier;
     this.pushService = deps.pushService;
     this.pushStore = deps.pushStore;
@@ -64,6 +82,14 @@ export class ThreadCompletionNotificationService {
   }
 
   public async checkAndNotifyThreadCompletion(threadId: string): Promise<void> {
+    // Completion reads must share the same per-thread ownership lane as thread
+    // mutation routes to prevent notification checks from observing half-applied state.
+    await this.threadConcurrencyCoordinator.runExclusive(threadId, async () => {
+      await this.checkAndNotifyThreadCompletionUnderThreadLock(threadId);
+    });
+  }
+
+  private async checkAndNotifyThreadCompletionUnderThreadLock(threadId: string): Promise<void> {
     const codexAdapter = this.readCodexAdapter();
     if (!codexAdapter) {
       return;
@@ -77,7 +103,9 @@ export class ThreadCompletionNotificationService {
       }
 
       const hasNtfyTarget = this.ntfyNotifier.isEnabled();
-      const subscriptions = this.pushService.isEnabled() ? this.pushStore.listSubscriptions() : [];
+      const subscriptions = this.pushService.isEnabled()
+        ? await this.pushMutationConcurrencyCoordinator.runExclusive(async () => this.pushStore.listSubscriptions())
+        : [];
       const hasWebPushTarget = subscriptions.length > 0;
       if (!hasNtfyTarget && !hasWebPushTarget) {
         return;
@@ -113,50 +141,43 @@ export class ThreadCompletionNotificationService {
       let webPushDelivered = 0;
       let webPushFailures = 0;
       if (hasWebPushTarget) {
-        const payload = this.buildThreadCompletionPushPayload({
+        const sendAggregate = await this.sendCompletionPushNotifications({
+          subscriptions,
           threadId: completionCandidate.threadId,
           turnId: completionCandidate.turnId,
           preview: context.preview,
-          agentText: completionCandidate.agentText,
-          privateMode: subscriptions.some((subscription) => subscription.settings.privateMode)
+          agentText: completionCandidate.agentText
         });
 
-        try {
-          const sendResult = await this.pushService.sendToSubscriptions(subscriptions, payload);
-          webPushAttempted = sendResult.attempted;
-          webPushDelivered = sendResult.delivered;
-          webPushFailures = sendResult.failures.length;
+        webPushAttempted = sendAggregate.attempted;
+        webPushDelivered = sendAggregate.delivered;
+        webPushFailures = sendAggregate.failures;
 
+        await this.pushMutationConcurrencyCoordinator.runExclusive(async () => {
           await Promise.all(
-            sendResult.prunedEndpoints.map(async (endpoint) => this.pushStore.removeSubscriptionByEndpoint(endpoint))
+            sendAggregate.prunedEndpoints.map(async (endpoint) => this.pushStore.removeSubscriptionByEndpoint(endpoint))
           );
 
-          this.pushSendStore.setLatest({
-            notificationId: payload.notificationId,
-            threadId: completionCandidate.threadId,
-            turnId: completionCandidate.turnId,
-            sentAt: payload.createdAt,
-            attempted: sendResult.attempted,
-            delivered: sendResult.delivered,
-            failures: sendResult.failures.length
-          });
-
-          if (sendResult.failures.length > 0) {
-            logger.warn(
-              {
-                threadId,
-                failures: sendResult.failures
-              },
-              "push-completion-send-failed"
-            );
+          if (sendAggregate.attempted > 0) {
+            this.pushSendStore.setLatest({
+              notificationId: sendAggregate.notificationId,
+              threadId: completionCandidate.threadId,
+              turnId: completionCandidate.turnId,
+              sentAt: sendAggregate.sentAt,
+              attempted: sendAggregate.attempted,
+              delivered: sendAggregate.delivered,
+              failures: sendAggregate.failures
+            });
           }
-        } catch (error) {
+        });
+
+        if (sendAggregate.failureDetails.length > 0) {
           logger.warn(
             {
               threadId,
-              error: this.errorMessageFromValue(error)
+              failures: sendAggregate.failureDetails
             },
-            "push-completion-send-threw"
+            "push-completion-send-failed"
           );
         }
       }
@@ -165,7 +186,9 @@ export class ThreadCompletionNotificationService {
         return;
       }
 
-      await this.pushStore.setCompletionWatermark(threadId, completionCandidate.marker);
+      await this.pushMutationConcurrencyCoordinator.runExclusive(async () => {
+        await this.pushStore.setCompletionWatermark(threadId, completionCandidate.marker);
+      });
       this.completionDetector.commit(threadId, completionCandidate.marker);
       this.pushSystem("thread completion notification sent", {
         threadId,
@@ -187,14 +210,14 @@ export class ThreadCompletionNotificationService {
   }
 
   private buildThreadCompletionPushPayload(input: {
+    notificationId: string;
+    sentAt: string;
     threadId: string;
     turnId: string;
     preview: string;
     agentText: string;
     privateMode: boolean;
   }): PushNotificationPayload {
-    const createdAt = new Date().toISOString();
-    const notificationId = `notif_${randomUUID()}`;
     const url = `/threads/${encodeURIComponent(input.threadId)}`;
 
     const title = input.privateMode
@@ -212,13 +235,13 @@ export class ThreadCompletionNotificationService {
       })();
 
     return {
-      notificationId,
+      notificationId: input.notificationId,
       title,
       body,
       threadId: input.threadId,
       turnId: input.turnId,
       url,
-      createdAt,
+      createdAt: input.sentAt,
       web_push: {
         notification: {
           title,
@@ -229,6 +252,79 @@ export class ThreadCompletionNotificationService {
           tag: `thread:${input.threadId}`
         }
       }
+    };
+  }
+
+  private async sendCompletionPushNotifications(input: {
+    subscriptions: Awaited<ReturnType<PushStore["listSubscriptions"]>>;
+    threadId: string;
+    turnId: string;
+    preview: string;
+    agentText: string;
+  }): Promise<CompletionPushSendAggregate> {
+    const notificationId = `notif_${randomUUID()}`;
+    const sentAt = new Date().toISOString();
+    const privateModeSubscriptions = input.subscriptions.filter((subscription) => subscription.settings.privateMode);
+    const detailedModeSubscriptions = input.subscriptions.filter((subscription) => !subscription.settings.privateMode);
+
+    let attempted = 0;
+    let delivered = 0;
+    let failures = 0;
+    const failureDetails: Array<{ endpoint: string; statusCode: number | null; message: string }> = [];
+    const prunedEndpointSet = new Set<string>();
+
+    const dispatchByPrivacyMode = async (
+      subscriptions: Awaited<ReturnType<PushStore["listSubscriptions"]>>,
+      privateMode: boolean
+    ): Promise<void> => {
+      if (subscriptions.length === 0) {
+        return;
+      }
+
+      const payload = this.buildThreadCompletionPushPayload({
+        notificationId,
+        sentAt,
+        threadId: input.threadId,
+        turnId: input.turnId,
+        preview: input.preview,
+        agentText: input.agentText,
+        privateMode
+      });
+
+      try {
+        const sendResult = await this.pushService.sendToSubscriptions(subscriptions, payload);
+        attempted += sendResult.attempted;
+        delivered += sendResult.delivered;
+        failures += sendResult.failures.length;
+        for (const failure of sendResult.failures) {
+          failureDetails.push(failure);
+        }
+        for (const endpoint of sendResult.prunedEndpoints) {
+          prunedEndpointSet.add(endpoint);
+        }
+      } catch (error) {
+        logger.warn(
+          {
+            threadId: input.threadId,
+            error: this.errorMessageFromValue(error),
+            privateMode
+          },
+          "push-completion-send-threw"
+        );
+      }
+    };
+
+    await dispatchByPrivacyMode(privateModeSubscriptions, true);
+    await dispatchByPrivacyMode(detailedModeSubscriptions, false);
+
+    return {
+      notificationId,
+      sentAt,
+      attempted,
+      delivered,
+      failures,
+      failureDetails,
+      prunedEndpoints: Array.from(prunedEndpointSet)
     };
   }
 

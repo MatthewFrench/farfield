@@ -27,7 +27,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
     coordinator.stop();
   });
 
-  it("skips concurrent executions for the same thread", async () => {
+  it("requeues concurrent executions for the same thread", async () => {
     vi.useFakeTimers();
     let releaseCheck: () => void = () => {};
     const checkGate = new Promise<void>((resolve) => {
@@ -54,6 +54,9 @@ describe("PushDispatchConcurrencyCoordinator", () => {
 
     releaseCheck();
     await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(runCount).toBe(2);
     coordinator.stop();
   });
 
