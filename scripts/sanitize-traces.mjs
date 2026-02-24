@@ -3,7 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const inputDir = path.join(root, "traces");
-const outputDir = path.join(root, "packages", "codex-protocol", "test", "fixtures", "sanitized");
+const outputDir = path.join(root, "packages", "CodexProtocol", "Tests", "fixtures", "sanitized");
 
 const BANNED_PATTERNS = [
   /\/Users\//gi,

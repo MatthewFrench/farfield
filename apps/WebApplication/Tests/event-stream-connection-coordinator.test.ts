@@ -1,0 +1,229 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  EventStreamConnectionCoordinator,
+  type EventSourceLike,
+  type EventStreamConnectionSnapshot
+} from "../Source/Application/StateManagement/EventStreamConnectionCoordinator";
+import {
+  EventRefreshScheduler,
+  type EventRefreshFlags
+} from "../Source/Application/StateManagement/EventRefreshScheduler";
+import { EventStreamRefreshDecisionEngine } from "../Source/Application/StateManagement/EventStreamRefreshDecisionEngine";
+
+const THREAD_ONLY_METHODS = ["thread-stream-state-changed", "thread-queued-followups-changed"] as const;
+
+class TestEventSource implements EventSourceLike {
+  public onopen: ((event: Event) => void) | null;
+  public onmessage: ((event: MessageEvent<string>) => void) | null;
+  public onerror: ((event: Event) => void) | null;
+  public readonly url: string;
+  public closed: boolean;
+
+  public constructor(url: string) {
+    this.url = url;
+    this.onopen = null;
+    this.onmessage = null;
+    this.onerror = null;
+    this.closed = false;
+  }
+
+  public close(): void {
+    this.closed = true;
+  }
+}
+
+function createCoordinator(input: {
+  createdSources: TestEventSource[];
+  initialReconnectDelayMs?: number;
+  maximumReconnectDelayMs?: number;
+}): EventStreamConnectionCoordinator {
+  const dependencies: {
+    createEventSource: (url: string) => TestEventSource;
+    scheduleTimeout: (callback: () => void, delayMs: number) => number;
+    clearScheduledTimeout: (timerId: number) => void;
+    initialReconnectDelayMs?: number;
+    maximumReconnectDelayMs?: number;
+  } = {
+    createEventSource: (url) => {
+      const source = new TestEventSource(url);
+      input.createdSources.push(source);
+      return source;
+    },
+    scheduleTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+    clearScheduledTimeout: (timerId) => window.clearTimeout(timerId)
+  };
+  if (input.initialReconnectDelayMs !== undefined) {
+    dependencies.initialReconnectDelayMs = input.initialReconnectDelayMs;
+  }
+  if (input.maximumReconnectDelayMs !== undefined) {
+    dependencies.maximumReconnectDelayMs = input.maximumReconnectDelayMs;
+  }
+  return new EventStreamConnectionCoordinator(dependencies);
+}
+
+describe("EventStreamConnectionCoordinator", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("schedules initial refresh on open using snapshot state", async () => {
+    vi.useFakeTimers();
+    const createdSources: TestEventSource[] = [];
+    const coordinator = createCoordinator({ createdSources });
+    const scheduler = new EventRefreshScheduler(20);
+    const decisionEngine = new EventStreamRefreshDecisionEngine(THREAD_ONLY_METHODS);
+    const executedRefreshes: EventRefreshFlags[] = [];
+    const connectionStatusChanges: boolean[] = [];
+    const snapshot: EventStreamConnectionSnapshot = {
+      activeTab: "debug",
+      selectedThreadId: "thread-1"
+    };
+
+    coordinator.start({
+      eventRefreshScheduler: scheduler,
+      eventStreamRefreshDecisionEngine: decisionEngine,
+      readSnapshot: () => snapshot,
+      executeScheduledRefresh: async (refreshFlags) => {
+        executedRefreshes.push(refreshFlags);
+      },
+      onConnectionStatusChange: (connected) => {
+        connectionStatusChanges.push(connected);
+      }
+    });
+
+    expect(createdSources).toHaveLength(1);
+    createdSources[0]?.onopen?.(new Event("open"));
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(executedRefreshes).toEqual([
+      {
+        refreshCore: true,
+        refreshHistory: true,
+        refreshSelectedThread: true
+      }
+    ]);
+    expect(connectionStatusChanges).toEqual([true]);
+
+    coordinator.stop();
+    expect(connectionStatusChanges).toEqual([true, false]);
+    expect(createdSources[0]?.closed).toBe(true);
+  });
+
+  it("maps message payloads through decision engine before scheduling refresh", async () => {
+    vi.useFakeTimers();
+    const createdSources: TestEventSource[] = [];
+    const coordinator = createCoordinator({ createdSources });
+    const scheduler = new EventRefreshScheduler(20);
+    const decisionEngine = new EventStreamRefreshDecisionEngine(THREAD_ONLY_METHODS);
+    const executedRefreshes: EventRefreshFlags[] = [];
+    let snapshot: EventStreamConnectionSnapshot = {
+      activeTab: "chat",
+      selectedThreadId: "thread-1"
+    };
+
+    coordinator.start({
+      eventRefreshScheduler: scheduler,
+      eventStreamRefreshDecisionEngine: decisionEngine,
+      readSnapshot: () => snapshot,
+      executeScheduledRefresh: async (refreshFlags) => {
+        executedRefreshes.push(refreshFlags);
+      },
+      onConnectionStatusChange: () => {}
+    });
+
+    const source = createdSources[0];
+    if (!source) {
+      throw new Error("Expected event source instance");
+    }
+
+    source.onopen?.(new Event("open"));
+    await vi.advanceTimersByTimeAsync(20);
+    executedRefreshes.length = 0;
+
+    snapshot = {
+      activeTab: "debug",
+      selectedThreadId: "thread-1"
+    };
+    source.onmessage?.(
+      new MessageEvent<string>("message", {
+        data: JSON.stringify({
+          type: "history",
+          entry: {
+            source: "app",
+            meta: {
+              method: "thread-stream-state-changed",
+              threadId: "thread-1"
+            }
+          }
+        })
+      })
+    );
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(executedRefreshes).toEqual([
+      {
+        refreshCore: false,
+        refreshHistory: true,
+        refreshSelectedThread: true
+      }
+    ]);
+
+    coordinator.stop();
+  });
+
+  it("reconnects with exponential backoff and cancels pending reconnect on stop", async () => {
+    vi.useFakeTimers();
+    const createdSources: TestEventSource[] = [];
+    const coordinator = createCoordinator({
+      createdSources,
+      initialReconnectDelayMs: 25,
+      maximumReconnectDelayMs: 100
+    });
+    const scheduler = new EventRefreshScheduler(0);
+    const decisionEngine = new EventStreamRefreshDecisionEngine(THREAD_ONLY_METHODS);
+
+    coordinator.start({
+      eventRefreshScheduler: scheduler,
+      eventStreamRefreshDecisionEngine: decisionEngine,
+      readSnapshot: () => ({
+        activeTab: "chat",
+        selectedThreadId: null
+      }),
+      executeScheduledRefresh: async () => {},
+      onConnectionStatusChange: () => {}
+    });
+
+    const firstSource = createdSources[0];
+    if (!firstSource) {
+      throw new Error("Expected initial event source instance");
+    }
+    firstSource.onerror?.(new Event("error"));
+
+    await vi.advanceTimersByTimeAsync(24);
+    expect(createdSources).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(createdSources).toHaveLength(2);
+
+    const secondSource = createdSources[1];
+    if (!secondSource) {
+      throw new Error("Expected second event source instance");
+    }
+    secondSource.onerror?.(new Event("error"));
+
+    await vi.advanceTimersByTimeAsync(49);
+    expect(createdSources).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(createdSources).toHaveLength(3);
+
+    const thirdSource = createdSources[2];
+    if (!thirdSource) {
+      throw new Error("Expected third event source instance");
+    }
+    thirdSource.onerror?.(new Event("error"));
+    coordinator.stop();
+
+    await vi.advanceTimersByTimeAsync(200);
+    expect(createdSources).toHaveLength(3);
+    expect(createdSources[2]?.closed).toBe(true);
+  });
+});

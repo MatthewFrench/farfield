@@ -1,0 +1,237 @@
+import { describe, expect, it, vi } from "vitest";
+import type { SelectedThreadDataRefreshChatClient } from "../Source/Features/Chat/StateManagement/SelectedThreadDataRefreshCoordinator";
+import {
+  SelectedThreadDataRefreshCoordinator,
+  type SelectedThreadLiveStateSnapshot,
+  type SelectedThreadReadThreadSnapshot,
+  type SelectedThreadStreamEventsSnapshot
+} from "../Source/Features/Chat/StateManagement/SelectedThreadDataRefreshCoordinator";
+
+function buildLiveStateSnapshot(
+  threadId: string,
+  conversationState: SelectedThreadLiveStateSnapshot["conversationState"]
+): SelectedThreadLiveStateSnapshot {
+  return {
+    ok: true,
+    threadId,
+    ownerClientId: null,
+    conversationState,
+    liveStateError: null
+  };
+}
+
+function buildStreamEventsSnapshot(threadId: string): SelectedThreadStreamEventsSnapshot {
+  return {
+    ok: true,
+    threadId,
+    ownerClientId: null,
+    events: []
+  };
+}
+
+function buildReadThreadSnapshot(
+  threadId: string,
+  turns: SelectedThreadReadThreadSnapshot["thread"]["turns"]
+): SelectedThreadReadThreadSnapshot {
+  return {
+    ok: true,
+    thread: {
+      id: threadId,
+      turns,
+      requests: [],
+      updatedAt: 1_700_000_000,
+      latestModel: "gpt-5.3-codex",
+      latestReasoningEffort: "medium",
+      latestCollaborationMode: {
+        mode: "default",
+        settings: {
+          model: "gpt-5.3-codex",
+          reasoning_effort: "medium",
+          developer_instructions: null
+        }
+      }
+    },
+    agentId: "codex"
+  };
+}
+
+function createChatClient(
+  overrides?: Partial<SelectedThreadDataRefreshChatClient>
+): SelectedThreadDataRefreshChatClient {
+  return {
+    readThread: overrides?.readThread ?? vi.fn(async (threadId: string) => (
+      buildReadThreadSnapshot(threadId, [])
+    )),
+    readLiveState: overrides?.readLiveState ?? vi.fn(async (threadId: string) => (
+      buildLiveStateSnapshot(threadId, null)
+    )),
+    readStreamEvents: overrides?.readStreamEvents ?? vi.fn(async (threadId: string) => (
+      buildStreamEventsSnapshot(threadId)
+    ))
+  };
+}
+
+describe("SelectedThreadDataRefreshCoordinator", () => {
+  it("reads live state, stream events, and read-thread snapshot when capabilities allow", async () => {
+    const coordinator = new SelectedThreadDataRefreshCoordinator();
+    const chatClient = createChatClient({
+      readLiveState: vi.fn(async (threadId: string) => (
+        buildLiveStateSnapshot(threadId, {
+          id: threadId,
+          turns: [
+            {
+              id: "turn-live-1",
+              status: "completed",
+              items: []
+            }
+          ],
+          requests: [],
+          updatedAt: 1_700_000_000,
+          latestModel: "gpt-5.3-codex",
+          latestReasoningEffort: "medium",
+          latestCollaborationMode: {
+            mode: "default",
+            settings: {
+              model: "gpt-5.3-codex",
+              reasoning_effort: "medium",
+              developer_instructions: null
+            }
+          }
+        })
+      )),
+      readThread: vi.fn(async (threadId: string) => (
+        buildReadThreadSnapshot(threadId, [
+          {
+            id: "turn-read-1",
+            status: "completed",
+            items: []
+          }
+        ])
+      )),
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId))
+    });
+
+    const snapshot = await coordinator.readSnapshot({
+      threadId: "thread-1",
+      includeTurns: true,
+      includeReadThread: true,
+      canReadLiveState: true,
+      canReadStreamEvents: true,
+      chatClient
+    });
+
+    expect(chatClient.readLiveState).toHaveBeenCalledWith("thread-1");
+    expect(chatClient.readStreamEvents).toHaveBeenCalledWith("thread-1");
+    expect(chatClient.readThread).toHaveBeenCalledWith("thread-1", { includeTurns: true });
+    expect(snapshot.readThreadSnapshot).not.toBeNull();
+    expect(snapshot.includeTurnsUsedForRead).toBe(true);
+    expect(snapshot.containsAnyTurns).toBe(true);
+  });
+
+  it("retries transient read-thread errors and forces includeTurns on retry", async () => {
+    const waitDurations: number[] = [];
+    const coordinator = new SelectedThreadDataRefreshCoordinator({
+      retryConfiguration: {
+        maximumAttempts: 3,
+        baseDelayMilliseconds: 10,
+        maximumDelayMilliseconds: 40
+      },
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      }
+    });
+    const readThreadCalls: boolean[] = [];
+    const chatClient = createChatClient({
+      readThread: vi.fn(async (threadId: string, options) => {
+        readThreadCalls.push(options?.includeTurns === true);
+        if (readThreadCalls.length === 1) {
+          throw new Error("thread not loaded in app-server");
+        }
+        return buildReadThreadSnapshot(threadId, [
+          {
+            id: "turn-read-2",
+            status: "completed",
+            items: []
+          }
+        ]);
+      }),
+      readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId))
+    });
+
+    const snapshot = await coordinator.readSnapshot({
+      threadId: "thread-2",
+      includeTurns: false,
+      includeReadThread: true,
+      canReadLiveState: false,
+      canReadStreamEvents: false,
+      chatClient
+    });
+
+    expect(readThreadCalls).toEqual([false, true]);
+    expect(waitDurations).toEqual([10]);
+    expect(snapshot.includeTurnsUsedForRead).toBe(true);
+    expect(snapshot.containsAnyTurns).toBe(true);
+  });
+
+  it("returns deterministic default snapshots when capabilities do not allow reads", async () => {
+    const coordinator = new SelectedThreadDataRefreshCoordinator();
+    const chatClient = createChatClient();
+
+    const snapshot = await coordinator.readSnapshot({
+      threadId: "thread-3",
+      includeTurns: false,
+      includeReadThread: false,
+      canReadLiveState: false,
+      canReadStreamEvents: false,
+      chatClient
+    });
+
+    expect(chatClient.readLiveState).not.toHaveBeenCalled();
+    expect(chatClient.readStreamEvents).not.toHaveBeenCalled();
+    expect(chatClient.readThread).not.toHaveBeenCalled();
+    expect(snapshot.liveStateSnapshot).toEqual({
+      ok: true,
+      threadId: "thread-3",
+      ownerClientId: null,
+      conversationState: null,
+      liveStateError: null
+    });
+    expect(snapshot.streamEventsSnapshot).toEqual({
+      ok: true,
+      threadId: "thread-3",
+      ownerClientId: null,
+      events: []
+    });
+    expect(snapshot.readThreadSnapshot).toBeNull();
+    expect(snapshot.containsAnyTurns).toBe(false);
+  });
+
+  it("throws non-transient read-thread errors without retrying", async () => {
+    const waitDurations: number[] = [];
+    const coordinator = new SelectedThreadDataRefreshCoordinator({
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      }
+    });
+    const chatClient = createChatClient({
+      readThread: vi.fn(async () => {
+        throw new Error("permission denied");
+      })
+    });
+
+    await expect(
+      coordinator.readSnapshot({
+        threadId: "thread-4",
+        includeTurns: false,
+        includeReadThread: true,
+        canReadLiveState: false,
+        canReadStreamEvents: false,
+        chatClient
+      })
+    ).rejects.toThrow("permission denied");
+
+    expect(chatClient.readThread).toHaveBeenCalledTimes(1);
+    expect(waitDurations).toEqual([]);
+  });
+});

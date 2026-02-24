@@ -3,7 +3,7 @@ import { defineConfig } from "@playwright/test";
 const baseURL = (process.env["E2E_REAL_BASE_URL"] ?? "http://127.0.0.1:4312").trim();
 
 export default defineConfig({
-  testDir: "./e2e/real/scenarios",
+  testDir: "./end-to-end/real/scenarios",
   timeout: 180_000,
   expect: {
     timeout: 30_000

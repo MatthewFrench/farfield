@@ -1,0 +1,67 @@
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { type PushClientState } from "@/SharedUtilities/Push";
+import { PushStatusButton } from "@/Features/PushNotifications/UserInterface/PushStatusButton";
+import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
+
+function renderPushStatusButton(input: {
+  pushClientState: PushClientState;
+  isEnablingPushNotifications?: boolean;
+  onEnablePushNotifications?: () => void;
+}): void {
+  cleanup();
+  render(
+    <TooltipProvider>
+      <PushStatusButton
+        pushClientState={input.pushClientState}
+        isEnablingPushNotifications={input.isEnablingPushNotifications ?? false}
+        onEnablePushNotifications={input.onEnablePushNotifications ?? (() => {})}
+      />
+    </TooltipProvider>
+  );
+}
+
+describe("PushStatusButton", () => {
+  it("does not render when push is unsupported", () => {
+    renderPushStatusButton({
+      pushClientState: {
+        supported: false,
+        serviceWorkerRegistered: false,
+        permission: "unsupported",
+        subscribed: false
+      }
+    });
+
+    expect(screen.queryByTestId("enable-notifications-button")).toBeNull();
+  });
+
+  it("disables button when notifications are already enabled", () => {
+    renderPushStatusButton({
+      pushClientState: {
+        supported: true,
+        serviceWorkerRegistered: true,
+        permission: "granted",
+        subscribed: true
+      }
+    });
+
+    const button = screen.getByTestId("enable-notifications-button");
+    expect(button.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("invokes enable handler when button is enabled and clicked", () => {
+    const onEnablePushNotifications = vi.fn();
+    renderPushStatusButton({
+      pushClientState: {
+        supported: true,
+        serviceWorkerRegistered: true,
+        permission: "default",
+        subscribed: false
+      },
+      onEnablePushNotifications
+    });
+
+    fireEvent.click(screen.getByTestId("enable-notifications-button"));
+    expect(onEnablePushNotifications).toHaveBeenCalledTimes(1);
+  });
+});

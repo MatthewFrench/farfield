@@ -89,6 +89,17 @@ for (const filter of buildFilters) {
   }
 }
 
+const sharedPackageWatchers = buildFilters.map((filter) =>
+  spawn(
+    bunBinary,
+    ["run", "--filter", filter, "build", "--watch"],
+    {
+      stdio: "inherit",
+      env: process.env
+    }
+  )
+);
+
 const devScript = args.remote ? "dev:remote" : "dev";
 const serverArgs = [];
 if (args.agents.trim().length > 0) {
@@ -114,7 +125,7 @@ const webProcess = spawn(
   }
 );
 
-const childProcesses = [serverProcess, webProcess];
+const childProcesses = [...sharedPackageWatchers, serverProcess, webProcess];
 let terminating = false;
 let firstExit = {
   code: null,

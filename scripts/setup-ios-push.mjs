@@ -8,8 +8,8 @@ import webPush from "web-push";
 
 const cwd = process.cwd();
 const envLocalPath = path.join(cwd, ".env.local");
-const caddyLocalTemplatePath = path.join(cwd, "ops", "caddy", "Caddyfile.local.template");
-const caddyLocalOutputPath = path.join(cwd, "ops", "caddy", "Caddyfile.local");
+const caddyLocalTemplatePath = path.join(cwd, "operations", "caddy", "Caddyfile.local.template");
+const caddyLocalOutputPath = path.join(cwd, "operations", "caddy", "Caddyfile.local");
 const localSitePlaceholder = "{{SITE_ADDRESS}}";
 const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
 
@@ -223,7 +223,7 @@ if (interactive) {
   try {
     process.stdout.write("Farfield iOS push setup\n");
     process.stdout.write("This wizard configures local HTTPS and Web Push for iPhone Home Screen use.\n");
-    process.stdout.write("It writes .env.local and generates ops/caddy/Caddyfile.local from template.\n");
+    process.stdout.write("It writes .env.local and generates operations/caddy/Caddyfile.local from template.\n");
     process.stdout.write("\n1) HTTPS host for iPhone\n");
     process.stdout.write("- What it is: the exact HTTPS origin your iPhone will open.\n");
     process.stdout.write("- Why needed: service workers and push only work on secure HTTPS origins.\n");

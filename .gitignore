@@ -18,15 +18,15 @@ worker.js
 # Runtime logs
 *.log
 .runtime/
-apps/server/invalid-thread-stream-events.jsonl
+apps/ServerApplication/invalid-thread-stream-events.jsonl
 
 # Local environment
 .env.local
 
 # Runtime push state
-apps/server/push-state.json
-apps/server/apps/server/push-state.json
+apps/ServerApplication/push-state.json
+apps/ServerApplication/apps/ServerApplication/push-state.json
 
 # Generated local/domain Caddy configs
-ops/caddy/Caddyfile.local
-ops/caddy/Caddyfile.domain
+operations/caddy/Caddyfile.local
+operations/caddy/Caddyfile.domain

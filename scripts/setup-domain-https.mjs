@@ -3,8 +3,8 @@ import path from "node:path";
 import { createInterface } from "node:readline/promises";
 
 const cwd = process.cwd();
-const caddyDomainTemplatePath = path.join(cwd, "ops", "caddy", "Caddyfile.domain.template");
-const caddyDomainOutputPath = path.join(cwd, "ops", "caddy", "Caddyfile.domain");
+const caddyDomainTemplatePath = path.join(cwd, "operations", "caddy", "Caddyfile.domain.template");
+const caddyDomainOutputPath = path.join(cwd, "operations", "caddy", "Caddyfile.domain");
 const domainPlaceholder = "{{DOMAIN_HOST}}";
 const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
 
@@ -122,7 +122,7 @@ if (interactive) {
   });
   try {
     process.stdout.write("Farfield domain HTTPS setup\n");
-    process.stdout.write("This wizard generates ops/caddy/Caddyfile.domain from template.\n");
+    process.stdout.write("This wizard generates operations/caddy/Caddyfile.domain from template.\n");
     process.stdout.write("- Use your real DNS host, for example farfield.yourdomain.com.\n");
     process.stdout.write("- This host should resolve to the machine running Farfield.\n");
     selectedDomainHost = await askNormalizedWithDefault(
@@ -151,5 +151,5 @@ fs.writeFileSync(caddyDomainOutputPath, withTrailingNewline(renderedDomainConfig
 process.stdout.write(`Generated ${caddyDomainOutputPath} from ${caddyDomainTemplatePath}\n`);
 process.stdout.write(`Domain host: ${selectedDomainHost}\n`);
 process.stdout.write(
-  'Next step: node scripts/with-env.mjs "caddy run --config ops/caddy/Caddyfile.domain"\n'
+  'Next step: node scripts/with-env.mjs "caddy run --config operations/caddy/Caddyfile.domain"\n'
 );

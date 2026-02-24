@@ -5,8 +5,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const cwd = process.cwd();
-const caddyConfigPath = path.join(cwd, "ops", "caddy", "Caddyfile.local");
-const caddyConfigTemplatePath = path.join(cwd, "ops", "caddy", "Caddyfile.local.template");
+const caddyConfigPath = path.join(cwd, "operations", "caddy", "Caddyfile.local");
+const caddyConfigTemplatePath = path.join(cwd, "operations", "caddy", "Caddyfile.local.template");
 const caddyRootCertificatePath = path.join(
   os.homedir(),
   "Library",

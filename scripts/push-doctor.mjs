@@ -61,10 +61,10 @@ if (!loopbackHosts.has(host)) {
   );
 }
 
-const localCaddyTemplate = path.join(cwd, "ops", "caddy", "Caddyfile.local.template");
-const domainCaddyTemplate = path.join(cwd, "ops", "caddy", "Caddyfile.domain.template");
-const localCaddy = path.join(cwd, "ops", "caddy", "Caddyfile.local");
-const domainCaddy = path.join(cwd, "ops", "caddy", "Caddyfile.domain");
+const localCaddyTemplate = path.join(cwd, "operations", "caddy", "Caddyfile.local.template");
+const domainCaddyTemplate = path.join(cwd, "operations", "caddy", "Caddyfile.domain.template");
+const localCaddy = path.join(cwd, "operations", "caddy", "Caddyfile.local");
+const domainCaddy = path.join(cwd, "operations", "caddy", "Caddyfile.domain");
 check("Caddy local template", fs.existsSync(localCaddyTemplate), localCaddyTemplate);
 check("Caddy domain template", fs.existsSync(domainCaddyTemplate), domainCaddyTemplate);
 check(

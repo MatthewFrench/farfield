@@ -100,6 +100,21 @@ When enabled, Farfield watches Codex thread stream updates and publishes a messa
 - Bun 1.2+
 - Codex or OpenCode installed locally
 
+## Architecture And Naming
+
+Farfield architecture and naming standards are documented in:
+
+- `docs/architecture.md`
+- `docs/proposed-structure-and-migration.md`
+
+Key conventions:
+
+1. Repository source roots stay `apps` and `packages`.
+2. Source folders/files under those roots use `PascalCase`.
+3. Source folder names should use full words and avoid abbreviations.
+4. Non-source roots (`docs`, `public`, `traces`, `scripts`) remain lowercase.
+5. State ownership and module boundaries must stay explicit and documented.
+
 ## Codex Schema Sync
 
 Farfield now vendors official Codex app-server schemas and generates protocol Zod validators from them.
@@ -110,8 +125,8 @@ bun run generate:codex-schema
 
 This command updates:
 
-- `packages/codex-protocol/vendor/codex-app-server-schema/` (stable + experimental TypeScript and JSON Schema)
-- `packages/codex-protocol/src/generated/app-server/` (generated Zod schema modules used by the app)
+- `packages/CodexProtocol/vendor/codex-app-server-schema/` (stable + experimental TypeScript and JSON Schema)
+- `packages/CodexProtocol/Source/generated/app-server/` (generated Zod schema modules used by the app)
 
 ## License
 

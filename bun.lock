@@ -16,7 +16,7 @@
         "zod": "^3.24.1",
       },
     },
-    "apps/server": {
+    "apps/ServerApplication": {
       "name": "@farfield/server",
       "version": "0.0.0",
       "dependencies": {
@@ -31,7 +31,7 @@
         "@types/web-push": "^3.6.4",
       },
     },
-    "apps/web": {
+    "apps/WebApplication": {
       "name": "@farfield/web",
       "version": "0.0.0",
       "dependencies": {
@@ -72,7 +72,7 @@
         "vite": "^7.3.1",
       },
     },
-    "packages/codex-api": {
+    "packages/CodexInterfaceAdapter": {
       "name": "@farfield/api",
       "version": "0.0.0",
       "dependencies": {
@@ -80,7 +80,7 @@
         "zod": "^3.24.1",
       },
     },
-    "packages/codex-protocol": {
+    "packages/CodexProtocol": {
       "name": "@farfield/protocol",
       "version": "0.0.0",
       "dependencies": {
@@ -91,7 +91,7 @@
         "json-schema-to-zod": "^2.7.0",
       },
     },
-    "packages/opencode-api": {
+    "packages/OpenCodeInterfaceAdapter": {
       "name": "@farfield/opencode-api",
       "version": "0.0.0",
       "dependencies": {
@@ -235,15 +235,15 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.27.3", "", { "os": "win32", "cpu": "x64" }, "sha512-4uJGhsxuptu3OcpVAzli+/gWusVGwZZHTlS63hh++ehExkVT8SgiEf7/uC/PclrPPkLhZqGgCTjd0VWLo6xMqA=="],
 
-    "@farfield/api": ["@farfield/api@workspace:packages/codex-api"],
+    "@farfield/api": ["@farfield/api@workspace:packages/CodexInterfaceAdapter"],
 
-    "@farfield/opencode-api": ["@farfield/opencode-api@workspace:packages/opencode-api"],
+    "@farfield/opencode-api": ["@farfield/opencode-api@workspace:packages/OpenCodeInterfaceAdapter"],
 
-    "@farfield/protocol": ["@farfield/protocol@workspace:packages/codex-protocol"],
+    "@farfield/protocol": ["@farfield/protocol@workspace:packages/CodexProtocol"],
 
-    "@farfield/server": ["@farfield/server@workspace:apps/server"],
+    "@farfield/server": ["@farfield/server@workspace:apps/ServerApplication"],
 
-    "@farfield/web": ["@farfield/web@workspace:apps/web"],
+    "@farfield/web": ["@farfield/web@workspace:apps/WebApplication"],
 
     "@floating-ui/core": ["@floating-ui/core@1.7.4", "", { "dependencies": { "@floating-ui/utils": "^0.2.10" } }, "sha512-C3HlIdsBxszvm5McXlB8PeOEWfBhcGBTZGkGlWc2U0KFY5IwG5OQEuQ8rq52DZmcHDlPLd+YFBK+cZcytwIFWg=="],
 

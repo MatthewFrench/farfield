@@ -30,29 +30,29 @@ Add standards-compliant iOS Home Screen web app support and background push noti
 
 ## Current Codebase Baseline
 
-1. Frontend is Vite + React in `apps/web`.
-2. Backend is Node HTTP server in `apps/server/src/index.ts`.
-3. Live updates currently depend on `EventSource("/events")` in `apps/web/src/App.tsx`.
+1. Frontend is Vite + React in `apps/WebApplication`.
+2. Backend is Node HTTP server in `apps/ServerApplication/Source/Index.ts`.
+3. Live updates currently depend on `EventSource("/events")` in `apps/WebApplication/Source/App.tsx`.
 4. Thread stream events are already available from IPC broadcasts and reduced with `reduceThreadStreamEvents`.
 
 ## Proposed Architecture
 
 1. Keep current SSE flow for foreground responsiveness.
-2. Add a PWA shell (manifest + service worker) in `apps/web`.
-3. Add Web Push subscription API + persistence + send pipeline in `apps/server`.
+2. Add a PWA shell (manifest + service worker) in `apps/WebApplication`.
+3. Add Web Push subscription API + persistence + send pipeline in `apps/ServerApplication`.
 4. Trigger push on strict completion transition detection from `thread-stream-state-changed` events.
 5. Put Caddy in front as the single HTTPS origin for web + API + SSE.
 6. Add lightweight API auth for `/api/*` and `/events` when remote access is enabled.
 
 ## Implementation Scope by Package
 
-## `packages/codex-protocol`
+## `packages/CodexProtocol`
 
 Add strict schemas and typed parsers for push-related payloads.
 
 ### New file
 
-`packages/codex-protocol/src/push.ts`
+`packages/CodexProtocol/Source/Push.ts`
 
 ### Schemas
 
@@ -68,9 +68,9 @@ All schemas must be `.strict()` and parsed via dedicated parser functions that t
 
 ### Exports
 
-Update `packages/codex-protocol/src/index.ts` to export `push.ts`.
+Update `packages/CodexProtocol/Source/Index.ts` to export `Push.ts`.
 
-## `apps/server`
+## `apps/ServerApplication`
 
 ### Dependencies
 
@@ -88,7 +88,7 @@ The server should fail fast at startup with a clear error if `PUSH_ENABLED=true`
 
 ### Persistence
 
-Add `apps/server/src/push-store.ts`.
+Add `apps/ServerApplication/Source/PushStore.ts`.
 
 Responsibilities:
 
@@ -100,11 +100,11 @@ Responsibilities:
 
 Storage location:
 
-`apps/server/push-subscriptions.json` (gitignored) or an app data directory path from env.
+`apps/ServerApplication/push-subscriptions.json` (gitignored) or an app data directory path from env.
 
 ### Push delivery service
 
-Add `apps/server/src/push-service.ts`.
+Add `apps/ServerApplication/Source/PushService.ts`.
 
 Responsibilities:
 
@@ -115,7 +115,7 @@ Responsibilities:
 
 ### Completion detector
 
-Add `apps/server/src/completion-detector.ts`.
+Add `apps/ServerApplication/Source/CompletionDetector.ts`.
 
 Responsibilities:
 
@@ -131,7 +131,7 @@ No heuristics outside strict typed state. The detector should operate only on pa
 
 ### HTTP API additions
 
-Add routes in `apps/server/src/index.ts`:
+Add routes in `apps/ServerApplication/Source/Index.ts`:
 
 1. `GET /api/push/vapid-public-key`
 2. `GET /api/push/status`
@@ -249,15 +249,15 @@ In the existing IPC frame handler where `thread-stream-state-changed` is process
 
 The `/events` SSE path remains the same endpoint and stream contract.
 
-## `apps/web`
+## `apps/WebApplication`
 
 ### PWA shell
 
 Add:
 
-1. `apps/web/public/manifest.webmanifest`
-2. `apps/web/public/icons/*` (maskable + standard sizes)
-3. Service worker entry: `apps/web/public/sw.js` (manual registration, current implementation).
+1. `apps/WebApplication/public/manifest.webmanifest`
+2. `apps/WebApplication/public/icons/*` (maskable + standard sizes)
+3. Service worker entry: `apps/WebApplication/public/sw.js` (manual registration, current implementation).
 
 ### Service worker behavior
 
@@ -268,7 +268,7 @@ Add:
 
 ### Client push API module
 
-Add `apps/web/src/lib/push.ts`.
+Add `apps/WebApplication/Source/SharedUtilities/Push.ts`.
 
 Responsibilities:
 
@@ -301,8 +301,8 @@ Use Caddy as the single entrypoint for both local LAN and real domain deployment
 
 ### Local LAN (trusted internal CA)
 
-Tracked template: `ops/caddy/Caddyfile.local.template`  
-Generated runtime file (gitignored): `ops/caddy/Caddyfile.local`
+Tracked template: `operations/caddy/Caddyfile.local.template`  
+Generated runtime file (gitignored): `operations/caddy/Caddyfile.local`
 
 ```caddyfile
 {{SITE_ADDRESS}} {
@@ -330,8 +330,8 @@ Notes:
 
 ### Real Domain (public CA)
 
-Tracked template: `ops/caddy/Caddyfile.domain.template`  
-Generated runtime file (gitignored): `ops/caddy/Caddyfile.domain`
+Tracked template: `operations/caddy/Caddyfile.domain.template`  
+Generated runtime file (gitignored): `operations/caddy/Caddyfile.domain`
 
 ```caddyfile
 {{DOMAIN_HOST}} {
@@ -372,7 +372,7 @@ Domain HTTPS:
 1. Point DNS to host IP.
 2. Generate domain config: `pnpm setup:domain-https`
 3. Start Farfield: `pnpm dev`
-4. Start Caddy with domain config: `caddy run --config ops/caddy/Caddyfile.domain`
+4. Start Caddy with domain config: `caddy run --config operations/caddy/Caddyfile.domain`
 5. Open domain in Safari, add to Home Screen, enable notifications.
 
 Incident quick checks:
@@ -389,7 +389,7 @@ Incident quick checks:
 Add convenience scripts in root `package.json`:
 
 1. `setup:ios-push` (writes `.env.local` with generated keys/token)
-2. `setup:domain-https` (generates `ops/caddy/Caddyfile.domain` from template)
+2. `setup:domain-https` (generates `operations/caddy/Caddyfile.domain` from template)
 3. `ios:trust-local-ca` (runs explicit local CA trust setup before launching local HTTPS stack)
 4. `caddy:local` (starts Caddy local HTTPS proxy using generated local config)
 5. `push:keys` (generate VAPID keypair)
@@ -557,5 +557,5 @@ Pass all items before merge:
 1. Global opt-in only.
 2. Completion notifications only.
 3. Single notification template.
-4. Caddy local + domain templates committed under `ops/caddy/`; generated runtime files are gitignored.
+4. Caddy local + domain templates committed under `operations/caddy/`; generated runtime files are gitignored.
 5. Expand preferences after first production validation.

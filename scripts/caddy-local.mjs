@@ -4,8 +4,8 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
 const cwd = process.cwd();
-const caddyConfigTemplatePath = path.join(cwd, "ops", "caddy", "Caddyfile.local.template");
-const caddyConfigPath = path.join(cwd, "ops", "caddy", "Caddyfile.local");
+const caddyConfigTemplatePath = path.join(cwd, "operations", "caddy", "Caddyfile.local.template");
+const caddyConfigPath = path.join(cwd, "operations", "caddy", "Caddyfile.local");
 const caddyHttpPort = 80;
 const caddyHttpsPort = 443;
 const caddyReadyTimeoutMs = Number(process.env["IOS_LOCAL_CADDY_READY_TIMEOUT_MS"] ?? "180000");

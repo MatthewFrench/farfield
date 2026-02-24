@@ -80,6 +80,6 @@ curl -sS -X POST "http://127.0.0.1:4311/api/threads/$SMOKE_THREAD_ID/archive" \
 After manual MCP pass, run:
 
 ```bash
-pnpm e2e:real:run
-pnpm verify:real
+pnpm end-to-end:real:run
+pnpm verify:end-to-end:real
 ```

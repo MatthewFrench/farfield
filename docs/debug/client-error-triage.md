@@ -50,8 +50,8 @@ rg '"operation":"push:auto-heal"' .runtime/logs/errors/session-*.ndjson
 # Filter by a known errorId
 rg '"errorId":"error_' .runtime/logs/errors/session-*.ndjson
 
-# Real-app e2e sentinel summary (latest scenario)
-tail -n 200 .runtime/e2e-sentinel/latest.ndjson
+# Real-app end-to-end sentinel summary (latest scenario)
+tail -n 200 .runtime/end-to-end-sentinel/latest.ndjson
 ```
 
 ## Event fields

@@ -1,0 +1,177 @@
+import {
+  EventRefreshScheduler,
+  type EventRefreshFlags
+} from "./EventRefreshScheduler";
+import { EventStreamRefreshDecisionEngine } from "./EventStreamRefreshDecisionEngine";
+
+export interface EventSourceLike {
+  onopen: ((event: Event) => void) | null;
+  onmessage: ((event: MessageEvent<string>) => void) | null;
+  onerror: ((event: Event) => void) | null;
+  close(): void;
+}
+
+export interface EventStreamConnectionSnapshot {
+  activeTab: "chat" | "debug";
+  selectedThreadId: string | null;
+}
+
+export interface EventStreamConnectionCoordinatorStartInput {
+  eventRefreshScheduler: EventRefreshScheduler;
+  eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionEngine;
+  readSnapshot: () => EventStreamConnectionSnapshot;
+  executeScheduledRefresh: (refreshFlags: EventRefreshFlags) => Promise<void>;
+  onConnectionStatusChange: (connected: boolean) => void;
+  eventsUrl?: string;
+}
+
+interface EventStreamConnectionCoordinatorContext {
+  eventRefreshScheduler: EventRefreshScheduler;
+  eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionEngine;
+  readSnapshot: () => EventStreamConnectionSnapshot;
+  executeScheduledRefresh: (refreshFlags: EventRefreshFlags) => Promise<void>;
+  onConnectionStatusChange: (connected: boolean) => void;
+  eventsUrl: string;
+}
+
+interface EventStreamConnectionCoordinatorDependencies {
+  createEventSource?: (url: string) => EventSourceLike;
+  scheduleTimeout?: (callback: () => void, delayMs: number) => number;
+  clearScheduledTimeout?: (timerId: number) => void;
+  initialReconnectDelayMs?: number;
+  maximumReconnectDelayMs?: number;
+}
+
+const DEFAULT_INITIAL_RECONNECT_DELAY_MS = 1_000;
+const DEFAULT_MAXIMUM_RECONNECT_DELAY_MS = 10_000;
+
+export class EventStreamConnectionCoordinator {
+  private readonly createEventSource: (url: string) => EventSourceLike;
+  private readonly scheduleTimeout: (callback: () => void, delayMs: number) => number;
+  private readonly clearScheduledTimeout: (timerId: number) => void;
+  private readonly initialReconnectDelayMs: number;
+  private readonly maximumReconnectDelayMs: number;
+  private reconnectDelayMs: number;
+  private reconnectTimerId: number | null;
+  private source: EventSourceLike | null;
+  private context: EventStreamConnectionCoordinatorContext | null;
+  private disposed: boolean;
+
+  public constructor(dependencies?: EventStreamConnectionCoordinatorDependencies) {
+    this.createEventSource = dependencies?.createEventSource ?? ((url) => new EventSource(url));
+    this.scheduleTimeout = dependencies?.scheduleTimeout ?? ((callback, delayMs) => window.setTimeout(callback, delayMs));
+    this.clearScheduledTimeout = dependencies?.clearScheduledTimeout ?? ((timerId) => window.clearTimeout(timerId));
+    this.initialReconnectDelayMs = dependencies?.initialReconnectDelayMs ?? DEFAULT_INITIAL_RECONNECT_DELAY_MS;
+    this.maximumReconnectDelayMs = dependencies?.maximumReconnectDelayMs ?? DEFAULT_MAXIMUM_RECONNECT_DELAY_MS;
+    this.reconnectDelayMs = this.initialReconnectDelayMs;
+    this.reconnectTimerId = null;
+    this.source = null;
+    this.context = null;
+    this.disposed = true;
+  }
+
+  public start(input: EventStreamConnectionCoordinatorStartInput): void {
+    this.stop();
+
+    this.context = {
+      eventRefreshScheduler: input.eventRefreshScheduler,
+      eventStreamRefreshDecisionEngine: input.eventStreamRefreshDecisionEngine,
+      readSnapshot: input.readSnapshot,
+      executeScheduledRefresh: input.executeScheduledRefresh,
+      onConnectionStatusChange: input.onConnectionStatusChange,
+      eventsUrl: input.eventsUrl ?? "/events"
+    };
+    this.reconnectDelayMs = this.initialReconnectDelayMs;
+    this.disposed = false;
+    this.connectEvents();
+  }
+
+  public stop(): void {
+    this.disposed = true;
+    if (this.reconnectTimerId !== null) {
+      this.clearScheduledTimeout(this.reconnectTimerId);
+      this.reconnectTimerId = null;
+    }
+    if (this.source) {
+      this.source.close();
+      this.source = null;
+    }
+    if (this.context) {
+      this.context.eventRefreshScheduler.dispose();
+      this.context.onConnectionStatusChange(false);
+    }
+    this.context = null;
+    this.reconnectDelayMs = this.initialReconnectDelayMs;
+  }
+
+  private connectEvents(): void {
+    if (this.disposed || !this.context) {
+      return;
+    }
+
+    this.source = this.createEventSource(this.context.eventsUrl);
+    this.source.onopen = () => {
+      if (!this.context) {
+        return;
+      }
+      this.context.onConnectionStatusChange(true);
+      this.reconnectDelayMs = this.initialReconnectDelayMs;
+      const snapshot = this.context.readSnapshot();
+      this.scheduleRefresh({
+        refreshCore: true,
+        refreshHistory: snapshot.activeTab === "debug",
+        refreshSelectedThread: Boolean(snapshot.selectedThreadId)
+      });
+    };
+    this.source.onmessage = (event) => {
+      if (!this.context) {
+        return;
+      }
+      const snapshot = this.context.readSnapshot();
+      const refreshDecision = this.context.eventStreamRefreshDecisionEngine.readDecision({
+        activeTab: snapshot.activeTab,
+        selectedThreadId: snapshot.selectedThreadId,
+        eventData: event.data
+      });
+      this.scheduleRefresh({
+        refreshCore: refreshDecision.refreshCore,
+        refreshHistory: refreshDecision.refreshHistory,
+        refreshSelectedThread: refreshDecision.refreshSelectedThread
+      });
+    };
+    this.source.onerror = () => {
+      if (!this.context) {
+        return;
+      }
+      this.context.onConnectionStatusChange(false);
+      if (this.source) {
+        this.source.close();
+        this.source = null;
+      }
+      this.scheduleReconnect();
+    };
+  }
+
+  private scheduleRefresh(refreshFlags: EventRefreshFlags): void {
+    if (!this.context) {
+      return;
+    }
+    this.context.eventRefreshScheduler.enqueueRefresh(refreshFlags, async (pendingRefreshFlags) => {
+      if (!this.context) {
+        return;
+      }
+      await this.context.executeScheduledRefresh(pendingRefreshFlags);
+    });
+  }
+
+  private scheduleReconnect(): void {
+    if (this.disposed || this.reconnectTimerId !== null) {
+      return;
+    }
+    this.reconnectTimerId = this.scheduleTimeout(() => {
+      this.reconnectTimerId = null;
+      this.connectEvents();
+    }, this.reconnectDelayMs);
+    this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, this.maximumReconnectDelayMs);
+  }
+}
