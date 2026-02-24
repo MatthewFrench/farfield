@@ -22,7 +22,7 @@ export class ThreadAdapterResolver {
   public resolveCreateThreadAdapter(requestedAgentId: AgentId | undefined): AgentAdapter | null {
     if (requestedAgentId) {
       const requestedAdapter = this.registry.getAdapter(requestedAgentId);
-      if (!requestedAdapter || !requestedAdapter.isEnabled()) {
+      if (!requestedAdapter || !requestedAdapter.isEnabled() || !requestedAdapter.isConnected()) {
         return null;
       }
 
@@ -30,11 +30,20 @@ export class ThreadAdapterResolver {
     }
 
     const defaultAgentId = this.registry.resolveDefaultAgentId();
-    if (!defaultAgentId) {
-      return null;
+    if (defaultAgentId) {
+      const defaultAdapter = this.registry.getAdapter(defaultAgentId);
+      if (defaultAdapter && defaultAdapter.isEnabled() && defaultAdapter.isConnected()) {
+        return defaultAdapter;
+      }
     }
 
-    return this.registry.getAdapter(defaultAgentId);
+    for (const enabledAdapter of this.registry.listEnabled()) {
+      if (enabledAdapter.isConnected()) {
+        return enabledAdapter;
+      }
+    }
+
+    return null;
   }
 
   public resolveAdapterForThread(threadId: string): ResolvedThreadAdapterResult {

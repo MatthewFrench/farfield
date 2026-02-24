@@ -58,6 +58,7 @@ export class DesktopIpcClient {
   private readonly requestTimeoutMs: number;
   private socket: net.Socket | null = null;
   private buffer = Buffer.alloc(0);
+  private bufferOffset = 0;
   private clientId: string | null = null;
   private readonly pending = new Map<string, PendingRequest>();
   private readonly events = new EventEmitter();
@@ -98,6 +99,7 @@ export class DesktopIpcClient {
       this.rejectAll(new DesktopIpcError("IPC socket closed"));
       this.socket = null;
       this.buffer = Buffer.alloc(0);
+      this.bufferOffset = 0;
       this.clientId = null;
       this.emitConnectionState({
         connected: false,
@@ -197,10 +199,10 @@ export class DesktopIpcClient {
   }
 
   private handleData(chunk: Buffer): void {
-    this.buffer = Buffer.concat([this.buffer, chunk]);
+    this.appendChunk(chunk);
 
-    while (this.buffer.length >= 4) {
-      const size = this.buffer.readUInt32LE(0);
+    while (this.buffer.length - this.bufferOffset >= 4) {
+      const size = this.buffer.readUInt32LE(this.bufferOffset);
       if (size > MAX_FRAME_SIZE_BYTES) {
         this.rejectAll(
           new DesktopIpcError(
@@ -211,12 +213,14 @@ export class DesktopIpcClient {
         return;
       }
 
-      if (this.buffer.length < 4 + size) {
+      if (this.buffer.length - this.bufferOffset < 4 + size) {
+        this.compactBufferIfNeeded();
         return;
       }
 
-      const payloadBuffer = this.buffer.slice(4, 4 + size);
-      this.buffer = this.buffer.slice(4 + size);
+      const payloadStart = this.bufferOffset + 4;
+      const payloadBuffer = this.buffer.subarray(payloadStart, payloadStart + size);
+      this.bufferOffset = payloadStart + size;
 
       let raw: JsonValue;
       try {
@@ -284,6 +288,42 @@ export class DesktopIpcClient {
 
       pending.resolve(IpcResponseFrameSchema.parse(frame));
     }
+
+    this.compactBufferIfNeeded();
+  }
+
+  private appendChunk(chunk: Buffer): void {
+    if (this.buffer.length === 0 || this.bufferOffset === this.buffer.length) {
+      this.buffer = Buffer.from(chunk);
+      this.bufferOffset = 0;
+      return;
+    }
+
+    if (this.bufferOffset > 0) {
+      this.buffer = Buffer.from(this.buffer.subarray(this.bufferOffset));
+      this.bufferOffset = 0;
+    }
+
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+  }
+
+  private compactBufferIfNeeded(): void {
+    if (this.bufferOffset === 0) {
+      return;
+    }
+
+    if (this.bufferOffset >= this.buffer.length) {
+      this.buffer = Buffer.alloc(0);
+      this.bufferOffset = 0;
+      return;
+    }
+
+    if (this.bufferOffset * 2 < this.buffer.length && this.bufferOffset < 64 * 1024) {
+      return;
+    }
+
+    this.buffer = Buffer.from(this.buffer.subarray(this.bufferOffset));
+    this.bufferOffset = 0;
   }
 
   public sendBroadcast(

@@ -60,11 +60,13 @@ export function ThreadSidebarPanel({
                     type="button"
                     onClick={onHideDesktopSidebar}
                     data-testid="sidebar-toggle-close"
+                    aria-label="Hide sidebar"
+                    title="Hide sidebar"
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
                   >
-                    <PanelLeft size={15} />
+                    <PanelLeft size={15} aria-hidden="true" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Hide sidebar</TooltipContent>
@@ -75,11 +77,13 @@ export function ThreadSidebarPanel({
                 type="button"
                 onClick={onCloseMobileSidebar}
                 data-testid="sidebar-toggle-close"
+                aria-label="Close sidebar"
+                title="Close sidebar"
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-foreground"
               >
-                <X size={14} />
+                <X size={14} aria-hidden="true" />
               </Button>
             )}
           </div>
@@ -138,9 +142,11 @@ export function ThreadSidebarPanel({
                 href="https://github.com/achimala/farfield"
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Open Farfield on GitHub"
+                title="Open Farfield on GitHub"
                 className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
               >
-                <Github size={14} />
+                <Github size={14} aria-hidden="true" />
               </a>
             </TooltipTrigger>
             <TooltipContent side="top" align="end">GitHub</TooltipContent>

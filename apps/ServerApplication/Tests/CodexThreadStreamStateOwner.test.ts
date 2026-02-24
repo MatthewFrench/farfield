@@ -212,9 +212,11 @@ describe("CodexThreadStreamStateOwner", () => {
   });
 
   it("marks stream reads for reset when cursor history has been evicted", () => {
-    const owner = new CodexThreadStreamStateOwner();
+    const owner = new CodexThreadStreamStateOwner({
+      streamEventLimit: 40
+    });
     owner.ingestInboundFrame(createSnapshotEvent());
-    for (let eventIndex = 0; eventIndex < 450; eventIndex += 1) {
+    for (let eventIndex = 0; eventIndex < 50; eventIndex += 1) {
       owner.ingestInboundFrame(createPatchEvent());
     }
 
@@ -267,5 +269,11 @@ describe("CodexThreadStreamStateOwner", () => {
     owner.ingestInboundFrame(malformedFrame);
 
     expect(fs.existsSync(invalidStreamEventsLogPath)).toBe(true);
+  });
+
+  it("rejects non-positive stream event limits", () => {
+    expect(() => new CodexThreadStreamStateOwner({
+      streamEventLimit: 0
+    })).toThrow("streamEventLimit must be a positive integer");
   });
 });

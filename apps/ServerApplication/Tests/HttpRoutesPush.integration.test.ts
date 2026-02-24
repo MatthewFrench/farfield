@@ -135,6 +135,7 @@ describe("server route integration push routes", () => {
     const localCaStatus = PushLocalCaStatusEnvelopeSchema.parse(await localCaStatusResponse.json());
     expect(localCaStatus.available).toBe(true);
     expect(localCaStatus.downloadPath).toBe("/api/push/local-ca/download");
+    expect(Object.prototype.hasOwnProperty.call(localCaStatus, "sourcePath")).toBe(false);
 
     const localCaDownloadResponse = await fetch(`${baseUrl}/api/push/local-ca/download`, {
       headers: {

@@ -42,9 +42,10 @@ export interface CodexIpcFrameDescription {
 
 export interface CodexThreadStreamStateOwnerOptions {
   invalidStreamEventsLogPath?: string;
+  streamEventLimit?: number;
 }
 
-const STREAM_EVENT_LIMIT = 400;
+const DEFAULT_STREAM_EVENT_LIMIT = 400;
 const THREAD_IDENTIFIER_CANDIDATES_SCHEMA = z
   .object({
     conversationId: z.string().optional(),
@@ -62,6 +63,7 @@ const DEFAULT_INVALID_STREAM_EVENT_LOG_PATH = path.resolve(
 
 export class CodexThreadStreamStateOwner {
   private readonly invalidStreamEventsLogPath: string;
+  private readonly streamEventLimit: number;
   private readonly threadOwnerById = new Map<string, string>();
   private readonly streamEventEntriesByThreadId = new Map<string, ThreadStreamEventEntry[]>();
   private readonly liveStateProjectionByThreadId = new Map<string, ThreadLiveStateProjection>();
@@ -71,6 +73,10 @@ export class CodexThreadStreamStateOwner {
     // stream payloads can be audited without coupling to transport pipeline internals.
     this.invalidStreamEventsLogPath = options.invalidStreamEventsLogPath
       ?? DEFAULT_INVALID_STREAM_EVENT_LOG_PATH;
+    this.streamEventLimit = options.streamEventLimit ?? DEFAULT_STREAM_EVENT_LIMIT;
+    if (!Number.isInteger(this.streamEventLimit) || this.streamEventLimit < 1) {
+      throw new Error("CodexThreadStreamStateOwner streamEventLimit must be a positive integer.");
+    }
     this.ensureInvalidStreamEventLogDirectoryExists();
   }
 
@@ -219,8 +225,8 @@ export class CodexThreadStreamStateOwner {
       sequence,
       frame
     });
-    if (currentEntries.length > STREAM_EVENT_LIMIT) {
-      currentEntries.splice(0, currentEntries.length - STREAM_EVENT_LIMIT);
+    if (currentEntries.length > this.streamEventLimit) {
+      currentEntries.splice(0, currentEntries.length - this.streamEventLimit);
     }
     this.streamEventEntriesByThreadId.set(conversationId, currentEntries);
   }

@@ -29,6 +29,12 @@ interface PushTestRouteOwnerDependencies {
     input: z.infer<typeof FarfieldPushTestBodySchema>,
     privateMode: boolean
   ) => PushNotificationPayload;
+  pushTestSendTimeoutMs: number;
+  withTimeout: <ValueType>(
+    promise: Promise<ValueType>,
+    timeoutMs: number,
+    label: string
+  ) => Promise<ValueType>;
 }
 
 /**
@@ -183,31 +189,64 @@ export class PushTestRouteOwner {
       (subscription) => !subscription.settings.privateMode
     );
 
-    const pushDispatchAttempts: PushDispatchAttempt[] = [];
+    const dispatchPromises: Promise<PushDispatchAttempt>[] = [];
+    let sharedNotificationIdentifier: string | null = null;
+    let sharedNotificationTimestamp: string | null = null;
+
+    const alignPayloadWithSharedNotification = (
+      payload: PushNotificationPayload
+    ): PushNotificationPayload => {
+      if (sharedNotificationIdentifier === null || sharedNotificationTimestamp === null) {
+        sharedNotificationIdentifier = payload.notificationId;
+        sharedNotificationTimestamp = payload.createdAt;
+        return payload;
+      }
+
+      return {
+        ...payload,
+        notificationId: sharedNotificationIdentifier,
+        createdAt: sharedNotificationTimestamp
+      };
+    };
+
     if (privateModeSubscriptions.length > 0) {
-      const privatePayload = this.dependencies.buildPushTestPayload(input.body, true);
-      const privateSendResult = await this.dependencies.pushService.sendToSubscriptions(
-        privateModeSubscriptions,
-        privatePayload
+      const privatePayload = alignPayloadWithSharedNotification(
+        this.dependencies.buildPushTestPayload(input.body, true)
       );
-      pushDispatchAttempts.push({
+      dispatchPromises.push(this.sendPushTestNotificationGroup({
+        subscriptions: privateModeSubscriptions,
         payload: privatePayload,
-        sendResult: privateSendResult
-      });
+        modeLabel: "private"
+      }));
     }
 
     if (detailedModeSubscriptions.length > 0) {
-      const detailedPayload = this.dependencies.buildPushTestPayload(input.body, false);
-      const detailedSendResult = await this.dependencies.pushService.sendToSubscriptions(
-        detailedModeSubscriptions,
-        detailedPayload
+      const detailedPayload = alignPayloadWithSharedNotification(
+        this.dependencies.buildPushTestPayload(input.body, false)
       );
-      pushDispatchAttempts.push({
+      dispatchPromises.push(this.sendPushTestNotificationGroup({
+        subscriptions: detailedModeSubscriptions,
         payload: detailedPayload,
-        sendResult: detailedSendResult
-      });
+        modeLabel: "detailed"
+      }));
     }
 
-    return pushDispatchAttempts;
+    return Promise.all(dispatchPromises);
+  }
+
+  private async sendPushTestNotificationGroup(input: {
+    subscriptions: StoredPushSubscription[];
+    payload: PushNotificationPayload;
+    modeLabel: "private" | "detailed";
+  }): Promise<PushDispatchAttempt> {
+    const sendResult = await this.dependencies.withTimeout(
+      this.dependencies.pushService.sendToSubscriptions(input.subscriptions, input.payload),
+      this.dependencies.pushTestSendTimeoutMs,
+      `push-test-send:${input.modeLabel}`
+    );
+    return {
+      payload: input.payload,
+      sendResult
+    };
   }
 }

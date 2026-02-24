@@ -33,12 +33,14 @@ export async function handleThreadCollectionRoutes(
     listEnabledAdapters,
     registerThreadAdapterOwnership,
     normalizeOptionalString,
+    listThreadsTimeoutMs,
     resolveCreateThreadAdapter,
     readJsonBody,
     jsonResponse,
     invalidateThreadListAggregationCache,
     pushActionEventWithRequestContext,
-    pushActionErrorWithRequestContext
+    pushActionErrorWithRequestContext,
+    withTimeout
   } = deps;
 
   if (req.method === "POST" && pathname === "/api/threads") {
@@ -158,20 +160,24 @@ export async function handleThreadCollectionRoutes(
         const adapterResults = await Promise.all(
           enabledAdapterList.map(async (adapter) => {
             try {
-              const result = await adapter.listThreads({
-                limit,
-                archived,
-                all: true,
-                maxPages,
-                cursor: null,
-                sortKey,
-                cwd
-              });
+              const boundedResult = await withTimeout(
+                adapter.listThreads({
+                  limit,
+                  archived,
+                  all: true,
+                  maxPages,
+                  cursor: null,
+                  sortKey,
+                  cwd
+                }),
+                listThreadsTimeoutMs,
+                `list-threads:${adapter.id}`
+              );
 
               return {
                 ok: true as const,
                 adapter,
-                result
+                result: boundedResult
               };
             } catch (error) {
               logger.warn(

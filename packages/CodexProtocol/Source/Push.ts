@@ -211,8 +211,7 @@ const LegacyPushReceiptStoreSchema = z
 export const PushLocalCaStatusResponseSchema = z
   .object({
     available: z.boolean(),
-    downloadPath: z.string().min(1).nullable(),
-    sourcePath: z.string().min(1).nullable()
+    downloadPath: z.string().min(1).nullable()
   })
   .strict();
 

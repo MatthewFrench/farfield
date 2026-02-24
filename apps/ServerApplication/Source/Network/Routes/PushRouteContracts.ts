@@ -23,6 +23,7 @@ export interface PushRouteDependencies {
   pushReceiptStore: PushReceiptStore;
   pushSendStore: PushSendStore;
   pushMutationConcurrencyCoordinator: PushMutationConcurrencyCoordinator;
+  pushTestSendTimeoutMs: number;
   pushTestBodySchema: typeof FarfieldPushTestBodySchema;
   readJsonBody: (req: IncomingMessage) => Promise<JsonValue>;
   jsonResponse: (res: ServerResponse, statusCode: number, body: object) => void;
@@ -30,4 +31,9 @@ export interface PushRouteDependencies {
     input: z.infer<typeof FarfieldPushTestBodySchema>,
     privateMode: boolean
   ) => PushNotificationPayload;
+  withTimeout: <ValueType>(
+    promise: Promise<ValueType>,
+    timeoutMs: number,
+    label: string
+  ) => Promise<ValueType>;
 }

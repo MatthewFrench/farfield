@@ -82,7 +82,8 @@ describe("ThreadSidebarPanel", () => {
       onHideDesktopSidebar
     });
 
-    fireEvent.click(screen.getByTestId("sidebar-toggle-close"));
+    const closeButton = screen.getByRole("button", { name: "Hide sidebar" });
+    fireEvent.click(closeButton);
     expect(onHideDesktopSidebar).toHaveBeenCalledTimes(1);
   });
 
@@ -93,7 +94,8 @@ describe("ThreadSidebarPanel", () => {
       onCloseMobileSidebar
     });
 
-    fireEvent.click(screen.getByTestId("sidebar-toggle-close"));
+    const closeButton = screen.getByRole("button", { name: "Close sidebar" });
+    fireEvent.click(closeButton);
     expect(onCloseMobileSidebar).toHaveBeenCalledTimes(1);
   });
 });

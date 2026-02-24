@@ -27,7 +27,7 @@ function makeSession(overrides?: Partial<Session>): Session {
   } as Session;
 }
 
-function makeUserMessage(id: string, text: string): UserMessage {
+function makeUserMessage(id: string, _text: string): UserMessage {
   return {
     id,
     role: "user",

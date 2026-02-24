@@ -28,6 +28,8 @@ function HeaderIconButton({
       onClick={onClick}
       disabled={disabled}
       data-testid={testId}
+      aria-label={title}
+      title={title}
       variant="ghost"
       size="icon"
       className={`h-8 w-8 rounded-lg ${
@@ -108,7 +110,7 @@ export function ApplicationHeaderBar({
             title="Threads"
             testId="sidebar-toggle-open"
           >
-            <Menu size={15} />
+            <Menu size={15} aria-hidden="true" />
           </HeaderIconButton>
         </div>
         {!desktopSidebarOpen && (
@@ -118,7 +120,7 @@ export function ApplicationHeaderBar({
               title="Show sidebar"
               testId="sidebar-toggle-open"
             >
-              <PanelLeft size={15} />
+              <PanelLeft size={15} aria-hidden="true" />
             </HeaderIconButton>
           </div>
         )}
@@ -152,7 +154,7 @@ export function ApplicationHeaderBar({
           title="Refresh"
           testId="refresh-button"
         >
-          <RefreshCcw size={14} className={isBusy ? "animate-spin" : ""} />
+          <RefreshCcw size={14} className={isBusy ? "animate-spin" : ""} aria-hidden="true" />
         </HeaderIconButton>
         <HeaderIconButton
           onClick={onToggleDebugTab}
@@ -160,10 +162,10 @@ export function ApplicationHeaderBar({
           title="Debug"
           testId="tab-debug"
         >
-          <Bug size={14} />
+          <Bug size={14} aria-hidden="true" />
         </HeaderIconButton>
         <HeaderIconButton onClick={onToggleTheme} title="Toggle theme">
-          {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+          {theme === "dark" ? <Sun size={14} aria-hidden="true" /> : <Moon size={14} aria-hidden="true" />}
         </HeaderIconButton>
       </div>
     </header>

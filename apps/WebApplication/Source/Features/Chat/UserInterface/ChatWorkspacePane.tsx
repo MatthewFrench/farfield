@@ -76,6 +76,7 @@ export function ChatWorkspacePane({
     <div
       data-testid="chat-surface"
       data-state={chatSurfaceState}
+      aria-busy={isBusy || isGenerating}
       className="relative flex-1 flex flex-col min-h-0 overflow-hidden"
     >
       <div
@@ -116,7 +117,15 @@ export function ChatWorkspacePane({
                       : <span data-testid="chat-empty-no-thread">Select a thread from the sidebar</span>}
               </div>
             ) : (
-              <div ref={chatContentRef} className="space-y-0">
+              <div
+                ref={chatContentRef}
+                role="log"
+                aria-live="polite"
+                aria-relevant="additions text"
+                aria-atomic="false"
+                aria-label="Conversation updates"
+                className="space-y-0"
+              >
                 {hasHiddenChatItems && (
                   <div className="flex justify-center pb-3">
                     <Button
@@ -160,10 +169,12 @@ export function ChatWorkspacePane({
               type="button"
               data-testid="chat-jump-to-bottom-button"
               onClick={onJumpToBottom}
+              aria-label="Jump to latest message"
+              title="Jump to latest message"
               size="icon"
               className="h-10 w-10 rounded-full border border-border bg-card text-foreground shadow-lg hover:bg-muted"
             >
-              <ArrowDown size={16} />
+              <ArrowDown size={16} aria-hidden="true" />
             </Button>
           </motion.div>
         )}
@@ -221,6 +232,9 @@ export function ChatWorkspacePane({
             />
 
             <ChatModeToolbar {...chatModeToolbarProperties} />
+          </div>
+          <div aria-live="polite" aria-atomic="true" className="sr-only">
+            {isGenerating ? `${activeAgentLabel} is thinking.` : ""}
           </div>
         </div>
       </div>

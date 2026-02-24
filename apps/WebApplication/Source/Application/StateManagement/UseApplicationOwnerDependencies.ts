@@ -49,9 +49,7 @@ import { ThreadListStateStore } from "@/Features/Threads/StateManagement/ThreadL
 import { ThreadMutationActionCoordinator } from "@/Features/Threads/StateManagement/ThreadMutationActionCoordinator";
 import { ThreadRefreshConcurrencyCoordinator } from "@/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
 
-export interface UseApplicationOwnerDependenciesInput<
-  CapabilitySnapshotType extends CapabilitySnapshotRecord
-> {
+export interface UseApplicationOwnerDependenciesInput {
   setErrorMessage: (errorMessage: string) => void;
   modeSelectionStateResolver: ModeSelectionStateResolver;
   unsupportedPushClientState: PushClientState;
@@ -115,7 +113,7 @@ export interface ApplicationOwnerDependencies<
 export function useApplicationOwnerDependencies<
   CapabilitySnapshotType extends CapabilitySnapshotRecord
 >(
-  input: UseApplicationOwnerDependenciesInput<CapabilitySnapshotType>
+  input: UseApplicationOwnerDependenciesInput
 ): ApplicationOwnerDependencies<CapabilitySnapshotType> {
   const apiAuthenticationErrorClassifier = useMemo(
     () => new ApiAuthenticationErrorClassifier(),

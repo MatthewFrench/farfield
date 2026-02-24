@@ -140,6 +140,8 @@ export interface ServerRuntimeConfiguration {
   ipcReconnectDelayMs: number;
   ntfyCompletionDebounceMs: number;
   capabilityListTimeoutMs: number;
+  threadListAdapterTimeoutMs: number;
+  pushTestSendTimeoutMs: number;
   traceDirectoryPath: string;
   defaultWorkspacePath: string;
   apiTokenHeaderName: string;
@@ -198,6 +200,14 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
   const ipcReconnectDelayMs = 1_000;
   const ntfyCompletionDebounceMs = 250;
   const capabilityListTimeoutMs = 8_000;
+  const threadListAdapterTimeoutMs = parsePositiveInteger(
+    env["THREAD_LIST_ADAPTER_TIMEOUT_MS"] ?? null,
+    7_500
+  );
+  const pushTestSendTimeoutMs = parsePositiveInteger(
+    env["PUSH_TEST_SEND_TIMEOUT_MS"] ?? null,
+    7_500
+  );
 
   const traceDirectoryPath = path.resolve(process.cwd(), "traces");
 
@@ -292,6 +302,8 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
     ipcReconnectDelayMs,
     ntfyCompletionDebounceMs,
     capabilityListTimeoutMs,
+    threadListAdapterTimeoutMs,
+    pushTestSendTimeoutMs,
     traceDirectoryPath,
     defaultWorkspacePath,
     apiTokenHeaderName,

@@ -93,6 +93,7 @@ This document defines the target folder/file structure and end-state ownership m
             UseApplicationRuntimeRequestHandlers.ts
             UseApplicationShellComposition.ts
             UseApplicationShellState.ts
+            UseApplicationShellStateContracts.ts
             UseApplicationShellViewProperties.ts
             UseApplicationSynchronizationEffects.ts
             UseCoreDataLoaders.ts
@@ -1263,6 +1264,19 @@ All path families above must remain internally consistent after each rename/move
      - push send fan-out uses bounded concurrent workers in `apps/ServerApplication/Source/Modules/PushNotifications/PushService.ts`
      - thread-stream updates invalidate thread-list aggregation cache in `apps/ServerApplication/Source/Application/ServerBootstrap.ts`
    - Reason: removes request-path event-loop blocking, improves push throughput, and keeps thread list reads fresher during live updates.
+
+18. Date: 2026-02-24
+   - Exception Owner: repository operations maintainers.
+   - Exception: `scripts/*.mjs` remains flat temporarily instead of the proposed grouped structure under `scripts/development`, `scripts/setup`, `scripts/smoke`, `scripts/operations`, and `scripts/tooling`.
+   - Affected Files/Modules:
+     - root `package.json` script entrypoints
+     - `scripts/*.mjs` runtime command ownership
+     - this end-state structure section in `docs/proposed-structure-and-migration.md`
+   - Mitigation Plan:
+     - keep script names explicit and ownership-aligned in their command prefixes
+     - keep all environment-sensitive script execution behind `scripts/with-env.mjs`
+     - execute grouped-folder migration in one path-consistent move set that updates scripts, tests, docs, and workflow paths together
+   - Planned Removal Date: 2026-04-30
 
 ## End-State Completion Criteria
 

@@ -70,10 +70,12 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     pushReceiptStore,
     pushSendStore,
     pushMutationConcurrencyCoordinator,
+    pushTestSendTimeoutMs,
     pushTestBodySchema,
     readJsonBody,
     jsonResponse,
-    buildPushTestPayload
+    buildPushTestPayload,
+    withTimeout
   } = deps;
   const pushTestRouteOwner = new PushTestRouteOwner({
     pushService,
@@ -83,7 +85,9 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     pushTestBodySchema,
     readJsonBody,
     jsonResponse,
-    buildPushTestPayload
+    buildPushTestPayload,
+    pushTestSendTimeoutMs,
+    withTimeout
   });
 
   if (segments[0] !== "api" || segments[1] !== "push") {
@@ -169,8 +173,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     jsonResponse(res, 200, {
       ok: true,
       available,
-      downloadPath: available ? "/api/push/local-ca/download" : null,
-      sourcePath: available ? pushLocalCaSourcePath : null
+      downloadPath: available ? "/api/push/local-ca/download" : null
     });
     return true;
   }

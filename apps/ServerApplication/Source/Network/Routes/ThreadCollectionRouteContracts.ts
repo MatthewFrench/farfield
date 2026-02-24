@@ -17,6 +17,7 @@ export interface ThreadCollectionRouteDependencies {
   parseInteger: (value: string | null, defaultValue: number) => number;
   parseBoolean: (value: string | null, defaultValue: boolean) => boolean;
   normalizeOptionalString: (value: string | null) => string | null;
+  listThreadsTimeoutMs: number;
   resolveCreateThreadAdapter: (requestedAgentId: AgentId | undefined) => AgentAdapter | null;
   readJsonBody: (req: IncomingMessage) => Promise<JsonValue>;
   jsonResponse: (res: ServerResponse, statusCode: number, body: object) => void;
@@ -31,4 +32,9 @@ export interface ThreadCollectionRouteDependencies {
     error: ErrorType,
     details: Record<string, JsonValue>
   ) => string;
+  withTimeout: <ValueType>(
+    promise: Promise<ValueType>,
+    timeoutMs: number,
+    label: string
+  ) => Promise<ValueType>;
 }

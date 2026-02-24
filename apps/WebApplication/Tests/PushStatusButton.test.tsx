@@ -47,6 +47,23 @@ describe("PushStatusButton", () => {
 
     const button = screen.getByTestId("enable-notifications-button");
     expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("data-push-status")).toBe("enabled");
+  });
+
+  it("disables button when browser notification permission is denied", () => {
+    renderPushStatusButton({
+      pushClientState: {
+        supported: true,
+        serviceWorkerRegistered: true,
+        permission: "denied",
+        subscribed: false
+      }
+    });
+
+    const button = screen.getByTestId("enable-notifications-button");
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("data-push-status")).toBe("blocked");
+    expect(button.getAttribute("aria-label")).toBe("Notifications blocked by browser settings");
   });
 
   it("invokes enable handler when button is enabled and clicked", () => {

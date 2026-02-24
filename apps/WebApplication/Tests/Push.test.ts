@@ -109,8 +109,7 @@ function installPushRecoveryHarness(options: { waitingWorker: boolean }): PushRe
     permissionState: async () => "granted"
   };
 
-  let registration: ServiceWorkerRegistration;
-  registration = {
+  const registration: ServiceWorkerRegistration = {
     active: null,
     cookies: createMockCookieStoreManager(),
     installing: null,

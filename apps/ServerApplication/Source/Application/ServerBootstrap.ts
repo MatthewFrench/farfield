@@ -244,6 +244,8 @@ const serverRequestHandler = new ServerRequestHandler({
   defaultWorkspace: runtimeConfiguration.defaultWorkspacePath,
   traceDirectoryPath: runtimeConfiguration.traceDirectoryPath,
   capabilityListTimeoutMs: runtimeConfiguration.capabilityListTimeoutMs,
+  threadListAdapterTimeoutMs: runtimeConfiguration.threadListAdapterTimeoutMs,
+  pushTestSendTimeoutMs: runtimeConfiguration.pushTestSendTimeoutMs,
   pushPrivateModeDefault: runtimeConfiguration.pushPrivateModeDefault,
   pushLocalCaSourcePath,
   configuredAgentIds,

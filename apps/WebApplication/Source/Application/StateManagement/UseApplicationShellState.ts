@@ -1,13 +1,8 @@
 import {
   useRef,
-  useState,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction
+  useState
 } from "react";
-import { type ApplicationRouteState } from "@/Application/DomainModel/ApplicationRouteStateMapper";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
-import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import {
   type CapabilityAgentsResponse,
   type CapabilityCollaborationModesResponse,
@@ -31,151 +26,16 @@ import { type DebugIssueSeverityFilter } from "@/Features/Debugging/DomainModel/
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { useApplicationArchivedThreadState } from "./UseApplicationArchivedThreadState";
+import { useApplicationPushState } from "./UseApplicationPushState";
+import {
+  type ApplicationShellState,
+  type UseApplicationShellStateInput
+} from "./UseApplicationShellStateContracts";
 
 type AgentDescriptor = CapabilityAgentsResponse["agents"][number];
 
-export interface UseApplicationShellStateInput {
-  initialUiState: ApplicationRouteState;
-  unsupportedPushClientState: PushClientState;
-  initialVisibleChatItems: number;
-}
-
-export interface ApplicationShellState {
-  error: string;
-  setError: Dispatch<SetStateAction<string>>;
-  health: CapabilityHealthResponse | null;
-  setHealth: Dispatch<SetStateAction<CapabilityHealthResponse | null>>;
-  configDefaults: CapabilityConfigDefaultsResponse | null;
-  setConfigDefaults: Dispatch<SetStateAction<CapabilityConfigDefaultsResponse | null>>;
-  threads: ThreadListResponse["data"];
-  setThreads: Dispatch<SetStateAction<ThreadListResponse["data"]>>;
-  unreadThreadIds: Record<string, true>;
-  setUnreadThreadIds: Dispatch<SetStateAction<Record<string, true>>>;
-  archivedThreads: ThreadListResponse["data"];
-  setArchivedThreads: Dispatch<SetStateAction<ThreadListResponse["data"]>>;
-  hasLoadedArchivedThreads: boolean;
-  setHasLoadedArchivedThreads: Dispatch<SetStateAction<boolean>>;
-  archivedThreadsTruncated: boolean;
-  setArchivedThreadsTruncated: Dispatch<SetStateAction<boolean>>;
-  isArchivedThreadsOpen: boolean;
-  setIsArchivedThreadsOpen: Dispatch<SetStateAction<boolean>>;
-  isArchivedThreadsLoading: boolean;
-  setIsArchivedThreadsLoading: Dispatch<SetStateAction<boolean>>;
-  selectedThreadId: string | null;
-  setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
-  liveState: ChatLiveStateResponse | null;
-  setLiveState: Dispatch<SetStateAction<ChatLiveStateResponse | null>>;
-  readThreadState: ChatReadThreadResponse | null;
-  setReadThreadState: Dispatch<SetStateAction<ChatReadThreadResponse | null>>;
-  isSelectedThreadLoading: boolean;
-  setIsSelectedThreadLoading: Dispatch<SetStateAction<boolean>>;
-  streamEvents: ChatStreamEventsResponse["events"];
-  setStreamEvents: Dispatch<SetStateAction<ChatStreamEventsResponse["events"]>>;
-  modes: CapabilityCollaborationModesResponse["data"];
-  setModes: Dispatch<SetStateAction<CapabilityCollaborationModesResponse["data"]>>;
-  models: CapabilityModelsResponse["data"];
-  setModels: Dispatch<SetStateAction<CapabilityModelsResponse["data"]>>;
-  selectedModeKey: string;
-  setSelectedModeKey: Dispatch<SetStateAction<string>>;
-  selectedModelId: string;
-  setSelectedModelId: Dispatch<SetStateAction<string>>;
-  selectedReasoningEffort: string;
-  setSelectedReasoningEffort: Dispatch<SetStateAction<string>>;
-  isBusy: boolean;
-  setIsBusy: Dispatch<SetStateAction<boolean>>;
-  traceStatus: DebugTraceStatusResponse | null;
-  setTraceStatus: Dispatch<SetStateAction<DebugTraceStatusResponse | null>>;
-  traceLabel: string;
-  setTraceLabel: Dispatch<SetStateAction<string>>;
-  traceNote: string;
-  setTraceNote: Dispatch<SetStateAction<string>>;
-  history: DebugHistoryResponse["history"];
-  setHistory: Dispatch<SetStateAction<DebugHistoryResponse["history"]>>;
-  debugErrors: DebugErrorListResponse["data"];
-  setDebugErrors: Dispatch<SetStateAction<DebugErrorListResponse["data"]>>;
-  debugErrorSessionId: string;
-  setDebugErrorSessionId: Dispatch<SetStateAction<string>>;
-  debugErrorSessionLogPath: string;
-  setDebugErrorSessionLogPath: Dispatch<SetStateAction<string>>;
-  selectedHistoryId: string;
-  setSelectedHistoryId: Dispatch<SetStateAction<string>>;
-  historyDetail: DebugHistoryDetailResponse | null;
-  setHistoryDetail: Dispatch<SetStateAction<DebugHistoryDetailResponse | null>>;
-  isCoreLoading: boolean;
-  setIsCoreLoading: Dispatch<SetStateAction<boolean>>;
-  waitForReplayResponse: boolean;
-  setWaitForReplayResponse: Dispatch<SetStateAction<boolean>>;
-  selectedRequestId: number | null;
-  setSelectedRequestId: Dispatch<SetStateAction<number | null>>;
-  answerDraft: Record<string, { option: string; freeform: string }>;
-  setAnswerDraft: Dispatch<SetStateAction<Record<string, { option: string; freeform: string }>>>;
-  agentDescriptors: AgentDescriptor[];
-  setAgentDescriptors: Dispatch<SetStateAction<AgentDescriptor[]>>;
-  selectedAgentId: AgentId;
-  setSelectedAgentId: Dispatch<SetStateAction<AgentId>>;
-  pushClientState: PushClientState;
-  setPushClientState: Dispatch<SetStateAction<PushClientState>>;
-  isEnablingPushNotifications: boolean;
-  setIsEnablingPushNotifications: Dispatch<SetStateAction<boolean>>;
-  requiresApiSessionToken: boolean;
-  setRequiresApiSessionToken: Dispatch<SetStateAction<boolean>>;
-  apiSessionTokenDraft: string;
-  setApiSessionTokenDraft: Dispatch<SetStateAction<string>>;
-  apiSessionBootstrapError: string;
-  setApiSessionBootstrapError: Dispatch<SetStateAction<string>>;
-  isApiSessionBootstrapPending: boolean;
-  setIsApiSessionBootstrapPending: Dispatch<SetStateAction<boolean>>;
-  activeTab: "chat" | "debug";
-  setActiveTab: Dispatch<SetStateAction<"chat" | "debug">>;
-  mobileSidebarOpen: boolean;
-  setMobileSidebarOpen: Dispatch<SetStateAction<boolean>>;
-  desktopSidebarOpen: boolean;
-  setDesktopSidebarOpen: Dispatch<SetStateAction<boolean>>;
-  isChatAtBottom: boolean;
-  setIsChatAtBottom: Dispatch<SetStateAction<boolean>>;
-  visibleChatItemLimit: number;
-  setVisibleChatItemLimit: Dispatch<SetStateAction<number>>;
-  hasHydratedModeFromLiveState: boolean;
-  setHasHydratedModeFromLiveState: Dispatch<SetStateAction<boolean>>;
-  isModeSyncing: boolean;
-  setIsModeSyncing: Dispatch<SetStateAction<boolean>>;
-  collapsedThreadProjectGroups: Record<string, boolean>;
-  setCollapsedThreadProjectGroups: Dispatch<SetStateAction<Record<string, boolean>>>;
-  collapsedArchivedProjectGroups: Record<string, boolean>;
-  setCollapsedArchivedProjectGroups: Dispatch<SetStateAction<Record<string, boolean>>>;
-  debugWorkspaceSection: DebugWorkspaceSection;
-  setDebugWorkspaceSection: Dispatch<SetStateAction<DebugWorkspaceSection>>;
-  selectedDebugIssueId: string;
-  setSelectedDebugIssueId: Dispatch<SetStateAction<string>>;
-  debugIssueSeverityFilter: DebugIssueSeverityFilter;
-  setDebugIssueSeverityFilter: Dispatch<SetStateAction<DebugIssueSeverityFilter>>;
-  debugIssueFilterQuery: string;
-  setDebugIssueFilterQuery: Dispatch<SetStateAction<string>>;
-  selectedThreadIdRef: MutableRefObject<string | null>;
-  activeTabRef: MutableRefObject<"chat" | "debug">;
-  coreRefreshIntervalRef: MutableRefObject<number | null>;
-  eventsConnectedRef: MutableRefObject<boolean>;
-  lastCoreRefreshAtRef: MutableRefObject<number>;
-  applicationShellElementRef: MutableRefObject<HTMLDivElement | null>;
-  scrollRef: MutableRefObject<HTMLDivElement | null>;
-  chatContentRef: MutableRefObject<HTMLDivElement | null>;
-  isChatAtBottomRef: MutableRefObject<boolean>;
-  lastAppliedModeSignatureRef: MutableRefObject<string>;
-  unreadThreadIdsRef: MutableRefObject<Record<string, true>>;
-  hasHydratedAgentSelectionRef: MutableRefObject<boolean>;
-  pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator;
-  debugErrorsSignatureRef: MutableRefObject<string[]>;
-  modesSignatureRef: MutableRefObject<string[]>;
-  modelsSignatureRef: MutableRefObject<string[]>;
-  isArchivedThreadsOpenRef: MutableRefObject<boolean>;
-  hasLoadedArchivedThreadsRef: MutableRefObject<boolean>;
-  selectedThreadLoadTokenRef: MutableRefObject<number>;
-  loadCoreDataTrackedRef: MutableRefObject<(() => Promise<void>) | null>;
-  loadSelectedThreadRef: MutableRefObject<((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null>;
-  viewportKeyboardStateRef: MutableRefObject<boolean | null>;
-  viewportTelemetryLastReportedAtRef: MutableRefObject<number>;
-  keyboardOpenScrollRafRef: MutableRefObject<number | null>;
-}
+export type { ApplicationShellState, UseApplicationShellStateInput } from "./UseApplicationShellStateContracts";
 
 export function useApplicationShellState(input: UseApplicationShellStateInput): ApplicationShellState {
   const [error, setError] = useState("");
@@ -183,11 +43,7 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
   const [configDefaults, setConfigDefaults] = useState<CapabilityConfigDefaultsResponse | null>(null);
   const [threads, setThreads] = useState<ThreadListResponse["data"]>([]);
   const [unreadThreadIds, setUnreadThreadIds] = useState<Record<string, true>>({});
-  const [archivedThreads, setArchivedThreads] = useState<ThreadListResponse["data"]>([]);
-  const [hasLoadedArchivedThreads, setHasLoadedArchivedThreads] = useState(false);
-  const [archivedThreadsTruncated, setArchivedThreadsTruncated] = useState(false);
-  const [isArchivedThreadsOpen, setIsArchivedThreadsOpen] = useState(false);
-  const [isArchivedThreadsLoading, setIsArchivedThreadsLoading] = useState(false);
+  const applicationArchivedThreadState = useApplicationArchivedThreadState();
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(input.initialUiState.threadId);
   const [liveState, setLiveState] = useState<ChatLiveStateResponse | null>(null);
   const [readThreadState, setReadThreadState] = useState<ChatReadThreadResponse | null>(null);
@@ -214,12 +70,9 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
   const [answerDraft, setAnswerDraft] = useState<Record<string, { option: string; freeform: string }>>({});
   const [agentDescriptors, setAgentDescriptors] = useState<AgentDescriptor[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<AgentId>("codex");
-  const [pushClientState, setPushClientState] = useState<PushClientState>(input.unsupportedPushClientState);
-  const [isEnablingPushNotifications, setIsEnablingPushNotifications] = useState(false);
-  const [requiresApiSessionToken, setRequiresApiSessionToken] = useState(false);
-  const [apiSessionTokenDraft, setApiSessionTokenDraft] = useState("");
-  const [apiSessionBootstrapError, setApiSessionBootstrapError] = useState("");
-  const [isApiSessionBootstrapPending, setIsApiSessionBootstrapPending] = useState(false);
+  const applicationPushState = useApplicationPushState({
+    unsupportedPushClientState: input.unsupportedPushClientState
+  });
   const [activeTab, setActiveTab] = useState<"chat" | "debug">(input.initialUiState.tab);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
@@ -228,7 +81,6 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
   const [hasHydratedModeFromLiveState, setHasHydratedModeFromLiveState] = useState(false);
   const [isModeSyncing, setIsModeSyncing] = useState(false);
   const [collapsedThreadProjectGroups, setCollapsedThreadProjectGroups] = useState<Record<string, boolean>>({});
-  const [collapsedArchivedProjectGroups, setCollapsedArchivedProjectGroups] = useState<Record<string, boolean>>({});
   const [debugWorkspaceSection, setDebugWorkspaceSection] = useState<DebugWorkspaceSection>("issues");
   const [selectedDebugIssueId, setSelectedDebugIssueId] = useState("");
   const [debugIssueSeverityFilter, setDebugIssueSeverityFilter] = useState<DebugIssueSeverityFilter>("all");
@@ -252,8 +104,6 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
   const debugErrorsSignatureRef = useRef<string[]>([]);
   const modesSignatureRef = useRef<string[]>([]);
   const modelsSignatureRef = useRef<string[]>([]);
-  const isArchivedThreadsOpenRef = useRef(false);
-  const hasLoadedArchivedThreadsRef = useRef(false);
   const selectedThreadLoadTokenRef = useRef(0);
   const loadCoreDataTrackedRef = useRef<(() => Promise<void>) | null>(null);
   const loadSelectedThreadRef = useRef<((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null>(null);
@@ -272,16 +122,7 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
     setThreads,
     unreadThreadIds,
     setUnreadThreadIds,
-    archivedThreads,
-    setArchivedThreads,
-    hasLoadedArchivedThreads,
-    setHasLoadedArchivedThreads,
-    archivedThreadsTruncated,
-    setArchivedThreadsTruncated,
-    isArchivedThreadsOpen,
-    setIsArchivedThreadsOpen,
-    isArchivedThreadsLoading,
-    setIsArchivedThreadsLoading,
+    ...applicationArchivedThreadState,
     selectedThreadId,
     setSelectedThreadId,
     liveState,
@@ -334,18 +175,7 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
     setAgentDescriptors,
     selectedAgentId,
     setSelectedAgentId,
-    pushClientState,
-    setPushClientState,
-    isEnablingPushNotifications,
-    setIsEnablingPushNotifications,
-    requiresApiSessionToken,
-    setRequiresApiSessionToken,
-    apiSessionTokenDraft,
-    setApiSessionTokenDraft,
-    apiSessionBootstrapError,
-    setApiSessionBootstrapError,
-    isApiSessionBootstrapPending,
-    setIsApiSessionBootstrapPending,
+    ...applicationPushState,
     activeTab,
     setActiveTab,
     mobileSidebarOpen,
@@ -362,8 +192,6 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
     setIsModeSyncing,
     collapsedThreadProjectGroups,
     setCollapsedThreadProjectGroups,
-    collapsedArchivedProjectGroups,
-    setCollapsedArchivedProjectGroups,
     debugWorkspaceSection,
     setDebugWorkspaceSection,
     selectedDebugIssueId,
@@ -388,8 +216,6 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
     debugErrorsSignatureRef,
     modesSignatureRef,
     modelsSignatureRef,
-    isArchivedThreadsOpenRef,
-    hasLoadedArchivedThreadsRef,
     selectedThreadLoadTokenRef,
     loadCoreDataTrackedRef,
     loadSelectedThreadRef,

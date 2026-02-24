@@ -42,6 +42,9 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.host).toBe("127.0.0.1");
     expect(configuration.port).toBe(4311);
     expect(configuration.pushEnabled).toBe(false);
+    expect(configuration.capabilityListTimeoutMs).toBe(8_000);
+    expect(configuration.threadListAdapterTimeoutMs).toBe(7_500);
+    expect(configuration.pushTestSendTimeoutMs).toBe(7_500);
     expect(configuration.pushStatePathResolution.filePath).toBe(
       path.join(temporaryDirectoryPath, "push-state.json")
     );
@@ -82,6 +85,18 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.apiToken).toBe("push_token");
     expect(configuration.apiAuthRequired).toBe(true);
     expect(configuration.apiSessionSigningSecret).toBe("push_token");
+  });
+
+  it("accepts timeout overrides from environment", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const configuration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      THREAD_LIST_ADAPTER_TIMEOUT_MS: "12000",
+      PUSH_TEST_SEND_TIMEOUT_MS: "3000"
+    });
+
+    expect(configuration.threadListAdapterTimeoutMs).toBe(12_000);
+    expect(configuration.pushTestSendTimeoutMs).toBe(3_000);
   });
 
   it("validates logger level and optional invalid stream log path", () => {

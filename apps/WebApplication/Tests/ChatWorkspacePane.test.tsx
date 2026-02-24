@@ -97,7 +97,17 @@ describe("ChatWorkspacePane", () => {
       chatSurfaceState: "ready"
     });
 
-    fireEvent.click(screen.getByTestId("chat-jump-to-bottom-button"));
+    fireEvent.click(screen.getByRole("button", { name: "Jump to latest message" }));
     expect(onJumpToBottom).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks conversation entries as an assistive-technology live log", () => {
+    renderChatWorkspacePane({
+      turnCount: 1,
+      chatSurfaceState: "ready",
+      visibleConversationItems: []
+    });
+
+    expect(screen.getByRole("log", { name: "Conversation updates" })).toBeDefined();
   });
 });

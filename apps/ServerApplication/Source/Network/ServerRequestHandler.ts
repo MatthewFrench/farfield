@@ -55,6 +55,8 @@ export interface ServerRequestHandlerDependencies {
   defaultWorkspace: string;
   traceDirectoryPath: string;
   capabilityListTimeoutMs: number;
+  threadListAdapterTimeoutMs: number;
+  pushTestSendTimeoutMs: number;
   pushPrivateModeDefault: boolean;
   pushLocalCaSourcePath: string;
   configuredAgentIds: AgentId[];
@@ -255,6 +257,7 @@ export class ServerRequestHandler {
         parseInteger: this.deps.parseInteger,
         parseBoolean: this.deps.parseBoolean,
         normalizeOptionalString: this.deps.normalizeOptionalString,
+        listThreadsTimeoutMs: this.deps.threadListAdapterTimeoutMs,
         resolveCreateThreadAdapter: (requestedAgentId) => {
           return this.deps.threadAdapterResolver.resolveCreateThreadAdapter(requestedAgentId);
         },
@@ -265,7 +268,8 @@ export class ServerRequestHandler {
         jsonResponse: this.deps.jsonResponse,
         invalidateThreadListAggregationCache: this.deps.invalidateThreadListAggregationCache,
         pushActionEventWithRequestContext,
-        pushActionErrorWithRequestContext
+        pushActionErrorWithRequestContext,
+        withTimeout: this.deps.withTimeout
       })) {
         return;
       }
@@ -297,10 +301,12 @@ export class ServerRequestHandler {
         pushReceiptStore: this.deps.pushReceiptStore,
         pushSendStore: this.deps.pushSendStore,
         pushMutationConcurrencyCoordinator: this.deps.pushMutationConcurrencyCoordinator,
+        pushTestSendTimeoutMs: this.deps.pushTestSendTimeoutMs,
         pushTestBodySchema: this.deps.pushTestBodySchema,
         readJsonBody: this.deps.readJsonBody,
         jsonResponse: this.deps.jsonResponse,
-        buildPushTestPayload: this.deps.buildPushTestPayload
+        buildPushTestPayload: this.deps.buildPushTestPayload,
+        withTimeout: this.deps.withTimeout
       })) {
         return;
       }
