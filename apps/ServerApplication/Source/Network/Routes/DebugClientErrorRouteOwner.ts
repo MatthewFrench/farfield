@@ -1,5 +1,5 @@
 import { CreateDebugClientErrorBodySchema } from "@farfield/protocol";
-import { parseBody } from "../../HttpSchemas.js";
+import { parseBody } from "../RequestSchemas/HttpSchemas.js";
 import {
   readFileNameFromPath,
   type DebugRouteDependencies

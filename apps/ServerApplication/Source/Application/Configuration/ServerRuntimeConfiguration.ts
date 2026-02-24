@@ -6,7 +6,7 @@ import { z } from "zod";
 import {
   resolvePushStatePath,
   type PushStatePathResolution
-} from "./PushStatePath.js";
+} from "../../Modules/PushNotifications/PushStatePath.js";
 
 const OptionalPathEnvSchema = z.string().trim().min(1).optional();
 

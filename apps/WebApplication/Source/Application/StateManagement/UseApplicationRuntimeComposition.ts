@@ -217,7 +217,7 @@ export function useApplicationRuntimeComposition(
       setIsModeSyncing: input.applicationShellState.setIsModeSyncing,
       setSelectedThreadId: input.applicationShellState.setSelectedThreadId,
       selectedThreadIdRef: input.applicationShellState.selectedThreadIdRef,
-      pendingMaterializationThreadIdsRef: input.applicationShellState.pendingMaterializationThreadIdsRef,
+      pendingThreadMaterializationCoordinator: input.applicationShellState.pendingThreadMaterializationCoordinator,
       readLastAppliedModeSignature: () => input.applicationShellState.lastAppliedModeSignatureRef.current,
       writeLastAppliedModeSignature: (nextModeSignature) => {
         input.applicationShellState.lastAppliedModeSignatureRef.current = nextModeSignature;

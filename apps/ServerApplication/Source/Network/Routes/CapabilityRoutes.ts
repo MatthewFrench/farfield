@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { logger } from "../../Logger.js";
+import { logger } from "../../Shared/Logging/Logger.js";
 import type { AgentId } from "../../Agents/Types.js";
 import type { AgentRegistry } from "../../Agents/Registry.js";
 

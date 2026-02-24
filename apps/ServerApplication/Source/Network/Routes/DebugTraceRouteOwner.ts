@@ -1,4 +1,4 @@
-import { parseBody, TraceMarkBodySchema, TraceStartBodySchema } from "../../HttpSchemas.js";
+import { parseBody, TraceMarkBodySchema, TraceStartBodySchema } from "../RequestSchemas/HttpSchemas.js";
 import { type DebugRouteDependencies } from "./DebugRouteContracts.js";
 import { streamDebugFileDownload } from "./DebugFileDownload.js";
 

@@ -1,4 +1,4 @@
-import { parseBody, SendMessageBodySchema } from "../../HttpSchemas.js";
+import { parseBody, SendMessageBodySchema } from "../RequestSchemas/HttpSchemas.js";
 import type {
   ThreadMemberRouteDependencies,
   ThreadMemberResolvedRouteContext

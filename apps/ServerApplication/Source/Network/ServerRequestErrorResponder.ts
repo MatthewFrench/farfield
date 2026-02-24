@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
-import { logger } from "../Logger.js";
+import { logger } from "../Shared/Logging/Logger.js";
 import type { ServerErrorEventRecordInput } from "./ServerErrorEventRecorder.js";
 import {
   ServerTransportErrorClassifier,

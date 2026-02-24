@@ -1,17 +1,17 @@
 import type { Server } from "node:http";
 import { AppServerTransportError } from "@farfield/api";
-import { logger } from "./Logger.js";
-import type { AgentRegistry } from "./Agents/Registry.js";
-import type { AgentId } from "./Agents/Types.js";
-import type { ActivityHistoryService } from "./ActivityHistoryService.js";
-import type { ClientErrorStore } from "./ClientErrorStore.js";
-import type { NtfyNotifier } from "./NtfyNotifier.js";
-import type { OpenCodeAgentAdapter } from "./Agents/Adapters/OpenCodeAgentAdapter.js";
-import type { PushDispatchConcurrencyCoordinator } from "./Network/PushDispatchConcurrencyCoordinator.js";
-import type { EventStreamClientRegistry } from "./Network/EventStreamClientRegistry.js";
-import type { PushReceiptStore } from "./PushReceiptStore.js";
-import type { PushService } from "./PushService.js";
-import type { PushStore } from "./PushStore.js";
+import { logger } from "../../Shared/Logging/Logger.js";
+import type { AgentRegistry } from "../../Agents/Registry.js";
+import type { AgentId } from "../../Agents/Types.js";
+import type { ActivityHistoryService } from "../../Modules/Activity/ActivityHistoryService.js";
+import type { ClientErrorStore } from "../../Modules/Debugging/ClientErrorStore.js";
+import type { NtfyNotifier } from "../../Modules/PushNotifications/NtfyNotifier.js";
+import type { OpenCodeAgentAdapter } from "../../Agents/Adapters/OpenCodeAgentAdapter.js";
+import type { PushDispatchConcurrencyCoordinator } from "../../Network/PushDispatchConcurrencyCoordinator.js";
+import type { EventStreamClientRegistry } from "../../Network/EventStreamClientRegistry.js";
+import type { PushReceiptStore } from "../../Modules/PushNotifications/PushReceiptStore.js";
+import type { PushService } from "../../Modules/PushNotifications/PushService.js";
+import type { PushStore } from "../../Modules/PushNotifications/PushStore.js";
 
 export interface ServerLifecycleCoordinatorDependencies {
   server: Server;

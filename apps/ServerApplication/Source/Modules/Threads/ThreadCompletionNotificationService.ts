@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { PushNotificationPayload } from "@farfield/protocol";
 import { CompletionDetector } from "./CompletionDetector.js";
-import { logger } from "./Logger.js";
-import type { CodexAgentAdapter } from "./Agents/Adapters/CodexAgentAdapter.js";
-import type { AgentThreadLiveState } from "./Agents/Types.js";
-import type { NtfyNotifier } from "./NtfyNotifier.js";
-import type { PushSendStore } from "./PushSendStore.js";
-import type { PushService } from "./PushService.js";
-import type { PushStore } from "./PushStore.js";
+import { logger } from "../../Shared/Logging/Logger.js";
+import type { CodexAgentAdapter } from "../../Agents/Adapters/CodexAgentAdapter.js";
+import type { AgentThreadLiveState } from "../../Agents/Types.js";
+import type { NtfyNotifier } from "../PushNotifications/NtfyNotifier.js";
+import type { PushSendStore } from "../PushNotifications/PushSendStore.js";
+import type { PushService } from "../PushNotifications/PushService.js";
+import type { PushStore } from "../PushNotifications/PushStore.js";
 
 type CompletionNotificationContext = {
   preview: string;
@@ -127,9 +127,9 @@ export class ThreadCompletionNotificationService {
           webPushDelivered = sendResult.delivered;
           webPushFailures = sendResult.failures.length;
 
-          for (const endpoint of sendResult.prunedEndpoints) {
-            this.pushStore.removeSubscriptionByEndpoint(endpoint);
-          }
+          await Promise.all(
+            sendResult.prunedEndpoints.map(async (endpoint) => this.pushStore.removeSubscriptionByEndpoint(endpoint))
+          );
 
           this.pushSendStore.setLatest({
             notificationId: payload.notificationId,
@@ -165,7 +165,7 @@ export class ThreadCompletionNotificationService {
         return;
       }
 
-      this.pushStore.setCompletionWatermark(threadId, completionCandidate.marker);
+      await this.pushStore.setCompletionWatermark(threadId, completionCandidate.marker);
       this.completionDetector.commit(threadId, completionCandidate.marker);
       this.pushSystem("thread completion notification sent", {
         threadId,

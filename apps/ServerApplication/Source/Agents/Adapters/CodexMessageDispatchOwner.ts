@@ -5,7 +5,7 @@ import {
   findLatestTurnParamsTemplate
 } from "@farfield/api";
 import type { TurnStartParams } from "@farfield/protocol";
-import { logger } from "../../Logger.js";
+import { logger } from "../../Shared/Logging/Logger.js";
 import type { AgentSendMessageInput } from "../Types.js";
 import type { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
 

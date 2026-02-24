@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveOwnerClientId } from "../Source/ThreadOwner.js";
+import { resolveOwnerClientId } from "../Source/Modules/Threads/ThreadOwner.js";
 
 describe("resolveOwnerClientId", () => {
   it("uses mapped owner when both mapped owner and override are present", () => {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import webPush from "web-push";
 import { type StoredPushSubscription } from "@farfield/protocol";
-import { PushService } from "../Source/PushService.js";
+import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
 
 vi.mock("web-push", () => {
   return {

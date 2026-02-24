@@ -11,11 +11,11 @@ import {
   type PushNotificationPayload
 } from "@farfield/protocol";
 import { z } from "zod";
-import { parseBody } from "../../HttpSchemas.js";
-import type { PushReceiptStore } from "../../PushReceiptStore.js";
-import type { PushSendStore } from "../../PushSendStore.js";
-import type { PushService } from "../../PushService.js";
-import type { PushStore } from "../../PushStore.js";
+import { parseBody } from "../RequestSchemas/HttpSchemas.js";
+import type { PushReceiptStore } from "../../Modules/PushNotifications/PushReceiptStore.js";
+import type { PushSendStore } from "../../Modules/PushNotifications/PushSendStore.js";
+import type { PushService } from "../../Modules/PushNotifications/PushService.js";
+import type { PushStore } from "../../Modules/PushNotifications/PushStore.js";
 
 const PushReceiptEventSchema = z.enum(["shown", "clicked", "error"]);
 const FileSystemErrorSchema = z
@@ -216,7 +216,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
 
   if (req.method === "POST" && pathname === "/api/push/subscriptions") {
     const body = parseBody(CreatePushSubscriptionBodySchema, await readJsonBody(req));
-    const subscription = pushStore.upsertSubscription(body.subscription, {
+    const subscription = await pushStore.upsertSubscription(body.subscription, {
       privateMode: body.settings?.privateMode ?? pushPrivateModeDefault
     });
     jsonResponse(res, 200, {
@@ -228,7 +228,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
 
   if (req.method === "DELETE" && pathname === "/api/push/subscriptions") {
     const body = parseBody(DeletePushSubscriptionBodySchema, await readJsonBody(req));
-    const deleted = pushStore.removeSubscriptionByEndpoint(body.endpoint);
+    const deleted = await pushStore.removeSubscriptionByEndpoint(body.endpoint);
     jsonResponse(res, 200, {
       ok: true,
       deleted
@@ -287,9 +287,9 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     const payload = buildPushTestPayload(body, privateMode);
     const sendResult = await pushService.sendToSubscriptions(subscriptions, payload);
 
-    for (const endpoint of sendResult.prunedEndpoints) {
-      pushStore.removeSubscriptionByEndpoint(endpoint);
-    }
+    await Promise.all(
+      sendResult.prunedEndpoints.map(async (endpoint) => pushStore.removeSubscriptionByEndpoint(endpoint))
+    );
 
     pushSendStore.setLatest({
       notificationId: payload.notificationId,

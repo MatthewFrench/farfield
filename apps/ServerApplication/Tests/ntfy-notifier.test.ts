@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NtfyNotifier, parseNtfyConfigFromEnv } from "../Source/NtfyNotifier.js";
+import { NtfyNotifier, parseNtfyConfigFromEnv } from "../Source/Modules/PushNotifications/NtfyNotifier.js";
 
 afterEach(() => {
   vi.restoreAllMocks();

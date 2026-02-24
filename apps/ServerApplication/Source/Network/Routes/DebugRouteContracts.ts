@@ -3,8 +3,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SendRequestOptions } from "@farfield/api";
 import { type IpcRequestFrame, type JsonValue } from "@farfield/protocol";
 import type { CodexAgentAdapter } from "../../Agents/Adapters/CodexAgentAdapter.js";
-import type { ActivityHistoryService } from "../../ActivityHistoryService.js";
-import type { ClientErrorStore } from "../../ClientErrorStore.js";
+import type { ActivityHistoryService } from "../../Modules/Activity/ActivityHistoryService.js";
+import type { ClientErrorStore } from "../../Modules/Debugging/ClientErrorStore.js";
 import type { ServerObservabilitySnapshot } from "../ServerObservabilitySnapshotOwner.js";
 
 export interface ParsedReplayFrame {

@@ -64,7 +64,7 @@ import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSele
 import {
   useSelectedThreadLoaders
 } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
-import { useTheme } from "@/Hooks/UseTheme";
+import { useTheme } from "@/Features/Theme/StateManagement/UseTheme";
 import {
   TooltipProvider
 } from "@/Components/UserInterface/Tooltip";
@@ -230,7 +230,7 @@ export function App(): React.JSX.Element {
     appDefaultModel: applicationDerivedState.appDefaultModel,
     appDefaultReasoningEffort: applicationDerivedState.appDefaultReasoningEffort,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
-    pendingMaterializationThreadIdsRef: applicationShellState.pendingMaterializationThreadIdsRef,
+    pendingThreadMaterializationCoordinator: applicationShellState.pendingThreadMaterializationCoordinator,
     conversationSyncSignatureBuilder,
     selectedThreadDataRefreshCoordinator: applicationOwnerDependencies.selectedThreadDataRefreshCoordinator,
     selectedThreadRefreshConcurrencyCoordinator: applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,

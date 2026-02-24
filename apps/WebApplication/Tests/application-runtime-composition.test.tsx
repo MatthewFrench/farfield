@@ -362,7 +362,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     appDefaultModel: applicationDerivedState.appDefaultModel,
     appDefaultReasoningEffort: applicationDerivedState.appDefaultReasoningEffort,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
-    pendingMaterializationThreadIdsRef: applicationShellState.pendingMaterializationThreadIdsRef,
+    pendingThreadMaterializationCoordinator: applicationShellState.pendingThreadMaterializationCoordinator,
     conversationSyncSignatureBuilder,
     selectedThreadDataRefreshCoordinator: applicationOwnerDependencies.selectedThreadDataRefreshCoordinator,
     selectedThreadRefreshConcurrencyCoordinator: applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,

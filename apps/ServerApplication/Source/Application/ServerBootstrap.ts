@@ -4,7 +4,7 @@ import {
   JsonValueSchema,
   type JsonValue
 } from "@farfield/protocol";
-import { logger } from "../Logger.js";
+import { logger } from "../Shared/Logging/Logger.js";
 import {
   parseServerCliOptions,
   formatServerHelpText
@@ -12,16 +12,16 @@ import {
 import { AgentRuntimeOwner } from "../Agents/AgentRuntimeOwner.js";
 import { ThreadAdapterResolver } from "../Agents/ThreadAdapterResolver.js";
 import { ThreadIndex } from "../Agents/ThreadIndex.js";
-import { ActivityHistoryService } from "../ActivityHistoryService.js";
-import { ClientErrorStore } from "../ClientErrorStore.js";
-import { NtfyNotifier, parseNtfyConfigFromEnv } from "../NtfyNotifier.js";
-import { PushReceiptStore } from "../PushReceiptStore.js";
-import { PushSendStore } from "../PushSendStore.js";
-import { PushService } from "../PushService.js";
-import { PushStore } from "../PushStore.js";
-import { readServerRuntimeConfiguration } from "../ServerRuntimeConfiguration.js";
-import { ServerLifecycleCoordinator } from "../ServerLifecycleCoordinator.js";
-import { ThreadCompletionNotificationService } from "../ThreadCompletionNotificationService.js";
+import { ActivityHistoryService } from "../Modules/Activity/ActivityHistoryService.js";
+import { ClientErrorStore } from "../Modules/Debugging/ClientErrorStore.js";
+import { NtfyNotifier, parseNtfyConfigFromEnv } from "../Modules/PushNotifications/NtfyNotifier.js";
+import { PushReceiptStore } from "../Modules/PushNotifications/PushReceiptStore.js";
+import { PushSendStore } from "../Modules/PushNotifications/PushSendStore.js";
+import { PushService } from "../Modules/PushNotifications/PushService.js";
+import { PushStore } from "../Modules/PushNotifications/PushStore.js";
+import { ThreadCompletionNotificationService } from "../Modules/Threads/ThreadCompletionNotificationService.js";
+import { readServerRuntimeConfiguration } from "./Configuration/ServerRuntimeConfiguration.js";
+import { ServerLifecycleCoordinator } from "./Bootstrap/ServerLifecycleCoordinator.js";
 import type { HistoryEntry } from "../Network/Routes/DebugTypes.js";
 import { EventStreamClientRegistry } from "../Network/EventStreamClientRegistry.js";
 import { PushDispatchConcurrencyCoordinator } from "../Network/PushDispatchConcurrencyCoordinator.js";
@@ -35,8 +35,8 @@ import {
   ThreadListAggregationCache,
 } from "../Network/ThreadListAggregationCache.js";
 import { ThreadConcurrencyCoordinator } from "../Network/ThreadConcurrencyCoordinator.js";
-import { RuntimeStateOwner } from "../RuntimeStateOwner.js";
-import { ServerBootstrapUtilityOwner } from "../ServerBootstrapUtilityOwner.js";
+import { RuntimeStateOwner } from "./StateManagement/RuntimeStateOwner.js";
+import { ServerBootstrapUtilityOwner } from "./Bootstrap/ServerBootstrapUtilityOwner.js";
 
 const PushTestBodySchema = FarfieldPushTestBodySchema;
 const runtimeConfiguration = readServerRuntimeConfiguration(process.env);
@@ -203,6 +203,9 @@ agentRuntimeOwner = new AgentRuntimeOwner({
     });
   },
   onThreadStreamStateChanged: (threadId) => {
+    invalidateThreadListAggregationCache("thread-stream-state-changed", {
+      threadId
+    });
     pushDispatchConcurrencyCoordinator.schedule(threadId);
   }
 });

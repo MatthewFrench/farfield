@@ -7,6 +7,7 @@ import {
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { type ThreadListItem } from "../DomainModel/ThreadGroupTypes";
 import { ThreadListStateController } from "./ThreadListStateController";
+import { PendingThreadMaterializationCoordinator } from "./PendingThreadMaterializationCoordinator";
 import {
   ThreadMutationActionCoordinator,
   type ThreadMutationActionErrorReportInput
@@ -27,7 +28,7 @@ export interface UseThreadActionHandlersInput {
   setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
   setMobileSidebarOpen: Dispatch<SetStateAction<boolean>>;
   selectedThreadIdRef: MutableRefObject<string | null>;
-  pendingMaterializationThreadIdsRef: MutableRefObject<Set<string>>;
+  pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
   threadMutationServerClient: ThreadMutationServerClient;
   threadListStateController: ThreadListStateController;
@@ -52,7 +53,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       onSetBusy: input.setIsBusy,
       onSetErrorMessage: input.setError,
       onMarkThreadPendingMaterialization: (threadId) => {
-        input.pendingMaterializationThreadIdsRef.current.add(threadId);
+        input.pendingThreadMaterializationCoordinator.markPending(threadId);
       },
       onThreadSelected: (threadId) => {
         input.setSelectedThreadId(threadId);
@@ -65,7 +66,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     });
   }, [
     input.buildActionRequestOptions,
-    input.pendingMaterializationThreadIdsRef,
+    input.pendingThreadMaterializationCoordinator,
     input.refreshAll,
     input.reportTrackedUserInterfaceError,
     input.selectedThreadIdRef,

@@ -1,4 +1,4 @@
-import { logger } from "../../Logger.js";
+import { logger } from "../../Shared/Logging/Logger.js";
 
 type CodexAppServerStderrSeverity = "error" | "warn" | "debug";
 

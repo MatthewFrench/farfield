@@ -4,7 +4,7 @@ import {
   parseBody,
   SetModeBodySchema,
   SubmitUserInputBodySchema
-} from "../../HttpSchemas.js";
+} from "../RequestSchemas/HttpSchemas.js";
 import type {
   ThreadMemberRouteDependencies,
   ThreadMemberResolvedRouteContext

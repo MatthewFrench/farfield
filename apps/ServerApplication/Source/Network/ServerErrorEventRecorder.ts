@@ -1,5 +1,5 @@
-import type { ClientErrorStore } from "../ClientErrorStore.js";
-import { logger } from "../Logger.js";
+import type { ClientErrorStore } from "../Modules/Debugging/ClientErrorStore.js";
+import { logger } from "../Shared/Logging/Logger.js";
 
 export interface ServerErrorEventRecordInput {
   source: string;

@@ -20,10 +20,12 @@ function buildDefaultState(): PushStateStore {
 export class PushStore {
   private readonly filePath: string;
   private state: PushStateStore;
+  private persistQueue: Promise<void>;
 
   public constructor(filePath: string) {
     this.filePath = path.resolve(filePath);
     this.state = buildDefaultState();
+    this.persistQueue = Promise.resolve();
   }
 
   public load(): void {
@@ -53,48 +55,47 @@ export class PushStore {
   public upsertSubscription(
     subscription: PushSubscription,
     settings: PushSettings
-  ): StoredPushSubscription {
+  ): Promise<StoredPushSubscription> {
     const now = new Date().toISOString();
     const existingIndex = this.state.subscriptions.findIndex(
       (candidate) => candidate.subscription.endpoint === subscription.endpoint
     );
 
+    let nextSubscription: StoredPushSubscription;
     if (existingIndex >= 0) {
       const existing = this.state.subscriptions[existingIndex];
       if (!existing) {
         throw new Error("Push subscription index resolution failed");
       }
-      const next: StoredPushSubscription = {
+      nextSubscription = {
         ...existing,
         subscription,
         settings,
         updatedAt: now
       };
-      this.state.subscriptions[existingIndex] = next;
-      this.persist();
-      return { ...next };
+      this.state.subscriptions[existingIndex] = nextSubscription;
+    } else {
+      nextSubscription = {
+        id: `sub_${randomUUID()}`,
+        subscription,
+        settings,
+        createdAt: now,
+        updatedAt: now
+      };
+      this.state.subscriptions.push(nextSubscription);
     }
 
-    const created: StoredPushSubscription = {
-      id: `sub_${randomUUID()}`,
-      subscription,
-      settings,
-      createdAt: now,
-      updatedAt: now
-    };
-    this.state.subscriptions.push(created);
-    this.persist();
-    return { ...created };
+    return this.persist().then(() => ({ ...nextSubscription }));
   }
 
-  public removeSubscriptionByEndpoint(endpoint: string): boolean {
+  public async removeSubscriptionByEndpoint(endpoint: string): Promise<boolean> {
     const originalLength = this.state.subscriptions.length;
     this.state.subscriptions = this.state.subscriptions.filter(
       (entry) => entry.subscription.endpoint !== endpoint
     );
     const changed = this.state.subscriptions.length !== originalLength;
     if (changed) {
-      this.persist();
+      await this.persist();
     }
     return changed;
   }
@@ -111,7 +112,7 @@ export class PushStore {
     }));
   }
 
-  public setCompletionWatermark(threadId: string, marker: string): boolean {
+  public async setCompletionWatermark(threadId: string, marker: string): Promise<boolean> {
     const existingIndex = this.state.completionWatermarks.findIndex(
       (candidate) => candidate.threadId === threadId
     );
@@ -128,7 +129,7 @@ export class PushStore {
         threadId,
         marker
       };
-      this.persist();
+      await this.persist();
       return true;
     }
 
@@ -136,39 +137,50 @@ export class PushStore {
       threadId,
       marker
     });
-    this.persist();
+    await this.persist();
     return true;
   }
 
-  private persist(): void {
+  private persist(): Promise<void> {
+    const encodedState = `${JSON.stringify(this.state, null, 2)}\n`;
+    const runPersistWrite = async (): Promise<void> => {
+      await this.persistEncodedState(encodedState);
+    };
+    const queuedPersist = this.persistQueue.then(runPersistWrite, runPersistWrite);
+    this.persistQueue = queuedPersist;
+    return queuedPersist;
+  }
+
+  private async persistEncodedState(encodedState: string): Promise<void> {
     const directory = path.dirname(this.filePath);
-    fs.mkdirSync(directory, { recursive: true });
+    await fs.promises.mkdir(directory, { recursive: true });
 
     const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
-    const encoded = `${JSON.stringify(this.state, null, 2)}\n`;
-    const fd = fs.openSync(tempPath, "w", 0o600);
+    const fileHandle = await fs.promises.open(tempPath, "w", 0o600);
     try {
-      fs.writeFileSync(fd, encoded, "utf8");
-      fs.fsyncSync(fd);
+      await fileHandle.writeFile(encodedState, "utf8");
+      await fileHandle.sync();
     } finally {
-      fs.closeSync(fd);
+      await fileHandle.close();
     }
 
     try {
-      fs.renameSync(tempPath, this.filePath);
+      await fs.promises.rename(tempPath, this.filePath);
     } catch (error) {
-      if (fs.existsSync(tempPath)) {
-        fs.unlinkSync(tempPath);
+      try {
+        await fs.promises.unlink(tempPath);
+      } catch {
+        // no-op
       }
       throw error;
     }
 
     if (process.platform !== "win32") {
-      const dirFd = fs.openSync(directory, "r");
+      const directoryHandle = await fs.promises.open(directory, "r");
       try {
-        fs.fsyncSync(dirFd);
+        await directoryHandle.sync();
       } finally {
-        fs.closeSync(dirFd);
+        await directoryHandle.close();
       }
     }
   }

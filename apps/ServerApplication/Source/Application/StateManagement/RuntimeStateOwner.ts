@@ -1,5 +1,5 @@
-import type { CodexAgentRuntimeState } from "./Agents/Adapters/CodexAgentAdapter.js";
-import type { TraceSummary } from "./Network/Routes/DebugTypes.js";
+import type { CodexAgentRuntimeState } from "../../Agents/Adapters/CodexAgentAdapter.js";
+import type { TraceSummary } from "../../Network/Routes/DebugTypes.js";
 
 export interface RuntimeStateSnapshot {
   appExecutable: string;

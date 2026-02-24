@@ -61,217 +61,258 @@ This document defines the target folder/file structure and end-state ownership m
     WebApplication/
       Source/
         Application/
-          AppShell.tsx
+          Boot/
+            InstallClientErrorReporter.ts
           Configuration/
             ApplicationBehaviorConfiguration.ts
-            WebPublicRuntimeConfiguration.ts
-          UserInterface/
-            ApplicationHeaderBar.tsx
-            ApiSessionBootstrapOverlay.tsx
-          Boot/
-            InstallDisplayMode.ts
-            InstallServiceWorker.ts
-            InstallClientErrorReporter.ts
+          DataAccess/
+            WebShellApi.ts
+          DomainModel/
+            ApiAuthenticationErrorClassifier.ts
+            ApplicationRouteStateMapper.ts
+            DateValueFormatter.ts
           StateManagement/
             ApiSessionBootstrapCoordinator.ts
-            CoreDataSnapshotStateApplier.ts
             CoreDataRefreshConcurrencyCoordinator.ts
+            CoreDataSnapshotStateApplier.ts
             EventRefreshScheduler.ts
             EventStreamConnectionCoordinator.ts
             EventStreamRefreshDecisionEngine.ts
             MobileSidebarSwipeCoordinator.ts
             PageTouchOverscrollGuardCoordinator.ts
             RuntimeViewportSizingCoordinator.ts
-            UseApplicationRefreshEffects.ts
             UseApplicationDerivedState.ts
             UseApplicationDerivedStateContracts.ts
+            UseApplicationChatFeatureComposition.ts
+            UseApplicationDebugFeatureComposition.ts
             UseApplicationOwnerDependencies.ts
             UseApplicationPresentationHelpers.tsx
+            UseApplicationPushFeatureComposition.ts
+            UseApplicationRefreshEffects.ts
+            UseApplicationRuntimeComposition.ts
+            UseApplicationRuntimeRequestHandlers.ts
+            UseApplicationShellComposition.ts
+            UseApplicationShellState.ts
             UseApplicationShellViewProperties.ts
+            UseApplicationSynchronizationEffects.ts
             UseCoreDataLoaders.ts
             UseEventStreamEffects.ts
             UseMobileSidebarTouchHandlers.ts
-            UseApplicationRuntimeRequestHandlers.ts
             UseViewportShellEffects.ts
             UserInterfaceActionRequestBuilder.ts
-          Providers/
+          UserInterface/
+            AgentFavicon.tsx
+            ApiSessionBootstrapOverlay.tsx
+            ApplicationHeaderBar.tsx
+            ApplicationShellLayout.tsx
         Features/
+          Capabilities/
+            DataAccess/
+              CapabilityApi.ts
+              CapabilityServerClient.ts
+              CapabilitySnapshotCache.ts
           Chat/
-            UserInterface/
-              ChatWorkspacePane.tsx
-              ChatView.tsx
-              ChatComposerPanel.tsx
-              ChatModeToolbar.tsx
+            DataAccess/
+              ChatApi.ts
+              ChatServerClient.ts
+            DomainModel/
+              ConversationSyncSignatureBuilder.ts
+              ConversationItemFlattener.ts
+              ModeSelectionStateResolver.ts
+              PendingUserInputAnswerBuilder.ts
+              PendingUserInputRequestSelector.ts
+              ReadThreadErrorClassifier.ts
             StateManagement/
-              ChatStateController.ts
-              ChatStateStore.ts
               ChatRequestActionCoordinator.ts
-              ChatRequestConcurrencyCoordinator.ts
-              CollaborationModeActionCoordinator.ts
               ChatScrollStateCoordinator.ts
+              CollaborationModeActionCoordinator.ts
               ModeSelectionSyncCoordinator.ts
               ReadThreadStateMerger.ts
               SelectedThreadDataRefreshCoordinator.ts
               SelectedThreadRefreshConcurrencyCoordinator.ts
-              UseChatModeToolbarProperties.ts
               UseChatActionHandlers.ts
+              UseChatModeToolbarProperties.ts
               UseChatScrollEffects.ts
               UseModeAndPendingRequestEffects.ts
               UseSelectedThreadLifecycleEffects.ts
               UseSelectedThreadLoaders.ts
-            DataAccess/
-              ChatServerClient.ts
-              ChatQueryCache.ts
-            DomainModel/
-              ChatTypes.ts
-              ChatSchemas.ts
-              ModeSelectionStateResolver.ts
-              ConversationSyncSignatureBuilder.ts
-              ConversationItemFlattener.ts
-              PendingUserInputAnswerBuilder.ts
-          Threads/
             UserInterface/
-              ThreadListPane.tsx
-              ThreadListPaneContracts.ts
-              ThreadListEmptyState.tsx
-              ThreadListActiveSection.tsx
-              ThreadListArchivedSection.tsx
-              ThreadSidebarPanel.tsx
-              ThreadSidebarViewport.tsx
-              ThreadFiltersBar.tsx
+              ChatModeToolbar.tsx
+              ChatModeToolbarPropertiesBuilder.ts
+              ChatWorkspacePane.tsx
+          Threads/
+            DataAccess/
+              ThreadApi.ts
+              ThreadMutationServerClient.ts
+              ThreadQueryCache.ts
+              ThreadServerClient.ts
+            DomainModel/
+              ThreadGroupSelectors.ts
+              ThreadGroupTypes.ts
             StateManagement/
+              PendingThreadMaterializationCoordinator.ts
+              ThreadListPresentationStateResolver.ts
               ThreadListStateController.ts
               ThreadListStateStore.ts
-              ThreadListPresentationStateResolver.ts
-              ThreadRefreshConcurrencyCoordinator.ts
               ThreadMutationActionCoordinator.ts
-              UseThreadListPaneProperties.ts
+              ThreadRefreshConcurrencyCoordinator.ts
               UseThreadActionHandlers.ts
-            DataAccess/
-              ThreadServerClient.ts
-              ThreadQueryCache.ts
-            DomainModel/
-              ThreadGroupTypes.ts
-              ThreadGroupSelectors.ts
-          Debugging/
+              UseThreadListPaneProperties.ts
             UserInterface/
-              DebugWorkspacePane.tsx
-              DebugStatusBanners.tsx
+              ThreadListActiveSection.tsx
+              ThreadListArchivedSection.tsx
+              ThreadListEmptyState.tsx
+              ThreadListPane.tsx
+              ThreadListPaneContracts.ts
+              ThreadSidebarPanel.tsx
+              ThreadSidebarViewport.tsx
+          Debugging/
+            DataAccess/
+              ClientErrorReporter.ts
+              DebugApi.ts
+              DebugServerClient.ts
+            DomainModel/
+              DebugIssueContracts.ts
+              DebugIssueDerivation.ts
+              DebugIssueStateResolver.ts
+              ErrorBannerDetailsParser.ts
             StateManagement/
-              DebugStateController.ts
-              DebugStateStore.ts
-              DebugRefreshConcurrencyCoordinator.ts
               DebugWorkspaceActionCoordinator.ts
               DebugWorkspaceDataReader.ts
               DebugWorkspaceStateStore.ts
+              TrackedUserInterfaceErrorPolicy.ts
               TrackedUserInterfaceErrorReporter.ts
               UseDebugActionHandlers.ts
-            DataAccess/
-              DebugServerClient.ts
-              ClientErrorServerClient.ts
-              DebugIssueCache.ts
-            DomainModel/
-              DebugIssueTypes.ts
-              DebugIssueSelectors.ts
-              DebugIssueStateResolver.ts
-          PushNotifications/
             UserInterface/
-              PushStatusButton.tsx
-            StateManagement/
-              PushStateController.ts
-              PushStateStore.ts
-              PushNotificationToolbarActionCoordinator.ts
+              DebugHistoryDetailPanel.tsx
+              DebugHistoryPanel.tsx
+              DebugIssuesPanel.tsx
+              DebugStatusBanners.tsx
+              DebugStreamEventsPanel.tsx
+              DebugTracePanel.tsx
+              DebugWorkspacePane.tsx
+          PushNotifications/
             DataAccess/
-              PushServerClient.ts
+              PushApi.ts
               PushClientStateManager.ts
               PushPreferenceStore.ts
+              PushServerClient.ts
             DomainModel/
-              PushTypes.ts
+              PushClientContracts.ts
+            StateManagement/
+              PushNotificationToolbarActionCoordinator.ts
+            UserInterface/
+              PushStatusButton.tsx
+          Theme/
+            DataAccess/
+              ThemePreferenceStore.ts
+            StateManagement/
+              UseTheme.ts
         Components/
           UserInterface/
+          ChatComposer.tsx
+          CodeSnippet.tsx
+          ConversationItem.tsx
+          StreamEventCard.tsx
         Shared/
           Contracts/
             StructuredDataValue.ts
-          Hooks/
-          TimeHandling/
-          TextFormatting/
-          IdentifierGeneration/
+            ApiContracts.ts
+          Errors/
+            ErrorMessage.ts
+            RequestCanceledError.ts
+          Styling/
+            ClassNameMerge.ts
+          Transport/
+            FarfieldHttpTransport.ts
         Main.tsx
         Index.css
-      Public/
+      public/
       Tests/
     ServerApplication/
       Source/
-        Application/
-          Bootstrap.ts
-          Configuration/
-            ServerRuntimeConfiguration.ts
-            PushRuntimeConfiguration.ts
-          Server.ts
-          RuntimeStateOwner.ts
-        Network/
-          Routes/
-            AgentRoutes.ts
-            CapabilityRoutes.ts
-            RuntimeRoutes.ts
-            ThreadCollectionRoutes.ts
-            ThreadRoutes.ts
-            ThreadMemberRoutes.ts
-            ThreadMemberRouteContracts.ts
-            ThreadMemberReadRouteOwner.ts
-            ThreadMemberMutationRouteOwner.ts
-            ThreadMemberMessageMutationRouteOwner.ts
-            ThreadMemberArchiveMutationRouteOwner.ts
-            ThreadMemberInteractionMutationRouteOwner.ts
-            DebugRoutes.ts
-            DebugRouteContracts.ts
-            DebugClientErrorRouteOwner.ts
-            DebugHistoryRouteOwner.ts
-            DebugReplayRouteOwner.ts
-            DebugReplayFrameParser.ts
-            DebugTraceRouteOwner.ts
-            PushRoutes.ts
-          Events/
-            EventStreamClientRegistry.ts
-          RequestSchemas/
-            RequestSchemas.ts
-          Middleware/
-            AuthenticationMiddleware.ts
-        Modules/
-          PushNotifications/
-            PushService.ts
-            PushSubscriptionRepository.ts
-            PushSendRepository.ts
-            PushReceiptRepository.ts
-            PushNotificationOrchestrator.ts
-            PushDispatchConcurrencyCoordinator.ts
-            PushTypes.ts
-          Threads/
-            ThreadOwnershipService.ts
-            CompletionDetectionService.ts
-            ThreadStateRepository.ts
-            ThreadConcurrencyCoordinator.ts
-          Debugging/
-            TraceService.ts
-            ReplayService.ts
-            ClientErrorRepository.ts
-            DebugHistoryCache.ts
         Agents/
           Adapters/
             CodexAgentAdapter.ts
-            CodexThreadManagementOwner.ts
+            CodexAppServerStderrOwner.ts
+            CodexConnectionLifecycleOwner.ts
+            CodexMessageDispatchOwner.ts
             CodexThreadInteractionOwner.ts
+            CodexThreadManagementOwner.ts
+            CodexThreadStreamStateOwner.ts
             OpenCodeAgentAdapter.ts
-          Registry/
-            AgentRegistry.ts
-          ThreadIndex/
-            ThreadIndex.ts
-        ServerBootstrapUtilityOwner.ts
+          AgentRuntimeOwner.ts
+          CliOptions.ts
+          Registry.ts
+          ThreadAdapterResolver.ts
+          ThreadIndex.ts
+          Types.ts
+        Application/
+          Bootstrap/
+            ServerBootstrapUtilityOwner.ts
+            ServerLifecycleCoordinator.ts
+          Configuration/
+            ServerRuntimeConfiguration.ts
+          StateManagement/
+            RuntimeStateOwner.ts
+          ServerBootstrap.ts
+        Modules/
+          Activity/
+            ActivityHistoryService.ts
+          Debugging/
+            ClientErrorStore.ts
+          PushNotifications/
+            NtfyNotifier.ts
+            PushReceiptStore.ts
+            PushSendStore.ts
+            PushService.ts
+            PushStatePath.ts
+            PushStore.ts
+          Threads/
+            CompletionDetector.ts
+            ThreadCompletionNotificationService.ts
+            ThreadOwner.ts
+        Network/
+          BrowserSessionAuthOwner.ts
+          EventStreamClientRegistry.ts
+          PushDispatchConcurrencyCoordinator.ts
+          PushTestPayloadOwner.ts
+          ServerErrorEventRecorder.ts
+          ServerObservabilitySnapshotOwner.ts
+          ServerRequestErrorResponder.ts
+          ServerRequestHandler.ts
+          ServerRequestUtilityOwner.ts
+          ServerTransportErrorClassifier.ts
+          ThreadConcurrencyCoordinator.ts
+          ThreadListAggregationCache.ts
+          RequestSchemas/
+            HttpSchemas.ts
+          Routes/
+            AgentRoutes.ts
+            CapabilityRoutes.ts
+            DebugClientErrorRouteOwner.ts
+            DebugFileDownload.ts
+            DebugHistoryRouteOwner.ts
+            DebugReplayFrameParser.ts
+            DebugReplayRouteOwner.ts
+            DebugRouteContracts.ts
+            DebugRoutes.ts
+            DebugTraceRouteOwner.ts
+            DebugTypes.ts
+            PushRoutes.ts
+            RuntimeRoutes.ts
+            ThreadCollectionRoutes.ts
+            ThreadMemberArchiveMutationRouteOwner.ts
+            ThreadMemberInteractionMutationRouteOwner.ts
+            ThreadMemberMessageMutationRouteOwner.ts
+            ThreadMemberMutationRouteOwner.ts
+            ThreadMemberReadRouteOwner.ts
+            ThreadMemberRouteContracts.ts
+            ThreadMemberRoutes.ts
+            ThreadRoutes.ts
         Shared/
-          Observability/
-            StructuredLogger.ts
-            MetricsPublisher.ts
-          Logger.ts
+          Logging/
+            Logger.ts
       Tests/
   packages/
     CodexProtocol/
@@ -286,14 +327,18 @@ This document defines the target folder/file structure and end-state ownership m
             StreamStateContracts.ts
         Parsers/
           ThreadParsers.ts
+        Generated/
         Index.ts
       Tests/
     CodexInterfaceAdapter/
       Source/
-        Clients/
-        Transports/
-        Services/
-        StateReduction/
+        AppServerClient.ts
+        AppServerTransport.ts
+        Errors.ts
+        IpcClient.ts
+        JsonRpc.ts
+        LiveState.ts
+        Service.ts
         Index.ts
       Tests/
     OpenCodeInterfaceAdapter/
@@ -430,15 +475,15 @@ This document defines the target folder/file structure and end-state ownership m
 
 | Area | Configuration Owner | Owner File (Target) | Scope |
 | --- | --- | --- | --- |
-| Web runtime configuration | `WebPublicRuntimeConfiguration` | `apps/WebApplication/Source/Application/Configuration/WebPublicRuntimeConfiguration.ts` | browser runtime (non-secret values only) |
+| Web runtime behavior configuration | `ApplicationBehaviorConfiguration` | `apps/WebApplication/Source/Application/Configuration/ApplicationBehaviorConfiguration.ts` | browser runtime (non-secret values only) |
 | Server runtime configuration | `ServerRuntimeConfiguration` | `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfiguration.ts` | process runtime |
-| Server push runtime configuration | `PushRuntimeConfiguration` | `apps/ServerApplication/Source/Application/Configuration/PushRuntimeConfiguration.ts` | push module runtime |
 
 ## State Ownership Registry (End-State)
 
 | Area | Mutable State Owner | Owner File (Target) | Access Pattern |
 | --- | --- | --- | --- |
-| Web chat state | `ChatStateController` | `apps/WebApplication/Source/Features/Chat/StateManagement/ChatStateController.ts` | typed commands + selectors |
+| Web application shell state | `useApplicationShellState` | `apps/WebApplication/Source/Application/StateManagement/UseApplicationShellState.ts` | typed state + ref ownership surface |
+| Web pending thread materialization state | `PendingThreadMaterializationCoordinator` | `apps/WebApplication/Source/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator.ts` | typed owner API for mark/clear/read pending materialization keys |
 | Web chat request action orchestration | `ChatRequestActionCoordinator` | `apps/WebApplication/Source/Features/Chat/StateManagement/ChatRequestActionCoordinator.ts` | typed owner API for send/submit/skip/interrupt user-intent actions |
 | Web collaboration-mode mutation action orchestration | `CollaborationModeActionCoordinator` | `apps/WebApplication/Source/Features/Chat/StateManagement/CollaborationModeActionCoordinator.ts` | typed owner API for `set-collaboration-mode` mutation orchestration |
 | Web chat scroll-bottom state policy | `ChatScrollStateCoordinator` | `apps/WebApplication/Source/Features/Chat/StateManagement/ChatScrollStateCoordinator.ts` | typed owner API for bottom detection/synchronization and pin-to-bottom behavior |
@@ -448,33 +493,31 @@ This document defines the target folder/file structure and end-state ownership m
 | Web thread list state | `ThreadListStateController` | `apps/WebApplication/Source/Features/Threads/StateManagement/ThreadListStateController.ts` | typed commands + selectors |
 | Web thread list presentation derivation | `ThreadListPresentationStateResolver` | `apps/WebApplication/Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver.ts` | typed owner API for grouped project sections, selected-thread projection, and archived section counts |
 | Web thread mutation action orchestration | `ThreadMutationActionCoordinator` | `apps/WebApplication/Source/Features/Threads/StateManagement/ThreadMutationActionCoordinator.ts` | typed owner API for create/archive/unarchive action orchestration |
-| Web debug state | `DebugStateController` | `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugStateController.ts` | typed commands + selectors |
-| Web push state | `PushStateController` | `apps/WebApplication/Source/Features/PushNotifications/StateManagement/PushStateController.ts` | typed commands + selectors |
 | Web push toolbar action orchestration | `PushNotificationToolbarActionCoordinator` | `apps/WebApplication/Source/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator.ts` | typed owner API for push-client refresh and enable actions |
 | Web runtime viewport sizing state | `RuntimeViewportSizingCoordinator` | `apps/WebApplication/Source/Application/StateManagement/RuntimeViewportSizingCoordinator.ts` | typed owner API for viewport metrics and CSS variable mutation |
 | Web API session bootstrap state | `ApiSessionBootstrapCoordinator` | `apps/WebApplication/Source/Application/StateManagement/ApiSessionBootstrapCoordinator.ts` | typed owner API for auth requirement detection, token challenge state, and session freshness decisions |
-| Server push orchestration state | `PushNotificationOrchestrator` | `apps/ServerApplication/Source/Modules/PushNotifications/PushNotificationOrchestrator.ts` | typed service API |
-| Server push persistence state | `PushSubscriptionRepository` | `apps/ServerApplication/Source/Modules/PushNotifications/PushSubscriptionRepository.ts` | typed repository API |
-| Server thread ownership state | `ThreadOwnershipService` | `apps/ServerApplication/Source/Modules/Threads/ThreadOwnershipService.ts` | typed service API |
+| Server push subscription + completion-watermark state | `PushStore` | `apps/ServerApplication/Source/Modules/PushNotifications/PushStore.ts` | typed owner API over persisted subscriptions/watermarks |
+| Server push send history state | `PushSendStore` | `apps/ServerApplication/Source/Modules/PushNotifications/PushSendStore.ts` | typed owner API for latest push-send status snapshot |
+| Server push receipt history state | `PushReceiptStore` | `apps/ServerApplication/Source/Modules/PushNotifications/PushReceiptStore.ts` | typed owner API for bounded receipt timeline |
+| Server client error session state | `ClientErrorStore` | `apps/ServerApplication/Source/Modules/Debugging/ClientErrorStore.ts` | typed owner API for append/read session errors |
 | Server agent runtime composition state | `AgentRuntimeOwner` | `apps/ServerApplication/Source/Agents/AgentRuntimeOwner.ts` | typed owner API |
 | Server thread adapter resolution state | `ThreadAdapterResolver` | `apps/ServerApplication/Source/Agents/ThreadAdapterResolver.ts` | typed service API |
-| Server completion detection state | `CompletionDetectionService` | `apps/ServerApplication/Source/Modules/Threads/CompletionDetectionService.ts` | typed service API |
-| Server trace state | `TraceService` | `apps/ServerApplication/Source/Modules/Debugging/TraceService.ts` | typed service API |
-| Server replay state | `ReplayService` | `apps/ServerApplication/Source/Modules/Debugging/ReplayService.ts` | typed service API |
-| Server activity history state | `ActivityHistoryService` | `apps/ServerApplication/Source/ActivityHistoryService.ts` | typed service API |
-| Server thread completion notification state | `ThreadCompletionNotificationService` | `apps/ServerApplication/Source/ThreadCompletionNotificationService.ts` | typed service API |
+| Server runtime snapshot state | `RuntimeStateOwner` | `apps/ServerApplication/Source/Application/StateManagement/RuntimeStateOwner.ts` | typed owner API for runtime status snapshots |
+| Server activity history state | `ActivityHistoryService` | `apps/ServerApplication/Source/Modules/Activity/ActivityHistoryService.ts` | typed service API |
+| Server completion detection state | `CompletionDetector` | `apps/ServerApplication/Source/Modules/Threads/CompletionDetector.ts` | typed detection policy owner |
+| Server thread completion notification state | `ThreadCompletionNotificationService` | `apps/ServerApplication/Source/Modules/Threads/ThreadCompletionNotificationService.ts` | typed orchestration service API |
 
 ## Cache Ownership Registry (End-State)
 
 | Area | Cache Owner | Owner File (Target) | Cache Contract |
 | --- | --- | --- | --- |
 | Web capability snapshot cache | `CapabilitySnapshotCache` | `apps/WebApplication/Source/Features/Capabilities/DataAccess/CapabilitySnapshotCache.ts` | short-lived modes/models/defaults snapshot cache with freshness window and single-flight refresh |
-| Web chat query cache | `ChatQueryCache` | `apps/WebApplication/Source/Features/Chat/DataAccess/ChatQueryCache.ts` | typed key/value, invalidation by thread + mutation |
 | Web thread query cache | `ThreadQueryCache` | `apps/WebApplication/Source/Features/Threads/DataAccess/ThreadQueryCache.ts` | typed key/value, TTL + explicit invalidation |
-| Web debug issue cache | `DebugIssueCache` | `apps/WebApplication/Source/Features/Debugging/DataAccess/DebugIssueCache.ts` | typed key/value, refresh by issue scope |
-| Web push local preference store | `PushPreferenceStore` | `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushPreferenceStore.ts` | typed browser storage adapter + key ownership |
+| Web push preference storage | `PushPreferenceStore` | `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushPreferenceStore.ts` | typed browser storage adapter + key ownership |
+| Web theme preference storage | `ThemePreferenceStore` | `apps/WebApplication/Source/Features/Theme/DataAccess/ThemePreferenceStore.ts` | typed browser storage adapter + key ownership |
 | Server thread list aggregation cache | `ThreadListAggregationCache` | `apps/ServerApplication/Source/Network/ThreadListAggregationCache.ts` | bounded in-memory merged-thread cache with explicit invalidation and single-flight loads |
-| Server debug history cache | `DebugHistoryCache` | `apps/ServerApplication/Source/Modules/Debugging/DebugHistoryCache.ts` | bounded in-memory cache with explicit eviction |
+| Server push receipt history storage | `PushReceiptStore` | `apps/ServerApplication/Source/Modules/PushNotifications/PushReceiptStore.ts` | bounded append-only store with max count + max age pruning |
+| Server push send history storage | `PushSendStore` | `apps/ServerApplication/Source/Modules/PushNotifications/PushSendStore.ts` | latest-send snapshot owner for diagnostics and visibility |
 
 ## Concurrency Ownership Registry (End-State)
 
@@ -484,13 +527,12 @@ This document defines the target folder/file structure and end-state ownership m
 | Web event-stream refresh scheduling | `EventRefreshScheduler` | `apps/WebApplication/Source/Application/StateManagement/EventRefreshScheduler.ts` | debounced flag coalescing and deterministic scheduled refresh dispatch |
 | Web event-stream connection lifecycle | `EventStreamConnectionCoordinator` | `apps/WebApplication/Source/Application/StateManagement/EventStreamConnectionCoordinator.ts` | EventSource open/error handling with reconnect backoff and refresh-decision dispatch coordination |
 | Web API session bootstrap requests | `ApiSessionBootstrapCoordinator` | `apps/WebApplication/Source/Application/StateManagement/ApiSessionBootstrapCoordinator.ts` | single-flight bootstrap requests with freshness-aware reuse and explicit token-challenge gating |
-| Web chat requests | `ChatRequestConcurrencyCoordinator` | `apps/WebApplication/Source/Features/Chat/StateManagement/ChatRequestConcurrencyCoordinator.ts` | duplicate request coalescing + cancellation |
 | Web selected-thread refresh hydration | `SelectedThreadRefreshConcurrencyCoordinator` | `apps/WebApplication/Source/Features/Chat/StateManagement/SelectedThreadRefreshConcurrencyCoordinator.ts` | queued refresh merge + thread-switch cancellation + stale-request suppression |
 | Web thread refresh | `ThreadRefreshConcurrencyCoordinator` | `apps/WebApplication/Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator.ts` | single-flight per thread identifier |
-| Web debug refresh | `DebugRefreshConcurrencyCoordinator` | `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugRefreshConcurrencyCoordinator.ts` | single-flight per debug query scope |
 | Server thread list aggregation reads | `ThreadListAggregationCache` | `apps/ServerApplication/Source/Network/ThreadListAggregationCache.ts` | single-flight by query key and deterministic stale-write protection |
-| Server push dispatch | `PushDispatchConcurrencyCoordinator` | `apps/ServerApplication/Source/Modules/PushNotifications/PushDispatchConcurrencyCoordinator.ts` | deterministic per-notification dispatch coordination |
-| Server thread concurrency | `ThreadConcurrencyCoordinator` | `apps/ServerApplication/Source/Modules/Threads/ThreadConcurrencyCoordinator.ts` | per-thread serialization and stale-update protection |
+| Server push dispatch | `PushDispatchConcurrencyCoordinator` | `apps/ServerApplication/Source/Network/PushDispatchConcurrencyCoordinator.ts` | deterministic per-thread completion-check scheduling |
+| Server push send fan-out | `PushService` | `apps/ServerApplication/Source/Modules/PushNotifications/PushService.ts` | bounded concurrent send workers with retry/backoff per subscription |
+| Server thread concurrency | `ThreadConcurrencyCoordinator` | `apps/ServerApplication/Source/Network/ThreadConcurrencyCoordinator.ts` | per-thread serialization and stale-update protection |
 | Server event stream clients | `EventStreamClientRegistry` | `apps/ServerApplication/Source/Network/EventStreamClientRegistry.ts` | centralized client lifecycle and broadcast coordination |
 
 ## Cache Architecture (End-State)
@@ -511,10 +553,10 @@ This document defines the target folder/file structure and end-state ownership m
 | Surface | Owner | Immediate Path | Non-Blocking Update Path | Persistence Tier |
 | --- | --- | --- | --- | --- |
 | Thread list query results | `ThreadQueryCache` | Render from in-memory cache when available | `ThreadRefreshConcurrencyCoordinator` performs background refresh and applies diff-only state updates | process memory |
-| Thread conversation live state | `ChatStateController` and conversation state owner | Render latest owner state snapshot | stream event processing updates state incrementally | process memory |
+| Thread conversation live state | `UseApplicationShellState` + `SelectedThreadDataRefreshCoordinator` | Render latest owner state snapshot | event-stream processing and selected-thread refresh coordinators update state incrementally | process memory |
 | Models, collaboration modes, and defaults | `CapabilitySnapshotCache` with `CapabilityServerClient` | Reuse short-lived in-memory capability snapshot | periodic background revalidation with single-flight per capability query | process memory |
 | API session bootstrap state | `ApiSessionBootstrapCoordinator` | Reuse in-memory auth/session bootstrap decision snapshot | refresh bootstrap only when session freshness threshold is reached or token challenge is resolved | process memory |
-| Debug issue list and history list | `DebugIssueCache` | Render cached debug view state when debug workspace is active | background refresh only when debug workspace is visible or explicitly requested | process memory |
+| Debug issue list and history list | `DebugWorkspaceStateStore` + `DebugWorkspaceDataReader` | Render cached debug view state when debug workspace is active | background refresh only when debug workspace is visible or explicitly requested | process memory |
 | Theme and user-facing local preferences | feature preference store owners | Read once at startup for immediate paint | write-through on user change with no blocking network dependency | browser local storage |
 | Push subscription metadata needed for offline delivery | push feature data-access owner | Initialize from owned browser storage adapter | service worker and push owner synchronize registration status in background | browser indexed storage |
 
@@ -598,11 +640,12 @@ Listed implemented paths are expected to exist in the repository.
 | `apps/WebApplication/Source/Main.tsx` | `apps/WebApplication/Source/Main.tsx` + `apps/WebApplication/Source/Application/Boot/*` |
 | `apps/WebApplication/Source/App.tsx` | `apps/WebApplication/Source/App.tsx` + `apps/WebApplication/Source/Application/StateManagement/*` + `apps/WebApplication/Source/Application/UserInterface/*` |
 | `apps/WebApplication/Source/Application/DataAccess/WebShellApi.ts` | `apps/WebApplication/Source/Application/DataAccess/WebShellApi.ts` |
-| `apps/WebApplication/Source/SharedUtilities/Push.ts` | `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushClientStateManager.ts` + `apps/WebApplication/Source/Features/PushNotifications/DomainModel/PushClientContracts.ts` |
+| `apps/WebApplication/Source/SharedUtilities/Push.ts` | `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushApi.ts` + `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushClientStateManager.ts` + `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushServerClient.ts` + `apps/WebApplication/Source/Features/PushNotifications/DomainModel/PushClientContracts.ts` |
 | `apps/WebApplication/Source/SharedUtilities/ClientErrors.ts` | `apps/WebApplication/Source/Application/Boot/InstallClientErrorReporter.ts` + `apps/WebApplication/Source/Features/Debugging/DataAccess/ClientErrorReporter.ts` |
 | `apps/WebApplication/Source/SharedUtilities/DebugHelpers.ts` | `apps/WebApplication/Source/Features/Debugging/DomainModel/DebugIssueContracts.ts` + `apps/WebApplication/Source/Features/Debugging/DomainModel/DebugIssueDerivation.ts` + `apps/WebApplication/Source/Features/Debugging/DomainModel/ErrorBannerDetailsParser.ts` + `apps/WebApplication/Source/Features/Debugging/StateManagement/TrackedUserInterfaceErrorPolicy.ts` + `apps/WebApplication/Source/Shared/Errors/ErrorMessage.ts` + `apps/WebApplication/Source/Features/Chat/DomainModel/ReadThreadErrorClassifier.ts` |
 | `apps/WebApplication/Source/SharedUtilities/Utils.ts` | `apps/WebApplication/Source/Shared/Styling/ClassNameMerge.ts` |
 | `apps/WebApplication/Source/SharedUtilities/thread-groups.ts` | `apps/WebApplication/Source/Features/Threads/DomainModel/ThreadGroupTypes.ts` + `apps/WebApplication/Source/Features/Threads/DomainModel/ThreadGroupSelectors.ts` |
+| `apps/WebApplication/Source/Hooks/UseTheme.ts` | `apps/WebApplication/Source/Features/Theme/StateManagement/UseTheme.ts` |
 | `apps/ServerApplication/Source/Index.ts` | `apps/ServerApplication/Source/Application/ServerBootstrap.ts` |
 | `apps/ServerApplication/Source/Agents/agent-runtime-owner.ts` | `apps/ServerApplication/Source/Agents/AgentRuntimeOwner.ts` |
 | `apps/ServerApplication/Source/Network/server-request-handler.ts` | `apps/ServerApplication/Source/Network/ServerRequestHandler.ts` |
@@ -613,15 +656,15 @@ Listed implemented paths are expected to exist in the repository.
 | `apps/ServerApplication/Source/Network/ServerRequestUtilityOwner.ts` | `apps/ServerApplication/Source/Network/ServerRequestUtilityOwner.ts` |
 | `apps/ServerApplication/Source/Network/PushTestPayloadOwner.ts` | `apps/ServerApplication/Source/Network/PushTestPayloadOwner.ts` |
 | `apps/ServerApplication/Source/Network/ServerErrorEventRecorder.ts` | `apps/ServerApplication/Source/Network/ServerErrorEventRecorder.ts` |
-| `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts` | `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts` |
-| `apps/ServerApplication/Source/ServerLifecycleCoordinator.ts` | `apps/ServerApplication/Source/ServerLifecycleCoordinator.ts` |
-| `apps/ServerApplication/Source/HttpSchemas.ts` | `apps/ServerApplication/Source/HttpSchemas.ts` |
-| `apps/ServerApplication/Source/Push*.ts` and `apps/ServerApplication/Source/PushService.ts` | `apps/ServerApplication/Source/Push*.ts` and `apps/ServerApplication/Source/PushService.ts` |
-| `apps/ServerApplication/Source/CompletionDetector.ts` | `apps/ServerApplication/Source/CompletionDetector.ts` |
-| `apps/ServerApplication/Source/ThreadOwner.ts` | `apps/ServerApplication/Source/ThreadOwner.ts` |
+| `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts` | `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfiguration.ts` |
+| `apps/ServerApplication/Source/ServerLifecycleCoordinator.ts` | `apps/ServerApplication/Source/Application/Bootstrap/ServerLifecycleCoordinator.ts` |
+| `apps/ServerApplication/Source/HttpSchemas.ts` | `apps/ServerApplication/Source/Network/RequestSchemas/HttpSchemas.ts` |
+| `apps/ServerApplication/Source/Push*.ts` and `apps/ServerApplication/Source/PushService.ts` | `apps/ServerApplication/Source/Modules/PushNotifications/{PushStore.ts,PushReceiptStore.ts,PushSendStore.ts,PushService.ts,PushStatePath.ts,NtfyNotifier.ts}` |
+| `apps/ServerApplication/Source/CompletionDetector.ts` | `apps/ServerApplication/Source/Modules/Threads/CompletionDetector.ts` |
+| `apps/ServerApplication/Source/ThreadOwner.ts` | `apps/ServerApplication/Source/Modules/Threads/ThreadOwner.ts` |
 | `packages/CodexProtocol/Source/*` | `packages/CodexProtocol/Source/Contracts/*` and `packages/CodexProtocol/Source/Parsers/*` |
-| `packages/CodexInterfaceAdapter/Source/*` | `packages/CodexInterfaceAdapter/Source/{Clients,Transports,Services,StateReduction}/*` |
-| `packages/OpenCodeInterfaceAdapter/Source/*` | `packages/OpenCodeInterfaceAdapter/Source/{Clients,Parsers,Mappers,Services}/*` |
+| `packages/CodexInterfaceAdapter/Source/*` | `packages/CodexInterfaceAdapter/Source/{AppServerClient.ts,AppServerTransport.ts,Errors.ts,IpcClient.ts,JsonRpc.ts,LiveState.ts,Service.ts,Index.ts}` |
+| `packages/OpenCodeInterfaceAdapter/Source/*` | `packages/OpenCodeInterfaceAdapter/Source/{Client.ts,Schemas.ts,MapperContracts.ts,SessionMapper.ts,ConversationTurnMapper.ts,TurnItemMapper.ts,EventPayloadMapper.ts,Mapper.ts,Service.ts,Index.ts}` |
 
 ## Concrete Refactor Scope (Execution Reference)
 
@@ -649,7 +692,7 @@ This execution reference captures an ownership-focused scope that was completed 
 8. `apps/WebApplication/Source/Features/Threads/DomainModel/ThreadGroupSelectors.ts`
 9. `apps/WebApplication/Source/Features/Threads/UserInterface/ThreadListPane.tsx`
 10. `apps/WebApplication/Source/Features/Threads/UserInterface/ThreadSidebarPanel.tsx`
-11. `apps/WebApplication/Source/Features/Threads/UserInterface/ThreadFiltersBar.tsx`
+11. `apps/WebApplication/Source/Features/Threads/UserInterface/ThreadSidebarViewport.tsx`
 
 ### Slice Checklist
 
@@ -680,13 +723,13 @@ Use this checklist as the single at-a-glance cleanup tracker.
 ### Current Completion Snapshot
 
 - Date: 2026-02-24
-- Checklist completion: 274 / 274 items (`100%`)
+- Checklist completion: 278 / 278 items (`100%`)
 
 ### Realistic End-State Estimate (Holistic)
 
 - Estimated overall completion: `100%`
 - Basis:
-  - Checklist execution is complete (`274 / 274`) with no open checklist items.
+  - Checklist execution is complete (`278 / 278`) with no open checklist items.
   - Detailed tree is illustrative; completion is tracked against the verified ownership mapping and checklist entries.
   - Source-file PascalCase conformance is complete for non-generated source.
   - Source-directory PascalCase-path conformance is complete for non-generated source.
@@ -720,6 +763,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Move thread grouping/project-section derivation, archived-section count, and selected-thread projection into `ThreadListPresentationStateResolver` consumed through `ThreadListStateController`.
 - [x] Replace `document.getElementById`-based runtime behavior in `apps/WebApplication/Source/App.tsx` with explicit ref-owned hooks/modules.
 - [x] Move browser storage ownership for theme and push preferences into feature data-access owner classes.
+- [x] Move theme hook ownership from top-level `Hooks/UseTheme.ts` into `Features/Theme/StateManagement/UseTheme.ts` and remove the generic hooks bucket.
 - [x] Move shared API contracts (`AgentId`, request option contracts) from `lib/api.ts` into explicit shared contracts ownership (`Shared/Contracts/ApiContracts.ts`).
 - [x] Introduce explicit named web API request/response contracts in `lib/api.ts` and remove `Parameters`/`ReturnType` type-introspection usage from web source modules.
 - [x] Restrict direct `lib/api.ts` consumption to feature `DataAccess` owners; migrate app and state-management modules to feature-owner/exported contracts and shared error contracts.
@@ -776,6 +820,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Extract mobile sidebar swipe-touch callback wiring ownership from `App.tsx` into `Application/StateManagement/UseMobileSidebarTouchHandlers.ts`.
 - [x] Extract core-data loading, archived-thread loading, and refresh-all callback wiring ownership from `App.tsx` into `Application/StateManagement/UseCoreDataLoaders.ts`.
 - [x] Extract selected-thread hydration and queued refresh callback wiring ownership from `App.tsx` into `Features/Chat/StateManagement/UseSelectedThreadLoaders.ts`.
+- [x] Replace shared pending-thread materialization `Set` ref mutation with explicit owner class `PendingThreadMaterializationCoordinator`.
 - [x] Extract viewport keyboard telemetry, runtime viewport sizing wiring, and overscroll-guard wiring ownership from `App.tsx` into `Application/StateManagement/UseViewportShellEffects.ts`.
 - [x] Extract app refresh/routing/visibility/interval effect wiring ownership from `App.tsx` into `Application/StateManagement/UseApplicationRefreshEffects.ts`.
 - [x] Extract EventSource-driven scheduled refresh effect wiring ownership from `App.tsx` into `Application/StateManagement/UseEventStreamEffects.ts`.
@@ -808,6 +853,9 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Extract event stream ownership into `EventStreamClientRegistry`.
 - [x] Extract thread concurrency ownership into `ThreadConcurrencyCoordinator`.
 - [x] Extract push dispatch concurrency into `PushDispatchConcurrencyCoordinator`.
+- [x] Move push-subscription and completion-watermark persistence writes to async queued file ownership in `PushStore` to avoid request-path event-loop blocking.
+- [x] Move push notification fan-out in `PushService` from sequential send loops to bounded concurrent send workers with the existing retry/backoff policy.
+- [x] Invalidate thread list aggregation cache on thread-stream state-change events in `ServerBootstrap` to avoid stale list snapshots during active stream updates.
 - [x] Extract HTTP request routing + transport error mapping into `ServerRequestHandler`.
 - [x] Extract server lifecycle ownership (`start`, `shutdown`, signals) into `ServerLifecycleCoordinator`.
 - [x] Extract agent adapter composition and IPC event wiring ownership into `AgentRuntimeOwner`.
@@ -863,14 +911,14 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Post-rename validation succeeded after import normalization (`bun run typecheck`, `bun run lint`, and `bun run test` all pass).
 - [x] Real-app test command surface is now descriptive and consistent (`end-to-end:real:*`, `verify:end-to-end:real`, `validate:end-to-end:governance`) with docs aligned.
 - [x] Real-app diagnostics output naming now uses explicit `end-to-end` ownership (`.runtime/end-to-end-sentinel/*`, `end-to-end-sentinel-summary`) across helper code and triage docs.
-- [x] Server runtime configuration ownership extracted into `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts`.
-- [x] Server lifecycle ownership extracted into `apps/ServerApplication/Source/ServerLifecycleCoordinator.ts`.
+- [x] Server runtime configuration ownership extracted into `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfiguration.ts`.
+- [x] Server lifecycle ownership extracted into `apps/ServerApplication/Source/Application/Bootstrap/ServerLifecycleCoordinator.ts`.
 - [x] HTTP request transport and route orchestration extracted into `apps/ServerApplication/Source/Network/ServerRequestHandler.ts`.
 - [x] Agent adapter composition and codex IPC event wiring extracted into `apps/ServerApplication/Source/Agents/AgentRuntimeOwner.ts`.
 - [x] Request parsing/timeout utilities extracted into `apps/ServerApplication/Source/Network/ServerRequestUtilityOwner.ts`.
 - [x] Push test payload construction extracted into `apps/ServerApplication/Source/Network/PushTestPayloadOwner.ts`.
 - [x] Server error event persistence/logging ownership extracted into `apps/ServerApplication/Source/Network/ServerErrorEventRecorder.ts`.
-- [x] Debug trace lifecycle mutation ownership moved into `apps/ServerApplication/Source/ActivityHistoryService.ts`, and debug routes now orchestrate owner APIs.
+- [x] Debug trace lifecycle mutation ownership moved into `apps/ServerApplication/Source/Modules/Activity/ActivityHistoryService.ts`, and debug routes now orchestrate owner APIs.
 - [x] Debug route helper ownership split into dedicated modules (`DebugTypes.ts`, `DebugFileDownload.ts`) to reduce route concentration.
 - [x] `apps/ServerApplication/Source/Network/Routes/DebugRoutes.ts` reduced from 439 lines to 391 lines while preserving route behavior and test coverage.
 - [x] Transport error-category mapping extracted into `apps/ServerApplication/Source/Network/ServerTransportErrorClassifier.ts` and applied in `ServerRequestHandler`.
@@ -932,7 +980,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Preference store tests now use isolated in-memory `Storage` mocks to prevent shared file-backed browser storage test races.
 - [x] Shared API contracts (`AgentId`, `ApiRequestOptions`) moved from `lib/api.ts` into `Shared/Contracts/ApiContracts.ts`, reducing transport-module coupling across feature/application owners.
 - [x] Explicit named API request/response contracts were added to `apps/WebApplication/Source/SharedUtilities/api.ts` (including replay response schema parsing), and web feature/application modules were migrated off `Parameters`/`ReturnType` introspection onto those contracts.
-- [x] Remaining server-side `ReturnType` contract derivation usage was removed from `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts`, `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts`, and `apps/ServerApplication/Source/Agents/Adapters/OpenCodeAgentAdapter.ts` in favor of explicit named contract types.
+- [x] Remaining server-side `ReturnType` contract derivation usage was removed from `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfiguration.ts`, `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts`, and `apps/ServerApplication/Source/Agents/Adapters/OpenCodeAgentAdapter.ts` in favor of explicit named contract types.
 - [x] `apps/WebApplication/Source/App.tsx` now consumes request-cancellation and API contract types through feature/shared owner modules instead of importing endpoint-contract surfaces directly from `apps/WebApplication/Source/SharedUtilities/api.ts`.
 - [x] Shared request execution logic (`request`, `requestNoContent`, request metadata headers, timeout handling, and action-request option mapping) was extracted from `apps/WebApplication/Source/SharedUtilities/api.ts` into `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransport.ts`.
 - [x] Debugging and push endpoint schemas/functions were extracted from `apps/WebApplication/Source/SharedUtilities/api.ts` into `apps/WebApplication/Source/Features/Debugging/DataAccess/DebugApi.ts` and `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushApi.ts`, with `lib/api.ts` retaining compatibility re-exports.
@@ -955,7 +1003,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Thread-member mutation ownership was further split into dedicated mutation owners (`ThreadMemberMessageMutationRouteOwner.ts`, `ThreadMemberArchiveMutationRouteOwner.ts`, and `ThreadMemberInteractionMutationRouteOwner.ts`), reducing `ThreadMemberMutationRouteOwner.ts` from 427 to 49 lines and isolating mutation responsibilities by behavior.
 - [x] Debug route ownership was split from `apps/ServerApplication/Source/Network/Routes/DebugRoutes.ts` into dedicated owner modules (`DebugClientErrorRouteOwner.ts`, `DebugHistoryRouteOwner.ts`, `DebugReplayRouteOwner.ts`, and `DebugTraceRouteOwner.ts`) plus explicit contracts/parsing modules (`DebugRouteContracts.ts` and `DebugReplayFrameParser.ts`), reducing `DebugRoutes.ts` from 416 to 41 lines.
 - [x] OpenCode mapper ownership was split from `packages/OpenCodeInterfaceAdapter/Source/Mapper.ts` into explicit mapper owner modules (`SessionMapper.ts`, `ConversationTurnMapper.ts`, `TurnItemMapper.ts`, `EventPayloadMapper.ts`) and shared contracts (`MapperContracts.ts`), reducing `Mapper.ts` from 428 to 14 lines while preserving compatibility exports.
-- [x] Server bootstrap utility ownership (`jsonResponse`, request-body parsing, error-message normalization, trace-directory creation, and agent descriptor mapping) was extracted from `apps/ServerApplication/Source/Application/ServerBootstrap.ts` into `apps/ServerApplication/Source/ServerBootstrapUtilityOwner.ts`, reducing the server composition-root file from 402 to 356 lines and removing the final non-`App.tsx` 400+ source-file hotspot.
+- [x] Server bootstrap utility ownership (`jsonResponse`, request-body parsing, error-message normalization, trace-directory creation, and agent descriptor mapping) was extracted from `apps/ServerApplication/Source/Application/ServerBootstrap.ts` into `apps/ServerApplication/Source/Application/Bootstrap/ServerBootstrapUtilityOwner.ts`, reducing the server composition-root file from 402 to 356 lines and removing the final non-`App.tsx` 400+ source-file hotspot.
 - [x] Server route orchestration filenames were normalized to explicit descriptive names (`DebugRoutes.ts`, `PushRoutes.ts`, and `ThreadRoutes.ts`) and all dependent imports/contracts were synchronized, removing remaining route filename ambiguity in the network layer.
 - [x] Server agent adapter filenames were normalized to explicit descriptive names (`CodexAgentAdapter.ts` and `OpenCodeAgentAdapter.ts`) and all dependent imports/contracts were synchronized, removing remaining adapter filename ambiguity in the server ownership layer.
 - [x] App runtime request/session/push callback ownership and stream/presentation helper ownership were extracted from `apps/WebApplication/Source/App.tsx` into `UseApplicationRuntimeRequestHandlers.ts` and `UseApplicationPresentationHelpers.tsx`, reducing `App.tsx` from 985 to 918 lines and keeping app-shell callback logic under explicit application state-management ownership.
@@ -976,12 +1024,16 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Codex adapter and push-service error classification helpers now use explicit generic signatures and schema parsing instead of broad contract typing.
 - [x] Repository rename wave executed for application/package roots, and workspace/config/documentation references were synchronized to `apps/WebApplication`, `apps/ServerApplication`, `packages/CodexProtocol`, `packages/CodexInterfaceAdapter`, and `packages/OpenCodeInterfaceAdapter`.
 - [x] `Source` and `Tests` path migration is complete across applications and packages, with scripts/tests/docs updated to use PascalCase path ownership.
-- [x] Push-state runtime ownership now uses only canonical path resolution; legacy migration behavior was removed from `apps/ServerApplication/Source/PushStatePath.ts` and `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts`.
+- [x] Push-state runtime ownership now uses only canonical path resolution; legacy migration behavior was removed from `apps/ServerApplication/Source/Modules/PushNotifications/PushStatePath.ts` and `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfiguration.ts`.
 - [x] Strict `JsonValue` transport-edge normalization was tightened in `packages/CodexInterfaceAdapter/Source/Service.ts` and server codex/opencode adapters using schema-owned parsing at ingress/egress boundaries.
 - [x] Server application internal composition entrypoint ownership now uses `apps/ServerApplication/Source/Application/ServerBootstrap.ts`; application-level implementation `Index.ts` was removed and server scripts/integration tests were updated to the descriptive entrypoint path.
 - [x] Web application cross-domain catch-all `apps/WebApplication/Source/SharedUtilities/*` ownership was removed; styling, debug issue derivation, error formatting, push client behavior, and crash reporter installation now live under explicit `Shared`, `Features`, and `Application/Boot` owner modules.
 - [x] Debug helper ownership from `apps/WebApplication/Source/SharedUtilities/DebugHelpers.ts` was split into explicit domain/state modules (`DebugIssueContracts.ts`, `DebugIssueDerivation.ts`, `ErrorBannerDetailsParser.ts`, and `TrackedUserInterfaceErrorPolicy.ts`) with chat-specific read-error classifiers and shared error-message ownership moved to dedicated modules.
 - [x] Push client and crash-reporter ownership was consolidated into feature/application owners (`PushClientStateManager.ts`, `PushClientContracts.ts`, `ClientErrorReporter.ts`, and `InstallClientErrorReporter.ts`) and all source/test imports were migrated to those owner paths.
+- [x] Theme hook ownership was moved from the generic `apps/WebApplication/Source/Hooks/UseTheme.ts` location into `apps/WebApplication/Source/Features/Theme/StateManagement/UseTheme.ts`, and the empty generic hooks folder was removed.
+- [x] Pending thread materialization ownership was moved from cross-module mutable ref mutation into `apps/WebApplication/Source/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator.ts`, and chat/thread loaders now consume typed owner APIs.
+- [x] Push store persistence now uses queued asynchronous file writes in `apps/ServerApplication/Source/Modules/PushNotifications/PushStore.ts`, removing synchronous filesystem writes from request paths.
+- [x] Push fan-out sending now uses bounded concurrent workers in `apps/ServerApplication/Source/Modules/PushNotifications/PushService.ts`, and thread-stream updates now invalidate thread-list aggregation cache in `apps/ServerApplication/Source/Application/ServerBootstrap.ts` for fresher list reads.
 
 ### Current High-Impact Remaining Gaps
 
@@ -1127,6 +1179,31 @@ All path families above must remain internally consistent after each rename/move
      - push client behavior and contracts live under `apps/WebApplication/Source/Features/PushNotifications/*`
      - application boot crash-reporter installation lives under `apps/WebApplication/Source/Application/Boot/*`
    - Reason: eliminates cross-domain catch-all coupling and keeps ownership boundaries explicit for maintainability.
+
+15. Date: 2026-02-24
+   - Decision: Normalize server source ownership under explicit `Application`, `Modules`, and `Shared` subtrees.
+   - Rule:
+     - bootstrap and lifecycle owners live under `apps/ServerApplication/Source/Application/Bootstrap/*`
+     - runtime configuration owner lives under `apps/ServerApplication/Source/Application/Configuration/*`
+     - runtime state owner lives under `apps/ServerApplication/Source/Application/StateManagement/*`
+     - domain services and persistence owners live under `apps/ServerApplication/Source/Modules/*`
+     - shared logging ownership lives under `apps/ServerApplication/Source/Shared/Logging/*`
+   - Reason: improves discoverability, enforces ownership boundaries, and removes root-level source concentration.
+
+16. Date: 2026-02-24
+   - Decision: Move pending thread materialization state out of cross-module mutable refs into an explicit owner class.
+   - Rule:
+     - pending thread materialization mutation/query behavior is owned by `apps/WebApplication/Source/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator.ts`
+     - chat/thread loaders and action handlers consume coordinator APIs instead of mutating shared `Set` refs directly
+   - Reason: enforces single-owner mutation policy and reduces hidden cross-module coupling.
+
+17. Date: 2026-02-24
+   - Decision: Use non-blocking persisted push-state writes and bounded concurrent push fan-out.
+   - Rule:
+     - push-state persistence writes are queued async operations in `apps/ServerApplication/Source/Modules/PushNotifications/PushStore.ts`
+     - push send fan-out uses bounded concurrent workers in `apps/ServerApplication/Source/Modules/PushNotifications/PushService.ts`
+     - thread-stream updates invalidate thread-list aggregation cache in `apps/ServerApplication/Source/Application/ServerBootstrap.ts`
+   - Reason: removes request-path event-loop blocking, improves push throughput, and keeps thread list reads fresher during live updates.
 
 ## End-State Completion Criteria
 

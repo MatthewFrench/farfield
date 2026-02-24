@@ -7,6 +7,7 @@ import {
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { PendingUserInputAnswerBuilder } from "../DomainModel/PendingUserInputAnswerBuilder";
 import { type PendingUserInputRequest } from "../DomainModel/PendingUserInputRequestSelector";
+import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import {
   ChatRequestActionCoordinator,
   type ChatRequestActionChatClient,
@@ -40,7 +41,7 @@ export interface UseChatActionHandlersInput {
   setIsModeSyncing: Dispatch<SetStateAction<boolean>>;
   setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
   selectedThreadIdRef: MutableRefObject<string | null>;
-  pendingMaterializationThreadIdsRef: MutableRefObject<Set<string>>;
+  pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator;
   readLastAppliedModeSignature: () => string;
   writeLastAppliedModeSignature: (modeSignature: string) => void;
   chatRequestActionCoordinator: ChatRequestActionCoordinator;
@@ -79,10 +80,10 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
         input.selectedThreadIdRef.current = threadId;
       },
       onMarkThreadPendingMaterialization: (threadId) => {
-        input.pendingMaterializationThreadIdsRef.current.add(threadId);
+        input.pendingThreadMaterializationCoordinator.markPending(threadId);
       },
       onClearThreadPendingMaterialization: (threadId) => {
-        input.pendingMaterializationThreadIdsRef.current.delete(threadId);
+        input.pendingThreadMaterializationCoordinator.clearPending(threadId);
       },
       chatClient: input.chatClient,
       threadMutationClient: input.threadMutationClient,
@@ -93,7 +94,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.buildActionRequestOptions,
     input.chatClient,
     input.chatRequestActionCoordinator,
-    input.pendingMaterializationThreadIdsRef,
+    input.pendingThreadMaterializationCoordinator,
     input.refreshAll,
     input.reportTrackedUserInterfaceError,
     input.selectedAgentId,

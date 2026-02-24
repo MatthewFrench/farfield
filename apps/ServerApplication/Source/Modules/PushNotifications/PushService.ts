@@ -37,6 +37,7 @@ const WebPushErrorSchema = z
 const MAX_PUSH_SEND_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 200;
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const PUSH_SEND_CONCURRENCY_LIMIT = 8;
 
 interface DescribedPushError {
   statusCode: number | null;
@@ -109,6 +110,61 @@ function toWireSubscription(subscription: StoredPushSubscription): webPush.PushS
   };
 }
 
+interface PushDispatchResult {
+  delivered: number;
+  failures: PushSendFailure[];
+  prunedEndpoints: string[];
+}
+
+async function sendSubscriptionsWithConcurrencyLimit(
+  subscriptions: StoredPushSubscription[],
+  payload: string,
+  requestOptions: webPush.RequestOptions
+): Promise<PushDispatchResult> {
+  const failures: PushSendFailure[] = [];
+  const prunedEndpoints: string[] = [];
+  let delivered = 0;
+  let nextSubscriptionIndex = 0;
+
+  const workerCount = Math.min(PUSH_SEND_CONCURRENCY_LIMIT, subscriptions.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const subscriptionIndex = nextSubscriptionIndex;
+      nextSubscriptionIndex += 1;
+      const subscription = subscriptions[subscriptionIndex];
+      if (!subscription) {
+        return;
+      }
+
+      try {
+        await sendNotificationWithRetry(
+          toWireSubscription(subscription),
+          payload,
+          requestOptions
+        );
+        delivered += 1;
+      } catch (error) {
+        const described = describePushError(error);
+        failures.push({
+          endpoint: subscription.subscription.endpoint,
+          statusCode: described.statusCode,
+          message: described.message
+        });
+        if (described.statusCode === 404 || described.statusCode === 410) {
+          prunedEndpoints.push(subscription.subscription.endpoint);
+        }
+      }
+    }
+  });
+
+  await Promise.all(workers);
+  return {
+    delivered,
+    failures,
+    prunedEndpoints
+  };
+}
+
 export class PushService {
   private readonly enabled: boolean;
   private readonly vapidPublicKey: string;
@@ -152,36 +208,17 @@ export class PushService {
       TTL: 300,
       urgency: "high"
     };
-    const failures: PushSendFailure[] = [];
-    const prunedEndpoints: string[] = [];
-    let delivered = 0;
-
-    for (const subscription of subscriptions) {
-      try {
-        await sendNotificationWithRetry(
-          toWireSubscription(subscription),
-          body,
-          requestOptions
-        );
-        delivered += 1;
-      } catch (error) {
-        const described = describePushError(error);
-        failures.push({
-          endpoint: subscription.subscription.endpoint,
-          statusCode: described.statusCode,
-          message: described.message
-        });
-        if (described.statusCode === 404 || described.statusCode === 410) {
-          prunedEndpoints.push(subscription.subscription.endpoint);
-        }
-      }
-    }
+    const sendResult = await sendSubscriptionsWithConcurrencyLimit(
+      subscriptions,
+      body,
+      requestOptions
+    );
 
     return {
       attempted: subscriptions.length,
-      delivered,
-      failures,
-      prunedEndpoints
+      delivered: sendResult.delivered,
+      failures: sendResult.failures,
+      prunedEndpoints: sendResult.prunedEndpoints
     };
   }
 }

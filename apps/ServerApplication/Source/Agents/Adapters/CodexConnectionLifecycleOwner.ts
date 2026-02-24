@@ -3,7 +3,7 @@ import {
   AppServerTransportError,
   type DesktopIpcClient
 } from "@farfield/api";
-import { logger } from "../../Logger.js";
+import { logger } from "../../Shared/Logging/Logger.js";
 import type { CodexAgentRuntimeState } from "./CodexAgentAdapter.js";
 
 interface DesktopIpcConnectionStateSnapshot {

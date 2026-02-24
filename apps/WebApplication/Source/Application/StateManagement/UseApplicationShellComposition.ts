@@ -83,7 +83,7 @@ export function useApplicationShellComposition(
     setSelectedThreadId: applicationShellState.setSelectedThreadId,
     setMobileSidebarOpen: applicationShellState.setMobileSidebarOpen,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
-    pendingMaterializationThreadIdsRef: applicationShellState.pendingMaterializationThreadIdsRef,
+    pendingThreadMaterializationCoordinator: applicationShellState.pendingThreadMaterializationCoordinator,
     threadMutationActionCoordinator: input.threadMutationActionCoordinator,
     threadMutationServerClient: input.threadMutationServerClient,
     threadListStateController: input.threadListStateController,

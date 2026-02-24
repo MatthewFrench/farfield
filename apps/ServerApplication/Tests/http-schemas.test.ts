@@ -6,7 +6,7 @@ import {
   StartThreadBodySchema,
   SetModeBodySchema,
   SubmitUserInputBodySchema
-} from "../Source/HttpSchemas.js";
+} from "../Source/Network/RequestSchemas/HttpSchemas.js";
 
 describe("server request schemas", () => {
   it("accepts valid send message body", () => {

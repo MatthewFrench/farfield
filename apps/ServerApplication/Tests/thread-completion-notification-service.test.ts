@@ -2,11 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { NtfyNotifier } from "../Source/NtfyNotifier.js";
-import { PushSendStore } from "../Source/PushSendStore.js";
-import { PushService } from "../Source/PushService.js";
-import { PushStore } from "../Source/PushStore.js";
-import { ThreadCompletionNotificationService } from "../Source/ThreadCompletionNotificationService.js";
+import { NtfyNotifier } from "../Source/Modules/PushNotifications/NtfyNotifier.js";
+import { PushSendStore } from "../Source/Modules/PushNotifications/PushSendStore.js";
+import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
+import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
+import { ThreadCompletionNotificationService } from "../Source/Modules/Threads/ThreadCompletionNotificationService.js";
 
 const temporaryDirectoryPaths: string[] = [];
 

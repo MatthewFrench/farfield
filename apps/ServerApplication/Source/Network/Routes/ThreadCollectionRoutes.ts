@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { JsonValue } from "@farfield/protocol";
 import { z } from "zod";
-import { logger } from "../../Logger.js";
-import { parseBody, StartThreadBodySchema } from "../../HttpSchemas.js";
+import { logger } from "../../Shared/Logging/Logger.js";
+import { parseBody, StartThreadBodySchema } from "../RequestSchemas/HttpSchemas.js";
 import type { AgentAdapter, AgentId } from "../../Agents/Types.js";
 import type {
   ThreadListAggregationCache,

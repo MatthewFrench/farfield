@@ -29,6 +29,7 @@ import {
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { type DebugIssueSeverityFilter } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/UserInterface/DebugWorkspacePane";
+import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 
 type AgentDescriptor = CapabilityAgentsResponse["agents"][number];
@@ -162,7 +163,7 @@ export interface ApplicationShellState {
   lastAppliedModeSignatureRef: MutableRefObject<string>;
   unreadThreadIdsRef: MutableRefObject<Record<string, true>>;
   hasHydratedAgentSelectionRef: MutableRefObject<boolean>;
-  pendingMaterializationThreadIdsRef: MutableRefObject<Set<string>>;
+  pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator;
   debugErrorsSignatureRef: MutableRefObject<string[]>;
   modesSignatureRef: MutableRefObject<string[]>;
   modelsSignatureRef: MutableRefObject<string[]>;
@@ -244,7 +245,10 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
   const lastAppliedModeSignatureRef = useRef("");
   const unreadThreadIdsRef = useRef<Record<string, true>>({});
   const hasHydratedAgentSelectionRef = useRef(false);
-  const pendingMaterializationThreadIdsRef = useRef<Set<string>>(new Set());
+  const pendingThreadMaterializationCoordinatorRef = useRef(
+    new PendingThreadMaterializationCoordinator()
+  );
+  const pendingThreadMaterializationCoordinator = pendingThreadMaterializationCoordinatorRef.current;
   const debugErrorsSignatureRef = useRef<string[]>([]);
   const modesSignatureRef = useRef<string[]>([]);
   const modelsSignatureRef = useRef<string[]>([]);
@@ -380,7 +384,7 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
     lastAppliedModeSignatureRef,
     unreadThreadIdsRef,
     hasHydratedAgentSelectionRef,
-    pendingMaterializationThreadIdsRef,
+    pendingThreadMaterializationCoordinator,
     debugErrorsSignatureRef,
     modesSignatureRef,
     modelsSignatureRef,

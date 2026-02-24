@@ -18,7 +18,12 @@ function getInitialTheme(): ThemePreference {
   return readSystemThemePreference();
 }
 
-export function useTheme() {
+export interface UseThemeResult {
+  theme: ThemePreference;
+  toggle: () => void;
+}
+
+export function useTheme(): UseThemeResult {
   const [theme, setTheme] = useState<ThemePreference>(getInitialTheme);
 
   useEffect(() => {
@@ -26,7 +31,9 @@ export function useTheme() {
     themePreferenceStore.writeThemePreference(theme);
   }, [theme]);
 
-  const toggle = useCallback(() => setTheme((t) => (t === "dark" ? "light" : "dark")), []);
+  const toggle = useCallback((): void => {
+    setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
+  }, []);
 
   return { theme, toggle };
 }

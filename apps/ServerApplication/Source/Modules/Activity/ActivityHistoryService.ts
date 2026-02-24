@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { logger } from "./Logger.js";
-import type { EventStreamClientRegistry } from "./Network/EventStreamClientRegistry.js";
-import type { ActiveTrace, HistoryEntry, TraceSummary } from "./Network/Routes/DebugTypes.js";
+import { logger } from "../../Shared/Logging/Logger.js";
+import type { EventStreamClientRegistry } from "../../Network/EventStreamClientRegistry.js";
+import type { ActiveTrace, HistoryEntry, TraceSummary } from "../../Network/Routes/DebugTypes.js";
 
 export class ActivityHistoryService {
   private readonly historyLimit: number;

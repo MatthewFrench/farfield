@@ -1,5 +1,5 @@
 import { type SendRequestOptions } from "@farfield/api";
-import { parseBody, ReplayBodySchema } from "../../HttpSchemas.js";
+import { parseBody, ReplayBodySchema } from "../RequestSchemas/HttpSchemas.js";
 import {
   buildSendRequestOptions,
   type DebugRouteDependencies,

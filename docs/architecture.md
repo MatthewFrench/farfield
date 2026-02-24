@@ -434,22 +434,20 @@ Naming quality checks:
 ### `apps/ServerApplication/Source`
 
 - `Application`
+- `Network` (root-level coordinators and owners)
 - `Network/Routes`
 - `Network/RequestSchemas`
-- `Network/Middleware`
 - `Modules/<ModuleName>`
 - `Agents`
 - `Shared`
 
 ### `packages/*/Source`
 
-- `Contracts`
-- `Parsers`
-- `Clients`
-- `Transports`
-- `Services`
-- `Mappers`
-- `StateReduction`
+- `packages/CodexProtocol/Source/Contracts`
+- `packages/CodexProtocol/Source/Parsers`
+- `packages/CodexProtocol/Source/Generated` (generator-owned)
+- `packages/CodexInterfaceAdapter/Source/*` (flat explicit owners; for example `AppServerClient.ts`, `AppServerTransport.ts`, `IpcClient.ts`, `LiveState.ts`, `Service.ts`)
+- `packages/OpenCodeInterfaceAdapter/Source/*` (flat explicit owners; for example `Client.ts`, `Schemas.ts`, `SessionMapper.ts`, `ConversationTurnMapper.ts`, `Service.ts`)
 
 ## Non-Source Structure Rules
 

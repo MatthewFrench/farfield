@@ -5,15 +5,15 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import type { AgentAdapter, AgentCapabilities, AgentId } from "../Source/Agents/Types.js";
-import { ActivityHistoryService } from "../Source/ActivityHistoryService.js";
-import { ClientErrorStore } from "../Source/ClientErrorStore.js";
+import { ActivityHistoryService } from "../Source/Modules/Activity/ActivityHistoryService.js";
+import { ClientErrorStore } from "../Source/Modules/Debugging/ClientErrorStore.js";
 import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
-import { NtfyNotifier } from "../Source/NtfyNotifier.js";
+import { NtfyNotifier } from "../Source/Modules/PushNotifications/NtfyNotifier.js";
 import { PushDispatchConcurrencyCoordinator } from "../Source/Network/PushDispatchConcurrencyCoordinator.js";
-import { PushReceiptStore } from "../Source/PushReceiptStore.js";
-import { PushService } from "../Source/PushService.js";
-import { PushStore } from "../Source/PushStore.js";
-import { ServerLifecycleCoordinator } from "../Source/ServerLifecycleCoordinator.js";
+import { PushReceiptStore } from "../Source/Modules/PushNotifications/PushReceiptStore.js";
+import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
+import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
+import { ServerLifecycleCoordinator } from "../Source/Application/Bootstrap/ServerLifecycleCoordinator.js";
 
 const temporaryDirectoryPaths: string[] = [];
 

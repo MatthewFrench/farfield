@@ -9,8 +9,8 @@ import {
   type IpcFrame,
   type ThreadStreamStateChangedBroadcast
 } from "@farfield/protocol";
-import { logger } from "../../Logger.js";
-import { resolveOwnerClientId } from "../../ThreadOwner.js";
+import { logger } from "../../Shared/Logging/Logger.js";
+import { resolveOwnerClientId } from "../../Modules/Threads/ThreadOwner.js";
 import type { AgentThreadLiveState, AgentThreadStreamEvents } from "../Types.js";
 
 interface ThreadLiveStateProjection {

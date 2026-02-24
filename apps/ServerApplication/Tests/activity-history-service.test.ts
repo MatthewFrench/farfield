@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { ActivityHistoryService } from "../Source/ActivityHistoryService.js";
+import { ActivityHistoryService } from "../Source/Modules/Activity/ActivityHistoryService.js";
 import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
 
 const temporaryDirectoryPaths: string[] = [];

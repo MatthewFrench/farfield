@@ -5,7 +5,7 @@ import {
 } from "@farfield/protocol";
 import { z } from "zod";
 import type { EventStreamClientRegistry } from "../EventStreamClientRegistry.js";
-import type { RuntimeStateOwner } from "../../RuntimeStateOwner.js";
+import type { RuntimeStateOwner } from "../../Application/StateManagement/RuntimeStateOwner.js";
 import type { BrowserSessionAuthOwner } from "../BrowserSessionAuthOwner.js";
 
 const EventsSessionBootstrapBodySchema = z

@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolvePushStatePath } from "../Source/PushStatePath.js";
+import { resolvePushStatePath } from "../Source/Modules/PushNotifications/PushStatePath.js";
 
 describe("resolvePushStatePath", () => {
   it("uses OS state directory on macOS when env override is not set", () => {

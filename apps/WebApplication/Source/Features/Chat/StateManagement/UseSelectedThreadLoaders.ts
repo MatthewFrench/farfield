@@ -10,6 +10,7 @@ import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
 import {
   type CapabilityAgentsResponse
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
+import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import {
   type ThreadListItem
 } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
@@ -47,7 +48,7 @@ export interface UseSelectedThreadLoadersInput {
   appDefaultModel: string;
   appDefaultReasoningEffort: string;
   selectedThreadIdRef: MutableRefObject<string | null>;
-  pendingMaterializationThreadIdsRef: MutableRefObject<Set<string>>;
+  pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator;
   conversationSyncSignatureBuilder: ConversationSyncSignatureBuilder;
   selectedThreadDataRefreshCoordinator: SelectedThreadDataRefreshCoordinator;
   selectedThreadRefreshConcurrencyCoordinator: SelectedThreadRefreshConcurrencyCoordinator;
@@ -75,7 +76,8 @@ export function useSelectedThreadLoaders(
     options?: LoadSelectedThreadOptions,
     signal?: AbortSignal
   ) => {
-    const includeTurns = options?.includeTurns ?? !input.pendingMaterializationThreadIdsRef.current.has(threadId);
+    const includeTurns = options?.includeTurns
+      ?? !input.pendingThreadMaterializationCoordinator.isPending(threadId);
     const includeReadThread = options?.includeReadThread ?? true;
     const thread = input.threads.find((entry) => entry.id === threadId) ?? null;
     const threadAgentId = thread?.agentId ?? input.selectedAgentId;
@@ -98,7 +100,7 @@ export function useSelectedThreadLoaders(
     }
 
     if (snapshot.containsAnyTurns) {
-      input.pendingMaterializationThreadIdsRef.current.delete(threadId);
+      input.pendingThreadMaterializationCoordinator.clearPending(threadId);
     }
 
     startTransition(() => {
@@ -170,7 +172,7 @@ export function useSelectedThreadLoaders(
     input.appDefaultReasoningEffort,
     input.chatServerClient,
     input.conversationSyncSignatureBuilder,
-    input.pendingMaterializationThreadIdsRef,
+    input.pendingThreadMaterializationCoordinator,
     input.readThreadStateMerger,
     input.selectedAgentId,
     input.selectedThreadDataRefreshCoordinator,
@@ -184,7 +186,7 @@ export function useSelectedThreadLoaders(
   const loadSelectedThreadTracked = useCallback(async (threadId: string, options?: LoadSelectedThreadOptions) => {
     const request: SelectedThreadRefreshRequest = {
       threadId,
-      includeTurns: options?.includeTurns ?? !input.pendingMaterializationThreadIdsRef.current.has(threadId),
+      includeTurns: options?.includeTurns ?? !input.pendingThreadMaterializationCoordinator.isPending(threadId),
       includeReadThread: options?.includeReadThread ?? true
     };
 
@@ -203,7 +205,7 @@ export function useSelectedThreadLoaders(
       isCanceledError: isRequestCanceledError
     });
   }, [
-    input.pendingMaterializationThreadIdsRef,
+    input.pendingThreadMaterializationCoordinator,
     input.selectedThreadRefreshConcurrencyCoordinator,
     loadSelectedThread
   ]);

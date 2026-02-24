@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { PushStore } from "../Source/PushStore.js";
+import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
 
 const tempDirectories: string[] = [];
 
@@ -30,10 +30,10 @@ describe("PushStore", () => {
     expect(store.listCompletionWatermarks()).toEqual([]);
   });
 
-  it("persists subscriptions and completion watermarks", () => {
+  it("persists subscriptions and completion watermarks", async () => {
     const { store, filePath } = createStoreWithTempPath();
     store.load();
-    const saved = store.upsertSubscription(
+    const saved = await store.upsertSubscription(
       {
         endpoint: "https://example.push.service/subscription-id",
         keys: {
@@ -45,7 +45,7 @@ describe("PushStore", () => {
         privateMode: true
       }
     );
-    store.setCompletionWatermark("thread_1", "thread_1:turn_1:item_1");
+    await store.setCompletionWatermark("thread_1", "thread_1:turn_1:item_1");
 
     const reloaded = new PushStore(filePath);
     reloaded.load();
@@ -55,10 +55,10 @@ describe("PushStore", () => {
     expect(reloaded.getCompletionWatermark("thread_1")).toBe("thread_1:turn_1:item_1");
   });
 
-  it("removes subscription by endpoint", () => {
+  it("removes subscription by endpoint", async () => {
     const { store } = createStoreWithTempPath();
     store.load();
-    store.upsertSubscription(
+    await store.upsertSubscription(
       {
         endpoint: "https://example.push.service/subscription-id",
         keys: {
@@ -71,11 +71,10 @@ describe("PushStore", () => {
       }
     );
 
-    const removed = store.removeSubscriptionByEndpoint(
+    const removed = await store.removeSubscriptionByEndpoint(
       "https://example.push.service/subscription-id"
     );
     expect(removed).toBe(true);
     expect(store.getSubscriptionCount()).toBe(0);
   });
 });
-

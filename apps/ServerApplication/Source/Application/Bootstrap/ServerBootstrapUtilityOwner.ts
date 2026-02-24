@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { JsonValue } from "@farfield/protocol";
-import type { AgentAdapter, AgentDescriptor } from "./Agents/Types.js";
+import type { AgentAdapter, AgentDescriptor } from "../../Agents/Types.js";
 
 export class ServerBootstrapUtilityOwner {
   public jsonResponse(res: ServerResponse, statusCode: number, body: object): void {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseThreadConversationState } from "@farfield/protocol";
-import { CompletionDetector } from "../Source/CompletionDetector.js";
+import { CompletionDetector } from "../Source/Modules/Threads/CompletionDetector.js";
 
 describe("CompletionDetector", () => {
   it("detects a new completed turn with an agent message", () => {
