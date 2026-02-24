@@ -104,6 +104,54 @@ const AddressSchema = z
   })
   .strict();
 
+const InheritedServerProcessEnvironmentSchema = z
+  .object({
+    PATH: z.string().optional(),
+    HOME: z.string().optional(),
+    USER: z.string().optional(),
+    LOGNAME: z.string().optional(),
+    SHELL: z.string().optional(),
+    TMPDIR: z.string().optional(),
+    TMP: z.string().optional(),
+    TEMP: z.string().optional(),
+    SYSTEMROOT: z.string().optional(),
+    SYSTEMDRIVE: z.string().optional(),
+    COMSPEC: z.string().optional(),
+    PATHEXT: z.string().optional(),
+    WINDIR: z.string().optional(),
+    APPDATA: z.string().optional(),
+    LOCALAPPDATA: z.string().optional(),
+    NO_COLOR: z.string().optional(),
+    FORCE_COLOR: z.string().optional(),
+    CI: z.string().optional()
+  })
+  .strict();
+
+function buildInheritedServerProcessEnvironment(
+  sourceEnvironment: NodeJS.ProcessEnv
+): NodeJS.ProcessEnv {
+  return InheritedServerProcessEnvironmentSchema.parse({
+    PATH: sourceEnvironment["PATH"],
+    HOME: sourceEnvironment["HOME"],
+    USER: sourceEnvironment["USER"],
+    LOGNAME: sourceEnvironment["LOGNAME"],
+    SHELL: sourceEnvironment["SHELL"],
+    TMPDIR: sourceEnvironment["TMPDIR"],
+    TMP: sourceEnvironment["TMP"],
+    TEMP: sourceEnvironment["TEMP"],
+    SYSTEMROOT: sourceEnvironment["SYSTEMROOT"],
+    SYSTEMDRIVE: sourceEnvironment["SYSTEMDRIVE"],
+    COMSPEC: sourceEnvironment["COMSPEC"],
+    PATHEXT: sourceEnvironment["PATHEXT"],
+    WINDIR: sourceEnvironment["WINDIR"],
+    APPDATA: sourceEnvironment["APPDATA"],
+    LOCALAPPDATA: sourceEnvironment["LOCALAPPDATA"],
+    NO_COLOR: sourceEnvironment["NO_COLOR"],
+    FORCE_COLOR: sourceEnvironment["FORCE_COLOR"],
+    CI: sourceEnvironment["CI"]
+  });
+}
+
 async function getAvailablePort(): Promise<number> {
   return await new Promise<number>((resolve, reject) => {
     const server = net.createServer();
@@ -181,7 +229,7 @@ describe("server route integration", () => {
       {
         cwd: process.cwd(),
         env: {
-          ...process.env,
+          ...buildInheritedServerProcessEnvironment(process.env),
           HOST: "127.0.0.1",
           PORT: String(port),
           API_TOKEN: apiToken,

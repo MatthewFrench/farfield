@@ -2,7 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./Index.css";
-import { reconcilePushSubscription } from "./Features/PushNotifications/DataAccess/PushClientStateManager";
+import { reconcilePushSubscription } from "./Features/PushNotifications/DataAccess/PushClientApi";
 import { installGlobalClientCrashReporter } from "./Application/Boot/InstallClientErrorReporter";
 
 const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";

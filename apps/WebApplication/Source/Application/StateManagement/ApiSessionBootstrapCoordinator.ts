@@ -11,6 +11,12 @@ export interface ApiSessionBootstrapDecision {
 
 const DEFAULT_REFRESH_LEAD_TIME_MS = 30_000;
 
+/**
+ * Owns API session bootstrap readiness and refresh behavior for the web shell.
+ * A still-valid authenticated session keeps the shell interactive while a background refresh runs.
+ * Background refresh failures are intentionally consumed because current session data remains valid
+ * until expiry and the next bootstrap attempt will retry through the same owner.
+ */
 export class ApiSessionBootstrapCoordinator {
   private readonly refreshLeadTimeMs: number;
   private inFlightBootstrapDecision: Promise<ApiSessionBootstrapDecision> | null;
@@ -49,7 +55,7 @@ export class ApiSessionBootstrapCoordinator {
     // Keep the app interactive while proactively refreshing a still-valid session.
     // The lead-time window is for refresh scheduling, not for blocking reads.
     if (this.hasValidSessionAt(nowEpochMs)) {
-      void this.executeBootstrapRequest(loadSession);
+      this.runBackgroundRefresh(loadSession);
       return {
         isReady: true,
         requiresApiToken: false
@@ -168,5 +174,14 @@ export class ApiSessionBootstrapCoordinator {
       return false;
     }
     return nowEpochMs < this.sessionExpiresAtEpochMs;
+  }
+
+  private runBackgroundRefresh(
+    loadSession: () => Promise<ApiSessionBootstrapResponse>
+  ): void {
+    void this.executeBootstrapRequest(loadSession).catch(() => {
+      // Refresh errors are consumed because session use remains valid until expiry.
+      return undefined;
+    });
   }
 }

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
+import {
+  ApiSessionBootstrapCoordinator,
+  type ApiSessionBootstrapResponse
+} from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
 
 describe("ApiSessionBootstrapCoordinator", () => {
   it("caches non-authenticated mode after first successful bootstrap read", async () => {
@@ -119,6 +122,60 @@ describe("ApiSessionBootstrapCoordinator", () => {
 
     expect(initializeRead).toHaveBeenCalledTimes(1);
     expect(nearExpiryRefreshRead).toHaveBeenCalledTimes(1);
+  });
+
+  it("consumes background refresh rejection and retries on later refresh attempts", async () => {
+    const refreshLeadTimeMs = 30_000;
+    const coordinator = new ApiSessionBootstrapCoordinator(refreshLeadTimeMs);
+    const expiresAt = "2099-01-01T00:00:20.000Z";
+    const expiresAtEpochMs = Date.parse(expiresAt);
+
+    const initializeRead = vi.fn(async () => ({
+      authRequired: true,
+      bootstrapped: true,
+      expiresAt
+    }));
+
+    let rejectBackgroundRefresh: (error: Error) => void = () => {
+      throw new Error("Expected background refresh reject callback to be initialized");
+    };
+    const failingBackgroundRefreshRead = vi.fn(
+      () =>
+        new Promise<ApiSessionBootstrapResponse>((_resolve, reject) => {
+          rejectBackgroundRefresh = (error: Error) => {
+            reject(error);
+          };
+        })
+    );
+
+    const succeedingBackgroundRefreshRead = vi.fn(async () => ({
+      authRequired: true,
+      bootstrapped: true,
+      expiresAt
+    }));
+
+    expect(await coordinator.ensureSession(initializeRead, expiresAtEpochMs - refreshLeadTimeMs - 1)).toEqual({
+      isReady: true,
+      requiresApiToken: false
+    });
+
+    expect(await coordinator.ensureSession(failingBackgroundRefreshRead, expiresAtEpochMs - refreshLeadTimeMs + 1)).toEqual({
+      isReady: true,
+      requiresApiToken: false
+    });
+
+    rejectBackgroundRefresh(new Error("refresh-error"));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(await coordinator.ensureSession(succeedingBackgroundRefreshRead, expiresAtEpochMs - refreshLeadTimeMs + 2)).toEqual({
+      isReady: true,
+      requiresApiToken: false
+    });
+
+    expect(initializeRead).toHaveBeenCalledTimes(1);
+    expect(failingBackgroundRefreshRead).toHaveBeenCalledTimes(1);
+    expect(succeedingBackgroundRefreshRead).toHaveBeenCalledTimes(1);
   });
 
   it("honors explicit api-token-required marker without issuing requests", async () => {

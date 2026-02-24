@@ -194,6 +194,7 @@ This document defines the target folder/file structure and end-state ownership m
           PushNotifications/
             DataAccess/
               PushApi.ts
+              PushClientApi.ts
               PushClientStateManager.ts
               PushPreferenceStore.ts
               PushServerClient.ts
@@ -251,6 +252,7 @@ This document defines the target folder/file structure and end-state ownership m
           Bootstrap/
             ServerBootstrapUtilityOwner.ts
             ServerLifecycleCoordinator.ts
+            ThreadListCacheInvalidationOwner.ts
           Configuration/
             ServerRuntimeConfiguration.ts
           StateManagement/
@@ -299,8 +301,12 @@ This document defines the target folder/file structure and end-state ownership m
             DebugRoutes.ts
             DebugTraceRouteOwner.ts
             DebugTypes.ts
+            PushRouteContracts.ts
             PushRoutes.ts
+            PushTestRouteOwner.ts
             RuntimeRoutes.ts
+            ThreadCollectionListQueryOwner.ts
+            ThreadCollectionRouteContracts.ts
             ThreadCollectionRoutes.ts
             ThreadMemberArchiveMutationRouteOwner.ts
             ThreadMemberInteractionMutationRouteOwner.ts
@@ -644,7 +650,7 @@ Listed implemented paths are expected to exist in the repository.
 | `apps/WebApplication/Source/Main.tsx` | `apps/WebApplication/Source/Main.tsx` + `apps/WebApplication/Source/Application/Boot/*` |
 | `apps/WebApplication/Source/App.tsx` | `apps/WebApplication/Source/App.tsx` + `apps/WebApplication/Source/Application/StateManagement/*` + `apps/WebApplication/Source/Application/UserInterface/*` |
 | `apps/WebApplication/Source/Application/DataAccess/WebShellApi.ts` | `apps/WebApplication/Source/Application/DataAccess/WebShellApi.ts` |
-| `apps/WebApplication/Source/SharedUtilities/Push.ts` | `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushApi.ts` + `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushClientStateManager.ts` + `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushServerClient.ts` + `apps/WebApplication/Source/Features/PushNotifications/DomainModel/PushClientContracts.ts` |
+| `apps/WebApplication/Source/SharedUtilities/Push.ts` | `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushApi.ts` + `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushClientApi.ts` + `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushClientStateManager.ts` + `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushServerClient.ts` + `apps/WebApplication/Source/Features/PushNotifications/DomainModel/PushClientContracts.ts` |
 | `apps/WebApplication/Source/SharedUtilities/ClientErrors.ts` | `apps/WebApplication/Source/Application/Boot/InstallClientErrorReporter.ts` + `apps/WebApplication/Source/Features/Debugging/DataAccess/ClientErrorReporter.ts` |
 | `apps/WebApplication/Source/SharedUtilities/DebugHelpers.ts` | `apps/WebApplication/Source/Features/Debugging/DomainModel/DebugIssueContracts.ts` + `apps/WebApplication/Source/Features/Debugging/DomainModel/DebugIssueDerivation.ts` + `apps/WebApplication/Source/Features/Debugging/DomainModel/ErrorBannerDetailsParser.ts` + `apps/WebApplication/Source/Features/Debugging/StateManagement/TrackedUserInterfaceErrorPolicy.ts` + `apps/WebApplication/Source/Shared/Errors/ErrorMessage.ts` + `apps/WebApplication/Source/Features/Chat/DomainModel/ReadThreadErrorClassifier.ts` |
 | `apps/WebApplication/Source/SharedUtilities/Utils.ts` | `apps/WebApplication/Source/Shared/Styling/ClassNameMerge.ts` |
@@ -728,10 +734,11 @@ Use this checklist as the single at-a-glance cleanup tracker.
 
 - Date: 2026-02-24
 - Checklist completion: 296 / 296 items (`100%`)
+- Pull request review-thread status (`MatthewFrench/farfield#1`): `0` unresolved review threads (verified via `gh api graphql` audit on 2026-02-24).
 
 ### Realistic End-State Estimate (Holistic)
 
-- Estimated overall completion: `98%`
+- Estimated overall completion: `99%`
 - Basis:
   - Checklist execution is complete (`296 / 296`) with no open checklist items.
   - Detailed tree is illustrative; completion is tracked against the verified ownership mapping and checklist entries.
@@ -740,18 +747,20 @@ Use this checklist as the single at-a-glance cleanup tracker.
   - Root-folder abbreviation cleanup is complete for structural roots (`e2e` -> `end-to-end`, `ops` -> `operations`).
   - Test-file PascalCase conformance is complete across `apps/*/Tests` and `packages/*/Tests`, including owner-aligned naming.
   - `apps/WebApplication/Source/App.tsx` runtime orchestration ownership was further extracted into `UseApplicationRuntimeComposition.ts`, reducing `App.tsx` from 552 to 298 lines while keeping feature/effect/shell assembly under explicit application state-management ownership.
-  - Source-size hard threshold is satisfied (`0` source files over 600 lines), while the preferred threshold has `4` remaining source files over 400 lines:
-    - `apps/ServerApplication/Source/Network/Routes/ThreadCollectionRoutes.ts` (478)
-    - `apps/ServerApplication/Source/Application/ServerBootstrap.ts` (433)
-    - `apps/ServerApplication/Source/Network/Routes/PushRoutes.ts` (420)
-    - `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushClientStateManager.ts` (404)
+  - Source-size conformance now satisfies both hard and preferred thresholds (`0` source files over 600 lines and `0` source files over 400 lines).
 
 ### Remaining Work Themes (Share of Remaining Effort)
 
-1. `65%` Preferred-size budget normalization:
-   - split remaining source files above the 400-line preferred threshold while preserving ownership boundaries
-   - keep route modules orchestration-only by extracting focused owner modules where size pressure remains
-2. `35%` Ongoing governance and drift control:
+1. `70%` Mutation-refresh precision:
+   - remove remaining broad post-mutation `refreshAll` flows in favor of targeted refresh operations where ownership already allows scoped invalidation
+   - keep mutation-triggered refresh behavior explicit per feature owner (`Threads`, `Chat`, and push-toolbar flows)
+   - current owner hotspots:
+     - `apps/WebApplication/Source/Features/Chat/StateManagement/ChatRequestActionCoordinator.ts`
+     - `apps/WebApplication/Source/Features/Threads/StateManagement/ThreadMutationActionCoordinator.ts`
+     - `apps/WebApplication/Source/Application/StateManagement/UseApplicationPushFeatureComposition.ts`
+     - `apps/WebApplication/Source/Application/StateManagement/UseApplicationRefreshEffects.ts`
+     - `apps/WebApplication/Source/Application/StateManagement/UseApplicationShellViewProperties.ts`
+2. `30%` Ongoing governance and drift control:
    - keep architecture/proposal documents synchronized with future refactors
    - enforce owner boundaries and naming rules during new feature work
 
@@ -931,6 +940,15 @@ Use this checklist as the single at-a-glance cleanup tracker.
 
 ### Recent Implementation Progress Notes
 
+- [x] `ApiSessionBootstrapCoordinator` now explicitly consumes non-blocking background refresh rejections and keeps retry behavior deterministic; focused coordinator tests now cover rejection-handling and retry sequencing.
+- [x] Progress audit confirmed architecture migration governance status in code and review systems: no unresolved PR review threads remain on `MatthewFrench/farfield#1`.
+- [x] `ThreadCompletionNotificationService` replaced cross-module `ReturnType` contract derivation with explicit `StoredPushSubscription[]` contracts to keep boundary types explicit and standards-compliant.
+- [x] Child-process environment propagation now avoids direct full `process.env` spread in remaining script/test spawn paths (`scripts/ios-device-smoke-matrix.mjs` and `apps/ServerApplication/Tests/HttpRoutes.integration.test.ts`) by using schema-owned allowlisted environment builders.
+- [x] Preferred-size-gap audit now confirms no source files remain above the 400-line preferred threshold (`0` over 400; `0` over 600).
+- [x] Thread list route query/cursor/sort ownership was extracted from `ThreadCollectionRoutes.ts` into `ThreadCollectionListQueryOwner.ts`, and route contracts were split into `ThreadCollectionRouteContracts.ts` to keep route wiring explicit and smaller.
+- [x] Push test dispatch ownership (`/api/push/test`) was extracted from `PushRoutes.ts` into `PushTestRouteOwner.ts`, and route contracts were split into `PushRouteContracts.ts`.
+- [x] Server bootstrap cache-invalidation policy ownership was extracted into `Application/Bootstrap/ThreadListCacheInvalidationOwner.ts`, reducing composition-root concentration in `ServerBootstrap.ts`.
+- [x] Browser push client convenience API wrappers were split out of `PushClientStateManager.ts` into `PushClientApi.ts` so class ownership remains focused on lifecycle behavior.
 - [x] `scripts/with-env.mjs` now builds spawned-process environment from a schema-owned allowlist instead of propagating the full `process.env` surface, while still loading explicit `.env` and `.env.local` values.
 - [x] `CodexThreadStreamStateOwner` default invalid stream-event log path now resolves to `.runtime/logs/threads/invalid-thread-stream-events.ndjson` to keep runtime artifacts out of source roots.
 - [x] Real scenario verification remains green on the current structure (`bun run end-to-end:real:run` -> `6/6` Playwright scenarios passing).

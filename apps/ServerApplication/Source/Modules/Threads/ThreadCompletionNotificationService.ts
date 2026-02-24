@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { PushNotificationPayload } from "@farfield/protocol";
+import type { PushNotificationPayload, StoredPushSubscription } from "@farfield/protocol";
 import { CompletionDetector } from "./CompletionDetector.js";
 import { logger } from "../../Shared/Logging/Logger.js";
 import type { CodexAgentAdapter } from "../../Agents/Adapters/CodexAgentAdapter.js";
@@ -256,7 +256,7 @@ export class ThreadCompletionNotificationService {
   }
 
   private async sendCompletionPushNotifications(input: {
-    subscriptions: Awaited<ReturnType<PushStore["listSubscriptions"]>>;
+    subscriptions: StoredPushSubscription[];
     threadId: string;
     turnId: string;
     preview: string;
@@ -274,7 +274,7 @@ export class ThreadCompletionNotificationService {
     const prunedEndpointSet = new Set<string>();
 
     const dispatchByPrivacyMode = async (
-      subscriptions: Awaited<ReturnType<PushStore["listSubscriptions"]>>,
+      subscriptions: StoredPushSubscription[],
       privateMode: boolean
     ): Promise<void> => {
       if (subscriptions.length === 0) {
