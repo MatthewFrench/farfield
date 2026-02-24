@@ -676,13 +676,13 @@ Use this checklist as the single at-a-glance cleanup tracker.
 ### Current Completion Snapshot
 
 - Date: 2026-02-24
-- Checklist completion: 268 / 268 items (`100%`)
+- Checklist completion: 270 / 270 items (`100%`)
 
 ### Realistic End-State Estimate (Holistic)
 
 - Estimated overall completion: `100%`
 - Basis:
-  - Checklist execution is complete (`268 / 268`) with no open checklist items.
+  - Checklist execution is complete (`270 / 270`) with no open checklist items.
   - Source-file PascalCase conformance is complete for non-generated source.
   - Source-directory PascalCase-path conformance is complete for non-generated source.
   - Root-folder abbreviation cleanup is complete for structural roots (`e2e` -> `end-to-end`, `ops` -> `operations`).
@@ -788,6 +788,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Temporarily reduced `apps/WebApplication/Source/SharedUtilities/api.ts` to a thin compatibility facade with app-level `bootstrapEventsSession` and `getWebShellHealth`, while shared request execution moved to `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransport.ts`.
 - [x] Remove compatibility-facade re-exports by deleting `apps/WebApplication/Source/SharedUtilities/api.ts` after migrating callers/tests to feature/application API owners.
 - [x] Keep `apps/WebApplication/Source/App.tsx` focused on app composition and top-level wiring only.
+- [x] Add focused runtime-composition seam tests in `apps/WebApplication/Tests/application-runtime-composition.test.tsx` covering loader-ref synchronization and composed hook wiring between refresh/synchronization effects and shell composition.
 
 ### Server Application Cleanup
 
@@ -955,6 +956,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] App runtime request/session/push callback ownership and stream/presentation helper ownership were extracted from `apps/WebApplication/Source/App.tsx` into `UseApplicationRuntimeRequestHandlers.ts` and `UseApplicationPresentationHelpers.tsx`, reducing `App.tsx` from 985 to 918 lines and keeping app-shell callback logic under explicit application state-management ownership.
 - [x] Remaining App chat/debug/push and shell-composition ownership was extracted from `apps/WebApplication/Source/App.tsx` into `UseApplicationChatFeatureComposition.ts`, `UseApplicationDebugFeatureComposition.ts`, `UseApplicationPushFeatureComposition.ts`, and `UseApplicationShellComposition.ts`, reducing `App.tsx` from 918 to 552 lines while preserving focused composition wiring.
 - [x] Remaining App runtime effect orchestration ownership was extracted from `apps/WebApplication/Source/App.tsx` into `UseApplicationRuntimeComposition.ts`, reducing `App.tsx` from 552 to 298 lines while keeping `App.tsx` focused on top-level composition and rendering.
+- [x] Focused runtime-composition seam tests were added in `apps/WebApplication/Tests/application-runtime-composition.test.tsx` to validate loader-ref synchronization and refresh/synchronization/shell wiring handoff through `UseApplicationRuntimeComposition`.
 - [x] Build artifact hygiene was refreshed by rebuilding `@farfield/protocol`, `@farfield/api`, and `@farfield/opencode-api` package outputs, eliminating stale sourcemap warning noise during current server/web test runs.
 - [x] Codex protocol thread schemas/parsers were split from `packages/CodexProtocol/Source/Thread.ts` into explicit contract owners under `packages/CodexProtocol/Source/Contracts/Thread/*` and `packages/CodexProtocol/Source/Parsers/ThreadParsers.ts`, reducing `Thread.ts` from 580 to 7 lines and lowering source-file size hotspot count from 7 to 6 files over 400 lines.
 - [x] Post-extraction focused validation passed for web and server workspaces (`bun run --filter @farfield/web typecheck`, `bun run --filter @farfield/web lint`, `bun run --filter @farfield/web test`, `bun run --filter @farfield/server typecheck`, `bun run --filter @farfield/server lint`, and `bun run --filter @farfield/server test`).
