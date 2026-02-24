@@ -965,6 +965,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Shared user-interface primitives now satisfy one-component-per-file standards for tabs and card modules, and debug workspace section contracts were moved from user-interface component ownership to domain contracts ownership.
 - [x] Post-rename validation succeeded after import normalization (`bun run typecheck`, `bun run lint`, and `bun run test` all pass).
 - [x] Real-app test command surface is now descriptive and consistent (`end-to-end:real:*`, `verify:end-to-end:real`, `validate:end-to-end:governance`) with docs aligned.
+- [x] Added guarded real-app command `end-to-end:real:safe-run` that captures pre/post thread snapshots and fails if any pre-existing thread disappears during Playwright execution; `verify:end-to-end:real` now uses this safety wrapper.
 - [x] Real-app diagnostics output naming now uses explicit `end-to-end` ownership (`.runtime/end-to-end-sentinel/*`, `end-to-end-sentinel-summary`) across helper code and triage docs.
 - [x] Server runtime configuration ownership extracted into `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfiguration.ts`.
 - [x] Server lifecycle ownership extracted into `apps/ServerApplication/Source/Application/Bootstrap/ServerLifecycleCoordinator.ts`.

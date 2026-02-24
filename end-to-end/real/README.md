@@ -40,11 +40,14 @@ pnpm smoke:app
 ```bash
 pnpm end-to-end:real:install
 pnpm end-to-end:real:run
+pnpm end-to-end:real:safe-run
 pnpm end-to-end:real:ui
 pnpm end-to-end:real:debug -- --grep "thread"
 pnpm verify:end-to-end:real
 pnpm stress:stream-burst
 ```
+
+`pnpm end-to-end:real:safe-run` captures pre/post thread snapshots under `.runtime/end-to-end-sentinel/` and fails if any pre-existing thread disappears during the run.
 
 ## Sentinel artifacts
 

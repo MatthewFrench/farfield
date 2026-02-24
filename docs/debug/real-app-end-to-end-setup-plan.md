@@ -107,9 +107,10 @@ A clean run means:
 2. Command surface in root `package.json`
    - `end-to-end:real:install`
    - `end-to-end:real:run`
+   - `end-to-end:real:safe-run`
    - `end-to-end:real:ui`
    - `end-to-end:real:debug`
-   - `verify:end-to-end:real` (`smoke:app` + `end-to-end:real:run`)
+   - `verify:end-to-end:real` (`smoke:app` + `end-to-end:real:safe-run`)
 3. Test structure under `end-to-end/real/`
    - `fixtures/real-app.fixture.ts`
    - `helpers/app-actions.ts`
@@ -139,12 +140,14 @@ A clean run means:
   - Installs Playwright browser dependency (`chromium`) locally.
 - `pnpm end-to-end:real:run`
   - Headless run of real-app scenarios against already-running app.
+- `pnpm end-to-end:real:safe-run`
+  - Headless real-app run with pre/post thread snapshot guard that fails if any pre-existing thread disappears.
 - `pnpm end-to-end:real:ui`
   - Playwright UI mode for local iteration.
 - `pnpm end-to-end:real:debug -- --grep "thread-open"`
   - Debug one scenario interactively.
 - `pnpm verify:end-to-end:real`
-  - `pnpm smoke:app` then `pnpm end-to-end:real:run`.
+  - `pnpm smoke:app` then `pnpm end-to-end:real:safe-run`.
 
 Note: these commands should be wrapped via `scripts/with-env.mjs` so `.env.local` token config is respected.
 
@@ -545,7 +548,7 @@ The manual MCP flow and Playwright spec flow should use the same scenario defini
 Implementation is complete when:
 
 1. `pnpm smoke:app` passes on healthy runtime.
-2. `pnpm end-to-end:real:run` passes locally with both:
+2. `pnpm end-to-end:real:safe-run` passes locally with both:
    - empty thread account
    - account with existing threads
 3. `pnpm end-to-end:real:ui` supports fast reruns while `pnpm dev` is active.
@@ -581,7 +584,7 @@ Implementation is complete when:
 
 ## Definition of Done
 
-Developers can run one command for runtime health (`pnpm smoke:app`), one command for headless real UI checks (`pnpm end-to-end:real:run`), and one interactive command for live repro/debug (`pnpm end-to-end:real:ui`), with continuous warning/error surveillance, enforced loading-settle timeouts, maintained coverage mapping, and failure diagnostics that directly point to root cause.
+Developers can run one command for runtime health (`pnpm smoke:app`), one command for headless real UI checks with thread-snapshot safety enforcement (`pnpm end-to-end:real:safe-run`), and one interactive command for live repro/debug (`pnpm end-to-end:real:ui`), with continuous warning/error surveillance, enforced loading-settle timeouts, maintained coverage mapping, and failure diagnostics that directly point to root cause.
 
 ## Potential Ideas (Estimated Value)
 
