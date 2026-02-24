@@ -40,6 +40,10 @@ This is the normative architecture contract for Farfield code.
    - `playwright-report`
    - `test-results`
 7. Top-level folder names must avoid abbreviations.
+8. Test files in `Tests` roots use PascalCase owner-aligned naming:
+   - `<OwnerName>.test.ts`
+   - `<OwnerName>.test.tsx`
+   - `<OwnerName>.integration.test.ts`
 
 ## Monorepo Boundaries
 
@@ -109,6 +113,7 @@ This is the normative architecture contract for Farfield code.
 6. Invalid configuration must fail startup with clear actionable errors.
 7. Browser-side `import.meta.env` reads are restricted to explicit web configuration owners.
 8. Browser configuration owners may expose only non-secret values.
+9. Child-process environment construction must use explicit allowlisted contracts owned by transport/configuration modules; direct `process.env` spreading is prohibited.
 
 ## Schema Rules
 
@@ -152,6 +157,17 @@ This is the normative architecture contract for Farfield code.
 2. Prefer `z.infer<typeof Schema>` (or mapped domain types) so runtime and compile-time contracts stay aligned.
 3. Do not pass raw parsed JSON through multiple layers untyped.
 4. Convert transport types to domain types at module boundaries.
+
+## Test And Comment Rules
+
+1. When changing non-trivial function logic, add or update high-value unit tests that cover behavior contracts and critical edge cases.
+2. Test names align to source owner names and stay in PascalCase under `Tests`.
+3. Comments are required only where they add engineering value:
+   - purpose and ownership intent
+   - non-obvious invariants and edge cases
+   - caveats and operational context
+4. Do not add low-value commentary that restates obvious code.
+5. Data-access owners and subscription lifecycle owners must include high-value module/class comments that describe boundary ownership, refresh/caching ownership, and key caveats.
 
 ## User Interface, Logic, and Data Separation
 
@@ -294,6 +310,7 @@ This is the normative architecture contract for Farfield code.
 6. Cache writes must preserve data consistency (no partial writes to shared caches).
 7. Stale data behavior must be explicit and testable.
 8. Observability for cache hit/miss/invalidation paths must be available in debug flows.
+9. Generic refresh paths must not invalidate all caches; invalidation must be explicit and scoped to mutation owners.
 
 ## Browser Persistence Tier Rules
 

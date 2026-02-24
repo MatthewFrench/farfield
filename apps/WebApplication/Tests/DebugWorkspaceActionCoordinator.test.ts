@@ -68,7 +68,7 @@ describe("DebugWorkspaceActionCoordinator", () => {
     expect(onHistoryDetailLoaded).toHaveBeenCalledWith(detail);
   });
 
-  it("replays selected history entry and refreshes app data", async () => {
+  it("replays selected history entry and refreshes core data", async () => {
     const coordinator = new DebugWorkspaceActionCoordinator();
     const debugClient = {
       readHistoryEntry: vi.fn(async () => buildHistoryDetail("entry-1")),
@@ -79,7 +79,7 @@ describe("DebugWorkspaceActionCoordinator", () => {
       markTrace: vi.fn(async () => {}),
       stopTrace: vi.fn(async () => {})
     };
-    const refreshAll = vi.fn(async () => {});
+    const refreshCoreData = vi.fn(async () => {});
 
     await coordinator.replayHistoryEntry({
       replayRequest: {
@@ -87,17 +87,17 @@ describe("DebugWorkspaceActionCoordinator", () => {
         waitForResponse: true
       },
       debugClient,
-      refreshAll
+      refreshCoreData
     });
 
     expect(debugClient.replayHistoryEntry).toHaveBeenCalledWith({
       entryId: "entry-1",
       waitForResponse: true
     });
-    expect(refreshAll).toHaveBeenCalledTimes(1);
+    expect(refreshCoreData).toHaveBeenCalledTimes(1);
   });
 
-  it("starts and marks trace, then refreshes app data", async () => {
+  it("starts and marks trace, then refreshes core data", async () => {
     const coordinator = new DebugWorkspaceActionCoordinator();
     const debugClient = {
       readHistoryEntry: vi.fn(async () => buildHistoryDetail("entry-1")),
@@ -106,25 +106,25 @@ describe("DebugWorkspaceActionCoordinator", () => {
       markTrace: vi.fn(async () => {}),
       stopTrace: vi.fn(async () => {})
     };
-    const refreshAll = vi.fn(async () => {});
+    const refreshCoreData = vi.fn(async () => {});
 
     await coordinator.startTrace({
       traceLabel: "Initial trace",
       debugClient,
-      refreshAll
+      refreshCoreData
     });
     await coordinator.markTrace({
       traceNote: "after selected-thread load",
       debugClient,
-      refreshAll
+      refreshCoreData
     });
 
     expect(debugClient.startTrace).toHaveBeenCalledWith("Initial trace");
     expect(debugClient.markTrace).toHaveBeenCalledWith("after selected-thread load");
-    expect(refreshAll).toHaveBeenCalledTimes(2);
+    expect(refreshCoreData).toHaveBeenCalledTimes(2);
   });
 
-  it("stops trace and refreshes app data", async () => {
+  it("stops trace and refreshes core data", async () => {
     const coordinator = new DebugWorkspaceActionCoordinator();
     const debugClient = {
       readHistoryEntry: vi.fn(async () => buildHistoryDetail("entry-1")),
@@ -133,14 +133,14 @@ describe("DebugWorkspaceActionCoordinator", () => {
       markTrace: vi.fn(async () => {}),
       stopTrace: vi.fn(async () => {})
     };
-    const refreshAll = vi.fn(async () => {});
+    const refreshCoreData = vi.fn(async () => {});
 
     await coordinator.stopTrace({
       debugClient,
-      refreshAll
+      refreshCoreData
     });
 
     expect(debugClient.stopTrace).toHaveBeenCalledTimes(1);
-    expect(refreshAll).toHaveBeenCalledTimes(1);
+    expect(refreshCoreData).toHaveBeenCalledTimes(1);
   });
 });

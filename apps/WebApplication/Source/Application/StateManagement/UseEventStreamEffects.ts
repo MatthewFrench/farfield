@@ -55,10 +55,11 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
         try {
           const loadCoreDataFunction = input.loadCoreDataTrackedRef.current;
           const loadSelectedThreadFunction = input.loadSelectedThreadRef.current;
+          const refreshOperations: Array<Promise<void>> = [];
 
           if (flags.refreshCore) {
             if (loadCoreDataFunction) {
-              await loadCoreDataFunction();
+              refreshOperations.push(loadCoreDataFunction());
             }
           } else if (flags.refreshHistory && input.activeTabRef.current === "debug") {
             const debugWorkspaceSnapshot = await input.debugWorkspaceDataReader.readSnapshot(
@@ -87,10 +88,14 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
           }
 
           if (flags.refreshSelectedThread && input.selectedThreadIdRef.current && loadSelectedThreadFunction) {
-            await loadSelectedThreadFunction(input.selectedThreadIdRef.current, {
+            refreshOperations.push(loadSelectedThreadFunction(input.selectedThreadIdRef.current, {
               includeReadThread: true,
               includeTurns: false
-            });
+            }));
+          }
+
+          if (refreshOperations.length > 0) {
+            await Promise.all(refreshOperations);
           }
         } catch (error) {
           if (error instanceof Error && isRequestCanceledError(error)) {

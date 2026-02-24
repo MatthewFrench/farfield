@@ -38,6 +38,7 @@ describe("readServerRuntimeConfiguration", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
     const configuration = readServerRuntimeConfiguration(buildBaseEnvironment(temporaryDirectoryPath));
 
+    expect(configuration.logLevel).toBe("info");
     expect(configuration.host).toBe("127.0.0.1");
     expect(configuration.port).toBe(4311);
     expect(configuration.pushEnabled).toBe(false);
@@ -51,6 +52,10 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.apiSessionCookieName).toBe("farfield_session");
     expect(configuration.apiSessionTimeToLiveMs).toBe(28_800_000);
     expect(configuration.apiSessionSecureCookie).toBe(false);
+    expect(configuration.ntfyConfiguration.enabled).toBe(false);
+    expect(configuration.invalidThreadStreamEventsLogPath).toBe(
+      path.resolve(process.cwd(), ".runtime", "logs", "threads", "invalid-thread-stream-events.ndjson")
+    );
   });
 
   it("requires VAPID settings when push is enabled", () => {
@@ -77,5 +82,28 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.apiToken).toBe("push_token");
     expect(configuration.apiAuthRequired).toBe(true);
     expect(configuration.apiSessionSigningSecret).toBe("push_token");
+  });
+
+  it("validates logger level and optional invalid stream log path", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const configuredInvalidStreamLogPath = path.join(temporaryDirectoryPath, "invalid-stream-events.ndjson");
+    const configuration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      LOG_LEVEL: "debug",
+      FARFIELD_INVALID_STREAM_LOG_PATH: configuredInvalidStreamLogPath
+    });
+
+    expect(configuration.logLevel).toBe("debug");
+    expect(configuration.invalidThreadStreamEventsLogPath).toBe(configuredInvalidStreamLogPath);
+  });
+
+  it("fails fast for unsupported logger levels", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    expect(() => {
+      readServerRuntimeConfiguration({
+        ...buildBaseEnvironment(temporaryDirectoryPath),
+        LOG_LEVEL: "verbose"
+      });
+    }).toThrow();
   });
 });

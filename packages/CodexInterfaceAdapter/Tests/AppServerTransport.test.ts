@@ -1,0 +1,59 @@
+import { describe, expect, it } from "vitest";
+import { buildAppServerSpawnEnvironment } from "../Source/AppServerTransport.js";
+
+describe("buildAppServerSpawnEnvironment", () => {
+  it("keeps only allowlisted inherited keys and injects codex identity keys", () => {
+    const environment = buildAppServerSpawnEnvironment({
+      baseEnvironment: {
+        HOME: "/Users/tester",
+        PATH: "/usr/bin",
+        RANDOM_KEY: "ignored"
+      },
+      userAgent: "farfield-tests",
+      clientId: "client-1"
+    });
+
+    expect(environment).toEqual({
+      HOME: "/Users/tester",
+      PATH: "/usr/bin",
+      CODEX_USER_AGENT: "farfield-tests",
+      CODEX_CLIENT_ID: "client-1"
+    });
+  });
+
+  it("allows explicit overrides for allowlisted keys", () => {
+    const environment = buildAppServerSpawnEnvironment({
+      baseEnvironment: {
+        HOME: "/Users/tester",
+        PATH: "/usr/bin"
+      },
+      overrideEnvironment: {
+        PATH: "/custom/bin",
+        CODEX_HOME: "/Users/tester/.codex"
+      },
+      userAgent: "farfield-tests",
+      clientId: "client-2"
+    });
+
+    expect(environment).toEqual({
+      HOME: "/Users/tester",
+      PATH: "/custom/bin",
+      CODEX_HOME: "/Users/tester/.codex",
+      CODEX_USER_AGENT: "farfield-tests",
+      CODEX_CLIENT_ID: "client-2"
+    });
+  });
+
+  it("throws when overrides contain unapproved keys", () => {
+    expect(() =>
+      buildAppServerSpawnEnvironment({
+        baseEnvironment: {},
+        overrideEnvironment: {
+          UNSAFE_KEY: "not-allowed"
+        },
+        userAgent: "farfield-tests",
+        clientId: "client-3"
+      })
+    ).toThrowError(/Unrecognized key/);
+  });
+});

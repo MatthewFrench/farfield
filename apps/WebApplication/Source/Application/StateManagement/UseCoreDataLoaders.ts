@@ -290,7 +290,7 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
   const refreshAll = useCallback(async () => {
     input.setIsCoreLoading(true);
     try {
-      input.threadListStateController.invalidateThreadQueries();
+      // Non-mutating refresh paths keep list caches warm; mutation handlers invalidate explicitly.
       const loadCoreDataFunction = input.loadCoreDataTrackedRef.current;
       const loadSelectedThreadFunction = input.loadSelectedThreadRef.current;
       if (loadCoreDataFunction) {
@@ -309,8 +309,7 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
     input.loadCoreDataTrackedRef,
     input.loadSelectedThreadRef,
     input.selectedThreadIdRef,
-    input.setIsCoreLoading,
-    input.threadListStateController
+    input.setIsCoreLoading
   ]);
 
   return {

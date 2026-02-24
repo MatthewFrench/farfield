@@ -29,24 +29,24 @@ export interface LoadDebugHistoryDetailActionInput {
 export interface ReplayDebugHistoryEntryActionInput {
   replayRequest: DebugReplayHistoryEntryInput;
   debugClient: DebugWorkspaceActionClient;
-  refreshAll: () => Promise<void>;
+  refreshCoreData: () => Promise<void>;
 }
 
 export interface StartDebugTraceActionInput {
   traceLabel: string;
   debugClient: DebugWorkspaceActionClient;
-  refreshAll: () => Promise<void>;
+  refreshCoreData: () => Promise<void>;
 }
 
 export interface MarkDebugTraceActionInput {
   traceNote: string;
   debugClient: DebugWorkspaceActionClient;
-  refreshAll: () => Promise<void>;
+  refreshCoreData: () => Promise<void>;
 }
 
 export interface StopDebugTraceActionInput {
   debugClient: DebugWorkspaceActionClient;
-  refreshAll: () => Promise<void>;
+  refreshCoreData: () => Promise<void>;
 }
 
 export class DebugWorkspaceActionCoordinator {
@@ -62,21 +62,21 @@ export class DebugWorkspaceActionCoordinator {
 
   public async replayHistoryEntry(input: ReplayDebugHistoryEntryActionInput): Promise<void> {
     await input.debugClient.replayHistoryEntry(input.replayRequest);
-    await input.refreshAll();
+    await input.refreshCoreData();
   }
 
   public async startTrace(input: StartDebugTraceActionInput): Promise<void> {
     await input.debugClient.startTrace(input.traceLabel);
-    await input.refreshAll();
+    await input.refreshCoreData();
   }
 
   public async markTrace(input: MarkDebugTraceActionInput): Promise<void> {
     await input.debugClient.markTrace(input.traceNote);
-    await input.refreshAll();
+    await input.refreshCoreData();
   }
 
   public async stopTrace(input: StopDebugTraceActionInput): Promise<void> {
     await input.debugClient.stopTrace();
-    await input.refreshAll();
+    await input.refreshCoreData();
   }
 }

@@ -27,6 +27,11 @@ Agents must follow both architecture docs for all code changes:
 1. `/Users/matthewfrench/GitHub/farfield/docs/architecture.md`
 2. `/Users/matthewfrench/GitHub/farfield/docs/proposed-structure-and-migration.md`
 
+Architecture standards quick links:
+
+1. `/Users/matthewfrench/GitHub/farfield/docs/architecture.md` (`Repository Surface Ownership`, `Module Dependency Matrix`, `Type System Rules`, `User Interface, Logic, and Data Separation`, `Data Ownership Rules`, `Cache Architecture`, `Concurrency Architecture`)
+2. `/Users/matthewfrench/GitHub/farfield/docs/proposed-structure-and-migration.md` (`Naming Baseline`, `Index File Policy (End-State)`, `Ownership Contracts (End-State)`, ownership registries, cleanup tracker)
+
 Mandatory rules:
 
 1. Respect package and layer boundaries.
@@ -71,6 +76,13 @@ Mandatory rules:
 40. Persistence writes must not block interaction-critical user interface paths.
 41. Do not use `Parameters`, `ReturnType`, or similar type-introspection utilities for cross-module contracts; declare explicit named request/response contract types.
 42. Do not use type-introspection utilities in tests; test contracts and mocks must use explicit named types.
+43. Test file names in every `Tests` folder must use PascalCase and explicit owner-aligned names.
+44. Test naming format is `<OwnerName>.test.ts` or `<OwnerName>.test.tsx`; integration tests use `<OwnerName>.integration.test.ts`.
+45. When modifying logic in a code function, ensure high-value unit tests exist for behavior/contracts/edge cases and add or update tests when coverage is insufficient.
+46. When modifying a non-trivial class or function, ensure high-value comments exist where needed (purpose, context, edge cases, caveats, and key tribal knowledge); avoid low-value commentary.
+47. Child-process environment construction must use explicit allowlisted schema-owned contracts; never spread `process.env` directly into spawned-process configuration.
+48. Generic refresh paths must not invalidate all caches; cache invalidation must be explicit, scoped, and owned by mutation paths.
+49. Data-access and subscription lifecycle owners must include high-value ownership comments that explain boundary contract, caching/refresh ownership, and important caveats.
 
 Before finalizing a change, agents must confirm:
 
@@ -95,6 +107,97 @@ Before finalizing a change, agents must confirm:
 19. Browser persistence usage follows explicit ownership, retention, and schema rules.
 20. Cache and background refresh behavior is non-blocking and deterministic.
 21. Test code does not rely on type-introspection utilities.
+22. Test file naming matches source naming style and owner naming contracts.
+23. Modified function logic has necessary high-value unit test coverage.
+24. Modified non-trivial functions/classes include necessary high-value comments only where useful.
+25. Spawned-process environment contracts are schema-owned and allowlisted (no direct full-environment propagation).
+26. Cache invalidation remains mutation-scoped and is not triggered by broad refresh helpers.
+27. External data-source and subscription owner modules have high-value ownership comments where needed.
+
+## Repository Structure Guide For Agents
+
+Use this tree and ownership summary to locate code quickly and keep changes in the right place.
+
+```text
+/
+  apps/
+    WebApplication/
+      Source/
+      Tests/
+      public/
+    ServerApplication/
+      Source/
+      Tests/
+  packages/
+    CodexProtocol/
+      Source/
+      Tests/
+    CodexInterfaceAdapter/
+      Source/
+      Tests/
+    OpenCodeInterfaceAdapter/
+      Source/
+      Tests/
+  docs/
+  scripts/
+  end-to-end/
+  operations/
+  public/
+  traces/
+```
+
+Folder ownership and purpose:
+
+1. `apps/WebApplication/Source`
+   - Browser product implementation.
+   - `Application` contains composition/bootstrap and app-wide owners.
+   - `Features` contains feature-owned `UserInterface`, `StateManagement`, `DataAccess`, and `DomainModel`.
+   - `Components` contains shared reusable user interface building blocks.
+   - `Shared` contains cross-feature contracts, transport primitives, and shared errors/styling.
+2. `apps/WebApplication/Tests`
+   - Web unit/integration tests.
+   - Filenames must be PascalCase and owner-aligned.
+3. `apps/WebApplication/public`
+   - Web static assets owned by the web app package.
+4. `apps/ServerApplication/Source`
+   - Server product implementation.
+   - `Application` contains runtime bootstrap/configuration/state owners.
+   - `Network` contains request handling, schemas, route owners, and server transport boundaries.
+   - `Modules` contains domain/service owners (threads, push notifications, debugging, activity).
+   - `Agents` contains adapter/runtime ownership for Codex/OpenCode integrations.
+   - `Shared` contains server-shared logging and low-level shared contracts.
+5. `apps/ServerApplication/Tests`
+   - Server unit/integration tests.
+   - Filenames must be PascalCase and owner-aligned.
+6. `packages/CodexProtocol/Source`
+   - Shared protocol contracts/parsers and generated schema outputs.
+   - Public package API boundary is `Source/Index.ts`.
+7. `packages/CodexProtocol/Tests`
+   - Protocol tests and sanitized fixture validation.
+8. `packages/CodexInterfaceAdapter/Source`
+   - Codex interface adapter ownership (transport, client, service, live state).
+   - Public package API boundary is `Source/Index.ts`.
+9. `packages/CodexInterfaceAdapter/Tests`
+   - Adapter behavior and contract tests.
+10. `packages/OpenCodeInterfaceAdapter/Source`
+   - OpenCode interface adapter ownership (mapping, service, schemas, client).
+   - Public package API boundary is `Source/Index.ts`.
+11. `packages/OpenCodeInterfaceAdapter/Tests`
+   - OpenCode adapter behavior and contract tests.
+12. `docs`
+   - Normative architecture standards and migration/proposal documents.
+   - Any ownership-rule change must update docs before completion.
+13. `scripts`
+   - Development/setup/smoke/operational command ownership only.
+   - No product business logic should live here.
+14. `end-to-end`
+   - End-to-end scenario ownership and fixtures/helpers.
+15. `operations`
+   - Runtime/deployment environment operations assets.
+16. `public`
+   - Root legacy static surface only; do not introduce new product behavior here.
+17. `traces`
+   - Runtime artifacts only; never commit raw trace data.
 
 ## Commands You Will Use Often
 

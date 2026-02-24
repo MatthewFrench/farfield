@@ -4,7 +4,7 @@ import {
   JsonValueSchema,
   type JsonValue
 } from "@farfield/protocol";
-import { logger } from "../Shared/Logging/Logger.js";
+import { configureLogger, logger } from "../Shared/Logging/Logger.js";
 import {
   parseServerCliOptions,
   formatServerHelpText
@@ -14,7 +14,7 @@ import { ThreadAdapterResolver } from "../Agents/ThreadAdapterResolver.js";
 import { ThreadIndex } from "../Agents/ThreadIndex.js";
 import { ActivityHistoryService } from "../Modules/Activity/ActivityHistoryService.js";
 import { ClientErrorStore } from "../Modules/Debugging/ClientErrorStore.js";
-import { NtfyNotifier, parseNtfyConfigFromEnv } from "../Modules/PushNotifications/NtfyNotifier.js";
+import { NtfyNotifier } from "../Modules/PushNotifications/NtfyNotifier.js";
 import { PushReceiptStore } from "../Modules/PushNotifications/PushReceiptStore.js";
 import { PushSendStore } from "../Modules/PushNotifications/PushSendStore.js";
 import { PushService } from "../Modules/PushNotifications/PushService.js";
@@ -40,6 +40,7 @@ import { ServerBootstrapUtilityOwner } from "./Bootstrap/ServerBootstrapUtilityO
 
 const PushTestBodySchema = FarfieldPushTestBodySchema;
 const runtimeConfiguration = readServerRuntimeConfiguration(process.env);
+configureLogger(runtimeConfiguration.logLevel);
 const serverBootstrapUtilityOwner = new ServerBootstrapUtilityOwner();
 
 function ensureTraceDirectory(): void {
@@ -139,7 +140,7 @@ const runtimeStateOwner = new RuntimeStateOwner({
   readClientErrorCount: () => clientErrorStore.getCount(),
   readActiveTraceSummary: () => activityHistoryService.readActiveTraceSummary()
 });
-const ntfyNotifier = new NtfyNotifier(parseNtfyConfigFromEnv(process.env));
+const ntfyNotifier = new NtfyNotifier(runtimeConfiguration.ntfyConfiguration);
 const threadCompletionNotificationService = new ThreadCompletionNotificationService({
   readCodexAdapter: () => agentRuntimeOwner?.readCodexAdapter() ?? null,
   ntfyNotifier,
@@ -190,6 +191,7 @@ agentRuntimeOwner = new AgentRuntimeOwner({
   configuredAgentIds,
   codexExecutablePath: codexExecutable,
   ipcSocketPath,
+  invalidStreamEventsLogPath: runtimeConfiguration.invalidThreadStreamEventsLogPath,
   defaultWorkspacePath: runtimeConfiguration.defaultWorkspacePath,
   userAgent: runtimeConfiguration.userAgent,
   ipcReconnectDelayMs: runtimeConfiguration.ipcReconnectDelayMs,

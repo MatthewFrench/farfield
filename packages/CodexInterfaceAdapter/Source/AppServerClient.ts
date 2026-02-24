@@ -88,6 +88,10 @@ const AppServerUnarchiveThreadResponseSchema = z
   .passthrough();
 const READ_THREAD_WITH_TURNS_TIMEOUT_MS = 90_000;
 
+/**
+ * Owns typed request/response mapping for Codex app-server RPC methods.
+ * Transport concerns stay in `AppServerTransport`; schema enforcement stays here.
+ */
 export class AppServerClient {
   private readonly transport: AppServerTransport;
 

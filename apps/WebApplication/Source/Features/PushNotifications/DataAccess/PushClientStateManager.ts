@@ -17,6 +17,10 @@ interface PushClientStateManagerDependencies {
   pushServerClient: PushServerClient;
 }
 
+/**
+ * Owns browser push-subscription lifecycle (permission, service worker registration, subscription reconcile/recovery).
+ * Server-side subscription persistence is delegated to `PushServerClient`.
+ */
 export class PushClientStateManager {
   private readonly pushPreferenceStore: PushPreferenceStore;
   private readonly pushServerClient: PushServerClient;

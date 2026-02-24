@@ -15,25 +15,58 @@ import {
   requestInitWithOptions
 } from "@/Shared/Transport/FarfieldHttpTransport";
 
-const ThreadListItemWithAgentSchema = AppServerListThreadsResponseSchema.shape.data.element.and(
-  z
-    .object({
-      agentId: z.enum(["codex", "opencode"]),
-      source: z.string().optional(),
-      removed: z.boolean().optional(),
-      projectRemoved: z.boolean().optional(),
-      projectState: z.enum(["active", "removed"]).optional()
-    })
-    .passthrough()
+// Thread-list responses come from heterogeneous adapters; parse permissive wire payloads once,
+// then immediately normalize to a strict app-owned contract used by thread state owners.
+const ThreadListItemWireSchema = AppServerListThreadsResponseSchema.shape.data.element.and(
+  z.object({
+    agentId: AgentIdSchema,
+    source: z.string().optional(),
+    removed: z.boolean().optional(),
+    projectRemoved: z.boolean().optional(),
+    projectState: z.enum(["active", "removed"]).optional()
+  }).passthrough()
 );
+
+const ThreadListItemContractSchema = z
+  .object({
+    id: z.string().min(1),
+    preview: z.string(),
+    createdAt: z.number().int().nonnegative(),
+    updatedAt: z.number().int().nonnegative(),
+    cwd: z.string().optional(),
+    path: z.string().nullable().optional(),
+    agentId: AgentIdSchema,
+    source: z.string().optional(),
+    removed: z.boolean().optional(),
+    projectRemoved: z.boolean().optional(),
+    projectState: z.enum(["active", "removed"]).optional()
+  })
+  .strict();
+
+const ThreadListItemSchema = ThreadListItemWireSchema.transform((value) => {
+  return ThreadListItemContractSchema.parse({
+    id: value.id,
+    preview: value.preview,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+    cwd: value.cwd,
+    path: value.path,
+    agentId: value.agentId,
+    source: value.source,
+    removed: value.removed,
+    projectRemoved: value.projectRemoved,
+    projectState: value.projectState
+  });
+});
 
 const ThreadListResponseSchema = z
   .object({
-    data: z.array(ThreadListItemWithAgentSchema),
+    data: z.array(ThreadListItemSchema),
     nextCursor: z.union([z.string(), z.null(), z.undefined()]).transform((v) => v ?? null),
     pages: z.number().int().nonnegative().optional(),
     truncated: z.boolean().optional()
-  });
+  })
+  .strict();
 export type ApiThreadListResponse = z.infer<typeof ThreadListResponseSchema>;
 
 export interface ApiListThreadsOptions extends ApiRequestOptions {
@@ -52,6 +85,7 @@ const ThreadListEnvelopeSchema = z
     ok: z.literal(true)
   })
   .merge(ThreadListResponseSchema)
+  .strict()
   .transform(({ ok: _ok, ...threadListResponse }) => threadListResponse);
 
 const ReadThreadResponseWithAgentSchema = AppServerReadThreadResponseSchema.extend({
@@ -70,14 +104,21 @@ const ReadThreadResponseEnvelopeSchema = z
   .merge(ReadThreadResponseWithAgentSchema)
   .transform(({ ok: _ok, ...readThreadResponse }) => readThreadResponse);
 
-const CreateThreadResponseSchema = z
+const CreateThreadResponseWireSchema = z
   .object({
     ok: z.literal(true),
-    threadId: z.string(),
-    agentId: z.enum(["codex", "opencode"])
+    threadId: z.string().min(1),
+    agentId: AgentIdSchema
   })
   .merge(AppServerStartThreadResponseSchema)
   .passthrough();
+
+const CreateThreadResponseSchema = z
+  .object({
+    threadId: z.string().min(1),
+    agentId: AgentIdSchema
+  })
+  .strict();
 export type ApiCreateThreadResponse = z.infer<typeof CreateThreadResponseSchema>;
 
 const ArchiveThreadResponseSchema = z
@@ -151,7 +192,11 @@ export async function createThread(
       options
     )
   );
-  return CreateThreadResponseSchema.parse(data);
+  const parsedWireResponse = CreateThreadResponseWireSchema.parse(data);
+  return CreateThreadResponseSchema.parse({
+    threadId: parsedWireResponse.threadId,
+    agentId: parsedWireResponse.agentId
+  });
 }
 
 export async function archiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {

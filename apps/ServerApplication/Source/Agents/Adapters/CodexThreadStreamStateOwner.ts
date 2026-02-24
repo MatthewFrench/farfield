@@ -51,9 +51,11 @@ export class CodexThreadStreamStateOwner {
   private readonly liveStateProjectionByThreadId = new Map<string, ThreadLiveStateProjection>();
 
   public constructor(options: CodexThreadStreamStateOwnerOptions = {}) {
+    // Invalid event logs are intentionally routed through one owner path so malformed
+    // stream payloads can be audited without coupling to transport pipeline internals.
     this.invalidStreamEventsLogPath = options.invalidStreamEventsLogPath ??
-      process.env["FARFIELD_INVALID_STREAM_LOG_PATH"] ??
       path.resolve(process.cwd(), "invalid-thread-stream-events.jsonl");
+    this.ensureInvalidStreamEventLogDirectoryExists();
   }
 
   public describeFrame(frame: IpcFrame): CodexIpcFrameDescription {
@@ -260,6 +262,22 @@ export class CodexThreadStreamStateOwner {
           error: toErrorMessage(error)
         },
         "codex-invalid-thread-stream-event-detail-write-failed"
+      );
+    }
+  }
+
+  private ensureInvalidStreamEventLogDirectoryExists(): void {
+    try {
+      fs.mkdirSync(path.dirname(this.invalidStreamEventsLogPath), {
+        recursive: true
+      });
+    } catch (error) {
+      logger.warn(
+        {
+          path: this.invalidStreamEventsLogPath,
+          error: toErrorMessage(error)
+        },
+        "codex-invalid-thread-stream-event-detail-directory-create-failed"
       );
     }
   }

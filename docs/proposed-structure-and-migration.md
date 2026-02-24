@@ -477,6 +477,7 @@ This document defines the target folder/file structure and end-state ownership m
 | --- | --- | --- | --- |
 | Web runtime behavior configuration | `ApplicationBehaviorConfiguration` | `apps/WebApplication/Source/Application/Configuration/ApplicationBehaviorConfiguration.ts` | browser runtime (non-secret values only) |
 | Server runtime configuration | `ServerRuntimeConfiguration` | `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfiguration.ts` | process runtime |
+| Codex app-server spawn environment configuration | `buildAppServerSpawnEnvironment` | `packages/CodexInterfaceAdapter/Source/AppServerTransport.ts` | child-process runtime |
 
 ## State Ownership Registry (End-State)
 
@@ -547,6 +548,7 @@ This document defines the target folder/file structure and end-state ownership m
 4. Duplicate in-flight reads of the same key are coalesced by cache owner or concurrency owner.
 5. Cache mutation occurs only through owner APIs.
 6. Cache observability is available for debugging and diagnostics.
+7. Broad refresh helpers do not invalidate cache entries; invalidation is mutation-scoped and owned by mutation flows.
 
 ## Web Caching, Persistence, and Background Refresh Strategy (End-State)
 
@@ -723,17 +725,18 @@ Use this checklist as the single at-a-glance cleanup tracker.
 ### Current Completion Snapshot
 
 - Date: 2026-02-24
-- Checklist completion: 278 / 278 items (`100%`)
+- Checklist completion: 296 / 296 items (`100%`)
 
 ### Realistic End-State Estimate (Holistic)
 
 - Estimated overall completion: `100%`
 - Basis:
-  - Checklist execution is complete (`278 / 278`) with no open checklist items.
+  - Checklist execution is complete (`296 / 296`) with no open checklist items.
   - Detailed tree is illustrative; completion is tracked against the verified ownership mapping and checklist entries.
   - Source-file PascalCase conformance is complete for non-generated source.
   - Source-directory PascalCase-path conformance is complete for non-generated source.
   - Root-folder abbreviation cleanup is complete for structural roots (`e2e` -> `end-to-end`, `ops` -> `operations`).
+  - Test-file PascalCase conformance is complete across `apps/*/Tests` and `packages/*/Tests`, including owner-aligned naming.
   - `apps/WebApplication/Source/App.tsx` runtime orchestration ownership was further extracted into `UseApplicationRuntimeComposition.ts`, reducing `App.tsx` from 552 to 298 lines while keeping feature/effect/shell assembly under explicit application state-management ownership.
   - Source-size conformance now satisfies both hard and preferred thresholds (`0` source files over 600 lines and `0` source files over 400 lines).
 
@@ -749,6 +752,8 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Proposed end-state structure includes owner registries and target file layout.
 - [x] Naming rules include PascalCase source paths and no abbreviations.
 - [x] Cross-module source contracts no longer rely on type-introspection utilities; explicit named contracts are used instead.
+- [x] Agent governance now links architecture/proposal standards, includes repository structure guidance, and enforces owner-aligned PascalCase test naming.
+- [x] Governance requires high-value unit tests and high-value comments when modifying non-trivial function logic.
 
 ### Web Application Cleanup
 
@@ -779,7 +784,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Move EventSource connection/reconnect and refresh-decision dispatch ownership from `App.tsx` effect into `EventStreamConnectionCoordinator`.
 - [x] Move API session bootstrap auth requirement detection, token challenge state, and session freshness behavior from `App.tsx` into `ApiSessionBootstrapCoordinator`.
 - [x] Extract API session token challenge user interface from `App.tsx` into `ApiSessionBootstrapOverlay`.
-- [x] Add focused tests for API session bootstrap ownership and protected bootstrap flow (`api-session-bootstrap-coordinator.test.ts` and `app.test.tsx` session-auth scenario).
+- [x] Add focused tests for API session bootstrap ownership and protected bootstrap flow (`ApiSessionBootstrapCoordinator.test.ts` and `App.test.tsx` session-auth scenario).
 - [x] Move user-interface action request metadata creation from `App.tsx` into `UserInterfaceActionRequestBuilder`.
 - [x] Move selected-thread refresh queue/cancellation ownership from `App.tsx` refs into `SelectedThreadRefreshConcurrencyCoordinator`.
 - [x] Move pending-user-input selection logic out of `lib/api.ts` into chat domain ownership.
@@ -838,7 +843,12 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Temporarily reduced `apps/WebApplication/Source/SharedUtilities/api.ts` to a thin compatibility facade with app-level `bootstrapEventsSession` and `getWebShellHealth`, while shared request execution moved to `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransport.ts`.
 - [x] Remove compatibility-facade re-exports by deleting `apps/WebApplication/Source/SharedUtilities/api.ts` after migrating callers/tests to feature/application API owners.
 - [x] Keep `apps/WebApplication/Source/App.tsx` focused on app composition and top-level wiring only.
-- [x] Add focused runtime-composition seam tests in `apps/WebApplication/Tests/application-runtime-composition.test.tsx` covering loader-ref synchronization and composed hook wiring between refresh/synchronization effects and shell composition.
+- [x] Add focused runtime-composition seam tests in `apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx` covering loader-ref synchronization and composed hook wiring between refresh/synchronization effects and shell composition.
+- [x] Normalize thread API list/create parsing to strict app-owned contracts with wire-to-domain mapping in `Features/Threads/DataAccess/ThreadApi.ts`.
+- [x] Add API contract tests for strict thread list/type validation and strict create-thread response projection in `apps/WebApplication/Tests/Api.test.ts`.
+- [x] Split shared tabs primitives into one-component-per-file modules (`Tabs.tsx`, `TabsList.tsx`, `TabsTrigger.tsx`, `TabsContent.tsx`) and update consumers to direct concrete imports.
+- [x] Split shared card primitives into one-component-per-file modules (`Card.tsx`, `CardHeader.tsx`, `CardTitle.tsx`, `CardDescription.tsx`, `CardContent.tsx`).
+- [x] Move debug workspace section schema/type contracts out of `DebugWorkspacePane.tsx` into domain-owned `DebugWorkspaceSectionContracts.ts`.
 
 ### Server Application Cleanup
 
@@ -871,6 +881,8 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Remove remaining server-side type-introspection usage in runtime configuration and agent adapters by replacing `ReturnType`-derived contracts with explicit named types.
 - [x] Replace broad IPC and JSON-RPC transport payload typing in `packages/CodexProtocol` and `packages/CodexInterfaceAdapter` with `JsonValue` and `JsonValueSchema` boundary contracts (`ipc.ts`, `json-rpc.ts`, `ipc-client.ts`, `app-server-transport.ts`, `app-server-client.ts`).
 - [x] Replace remaining broad `unknown`-typed server and package contract surfaces with explicit schema-owned structured-data contracts where behavior allows strict typing.
+- [x] Centralize `LOG_LEVEL`, ntfy settings, and invalid thread-stream log-path parsing under `Application/Configuration/ServerRuntimeConfiguration.ts`, and remove direct server-side environment reads from logging and stream-state owners.
+- [x] Move default invalid thread-stream event logging from repository source roots into `.runtime/logs/threads` and ensure log-directory creation is owned by `CodexThreadStreamStateOwner`.
 
 ### Package Cleanup
 
@@ -902,12 +914,21 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Rename real end-to-end command namespace from `e2e:real:*` to `end-to-end:real:*` and align all command references.
 - [x] Rename governance and sentinel naming surfaces from `e2e-*` to `end-to-end-*` (`validate-end-to-end-governance`, `.runtime/end-to-end-sentinel`).
 - [x] Normalize non-generated `apps/*` and `packages/*` import specifiers by removing duplicate relative path segments (`././`, `.././`).
+- [x] Rename all test files to PascalCase owner-aligned naming across `apps/*/Tests` and `packages/*/Tests`.
 - [x] Update all path-dependent surfaces listed in the compatibility section after each rename set.
 
 ### Recent Implementation Progress Notes
 
+- [x] Codex app-server spawn environment ownership now uses strict allowlisted schema parsing in `packages/CodexInterfaceAdapter/Source/AppServerTransport.ts` (`buildAppServerSpawnEnvironment`), removing direct full-environment propagation to child process startup.
+- [x] `apps/WebApplication/Source/Application/StateManagement/UseCoreDataLoaders.ts` refresh-all behavior now preserves cache state during generic refresh paths; thread-query invalidation remains mutation-scoped in thread mutation owners.
+- [x] Event-stream scheduled refresh execution in `apps/WebApplication/Source/Application/StateManagement/UseEventStreamEffects.ts` now runs independent refresh operations concurrently, reducing blocked refresh latency while preserving owner boundaries.
+- [x] Debug workspace actions now refresh core snapshots via `loadCoreDataTracked` instead of full `refreshAll`, avoiding unrelated selected-thread reload work after trace/replay operations.
+- [x] External data-source and subscription owners now include high-value ownership comments (`CapabilityServerClient`, `ChatServerClient`, `DebugServerClient`, `ThreadServerClient`, `ThreadMutationServerClient`, `PushServerClient`, `PushClientStateManager`, `EventStreamConnectionCoordinator`, `EventStreamRefreshDecisionEngine`, `AppServerClient`, `DesktopIpcClient`, `CodexMonitorService`, `OpenCodeConnection`, `OpenCodeMonitorService`).
 - [x] Import-path normalization sweep resolved PascalCase and kebab-case drift by canonicalizing import specifiers against on-disk path ownership across `apps/*` and `packages/*`.
 - [x] Non-generated source import-path canonicalization now also removes duplicate relative-segment drift (`././`, `.././`) across `apps/*` and `packages/*`.
+- [x] Configuration ownership tightened by moving log-level, ntfy, and invalid stream-event path parsing into `ServerRuntimeConfiguration` and applying runtime logger configuration at server bootstrap.
+- [x] Thread API boundary contracts tightened by normalizing adapter wire payloads into strict app-owned list/create contracts with focused regression tests.
+- [x] Shared user-interface primitives now satisfy one-component-per-file standards for tabs and card modules, and debug workspace section contracts were moved from user-interface component ownership to domain contracts ownership.
 - [x] Post-rename validation succeeded after import normalization (`bun run typecheck`, `bun run lint`, and `bun run test` all pass).
 - [x] Real-app test command surface is now descriptive and consistent (`end-to-end:real:*`, `verify:end-to-end:real`, `validate:end-to-end:governance`) with docs aligned.
 - [x] Real-app diagnostics output naming now uses explicit `end-to-end` ownership (`.runtime/end-to-end-sentinel/*`, `end-to-end-sentinel-summary`) across helper code and triage docs.
@@ -1009,11 +1030,11 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] App runtime request/session/push callback ownership and stream/presentation helper ownership were extracted from `apps/WebApplication/Source/App.tsx` into `UseApplicationRuntimeRequestHandlers.ts` and `UseApplicationPresentationHelpers.tsx`, reducing `App.tsx` from 985 to 918 lines and keeping app-shell callback logic under explicit application state-management ownership.
 - [x] Remaining App chat/debug/push and shell-composition ownership was extracted from `apps/WebApplication/Source/App.tsx` into `UseApplicationChatFeatureComposition.ts`, `UseApplicationDebugFeatureComposition.ts`, `UseApplicationPushFeatureComposition.ts`, and `UseApplicationShellComposition.ts`, reducing `App.tsx` from 918 to 552 lines while preserving focused composition wiring.
 - [x] Remaining App runtime effect orchestration ownership was extracted from `apps/WebApplication/Source/App.tsx` into `UseApplicationRuntimeComposition.ts`, reducing `App.tsx` from 552 to 298 lines while keeping `App.tsx` focused on top-level composition and rendering.
-- [x] Focused runtime-composition seam tests were added in `apps/WebApplication/Tests/application-runtime-composition.test.tsx` to validate loader-ref synchronization and refresh/synchronization/shell wiring handoff through `UseApplicationRuntimeComposition`.
+- [x] Focused runtime-composition seam tests were added in `apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx` to validate loader-ref synchronization and refresh/synchronization/shell wiring handoff through `UseApplicationRuntimeComposition`.
 - [x] Build artifact hygiene was refreshed by rebuilding `@farfield/protocol`, `@farfield/api`, and `@farfield/opencode-api` package outputs, eliminating stale sourcemap warning noise during current server/web test runs.
 - [x] Codex protocol thread schemas/parsers were split from `packages/CodexProtocol/Source/Thread.ts` into explicit contract owners under `packages/CodexProtocol/Source/Contracts/Thread/*` and `packages/CodexProtocol/Source/Parsers/ThreadParsers.ts`, reducing `Thread.ts` from 580 to 7 lines and lowering source-file size hotspot count from 7 to 6 files over 400 lines.
 - [x] Post-extraction focused validation passed for web and server workspaces (`bun run --filter @farfield/web typecheck`, `bun run --filter @farfield/web lint`, `bun run --filter @farfield/web test`, `bun run --filter @farfield/server typecheck`, `bun run --filter @farfield/server lint`, and `bun run --filter @farfield/server test`).
-- [x] `apps/WebApplication/Tests/app.test.tsx` now includes a protected-session bootstrap scenario covering token entry and post-auth data loading.
+- [x] `apps/WebApplication/Tests/App.test.tsx` now includes a protected-session bootstrap scenario covering token entry and post-auth data loading.
 - [x] Tooling direction was documented in architecture/proposal docs with Biome recorded as an approved future candidate for formatter/linter consolidation planning.
 - [x] Server route-owner contracts now keep strict `JsonValue` request parsing at HTTP ingress while using explicit object response contracts for route outputs, avoiding index-signature bleed across domain response models.
 - [x] IPC history recording now validates captured frame payloads with `JsonValueSchema` before persistence, ensuring debug-history payloads remain schema-owned structured data.

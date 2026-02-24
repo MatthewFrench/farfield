@@ -20,6 +20,10 @@ export type CapabilityModelsResponse = ApiModelsResponse;
 export type CapabilityConfigDefaultsOptions = ApiConfigDefaultsOptions;
 export type CapabilityConfigDefaultsResponse = ApiConfigDefaultsResponse;
 
+/**
+ * Owns capability endpoint reads.
+ * Snapshot reuse policy is centralized in `CapabilitySnapshotCache`.
+ */
 export class CapabilityServerClient {
   public async readHealthStatus(options?: ApiRequestOptions): Promise<ApiHealthResponse> {
     return getHealth(options);

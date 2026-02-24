@@ -1,6 +1,10 @@
 import { listThreads, type ApiListThreadsOptions } from "./ThreadApi";
 import type { ThreadListLoadOptions, ThreadListResponse } from "../DomainModel/ThreadGroupTypes";
 
+/**
+ * Owns thread collection reads from the HTTP boundary.
+ * Caching and invalidation policy live in thread state owners, not this transport adapter.
+ */
 export class ThreadServerClient {
   public async listThreads(options: ThreadListLoadOptions): Promise<ThreadListResponse> {
     const requestOptions: ApiListThreadsOptions = {

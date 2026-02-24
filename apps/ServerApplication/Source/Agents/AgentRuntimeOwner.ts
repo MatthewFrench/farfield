@@ -7,6 +7,7 @@ export interface AgentRuntimeOwnerDependencies {
   configuredAgentIds: AgentId[];
   codexExecutablePath: string;
   ipcSocketPath: string;
+  invalidStreamEventsLogPath: string;
   defaultWorkspacePath: string;
   userAgent: string;
   ipcReconnectDelayMs: number;
@@ -47,6 +48,7 @@ export class AgentRuntimeOwner {
         this.codexAdapter = new CodexAgentAdapter({
           appExecutable: dependencies.codexExecutablePath,
           socketPath: dependencies.ipcSocketPath,
+          invalidStreamEventsLogPath: dependencies.invalidStreamEventsLogPath,
           workspaceDir: dependencies.defaultWorkspacePath,
           userAgent: dependencies.userAgent,
           reconnectDelayMs: dependencies.ipcReconnectDelayMs,

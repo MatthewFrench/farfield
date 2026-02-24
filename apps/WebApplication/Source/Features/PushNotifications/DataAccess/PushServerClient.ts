@@ -21,6 +21,10 @@ import {
 } from "./PushApi";
 import { type ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
+/**
+ * Owns push HTTP calls to the Farfield server.
+ * Browser subscription lifecycle is managed by `PushClientStateManager`.
+ */
 export class PushServerClient {
   public async readPushStatus(options?: ApiRequestOptions): Promise<ApiPushStatusResponse> {
     return getPushStatus(options);

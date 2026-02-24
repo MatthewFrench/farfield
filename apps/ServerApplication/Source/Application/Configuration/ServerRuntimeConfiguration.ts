@@ -7,6 +7,14 @@ import {
   resolvePushStatePath,
   type PushStatePathResolution
 } from "../../Modules/PushNotifications/PushStatePath.js";
+import {
+  parseNtfyConfigFromEnv,
+  type NtfyConfig
+} from "../../Modules/PushNotifications/NtfyNotifier.js";
+import {
+  LoggerLevelSchema,
+  type LoggerLevel
+} from "../../Shared/Logging/Logger.js";
 
 const OptionalPathEnvSchema = z.string().trim().min(1).optional();
 
@@ -124,6 +132,7 @@ function resolvePushLocalCaSourcePath(env: NodeJS.ProcessEnv): string {
 }
 
 export interface ServerRuntimeConfiguration {
+  logLevel: LoggerLevel;
   host: string;
   port: number;
   historyLimit: number;
@@ -170,10 +179,13 @@ export interface ServerRuntimeConfiguration {
   clientErrorSessionId: string;
   clientErrorLogPath: string;
   clientErrorMaxEntries: number;
+  invalidThreadStreamEventsLogPath: string;
+  ntfyConfiguration: NtfyConfig;
 }
 
 export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRuntimeConfiguration {
   const defaultWorkspacePath = path.resolve(process.cwd());
+  const logLevel = LoggerLevelSchema.parse((env["LOG_LEVEL"] ?? "info").trim().toLowerCase());
   const host = env["HOST"] ?? "127.0.0.1";
   const port = parsePositiveInteger(env["PORT"] ?? null, 4311);
   const historyLimit = 2_000;
@@ -261,8 +273,13 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
       `${clientErrorSessionId}.ndjson`
     );
   const clientErrorMaxEntries = parsePositiveInteger(env["DEBUG_CLIENT_ERROR_MAX_ENTRIES"] ?? null, 2000);
+  const invalidThreadStreamEventsLogPath =
+    parseOptionalPathEnvironmentValue("FARFIELD_INVALID_STREAM_LOG_PATH", env["FARFIELD_INVALID_STREAM_LOG_PATH"])
+    ?? path.resolve(defaultWorkspacePath, ".runtime", "logs", "threads", "invalid-thread-stream-events.ndjson");
+  const ntfyConfiguration = parseNtfyConfigFromEnv(env);
 
   return {
+    logLevel,
     host,
     port,
     historyLimit,
@@ -308,6 +325,8 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
     clientErrorSessionTimestamp,
     clientErrorSessionId,
     clientErrorLogPath,
-    clientErrorMaxEntries
+    clientErrorMaxEntries,
+    invalidThreadStreamEventsLogPath,
+    ntfyConfiguration
   };
 }

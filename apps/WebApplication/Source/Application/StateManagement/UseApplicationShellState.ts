@@ -28,7 +28,7 @@ import {
   type DebugTraceStatusResponse
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { type DebugIssueSeverityFilter } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
-import { type DebugWorkspaceSection } from "@/Features/Debugging/UserInterface/DebugWorkspacePane";
+import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 

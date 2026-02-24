@@ -1,10 +1,15 @@
 import { Bug } from "lucide-react";
-import { z } from "zod";
 import {
   type DebugIssueSeverityFilter
 } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
-import { Tabs, TabsList, TabsTrigger } from "@/Components/UserInterface/Tabs";
+import {
+  DebugWorkspaceSectionSchema,
+  type DebugWorkspaceSection
+} from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
+import { Tabs } from "@/Components/UserInterface/Tabs";
+import { TabsList } from "@/Components/UserInterface/TabsList";
+import { TabsTrigger } from "@/Components/UserInterface/TabsTrigger";
 import {
   DebugHistoryPanel,
   type DebugHistoryEntryListItem
@@ -13,10 +18,6 @@ import { type ReplayHistoryEntryRequestInput } from "./DebugHistoryDetailPanel";
 import { DebugIssuesPanel } from "./DebugIssuesPanel";
 import { DebugStreamEventsPanel } from "./DebugStreamEventsPanel";
 import { DebugTracePanel, type DebugTraceSummary } from "./DebugTracePanel";
-
-export const DebugWorkspaceSectionSchema = z.enum(["issues", "history", "stream", "trace"]);
-
-export type DebugWorkspaceSection = z.infer<typeof DebugWorkspaceSectionSchema>;
 
 export interface DebugWorkspacePaneProps {
   debugWorkspaceSection: DebugWorkspaceSection;

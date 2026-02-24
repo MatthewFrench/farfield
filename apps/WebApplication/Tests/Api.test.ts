@@ -5,6 +5,7 @@ import {
 import { getDebugClientError } from "../Source/Features/Debugging/DataAccess/DebugApi";
 import { sendMessage } from "../Source/Features/Chat/DataAccess/ChatApi";
 import {
+  createThread,
   listThreads,
   unarchiveThread
 } from "../Source/Features/Threads/DataAccess/ThreadApi";
@@ -158,6 +159,34 @@ describe("API envelope parsing", () => {
     expect(result.truncated).toBe(true);
   });
 
+  it("fails thread list parsing when required thread fields are invalid", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        data: [
+          {
+            id: "thread_1",
+            preview: "hello",
+            createdAt: 123,
+            updatedAt: "not-a-number",
+            agentId: "codex"
+          }
+        ],
+        nextCursor: null
+      })
+    } as Response);
+
+    await expect(
+      listThreads({
+        limit: 80,
+        archived: false,
+        all: true,
+        maxPages: 20
+      })
+    ).rejects.toThrow(/updatedAt/);
+  });
+
   it("parses config defaults response", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
@@ -188,6 +217,34 @@ describe("API envelope parsing", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
     expect(requestUrl).toBe("/api/threads/thread_123/unarchive");
+  });
+
+  it("returns strict create-thread response contract", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        threadId: "thread_123",
+        agentId: "codex",
+        thread: {
+          id: "thread_123",
+          preview: "hello",
+          createdAt: 1,
+          updatedAt: 1,
+          cwd: "/tmp/workspace",
+          cliVersion: "1.0.0",
+          modelProvider: "openai",
+          source: "cli",
+          turns: []
+        }
+      })
+    } as Response);
+
+    const created = await createThread();
+    expect(created).toEqual({
+      threadId: "thread_123",
+      agentId: "codex"
+    });
   });
 
   it("succeeds for sendMessage when response has no JSON body", async () => {

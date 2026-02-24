@@ -21,6 +21,60 @@ interface PendingRequest {
 }
 
 const InitializeResultSchema = z.object({}).passthrough();
+const AppServerSpawnEnvironmentShape = {
+  HOME: z.string().min(1).optional(),
+  PATH: z.string().min(1).optional(),
+  SHELL: z.string().min(1).optional(),
+  USER: z.string().min(1).optional(),
+  USERNAME: z.string().min(1).optional(),
+  TMPDIR: z.string().min(1).optional(),
+  TMP: z.string().min(1).optional(),
+  TEMP: z.string().min(1).optional(),
+  LANG: z.string().min(1).optional(),
+  LC_ALL: z.string().min(1).optional(),
+  TERM: z.string().min(1).optional(),
+  TZ: z.string().min(1).optional(),
+  SSL_CERT_FILE: z.string().min(1).optional(),
+  SSL_CERT_DIR: z.string().min(1).optional(),
+  NODE_EXTRA_CA_CERTS: z.string().min(1).optional(),
+  HTTP_PROXY: z.string().min(1).optional(),
+  HTTPS_PROXY: z.string().min(1).optional(),
+  NO_PROXY: z.string().min(1).optional(),
+  ALL_PROXY: z.string().min(1).optional(),
+  CODEX_HOME: z.string().min(1).optional(),
+  XDG_CONFIG_HOME: z.string().min(1).optional(),
+  XDG_CACHE_HOME: z.string().min(1).optional(),
+  APPDATA: z.string().min(1).optional(),
+  LOCALAPPDATA: z.string().min(1).optional(),
+  USERPROFILE: z.string().min(1).optional(),
+  SystemRoot: z.string().min(1).optional(),
+  ComSpec: z.string().min(1).optional()
+} as const;
+const AppServerSpawnInheritedEnvironmentSchema = z.object(AppServerSpawnEnvironmentShape).strip();
+const AppServerSpawnOverrideEnvironmentSchema = z.object(AppServerSpawnEnvironmentShape).strict();
+
+export interface BuildAppServerSpawnEnvironmentInput {
+  baseEnvironment: NodeJS.ProcessEnv;
+  overrideEnvironment?: NodeJS.ProcessEnv;
+  userAgent: string;
+  clientId: string;
+}
+
+/**
+ * Owns the exact environment contract used to spawn `codex app-server`.
+ * Only allowlisted keys may cross the process boundary so configuration remains explicit and reviewable.
+ */
+export function buildAppServerSpawnEnvironment(input: BuildAppServerSpawnEnvironmentInput): NodeJS.ProcessEnv {
+  const inheritedEnvironment = AppServerSpawnInheritedEnvironmentSchema.parse(input.baseEnvironment);
+  const overrideEnvironment = AppServerSpawnOverrideEnvironmentSchema.parse(input.overrideEnvironment ?? {});
+
+  return {
+    ...inheritedEnvironment,
+    ...overrideEnvironment,
+    CODEX_USER_AGENT: input.userAgent,
+    CODEX_CLIENT_ID: input.clientId
+  };
+}
 
 export interface ChildProcessAppServerTransportOptions {
   executablePath: string;
@@ -58,14 +112,27 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       return;
     }
 
+    const clientIdentifier = `farfield-${randomUUID()}`;
+    let spawnEnvironment: NodeJS.ProcessEnv;
+    try {
+      const spawnEnvironmentInput: BuildAppServerSpawnEnvironmentInput = {
+        baseEnvironment: process.env,
+        userAgent: this.userAgent,
+        clientId: clientIdentifier
+      };
+      if (this.env) {
+        spawnEnvironmentInput.overrideEnvironment = this.env;
+      }
+      spawnEnvironment = buildAppServerSpawnEnvironment(spawnEnvironmentInput);
+    } catch (error) {
+      throw new AppServerTransportError(
+        `app-server environment configuration invalid: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
     const child = spawn(this.executablePath, ["app-server"], {
       cwd: this.cwd,
-      env: {
-        ...process.env,
-        ...this.env,
-        CODEX_USER_AGENT: this.userAgent,
-        CODEX_CLIENT_ID: `farfield-${randomUUID()}`
-      },
+      env: spawnEnvironment,
       stdio: ["pipe", "pipe", "pipe"]
     });
 

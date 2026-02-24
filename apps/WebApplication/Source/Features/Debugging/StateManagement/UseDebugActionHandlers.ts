@@ -10,13 +10,13 @@ import type {
 import { DebugWorkspaceActionCoordinator } from "./DebugWorkspaceActionCoordinator";
 import { type DebugServerClient } from "../DataAccess/DebugServerClient";
 import { type ReplayHistoryEntryRequestInput } from "../UserInterface/DebugHistoryDetailPanel";
-import { type DebugWorkspaceSection } from "../UserInterface/DebugWorkspacePane";
+import { type DebugWorkspaceSection } from "../DomainModel/DebugWorkspaceSectionContracts";
 import { type DebugHistoryDetailResponse } from "../DataAccess/DebugServerClient";
 
 export interface UseDebugActionHandlersInput {
   debugWorkspaceActionCoordinator: DebugWorkspaceActionCoordinator;
   debugServerClient: DebugServerClient;
-  refreshAll: () => Promise<void>;
+  refreshCoreData: () => Promise<void>;
   traceLabel: string;
   traceNote: string;
   errorBannerDetails: ErrorBannerDetails;
@@ -51,34 +51,34 @@ export function useDebugActionHandlers(input: UseDebugActionHandlersInput): Debu
       void input.debugWorkspaceActionCoordinator.replayHistoryEntry({
         replayRequest: replayInput,
         debugClient: input.debugServerClient,
-        refreshAll: input.refreshAll
+        refreshCoreData: input.refreshCoreData
       });
     },
-    [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshAll]
+    [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData]
   );
 
   const startTraceFromDebugPanel = useCallback(() => {
     void input.debugWorkspaceActionCoordinator.startTrace({
       traceLabel: input.traceLabel,
       debugClient: input.debugServerClient,
-      refreshAll: input.refreshAll
+      refreshCoreData: input.refreshCoreData
     });
-  }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshAll, input.traceLabel]);
+  }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData, input.traceLabel]);
 
   const markTraceFromDebugPanel = useCallback(() => {
     void input.debugWorkspaceActionCoordinator.markTrace({
       traceNote: input.traceNote,
       debugClient: input.debugServerClient,
-      refreshAll: input.refreshAll
+      refreshCoreData: input.refreshCoreData
     });
-  }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshAll, input.traceNote]);
+  }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData, input.traceNote]);
 
   const stopTraceFromDebugPanel = useCallback(() => {
     void input.debugWorkspaceActionCoordinator.stopTrace({
       debugClient: input.debugServerClient,
-      refreshAll: input.refreshAll
+      refreshCoreData: input.refreshCoreData
     });
-  }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshAll]);
+  }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData]);
 
   const openDebugFromErrorBanner = useCallback(() => {
     input.setActiveTab("debug");

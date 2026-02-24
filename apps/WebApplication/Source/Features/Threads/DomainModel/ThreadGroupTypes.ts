@@ -1,13 +1,18 @@
-import type { AppServerListThreadsResponse } from "@farfield/protocol";
 import type { AgentId } from "@/Shared/Contracts/ApiContracts";
 
-export type ThreadListItem = AppServerListThreadsResponse["data"][number] & {
+export interface ThreadListItem {
+  id: string;
+  preview: string;
+  createdAt: number;
+  updatedAt: number;
+  cwd?: string | undefined;
+  path?: string | null | undefined;
   agentId: AgentId;
   source?: string | undefined;
   removed?: boolean | undefined;
   projectRemoved?: boolean | undefined;
   projectState?: "active" | "removed" | undefined;
-};
+}
 
 export interface ThreadListResponse {
   data: ThreadListItem[];

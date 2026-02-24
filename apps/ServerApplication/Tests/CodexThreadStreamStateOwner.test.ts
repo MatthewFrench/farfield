@@ -201,4 +201,23 @@ describe("CodexThreadStreamStateOwner", () => {
     expect(content.includes("\"thread-stream-state-changed\"")).toBe(true);
     expect(content.includes("\"error\"")).toBe(true);
   });
+
+  it("creates missing parent directories for invalid-event detail logs", () => {
+    const logDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "codex-stream-owner-nested-test-"));
+    const invalidStreamEventsLogPath = path.join(logDirectory, "nested", "logs", "invalid-stream-events.ndjson");
+    const owner = new CodexThreadStreamStateOwner({
+      invalidStreamEventsLogPath
+    });
+
+    const malformedFrame: IpcFrame = {
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "client-a",
+      version: 4,
+      params: {}
+    };
+    owner.ingestInboundFrame(malformedFrame);
+
+    expect(fs.existsSync(invalidStreamEventsLogPath)).toBe(true);
+  });
 });

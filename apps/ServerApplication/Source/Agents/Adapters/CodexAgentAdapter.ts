@@ -54,6 +54,7 @@ export interface CodexIpcFrameEvent {
 export interface CodexAgentOptions {
   appExecutable: string;
   socketPath: string;
+  invalidStreamEventsLogPath: string;
   workspaceDir: string;
   userAgent: string;
   reconnectDelayMs: number;
@@ -88,7 +89,9 @@ export class CodexAgentAdapter implements AgentAdapter {
   public constructor(options: CodexAgentOptions) {
     this.workspaceDir = options.workspaceDir;
     this.appServerStderrOwner = new CodexAppServerStderrOwner();
-    this.threadStreamStateOwner = new CodexThreadStreamStateOwner();
+    this.threadStreamStateOwner = new CodexThreadStreamStateOwner({
+      invalidStreamEventsLogPath: options.invalidStreamEventsLogPath
+    });
 
     this.appClient = new AppServerClient({
       executablePath: options.appExecutable,

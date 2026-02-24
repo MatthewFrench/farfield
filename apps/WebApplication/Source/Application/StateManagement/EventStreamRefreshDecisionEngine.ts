@@ -38,6 +38,9 @@ export interface EventStreamRefreshDecision {
   refreshSelectedThread: boolean;
 }
 
+/**
+ * Parses event-stream payloads and decides the minimum refresh scope needed for UI consistency.
+ */
 export class EventStreamRefreshDecisionEngine {
   private readonly threadOnlyHistoryMethods: Set<string>;
 

@@ -49,6 +49,10 @@ const InitializeResultSchema = z
   })
   .passthrough();
 
+/**
+ * Owns raw desktop IPC socket lifecycle and framed request/response delivery.
+ * Higher-level thread/message behavior is implemented by service/coordinator owners.
+ */
 export class DesktopIpcClient {
   private readonly socketPath: string;
   private readonly requestTimeoutMs: number;

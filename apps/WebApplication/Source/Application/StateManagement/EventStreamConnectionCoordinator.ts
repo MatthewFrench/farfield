@@ -45,6 +45,10 @@ interface EventStreamConnectionCoordinatorDependencies {
 const DEFAULT_INITIAL_RECONNECT_DELAY_MS = 1_000;
 const DEFAULT_MAXIMUM_RECONNECT_DELAY_MS = 10_000;
 
+/**
+ * Owns EventSource lifecycle and reconnect backoff for runtime updates.
+ * Refresh work is delegated to injected schedulers/loaders so this class stays transport-focused.
+ */
 export class EventStreamConnectionCoordinator {
   private readonly createEventSource: (url: string) => EventSourceLike;
   private readonly scheduleTimeout: (callback: () => void, delayMs: number) => number;

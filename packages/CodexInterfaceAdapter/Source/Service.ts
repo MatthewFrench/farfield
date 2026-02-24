@@ -44,6 +44,10 @@ export interface InterruptInput {
   ownerClientId: string;
 }
 
+/**
+ * Owns Codex thread-level command payload construction over desktop IPC.
+ * IPC transport delivery remains in `DesktopIpcClient`.
+ */
 export class CodexMonitorService {
   private readonly ipcClient: DesktopIpcClient;
 

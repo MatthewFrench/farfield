@@ -11,6 +11,10 @@ export interface OpenCodeClientOptions {
   url?: string;
 }
 
+/**
+ * Owns OpenCode SDK connection lifecycle and client instantiation.
+ * Session/message orchestration is handled by `OpenCodeMonitorService`.
+ */
 export class OpenCodeConnection {
   private client: OpencodeClient | null = null;
   private server: { url: string; close(): void } | null = null;

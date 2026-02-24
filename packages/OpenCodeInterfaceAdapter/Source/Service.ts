@@ -29,6 +29,9 @@ export interface OpenCodeCreateSessionInput {
   directory?: string;
 }
 
+/**
+ * Owns OpenCode session/thread API mapping from SDK payloads into Farfield contracts.
+ */
 export class OpenCodeMonitorService {
   private readonly connection: OpenCodeConnection;
 

@@ -264,7 +264,7 @@ export function useApplicationRuntimeComposition(
   const debugFeatureComposition = useApplicationDebugFeatureComposition({
     debugWorkspaceActionCoordinator: input.applicationOwnerDependencies.debugWorkspaceActionCoordinator,
     debugServerClient: input.applicationOwnerDependencies.debugServerClient,
-    refreshAll: input.coreDataLoaders.refreshAll,
+    refreshCoreData: input.coreDataLoaders.loadCoreDataTracked,
     traceLabel: input.applicationShellState.traceLabel,
     traceNote: input.applicationShellState.traceNote,
     errorBannerDetails: input.applicationDerivedState.errorBannerDetails,

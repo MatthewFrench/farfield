@@ -7,9 +7,9 @@ import { type ChatWorkspacePaneProps } from "@/Features/Chat/UserInterface/ChatW
 import { type DebugHistoryEntryListItem } from "@/Features/Debugging/UserInterface/DebugHistoryPanel";
 import { type DebugTraceSummary } from "@/Features/Debugging/UserInterface/DebugTracePanel";
 import { type DebugStatusBannersProps } from "@/Features/Debugging/UserInterface/DebugStatusBanners";
+import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import {
-  type DebugWorkspacePaneProps,
-  type DebugWorkspaceSection
+  type DebugWorkspacePaneProps
 } from "@/Features/Debugging/UserInterface/DebugWorkspacePane";
 import { type ThreadSidebarPanelHealthState } from "@/Features/Threads/UserInterface/ThreadSidebarPanel";
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";

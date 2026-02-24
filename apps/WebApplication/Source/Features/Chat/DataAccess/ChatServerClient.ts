@@ -26,6 +26,10 @@ export type ChatSetCollaborationModeInput = ApiSetCollaborationModeInput;
 export type ChatSubmitUserInputInput = ApiSubmitUserInputInput;
 export type ChatInterruptThreadInput = ApiInterruptThreadInput;
 
+/**
+ * Owns chat endpoint calls.
+ * Concurrency, retry, and snapshot-merge policy are handled by state coordinators.
+ */
 export class ChatServerClient {
   public async readThread(threadId: string, options?: ApiReadThreadOptions): Promise<ApiReadThreadResponse> {
     return readThread(threadId, options);

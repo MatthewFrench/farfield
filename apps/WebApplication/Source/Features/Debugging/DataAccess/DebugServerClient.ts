@@ -26,6 +26,10 @@ export type DebugErrorDetailResponse = ApiDebugErrorDetailResponse;
 export type DebugReplayHistoryEntryInput = ApiReplayHistoryEntryInput;
 export type DebugReplayHistoryEntryResponse = ApiReplayHistoryEntryResponse;
 
+/**
+ * Owns debug endpoint reads and trace commands.
+ * Higher-level refresh cadence and merge behavior are owned by debugging state modules.
+ */
 export class DebugServerClient {
   public async readTraceStatus(options?: ApiRequestOptions): Promise<ApiTraceStatusResponse> {
     return getTraceStatus(options);

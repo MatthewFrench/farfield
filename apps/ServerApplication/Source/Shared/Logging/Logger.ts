@@ -1,9 +1,22 @@
 import pino from "pino";
+import { z } from "zod";
 
-const level = process.env["LOG_LEVEL"] ?? "info";
+export const LoggerLevelSchema = z.enum([
+  "fatal",
+  "error",
+  "warn",
+  "info",
+  "debug",
+  "trace",
+  "silent"
+]);
+export type LoggerLevel = z.infer<typeof LoggerLevelSchema>;
 
 export const logger = pino({
   name: "farfield-server",
-  level
+  level: "info"
 });
 
+export function configureLogger(level: LoggerLevel): void {
+  logger.level = level;
+}
