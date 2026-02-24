@@ -12,7 +12,7 @@ import {
   type DebugWorkspaceSection
 } from "@/Features/Debugging/UserInterface/DebugWorkspacePane";
 import { type ThreadSidebarPanelHealthState } from "@/Features/Threads/UserInterface/ThreadSidebarPanel";
-import { type PushClientState } from "@/SharedUtilities/Push";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 
 export interface UseApplicationShellViewPropertiesInput {
   health: CapabilityHealthResponse | null;

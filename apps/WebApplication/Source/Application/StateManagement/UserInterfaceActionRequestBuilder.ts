@@ -1,5 +1,8 @@
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
-import { createUiActionId } from "@/SharedUtilities/DebugHelpers";
+
+function createUserInterfaceActionId(): string {
+  return `action_${String(Date.now())}_${Math.floor(Math.random() * 1_000_000_000).toString(16)}`;
+}
 
 export interface UserInterfaceActionRequest {
   actionId: string;
@@ -10,7 +13,7 @@ export class UserInterfaceActionRequestBuilder {
   private readonly readActionId: () => string;
 
   public constructor(readActionId?: () => string) {
-    this.readActionId = readActionId ?? createUiActionId;
+    this.readActionId = readActionId ?? createUserInterfaceActionId;
   }
 
   public create(actionName: string): UserInterfaceActionRequest {

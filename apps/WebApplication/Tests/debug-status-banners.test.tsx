@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { type ErrorBannerDetails } from "@/SharedUtilities/DebugHelpers";
+import { type ErrorBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { DebugStatusBanners } from "@/Features/Debugging/UserInterface/DebugStatusBanners";
 
 const BASE_ERROR_BANNER_DETAILS: ErrorBannerDetails = {

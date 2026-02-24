@@ -14,7 +14,7 @@
   "rtl": false,
   "aliases": {
     "components": "@/components",
-    "utils": "@/SharedUtilities/utils",
+    "utils": "@/Shared/Styling/ClassNameMerge",
     "ui": "@/Components/ui",
     "lib": "@/lib",
     "hooks": "@/hooks"

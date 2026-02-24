@@ -13,7 +13,7 @@ import {
   getPushVapidPublicKey,
   savePushSubscription
 } from "../Source/Features/PushNotifications/DataAccess/PushApi";
-import { disablePushNotifications, recoverPushNotifications } from "../Source/SharedUtilities/Push";
+import { disablePushNotifications, recoverPushNotifications } from "../Source/Features/PushNotifications/DataAccess/PushClientStateManager";
 
 interface PushRecoveryHarness {
   registerMock: Mock<() => Promise<ServiceWorkerRegistration>>;

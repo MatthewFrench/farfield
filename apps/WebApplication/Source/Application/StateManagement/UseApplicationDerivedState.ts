@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo } from "react";
-import { toErrorBannerDetails } from "@/SharedUtilities/DebugHelpers";
+import { toErrorBannerDetails } from "@/Features/Debugging/DomainModel/ErrorBannerDetailsParser";
 import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
 import {
   type ApplicationDerivedState,

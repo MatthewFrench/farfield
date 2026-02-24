@@ -15,7 +15,7 @@ This plan is setup and workflow only. It does not include turning manual session
 ### Runtime topology already in place
 
 - Frontend Vite dev server runs on `127.0.0.1:4312` (`apps/WebApplication/vite.config.ts`).
-- Backend server runs on `127.0.0.1:4311` (`apps/ServerApplication/Source/Index.ts`).
+- Backend server runs on `127.0.0.1:4311` (`apps/ServerApplication/Source/Application/ServerBootstrap.ts`).
 - Frontend proxies `/api` and `/events` to backend (`apps/WebApplication/vite.config.ts`).
 - API token injection in dev proxy is restricted to trusted origins (`localhost` defaults, configurable via `VITE_DEV_PROXY_TRUSTED_ORIGINS`) when `API_TOKEN` or `PUSH_API_TOKEN` is set (`apps/WebApplication/vite.config.ts`).
 - When `API_TOKEN` is configured, `/events` requires the same token as `/api/*`; browser flows should run through the trusted dev proxy/Caddy path.

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { type PushClientState } from "@/SharedUtilities/Push";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { PushStatusButton } from "@/Features/PushNotifications/UserInterface/PushStatusButton";
 import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 

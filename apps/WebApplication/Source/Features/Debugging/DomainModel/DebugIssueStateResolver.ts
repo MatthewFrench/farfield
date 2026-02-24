@@ -1,11 +1,13 @@
 import {
   buildDebugErrorIssue,
   buildDebugWarningIssuesFromHistory,
-  sortDebugIssuesByTimeDesc,
+  sortDebugIssuesByTimeDesc
+} from "@/Features/Debugging/DomainModel/DebugIssueDerivation";
+import {
   type DebugErrorLike,
   type DebugHistoryEntryLike,
   type DebugIssue
-} from "@/SharedUtilities/DebugHelpers";
+} from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 
 export type DebugIssueSeverityFilter = "all" | "error" | "warning";
 

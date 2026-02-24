@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@/SharedUtilities/Utils";
+import { cn } from "@/Shared/Styling/ClassNameMerge";
 
 export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => {

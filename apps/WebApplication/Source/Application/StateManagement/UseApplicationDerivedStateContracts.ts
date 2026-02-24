@@ -2,7 +2,7 @@ import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import {
   type DebugIssue,
   type ErrorBannerDetails
-} from "@/SharedUtilities/DebugHelpers";
+} from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import {
   type ThreadListPaneProperties
 } from "@/Features/Threads/UserInterface/ThreadListPane";

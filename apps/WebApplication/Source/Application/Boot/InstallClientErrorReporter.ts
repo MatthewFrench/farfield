@@ -1,13 +1,9 @@
-import { CreateDebugClientErrorBodySchema } from "@farfield/protocol";
 import { z } from "zod";
 import {
-  createDebugClientError,
-  type ApiCreateDebugClientErrorInput,
-  type ApiDebugErrorCreateResponse
-} from "@/Features/Debugging/DataAccess/DebugApi";
+  reportClientError,
+  type ClientErrorReportInput
+} from "@/Features/Debugging/DataAccess/ClientErrorReporter";
 
-export type ClientErrorReportInput = ApiCreateDebugClientErrorInput;
-export type ClientErrorReportResult = ApiDebugErrorCreateResponse;
 type BrowserErrorReason = ErrorEvent["error"] | PromiseRejectionEvent["reason"];
 
 interface NormalizedBrowserError {
@@ -35,11 +31,6 @@ const ErrorObjectSchema = z
     stack: z.string().trim().min(1).optional()
   })
   .passthrough();
-
-export async function reportClientError(input: ClientErrorReportInput): Promise<ClientErrorReportResult> {
-  const parsed = CreateDebugClientErrorBodySchema.parse(input);
-  return createDebugClientError(parsed);
-}
 
 function parseOptionalText(value: string | null | undefined): string | null {
   const parsed = OptionalNonEmptyStringSchema.safeParse(value ?? null);

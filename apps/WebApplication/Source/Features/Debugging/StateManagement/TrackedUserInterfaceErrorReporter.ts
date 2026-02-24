@@ -2,13 +2,13 @@ import {
   reportClientError,
   type ClientErrorReportInput,
   type ClientErrorReportResult
-} from "@/SharedUtilities/ClientErrors";
+} from "@/Features/Debugging/DataAccess/ClientErrorReporter";
+import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import {
   extractRequestIdFromErrorMessage,
   formatTrackedUiErrorMessage,
-  shouldIgnoreUiErrorMessage,
-  toErrorMessage
-} from "@/SharedUtilities/DebugHelpers";
+  shouldIgnoreUiErrorMessage
+} from "@/Features/Debugging/StateManagement/TrackedUserInterfaceErrorPolicy";
 
 type ErrorInput = Error | string | number | boolean | bigint | symbol | null | undefined | object;
 

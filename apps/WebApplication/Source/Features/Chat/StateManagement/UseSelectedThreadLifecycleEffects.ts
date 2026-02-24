@@ -4,8 +4,9 @@ import {
   type MutableRefObject,
   type SetStateAction
 } from "react";
+import { isThreadNotLoadedReadError } from "@/Features/Chat/DomainModel/ReadThreadErrorClassifier";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
-import { isThreadNotLoadedReadError, toErrorMessage } from "@/SharedUtilities/DebugHelpers";
+import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import type {
   ChatLiveStateResponse,
   ChatReadThreadResponse,

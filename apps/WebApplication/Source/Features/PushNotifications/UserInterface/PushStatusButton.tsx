@@ -1,5 +1,5 @@
 import { Bell, Loader2 } from "lucide-react";
-import { type PushClientState } from "@/SharedUtilities/Push";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { Button } from "@/Components/UserInterface/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/UserInterface/Tooltip";
 

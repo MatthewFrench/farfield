@@ -1,4 +1,5 @@
-import { isTransientReadThreadError, toErrorMessage } from "@/SharedUtilities/DebugHelpers";
+import { isTransientReadThreadError } from "@/Features/Chat/DomainModel/ReadThreadErrorClassifier";
+import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import type {
   ChatLiveStateResponse,
   ChatReadThreadOptions,

@@ -1,6 +1,6 @@
 import { CreateDebugClientErrorBodySchema } from "@farfield/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { installGlobalClientCrashReporter } from "../Source/SharedUtilities/ClientErrors";
+import { installGlobalClientCrashReporter } from "../Source/Application/Boot/InstallClientErrorReporter";
 
 function buildCreateErrorSuccessResponse(): Response {
   return {

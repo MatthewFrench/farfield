@@ -7,7 +7,7 @@ import {
 } from "react";
 import { type ApplicationRouteState } from "@/Application/DomainModel/ApplicationRouteStateMapper";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
-import { type PushClientState } from "@/SharedUtilities/Push";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import {
   type CapabilityAgentsResponse,
   type CapabilityCollaborationModesResponse,

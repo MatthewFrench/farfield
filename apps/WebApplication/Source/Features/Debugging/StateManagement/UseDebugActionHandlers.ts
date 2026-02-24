@@ -3,7 +3,7 @@ import {
   type Dispatch,
   type SetStateAction
 } from "react";
-import type { ErrorBannerDetails } from "@/SharedUtilities/DebugHelpers";
+import type { ErrorBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import type {
   DebugIssueSeverityFilter
 } from "../DomainModel/DebugIssueStateResolver";

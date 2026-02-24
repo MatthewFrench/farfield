@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { type DebugIssue } from "@/SharedUtilities/DebugHelpers";
+import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import {
   DebugWorkspacePane,
   type DebugWorkspacePaneProps

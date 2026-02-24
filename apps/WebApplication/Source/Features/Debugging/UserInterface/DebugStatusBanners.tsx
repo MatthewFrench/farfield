@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
-import { type ErrorBannerDetails } from "@/SharedUtilities/DebugHelpers";
+import { type ErrorBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { Button } from "@/Components/UserInterface/Button";
 
 interface LiveStateReductionErrorSummary {

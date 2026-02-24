@@ -1,4 +1,4 @@
-import type { PushClientState } from "@/SharedUtilities/Push";
+import type { PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { PushClientStateManager } from "../DataAccess/PushClientStateManager";
 
 interface PushNotificationToolbarActionCoordinatorDependencies {

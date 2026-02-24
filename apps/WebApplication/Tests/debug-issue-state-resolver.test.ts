@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   type DebugErrorLike,
   type DebugHistoryEntryLike
-} from "@/SharedUtilities/DebugHelpers";
+} from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { DebugIssueStateResolver } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 
 function buildDebugError(input: {

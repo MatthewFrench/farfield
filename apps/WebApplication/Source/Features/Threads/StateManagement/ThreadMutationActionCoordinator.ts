@@ -1,6 +1,6 @@
 import type { ThreadMutationCreateThreadInput } from "../DataAccess/ThreadMutationServerClient";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
-import { toErrorMessage } from "@/SharedUtilities/DebugHelpers";
+import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 
 export interface ThreadMutationActionRequestOptions {
   actionId: string;

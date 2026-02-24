@@ -2,8 +2,8 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./Index.css";
-import { reconcilePushSubscription } from "./SharedUtilities/Push";
-import { installGlobalClientCrashReporter } from "./SharedUtilities/ClientErrors";
+import { reconcilePushSubscription } from "./Features/PushNotifications/DataAccess/PushClientStateManager";
+import { installGlobalClientCrashReporter } from "./Application/Boot/InstallClientErrorReporter";
 
 const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";
 const BOOT_STATUS_EVENT_NAME = "farfield:boot-status";

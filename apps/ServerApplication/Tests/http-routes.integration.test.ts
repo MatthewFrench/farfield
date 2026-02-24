@@ -163,7 +163,12 @@ describe("server route integration", () => {
     const localCaPath = path.join(tempDirectory, "root.crt");
     fs.writeFileSync(localCaPath, "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n", "utf8");
 
-    const serverEntryPath = path.resolve(process.cwd(), "Source", "index.ts");
+    const serverEntryPath = path.resolve(
+      process.cwd(),
+      "Source",
+      "Application",
+      "ServerBootstrap.ts"
+    );
     serverProcess = spawn(
       process.execPath,
       ["--import", "tsx", serverEntryPath, "--agents=codex"],

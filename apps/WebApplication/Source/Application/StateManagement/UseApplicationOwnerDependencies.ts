@@ -10,7 +10,7 @@ import { MobileSidebarSwipeCoordinator } from "@/Application/StateManagement/Mob
 import { PageTouchOverscrollGuardCoordinator } from "@/Application/StateManagement/PageTouchOverscrollGuardCoordinator";
 import { RuntimeViewportSizingCoordinator } from "@/Application/StateManagement/RuntimeViewportSizingCoordinator";
 import { UserInterfaceActionRequestBuilder } from "@/Application/StateManagement/UserInterfaceActionRequestBuilder";
-import { type PushClientState } from "@/SharedUtilities/Push";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import {
   CapabilityServerClient
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";

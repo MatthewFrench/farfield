@@ -53,7 +53,7 @@ This document defines the target folder/file structure and end-state ownership m
   .runtime/              # runtime artifact only
 ```
 
-## Proposed End-State Tree (Detailed)
+## Proposed End-State Tree (Detailed, Illustrative)
 
 ```text
 /
@@ -588,33 +588,37 @@ Rules for this strategy:
 3. Concurrency owners define bounded in-flight work per key/scope.
 4. Performance exceptions include documented rationale and owner accountability.
 
-## Current-To-End-State Mapping (Primary Targets)
+## Current-To-End-State Mapping (Verified Ownership Mapping)
 
-| Current Path | Target Path |
+This table maps legacy concentration points to the currently implemented owner paths.
+Listed implemented paths are expected to exist in the repository.
+
+| Legacy / Transition Path | Implemented Owner Path |
 | --- | --- |
 | `apps/WebApplication/Source/Main.tsx` | `apps/WebApplication/Source/Main.tsx` + `apps/WebApplication/Source/Application/Boot/*` |
-| `apps/WebApplication/Source/App.tsx` | `apps/WebApplication/Source/Application/AppShell.tsx` + `apps/WebApplication/Source/Features/*` |
+| `apps/WebApplication/Source/App.tsx` | `apps/WebApplication/Source/App.tsx` + `apps/WebApplication/Source/Application/StateManagement/*` + `apps/WebApplication/Source/Application/UserInterface/*` |
 | `apps/WebApplication/Source/Application/DataAccess/WebShellApi.ts` | `apps/WebApplication/Source/Application/DataAccess/WebShellApi.ts` |
-| `apps/WebApplication/Source/SharedUtilities/push.ts` | `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushServerClient.ts` + `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushClientStateManager.ts` |
-| `apps/WebApplication/Source/SharedUtilities/client-errors.ts` | `apps/WebApplication/Source/Application/Boot/InstallClientErrorReporter.ts` |
-| `apps/WebApplication/Source/SharedUtilities/debug-helpers.ts` | `apps/WebApplication/Source/Features/Debugging/DomainModel/*` |
-| `apps/WebApplication/Source/SharedUtilities/thread-groups.ts` | `apps/WebApplication/Source/Features/Threads/DomainModel/*` |
-| `apps/ServerApplication/Source/Index.ts` | `apps/ServerApplication/Source/Application/Bootstrap.ts` + module composition |
-| `apps/ServerApplication/Source/Agents/agent-runtime-owner.ts` | `apps/ServerApplication/Source/Agents/Runtime/AgentRuntimeOwner.ts` |
-| `apps/ServerApplication/Source/Network/server-request-handler.ts` | `apps/ServerApplication/Source/Network/Http/ServerRequestHandler.ts` |
-| `apps/ServerApplication/Source/Network/Routes/debug-types.ts` | `apps/ServerApplication/Source/Modules/Debugging/DebugTypes.ts` |
-| `apps/ServerApplication/Source/Network/Routes/debug-file-download.ts` | `apps/ServerApplication/Source/Modules/Debugging/DebugFileDownloadService.ts` |
-| `apps/ServerApplication/Source/Network/ServerTransportErrorClassifier.ts` | `apps/ServerApplication/Source/Network/Http/ServerTransportErrorClassifier.ts` |
-| `apps/ServerApplication/Source/Network/ServerObservabilitySnapshotOwner.ts` | `apps/ServerApplication/Source/Shared/Observability/ServerObservabilitySnapshotOwner.ts` |
-| `apps/ServerApplication/Source/Network/ServerRequestUtilityOwner.ts` | `apps/ServerApplication/Source/Network/Http/ServerRequestUtilityOwner.ts` |
-| `apps/ServerApplication/Source/Network/PushTestPayloadOwner.ts` | `apps/ServerApplication/Source/Modules/PushNotifications/PushTestPayloadOwner.ts` |
-| `apps/ServerApplication/Source/Network/ServerErrorEventRecorder.ts` | `apps/ServerApplication/Source/Shared/Observability/ServerErrorEventRecorder.ts` |
-| `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts` | `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfiguration.ts` |
-| `apps/ServerApplication/Source/ServerLifecycleCoordinator.ts` | `apps/ServerApplication/Source/Application/Bootstrap/ServerLifecycleCoordinator.ts` |
-| `apps/ServerApplication/Source/HttpSchemas.ts` | `apps/ServerApplication/Source/Network/RequestSchemas/RequestSchemas.ts` |
-| `apps/ServerApplication/Source/Push*.ts` and `apps/ServerApplication/Source/PushService.ts` | `apps/ServerApplication/Source/Modules/PushNotifications/*` |
-| `apps/ServerApplication/Source/CompletionDetector.ts` | `apps/ServerApplication/Source/Modules/Threads/CompletionDetectionService.ts` |
-| `apps/ServerApplication/Source/ThreadOwner.ts` | `apps/ServerApplication/Source/Modules/Threads/ThreadOwnershipService.ts` |
+| `apps/WebApplication/Source/SharedUtilities/Push.ts` | `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushClientStateManager.ts` + `apps/WebApplication/Source/Features/PushNotifications/DomainModel/PushClientContracts.ts` |
+| `apps/WebApplication/Source/SharedUtilities/ClientErrors.ts` | `apps/WebApplication/Source/Application/Boot/InstallClientErrorReporter.ts` + `apps/WebApplication/Source/Features/Debugging/DataAccess/ClientErrorReporter.ts` |
+| `apps/WebApplication/Source/SharedUtilities/DebugHelpers.ts` | `apps/WebApplication/Source/Features/Debugging/DomainModel/DebugIssueContracts.ts` + `apps/WebApplication/Source/Features/Debugging/DomainModel/DebugIssueDerivation.ts` + `apps/WebApplication/Source/Features/Debugging/DomainModel/ErrorBannerDetailsParser.ts` + `apps/WebApplication/Source/Features/Debugging/StateManagement/TrackedUserInterfaceErrorPolicy.ts` + `apps/WebApplication/Source/Shared/Errors/ErrorMessage.ts` + `apps/WebApplication/Source/Features/Chat/DomainModel/ReadThreadErrorClassifier.ts` |
+| `apps/WebApplication/Source/SharedUtilities/Utils.ts` | `apps/WebApplication/Source/Shared/Styling/ClassNameMerge.ts` |
+| `apps/WebApplication/Source/SharedUtilities/thread-groups.ts` | `apps/WebApplication/Source/Features/Threads/DomainModel/ThreadGroupTypes.ts` + `apps/WebApplication/Source/Features/Threads/DomainModel/ThreadGroupSelectors.ts` |
+| `apps/ServerApplication/Source/Index.ts` | `apps/ServerApplication/Source/Application/ServerBootstrap.ts` |
+| `apps/ServerApplication/Source/Agents/agent-runtime-owner.ts` | `apps/ServerApplication/Source/Agents/AgentRuntimeOwner.ts` |
+| `apps/ServerApplication/Source/Network/server-request-handler.ts` | `apps/ServerApplication/Source/Network/ServerRequestHandler.ts` |
+| `apps/ServerApplication/Source/Network/Routes/debug-types.ts` | `apps/ServerApplication/Source/Network/Routes/DebugTypes.ts` |
+| `apps/ServerApplication/Source/Network/Routes/debug-file-download.ts` | `apps/ServerApplication/Source/Network/Routes/DebugFileDownload.ts` |
+| `apps/ServerApplication/Source/Network/ServerTransportErrorClassifier.ts` | `apps/ServerApplication/Source/Network/ServerTransportErrorClassifier.ts` |
+| `apps/ServerApplication/Source/Network/ServerObservabilitySnapshotOwner.ts` | `apps/ServerApplication/Source/Network/ServerObservabilitySnapshotOwner.ts` |
+| `apps/ServerApplication/Source/Network/ServerRequestUtilityOwner.ts` | `apps/ServerApplication/Source/Network/ServerRequestUtilityOwner.ts` |
+| `apps/ServerApplication/Source/Network/PushTestPayloadOwner.ts` | `apps/ServerApplication/Source/Network/PushTestPayloadOwner.ts` |
+| `apps/ServerApplication/Source/Network/ServerErrorEventRecorder.ts` | `apps/ServerApplication/Source/Network/ServerErrorEventRecorder.ts` |
+| `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts` | `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts` |
+| `apps/ServerApplication/Source/ServerLifecycleCoordinator.ts` | `apps/ServerApplication/Source/ServerLifecycleCoordinator.ts` |
+| `apps/ServerApplication/Source/HttpSchemas.ts` | `apps/ServerApplication/Source/HttpSchemas.ts` |
+| `apps/ServerApplication/Source/Push*.ts` and `apps/ServerApplication/Source/PushService.ts` | `apps/ServerApplication/Source/Push*.ts` and `apps/ServerApplication/Source/PushService.ts` |
+| `apps/ServerApplication/Source/CompletionDetector.ts` | `apps/ServerApplication/Source/CompletionDetector.ts` |
+| `apps/ServerApplication/Source/ThreadOwner.ts` | `apps/ServerApplication/Source/ThreadOwner.ts` |
 | `packages/CodexProtocol/Source/*` | `packages/CodexProtocol/Source/Contracts/*` and `packages/CodexProtocol/Source/Parsers/*` |
 | `packages/CodexInterfaceAdapter/Source/*` | `packages/CodexInterfaceAdapter/Source/{Clients,Transports,Services,StateReduction}/*` |
 | `packages/OpenCodeInterfaceAdapter/Source/*` | `packages/OpenCodeInterfaceAdapter/Source/{Clients,Parsers,Mappers,Services}/*` |
@@ -676,13 +680,14 @@ Use this checklist as the single at-a-glance cleanup tracker.
 ### Current Completion Snapshot
 
 - Date: 2026-02-24
-- Checklist completion: 270 / 270 items (`100%`)
+- Checklist completion: 274 / 274 items (`100%`)
 
 ### Realistic End-State Estimate (Holistic)
 
 - Estimated overall completion: `100%`
 - Basis:
-  - Checklist execution is complete (`270 / 270`) with no open checklist items.
+  - Checklist execution is complete (`274 / 274`) with no open checklist items.
+  - Detailed tree is illustrative; completion is tracked against the verified ownership mapping and checklist entries.
   - Source-file PascalCase conformance is complete for non-generated source.
   - Source-directory PascalCase-path conformance is complete for non-generated source.
   - Root-folder abbreviation cleanup is complete for structural roots (`e2e` -> `end-to-end`, `ops` -> `operations`).
@@ -792,12 +797,12 @@ Use this checklist as the single at-a-glance cleanup tracker.
 
 ### Server Application Cleanup
 
-- [x] Extract thread route ownership from `apps/ServerApplication/Source/Index.ts` into dedicated route-owner modules.
-- [x] Extract capability route ownership (`/api/config/defaults`, `/api/models`, `/api/collaboration-modes`) from `apps/ServerApplication/Source/Index.ts`.
-- [x] Extract runtime API route ownership (`/events`, `/api/health`, `/api/events/session`) from `apps/ServerApplication/Source/Index.ts`.
-- [x] Extract agent descriptor route ownership (`/api/agents`) from `apps/ServerApplication/Source/Index.ts`.
+- [x] Extract thread route ownership from `apps/ServerApplication/Source/Application/ServerBootstrap.ts` into dedicated route-owner modules.
+- [x] Extract capability route ownership (`/api/config/defaults`, `/api/models`, `/api/collaboration-modes`) from `apps/ServerApplication/Source/Application/ServerBootstrap.ts`.
+- [x] Extract runtime API route ownership (`/events`, `/api/health`, `/api/events/session`) from `apps/ServerApplication/Source/Application/ServerBootstrap.ts`.
+- [x] Extract agent descriptor route ownership (`/api/agents`) from `apps/ServerApplication/Source/Application/ServerBootstrap.ts`.
 - [x] Extract thread adapter resolution ownership into `ThreadAdapterResolver`.
-- [x] Extract runtime state owners from `apps/ServerApplication/Source/Index.ts`.
+- [x] Extract runtime state owners from `apps/ServerApplication/Source/Application/ServerBootstrap.ts`.
 - [x] Extract activity/history ownership into `ActivityHistoryService`.
 - [x] Extract completion notification orchestration into `ThreadCompletionNotificationService`.
 - [x] Extract event stream ownership into `EventStreamClientRegistry`.
@@ -874,9 +879,9 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Codex app-server stderr normalization/classification ownership extracted from `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts` into `apps/ServerApplication/Source/Agents/Adapters/CodexAppServerStderrOwner.ts`.
 - [x] Codex runtime connection lifecycle and message-dispatch ownership extracted from `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts` into `CodexConnectionLifecycleOwner.ts` and `CodexMessageDispatchOwner.ts`, reducing adapter size to 483 lines.
 - [x] Structured owner observability snapshot extracted into `apps/ServerApplication/Source/Network/ServerObservabilitySnapshotOwner.ts` and exposed at `/api/debug/observability`.
-- [x] `apps/ServerApplication/Source/Index.ts` composition-root size reduced from 766 lines to 402 lines while preserving test coverage (`@farfield/server`: typecheck, test, lint).
+- [x] `apps/ServerApplication/Source/Application/ServerBootstrap.ts` composition-root size reduced from 766 lines to 402 lines while preserving test coverage (`@farfield/server`: typecheck, test, lint).
 - [x] `apps/WebApplication/Source/App.tsx` runtime root node access migrated from `document.getElementById("root")` to `applicationShellElementRef` ownership for viewport/touch orchestration.
-- [x] Browser storage ownership for theme/push preferences extracted from `useTheme` and `apps/WebApplication/Source/SharedUtilities/Push.ts` into `ThemePreferenceStore` and `PushPreferenceStore` with explicit tests.
+- [x] Browser storage ownership for theme/push preferences extracted from `useTheme` and push client ownership modules into `ThemePreferenceStore` and `PushPreferenceStore` with explicit tests.
 - [x] Introduced `CapabilityServerClient`, `ChatServerClient`, `DebugServerClient`, `ThreadMutationServerClient`, and `PushServerClient`, then migrated `App.tsx` and `push.ts` API call sites to those owner classes.
 - [x] Pending-user-input selection ownership moved to `PendingUserInputRequestSelector`, and UI modules no longer import that selector logic from `lib/api.ts`.
 - [x] Introduced `CapabilitySnapshotCache` and migrated capability snapshot freshness + single-flight refresh behavior out of ad-hoc `App.tsx` refs.
@@ -886,7 +891,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Manual `stripOk` transport envelope shape introspection removed from `apps/WebApplication/Source/SharedUtilities/api.ts` in favor of strict Zod envelope transforms for threads/models/collaboration-modes reads.
 - [x] Debug workspace history/error dual-fetch and signature derivation normalized under `DebugWorkspaceDataReader`, reducing duplicated logic between core-load and event-refresh paths.
 - [x] Push service-worker token synchronization protocol was removed from browser and service-worker code; service-worker message handling is now limited to lifecycle commands.
-- [x] Browser-side API token ownership removed from web bundle code by deleting `apps/WebApplication/Source/Application/Configuration/WebRuntimeConfiguration.ts`, removing `X-Farfield-Token` injection from `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransport.ts` and `apps/WebApplication/public/sw.js`, and simplifying `apps/WebApplication/Source/SharedUtilities/push.ts` to service-worker lifecycle ownership only.
+- [x] Browser-side API token ownership removed from web bundle code by deleting `apps/WebApplication/Source/Application/Configuration/WebRuntimeConfiguration.ts`, removing `X-Farfield-Token` injection from `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransport.ts` and `apps/WebApplication/public/sw.js`, and keeping push client/service-worker ownership free of browser-stored API tokens.
 - [x] Web stream-event and debug payload ownership now uses explicit contract types (`IpcFrameSchema` and structured-data schemas) in `ChatApi`, `DebugApi`, `StreamEventCard`, and shared transport parsing surfaces.
 - [x] `apps/WebApplication/Source` no longer contains explicit broad `unknown`-typed transport/domain contract surfaces; remaining `unknown` references in that tree are string literals only.
 - [x] Architecture/security documentation now explicitly captures direct browser-to-Farfield-server mode (`API_TOKEN` unset) and protected mode (trusted server-side header injection required when `API_TOKEN` is set).
@@ -950,7 +955,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Thread-member mutation ownership was further split into dedicated mutation owners (`ThreadMemberMessageMutationRouteOwner.ts`, `ThreadMemberArchiveMutationRouteOwner.ts`, and `ThreadMemberInteractionMutationRouteOwner.ts`), reducing `ThreadMemberMutationRouteOwner.ts` from 427 to 49 lines and isolating mutation responsibilities by behavior.
 - [x] Debug route ownership was split from `apps/ServerApplication/Source/Network/Routes/DebugRoutes.ts` into dedicated owner modules (`DebugClientErrorRouteOwner.ts`, `DebugHistoryRouteOwner.ts`, `DebugReplayRouteOwner.ts`, and `DebugTraceRouteOwner.ts`) plus explicit contracts/parsing modules (`DebugRouteContracts.ts` and `DebugReplayFrameParser.ts`), reducing `DebugRoutes.ts` from 416 to 41 lines.
 - [x] OpenCode mapper ownership was split from `packages/OpenCodeInterfaceAdapter/Source/Mapper.ts` into explicit mapper owner modules (`SessionMapper.ts`, `ConversationTurnMapper.ts`, `TurnItemMapper.ts`, `EventPayloadMapper.ts`) and shared contracts (`MapperContracts.ts`), reducing `Mapper.ts` from 428 to 14 lines while preserving compatibility exports.
-- [x] Server bootstrap utility ownership (`jsonResponse`, request-body parsing, error-message normalization, trace-directory creation, and agent descriptor mapping) was extracted from `apps/ServerApplication/Source/Index.ts` into `apps/ServerApplication/Source/ServerBootstrapUtilityOwner.ts`, reducing `Index.ts` from 402 to 356 lines and removing the final non-`App.tsx` 400+ source-file hotspot.
+- [x] Server bootstrap utility ownership (`jsonResponse`, request-body parsing, error-message normalization, trace-directory creation, and agent descriptor mapping) was extracted from `apps/ServerApplication/Source/Application/ServerBootstrap.ts` into `apps/ServerApplication/Source/ServerBootstrapUtilityOwner.ts`, reducing the server composition-root file from 402 to 356 lines and removing the final non-`App.tsx` 400+ source-file hotspot.
 - [x] Server route orchestration filenames were normalized to explicit descriptive names (`DebugRoutes.ts`, `PushRoutes.ts`, and `ThreadRoutes.ts`) and all dependent imports/contracts were synchronized, removing remaining route filename ambiguity in the network layer.
 - [x] Server agent adapter filenames were normalized to explicit descriptive names (`CodexAgentAdapter.ts` and `OpenCodeAgentAdapter.ts`) and all dependent imports/contracts were synchronized, removing remaining adapter filename ambiguity in the server ownership layer.
 - [x] App runtime request/session/push callback ownership and stream/presentation helper ownership were extracted from `apps/WebApplication/Source/App.tsx` into `UseApplicationRuntimeRequestHandlers.ts` and `UseApplicationPresentationHelpers.tsx`, reducing `App.tsx` from 985 to 918 lines and keeping app-shell callback logic under explicit application state-management ownership.
@@ -973,6 +978,10 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] `Source` and `Tests` path migration is complete across applications and packages, with scripts/tests/docs updated to use PascalCase path ownership.
 - [x] Push-state runtime ownership now uses only canonical path resolution; legacy migration behavior was removed from `apps/ServerApplication/Source/PushStatePath.ts` and `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts`.
 - [x] Strict `JsonValue` transport-edge normalization was tightened in `packages/CodexInterfaceAdapter/Source/Service.ts` and server codex/opencode adapters using schema-owned parsing at ingress/egress boundaries.
+- [x] Server application internal composition entrypoint ownership now uses `apps/ServerApplication/Source/Application/ServerBootstrap.ts`; application-level implementation `Index.ts` was removed and server scripts/integration tests were updated to the descriptive entrypoint path.
+- [x] Web application cross-domain catch-all `apps/WebApplication/Source/SharedUtilities/*` ownership was removed; styling, debug issue derivation, error formatting, push client behavior, and crash reporter installation now live under explicit `Shared`, `Features`, and `Application/Boot` owner modules.
+- [x] Debug helper ownership from `apps/WebApplication/Source/SharedUtilities/DebugHelpers.ts` was split into explicit domain/state modules (`DebugIssueContracts.ts`, `DebugIssueDerivation.ts`, `ErrorBannerDetailsParser.ts`, and `TrackedUserInterfaceErrorPolicy.ts`) with chat-specific read-error classifiers and shared error-message ownership moved to dedicated modules.
+- [x] Push client and crash-reporter ownership was consolidated into feature/application owners (`PushClientStateManager.ts`, `PushClientContracts.ts`, `ClientErrorReporter.ts`, and `InstallClientErrorReporter.ts`) and all source/test imports were migrated to those owner paths.
 
 ### Current High-Impact Remaining Gaps
 
@@ -1101,6 +1110,23 @@ All path families above must remain internally consistent after each rename/move
      - canonical import-specifier normalization applies to hand-authored source only
      - generated/vendor directories are updated through source generator workflows only
    - Reason: manual edits in generated/vendor surfaces introduce churn and are overwritten by generation workflows, which reduces long-term maintainability and review signal.
+
+13. Date: 2026-02-24
+   - Decision: Replace server application implementation `Index.ts` with descriptive bootstrap entrypoint ownership.
+   - Rule:
+     - application runtime entrypoint is `apps/ServerApplication/Source/Application/ServerBootstrap.ts`
+     - server package scripts and integration tests reference the descriptive entrypoint path
+   - Reason: aligns server source with internal `Index.ts` prohibition and improves entrypoint discoverability.
+
+14. Date: 2026-02-24
+   - Decision: Remove web `SharedUtilities` catch-all ownership and split behavior into explicit owner modules.
+   - Rule:
+     - styling helpers live under `apps/WebApplication/Source/Shared/Styling/*`
+     - shared error-message formatting lives under `apps/WebApplication/Source/Shared/Errors/*`
+     - debug issue derivation and error policies live under `apps/WebApplication/Source/Features/Debugging/*`
+     - push client behavior and contracts live under `apps/WebApplication/Source/Features/PushNotifications/*`
+     - application boot crash-reporter installation lives under `apps/WebApplication/Source/Application/Boot/*`
+   - Reason: eliminates cross-domain catch-all coupling and keeps ownership boundaries explicit for maintainability.
 
 ## End-State Completion Criteria
 

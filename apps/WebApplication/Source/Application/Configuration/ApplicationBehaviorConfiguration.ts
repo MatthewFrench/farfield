@@ -1,4 +1,4 @@
-import { type PushClientState } from "@/SharedUtilities/Push";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 
 export const DEFAULT_EFFORT_OPTIONS = ["minimal", "low", "medium", "high", "xhigh"] as const;
 export const INITIAL_VISIBLE_CHAT_ITEMS = 90;

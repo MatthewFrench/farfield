@@ -31,7 +31,7 @@ Add standards-compliant iOS Home Screen web app support and background push noti
 ## Current Codebase Baseline
 
 1. Frontend is Vite + React in `apps/WebApplication`.
-2. Backend is Node HTTP server in `apps/ServerApplication/Source/Index.ts`.
+2. Backend is Node HTTP server in `apps/ServerApplication/Source/Application/ServerBootstrap.ts`.
 3. Live updates currently depend on `EventSource("/events")` in `apps/WebApplication/Source/App.tsx`.
 4. Thread stream events are already available from IPC broadcasts and reduced with `reduceThreadStreamEvents`.
 
@@ -131,7 +131,7 @@ No heuristics outside strict typed state. The detector should operate only on pa
 
 ### HTTP API additions
 
-Add routes in `apps/ServerApplication/Source/Index.ts`:
+Add routes in `apps/ServerApplication/Source/Application/ServerBootstrap.ts`:
 
 1. `GET /api/push/vapid-public-key`
 2. `GET /api/push/status`
@@ -268,7 +268,7 @@ Add:
 
 ### Client push API module
 
-Add `apps/WebApplication/Source/SharedUtilities/Push.ts`.
+Add `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushClientStateManager.ts`.
 
 Responsibilities:
 

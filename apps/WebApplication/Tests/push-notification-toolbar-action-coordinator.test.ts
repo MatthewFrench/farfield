@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type PushClientState } from "@/SharedUtilities/Push";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { PushClientStateManager } from "@/Features/PushNotifications/DataAccess/PushClientStateManager";
 import {
   PushNotificationToolbarActionCoordinator

@@ -5,7 +5,7 @@ import {
   type RefObject,
   type SetStateAction
 } from "react";
-import { reportClientError } from "@/SharedUtilities/ClientErrors";
+import { reportClientError } from "@/Features/Debugging/DataAccess/ClientErrorReporter";
 import { ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { PageTouchOverscrollGuardCoordinator } from "./PageTouchOverscrollGuardCoordinator";
 import { RuntimeViewportSizingCoordinator } from "./RuntimeViewportSizingCoordinator";

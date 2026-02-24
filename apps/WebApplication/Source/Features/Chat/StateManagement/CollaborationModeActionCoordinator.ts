@@ -1,5 +1,5 @@
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
-import { toErrorMessage } from "@/SharedUtilities/DebugHelpers";
+import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { ModeSelectionStateResolver } from "../DomainModel/ModeSelectionStateResolver";
 
 export interface CollaborationModeActionRequestOptions {

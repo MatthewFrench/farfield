@@ -9,10 +9,10 @@ import {
 import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
 import {
   toErrorMessage
-} from "@/SharedUtilities/DebugHelpers";
+} from "@/Shared/Errors/ErrorMessage";
 import {
   type PushClientState
-} from "@/SharedUtilities/Push";
+} from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import {
   PushNotificationToolbarActionCoordinator
 } from "@/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";

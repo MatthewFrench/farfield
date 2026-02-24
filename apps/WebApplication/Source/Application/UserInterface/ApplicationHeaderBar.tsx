@@ -1,6 +1,6 @@
 import { Bug, Loader2, Menu, Moon, PanelLeft, RefreshCcw, Sun } from "lucide-react";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
-import { type PushClientState } from "@/SharedUtilities/Push";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { PushStatusButton } from "@/Features/PushNotifications/UserInterface/PushStatusButton";
 import { Button } from "@/Components/UserInterface/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/UserInterface/Tooltip";

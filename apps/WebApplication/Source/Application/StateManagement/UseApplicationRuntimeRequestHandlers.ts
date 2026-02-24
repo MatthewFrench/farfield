@@ -12,7 +12,7 @@ import { UserInterfaceActionRequestBuilder } from "@/Application/StateManagement
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import {
   toErrorMessage
-} from "@/SharedUtilities/DebugHelpers";
+} from "@/Shared/Errors/ErrorMessage";
 import {
   TrackedUserInterfaceErrorReporter,
   type TrackedUserInterfaceErrorReportInput

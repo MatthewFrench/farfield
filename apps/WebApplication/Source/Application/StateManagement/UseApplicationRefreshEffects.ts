@@ -7,7 +7,7 @@ import {
 import { ApplicationRouteStateMapper } from "@/Application/DomainModel/ApplicationRouteStateMapper";
 import { DebugIssueStateResolver } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
-import type { DebugIssue } from "@/SharedUtilities/DebugHelpers";
+import type { DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 
 export interface UseApplicationRefreshEffectsInput {
   selectedThreadId: string | null;

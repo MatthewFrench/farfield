@@ -2,7 +2,7 @@ import { AlertTriangle } from "lucide-react";
 import {
   type DebugIssueSeverityFilter
 } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
-import { type DebugIssue } from "@/SharedUtilities/DebugHelpers";
+import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { Badge } from "@/Components/UserInterface/Badge";
 import { Button } from "@/Components/UserInterface/Button";
 import { Input } from "@/Components/UserInterface/Input";

@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   type DebugIssueSeverityFilter
 } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
-import { type DebugIssue } from "@/SharedUtilities/DebugHelpers";
+import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { Tabs, TabsList, TabsTrigger } from "@/Components/UserInterface/Tabs";
 import {
   DebugHistoryPanel,
