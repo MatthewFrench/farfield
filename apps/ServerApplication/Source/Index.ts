@@ -1,5 +1,4 @@
-import http, { type IncomingMessage, type ServerResponse } from "node:http";
-import fs from "node:fs";
+import http from "node:http";
 import {
   FarfieldPushTestBodySchema,
   JsonValueSchema,
@@ -23,7 +22,6 @@ import { PushStore } from "./PushStore.js";
 import { readServerRuntimeConfiguration } from "./ServerRuntimeConfiguration.js";
 import { ServerLifecycleCoordinator } from "./ServerLifecycleCoordinator.js";
 import { ThreadCompletionNotificationService } from "./ThreadCompletionNotificationService.js";
-import type { AgentAdapter, AgentDescriptor } from "./Agents/Types.js";
 import type { HistoryEntry } from "./Network/Routes/DebugTypes.js";
 import { EventStreamClientRegistry } from "./Network/EventStreamClientRegistry.js";
 import { PushDispatchConcurrencyCoordinator } from "./Network/PushDispatchConcurrencyCoordinator.js";
@@ -38,62 +36,21 @@ import {
 } from "./Network/ThreadListAggregationCache.js";
 import { ThreadConcurrencyCoordinator } from "./Network/ThreadConcurrencyCoordinator.js";
 import { RuntimeStateOwner } from "./RuntimeStateOwner.js";
+import { ServerBootstrapUtilityOwner } from "./ServerBootstrapUtilityOwner.js";
 
 const PushTestBodySchema = FarfieldPushTestBodySchema;
 const runtimeConfiguration = readServerRuntimeConfiguration(process.env);
-
-function jsonResponse(res: ServerResponse, statusCode: number, body: object): void {
-  const encoded = Buffer.from(JSON.stringify(body), "utf8");
-  res.writeHead(statusCode, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Content-Length": encoded.length,
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "content-type, x-farfield-token, x-farfield-request-id, x-farfield-action-id, x-farfield-action-name",
-    "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS"
-  });
-  res.end(encoded);
-}
-
-async function readJsonBody(req: IncomingMessage): Promise<JsonValue> {
-  const chunks: Buffer[] = [];
-
-  for await (const chunk of req) {
-    if (typeof chunk === "string") {
-      chunks.push(Buffer.from(chunk, "utf8"));
-      continue;
-    }
-    chunks.push(chunk as Buffer);
-  }
-
-  const raw = Buffer.concat(chunks).toString("utf8").trim();
-  if (!raw) {
-    return {};
-  }
-
-  return JSON.parse(raw);
-}
-
-function toErrorMessage<ErrorType>(error: ErrorType): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  return String(error);
-}
+const serverBootstrapUtilityOwner = new ServerBootstrapUtilityOwner();
 
 function ensureTraceDirectory(): void {
-  if (!fs.existsSync(runtimeConfiguration.traceDirectoryPath)) {
-    fs.mkdirSync(runtimeConfiguration.traceDirectoryPath, { recursive: true });
-  }
+  serverBootstrapUtilityOwner.ensureDirectoryExists(runtimeConfiguration.traceDirectoryPath);
 }
 
 const parsedCli = (() => {
   try {
     return parseServerCliOptions(process.argv.slice(2));
   } catch (error) {
-    const message = toErrorMessage(error);
+    const message = serverBootstrapUtilityOwner.toErrorMessage(error);
     process.stderr.write(`${message}\n`);
     process.stderr.write("Run with --help to see valid arguments.\n");
     process.exit(1);
@@ -252,17 +209,6 @@ agentRuntimeOwner = new AgentRuntimeOwner({
 const registry = agentRuntimeOwner.readRegistry();
 const threadAdapterResolver = new ThreadAdapterResolver(registry, threadIndex);
 
-function buildAgentDescriptor(adapter: AgentAdapter, projectDirectories: string[]): AgentDescriptor {
-  return {
-    id: adapter.id,
-    label: adapter.label,
-    enabled: adapter.isEnabled(),
-    connected: adapter.isConnected(),
-    capabilities: adapter.capabilities,
-    projectDirectories
-  };
-}
-
 function broadcastRuntimeState(): void {
   eventStreamClientRegistry.broadcast({
     type: "state",
@@ -331,13 +277,21 @@ const serverRequestHandler = new ServerRequestHandler({
   withTimeout: (promise, timeoutMs, label) => {
     return serverRequestUtilityOwner.withTimeout(promise, timeoutMs, label);
   },
-  readJsonBody,
-  jsonResponse,
-  toErrorMessage,
+  readJsonBody: async (request) => {
+    return serverBootstrapUtilityOwner.readJsonBody(request);
+  },
+  jsonResponse: (response, statusCode, body) => {
+    serverBootstrapUtilityOwner.jsonResponse(response, statusCode, body);
+  },
+  toErrorMessage: (error) => {
+    return serverBootstrapUtilityOwner.toErrorMessage(error);
+  },
   ensureTraceDirectory,
   pushSystem,
   invalidateThreadListAggregationCache,
-  buildAgentDescriptor,
+  buildAgentDescriptor: (adapter, projectDirectories) => {
+    return serverBootstrapUtilityOwner.buildAgentDescriptor(adapter, projectDirectories);
+  },
   setRuntimeLastError: (message) => {
     runtimeStateOwner.setRuntimeLastError(message);
   },
@@ -394,7 +348,7 @@ serverLifecycleCoordinator = new ServerLifecycleCoordinator({
 serverLifecycleCoordinator.installSignalHandlers();
 
 void serverLifecycleCoordinator.start().catch((error) => {
-  const runtimeErrorMessage = toErrorMessage(error);
+  const runtimeErrorMessage = serverBootstrapUtilityOwner.toErrorMessage(error);
   runtimeStateOwner.setRuntimeLastError(runtimeErrorMessage);
   pushSystem("Monitor server failed to start", { error: runtimeErrorMessage });
   logger.fatal({ error: runtimeErrorMessage }, "monitor-server-failed-to-start");

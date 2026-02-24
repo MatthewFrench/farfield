@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   sessionToThreadListItem,
-  sessionToConversationState,
-  messagesToTurns,
-  partToTurnItem
-} from "../Source/Mapper.js";
+  sessionToConversationState
+} from "../Source/SessionMapper.js";
+import { messagesToTurns } from "../Source/ConversationTurnMapper.js";
+import { partToTurnItem } from "../Source/TurnItemMapper.js";
 import type { OpenCodeStructuredDataValue } from "../Source/Schemas.js";
 import type {
   Session,

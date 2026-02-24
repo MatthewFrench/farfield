@@ -1,0 +1,79 @@
+import { parseBody, SendMessageBodySchema } from "../../HttpSchemas.js";
+import type {
+  ThreadMemberRouteDependencies,
+  ThreadMemberResolvedRouteContext
+} from "./ThreadMemberRouteContracts.js";
+
+export interface ThreadMemberMessageMutationRouteOwnerOptions {
+  dependencies: ThreadMemberRouteDependencies;
+  context: ThreadMemberResolvedRouteContext;
+}
+
+export class ThreadMemberMessageMutationRouteOwner {
+  private readonly dependencies: ThreadMemberRouteDependencies;
+  private readonly context: ThreadMemberResolvedRouteContext;
+
+  public constructor(options: ThreadMemberMessageMutationRouteOwnerOptions) {
+    this.dependencies = options.dependencies;
+    this.context = options.context;
+  }
+
+  public async handle(): Promise<boolean> {
+    const {
+      req,
+      readJsonBody,
+      threadConcurrencyCoordinator,
+      pushActionEventWithRequestContext,
+      pushActionErrorWithRequestContext,
+      invalidateThreadListAggregationCache,
+      jsonResponse
+    } = this.dependencies;
+    const { adapter, agentId, threadId } = this.context;
+
+    if (!(req.method === "POST" && this.dependencies.segments[3] === "messages")) {
+      return false;
+    }
+
+    const body = parseBody(SendMessageBodySchema, await readJsonBody(req));
+
+    pushActionEventWithRequestContext("messages", "attempt", {
+      agentId,
+      threadId,
+      textLength: body.text.length
+    });
+
+    try {
+      await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
+        await adapter.sendMessage({
+          threadId,
+          text: body.text,
+          ...(body.ownerClientId ? { ownerClientId: body.ownerClientId } : {}),
+          ...(body.cwd ? { cwd: body.cwd } : {}),
+          ...(typeof body.isSteering === "boolean" ? { isSteering: body.isSteering } : {})
+        });
+      });
+    } catch (error) {
+      const message = pushActionErrorWithRequestContext("messages", error, {
+        agentId,
+        threadId
+      });
+      jsonResponse(this.dependencies.res, 500, { ok: false, error: message, threadId });
+      return true;
+    }
+
+    pushActionEventWithRequestContext("messages", "success", {
+      agentId,
+      threadId
+    });
+    invalidateThreadListAggregationCache("thread-message-sent", {
+      threadId,
+      agentId
+    });
+
+    jsonResponse(this.dependencies.res, 200, {
+      ok: true,
+      threadId
+    });
+    return true;
+  }
+}

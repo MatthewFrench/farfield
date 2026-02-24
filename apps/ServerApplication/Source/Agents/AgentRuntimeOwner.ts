@@ -1,6 +1,6 @@
 import { AgentRegistry } from "./Registry.js";
-import { CodexAgentAdapter, type CodexIpcFrameEvent } from "./Adapters/CodexAgent.js";
-import { OpenCodeAgentAdapter } from "./Adapters/OpencodeAgent.js";
+import { CodexAgentAdapter, type CodexIpcFrameEvent } from "./Adapters/CodexAgentAdapter.js";
+import { OpenCodeAgentAdapter } from "./Adapters/OpenCodeAgentAdapter.js";
 import type { AgentAdapter, AgentId } from "./Types.js";
 
 export interface AgentRuntimeOwnerDependencies {

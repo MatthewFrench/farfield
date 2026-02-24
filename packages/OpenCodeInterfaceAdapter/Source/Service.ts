@@ -1,10 +1,12 @@
 import type { OpenCodeConnection } from "./Client.js";
 import {
   sessionToConversationState,
-  sessionToThreadListItem,
-  type MappedThreadConversationState,
-  type MappedThreadListItem
-} from "./Mapper.js";
+  sessionToThreadListItem
+} from "./SessionMapper.js";
+import type {
+  MappedThreadConversationState,
+  MappedThreadListItem
+} from "./MapperContracts.js";
 import {
   OpenCodeStructuredDataValueSchema,
   parseOpenCodeProjectList,

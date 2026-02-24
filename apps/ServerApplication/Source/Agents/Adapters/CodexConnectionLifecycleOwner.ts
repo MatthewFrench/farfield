@@ -4,7 +4,7 @@ import {
   type DesktopIpcClient
 } from "@farfield/api";
 import { logger } from "../../Logger.js";
-import type { CodexAgentRuntimeState } from "./CodexAgent.js";
+import type { CodexAgentRuntimeState } from "./CodexAgentAdapter.js";
 
 interface DesktopIpcConnectionStateSnapshot {
   connected: boolean;

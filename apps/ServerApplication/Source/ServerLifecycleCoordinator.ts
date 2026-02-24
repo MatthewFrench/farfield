@@ -6,7 +6,7 @@ import type { AgentId } from "./Agents/Types.js";
 import type { ActivityHistoryService } from "./ActivityHistoryService.js";
 import type { ClientErrorStore } from "./ClientErrorStore.js";
 import type { NtfyNotifier } from "./NtfyNotifier.js";
-import type { OpenCodeAgentAdapter } from "./Agents/Adapters/OpencodeAgent.js";
+import type { OpenCodeAgentAdapter } from "./Agents/Adapters/OpenCodeAgentAdapter.js";
 import type { PushDispatchConcurrencyCoordinator } from "./Network/PushDispatchConcurrencyCoordinator.js";
 import type { EventStreamClientRegistry } from "./Network/EventStreamClientRegistry.js";
 import type { PushReceiptStore } from "./PushReceiptStore.js";

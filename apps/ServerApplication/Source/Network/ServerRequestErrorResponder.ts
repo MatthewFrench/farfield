@@ -7,7 +7,7 @@ import {
   type ServerTransportErrorClassification
 } from "./ServerTransportErrorClassifier.js";
 import type { HistoryEntry } from "./Routes/DebugTypes.js";
-import type { ThreadRouteDependencies } from "./Routes/Threads.js";
+import type { ThreadRouteDependencies } from "./Routes/ThreadRoutes.js";
 
 export interface ServerRequestErrorContext {
   requestId: string;

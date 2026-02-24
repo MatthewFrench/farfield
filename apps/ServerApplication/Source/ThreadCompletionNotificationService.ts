@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { PushNotificationPayload } from "@farfield/protocol";
 import { CompletionDetector } from "./CompletionDetector.js";
 import { logger } from "./Logger.js";
-import type { CodexAgentAdapter } from "./Agents/Adapters/CodexAgent.js";
+import type { CodexAgentAdapter } from "./Agents/Adapters/CodexAgentAdapter.js";
 import type { AgentThreadLiveState } from "./Agents/Types.js";
 import type { NtfyNotifier } from "./NtfyNotifier.js";
 import type { PushSendStore } from "./PushSendStore.js";

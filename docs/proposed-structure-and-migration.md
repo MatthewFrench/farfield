@@ -63,6 +63,7 @@ This document defines the target folder/file structure and end-state ownership m
         Application/
           AppShell.tsx
           Configuration/
+            ApplicationBehaviorConfiguration.ts
             WebPublicRuntimeConfiguration.ts
           UserInterface/
             ApplicationHeaderBar.tsx
@@ -82,11 +83,15 @@ This document defines the target folder/file structure and end-state ownership m
             PageTouchOverscrollGuardCoordinator.ts
             RuntimeViewportSizingCoordinator.ts
             UseApplicationRefreshEffects.ts
+            UseApplicationDerivedState.ts
+            UseApplicationDerivedStateContracts.ts
             UseApplicationOwnerDependencies.ts
+            UseApplicationPresentationHelpers.tsx
             UseApplicationShellViewProperties.ts
             UseCoreDataLoaders.ts
             UseEventStreamEffects.ts
             UseMobileSidebarTouchHandlers.ts
+            UseApplicationRuntimeRequestHandlers.ts
             UseViewportShellEffects.ts
             UserInterfaceActionRequestBuilder.ts
           Providers/
@@ -206,10 +211,26 @@ This document defines the target folder/file structure and end-state ownership m
           RuntimeStateOwner.ts
         Network/
           Routes/
-            HealthRoute.ts
-            ThreadsRoute.ts
-            DebugRoute.ts
-            PushRoute.ts
+            AgentRoutes.ts
+            CapabilityRoutes.ts
+            RuntimeRoutes.ts
+            ThreadCollectionRoutes.ts
+            ThreadRoutes.ts
+            ThreadMemberRoutes.ts
+            ThreadMemberRouteContracts.ts
+            ThreadMemberReadRouteOwner.ts
+            ThreadMemberMutationRouteOwner.ts
+            ThreadMemberMessageMutationRouteOwner.ts
+            ThreadMemberArchiveMutationRouteOwner.ts
+            ThreadMemberInteractionMutationRouteOwner.ts
+            DebugRoutes.ts
+            DebugRouteContracts.ts
+            DebugClientErrorRouteOwner.ts
+            DebugHistoryRouteOwner.ts
+            DebugReplayRouteOwner.ts
+            DebugReplayFrameParser.ts
+            DebugTraceRouteOwner.ts
+            PushRoutes.ts
           Events/
             EventStreamClientRegistry.ts
           RequestSchemas/
@@ -238,11 +259,14 @@ This document defines the target folder/file structure and end-state ownership m
         Agents/
           Adapters/
             CodexAgentAdapter.ts
+            CodexThreadManagementOwner.ts
+            CodexThreadInteractionOwner.ts
             OpenCodeAgentAdapter.ts
           Registry/
             AgentRegistry.ts
           ThreadIndex/
             ThreadIndex.ts
+        ServerBootstrapUtilityOwner.ts
         Shared/
           Observability/
             StructuredLogger.ts
@@ -274,10 +298,15 @@ This document defines the target folder/file structure and end-state ownership m
       Tests/
     OpenCodeInterfaceAdapter/
       Source/
-        Clients/
-        Parsers/
-        Mappers/
-        Services/
+        Client.ts
+        Schemas.ts
+        MapperContracts.ts
+        SessionMapper.ts
+        ConversationTurnMapper.ts
+        TurnItemMapper.ts
+        EventPayloadMapper.ts
+        Mapper.ts
+        Service.ts
         Index.ts
       Tests/
   scripts/
@@ -638,10 +667,7 @@ This execution reference captures an ownership-focused scope that was completed 
 
 ### Out Of Immediate Scope (Current)
 
-1. Chat feature extraction
-2. Debug feature extraction
-3. Push feature extraction
-4. Final `App.tsx` composition-only reduction after remaining feature extractions complete
+All previously deferred App extraction items are now complete.
 
 ## Cleanup Progress Tracker
 
@@ -650,30 +676,24 @@ Use this checklist as the single at-a-glance cleanup tracker.
 ### Current Completion Snapshot
 
 - Date: 2026-02-24
-- Checklist completion: 251 / 255 items (`98.4%`)
+- Checklist completion: 268 / 268 items (`100%`)
 
 ### Realistic End-State Estimate (Holistic)
 
-- Estimated overall completion: `98%`
+- Estimated overall completion: `100%`
 - Basis:
-  - Checklist execution remains high (`251 / 255`) with all remaining open checklist items concentrated on `apps/WebApplication/Source/App.tsx` decomposition.
-  - Source-file PascalCase conformance is complete for non-generated source (`176 / 176`).
-  - Source-directory PascalCase-path conformance is complete for non-generated source (`43 / 43`).
+  - Checklist execution is complete (`268 / 268`) with no open checklist items.
+  - Source-file PascalCase conformance is complete for non-generated source.
+  - Source-directory PascalCase-path conformance is complete for non-generated source.
   - Root-folder abbreviation cleanup is complete for structural roots (`e2e` -> `end-to-end`, `ops` -> `operations`).
-  - `apps/WebApplication/Source/App.tsx` ownership extraction continued with owner-instantiation slicing (`App.tsx` now 1148 lines), thread-list user-interface ownership was split into dedicated section components (`ThreadListPane.tsx` now 27 lines), and codex protocol thread contracts/parsers were split from one monolithic file (`Thread.ts` now 7 lines); size-budget conformance still has concentration hotspots (`6` source files over 400 lines, `1` source file over 600 lines).
+  - `apps/WebApplication/Source/App.tsx` runtime orchestration ownership was further extracted into `UseApplicationRuntimeComposition.ts`, reducing `App.tsx` from 552 to 298 lines while keeping feature/effect/shell assembly under explicit application state-management ownership.
+  - Source-size conformance now satisfies both hard and preferred thresholds (`0` source files over 600 lines and `0` source files over 400 lines).
 
 ### Remaining Work Themes (Share of Remaining Effort)
 
-1. `25%` App composition and feature ownership completion:
-   - complete remaining Chat/Debugging/Push extraction from `apps/WebApplication/Source/App.tsx`
-   - keep app shell focused on composition and wiring only
-2. `60%` Size-budget hardening:
-   - split largest files that still exceed preferred/hard budgets into explicit owners
-   - keep class/module boundaries cohesive while reducing file size concentration
-3. `15%` Final structural consistency and cleanup:
-   - remove remaining historical path references in migration notes
-   - keep decision log and owner registries current with final moves
-   - clean up test-time sourcemap warnings caused by stale build artifacts
+1. `100%` Migration completion and governance:
+   - keep architecture/proposal documents synchronized with future refactors
+   - enforce owner boundaries and naming rules during new feature work
 
 ### Foundations
 
@@ -761,13 +781,13 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Extract shared browser request execution ownership from `apps/WebApplication/Source/SharedUtilities/api.ts` into `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransport.ts`.
 - [x] Extract debugging and push endpoint schemas/functions from `apps/WebApplication/Source/SharedUtilities/api.ts` into feature data-access modules (`Features/Debugging/DataAccess/DebugApi.ts`, `Features/PushNotifications/DataAccess/PushApi.ts`) while preserving compatibility re-exports.
 - [x] Complete `Web Threads Ownership Extraction` slice.
-- [ ] Complete Chat feature extraction from `apps/WebApplication/Source/App.tsx`.
-- [ ] Complete Debugging feature extraction from `apps/WebApplication/Source/App.tsx`.
-- [ ] Complete PushNotifications feature extraction from `apps/WebApplication/Source/App.tsx`.
+- [x] Complete Chat feature extraction from `apps/WebApplication/Source/App.tsx`.
+- [x] Complete Debugging feature extraction from `apps/WebApplication/Source/App.tsx`.
+- [x] Complete PushNotifications feature extraction from `apps/WebApplication/Source/App.tsx`.
 - [x] Split `apps/WebApplication/Source/SharedUtilities/api.ts` endpoint ownership into feature modules (`CapabilityApi`, `ThreadApi`, `ChatApi`, `DebugApi`, `PushApi`) and feature-owned server clients.
 - [x] Temporarily reduced `apps/WebApplication/Source/SharedUtilities/api.ts` to a thin compatibility facade with app-level `bootstrapEventsSession` and `getWebShellHealth`, while shared request execution moved to `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransport.ts`.
 - [x] Remove compatibility-facade re-exports by deleting `apps/WebApplication/Source/SharedUtilities/api.ts` after migrating callers/tests to feature/application API owners.
-- [ ] Keep `apps/WebApplication/Source/App.tsx` focused on app composition and top-level wiring only.
+- [x] Keep `apps/WebApplication/Source/App.tsx` focused on app composition and top-level wiring only.
 
 ### Server Application Cleanup
 
@@ -846,16 +866,16 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Server error event persistence/logging ownership extracted into `apps/ServerApplication/Source/Network/ServerErrorEventRecorder.ts`.
 - [x] Debug trace lifecycle mutation ownership moved into `apps/ServerApplication/Source/ActivityHistoryService.ts`, and debug routes now orchestrate owner APIs.
 - [x] Debug route helper ownership split into dedicated modules (`DebugTypes.ts`, `DebugFileDownload.ts`) to reduce route concentration.
-- [x] `apps/ServerApplication/Source/Network/Routes/Debug.ts` reduced from 439 lines to 391 lines while preserving route behavior and test coverage.
+- [x] `apps/ServerApplication/Source/Network/Routes/DebugRoutes.ts` reduced from 439 lines to 391 lines while preserving route behavior and test coverage.
 - [x] Transport error-category mapping extracted into `apps/ServerApplication/Source/Network/ServerTransportErrorClassifier.ts` and applied in `ServerRequestHandler`.
 - [x] HTTP request error classification/logging/response ownership extracted from `apps/ServerApplication/Source/Network/ServerRequestHandler.ts` into `apps/ServerApplication/Source/Network/ServerRequestErrorResponder.ts`, with focused responder tests and handler size reduced to 385 lines.
-- [x] Codex thread stream projection/event-log ownership extracted from `apps/ServerApplication/Source/Agents/Adapters/CodexAgent.ts` into `apps/ServerApplication/Source/Agents/Adapters/CodexThreadStreamStateOwner.ts`, reducing adapter concentration with focused owner tests.
-- [x] Codex app-server stderr normalization/classification ownership extracted from `apps/ServerApplication/Source/Agents/Adapters/CodexAgent.ts` into `apps/ServerApplication/Source/Agents/Adapters/CodexAppServerStderrOwner.ts`.
-- [x] Codex runtime connection lifecycle and message-dispatch ownership extracted from `apps/ServerApplication/Source/Agents/Adapters/CodexAgent.ts` into `CodexConnectionLifecycleOwner.ts` and `CodexMessageDispatchOwner.ts`, reducing adapter size to 483 lines.
+- [x] Codex thread stream projection/event-log ownership extracted from `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts` into `apps/ServerApplication/Source/Agents/Adapters/CodexThreadStreamStateOwner.ts`, reducing adapter concentration with focused owner tests.
+- [x] Codex app-server stderr normalization/classification ownership extracted from `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts` into `apps/ServerApplication/Source/Agents/Adapters/CodexAppServerStderrOwner.ts`.
+- [x] Codex runtime connection lifecycle and message-dispatch ownership extracted from `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts` into `CodexConnectionLifecycleOwner.ts` and `CodexMessageDispatchOwner.ts`, reducing adapter size to 483 lines.
 - [x] Structured owner observability snapshot extracted into `apps/ServerApplication/Source/Network/ServerObservabilitySnapshotOwner.ts` and exposed at `/api/debug/observability`.
 - [x] `apps/ServerApplication/Source/Index.ts` composition-root size reduced from 766 lines to 402 lines while preserving test coverage (`@farfield/server`: typecheck, test, lint).
 - [x] `apps/WebApplication/Source/App.tsx` runtime root node access migrated from `document.getElementById("root")` to `applicationShellElementRef` ownership for viewport/touch orchestration.
-- [x] Browser storage ownership for theme/push preferences extracted from `useTheme` and `Push.ts` into `ThemePreferenceStore` and `PushPreferenceStore` with explicit tests.
+- [x] Browser storage ownership for theme/push preferences extracted from `useTheme` and `apps/WebApplication/Source/SharedUtilities/Push.ts` into `ThemePreferenceStore` and `PushPreferenceStore` with explicit tests.
 - [x] Introduced `CapabilityServerClient`, `ChatServerClient`, `DebugServerClient`, `ThreadMutationServerClient`, and `PushServerClient`, then migrated `App.tsx` and `push.ts` API call sites to those owner classes.
 - [x] Pending-user-input selection ownership moved to `PendingUserInputRequestSelector`, and UI modules no longer import that selector logic from `lib/api.ts`.
 - [x] Introduced `CapabilitySnapshotCache` and migrated capability snapshot freshness + single-flight refresh behavior out of ad-hoc `App.tsx` refs.
@@ -906,7 +926,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Preference store tests now use isolated in-memory `Storage` mocks to prevent shared file-backed browser storage test races.
 - [x] Shared API contracts (`AgentId`, `ApiRequestOptions`) moved from `lib/api.ts` into `Shared/Contracts/ApiContracts.ts`, reducing transport-module coupling across feature/application owners.
 - [x] Explicit named API request/response contracts were added to `apps/WebApplication/Source/SharedUtilities/api.ts` (including replay response schema parsing), and web feature/application modules were migrated off `Parameters`/`ReturnType` introspection onto those contracts.
-- [x] Remaining server-side `ReturnType` contract derivation usage was removed from `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts`, `apps/ServerApplication/Source/Agents/Adapters/CodexAgent.ts`, and `apps/ServerApplication/Source/Agents/Adapters/OpencodeAgent.ts` in favor of explicit named contract types.
+- [x] Remaining server-side `ReturnType` contract derivation usage was removed from `apps/ServerApplication/Source/ServerRuntimeConfiguration.ts`, `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts`, and `apps/ServerApplication/Source/Agents/Adapters/OpenCodeAgentAdapter.ts` in favor of explicit named contract types.
 - [x] `apps/WebApplication/Source/App.tsx` now consumes request-cancellation and API contract types through feature/shared owner modules instead of importing endpoint-contract surfaces directly from `apps/WebApplication/Source/SharedUtilities/api.ts`.
 - [x] Shared request execution logic (`request`, `requestNoContent`, request metadata headers, timeout handling, and action-request option mapping) was extracted from `apps/WebApplication/Source/SharedUtilities/api.ts` into `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransport.ts`.
 - [x] Debugging and push endpoint schemas/functions were extracted from `apps/WebApplication/Source/SharedUtilities/api.ts` into `apps/WebApplication/Source/Features/Debugging/DataAccess/DebugApi.ts` and `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushApi.ts`, with `lib/api.ts` retaining compatibility re-exports.
@@ -923,8 +943,21 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Core snapshot-to-state transition ownership was extracted from `apps/WebApplication/Source/Application/StateManagement/UseCoreDataLoaders.ts` into `CoreDataSnapshotStateApplier.ts`, reducing `UseCoreDataLoaders.ts` from 460 to 322 lines and lowering source-file size hotspot count from 9 to 8 files over 400 lines.
 - [x] Thread-list user-interface ownership was split from `apps/WebApplication/Source/Features/Threads/UserInterface/ThreadListPane.tsx` into `ThreadListEmptyState.tsx`, `ThreadListActiveSection.tsx`, `ThreadListArchivedSection.tsx`, and `ThreadListPaneContracts.ts`, reducing `ThreadListPane.tsx` from 419 to 27 lines and lowering source-file size hotspot count from 8 to 7 files over 400 lines.
 - [x] Application owner-instantiation wiring was extracted from `apps/WebApplication/Source/App.tsx` into `apps/WebApplication/Source/Application/StateManagement/UseApplicationOwnerDependencies.ts`, reducing `App.tsx` from 1293 to 1148 lines and keeping owner construction in one module.
+- [x] Application behavior configuration and large derived-state ownership were extracted from `apps/WebApplication/Source/App.tsx` into `apps/WebApplication/Source/Application/Configuration/ApplicationBehaviorConfiguration.ts`, `apps/WebApplication/Source/Application/StateManagement/UseApplicationDerivedState.ts`, and `apps/WebApplication/Source/Application/StateManagement/UseApplicationDerivedStateContracts.ts`, reducing `App.tsx` from 1148 to 985 lines while keeping the derived-state owner module under preferred file-size budgets.
+- [x] Codex adapter thread-management and real-time interaction ownership were extracted from `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts` into `CodexThreadManagementOwner.ts` and `CodexThreadInteractionOwner.ts`, reducing `CodexAgentAdapter.ts` from 483 to 322 lines while preserving strict adapter contracts.
+- [x] Thread-member route orchestration ownership was split from `apps/ServerApplication/Source/Network/Routes/ThreadMemberRoutes.ts` into `ThreadMemberReadRouteOwner.ts`, `ThreadMemberMutationRouteOwner.ts`, and `ThreadMemberRouteContracts.ts`, reducing `ThreadMemberRoutes.ts` from 444 to 52 lines and isolating read-vs-mutation behavior.
+- [x] Thread-member mutation ownership was further split into dedicated mutation owners (`ThreadMemberMessageMutationRouteOwner.ts`, `ThreadMemberArchiveMutationRouteOwner.ts`, and `ThreadMemberInteractionMutationRouteOwner.ts`), reducing `ThreadMemberMutationRouteOwner.ts` from 427 to 49 lines and isolating mutation responsibilities by behavior.
+- [x] Debug route ownership was split from `apps/ServerApplication/Source/Network/Routes/DebugRoutes.ts` into dedicated owner modules (`DebugClientErrorRouteOwner.ts`, `DebugHistoryRouteOwner.ts`, `DebugReplayRouteOwner.ts`, and `DebugTraceRouteOwner.ts`) plus explicit contracts/parsing modules (`DebugRouteContracts.ts` and `DebugReplayFrameParser.ts`), reducing `DebugRoutes.ts` from 416 to 41 lines.
+- [x] OpenCode mapper ownership was split from `packages/OpenCodeInterfaceAdapter/Source/Mapper.ts` into explicit mapper owner modules (`SessionMapper.ts`, `ConversationTurnMapper.ts`, `TurnItemMapper.ts`, `EventPayloadMapper.ts`) and shared contracts (`MapperContracts.ts`), reducing `Mapper.ts` from 428 to 14 lines while preserving compatibility exports.
+- [x] Server bootstrap utility ownership (`jsonResponse`, request-body parsing, error-message normalization, trace-directory creation, and agent descriptor mapping) was extracted from `apps/ServerApplication/Source/Index.ts` into `apps/ServerApplication/Source/ServerBootstrapUtilityOwner.ts`, reducing `Index.ts` from 402 to 356 lines and removing the final non-`App.tsx` 400+ source-file hotspot.
+- [x] Server route orchestration filenames were normalized to explicit descriptive names (`DebugRoutes.ts`, `PushRoutes.ts`, and `ThreadRoutes.ts`) and all dependent imports/contracts were synchronized, removing remaining route filename ambiguity in the network layer.
+- [x] Server agent adapter filenames were normalized to explicit descriptive names (`CodexAgentAdapter.ts` and `OpenCodeAgentAdapter.ts`) and all dependent imports/contracts were synchronized, removing remaining adapter filename ambiguity in the server ownership layer.
+- [x] App runtime request/session/push callback ownership and stream/presentation helper ownership were extracted from `apps/WebApplication/Source/App.tsx` into `UseApplicationRuntimeRequestHandlers.ts` and `UseApplicationPresentationHelpers.tsx`, reducing `App.tsx` from 985 to 918 lines and keeping app-shell callback logic under explicit application state-management ownership.
+- [x] Remaining App chat/debug/push and shell-composition ownership was extracted from `apps/WebApplication/Source/App.tsx` into `UseApplicationChatFeatureComposition.ts`, `UseApplicationDebugFeatureComposition.ts`, `UseApplicationPushFeatureComposition.ts`, and `UseApplicationShellComposition.ts`, reducing `App.tsx` from 918 to 552 lines while preserving focused composition wiring.
+- [x] Remaining App runtime effect orchestration ownership was extracted from `apps/WebApplication/Source/App.tsx` into `UseApplicationRuntimeComposition.ts`, reducing `App.tsx` from 552 to 298 lines while keeping `App.tsx` focused on top-level composition and rendering.
+- [x] Build artifact hygiene was refreshed by rebuilding `@farfield/protocol`, `@farfield/api`, and `@farfield/opencode-api` package outputs, eliminating stale sourcemap warning noise during current server/web test runs.
 - [x] Codex protocol thread schemas/parsers were split from `packages/CodexProtocol/Source/Thread.ts` into explicit contract owners under `packages/CodexProtocol/Source/Contracts/Thread/*` and `packages/CodexProtocol/Source/Parsers/ThreadParsers.ts`, reducing `Thread.ts` from 580 to 7 lines and lowering source-file size hotspot count from 7 to 6 files over 400 lines.
-- [x] Post-extraction validation passed across workspaces (`bun run typecheck`, `bun run lint`, and `bun run test`).
+- [x] Post-extraction focused validation passed for web and server workspaces (`bun run --filter @farfield/web typecheck`, `bun run --filter @farfield/web lint`, `bun run --filter @farfield/web test`, `bun run --filter @farfield/server typecheck`, `bun run --filter @farfield/server lint`, and `bun run --filter @farfield/server test`).
 - [x] `apps/WebApplication/Tests/app.test.tsx` now includes a protected-session bootstrap scenario covering token entry and post-auth data loading.
 - [x] Tooling direction was documented in architecture/proposal docs with Biome recorded as an approved future candidate for formatter/linter consolidation planning.
 - [x] Server route-owner contracts now keep strict `JsonValue` request parsing at HTTP ingress while using explicit object response contracts for route outputs, avoiding index-signature bleed across domain response models.
@@ -941,9 +974,8 @@ Use this checklist as the single at-a-glance cleanup tracker.
 
 ### Current High-Impact Remaining Gaps
 
-1. `apps/WebApplication/Source/App.tsx` remains larger than the target composition-only intent; final slicing should remove remaining mixed orchestration concerns into feature/application owner modules.
-2. Several source files remain over preferred size budgets and need further ownership splits (`apps/WebApplication/Source/App.tsx` at 1148 lines and additional 400+ line route/package surfaces, including `apps/ServerApplication/Source/Agents/Adapters/CodexAgent.ts` at 483 lines, `apps/ServerApplication/Source/Network/Routes/ThreadMemberRoutes.ts` at 444 lines, and `packages/OpenCodeInterfaceAdapter/Source/Mapper.ts` at 428 lines).
-3. Test runs still emit sourcemap warnings from stale `dist` artifacts in protocol and adapter packages; cleanup of build artifact/source-map ownership should be completed.
+1. No blocking high-impact migration gaps remain.
+2. No active source-size watchlist remains; all current source owners are under preferred and hard file-size thresholds.
 
 ## Compatibility And Path Alignment Requirements
 
