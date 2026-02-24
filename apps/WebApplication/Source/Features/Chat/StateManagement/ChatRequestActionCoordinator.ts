@@ -63,7 +63,7 @@ export interface SendMessageActionInput {
   chatClient: ChatRequestActionChatClient;
   threadMutationClient: ChatRequestActionThreadMutationClient;
   onInvalidateActiveThreadQuery: () => void;
-  refreshAll: () => Promise<void>;
+  onRefreshThreadData: (threadId: string) => Promise<void>;
   reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
 }
 
@@ -75,7 +75,7 @@ export interface SubmitPendingUserInputActionInput {
   onSetBusy: (isBusy: boolean) => void;
   chatClient: ChatRequestActionChatClient;
   onInvalidateActiveThreadQuery: () => void;
-  refreshAll: () => Promise<void>;
+  onRefreshThreadData: (threadId: string) => Promise<void>;
   reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
 }
 
@@ -86,7 +86,7 @@ export interface SkipPendingUserInputActionInput {
   onSetBusy: (isBusy: boolean) => void;
   chatClient: ChatRequestActionChatClient;
   onInvalidateActiveThreadQuery: () => void;
-  refreshAll: () => Promise<void>;
+  onRefreshThreadData: (threadId: string) => Promise<void>;
   reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
 }
 
@@ -96,7 +96,7 @@ export interface InterruptThreadActionInput {
   onSetBusy: (isBusy: boolean) => void;
   chatClient: ChatRequestActionChatClient;
   onInvalidateActiveThreadQuery: () => void;
-  refreshAll: () => Promise<void>;
+  onRefreshThreadData: (threadId: string) => Promise<void>;
   reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
 }
 
@@ -127,7 +127,7 @@ export class ChatRequestActionCoordinator {
       await input.chatClient.sendMessage({ threadId, text: input.draft }, requestOptions);
       input.onClearThreadPendingMaterialization(threadId);
       input.onInvalidateActiveThreadQuery();
-      await input.refreshAll();
+      await input.onRefreshThreadData(threadId);
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
         operation: "send-message",
@@ -159,7 +159,7 @@ export class ChatRequestActionCoordinator {
         }
       }, requestOptions);
       input.onInvalidateActiveThreadQuery();
-      await input.refreshAll();
+      await input.onRefreshThreadData(input.selectedThreadId);
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
         operation: "submit-user-input",
@@ -191,7 +191,7 @@ export class ChatRequestActionCoordinator {
         }
       }, requestOptions);
       input.onInvalidateActiveThreadQuery();
-      await input.refreshAll();
+      await input.onRefreshThreadData(input.selectedThreadId);
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
         operation: "skip-user-input",
@@ -219,7 +219,7 @@ export class ChatRequestActionCoordinator {
         threadId: input.selectedThreadId
       }, requestOptions);
       input.onInvalidateActiveThreadQuery();
-      await input.refreshAll();
+      await input.onRefreshThreadData(input.selectedThreadId);
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
         operation: "interrupt-thread",

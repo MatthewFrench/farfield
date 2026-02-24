@@ -164,6 +164,7 @@ export interface ServerRuntimeConfiguration {
   threadListAggregationCacheMaximumEntries: number;
   webHealthBuildId: string;
   webHealthServiceWorkerVersion: string | null;
+  appServerBaseEnvironment: NodeJS.ProcessEnv;
   codexExecutablePath: string;
   ipcSocketPath: string;
   gitCommit: string | null;
@@ -181,6 +182,10 @@ export interface ServerRuntimeConfiguration {
   clientErrorMaxEntries: number;
   invalidThreadStreamEventsLogPath: string;
   ntfyConfiguration: NtfyConfig;
+}
+
+export function readServerRuntimeConfigurationFromCurrentProcessEnvironment(): ServerRuntimeConfiguration {
+  return readServerRuntimeConfiguration(process.env);
 }
 
 export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRuntimeConfiguration {
@@ -311,6 +316,7 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
     threadListAggregationCacheMaximumEntries,
     webHealthBuildId,
     webHealthServiceWorkerVersion,
+    appServerBaseEnvironment: env,
     codexExecutablePath,
     ipcSocketPath,
     gitCommit,

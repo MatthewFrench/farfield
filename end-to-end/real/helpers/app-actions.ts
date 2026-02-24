@@ -22,6 +22,10 @@ export async function openDebugTab(page: Page): Promise<void> {
   await page.getByTestId("tab-debug").click();
 }
 
+export async function triggerHeaderRefresh(page: Page): Promise<void> {
+  await page.getByTestId("refresh-button").click();
+}
+
 export async function openPreflightTab(page: Page): Promise<void> {
   await page.getByTestId("tab-preflight").click();
 }

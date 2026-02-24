@@ -54,6 +54,7 @@ export interface CodexIpcFrameEvent {
 
 export interface CodexAgentOptions {
   appExecutable: string;
+  appServerBaseEnvironment: NodeJS.ProcessEnv;
   socketPath: string;
   invalidStreamEventsLogPath: string;
   workspaceDir: string;
@@ -96,6 +97,7 @@ export class CodexAgentAdapter implements AgentAdapter {
 
     this.appClient = new AppServerClient({
       executablePath: options.appExecutable,
+      baseEnvironment: options.appServerBaseEnvironment,
       userAgent: options.userAgent,
       cwd: options.workspaceDir,
       onStderr: (line) => {

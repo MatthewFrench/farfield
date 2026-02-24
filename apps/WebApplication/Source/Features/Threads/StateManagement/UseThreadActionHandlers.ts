@@ -33,7 +33,7 @@ export interface UseThreadActionHandlersInput {
   threadMutationServerClient: ThreadMutationServerClient;
   threadListStateController: ThreadListStateController;
   loadCoreDataTracked: () => Promise<void>;
-  refreshAll: () => Promise<void>;
+  loadSelectedThreadTracked: (threadId: string) => Promise<void>;
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
 }
 
@@ -45,6 +45,11 @@ export interface ThreadActionHandlers {
 }
 
 export function useThreadActionHandlers(input: UseThreadActionHandlersInput): ThreadActionHandlers {
+  const refreshCreatedThreadData = useCallback(async (threadId: string): Promise<void> => {
+    await input.loadCoreDataTracked();
+    await input.loadSelectedThreadTracked(threadId);
+  }, [input.loadCoreDataTracked, input.loadSelectedThreadTracked]);
+
   const createNewThread = useCallback(async (projectPath: string, agentId?: AgentId) => {
     await input.threadMutationActionCoordinator.createThread({
       projectPath,
@@ -64,14 +69,16 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         input.threadListStateController.invalidateActiveThreadQuery();
       },
       threadMutationClient: input.threadMutationServerClient,
-      refreshAll: input.refreshAll,
+      onRefreshCreatedThreadData: refreshCreatedThreadData,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
     });
   }, [
     input.buildActionRequestOptions,
+    input.loadCoreDataTracked,
+    input.loadSelectedThreadTracked,
     input.pendingThreadMaterializationCoordinator,
-    input.refreshAll,
     input.reportTrackedUserInterfaceError,
+    refreshCreatedThreadData,
     input.selectedThreadIdRef,
     input.setError,
     input.setIsBusy,

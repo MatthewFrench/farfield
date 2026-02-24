@@ -18,7 +18,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const onThreadSelected = vi.fn();
     const onSetMobileSidebarOpen = vi.fn();
     const onInvalidateActiveThreadQuery = vi.fn();
-    const refreshAll = vi.fn(async () => {});
+    const onRefreshCreatedThreadData = vi.fn(async (_threadId: string) => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
@@ -36,7 +36,7 @@ describe("ThreadMutationActionCoordinator", () => {
       onSetMobileSidebarOpen,
       onInvalidateActiveThreadQuery,
       threadMutationClient,
-      refreshAll,
+      onRefreshCreatedThreadData,
       reportTrackedUserInterfaceError
     });
 
@@ -44,7 +44,7 @@ describe("ThreadMutationActionCoordinator", () => {
     expect(onSetBusy).not.toHaveBeenCalled();
     expect(threadMutationClient.createThread).not.toHaveBeenCalled();
     expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
-    expect(refreshAll).not.toHaveBeenCalled();
+    expect(onRefreshCreatedThreadData).not.toHaveBeenCalled();
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
   });
 
@@ -56,7 +56,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const mobileSidebarOpenStates: boolean[] = [];
     const onSetErrorMessage = vi.fn();
     const onInvalidateActiveThreadQuery = vi.fn();
-    const refreshAll = vi.fn(async () => {});
+    const onRefreshCreatedThreadData = vi.fn(async (_threadId: string) => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
       createThread: vi.fn(async () => ({ threadId: "thread-55" })),
@@ -83,7 +83,7 @@ describe("ThreadMutationActionCoordinator", () => {
       },
       onInvalidateActiveThreadQuery,
       threadMutationClient,
-      refreshAll,
+      onRefreshCreatedThreadData,
       reportTrackedUserInterfaceError
     });
 
@@ -102,7 +102,8 @@ describe("ThreadMutationActionCoordinator", () => {
     expect(selectedThreadIdentifiers).toEqual(["thread-55"]);
     expect(mobileSidebarOpenStates).toEqual([false]);
     expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
-    expect(refreshAll).toHaveBeenCalledTimes(1);
+    expect(onRefreshCreatedThreadData).toHaveBeenCalledWith("thread-55");
+    expect(onRefreshCreatedThreadData).toHaveBeenCalledTimes(1);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(busyStates).toEqual([true, false]);
   });

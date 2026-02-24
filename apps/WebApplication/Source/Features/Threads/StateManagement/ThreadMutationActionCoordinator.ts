@@ -35,7 +35,7 @@ export interface CreateThreadActionInput {
   onSetMobileSidebarOpen: (isOpen: boolean) => void;
   onInvalidateActiveThreadQuery: () => void;
   threadMutationClient: ThreadMutationActionClient;
-  refreshAll: () => Promise<void>;
+  onRefreshCreatedThreadData: (threadId: string) => Promise<void>;
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
 }
 
@@ -91,7 +91,7 @@ export class ThreadMutationActionCoordinator {
       input.onThreadSelected(created.threadId);
       input.onSetMobileSidebarOpen(false);
       input.onInvalidateActiveThreadQuery();
-      await input.refreshAll();
+      await input.onRefreshCreatedThreadData(created.threadId);
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
         operation: "create-thread",

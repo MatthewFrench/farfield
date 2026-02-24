@@ -1,3 +1,7 @@
+import {
+  useCallback,
+  useMemo
+} from "react";
 import { ApplicationRouteStateMapper } from "@/Application/DomainModel/ApplicationRouteStateMapper";
 import {
   type ApplicationFormattingHelpers
@@ -29,6 +33,9 @@ import {
   type CoreDataCapabilitySnapshot,
   type CoreDataLoaders
 } from "@/Application/StateManagement/UseCoreDataLoaders";
+import {
+  RuntimeRefreshObservabilityOwner
+} from "@/Application/StateManagement/RuntimeRefreshObservabilityOwner";
 import {
   useModeAndPendingRequestEffects
 } from "@/Features/Chat/StateManagement/UseModeAndPendingRequestEffects";
@@ -75,7 +82,14 @@ export function useApplicationRuntimeComposition(
     apiSessionBootstrapCoordinator: input.applicationOwnerDependencies.apiSessionBootstrapCoordinator,
     apiSessionTokenDraft: input.applicationShellState.apiSessionTokenDraft,
     pushNotificationToolbarActionCoordinator: input.applicationOwnerDependencies.pushNotificationToolbarActionCoordinator,
-    refreshAll: input.coreDataLoaders.refreshAll,
+    loadCoreDataTracked: input.coreDataLoaders.loadCoreDataTracked,
+    loadSelectedThreadIfPresent: async (): Promise<void> => {
+      const selectedThreadIdentifier = input.applicationShellState.selectedThreadIdRef.current;
+      if (!selectedThreadIdentifier) {
+        return;
+      }
+      await input.loadSelectedThreadTracked(selectedThreadIdentifier);
+    },
     setApiSessionTokenDraft: input.applicationShellState.setApiSessionTokenDraft,
     setApiSessionBootstrapErrorMessage: input.applicationShellState.setApiSessionBootstrapError,
     setErrorMessage: input.applicationShellState.setError,
@@ -84,6 +98,49 @@ export function useApplicationRuntimeComposition(
     setPushClientState: input.applicationShellState.setPushClientState,
     setRequiresApiSessionToken: input.applicationShellState.setRequiresApiSessionToken
   });
+
+  const runtimeRefreshObservabilityOwner = useMemo(
+    () => new RuntimeRefreshObservabilityOwner(),
+    []
+  );
+
+  // Keep refresh ordering and loading-state transitions consistent for startup
+  // and manual header refresh actions through one runtime-owned operation.
+  const refreshCoreDataAndSelectedThread = useCallback(async (): Promise<void> => {
+    const handleRuntimeRequestError = input.runtimeRequestHandlers.handleRuntimeRequestError;
+    const loadCoreDataFunction = input.applicationShellState.loadCoreDataTrackedRef.current;
+    const loadSelectedThreadFunction = input.applicationShellState.loadSelectedThreadRef.current;
+    const measurement = runtimeRefreshObservabilityOwner.beginRefresh();
+    let didCompleteRefresh = false;
+
+    input.applicationShellState.setIsCoreLoading(true);
+    try {
+      if (loadCoreDataFunction) {
+        await loadCoreDataFunction();
+      }
+      const selectedThreadIdentifier = input.applicationShellState.selectedThreadIdRef.current;
+      if (selectedThreadIdentifier && loadSelectedThreadFunction) {
+        await loadSelectedThreadFunction(selectedThreadIdentifier);
+      }
+      didCompleteRefresh = true;
+    } catch (error) {
+      handleRuntimeRequestError(error);
+    } finally {
+      if (didCompleteRefresh) {
+        runtimeRefreshObservabilityOwner.completeRefreshSuccess(measurement);
+      } else {
+        runtimeRefreshObservabilityOwner.completeRefreshFailure(measurement);
+      }
+      input.applicationShellState.setIsCoreLoading(false);
+    }
+  }, [
+    input.runtimeRequestHandlers.handleRuntimeRequestError,
+    input.applicationShellState.loadCoreDataTrackedRef,
+    input.applicationShellState.loadSelectedThreadRef,
+    input.applicationShellState.selectedThreadIdRef,
+    input.applicationShellState.setIsCoreLoading,
+    runtimeRefreshObservabilityOwner
+  ]);
 
   useViewportShellEffects({
     applicationShellElementRef: input.applicationShellState.applicationShellElementRef,
@@ -123,7 +180,7 @@ export function useApplicationRuntimeComposition(
     applicationRouteStateMapper: input.applicationRouteStateMapper,
     loadCoreDataTracked: input.coreDataLoaders.loadCoreDataTracked,
     loadArchivedThreads: input.coreDataLoaders.loadArchivedThreads,
-    refreshAll: input.coreDataLoaders.refreshAll,
+    refreshCoreDataAndSelectedThread,
     refreshPushClientState: pushFeatureComposition.refreshPushClientState,
     handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError,
     coreRefreshIntervalMs: input.coreRefreshIntervalMs,
@@ -228,7 +285,7 @@ export function useApplicationRuntimeComposition(
       onInvalidateActiveThreadQuery: () => {
         input.applicationOwnerDependencies.threadListStateController.invalidateActiveThreadQuery();
       },
-      refreshAll: input.coreDataLoaders.refreshAll,
+      loadCoreDataTracked: input.coreDataLoaders.loadCoreDataTracked,
       onReloadSelectedThread: input.loadSelectedThreadTracked,
       reportTrackedUserInterfaceError: input.runtimeRequestHandlers.reportTrackedUserInterfaceError
     },
@@ -297,7 +354,8 @@ export function useApplicationRuntimeComposition(
     renderAgentFavicon: input.renderAgentFavicon,
     formatDateValue: input.formatDateValue,
     loadCoreDataTracked: input.coreDataLoaders.loadCoreDataTracked,
-    refreshAll: input.coreDataLoaders.refreshAll,
+    loadSelectedThreadTracked: input.loadSelectedThreadTracked,
+    refreshCoreDataAndSelectedThread,
     buildActionRequestOptions: input.runtimeRequestHandlers.buildActionRequestOptions,
     reportTrackedUserInterfaceError: input.runtimeRequestHandlers.reportTrackedUserInterfaceError,
     threadMutationServerClient: input.applicationOwnerDependencies.threadMutationServerClient,

@@ -35,6 +35,7 @@ interface DebugFeatureCompositionMock {
 interface ApplicationRefreshEffectsCapture {
   refreshPushClientState: () => Promise<void>;
   loadCoreDataTracked: () => Promise<void>;
+  refreshCoreDataAndSelectedThread: () => Promise<void>;
 }
 
 interface ApplicationSynchronizationEffectsCapture {
@@ -53,6 +54,7 @@ interface ApplicationShellCompositionCapture {
   chatFeatureComposition: ChatFeatureCompositionMock;
   debugFeatureComposition: DebugFeatureCompositionMock;
   pushFeatureComposition: PushFeatureCompositionMock;
+  refreshCoreDataAndSelectedThread: () => Promise<void>;
 }
 
 const hookMocks = vi.hoisted(() => ({
@@ -323,8 +325,6 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     isArchivedThreadsOpenRef: applicationShellState.isArchivedThreadsOpenRef,
     hasLoadedArchivedThreadsRef: applicationShellState.hasLoadedArchivedThreadsRef,
     lastCoreRefreshAtRef: applicationShellState.lastCoreRefreshAtRef,
-    loadCoreDataTrackedRef: applicationShellState.loadCoreDataTrackedRef,
-    loadSelectedThreadRef: applicationShellState.loadSelectedThreadRef,
     setHealth: applicationShellState.setHealth,
     setThreads: applicationShellState.setThreads,
     setUnreadThreadIds: applicationShellState.setUnreadThreadIds,
@@ -344,7 +344,6 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     setArchivedThreads: applicationShellState.setArchivedThreads,
     setArchivedThreadsTruncated: applicationShellState.setArchivedThreadsTruncated,
     setHasLoadedArchivedThreads: applicationShellState.setHasLoadedArchivedThreads,
-    setIsCoreLoading: applicationShellState.setIsCoreLoading,
     ensureApiSessionBootstrapped: runtimeRequestHandlers.ensureApiSessionBootstrapped,
     readInitialModeKey: (availableModes) => {
       const nonPlanDefault = availableModes.find((mode) => !modeSelectionStateResolver.isPlanModeOption(mode));
@@ -500,6 +499,14 @@ describe("useApplicationRuntimeComposition", () => {
     );
     expect(refreshEffectsInput.refreshPushClientState).toBe(
       pushFeatureCompositionMock.refreshPushClientState
+    );
+
+    const shellCompositionInput = applicationShellCompositionCapture;
+    if (!shellCompositionInput) {
+      throw new Error("Expected shell composition input to be captured");
+    }
+    expect(shellCompositionInput.refreshCoreDataAndSelectedThread).toBe(
+      refreshEffectsInput.refreshCoreDataAndSelectedThread
     );
 
     const synchronizationEffectsInput = applicationSynchronizationEffectsCapture;

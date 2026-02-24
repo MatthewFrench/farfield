@@ -21,7 +21,8 @@ export interface UseApplicationPushFeatureCompositionInput {
   apiSessionBootstrapCoordinator: ApiSessionBootstrapCoordinator;
   apiSessionTokenDraft: string;
   pushNotificationToolbarActionCoordinator: PushNotificationToolbarActionCoordinator;
-  refreshAll: () => Promise<void>;
+  loadCoreDataTracked: () => Promise<void>;
+  loadSelectedThreadIfPresent: () => Promise<void>;
   setApiSessionTokenDraft: Dispatch<SetStateAction<string>>;
   setApiSessionBootstrapErrorMessage: Dispatch<SetStateAction<string>>;
   setErrorMessage: Dispatch<SetStateAction<string>>;
@@ -65,7 +66,8 @@ export function useApplicationPushFeatureComposition(
       input.setRequiresApiSessionToken(false);
       input.setApiSessionBootstrapErrorMessage("");
       input.setApiSessionTokenDraft("");
-      await input.refreshAll();
+      await input.loadCoreDataTracked();
+      await input.loadSelectedThreadIfPresent();
     } catch (error) {
       input.setApiSessionBootstrapErrorMessage(toErrorMessage(error));
     } finally {
@@ -74,7 +76,8 @@ export function useApplicationPushFeatureComposition(
   }, [
     input.apiSessionBootstrapCoordinator,
     input.apiSessionTokenDraft,
-    input.refreshAll,
+    input.loadCoreDataTracked,
+    input.loadSelectedThreadIfPresent,
     input.setApiSessionBootstrapErrorMessage,
     input.setApiSessionTokenDraft,
     input.setIsApiSessionBootstrapPending,

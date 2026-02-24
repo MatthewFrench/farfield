@@ -6,6 +6,7 @@ import type { AgentAdapter, AgentId } from "./Types.js";
 export interface AgentRuntimeOwnerDependencies {
   configuredAgentIds: AgentId[];
   codexExecutablePath: string;
+  appServerBaseEnvironment: NodeJS.ProcessEnv;
   ipcSocketPath: string;
   invalidStreamEventsLogPath: string;
   defaultWorkspacePath: string;
@@ -47,6 +48,7 @@ export class AgentRuntimeOwner {
       if (agentId === "codex") {
         this.codexAdapter = new CodexAgentAdapter({
           appExecutable: dependencies.codexExecutablePath,
+          appServerBaseEnvironment: dependencies.appServerBaseEnvironment,
           socketPath: dependencies.ipcSocketPath,
           invalidStreamEventsLogPath: dependencies.invalidStreamEventsLogPath,
           workspaceDir: dependencies.defaultWorkspacePath,

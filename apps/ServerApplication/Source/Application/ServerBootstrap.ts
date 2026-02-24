@@ -20,7 +20,7 @@ import { PushSendStore } from "../Modules/PushNotifications/PushSendStore.js";
 import { PushService } from "../Modules/PushNotifications/PushService.js";
 import { PushStore } from "../Modules/PushNotifications/PushStore.js";
 import { ThreadCompletionNotificationService } from "../Modules/Threads/ThreadCompletionNotificationService.js";
-import { readServerRuntimeConfiguration } from "./Configuration/ServerRuntimeConfiguration.js";
+import { readServerRuntimeConfigurationFromCurrentProcessEnvironment } from "./Configuration/ServerRuntimeConfiguration.js";
 import { ServerLifecycleCoordinator } from "./Bootstrap/ServerLifecycleCoordinator.js";
 import type { HistoryEntry } from "../Network/Routes/DebugTypes.js";
 import { EventStreamClientRegistry } from "../Network/EventStreamClientRegistry.js";
@@ -39,7 +39,7 @@ import { PushMutationConcurrencyCoordinator } from "../Network/PushMutationConcu
 import { ThreadListCacheInvalidationOwner } from "./Bootstrap/ThreadListCacheInvalidationOwner.js";
 
 const PushTestBodySchema = FarfieldPushTestBodySchema;
-const runtimeConfiguration = readServerRuntimeConfiguration(process.env);
+const runtimeConfiguration = readServerRuntimeConfigurationFromCurrentProcessEnvironment();
 configureLogger(runtimeConfiguration.logLevel);
 const serverBootstrapUtilityOwner = new ServerBootstrapUtilityOwner();
 
@@ -189,6 +189,7 @@ function invalidateThreadListAggregationCache(
 agentRuntimeOwner = new AgentRuntimeOwner({
   configuredAgentIds,
   codexExecutablePath: codexExecutable,
+  appServerBaseEnvironment: runtimeConfiguration.appServerBaseEnvironment,
   ipcSocketPath,
   invalidStreamEventsLogPath: runtimeConfiguration.invalidThreadStreamEventsLogPath,
   defaultWorkspacePath: runtimeConfiguration.defaultWorkspacePath,

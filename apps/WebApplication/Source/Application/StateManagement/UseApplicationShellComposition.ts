@@ -40,7 +40,8 @@ export interface UseApplicationShellCompositionInput {
   renderAgentFavicon: ThreadListPaneProperties["renderAgentFavicon"];
   formatDateValue: ThreadListPaneProperties["formatDate"];
   loadCoreDataTracked: () => Promise<void>;
-  refreshAll: () => Promise<void>;
+  loadSelectedThreadTracked: (threadId: string) => Promise<void>;
+  refreshCoreDataAndSelectedThread: () => Promise<void>;
   buildActionRequestOptions: (actionName: string) => {
     actionId: string;
     requestOptions: ApiRequestOptions;
@@ -88,7 +89,7 @@ export function useApplicationShellComposition(
     threadMutationServerClient: input.threadMutationServerClient,
     threadListStateController: input.threadListStateController,
     loadCoreDataTracked: input.loadCoreDataTracked,
-    refreshAll: input.refreshAll,
+    loadSelectedThreadTracked: input.loadSelectedThreadTracked,
     reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
   });
 
@@ -164,7 +165,7 @@ export function useApplicationShellComposition(
       applicationShellState.setDesktopSidebarOpen(nextOpen);
     },
     enablePushNotificationsFromToolbar: input.pushFeatureComposition.enablePushNotificationsFromToolbar,
-    refreshAll: input.refreshAll,
+    refreshCoreDataAndSelectedThread: input.refreshCoreDataAndSelectedThread,
     setActiveTab: (nextTab) => {
       applicationShellState.setActiveTab(nextTab);
     },

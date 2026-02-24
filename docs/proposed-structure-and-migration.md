@@ -738,7 +738,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 
 ### Realistic End-State Estimate (Holistic)
 
-- Estimated overall completion: `99%`
+- Estimated overall completion: `100%`
 - Basis:
   - Checklist execution is complete (`296 / 296`) with no open checklist items.
   - Detailed tree is illustrative; completion is tracked against the verified ownership mapping and checklist entries.
@@ -748,19 +748,11 @@ Use this checklist as the single at-a-glance cleanup tracker.
   - Test-file PascalCase conformance is complete across `apps/*/Tests` and `packages/*/Tests`, including owner-aligned naming.
   - `apps/WebApplication/Source/App.tsx` runtime orchestration ownership was further extracted into `UseApplicationRuntimeComposition.ts`, reducing `App.tsx` from 552 to 298 lines while keeping feature/effect/shell assembly under explicit application state-management ownership.
   - Source-size conformance now satisfies both hard and preferred thresholds (`0` source files over 600 lines and `0` source files over 400 lines).
+  - Broad `refreshAll` ownership has been removed from web source; startup and manual refresh paths now run through explicit runtime-owned core + selected-thread refresh orchestration.
 
 ### Remaining Work Themes (Share of Remaining Effort)
 
-1. `70%` Mutation-refresh precision:
-   - remove remaining broad post-mutation `refreshAll` flows in favor of targeted refresh operations where ownership already allows scoped invalidation
-   - keep mutation-triggered refresh behavior explicit per feature owner (`Threads`, `Chat`, and push-toolbar flows)
-   - current owner hotspots:
-     - `apps/WebApplication/Source/Features/Chat/StateManagement/ChatRequestActionCoordinator.ts`
-     - `apps/WebApplication/Source/Features/Threads/StateManagement/ThreadMutationActionCoordinator.ts`
-     - `apps/WebApplication/Source/Application/StateManagement/UseApplicationPushFeatureComposition.ts`
-     - `apps/WebApplication/Source/Application/StateManagement/UseApplicationRefreshEffects.ts`
-     - `apps/WebApplication/Source/Application/StateManagement/UseApplicationShellViewProperties.ts`
-2. `30%` Ongoing governance and drift control:
+1. `100%` Ongoing governance and drift control:
    - keep architecture/proposal documents synchronized with future refactors
    - enforce owner boundaries and naming rules during new feature work
 
@@ -802,7 +794,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Move EventSource connection/reconnect and refresh-decision dispatch ownership from `App.tsx` effect into `EventStreamConnectionCoordinator`.
 - [x] Move API session bootstrap auth requirement detection, token challenge state, and session freshness behavior from `App.tsx` into `ApiSessionBootstrapCoordinator`.
 - [x] Extract API session token challenge user interface from `App.tsx` into `ApiSessionBootstrapOverlay`.
-- [x] Add focused tests for API session bootstrap ownership and protected bootstrap flow (`ApiSessionBootstrapCoordinator.test.ts` and `App.test.tsx` session-auth scenario).
+- [x] Add focused tests for API session bootstrap ownership and protected bootstrap flow (`ApiSessionBootstrapCoordinator.test.ts` and `AppSessionAndDebug.test.tsx` session-auth scenario).
 - [x] Move user-interface action request metadata creation from `App.tsx` into `UserInterfaceActionRequestBuilder`.
 - [x] Move selected-thread refresh queue/cancellation ownership from `App.tsx` refs into `SelectedThreadRefreshConcurrencyCoordinator`.
 - [x] Move pending-user-input selection logic out of `lib/api.ts` into chat domain ownership.
@@ -841,7 +833,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Extract debug workspace action-callback wiring and error-banner debug-navigation ownership from `App.tsx` into `Features/Debugging/StateManagement/UseDebugActionHandlers.ts`.
 - [x] Extract thread mutation callback wiring ownership from `App.tsx` into `Features/Threads/StateManagement/UseThreadActionHandlers.ts`.
 - [x] Extract mobile sidebar swipe-touch callback wiring ownership from `App.tsx` into `Application/StateManagement/UseMobileSidebarTouchHandlers.ts`.
-- [x] Extract core-data loading, archived-thread loading, and refresh-all callback wiring ownership from `App.tsx` into `Application/StateManagement/UseCoreDataLoaders.ts`.
+- [x] Extract core-data and archived-thread loading ownership from `App.tsx` into `Application/StateManagement/UseCoreDataLoaders.ts`, with runtime-owned core + selected-thread refresh composition in `UseApplicationRuntimeComposition.ts`.
 - [x] Extract selected-thread hydration and queued refresh callback wiring ownership from `App.tsx` into `Features/Chat/StateManagement/UseSelectedThreadLoaders.ts`.
 - [x] Replace shared pending-thread materialization `Set` ref mutation with explicit owner class `PendingThreadMaterializationCoordinator`.
 - [x] Extract viewport keyboard telemetry, runtime viewport sizing wiring, and overscroll-guard wiring ownership from `App.tsx` into `Application/StateManagement/UseViewportShellEffects.ts`.
@@ -943,7 +935,15 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] `ApiSessionBootstrapCoordinator` now explicitly consumes non-blocking background refresh rejections and keeps retry behavior deterministic; focused coordinator tests now cover rejection-handling and retry sequencing.
 - [x] Progress audit confirmed architecture migration governance status in code and review systems: no unresolved PR review threads remain on `MatthewFrench/farfield#1`.
 - [x] `ThreadCompletionNotificationService` replaced cross-module `ReturnType` contract derivation with explicit `StoredPushSubscription[]` contracts to keep boundary types explicit and standards-compliant.
-- [x] Child-process environment propagation now avoids direct full `process.env` spread in remaining script/test spawn paths (`scripts/ios-device-smoke-matrix.mjs` and `apps/ServerApplication/Tests/HttpRoutes.integration.test.ts`) by using schema-owned allowlisted environment builders.
+- [x] Child-process environment propagation now avoids direct full `process.env` spread in remaining script/test spawn paths (`scripts/ios-device-smoke-matrix.mjs` and route-integration harness ownership under `apps/ServerApplication/Tests/HttpRoutesIntegrationEnvironment.ts`) by using schema-owned allowlisted environment builders.
+- [x] Chat and thread mutation coordinators now refresh through explicit scoped owner composition (`loadCoreDataTracked` + selected-thread reload callbacks) instead of broad `refreshAll` paths in `ChatRequestActionCoordinator`, `ThreadMutationActionCoordinator`, `UseChatActionHandlers`, and `UseThreadActionHandlers`.
+- [x] API session token bootstrap success path now refreshes through explicit scoped owner callbacks (`loadCoreDataTracked` + selected-thread reload-if-present) in `UseApplicationPushFeatureComposition`.
+- [x] Broad `refreshAll` call sites were removed from web source; startup and manual refresh now run through explicit runtime-owned core + selected-thread refresh composition paths.
+- [x] Startup/manual refresh composition now executes through stable loader refs in `UseApplicationRuntimeComposition.ts`, preventing refresh-effect churn from unstable callback identities and preserving deterministic initial-load behavior.
+- [x] Runtime refresh observability counters/timing ownership was added in `RuntimeRefreshObservabilityOwner.ts` and wired into runtime refresh composition so startup/manual refresh behavior now records deterministic in-flight/success/failure and duration snapshots.
+- [x] Monolithic web app behavior tests were split into owner-focused suites (`AppShellBehavior.test.tsx`, `AppSessionAndDebug.test.tsx`, `AppThreadRefreshBehavior.test.tsx`) with shared fixture ownership in `AppTestEnvironment.tsx`.
+- [x] Monolithic server route integration tests were split into focused route suites (`HttpRoutesAuthentication.integration.test.ts`, `HttpRoutesPush.integration.test.ts`, `HttpRoutesDebug.integration.test.ts`) with shared server lifecycle ownership in `HttpRoutesIntegrationEnvironment.ts`.
+- [x] Real app Playwright coverage now includes startup/manual refresh verification (`startup-and-header-refresh.spec.ts`) and coverage tracking was updated in `end-to-end/real/coverage-matrix.md`.
 - [x] Preferred-size-gap audit now confirms no source files remain above the 400-line preferred threshold (`0` over 400; `0` over 600).
 - [x] Thread list route query/cursor/sort ownership was extracted from `ThreadCollectionRoutes.ts` into `ThreadCollectionListQueryOwner.ts`, and route contracts were split into `ThreadCollectionRouteContracts.ts` to keep route wiring explicit and smaller.
 - [x] Push test dispatch ownership (`/api/push/test`) was extracted from `PushRoutes.ts` into `PushTestRouteOwner.ts`, and route contracts were split into `PushRouteContracts.ts`.
@@ -951,9 +951,10 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Browser push client convenience API wrappers were split out of `PushClientStateManager.ts` into `PushClientApi.ts` so class ownership remains focused on lifecycle behavior.
 - [x] `scripts/with-env.mjs` now builds spawned-process environment from a schema-owned allowlist instead of propagating the full `process.env` surface, while still loading explicit `.env` and `.env.local` values.
 - [x] `CodexThreadStreamStateOwner` default invalid stream-event log path now resolves to `.runtime/logs/threads/invalid-thread-stream-events.ndjson` to keep runtime artifacts out of source roots.
-- [x] Real scenario verification remains green on the current structure (`bun run end-to-end:real:run` -> `6/6` Playwright scenarios passing).
+- [x] Real-app Playwright suite now contains `7` scenarios (`bunx playwright test -c playwright.real.config.ts --list`), including startup/header-refresh coverage; full execution requires the local Farfield server at `127.0.0.1:4311` and fails fast with `ECONNREFUSED` when that prerequisite is not running.
 - [x] Codex app-server spawn environment ownership now uses strict allowlisted schema parsing in `packages/CodexInterfaceAdapter/Source/AppServerTransport.ts` (`buildAppServerSpawnEnvironment`), removing direct full-environment propagation to child process startup.
-- [x] `apps/WebApplication/Source/Application/StateManagement/UseCoreDataLoaders.ts` refresh-all behavior now preserves cache state during generic refresh paths; thread-query invalidation remains mutation-scoped in thread mutation owners.
+- [x] Direct `process.env` reads for app-server spawn configuration were removed from non-configuration owner modules: server bootstrap now reads runtime configuration via `readServerRuntimeConfigurationFromCurrentProcessEnvironment()`, then passes `appServerBaseEnvironment` through `AgentRuntimeOwner` and `CodexAgentAdapter` into `ChildProcessAppServerTransport`.
+- [x] `apps/WebApplication/Source/Application/StateManagement/UseCoreDataLoaders.ts` now owns only core/archived snapshot loading, while runtime composition owns explicit core + selected-thread refresh orchestration and loading-state transitions.
 - [x] Event-stream scheduled refresh execution in `apps/WebApplication/Source/Application/StateManagement/UseEventStreamEffects.ts` now runs independent refresh operations concurrently, reducing blocked refresh latency while preserving owner boundaries.
 - [x] Debug workspace actions now refresh core snapshots via `loadCoreDataTracked` instead of full `refreshAll`, avoiding unrelated selected-thread reload work after trace/replay operations.
 - [x] External data-source and subscription owners now include high-value ownership comments (`CapabilityServerClient`, `ChatServerClient`, `DebugServerClient`, `ThreadServerClient`, `ThreadMutationServerClient`, `PushServerClient`, `PushClientStateManager`, `EventStreamConnectionCoordinator`, `EventStreamRefreshDecisionEngine`, `AppServerClient`, `DesktopIpcClient`, `CodexMonitorService`, `OpenCodeConnection`, `OpenCodeMonitorService`).
@@ -1070,7 +1071,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Build artifact hygiene was refreshed by rebuilding `@farfield/protocol`, `@farfield/api`, and `@farfield/opencode-api` package outputs, eliminating stale sourcemap warning noise during current server/web test runs.
 - [x] Codex protocol thread schemas/parsers were split from `packages/CodexProtocol/Source/Thread.ts` into explicit contract owners under `packages/CodexProtocol/Source/Contracts/Thread/*` and `packages/CodexProtocol/Source/Parsers/ThreadParsers.ts`, reducing `Thread.ts` from 580 to 7 lines and lowering source-file size hotspot count from 7 to 6 files over 400 lines.
 - [x] Post-extraction focused validation passed for web and server workspaces (`bun run --filter @farfield/web typecheck`, `bun run --filter @farfield/web lint`, `bun run --filter @farfield/web test`, `bun run --filter @farfield/server typecheck`, `bun run --filter @farfield/server lint`, and `bun run --filter @farfield/server test`).
-- [x] `apps/WebApplication/Tests/App.test.tsx` now includes a protected-session bootstrap scenario covering token entry and post-auth data loading.
+- [x] `apps/WebApplication/Tests/AppSessionAndDebug.test.tsx` includes a protected-session bootstrap scenario covering token entry and post-auth data loading.
 - [x] Tooling direction was documented in architecture/proposal docs with Biome recorded as an approved future candidate for formatter/linter consolidation planning.
 - [x] Server route-owner contracts now keep strict `JsonValue` request parsing at HTTP ingress while using explicit object response contracts for route outputs, avoiding index-signature bleed across domain response models.
 - [x] IPC history recording now validates captured frame payloads with `JsonValueSchema` before persistence, ensuring debug-history payloads remain schema-owned structured data.

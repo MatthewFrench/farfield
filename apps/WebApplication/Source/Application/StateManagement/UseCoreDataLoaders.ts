@@ -45,11 +45,6 @@ export interface SelectedThreadLoaderOptions {
   includeReadThread?: boolean;
 }
 
-export type SelectedThreadLoader = (
-  threadId: string,
-  options?: SelectedThreadLoaderOptions
-) => Promise<void>;
-
 type Health = CapabilityHealthResponse;
 type ConfigDefaults = CapabilityConfigDefaultsResponse;
 type ThreadsResponse = ThreadListResponse;
@@ -84,8 +79,6 @@ export interface UseCoreDataLoadersInput {
   isArchivedThreadsOpenRef: MutableRefObject<boolean>;
   hasLoadedArchivedThreadsRef: MutableRefObject<boolean>;
   lastCoreRefreshAtRef: MutableRefObject<number>;
-  loadCoreDataTrackedRef: MutableRefObject<(() => Promise<void>) | null>;
-  loadSelectedThreadRef: MutableRefObject<SelectedThreadLoader | null>;
   setHealth: Dispatch<SetStateAction<Health | null>>;
   setThreads: Dispatch<SetStateAction<ThreadsResponse["data"]>>;
   setUnreadThreadIds: Dispatch<SetStateAction<Record<string, true>>>;
@@ -105,7 +98,6 @@ export interface UseCoreDataLoadersInput {
   setArchivedThreads: Dispatch<SetStateAction<ThreadsResponse["data"]>>;
   setArchivedThreadsTruncated: Dispatch<SetStateAction<boolean>>;
   setHasLoadedArchivedThreads: Dispatch<SetStateAction<boolean>>;
-  setIsCoreLoading: Dispatch<SetStateAction<boolean>>;
   ensureApiSessionBootstrapped: () => Promise<boolean>;
   readInitialModeKey: (modes: ModesResponse["data"]) => string;
   handleRuntimeRequestError: <ErrorType,>(error: ErrorType) => void;
@@ -115,7 +107,6 @@ export interface CoreDataLoaders {
   loadCoreData: () => Promise<void>;
   loadArchivedThreads: () => Promise<void>;
   loadCoreDataTracked: () => Promise<void>;
-  refreshAll: () => Promise<void>;
 }
 
 export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoaders {
@@ -319,35 +310,9 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
     loadCoreData
   ]);
 
-  const refreshAll = useCallback(async () => {
-    input.setIsCoreLoading(true);
-    try {
-      // Non-mutating refresh paths keep list caches warm; mutation handlers invalidate explicitly.
-      const loadCoreDataFunction = input.loadCoreDataTrackedRef.current;
-      const loadSelectedThreadFunction = input.loadSelectedThreadRef.current;
-      if (loadCoreDataFunction) {
-        await loadCoreDataFunction();
-      }
-      if (input.selectedThreadIdRef.current && loadSelectedThreadFunction) {
-        await loadSelectedThreadFunction(input.selectedThreadIdRef.current);
-      }
-    } catch (error) {
-      input.handleRuntimeRequestError(error);
-    } finally {
-      input.setIsCoreLoading(false);
-    }
-  }, [
-    input.handleRuntimeRequestError,
-    input.loadCoreDataTrackedRef,
-    input.loadSelectedThreadRef,
-    input.selectedThreadIdRef,
-    input.setIsCoreLoading
-  ]);
-
   return {
     loadCoreData,
     loadArchivedThreads,
-    loadCoreDataTracked,
-    refreshAll
+    loadCoreDataTracked
   };
 }

@@ -79,6 +79,7 @@ export function buildAppServerSpawnEnvironment(input: BuildAppServerSpawnEnviron
 export interface ChildProcessAppServerTransportOptions {
   executablePath: string;
   userAgent: string;
+  baseEnvironment: NodeJS.ProcessEnv;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   requestTimeoutMs?: number;
@@ -88,6 +89,7 @@ export interface ChildProcessAppServerTransportOptions {
 export class ChildProcessAppServerTransport implements AppServerTransport {
   private readonly executablePath: string;
   private readonly userAgent: string;
+  private readonly baseEnvironment: NodeJS.ProcessEnv;
   private readonly cwd: string | undefined;
   private readonly env: NodeJS.ProcessEnv | undefined;
   private readonly requestTimeoutMs: number;
@@ -101,6 +103,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
   public constructor(options: ChildProcessAppServerTransportOptions) {
     this.executablePath = options.executablePath;
     this.userAgent = options.userAgent;
+    this.baseEnvironment = options.baseEnvironment;
     this.cwd = options.cwd;
     this.env = options.env;
     this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
@@ -116,7 +119,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     let spawnEnvironment: NodeJS.ProcessEnv;
     try {
       const spawnEnvironmentInput: BuildAppServerSpawnEnvironmentInput = {
-        baseEnvironment: process.env,
+        baseEnvironment: this.baseEnvironment,
         userAgent: this.userAgent,
         clientId: clientIdentifier
       };

@@ -50,7 +50,7 @@ export interface UseChatActionHandlersInput {
   threadMutationClient: ChatRequestActionThreadMutationClient;
   pendingUserInputAnswerBuilder: PendingUserInputAnswerBuilder;
   onInvalidateActiveThreadQuery: () => void;
-  refreshAll: () => Promise<void>;
+  loadCoreDataTracked: () => Promise<void>;
   onReloadSelectedThread: (threadId: string) => Promise<void>;
   reportTrackedUserInterfaceError: (input: ChatActionErrorReportInput) => Promise<void>;
 }
@@ -69,6 +69,11 @@ export interface ChatActionHandlers {
 }
 
 export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatActionHandlers {
+  const refreshThreadData = useCallback(async (threadId: string): Promise<void> => {
+    await input.loadCoreDataTracked();
+    await input.onReloadSelectedThread(threadId);
+  }, [input.loadCoreDataTracked, input.onReloadSelectedThread]);
+
   const submitMessage = useCallback(async (draft: string) => {
     await input.chatRequestActionCoordinator.sendMessage({
       draft,
@@ -89,7 +94,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       chatClient: input.chatClient,
       threadMutationClient: input.threadMutationClient,
       onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      refreshAll: input.refreshAll,
+      onRefreshThreadData: refreshThreadData,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
     });
   }, [
@@ -98,7 +103,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.chatRequestActionCoordinator,
     input.pendingThreadMaterializationCoordinator,
     input.onInvalidateActiveThreadQuery,
-    input.refreshAll,
+    refreshThreadData,
     input.reportTrackedUserInterfaceError,
     input.selectedAgentId,
     input.selectedThreadId,
@@ -156,7 +161,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       onSetBusy: input.setIsBusy,
       chatClient: input.chatClient,
       onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      refreshAll: input.refreshAll,
+      onRefreshThreadData: refreshThreadData,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
     });
   }, [
@@ -167,7 +172,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.chatRequestActionCoordinator,
     input.onInvalidateActiveThreadQuery,
     input.pendingUserInputAnswerBuilder,
-    input.refreshAll,
+    refreshThreadData,
     input.reportTrackedUserInterfaceError,
     input.selectedThreadId,
     input.setIsBusy
@@ -184,7 +189,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       onSetBusy: input.setIsBusy,
       chatClient: input.chatClient,
       onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      refreshAll: input.refreshAll,
+      onRefreshThreadData: refreshThreadData,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
     });
   }, [
@@ -193,7 +198,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.chatClient,
     input.chatRequestActionCoordinator,
     input.onInvalidateActiveThreadQuery,
-    input.refreshAll,
+    refreshThreadData,
     input.reportTrackedUserInterfaceError,
     input.selectedThreadId,
     input.setIsBusy
@@ -206,7 +211,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       onSetBusy: input.setIsBusy,
       chatClient: input.chatClient,
       onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      refreshAll: input.refreshAll,
+      onRefreshThreadData: refreshThreadData,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
     });
   }, [
@@ -214,7 +219,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.chatClient,
     input.chatRequestActionCoordinator,
     input.onInvalidateActiveThreadQuery,
-    input.refreshAll,
+    refreshThreadData,
     input.reportTrackedUserInterfaceError,
     input.selectedThreadId,
     input.setIsBusy

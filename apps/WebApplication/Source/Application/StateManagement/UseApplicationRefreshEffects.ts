@@ -34,7 +34,7 @@ export interface UseApplicationRefreshEffectsInput {
   applicationRouteStateMapper: ApplicationRouteStateMapper;
   loadCoreDataTracked: () => Promise<void>;
   loadArchivedThreads: () => Promise<void>;
-  refreshAll: () => Promise<void>;
+  refreshCoreDataAndSelectedThread: () => Promise<void>;
   refreshPushClientState: () => Promise<void>;
   handleRuntimeRequestError: <ErrorType,>(error: ErrorType) => void;
   coreRefreshIntervalMs: number;
@@ -128,8 +128,10 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   }, [input.activeTab, input.applicationRouteStateMapper, input.selectedThreadId]);
 
   useEffect(() => {
-    void input.refreshAll();
-  }, [input.refreshAll]);
+    void input.refreshCoreDataAndSelectedThread().catch((error) => {
+      input.handleRuntimeRequestError(error);
+    });
+  }, [input.handleRuntimeRequestError, input.refreshCoreDataAndSelectedThread]);
 
   useEffect(() => {
     void input.refreshPushClientState();

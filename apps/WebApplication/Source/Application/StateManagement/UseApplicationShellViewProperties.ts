@@ -30,7 +30,7 @@ export interface UseApplicationShellViewPropertiesInput {
   setMobileSidebarOpen: (nextOpen: boolean) => void;
   setDesktopSidebarOpen: (nextOpen: boolean) => void;
   enablePushNotificationsFromToolbar: () => void | Promise<void>;
-  refreshAll: () => void | Promise<void>;
+  refreshCoreDataAndSelectedThread: () => void | Promise<void>;
   setActiveTab: (nextTab: ApplicationHeaderBarProps["activeTab"]) => void;
   toggleTheme: () => void;
   renderAgentFavicon: ApplicationHeaderBarProps["renderAgentFavicon"];
@@ -135,7 +135,7 @@ export function useApplicationShellViewProperties(
     setMobileSidebarOpen,
     setDesktopSidebarOpen,
     enablePushNotificationsFromToolbar,
-    refreshAll,
+    refreshCoreDataAndSelectedThread,
     setActiveTab,
     toggleTheme,
     renderAgentFavicon,
@@ -248,7 +248,7 @@ export function useApplicationShellViewProperties(
       void enablePushNotificationsFromToolbar();
     },
     onRefresh: () => {
-      void refreshAll();
+      void refreshCoreDataAndSelectedThread();
     },
     onToggleDebugTab: () => {
       setActiveTab(activeTab === "debug" ? "chat" : "debug");

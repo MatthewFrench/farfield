@@ -191,8 +191,6 @@ export function App(): React.JSX.Element {
     isArchivedThreadsOpenRef: applicationShellState.isArchivedThreadsOpenRef,
     hasLoadedArchivedThreadsRef: applicationShellState.hasLoadedArchivedThreadsRef,
     lastCoreRefreshAtRef: applicationShellState.lastCoreRefreshAtRef,
-    loadCoreDataTrackedRef: applicationShellState.loadCoreDataTrackedRef,
-    loadSelectedThreadRef: applicationShellState.loadSelectedThreadRef,
     setHealth: applicationShellState.setHealth,
     setThreads: applicationShellState.setThreads,
     setUnreadThreadIds: applicationShellState.setUnreadThreadIds,
@@ -212,7 +210,6 @@ export function App(): React.JSX.Element {
     setArchivedThreads: applicationShellState.setArchivedThreads,
     setArchivedThreadsTruncated: applicationShellState.setArchivedThreadsTruncated,
     setHasLoadedArchivedThreads: applicationShellState.setHasLoadedArchivedThreads,
-    setIsCoreLoading: applicationShellState.setIsCoreLoading,
     ensureApiSessionBootstrapped: runtimeRequestHandlers.ensureApiSessionBootstrapped,
     readInitialModeKey: (availableModes) => {
       const nonPlanDefault = availableModes.find((mode) => !modeSelectionStateResolver.isPlanModeOption(mode));
