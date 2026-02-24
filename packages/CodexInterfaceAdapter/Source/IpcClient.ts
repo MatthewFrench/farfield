@@ -15,6 +15,7 @@ import {
   parseIpcFrame
 } from "@farfield/protocol";
 import { DesktopIpcError } from "./Errors.js";
+import { IpcFrameBufferAccumulator } from "./IpcFrameBufferAccumulator.js";
 
 interface PendingRequest {
   method: string;
@@ -57,8 +58,7 @@ export class DesktopIpcClient {
   private readonly socketPath: string;
   private readonly requestTimeoutMs: number;
   private socket: net.Socket | null = null;
-  private buffer = Buffer.alloc(0);
-  private bufferOffset = 0;
+  private readonly frameBuffer = new IpcFrameBufferAccumulator();
   private clientId: string | null = null;
   private readonly pending = new Map<string, PendingRequest>();
   private readonly events = new EventEmitter();
@@ -98,8 +98,7 @@ export class DesktopIpcClient {
     this.socket.on("close", () => {
       this.rejectAll(new DesktopIpcError("IPC socket closed"));
       this.socket = null;
-      this.buffer = Buffer.alloc(0);
-      this.bufferOffset = 0;
+      this.frameBuffer.clear();
       this.clientId = null;
       this.emitConnectionState({
         connected: false,
@@ -199,28 +198,25 @@ export class DesktopIpcClient {
   }
 
   private handleData(chunk: Buffer): void {
-    this.appendChunk(chunk);
+    this.frameBuffer.appendChunk(chunk);
 
-    while (this.buffer.length - this.bufferOffset >= 4) {
-      const size = this.buffer.readUInt32LE(this.bufferOffset);
-      if (size > MAX_FRAME_SIZE_BYTES) {
+    while (true) {
+      const readResult = this.frameBuffer.readNextPayload(MAX_FRAME_SIZE_BYTES);
+      if (readResult.type === "none") {
+        break;
+      }
+
+      if (readResult.type === "frame-too-large") {
         this.rejectAll(
           new DesktopIpcError(
-            `IPC frame exceeded limit (${String(size)} > ${String(MAX_FRAME_SIZE_BYTES)})`
+            `IPC frame exceeded limit (${String(readResult.size)} > ${String(MAX_FRAME_SIZE_BYTES)})`
           )
         );
         this.socket?.destroy();
         return;
       }
 
-      if (this.buffer.length - this.bufferOffset < 4 + size) {
-        this.compactBufferIfNeeded();
-        return;
-      }
-
-      const payloadStart = this.bufferOffset + 4;
-      const payloadBuffer = this.buffer.subarray(payloadStart, payloadStart + size);
-      this.bufferOffset = payloadStart + size;
+      const payloadBuffer = readResult.payload;
 
       let raw: JsonValue;
       try {
@@ -288,42 +284,6 @@ export class DesktopIpcClient {
 
       pending.resolve(IpcResponseFrameSchema.parse(frame));
     }
-
-    this.compactBufferIfNeeded();
-  }
-
-  private appendChunk(chunk: Buffer): void {
-    if (this.buffer.length === 0 || this.bufferOffset === this.buffer.length) {
-      this.buffer = Buffer.from(chunk);
-      this.bufferOffset = 0;
-      return;
-    }
-
-    if (this.bufferOffset > 0) {
-      this.buffer = Buffer.from(this.buffer.subarray(this.bufferOffset));
-      this.bufferOffset = 0;
-    }
-
-    this.buffer = Buffer.concat([this.buffer, chunk]);
-  }
-
-  private compactBufferIfNeeded(): void {
-    if (this.bufferOffset === 0) {
-      return;
-    }
-
-    if (this.bufferOffset >= this.buffer.length) {
-      this.buffer = Buffer.alloc(0);
-      this.bufferOffset = 0;
-      return;
-    }
-
-    if (this.bufferOffset * 2 < this.buffer.length && this.bufferOffset < 64 * 1024) {
-      return;
-    }
-
-    this.buffer = Buffer.from(this.buffer.subarray(this.bufferOffset));
-    this.bufferOffset = 0;
   }
 
   public sendBroadcast(
