@@ -17,6 +17,29 @@ export interface AgentRuntimeOwnerDependencies {
   onThreadStreamStateChanged: (threadId: string) => void;
 }
 
+/**
+ * Completion scheduling should only react to real inbound stream updates.
+ * Outbound replay preview frames are diagnostic-only and must not trigger side effects.
+ */
+export function shouldScheduleThreadStreamStateChanged(
+  event: CodexIpcFrameEvent
+): event is CodexIpcFrameEvent & {
+  direction: "in";
+  method: "thread-stream-state-changed";
+  threadId: string;
+} {
+  if (event.direction !== "in") {
+    return false;
+  }
+  if (event.method !== "thread-stream-state-changed") {
+    return false;
+  }
+  if (typeof event.threadId !== "string") {
+    return false;
+  }
+  return event.threadId.trim().length > 0;
+}
+
 export class AgentRuntimeOwner {
   private readonly registry: AgentRegistry;
   private codexAdapter: CodexAgentAdapter | null;
@@ -59,7 +82,7 @@ export class AgentRuntimeOwner {
 
         this.codexAdapter.onIpcFrame((event) => {
           dependencies.onCodexFrame(event);
-          if (event.method === "thread-stream-state-changed" && event.threadId) {
+          if (shouldScheduleThreadStreamStateChanged(event)) {
             dependencies.onThreadStreamStateChanged(event.threadId);
           }
         });
