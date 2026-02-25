@@ -1,4 +1,5 @@
 import { logger } from "../Shared/Logging/Logger.js";
+import { AppServerRpcError } from "@farfield/api";
 import type { AgentRegistry } from "./Registry.js";
 import type { ThreadIndex } from "./ThreadIndex.js";
 import type { AgentAdapter, AgentId } from "./Types.js";
@@ -13,12 +14,14 @@ export interface ThreadAdapterResolverStatistics {
   unregisteredDiscoverySuccessCount: number;
   unregisteredDiscoveryMissCount: number;
   unregisteredDiscoveryMissCacheHitCount: number;
+  unregisteredDiscoveryProbeFailureCount: number;
   unregisteredDiscoveryAmbiguousCount: number;
   unregisteredDiscoveryAlertCount: number;
 }
 
 const UnregisteredDiscoveryMissAlertThreshold = 3;
 const DefaultUnregisteredThreadMissTimeToLiveMs = 2_000;
+const ThreadMissingMessagePattern = /\b(conversation|thread)\s+not\s+found\b/i;
 
 export interface ThreadAdapterResolverOptions {
   unregisteredThreadMissTimeToLiveMs?: number;
@@ -39,6 +42,7 @@ export class ThreadAdapterResolver {
   private unregisteredDiscoverySuccessCount: number;
   private unregisteredDiscoveryMissCount: number;
   private unregisteredDiscoveryMissCacheHitCount: number;
+  private unregisteredDiscoveryProbeFailureCount: number;
   private unregisteredDiscoveryAmbiguousCount: number;
   private unregisteredDiscoveryAlertCount: number;
   private readonly consecutiveUnregisteredDiscoveryMissCountByThreadId: Map<string, number>;
@@ -65,6 +69,7 @@ export class ThreadAdapterResolver {
     this.unregisteredDiscoverySuccessCount = 0;
     this.unregisteredDiscoveryMissCount = 0;
     this.unregisteredDiscoveryMissCacheHitCount = 0;
+    this.unregisteredDiscoveryProbeFailureCount = 0;
     this.unregisteredDiscoveryAmbiguousCount = 0;
     this.unregisteredDiscoveryAlertCount = 0;
     this.consecutiveUnregisteredDiscoveryMissCountByThreadId = new Map<string, number>();
@@ -141,6 +146,7 @@ export class ThreadAdapterResolver {
       unregisteredDiscoverySuccessCount: this.unregisteredDiscoverySuccessCount,
       unregisteredDiscoveryMissCount: this.unregisteredDiscoveryMissCount,
       unregisteredDiscoveryMissCacheHitCount: this.unregisteredDiscoveryMissCacheHitCount,
+      unregisteredDiscoveryProbeFailureCount: this.unregisteredDiscoveryProbeFailureCount,
       unregisteredDiscoveryAmbiguousCount: this.unregisteredDiscoveryAmbiguousCount,
       unregisteredDiscoveryAlertCount: this.unregisteredDiscoveryAlertCount
     };
@@ -191,9 +197,14 @@ export class ThreadAdapterResolver {
     }
 
     let discoveredAdapter: AgentAdapter | null = null;
+    let hasProbeFailures = false;
     for (const adapter of connectedEnabledAdapters) {
-      const adapterOwnsThread = await this.adapterOwnsThread(adapter, threadId);
-      if (!adapterOwnsThread) {
+      const probeOutcome = await this.probeAdapterThreadOwnership(adapter, threadId);
+      if (probeOutcome === "thread-missing") {
+        continue;
+      }
+      if (probeOutcome === "probe-failed") {
+        hasProbeFailures = true;
         continue;
       }
 
@@ -221,6 +232,13 @@ export class ThreadAdapterResolver {
     }
 
     if (!discoveredAdapter) {
+      if (hasProbeFailures) {
+        return {
+          ok: false,
+          status: 503,
+          error: `Thread ${threadId} ownership probe failed for one or more agents. Retry the request.`
+        };
+      }
       return null;
     }
 
@@ -235,16 +253,40 @@ export class ThreadAdapterResolver {
     };
   }
 
-  private async adapterOwnsThread(adapter: AgentAdapter, threadId: string): Promise<boolean> {
-    try {
-      await adapter.readThread({
-        threadId,
-        includeTurns: false
-      });
-      return true;
-    } catch {
-      return false;
+  private async probeAdapterThreadOwnership(
+    adapter: AgentAdapter,
+    threadId: string
+  ): Promise<"thread-owned" | "thread-missing" | "probe-failed"> {
+    return adapter.readThread({
+      threadId,
+      includeTurns: false
+    }).then(
+      () => "thread-owned",
+      (error: Error) => {
+        if (this.isExplicitThreadMissingError(error)) {
+          return "thread-missing";
+        }
+
+        this.unregisteredDiscoveryProbeFailureCount += 1;
+        logger.warn(
+          {
+            threadId,
+            agentId: adapter.id,
+            error: error.message
+          },
+          "thread-adapter-resolution-probe-failed"
+        );
+        return "probe-failed";
+      }
+    );
+  }
+
+  private isExplicitThreadMissingError(error: Error): boolean {
+    if (error instanceof AppServerRpcError) {
+      return error.code === -32600 && ThreadMissingMessagePattern.test(error.message);
     }
+
+    return ThreadMissingMessagePattern.test(error.message);
   }
 
   private recordUnregisteredDiscoveryMiss(

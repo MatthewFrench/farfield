@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseThreadConversationState } from "@farfield/protocol";
+import { AppServerRpcError } from "@farfield/api";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import { ThreadAdapterResolver } from "../Source/Agents/ThreadAdapterResolver.js";
 import { ThreadIndex } from "../Source/Agents/ThreadIndex.js";
@@ -19,6 +20,10 @@ const defaultCapabilities: AgentCapabilities = {
   canReadLiveState: false,
   canReadStreamEvents: false
 };
+
+function createThreadMissingError(): AppServerRpcError {
+  return new AppServerRpcError(-32600, "conversation not found");
+}
 
 function createAdapter(input: {
   id: AgentId;
@@ -85,7 +90,10 @@ describe("ThreadAdapterResolver", () => {
     const codexAdapter = createAdapter({
       id: "codex",
       enabled: true,
-      connected: true
+      connected: true,
+      readThread: async () => {
+        throw createThreadMissingError();
+      }
     });
     const opencodeAdapter = createAdapter({ id: "opencode", enabled: true, connected: false });
     const registry = new AgentRegistry([codexAdapter, opencodeAdapter]);
@@ -139,7 +147,7 @@ describe("ThreadAdapterResolver", () => {
       enabled: true,
       connected: true,
       readThread: async () => {
-        throw new Error("thread not found");
+        throw createThreadMissingError();
       }
     });
     const threadIndex = new ThreadIndex();
@@ -161,7 +169,7 @@ describe("ThreadAdapterResolver", () => {
       enabled: true,
       connected: true,
       readThread: async () => {
-        throw new Error("thread not found");
+        throw createThreadMissingError();
       }
     });
     let nowEpochMs = 100;
@@ -199,7 +207,7 @@ describe("ThreadAdapterResolver", () => {
       connected: true,
       readThread: async () => {
         readThreadCount += 1;
-        throw new Error("thread not found");
+        throw createThreadMissingError();
       }
     });
     const resolver = new ThreadAdapterResolver(
@@ -250,7 +258,7 @@ describe("ThreadAdapterResolver", () => {
       connected: true,
       readThread: async (input) => {
         if (input.threadId !== "thread_ambiguous") {
-          throw new Error("thread not found");
+          throw createThreadMissingError();
         }
         return {
           thread: parseThreadConversationState({
@@ -267,7 +275,7 @@ describe("ThreadAdapterResolver", () => {
       connected: true,
       readThread: async (input) => {
         if (input.threadId !== "thread_ambiguous") {
-          throw new Error("thread not found");
+          throw createThreadMissingError();
         }
         return {
           thread: parseThreadConversationState({
@@ -293,5 +301,33 @@ describe("ThreadAdapterResolver", () => {
 
     const statistics = resolver.readStatistics();
     expect(statistics.unregisteredDiscoveryAmbiguousCount).toBe(1);
+  });
+
+  it("returns service-unavailable when adapter probe fails with non-missing error", async () => {
+    const codexAdapter = createAdapter({
+      id: "codex",
+      enabled: true,
+      connected: true,
+      readThread: async () => {
+        throw new Error("app-server request timed out");
+      }
+    });
+    const resolver = new ThreadAdapterResolver(
+      new AgentRegistry([codexAdapter]),
+      new ThreadIndex()
+    );
+
+    const unavailable = await resolver.resolveAdapterForThread("thread_probe_failure");
+    expect(unavailable.ok).toBe(false);
+    if (unavailable.ok) {
+      throw new Error("expected probe failure to return service unavailable");
+    }
+    expect(unavailable.status).toBe(503);
+    expect(unavailable.error).toContain("ownership probe failed");
+
+    const statistics = resolver.readStatistics();
+    expect(statistics.unregisteredDiscoveryAttemptCount).toBe(1);
+    expect(statistics.unregisteredDiscoveryProbeFailureCount).toBe(1);
+    expect(statistics.unregisteredDiscoveryMissCount).toBe(0);
   });
 });
