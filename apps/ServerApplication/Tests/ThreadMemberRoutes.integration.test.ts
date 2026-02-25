@@ -155,4 +155,78 @@ describe("ThreadMemberRoutes integration", () => {
       threadId: "thread_ambiguous"
     });
   });
+
+  it("returns 200 when unregistered thread discovery resolves to one adapter", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "GET";
+
+    const readThreadIncludeTurnsValues: boolean[] = [];
+    const codexAdapter = createAdapter("codex", async (input) => {
+      if (input.threadId !== "thread_single_owner") {
+        throw new Error("thread not found");
+      }
+      readThreadIncludeTurnsValues.push(input.includeTurns);
+      return {
+        thread: parseThreadConversationState({
+          id: input.threadId,
+          turns: [],
+          requests: []
+        })
+      };
+    });
+    const opencodeAdapter = createAdapter("opencode", async () => {
+      throw new Error("thread not found");
+    });
+
+    const threadAdapterResolver = new ThreadAdapterResolver(
+      new AgentRegistry([codexAdapter, opencodeAdapter]),
+      new ThreadIndex()
+    );
+
+    let capturedStatusCode: number | null = null;
+    let capturedResponseBody: object | null = null;
+
+    const dependencies: ThreadMemberRouteDependencies = {
+      req: request,
+      res: response,
+      segments: ["api", "threads", "thread_single_owner"],
+      url: new URL("http://localhost/api/threads/thread_single_owner"),
+      codexAdapter: null,
+      parseInteger: (value, defaultValue) => {
+        if (!value) {
+          return defaultValue;
+        }
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : defaultValue;
+      },
+      parseBoolean: (value, defaultValue) => {
+        if (!value) {
+          return defaultValue;
+        }
+        return value === "true";
+      },
+      threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
+      resolveAdapterForThread: async (threadId) => threadAdapterResolver.resolveAdapterForThread(threadId),
+      readJsonBody: async () => ({}),
+      jsonResponse: (_res, statusCode, body) => {
+        capturedStatusCode = statusCode;
+        capturedResponseBody = body;
+      },
+      invalidateThreadListAggregationCache: () => {},
+      pushActionEventWithRequestContext: () => {},
+      pushActionErrorWithRequestContext: () => "action-error-id"
+    };
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedResponseBody).toMatchObject({
+      ok: true,
+      agentId: "codex",
+      thread: {
+        id: "thread_single_owner"
+      }
+    });
+    expect(readThreadIncludeTurnsValues).toEqual([false, true]);
+  });
 });

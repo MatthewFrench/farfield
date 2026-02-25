@@ -164,9 +164,14 @@ describe("ThreadAdapterResolver", () => {
         throw new Error("thread not found");
       }
     });
+    let nowEpochMs = 100;
     const resolver = new ThreadAdapterResolver(
       new AgentRegistry([codexAdapter]),
-      new ThreadIndex()
+      new ThreadIndex(),
+      {
+        now: () => nowEpochMs,
+        unregisteredThreadMissTimeToLiveMs: 10
+      }
     );
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -176,12 +181,66 @@ describe("ThreadAdapterResolver", () => {
         throw new Error("expected repeated missing thread to fail");
       }
       expect(missing.status).toBe(404);
+      nowEpochMs += 11;
     }
 
     const statistics = resolver.readStatistics();
     expect(statistics.unregisteredDiscoveryAttemptCount).toBe(3);
     expect(statistics.unregisteredDiscoveryMissCount).toBe(3);
     expect(statistics.unregisteredDiscoveryAlertCount).toBe(1);
+  });
+
+  it("uses miss cache to avoid repeated adapter probes for unknown thread ids", async () => {
+    let nowEpochMs = 1_000;
+    let readThreadCount = 0;
+    const codexAdapter = createAdapter({
+      id: "codex",
+      enabled: true,
+      connected: true,
+      readThread: async () => {
+        readThreadCount += 1;
+        throw new Error("thread not found");
+      }
+    });
+    const resolver = new ThreadAdapterResolver(
+      new AgentRegistry([codexAdapter]),
+      new ThreadIndex(),
+      {
+        now: () => nowEpochMs,
+        unregisteredThreadMissTimeToLiveMs: 50
+      }
+    );
+
+    const firstMissing = await resolver.resolveAdapterForThread("thread_miss_cached");
+    expect(firstMissing.ok).toBe(false);
+    if (firstMissing.ok) {
+      throw new Error("expected first missing thread request to fail");
+    }
+    expect(firstMissing.status).toBe(404);
+    expect(readThreadCount).toBe(1);
+
+    nowEpochMs += 25;
+    const cachedMissing = await resolver.resolveAdapterForThread("thread_miss_cached");
+    expect(cachedMissing.ok).toBe(false);
+    if (cachedMissing.ok) {
+      throw new Error("expected cached missing thread request to fail");
+    }
+    expect(cachedMissing.status).toBe(404);
+    expect(readThreadCount).toBe(1);
+
+    nowEpochMs += 60;
+    const refreshedMissing = await resolver.resolveAdapterForThread("thread_miss_cached");
+    expect(refreshedMissing.ok).toBe(false);
+    if (refreshedMissing.ok) {
+      throw new Error("expected refreshed missing thread request to fail");
+    }
+    expect(refreshedMissing.status).toBe(404);
+    expect(readThreadCount).toBe(2);
+
+    const statistics = resolver.readStatistics();
+    expect(statistics.unregisteredDiscoveryAttemptCount).toBe(2);
+    expect(statistics.unregisteredDiscoveryMissCount).toBe(2);
+    expect(statistics.unregisteredDiscoveryMissCacheHitCount).toBe(1);
   });
 
   it("reports ambiguity when multiple connected enabled adapters own a thread", async () => {

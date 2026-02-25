@@ -151,3 +151,96 @@ export const FarfieldDebugErrorDetailEnvelopeSchema = z
   })
   .merge(DebugErrorDetailResponseSchema)
   .strict();
+
+export const FarfieldThreadListAggregationCacheStatisticsSchema = z
+  .object({
+    hitCount: z.number().int().nonnegative(),
+    missCount: z.number().int().nonnegative(),
+    coalescedCount: z.number().int().nonnegative(),
+    evictionCount: z.number().int().nonnegative(),
+    invalidationCount: z.number().int().nonnegative(),
+    entryCount: z.number().int().nonnegative(),
+    inFlightCount: z.number().int().nonnegative()
+  })
+  .strict();
+
+export const FarfieldThreadConcurrencyStatisticsSchema = z
+  .object({
+    queuedExecutionCount: z.number().int().nonnegative(),
+    completedExecutionCount: z.number().int().nonnegative(),
+    failedExecutionCount: z.number().int().nonnegative(),
+    activeThreadCount: z.number().int().nonnegative()
+  })
+  .strict();
+
+export const FarfieldPushDispatchConcurrencyStatisticsSchema = z
+  .object({
+    scheduledCheckCount: z.number().int().nonnegative(),
+    startedCheckCount: z.number().int().nonnegative(),
+    completedCheckCount: z.number().int().nonnegative(),
+    skippedWhileInFlightCount: z.number().int().nonnegative(),
+    activeTimerCount: z.number().int().nonnegative(),
+    inFlightThreadCount: z.number().int().nonnegative()
+  })
+  .strict();
+
+export const FarfieldPushMutationConcurrencyStatisticsSchema = z
+  .object({
+    queuedExecutionCount: z.number().int().nonnegative(),
+    completedExecutionCount: z.number().int().nonnegative(),
+    failedExecutionCount: z.number().int().nonnegative(),
+    hasInFlightOperation: z.boolean()
+  })
+  .strict();
+
+export const FarfieldEventStreamClientRegistryStatisticsSchema = z
+  .object({
+    activeClientCount: z.number().int().nonnegative(),
+    keepaliveEnabled: z.boolean(),
+    addedClientCount: z.number().int().nonnegative(),
+    removedClientCount: z.number().int().nonnegative(),
+    broadcastEventCount: z.number().int().nonnegative(),
+    broadcastDeliveryAttemptCount: z.number().int().nonnegative(),
+    eventWriteFailureCount: z.number().int().nonnegative(),
+    keepaliveWriteFailureCount: z.number().int().nonnegative()
+  })
+  .strict();
+
+export const FarfieldThreadAdapterResolverStatisticsSchema = z
+  .object({
+    registeredLookupCount: z.number().int().nonnegative(),
+    unregisteredDiscoveryAttemptCount: z.number().int().nonnegative(),
+    unregisteredDiscoverySuccessCount: z.number().int().nonnegative(),
+    unregisteredDiscoveryMissCount: z.number().int().nonnegative(),
+    unregisteredDiscoveryMissCacheHitCount: z.number().int().nonnegative(),
+    unregisteredDiscoveryAmbiguousCount: z.number().int().nonnegative(),
+    unregisteredDiscoveryAlertCount: z.number().int().nonnegative()
+  })
+  .strict();
+
+export const FarfieldDebugObservabilitySnapshotSchema = z
+  .object({
+    recordedAt: z.string().datetime(),
+    cache: z.object({
+      threadListAggregation: FarfieldThreadListAggregationCacheStatisticsSchema
+    }).strict(),
+    concurrency: z.object({
+      thread: FarfieldThreadConcurrencyStatisticsSchema,
+      pushDispatch: FarfieldPushDispatchConcurrencyStatisticsSchema,
+      pushMutation: FarfieldPushMutationConcurrencyStatisticsSchema
+    }).strict(),
+    streaming: z.object({
+      eventStream: FarfieldEventStreamClientRegistryStatisticsSchema
+    }).strict(),
+    routing: z.object({
+      threadAdapterResolver: FarfieldThreadAdapterResolverStatisticsSchema
+    }).strict()
+  })
+  .strict();
+
+export const FarfieldDebugObservabilityEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    snapshot: FarfieldDebugObservabilitySnapshotSchema
+  })
+  .strict();

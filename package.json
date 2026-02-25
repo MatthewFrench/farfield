@@ -11,7 +11,7 @@
     "dev:remote": "node scripts/with-env.mjs \"node scripts/dev.mjs --remote\"",
     "build": "bun run --workspaces build",
     "test": "bun run --filter @farfield/protocol build && bun run --workspaces test",
-    "test:ci:mocked": "bun run --filter @farfield/server test -- Tests/AgentRuntimeOwner.test.ts Tests/ThreadAdapterResolver.test.ts Tests/ThreadMemberReadRouteOwner.test.ts Tests/ThreadMemberRoutes.integration.test.ts Tests/ServerObservabilitySnapshotOwner.test.ts && bun run --filter @farfield/web test -- Tests/ApplicationRuntimeComposition.test.tsx Tests/AppSessionAndDebug.test.tsx Tests/AppShellBehavior.test.tsx Tests/AppThreadRefreshBehavior.test.tsx",
+    "test:ci:mocked": "bun run --filter @farfield/protocol build && bun run --filter @farfield/server test -- Tests/AgentRuntimeOwner.test.ts Tests/ThreadAdapterResolver.test.ts Tests/ThreadMemberReadRouteOwner.test.ts Tests/ThreadMemberRoutes.integration.test.ts Tests/ServerObservabilitySnapshotOwner.test.ts && bun run --filter @farfield/web test -- Tests/ApplicationRuntimeComposition.test.tsx Tests/AppSessionAndDebug.test.tsx Tests/AppShellBehavior.test.tsx Tests/AppThreadRefreshBehavior.test.tsx",
     "coverage:check": "bun run --filter @farfield/protocol build && bun run --workspaces test:coverage",
     "lint": "bun run --workspaces lint",
     "typecheck": "bun run --workspaces typecheck",

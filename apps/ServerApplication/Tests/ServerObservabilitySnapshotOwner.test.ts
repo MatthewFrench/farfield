@@ -58,6 +58,7 @@ describe("ServerObservabilitySnapshotOwner", () => {
     expect(snapshot.concurrency.pushMutation.queuedExecutionCount).toBeGreaterThanOrEqual(0);
     expect(snapshot.streaming.eventStream.activeClientCount).toBe(0);
     expect(snapshot.routing.threadAdapterResolver.unregisteredDiscoveryAttemptCount).toBe(0);
+    expect(snapshot.routing.threadAdapterResolver.unregisteredDiscoveryMissCacheHitCount).toBe(0);
 
     pushDispatchConcurrencyCoordinator.stop();
     eventStreamClientRegistry.stopKeepalive();

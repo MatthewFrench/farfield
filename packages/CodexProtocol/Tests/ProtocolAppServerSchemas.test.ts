@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  FarfieldDebugObservabilityEnvelopeSchema,
   parseAppServerCollaborationModeListResponse,
   parseAppServerConfigReadResponse,
   parseAppServerListModelsResponse,
@@ -203,5 +204,126 @@ describe("codex-protocol app-server schemas", () => {
     expect(parsed.config.profile).toBe("personal");
     expect(parsed.config.model_reasoning_effort).toBe("medium");
     expect(parsed.config.profiles["personal"]?.model_reasoning_effort).toBe("xhigh");
+  });
+
+  it("parses farfield debug observability envelope", () => {
+    const parsed = FarfieldDebugObservabilityEnvelopeSchema.parse({
+      ok: true,
+      snapshot: {
+        recordedAt: "2026-02-26T00:00:00.000Z",
+        cache: {
+          threadListAggregation: {
+            hitCount: 1,
+            missCount: 2,
+            coalescedCount: 3,
+            evictionCount: 4,
+            invalidationCount: 5,
+            entryCount: 6,
+            inFlightCount: 7
+          }
+        },
+        concurrency: {
+          thread: {
+            queuedExecutionCount: 1,
+            completedExecutionCount: 2,
+            failedExecutionCount: 3,
+            activeThreadCount: 4
+          },
+          pushDispatch: {
+            scheduledCheckCount: 1,
+            startedCheckCount: 2,
+            completedCheckCount: 3,
+            skippedWhileInFlightCount: 4,
+            activeTimerCount: 5,
+            inFlightThreadCount: 6
+          },
+          pushMutation: {
+            queuedExecutionCount: 1,
+            completedExecutionCount: 2,
+            failedExecutionCount: 3,
+            hasInFlightOperation: false
+          }
+        },
+        streaming: {
+          eventStream: {
+            activeClientCount: 1,
+            keepaliveEnabled: true,
+            addedClientCount: 2,
+            removedClientCount: 3,
+            broadcastEventCount: 4,
+            broadcastDeliveryAttemptCount: 5,
+            eventWriteFailureCount: 6,
+            keepaliveWriteFailureCount: 7
+          }
+        },
+        routing: {
+          threadAdapterResolver: {
+            registeredLookupCount: 1,
+            unregisteredDiscoveryAttemptCount: 2,
+            unregisteredDiscoverySuccessCount: 3,
+            unregisteredDiscoveryMissCount: 4,
+            unregisteredDiscoveryMissCacheHitCount: 5,
+            unregisteredDiscoveryAmbiguousCount: 6,
+            unregisteredDiscoveryAlertCount: 7
+          }
+        }
+      }
+    });
+
+    expect(parsed.snapshot.routing.threadAdapterResolver.unregisteredDiscoveryMissCacheHitCount).toBe(5);
+  });
+
+  it("rejects farfield debug observability envelope when routing stats are missing", () => {
+    expect(() => FarfieldDebugObservabilityEnvelopeSchema.parse({
+      ok: true,
+      snapshot: {
+        recordedAt: "2026-02-26T00:00:00.000Z",
+        cache: {
+          threadListAggregation: {
+            hitCount: 1,
+            missCount: 2,
+            coalescedCount: 3,
+            evictionCount: 4,
+            invalidationCount: 5,
+            entryCount: 6,
+            inFlightCount: 7
+          }
+        },
+        concurrency: {
+          thread: {
+            queuedExecutionCount: 1,
+            completedExecutionCount: 2,
+            failedExecutionCount: 3,
+            activeThreadCount: 4
+          },
+          pushDispatch: {
+            scheduledCheckCount: 1,
+            startedCheckCount: 2,
+            completedCheckCount: 3,
+            skippedWhileInFlightCount: 4,
+            activeTimerCount: 5,
+            inFlightThreadCount: 6
+          },
+          pushMutation: {
+            queuedExecutionCount: 1,
+            completedExecutionCount: 2,
+            failedExecutionCount: 3,
+            hasInFlightOperation: false
+          }
+        },
+        streaming: {
+          eventStream: {
+            activeClientCount: 1,
+            keepaliveEnabled: true,
+            addedClientCount: 2,
+            removedClientCount: 3,
+            broadcastEventCount: 4,
+            broadcastDeliveryAttemptCount: 5,
+            eventWriteFailureCount: 6,
+            keepaliveWriteFailureCount: 7
+          }
+        }
+      }
+    })).toThrowError(/routing/);
   });
 });

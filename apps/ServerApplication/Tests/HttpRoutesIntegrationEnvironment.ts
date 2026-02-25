@@ -9,6 +9,7 @@ import {
   FarfieldDebugErrorCreateEnvelopeSchema,
   FarfieldDebugErrorDetailEnvelopeSchema,
   FarfieldDebugErrorListEnvelopeSchema,
+  FarfieldDebugObservabilityEnvelopeSchema,
   FarfieldEventsSessionResponseSchema,
   FarfieldHealthResponseSchema,
   FarfieldPushLocalCaStatusEnvelopeSchema,
@@ -33,76 +34,7 @@ export const PushLocalCaStatusEnvelopeSchema = FarfieldPushLocalCaStatusEnvelope
 export const DebugErrorCreateEnvelopeSchema = FarfieldDebugErrorCreateEnvelopeSchema;
 export const DebugErrorListEnvelopeSchema = FarfieldDebugErrorListEnvelopeSchema;
 export const DebugErrorDetailEnvelopeSchema = FarfieldDebugErrorDetailEnvelopeSchema;
-
-export const DebugObservabilityEnvelopeSchema = z
-  .object({
-    ok: z.literal(true),
-    snapshot: z
-      .object({
-        recordedAt: z.string().datetime(),
-        cache: z
-          .object({
-            threadListAggregation: z.object({
-              hitCount: z.number().int().nonnegative(),
-              missCount: z.number().int().nonnegative(),
-              coalescedCount: z.number().int().nonnegative(),
-              evictionCount: z.number().int().nonnegative(),
-              invalidationCount: z.number().int().nonnegative(),
-              entryCount: z.number().int().nonnegative(),
-              inFlightCount: z.number().int().nonnegative()
-            })
-          }),
-        concurrency: z
-          .object({
-            thread: z.object({
-              queuedExecutionCount: z.number().int().nonnegative(),
-              completedExecutionCount: z.number().int().nonnegative(),
-              failedExecutionCount: z.number().int().nonnegative(),
-              activeThreadCount: z.number().int().nonnegative()
-            }),
-            pushDispatch: z.object({
-              scheduledCheckCount: z.number().int().nonnegative(),
-              startedCheckCount: z.number().int().nonnegative(),
-              completedCheckCount: z.number().int().nonnegative(),
-              skippedWhileInFlightCount: z.number().int().nonnegative(),
-              activeTimerCount: z.number().int().nonnegative(),
-              inFlightThreadCount: z.number().int().nonnegative()
-            }),
-            pushMutation: z.object({
-              queuedExecutionCount: z.number().int().nonnegative(),
-              completedExecutionCount: z.number().int().nonnegative(),
-              failedExecutionCount: z.number().int().nonnegative(),
-              hasInFlightOperation: z.boolean()
-            })
-          }),
-        streaming: z
-          .object({
-            eventStream: z.object({
-              activeClientCount: z.number().int().nonnegative(),
-              keepaliveEnabled: z.boolean(),
-              addedClientCount: z.number().int().nonnegative(),
-              removedClientCount: z.number().int().nonnegative(),
-              broadcastEventCount: z.number().int().nonnegative(),
-              broadcastDeliveryAttemptCount: z.number().int().nonnegative(),
-              eventWriteFailureCount: z.number().int().nonnegative(),
-              keepaliveWriteFailureCount: z.number().int().nonnegative()
-            })
-          }),
-        routing: z
-          .object({
-            threadAdapterResolver: z.object({
-              registeredLookupCount: z.number().int().nonnegative(),
-              unregisteredDiscoveryAttemptCount: z.number().int().nonnegative(),
-              unregisteredDiscoverySuccessCount: z.number().int().nonnegative(),
-              unregisteredDiscoveryMissCount: z.number().int().nonnegative(),
-              unregisteredDiscoveryAmbiguousCount: z.number().int().nonnegative(),
-              unregisteredDiscoveryAlertCount: z.number().int().nonnegative()
-            })
-          })
-      })
-      .strict()
-  })
-  .strict();
+export const DebugObservabilityEnvelopeSchema = FarfieldDebugObservabilityEnvelopeSchema;
 
 const AddressSchema = z
   .object({

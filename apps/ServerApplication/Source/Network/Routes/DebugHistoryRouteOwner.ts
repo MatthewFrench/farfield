@@ -1,3 +1,4 @@
+import { FarfieldDebugObservabilityEnvelopeSchema } from "@farfield/protocol";
 import { type DebugRouteDependencies } from "./DebugRouteContracts.js";
 
 export class DebugHistoryRouteOwner {
@@ -74,10 +75,10 @@ export class DebugHistoryRouteOwner {
       return false;
     }
 
-    jsonResponse(res, 200, {
+    jsonResponse(res, 200, FarfieldDebugObservabilityEnvelopeSchema.parse({
       ok: true,
       snapshot: readObservabilitySnapshot()
-    });
+    }));
     return true;
   }
 }

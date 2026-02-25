@@ -12,11 +12,18 @@ export interface ThreadAdapterResolverStatistics {
   unregisteredDiscoveryAttemptCount: number;
   unregisteredDiscoverySuccessCount: number;
   unregisteredDiscoveryMissCount: number;
+  unregisteredDiscoveryMissCacheHitCount: number;
   unregisteredDiscoveryAmbiguousCount: number;
   unregisteredDiscoveryAlertCount: number;
 }
 
 const UnregisteredDiscoveryMissAlertThreshold = 3;
+const DefaultUnregisteredThreadMissTimeToLiveMs = 2_000;
+
+export interface ThreadAdapterResolverOptions {
+  unregisteredThreadMissTimeToLiveMs?: number;
+  now?: () => number;
+}
 
 /**
  * Owns thread-to-adapter resolution. When ownership is missing, it performs a
@@ -25,29 +32,49 @@ const UnregisteredDiscoveryMissAlertThreshold = 3;
 export class ThreadAdapterResolver {
   private readonly registry: AgentRegistry;
   private readonly threadIndex: ThreadIndex;
+  private readonly unregisteredThreadMissTimeToLiveMs: number;
+  private readonly now: () => number;
   private registeredLookupCount: number;
   private unregisteredDiscoveryAttemptCount: number;
   private unregisteredDiscoverySuccessCount: number;
   private unregisteredDiscoveryMissCount: number;
+  private unregisteredDiscoveryMissCacheHitCount: number;
   private unregisteredDiscoveryAmbiguousCount: number;
   private unregisteredDiscoveryAlertCount: number;
   private readonly consecutiveUnregisteredDiscoveryMissCountByThreadId: Map<string, number>;
+  private readonly unregisteredDiscoveryMissExpiresAtEpochMsByThreadId: Map<string, number>;
 
-  public constructor(registry: AgentRegistry, threadIndex: ThreadIndex) {
+  public constructor(registry: AgentRegistry, threadIndex: ThreadIndex, options: ThreadAdapterResolverOptions = {}) {
+    const configuredUnregisteredThreadMissTimeToLiveMs = (
+      options.unregisteredThreadMissTimeToLiveMs
+      ?? DefaultUnregisteredThreadMissTimeToLiveMs
+    );
+    if (
+      !Number.isInteger(configuredUnregisteredThreadMissTimeToLiveMs)
+      || configuredUnregisteredThreadMissTimeToLiveMs <= 0
+    ) {
+      throw new Error("ThreadAdapterResolver requires positive integer unregisteredThreadMissTimeToLiveMs");
+    }
+
     this.registry = registry;
     this.threadIndex = threadIndex;
+    this.unregisteredThreadMissTimeToLiveMs = configuredUnregisteredThreadMissTimeToLiveMs;
+    this.now = options.now ?? (() => Date.now());
     this.registeredLookupCount = 0;
     this.unregisteredDiscoveryAttemptCount = 0;
     this.unregisteredDiscoverySuccessCount = 0;
     this.unregisteredDiscoveryMissCount = 0;
+    this.unregisteredDiscoveryMissCacheHitCount = 0;
     this.unregisteredDiscoveryAmbiguousCount = 0;
     this.unregisteredDiscoveryAlertCount = 0;
     this.consecutiveUnregisteredDiscoveryMissCountByThreadId = new Map<string, number>();
+    this.unregisteredDiscoveryMissExpiresAtEpochMsByThreadId = new Map<string, number>();
   }
 
   public registerThreadOwner(threadId: string, agentId: AgentId): void {
     this.threadIndex.register(threadId, agentId);
     this.consecutiveUnregisteredDiscoveryMissCountByThreadId.delete(threadId);
+    this.unregisteredDiscoveryMissExpiresAtEpochMsByThreadId.delete(threadId);
   }
 
   public resolveCreateThreadAdapter(requestedAgentId: AgentId | undefined): AgentAdapter | null {
@@ -84,6 +111,15 @@ export class ThreadAdapterResolver {
       return this.resolveRegisteredAdapter(threadId, registeredAgentId);
     }
 
+    if (this.hasFreshUnregisteredDiscoveryMiss(threadId)) {
+      this.unregisteredDiscoveryMissCacheHitCount += 1;
+      return {
+        ok: false,
+        status: 404,
+        error: `Thread ${threadId} is not registered and could not be discovered. Refresh thread list and try again.`
+      };
+    }
+
     this.unregisteredDiscoveryAttemptCount += 1;
     const discoveredAdapter = await this.discoverAdapterForUnregisteredThread(threadId);
     if (discoveredAdapter) {
@@ -104,6 +140,7 @@ export class ThreadAdapterResolver {
       unregisteredDiscoveryAttemptCount: this.unregisteredDiscoveryAttemptCount,
       unregisteredDiscoverySuccessCount: this.unregisteredDiscoverySuccessCount,
       unregisteredDiscoveryMissCount: this.unregisteredDiscoveryMissCount,
+      unregisteredDiscoveryMissCacheHitCount: this.unregisteredDiscoveryMissCacheHitCount,
       unregisteredDiscoveryAmbiguousCount: this.unregisteredDiscoveryAmbiguousCount,
       unregisteredDiscoveryAlertCount: this.unregisteredDiscoveryAlertCount
     };
@@ -189,6 +226,7 @@ export class ThreadAdapterResolver {
 
     this.unregisteredDiscoverySuccessCount += 1;
     this.consecutiveUnregisteredDiscoveryMissCountByThreadId.delete(threadId);
+    this.unregisteredDiscoveryMissExpiresAtEpochMsByThreadId.delete(threadId);
     this.threadIndex.register(threadId, discoveredAdapter.id);
     return {
       ok: true,
@@ -214,8 +252,16 @@ export class ThreadAdapterResolver {
     reason: "no-connected-adapters" | "no-match"
   ): void {
     this.unregisteredDiscoveryMissCount += 1;
+    if (reason === "no-connected-adapters") {
+      return;
+    }
+
     const nextMissCount = (this.consecutiveUnregisteredDiscoveryMissCountByThreadId.get(threadId) ?? 0) + 1;
     this.consecutiveUnregisteredDiscoveryMissCountByThreadId.set(threadId, nextMissCount);
+    this.unregisteredDiscoveryMissExpiresAtEpochMsByThreadId.set(
+      threadId,
+      this.now() + this.unregisteredThreadMissTimeToLiveMs
+    );
 
     if (nextMissCount % UnregisteredDiscoveryMissAlertThreshold !== 0) {
       return;
@@ -230,5 +276,17 @@ export class ThreadAdapterResolver {
       },
       "thread-adapter-resolution-discovery-miss-threshold-reached"
     );
+  }
+
+  private hasFreshUnregisteredDiscoveryMiss(threadId: string): boolean {
+    const expiresAtEpochMs = this.unregisteredDiscoveryMissExpiresAtEpochMsByThreadId.get(threadId);
+    if (expiresAtEpochMs === undefined) {
+      return false;
+    }
+    if (this.now() >= expiresAtEpochMs) {
+      this.unregisteredDiscoveryMissExpiresAtEpochMsByThreadId.delete(threadId);
+      return false;
+    }
+    return true;
   }
 }
