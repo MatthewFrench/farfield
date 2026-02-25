@@ -8,8 +8,8 @@
     "dev:remote": "vite --host 0.0.0.0 --port 4312",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "mkdir -p .runtime && NODE_OPTIONS=--localstorage-file=.runtime/vitest-localstorage vitest run",
-    "test:coverage": "mkdir -p .runtime && NODE_OPTIONS=--localstorage-file=.runtime/vitest-localstorage vitest run --coverage",
+    "test": "mkdir -p .runtime && bunx vitest run",
+    "test:coverage": "mkdir -p .runtime && bunx vitest run --coverage",
     "lint": "eslint Source Tests vite.config.ts --max-warnings=0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
