@@ -14,7 +14,7 @@
     "test:ci:mocked": "bun run --filter @farfield/protocol build && bun run --filter @farfield/server test -- Tests/AgentRuntimeOwner.test.ts Tests/ThreadAdapterResolver.test.ts Tests/ThreadMemberReadRouteOwner.test.ts Tests/ThreadMemberRoutes.integration.test.ts Tests/ServerObservabilitySnapshotOwner.test.ts && bun run --filter @farfield/web test -- Tests/ApplicationRuntimeComposition.test.tsx Tests/AppSessionAndDebug.test.tsx Tests/AppShellBehavior.test.tsx Tests/AppThreadRefreshBehavior.test.tsx",
     "coverage:check": "bun run --filter @farfield/protocol build && bun run --workspaces test:coverage",
     "lint": "bunx eslint apps/ServerApplication/Source apps/ServerApplication/Tests apps/WebApplication/Source apps/WebApplication/Tests apps/WebApplication/vite.config.ts packages/CodexProtocol/Source packages/CodexProtocol/Tests packages/CodexInterfaceAdapter/Source packages/CodexInterfaceAdapter/Tests packages/OpenCodeInterfaceAdapter/Source packages/OpenCodeInterfaceAdapter/Tests --max-warnings=0",
-    "typecheck": "bun run --cwd packages/CodexProtocol typecheck && bun run --cwd packages/CodexInterfaceAdapter typecheck && bun run --cwd packages/OpenCodeInterfaceAdapter typecheck && bun run --cwd apps/ServerApplication typecheck && bun run --cwd apps/WebApplication typecheck",
+    "typecheck": "bun run --cwd packages/CodexProtocol build && bun run --cwd packages/CodexInterfaceAdapter build && bun run --cwd packages/OpenCodeInterfaceAdapter build && bun run --cwd apps/ServerApplication typecheck && bun run --cwd apps/WebApplication typecheck",
     "premerge:check": "bun run lint && bun run test && bun run coverage:check",
     "setup:ios-push": "node scripts/setup-ios-push.mjs",
     "setup:ntfy": "node scripts/setup-ntfy.mjs",
