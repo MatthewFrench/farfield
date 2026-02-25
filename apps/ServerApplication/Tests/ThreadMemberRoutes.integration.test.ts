@@ -42,7 +42,8 @@ function createMockRequestResponsePair(): { request: IncomingMessage; response: 
 
 function createAdapter(
   id: "codex" | "opencode",
-  readThread: (input: AgentReadThreadInput) => Promise<AgentReadThreadResult>
+  readThread: (input: AgentReadThreadInput) => Promise<AgentReadThreadResult>,
+  sendMessage?: (input: AgentSendMessageInput) => Promise<void>
 ): AgentAdapter {
   return {
     id,
@@ -65,8 +66,11 @@ function createAdapter(
     async readThread(input: AgentReadThreadInput): Promise<AgentReadThreadResult> {
       return readThread(input);
     },
-    async sendMessage(_input: AgentSendMessageInput): Promise<void> {
-      throw new Error("not used in this test");
+    async sendMessage(input: AgentSendMessageInput): Promise<void> {
+      if (!sendMessage) {
+        throw new Error("not used in this test");
+      }
+      await sendMessage(input);
     },
     async interrupt(_input: AgentInterruptInput): Promise<void> {
       throw new Error("not used in this test");
@@ -228,5 +232,67 @@ describe("ThreadMemberRoutes integration", () => {
       }
     });
     expect(readThreadIncludeTurnsValues).toEqual([false, true]);
+  });
+
+  it("does not treat nested messages paths as send-message mutation endpoints", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const sentMessages: AgentSendMessageInput[] = [];
+    const codexAdapter = createAdapter(
+      "codex",
+      async () => {
+        throw new Error("not used in this test");
+      },
+      async (input) => {
+        sentMessages.push(input);
+      }
+    );
+
+    let capturedStatusCode: number | null = null;
+    let capturedResponseBody: object | null = null;
+
+    const dependencies: ThreadMemberRouteDependencies = {
+      req: request,
+      res: response,
+      segments: ["api", "threads", "thread_nested_messages_path", "messages", "extra"],
+      url: new URL("http://localhost/api/threads/thread_nested_messages_path/messages/extra"),
+      codexAdapter: null,
+      parseInteger: (value, defaultValue) => {
+        if (!value) {
+          return defaultValue;
+        }
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : defaultValue;
+      },
+      parseBoolean: (value, defaultValue) => {
+        if (!value) {
+          return defaultValue;
+        }
+        return value === "true";
+      },
+      threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
+      resolveAdapterForThread: async () => ({
+        ok: true,
+        adapter: codexAdapter,
+        agentId: "codex"
+      }),
+      readJsonBody: async () => ({
+        text: "hello"
+      }),
+      jsonResponse: (_res, statusCode, body) => {
+        capturedStatusCode = statusCode;
+        capturedResponseBody = body;
+      },
+      invalidateThreadListAggregationCache: () => {},
+      pushActionEventWithRequestContext: () => {},
+      pushActionErrorWithRequestContext: () => "action-error-id"
+    };
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+    expect(handled).toBe(false);
+    expect(sentMessages).toEqual([]);
+    expect(capturedStatusCode).toBeNull();
+    expect(capturedResponseBody).toBeNull();
   });
 });

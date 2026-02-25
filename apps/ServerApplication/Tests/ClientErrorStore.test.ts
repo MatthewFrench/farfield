@@ -104,4 +104,47 @@ describe("ClientErrorStore", () => {
     const lines = raw.split("\n");
     expect(lines.length).toBe(3);
   });
+
+  it("skips malformed ndjson lines while loading existing events", () => {
+    const directory = makeTempDir();
+    const logPath = path.join(directory, "session.ndjson");
+    const validEvent = {
+      errorId: "error_valid",
+      sessionId: "session_3",
+      origin: "client" as const,
+      source: "web-app",
+      operation: "valid-op",
+      message: "valid",
+      name: null,
+      stack: null,
+      requestId: null,
+      threadId: null,
+      url: null,
+      details: {},
+      occurredAt: "2026-02-18T00:00:00.000Z",
+      recordedAt: "2026-02-18T00:00:01.000Z"
+    };
+    const invalidSchemaEvent = {
+      errorId: "error_invalid_schema",
+      sessionId: "session_3",
+      origin: "invalid-origin",
+      source: "monitor-server",
+      operation: "invalid",
+      message: "invalid",
+      details: {},
+      occurredAt: "2026-02-18T00:00:00.000Z",
+      recordedAt: "2026-02-18T00:00:01.000Z"
+    };
+    const lines = [
+      JSON.stringify(validEvent),
+      "{\"errorId\":\"error_truncated\"",
+      JSON.stringify(invalidSchemaEvent)
+    ];
+    fs.writeFileSync(logPath, `${lines.join("\n")}\n`, "utf8");
+
+    const store = new ClientErrorStore(logPath, "session_3", 20);
+    expect(store.getCount()).toBe(1);
+    expect(store.getById("error_valid")?.operation).toBe("valid-op");
+    expect(store.getById("error_invalid_schema")).toBeNull();
+  });
 });

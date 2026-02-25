@@ -6,6 +6,7 @@ import {
   type CreateDebugClientErrorBody,
   type DebugErrorEvent
 } from "@farfield/protocol";
+import { logger } from "../../Shared/Logging/Logger.js";
 
 interface RecordServerErrorInput {
   source: string;
@@ -170,10 +171,21 @@ export class ClientErrorStore {
     }
 
     const lines = raw.split("\n").filter((line) => line.trim().length > 0);
-    for (const line of lines) {
-      const parsed = parseDebugErrorEvent(JSON.parse(line));
-      this.events.push(parsed);
-      this.byId.set(parsed.errorId, parsed);
+    for (const [lineIndex, line] of lines.entries()) {
+      try {
+        const parsed = parseDebugErrorEvent(JSON.parse(line));
+        this.events.push(parsed);
+        this.byId.set(parsed.errorId, parsed);
+      } catch {
+        logger.warn(
+          {
+            sessionId: this.sessionId,
+            logPath: this.filePath,
+            lineNumber: lineIndex + 1
+          },
+          "client-error-store-skip-malformed-line"
+        );
+      }
     }
 
     if (this.events.length > this.maxEntries) {

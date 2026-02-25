@@ -30,7 +30,11 @@ export class ThreadMemberMessageMutationRouteOwner {
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
-    if (!(req.method === "POST" && this.dependencies.segments[3] === "messages")) {
+    if (!(
+      req.method === "POST"
+      && this.dependencies.segments.length === 4
+      && this.dependencies.segments[3] === "messages"
+    )) {
       return false;
     }
 
