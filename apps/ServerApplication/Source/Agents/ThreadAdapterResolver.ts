@@ -6,6 +6,10 @@ export type ResolvedThreadAdapterResult =
   | { ok: true; adapter: AgentAdapter; agentId: AgentId }
   | { ok: false; status: number; error: string };
 
+/**
+ * Owns thread-to-adapter resolution. When ownership is missing, it performs a
+ * deterministic read probe across connected enabled adapters and persists the discovered owner.
+ */
 export class ThreadAdapterResolver {
   private readonly registry: AgentRegistry;
   private readonly threadIndex: ThreadIndex;
@@ -46,16 +50,28 @@ export class ThreadAdapterResolver {
     return null;
   }
 
-  public resolveAdapterForThread(threadId: string): ResolvedThreadAdapterResult {
+  public async resolveAdapterForThread(threadId: string): Promise<ResolvedThreadAdapterResult> {
     const registeredAgentId = this.threadIndex.resolve(threadId);
-    if (!registeredAgentId) {
-      return {
-        ok: false,
-        status: 404,
-        error: `Thread ${threadId} is not registered. Refresh thread list and try again.`
-      };
+    if (registeredAgentId) {
+      return this.resolveRegisteredAdapter(threadId, registeredAgentId);
     }
 
+    const discoveredAdapter = await this.discoverAdapterForUnregisteredThread(threadId);
+    if (discoveredAdapter) {
+      return discoveredAdapter;
+    }
+
+    return {
+      ok: false,
+      status: 404,
+      error: `Thread ${threadId} is not registered and could not be discovered. Refresh thread list and try again.`
+    };
+  }
+
+  private resolveRegisteredAdapter(
+    threadId: string,
+    registeredAgentId: AgentId
+  ): ResolvedThreadAdapterResult {
     const adapter = this.registry.getAdapter(registeredAgentId);
     if (!adapter || !adapter.isEnabled()) {
       return {
@@ -78,5 +94,65 @@ export class ThreadAdapterResolver {
       adapter,
       agentId: registeredAgentId
     };
+  }
+
+  private async discoverAdapterForUnregisteredThread(
+    threadId: string
+  ): Promise<ResolvedThreadAdapterResult | null> {
+    const connectedEnabledAdapters = this.registry
+      .listEnabled()
+      .filter((adapter) => adapter.isConnected());
+
+    if (connectedEnabledAdapters.length === 0) {
+      return {
+        ok: false,
+        status: 503,
+        error: `No connected enabled agents are available to resolve thread ${threadId}.`
+      };
+    }
+
+    let discoveredAdapter: AgentAdapter | null = null;
+    for (const adapter of connectedEnabledAdapters) {
+      const adapterOwnsThread = await this.adapterOwnsThread(adapter, threadId);
+      if (!adapterOwnsThread) {
+        continue;
+      }
+
+      if (discoveredAdapter) {
+        return {
+          ok: false,
+          status: 409,
+          error: (
+            `Thread ${threadId} matched multiple connected enabled agents `
+            + `(${discoveredAdapter.id}, ${adapter.id}). Refresh thread list and retry.`
+          )
+        };
+      }
+
+      discoveredAdapter = adapter;
+    }
+
+    if (!discoveredAdapter) {
+      return null;
+    }
+
+    this.threadIndex.register(threadId, discoveredAdapter.id);
+    return {
+      ok: true,
+      adapter: discoveredAdapter,
+      agentId: discoveredAdapter.id
+    };
+  }
+
+  private async adapterOwnsThread(adapter: AgentAdapter, threadId: string): Promise<boolean> {
+    try {
+      await adapter.readThread({
+        threadId,
+        includeTurns: false
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

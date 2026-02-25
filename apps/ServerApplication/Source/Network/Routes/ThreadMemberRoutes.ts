@@ -30,7 +30,7 @@ export async function handleThreadMemberRoutes(
     return true;
   }
 
-  const resolved = resolveAdapterForThread(threadId);
+  const resolved = await resolveAdapterForThread(threadId);
   if (!resolved.ok) {
     jsonResponse(res, resolved.status, {
       ok: false,

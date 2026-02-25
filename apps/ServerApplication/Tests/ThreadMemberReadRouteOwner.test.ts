@@ -107,7 +107,7 @@ describe("ThreadMemberReadRouteOwner", () => {
       },
       parseBoolean: () => true,
       threadConcurrencyCoordinator,
-      resolveAdapterForThread: () => ({
+      resolveAdapterForThread: async () => ({
         ok: true,
         adapter,
         agentId: "codex"
@@ -189,7 +189,7 @@ describe("ThreadMemberReadRouteOwner", () => {
       },
       parseBoolean: () => true,
       threadConcurrencyCoordinator,
-      resolveAdapterForThread: () => ({
+      resolveAdapterForThread: async () => ({
         ok: true,
         adapter,
         agentId: "codex"
@@ -262,7 +262,7 @@ describe("ThreadMemberReadRouteOwner", () => {
       },
       parseBoolean: () => true,
       threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
-      resolveAdapterForThread: () => ({
+      resolveAdapterForThread: async () => ({
         ok: true,
         adapter,
         agentId: "codex"

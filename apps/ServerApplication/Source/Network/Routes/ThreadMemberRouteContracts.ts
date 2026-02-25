@@ -17,7 +17,7 @@ export interface ThreadMemberRouteDependencies {
   parseInteger: (value: string | null, defaultValue: number) => number;
   parseBoolean: (value: string | null, defaultValue: boolean) => boolean;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
-  resolveAdapterForThread: (threadId: string) => ResolvedThreadAdapterResult;
+  resolveAdapterForThread: (threadId: string) => Promise<ResolvedThreadAdapterResult>;
   readJsonBody: (req: IncomingMessage) => Promise<JsonValue>;
   jsonResponse: (res: ServerResponse, statusCode: number, body: object) => void;
   invalidateThreadListAggregationCache: (reason: string, details?: Record<string, JsonValue>) => void;
