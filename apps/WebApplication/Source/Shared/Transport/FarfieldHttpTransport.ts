@@ -17,7 +17,79 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const REQUEST_ID_HEADER_NAME = "X-Farfield-Request-Id";
 const ACTION_ID_HEADER_NAME = "X-Farfield-Action-Id";
 const ACTION_NAME_HEADER_NAME = "X-Farfield-Action-Name";
+const MAX_RESPONSE_TEXT_LENGTH = 4000;
 const ApiErrorEnvelopeSchema = FarfieldApiErrorResponseSchema;
+
+export interface FarfieldHttpRequestFailureDetails {
+  path: string;
+  status: number | null;
+  statusText: string | null;
+  requestId: string | null;
+  responseText: string | null;
+}
+
+export class FarfieldHttpRequestFailureError extends Error {
+  public readonly requestFailureDetails: FarfieldHttpRequestFailureDetails;
+
+  public constructor(message: string, requestFailureDetails: FarfieldHttpRequestFailureDetails) {
+    super(message);
+    this.name = "FarfieldHttpRequestFailureError";
+    this.requestFailureDetails = requestFailureDetails;
+  }
+}
+
+function buildFailureMessage(
+  baseMessage: string,
+  context: FarfieldHttpRequestFailureDetails
+): string {
+  const statusText = context.statusText?.trim().length ? ` ${context.statusText}` : "";
+  const requestId = context.requestId && context.requestId.trim().length > 0 ? context.requestId : null;
+  const statusTextParts = [
+    "status=",
+    String(context.status ?? "n/a"),
+    statusText
+  ];
+  const message = `${baseMessage} ${statusTextParts.join("")}`.trim();
+  return appendRequestId(message, requestId);
+}
+
+function trimRequestBody(text: string): string {
+  const normalized = text.trim();
+  if (normalized.length <= MAX_RESPONSE_TEXT_LENGTH) {
+    return normalized;
+  }
+  return `${normalized.slice(0, MAX_RESPONSE_TEXT_LENGTH)}... [truncated]`;
+}
+
+async function readResponseText(response: Response): Promise<string | null> {
+  try {
+    const rawText = await response.clone().text();
+    if (rawText.trim().length === 0) {
+      return null;
+    }
+    return trimRequestBody(rawText);
+  } catch {
+    return null;
+  }
+}
+
+function createRequestFailureError(
+  path: string,
+  requestId: string | null,
+  response: Response | null,
+  responseText: string | null,
+  baseMessage: string
+): FarfieldHttpRequestFailureError {
+  const context: FarfieldHttpRequestFailureDetails = {
+    path,
+    status: response ? response.status : null,
+    statusText: response ? response.statusText : null,
+    requestId,
+    responseText
+  };
+  const message = buildFailureMessage(baseMessage, context);
+  return new FarfieldHttpRequestFailureError(message, context);
+}
 
 function createClientRequestId(): string {
   return `req_${String(Date.now())}_${Math.floor(Math.random() * 1_000_000_000).toString(16)}`;
@@ -84,7 +156,7 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
       }
       throw new RequestCanceledError(path);
     }
-    throw new Error(`Request failed for ${path}: ${message} requestId ${requestId}`);
+    throw createRequestFailureError(path, requestId, null, null, `Request failed for ${path}: ${message}`);
   } finally {
     clearTimeout(timeoutHandle);
     if (inheritedSignal) {
@@ -97,14 +169,31 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
 export async function request(path: string, init?: RequestInit): Promise<StructuredDataValue> {
   const response = await performRequest(path, init);
   const responseRequestId = readResponseRequestId(response);
+  const responseText = await readResponseText(response);
 
   let data: StructuredDataValue;
+  if (responseText === null) {
+    throw createRequestFailureError(
+      path,
+      responseRequestId,
+      response,
+      null,
+      `Invalid JSON response from ${path}: empty response`
+    );
+  }
+
   try {
-    const rawJsonData = await response.json();
+    const rawJsonData = JSON.parse(responseText);
     data = StructuredDataValueSchema.parse(rawJsonData);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(appendRequestId(`Invalid JSON response from ${path}: ${message}`, responseRequestId));
+    throw createRequestFailureError(
+      path,
+      responseRequestId,
+      response,
+      responseText,
+      `Invalid JSON response from ${path}: ${message}`
+    );
   }
 
   let envelope: z.infer<typeof ApiEnvelopeSchema>;
@@ -112,13 +201,23 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
     envelope = ApiEnvelopeSchema.parse(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(appendRequestId(`Invalid API envelope from ${path}: ${message}`, responseRequestId));
+    throw createRequestFailureError(
+      path,
+      responseRequestId,
+      response,
+      responseText,
+      `Invalid API envelope from ${path}: ${message}`
+    );
   }
 
   if (!response.ok || envelope.ok === false) {
     const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
-    throw new Error(
-      appendRequestId(parsedError.success ? parsedError.data.error : `Request failed for ${path}`, responseRequestId)
+    throw createRequestFailureError(
+      path,
+      responseRequestId,
+      response,
+      responseText,
+      parsedError.success ? parsedError.data.error : `Request failed for ${path}`
     );
   }
 
@@ -131,10 +230,20 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
   if (response.ok) {
     return;
   }
+  const responseText = await readResponseText(response);
+  if (responseText === null) {
+    throw createRequestFailureError(
+      path,
+      responseRequestId,
+      response,
+      null,
+      `Request failed for ${path}: empty response`
+    );
+  }
 
   let data: StructuredDataValue | null = null;
   try {
-    const rawJsonData = await response.json();
+    const rawJsonData = JSON.parse(responseText);
     const parsedJsonData = StructuredDataValueSchema.safeParse(rawJsonData);
     data = parsedJsonData.success ? parsedJsonData.data : null;
   } catch {
@@ -142,8 +251,12 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
   }
 
   const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
-  throw new Error(
-    appendRequestId(parsedError.success ? parsedError.data.error : `Request failed for ${path}`, responseRequestId)
+  throw createRequestFailureError(
+    path,
+    responseRequestId,
+    response,
+    responseText,
+    parsedError.success ? parsedError.data.error : `Request failed for ${path}`
   );
 }
 

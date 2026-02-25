@@ -1,5 +1,5 @@
 export function extractRequestIdFromErrorMessage(errorMessage: string): string | null {
-  const requestIdMatch = errorMessage.match(/\brequest(?:Id)?[ =:]+([a-z0-9._-]+)/i);
+  const requestIdMatch = errorMessage.match(/\brequest\s*id[ =:]+([a-z0-9._-]+)/i);
   return requestIdMatch?.[1] ?? null;
 }
 

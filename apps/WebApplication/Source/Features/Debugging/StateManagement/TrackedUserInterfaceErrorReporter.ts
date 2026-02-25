@@ -3,6 +3,9 @@ import {
   type ClientErrorReportInput,
   type ClientErrorReportResult
 } from "@/Features/Debugging/DataAccess/ClientErrorReporter";
+import {
+  FarfieldHttpRequestFailureError,
+} from "@/Shared/Transport/FarfieldHttpTransport";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import {
   extractRequestIdFromErrorMessage,
@@ -44,7 +47,24 @@ export class TrackedUserInterfaceErrorReporter {
       return;
     }
 
-    const requestId = extractRequestIdFromErrorMessage(errorMessage);
+    const requestFailureDetails = input.error instanceof Error
+      ? input.error instanceof FarfieldHttpRequestFailureError ? input.error.requestFailureDetails : null
+      : null;
+    const requestId = requestFailureDetails?.requestId ?? extractRequestIdFromErrorMessage(errorMessage);
+
+    const details: Record<string, string | number | boolean | null> = {
+      actionId: input.actionId,
+      actionName: input.operation,
+      ...(input.details ?? {})
+    };
+
+    if (requestFailureDetails !== null) {
+      details.path = requestFailureDetails.path;
+      details.requestStatus = requestFailureDetails.status;
+      details.requestStatusText = requestFailureDetails.statusText;
+      details.responseText = requestFailureDetails.responseText;
+    }
+
     let errorId: string | null = null;
     try {
       const report = await this.reportClientErrorFn({
@@ -57,11 +77,7 @@ export class TrackedUserInterfaceErrorReporter {
         requestId,
         threadId: input.threadId,
         url: this.readPathnameAndSearch(),
-        details: {
-          actionId: input.actionId,
-          actionName: input.operation,
-          ...(input.details ?? {})
-        }
+        details
       });
       errorId = report.errorId;
     } catch {
