@@ -17,7 +17,9 @@ const ApiEnvelopeSchema = z
   })
   .passthrough();
 
-const REQUEST_TIMEOUT_MS = 30_000;
+// Thread and capability reads can exceed one minute on cold local agent startup.
+// Keep request budgets above that window so startup does not fail into error state.
+const REQUEST_TIMEOUT_MS = 120_000;
 const REQUEST_ID_HEADER_NAME = "X-Farfield-Request-Id";
 const ACTION_ID_HEADER_NAME = "X-Farfield-Action-Id";
 const ACTION_NAME_HEADER_NAME = "X-Farfield-Action-Name";

@@ -4,6 +4,7 @@ import { App } from "./App";
 import "./Index.css";
 import { reconcilePushSubscription } from "./Features/PushNotifications/DataAccess/PushClientApi";
 import { installGlobalClientCrashReporter } from "./Application/Boot/InstallClientErrorReporter";
+import { ServiceWorkerControllerChangeReloadOwner } from "./Application/Boot/ServiceWorkerControllerChangeReloadOwner";
 
 const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";
 const BOOT_STATUS_EVENT_NAME = "farfield:boot-status";
@@ -192,7 +193,9 @@ function reconcilePushSubscriptionOnStartup(): void {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    let didReloadAfterControllerChange = false;
+    const serviceWorkerControllerChangeReloadOwner = new ServiceWorkerControllerChangeReloadOwner(
+      navigator.serviceWorker.controller !== null
+    );
 
     void navigator.serviceWorker
       .register("/sw.js")
@@ -215,13 +218,12 @@ if ("serviceWorker" in navigator) {
         });
 
         navigator.serviceWorker.addEventListener("controllerchange", () => {
-          if (didReloadAfterControllerChange) {
+          const reloadDecision = serviceWorkerControllerChangeReloadOwner.readDecision({
+            reloadSuppressed: isServiceWorkerReloadSuppressed()
+          });
+          if (!reloadDecision.shouldReload) {
             return;
           }
-          if (isServiceWorkerReloadSuppressed()) {
-            return;
-          }
-          didReloadAfterControllerChange = true;
           window.location.reload();
         });
 
