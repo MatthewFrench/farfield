@@ -4,8 +4,9 @@ import {
   type ClientErrorReportResult
 } from "@/Features/Debugging/DataAccess/ClientErrorReporter";
 import {
-  FarfieldHttpRequestFailureError,
+  type FarfieldHttpRequestFailureDetails
 } from "@/Shared/Transport/FarfieldHttpTransport";
+import { z } from "zod";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import {
   extractRequestIdFromErrorMessage,
@@ -29,6 +30,18 @@ interface TrackedUserInterfaceErrorReporterDependencies {
   readPathnameAndSearch?: () => string;
 }
 
+const RequestFailureDetailsSchema = z.object({
+  path: z.string().trim().min(1),
+  status: z.number().int().nullable(),
+  statusText: z.string().trim().min(1).nullable(),
+  requestId: z.string().trim().min(1).nullable(),
+  responseText: z.string().trim().min(1).nullable()
+});
+
+const RequestFailureErrorSchema = z.object({
+  requestFailureDetails: RequestFailureDetailsSchema
+}).passthrough();
+
 export class TrackedUserInterfaceErrorReporter {
   private readonly setErrorMessage: (errorMessage: string) => void;
   private readonly reportClientErrorFn: (input: ClientErrorReportInput) => Promise<ClientErrorReportResult>;
@@ -47,8 +60,9 @@ export class TrackedUserInterfaceErrorReporter {
       return;
     }
 
-    const requestFailureDetails = input.error instanceof Error
-      ? input.error instanceof FarfieldHttpRequestFailureError ? input.error.requestFailureDetails : null
+    const parsedRequestFailureError = RequestFailureErrorSchema.safeParse(input.error);
+    const requestFailureDetails: FarfieldHttpRequestFailureDetails | null = parsedRequestFailureError.success
+      ? parsedRequestFailureError.data.requestFailureDetails
       : null;
     const requestId = requestFailureDetails?.requestId ?? extractRequestIdFromErrorMessage(errorMessage);
 
@@ -59,10 +73,10 @@ export class TrackedUserInterfaceErrorReporter {
     };
 
     if (requestFailureDetails !== null) {
-      details.path = requestFailureDetails.path;
-      details.requestStatus = requestFailureDetails.status;
-      details.requestStatusText = requestFailureDetails.statusText;
-      details.responseText = requestFailureDetails.responseText;
+      details["path"] = requestFailureDetails.path;
+      details["requestStatus"] = requestFailureDetails.status;
+      details["requestStatusText"] = requestFailureDetails.statusText;
+      details["responseText"] = requestFailureDetails.responseText;
     }
 
     let errorId: string | null = null;
