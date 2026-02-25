@@ -1,6 +1,10 @@
 import { FarfieldEventsSessionResponseSchema } from "@farfield/protocol";
 import { z } from "zod";
-import { request } from "@/Shared/Transport/FarfieldHttpTransport";
+import { type ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
+import {
+  applyRequestOptions,
+  request
+} from "@/Shared/Transport/FarfieldHttpTransport";
 
 const WebShellHealthResponseSchema = z
   .object({
@@ -24,7 +28,8 @@ const EventsSessionBootstrapRequestSchema = z
 export type ApiEventsSessionBootstrapRequest = z.infer<typeof EventsSessionBootstrapRequestSchema>;
 
 export async function bootstrapEventsSession(
-  input?: ApiEventsSessionBootstrapRequest
+  input?: ApiEventsSessionBootstrapRequest,
+  options?: ApiRequestOptions
 ): Promise<ApiEventsSessionBootstrapResponse> {
   const requestInit: RequestInit = {
     method: "POST"
@@ -36,9 +41,10 @@ export async function bootstrapEventsSession(
     };
     requestInit.body = JSON.stringify(payload);
   }
-  return EventsSessionBootstrapResponseSchema.parse(
-    await request("/api/events/session", requestInit)
-  );
+  return EventsSessionBootstrapResponseSchema.parse(await request(
+    "/api/events/session",
+    applyRequestOptions(requestInit, options)
+  ));
 }
 
 export async function getWebShellHealth(): Promise<ApiWebShellHealthResponse> {

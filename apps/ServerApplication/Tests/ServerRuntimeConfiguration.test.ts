@@ -42,6 +42,8 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.host).toBe("127.0.0.1");
     expect(configuration.port).toBe(4311);
     expect(configuration.pushEnabled).toBe(false);
+    expect(configuration.runtimeStateSnapshotCacheTimeToLiveMs).toBe(250);
+    expect(configuration.historyPayloadSummaryMaximumBytes).toBe(131_072);
     expect(configuration.capabilityListTimeoutMs).toBe(8_000);
     expect(configuration.threadListAdapterTimeoutMs).toBe(7_500);
     expect(configuration.pushTestSendTimeoutMs).toBe(7_500);

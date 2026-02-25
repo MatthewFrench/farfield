@@ -136,7 +136,9 @@ export interface ServerRuntimeConfiguration {
   host: string;
   port: number;
   historyLimit: number;
+  historyPayloadSummaryMaximumBytes: number;
   userAgent: string;
+  runtimeStateSnapshotCacheTimeToLiveMs: number;
   ipcReconnectDelayMs: number;
   ntfyCompletionDebounceMs: number;
   capabilityListTimeoutMs: number;
@@ -196,7 +198,15 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
   const host = env["HOST"] ?? "127.0.0.1";
   const port = parsePositiveInteger(env["PORT"] ?? null, 4311);
   const historyLimit = 2_000;
+  const historyPayloadSummaryMaximumBytes = parsePositiveInteger(
+    env["HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES"] ?? null,
+    131_072
+  );
   const userAgent = "farfield/0.2.0";
+  const runtimeStateSnapshotCacheTimeToLiveMs = parsePositiveInteger(
+    env["RUNTIME_STATE_SNAPSHOT_CACHE_TIME_TO_LIVE_MS"] ?? null,
+    250
+  );
   const ipcReconnectDelayMs = 1_000;
   const ntfyCompletionDebounceMs = 250;
   const capabilityListTimeoutMs = 8_000;
@@ -292,7 +302,9 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
     host,
     port,
     historyLimit,
+    historyPayloadSummaryMaximumBytes,
     userAgent,
+    runtimeStateSnapshotCacheTimeToLiveMs,
     ipcReconnectDelayMs,
     ntfyCompletionDebounceMs,
     capabilityListTimeoutMs,

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
-  FarfieldEventStreamEnvelopeSchema,
+  type FarfieldEventStreamEnvelope,
   type FarfieldEventStreamEvent
 } from "@farfield/protocol";
 
@@ -102,10 +102,10 @@ export class EventStreamClientRegistry {
   public broadcast(event: FarfieldEventStreamEvent): void {
     this.broadcastEventCount += 1;
     this.lastBroadcastSequence += 1;
-    const envelope = FarfieldEventStreamEnvelopeSchema.parse({
+    const envelope: FarfieldEventStreamEnvelope = {
       sequence: this.lastBroadcastSequence,
       event
-    });
+    };
     for (const client of this.clientSet) {
       this.broadcastDeliveryAttemptCount += 1;
       this.writeEvent(client, envelope);
@@ -127,12 +127,8 @@ export class EventStreamClientRegistry {
 
   private writeEvent(
     client: ServerResponse,
-    envelopeInput: {
-      sequence: number;
-      event: FarfieldEventStreamEvent;
-    }
+    envelope: FarfieldEventStreamEnvelope
   ): void {
-    const envelope = FarfieldEventStreamEnvelopeSchema.parse(envelopeInput);
     try {
       client.write(`id: ${String(envelope.sequence)}\n`);
       client.write(`data: ${JSON.stringify(envelope)}\n\n`);

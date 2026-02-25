@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { applyStrictPatch } from "@farfield/api";
+import { applyTrustedPatchSequence, StrictPatchSequenceError } from "@farfield/api";
 import {
   JsonValueSchema,
   parseThreadStreamStateChangedBroadcast,
   ProtocolValidationError,
+  type JsonValue,
   type IpcFrame,
   type ThreadStreamStateChangedBroadcast
 } from "@farfield/protocol";
@@ -101,7 +102,7 @@ export class CodexThreadStreamStateOwner {
     let streamStateChangedBroadcast: ThreadStreamStateChangedBroadcast;
     try {
       streamStateChangedBroadcast = parseThreadStreamStateChangedBroadcast(
-        JsonValueSchema.parse(frame)
+        frame as JsonValue
       );
     } catch (error) {
       const errorMessage = toErrorMessage(error);
@@ -264,36 +265,32 @@ export class CodexThreadStreamStateOwner {
     }
 
     let updatedConversationState = previousProjection.conversationState;
-    for (let patchIndex = 0; patchIndex < change.patches.length; patchIndex += 1) {
-      const patch = change.patches[patchIndex];
-      if (!patch) {
-        continue;
-      }
-
-      try {
-        updatedConversationState = applyStrictPatch(updatedConversationState, patch);
-      } catch (error) {
-        const errorMessage = toErrorMessage(error);
-        logger.error(
-          {
-            threadId,
-            error: errorMessage,
-            patchIndex
-          },
-          "codex-thread-stream-reduction-failed"
-        );
-        this.liveStateProjectionByThreadId.set(threadId, {
-          ownerClientId: event.sourceClientId,
-          conversationState: null,
-          liveStateError: {
-            kind: "reductionFailed",
-            message: errorMessage,
-            eventIndex: null,
-            patchIndex
-          }
-        });
-        return;
-      }
+    try {
+      updatedConversationState = applyTrustedPatchSequence(updatedConversationState, change.patches);
+    } catch (error) {
+      const errorMessage = toErrorMessage(error);
+      const patchIndex = error instanceof StrictPatchSequenceError
+        ? error.patchIndex
+        : null;
+      logger.error(
+        {
+          threadId,
+          error: errorMessage,
+          patchIndex
+        },
+        "codex-thread-stream-reduction-failed"
+      );
+      this.liveStateProjectionByThreadId.set(threadId, {
+        ownerClientId: event.sourceClientId,
+        conversationState: null,
+        liveStateError: {
+          kind: "reductionFailed",
+          message: errorMessage,
+          eventIndex: null,
+          patchIndex
+        }
+      });
+      return;
     }
 
     this.liveStateProjectionByThreadId.set(threadId, {

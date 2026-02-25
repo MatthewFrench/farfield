@@ -348,6 +348,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     setArchivedThreadsTruncated: applicationShellState.setArchivedThreadsTruncated,
     setHasLoadedArchivedThreads: applicationShellState.setHasLoadedArchivedThreads,
     ensureApiSessionBootstrapped: runtimeRequestHandlers.ensureApiSessionBootstrapped,
+    buildActionRequestOptions: runtimeRequestHandlers.buildActionRequestOptions,
     readInitialModeKey: (availableModes) => {
       const nonPlanDefault = availableModes.find((mode) => !modeSelectionStateResolver.isPlanModeOption(mode));
       return nonPlanDefault?.mode ?? availableModes[0]?.mode ?? "";

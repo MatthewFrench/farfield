@@ -111,6 +111,78 @@ describe("TrackedUserInterfaceErrorReporter", () => {
     );
   });
 
+  it("suppresses duplicate reports within the deduplication window", async () => {
+    const setErrorMessage = vi.fn();
+    const reportClientErrorFn = vi.fn(async () => ({
+      ok: true as const,
+      errorId: "error-777",
+      sessionId: "session-1",
+      recordedAt: "2026-01-01T00:00:00.000Z"
+    }));
+    let now = 10_000;
+    const reporter = new TrackedUserInterfaceErrorReporter({
+      setErrorMessage,
+      reportClientErrorFn,
+      readPathnameAndSearch: () => "/",
+      readNow: () => now,
+      reportDeduplicationWindowMs: 30_000
+    });
+
+    await reporter.report({
+      operation: "core.load",
+      actionId: "action-1",
+      threadId: null,
+      error: new Error("Request timed out for /api/health requestId req-1")
+    });
+
+    now += 500;
+    await reporter.report({
+      operation: "core.load",
+      actionId: "action-2",
+      threadId: null,
+      error: new Error("Request timed out for /api/health requestId req-1")
+    });
+
+    expect(reportClientErrorFn).toHaveBeenCalledTimes(1);
+    expect(setErrorMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports again after the deduplication window expires", async () => {
+    const setErrorMessage = vi.fn();
+    const reportClientErrorFn = vi.fn(async () => ({
+      ok: true as const,
+      errorId: "error-778",
+      sessionId: "session-1",
+      recordedAt: "2026-01-01T00:00:00.000Z"
+    }));
+    let now = 20_000;
+    const reporter = new TrackedUserInterfaceErrorReporter({
+      setErrorMessage,
+      reportClientErrorFn,
+      readPathnameAndSearch: () => "/",
+      readNow: () => now,
+      reportDeduplicationWindowMs: 3_000
+    });
+
+    await reporter.report({
+      operation: "core.load",
+      actionId: "action-1",
+      threadId: null,
+      error: new Error("Request timed out for /api/health requestId req-1")
+    });
+
+    now += 3_500;
+    await reporter.report({
+      operation: "core.load",
+      actionId: "action-2",
+      threadId: null,
+      error: new Error("Request timed out for /api/health requestId req-1")
+    });
+
+    expect(reportClientErrorFn).toHaveBeenCalledTimes(2);
+    expect(setErrorMessage).toHaveBeenCalledTimes(2);
+  });
+
   it("records structured request failure fields in client error details", async () => {
     const setErrorMessage = vi.fn();
     const reportClientErrorFn = vi.fn(async () => ({

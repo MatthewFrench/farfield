@@ -107,4 +107,22 @@ describe("ActivityHistoryService", () => {
       setTimeout(resolve, 25);
     });
   });
+
+  it("summarizes oversized history payloads while preserving full payload lookup", () => {
+    const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
+    const service = new ActivityHistoryService(4, eventStreamClientRegistry, 64);
+    const oversizedPayload = {
+      method: "thread-stream-state-changed",
+      value: "x".repeat(2_048)
+    };
+
+    const entry = service.pushHistory("ipc", "in", oversizedPayload, {});
+    const history = service.readHistoryEntries();
+    const payloadFromList = history[0]?.payload;
+    const payloadFromLookup = service.readHistoryById().get(entry.id);
+
+    expect(typeof payloadFromList).toBe("object");
+    expect(payloadFromList).not.toEqual(oversizedPayload);
+    expect(payloadFromLookup).toEqual(oversizedPayload);
+  });
 });

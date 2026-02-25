@@ -28,6 +28,8 @@ interface TrackedUserInterfaceErrorReporterDependencies {
   setErrorMessage: (errorMessage: string) => void;
   reportClientErrorFn?: (input: ClientErrorReportInput) => Promise<ClientErrorReportResult>;
   readPathnameAndSearch?: () => string;
+  readNow?: () => number;
+  reportDeduplicationWindowMs?: number;
 }
 
 const RequestFailureDetailsSchema = z.object({
@@ -45,15 +47,26 @@ const RequestFailureErrorSchema = z.object({
 }).passthrough();
 
 export class TrackedUserInterfaceErrorReporter {
+  private readonly reportDeduplicationWindowMs: number;
   private readonly setErrorMessage: (errorMessage: string) => void;
   private readonly reportClientErrorFn: (input: ClientErrorReportInput) => Promise<ClientErrorReportResult>;
   private readonly readPathnameAndSearch: () => string;
+  private readonly readNow: () => number;
+  private readonly mostRecentErrorReportTimestampByKey: Map<string, number>;
 
   public constructor(dependencies: TrackedUserInterfaceErrorReporterDependencies) {
+    const reportDeduplicationWindowMs = dependencies.reportDeduplicationWindowMs ?? 15_000;
+    if (!Number.isInteger(reportDeduplicationWindowMs) || reportDeduplicationWindowMs <= 0) {
+      throw new Error("reportDeduplicationWindowMs must be a positive integer");
+    }
+
+    this.reportDeduplicationWindowMs = reportDeduplicationWindowMs;
     this.setErrorMessage = dependencies.setErrorMessage;
     this.reportClientErrorFn = dependencies.reportClientErrorFn ?? reportClientError;
     this.readPathnameAndSearch = dependencies.readPathnameAndSearch
       ?? (() => window.location.pathname + window.location.search);
+    this.readNow = dependencies.readNow ?? (() => Date.now());
+    this.mostRecentErrorReportTimestampByKey = new Map<string, number>();
   }
 
   public async report(input: TrackedUserInterfaceErrorReportInput): Promise<void> {
@@ -67,6 +80,14 @@ export class TrackedUserInterfaceErrorReporter {
       ? parsedRequestFailureError.data.requestFailureDetails
       : null;
     const requestId = requestFailureDetails?.requestId ?? extractRequestIdFromErrorMessage(errorMessage);
+    if (this.shouldSkipDuplicateErrorReport({
+      operation: input.operation,
+      errorMessage,
+      requestId,
+      threadId: input.threadId
+    })) {
+      return;
+    }
 
     const details: Record<string, string | number | boolean | null> = {
       actionId: input.actionId,
@@ -109,5 +130,43 @@ export class TrackedUserInterfaceErrorReporter {
       requestId,
       errorId
     }));
+  }
+
+  private shouldSkipDuplicateErrorReport(input: {
+    operation: string;
+    errorMessage: string;
+    requestId: string | null;
+    threadId: string | null;
+  }): boolean {
+    const now = this.readNow();
+    this.pruneExpiredReportKeys(now);
+    const reportKey = this.createReportKey(input);
+    const previousReportTimestamp = this.mostRecentErrorReportTimestampByKey.get(reportKey);
+    if (typeof previousReportTimestamp === "number") {
+      this.mostRecentErrorReportTimestampByKey.set(reportKey, now);
+      return true;
+    }
+    this.mostRecentErrorReportTimestampByKey.set(reportKey, now);
+    return false;
+  }
+
+  private pruneExpiredReportKeys(now: number): void {
+    for (const [reportKey, reportedAt] of this.mostRecentErrorReportTimestampByKey.entries()) {
+      if (now - reportedAt < this.reportDeduplicationWindowMs) {
+        continue;
+      }
+      this.mostRecentErrorReportTimestampByKey.delete(reportKey);
+    }
+  }
+
+  private createReportKey(input: {
+    operation: string;
+    errorMessage: string;
+    requestId: string | null;
+    threadId: string | null;
+  }): string {
+    const requestIdentifier = input.requestId ?? "no-request-id";
+    const threadIdentifier = input.threadId ?? "no-thread-id";
+    return `${input.operation}|${requestIdentifier}|${threadIdentifier}|${input.errorMessage}`;
   }
 }

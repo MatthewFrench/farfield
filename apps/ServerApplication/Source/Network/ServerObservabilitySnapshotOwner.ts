@@ -1,9 +1,11 @@
 import type { EventStreamClientRegistry, EventStreamClientRegistryStatistics } from "./EventStreamClientRegistry.js";
+import type { EventLoopLagObservabilityOwner, EventLoopLagStatistics } from "./EventLoopLagObservabilityOwner.js";
 import type { PushDispatchConcurrencyCoordinator, PushDispatchConcurrencyCoordinatorStatistics } from "./PushDispatchConcurrencyCoordinator.js";
 import type {
   PushMutationConcurrencyCoordinator,
   PushMutationConcurrencyCoordinatorStatistics
 } from "./PushMutationConcurrencyCoordinator.js";
+import type { RequestObservabilityOwner, RequestObservabilitySnapshot } from "./RequestObservabilityOwner.js";
 import type { ThreadConcurrencyCoordinator, ThreadConcurrencyCoordinatorStatistics } from "./ThreadConcurrencyCoordinator.js";
 import type { ThreadListAggregationCache, ThreadListAggregationCacheStatistics } from "./ThreadListAggregationCache.js";
 import type { ThreadAdapterResolver, ThreadAdapterResolverStatistics } from "../Agents/ThreadAdapterResolver.js";
@@ -24,6 +26,10 @@ export interface ServerObservabilitySnapshot {
   routing: {
     threadAdapterResolver: ThreadAdapterResolverStatistics;
   };
+  performance: {
+    requestRouting: RequestObservabilitySnapshot;
+    eventLoop: EventLoopLagStatistics;
+  };
 }
 
 export interface ServerObservabilitySnapshotOwnerDependencies {
@@ -33,6 +39,8 @@ export interface ServerObservabilitySnapshotOwnerDependencies {
   pushMutationConcurrencyCoordinator: PushMutationConcurrencyCoordinator;
   eventStreamClientRegistry: EventStreamClientRegistry;
   threadAdapterResolver: ThreadAdapterResolver;
+  requestObservabilityOwner: RequestObservabilityOwner;
+  eventLoopLagObservabilityOwner: EventLoopLagObservabilityOwner;
 }
 
 export class ServerObservabilitySnapshotOwner {
@@ -58,6 +66,10 @@ export class ServerObservabilitySnapshotOwner {
       },
       routing: {
         threadAdapterResolver: this.dependencies.threadAdapterResolver.readStatistics()
+      },
+      performance: {
+        requestRouting: this.dependencies.requestObservabilityOwner.readSnapshot(),
+        eventLoop: this.dependencies.eventLoopLagObservabilityOwner.readStatistics()
       }
     };
   }

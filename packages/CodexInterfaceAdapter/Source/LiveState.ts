@@ -1,4 +1,3 @@
-import { z } from "zod";
 import {
   JsonValueSchema,
   type JsonObject,
@@ -31,11 +30,11 @@ function parseArrayIndex(segment: number | string): number {
 }
 
 function isJsonArray(value: JsonValue): value is JsonValue[] {
-  return z.array(JsonValueSchema).safeParse(value).success;
+  return Array.isArray(value);
 }
 
 function isJsonObject(value: JsonValue): value is JsonObject {
-  return z.record(JsonValueSchema).safeParse(value).success;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function assertPathExists(target: JsonValue, path: (number | string)[]): void {
@@ -72,18 +71,14 @@ function assertPathExists(target: JsonValue, path: (number | string)[]): void {
 }
 
 function requirePatchValue(patch: ThreadStreamPatch): JsonValue {
-  const parsedValue = JsonValueSchema.safeParse(patch.value);
-  if (!parsedValue.success) {
+  if (patch.value === undefined) {
     throw new Error(`Patch ${patch.op} requires a structured value`);
   }
-  return parsedValue.data;
+  return patch.value;
 }
 
-export function applyStrictPatch(
-  source: ThreadConversationState,
-  patch: ThreadStreamPatch
-): ThreadConversationState {
-  const state = JsonValueSchema.parse(cloneState(source));
+function applyPatchToState(state: JsonValue, patch: ThreadStreamPatch): void {
+  const stateValue = state;
 
   if (patch.path.length === 0) {
     throw new Error("Patch path cannot be empty");
@@ -95,9 +90,9 @@ export function applyStrictPatch(
     throw new Error("Patch path cannot be empty");
   }
 
-  assertPathExists(state, parentPath);
+  assertPathExists(stateValue, parentPath);
 
-  let parent: JsonValue = state;
+  let parent: JsonValue = stateValue;
   for (const segment of parentPath) {
     if (isJsonArray(parent)) {
       const index = parseArrayIndex(segment);
@@ -123,7 +118,7 @@ export function applyStrictPatch(
   if (isJsonArray(parent)) {
     if (patch.op === "add" && last === "-") {
       parent.push(requirePatchValue(patch));
-      return parseThreadConversationState(state);
+      return;
     }
 
     const arrayIndex = parseArrayIndex(last);
@@ -133,7 +128,7 @@ export function applyStrictPatch(
         throw new Error(`Patch add index out of range: ${String(last)}`);
       }
       parent.splice(arrayIndex, 0, requirePatchValue(patch));
-      return parseThreadConversationState(state);
+      return;
     }
 
     if (patch.op === "replace") {
@@ -141,7 +136,7 @@ export function applyStrictPatch(
         throw new Error(`Patch replace index out of range: ${String(last)}`);
       }
       parent[arrayIndex] = requirePatchValue(patch);
-      return parseThreadConversationState(state);
+      return;
     }
 
     if (patch.op === "remove") {
@@ -149,7 +144,7 @@ export function applyStrictPatch(
         throw new Error(`Patch remove index out of range: ${String(last)}`);
       }
       parent.splice(arrayIndex, 1);
-      return parseThreadConversationState(state);
+      return;
     }
   }
 
@@ -160,14 +155,164 @@ export function applyStrictPatch(
         throw new Error(`Patch remove key missing: ${key}`);
       }
       delete parent[key];
-      return parseThreadConversationState(state);
+      return;
     }
 
     parent[key] = requirePatchValue(patch);
-    return parseThreadConversationState(state);
+    return;
   }
 
   throw new Error("Patch target type mismatch");
+}
+
+export class StrictPatchSequenceError extends Error {
+  public readonly patchIndex: number;
+  public override readonly cause: Error | string | JsonValue | undefined;
+
+  public constructor(
+    message: string,
+    patchIndex: number,
+    cause?: Error | string | JsonValue
+  ) {
+    super(message);
+    this.name = "StrictPatchSequenceError";
+    this.patchIndex = patchIndex;
+    this.cause = cause;
+  }
+}
+
+export function applyStrictPatch(
+  source: ThreadConversationState,
+  patch: ThreadStreamPatch
+): ThreadConversationState {
+  const state = JsonValueSchema.parse(cloneState(source));
+  applyPatchToState(state, patch);
+  return parseThreadConversationState(state);
+}
+
+export function applyStrictPatchSequence(
+  source: ThreadConversationState,
+  patches: ThreadStreamPatch[]
+): ThreadConversationState {
+  const state = JsonValueSchema.parse(cloneState(source));
+
+  for (let patchIndex = 0; patchIndex < patches.length; patchIndex += 1) {
+    const patch = patches[patchIndex];
+    if (!patch) {
+      continue;
+    }
+
+    try {
+      applyPatchToState(state, patch);
+    } catch (error) {
+      const normalizedCause = (() => {
+        if (error instanceof Error || typeof error === "string") {
+          return error;
+        }
+        const structuredError = JsonValueSchema.safeParse(error);
+        return structuredError.success ? structuredError.data : String(error);
+      })();
+      throw new StrictPatchSequenceError(
+        `Patch sequence failed at index ${String(patchIndex)}: ${toErrorMessage(normalizedCause)}`,
+        patchIndex,
+        normalizedCause
+      );
+    }
+  }
+
+  try {
+    return parseThreadConversationState(state);
+  } catch (error) {
+    let failingPatchIndex = patches.length > 0 ? patches.length - 1 : 0;
+
+    if (patches.length > 0) {
+      const replayState = JsonValueSchema.parse(cloneState(source));
+      for (let patchIndex = 0; patchIndex < patches.length; patchIndex += 1) {
+        const patch = patches[patchIndex];
+        if (!patch) {
+          continue;
+        }
+
+        applyPatchToState(replayState, patch);
+        try {
+          parseThreadConversationState(replayState);
+        } catch {
+          failingPatchIndex = patchIndex;
+          break;
+        }
+      }
+    }
+
+    const normalizedCause = (() => {
+      if (error instanceof Error || typeof error === "string") {
+        return error;
+      }
+      const structuredError = JsonValueSchema.safeParse(error);
+      return structuredError.success ? structuredError.data : String(error);
+    })();
+    throw new StrictPatchSequenceError(
+      `Patch sequence produced invalid conversation state at index ${String(failingPatchIndex)}: ${
+        toErrorMessage(normalizedCause)
+      }`,
+      failingPatchIndex,
+      normalizedCause
+    );
+  }
+}
+
+/**
+ * Applies stream patches to an already-validated conversation state without cloning or
+ * per-patch schema validation while still enforcing one end-state schema validation.
+ * This hot-path reducer is reserved for trusted stream payloads parsed at transport boundaries.
+ */
+export function applyTrustedPatchSequence(
+  source: ThreadConversationState,
+  patches: ThreadStreamPatch[]
+): ThreadConversationState {
+  const mutableState = source as JsonValue;
+
+  for (let patchIndex = 0; patchIndex < patches.length; patchIndex += 1) {
+    const patch = patches[patchIndex];
+    if (!patch) {
+      continue;
+    }
+
+    try {
+      applyPatchToState(mutableState, patch);
+    } catch (error) {
+      const normalizedCause = (() => {
+        if (error instanceof Error || typeof error === "string") {
+          return error;
+        }
+        const structuredError = JsonValueSchema.safeParse(error);
+        return structuredError.success ? structuredError.data : String(error);
+      })();
+      throw new StrictPatchSequenceError(
+        `Patch sequence failed at index ${String(patchIndex)}: ${toErrorMessage(normalizedCause)}`,
+        patchIndex,
+        normalizedCause
+      );
+    }
+  }
+
+  try {
+    return parseThreadConversationState(mutableState);
+  } catch (error) {
+    const normalizedCause = (() => {
+      if (error instanceof Error || typeof error === "string") {
+        return error;
+      }
+      const structuredError = JsonValueSchema.safeParse(error);
+      return structuredError.success ? structuredError.data : String(error);
+    })();
+    throw new StrictPatchSequenceError(
+      `Patch sequence produced invalid conversation state at index ${String(
+        patches.length > 0 ? patches.length - 1 : 0
+      )}: ${toErrorMessage(normalizedCause)}`,
+      patches.length > 0 ? patches.length - 1 : 0,
+      normalizedCause
+    );
+  }
 }
 
 export interface ThreadStreamDerivedState {

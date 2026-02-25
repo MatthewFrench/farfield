@@ -7,6 +7,7 @@ import type { ActiveTrace, HistoryEntry, TraceSummary } from "../../Network/Rout
 
 export class ActivityHistoryService {
   private readonly historyLimit: number;
+  private readonly historyPayloadSummaryMaximumBytes: number;
   private readonly recentTraceLimit: number;
   private readonly eventStreamClientRegistry: EventStreamClientRegistry;
   private readonly history: HistoryEntry[];
@@ -16,13 +17,23 @@ export class ActivityHistoryService {
 
   public constructor(
     historyLimit: number,
-    eventStreamClientRegistry: EventStreamClientRegistry
+    eventStreamClientRegistry: EventStreamClientRegistry,
+    historyPayloadSummaryMaximumBytes = 131_072
   ) {
     if (!Number.isInteger(historyLimit) || historyLimit <= 0) {
       throw new Error("ActivityHistoryService requires positive integer historyLimit");
     }
+    if (
+      !Number.isInteger(historyPayloadSummaryMaximumBytes)
+      || historyPayloadSummaryMaximumBytes <= 0
+    ) {
+      throw new Error(
+        "ActivityHistoryService requires positive integer historyPayloadSummaryMaximumBytes"
+      );
+    }
 
     this.historyLimit = historyLimit;
+    this.historyPayloadSummaryMaximumBytes = historyPayloadSummaryMaximumBytes;
     this.recentTraceLimit = 20;
     this.eventStreamClientRegistry = eventStreamClientRegistry;
     this.history = [];
@@ -149,12 +160,13 @@ export class ActivityHistoryService {
     payload: HistoryEntry["payload"],
     meta: HistoryEntry["meta"] = {}
   ): HistoryEntry {
+    const historyPayload = this.summarizePayloadForHistory(payload);
     const entry: HistoryEntry = {
       id: randomUUID(),
       at: new Date().toISOString(),
       source,
       direction,
-      payload,
+      payload: historyPayload,
       meta
     };
 
@@ -244,5 +256,22 @@ export class ActivityHistoryService {
     }
 
     return summary;
+  }
+
+  private summarizePayloadForHistory(payload: HistoryEntry["payload"]): HistoryEntry["payload"] {
+    const serializedPayload = JSON.stringify(payload);
+    const serializedPayloadBytes = Buffer.byteLength(serializedPayload, "utf8");
+    if (serializedPayloadBytes <= this.historyPayloadSummaryMaximumBytes) {
+      return payload;
+    }
+
+    const previewMaximumBytes = Math.min(4_096, this.historyPayloadSummaryMaximumBytes);
+    const preview = serializedPayload.slice(0, previewMaximumBytes);
+    return {
+      type: "history-payload-summary",
+      truncated: true,
+      originalSizeBytes: serializedPayloadBytes,
+      preview
+    };
   }
 }

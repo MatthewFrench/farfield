@@ -44,12 +44,12 @@ type DebugErrorsResponse = DebugErrorListResponse;
 type AgentDescriptor = AgentsResponse["agents"][number];
 
 export interface ApplyCoreDataSnapshotStateInput {
-  nextHealth: Health;
-  nextActiveThreadState: LoadActiveThreadStateResult;
-  nextTraceStatus: TraceStatus;
-  nextAgents: AgentsResponse | null;
-  nextCapabilities: CapabilitySnapshot;
-  debugWorkspaceData: DebugWorkspaceDataSnapshot | null;
+  nextHealth?: Health;
+  nextActiveThreadState?: LoadActiveThreadStateResult;
+  nextTraceStatus?: TraceStatus;
+  nextAgents?: AgentsResponse | null;
+  nextCapabilities?: CapabilitySnapshot;
+  debugWorkspaceData?: DebugWorkspaceDataSnapshot | null;
   debugWorkspaceStateStore: DebugWorkspaceStateStore;
   threadListStateController: ThreadListStateController;
   debugErrorsSignatureRef: MutableRefObject<string[]>;
@@ -102,84 +102,108 @@ function applyDebugWorkspaceSnapshot(input: {
 }
 
 export function applyCoreDataSnapshotState(input: ApplyCoreDataSnapshotStateInput): void {
-  const nextModesSignature = input.nextCapabilities.modes.data.map((mode) =>
-    [mode.mode, mode.name, mode.reasoning_effort ?? ""].join("|")
-  );
-  const nextModelsSignature = input.nextCapabilities.models.data.map((model) =>
-    [model.id, model.displayName ?? ""].join("|")
-  );
+  const nextCapabilities = input.nextCapabilities;
+  const nextHealth = input.nextHealth;
+  const nextActiveThreadState = input.nextActiveThreadState;
+  const nextTraceStatus = input.nextTraceStatus;
+  const nextModesSignature = nextCapabilities
+    ? nextCapabilities.modes.data.map((mode) =>
+      [mode.mode, mode.name, mode.reasoning_effort ?? ""].join("|")
+    )
+    : null;
+  const nextModelsSignature = nextCapabilities
+    ? nextCapabilities.models.data.map((model) =>
+      [model.id, model.displayName ?? ""].join("|")
+    )
+    : null;
 
   let preferredAgentId: AgentId | null = null;
+  let nextThreadsForSelection: ThreadsResponse["data"] | null = null;
 
-  input.setHealth((previousHealth) => {
-    if (
-      previousHealth
-      && previousHealth.state.appReady === input.nextHealth.state.appReady
-      && previousHealth.state.ipcConnected === input.nextHealth.state.ipcConnected
-      && previousHealth.state.ipcInitialized === input.nextHealth.state.ipcInitialized
-      && previousHealth.state.gitCommit === input.nextHealth.state.gitCommit
-      && previousHealth.state.lastError === input.nextHealth.state.lastError
-      && previousHealth.state.historyCount === input.nextHealth.state.historyCount
-      && previousHealth.state.threadOwnerCount === input.nextHealth.state.threadOwnerCount
-    ) {
-      return previousHealth;
-    }
-    return input.nextHealth;
-  });
-
-  if (input.nextActiveThreadState.didChangeThreads) {
-    input.setThreads(input.nextActiveThreadState.nextThreads);
-  }
-
-  input.setUnreadThreadIds((previousUnreadThreadIdentifiers) => {
-    if (
-      ThreadGroupSelectors.unreadThreadIdentifierMapsMatch(
-        previousUnreadThreadIdentifiers,
-        input.nextActiveThreadState.nextUnreadThreadIdentifiers
-      )
-    ) {
-      return previousUnreadThreadIdentifiers;
-    }
-    return input.nextActiveThreadState.nextUnreadThreadIdentifiers;
-  });
-
-  if (!ThreadGroupSelectors.signaturesMatch(input.modesSignatureRef.current, nextModesSignature)) {
-    input.modesSignatureRef.current = nextModesSignature;
-    input.setModes(input.nextCapabilities.modes.data);
-  }
-
-  if (!ThreadGroupSelectors.signaturesMatch(input.modelsSignatureRef.current, nextModelsSignature)) {
-    input.modelsSignatureRef.current = nextModelsSignature;
-    input.setModels(input.nextCapabilities.models.data);
-  }
-
-  if (input.nextCapabilities.defaults) {
-    input.setConfigDefaults((previousDefaults) => {
+  if (nextHealth) {
+    input.setHealth((previousHealth) => {
       if (
-        previousDefaults
-        && previousDefaults.agentId === input.nextCapabilities.defaults?.agentId
-        && previousDefaults.model === input.nextCapabilities.defaults?.model
-        && previousDefaults.reasoningEffort === input.nextCapabilities.defaults?.reasoningEffort
+        previousHealth
+        && previousHealth.state.appReady === nextHealth.state.appReady
+        && previousHealth.state.ipcConnected === nextHealth.state.ipcConnected
+        && previousHealth.state.ipcInitialized === nextHealth.state.ipcInitialized
+        && previousHealth.state.gitCommit === nextHealth.state.gitCommit
+        && previousHealth.state.lastError === nextHealth.state.lastError
+        && previousHealth.state.historyCount === nextHealth.state.historyCount
+        && previousHealth.state.threadOwnerCount === nextHealth.state.threadOwnerCount
       ) {
-        return previousDefaults;
+        return previousHealth;
       }
-      return input.nextCapabilities.defaults;
+      return nextHealth;
     });
   }
 
-  input.setTraceStatus((previousTraceStatus) => {
-    if (
-      previousTraceStatus
-      && previousTraceStatus.active?.id === input.nextTraceStatus.active?.id
-      && previousTraceStatus.active?.eventCount === input.nextTraceStatus.active?.eventCount
-      && previousTraceStatus.recent.length === input.nextTraceStatus.recent.length
-      && previousTraceStatus.recent[0]?.id === input.nextTraceStatus.recent[0]?.id
-      && previousTraceStatus.recent[0]?.eventCount === input.nextTraceStatus.recent[0]?.eventCount
-    ) {
-      return previousTraceStatus;
+  if (nextActiveThreadState) {
+    if (nextActiveThreadState.didChangeThreads) {
+      input.setThreads(nextActiveThreadState.nextThreads);
     }
-    return input.nextTraceStatus;
-  });
+    nextThreadsForSelection = nextActiveThreadState.nextThreads;
+
+    input.setUnreadThreadIds((previousUnreadThreadIdentifiers) => {
+      if (
+        ThreadGroupSelectors.unreadThreadIdentifierMapsMatch(
+          previousUnreadThreadIdentifiers,
+          nextActiveThreadState.nextUnreadThreadIdentifiers
+        )
+      ) {
+        return previousUnreadThreadIdentifiers;
+      }
+      return nextActiveThreadState.nextUnreadThreadIdentifiers;
+    });
+  }
+
+  if (
+    nextCapabilities
+    && nextModesSignature
+    && !ThreadGroupSelectors.signaturesMatch(input.modesSignatureRef.current, nextModesSignature)
+  ) {
+    input.modesSignatureRef.current = nextModesSignature;
+    input.setModes(nextCapabilities.modes.data);
+  }
+
+  if (
+    nextCapabilities
+    && nextModelsSignature
+    && !ThreadGroupSelectors.signaturesMatch(input.modelsSignatureRef.current, nextModelsSignature)
+  ) {
+    input.modelsSignatureRef.current = nextModelsSignature;
+    input.setModels(nextCapabilities.models.data);
+  }
+
+  if (nextCapabilities?.defaults) {
+    input.setConfigDefaults((previousDefaults) => {
+      if (
+        previousDefaults
+        && previousDefaults.agentId === nextCapabilities.defaults?.agentId
+        && previousDefaults.model === nextCapabilities.defaults?.model
+        && previousDefaults.reasoningEffort === nextCapabilities.defaults?.reasoningEffort
+      ) {
+        return previousDefaults;
+      }
+      return nextCapabilities.defaults;
+    });
+  }
+
+  if (nextTraceStatus) {
+    input.setTraceStatus((previousTraceStatus) => {
+      if (
+        previousTraceStatus
+        && previousTraceStatus.active?.id === nextTraceStatus.active?.id
+        && previousTraceStatus.active?.eventCount === nextTraceStatus.active?.eventCount
+        && previousTraceStatus.recent.length === nextTraceStatus.recent.length
+        && previousTraceStatus.recent[0]?.id === nextTraceStatus.recent[0]?.id
+        && previousTraceStatus.recent[0]?.eventCount === nextTraceStatus.recent[0]?.eventCount
+      ) {
+        return previousTraceStatus;
+      }
+      return nextTraceStatus;
+    });
+  }
 
   if (input.debugWorkspaceData) {
     applyDebugWorkspaceSnapshot({
@@ -232,18 +256,22 @@ export function applyCoreDataSnapshotState(input: ApplyCoreDataSnapshotStateInpu
     });
   }
 
-  input.setSelectedThreadId((currentSelectedThreadIdentifier) =>
-    input.threadListStateController.computeInitialSelectedThreadIdentifier({
-      currentSelectedThreadIdentifier,
-      preferredAgentIdentifier: preferredAgentId,
-      nextThreads: input.nextActiveThreadState.nextThreads
-    })
-  );
+  if (nextThreadsForSelection) {
+    input.setSelectedThreadId((currentSelectedThreadIdentifier) =>
+      input.threadListStateController.computeInitialSelectedThreadIdentifier({
+        currentSelectedThreadIdentifier,
+        preferredAgentIdentifier: preferredAgentId,
+        nextThreads: nextThreadsForSelection
+      })
+    );
+  }
 
-  input.setSelectedModeKey((currentModeKey) => {
-    if (currentModeKey) {
-      return currentModeKey;
-    }
-    return input.readInitialModeKey(input.nextCapabilities.modes.data);
-  });
+  if (nextCapabilities) {
+    input.setSelectedModeKey((currentModeKey) => {
+      if (currentModeKey) {
+        return currentModeKey;
+      }
+      return input.readInitialModeKey(nextCapabilities.modes.data);
+    });
+  }
 }

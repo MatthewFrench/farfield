@@ -37,25 +37,42 @@ export interface RuntimeStateReadModel {
 
 export class RuntimeStateOwner {
   private readonly readModel: RuntimeStateReadModel;
+  private readonly snapshotCacheTimeToLiveMs: number;
   private runtimeLastError: string | null;
+  private cachedSnapshot: RuntimeStateSnapshot | null;
+  private cachedSnapshotAtEpochMs: number;
 
-  public constructor(readModel: RuntimeStateReadModel) {
+  public constructor(readModel: RuntimeStateReadModel, snapshotCacheTimeToLiveMs = 250) {
+    if (!Number.isInteger(snapshotCacheTimeToLiveMs) || snapshotCacheTimeToLiveMs < 0) {
+      throw new Error("RuntimeStateOwner requires non-negative integer snapshotCacheTimeToLiveMs");
+    }
     this.readModel = readModel;
+    this.snapshotCacheTimeToLiveMs = snapshotCacheTimeToLiveMs;
     this.runtimeLastError = null;
+    this.cachedSnapshot = null;
+    this.cachedSnapshotAtEpochMs = 0;
   }
 
   public setRuntimeLastError(message: string | null): void {
     this.runtimeLastError = message;
+    this.cachedSnapshot = null;
+    this.cachedSnapshotAtEpochMs = 0;
   }
 
   public readRuntimeLastError(): string | null {
     return this.runtimeLastError;
   }
 
-  public readSnapshot(): RuntimeStateSnapshot {
-    const codexRuntimeState = this.readModel.readCodexRuntimeState();
+  public readSnapshot(nowEpochMs: number = Date.now()): RuntimeStateSnapshot {
+    if (
+      this.cachedSnapshot
+      && nowEpochMs - this.cachedSnapshotAtEpochMs <= this.snapshotCacheTimeToLiveMs
+    ) {
+      return this.cachedSnapshot;
+    }
 
-    return {
+    const codexRuntimeState = this.readModel.readCodexRuntimeState();
+    const snapshot: RuntimeStateSnapshot = {
       appExecutable: this.readModel.appExecutable,
       socketPath: this.readModel.socketPath,
       workspaceDir: this.readModel.workspaceDir,
@@ -73,5 +90,9 @@ export class RuntimeStateOwner {
       clientErrorCount: this.readModel.readClientErrorCount(),
       activeTrace: this.readModel.readActiveTraceSummary()
     };
+
+    this.cachedSnapshot = snapshot;
+    this.cachedSnapshotAtEpochMs = nowEpochMs;
+    return snapshot;
   }
 }

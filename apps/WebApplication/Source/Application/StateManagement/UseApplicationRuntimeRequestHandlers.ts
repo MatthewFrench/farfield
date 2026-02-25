@@ -8,6 +8,7 @@ import {
 } from "@/Application/DataAccess/WebShellApi";
 import { ApiAuthenticationErrorClassifier } from "@/Application/DomainModel/ApiAuthenticationErrorClassifier";
 import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
+import { STARTUP_CRITICAL_EVENTS_SESSION_OPERATION } from "@/Application/StateManagement/CoreDataStartupRequestProfile";
 import { UserInterfaceActionRequestBuilder } from "@/Application/StateManagement/UserInterfaceActionRequestBuilder";
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import {
@@ -100,7 +101,12 @@ export function useApplicationRuntimeRequestHandlers(
 
   const ensureApiSessionBootstrapped = useCallback(async (): Promise<boolean> => {
     const bootstrapDecision = await input.apiSessionBootstrapCoordinator.ensureSession(
-      () => bootstrapEventsSession()
+      () => {
+        const actionRequest = input.userInterfaceActionRequestBuilder.create(
+          STARTUP_CRITICAL_EVENTS_SESSION_OPERATION
+        );
+        return bootstrapEventsSession(undefined, actionRequest.requestOptions);
+      }
     );
 
     if (bootstrapDecision.isReady) {

@@ -11,6 +11,7 @@
 | Error banner persistence + dismiss | Force a deterministic API failure, verify banner persists and closes only via manual dismiss | `end-to-end/real/scenarios/error-banner.spec.ts` (`error banner persists until manual dismiss`) | `MANUAL-ERROR-BANNER` | `@farfield` | `2026-02-20` |
 | Mobile sidebar toggles | Open and close the mobile sidebar via close button and backdrop | `end-to-end/real/scenarios/mobile-sidebar.spec.ts` (`mobile sidebar open and close behavior`) | `MANUAL-MOBILE-SIDEBAR` | `@farfield` | `2026-02-20` |
 | Startup refresh + header refresh | Validate startup settle and manual header refresh settle without runtime regressions | `end-to-end/real/scenarios/startup-and-header-refresh.spec.ts` (`startup and header refresh behavior`) | `MANUAL-STARTUP-HEADER-REFRESH` | `@farfield` | `2026-02-24` |
+| Startup under deferred-load pressure | Slow deferred startup endpoints and verify shell/thread list remain interactive without startup banner | `end-to-end/real/scenarios/startup-under-load.spec.ts` (`startup remains interactive when deferred startup requests are slow`) | `MANUAL-STARTUP-UNDER-LOAD` | `@farfield` | `2026-02-25` |
 
 ## Open Gaps
 

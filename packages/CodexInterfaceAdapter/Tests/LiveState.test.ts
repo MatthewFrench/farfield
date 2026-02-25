@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { parseThreadStreamStateChangedBroadcast } from "@farfield/protocol";
-import { reduceThreadStreamEvents, ThreadStreamReductionError } from "../Source/LiveState.js";
+import {
+  applyStrictPatchSequence,
+  applyTrustedPatchSequence,
+  reduceThreadStreamEvents,
+  StrictPatchSequenceError,
+  ThreadStreamReductionError
+} from "../Source/LiveState.js";
 
 describe("live-state reducer", () => {
   it("applies snapshot then patches", () => {
@@ -218,5 +224,190 @@ describe("live-state reducer", () => {
     expect(reductionError.details.patchIndex).toBe(0);
     expect(reductionError.details.event.params.conversationId).toBe("thread-3");
     expect(reductionError.details.patch.op).toBe("replace");
+  });
+
+  it("applies strict patch sequences with one end-state validation pass", () => {
+    const sourceState = {
+      id: "thread-sequence-1",
+      turns: [
+        {
+          status: "completed",
+          items: []
+        }
+      ],
+      requests: []
+    };
+
+    const patchedState = applyStrictPatchSequence(sourceState, [
+      {
+        op: "add",
+        path: ["requests", 0],
+        value: {
+          method: "item/tool/requestUserInput",
+          id: 3,
+          params: {
+            threadId: "thread-sequence-1",
+            turnId: "turn-2",
+            itemId: "item-9",
+            questions: [
+              {
+                id: "q1",
+                header: "Header",
+                question: "Choose",
+                isOther: true,
+                isSecret: false,
+                options: [
+                  {
+                    label: "A",
+                    description: "A desc"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        op: "replace",
+        path: ["turns", 0, "status"],
+        value: "inProgress"
+      }
+    ]);
+
+    expect(patchedState.requests.length).toBe(1);
+    expect(patchedState.turns[0]?.status).toBe("inProgress");
+  });
+
+  it("reports failing patch index for strict patch sequences", () => {
+    const sourceState = {
+      id: "thread-sequence-2",
+      turns: [
+        {
+          status: "completed",
+          items: []
+        }
+      ],
+      requests: []
+    };
+
+    let capturedError: StrictPatchSequenceError | null = null;
+    try {
+      applyStrictPatchSequence(sourceState, [
+        {
+          op: "replace",
+          path: ["turns", 9, "status"],
+          value: "inProgress"
+        }
+      ]);
+    } catch (error) {
+      if (error instanceof StrictPatchSequenceError) {
+        capturedError = error;
+      } else {
+        throw error;
+      }
+    }
+
+    expect(capturedError).toBeInstanceOf(StrictPatchSequenceError);
+    if (!capturedError) {
+      throw new Error("Expected StrictPatchSequenceError");
+    }
+    expect(capturedError.patchIndex).toBe(0);
+  });
+
+  it("applies trusted patch sequences for parsed stream patches", () => {
+    const sourceState = {
+      id: "thread-trusted-sequence-1",
+      turns: [
+        {
+          status: "completed",
+          items: []
+        }
+      ],
+      requests: []
+    };
+
+    const patchedState = applyTrustedPatchSequence(sourceState, [
+      {
+        op: "replace",
+        path: ["turns", 0, "status"],
+        value: "inProgress"
+      },
+      {
+        op: "add",
+        path: ["requests", 0],
+        value: {
+          method: "item/tool/requestUserInput",
+          id: 5,
+          params: {
+            threadId: "thread-trusted-sequence-1",
+            turnId: "turn-2",
+            itemId: "item-5",
+            questions: [
+              {
+                id: "question-1",
+                header: "Header",
+                question: "Choose",
+                isOther: false,
+                isSecret: false,
+                options: [
+                  {
+                    label: "Option",
+                    description: "Description"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ]);
+
+    expect(patchedState.turns[0]?.status).toBe("inProgress");
+    expect(patchedState.requests.length).toBe(1);
+  });
+
+  it("reports trusted patch sequence errors when final state becomes invalid", () => {
+    const sourceState = {
+      id: "thread-trusted-sequence-2",
+      turns: [
+        {
+          status: "completed",
+          items: [
+            {
+              id: "item-1",
+              type: "userMessage",
+              content: [{ type: "text", text: "hello" }]
+            }
+          ]
+        }
+      ],
+      requests: []
+    };
+
+    let capturedError: StrictPatchSequenceError | null = null;
+    try {
+      applyTrustedPatchSequence(sourceState, [
+        {
+          op: "replace",
+          path: ["turns", 0, "items", 0],
+          value: {
+            id: "item-2",
+            type: "newUnknownItemType"
+          }
+        }
+      ]);
+    } catch (error) {
+      if (error instanceof StrictPatchSequenceError) {
+        capturedError = error;
+      } else {
+        throw error;
+      }
+    }
+
+    expect(capturedError).toBeInstanceOf(StrictPatchSequenceError);
+    if (!capturedError) {
+      throw new Error("Expected StrictPatchSequenceError");
+    }
+    expect(capturedError.patchIndex).toBe(0);
   });
 });

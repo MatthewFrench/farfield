@@ -23,6 +23,8 @@ export interface LoadActiveThreadStateInput {
   previousUnreadThreadIdentifiers: Record<string, true>;
   selectedThreadIdentifier: string | null;
   readFromCache: boolean;
+  actionId?: string;
+  actionName?: string;
 }
 
 export interface LoadActiveThreadStateResult {
@@ -38,6 +40,8 @@ export interface LoadArchivedThreadStateInput {
   maxPages: number;
   sortKey: "created_at" | "updated_at";
   readFromCache: boolean;
+  actionId?: string;
+  actionName?: string;
 }
 
 export interface LoadArchivedThreadStateResult {
@@ -90,14 +94,22 @@ export class ThreadListStateController {
   }
 
   public async loadActiveThreadState(input: LoadActiveThreadStateInput): Promise<LoadActiveThreadStateResult> {
+    const loadOptions: ThreadListLoadOptions = {
+      archived: false,
+      limit: input.limit,
+      maxPages: input.maxPages,
+      sortKey: input.sortKey
+    };
+    if (input.actionId) {
+      loadOptions.actionId = input.actionId;
+    }
+    if (input.actionName) {
+      loadOptions.actionName = input.actionName;
+    }
+
     const threadListResult = await this.loadThreadList(
       ACTIVE_THREADS_CACHE_KEY,
-      {
-        archived: false,
-        limit: input.limit,
-        maxPages: input.maxPages,
-        sortKey: input.sortKey
-      },
+      loadOptions,
       input.readFromCache
     );
 
@@ -116,14 +128,22 @@ export class ThreadListStateController {
   }
 
   public async loadArchivedThreadState(input: LoadArchivedThreadStateInput): Promise<LoadArchivedThreadStateResult> {
+    const loadOptions: ThreadListLoadOptions = {
+      archived: true,
+      limit: input.limit,
+      maxPages: input.maxPages,
+      sortKey: input.sortKey
+    };
+    if (input.actionId) {
+      loadOptions.actionId = input.actionId;
+    }
+    if (input.actionName) {
+      loadOptions.actionName = input.actionName;
+    }
+
     const threadListResult = await this.loadThreadList(
       ARCHIVED_THREADS_CACHE_KEY,
-      {
-        archived: true,
-        limit: input.limit,
-        maxPages: input.maxPages,
-        sortKey: input.sortKey
-      },
+      loadOptions,
       input.readFromCache
     );
 

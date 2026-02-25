@@ -1,4 +1,4 @@
-import { FarfieldThreadStreamDeltaEventSchema } from "@farfield/protocol";
+import type { FarfieldThreadStreamDeltaEvent } from "@farfield/protocol";
 import { logger } from "../Shared/Logging/Logger.js";
 import type {
   AgentThreadLiveState,
@@ -94,7 +94,7 @@ export class ThreadStreamDeltaEventPublisher {
       return;
     }
 
-    const event = FarfieldThreadStreamDeltaEventSchema.parse({
+    const event: FarfieldThreadStreamDeltaEvent = {
       type: "thread-stream-delta",
       delta: {
         threadId,
@@ -116,7 +116,7 @@ export class ThreadStreamDeltaEventPublisher {
         },
         streamEventsSinceSequenceUsed: sinceSequence
       }
-    });
+    };
     this.eventStreamClientRegistry.broadcast(event);
   }
 }
@@ -130,4 +130,3 @@ function toErrorMessage<ErrorType>(error: ErrorType): string {
   }
   return String(error);
 }
-

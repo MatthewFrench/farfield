@@ -3,6 +3,7 @@ import type {
   DebugHistoryResponse,
   DebugServerClient
 } from "../DataAccess/DebugServerClient";
+import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
 export interface DebugWorkspaceDataSnapshot {
   history: DebugHistoryResponse["history"];
@@ -10,6 +11,11 @@ export interface DebugWorkspaceDataSnapshot {
   debugErrorSessionId: DebugErrorListResponse["sessionId"];
   debugErrorSessionLogPath: DebugErrorListResponse["sessionLogPath"];
   debugErrorsSignature: string[];
+}
+
+export interface DebugWorkspaceDataReadOptions {
+  historyRequestOptions?: ApiRequestOptions;
+  debugErrorsRequestOptions?: ApiRequestOptions;
 }
 
 export class DebugWorkspaceDataReader {
@@ -21,11 +27,12 @@ export class DebugWorkspaceDataReader {
 
   public async readSnapshot(
     historyLimit: number,
-    errorListLimit: number
+    errorListLimit: number,
+    options?: DebugWorkspaceDataReadOptions
   ): Promise<DebugWorkspaceDataSnapshot> {
     const [historyResponse, debugErrorsResponse] = await Promise.all([
-      this.debugServerClient.listHistory(historyLimit),
-      this.debugServerClient.listClientErrors(errorListLimit)
+      this.debugServerClient.listHistory(historyLimit, options?.historyRequestOptions),
+      this.debugServerClient.listClientErrors(errorListLimit, options?.debugErrorsRequestOptions)
     ]);
 
     return {

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { FarfieldPushTestBodySchema, type PushNotificationPayload } from "@farfield/protocol";
 import { z } from "zod";
@@ -21,6 +22,7 @@ import {
   type ServerRequestErrorContext
 } from "./ServerRequestErrorResponder.js";
 import type { BrowserSessionAuthOwner } from "./BrowserSessionAuthOwner.js";
+import type { RequestObservabilityOwner } from "./RequestObservabilityOwner.js";
 import { handleAgentRoutes } from "./Routes/AgentRoutes.js";
 import { handleCapabilityRoutes } from "./Routes/CapabilityRoutes.js";
 import type { HistoryEntry } from "./Routes/DebugTypes.js";
@@ -74,6 +76,8 @@ export interface ServerRequestHandlerDependencies {
   pushReceiptStore: PushReceiptStore;
   pushSendStore: PushSendStore;
   pushMutationConcurrencyCoordinator: PushMutationConcurrencyCoordinator;
+  requestObservabilityOwner: RequestObservabilityOwner;
+  readCurrentEventLoopLagMs: () => number;
   readObservabilitySnapshot: () => ServerObservabilitySnapshot;
   pushTestBodySchema: typeof FarfieldPushTestBodySchema;
   buildPushTestPayload: (
@@ -117,6 +121,10 @@ export class ServerRequestHandler {
   }
 
   public async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const requestStartedAtHighResolutionMilliseconds = performance.now();
+    const requestStartedAt = new Date().toISOString();
+    const requestQueueDelayMilliseconds = this.deps.readCurrentEventLoopLagMs();
+    let pathnameForMetrics = req.url?.split("?")[0] ?? "/missing-url";
     const requestId = this.deps.normalizeOptionalString(
       this.readHeader(req, this.deps.clientRequestIdHeaderName)
     ) ?? `request_${randomUUID()}`;
@@ -146,6 +154,16 @@ export class ServerRequestHandler {
       ...(requestContext.actionId ? { actionId: requestContext.actionId } : {}),
       ...(requestContext.actionName ? { actionName: requestContext.actionName } : {})
     };
+
+    this.deps.requestObservabilityOwner.recordRequestStarted({
+      requestId,
+      actionId: requestActionId,
+      actionName: requestActionName,
+      method: req.method ?? "UNKNOWN",
+      pathname: pathnameForMetrics,
+      startedAt: requestStartedAt,
+      queueDelayMs: requestQueueDelayMilliseconds
+    });
 
     const pushActionEventWithRequestContext: ThreadRouteDependencies["pushActionEventWithRequestContext"] = (
       action,
@@ -183,6 +201,7 @@ export class ServerRequestHandler {
 
       const url = new URL(req.url, `http://${this.deps.host}:${String(this.deps.port)}`);
       const pathname = url.pathname;
+      pathnameForMetrics = pathname;
       const segments = pathname.split("/").filter(Boolean);
 
       if (this.deps.isShuttingDown() && pathname !== "/healthz") {
@@ -346,6 +365,23 @@ export class ServerRequestHandler {
         res,
         error,
         context: requestContext
+      });
+    } finally {
+      const durationMilliseconds = Math.max(
+        0,
+        performance.now() - requestStartedAtHighResolutionMilliseconds
+      );
+      this.deps.requestObservabilityOwner.recordRequestCompleted({
+        requestId,
+        actionId: requestActionId,
+        actionName: requestActionName,
+        method: req.method ?? "UNKNOWN",
+        pathname: pathnameForMetrics,
+        startedAt: requestStartedAt,
+        statusCode: res.statusCode,
+        durationMs: durationMilliseconds,
+        queueDelayMs: requestQueueDelayMilliseconds,
+        completedAt: new Date().toISOString()
       });
     }
   }

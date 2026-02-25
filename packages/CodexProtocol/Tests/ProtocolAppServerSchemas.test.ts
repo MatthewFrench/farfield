@@ -268,6 +268,77 @@ describe("codex-protocol app-server schemas", () => {
             unregisteredDiscoveryAmbiguousCount: 6,
             unregisteredDiscoveryAlertCount: 7
           }
+        },
+        performance: {
+          requestRouting: {
+            totalRequestCount: 10,
+            totalErrorCount: 2,
+            inFlightRequestCount: 1,
+            routeTimings: [
+              {
+                route: "/api/threads/:threadId",
+                method: "GET",
+                requestCount: 4,
+                errorCount: 1,
+                lastDurationMs: 40,
+                p50DurationMs: 35,
+                p95DurationMs: 80,
+                p99DurationMs: 95,
+                lastQueueDelayMs: 2,
+                p95QueueDelayMs: 5,
+                maxQueueDelayMs: 9
+              }
+            ],
+            startupRequestTimings: [
+              {
+                requestId: "request_1",
+                actionId: "action_1",
+                actionName: "startup-critical.threads.active",
+                description: "Load active thread list for sidebar",
+                method: "GET",
+                pathname: "/api/threads",
+                statusCode: 200,
+                durationMs: 42,
+                queueDelayMs: 3,
+                completedAt: "2026-02-26T00:00:02.000Z"
+              }
+            ],
+            requestLifecycleEvents: [
+              {
+                phase: "started",
+                requestId: "request_1",
+                actionId: "action_1",
+                actionName: "startup-critical.threads.active",
+                method: "GET",
+                pathname: "/api/threads",
+                startedAt: "2026-02-26T00:00:00.500Z",
+                queueDelayMs: 2
+              },
+              {
+                phase: "completed",
+                requestId: "request_1",
+                actionId: "action_1",
+                actionName: "startup-critical.threads.active",
+                method: "GET",
+                pathname: "/api/threads",
+                startedAt: "2026-02-26T00:00:00.500Z",
+                statusCode: 200,
+                durationMs: 42,
+                queueDelayMs: 3,
+                completedAt: "2026-02-26T00:00:02.000Z",
+                outcome: "success"
+              }
+            ]
+          },
+          eventLoop: {
+            sampleIntervalMs: 1000,
+            sampleCount: 30,
+            lastLagMs: 1,
+            p50LagMs: 0,
+            p95LagMs: 4,
+            p99LagMs: 7,
+            maxLagMs: 9
+          }
         }
       }
     });
@@ -395,6 +466,24 @@ describe("codex-protocol app-server schemas", () => {
             broadcastDeliveryAttemptCount: 5,
             eventWriteFailureCount: 6,
             keepaliveWriteFailureCount: 7
+          }
+        },
+        performance: {
+          requestRouting: {
+            totalRequestCount: 1,
+            totalErrorCount: 0,
+            inFlightRequestCount: 0,
+            routeTimings: [],
+            startupRequestTimings: []
+          },
+          eventLoop: {
+            sampleIntervalMs: 1000,
+            sampleCount: 1,
+            lastLagMs: 0,
+            p50LagMs: 0,
+            p95LagMs: 0,
+            p99LagMs: 0,
+            maxLagMs: 0
           }
         }
       }

@@ -377,6 +377,95 @@ export const FarfieldThreadAdapterResolverStatisticsSchema = z
   })
   .strict();
 
+export const FarfieldRouteTimingSummarySchema = z
+  .object({
+    route: z.string().trim().min(1),
+    method: z.string().trim().min(1),
+    requestCount: z.number().int().nonnegative(),
+    errorCount: z.number().int().nonnegative(),
+    lastDurationMs: z.number().nonnegative(),
+    p50DurationMs: z.number().nonnegative(),
+    p95DurationMs: z.number().nonnegative(),
+    p99DurationMs: z.number().nonnegative(),
+    lastQueueDelayMs: z.number().nonnegative(),
+    p95QueueDelayMs: z.number().nonnegative(),
+    maxQueueDelayMs: z.number().nonnegative()
+  })
+  .strict();
+
+export const FarfieldStartupRequestTimingSummarySchema = z
+  .object({
+    requestId: z.string().trim().min(1),
+    actionId: z.string().trim().min(1).nullable(),
+    actionName: z.string().trim().min(1),
+    description: z.string().trim().min(1),
+    method: z.string().trim().min(1),
+    pathname: z.string().trim().min(1),
+    statusCode: z.number().int().min(100).max(599),
+    durationMs: z.number().nonnegative(),
+    queueDelayMs: z.number().nonnegative(),
+    completedAt: z.string().datetime()
+  })
+  .strict();
+
+export const FarfieldRequestLifecycleStartedEventSchema = z
+  .object({
+    phase: z.literal("started"),
+    requestId: z.string().trim().min(1),
+    actionId: z.string().trim().min(1).nullable(),
+    actionName: z.string().trim().min(1).nullable(),
+    method: z.string().trim().min(1),
+    pathname: z.string().trim().min(1),
+    startedAt: z.string().datetime(),
+    queueDelayMs: z.number().nonnegative()
+  })
+  .strict();
+
+export const FarfieldRequestLifecycleCompletedEventSchema = z
+  .object({
+    phase: z.literal("completed"),
+    requestId: z.string().trim().min(1),
+    actionId: z.string().trim().min(1).nullable(),
+    actionName: z.string().trim().min(1).nullable(),
+    method: z.string().trim().min(1),
+    pathname: z.string().trim().min(1),
+    startedAt: z.string().datetime(),
+    statusCode: z.number().int().min(100).max(599),
+    durationMs: z.number().nonnegative(),
+    queueDelayMs: z.number().nonnegative(),
+    completedAt: z.string().datetime(),
+    outcome: z.union([z.literal("success"), z.literal("error")])
+  })
+  .strict();
+
+export const FarfieldRequestLifecycleEventSchema = z.union([
+  FarfieldRequestLifecycleStartedEventSchema,
+  FarfieldRequestLifecycleCompletedEventSchema
+]);
+
+export const FarfieldRequestObservabilitySnapshotSchema = z
+  .object({
+    totalRequestCount: z.number().int().nonnegative(),
+    totalErrorCount: z.number().int().nonnegative(),
+    inFlightRequestCount: z.number().int().nonnegative(),
+    routeTimings: z.array(FarfieldRouteTimingSummarySchema),
+    startupRequestTimings: z.array(FarfieldStartupRequestTimingSummarySchema),
+    requestLifecycleEvents: z.array(FarfieldRequestLifecycleEventSchema)
+  })
+  .strict();
+
+export const FarfieldEventLoopLagStatisticsSchema = z
+  .object({
+    sampleIntervalMs: z.number().int().positive(),
+    sampleCount: z.number().int().nonnegative(),
+    lastLagMs: z.number().nonnegative(),
+    p50LagMs: z.number().nonnegative(),
+    p95LagMs: z.number().nonnegative(),
+    p99LagMs: z.number().nonnegative(),
+    maxLagMs: z.number().nonnegative()
+  })
+  .strict();
+
 export const FarfieldDebugObservabilitySnapshotSchema = z
   .object({
     recordedAt: z.string().datetime(),
@@ -393,6 +482,10 @@ export const FarfieldDebugObservabilitySnapshotSchema = z
     }).strict(),
     routing: z.object({
       threadAdapterResolver: FarfieldThreadAdapterResolverStatisticsSchema
+    }).strict(),
+    performance: z.object({
+      requestRouting: FarfieldRequestObservabilitySnapshotSchema,
+      eventLoop: FarfieldEventLoopLagStatisticsSchema
     }).strict()
   })
   .strict();

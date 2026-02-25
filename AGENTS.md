@@ -86,6 +86,26 @@ Mandatory rules:
 48. Generic refresh paths must not invalidate all caches; cache invalidation must be explicit, scoped, and owned by mutation paths.
 49. Data-access and subscription lifecycle owners must include high-value ownership comments that explain boundary contract, caching/refresh ownership, and important caveats.
 50. Stream-event read contracts must use explicit cursor metadata (`nextSequence`, `firstAvailableSequence`, `resetRequired`) and client owners must apply deterministic append-or-reset merge behavior from that contract.
+51. Transport-boundary parsing must occur once per inbound payload; owner modules must not re-parse the same payload shape inside high-frequency loops.
+52. High-frequency stream owners must project transport payloads into internal owner-managed models; raw transport envelopes must not be the primary mutable state model.
+53. Mutable collection state must declare an explicit identity strategy (stable identifiers plus ordered identifier lists); positional indexes are synchronization cursors, not durable identity.
+54. Stream patch application paths must be proportional to changed data and must avoid full-state clone, full-state serialization, or full-state validation on each micro update.
+55. Any required full-state validation must run at controlled checkpoints (snapshot load, batch boundary, or explicit resynchronization) with deterministic typed error behavior.
+56. High-frequency observability must be bounded and summarized (batching, rate limits, or sampling windows); raw per-event payload logging is only allowed in explicit debug-only owners.
+57. Changes to stream reducers, cache owners, or subscription owners must include focused performance evidence (latency and queue-delay measurements under burst traffic).
+58. Data model changes must define three explicit contracts: boundary payload contract, internal owner model contract, and transformation-owner contract.
+59. Unit tests for stream reduction owners must cover deterministic replay, cursor reset-required behavior, and missing-cursor recovery behavior.
+60. Unit tests for patch processors must cover append, middle replace, middle remove, and index-shift sequences across non-trivial collections.
+61. Unit tests for reduction failure behavior must assert deterministic localization metadata (event index and patch index when available).
+62. Stream-heavy integration or smoke tests must include burst-traffic scenarios with explicit latency and queue-delay budgets.
+63. Performance-sensitive high-frequency reducers must include reference-implementation equivalence tests (optimized path output must match canonical validation path output for the same event stream).
+64. High-frequency patch tests must include adversarial index-shift sequences (prepend/insert/remove before target, then mutate target) and assert deterministic results.
+65. Cursor synchronization tests must cover replay, dropped-range reset signaling, and deterministic resynchronization behavior.
+66. Hot-path unit tests must assert bounded side effects with deterministic fakes and counters (for example parse, serialize, and log call budgets), not only output equality.
+67. High-frequency logging tests must assert bounded emission behavior (batch/rate-limited/sampled) and confirm raw per-event payload emission is disabled by default.
+68. Stream-owner tests must include large-state small-delta scenarios to prevent regressions that scale work by total state size.
+69. Data-model tests must assert explicit boundary-payload to internal-owner-model mapping stability when payloads include passthrough or extra fields.
+70. Performance-sensitive unit tests must prefer deterministic side-effect counters over wall-clock timing assertions; duration budgets belong in integration and smoke performance tests.
 
 Before finalizing a change, agents must confirm:
 
@@ -117,6 +137,17 @@ Before finalizing a change, agents must confirm:
 26. Cache invalidation remains mutation-scoped and is not triggered by broad refresh helpers.
 27. External data-source and subscription owner modules have high-value ownership comments where needed.
 28. Stream-event cursor ownership remains explicit from route/data-access contracts through client merge policy (no ad-hoc event-shape checks for synchronization).
+29. Modified high-frequency paths do not perform repeated parse, safeParse, or serialize calls for the same payload shape inside loops.
+30. Modified features with stream data clearly separate boundary payload models from internal owner models when access patterns differ.
+31. Stream reducer tests were added or updated for deterministic replay, index-shift patch sequences, and reset-required cursor behavior.
+32. Reduction failure tests assert deterministic localization metadata (event index and patch index when available).
+33. Burst-load performance readouts were captured and reviewed for modified stream paths (latency and queue delay).
+34. High-frequency logging is bounded by default and avoids raw per-event payload emission outside debug-only flows.
+35. Performance-sensitive reducers include reference-equivalence tests against canonical validation behavior.
+36. Adversarial index-shift patch sequence tests exist for modified patch or reducer owners.
+37. Hot-path deterministic side-effect budget tests exist (parse, serialize, and log calls are bounded).
+38. Large-state small-delta regression tests exist for modified high-frequency stream or subscription owners.
+39. Cursor replay/drop/resync tests exist and assert deterministic reset signaling and merge behavior.
 
 ## Repository Structure Guide For Agents
 

@@ -2,7 +2,6 @@ import http from "node:http";
 import {
   FarfieldHealthStateSchema,
   FarfieldPushTestBodySchema,
-  JsonValueSchema,
   type JsonValue
 } from "@farfield/protocol";
 import { configureLogger, logger } from "../Shared/Logging/Logger.js";
@@ -25,7 +24,9 @@ import { readServerRuntimeConfigurationFromCurrentProcessEnvironment } from "./C
 import { ServerLifecycleCoordinator } from "./Bootstrap/ServerLifecycleCoordinator.js";
 import type { HistoryEntry } from "../Network/Routes/DebugTypes.js";
 import { EventStreamClientRegistry } from "../Network/EventStreamClientRegistry.js";
+import { EventLoopLagObservabilityOwner } from "../Network/EventLoopLagObservabilityOwner.js";
 import { PushDispatchConcurrencyCoordinator } from "../Network/PushDispatchConcurrencyCoordinator.js";
+import { RequestObservabilityOwner } from "../Network/RequestObservabilityOwner.js";
 import { ServerErrorEventRecorder } from "../Network/ServerErrorEventRecorder.js";
 import { ServerObservabilitySnapshotOwner } from "../Network/ServerObservabilitySnapshotOwner.js";
 import { PushTestPayloadOwner } from "../Network/PushTestPayloadOwner.js";
@@ -111,9 +112,16 @@ const EVENT_STREAM_KEEPALIVE_INTERVAL_MS = 15_000;
 const eventStreamClientRegistry = new EventStreamClientRegistry(
   EVENT_STREAM_KEEPALIVE_INTERVAL_MS
 );
+const eventLoopLagObservabilityOwner = new EventLoopLagObservabilityOwner();
+eventLoopLagObservabilityOwner.start();
+process.on("exit", () => {
+  eventLoopLagObservabilityOwner.stop();
+});
+const requestObservabilityOwner = new RequestObservabilityOwner();
 const activityHistoryService = new ActivityHistoryService(
   runtimeConfiguration.historyLimit,
-  eventStreamClientRegistry
+  eventStreamClientRegistry,
+  runtimeConfiguration.historyPayloadSummaryMaximumBytes
 );
 const threadIndex = new ThreadIndex();
 const threadListAggregationCache = new ThreadListAggregationCache(
@@ -141,7 +149,7 @@ const runtimeStateOwner = new RuntimeStateOwner({
   readPushReceiptCount: () => pushReceiptStore.getCount(),
   readClientErrorCount: () => clientErrorStore.getCount(),
   readActiveTraceSummary: () => activityHistoryService.readActiveTraceSummary()
-});
+}, runtimeConfiguration.runtimeStateSnapshotCacheTimeToLiveMs);
 const ntfyNotifier = new NtfyNotifier(runtimeConfiguration.ntfyConfiguration);
 const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
 const threadCompletionNotificationService = new ThreadCompletionNotificationService({
@@ -211,6 +219,37 @@ function invalidateThreadListAggregationCache(
   threadListCacheInvalidationOwner.invalidate(reason, details);
 }
 
+let bufferedThreadStreamHistoryEventCount = 0;
+let bufferedThreadStreamHistoryFirstAtMs: number | null = null;
+let bufferedThreadStreamHistoryLatestThreadId: string | null = null;
+
+function flushBufferedThreadStreamHistorySummary(nowMs: number): void {
+  if (
+    bufferedThreadStreamHistoryEventCount === 0
+    || bufferedThreadStreamHistoryFirstAtMs === null
+  ) {
+    return;
+  }
+
+  const spanMs = Math.max(0, nowMs - bufferedThreadStreamHistoryFirstAtMs);
+  activityHistoryService.pushHistory("ipc", "in", {
+    type: "thread-stream-state-changed-batch",
+    count: bufferedThreadStreamHistoryEventCount,
+    spanMs,
+    latestThreadId: bufferedThreadStreamHistoryLatestThreadId
+  }, {
+    method: "thread-stream-state-changed",
+    threadId: bufferedThreadStreamHistoryLatestThreadId,
+    summarized: true,
+    count: bufferedThreadStreamHistoryEventCount,
+    spanMs
+  });
+
+  bufferedThreadStreamHistoryEventCount = 0;
+  bufferedThreadStreamHistoryFirstAtMs = null;
+  bufferedThreadStreamHistoryLatestThreadId = null;
+}
+
 agentRuntimeOwner = new AgentRuntimeOwner({
   configuredAgentIds,
   codexExecutablePath: codexExecutable,
@@ -224,7 +263,21 @@ agentRuntimeOwner = new AgentRuntimeOwner({
     broadcastRuntimeState();
   },
   onCodexFrame: (event) => {
-    activityHistoryService.pushHistory("ipc", event.direction, JsonValueSchema.parse(event.frame), {
+    if (event.method === "thread-stream-state-changed") {
+      const nowMs = Date.now();
+      bufferedThreadStreamHistoryEventCount += 1;
+      if (bufferedThreadStreamHistoryFirstAtMs === null) {
+        bufferedThreadStreamHistoryFirstAtMs = nowMs;
+      }
+      bufferedThreadStreamHistoryLatestThreadId = event.threadId;
+      if (nowMs - bufferedThreadStreamHistoryFirstAtMs >= 1_000) {
+        flushBufferedThreadStreamHistorySummary(nowMs);
+      }
+      return;
+    }
+
+    flushBufferedThreadStreamHistorySummary(Date.now());
+    activityHistoryService.pushHistory("ipc", event.direction, event.frame as JsonValue, {
       method: event.method,
       threadId: event.threadId
     });
@@ -245,7 +298,9 @@ const serverObservabilitySnapshotOwner = new ServerObservabilitySnapshotOwner({
   pushDispatchConcurrencyCoordinator,
   pushMutationConcurrencyCoordinator,
   eventStreamClientRegistry,
-  threadAdapterResolver
+  threadAdapterResolver,
+  requestObservabilityOwner,
+  eventLoopLagObservabilityOwner
 });
 
 function broadcastRuntimeState(): void {
@@ -298,6 +353,8 @@ const serverRequestHandler = new ServerRequestHandler({
   pushReceiptStore,
   pushSendStore,
   pushMutationConcurrencyCoordinator,
+  requestObservabilityOwner,
+  readCurrentEventLoopLagMs: () => eventLoopLagObservabilityOwner.readCurrentLagMs(),
   readObservabilitySnapshot: () => {
     return serverObservabilitySnapshotOwner.readSnapshot();
   },
