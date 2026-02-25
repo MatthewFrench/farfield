@@ -6,6 +6,7 @@ import type {
 } from "./PushMutationConcurrencyCoordinator.js";
 import type { ThreadConcurrencyCoordinator, ThreadConcurrencyCoordinatorStatistics } from "./ThreadConcurrencyCoordinator.js";
 import type { ThreadListAggregationCache, ThreadListAggregationCacheStatistics } from "./ThreadListAggregationCache.js";
+import type { ThreadAdapterResolver, ThreadAdapterResolverStatistics } from "../Agents/ThreadAdapterResolver.js";
 
 export interface ServerObservabilitySnapshot {
   recordedAt: string;
@@ -20,6 +21,9 @@ export interface ServerObservabilitySnapshot {
   streaming: {
     eventStream: EventStreamClientRegistryStatistics;
   };
+  routing: {
+    threadAdapterResolver: ThreadAdapterResolverStatistics;
+  };
 }
 
 export interface ServerObservabilitySnapshotOwnerDependencies {
@@ -28,6 +32,7 @@ export interface ServerObservabilitySnapshotOwnerDependencies {
   pushDispatchConcurrencyCoordinator: PushDispatchConcurrencyCoordinator;
   pushMutationConcurrencyCoordinator: PushMutationConcurrencyCoordinator;
   eventStreamClientRegistry: EventStreamClientRegistry;
+  threadAdapterResolver: ThreadAdapterResolver;
 }
 
 export class ServerObservabilitySnapshotOwner {
@@ -50,6 +55,9 @@ export class ServerObservabilitySnapshotOwner {
       },
       streaming: {
         eventStream: this.dependencies.eventStreamClientRegistry.readStatistics()
+      },
+      routing: {
+        threadAdapterResolver: this.dependencies.threadAdapterResolver.readStatistics()
       }
     };
   }

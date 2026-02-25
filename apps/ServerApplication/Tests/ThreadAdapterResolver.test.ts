@@ -154,4 +154,85 @@ describe("ThreadAdapterResolver", () => {
     expect(discovered.agentId).toBe("codex");
     expect(threadIndex.resolve("thread_discovered")).toBe("codex");
   });
+
+  it("tracks repeated discovery misses and aggregates threshold alerts", async () => {
+    const codexAdapter = createAdapter({
+      id: "codex",
+      enabled: true,
+      connected: true,
+      readThread: async () => {
+        throw new Error("thread not found");
+      }
+    });
+    const resolver = new ThreadAdapterResolver(
+      new AgentRegistry([codexAdapter]),
+      new ThreadIndex()
+    );
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const missing = await resolver.resolveAdapterForThread("thread_missing_repeated");
+      expect(missing.ok).toBe(false);
+      if (missing.ok) {
+        throw new Error("expected repeated missing thread to fail");
+      }
+      expect(missing.status).toBe(404);
+    }
+
+    const statistics = resolver.readStatistics();
+    expect(statistics.unregisteredDiscoveryAttemptCount).toBe(3);
+    expect(statistics.unregisteredDiscoveryMissCount).toBe(3);
+    expect(statistics.unregisteredDiscoveryAlertCount).toBe(1);
+  });
+
+  it("reports ambiguity when multiple connected enabled adapters own a thread", async () => {
+    const codexAdapter = createAdapter({
+      id: "codex",
+      enabled: true,
+      connected: true,
+      readThread: async (input) => {
+        if (input.threadId !== "thread_ambiguous") {
+          throw new Error("thread not found");
+        }
+        return {
+          thread: parseThreadConversationState({
+            id: input.threadId,
+            turns: [],
+            requests: []
+          })
+        };
+      }
+    });
+    const opencodeAdapter = createAdapter({
+      id: "opencode",
+      enabled: true,
+      connected: true,
+      readThread: async (input) => {
+        if (input.threadId !== "thread_ambiguous") {
+          throw new Error("thread not found");
+        }
+        return {
+          thread: parseThreadConversationState({
+            id: input.threadId,
+            turns: [],
+            requests: []
+          })
+        };
+      }
+    });
+    const resolver = new ThreadAdapterResolver(
+      new AgentRegistry([codexAdapter, opencodeAdapter]),
+      new ThreadIndex()
+    );
+
+    const ambiguous = await resolver.resolveAdapterForThread("thread_ambiguous");
+    expect(ambiguous.ok).toBe(false);
+    if (ambiguous.ok) {
+      throw new Error("expected ambiguity to fail");
+    }
+    expect(ambiguous.status).toBe(409);
+    expect(ambiguous.error).toContain("matched multiple connected enabled agents");
+
+    const statistics = resolver.readStatistics();
+    expect(statistics.unregisteredDiscoveryAmbiguousCount).toBe(1);
+  });
 });

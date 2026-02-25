@@ -163,13 +163,6 @@ const pushDispatchConcurrencyCoordinator = new PushDispatchConcurrencyCoordinato
     await threadCompletionNotificationService.checkAndNotifyThreadCompletion(threadId);
   }
 );
-const serverObservabilitySnapshotOwner = new ServerObservabilitySnapshotOwner({
-  threadListAggregationCache,
-  threadConcurrencyCoordinator,
-  pushDispatchConcurrencyCoordinator,
-  pushMutationConcurrencyCoordinator,
-  eventStreamClientRegistry
-});
 
 function pushSystem(message: string, details: HistoryEntry["meta"] = {}): void {
   activityHistoryService.pushSystem(message, details);
@@ -213,6 +206,14 @@ agentRuntimeOwner = new AgentRuntimeOwner({
 });
 const registry = agentRuntimeOwner.readRegistry();
 const threadAdapterResolver = new ThreadAdapterResolver(registry, threadIndex);
+const serverObservabilitySnapshotOwner = new ServerObservabilitySnapshotOwner({
+  threadListAggregationCache,
+  threadConcurrencyCoordinator,
+  pushDispatchConcurrencyCoordinator,
+  pushMutationConcurrencyCoordinator,
+  eventStreamClientRegistry,
+  threadAdapterResolver
+});
 
 function broadcastRuntimeState(): void {
   eventStreamClientRegistry.broadcast({

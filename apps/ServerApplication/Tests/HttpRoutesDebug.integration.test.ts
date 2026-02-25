@@ -122,5 +122,6 @@ describe("server route integration debug routes", () => {
     expect(payload.snapshot.cache.threadListAggregation.entryCount).toBeGreaterThanOrEqual(0);
     expect(payload.snapshot.concurrency.thread.queuedExecutionCount).toBeGreaterThanOrEqual(0);
     expect(payload.snapshot.streaming.eventStream.activeClientCount).toBeGreaterThanOrEqual(0);
+    expect(payload.snapshot.routing.threadAdapterResolver.unregisteredDiscoveryAttemptCount).toBeGreaterThanOrEqual(0);
   });
 });

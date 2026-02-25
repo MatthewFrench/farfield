@@ -1,3 +1,4 @@
+import { logger } from "../Shared/Logging/Logger.js";
 import type { AgentRegistry } from "./Registry.js";
 import type { ThreadIndex } from "./ThreadIndex.js";
 import type { AgentAdapter, AgentId } from "./Types.js";
@@ -6,6 +7,17 @@ export type ResolvedThreadAdapterResult =
   | { ok: true; adapter: AgentAdapter; agentId: AgentId }
   | { ok: false; status: number; error: string };
 
+export interface ThreadAdapterResolverStatistics {
+  registeredLookupCount: number;
+  unregisteredDiscoveryAttemptCount: number;
+  unregisteredDiscoverySuccessCount: number;
+  unregisteredDiscoveryMissCount: number;
+  unregisteredDiscoveryAmbiguousCount: number;
+  unregisteredDiscoveryAlertCount: number;
+}
+
+const UnregisteredDiscoveryMissAlertThreshold = 3;
+
 /**
  * Owns thread-to-adapter resolution. When ownership is missing, it performs a
  * deterministic read probe across connected enabled adapters and persists the discovered owner.
@@ -13,14 +25,29 @@ export type ResolvedThreadAdapterResult =
 export class ThreadAdapterResolver {
   private readonly registry: AgentRegistry;
   private readonly threadIndex: ThreadIndex;
+  private registeredLookupCount: number;
+  private unregisteredDiscoveryAttemptCount: number;
+  private unregisteredDiscoverySuccessCount: number;
+  private unregisteredDiscoveryMissCount: number;
+  private unregisteredDiscoveryAmbiguousCount: number;
+  private unregisteredDiscoveryAlertCount: number;
+  private readonly consecutiveUnregisteredDiscoveryMissCountByThreadId: Map<string, number>;
 
   public constructor(registry: AgentRegistry, threadIndex: ThreadIndex) {
     this.registry = registry;
     this.threadIndex = threadIndex;
+    this.registeredLookupCount = 0;
+    this.unregisteredDiscoveryAttemptCount = 0;
+    this.unregisteredDiscoverySuccessCount = 0;
+    this.unregisteredDiscoveryMissCount = 0;
+    this.unregisteredDiscoveryAmbiguousCount = 0;
+    this.unregisteredDiscoveryAlertCount = 0;
+    this.consecutiveUnregisteredDiscoveryMissCountByThreadId = new Map<string, number>();
   }
 
   public registerThreadOwner(threadId: string, agentId: AgentId): void {
     this.threadIndex.register(threadId, agentId);
+    this.consecutiveUnregisteredDiscoveryMissCountByThreadId.delete(threadId);
   }
 
   public resolveCreateThreadAdapter(requestedAgentId: AgentId | undefined): AgentAdapter | null {
@@ -53,18 +80,32 @@ export class ThreadAdapterResolver {
   public async resolveAdapterForThread(threadId: string): Promise<ResolvedThreadAdapterResult> {
     const registeredAgentId = this.threadIndex.resolve(threadId);
     if (registeredAgentId) {
+      this.registeredLookupCount += 1;
       return this.resolveRegisteredAdapter(threadId, registeredAgentId);
     }
 
+    this.unregisteredDiscoveryAttemptCount += 1;
     const discoveredAdapter = await this.discoverAdapterForUnregisteredThread(threadId);
     if (discoveredAdapter) {
       return discoveredAdapter;
     }
 
+    this.recordUnregisteredDiscoveryMiss(threadId, "no-match");
     return {
       ok: false,
       status: 404,
       error: `Thread ${threadId} is not registered and could not be discovered. Refresh thread list and try again.`
+    };
+  }
+
+  public readStatistics(): ThreadAdapterResolverStatistics {
+    return {
+      registeredLookupCount: this.registeredLookupCount,
+      unregisteredDiscoveryAttemptCount: this.unregisteredDiscoveryAttemptCount,
+      unregisteredDiscoverySuccessCount: this.unregisteredDiscoverySuccessCount,
+      unregisteredDiscoveryMissCount: this.unregisteredDiscoveryMissCount,
+      unregisteredDiscoveryAmbiguousCount: this.unregisteredDiscoveryAmbiguousCount,
+      unregisteredDiscoveryAlertCount: this.unregisteredDiscoveryAlertCount
     };
   }
 
@@ -104,6 +145,7 @@ export class ThreadAdapterResolver {
       .filter((adapter) => adapter.isConnected());
 
     if (connectedEnabledAdapters.length === 0) {
+      this.recordUnregisteredDiscoveryMiss(threadId, "no-connected-adapters");
       return {
         ok: false,
         status: 503,
@@ -119,6 +161,15 @@ export class ThreadAdapterResolver {
       }
 
       if (discoveredAdapter) {
+        this.unregisteredDiscoveryAmbiguousCount += 1;
+        logger.warn(
+          {
+            threadId,
+            firstAgentId: discoveredAdapter.id,
+            secondAgentId: adapter.id
+          },
+          "thread-adapter-resolution-ambiguous-discovery"
+        );
         return {
           ok: false,
           status: 409,
@@ -136,6 +187,8 @@ export class ThreadAdapterResolver {
       return null;
     }
 
+    this.unregisteredDiscoverySuccessCount += 1;
+    this.consecutiveUnregisteredDiscoveryMissCountByThreadId.delete(threadId);
     this.threadIndex.register(threadId, discoveredAdapter.id);
     return {
       ok: true,
@@ -154,5 +207,28 @@ export class ThreadAdapterResolver {
     } catch {
       return false;
     }
+  }
+
+  private recordUnregisteredDiscoveryMiss(
+    threadId: string,
+    reason: "no-connected-adapters" | "no-match"
+  ): void {
+    this.unregisteredDiscoveryMissCount += 1;
+    const nextMissCount = (this.consecutiveUnregisteredDiscoveryMissCountByThreadId.get(threadId) ?? 0) + 1;
+    this.consecutiveUnregisteredDiscoveryMissCountByThreadId.set(threadId, nextMissCount);
+
+    if (nextMissCount % UnregisteredDiscoveryMissAlertThreshold !== 0) {
+      return;
+    }
+
+    this.unregisteredDiscoveryAlertCount += 1;
+    logger.warn(
+      {
+        threadId,
+        reason,
+        consecutiveMissCount: nextMissCount
+      },
+      "thread-adapter-resolution-discovery-miss-threshold-reached"
+    );
   }
 }

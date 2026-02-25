@@ -87,6 +87,17 @@ export const DebugObservabilityEnvelopeSchema = z
               eventWriteFailureCount: z.number().int().nonnegative(),
               keepaliveWriteFailureCount: z.number().int().nonnegative()
             })
+          }),
+        routing: z
+          .object({
+            threadAdapterResolver: z.object({
+              registeredLookupCount: z.number().int().nonnegative(),
+              unregisteredDiscoveryAttemptCount: z.number().int().nonnegative(),
+              unregisteredDiscoverySuccessCount: z.number().int().nonnegative(),
+              unregisteredDiscoveryMissCount: z.number().int().nonnegative(),
+              unregisteredDiscoveryAmbiguousCount: z.number().int().nonnegative(),
+              unregisteredDiscoveryAlertCount: z.number().int().nonnegative()
+            })
           })
       })
       .strict()
