@@ -14,6 +14,9 @@ import {
   toErrorMessage
 } from "@/Shared/Errors/ErrorMessage";
 import {
+  resolveRuntimeRequestErrorDescriptor
+} from "@/Shared/Errors/RuntimeRequestErrorDescriptor";
+import {
   TrackedUserInterfaceErrorReporter,
   type TrackedUserInterfaceErrorReportInput
 } from "@/Features/Debugging/StateManagement/TrackedUserInterfaceErrorReporter";
@@ -70,16 +73,21 @@ export function useApplicationRuntimeRequestHandlers(
 
     const runtimeErrorOperation = "runtime-request-error";
     const actionId = input.userInterfaceActionRequestBuilder.create(runtimeErrorOperation).actionId;
+    const runtimeErrorDescriptor = resolveRuntimeRequestErrorDescriptor({
+      rawMessage: message,
+      defaultOperation: runtimeErrorOperation,
+      actionId
+    });
     void input.trackedUserInterfaceErrorReporter.report({
-      operation: runtimeErrorOperation,
+      operation: runtimeErrorDescriptor.operation,
       actionId,
       threadId: null,
-      error: message,
+      error: runtimeErrorDescriptor.trackingErrorMessage,
       details: {
         handler: "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError"
       }
     });
-    input.setErrorMessage(`${runtimeErrorOperation}: ${message} actionId=${actionId}`);
+    input.setErrorMessage(runtimeErrorDescriptor.bannerErrorMessage);
   }, [
     input.apiAuthenticationErrorClassifier,
     input.apiSessionBootstrapCoordinator,
