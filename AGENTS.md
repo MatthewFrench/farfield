@@ -149,6 +149,76 @@ Before finalizing a change, agents must confirm:
 38. Large-state small-delta regression tests exist for modified high-frequency stream or subscription owners.
 39. Cursor replay/drop/resync tests exist and assert deterministic reset signaling and merge behavior.
 
+## Runtime Safety, Complexity, and Maintainability Playbook
+
+Purpose:
+Reduce defects and debugging cost by pushing uncertainty to boundaries, keeping internal logic explicit, and preserving high-signal observability and test coverage.
+
+General guidelines:
+
+1. Resolve all inbound data uncertainty at boundaries, then pass trusted application-owned contracts inward.
+2. Keep internal owners deterministic and explicit: avoid scattered runtime shape checks for external uncertainty.
+3. Prefer stable identity keys over positional indexes for mutable collections and patch targets.
+4. Centralize repeated literals (event names, operation names, route tokens, threshold values) in owner-owned constants/contracts.
+5. Add high-value comments only for non-obvious behavior, invariants, and threshold rationale.
+6. Keep mutable state ownership singular: one owner module/class per mutable state surface.
+7. Keep code paths proportional to changed data in high-frequency flows; avoid full-state work for small deltas.
+8. Preserve strict layering: composition and user interface wiring, state and logic ownership, then data-access and boundaries.
+9. Keep observability actionable: operation identity, correlation/request id, start time, end state, and duration.
+10. Prefer explicit named helpers over dense inline expressions when logic is non-trivial or reused.
+
+Execution protocol (when this, do this):
+
+1. If non-boundary code adds `typeof`, property-existence checks, or optional probing on required fields, stop and move uncertainty handling to the ingress boundary mapper.
+2. If domain owners directly consume transport payload shapes, introduce an explicit mapping function and internal contract type before domain usage.
+3. If a literal string or number appears in multiple places, extract an owner constant and replace inline duplication.
+4. If a timing or size threshold is not obvious, name the constant and add a short rationale comment near declaration.
+5. If a function or hook mixes timers, async I/O, state transitions, and error handling, split orchestration into a dedicated owner with named methods.
+6. If anonymous callbacks contain branching business logic, extract named functions to improve readability and testability.
+7. If environment variable names/defaults are inline in multiple modules, centralize keys/defaults in configuration owners.
+8. If observability event names are inline strings, define and reuse typed event name constants.
+9. If request/route normalization logic repeats or embeds sentinel strings, create owner-level utilities/constants and test them.
+10. If stream or patch reducers re-parse, re-serialize, or deep-clone within tight loops, redesign to incremental update paths and checkpoint validation.
+11. If a contract guarantee cannot be established without weakening types, stop and escalate the design concern.
+12. If changing hot paths, collect before/after performance readouts (latency and queue delay) for the modified operations.
+
+Testing expectations:
+
+1. Boundary tests must prove invalid input rejection with explicit contextual error behavior.
+2. Mapper tests must prove normalization of optionality, default handling, and identity semantics.
+3. Domain tests must operate on trusted internal contracts and validate deterministic behavior.
+4. Stream and patch tests must cover replay, index-shift sequences, reset-required behavior, and missing-cursor recovery.
+5. Hot-path tests must include deterministic side-effect budgets (for parse, serialize, and logging call counts).
+6. Large-state small-delta tests must verify work remains proportional to changed data.
+7. Observability tests must confirm bounded logging behavior in high-frequency paths.
+
+Examples (generic pattern plus explicit style example):
+
+1. Pattern: Inline regex with unclear intent in business logic.
+   Example style: Extract a named regex constant for request-id parsing, add a short comment for expected formats, and add unit tests for valid and invalid samples.
+2. Pattern: Branching on raw transport method strings in multiple places.
+   Example style: Promote method names to protocol constants/contracts and use exhaustive switches over owned discriminants.
+3. Pattern: Inline observability event key strings.
+   Example style: Create an owner-level event name registry and reference named constants for error and success emissions.
+4. Pattern: Inline threshold value such as `1_000` without context.
+   Example style: Declare a named constant like `BUFFERED_HISTORY_FLUSH_INTERVAL_MILLISECONDS` with a one-line rationale comment.
+5. Pattern: Route pathname derivation with inline sentinel literals.
+   Example style: Move normalization into a small owner utility and centralize sentinel values such as missing-path tokens.
+6. Pattern: Large orchestration hook with nested async callbacks.
+   Example style: Keep a thin hook wrapper and move orchestration into a state owner/coordinator class with named methods.
+7. Pattern: Deep optional chaining against payload internals across internal modules.
+   Example style: Map payloads at ingress to explicit contracts that encode nullable variants once.
+8. Pattern: Index-based patch targeting treated as durable identity.
+   Example style: Maintain stable identifier maps plus ordered identifier lists; treat indexes as synchronization cursors only.
+
+Quick review heuristics:
+
+1. If internal modules still reason about payload shape, boundary ownership is incomplete.
+2. If readers cannot explain why a threshold exists, the code needs a named constant and rationale.
+3. If hot paths are correct but hard to measure, observability ownership is incomplete.
+4. If tests prove only outputs, add tests that prove bounded work and deterministic side effects.
+5. If small changes require touching many layers, ownership boundaries need simplification.
+
 ## Repository Structure Guide For Agents
 
 Use this tree and ownership summary to locate code quickly and keep changes in the right place.
