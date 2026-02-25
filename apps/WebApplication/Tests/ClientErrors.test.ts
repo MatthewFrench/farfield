@@ -3,16 +3,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { installGlobalClientCrashReporter } from "../Source/Application/Boot/InstallClientErrorReporter";
 
 function buildCreateErrorSuccessResponse(): Response {
-  return {
-    ok: true,
-    headers: new Headers({ "X-Farfield-Request-Id": "req_server_1" }),
-    json: async () => ({
+  return new Response(
+    JSON.stringify({
       ok: true,
       errorId: "error_1",
       sessionId: "session_1",
       recordedAt: "2026-02-21T00:00:01.000Z"
-    })
-  } as Response;
+    }),
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Farfield-Request-Id": "req_server_1"
+      }
+    }
+  );
 }
 
 function buildUnhandledRejectionEvent(reason: PromiseRejectionEvent["reason"]): PromiseRejectionEvent {

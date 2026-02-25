@@ -103,6 +103,7 @@ This is the normative architecture contract for Farfield code.
 9. Route response writers accept explicit object contracts from owner modules; response typing must not force index-signature coupling onto domain response contracts.
 10. IPC and JSON-RPC transport payloads must use schema-owned structured-data contracts (`JsonValueSchema`) at decode and encode boundaries, with explicit parse failures for contract mismatches.
 11. Stream-event read routes must expose explicit cursor metadata contracts (`nextSequence`, `firstAvailableSequence`, `resetRequired`) so clients can append incrementally without ad-hoc payload introspection.
+12. HTTP response decoders must parse full response bodies before any truncation or sampling; response-size controls are allowed only on diagnostic/observability copies after parse.
 
 ## Configuration Ownership Rules
 
@@ -169,6 +170,7 @@ This is the normative architecture contract for Farfield code.
    - caveats and operational context
 4. Do not add low-value commentary that restates obvious code.
 5. Data-access owners and subscription lifecycle owners must include high-value module/class comments that describe boundary ownership, refresh/caching ownership, and key caveats.
+6. Transport-boundary tests must include large-payload decode coverage (for example multi-kilobyte JSON) so diagnostics limits cannot corrupt parse behavior.
 
 ## User Interface, Logic, and Data Separation
 

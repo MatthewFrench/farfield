@@ -1,3 +1,7 @@
+/**
+ * Owns HTTP request execution, envelope parsing, and request-failure diagnostics for web data-access modules.
+ * Invariant: JSON parsing always uses the full response body; truncation is diagnostic-only.
+ */
 import { FarfieldApiErrorResponseSchema } from "@farfield/protocol";
 import { z } from "zod";
 import { type ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
