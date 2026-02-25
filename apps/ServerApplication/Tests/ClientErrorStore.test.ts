@@ -45,6 +45,7 @@ describe("ClientErrorStore", () => {
       source: "monitor-server",
       operation: "request-failed",
       message: "Desktop IPC is not connected",
+      severity: "error",
       name: "Error",
       stack: "Error: Desktop IPC is not connected",
       requestId: "req_2",
@@ -72,7 +73,7 @@ describe("ClientErrorStore", () => {
     expect(reloadedStore.getById(serverEvent.errorId)?.operation).toBe("request-failed");
   });
 
-  it("caps in-memory events by maxEntries while preserving log file", () => {
+  it("caps in-memory events and session log file by maxEntries", () => {
     const directory = makeTempDir();
     const logPath = path.join(directory, "session.ndjson");
     const store = new ClientErrorStore(logPath, "session_2", 2);
@@ -102,7 +103,26 @@ describe("ClientErrorStore", () => {
 
     const raw = fs.readFileSync(logPath, "utf8").trim();
     const lines = raw.split("\n");
-    expect(lines.length).toBe(3);
+    expect(lines.length).toBe(2);
+  });
+
+  it("clears stored events and truncates the session log file", () => {
+    const directory = makeTempDir();
+    const logPath = path.join(directory, "session.ndjson");
+    const store = new ClientErrorStore(logPath, "session_2", 2);
+
+    store.recordClientError({
+      source: "web-app",
+      operation: "op-1",
+      message: "one",
+      details: {}
+    });
+    const clearedCount = store.clear();
+
+    expect(clearedCount).toBe(1);
+    expect(store.getCount()).toBe(0);
+    expect(store.list(10)).toEqual([]);
+    expect(fs.readFileSync(logPath, "utf8")).toBe("");
   });
 
   it("skips malformed ndjson lines while loading existing events", () => {
@@ -115,6 +135,7 @@ describe("ClientErrorStore", () => {
       source: "web-app",
       operation: "valid-op",
       message: "valid",
+      severity: "error" as const,
       name: null,
       stack: null,
       requestId: null,

@@ -80,6 +80,7 @@ export interface UseApplicationShellViewPropertiesInput {
   setSelectedDebugIssueId: DebugWorkspacePaneProps["onSelectDebugIssue"];
   setDebugIssueSeverityFilter: DebugWorkspacePaneProps["onDebugIssueSeverityFilterChange"];
   setDebugIssueFilterQuery: DebugWorkspacePaneProps["onDebugIssueFilterQueryChange"];
+  clearDebugIssuesFromDebugPanel: DebugWorkspacePaneProps["onClearDebugIssues"];
   debugHistoryEntryListItems: readonly DebugHistoryEntryListItem[];
   selectedHistoryId: string;
   selectedHistoryDetailId: string | null;
@@ -185,6 +186,7 @@ export function useApplicationShellViewProperties(
     setSelectedDebugIssueId,
     setDebugIssueSeverityFilter,
     setDebugIssueFilterQuery,
+    clearDebugIssuesFromDebugPanel,
     debugHistoryEntryListItems,
     selectedHistoryId,
     selectedHistoryDetailId,
@@ -327,6 +329,7 @@ export function useApplicationShellViewProperties(
     onSelectDebugIssue: setSelectedDebugIssueId,
     onDebugIssueSeverityFilterChange: setDebugIssueSeverityFilter,
     onDebugIssueFilterQueryChange: setDebugIssueFilterQuery,
+    onClearDebugIssues: clearDebugIssuesFromDebugPanel,
     debugHistoryEntryListItems,
     selectedHistoryId,
     selectedHistoryDetailId,

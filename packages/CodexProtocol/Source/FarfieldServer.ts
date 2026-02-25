@@ -10,10 +10,14 @@ import {
   VapidPublicKeyResponseSchema
 } from "./Push.js";
 import {
+  DebugErrorClearResponseSchema,
   DebugErrorCreateResponseSchema,
   DebugErrorDetailResponseSchema,
   DebugErrorListResponseSchema
 } from "./AppServer.js";
+import { IpcFrameSchema } from "./Ipc.js";
+import { JsonValueSchema } from "./Common.js";
+import { ThreadConversationStateSchema } from "./Contracts/Thread/ConversationStateContracts.js";
 
 export const FarfieldApiErrorResponseSchema = z
   .object({
@@ -49,6 +53,153 @@ export const FarfieldEventsSessionResponseSchema = z
     authRequired: z.boolean(),
     bootstrapped: z.boolean(),
     expiresAt: z.string().datetime().nullable()
+  })
+  .strict();
+
+export const FarfieldHistoryEntrySchema = z
+  .object({
+    id: z.string().min(1),
+    at: z.string().datetime(),
+    source: z.enum(["ipc", "app", "system"]),
+    direction: z.enum(["in", "out", "system"]),
+    payload: JsonValueSchema,
+    meta: z.record(JsonValueSchema)
+  })
+  .strict();
+
+export type FarfieldHistoryEntry = z.infer<typeof FarfieldHistoryEntrySchema>;
+
+export const FarfieldThreadLiveStateSnapshotSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1),
+    ownerClientId: z.string().nullable(),
+    conversationState: z.union([ThreadConversationStateSchema, z.null()]),
+    liveStateError: z
+      .object({
+        kind: z.literal("reductionFailed"),
+        message: z.string().min(1),
+        eventIndex: z.number().int().nonnegative().nullable(),
+        patchIndex: z.number().int().nonnegative().nullable()
+      })
+      .nullable()
+  })
+  .strict();
+
+export type FarfieldThreadLiveStateSnapshot = z.infer<typeof FarfieldThreadLiveStateSnapshotSchema>;
+
+export const FarfieldThreadStreamEventsSnapshotSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1),
+    ownerClientId: z.string().nullable(),
+    events: z.array(IpcFrameSchema),
+    nextSequence: z.number().int().nonnegative(),
+    firstAvailableSequence: z.number().int().nonnegative(),
+    resetRequired: z.boolean()
+  })
+  .strict();
+
+export type FarfieldThreadStreamEventsSnapshot = z.infer<typeof FarfieldThreadStreamEventsSnapshotSchema>;
+export type FarfieldHealthState = z.infer<typeof FarfieldHealthStateSchema>;
+
+export type FarfieldRuntimeStateChangedEvent = {
+  type: "runtime-state-changed";
+  state: FarfieldHealthState;
+};
+
+export type FarfieldActivityHistoryAppendedEvent = {
+  type: "activity-history-appended";
+  entry: FarfieldHistoryEntry;
+};
+
+export type FarfieldThreadStreamDelta = {
+  threadId: string;
+  liveStateSnapshot: FarfieldThreadLiveStateSnapshot;
+  streamEventsSnapshot: FarfieldThreadStreamEventsSnapshot;
+  streamEventsSinceSequenceUsed: number | null;
+};
+
+export type FarfieldThreadStreamDeltaEvent = {
+  type: "thread-stream-delta";
+  delta: FarfieldThreadStreamDelta;
+};
+
+export type FarfieldEventStreamEvent =
+  | FarfieldRuntimeStateChangedEvent
+  | FarfieldActivityHistoryAppendedEvent
+  | FarfieldThreadStreamDeltaEvent;
+
+export type FarfieldEventStreamEnvelope = {
+  sequence: number;
+  event: FarfieldEventStreamEvent;
+};
+
+export const FarfieldRuntimeStateChangedEventSchema = z
+  .object({
+    type: z.literal("runtime-state-changed"),
+    state: FarfieldHealthStateSchema
+  })
+  .strict();
+
+export const FarfieldActivityHistoryAppendedEventSchema = z
+  .object({
+    type: z.literal("activity-history-appended"),
+    entry: FarfieldHistoryEntrySchema
+  })
+  .strict();
+
+export const FarfieldThreadStreamDeltaEventSchema: z.ZodObject<
+  {
+    type: z.ZodLiteral<"thread-stream-delta">;
+    delta: z.ZodObject<
+      {
+        threadId: z.ZodString;
+        liveStateSnapshot: typeof FarfieldThreadLiveStateSnapshotSchema;
+        streamEventsSnapshot: typeof FarfieldThreadStreamEventsSnapshotSchema;
+        streamEventsSinceSequenceUsed: z.ZodNullable<z.ZodNumber>;
+      },
+      "strict"
+    >;
+  },
+  "strict"
+> = z
+  .object({
+    type: z.literal("thread-stream-delta"),
+    delta: z
+      .object({
+        threadId: z.string().min(1),
+        liveStateSnapshot: FarfieldThreadLiveStateSnapshotSchema,
+        streamEventsSnapshot: FarfieldThreadStreamEventsSnapshotSchema,
+        streamEventsSinceSequenceUsed: z.number().int().nonnegative().nullable()
+      })
+      .strict()
+  })
+  .strict();
+
+export const FarfieldEventStreamEventSchema: z.ZodDiscriminatedUnion<
+  "type",
+  [
+    typeof FarfieldRuntimeStateChangedEventSchema,
+    typeof FarfieldActivityHistoryAppendedEventSchema,
+    typeof FarfieldThreadStreamDeltaEventSchema
+  ]
+> = z.discriminatedUnion("type", [
+  FarfieldRuntimeStateChangedEventSchema,
+  FarfieldActivityHistoryAppendedEventSchema,
+  FarfieldThreadStreamDeltaEventSchema
+]);
+
+export const FarfieldEventStreamEnvelopeSchema: z.ZodObject<
+  {
+    sequence: z.ZodNumber;
+    event: typeof FarfieldEventStreamEventSchema;
+  },
+  "strict"
+> = z
+  .object({
+    sequence: z.number().int().nonnegative(),
+    event: FarfieldEventStreamEventSchema
   })
   .strict();
 
@@ -138,6 +289,13 @@ export const FarfieldDebugErrorCreateEnvelopeSchema = z
   .merge(DebugErrorCreateResponseSchema)
   .strict();
 
+export const FarfieldDebugErrorClearEnvelopeSchema = z
+  .object({
+    ok: z.literal(true)
+  })
+  .merge(DebugErrorClearResponseSchema)
+  .strict();
+
 export const FarfieldDebugErrorListEnvelopeSchema = z
   .object({
     ok: z.literal(true)
@@ -213,6 +371,7 @@ export const FarfieldThreadAdapterResolverStatisticsSchema = z
     unregisteredDiscoverySuccessCount: z.number().int().nonnegative(),
     unregisteredDiscoveryMissCount: z.number().int().nonnegative(),
     unregisteredDiscoveryMissCacheHitCount: z.number().int().nonnegative(),
+    unregisteredDiscoveryProbeFailureCount: z.number().int().nonnegative().optional().default(0),
     unregisteredDiscoveryAmbiguousCount: z.number().int().nonnegative(),
     unregisteredDiscoveryAlertCount: z.number().int().nonnegative()
   })

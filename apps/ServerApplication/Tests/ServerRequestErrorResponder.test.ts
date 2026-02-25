@@ -137,7 +137,9 @@ describe("ServerRequestErrorResponder", () => {
     });
     expect(harness.jsonResponseCalls[0]?.body.error.includes("Expected string, received number")).toBe(true);
     expect(harness.runtimeLastErrors).toEqual([]);
-    expect(harness.recordedServerErrors).toEqual([]);
+    expect(harness.recordedServerErrors).toHaveLength(1);
+    expect(harness.recordedServerErrors[0]?.severity).toBe("warning");
+    expect(harness.recordedServerErrors[0]?.details?.errorCategory).toBe("request_validation");
     expect(harness.pushedSystemEvents).toEqual([]);
     expect(harness.broadcastCount).toBe(0);
   });
@@ -159,6 +161,7 @@ describe("ServerRequestErrorResponder", () => {
 
     expect(harness.runtimeLastErrors).toEqual(["request handler crashed"]);
     expect(harness.recordedServerErrors).toHaveLength(1);
+    expect(harness.recordedServerErrors[0]?.severity).toBe("error");
     expect(harness.recordedServerErrors[0]?.details?.errorCategory).toBe("internal");
     expect(harness.pushedSystemEvents).toEqual([
       {

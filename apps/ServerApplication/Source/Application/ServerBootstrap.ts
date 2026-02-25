@@ -1,5 +1,6 @@
 import http from "node:http";
 import {
+  FarfieldHealthStateSchema,
   FarfieldPushTestBodySchema,
   JsonValueSchema,
   type JsonValue
@@ -37,6 +38,7 @@ import { RuntimeStateOwner } from "./StateManagement/RuntimeStateOwner.js";
 import { ServerBootstrapUtilityOwner } from "./Bootstrap/ServerBootstrapUtilityOwner.js";
 import { PushMutationConcurrencyCoordinator } from "../Network/PushMutationConcurrencyCoordinator.js";
 import { ThreadListCacheInvalidationOwner } from "./Bootstrap/ThreadListCacheInvalidationOwner.js";
+import { ThreadStreamDeltaEventPublisher } from "../Network/ThreadStreamDeltaEventPublisher.js";
 
 const PushTestBodySchema = FarfieldPushTestBodySchema;
 const runtimeConfiguration = readServerRuntimeConfigurationFromCurrentProcessEnvironment();
@@ -163,6 +165,36 @@ const pushDispatchConcurrencyCoordinator = new PushDispatchConcurrencyCoordinato
     await threadCompletionNotificationService.checkAndNotifyThreadCompletion(threadId);
   }
 );
+const threadStreamDeltaEventPublisher = new ThreadStreamDeltaEventPublisher({
+  eventStreamClientRegistry,
+  readThreadLiveState: async (threadId) => {
+    const codexAdapter = agentRuntimeOwner?.readCodexAdapter();
+    if (!codexAdapter) {
+      return {
+        ownerClientId: null,
+        conversationState: null,
+        liveStateError: null
+      };
+    }
+    return codexAdapter.readLiveState(threadId);
+  },
+  readThreadStreamEvents: async (threadId, sinceSequence, limit) => {
+    const codexAdapter = agentRuntimeOwner?.readCodexAdapter();
+    if (!codexAdapter) {
+      return {
+        ownerClientId: null,
+        events: [],
+        nextSequence: 0,
+        firstAvailableSequence: 0,
+        resetRequired: false
+      };
+    }
+    return codexAdapter.readStreamEvents(threadId, {
+      limit,
+      sinceSequence
+    });
+  }
+});
 
 function pushSystem(message: string, details: HistoryEntry["meta"] = {}): void {
   activityHistoryService.pushSystem(message, details);
@@ -202,6 +234,7 @@ agentRuntimeOwner = new AgentRuntimeOwner({
       threadId
     });
     pushDispatchConcurrencyCoordinator.schedule(threadId);
+    threadStreamDeltaEventPublisher.schedulePublish(threadId);
   }
 });
 const registry = agentRuntimeOwner.readRegistry();
@@ -216,9 +249,10 @@ const serverObservabilitySnapshotOwner = new ServerObservabilitySnapshotOwner({
 });
 
 function broadcastRuntimeState(): void {
+  const runtimeStateSnapshot = FarfieldHealthStateSchema.parse(runtimeStateOwner.readSnapshot());
   eventStreamClientRegistry.broadcast({
-    type: "state",
-    state: runtimeStateOwner.readSnapshot()
+    type: "runtime-state-changed",
+    state: runtimeStateSnapshot
   });
 }
 

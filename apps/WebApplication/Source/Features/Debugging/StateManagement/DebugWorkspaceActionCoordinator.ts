@@ -1,4 +1,5 @@
 import type {
+  DebugErrorClearResponse,
   DebugHistoryDetailResponse,
   DebugReplayHistoryEntryInput
 } from "../DataAccess/DebugServerClient";
@@ -9,6 +10,7 @@ export interface DebugWorkspaceActionClient {
     entryId: string,
     options?: ApiRequestOptions
   ): Promise<DebugHistoryDetailResponse>;
+  clearClientErrors(options?: ApiRequestOptions): Promise<DebugErrorClearResponse>;
   replayHistoryEntry(
     input: DebugReplayHistoryEntryInput,
     options?: ApiRequestOptions
@@ -28,6 +30,11 @@ export interface LoadDebugHistoryDetailActionInput {
 
 export interface ReplayDebugHistoryEntryActionInput {
   replayRequest: DebugReplayHistoryEntryInput;
+  debugClient: DebugWorkspaceActionClient;
+  refreshCoreData: () => Promise<void>;
+}
+
+export interface ClearDebugClientErrorsActionInput {
   debugClient: DebugWorkspaceActionClient;
   refreshCoreData: () => Promise<void>;
 }
@@ -62,6 +69,11 @@ export class DebugWorkspaceActionCoordinator {
 
   public async replayHistoryEntry(input: ReplayDebugHistoryEntryActionInput): Promise<void> {
     await input.debugClient.replayHistoryEntry(input.replayRequest);
+    await input.refreshCoreData();
+  }
+
+  public async clearClientErrors(input: ClearDebugClientErrorsActionInput): Promise<void> {
+    await input.debugClient.clearClientErrors();
     await input.refreshCoreData();
   }
 

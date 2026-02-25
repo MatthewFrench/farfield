@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import {
   parseDebugErrorEvent,
   type CreateDebugClientErrorBody,
-  type DebugErrorEvent
+  type DebugErrorEvent,
+  type DebugErrorSeverity
 } from "@farfield/protocol";
 import { logger } from "../../Shared/Logging/Logger.js";
 
@@ -12,6 +13,7 @@ interface RecordServerErrorInput {
   source: string;
   operation: string;
   message: string;
+  severity: DebugErrorSeverity;
   name: string | null;
   stack: string | null;
   requestId: string | null;
@@ -26,6 +28,7 @@ interface RecordErrorInput {
   source: string;
   operation: string;
   message: string;
+  severity: DebugErrorSeverity;
   name: string | null;
   stack: string | null;
   requestId: string | null;
@@ -96,6 +99,7 @@ export class ClientErrorStore {
       source: input.source,
       operation: input.operation,
       message: input.message,
+      severity: input.severity,
       name: input.name ?? null,
       stack: input.stack ?? null,
       requestId: input.requestId ?? null,
@@ -112,6 +116,7 @@ export class ClientErrorStore {
       source: input.source,
       operation: input.operation,
       message: input.message,
+      severity: input.severity,
       name: input.name ?? null,
       stack: input.stack ?? null,
       requestId: input.requestId ?? null,
@@ -130,6 +135,7 @@ export class ClientErrorStore {
       source: input.source,
       operation: input.operation,
       message: input.message,
+      severity: input.severity,
       name: input.name,
       stack: input.stack,
       requestId: input.requestId,
@@ -142,14 +148,20 @@ export class ClientErrorStore {
 
     this.events.push(event);
     this.byId.set(event.errorId, event);
+    let didTrimEntries = false;
     if (this.events.length > this.maxEntries) {
       const removed = this.events.shift();
       if (removed) {
         this.byId.delete(removed.errorId);
+        didTrimEntries = true;
       }
     }
 
-    this.appendEvent(event);
+    if (didTrimEntries) {
+      this.writeAllEvents();
+    } else {
+      this.appendEvent(event);
+    }
     return {
       ...event,
       details: { ...event.details }
@@ -195,10 +207,28 @@ export class ClientErrorStore {
       for (const entry of this.events) {
         this.byId.set(entry.errorId, entry);
       }
+      this.writeAllEvents();
     }
+  }
+
+  public clear(): number {
+    const clearedCount = this.events.length;
+    this.events = [];
+    this.byId.clear();
+    fs.writeFileSync(this.filePath, "", "utf8");
+    return clearedCount;
   }
 
   private appendEvent(event: DebugErrorEvent): void {
     fs.appendFileSync(this.filePath, `${JSON.stringify(event)}\n`, "utf8");
+  }
+
+  private writeAllEvents(): void {
+    const lines = this.events.map((event) => JSON.stringify(event)).join("\n");
+    if (lines.length === 0) {
+      fs.writeFileSync(this.filePath, "", "utf8");
+      return;
+    }
+    fs.writeFileSync(this.filePath, `${lines}\n`, "utf8");
   }
 }

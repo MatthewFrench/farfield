@@ -1,4 +1,6 @@
 import {
+  clearDebugClientErrors,
+  type ApiDebugErrorClearResponse,
   type ApiDebugErrorDetailResponse,
   type ApiDebugErrorListResponse,
   type ApiDebugHistoryDetailResponse,
@@ -23,6 +25,7 @@ export type DebugHistoryResponse = ApiDebugHistoryResponse;
 export type DebugHistoryDetailResponse = ApiDebugHistoryDetailResponse;
 export type DebugErrorListResponse = ApiDebugErrorListResponse;
 export type DebugErrorDetailResponse = ApiDebugErrorDetailResponse;
+export type DebugErrorClearResponse = ApiDebugErrorClearResponse;
 export type DebugReplayHistoryEntryInput = ApiReplayHistoryEntryInput;
 export type DebugReplayHistoryEntryResponse = ApiReplayHistoryEntryResponse;
 
@@ -73,6 +76,10 @@ export class DebugServerClient {
     options?: ApiRequestOptions
   ): Promise<ApiDebugErrorDetailResponse> {
     return getDebugClientError(errorId, options);
+  }
+
+  public async clearClientErrors(options?: ApiRequestOptions): Promise<ApiDebugErrorClearResponse> {
+    return clearDebugClientErrors(options);
   }
 
   public async replayHistoryEntry(

@@ -1,4 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import {
+  FarfieldEventStreamEnvelopeSchema,
+  type FarfieldEventStreamEvent
+} from "@farfield/protocol";
 
 const EVENT_STREAM_HEADERS = {
   "Content-Type": "text/event-stream",
@@ -24,6 +28,7 @@ export class EventStreamClientRegistry {
   private readonly keepaliveIntervalMs: number;
   private readonly clientSet: Set<ServerResponse>;
   private keepaliveTimer: NodeJS.Timeout | null;
+  private lastBroadcastSequence: number;
   private addedClientCount: number;
   private removedClientCount: number;
   private broadcastEventCount: number;
@@ -39,6 +44,7 @@ export class EventStreamClientRegistry {
     this.keepaliveIntervalMs = keepaliveIntervalMs;
     this.clientSet = new Set<ServerResponse>();
     this.keepaliveTimer = null;
+    this.lastBroadcastSequence = 0;
     this.addedClientCount = 0;
     this.removedClientCount = 0;
     this.broadcastEventCount = 0;
@@ -74,13 +80,16 @@ export class EventStreamClientRegistry {
     this.clientSet.clear();
   }
 
-  public addClient(req: IncomingMessage, res: ServerResponse, initialPayload: object): void {
+  public addClient(req: IncomingMessage, res: ServerResponse, initialEvent: FarfieldEventStreamEvent): void {
     res.writeHead(200, EVENT_STREAM_HEADERS);
     res.write("retry: 1000\n\n");
 
     this.clientSet.add(res);
     this.addedClientCount += 1;
-    this.writeEvent(res, initialPayload);
+    this.writeEvent(res, {
+      sequence: this.lastBroadcastSequence,
+      event: initialEvent
+    });
 
     req.on("close", () => {
       const removed = this.clientSet.delete(res);
@@ -90,11 +99,16 @@ export class EventStreamClientRegistry {
     });
   }
 
-  public broadcast(payload: object): void {
+  public broadcast(event: FarfieldEventStreamEvent): void {
     this.broadcastEventCount += 1;
+    this.lastBroadcastSequence += 1;
+    const envelope = FarfieldEventStreamEnvelopeSchema.parse({
+      sequence: this.lastBroadcastSequence,
+      event
+    });
     for (const client of this.clientSet) {
       this.broadcastDeliveryAttemptCount += 1;
-      this.writeEvent(client, payload);
+      this.writeEvent(client, envelope);
     }
   }
 
@@ -111,9 +125,17 @@ export class EventStreamClientRegistry {
     };
   }
 
-  private writeEvent(client: ServerResponse, payload: object): void {
+  private writeEvent(
+    client: ServerResponse,
+    envelopeInput: {
+      sequence: number;
+      event: FarfieldEventStreamEvent;
+    }
+  ): void {
+    const envelope = FarfieldEventStreamEnvelopeSchema.parse(envelopeInput);
     try {
-      client.write(`data: ${JSON.stringify(payload)}\n\n`);
+      client.write(`id: ${String(envelope.sequence)}\n`);
+      client.write(`data: ${JSON.stringify(envelope)}\n\n`);
     } catch {
       this.eventWriteFailureCount += 1;
       this.clientSet.delete(client);

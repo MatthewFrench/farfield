@@ -18,6 +18,7 @@ interface DebugIssuesPanelProps {
   onIssueSelect: (issueId: string) => void;
   onSeverityFilterChange: (severityFilter: DebugIssueSeverityFilter) => void;
   onFilterQueryChange: (filterQuery: string) => void;
+  onClearIssues: () => void;
 }
 
 export function DebugIssuesPanel({
@@ -30,7 +31,8 @@ export function DebugIssuesPanel({
   debugErrorSessionLogPath,
   onIssueSelect,
   onSeverityFilterChange,
-  onFilterQueryChange
+  onFilterQueryChange,
+  onClearIssues
 }: DebugIssuesPanelProps): React.JSX.Element {
   return (
     <div data-testid="debug-issues-panel" className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[330px_minmax(0,1fr)] divide-y md:divide-y-0 md:divide-x divide-border overflow-hidden">
@@ -42,14 +44,26 @@ export function DebugIssuesPanel({
               <span className="text-sm font-medium">Issues</span>
               <span className="text-xs text-muted-foreground/70">{issues.length}</span>
             </div>
-            {debugErrorSessionLogPath.length > 0 && (
-              <a
-                href="/api/debug/client-errors/session-log"
-                className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[11px]"
+                onClick={onClearIssues}
+                disabled={issues.length === 0}
               >
-                session log
-              </a>
-            )}
+                Clear
+              </Button>
+              {debugErrorSessionLogPath.length > 0 && (
+                <a
+                  href="/api/debug/client-errors/session-log"
+                  className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                >
+                  session log
+                </a>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1.5">
             <Button
@@ -164,7 +178,7 @@ export function DebugIssuesPanel({
                 <div className="sm:col-span-2"><span className="text-muted-foreground">actionName:</span> {selectedIssue.actionName ?? "n/a"}</div>
               </div>
 
-              {selectedIssue.severity === "error" && (
+              {selectedIssue.kind === "debug-error" && (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
                     <div><span className="text-muted-foreground">errorId:</span> {selectedIssue.errorId}</div>
@@ -190,7 +204,7 @@ export function DebugIssuesPanel({
                 </>
               )}
 
-              {selectedIssue.severity === "warning" && (
+              {selectedIssue.kind === "history-warning" && (
                 <div className="space-y-1">
                   <div className="text-xs font-medium text-muted-foreground">Payload</div>
                   <pre className="font-mono text-[11px] leading-5 whitespace-pre-wrap break-words text-muted-foreground">

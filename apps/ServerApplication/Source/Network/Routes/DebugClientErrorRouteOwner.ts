@@ -18,6 +18,10 @@ export class DebugClientErrorRouteOwner {
       return true;
     }
 
+    if (await this.handleClearClientErrorsRoute()) {
+      return true;
+    }
+
     if (await this.handleListClientErrorsRoute()) {
       return true;
     }
@@ -49,6 +53,7 @@ export class DebugClientErrorRouteOwner {
     onClientErrorRecorded({
       errorId: event.errorId,
       origin: event.origin,
+      severity: event.severity,
       source: event.source,
       operation: event.operation,
       requestId: event.requestId,
@@ -60,6 +65,23 @@ export class DebugClientErrorRouteOwner {
       errorId: event.errorId,
       sessionId: event.sessionId,
       recordedAt: event.recordedAt
+    });
+    return true;
+  }
+
+  private async handleClearClientErrorsRoute(): Promise<boolean> {
+    const { req, pathname, clientErrorStore, jsonResponse, res } = this.dependencies;
+
+    if (!(req.method === "DELETE" && pathname === "/api/debug/client-errors")) {
+      return false;
+    }
+
+    const clearedCount = clientErrorStore.clear();
+    jsonResponse(res, 200, {
+      ok: true,
+      clearedCount,
+      sessionId: clientErrorStore.getSessionId(),
+      sessionLogPath: clientErrorStore.getSessionLogPath()
     });
     return true;
   }

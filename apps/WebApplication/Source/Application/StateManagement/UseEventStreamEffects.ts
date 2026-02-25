@@ -12,6 +12,7 @@ import type {
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { DebugWorkspaceDataReader } from "@/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
+import { type ApplySelectedThreadStreamDeltaInput } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import type { SelectedThreadLoaderOptions } from "./UseCoreDataLoaders";
 import { EventRefreshScheduler } from "./EventRefreshScheduler";
 import { EventStreamConnectionCoordinator } from "./EventStreamConnectionCoordinator";
@@ -35,6 +36,7 @@ export interface UseEventStreamEffectsInput {
   setDebugErrors: Dispatch<SetStateAction<DebugErrorListResponse["data"]>>;
   setDebugErrorSessionId: Dispatch<SetStateAction<string>>;
   setDebugErrorSessionLogPath: Dispatch<SetStateAction<string>>;
+  applySelectedThreadStreamDelta: (input: ApplySelectedThreadStreamDeltaInput) => void;
   handleRuntimeRequestError: <ErrorType,>(error: ErrorType) => void;
 }
 
@@ -104,6 +106,14 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
           input.handleRuntimeRequestError(error);
         }
       },
+      applyThreadStreamDelta: (threadStreamDelta) => {
+        input.applySelectedThreadStreamDelta({
+          threadId: threadStreamDelta.threadId,
+          liveStateSnapshot: threadStreamDelta.liveStateSnapshot,
+          streamEventsSnapshot: threadStreamDelta.streamEventsSnapshot,
+          streamEventsSinceSequenceUsed: threadStreamDelta.streamEventsSinceSequenceUsed
+        });
+      },
       onConnectionStatusChange: (connected) => {
         input.eventsConnectedRef.current = connected;
       }
@@ -123,6 +133,7 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
     input.eventStreamConnectionCoordinator,
     input.eventStreamRefreshDecisionEngine,
     input.eventsConnectedRef,
+    input.applySelectedThreadStreamDelta,
     input.handleRuntimeRequestError,
     input.loadCoreDataTrackedRef,
     input.loadSelectedThreadRef,

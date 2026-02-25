@@ -136,12 +136,14 @@ export const AppServerSetModeRequestSchema = z
   .passthrough();
 
 export const DebugErrorOriginSchema = z.enum(["client", "server"]);
+export const DebugErrorSeveritySchema = z.enum(["error", "warning"]);
 
 export const CreateDebugClientErrorBodySchema = z
   .object({
     source: NonEmptyStringSchema,
     operation: NonEmptyStringSchema,
     message: NonEmptyStringSchema,
+    severity: DebugErrorSeveritySchema.optional().default("error"),
     name: NullableStringSchema.optional().default(null),
     stack: NullableStringSchema.optional().default(null),
     requestId: NullableStringSchema.optional().default(null),
@@ -160,6 +162,7 @@ export const DebugErrorEventSchema = z
     source: NonEmptyStringSchema,
     operation: NonEmptyStringSchema,
     message: NonEmptyStringSchema,
+    severity: DebugErrorSeveritySchema.optional().default("error"),
     name: NullableStringSchema,
     stack: NullableStringSchema,
     requestId: NullableStringSchema,
@@ -176,6 +179,14 @@ export const DebugErrorCreateResponseSchema = z
     errorId: NonEmptyStringSchema,
     sessionId: NonEmptyStringSchema,
     recordedAt: z.string().datetime()
+  })
+  .strict();
+
+export const DebugErrorClearResponseSchema = z
+  .object({
+    clearedCount: z.number().int().nonnegative(),
+    sessionId: NonEmptyStringSchema,
+    sessionLogPath: NonEmptyStringSchema
   })
   .strict();
 
@@ -204,8 +215,10 @@ export type AppServerCollaborationModeListResponse = z.infer<
 export type AppServerStartThreadResponse = z.infer<typeof AppServerStartThreadResponseSchema>;
 export type AppServerConfigReadResponse = z.infer<typeof AppServerConfigReadResponseSchema>;
 export type CreateDebugClientErrorBody = z.infer<typeof CreateDebugClientErrorBodySchema>;
+export type DebugErrorSeverity = z.infer<typeof DebugErrorSeveritySchema>;
 export type DebugErrorEvent = z.infer<typeof DebugErrorEventSchema>;
 export type DebugErrorCreateResponse = z.infer<typeof DebugErrorCreateResponseSchema>;
+export type DebugErrorClearResponse = z.infer<typeof DebugErrorClearResponseSchema>;
 export type DebugErrorListResponse = z.infer<typeof DebugErrorListResponseSchema>;
 export type DebugErrorDetailResponse = z.infer<typeof DebugErrorDetailResponseSchema>;
 
@@ -286,6 +299,12 @@ export function parseDebugErrorCreateResponse(
   value: z.input<typeof DebugErrorCreateResponseSchema>
 ): DebugErrorCreateResponse {
   return parseWithSchema(DebugErrorCreateResponseSchema, value, "DebugErrorCreateResponse");
+}
+
+export function parseDebugErrorClearResponse(
+  value: z.input<typeof DebugErrorClearResponseSchema>
+): DebugErrorClearResponse {
+  return parseWithSchema(DebugErrorClearResponseSchema, value, "DebugErrorClearResponse");
 }
 
 export function parseDebugErrorListResponse(

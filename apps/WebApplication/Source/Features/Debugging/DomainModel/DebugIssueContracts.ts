@@ -6,6 +6,7 @@ export interface DebugErrorLike {
   source: string;
   operation: string;
   message: string;
+  severity: "error" | "warning";
   name: string | null;
   stack: string | null;
   requestId: string | null;
@@ -32,6 +33,7 @@ export interface ErrorBannerDetails {
 
 export interface DebugIssueBase {
   id: string;
+  kind: "debug-error" | "history-warning";
   severity: "error" | "warning";
   occurredAt: string;
   message: string;
@@ -44,7 +46,8 @@ export interface DebugIssueBase {
 }
 
 export interface DebugErrorIssue extends DebugIssueBase {
-  severity: "error";
+  kind: "debug-error";
+  severity: "error" | "warning";
   errorId: string;
   origin: DebugErrorLike["origin"];
   source: string;
@@ -55,6 +58,7 @@ export interface DebugErrorIssue extends DebugIssueBase {
 }
 
 export interface DebugWarningIssue extends DebugIssueBase {
+  kind: "history-warning";
   severity: "warning";
   warningType: "ipc-method" | "system-message";
   historyEntryId: string;

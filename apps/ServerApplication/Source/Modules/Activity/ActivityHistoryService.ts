@@ -169,7 +169,10 @@ export class ActivityHistoryService {
     }
 
     this.recordTraceEvent({ type: "history", ...entry });
-    this.eventStreamClientRegistry.broadcast({ type: "history", entry });
+    this.eventStreamClientRegistry.broadcast({
+      type: "activity-history-appended",
+      entry
+    });
     return entry;
   }
 

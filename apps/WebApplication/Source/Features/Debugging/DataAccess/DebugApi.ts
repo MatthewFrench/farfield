@@ -1,4 +1,5 @@
 import {
+  FarfieldDebugErrorClearEnvelopeSchema,
   CreateDebugClientErrorBodySchema,
   FarfieldDebugErrorCreateEnvelopeSchema
 } from "@farfield/protocol";
@@ -68,6 +69,9 @@ export type ApiDebugHistoryDetailResponse = z.infer<typeof HistoryDetailSchema>;
 const DebugErrorCreateEnvelopeSchema = FarfieldDebugErrorCreateEnvelopeSchema;
 export type ApiDebugErrorCreateResponse = z.infer<typeof DebugErrorCreateEnvelopeSchema>;
 
+const DebugErrorClearEnvelopeSchema = FarfieldDebugErrorClearEnvelopeSchema;
+export type ApiDebugErrorClearResponse = z.infer<typeof DebugErrorClearEnvelopeSchema>;
+
 const DebugErrorEventSchema = z
   .object({
     errorId: z.string().trim().min(1),
@@ -76,6 +80,7 @@ const DebugErrorEventSchema = z
     source: z.string().trim().min(1),
     operation: z.string().trim().min(1),
     message: z.string().trim().min(1),
+    severity: z.enum(["error", "warning"]),
     name: z.string().nullable(),
     stack: z.string().nullable(),
     requestId: z.string().nullable(),
@@ -223,6 +228,21 @@ export async function getDebugClientError(
     requestInitWithOptions(options)
   );
   return DebugErrorDetailEnvelopeSchema.parse(data);
+}
+
+export async function clearDebugClientErrors(
+  options?: ApiRequestOptions
+): Promise<ApiDebugErrorClearResponse> {
+  const data = await request(
+    "/api/debug/client-errors",
+    applyRequestOptions(
+      {
+        method: "DELETE"
+      },
+      options
+    )
+  );
+  return DebugErrorClearEnvelopeSchema.parse(data);
 }
 
 export async function replayHistoryEntry(

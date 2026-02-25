@@ -26,6 +26,7 @@ interface DebugFeatureCompositionMock {
     direction: "request" | "response";
     waitForResponse: boolean;
   }) => void;
+  clearDebugIssuesFromPanel: () => void;
   startTraceFromDebugPanel: () => void;
   markTraceFromDebugPanel: () => void;
   stopTraceFromDebugPanel: () => void;
@@ -166,6 +167,7 @@ interface RuntimeHarnessSnapshot {
   applicationShellState: ApplicationShellState;
   coreDataLoaders: CoreDataLoaders;
   loadSelectedThreadTracked: SelectedThreadLoaders["loadSelectedThreadTracked"];
+  applySelectedThreadStreamDelta: SelectedThreadLoaders["applySelectedThreadStreamDelta"];
   runtimeRequestHandlers: ApplicationRuntimeRequestHandlers;
 }
 
@@ -208,6 +210,7 @@ function createDebugFeatureCompositionMock(): DebugFeatureCompositionMock {
   return {
     loadHistoryDetail: vi.fn(async (_historyEntryId: string): Promise<void> => {}),
     replayHistoryEntryFromDetail: vi.fn(),
+    clearDebugIssuesFromPanel: vi.fn(),
     startTraceFromDebugPanel: vi.fn(),
     markTraceFromDebugPanel: vi.fn(),
     stopTraceFromDebugPanel: vi.fn(),
@@ -353,7 +356,8 @@ function RuntimeCompositionHarness(): React.JSX.Element {
   });
 
   const {
-    loadSelectedThreadTracked
+    loadSelectedThreadTracked,
+    applySelectedThreadStreamDelta
   } = useSelectedThreadLoaders({
     threads: applicationShellState.threads,
     selectedAgentId: applicationShellState.selectedAgentId,
@@ -396,6 +400,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     runtimeRequestHandlers,
     coreDataLoaders,
     loadSelectedThreadTracked,
+    applySelectedThreadStreamDelta,
     streamEventCards,
     renderAgentFavicon,
     formatDateValue
@@ -405,6 +410,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     applicationShellState,
     coreDataLoaders,
     loadSelectedThreadTracked,
+    applySelectedThreadStreamDelta,
     runtimeRequestHandlers
   };
 

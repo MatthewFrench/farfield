@@ -8,9 +8,10 @@ describe("ServerTransportErrorClassifier", () => {
 
     expect(classification.category).toBe("request_validation");
     expect(classification.statusCode).toBe(400);
+    expect(classification.severity).toBe("warning");
     expect(classification.logLevel).toBe("warn");
     expect(classification.logEventName).toBe("request-validation-failed");
-    expect(classification.shouldRecordServerError).toBe(false);
+    expect(classification.shouldRecordServerError).toBe(true);
     expect(classification.shouldPushSystemEvent).toBe(false);
     expect(classification.shouldBroadcastRuntimeState).toBe(false);
   });
@@ -25,6 +26,7 @@ describe("ServerTransportErrorClassifier", () => {
 
     expect(classification.category).toBe("shutdown_transport");
     expect(classification.statusCode).toBe(503);
+    expect(classification.severity).toBe("warning");
     expect(classification.logLevel).toBe("info");
     expect(classification.logEventName).toBe("request-closed-during-shutdown");
     expect(classification.runtimeErrorMessage).toBe("Server is shutting down");
@@ -41,6 +43,7 @@ describe("ServerTransportErrorClassifier", () => {
 
     expect(classification.category).toBe("internal");
     expect(classification.statusCode).toBe(500);
+    expect(classification.severity).toBe("error");
     expect(classification.logLevel).toBe("error");
     expect(classification.logEventName).toBe("request-failed");
     expect(classification.runtimeErrorMessage).toBe("boom");

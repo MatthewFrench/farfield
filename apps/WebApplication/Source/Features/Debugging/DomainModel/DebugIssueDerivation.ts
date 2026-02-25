@@ -66,7 +66,8 @@ export function buildDebugErrorIssue(event: DebugErrorLike): DebugErrorIssue {
 
   return {
     id: `error:${event.errorId}`,
-    severity: "error",
+    kind: "debug-error",
+    severity: event.severity,
     occurredAt: event.occurredAt,
     message: event.message,
     sourceLabel,
@@ -104,6 +105,7 @@ export function buildDebugWarningIssuesFromHistory(
       ].join(" ").toLowerCase();
       warningIssues.push({
         id: `warning:history-method:${entry.id}`,
+        kind: "history-warning",
         severity: "warning",
         warningType: "ipc-method",
         historyEntryId: entry.id,
@@ -142,6 +144,7 @@ export function buildDebugWarningIssuesFromHistory(
     ].join(" ").toLowerCase();
     warningIssues.push({
       id: `warning:system:${entry.id}`,
+      kind: "history-warning",
       severity: "warning",
       warningType: "system-message",
       historyEntryId: entry.id,

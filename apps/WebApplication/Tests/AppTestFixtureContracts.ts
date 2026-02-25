@@ -87,6 +87,7 @@ export interface DebugErrorFixture {
   source: string;
   operation: string;
   message: string;
+  severity: "error" | "warning";
   name: string | null;
   stack: string | null;
   requestId: string | null;

@@ -36,6 +36,13 @@ export interface LoadSelectedThreadOptions {
   includeReadThread?: boolean;
 }
 
+export interface ApplySelectedThreadStreamDeltaInput {
+  threadId: string;
+  liveStateSnapshot: LiveStateResponse;
+  streamEventsSnapshot: StreamEventsResponse;
+  streamEventsSinceSequenceUsed: number | null;
+}
+
 type LiveStateResponse = ChatLiveStateResponse;
 type StreamEventsResponse = ChatStreamEventsResponse;
 type ReadThreadResponse = ChatReadThreadResponse;
@@ -67,6 +74,7 @@ export interface SelectedThreadLoaders {
     signal?: AbortSignal
   ) => Promise<void>;
   loadSelectedThreadTracked: (threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>;
+  applySelectedThreadStreamDelta: (input: ApplySelectedThreadStreamDeltaInput) => void;
 }
 
 const STREAM_EVENT_RETENTION_LIMIT = 400;
@@ -75,6 +83,111 @@ export function useSelectedThreadLoaders(
   input: UseSelectedThreadLoadersInput
 ): SelectedThreadLoaders {
   const nextStreamSequenceByThreadReference = useRef<Map<string, number>>(new Map());
+
+  const applySnapshotsToState = useCallback((snapshotInput: {
+    threadId: string;
+    liveStateSnapshot: LiveStateResponse;
+    streamEventsSnapshot: StreamEventsResponse;
+    streamEventsSinceSequenceUsed: number | null;
+    readThreadSnapshot: ReadThreadResponse | null;
+    includeTurnsUsedForRead: boolean;
+  }) => {
+    const containsAnyTurns = (
+      (snapshotInput.liveStateSnapshot.conversationState?.turns.length ?? 0) > 0
+      || (snapshotInput.readThreadSnapshot?.thread.turns.length ?? 0) > 0
+    );
+    if (containsAnyTurns) {
+      input.pendingThreadMaterializationCoordinator.clearPending(snapshotInput.threadId);
+    }
+
+    nextStreamSequenceByThreadReference.current.set(
+      snapshotInput.threadId,
+      snapshotInput.streamEventsSnapshot.nextSequence
+    );
+
+    startTransition(() => {
+      input.setLiveState((previousLiveState) => {
+        if (
+          input.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
+            previousLiveState,
+            input.appDefaultModel,
+            input.appDefaultReasoningEffort
+          )
+          === input.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
+            snapshotInput.liveStateSnapshot,
+            input.appDefaultModel,
+            input.appDefaultReasoningEffort
+          )
+        ) {
+          return previousLiveState;
+        }
+        return snapshotInput.liveStateSnapshot;
+      });
+
+      const readThreadSnapshot = snapshotInput.readThreadSnapshot;
+      if (readThreadSnapshot) {
+        input.setReadThreadState((previousReadThreadState) => {
+          const mergedReadThread = input.readThreadStateMerger.merge<ReadThreadResponse>({
+            previous: previousReadThreadState,
+            incoming: readThreadSnapshot,
+            includeTurns: snapshotInput.includeTurnsUsedForRead
+          });
+
+          if (
+            input.conversationSyncSignatureBuilder.buildReadThreadSyncSignature(
+              previousReadThreadState,
+              input.appDefaultModel,
+              input.appDefaultReasoningEffort
+            )
+            === input.conversationSyncSignatureBuilder.buildReadThreadSyncSignature(
+              mergedReadThread,
+              input.appDefaultModel,
+              input.appDefaultReasoningEffort
+            )
+          ) {
+            return previousReadThreadState;
+          }
+
+          return mergedReadThread;
+        });
+      }
+
+      input.setStreamEvents((previousStreamEvents) => {
+        if (snapshotInput.streamEventsSnapshot.resetRequired) {
+          if (matchesStreamEventTail(previousStreamEvents, snapshotInput.streamEventsSnapshot.events)) {
+            return previousStreamEvents;
+          }
+          return snapshotInput.streamEventsSnapshot.events;
+        }
+
+        if (snapshotInput.streamEventsSinceSequenceUsed !== null) {
+          if (snapshotInput.streamEventsSnapshot.events.length === 0) {
+            return previousStreamEvents;
+          }
+
+          // Cursor-based reads return only unseen events, so state can append deterministically.
+          const mergedEvents = previousStreamEvents.concat(snapshotInput.streamEventsSnapshot.events);
+          return mergedEvents.length > STREAM_EVENT_RETENTION_LIMIT
+            ? mergedEvents.slice(-STREAM_EVENT_RETENTION_LIMIT)
+            : mergedEvents;
+        }
+
+        if (matchesStreamEventTail(previousStreamEvents, snapshotInput.streamEventsSnapshot.events)) {
+          return previousStreamEvents;
+        }
+        return snapshotInput.streamEventsSnapshot.events;
+      });
+    });
+  }, [
+    input.appDefaultModel,
+    input.appDefaultReasoningEffort,
+    input.conversationSyncSignatureBuilder,
+    input.pendingThreadMaterializationCoordinator,
+    input.readThreadStateMerger,
+    input.setLiveState,
+    input.setReadThreadState,
+    input.setStreamEvents
+  ]);
 
   const loadSelectedThread = useCallback(async (
     threadId: string,
@@ -108,103 +221,22 @@ export function useSelectedThreadLoaders(
       return;
     }
 
-    if (snapshot.containsAnyTurns) {
-      input.pendingThreadMaterializationCoordinator.clearPending(threadId);
-    }
-    if (canReadStreamEvents) {
-      nextStreamSequenceByThreadReference.current.set(
-        threadId,
-        snapshot.streamEventsSnapshot.nextSequence
-      );
-    }
-
-    startTransition(() => {
-      input.setLiveState((previousLiveState) => {
-        if (
-          input.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
-            previousLiveState,
-            input.appDefaultModel,
-            input.appDefaultReasoningEffort
-          )
-          === input.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
-            snapshot.liveStateSnapshot,
-            input.appDefaultModel,
-            input.appDefaultReasoningEffort
-          )
-        ) {
-          return previousLiveState;
-        }
-        return snapshot.liveStateSnapshot;
-      });
-
-      const readThreadSnapshot = snapshot.readThreadSnapshot;
-      if (readThreadSnapshot) {
-        input.setReadThreadState((previousReadThreadState) => {
-          const mergedReadThread = input.readThreadStateMerger.merge<ReadThreadResponse>({
-            previous: previousReadThreadState,
-            incoming: readThreadSnapshot,
-            includeTurns: snapshot.includeTurnsUsedForRead
-          });
-
-          if (
-            input.conversationSyncSignatureBuilder.buildReadThreadSyncSignature(
-              previousReadThreadState,
-              input.appDefaultModel,
-              input.appDefaultReasoningEffort
-            )
-            === input.conversationSyncSignatureBuilder.buildReadThreadSyncSignature(
-              mergedReadThread,
-              input.appDefaultModel,
-              input.appDefaultReasoningEffort
-            )
-          ) {
-            return previousReadThreadState;
-          }
-
-          return mergedReadThread;
-        });
-      }
-
-      input.setStreamEvents((previousStreamEvents) => {
-        if (snapshot.streamEventsSnapshot.resetRequired) {
-          if (matchesStreamEventTail(previousStreamEvents, snapshot.streamEventsSnapshot.events)) {
-            return previousStreamEvents;
-          }
-          return snapshot.streamEventsSnapshot.events;
-        }
-
-        if (snapshot.streamEventsSinceSequenceUsed !== null) {
-          if (snapshot.streamEventsSnapshot.events.length === 0) {
-            return previousStreamEvents;
-          }
-
-          // Cursor-based reads return only unseen events, so state can append deterministically.
-          const mergedEvents = previousStreamEvents.concat(snapshot.streamEventsSnapshot.events);
-          return mergedEvents.length > STREAM_EVENT_RETENTION_LIMIT
-            ? mergedEvents.slice(-STREAM_EVENT_RETENTION_LIMIT)
-            : mergedEvents;
-        }
-
-        if (matchesStreamEventTail(previousStreamEvents, snapshot.streamEventsSnapshot.events)) {
-          return previousStreamEvents;
-        }
-        return snapshot.streamEventsSnapshot.events;
-      });
+    applySnapshotsToState({
+      threadId,
+      liveStateSnapshot: snapshot.liveStateSnapshot,
+      streamEventsSnapshot: snapshot.streamEventsSnapshot,
+      streamEventsSinceSequenceUsed: snapshot.streamEventsSinceSequenceUsed,
+      readThreadSnapshot: snapshot.readThreadSnapshot,
+      includeTurnsUsedForRead: snapshot.includeTurnsUsedForRead
     });
   }, [
+    applySnapshotsToState,
     input.agentsById,
-    input.appDefaultModel,
-    input.appDefaultReasoningEffort,
     input.chatServerClient,
-    input.conversationSyncSignatureBuilder,
     input.pendingThreadMaterializationCoordinator,
-    input.readThreadStateMerger,
     input.selectedAgentId,
     input.selectedThreadDataRefreshCoordinator,
     input.selectedThreadIdRef,
-    input.setLiveState,
-    input.setReadThreadState,
-    input.setStreamEvents,
     input.threads
   ]);
 
@@ -235,9 +267,28 @@ export function useSelectedThreadLoaders(
     loadSelectedThread
   ]);
 
+  const applySelectedThreadStreamDelta = useCallback((streamDeltaInput: ApplySelectedThreadStreamDeltaInput) => {
+    if (input.selectedThreadIdRef.current !== streamDeltaInput.threadId) {
+      return;
+    }
+
+    applySnapshotsToState({
+      threadId: streamDeltaInput.threadId,
+      liveStateSnapshot: streamDeltaInput.liveStateSnapshot,
+      streamEventsSnapshot: streamDeltaInput.streamEventsSnapshot,
+      streamEventsSinceSequenceUsed: streamDeltaInput.streamEventsSinceSequenceUsed,
+      readThreadSnapshot: null,
+      includeTurnsUsedForRead: false
+    });
+  }, [
+    applySnapshotsToState,
+    input.selectedThreadIdRef
+  ]);
+
   return {
     loadSelectedThread,
-    loadSelectedThreadTracked
+    loadSelectedThreadTracked,
+    applySelectedThreadStreamDelta
   };
 }
 

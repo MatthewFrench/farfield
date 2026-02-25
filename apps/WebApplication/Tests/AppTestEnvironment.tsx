@@ -59,6 +59,7 @@ const EventsSessionBootstrapRequestSchema = z
   .strict();
 
 const localStorageState = new Map<string, string>();
+let eventStreamSequence = 0;
 
 let agentsFixture: AgentsFixture;
 let threadsFixture: ThreadListFixture;
@@ -77,6 +78,7 @@ function resetFixtures(): void {
   window.history.replaceState(null, "", "/");
   MockEventSource.reset();
   localStorageState.clear();
+  eventStreamSequence = 0;
 
   agentsFixture = {
     ok: true,
@@ -351,6 +353,33 @@ function installGlobals(): void {
       }
 
       if (pathname === "/api/debug/client-errors") {
+        if (init?.method === "POST") {
+          return {
+            ok: true,
+            json: async () => ({
+              ok: true,
+              errorId: "error_test_created",
+              sessionId: debugErrorsFixture.sessionId,
+              recordedAt: "2026-02-26T00:00:00.000Z"
+            })
+          } as Response;
+        }
+        if (init?.method === "DELETE") {
+          const clearedCount = debugErrorsFixture.data.length;
+          debugErrorsFixture = {
+            ...debugErrorsFixture,
+            data: []
+          };
+          return {
+            ok: true,
+            json: async () => ({
+              ok: true,
+              clearedCount,
+              sessionId: debugErrorsFixture.sessionId,
+              sessionLogPath: debugErrorsFixture.sessionLogPath
+            })
+          } as Response;
+        }
         return {
           ok: true,
           json: async () => debugErrorsFixture
@@ -430,12 +459,23 @@ export function registerAppTestEnvironment(): AppTestEnvironment {
       eventsSessionFixture = fixture;
     },
     emitHistoryEventForThread: (threadId: string) => {
+      eventStreamSequence += 1;
       MockEventSource.emit({
-        type: "history",
-        entry: {
-          source: "app",
-          meta: {
-            threadId
+        sequence: eventStreamSequence,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: `history-${String(eventStreamSequence)}`,
+            at: new Date().toISOString(),
+            source: "app",
+            direction: "out",
+            payload: {
+              ok: true
+            },
+            meta: {
+              threadId,
+              method: "messages.send"
+            }
           }
         }
       });

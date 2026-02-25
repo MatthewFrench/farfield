@@ -15,15 +15,19 @@ describe("EventStreamRefreshDecisionEngine", () => {
       activeTab: "chat",
       selectedThreadId: "thread-1",
       eventData: JSON.stringify({
-        type: "state",
-        state: { connected: true }
+        sequence: 1,
+        event: {
+          type: "runtime-state-changed",
+          state: { connected: true }
+        }
       })
     });
 
     expect(decision).toEqual({
       refreshCore: true,
       refreshHistory: false,
-      refreshSelectedThread: false
+      refreshSelectedThread: false,
+      threadStreamDelta: null
     });
   });
 
@@ -34,12 +38,22 @@ describe("EventStreamRefreshDecisionEngine", () => {
       activeTab: "debug",
       selectedThreadId: "thread-1",
       eventData: JSON.stringify({
-        type: "history",
-        entry: {
-          source: "app",
-          meta: {
-            method: "thread-stream-state-changed",
-            threadId: "thread-1"
+        sequence: 2,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: "entry-1",
+            at: "2026-02-26T00:00:00.000Z",
+            source: "app",
+            direction: "out",
+            payload: {
+              type: "action",
+              action: "thread-queued-followups-changed"
+            },
+            meta: {
+              method: "thread-queued-followups-changed",
+              threadId: "thread-1"
+            }
           }
         }
       })
@@ -48,7 +62,8 @@ describe("EventStreamRefreshDecisionEngine", () => {
     expect(decision).toEqual({
       refreshCore: false,
       refreshHistory: true,
-      refreshSelectedThread: true
+      refreshSelectedThread: true,
+      threadStreamDelta: null
     });
   });
 
@@ -59,11 +74,21 @@ describe("EventStreamRefreshDecisionEngine", () => {
       activeTab: "chat",
       selectedThreadId: "thread-1",
       eventData: JSON.stringify({
-        type: "history",
-        entry: {
-          source: "app",
-          meta: {
-            method: "thread-created"
+        sequence: 3,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: "entry-2",
+            at: "2026-02-26T00:00:00.000Z",
+            source: "app",
+            direction: "out",
+            payload: {
+              type: "action",
+              action: "thread-created"
+            },
+            meta: {
+              method: "thread-created"
+            }
           }
         }
       })
@@ -72,8 +97,49 @@ describe("EventStreamRefreshDecisionEngine", () => {
     expect(decision).toEqual({
       refreshCore: true,
       refreshHistory: false,
-      refreshSelectedThread: false
+      refreshSelectedThread: false,
+      threadStreamDelta: null
     });
+  });
+
+  it("exposes pushed thread stream deltas for selected thread and skips selected-thread refresh", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "chat",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 4,
+        event: {
+          type: "thread-stream-delta",
+          delta: {
+            threadId: "thread-1",
+            liveStateSnapshot: {
+              ok: true,
+              threadId: "thread-1",
+              ownerClientId: "client-a",
+              conversationState: null,
+              liveStateError: null
+            },
+            streamEventsSnapshot: {
+              ok: true,
+              threadId: "thread-1",
+              ownerClientId: "client-a",
+              events: [],
+              nextSequence: 11,
+              firstAvailableSequence: 2,
+              resetRequired: false
+            },
+            streamEventsSinceSequenceUsed: 10
+          }
+        }
+      })
+    });
+
+    expect(decision.refreshCore).toBe(false);
+    expect(decision.refreshHistory).toBe(false);
+    expect(decision.refreshSelectedThread).toBe(false);
+    expect(decision.threadStreamDelta?.threadId).toBe("thread-1");
   });
 
   it("refreshes core when event payload is invalid", () => {
@@ -88,7 +154,8 @@ describe("EventStreamRefreshDecisionEngine", () => {
     expect(decision).toEqual({
       refreshCore: true,
       refreshHistory: false,
-      refreshSelectedThread: false
+      refreshSelectedThread: false,
+      threadStreamDelta: null
     });
   });
 });

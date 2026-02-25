@@ -140,6 +140,7 @@ function reportGlobalBrowserError(
     source,
     operation: input.operation,
     message: input.message,
+    severity: "error",
     name: input.name,
     stack: input.stack,
     requestId: null,

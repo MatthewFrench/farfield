@@ -34,6 +34,7 @@ export interface DebugWorkspacePaneProps {
   onSelectDebugIssue: (issueId: string) => void;
   onDebugIssueSeverityFilterChange: (severityFilter: DebugIssueSeverityFilter) => void;
   onDebugIssueFilterQueryChange: (filterQuery: string) => void;
+  onClearDebugIssues: () => void;
   debugHistoryEntryListItems: readonly DebugHistoryEntryListItem[];
   selectedHistoryId: string;
   selectedHistoryDetailId: string | null;
@@ -70,6 +71,7 @@ export function DebugWorkspacePane({
   onSelectDebugIssue,
   onDebugIssueSeverityFilterChange,
   onDebugIssueFilterQueryChange,
+  onClearDebugIssues,
   debugHistoryEntryListItems,
   selectedHistoryId,
   selectedHistoryDetailId,
@@ -134,6 +136,7 @@ export function DebugWorkspacePane({
             onIssueSelect={onSelectDebugIssue}
             onSeverityFilterChange={onDebugIssueSeverityFilterChange}
             onFilterQueryChange={onDebugIssueFilterQueryChange}
+            onClearIssues={onClearDebugIssues}
           />
         )}
 

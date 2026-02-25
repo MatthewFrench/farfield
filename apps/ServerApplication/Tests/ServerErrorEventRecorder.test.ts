@@ -35,6 +35,7 @@ describe("ServerErrorEventRecorder", () => {
       source: "farfield-server",
       operation: "http:request",
       message: "Request failed",
+      severity: "error",
       name: "Error",
       stack: "stack",
       requestId: "request_1",
@@ -53,6 +54,7 @@ describe("ServerErrorEventRecorder", () => {
     expect(entries[0]?.source).toBe("farfield-server");
     expect(entries[0]?.operation).toBe("http:request");
     expect(entries[0]?.message).toBe("Request failed");
+    expect(entries[0]?.severity).toBe("error");
     expect(entries[0]?.requestId).toBe("request_1");
     expect(entries[0]?.threadId).toBe("thread_1");
     expect(entries[0]?.url).toBe("/api/threads");

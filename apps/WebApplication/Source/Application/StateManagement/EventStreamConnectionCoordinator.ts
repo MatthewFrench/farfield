@@ -3,6 +3,7 @@ import {
   type EventRefreshFlags
 } from "./EventRefreshScheduler";
 import { EventStreamRefreshDecisionEngine } from "./EventStreamRefreshDecisionEngine";
+import type { FarfieldThreadStreamDelta } from "@farfield/protocol";
 
 export interface EventSourceLike {
   onopen: ((event: Event) => void) | null;
@@ -21,6 +22,7 @@ export interface EventStreamConnectionCoordinatorStartInput {
   eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionEngine;
   readSnapshot: () => EventStreamConnectionSnapshot;
   executeScheduledRefresh: (refreshFlags: EventRefreshFlags) => Promise<void>;
+  applyThreadStreamDelta: (threadStreamDelta: FarfieldThreadStreamDelta) => void;
   onConnectionStatusChange: (connected: boolean) => void;
   eventsUrl?: string;
 }
@@ -30,6 +32,7 @@ interface EventStreamConnectionCoordinatorContext {
   eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionEngine;
   readSnapshot: () => EventStreamConnectionSnapshot;
   executeScheduledRefresh: (refreshFlags: EventRefreshFlags) => Promise<void>;
+  applyThreadStreamDelta: (threadStreamDelta: FarfieldThreadStreamDelta) => void;
   onConnectionStatusChange: (connected: boolean) => void;
   eventsUrl: string;
 }
@@ -82,6 +85,7 @@ export class EventStreamConnectionCoordinator {
       eventStreamRefreshDecisionEngine: input.eventStreamRefreshDecisionEngine,
       readSnapshot: input.readSnapshot,
       executeScheduledRefresh: input.executeScheduledRefresh,
+      applyThreadStreamDelta: input.applyThreadStreamDelta,
       onConnectionStatusChange: input.onConnectionStatusChange,
       eventsUrl: input.eventsUrl ?? "/events"
     };
@@ -142,6 +146,9 @@ export class EventStreamConnectionCoordinator {
         refreshHistory: refreshDecision.refreshHistory,
         refreshSelectedThread: refreshDecision.refreshSelectedThread
       });
+      if (refreshDecision.threadStreamDelta) {
+        this.context.applyThreadStreamDelta(refreshDecision.threadStreamDelta);
+      }
     };
     this.source.onerror = () => {
       if (!this.context) {
@@ -158,6 +165,13 @@ export class EventStreamConnectionCoordinator {
 
   private scheduleRefresh(refreshFlags: EventRefreshFlags): void {
     if (!this.context) {
+      return;
+    }
+    if (
+      !refreshFlags.refreshCore &&
+      !refreshFlags.refreshHistory &&
+      !refreshFlags.refreshSelectedThread
+    ) {
       return;
     }
     this.context.eventRefreshScheduler.enqueueRefresh(refreshFlags, async (pendingRefreshFlags) => {

@@ -31,6 +31,7 @@ export interface UseDebugActionHandlersInput {
 export interface DebugActionHandlers {
   loadHistoryDetail: (id: string) => Promise<void>;
   replayHistoryEntryFromDetail: (input: ReplayHistoryEntryRequestInput) => void;
+  clearDebugIssuesFromPanel: () => void;
   startTraceFromDebugPanel: () => void;
   markTraceFromDebugPanel: () => void;
   stopTraceFromDebugPanel: () => void;
@@ -56,6 +57,19 @@ export function useDebugActionHandlers(input: UseDebugActionHandlersInput): Debu
     },
     [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData]
   );
+
+  const clearDebugIssuesFromPanel = useCallback(() => {
+    input.setSelectedDebugIssueId("");
+    void input.debugWorkspaceActionCoordinator.clearClientErrors({
+      debugClient: input.debugServerClient,
+      refreshCoreData: input.refreshCoreData
+    });
+  }, [
+    input.debugServerClient,
+    input.debugWorkspaceActionCoordinator,
+    input.refreshCoreData,
+    input.setSelectedDebugIssueId
+  ]);
 
   const startTraceFromDebugPanel = useCallback(() => {
     void input.debugWorkspaceActionCoordinator.startTrace({
@@ -111,6 +125,7 @@ export function useDebugActionHandlers(input: UseDebugActionHandlersInput): Debu
   return {
     loadHistoryDetail,
     replayHistoryEntryFromDetail,
+    clearDebugIssuesFromPanel,
     startTraceFromDebugPanel,
     markTraceFromDebugPanel,
     stopTraceFromDebugPanel,

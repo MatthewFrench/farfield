@@ -211,8 +211,8 @@ export function useApplicationShellComposition(
     setDebugWorkspaceSection: (nextSection) => {
       applicationShellState.setDebugWorkspaceSection(nextSection);
     },
-    debugErrorIssueCount: applicationDerivedState.debugErrorIssues.length,
-    debugWarningIssueCount: applicationDerivedState.debugWarningIssues.length,
+    debugErrorIssueCount: applicationDerivedState.debugIssues.filter((issue) => issue.severity === "error").length,
+    debugWarningIssueCount: applicationDerivedState.debugIssues.filter((issue) => issue.severity === "warning").length,
     filteredDebugIssues: applicationDerivedState.filteredDebugIssues,
     selectedDebugIssue: applicationDerivedState.selectedDebugIssue,
     selectedDebugIssueId: applicationShellState.selectedDebugIssueId,
@@ -229,6 +229,7 @@ export function useApplicationShellComposition(
     setDebugIssueFilterQuery: (nextQuery) => {
       applicationShellState.setDebugIssueFilterQuery(nextQuery);
     },
+    clearDebugIssuesFromDebugPanel: input.debugFeatureComposition.clearDebugIssuesFromPanel,
     debugHistoryEntryListItems: applicationDerivedState.debugHistoryEntryListItems,
     selectedHistoryId: applicationShellState.selectedHistoryId,
     selectedHistoryDetailId: applicationShellState.historyDetail?.entry.id ?? null,

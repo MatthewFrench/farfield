@@ -1,30 +1,7 @@
-import { z } from "zod";
-
-const StateEventSchema = z
-  .object({
-    type: z.literal("state"),
-    state: z.object({}).passthrough()
-  })
-  .passthrough();
-
-const HistoryEventSchema = z
-  .object({
-    type: z.literal("history"),
-    entry: z
-      .object({
-        source: z.enum(["ipc", "app", "system"]),
-        meta: z
-          .object({
-            method: z.string().optional(),
-            threadId: z.string().optional()
-          })
-          .passthrough()
-      })
-      .passthrough()
-  })
-  .passthrough();
-
-const StreamEventSchema = z.union([StateEventSchema, HistoryEventSchema]);
+import {
+  FarfieldEventStreamEnvelopeSchema,
+  type FarfieldThreadStreamDelta
+} from "@farfield/protocol";
 
 export interface EventStreamRefreshDecisionInput {
   activeTab: "chat" | "debug";
@@ -36,6 +13,7 @@ export interface EventStreamRefreshDecision {
   refreshCore: boolean;
   refreshHistory: boolean;
   refreshSelectedThread: boolean;
+  threadStreamDelta: FarfieldThreadStreamDelta | null;
 }
 
 /**
@@ -50,26 +28,35 @@ export class EventStreamRefreshDecisionEngine {
 
   public readDecision(input: EventStreamRefreshDecisionInput): EventStreamRefreshDecision {
     let refreshCore = false;
-    const refreshHistory = input.activeTab === "debug";
+    let refreshHistory = false;
     let refreshSelectedThread = false;
+    let threadStreamDelta: FarfieldThreadStreamDelta | null = null;
 
     try {
-      const parseResult = StreamEventSchema.safeParse(JSON.parse(input.eventData));
+      const parseResult = FarfieldEventStreamEnvelopeSchema.safeParse(JSON.parse(input.eventData));
       if (!parseResult.success) {
         refreshCore = true;
-      } else if (parseResult.data.type === "state") {
+        refreshHistory = input.activeTab === "debug";
+      } else if (parseResult.data.event.type === "runtime-state-changed") {
         refreshCore = true;
-      } else {
-        const eventMethod = parseResult.data.entry.meta.method;
-        const eventThreadId = parseResult.data.entry.meta.threadId;
+      } else if (parseResult.data.event.type === "activity-history-appended") {
+        refreshHistory = input.activeTab === "debug";
+        const eventMethodValue = parseResult.data.event.entry.meta["method"];
+        const eventThreadIdValue = parseResult.data.event.entry.meta["threadId"];
+        const eventMethod = typeof eventMethodValue === "string" ? eventMethodValue : null;
+        const eventThreadId = typeof eventThreadIdValue === "string" ? eventThreadIdValue : null;
         const isThreadOnlyMethod = typeof eventMethod === "string"
           && this.threadOnlyHistoryMethods.has(eventMethod);
 
-        if (!isThreadOnlyMethod && (parseResult.data.entry.source === "app" || parseResult.data.entry.source === "system")) {
+        if (
+          !isThreadOnlyMethod
+          && (parseResult.data.event.entry.source === "app" || parseResult.data.event.entry.source === "system")
+        ) {
           refreshCore = true;
         }
         if (
-          eventThreadId
+          eventMethod !== "thread-stream-state-changed"
+          && eventThreadId
           && input.selectedThreadId
           && eventThreadId === input.selectedThreadId
         ) {
@@ -78,15 +65,24 @@ export class EventStreamRefreshDecisionEngine {
         if (!eventThreadId && !isThreadOnlyMethod) {
           refreshCore = true;
         }
+      } else {
+        if (
+          input.selectedThreadId
+          && parseResult.data.event.delta.threadId === input.selectedThreadId
+        ) {
+          threadStreamDelta = parseResult.data.event.delta;
+        }
       }
     } catch {
       refreshCore = true;
+      refreshHistory = input.activeTab === "debug";
     }
 
     return {
       refreshCore,
       refreshHistory,
-      refreshSelectedThread
+      refreshSelectedThread,
+      threadStreamDelta
     };
   }
 }

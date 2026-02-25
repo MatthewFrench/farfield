@@ -1,7 +1,12 @@
 import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SendRequestOptions } from "@farfield/api";
-import { type IpcRequestFrame, type JsonValue } from "@farfield/protocol";
+import {
+  type DebugErrorEvent,
+  type DebugErrorSeverity,
+  type IpcRequestFrame,
+  type JsonValue
+} from "@farfield/protocol";
 import type { CodexAgentAdapter } from "../../Agents/Adapters/CodexAgentAdapter.js";
 import type { ActivityHistoryService } from "../../Modules/Activity/ActivityHistoryService.js";
 import type { ClientErrorStore } from "../../Modules/Debugging/ClientErrorStore.js";
@@ -34,7 +39,8 @@ export interface DebugRouteDependencies {
   readJsonBody: (req: IncomingMessage) => Promise<JsonValue>;
   onClientErrorRecorded: (input: {
     errorId: string;
-    origin: string;
+    origin: DebugErrorEvent["origin"];
+    severity: DebugErrorSeverity;
     source: string;
     operation: string;
     requestId: string | null;

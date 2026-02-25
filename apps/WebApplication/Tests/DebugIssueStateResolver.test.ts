@@ -17,6 +17,7 @@ function buildDebugError(input: {
     source: "farfield-web",
     operation: input.operation,
     message: input.message,
+    severity: "error",
     name: "Error",
     stack: null,
     requestId: null,

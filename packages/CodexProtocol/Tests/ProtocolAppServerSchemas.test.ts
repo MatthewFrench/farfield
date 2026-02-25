@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  FarfieldEventStreamEnvelopeSchema,
   FarfieldDebugObservabilityEnvelopeSchema,
   parseAppServerCollaborationModeListResponse,
   parseAppServerConfigReadResponse,
   parseAppServerListModelsResponse,
   parseAppServerListThreadsResponse,
   parseAppServerReadThreadResponse,
-  parseAppServerStartThreadResponse
+  parseAppServerStartThreadResponse,
+  parseDebugErrorEvent
 } from "../Source/Index.js";
 
 describe("codex-protocol app-server schemas", () => {
@@ -273,6 +275,78 @@ describe("codex-protocol app-server schemas", () => {
     expect(parsed.snapshot.routing.threadAdapterResolver.unregisteredDiscoveryMissCacheHitCount).toBe(5);
   });
 
+  it("parses farfield event-stream envelope for thread stream delta payloads", () => {
+    const parsed = FarfieldEventStreamEnvelopeSchema.parse({
+      sequence: 12,
+      event: {
+        type: "thread-stream-delta",
+        delta: {
+          threadId: "thread-1",
+          liveStateSnapshot: {
+            ok: true,
+            threadId: "thread-1",
+            ownerClientId: "client-a",
+            conversationState: null,
+            liveStateError: null
+          },
+          streamEventsSnapshot: {
+            ok: true,
+            threadId: "thread-1",
+            ownerClientId: "client-a",
+            events: [
+              {
+                type: "request",
+                requestId: "request-1",
+                method: "thread/read",
+                params: {
+                  threadId: "thread-1"
+                }
+              }
+            ],
+            nextSequence: 4,
+            firstAvailableSequence: 2,
+            resetRequired: false
+          },
+          streamEventsSinceSequenceUsed: 3
+        }
+      }
+    });
+
+    expect(parsed.event.type).toBe("thread-stream-delta");
+    if (parsed.event.type !== "thread-stream-delta") {
+      throw new Error("Expected thread-stream-delta payload");
+    }
+    expect(parsed.event.delta.streamEventsSnapshot.nextSequence).toBe(4);
+  });
+
+  it("rejects farfield event-stream envelopes when required event metadata is missing", () => {
+    expect(() => FarfieldEventStreamEnvelopeSchema.parse({
+      sequence: 1,
+      event: {
+        type: "thread-stream-delta",
+        delta: {
+          threadId: "thread-1",
+          liveStateSnapshot: {
+            ok: true,
+            threadId: "thread-1",
+            ownerClientId: null,
+            conversationState: null,
+            liveStateError: null
+          },
+          streamEventsSnapshot: {
+            ok: true,
+            threadId: "thread-1",
+            ownerClientId: null,
+            events: [],
+            firstAvailableSequence: 0,
+            resetRequired: false
+          },
+          streamEventsSinceSequenceUsed: null
+        }
+      }
+    })).toThrowError(/nextSequence/);
+  });
+
   it("rejects farfield debug observability envelope when routing stats are missing", () => {
     expect(() => FarfieldDebugObservabilityEnvelopeSchema.parse({
       ok: true,
@@ -325,5 +399,26 @@ describe("codex-protocol app-server schemas", () => {
         }
       }
     })).toThrowError(/routing/);
+  });
+
+  it("defaults debug error severity to error for legacy records", () => {
+    const parsed = parseDebugErrorEvent({
+      errorId: "error_1",
+      sessionId: "session_1",
+      origin: "client",
+      source: "farfield-web",
+      operation: "legacy-operation",
+      message: "legacy error",
+      name: null,
+      stack: null,
+      requestId: null,
+      threadId: null,
+      url: null,
+      occurredAt: "2026-02-26T00:00:00.000Z",
+      recordedAt: "2026-02-26T00:00:01.000Z",
+      details: {}
+    });
+
+    expect(parsed.severity).toBe("error");
   });
 });

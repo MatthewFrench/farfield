@@ -26,6 +26,36 @@ interface PushRecoveryHarness {
   cacheDeleteMock: Mock<(cacheName: string) => Promise<boolean>>;
 }
 
+function installLocalStorageMock(): void {
+  const storageEntries = new Map<string, string>();
+  const localStorageMock: Storage = {
+    get length() {
+      return storageEntries.size;
+    },
+    clear(): void {
+      storageEntries.clear();
+    },
+    getItem(key: string): string | null {
+      const value = storageEntries.get(key);
+      return value === undefined ? null : value;
+    },
+    key(index: number): string | null {
+      return Array.from(storageEntries.keys())[index] ?? null;
+    },
+    removeItem(key: string): void {
+      storageEntries.delete(key);
+    },
+    setItem(key: string, value: string): void {
+      storageEntries.set(key, value);
+    }
+  };
+
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: localStorageMock
+  });
+}
+
 function createMockCookieStoreManager(): CookieStoreManager {
   return {
     getSubscriptions: async () => [],
@@ -189,6 +219,7 @@ function installPushRecoveryHarness(options: { waitingWorker: boolean }): PushRe
 describe("recoverPushNotifications", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    installLocalStorageMock();
     vi.mocked(getPushStatus).mockResolvedValue({
       ok: true,
       enabled: true,
@@ -274,6 +305,7 @@ describe("recoverPushNotifications", () => {
 describe("disablePushNotifications", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    installLocalStorageMock();
     vi.mocked(deletePushSubscription).mockResolvedValue({
       deleted: true
     });

@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getConfigDefaults,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
-import { getDebugClientError } from "../Source/Features/Debugging/DataAccess/DebugApi";
+import {
+  clearDebugClientErrors,
+  getDebugClientError
+} from "../Source/Features/Debugging/DataAccess/DebugApi";
 import { sendMessage } from "../Source/Features/Chat/DataAccess/ChatApi";
 import {
   createThread,
@@ -28,6 +31,7 @@ describe("API envelope parsing", () => {
           source: "web-app",
           operation: "debug:client-error-detail",
           message: "example",
+          severity: "error",
           name: null,
           stack: null,
           requestId: null,
@@ -106,6 +110,23 @@ describe("API envelope parsing", () => {
     expect(requestInit?.method).toBe("POST");
     expect(new Headers(requestInit?.headers).get("Content-Type")).toBe("application/json");
     expect(String(requestInit?.body)).toBe(JSON.stringify({ apiToken: "token_123" }));
+  });
+
+  it("clears debug client errors through the debug endpoint", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        clearedCount: 2,
+        sessionId: "session_1",
+        sessionLogPath: ".runtime/logs/errors/client-errors.ndjson"
+      })
+    } as Response);
+
+    const result = await clearDebugClientErrors();
+    expect(result.clearedCount).toBe(2);
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    expect(requestInit?.method).toBe("DELETE");
   });
 
   it("requests thread list with sortKey and cwd", async () => {

@@ -63,6 +63,7 @@ export interface UseApplicationRuntimeCompositionInput {
   runtimeRequestHandlers: ApplicationRuntimeRequestHandlers;
   coreDataLoaders: CoreDataLoaders;
   loadSelectedThreadTracked: SelectedThreadLoaders["loadSelectedThreadTracked"];
+  applySelectedThreadStreamDelta: SelectedThreadLoaders["applySelectedThreadStreamDelta"];
   streamEventCards: React.JSX.Element[];
   renderAgentFavicon: ApplicationFormattingHelpers["renderAgentFavicon"];
   formatDateValue: ApplicationFormattingHelpers["formatDateValue"];
@@ -219,6 +220,7 @@ export function useApplicationRuntimeComposition(
     setDebugErrors: input.applicationShellState.setDebugErrors,
     setDebugErrorSessionId: input.applicationShellState.setDebugErrorSessionId,
     setDebugErrorSessionLogPath: input.applicationShellState.setDebugErrorSessionLogPath,
+    applySelectedThreadStreamDelta: input.applySelectedThreadStreamDelta,
     handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError
   });
 

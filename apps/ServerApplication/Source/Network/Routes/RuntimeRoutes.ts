@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
+  FarfieldHealthStateSchema,
   FarfieldEventsSessionResponseSchema,
   type JsonValue
 } from "@farfield/protocol";
@@ -44,9 +45,10 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
   } = deps;
 
   if (req.method === "GET" && pathname === "/events") {
+    const runtimeStateSnapshot = FarfieldHealthStateSchema.parse(runtimeStateOwner.readSnapshot());
     eventStreamClientRegistry.addClient(req, res, {
-      type: "state",
-      state: runtimeStateOwner.readSnapshot()
+      type: "runtime-state-changed",
+      state: runtimeStateSnapshot
     });
     return true;
   }

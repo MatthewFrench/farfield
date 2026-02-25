@@ -219,7 +219,8 @@ export function App(): React.JSX.Element {
   });
 
   const {
-    loadSelectedThreadTracked
+    loadSelectedThreadTracked,
+    applySelectedThreadStreamDelta
   } = useSelectedThreadLoaders({
     threads: applicationShellState.threads,
     selectedAgentId: applicationShellState.selectedAgentId,
@@ -255,6 +256,7 @@ export function App(): React.JSX.Element {
     runtimeRequestHandlers,
     coreDataLoaders,
     loadSelectedThreadTracked,
+    applySelectedThreadStreamDelta,
     streamEventCards,
     renderAgentFavicon,
     formatDateValue

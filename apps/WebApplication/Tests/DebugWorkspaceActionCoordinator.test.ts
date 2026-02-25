@@ -24,11 +24,21 @@ function buildHistoryDetail(id: string): HistoryDetail {
   };
 }
 
+function buildClearClientErrorsResponse() {
+  return {
+    ok: true as const,
+    clearedCount: 0,
+    sessionId: "session-1",
+    sessionLogPath: "/tmp/session.ndjson"
+  };
+}
+
 describe("DebugWorkspaceActionCoordinator", () => {
   it("clears history detail when no history entry identifier is provided", async () => {
     const coordinator = new DebugWorkspaceActionCoordinator();
     const debugClient = {
       readHistoryEntry: vi.fn(async () => buildHistoryDetail("entry-1")),
+      clearClientErrors: vi.fn(async () => buildClearClientErrorsResponse()),
       replayHistoryEntry: vi.fn(async () => ({})),
       startTrace: vi.fn(async () => {}),
       markTrace: vi.fn(async () => {}),
@@ -51,6 +61,7 @@ describe("DebugWorkspaceActionCoordinator", () => {
     const detail = buildHistoryDetail("entry-9");
     const debugClient = {
       readHistoryEntry: vi.fn(async () => detail),
+      clearClientErrors: vi.fn(async () => buildClearClientErrorsResponse()),
       replayHistoryEntry: vi.fn(async () => ({})),
       startTrace: vi.fn(async () => {}),
       markTrace: vi.fn(async () => {}),
@@ -72,6 +83,7 @@ describe("DebugWorkspaceActionCoordinator", () => {
     const coordinator = new DebugWorkspaceActionCoordinator();
     const debugClient = {
       readHistoryEntry: vi.fn(async () => buildHistoryDetail("entry-1")),
+      clearClientErrors: vi.fn(async () => buildClearClientErrorsResponse()),
       replayHistoryEntry: vi.fn(async () => ({
         ok: true
       })),
@@ -101,6 +113,7 @@ describe("DebugWorkspaceActionCoordinator", () => {
     const coordinator = new DebugWorkspaceActionCoordinator();
     const debugClient = {
       readHistoryEntry: vi.fn(async () => buildHistoryDetail("entry-1")),
+      clearClientErrors: vi.fn(async () => buildClearClientErrorsResponse()),
       replayHistoryEntry: vi.fn(async () => ({})),
       startTrace: vi.fn(async () => {}),
       markTrace: vi.fn(async () => {}),
@@ -128,6 +141,7 @@ describe("DebugWorkspaceActionCoordinator", () => {
     const coordinator = new DebugWorkspaceActionCoordinator();
     const debugClient = {
       readHistoryEntry: vi.fn(async () => buildHistoryDetail("entry-1")),
+      clearClientErrors: vi.fn(async () => buildClearClientErrorsResponse()),
       replayHistoryEntry: vi.fn(async () => ({})),
       startTrace: vi.fn(async () => {}),
       markTrace: vi.fn(async () => {}),
@@ -141,6 +155,32 @@ describe("DebugWorkspaceActionCoordinator", () => {
     });
 
     expect(debugClient.stopTrace).toHaveBeenCalledTimes(1);
+    expect(refreshCoreData).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears debug client errors and refreshes core data", async () => {
+    const coordinator = new DebugWorkspaceActionCoordinator();
+    const debugClient = {
+      readHistoryEntry: vi.fn(async () => buildHistoryDetail("entry-1")),
+      clearClientErrors: vi.fn(async () => ({
+        ok: true as const,
+        clearedCount: 3,
+        sessionId: "session-1",
+        sessionLogPath: "/tmp/session.ndjson"
+      })),
+      replayHistoryEntry: vi.fn(async () => ({})),
+      startTrace: vi.fn(async () => {}),
+      markTrace: vi.fn(async () => {}),
+      stopTrace: vi.fn(async () => {})
+    };
+    const refreshCoreData = vi.fn(async () => {});
+
+    await coordinator.clearClientErrors({
+      debugClient,
+      refreshCoreData
+    });
+
+    expect(debugClient.clearClientErrors).toHaveBeenCalledTimes(1);
     expect(refreshCoreData).toHaveBeenCalledTimes(1);
   });
 });

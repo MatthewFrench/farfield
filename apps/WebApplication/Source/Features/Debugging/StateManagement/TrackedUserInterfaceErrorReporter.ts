@@ -51,6 +51,7 @@ export class TrackedUserInterfaceErrorReporter {
         source: "farfield-web",
         operation: input.operation,
         message: errorMessage,
+        severity: "error",
         name: null,
         stack: null,
         requestId,

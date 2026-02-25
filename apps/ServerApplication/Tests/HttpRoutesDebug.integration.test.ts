@@ -8,6 +8,7 @@ import {
 } from "vitest";
 import {
   ApiErrorEnvelopeSchema,
+  DebugErrorClearEnvelopeSchema,
   DebugErrorCreateEnvelopeSchema,
   DebugErrorDetailEnvelopeSchema,
   DebugErrorListEnvelopeSchema,
@@ -57,6 +58,7 @@ describe("server route integration debug routes", () => {
     const listed = DebugErrorListEnvelopeSchema.parse(await listResponse.json());
     const listedEvent = listed.data.find((event) => event.errorId === created.errorId);
     expect(Boolean(listedEvent)).toBe(true);
+    expect(listedEvent?.severity).toBe("error");
 
     const detailResponse = await fetch(
       `${baseUrl}/api/debug/client-errors/${encodeURIComponent(created.errorId)}`,
@@ -74,6 +76,21 @@ describe("server route integration debug routes", () => {
     expect(sessionLogResponse.status).toBe(200);
     const sessionLog = await sessionLogResponse.text();
     expect(sessionLog.includes(created.errorId)).toBe(true);
+
+    const clearResponse = await fetch(`${baseUrl}/api/debug/client-errors`, {
+      method: "DELETE",
+      headers: authHeaders
+    });
+    expect(clearResponse.status).toBe(200);
+    const cleared = DebugErrorClearEnvelopeSchema.parse(await clearResponse.json());
+    expect(cleared.clearedCount).toBeGreaterThanOrEqual(1);
+
+    const listAfterClearResponse = await fetch(`${baseUrl}/api/debug/client-errors?limit=20`, {
+      headers: authHeaders
+    });
+    expect(listAfterClearResponse.status).toBe(200);
+    const listedAfterClear = DebugErrorListEnvelopeSchema.parse(await listAfterClearResponse.json());
+    expect(listedAfterClear.data).toEqual([]);
   });
 
   it("returns 400 for malformed debug identifier segments", async () => {

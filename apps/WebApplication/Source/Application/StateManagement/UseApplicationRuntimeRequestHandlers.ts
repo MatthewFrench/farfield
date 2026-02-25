@@ -67,10 +67,24 @@ export function useApplicationRuntimeRequestHandlers(
       input.setApiSessionBootstrapErrorMessage("");
       return;
     }
-    input.setErrorMessage(message);
+
+    const runtimeErrorOperation = "runtime-request-error";
+    const actionId = input.userInterfaceActionRequestBuilder.create(runtimeErrorOperation).actionId;
+    void input.trackedUserInterfaceErrorReporter.report({
+      operation: runtimeErrorOperation,
+      actionId,
+      threadId: null,
+      error: message,
+      details: {
+        handler: "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError"
+      }
+    });
+    input.setErrorMessage(`${runtimeErrorOperation}: ${message} actionId=${actionId}`);
   }, [
     input.apiAuthenticationErrorClassifier,
     input.apiSessionBootstrapCoordinator,
+    input.trackedUserInterfaceErrorReporter,
+    input.userInterfaceActionRequestBuilder,
     input.setApiSessionBootstrapErrorMessage,
     input.setErrorMessage,
     input.setRequiresApiSessionToken

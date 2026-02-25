@@ -1,3 +1,4 @@
+import { type DebugErrorSeverity } from "@farfield/protocol";
 import type { ClientErrorStore } from "../Modules/Debugging/ClientErrorStore.js";
 import { logger } from "../Shared/Logging/Logger.js";
 
@@ -5,6 +6,7 @@ export interface ServerErrorEventRecordInput {
   source: string;
   operation: string;
   message: string;
+  severity: DebugErrorSeverity;
   name: string | null;
   stack: string | null;
   requestId: string | null;
@@ -26,6 +28,7 @@ export class ServerErrorEventRecorder {
       source: input.source,
       operation: input.operation,
       message: input.message,
+      severity: input.severity,
       name: input.name,
       stack: input.stack,
       requestId: input.requestId,
@@ -35,17 +38,20 @@ export class ServerErrorEventRecorder {
       occurredAt
     });
 
-    logger.error(
-      {
-        errorId: event.errorId,
-        origin: event.origin,
-        source: event.source,
-        operation: event.operation,
-        requestId: event.requestId,
-        threadId: event.threadId,
-        message: event.message
-      },
-      "client-error-recorded"
-    );
+    const loggerInput = {
+      errorId: event.errorId,
+      origin: event.origin,
+      severity: event.severity,
+      source: event.source,
+      operation: event.operation,
+      requestId: event.requestId,
+      threadId: event.threadId,
+      message: event.message
+    };
+    if (event.severity === "warning") {
+      logger.warn(loggerInput, "client-error-recorded");
+      return;
+    }
+    logger.error(loggerInput, "client-error-recorded");
   }
 }

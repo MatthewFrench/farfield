@@ -56,6 +56,7 @@ describe("DebugWorkspaceDataReader", () => {
           source: "farfield-web",
           operation: "read-history",
           message: "Failed to read history",
+          severity: "error",
           name: null,
           stack: null,
           requestId: null,

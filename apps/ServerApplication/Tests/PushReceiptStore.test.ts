@@ -34,6 +34,7 @@ describe("PushReceiptStore", () => {
   });
 
   it("persists and reloads receipts", () => {
+    const createdAt = new Date(Date.now() - 1_000).toISOString();
     const { store, filePath } = createStoreWithTempPath();
     store.load();
     store.add({
@@ -43,7 +44,7 @@ describe("PushReceiptStore", () => {
       threadId: "thread_1",
       turnId: "turn_1",
       message: null,
-      createdAt: "2026-02-18T00:00:00.000Z"
+      createdAt
     });
 
     const reloaded = new PushReceiptStore(filePath, 10, 7 * 24 * 60 * 60 * 1_000);
@@ -57,11 +58,12 @@ describe("PushReceiptStore", () => {
       threadId: "thread_1",
       turnId: "turn_1",
       message: null,
-      createdAt: "2026-02-18T00:00:00.000Z"
+      createdAt
     });
   });
 
   it("enforces max receipt retention", () => {
+    const baseTimestampMs = Date.now();
     const { store } = createStoreWithTempPath(2);
     store.load();
     store.add({
@@ -71,7 +73,7 @@ describe("PushReceiptStore", () => {
       threadId: "thread_1",
       turnId: "turn_1",
       message: null,
-      createdAt: "2026-02-18T00:00:00.000Z"
+      createdAt: new Date(baseTimestampMs - 2_000).toISOString()
     });
     store.add({
       notificationId: "notif_2",
@@ -80,7 +82,7 @@ describe("PushReceiptStore", () => {
       threadId: "thread_1",
       turnId: "turn_1",
       message: null,
-      createdAt: "2026-02-18T00:00:01.000Z"
+      createdAt: new Date(baseTimestampMs - 1_000).toISOString()
     });
     store.add({
       notificationId: "notif_3",
@@ -89,7 +91,7 @@ describe("PushReceiptStore", () => {
       threadId: "thread_2",
       turnId: "turn_2",
       message: null,
-      createdAt: "2026-02-18T00:00:02.000Z"
+      createdAt: new Date(baseTimestampMs).toISOString()
     });
 
     expect(store.getCount()).toBe(2);

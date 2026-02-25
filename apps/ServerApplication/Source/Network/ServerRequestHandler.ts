@@ -329,6 +329,10 @@ export class ServerRequestHandler {
         jsonResponse: this.deps.jsonResponse,
         readJsonBody: this.deps.readJsonBody,
         onClientErrorRecorded: (input) => {
+          if (input.severity === "warning") {
+            logger.warn(input, "client-error-recorded");
+            return;
+          }
           logger.error(input, "client-error-recorded");
         }
       })) {

@@ -86,6 +86,7 @@ describe("EventStreamConnectionCoordinator", () => {
       executeScheduledRefresh: async (refreshFlags) => {
         executedRefreshes.push(refreshFlags);
       },
+      applyThreadStreamDelta: () => {},
       onConnectionStatusChange: (connected) => {
         connectionStatusChanges.push(connected);
       }
@@ -128,6 +129,7 @@ describe("EventStreamConnectionCoordinator", () => {
       executeScheduledRefresh: async (refreshFlags) => {
         executedRefreshes.push(refreshFlags);
       },
+      applyThreadStreamDelta: () => {},
       onConnectionStatusChange: () => {}
     });
 
@@ -147,12 +149,22 @@ describe("EventStreamConnectionCoordinator", () => {
     source.onmessage?.(
       new MessageEvent<string>("message", {
         data: JSON.stringify({
-          type: "history",
-          entry: {
-            source: "app",
-            meta: {
-              method: "thread-stream-state-changed",
-              threadId: "thread-1"
+          sequence: 4,
+          event: {
+            type: "activity-history-appended",
+            entry: {
+              id: "entry-1",
+              at: "2026-02-26T00:00:00.000Z",
+              source: "app",
+              direction: "out",
+              payload: {
+                type: "action",
+                action: "thread-stream-state-changed"
+              },
+              meta: {
+                method: "thread-queued-followups-changed",
+                threadId: "thread-1"
+              }
             }
           }
         })
@@ -167,6 +179,78 @@ describe("EventStreamConnectionCoordinator", () => {
         refreshSelectedThread: true
       }
     ]);
+
+    coordinator.stop();
+  });
+
+  it("applies thread stream deltas for selected thread without scheduling selected-thread refresh", async () => {
+    vi.useFakeTimers();
+    const createdSources: TestEventSource[] = [];
+    const coordinator = createCoordinator({ createdSources });
+    const scheduler = new EventRefreshScheduler(20);
+    const decisionEngine = new EventStreamRefreshDecisionEngine(THREAD_ONLY_METHODS);
+    const executedRefreshes: EventRefreshFlags[] = [];
+    const appliedDeltaThreadIds: string[] = [];
+
+    coordinator.start({
+      eventRefreshScheduler: scheduler,
+      eventStreamRefreshDecisionEngine: decisionEngine,
+      readSnapshot: () => ({
+        activeTab: "chat",
+        selectedThreadId: "thread-1"
+      }),
+      executeScheduledRefresh: async (refreshFlags) => {
+        executedRefreshes.push(refreshFlags);
+      },
+      applyThreadStreamDelta: (threadStreamDelta) => {
+        appliedDeltaThreadIds.push(threadStreamDelta.threadId);
+      },
+      onConnectionStatusChange: () => {}
+    });
+
+    const source = createdSources[0];
+    if (!source) {
+      throw new Error("Expected event source instance");
+    }
+
+    source.onopen?.(new Event("open"));
+    await vi.advanceTimersByTimeAsync(20);
+    executedRefreshes.length = 0;
+
+    source.onmessage?.(
+      new MessageEvent<string>("message", {
+        data: JSON.stringify({
+          sequence: 5,
+          event: {
+            type: "thread-stream-delta",
+            delta: {
+              threadId: "thread-1",
+              liveStateSnapshot: {
+                ok: true,
+                threadId: "thread-1",
+                ownerClientId: "client-a",
+                conversationState: null,
+                liveStateError: null
+              },
+              streamEventsSnapshot: {
+                ok: true,
+                threadId: "thread-1",
+                ownerClientId: "client-a",
+                events: [],
+                nextSequence: 2,
+                firstAvailableSequence: 0,
+                resetRequired: false
+              },
+              streamEventsSinceSequenceUsed: 1
+            }
+          }
+        })
+      })
+    );
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(appliedDeltaThreadIds).toEqual(["thread-1"]);
+    expect(executedRefreshes).toEqual([]);
 
     coordinator.stop();
   });
@@ -190,6 +274,7 @@ describe("EventStreamConnectionCoordinator", () => {
         selectedThreadId: null
       }),
       executeScheduledRefresh: async () => {},
+      applyThreadStreamDelta: () => {},
       onConnectionStatusChange: () => {}
     });
 

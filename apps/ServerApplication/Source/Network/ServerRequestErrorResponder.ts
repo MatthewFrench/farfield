@@ -46,6 +46,12 @@ export class ServerRequestErrorResponder {
 
     if (error instanceof z.ZodError) {
       const validationClassification = this.classifier.classifyValidationError(error.message);
+      this.recordServerErrorIfNeeded({
+        classification: validationClassification,
+        normalizedError: error,
+        req,
+        context
+      });
       this.logClassification({
         classification: validationClassification,
         req,
@@ -120,6 +126,7 @@ export class ServerRequestErrorResponder {
         source: "farfield-server",
         operation: "http:request",
         message: classification.runtimeErrorMessage,
+        severity: classification.severity,
         name: normalizedError.name,
         stack: normalizedError.stack ?? null,
         requestId: context.requestId,

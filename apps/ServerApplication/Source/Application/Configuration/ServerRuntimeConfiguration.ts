@@ -280,13 +280,7 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
   const clientErrorSessionId = `session-${clientErrorSessionTimestamp}-${String(process.pid)}`;
   const clientErrorLogPath =
     parseOptionalPathEnvironmentValue("DEBUG_CLIENT_ERROR_LOG_PATH", env["DEBUG_CLIENT_ERROR_LOG_PATH"])
-    ?? path.join(
-      defaultWorkspacePath,
-      ".runtime",
-      "logs",
-      "errors",
-      `${clientErrorSessionId}.ndjson`
-    );
+    ?? path.join(defaultWorkspacePath, ".runtime", "logs", "errors", "client-errors.ndjson");
   const clientErrorMaxEntries = parsePositiveInteger(env["DEBUG_CLIENT_ERROR_MAX_ENTRIES"] ?? null, 2000);
   const invalidThreadStreamEventsLogPath =
     parseOptionalPathEnvironmentValue("FARFIELD_INVALID_STREAM_LOG_PATH", env["FARFIELD_INVALID_STREAM_LOG_PATH"])

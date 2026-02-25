@@ -8,6 +8,7 @@ import {
 
 const exampleDebugIssue: DebugIssue = {
   id: "error:debug-issue-1",
+  kind: "debug-error",
   severity: "error",
   occurredAt: "2025-01-01T00:00:00.000Z",
   message: "Example debug error",
@@ -41,6 +42,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onSelectDebugIssue: () => {},
   onDebugIssueSeverityFilterChange: () => {},
   onDebugIssueFilterQueryChange: () => {},
+  onClearDebugIssues: () => {},
   debugHistoryEntryListItems: [
     {
       id: "history-1",

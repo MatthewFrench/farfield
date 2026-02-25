@@ -6,6 +6,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import {
   FarfieldApiErrorResponseSchema,
   FarfieldCreatePushSubscriptionEnvelopeSchema,
+  FarfieldDebugErrorClearEnvelopeSchema,
   FarfieldDebugErrorCreateEnvelopeSchema,
   FarfieldDebugErrorDetailEnvelopeSchema,
   FarfieldDebugErrorListEnvelopeSchema,
@@ -32,6 +33,7 @@ export const PushReceiptCreateEnvelopeSchema = FarfieldPushReceiptCreateEnvelope
 export const PushReceiptLatestEnvelopeSchema = FarfieldPushReceiptLatestEnvelopeSchema;
 export const PushLocalCaStatusEnvelopeSchema = FarfieldPushLocalCaStatusEnvelopeSchema;
 export const DebugErrorCreateEnvelopeSchema = FarfieldDebugErrorCreateEnvelopeSchema;
+export const DebugErrorClearEnvelopeSchema = FarfieldDebugErrorClearEnvelopeSchema;
 export const DebugErrorListEnvelopeSchema = FarfieldDebugErrorListEnvelopeSchema;
 export const DebugErrorDetailEnvelopeSchema = FarfieldDebugErrorDetailEnvelopeSchema;
 export const DebugObservabilityEnvelopeSchema = FarfieldDebugObservabilityEnvelopeSchema;

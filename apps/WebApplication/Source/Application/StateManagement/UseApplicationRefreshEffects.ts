@@ -159,25 +159,57 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   }, [input.handleRuntimeRequestError, input.loadCoreDataTracked]);
 
   useEffect(() => {
-    input.coreRefreshIntervalRef.current = window.setInterval(() => {
-      if (document.visibilityState !== "visible") {
+    let disposed = false;
+
+    const scheduleNextWatchdog = (delayMilliseconds: number): void => {
+      input.coreRefreshIntervalRef.current = window.setTimeout(() => {
+        void runWatchdogCycle();
+      }, delayMilliseconds);
+    };
+
+    const runWatchdogCycle = async (): Promise<void> => {
+      if (disposed) {
         return;
       }
 
-      const now = Date.now();
-      if (
+      if (document.visibilityState === "visible") {
+        const now = Date.now();
+        const shouldRefreshWhenDisconnected = !input.eventsConnectedRef.current;
+        const shouldRefreshWhenConnected = (
+          input.eventsConnectedRef.current
+          && now - input.lastCoreRefreshAtRef.current >= input.coreRefreshConnectedMinIntervalMs
+        );
+
+        if (shouldRefreshWhenDisconnected || shouldRefreshWhenConnected) {
+          try {
+            await input.loadCoreDataTracked();
+          } catch (error) {
+            input.handleRuntimeRequestError(error);
+          }
+        }
+      }
+
+      if (disposed) {
+        return;
+      }
+      scheduleNextWatchdog(
         input.eventsConnectedRef.current
-        && now - input.lastCoreRefreshAtRef.current < input.coreRefreshConnectedMinIntervalMs
-      ) {
-        return;
-      }
+          ? input.coreRefreshConnectedMinIntervalMs
+          : input.coreRefreshIntervalMs
+      );
+    };
 
-      void input.loadCoreDataTracked().catch((error) => input.handleRuntimeRequestError(error));
-    }, input.coreRefreshIntervalMs);
+    scheduleNextWatchdog(
+      input.eventsConnectedRef.current
+        ? input.coreRefreshConnectedMinIntervalMs
+        : input.coreRefreshIntervalMs
+    );
 
     return () => {
+      disposed = true;
       if (input.coreRefreshIntervalRef.current !== null) {
-        window.clearInterval(input.coreRefreshIntervalRef.current);
+        window.clearTimeout(input.coreRefreshIntervalRef.current);
+        input.coreRefreshIntervalRef.current = null;
       }
     };
   }, [
