@@ -74,6 +74,15 @@ let eventsSessionFixture: EventsSessionFixture;
 
 let globalsInstalled = false;
 
+function createJsonResponse<TResponseBody>(responseBody: TResponseBody): Response {
+  return new Response(JSON.stringify(responseBody), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+}
+
 function resetFixtures(): void {
   window.history.replaceState(null, "", "/");
   MockEventSource.reset();
@@ -237,54 +246,42 @@ function installGlobals(): void {
             eventsSessionFixture.expiresAt = "2099-01-01T00:00:00.000Z";
           }
         }
-        return {
+        return createJsonResponse({
           ok: true,
-          json: async () => ({
-            ok: true,
-            authRequired: eventsSessionFixture.authRequired,
-            bootstrapped: eventsSessionFixture.bootstrapped,
-            expiresAt: eventsSessionFixture.bootstrapped ? eventsSessionFixture.expiresAt : null
-          })
-        } as Response;
+          authRequired: eventsSessionFixture.authRequired,
+          bootstrapped: eventsSessionFixture.bootstrapped,
+          expiresAt: eventsSessionFixture.bootstrapped ? eventsSessionFixture.expiresAt : null
+        });
       }
 
       if (pathname === "/api/health") {
-        return {
+        return createJsonResponse({
           ok: true,
-          json: async () => ({
-            ok: true,
-            state: {
-              appReady: true,
-              ipcConnected: true,
-              ipcInitialized: true,
-              lastError: null,
-              historyCount: 0,
-              threadOwnerCount: 0
-            }
-          })
-        } as Response;
+          state: {
+            appReady: true,
+            ipcConnected: true,
+            ipcInitialized: true,
+            lastError: null,
+            historyCount: 0,
+            threadOwnerCount: 0
+          }
+        });
       }
 
       if (pathname.startsWith("/api/threads/") && pathname.endsWith("/live-state")) {
-        return {
-          ok: true,
-          json: async () => liveStateResolver(threadId)
-        } as Response;
+        return createJsonResponse(liveStateResolver(threadId));
       }
 
       if (pathname.startsWith("/api/threads/") && pathname.endsWith("/stream-events")) {
-        return {
+        return createJsonResponse({
           ok: true,
-          json: async () => ({
-            ok: true,
-            threadId,
-            ownerClientId: null,
-            events: [],
-            nextSequence: 0,
-            firstAvailableSequence: 0,
-            resetRequired: false
-          })
-        } as Response;
+          threadId,
+          ownerClientId: null,
+          events: [],
+          nextSequence: 0,
+          firstAvailableSequence: 0,
+          resetRequired: false
+        });
       }
 
       if (pathname.startsWith("/api/threads/") && parsedUrl.searchParams.has("includeTurns")) {
@@ -296,73 +293,49 @@ function installGlobals(): void {
               setTimeout(resolve, readThreadDelayMilliseconds);
             });
           }
-          return {
-            ok: true,
-            json: async () => readThread
-          } as Response;
+          return createJsonResponse(readThread);
         }
       }
 
       if (pathname === "/api/threads") {
-        return {
-          ok: true,
-          json: async () => threadsFixture
-        } as Response;
+        return createJsonResponse(threadsFixture);
       }
 
       if (pathname === "/api/collaboration-modes") {
-        return {
-          ok: true,
-          json: async () => collaborationModesFixture
-        } as Response;
+        return createJsonResponse(collaborationModesFixture);
       }
 
       if (pathname === "/api/models") {
-        return {
-          ok: true,
-          json: async () => modelsFixture
-        } as Response;
+        return createJsonResponse(modelsFixture);
       }
 
       if (pathname === "/api/config/defaults") {
-        return {
-          ok: true,
-          json: async () => configDefaultsFixture
-        } as Response;
+        return createJsonResponse(configDefaultsFixture);
       }
 
       if (pathname === "/api/debug/trace/status") {
-        return {
+        return createJsonResponse({
           ok: true,
-          json: async () => ({
-            ok: true,
-            active: null,
-            recent: []
-          })
-        } as Response;
+          active: null,
+          recent: []
+        });
       }
 
       if (pathname === "/api/debug/history") {
-        return {
+        return createJsonResponse({
           ok: true,
-          json: async () => ({
-            ok: true,
-            history: []
-          })
-        } as Response;
+          history: []
+        });
       }
 
       if (pathname === "/api/debug/client-errors") {
         if (init?.method === "POST") {
-          return {
+          return createJsonResponse({
             ok: true,
-            json: async () => ({
-              ok: true,
-              errorId: "error_test_created",
-              sessionId: debugErrorsFixture.sessionId,
-              recordedAt: "2026-02-26T00:00:00.000Z"
-            })
-          } as Response;
+            errorId: "error_test_created",
+            sessionId: debugErrorsFixture.sessionId,
+            recordedAt: "2026-02-26T00:00:00.000Z"
+          });
         }
         if (init?.method === "DELETE") {
           const clearedCount = debugErrorsFixture.data.length;
@@ -370,40 +343,28 @@ function installGlobals(): void {
             ...debugErrorsFixture,
             data: []
           };
-          return {
+          return createJsonResponse({
             ok: true,
-            json: async () => ({
-              ok: true,
-              clearedCount,
-              sessionId: debugErrorsFixture.sessionId,
-              sessionLogPath: debugErrorsFixture.sessionLogPath
-            })
-          } as Response;
+            clearedCount,
+            sessionId: debugErrorsFixture.sessionId,
+            sessionLogPath: debugErrorsFixture.sessionLogPath
+          });
         }
-        return {
-          ok: true,
-          json: async () => debugErrorsFixture
-        } as Response;
+        return createJsonResponse(debugErrorsFixture);
       }
 
       if (pathname === "/api/agents") {
-        return {
-          ok: true,
-          json: async () => agentsFixture
-        } as Response;
+        return createJsonResponse(agentsFixture);
       }
 
-      return {
+      return createJsonResponse({
         ok: true,
-        json: async () => ({
-          ok: true,
-          threadId: "t",
-          ownerClientId: null,
-          conversationState: null,
-          liveStateError: null,
-          events: []
-        })
-      } as Response;
+        threadId: "t",
+        ownerClientId: null,
+        conversationState: null,
+        liveStateError: null,
+        events: []
+      });
     })
   );
 

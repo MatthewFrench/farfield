@@ -95,6 +95,20 @@ export function ApplicationHeaderBar({
   onToggleTheme,
   renderAgentFavicon
 }: ApplicationHeaderBarProps): React.JSX.Element {
+  const handleOpenMobileSidebar = (): void => {
+    onOpenMobileSidebar();
+    if (activeTab === "debug") {
+      onToggleDebugTab();
+    }
+  };
+
+  const handleOpenDesktopSidebar = (): void => {
+    onOpenDesktopSidebar();
+    if (activeTab === "debug") {
+      onToggleDebugTab();
+    }
+  };
+
   return (
     <header
       className={`flex items-center justify-between px-3 h-14 shrink-0 gap-2 ${
@@ -106,7 +120,7 @@ export function ApplicationHeaderBar({
       <div className="flex items-center gap-2 min-w-0">
         <div className="md:hidden">
           <HeaderIconButton
-            onClick={onOpenMobileSidebar}
+            onClick={handleOpenMobileSidebar}
             title="Threads"
             testId="sidebar-toggle-open"
           >
@@ -116,7 +130,7 @@ export function ApplicationHeaderBar({
         {!desktopSidebarOpen && (
           <div className="hidden md:block">
             <HeaderIconButton
-              onClick={onOpenDesktopSidebar}
+              onClick={handleOpenDesktopSidebar}
               title="Show sidebar"
               testId="sidebar-toggle-open"
             >

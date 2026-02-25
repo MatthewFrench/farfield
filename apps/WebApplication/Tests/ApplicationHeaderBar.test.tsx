@@ -4,17 +4,20 @@ import { ApplicationHeaderBar } from "@/Application/UserInterface/ApplicationHea
 import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 
 function renderApplicationHeaderBar(input?: {
+  activeTab?: "chat" | "debug";
+  desktopSidebarOpen?: boolean;
   onRefresh?: () => void;
   onToggleDebugTab?: () => void;
   onEnablePushNotifications?: () => void;
   onOpenMobileSidebar?: () => void;
+  onOpenDesktopSidebar?: () => void;
 }): void {
   cleanup();
   render(
     <TooltipProvider>
       <ApplicationHeaderBar
-        activeTab="chat"
-        desktopSidebarOpen={true}
+        activeTab={input?.activeTab ?? "chat"}
+        desktopSidebarOpen={input?.desktopSidebarOpen ?? true}
         selectedThreadLabel="Thread one"
         hasSelectedThread={true}
         activeThreadAgentId="codex"
@@ -30,7 +33,7 @@ function renderApplicationHeaderBar(input?: {
         isBusy={false}
         theme="light"
         onOpenMobileSidebar={input?.onOpenMobileSidebar ?? (() => {})}
-        onOpenDesktopSidebar={() => {}}
+        onOpenDesktopSidebar={input?.onOpenDesktopSidebar ?? (() => {})}
         onEnablePushNotifications={input?.onEnablePushNotifications ?? (() => {})}
         onRefresh={input?.onRefresh ?? (() => {})}
         onToggleDebugTab={input?.onToggleDebugTab ?? (() => {})}
@@ -76,7 +79,40 @@ describe("ApplicationHeaderBar", () => {
       onOpenMobileSidebar
     });
 
-    fireEvent.click(screen.getByTestId("sidebar-toggle-open"));
+    fireEvent.click(screen.getByRole("button", { name: "Threads" }));
     expect(onOpenMobileSidebar).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes debug tab when opening mobile sidebar from debug view", () => {
+    const onOpenMobileSidebar = vi.fn();
+    const onToggleDebugTab = vi.fn();
+
+    renderApplicationHeaderBar({
+      activeTab: "debug",
+      onOpenMobileSidebar,
+      onToggleDebugTab
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Threads" }));
+
+    expect(onOpenMobileSidebar).toHaveBeenCalledTimes(1);
+    expect(onToggleDebugTab).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes debug tab when opening desktop sidebar from debug view", () => {
+    const onOpenDesktopSidebar = vi.fn();
+    const onToggleDebugTab = vi.fn();
+
+    renderApplicationHeaderBar({
+      activeTab: "debug",
+      desktopSidebarOpen: false,
+      onOpenDesktopSidebar,
+      onToggleDebugTab
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
+
+    expect(onOpenDesktopSidebar).toHaveBeenCalledTimes(1);
+    expect(onToggleDebugTab).toHaveBeenCalledTimes(1);
   });
 });

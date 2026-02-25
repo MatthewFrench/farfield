@@ -35,7 +35,9 @@ const RequestFailureDetailsSchema = z.object({
   status: z.number().int().nullable(),
   statusText: z.string().trim().min(1).nullable(),
   requestId: z.string().trim().min(1).nullable(),
-  responseText: z.string().trim().min(1).nullable()
+  responseText: z.string().trim().min(1).nullable(),
+  responseTextLength: z.number().int().positive().nullable().optional().default(null),
+  responseTextTruncated: z.boolean().optional().default(false)
 });
 
 const RequestFailureErrorSchema = z.object({
@@ -77,6 +79,8 @@ export class TrackedUserInterfaceErrorReporter {
       details["requestStatus"] = requestFailureDetails.status;
       details["requestStatusText"] = requestFailureDetails.statusText;
       details["responseText"] = requestFailureDetails.responseText;
+      details["responseTextLength"] = requestFailureDetails.responseTextLength;
+      details["responseTextTruncated"] = requestFailureDetails.responseTextTruncated;
     }
 
     let errorId: string | null = null;

@@ -241,9 +241,11 @@ export function useApplicationShellViewProperties(
     isBusy,
     theme,
     onOpenMobileSidebar: () => {
+      setActiveTab("chat");
       setMobileSidebarOpen(true);
     },
     onOpenDesktopSidebar: () => {
+      setActiveTab("chat");
       setDesktopSidebarOpen(true);
     },
     onEnablePushNotifications: () => {
@@ -263,7 +265,10 @@ export function useApplicationShellViewProperties(
     activeTab,
     errorMessage,
     errorBannerDetails,
-    onOpenDebugFromErrorBanner: openDebugFromErrorBanner,
+    onOpenDebugFromErrorBanner: () => {
+      openDebugFromErrorBanner();
+      setErrorMessage("");
+    },
     onDismissErrorBanner: () => {
       setErrorMessage("");
     },

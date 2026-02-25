@@ -8,6 +8,8 @@ class StructuredRequestFailureError extends Error {
     statusText: string | null;
     requestId: string | null;
     responseText: string | null;
+    responseTextLength: number | null;
+    responseTextTruncated: boolean;
   };
 
   public constructor(input: {
@@ -17,6 +19,8 @@ class StructuredRequestFailureError extends Error {
     statusText: string | null;
     requestId: string | null;
     responseText: string | null;
+    responseTextLength: number | null;
+    responseTextTruncated: boolean;
   }) {
     super(input.message);
     this.requestFailureDetails = {
@@ -24,7 +28,9 @@ class StructuredRequestFailureError extends Error {
       status: input.status,
       statusText: input.statusText,
       requestId: input.requestId,
-      responseText: input.responseText
+      responseText: input.responseText,
+      responseTextLength: input.responseTextLength,
+      responseTextTruncated: input.responseTextTruncated
     };
   }
 }
@@ -129,7 +135,9 @@ describe("TrackedUserInterfaceErrorReporter", () => {
         status: 500,
         statusText: "Internal Server Error",
         requestId: "req-22",
-        responseText: "{\"ok\":false,\"error\":\"boom\"}"
+        responseText: "{\"ok\":false,\"error\":\"boom\"}",
+        responseTextLength: 27,
+        responseTextTruncated: false
       })
     });
 
@@ -150,7 +158,9 @@ describe("TrackedUserInterfaceErrorReporter", () => {
         path: "/api/threads/thread-1/collaboration-mode",
         requestStatus: 500,
         requestStatusText: "Internal Server Error",
-        responseText: "{\"ok\":false,\"error\":\"boom\"}"
+        responseText: "{\"ok\":false,\"error\":\"boom\"}",
+        responseTextLength: 27,
+        responseTextTruncated: false
       }
     });
   });

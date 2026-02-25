@@ -51,10 +51,13 @@ describe("DebugStatusBanners", () => {
     expect(screen.getByTestId("error-banner-message").textContent).toContain("failed to load");
 
     fireEvent.click(screen.getByTestId("error-banner-open-debug"));
+    expect(onOpenDebugFromErrorBanner).toHaveBeenCalledTimes(1);
+    expect(onDismissErrorBanner).toHaveBeenCalledTimes(1);
+
     fireEvent.click(screen.getByTestId("error-banner-dismiss"));
 
     expect(onOpenDebugFromErrorBanner).toHaveBeenCalledTimes(1);
-    expect(onDismissErrorBanner).toHaveBeenCalledTimes(1);
+    expect(onDismissErrorBanner).toHaveBeenCalledTimes(2);
   });
 
   it("renders live-state reduction banner on chat tab", () => {

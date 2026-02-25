@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getConfigDefaults,
+  listCollaborationModes
 } from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
 import {
   clearDebugClientErrors,
@@ -13,6 +14,16 @@ import {
   unarchiveThread
 } from "../Source/Features/Threads/DataAccess/ThreadApi";
 import { bootstrapEventsSession } from "../Source/Application/DataAccess/WebShellApi";
+import { type StructuredDataValue } from "../Source/Shared/Contracts/StructuredDataValue";
+
+function createJsonResponse(body: StructuredDataValue, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -20,9 +31,8 @@ afterEach(() => {
 
 describe("API envelope parsing", () => {
   it("accepts successful envelopes where detail payload has object-shaped error field", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
         ok: true,
         error: {
           errorId: "error_1",
@@ -44,7 +54,7 @@ describe("API envelope parsing", () => {
         sessionId: "session_1",
         sessionLogPath: ".runtime/logs/errors/session-test.ndjson"
       })
-    } as Response);
+    );
 
     const result = await getDebugClientError("error_1");
     expect(result.error.errorId).toBe("error_1");
@@ -52,13 +62,12 @@ describe("API envelope parsing", () => {
   });
 
   it("throws server error message for non-ok envelopes", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: false,
-      json: async () => ({
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
         ok: false,
         error: "Nope"
-      })
-    } as Response);
+      }, 500)
+    );
 
     await expect(getDebugClientError("error_1")).rejects.toThrow("Nope");
   });
@@ -69,20 +78,19 @@ describe("API envelope parsing", () => {
     );
 
     await expect(getDebugClientError("error_1")).rejects.toThrow(
-      /Request failed for \/api\/debug\/client-errors\/error_1: The string did not match the expected pattern\. requestId /
+      /Request failed for \/api\/debug\/client-errors\/error_1: The string did not match the expected pattern\. status=n\/a/
     );
   });
 
   it("parses events session bootstrap response", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
         ok: true,
         authRequired: true,
         bootstrapped: true,
         expiresAt: "2026-02-19T00:00:00.000Z"
       })
-    } as Response);
+    );
 
     const result = await bootstrapEventsSession();
     expect(result.authRequired).toBe(true);
@@ -91,15 +99,14 @@ describe("API envelope parsing", () => {
   });
 
   it("posts token payload for events session bootstrap when provided", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
         ok: true,
         authRequired: true,
         bootstrapped: true,
         expiresAt: "2026-02-19T00:00:00.000Z"
       })
-    } as Response);
+    );
 
     await bootstrapEventsSession({
       apiToken: "token_123"
@@ -113,15 +120,14 @@ describe("API envelope parsing", () => {
   });
 
   it("clears debug client errors through the debug endpoint", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
         ok: true,
         clearedCount: 2,
         sessionId: "session_1",
         sessionLogPath: ".runtime/logs/errors/client-errors.ndjson"
       })
-    } as Response);
+    );
 
     const result = await clearDebugClientErrors();
     expect(result.clearedCount).toBe(2);
@@ -130,14 +136,13 @@ describe("API envelope parsing", () => {
   });
 
   it("requests thread list with sortKey and cwd", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
         ok: true,
         data: [],
         nextCursor: null
       })
-    } as Response);
+    );
 
     await listThreads({
       limit: 80,
@@ -159,16 +164,15 @@ describe("API envelope parsing", () => {
   });
 
   it("parses pagination metadata for thread list", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
         ok: true,
         data: [],
         nextCursor: "cursor_2",
         pages: 3,
         truncated: true
       })
-    } as Response);
+    );
 
     const result = await listThreads({
       limit: 80,
@@ -182,10 +186,31 @@ describe("API envelope parsing", () => {
     expect(result.truncated).toBe(true);
   });
 
+  it("parses large JSON payloads without truncation-induced parse failures", async () => {
+    const longDeveloperInstructions = "x".repeat(6_000);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        data: [
+          {
+            name: "Plan",
+            mode: "plan",
+            model: null,
+            reasoning_effort: "medium",
+            developer_instructions: longDeveloperInstructions
+          }
+        ]
+      })
+    );
+
+    const result = await listCollaborationModes();
+    expect(result.data[0]?.name).toBe("Plan");
+    expect(result.data[0]?.developer_instructions).toBe(longDeveloperInstructions);
+  });
+
   it("fails thread list parsing when required thread fields are invalid", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
         ok: true,
         data: [
           {
@@ -198,7 +223,7 @@ describe("API envelope parsing", () => {
         ],
         nextCursor: null
       })
-    } as Response);
+    );
 
     await expect(
       listThreads({
@@ -211,15 +236,14 @@ describe("API envelope parsing", () => {
   });
 
   it("parses config defaults response", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
         ok: true,
         agentId: "codex",
         model: "gpt-5.3-codex",
         reasoningEffort: "xhigh"
       })
-    } as Response);
+    );
 
     const result = await getConfigDefaults({ agentId: "codex" });
     expect(result.agentId).toBe("codex");
@@ -227,13 +251,12 @@ describe("API envelope parsing", () => {
   });
 
   it("posts thread unarchive endpoint", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
         ok: true,
         threadId: "thread_123"
       })
-    } as Response);
+    );
 
     await unarchiveThread("thread_123");
 
@@ -243,9 +266,8 @@ describe("API envelope parsing", () => {
   });
 
   it("returns strict create-thread response contract", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
         ok: true,
         threadId: "thread_123",
         agentId: "codex",
@@ -261,7 +283,7 @@ describe("API envelope parsing", () => {
           turns: []
         }
       })
-    } as Response);
+    );
 
     const created = await createThread();
     expect(created).toEqual({
@@ -271,10 +293,9 @@ describe("API envelope parsing", () => {
   });
 
   it("succeeds for sendMessage when response has no JSON body", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, {
       status: 200
-    } as Response);
+    }));
 
     await sendMessage({
       threadId: "thread_123",

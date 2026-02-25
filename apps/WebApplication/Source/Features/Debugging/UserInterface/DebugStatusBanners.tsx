@@ -75,7 +75,10 @@ export function DebugStatusBanners({
                 <Button
                   type="button"
                   data-testid="error-banner-open-debug"
-                  onClick={onOpenDebugFromErrorBanner}
+                  onClick={() => {
+                    onOpenDebugFromErrorBanner();
+                    onDismissErrorBanner();
+                  }}
                   variant="ghost"
                   size="sm"
                   className="h-7 px-2 text-xs text-destructive-foreground/90 hover:text-destructive-foreground hover:bg-black/10"

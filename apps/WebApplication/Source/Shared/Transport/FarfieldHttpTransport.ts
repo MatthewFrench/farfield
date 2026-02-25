@@ -20,12 +20,25 @@ const ACTION_NAME_HEADER_NAME = "X-Farfield-Action-Name";
 const MAX_RESPONSE_TEXT_LENGTH = 4000;
 const ApiErrorEnvelopeSchema = FarfieldApiErrorResponseSchema;
 
+interface ResponseTextSummary {
+  responseText: string | null;
+  responseTextLength: number | null;
+  responseTextTruncated: boolean;
+}
+
+interface ResponseBodyReadResult {
+  parseText: string | null;
+  responseTextSummary: ResponseTextSummary;
+}
+
 export interface FarfieldHttpRequestFailureDetails {
   path: string;
   status: number | null;
   statusText: string | null;
   requestId: string | null;
   responseText: string | null;
+  responseTextLength: number | null;
+  responseTextTruncated: boolean;
 }
 
 export class FarfieldHttpRequestFailureError extends Error {
@@ -61,15 +74,55 @@ function trimRequestBody(text: string): string {
   return `${normalized.slice(0, MAX_RESPONSE_TEXT_LENGTH)}... [truncated]`;
 }
 
-async function readResponseText(response: Response): Promise<string | null> {
+function createEmptyResponseTextSummary(): ResponseTextSummary {
+  return {
+    responseText: null,
+    responseTextLength: null,
+    responseTextTruncated: false
+  };
+}
+
+function summarizeResponseText(rawText: string): ResponseTextSummary {
+  const normalized = rawText.trim();
+  if (normalized.length === 0) {
+    return createEmptyResponseTextSummary();
+  }
+
+  if (normalized.length <= MAX_RESPONSE_TEXT_LENGTH) {
+    return {
+      responseText: normalized,
+      responseTextLength: normalized.length,
+      responseTextTruncated: false
+    };
+  }
+
+  return {
+    responseText: trimRequestBody(normalized),
+    responseTextLength: normalized.length,
+    responseTextTruncated: true
+  };
+}
+
+// Parse the full response body for correctness and keep truncation only for diagnostic payloads.
+async function readResponseBody(response: Response): Promise<ResponseBodyReadResult> {
   try {
     const rawText = await response.clone().text();
     if (rawText.trim().length === 0) {
-      return null;
+      return {
+        parseText: null,
+        responseTextSummary: createEmptyResponseTextSummary()
+      };
     }
-    return trimRequestBody(rawText);
+
+    return {
+      parseText: rawText,
+      responseTextSummary: summarizeResponseText(rawText)
+    };
   } catch {
-    return null;
+    return {
+      parseText: null,
+      responseTextSummary: createEmptyResponseTextSummary()
+    };
   }
 }
 
@@ -77,7 +130,7 @@ function createRequestFailureError(
   path: string,
   requestId: string | null,
   response: Response | null,
-  responseText: string | null,
+  responseTextSummary: ResponseTextSummary,
   baseMessage: string
 ): FarfieldHttpRequestFailureError {
   const context: FarfieldHttpRequestFailureDetails = {
@@ -85,7 +138,9 @@ function createRequestFailureError(
     status: response ? response.status : null,
     statusText: response ? response.statusText : null,
     requestId,
-    responseText
+    responseText: responseTextSummary.responseText,
+    responseTextLength: responseTextSummary.responseTextLength,
+    responseTextTruncated: responseTextSummary.responseTextTruncated
   };
   const message = buildFailureMessage(baseMessage, context);
   return new FarfieldHttpRequestFailureError(message, context);
@@ -156,7 +211,13 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
       }
       throw new RequestCanceledError(path);
     }
-    throw createRequestFailureError(path, requestId, null, null, `Request failed for ${path}: ${message}`);
+    throw createRequestFailureError(
+      path,
+      requestId,
+      null,
+      createEmptyResponseTextSummary(),
+      `Request failed for ${path}: ${message}`
+    );
   } finally {
     clearTimeout(timeoutHandle);
     if (inheritedSignal) {
@@ -169,21 +230,21 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
 export async function request(path: string, init?: RequestInit): Promise<StructuredDataValue> {
   const response = await performRequest(path, init);
   const responseRequestId = readResponseRequestId(response);
-  const responseText = await readResponseText(response);
+  const responseBody = await readResponseBody(response);
 
   let data: StructuredDataValue;
-  if (responseText === null) {
+  if (responseBody.parseText === null) {
     throw createRequestFailureError(
       path,
       responseRequestId,
       response,
-      null,
+      responseBody.responseTextSummary,
       `Invalid JSON response from ${path}: empty response`
     );
   }
 
   try {
-    const rawJsonData = JSON.parse(responseText);
+    const rawJsonData = JSON.parse(responseBody.parseText);
     data = StructuredDataValueSchema.parse(rawJsonData);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -191,7 +252,7 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
       path,
       responseRequestId,
       response,
-      responseText,
+      responseBody.responseTextSummary,
       `Invalid JSON response from ${path}: ${message}`
     );
   }
@@ -205,7 +266,7 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
       path,
       responseRequestId,
       response,
-      responseText,
+      responseBody.responseTextSummary,
       `Invalid API envelope from ${path}: ${message}`
     );
   }
@@ -216,7 +277,7 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
       path,
       responseRequestId,
       response,
-      responseText,
+      responseBody.responseTextSummary,
       parsedError.success ? parsedError.data.error : `Request failed for ${path}`
     );
   }
@@ -230,20 +291,20 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
   if (response.ok) {
     return;
   }
-  const responseText = await readResponseText(response);
-  if (responseText === null) {
+  const responseBody = await readResponseBody(response);
+  if (responseBody.parseText === null) {
     throw createRequestFailureError(
       path,
       responseRequestId,
       response,
-      null,
+      responseBody.responseTextSummary,
       `Request failed for ${path}: empty response`
     );
   }
 
   let data: StructuredDataValue | null = null;
   try {
-    const rawJsonData = JSON.parse(responseText);
+    const rawJsonData = JSON.parse(responseBody.parseText);
     const parsedJsonData = StructuredDataValueSchema.safeParse(rawJsonData);
     data = parsedJsonData.success ? parsedJsonData.data : null;
   } catch {
@@ -255,7 +316,7 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
     path,
     responseRequestId,
     response,
-    responseText,
+    responseBody.responseTextSummary,
     parsedError.success ? parsedError.data.error : `Request failed for ${path}`
   );
 }

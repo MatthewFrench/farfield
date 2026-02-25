@@ -13,6 +13,61 @@ import { registerAppTestEnvironment } from "./AppTestEnvironment";
 const environment = registerAppTestEnvironment();
 
 describe("App", () => {
+  it("opens debug and clears the error banner from the banner action", async () => {
+    environment.setThreadsFixture({
+      ok: true,
+      data: [
+        {
+          id: "thread-1",
+          preview: "Thread one",
+          createdAt: 1700000000,
+          updatedAt: 1700000001,
+          source: "opencode",
+          agentId: "codex"
+        }
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false
+    });
+    let readThreadCallCount = 0;
+    environment.setReadThreadResolver((threadId) => {
+      readThreadCallCount += 1;
+      if (readThreadCallCount === 1) {
+        return null;
+      }
+      return {
+        ok: true,
+        thread: environment.buildConversationStateFixture(threadId, "gpt-5.3-codex"),
+        agentId: "codex"
+      };
+    });
+    environment.setPathname("/threads/thread-1");
+    environment.renderApp();
+
+    const initialErrorBannerMessage = (await screen.findByTestId("error-banner-message")).textContent ?? "";
+    fireEvent.click(await screen.findByTestId("error-banner-open-debug"));
+
+    await waitFor(() => {
+      expect(screen.queryByText(initialErrorBannerMessage)).toBeNull();
+    });
+    expect(await screen.findByTestId("debug-issues-panel")).toBeTruthy();
+  });
+
+  it("closes debug view when opening the threads sidebar", async () => {
+    environment.setPathname("/debug");
+    environment.renderApp();
+
+    expect(await screen.findByTestId("debug-issues-panel")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("sidebar-toggle-open"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("debug-issues-panel")).toBeNull();
+    });
+    expect(await screen.findByTestId("chat-surface")).toBeTruthy();
+  });
+
   it("shows client errors in the debug issues panel", async () => {
     environment.setDebugErrorsFixture({
       ok: true,
