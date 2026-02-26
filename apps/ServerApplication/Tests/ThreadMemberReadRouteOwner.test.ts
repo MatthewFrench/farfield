@@ -322,4 +322,72 @@ describe("ThreadMemberReadRouteOwner", () => {
     );
     expect(parsedValidationErrorResponse.details.length).toBeGreaterThan(0);
   });
+
+  it("returns false for nested live-state paths to enforce canonical read routes", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "GET";
+
+    const readLiveState = vi.fn(async () => ({
+      ownerClientId: "client-a",
+      conversationState: null,
+      liveStateError: null
+    }));
+    const adapter: AgentAdapter = {
+      ...createUnsupportedAgentAdapter(),
+      capabilities: {
+        canListModels: false,
+        canListCollaborationModes: false,
+        canSetCollaborationMode: false,
+        canSubmitUserInput: false,
+        canReadLiveState: true,
+        canReadStreamEvents: false
+      },
+      readLiveState
+    };
+
+    let capturedStatusCode: number | null = null;
+    let capturedResponseBody: object | null = null;
+
+    const dependencies: ThreadMemberRouteDependencies = {
+      req: request,
+      res: response,
+      segments: ["api", "threads", "thread-1", "live-state", "extra"],
+      url: new URL("http://localhost/api/threads/thread-1/live-state/extra"),
+      codexAdapter: null,
+      parseInteger: () => {
+        throw new Error("Not used in live-state route-owner test");
+      },
+      parseBoolean: () => true,
+      threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
+      resolveAdapterForThread: async () => ({
+        ok: true,
+        adapter,
+        agentId: "codex"
+      }),
+      readJsonBody: async () => ({}),
+      jsonResponse: (_res, statusCode, body) => {
+        capturedStatusCode = statusCode;
+        capturedResponseBody = body;
+      },
+      invalidateThreadListAggregationCache: () => {},
+      pushActionEventWithRequestContext: () => {},
+      pushActionErrorWithRequestContext: () => "action-error-id"
+    };
+    const context: ThreadMemberResolvedRouteContext = {
+      threadId: "thread-1",
+      adapter,
+      agentId: "codex"
+    };
+
+    const owner = new ThreadMemberReadRouteOwner({
+      dependencies,
+      context
+    });
+    const handled = await owner.handle();
+
+    expect(handled).toBe(false);
+    expect(readLiveState).not.toHaveBeenCalled();
+    expect(capturedStatusCode).toBeNull();
+    expect(capturedResponseBody).toBeNull();
+  });
 });

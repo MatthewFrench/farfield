@@ -48,16 +48,30 @@ export const IpcRequestFrameSchema = z
   .passthrough();
 
 export const IpcResponseFrameSchema = z
-  .object({
-    type: z.literal(IpcFrameType.response),
-    requestId: IpcRequestIdSchema,
-    method: NonEmptyStringSchema.optional(),
-    handledByClientId: NonEmptyStringSchema.optional(),
-    resultType: IpcResponseResultTypeSchema,
-    result: JsonValueSchema.optional(),
-    error: JsonValueSchema.optional()
-  })
-  .passthrough();
+  .discriminatedUnion("resultType", [
+    z
+      .object({
+        type: z.literal(IpcFrameType.response),
+        requestId: IpcRequestIdSchema,
+        method: NonEmptyStringSchema.optional(),
+        handledByClientId: NonEmptyStringSchema.optional(),
+        resultType: z.literal(IpcResponseResultType.success),
+        result: JsonValueSchema.optional(),
+        error: z.never().optional()
+      })
+      .passthrough(),
+    z
+      .object({
+        type: z.literal(IpcFrameType.response),
+        requestId: IpcRequestIdSchema,
+        method: NonEmptyStringSchema.optional(),
+        handledByClientId: NonEmptyStringSchema.optional(),
+        resultType: z.literal(IpcResponseResultType.error),
+        error: JsonValueSchema,
+        result: z.never().optional()
+      })
+      .passthrough()
+  ]);
 
 export const IpcBroadcastFrameSchema = z
   .object({
@@ -90,18 +104,12 @@ export const IpcClientDiscoveryResponseFrameSchema = z
   })
   .passthrough();
 
-export const IpcFrameSchema: z.ZodDiscriminatedUnion<
-  "type",
-  [
-    typeof IpcRequestFrameSchema,
-    typeof IpcResponseFrameSchema,
-    typeof IpcBroadcastFrameSchema,
-    typeof IpcClientDiscoveryRequestFrameSchema,
-    typeof IpcClientDiscoveryResponseFrameSchema
-  ]
-> = z.discriminatedUnion("type", [
+// `response` now has its own discriminant (`resultType`) for strict result/error contracts.
+// Use a plain union at the outer frame level so response sub-variants can remain explicit.
+export const IpcFrameSchema = z.union([
   IpcRequestFrameSchema,
-  IpcResponseFrameSchema,
+  IpcResponseFrameSchema.options[0],
+  IpcResponseFrameSchema.options[1],
   IpcBroadcastFrameSchema,
   IpcClientDiscoveryRequestFrameSchema,
   IpcClientDiscoveryResponseFrameSchema

@@ -1,3 +1,7 @@
+/**
+ * Owns debug workspace snapshot reads and deterministic debug-error signature projection.
+ * Signatures are state-store comparison keys; they must remain unambiguous across field values.
+ */
 import type {
   DebugErrorListResponse,
   DebugHistoryResponse,
@@ -5,7 +9,14 @@ import type {
 } from "../DataAccess/DebugServerClient";
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
-const DEBUG_ERROR_SIGNATURE_SEGMENT_SEPARATOR = "|";
+const DEBUG_ERROR_SIGNATURE_SCHEMA_VERSION = "v1";
+
+type DebugErrorSignatureTuple = readonly [
+  schemaVersion: string,
+  errorId: string,
+  recordedAt: string,
+  message: string
+];
 
 export interface DebugWorkspaceDataSnapshot {
   history: DebugHistoryResponse["history"];
@@ -18,6 +29,18 @@ export interface DebugWorkspaceDataSnapshot {
 export interface DebugWorkspaceDataReadOptions {
   historyRequestOptions?: ApiRequestOptions;
   debugErrorsRequestOptions?: ApiRequestOptions;
+}
+
+function buildDebugErrorSignature(
+  debugError: DebugErrorListResponse["data"][number]
+): string {
+  const signatureTuple: DebugErrorSignatureTuple = [
+    DEBUG_ERROR_SIGNATURE_SCHEMA_VERSION,
+    debugError.errorId,
+    debugError.recordedAt,
+    debugError.message
+  ];
+  return JSON.stringify(signatureTuple);
 }
 
 export class DebugWorkspaceDataReader {
@@ -42,9 +65,7 @@ export class DebugWorkspaceDataReader {
       debugErrors: debugErrorsResponse.data,
       debugErrorSessionId: debugErrorsResponse.sessionId,
       debugErrorSessionLogPath: debugErrorsResponse.sessionLogPath,
-      debugErrorsSignature: debugErrorsResponse.data.map((entry) =>
-        [entry.errorId, entry.recordedAt, entry.message].join(DEBUG_ERROR_SIGNATURE_SEGMENT_SEPARATOR)
-      )
+      debugErrorsSignature: debugErrorsResponse.data.map(buildDebugErrorSignature)
     };
   }
 }

@@ -1,4 +1,5 @@
 import {
+  isThreadMemberSubresourceRoute,
   ThreadMemberMutationActionByName,
   ThreadMemberRouteMethodByName,
   ThreadMemberRouteSegmentByName,
@@ -39,7 +40,13 @@ export class ThreadMemberArchiveMutationRouteOwner {
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
-    if (!(req.method === ThreadMemberRouteMethodByName.post && this.dependencies.segments[3] === ThreadMemberRouteSegmentByName.archive)) {
+    if (!(
+      req.method === ThreadMemberRouteMethodByName.post
+      && isThreadMemberSubresourceRoute(
+        this.dependencies.segments,
+        ThreadMemberRouteSegmentByName.archive
+      )
+    )) {
       return false;
     }
 
@@ -99,7 +106,13 @@ export class ThreadMemberArchiveMutationRouteOwner {
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
-    if (!(req.method === ThreadMemberRouteMethodByName.post && this.dependencies.segments[3] === ThreadMemberRouteSegmentByName.unarchive)) {
+    if (!(
+      req.method === ThreadMemberRouteMethodByName.post
+      && isThreadMemberSubresourceRoute(
+        this.dependencies.segments,
+        ThreadMemberRouteSegmentByName.unarchive
+      )
+    )) {
       return false;
     }
 

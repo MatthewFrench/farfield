@@ -22,6 +22,16 @@ export const ThreadMemberRouteSegmentByName = {
   interrupt: "interrupt"
 } as const;
 
+export const ThreadMemberRouteSegmentIndexByName = {
+  threadIdentifier: 2,
+  threadSubresource: 3
+} as const;
+
+export const ThreadMemberRouteSegmentCountByName = {
+  threadRead: 3,
+  threadSubresource: 4
+} as const;
+
 export const ThreadMemberMutationActionByName = {
   messages: "messages",
   threadArchive: "thread-archive",
@@ -64,4 +74,15 @@ export interface ThreadMemberResolvedRouteContext {
   threadId: string;
   adapter: AgentAdapter;
   agentId: AgentId;
+}
+
+// Canonical thread-member subresource matching keeps nested paths from mutating unrelated routes.
+export function isThreadMemberSubresourceRoute(
+  segments: readonly string[],
+  subresource: string
+): boolean {
+  return (
+    segments.length === ThreadMemberRouteSegmentCountByName.threadSubresource
+    && segments[ThreadMemberRouteSegmentIndexByName.threadSubresource] === subresource
+  );
 }

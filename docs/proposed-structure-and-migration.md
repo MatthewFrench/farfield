@@ -951,6 +951,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Server bootstrap cache-invalidation policy ownership was extracted into `Application/Bootstrap/ThreadListCacheInvalidationOwner.ts`, reducing composition-root concentration in `ServerBootstrap.ts`.
 - [x] Browser push client convenience API wrappers were split out of `PushClientStateManager.ts` into `PushClientApi.ts` so class ownership remains focused on lifecycle behavior.
 - [x] `scripts/tooling/with-env.mjs` now builds spawned-process environment from a schema-owned allowlist instead of propagating the full `process.env` surface, while still loading explicit `.env` and `.env.local` values.
+- [x] Script path-literal governance is now enforced by `scripts/tooling/validate-script-path-governance.mjs` (`bun run validate:scripts:governance`), and `scripts/tooling/generate-codex-schema.mjs` now uses canonical `packages/CodexProtocol` ownership paths for schema regeneration.
 - [x] `CodexThreadStreamStateOwner` default invalid stream-event log path now resolves to `.runtime/logs/threads/invalid-thread-stream-events.ndjson` to keep runtime artifacts out of source roots.
 - [x] Real-app Playwright suite now contains `7` scenarios (`bunx playwright test -c playwright.real.config.ts --list`), including startup/header-refresh coverage; full execution requires the local Farfield server at `127.0.0.1:4311` and fails fast with `ECONNREFUSED` when that prerequisite is not running.
 - [x] Codex app-server spawn environment ownership now uses strict allowlisted schema parsing in `packages/CodexInterfaceAdapter/Source/AppServerTransport.ts` (`buildAppServerSpawnEnvironment`), removing direct full-environment propagation to child process startup.
@@ -1113,6 +1114,7 @@ When folder and file paths are moved to this end-state layout, update all path-d
 3. Build/dev/runtime scripts:
    - `scripts/**/*.mjs`
    - runtime bootstrap paths referenced by scripts
+   - `bun run validate:scripts:governance` path-literal governance checks after script path changes
 4. Test and end-to-end runners:
    - `playwright.real.config.ts`
    - `end-to-end/**` imports and helper references
@@ -1205,6 +1207,7 @@ All path families above must remain internally consistent after each rename/move
    - Rule:
      - use `end-to-end:real:*` scripts and `verify:end-to-end:real` command naming
      - use `validate:end-to-end:governance` for coverage governance checks
+     - use `validate:scripts:governance` for canonical script path-literal checks
      - use `.runtime/end-to-end-sentinel/*` for real-app sentinel artifacts
    - Reason: this keeps command, artifact, and governance naming aligned with no-abbreviation clarity standards.
 
@@ -1278,6 +1281,7 @@ All path families above must remain internally consistent after each rename/move
      - root command rewiring now points to grouped script paths
      - workflow syntax checks and env-loader invocation now target grouped paths
      - migration/docs references now point to grouped script ownership
+     - script path literals are now validated by `bun run validate:scripts:governance` to prevent legacy path drift
 
 19. Date: 2026-02-26
    - Decision: Codify boundary and hot-path hardening governance outcomes and classify excluded surfaces by policy status.

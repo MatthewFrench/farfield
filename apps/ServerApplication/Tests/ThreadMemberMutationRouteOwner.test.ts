@@ -233,6 +233,66 @@ describe("ThreadMemberMutationRouteOwner", () => {
     expect(jsonResponse).not.toHaveBeenCalled();
   });
 
+  it("returns false for nested archive paths to enforce canonical mutation routes", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const adapter = createAgentAdapter({
+      sendMessage: async () => {}
+    });
+
+    const jsonResponse = vi.fn<(statusCode: number, body: object) => void>();
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "archive", "extra"],
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          jsonResponse(statusCode, body);
+        },
+        pushActionEventWithRequestContext: () => {}
+      }),
+      context: createContext(adapter)
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(false);
+    expect(jsonResponse).not.toHaveBeenCalled();
+  });
+
+  it("returns false for nested interrupt paths to enforce canonical mutation routes", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const adapter = createAgentAdapter({
+      sendMessage: async () => {}
+    });
+
+    const jsonResponse = vi.fn<(statusCode: number, body: object) => void>();
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "interrupt", "extra"],
+        readJsonBody: async () => ({
+          ownerClientId: "client-1"
+        }),
+        onJsonResponse: (statusCode, body) => {
+          jsonResponse(statusCode, body);
+        },
+        pushActionEventWithRequestContext: () => {}
+      }),
+      context: createContext(adapter)
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(false);
+    expect(jsonResponse).not.toHaveBeenCalled();
+  });
+
   it("throws for malformed send-message payloads before mutation execution", async () => {
     const { request, response } = createMockRequestResponsePair();
     request.method = "POST";

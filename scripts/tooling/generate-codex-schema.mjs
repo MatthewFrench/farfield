@@ -3,15 +3,113 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { z } from "zod";
 
+/**
+ * Owns Codex app-server schema generation and protocol regeneration wiring.
+ * Canonical package-path ownership is enforced here so script paths stay aligned after renames.
+ */
 const root = process.cwd();
+const codexProtocolPackageDirectoryPath = path.join(root, "packages", "CodexProtocol");
 const defaultOutDir = path.join(
-  root,
-  "packages",
-  "codex-protocol",
+  codexProtocolPackageDirectoryPath,
   "vendor",
   "codex-app-server-schema"
 );
+
+const SpawnEnvironmentSchema = z.record(z.string().min(1), z.string());
+
+const SPAWN_ENVIRONMENT_EXACT_KEYS = new Set([
+  "ALL_PROXY",
+  "APPDATA",
+  "CI",
+  "CODEX_HOME",
+  "COLORTERM",
+  "ComSpec",
+  "EDITOR",
+  "FORCE_COLOR",
+  "HOME",
+  "HOST",
+  "HTTPS_PROXY",
+  "HTTP_PROXY",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LOCALAPPDATA",
+  "LOG_LEVEL",
+  "NO_COLOR",
+  "NO_PROXY",
+  "PATH",
+  "PORT",
+  "PWD",
+  "SHELL",
+  "SHLVL",
+  "SSL_CERT_DIR",
+  "SSL_CERT_FILE",
+  "SystemRoot",
+  "TERM",
+  "TERM_PROGRAM",
+  "TMP",
+  "TMPDIR",
+  "TEMP",
+  "TZ",
+  "USER",
+  "USERNAME",
+  "USERPROFILE",
+  "VISUAL",
+  "XDG_CACHE_HOME",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_STATE_HOME"
+]);
+
+const SPAWN_ENVIRONMENT_PREFIXES = [
+  "API_",
+  "APP_SMOKE_",
+  "BUN_",
+  "CADDY_",
+  "CODEX_",
+  "DEBUG_",
+  "FARFIELD_",
+  "GITHUB_",
+  "IOS_",
+  "NODE_",
+  "NTFY_",
+  "NPM_",
+  "PLAYWRIGHT_",
+  "PUSH_",
+  "STREAM_BURST_",
+  "THREAD_",
+  "VITE_",
+  "WEB_",
+  "npm_"
+];
+
+function shouldIncludeSpawnEnvironmentKey(environmentKey) {
+  if (SPAWN_ENVIRONMENT_EXACT_KEYS.has(environmentKey)) {
+    return true;
+  }
+
+  return SPAWN_ENVIRONMENT_PREFIXES.some((prefix) => environmentKey.startsWith(prefix));
+}
+
+function buildSpawnEnvironment(sourceEnvironment) {
+  const spawnEnvironment = {};
+
+  for (const [environmentKey, environmentValue] of Object.entries(sourceEnvironment)) {
+    if (!shouldIncludeSpawnEnvironmentKey(environmentKey)) {
+      continue;
+    }
+    if (typeof environmentValue !== "string") {
+      continue;
+    }
+    spawnEnvironment[environmentKey] = environmentValue;
+  }
+
+  return SpawnEnvironmentSchema.parse(spawnEnvironment);
+}
+
+const spawnEnvironment = buildSpawnEnvironment(process.env);
 
 function printHelp() {
   process.stdout.write(
@@ -103,7 +201,7 @@ function resolveCodexExecutable(explicitPath) {
 function runCodex(codexExecutable, args, label) {
   const result = spawnSync(codexExecutable, args, {
     stdio: "inherit",
-    env: process.env
+    env: spawnEnvironment
   });
 
   if (result.error) {
@@ -128,7 +226,7 @@ function runCodex(codexExecutable, args, label) {
 function readCodexVersion(codexExecutable) {
   const result = spawnSync(codexExecutable, ["--version"], {
     encoding: "utf8",
-    env: process.env
+    env: spawnEnvironment
   });
   if (result.error || result.status !== 0) {
     return "unknown";
@@ -142,7 +240,7 @@ function runBunScript(script, cwd) {
   const result = spawnSync(bunExecutable, ["run", script], {
     cwd,
     stdio: "inherit",
-    env: process.env
+    env: spawnEnvironment
   });
 
   if (result.error) {
@@ -204,6 +302,13 @@ function writeMetadataFile(codexExecutable, outDir) {
 }
 
 function main() {
+  if (!fs.existsSync(codexProtocolPackageDirectoryPath)) {
+    process.stderr.write(
+      `Missing protocol package directory: ${codexProtocolPackageDirectoryPath}\n`
+    );
+    process.exit(1);
+  }
+
   const args = parseArgs(process.argv.slice(2));
   const codexExecutable = resolveCodexExecutable(args.codexPath);
   const outDir = args.outDir;
@@ -219,7 +324,7 @@ function main() {
 
   const generateProtocolSchemasStatus = runBunScript(
     "generate:app-server-zod",
-    path.join(root, "packages", "codex-protocol")
+    codexProtocolPackageDirectoryPath
   );
   if (generateProtocolSchemasStatus !== 0) {
     process.exit(generateProtocolSchemasStatus);

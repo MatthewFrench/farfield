@@ -5,6 +5,7 @@ import {
   ThreadMemberReadRouteOwner
 } from "./ThreadMemberReadRouteOwner.js";
 import {
+  ThreadMemberRouteSegmentIndexByName,
   ThreadMemberRouteSegmentByName,
   type ThreadMemberRouteDependencies
 } from "./ThreadMemberRouteContracts.js";
@@ -15,18 +16,19 @@ export async function handleThreadMemberRoutes(
   dependencies: ThreadMemberRouteDependencies
 ): Promise<boolean> {
   const { segments, resolveAdapterForThread, jsonResponse, res } = dependencies;
+  const threadIdentifierSegment = segments[ThreadMemberRouteSegmentIndexByName.threadIdentifier];
 
   if (
     !(segments[0] === ThreadMemberRouteSegmentByName.api
     && segments[1] === ThreadMemberRouteSegmentByName.threads
-    && segments[2])
+    && threadIdentifierSegment)
   ) {
     return false;
   }
 
   let threadId: string;
   try {
-    threadId = decodeURIComponent(segments[2]);
+    threadId = decodeURIComponent(threadIdentifierSegment);
   } catch {
     jsonResponse(res, 400, {
       ok: false,

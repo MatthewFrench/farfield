@@ -5,6 +5,7 @@ import {
   parseSubmitUserInputBody
 } from "../RequestSchemas/HttpSchemas.js";
 import {
+  isThreadMemberSubresourceRoute,
   ThreadMemberMutationActionByName,
   ThreadMemberRouteMethodByName,
   ThreadMemberRouteSegmentByName,
@@ -51,7 +52,10 @@ export class ThreadMemberInteractionMutationRouteOwner {
 
     if (
       !(req.method === ThreadMemberRouteMethodByName.post
-      && this.dependencies.segments[3] === ThreadMemberRouteSegmentByName.collaborationMode)
+      && isThreadMemberSubresourceRoute(
+        this.dependencies.segments,
+        ThreadMemberRouteSegmentByName.collaborationMode
+      ))
     ) {
       return false;
     }
@@ -122,7 +126,10 @@ export class ThreadMemberInteractionMutationRouteOwner {
 
     if (
       !(req.method === ThreadMemberRouteMethodByName.post
-      && this.dependencies.segments[3] === ThreadMemberRouteSegmentByName.userInput)
+      && isThreadMemberSubresourceRoute(
+        this.dependencies.segments,
+        ThreadMemberRouteSegmentByName.userInput
+      ))
     ) {
       return false;
     }
@@ -203,7 +210,10 @@ export class ThreadMemberInteractionMutationRouteOwner {
 
     if (
       !(req.method === ThreadMemberRouteMethodByName.post
-      && this.dependencies.segments[3] === ThreadMemberRouteSegmentByName.interrupt)
+      && isThreadMemberSubresourceRoute(
+        this.dependencies.segments,
+        ThreadMemberRouteSegmentByName.interrupt
+      ))
     ) {
       return false;
     }

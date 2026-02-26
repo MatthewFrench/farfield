@@ -381,6 +381,7 @@ This is the normative architecture contract for Farfield code.
 2. Keep type safety enforcement through TypeScript (`tsc`) and strict schema validation boundaries.
 3. Prefer a single formatter/linter stack for consistency and speed when tooling consolidation work is scheduled.
 4. Biome is an approved candidate for future formatter/linter consolidation, with migration design required before adoption.
+5. Script-owned runtime path literals must remain canonical and be validated with `bun run validate:scripts:governance` after path-sensitive script changes.
 
 ## Import and Export Rules
 

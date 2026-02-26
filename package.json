@@ -41,6 +41,7 @@
     "stress:stream-burst": "node scripts/tooling/with-env.mjs \"node scripts/operations/stream-burst.mjs\"",
     "verify:end-to-end:real": "bun run smoke:app && bun run end-to-end:real:safe-run",
     "validate:end-to-end:governance": "node scripts/tooling/validate-end-to-end-governance.mjs",
+    "validate:scripts:governance": "node scripts/tooling/validate-script-path-governance.mjs",
     "sanitize:traces": "node scripts/tooling/sanitize-traces.mjs",
     "generate:codex-schema": "node scripts/tooling/generate-codex-schema.mjs",
     "screenshot:codex": "node skills/codex-window-debug/tools/codex-window-screenshot.mjs"

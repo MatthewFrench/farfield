@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  isThreadMemberSubresourceRoute,
+  ThreadMemberRouteSegmentCountByName,
   ThreadMemberRouteMethodByName,
   ThreadMemberRouteSegmentByName,
   type ThreadMemberRouteDependencies,
@@ -24,7 +26,10 @@ export class ThreadMemberReadRouteOwner {
     const { req, res, segments, url, codexAdapter, parseBoolean, jsonResponse } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
-    if (req.method === ThreadMemberRouteMethodByName.get && segments.length === 3) {
+    if (
+      req.method === ThreadMemberRouteMethodByName.get
+      && segments.length === ThreadMemberRouteSegmentCountByName.threadRead
+    ) {
       const includeTurns = parseBoolean(url.searchParams.get("includeTurns"), true);
 
       try {
@@ -53,7 +58,10 @@ export class ThreadMemberReadRouteOwner {
       }
     }
 
-    if (req.method === ThreadMemberRouteMethodByName.get && segments[3] === ThreadMemberRouteSegmentByName.liveState) {
+    if (
+      req.method === ThreadMemberRouteMethodByName.get
+      && isThreadMemberSubresourceRoute(segments, ThreadMemberRouteSegmentByName.liveState)
+    ) {
       if (!adapter.capabilities.canReadLiveState || !adapter.readLiveState) {
         jsonResponse(res, 400, {
           ok: false,
@@ -74,7 +82,10 @@ export class ThreadMemberReadRouteOwner {
       return true;
     }
 
-    if (req.method === ThreadMemberRouteMethodByName.get && segments[3] === ThreadMemberRouteSegmentByName.streamEvents) {
+    if (
+      req.method === ThreadMemberRouteMethodByName.get
+      && isThreadMemberSubresourceRoute(segments, ThreadMemberRouteSegmentByName.streamEvents)
+    ) {
       if (!adapter.capabilities.canReadStreamEvents || !adapter.readStreamEvents) {
         jsonResponse(res, 400, {
           ok: false,

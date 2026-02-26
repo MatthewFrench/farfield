@@ -56,6 +56,32 @@ describe("codex-protocol ipc schemas", () => {
     expect(parsed.type).toBe(IpcFrameType.response);
   });
 
+  it("rejects success response frames that include an error payload", () => {
+    expect(() =>
+      parseIpcFrame({
+        type: IpcFrameType.response,
+        requestId: "request-7a",
+        resultType: IpcResponseResultType.success,
+        result: {
+          accepted: true
+        },
+        error: {
+          reason: "must-not-be-present"
+        }
+      })
+    ).toThrowError(/error/i);
+  });
+
+  it("rejects error response frames that omit the error payload", () => {
+    expect(() =>
+      parseIpcFrame({
+        type: IpcFrameType.response,
+        requestId: "request-7b",
+        resultType: IpcResponseResultType.error
+      })
+    ).toThrowError(/error/i);
+  });
+
   it("rejects ipc frames with unsupported discriminant values", () => {
     expect(() =>
       parseIpcFrame({
