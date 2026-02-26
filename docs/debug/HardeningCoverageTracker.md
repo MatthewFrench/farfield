@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-26 16:35:57Z
+Last Updated (UTC): 2026-02-26 19:29:33Z
 
 ## Scope Model
 
@@ -62,6 +62,36 @@ Files touched in this continuation wave:
 16. `apps/ServerApplication/Tests/AgentRoutes.test.ts`
 17. `apps/ServerApplication/Source/Network/Routes/ThreadRoutes.ts`
 18. `apps/ServerApplication/Tests/ThreadRoutes.test.ts`
+
+## Latest Continuation Commit Wave (Current)
+
+The following isolated commits were added after the previous continuation section:
+
+1. `921c25c` `refactor: harden thread member route boundary parsing`
+2. `3c429cd` `refactor: harden debug download stream contracts`
+3. `b3c1a69` `refactor: harden replay frame parser contracts`
+4. `572a2ae` `refactor: harden debug route dispatch ownership`
+5. `6dbf480` `refactor: harden debug client error route boundaries`
+6. `3bf48d8` `refactor: harden debug history route boundaries`
+7. `bf8c004` `refactor: harden debug trace route boundaries`
+8. `5c664eb` `refactor: harden debug replay route contracts`
+9. `363193c` `refactor: harden thread member route contract matching`
+
+Files touched in this continuation segment:
+
+1. `apps/ServerApplication/Source/Network/Routes/ThreadMemberRoutes.ts`
+2. `apps/ServerApplication/Tests/ThreadMemberRoutes.integration.test.ts`
+3. `apps/ServerApplication/Source/Network/Routes/DebugFileDownload.ts`
+4. `apps/ServerApplication/Tests/DebugFileDownload.test.ts`
+5. `apps/ServerApplication/Source/Network/Routes/DebugReplayFrameParser.ts`
+6. `apps/ServerApplication/Tests/DebugReplayFrameParser.test.ts`
+7. `apps/ServerApplication/Source/Network/Routes/DebugRoutes.ts`
+8. `apps/ServerApplication/Tests/HttpRoutesDebug.integration.test.ts`
+9. `apps/ServerApplication/Source/Network/Routes/DebugClientErrorRouteOwner.ts`
+10. `apps/ServerApplication/Source/Network/Routes/DebugHistoryRouteOwner.ts`
+11. `apps/ServerApplication/Source/Network/Routes/DebugTraceRouteOwner.ts`
+12. `apps/ServerApplication/Source/Network/Routes/DebugReplayRouteOwner.ts`
+13. `apps/ServerApplication/Source/Network/Routes/ThreadMemberRouteContracts.ts`
 
 ## Repository Segment Coverage
 
