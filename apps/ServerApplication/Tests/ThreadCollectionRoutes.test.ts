@@ -16,6 +16,11 @@ import type {
 } from "../Source/Agents/Types.js";
 import { ThreadListAggregationCache } from "../Source/Network/ThreadListAggregationCache.js";
 import {
+  ThreadCollectionRouteMethodByName,
+  ThreadCollectionRoutePathnameByName,
+  type ThreadCollectionRouteMethod
+} from "../Source/Network/Routes/ThreadCollectionRouteContracts.js";
+import {
   handleThreadCollectionRoutes,
   type ThreadCollectionRouteDependencies
 } from "../Source/Network/Routes/ThreadCollectionRoutes.js";
@@ -23,6 +28,15 @@ import {
 type ResolveCreateThreadAdapter = (
   requestedAgentId: AgentId | undefined
 ) => AgentAdapter | null;
+
+const ThreadCollectionRouteTestOrigin = "http://localhost";
+
+function buildThreadCollectionRouteUrl(queryString = ""): URL {
+  return new URL(
+    `${ThreadCollectionRoutePathnameByName.threads}${queryString}`,
+    ThreadCollectionRouteTestOrigin
+  );
+}
 
 function createMockRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
   const socket = new Socket();
@@ -78,7 +92,7 @@ function createMockAgentAdapter(
 }
 
 function createCollectionRouteDependencies(input: {
-  method?: "GET" | "POST";
+  method?: ThreadCollectionRouteMethod;
   pathname?: string;
   url: URL;
   defaultWorkspace?: string;
@@ -93,12 +107,12 @@ function createCollectionRouteDependencies(input: {
   ) => Promise<ValueType>;
 }): ThreadCollectionRouteDependencies {
   const { request, response } = createMockRequestResponsePair();
-  request.method = input.method ?? "GET";
+  request.method = input.method ?? ThreadCollectionRouteMethodByName.get;
 
   return {
     req: request,
     res: response,
-    pathname: input.pathname ?? "/api/threads",
+    pathname: input.pathname ?? ThreadCollectionRoutePathnameByName.threads,
     url: input.url,
     defaultWorkspace: input.defaultWorkspace ?? "/tmp/workspace",
     threadListAggregationCache: new ThreadListAggregationCache(1_000, 4),
@@ -137,8 +151,8 @@ describe("handleThreadCollectionRoutes", () => {
 
     const handled = await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
-        method: "POST",
-        url: new URL("http://localhost/api/threads"),
+        method: ThreadCollectionRouteMethodByName.post,
+        url: buildThreadCollectionRouteUrl(),
         listEnabledAdapters: () => [],
         resolveCreateThreadAdapter: () => null,
         readJsonBody: async () => ({
@@ -186,8 +200,8 @@ describe("handleThreadCollectionRoutes", () => {
 
     const handled = await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
-        method: "POST",
-        url: new URL("http://localhost/api/threads"),
+        method: ThreadCollectionRouteMethodByName.post,
+        url: buildThreadCollectionRouteUrl(),
         defaultWorkspace: "/workspace/default",
         listEnabledAdapters: () => [adapter],
         resolveCreateThreadAdapter: () => adapter,
@@ -211,6 +225,30 @@ describe("handleThreadCollectionRoutes", () => {
     });
   });
 
+  it("returns false when pathname does not match the collection route contract", async () => {
+    let wasResponseWritten = false;
+    const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
+      data: [],
+      nextCursor: null
+    }));
+    const adapter = createMockAgentAdapter("codex", listThreads);
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        pathname: `${ThreadCollectionRoutePathnameByName.threads}/member`,
+        url: buildThreadCollectionRouteUrl(),
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: () => {
+          wasResponseWritten = true;
+        }
+      })
+    );
+
+    expect(handled).toBe(false);
+    expect(wasResponseWritten).toBe(false);
+    expect(listThreads).not.toHaveBeenCalled();
+  });
+
   it("returns 400 when limit exceeds the route maximum", async () => {
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
@@ -222,7 +260,7 @@ describe("handleThreadCollectionRoutes", () => {
 
     const handled = await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
-        url: new URL("http://localhost/api/threads?limit=999"),
+        url: buildThreadCollectionRouteUrl("?limit=999"),
         listEnabledAdapters: () => [adapter],
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
@@ -250,7 +288,7 @@ describe("handleThreadCollectionRoutes", () => {
 
     await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
-        url: new URL("http://localhost/api/threads?archived=1"),
+        url: buildThreadCollectionRouteUrl("?archived=1"),
         listEnabledAdapters: () => [adapter],
         onJsonResponse: (statusCode) => {
           capturedStatusCode = statusCode;
@@ -273,7 +311,7 @@ describe("handleThreadCollectionRoutes", () => {
 
     await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
-        url: new URL("http://localhost/api/threads?cursor=invalid-cursor"),
+        url: buildThreadCollectionRouteUrl("?cursor=invalid-cursor"),
         listEnabledAdapters: () => [adapter],
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
@@ -315,8 +353,8 @@ describe("handleThreadCollectionRoutes", () => {
 
     const handled = await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
-        url: new URL(
-          "http://localhost/api/threads?limit=10&maxPages=2&archived=false&all=false&sortKey=created_at"
+        url: buildThreadCollectionRouteUrl(
+          "?limit=10&maxPages=2&archived=false&all=false&sortKey=created_at"
         ),
         listEnabledAdapters: () => [adapter],
         onJsonResponse: (statusCode, body) => {
@@ -353,7 +391,7 @@ describe("handleThreadCollectionRoutes", () => {
 
     await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
-        url: new URL("http://localhost/api/threads?limit=10"),
+        url: buildThreadCollectionRouteUrl("?limit=10"),
         listEnabledAdapters: () => [adapter],
         onJsonResponse: () => {}
       })
@@ -409,7 +447,7 @@ describe("handleThreadCollectionRoutes", () => {
 
     const handled = await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
-        url: new URL(`http://localhost/api/threads?limit=1&cursor=${encodedCursor}`),
+        url: buildThreadCollectionRouteUrl(`?limit=1&cursor=${encodedCursor}`),
         listEnabledAdapters: () => [adapter],
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
@@ -456,7 +494,7 @@ describe("handleThreadCollectionRoutes", () => {
 
     const handled = await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
-        url: new URL("http://localhost/api/threads?limit=10"),
+        url: buildThreadCollectionRouteUrl("?limit=10"),
         listEnabledAdapters: () => [fastAdapter, slowAdapter],
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;

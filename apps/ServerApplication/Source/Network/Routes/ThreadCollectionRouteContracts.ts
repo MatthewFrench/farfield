@@ -5,14 +5,30 @@ import type {
   ThreadListAggregationCache
 } from "../ThreadListAggregationCache.js";
 
-export const ThreadCollectionRouteMethodByName = {
+export type ThreadCollectionRouteMethod = "GET" | "POST";
+
+export interface ThreadCollectionRouteMethodMap {
+  get: "GET";
+  post: "POST";
+}
+
+export const ThreadCollectionRouteMethodByName: Readonly<ThreadCollectionRouteMethodMap> = {
   get: "GET",
   post: "POST"
-} as const;
+};
 
-export const ThreadCollectionRoutePathnameByName = {
+export type ThreadCollectionRoutePathname = "/api/threads";
+
+export interface ThreadCollectionRoutePathnameMap {
+  threads: ThreadCollectionRoutePathname;
+}
+
+export const ThreadCollectionRoutePathnameByName: Readonly<ThreadCollectionRoutePathnameMap> = {
   threads: "/api/threads"
-} as const;
+};
+
+export type ThreadCollectionRouteActionStage = "attempt" | "success" | "error";
+export type ThreadCollectionRouteActionDetails = Record<string, JsonValue>;
 
 export interface ThreadCollectionRouteDependencies {
   req: IncomingMessage;
@@ -33,13 +49,13 @@ export interface ThreadCollectionRouteDependencies {
   invalidateThreadListAggregationCache: (reason: string, details?: Record<string, JsonValue>) => void;
   pushActionEventWithRequestContext: (
     action: string,
-    stage: "attempt" | "success" | "error",
-    details: Record<string, JsonValue>
+    stage: ThreadCollectionRouteActionStage,
+    details: ThreadCollectionRouteActionDetails
   ) => void;
   pushActionErrorWithRequestContext: <ErrorType>(
     action: string,
     error: ErrorType,
-    details: Record<string, JsonValue>
+    details: ThreadCollectionRouteActionDetails
   ) => string;
   withTimeout: <ValueType>(
     promise: Promise<ValueType>,
