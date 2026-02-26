@@ -54,8 +54,8 @@ export class ThreadMemberMessageMutationRouteOwner {
         await adapter.sendMessage({
           threadId,
           text: body.text,
-          ...(body.ownerClientId ? { ownerClientId: body.ownerClientId } : {}),
-          ...(body.cwd ? { cwd: body.cwd } : {}),
+          ...(body.ownerClientId !== undefined ? { ownerClientId: body.ownerClientId } : {}),
+          ...(body.cwd !== undefined ? { cwd: body.cwd } : {}),
           ...(typeof body.isSteering === "boolean" ? { isSteering: body.isSteering } : {})
         });
       });

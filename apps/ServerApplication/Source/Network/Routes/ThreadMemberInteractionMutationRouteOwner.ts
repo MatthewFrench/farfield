@@ -82,7 +82,7 @@ export class ThreadMemberInteractionMutationRouteOwner {
       const result = await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
         return setCollaborationMode({
           threadId,
-          ...(body.ownerClientId ? { ownerClientId: body.ownerClientId } : {}),
+          ...(body.ownerClientId !== undefined ? { ownerClientId: body.ownerClientId } : {}),
           collaborationMode: body.collaborationMode
         });
       });
@@ -156,7 +156,7 @@ export class ThreadMemberInteractionMutationRouteOwner {
       const result = await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
         return submitUserInput({
           threadId,
-          ...(body.ownerClientId ? { ownerClientId: body.ownerClientId } : {}),
+          ...(body.ownerClientId !== undefined ? { ownerClientId: body.ownerClientId } : {}),
           requestId: body.requestId,
           response: body.response
         });
@@ -229,7 +229,7 @@ export class ThreadMemberInteractionMutationRouteOwner {
       await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
         await adapter.interrupt({
           threadId,
-          ...(body.ownerClientId ? { ownerClientId: body.ownerClientId } : {})
+          ...(body.ownerClientId !== undefined ? { ownerClientId: body.ownerClientId } : {})
         });
       });
     } catch (error) {

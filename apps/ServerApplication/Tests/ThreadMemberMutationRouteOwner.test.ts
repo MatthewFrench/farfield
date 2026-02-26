@@ -36,6 +36,13 @@ function createMockRequestResponsePair(): { request: IncomingMessage; response: 
 
 function createAgentAdapter(input: {
   sendMessage?: (value: AgentSendMessageInput) => Promise<void>;
+  setCollaborationMode?: (
+    value: AgentSetCollaborationModeInput
+  ) => Promise<AgentSetCollaborationModeResult>;
+  submitUserInput?: (
+    value: AgentSubmitUserInputInput
+  ) => Promise<AgentSubmitUserInputResult>;
+  interrupt?: (value: AgentInterruptInput) => Promise<void>;
 }): AgentAdapter {
   return {
     id: "codex",
@@ -43,8 +50,8 @@ function createAgentAdapter(input: {
     capabilities: {
       canListModels: false,
       canListCollaborationModes: false,
-      canSetCollaborationMode: false,
-      canSubmitUserInput: false,
+      canSetCollaborationMode: input.setCollaborationMode !== undefined,
+      canSubmitUserInput: input.submitUserInput !== undefined,
       canReadLiveState: false,
       canReadStreamEvents: false
     },
@@ -72,17 +79,26 @@ function createAgentAdapter(input: {
       await input.sendMessage(inputValue);
     },
     async setCollaborationMode(
-      _input: AgentSetCollaborationModeInput
+      inputValue: AgentSetCollaborationModeInput
     ): Promise<AgentSetCollaborationModeResult> {
-      throw new Error("Not used in mutation route-owner tests");
+      if (!input.setCollaborationMode) {
+        throw new Error("Not used in mutation route-owner tests");
+      }
+      return input.setCollaborationMode(inputValue);
     },
     async submitUserInput(
-      _input: AgentSubmitUserInputInput
+      inputValue: AgentSubmitUserInputInput
     ): Promise<AgentSubmitUserInputResult> {
-      throw new Error("Not used in mutation route-owner tests");
+      if (!input.submitUserInput) {
+        throw new Error("Not used in mutation route-owner tests");
+      }
+      return input.submitUserInput(inputValue);
     },
-    async interrupt(_input: AgentInterruptInput): Promise<void> {
-      throw new Error("Not used in mutation route-owner tests");
+    async interrupt(inputValue: AgentInterruptInput): Promise<void> {
+      if (!input.interrupt) {
+        throw new Error("Not used in mutation route-owner tests");
+      }
+      await input.interrupt(inputValue);
     }
   };
 }
@@ -200,6 +216,185 @@ describe("ThreadMemberMutationRouteOwner", () => {
       ok: true,
       threadId: "thread-1"
     });
+  });
+
+  it("forwards explicit empty-string ownerClientId and cwd for send-message mutations", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const sentMessages: AgentSendMessageInput[] = [];
+    const adapter = createAgentAdapter({
+      sendMessage: async (value) => {
+        sentMessages.push(value);
+      }
+    });
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "messages"],
+        readJsonBody: async () => ({
+          text: "hello",
+          ownerClientId: "",
+          cwd: ""
+        }),
+        onJsonResponse: () => {},
+        pushActionEventWithRequestContext: () => {}
+      }),
+      context: createContext(adapter)
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(sentMessages).toEqual([
+      {
+        threadId: "thread-1",
+        text: "hello",
+        ownerClientId: "",
+        cwd: ""
+      }
+    ]);
+  });
+
+  it("forwards explicit empty-string ownerClientId for collaboration-mode mutations", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const setCollaborationModeCalls: AgentSetCollaborationModeInput[] = [];
+    const adapter = createAgentAdapter({
+      setCollaborationMode: async (value) => {
+        setCollaborationModeCalls.push(value);
+        return {
+          ownerClientId: ""
+        };
+      }
+    });
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "collaboration-mode"],
+        readJsonBody: async () => ({
+          ownerClientId: "",
+          collaborationMode: {
+            mode: "default",
+            settings: {}
+          }
+        }),
+        onJsonResponse: () => {},
+        pushActionEventWithRequestContext: () => {}
+      }),
+      context: createContext(adapter)
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(setCollaborationModeCalls).toEqual([
+      {
+        threadId: "thread-1",
+        ownerClientId: "",
+        collaborationMode: {
+          mode: "default",
+          settings: {}
+        }
+      }
+    ]);
+  });
+
+  it("forwards explicit empty-string ownerClientId for submit-user-input mutations", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const submitUserInputCalls: AgentSubmitUserInputInput[] = [];
+    const adapter = createAgentAdapter({
+      submitUserInput: async (value) => {
+        submitUserInputCalls.push(value);
+        return {
+          ownerClientId: "",
+          requestId: value.requestId
+        };
+      }
+    });
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "user-input"],
+        readJsonBody: async () => ({
+          ownerClientId: "",
+          requestId: 13,
+          response: {
+            answers: {
+              question_1: {
+                answers: ["answer"]
+              }
+            }
+          }
+        }),
+        onJsonResponse: () => {},
+        pushActionEventWithRequestContext: () => {}
+      }),
+      context: createContext(adapter)
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(submitUserInputCalls).toEqual([
+      {
+        threadId: "thread-1",
+        ownerClientId: "",
+        requestId: 13,
+        response: {
+          answers: {
+            question_1: {
+              answers: ["answer"]
+            }
+          }
+        }
+      }
+    ]);
+  });
+
+  it("forwards explicit empty-string ownerClientId for interrupt mutations", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const interruptCalls: AgentInterruptInput[] = [];
+    const adapter = createAgentAdapter({
+      interrupt: async (value) => {
+        interruptCalls.push(value);
+      }
+    });
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "interrupt"],
+        readJsonBody: async () => ({
+          ownerClientId: ""
+        }),
+        onJsonResponse: () => {},
+        pushActionEventWithRequestContext: () => {}
+      }),
+      context: createContext(adapter)
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(interruptCalls).toEqual([
+      {
+        threadId: "thread-1",
+        ownerClientId: ""
+      }
+    ]);
   });
 
   it("returns false for unmatched thread-member mutation routes", async () => {
