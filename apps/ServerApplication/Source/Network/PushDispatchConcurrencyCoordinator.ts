@@ -68,7 +68,7 @@ export class PushDispatchConcurrencyCoordinator {
       return;
     }
 
-    this.scheduleNormalizedThreadCheck(normalizedThreadId);
+    this.scheduleNormalizedThreadCheckWithSuppressedSchedulerErrors(normalizedThreadId);
   }
 
   public stop(): void {
@@ -160,15 +160,24 @@ export class PushDispatchConcurrencyCoordinator {
 
   private executeCheckWithoutUnhandledRejection(threadId: string): void {
     void this.executeCheck(threadId).catch(() => {
-      this.suppressedSchedulerErrorCount += 1;
+      this.recordSuppressedSchedulerError();
     });
   }
 
   private schedulePendingRerun(threadId: string): void {
+    this.scheduleNormalizedThreadCheckWithSuppressedSchedulerErrors(threadId);
+  }
+
+  // Policy-owner callbacks can throw; scheduler ownership requires suppressing and counting these errors.
+  private scheduleNormalizedThreadCheckWithSuppressedSchedulerErrors(threadId: string): void {
     try {
       this.scheduleNormalizedThreadCheck(threadId);
     } catch {
-      this.suppressedSchedulerErrorCount += 1;
+      this.recordSuppressedSchedulerError();
     }
+  }
+
+  private recordSuppressedSchedulerError(): void {
+    this.suppressedSchedulerErrorCount += 1;
   }
 }

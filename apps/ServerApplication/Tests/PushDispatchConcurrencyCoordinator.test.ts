@@ -56,6 +56,36 @@ describe("PushDispatchConcurrencyCoordinator", () => {
     coordinator.stop();
   });
 
+  it("normalizes thread identifiers before dispatching checks", async () => {
+    vi.useFakeTimers();
+    const calls: string[] = [];
+    const coordinator = new PushDispatchConcurrencyCoordinator(
+      DEBOUNCE_MILLISECONDS,
+      () => true,
+      async (threadId) => {
+        calls.push(threadId);
+      }
+    );
+
+    coordinator.schedule("  thread_1  ");
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MILLISECONDS);
+
+    expect(calls).toEqual(["thread_1"]);
+    expect(coordinator.readStatistics()).toEqual({
+      scheduledCheckCount: 1,
+      startedCheckCount: 1,
+      completedCheckCount: 1,
+      failedCheckCount: 0,
+      skippedWhileInFlightCount: 0,
+      suppressedSchedulerErrorCount: 0,
+      activeTimerCount: 0,
+      inFlightThreadCount: 0,
+      pendingRerunThreadCount: 0,
+      isStopped: false
+    });
+    coordinator.stop();
+  });
+
   it("requeues concurrent executions for the same thread with deterministic statistics", async () => {
     vi.useFakeTimers();
     let releaseCheck: () => void = () => {};
@@ -146,9 +176,13 @@ describe("PushDispatchConcurrencyCoordinator", () => {
 
   it("ignores disabled scheduling and blank thread identifiers", async () => {
     vi.useFakeTimers();
+    let shouldScheduleCallCount = 0;
     const coordinator = new PushDispatchConcurrencyCoordinator(
       DEBOUNCE_MILLISECONDS,
-      () => false,
+      () => {
+        shouldScheduleCallCount += 1;
+        return false;
+      },
       async () => {}
     );
 
@@ -160,7 +194,69 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       scheduledCheckCount: 0,
       startedCheckCount: 0
     });
+    expect(shouldScheduleCallCount).toBe(1);
     coordinator.stop();
+  });
+
+  it("suppresses scheduler policy errors from direct schedule calls", async () => {
+    vi.useFakeTimers();
+    const coordinator = new PushDispatchConcurrencyCoordinator(
+      DEBOUNCE_MILLISECONDS,
+      () => {
+        throw new Error("policy failure");
+      },
+      async () => {}
+    );
+
+    expect(() => {
+      coordinator.schedule("thread_1");
+    }).not.toThrow();
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MILLISECONDS);
+
+    expect(coordinator.readStatistics()).toEqual({
+      scheduledCheckCount: 0,
+      startedCheckCount: 0,
+      completedCheckCount: 0,
+      failedCheckCount: 0,
+      skippedWhileInFlightCount: 0,
+      suppressedSchedulerErrorCount: 1,
+      activeTimerCount: 0,
+      inFlightThreadCount: 0,
+      pendingRerunThreadCount: 0,
+      isStopped: false
+    });
+    coordinator.stop();
+  });
+
+  it("does not evaluate scheduling policy after coordinator is stopped", async () => {
+    vi.useFakeTimers();
+    let shouldScheduleCallCount = 0;
+    const coordinator = new PushDispatchConcurrencyCoordinator(
+      DEBOUNCE_MILLISECONDS,
+      () => {
+        shouldScheduleCallCount += 1;
+        return true;
+      },
+      async () => {}
+    );
+
+    coordinator.stop();
+    coordinator.schedule("thread_1");
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MILLISECONDS);
+
+    expect(shouldScheduleCallCount).toBe(0);
+    expect(coordinator.readStatistics()).toEqual({
+      scheduledCheckCount: 0,
+      startedCheckCount: 0,
+      completedCheckCount: 0,
+      failedCheckCount: 0,
+      skippedWhileInFlightCount: 0,
+      suppressedSchedulerErrorCount: 0,
+      activeTimerCount: 0,
+      inFlightThreadCount: 0,
+      pendingRerunThreadCount: 0,
+      isStopped: true
+    });
   });
 
   it("does not rerun pending checks after stop is called", async () => {
