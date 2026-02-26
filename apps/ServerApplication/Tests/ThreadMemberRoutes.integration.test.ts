@@ -4,7 +4,7 @@ import {
   parseThreadConversationState,
   ThreadConversationStateSchema
 } from "@farfield/protocol";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import { ThreadAdapterResolver } from "../Source/Agents/ThreadAdapterResolver.js";
@@ -33,6 +33,7 @@ const LocalhostBaseUrl = "http://localhost";
 const AmbiguousThreadIdentifier = "thread_ambiguous";
 const SingleOwnerThreadIdentifier = "thread_single_owner";
 const NestedMessagesPathThreadIdentifier = "thread_nested_messages_path";
+const InvalidThreadIdentifierSegment = "%E0%A4%A";
 const ActionErrorIdentifier = "action-error-id";
 const MessageBodyText = "hello";
 
@@ -58,6 +59,13 @@ const ReadThreadRouteResponseSchema = z
     ok: z.literal(true),
     agentId: z.enum(["codex", "opencode"]),
     thread: ThreadConversationStateSchema
+  })
+  .strict();
+
+const InvalidThreadIdentifierResponseSchema = z
+  .object({
+    ok: z.literal(false),
+    error: z.literal("Invalid thread identifier")
   })
   .strict();
 
@@ -108,6 +116,17 @@ function createThreadRoutePath(threadIdentifier: string, ...tailSegments: string
 function createThreadRouteUrl(threadIdentifier: string, ...tailSegments: string[]): URL {
   const routePath = createThreadRoutePath(threadIdentifier, ...tailSegments);
   return new URL(routePath, LocalhostBaseUrl);
+}
+
+function createThreadRouteUrlWithRawThreadIdentifierSegment(
+  threadIdentifierSegment: string,
+  ...tailSegments: string[]
+): URL {
+  const basePath = `/api/threads/${threadIdentifierSegment}`;
+  if (tailSegments.length === 0) {
+    return new URL(basePath, LocalhostBaseUrl);
+  }
+  return new URL(`${basePath}/${tailSegments.join("/")}`, LocalhostBaseUrl);
 }
 
 function createJsonResponseWriter(
@@ -281,6 +300,39 @@ describe("ThreadMemberRoutes integration", () => {
     expect(readThreadIncludeTurnsValues).toEqual([false, true]);
   });
 
+  it("returns 400 and does not resolve adapter when thread identifier decoding fails", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "GET";
+
+    const resolveAdapterForThread = vi.fn<
+      ThreadMemberRouteDependencies["resolveAdapterForThread"]
+    >(async () => ({
+      ok: false,
+      status: 404,
+      error: "not used in this test"
+    }));
+
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(InvalidThreadIdentifierSegment),
+      createThreadRouteUrlWithRawThreadIdentifierSegment(InvalidThreadIdentifierSegment),
+      resolveAdapterForThread,
+      async () => ({}),
+      capturedResponse
+    );
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+    expect(handled).toBe(true);
+    expect(resolveAdapterForThread).not.toHaveBeenCalled();
+    expect(capturedResponse.statusCode).toBe(400);
+    expect(InvalidThreadIdentifierResponseSchema.parse(capturedResponse.body)).toEqual({
+      ok: false,
+      error: "Invalid thread identifier"
+    });
+  });
+
   it("does not treat nested messages paths as send-message mutation endpoints", async () => {
     const { request, response } = createMockRequestResponsePair();
     request.method = "POST";
@@ -295,6 +347,13 @@ describe("ThreadMemberRoutes integration", () => {
         sentMessages.push(input);
       }
     );
+    const resolveAdapterForThread = vi.fn<
+      ThreadMemberRouteDependencies["resolveAdapterForThread"]
+    >(async () => ({
+      ok: true,
+      adapter: codexAdapter,
+      agentId: "codex"
+    }));
 
     const capturedResponse = createCapturedJsonResponse();
     const dependencies = createThreadMemberRouteDependencies(
@@ -310,11 +369,7 @@ describe("ThreadMemberRoutes integration", () => {
         ThreadMemberRouteSegmentByName.messages,
         "extra"
       ),
-      async () => ({
-        ok: true,
-        adapter: codexAdapter,
-        agentId: "codex"
-      }),
+      resolveAdapterForThread,
       async () => ({
         text: MessageBodyText
       }),
@@ -323,6 +378,8 @@ describe("ThreadMemberRoutes integration", () => {
 
     const handled = await handleThreadMemberRoutes(dependencies);
     expect(handled).toBe(false);
+    expect(resolveAdapterForThread).toHaveBeenCalledTimes(1);
+    expect(resolveAdapterForThread).toHaveBeenCalledWith(NestedMessagesPathThreadIdentifier);
     expect(sentMessages).toEqual([]);
     expect(capturedResponse.statusCode).toBeNull();
     expect(capturedResponse.body).toBeNull();

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   ThreadMemberMutationRouteOwner
 } from "./ThreadMemberMutationRouteOwner.js";
@@ -12,27 +13,46 @@ import {
 
 export type { ThreadMemberRouteDependencies } from "./ThreadMemberRouteContracts.js";
 
+const ThreadMemberRouteStatusCodeByName = {
+  badRequest: 400
+} as const;
+
+const ThreadMemberRouteErrorByName = {
+  invalidThreadIdentifier: "Invalid thread identifier"
+} as const;
+
+// Boundary route parsing keeps `/api/threads/:threadId*` ownership deterministic and explicit.
+const ThreadMemberRouteSegmentsSchema = z
+  .tuple([
+    z.literal(ThreadMemberRouteSegmentByName.api),
+    z.literal(ThreadMemberRouteSegmentByName.threads),
+    z.string().min(1)
+  ])
+  .rest(z.string());
+
+type ThreadMemberRouteSegments = [
+  typeof ThreadMemberRouteSegmentByName.api,
+  typeof ThreadMemberRouteSegmentByName.threads,
+  string,
+  ...string[]
+];
+
 export async function handleThreadMemberRoutes(
   dependencies: ThreadMemberRouteDependencies
 ): Promise<boolean> {
   const { segments, resolveAdapterForThread, jsonResponse, res } = dependencies;
-  const threadIdentifierSegment = segments[ThreadMemberRouteSegmentIndexByName.threadIdentifier];
-
-  if (
-    !(segments[0] === ThreadMemberRouteSegmentByName.api
-    && segments[1] === ThreadMemberRouteSegmentByName.threads
-    && threadIdentifierSegment)
-  ) {
+  const parsedSegments = parseThreadMemberRouteSegments(segments);
+  if (parsedSegments === null) {
     return false;
   }
 
-  let threadId: string;
-  try {
-    threadId = decodeURIComponent(threadIdentifierSegment);
-  } catch {
-    jsonResponse(res, 400, {
+  const rawThreadIdentifier =
+    parsedSegments[ThreadMemberRouteSegmentIndexByName.threadIdentifier];
+  const threadId = tryDecodeThreadIdentifier(rawThreadIdentifier);
+  if (threadId === null) {
+    jsonResponse(res, ThreadMemberRouteStatusCodeByName.badRequest, {
       ok: false,
-      error: "Invalid thread identifier"
+      error: ThreadMemberRouteErrorByName.invalidThreadIdentifier
     });
     return true;
   }
@@ -66,4 +86,22 @@ export async function handleThreadMemberRoutes(
     context
   });
   return mutationRouteOwner.handle();
+}
+
+function parseThreadMemberRouteSegments(
+  segments: readonly string[]
+): ThreadMemberRouteSegments | null {
+  const parsedSegments = ThreadMemberRouteSegmentsSchema.safeParse(segments);
+  if (!parsedSegments.success) {
+    return null;
+  }
+  return parsedSegments.data;
+}
+
+function tryDecodeThreadIdentifier(rawThreadIdentifier: string): string | null {
+  try {
+    return decodeURIComponent(rawThreadIdentifier);
+  } catch {
+    return null;
+  }
 }
