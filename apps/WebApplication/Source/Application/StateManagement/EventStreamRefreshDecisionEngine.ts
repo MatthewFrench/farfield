@@ -7,7 +7,6 @@ import { z } from "zod";
 const DEBUG_ACTIVE_TAB = "debug";
 const EVENT_TYPE_RUNTIME_STATE_CHANGED = "runtime-state-changed";
 const EVENT_TYPE_ACTIVITY_HISTORY_APPENDED = "activity-history-appended";
-const EVENT_TYPE_THREAD_STREAM_DELTA = "thread-stream-delta";
 const THREAD_STREAM_STATE_CHANGED_METHOD = "thread-stream-state-changed";
 const CORE_REFRESH_HISTORY_ENTRY_SOURCES = new Set(["app", "system"]);
 const EVENT_HISTORY_REFRESH_METADATA_STRING_SCHEMA = z.preprocess(
@@ -78,7 +77,8 @@ export class EventStreamRefreshDecisionEngine {
         if (
           eventMethod !== THREAD_STREAM_STATE_CHANGED_METHOD
           && eventThreadId !== null
-          && input.selectedThreadId
+          && input.selectedThreadId !== null
+          && input.selectedThreadId.length > 0
           && eventThreadId === input.selectedThreadId
         ) {
           refreshSelectedThread = true;
@@ -87,9 +87,10 @@ export class EventStreamRefreshDecisionEngine {
         if (eventThreadId === null && !isThreadOnlyMethod) {
           refreshCore = true;
         }
-      } else if (parseResult.data.event.type === EVENT_TYPE_THREAD_STREAM_DELTA) {
+      } else {
         if (
-          input.selectedThreadId
+          input.selectedThreadId !== null
+          && input.selectedThreadId.length > 0
           && parseResult.data.event.delta.threadId === input.selectedThreadId
         ) {
           threadStreamDelta = parseResult.data.event.delta;

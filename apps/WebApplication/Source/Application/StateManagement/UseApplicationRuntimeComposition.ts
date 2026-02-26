@@ -126,7 +126,7 @@ export function useApplicationRuntimeComposition(
   // Push bootstrap can complete at any time; resolve selected-thread refresh from the latest runtime selection ref.
   const loadSelectedThreadIfPresentFromRuntimeState = useCallback(async (): Promise<void> => {
     const selectedThreadIdentifier = input.applicationShellState.selectedThreadIdRef.current;
-    if (!selectedThreadIdentifier) {
+    if (selectedThreadIdentifier === null || selectedThreadIdentifier.length === 0) {
       return;
     }
     await input.loadSelectedThreadTracked(selectedThreadIdentifier);
@@ -281,7 +281,7 @@ export function useApplicationRuntimeComposition(
     conversationState: input.applicationDerivedState.conversationState,
     appDefaultModel: input.applicationDerivedState.appDefaultModel,
     appDefaultReasoningEffort: input.applicationDerivedState.appDefaultReasoningEffort,
-    defaultModeKey: input.applicationDerivedState.defaultModeOption?.mode || EMPTY_MODE_KEY,
+    defaultModeKey: input.applicationDerivedState.defaultModeOption?.mode ?? EMPTY_MODE_KEY,
     selectedModeKey: input.applicationShellState.selectedModeKey,
     selectedModelId: input.applicationShellState.selectedModelId,
     selectedReasoningEffort: input.applicationShellState.selectedReasoningEffort,

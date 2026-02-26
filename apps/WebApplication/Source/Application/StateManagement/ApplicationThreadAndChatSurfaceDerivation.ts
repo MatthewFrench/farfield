@@ -15,7 +15,7 @@ export function readSelectedThreadLabel(input: SelectedThreadLabelInput): string
   if (selectedThread) {
     return ThreadGroupSelectors.threadLabel(selectedThread);
   }
-  if (selectedThreadId && isSelectedThreadLoading) {
+  if (selectedThreadId !== null && selectedThreadId.length > 0 && isSelectedThreadLoading) {
     return LOADING_THREAD_LABEL;
   }
   return NO_THREAD_SELECTED_LABEL;
@@ -39,14 +39,15 @@ export function readChatSurfaceState(input: ChatSurfaceStateInput): ApplicationC
     isSelectedThreadLoading,
     turnCount
   } = input;
-  if (!selectedThreadId && isCoreLoading) {
+  const hasSelectedThread = selectedThreadId !== null && selectedThreadId.length > 0;
+  if (!hasSelectedThread && isCoreLoading) {
     return "loading-threads";
   }
-  if (selectedThreadId && isSelectedThreadLoading) {
+  if (hasSelectedThread && isSelectedThreadLoading) {
     return "loading-thread";
   }
   if (turnCount === 0) {
-    return selectedThreadId ? "no-messages" : "no-thread";
+    return hasSelectedThread ? "no-messages" : "no-thread";
   }
   return "ready";
 }

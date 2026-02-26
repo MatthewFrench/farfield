@@ -49,7 +49,7 @@ export class ConversationItemFlattener {
             ? TOP_SPACING_FOR_NEW_TURN_PIXELS
             : TOP_SPACING_FOR_CONTINUING_TURN_PIXELS;
         flattened.push({
-          key: item.id ?? `${String(turnIndex)}-${String(itemIndexInTurn)}`,
+          key: item.id,
           item,
           isLast: false,
           turnIsInProgress: turnInProgress,

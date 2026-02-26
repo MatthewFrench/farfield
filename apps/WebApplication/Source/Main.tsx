@@ -58,6 +58,10 @@ interface NavigatorWithStandalone extends Navigator {
   standalone?: boolean;
 }
 
+interface NavigatorWithOptionalServiceWorker {
+  serviceWorker?: ServiceWorkerContainer;
+}
+
 interface WindowWithSwReloadSuppression extends Window {
   __farfieldSuppressSwReload?: boolean;
 }
@@ -148,9 +152,7 @@ function installBootstrapWindowOwners(): void {
   });
 }
 
-if (typeof window !== "undefined") {
-  installBootstrapWindowOwners();
-}
+installBootstrapWindowOwners();
 
 function installDevelopmentBootStatusPublisher(): void {
   if (!import.meta.env.DEV || !import.meta.hot) {
@@ -174,16 +176,16 @@ function installDevelopmentBootStatusPublisher(): void {
   import.meta.hot.on("vite:error", (payload: ViteErrorPayload) => {
     const parsedPayload = ViteErrorPayloadSchema.parse(payload);
     const pluginLabel =
-      parsedPayload.err.plugin && parsedPayload.err.plugin.length > 0
+      parsedPayload.err.plugin !== undefined && parsedPayload.err.plugin.length > 0
         ? `[${parsedPayload.err.plugin}] `
         : "";
     const fileLabel =
-      parsedPayload.err.id && parsedPayload.err.id.length > 0
+      parsedPayload.err.id !== undefined && parsedPayload.err.id.length > 0
         ? `\n${parsedPayload.err.id}`
         : "";
     const summary = `${pluginLabel}${parsedPayload.err.message}${fileLabel}`.trim();
     const details =
-      parsedPayload.err.stack && parsedPayload.err.stack.trim().length > 0
+      parsedPayload.err.stack !== undefined && parsedPayload.err.stack.trim().length > 0
         ? parsedPayload.err.stack
         : summary;
 
@@ -219,12 +221,13 @@ function reconcilePushSubscriptionOnStartup(): void {
 }
 
 function installServiceWorkerStartupRegistration(): void {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+  const navigatorWithOptionalServiceWorker = window.navigator as NavigatorWithOptionalServiceWorker;
+  const serviceWorkerContainer = navigatorWithOptionalServiceWorker.serviceWorker;
+  if (serviceWorkerContainer === undefined) {
     return;
   }
 
   window.addEventListener("load", () => {
-    const serviceWorkerContainer = navigator.serviceWorker;
     const serviceWorkerControllerChangeReloadOwner = new ServiceWorkerControllerChangeReloadOwner(
       serviceWorkerContainer.controller !== null
     );

@@ -67,7 +67,7 @@ export class ChatModeToolbarPropertiesBuilder {
       pendingRequestCount: input.pendingRequestCount,
       onTogglePlanMode: () => {
         const nextModeKey = this.readNextModeKeyForPlanToggle(input);
-        if (!nextModeKey) {
+        if (nextModeKey.length === 0) {
           return;
         }
         input.onSetSelectedModeKey(nextModeKey);

@@ -82,7 +82,7 @@ export function PendingRequestCard({
                       />
                       <span className="text-sm">
                         <span className="font-medium">{option.label}</span>
-                        {descriptionText ? (
+                        {descriptionText !== null ? (
                           <span className="block text-xs text-muted-foreground/70 mt-0.5">
                             {descriptionText}
                           </span>

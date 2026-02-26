@@ -20,16 +20,16 @@ export class ThreadServerClient {
       maxPages: options.maxPages,
       sortKey: options.sortKey
     };
-    if (options.cwd) {
+    if (options.cwd !== undefined && options.cwd.length > 0) {
       requestOptions.cwd = options.cwd;
     }
     if (options.signal) {
       requestOptions.signal = options.signal;
     }
-    if (options.actionId) {
+    if (options.actionId !== undefined && options.actionId.length > 0) {
       requestOptions.actionId = options.actionId;
     }
-    if (options.actionName) {
+    if (options.actionName !== undefined && options.actionName.length > 0) {
       requestOptions.actionName = options.actionName;
     }
     return requestOptions;

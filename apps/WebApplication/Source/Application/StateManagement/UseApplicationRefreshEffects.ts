@@ -78,7 +78,7 @@ export interface UseApplicationRefreshEffectsInput {
 export function useApplicationRefreshEffects(input: UseApplicationRefreshEffectsInput): void {
   useEffect(() => {
     input.selectedThreadIdRef.current = input.selectedThreadId;
-    if (!input.selectedThreadId) {
+    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
       return;
     }
 
@@ -198,6 +198,7 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
 
   useEffect(() => {
     let disposed = false;
+    const isDisposed = (): boolean => disposed;
 
     const scheduleNextWatchdog = (delayMilliseconds: number): void => {
       input.coreRefreshIntervalRef.current = window.setTimeout(() => {
@@ -216,7 +217,7 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
     };
 
     const runWatchdogCycle = async (): Promise<void> => {
-      if (disposed) {
+      if (isDisposed()) {
         return;
       }
 
@@ -237,7 +238,7 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
         }
       }
 
-      if (disposed) {
+      if (isDisposed()) {
         return;
       }
       scheduleNextWatchdogForCurrentConnectionState();

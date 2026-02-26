@@ -165,7 +165,7 @@ function ConversationItemComponent({
     case "userMessage":
     case "steeringUserMessage": {
       const text = readTextContent(item.content);
-      if (!text) return null;
+      if (text.length === 0) return null;
       return (
         <div className={USER_MESSAGE_WRAPPER_CLASS}>
           <div className={USER_MESSAGE_BUBBLE_CLASS}>
@@ -177,7 +177,7 @@ function ConversationItemComponent({
 
     /* ── Agent message ──────────────────────────────────── */
     case "agentMessage":
-      if (!item.text) return null;
+      if (item.text.length === 0) return null;
       return (
         <MarkdownText text={item.text} />
       );
@@ -194,7 +194,7 @@ function ConversationItemComponent({
     /* ── Reasoning ──────────────────────────────────────── */
     case "reasoning": {
       const summary = readReasoningSummary(item.summary);
-      if (summary.length === 0 && !item.text) return null;
+      if (summary.length === 0 && (item.text === undefined || item.text.length === 0)) return null;
       return (
         <ReasoningBlock
           summary={summary.length > 0 ? summary : [REASONING_DEFAULT_SUMMARY_LINE]}
@@ -215,7 +215,7 @@ function ConversationItemComponent({
     /* ── User input response ────────────────────────────── */
     case "userInputResponse": {
       const answersText = readUserInputAnswersText(item.answers);
-      if (!answersText) return null;
+      if (answersText.length === 0) return null;
       return (
         <div className={USER_MESSAGE_WRAPPER_CLASS}>
           <div className={USER_INPUT_RESPONSE_BUBBLE_CLASS}>
@@ -266,7 +266,7 @@ function ConversationItemComponent({
           {item.durationMs != null && (
             <div className={TOOL_PANEL_DURATION_TEXT_CLASS}>{item.durationMs}{MILLISECOND_SUFFIX}</div>
           )}
-          {item.error?.message && (
+          {item.error?.message !== undefined && item.error.message.length > 0 && (
             <div className={TOOL_PANEL_ERROR_TEXT_CLASS}>{item.error.message}</div>
           )}
           {item.result?.content && item.result.content.length > 0 && (
@@ -295,7 +295,7 @@ function ConversationItemComponent({
           <div className={TOOL_PANEL_RECEIVER_TEXT_CLASS}>
             {RECEIVER_THREAD_LABEL} {formatReceiverThreadIds(item.receiverThreadIds)}
           </div>
-          {item.prompt && (
+          {item.prompt !== null && item.prompt !== undefined && item.prompt.length > 0 && (
             <div className={TOOL_PANEL_PROMPT_TEXT_CLASS}>
               {item.prompt}
             </div>
@@ -307,7 +307,7 @@ function ConversationItemComponent({
       return (
         <div className={SECTION_PANEL_CLASS}>
           <div className={SECTION_PANEL_TITLE_CLASS}>{PLAN_STEPS_PANEL_TITLE}</div>
-          {item.explanation && (
+          {item.explanation !== null && item.explanation !== undefined && item.explanation.length > 0 && (
             <div className={PLAN_STEPS_EXPLANATION_CLASS}>
               {item.explanation}
             </div>

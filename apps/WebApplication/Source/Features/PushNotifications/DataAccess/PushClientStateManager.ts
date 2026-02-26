@@ -86,7 +86,7 @@ export class PushClientStateManager {
     const subscription = registration ? await registration.pushManager.getSubscription() : null;
     return {
       supported: true,
-      serviceWorkerRegistered: registration !== undefined && registration !== null,
+      serviceWorkerRegistered: registration !== undefined,
       permission: Notification.permission,
       subscribed: subscription !== null
     };

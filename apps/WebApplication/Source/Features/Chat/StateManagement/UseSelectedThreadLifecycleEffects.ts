@@ -40,7 +40,7 @@ export function useSelectedThreadLifecycleEffects(input: UseSelectedThreadLifecy
     input.selectedThreadLoadTokenRef.current += 1;
     const loadToken = input.selectedThreadLoadTokenRef.current;
 
-    if (!input.selectedThreadId) {
+    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
       input.selectedThreadRefreshConcurrencyCoordinator.cancelActiveRefresh();
       input.setLiveState(null);
       input.setReadThreadState(null);

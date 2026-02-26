@@ -15,7 +15,7 @@ function readSystemThemePreference(): ThemePreference {
 
 function getInitialTheme(): ThemePreference {
   const storedThemePreference = themePreferenceStore.readThemePreference();
-  if (storedThemePreference) {
+  if (storedThemePreference !== null) {
     return storedThemePreference;
   }
   return readSystemThemePreference();

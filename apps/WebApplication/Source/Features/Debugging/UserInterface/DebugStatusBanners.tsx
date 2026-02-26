@@ -31,7 +31,7 @@ export function DebugStatusBanners({
   return (
     <>
       <AnimatePresence>
-        {errorMessage && (
+        {errorMessage.length > 0 && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
@@ -49,7 +49,7 @@ export function DebugStatusBanners({
                 <span data-testid="error-banner-message" className="truncate">
                   {errorBannerDetails.message}
                 </span>
-                {errorBannerDetails.actionId && (
+                {errorBannerDetails.actionId !== null && errorBannerDetails.actionId.length > 0 && (
                   <span
                     data-testid="error-banner-action-id"
                     className="hidden sm:inline-flex font-mono text-[11px] px-1 py-0.5 rounded bg-black/15"
@@ -57,7 +57,7 @@ export function DebugStatusBanners({
                     action {errorBannerDetails.actionId}
                   </span>
                 )}
-                {errorBannerDetails.requestId && (
+                {errorBannerDetails.requestId !== null && errorBannerDetails.requestId.length > 0 && (
                   <span
                     data-testid="error-banner-request-id"
                     className="hidden sm:inline-flex font-mono text-[11px] px-1 py-0.5 rounded bg-black/15"
@@ -65,7 +65,7 @@ export function DebugStatusBanners({
                     request {errorBannerDetails.requestId}
                   </span>
                 )}
-                {errorBannerDetails.errorId && (
+                {errorBannerDetails.errorId !== null && errorBannerDetails.errorId.length > 0 && (
                   <span
                     data-testid="error-banner-error-id"
                     className="hidden sm:inline-flex font-mono text-[11px] px-1 py-0.5 rounded bg-black/15"

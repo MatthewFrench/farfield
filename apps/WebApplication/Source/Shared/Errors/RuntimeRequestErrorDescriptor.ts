@@ -71,7 +71,7 @@ function buildOperationScopedMessage(
   trackingErrorMessage: string,
   parsedOperation: string | null
 ): string {
-  if (parsedOperation) {
+  if (parsedOperation !== null && parsedOperation.length > 0) {
     return trackingErrorMessage;
   }
   return `${operation}${OPERATION_DELIMITER}${trackingErrorMessage}`;

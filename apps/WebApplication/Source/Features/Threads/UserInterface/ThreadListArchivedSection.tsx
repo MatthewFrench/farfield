@@ -99,7 +99,7 @@ export function ThreadListArchivedSection({
                             <span className="min-w-0 flex-1 truncate">
                               {ThreadGroupSelectors.threadLabel(thread)}
                             </span>
-                            {thread.updatedAt && (
+                            {thread.updatedAt !== 0 && !Number.isNaN(thread.updatedAt) && (
                               <span className="shrink-0 text-[10px] text-muted-foreground/60">
                                 {properties.formatDate(thread.updatedAt)}
                               </span>

@@ -73,7 +73,7 @@ export interface ApiConfigDefaultsOptions extends ApiRequestOptions {
 
 function readConfigDefaultsPath(options?: ApiConfigDefaultsOptions): string {
   const params = new URLSearchParams();
-  if (options?.agentId) {
+  if (options?.agentId !== undefined) {
     params.set("agentId", options.agentId);
   }
   const suffix = params.toString();

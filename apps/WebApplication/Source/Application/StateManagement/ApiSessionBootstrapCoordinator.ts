@@ -195,7 +195,7 @@ export class ApiSessionBootstrapCoordinator {
   }
 
   private readExpiresAtEpochMs(expiresAt: string | null): number | null {
-    if (!expiresAt) {
+    if (expiresAt === null || expiresAt.length === 0) {
       return null;
     }
     const expiresAtEpochMs = Date.parse(expiresAt);

@@ -5,7 +5,6 @@ const SEND_MESSAGE_ACTION_NAME = "send-message";
 const SUBMIT_USER_INPUT_ACTION_NAME = "submit-user-input";
 const SKIP_USER_INPUT_ACTION_NAME = "skip-user-input";
 const INTERRUPT_THREAD_ACTION_NAME = "interrupt-thread";
-const NO_THREAD_AVAILABLE_SEND_ERROR_MESSAGE = "No thread available for send-message";
 
 export interface ChatRequestActionRequestOptions {
   actionId: string;
@@ -109,7 +108,7 @@ export interface InterruptThreadActionInput {
 export class ChatRequestActionCoordinator {
   public async sendMessage(input: SendMessageActionInput): Promise<void> {
     const trimmedDraft = input.draft.trim();
-    if (!trimmedDraft) {
+    if (trimmedDraft.length === 0) {
       return;
     }
 
@@ -117,17 +116,13 @@ export class ChatRequestActionCoordinator {
     let threadId: string | null = input.selectedThreadId;
     input.onSetBusy(true);
     try {
-      if (!threadId) {
+      if (threadId === null || threadId.length === 0) {
         const created = await input.threadMutationClient.createThread({
           agentId: input.selectedAgentId
         }, requestOptions);
         threadId = created.threadId;
         input.onMarkThreadPendingMaterialization(threadId);
         input.onThreadSelected(threadId);
-      }
-
-      if (!threadId) {
-        throw new Error(NO_THREAD_AVAILABLE_SEND_ERROR_MESSAGE);
       }
 
       await input.chatClient.sendMessage({ threadId, text: input.draft }, requestOptions);
@@ -150,7 +145,7 @@ export class ChatRequestActionCoordinator {
   }
 
   public async submitPendingUserInput(input: SubmitPendingUserInputActionInput): Promise<void> {
-    if (!input.selectedThreadId) {
+    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
       return;
     }
 
@@ -182,7 +177,7 @@ export class ChatRequestActionCoordinator {
   }
 
   public async skipPendingUserInput(input: SkipPendingUserInputActionInput): Promise<void> {
-    if (!input.selectedThreadId) {
+    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
       return;
     }
 
@@ -214,7 +209,7 @@ export class ChatRequestActionCoordinator {
   }
 
   public async interruptThread(input: InterruptThreadActionInput): Promise<void> {
-    if (!input.selectedThreadId) {
+    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
       return;
     }
 

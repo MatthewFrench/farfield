@@ -85,7 +85,7 @@ export interface UnarchiveThreadActionInput {
 export class ThreadMutationActionCoordinator {
   public async createThread(input: CreateThreadActionInput): Promise<void> {
     const trimmedProjectPath = input.projectPath.trim();
-    if (!trimmedProjectPath) {
+    if (trimmedProjectPath.length === 0) {
       input.onSetErrorMessage(MISSING_PROJECT_PATH_MESSAGE);
       return;
     }
@@ -172,7 +172,7 @@ export class ThreadMutationActionCoordinator {
     const createThreadInput: ThreadMutationCreateThreadInput = {
       cwd: projectPath
     };
-    if (agentId) {
+    if (agentId !== undefined) {
       createThreadInput.agentId = agentId;
     }
     return createThreadInput;

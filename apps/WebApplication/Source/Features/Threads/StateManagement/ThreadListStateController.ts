@@ -206,10 +206,10 @@ export class ThreadListStateController {
       maxPages: input.maxPages,
       sortKey: input.sortKey
     };
-    if (input.actionId) {
+    if (input.actionId !== undefined && input.actionId.length > 0) {
       loadOptions.actionId = input.actionId;
     }
-    if (input.actionName) {
+    if (input.actionName !== undefined && input.actionName.length > 0) {
       loadOptions.actionName = input.actionName;
     }
     return loadOptions;
@@ -246,10 +246,10 @@ export class ThreadListStateController {
     actionName: string | undefined
   ): ThreadListActionMetadata {
     const actionMetadata: ThreadListActionMetadata = {};
-    if (actionId) {
+    if (actionId !== undefined && actionId.length > 0) {
       actionMetadata.actionId = actionId;
     }
-    if (actionName) {
+    if (actionName !== undefined && actionName.length > 0) {
       actionMetadata.actionName = actionName;
     }
     return actionMetadata;

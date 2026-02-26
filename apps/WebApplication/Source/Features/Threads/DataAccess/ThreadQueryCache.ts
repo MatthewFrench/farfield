@@ -78,7 +78,7 @@ export class ThreadQueryCache {
   private evictUntilWithinBounds(): void {
     while (this.entryByKey.size > this.maximumEntries) {
       const oldestKeyIteratorResult = this.entryByKey.keys().next();
-      if (oldestKeyIteratorResult.done) {
+      if (oldestKeyIteratorResult.done === true) {
         return;
       }
       this.entryByKey.delete(oldestKeyIteratorResult.value);

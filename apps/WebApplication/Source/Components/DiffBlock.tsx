@@ -167,7 +167,7 @@ function DiffBlockComponent({ changes }: DiffBlockProps) {
       {changes.map((change, i) => {
         const isExpanded = expandedIdx === i;
         const { fileName, directoryPath } = readPathDisplayParts(change.path);
-        const lines = change.diff ? parseDiff(change.diff) : [];
+        const lines = change.diff !== undefined && change.diff.length > 0 ? parseDiff(change.diff) : [];
         const { addedLineCount, removedLineCount } = readDiffSummary(lines);
         const kindMetadata = readFileChangeKindMetadata(change.kind.type);
         const { Icon, label, className } = kindMetadata;
@@ -182,7 +182,7 @@ function DiffBlockComponent({ changes }: DiffBlockProps) {
             >
               <Icon size={12} className={`shrink-0 ${className}`} />
               <span className="font-mono text-xs font-medium text-foreground truncate">{fileName}</span>
-              {directoryPath && (
+              {directoryPath !== null && directoryPath.length > 0 && (
                 <span className="text-[11px] text-muted-foreground/40 truncate hidden sm:block">
                   {directoryPath}
                 </span>
@@ -213,7 +213,7 @@ function DiffBlockComponent({ changes }: DiffBlockProps) {
                   className="overflow-hidden"
                 >
                   <div className="border-t border-border overflow-x-auto">
-                    {change.diff ? (
+                    {change.diff !== undefined && change.diff.length > 0 ? (
                       lines.map((line, j) => (
                         <div
                           key={j}

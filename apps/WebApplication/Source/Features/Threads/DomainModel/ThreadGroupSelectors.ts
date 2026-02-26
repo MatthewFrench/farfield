@@ -17,7 +17,6 @@ interface ComputeUnreadThreadFromHistoryInput {
 }
 
 const EMPTY_TEXT = "";
-const DEFAULT_THREAD_TIMESTAMP = 0;
 const THREAD_LABEL_IDENTIFIER_LENGTH = 8;
 const THREAD_LABEL_PREFIX = "thread ";
 const PROJECT_KEY_PREFIX = "project:";
@@ -37,7 +36,7 @@ const TRAILING_PROJECT_PATH_SEPARATOR_PATTERN = /\/+$/;
 export class ThreadGroupSelectors {
   public static threadLabel(thread: Pick<ThreadListItem, "id" | "preview">): string {
     const text = thread.preview.trim();
-    if (!text) {
+    if (text.length === 0) {
       return `${THREAD_LABEL_PREFIX}${thread.id.slice(0, THREAD_LABEL_IDENTIFIER_LENGTH)}`;
     }
     return text;
@@ -109,7 +108,7 @@ export class ThreadGroupSelectors {
       const projectPath = ThreadGroupSelectors.normalizeProjectPathFromThread(thread);
       const groupKey = ThreadGroupSelectors.buildProjectGroupKey(projectPath);
       const groupLabel = ThreadGroupSelectors.buildProjectGroupLabel(projectPath);
-      const threadCreatedAt = thread.createdAt ?? DEFAULT_THREAD_TIMESTAMP;
+      const threadCreatedAt = thread.createdAt;
       const threadUpdatedAt = ThreadGroupSelectors.readThreadUpdatedAtTimestamp(thread);
       const projectMarkedRemoved = ThreadGroupSelectors.threadProjectIsMarkedRemoved(thread);
 
@@ -195,7 +194,7 @@ export class ThreadGroupSelectors {
   }
 
   private static readThreadUpdatedAtTimestamp(thread: Pick<ThreadListItem, "updatedAt">): number {
-    return thread.updatedAt ?? DEFAULT_THREAD_TIMESTAMP;
+    return thread.updatedAt;
   }
 
   private static shouldMarkThreadUnreadFromHistory(input: ComputeUnreadThreadFromHistoryInput): boolean {
@@ -236,7 +235,7 @@ export class ThreadGroupSelectors {
 
   private static projectLabelFromPath(projectPath: string): string {
     const normalized = ThreadGroupSelectors.normalizeProjectPath(projectPath);
-    if (!normalized) {
+    if (normalized.length === 0) {
       return projectPath;
     }
 
@@ -263,21 +262,21 @@ export class ThreadGroupSelectors {
   }
 
   private static normalizeOptionalProjectPath(value: string | null | undefined): string {
-    if (!value) {
+    if (value === null || value === undefined || value.length === 0) {
       return EMPTY_TEXT;
     }
     return ThreadGroupSelectors.normalizeProjectPath(value);
   }
 
   private static buildProjectGroupKey(projectPath: string | null): string {
-    if (!projectPath) {
+    if (projectPath === null || projectPath.length === 0) {
       return UNKNOWN_PROJECT_KEY;
     }
     return `${PROJECT_KEY_PREFIX}${projectPath}`;
   }
 
   private static buildProjectGroupLabel(projectPath: string | null): string {
-    if (!projectPath) {
+    if (projectPath === null || projectPath.length === 0) {
       return UNKNOWN_PROJECT_LABEL;
     }
     return ThreadGroupSelectors.projectLabelFromPath(projectPath);

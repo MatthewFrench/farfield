@@ -125,7 +125,7 @@ export function ThreadListActiveSection({
                               {threadIsGenerating && (
                                 <Loader2 size={11} className="animate-spin text-muted-foreground/70" />
                               )}
-                              {thread.updatedAt && (
+                              {thread.updatedAt !== 0 && !Number.isNaN(thread.updatedAt) && (
                                 <span className="text-[10px] text-muted-foreground/50">
                                   {properties.formatDate(thread.updatedAt)}
                                 </span>

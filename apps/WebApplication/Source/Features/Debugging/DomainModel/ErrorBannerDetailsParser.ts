@@ -55,7 +55,7 @@ function stripRepeatedOperationPrefix(message: string, operation: string): strin
 function readCapturedIdentifier(raw: string, pattern: RegExp): string | null {
   const identifierMatch = raw.match(pattern);
   const capturedIdentifier = identifierMatch?.[REGULAR_EXPRESSION_FIRST_CAPTURE_GROUP_INDEX];
-  if (!capturedIdentifier) {
+  if (capturedIdentifier === undefined || capturedIdentifier.length === 0) {
     return null;
   }
 

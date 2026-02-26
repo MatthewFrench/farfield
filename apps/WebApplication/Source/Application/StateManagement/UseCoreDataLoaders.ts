@@ -145,10 +145,10 @@ function createStartupTaggedError<ErrorType>(operation: string, error: ErrorType
 
 function readThreadLoadActionMetadata(requestOptions: ApiRequestOptions): ThreadLoadActionMetadata {
   const metadata: ThreadLoadActionMetadata = {};
-  if (requestOptions.actionId) {
+  if (requestOptions.actionId !== undefined && requestOptions.actionId.length > 0) {
     metadata.actionId = requestOptions.actionId;
   }
-  if (requestOptions.actionName) {
+  if (requestOptions.actionName !== undefined && requestOptions.actionName.length > 0) {
     metadata.actionName = requestOptions.actionName;
   }
   return metadata;

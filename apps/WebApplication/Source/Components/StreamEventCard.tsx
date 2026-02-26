@@ -1,13 +1,10 @@
 import { useState } from "react";
-import { FileChangeEntrySchema, type IpcFrame } from "@farfield/protocol";
+import { FileChangeEntrySchema, IpcFrameType, type IpcFrame } from "@farfield/protocol";
 import { ChevronRight } from "lucide-react";
 import { z } from "zod";
 import { DiffBlock } from "@/Components/DiffBlock";
 import { Button } from "@/Components/UserInterface/Button";
 
-const REQUEST_EVENT_TYPE = "request";
-const BROADCAST_EVENT_TYPE = "broadcast";
-const RESPONSE_EVENT_TYPE = "response";
 const EVENT_BODY_JSON_INDENT_SPACES = 2;
 
 const StreamEventDiffParametersSchema = z
@@ -23,17 +20,17 @@ export interface StreamEventCardProps {
 }
 
 function readEventLabel(event: IpcFrame): string {
-  if (event.type === REQUEST_EVENT_TYPE || event.type === BROADCAST_EVENT_TYPE) {
+  if (event.type === IpcFrameType.request || event.type === IpcFrameType.broadcast) {
     return event.method;
   }
-  if (event.type === RESPONSE_EVENT_TYPE && event.method) {
+  if (event.type === IpcFrameType.response && event.method !== undefined && event.method.length > 0) {
     return event.method;
   }
   return event.type;
 }
 
 function readDiffChanges(event: IpcFrame): StreamEventChange[] | null {
-  if (event.type !== REQUEST_EVENT_TYPE && event.type !== BROADCAST_EVENT_TYPE) {
+  if (event.type !== IpcFrameType.request && event.type !== IpcFrameType.broadcast) {
     return null;
   }
   const parsed = StreamEventDiffParametersSchema.safeParse(event.params);
@@ -66,7 +63,7 @@ export function StreamEventCard({ event }: StreamEventCardProps): React.JSX.Elem
       </Button>
       {open && (
         <div className="border-t border-border px-2.5 py-2">
-          {isFileChange && changes ? (
+          {isFileChange ? (
             <DiffBlock changes={changes} />
           ) : (
             <pre className="font-mono text-[11px] text-muted-foreground/80 whitespace-pre-wrap break-words">

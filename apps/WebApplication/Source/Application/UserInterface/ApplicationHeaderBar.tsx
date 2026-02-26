@@ -9,7 +9,7 @@ const DEBUG_TAB = "debug";
 const CHAT_TAB = "chat";
 
 function readHeaderIconButtonClassName(active: boolean | undefined): string {
-  if (active) {
+  if (active === true) {
     return "h-8 w-8 rounded-lg bg-muted text-foreground hover:bg-muted";
   }
   return "h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted";
@@ -48,7 +48,7 @@ function HeaderIconButton({
     </Button>
   );
 
-  if (!title) {
+  if (title === undefined || title.length === 0) {
     return buttonNode;
   }
 
@@ -161,7 +161,7 @@ export function ApplicationHeaderBar({
         <div className="min-w-0">
           <div data-testid="selected-thread-label" className="text-sm font-medium truncate leading-5 flex items-center gap-1.5">
             {selectedThreadLabel}
-            {hasSelectedThread && activeAgentLabel && (
+            {hasSelectedThread && activeAgentLabel.length > 0 && (
               <span className="shrink-0 h-5 w-5 rounded-md bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
                 {renderAgentFavicon(activeThreadAgentId, activeAgentLabel, "h-4 w-4")}
               </span>

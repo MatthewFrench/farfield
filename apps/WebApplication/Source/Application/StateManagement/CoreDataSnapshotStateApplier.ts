@@ -412,7 +412,7 @@ function applySelectedModeKeySnapshot(input: {
   setSelectedModeKey: Dispatch<SetStateAction<string>>;
 }): void {
   input.setSelectedModeKey((currentModeKey) => {
-    if (currentModeKey) {
+    if (currentModeKey.length > 0) {
       return currentModeKey;
     }
     return input.readInitialModeKey(input.nextCapabilitiesSnapshot.modes);

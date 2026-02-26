@@ -188,7 +188,7 @@ export function DebugIssuesPanel({
                     <div><span className="text-muted-foreground">source:</span> {selectedIssue.source}</div>
                     <div className="sm:col-span-2"><span className="text-muted-foreground">name:</span> {selectedIssue.name ?? "n/a"}</div>
                   </div>
-                  {selectedIssue.stack && (
+                  {selectedIssue.stack !== null && selectedIssue.stack.length > 0 && (
                     <div className="space-y-1">
                       <div className="text-xs font-medium text-muted-foreground">Stack</div>
                       <pre className="font-mono text-[11px] leading-5 whitespace-pre-wrap break-words text-muted-foreground">

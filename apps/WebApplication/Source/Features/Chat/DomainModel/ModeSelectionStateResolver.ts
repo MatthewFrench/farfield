@@ -86,7 +86,7 @@ export class ModeSelectionStateResolver {
     assumedDefault: string
   ): string {
     const normalized = this.normalizeNullableModeValue(value);
-    if (!normalized) {
+    if (normalized.length === 0) {
       return "";
     }
     if (normalized === assumedDefault) {

@@ -129,7 +129,8 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
 
           if (
             flags.refreshSelectedThread
-            && scheduledRefreshSnapshot.selectedThreadId
+            && scheduledRefreshSnapshot.selectedThreadId !== null
+            && scheduledRefreshSnapshot.selectedThreadId.length > 0
             && loadSelectedThreadFunction
           ) {
             refreshOperations.push(

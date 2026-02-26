@@ -77,7 +77,11 @@ function readComposerPlaceholder(
   activeAgentLabel: string,
   selectedAgentLabel: string
 ): string {
-  return selectedThreadId ? `Message ${activeAgentLabel}…` : `Message ${selectedAgentLabel}…`;
+  return (
+    selectedThreadId !== null && selectedThreadId.length > 0
+      ? `Message ${activeAgentLabel}…`
+      : `Message ${selectedAgentLabel}…`
+  );
 }
 
 export interface ChatWorkspacePaneProps {
@@ -142,6 +146,13 @@ export function ChatWorkspacePane({
   const emptyStateDescriptor = shouldRenderEmptyState
     ? readChatEmptyStateDescriptor(chatSurfaceState, canCreateNewThread)
     : null;
+  const shouldShowEmptyStateLoadingIndicator = (
+    emptyStateDescriptor !== null
+    && emptyStateDescriptor.showLoadingIndicator === true
+  );
+  const loadingEmptyStateDescriptor = shouldShowEmptyStateLoadingIndicator
+    ? emptyStateDescriptor
+    : null;
   const shouldRenderJumpToBottomButton = !isChatAtBottom && turnCount > 0;
 
   return (
@@ -168,11 +179,11 @@ export function ChatWorkspacePane({
           >
             {shouldRenderEmptyState ? (
               <div data-testid="chat-empty-state" className="text-center py-20 text-sm text-muted-foreground">
-                {emptyStateDescriptor?.showLoadingIndicator
+                {loadingEmptyStateDescriptor !== null
                   ? (
-                    <span data-testid={emptyStateDescriptor.testId} className="inline-flex items-center gap-2">
+                    <span data-testid={loadingEmptyStateDescriptor.testId} className="inline-flex items-center gap-2">
                       <Loader2 size={14} className="animate-spin" />
-                      {emptyStateDescriptor.message}
+                      {loadingEmptyStateDescriptor.message}
                     </span>
                   )
                   : <span data-testid={emptyStateDescriptor?.testId}>{emptyStateDescriptor?.message}</span>}

@@ -217,10 +217,10 @@ function buildThreadListSearchParameters(options: ApiListThreadsOptions): URLSea
   parameters.set(LIST_THREADS_ALL_QUERY_KEY, readBooleanQueryValue(options.all));
   parameters.set(LIST_THREADS_MAX_PAGES_QUERY_KEY, String(options.maxPages));
 
-  if (options.sortKey) {
+  if (options.sortKey !== undefined && options.sortKey.length > 0) {
     parameters.set(LIST_THREADS_SORT_KEY_QUERY_KEY, options.sortKey);
   }
-  if (options.cwd) {
+  if (options.cwd !== undefined && options.cwd.length > 0) {
     parameters.set(LIST_THREADS_CURRENT_WORKING_DIRECTORY_QUERY_KEY, options.cwd);
   }
 

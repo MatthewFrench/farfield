@@ -12,15 +12,21 @@ export function readSystemHealthStatus(input: SystemHealthStatusInput): SystemHe
       hasAnySystemFailure: !openCodeConnected
     };
   }
+  if (health === null) {
+    return {
+      allSystemsReady: false,
+      hasAnySystemFailure: !openCodeConnected
+    };
+  }
 
   return {
     allSystemsReady:
-      health?.state.appReady === true
-      && health?.state.ipcConnected === true
-      && health?.state.ipcInitialized === true,
+      health.state.appReady === true
+      && health.state.ipcConnected === true
+      && health.state.ipcInitialized === true,
     hasAnySystemFailure:
-      health?.state.appReady === false
-      || health?.state.ipcConnected === false
-      || health?.state.ipcInitialized === false
+      health.state.appReady === false
+      || health.state.ipcConnected === false
+      || health.state.ipcInitialized === false
   };
 }

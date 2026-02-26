@@ -30,16 +30,24 @@ function readEffortOptions(
 ): string[] {
   const values = new Set<string>(defaultEffortOptions);
   for (const mode of modes) {
-    if (mode.reasoning_effort) {
+    if (
+      mode.reasoning_effort !== null
+      && mode.reasoning_effort !== undefined
+      && mode.reasoning_effort.length > 0
+    ) {
       values.add(mode.reasoning_effort);
     }
   }
 
-  if (latestReasoningEffort) {
+  if (
+    latestReasoningEffort !== null
+    && latestReasoningEffort !== undefined
+    && latestReasoningEffort.length > 0
+  ) {
     values.add(latestReasoningEffort);
   }
 
-  if (selectedReasoningEffort) {
+  if (selectedReasoningEffort.length > 0) {
     values.add(selectedReasoningEffort);
   }
 
@@ -144,7 +152,7 @@ export function useApplicationDerivedState(
 
   const liveStateReductionError = useMemo<ApplicationDerivedState["liveStateReductionError"]>(() => {
     const errorState = liveState?.liveStateError;
-    if (!errorState || errorState.kind !== "reductionFailed") {
+    if (errorState === null || errorState === undefined) {
       return null;
     }
     return errorState;

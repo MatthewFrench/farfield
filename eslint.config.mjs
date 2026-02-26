@@ -66,6 +66,8 @@ export default tseslint.config(
   {
     files: [
       "apps/ServerApplication/Source/**/*.ts",
+      "apps/WebApplication/Source/**/*.ts",
+      "apps/WebApplication/Source/**/*.tsx",
       "packages/CodexInterfaceAdapter/Source/**/*.ts",
       "packages/CodexProtocol/Source/**/*.ts",
       "packages/OpenCodeInterfaceAdapter/Source/**/*.ts"

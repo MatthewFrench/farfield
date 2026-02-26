@@ -39,7 +39,11 @@ export class SelectedThreadRefreshConcurrencyCoordinator {
       this.queuedRefreshRequest = this.queuedRefreshRequest
         ? this.mergeRequests(this.queuedRefreshRequest, input.request)
         : input.request;
-      if (this.activeThreadId && this.activeThreadId !== input.request.threadId) {
+      if (
+        this.activeThreadId !== null
+        && this.activeThreadId.length > 0
+        && this.activeThreadId !== input.request.threadId
+      ) {
         this.activeRefreshAbortController?.abort();
       }
       await this.inFlightRefresh;
@@ -59,11 +63,15 @@ export class SelectedThreadRefreshConcurrencyCoordinator {
           await input.executeRefresh(nextRequest, abortController.signal);
         } catch (error) {
           const normalizedError = normalizeExecutionError(error);
-          if (input.isCanceledError(normalizedError) && this.queuedRefreshRequest) {
-            nextRequest = this.queuedRefreshRequest;
-            continue;
+          if (!input.isCanceledError(normalizedError)) {
+            throw normalizedError;
           }
-          throw normalizedError;
+          const queuedRefreshRequest = this.readQueuedRefreshRequest();
+          if (queuedRefreshRequest === null) {
+            throw normalizedError;
+          }
+          nextRequest = queuedRefreshRequest;
+          continue;
         }
 
         nextRequest = this.queuedRefreshRequest;
@@ -97,5 +105,9 @@ export class SelectedThreadRefreshConcurrencyCoordinator {
     this.queuedRefreshRequest = null;
     this.activeRefreshAbortController = null;
     this.activeThreadId = null;
+  }
+
+  private readQueuedRefreshRequest(): SelectedThreadRefreshRequest | null {
+    return this.queuedRefreshRequest;
   }
 }

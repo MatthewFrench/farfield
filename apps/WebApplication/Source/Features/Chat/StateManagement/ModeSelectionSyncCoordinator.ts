@@ -128,7 +128,16 @@ export class ModeSelectionSyncCoordinator {
   }
 
   private readRemoteModeKey(input: ModeSelectionSyncInput, remoteSelectionModeKey: string): string {
-    return remoteSelectionModeKey || input.selectedModeKey || input.defaultModeKey || EMPTY_MODE_KEY;
+    if (remoteSelectionModeKey.length > 0) {
+      return remoteSelectionModeKey;
+    }
+    if (input.selectedModeKey.length > 0) {
+      return input.selectedModeKey;
+    }
+    if (input.defaultModeKey.length > 0) {
+      return input.defaultModeKey;
+    }
+    return EMPTY_MODE_KEY;
   }
 
   private readNextSelectedModeKeyForRemoteUpdate(
@@ -136,10 +145,10 @@ export class ModeSelectionSyncCoordinator {
     remoteSelectionModeKey: string,
     remoteModeKey: string
   ): string {
-    if (remoteSelectionModeKey) {
+    if (remoteSelectionModeKey.length > 0) {
       return remoteSelectionModeKey;
     }
-    if (!input.selectedModeKey && remoteModeKey) {
+    if (input.selectedModeKey.length === 0 && remoteModeKey.length > 0) {
       return remoteModeKey;
     }
     return input.selectedModeKey;

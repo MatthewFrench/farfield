@@ -45,13 +45,13 @@ export interface DebugActionHandlers {
 }
 
 function readDebugIssueFilterQueryFromErrorBanner(errorBannerDetails: ErrorBannerDetails): string {
-  if (errorBannerDetails.requestId) {
+  if (errorBannerDetails.requestId !== null && errorBannerDetails.requestId.length > 0) {
     return errorBannerDetails.requestId;
   }
-  if (errorBannerDetails.actionId) {
+  if (errorBannerDetails.actionId !== null && errorBannerDetails.actionId.length > 0) {
     return errorBannerDetails.actionId;
   }
-  if (errorBannerDetails.operation) {
+  if (errorBannerDetails.operation.length > 0) {
     return errorBannerDetails.operation;
   }
   return EMPTY_DEBUG_ISSUE_FILTER_QUERY;
@@ -118,7 +118,7 @@ export function useDebugActionHandlers(input: UseDebugActionHandlersInput): Debu
     input.setDebugWorkspaceSection(DEBUG_ISSUES_WORKSPACE_SECTION);
     input.setDebugIssueSeverityFilter(DEBUG_ISSUE_SEVERITY_FILTER_ALL);
 
-    if (input.errorBannerDetails.errorId) {
+    if (input.errorBannerDetails.errorId !== null && input.errorBannerDetails.errorId.length > 0) {
       input.setSelectedDebugIssueId(
         buildDebugErrorIssueIdentifier(input.errorBannerDetails.errorId)
       );

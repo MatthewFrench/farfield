@@ -67,12 +67,12 @@ export class CollaborationModeActionCoordinator {
   }
 
   public async applyDraft(input: ApplyCollaborationModeDraftActionInput): Promise<void> {
-    if (!input.selectedThreadId) {
+    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
       return;
     }
 
     const mode = input.modes.find((entry) => entry.mode === input.draft.modeKey) ?? null;
-    if (!mode || mode.mode !== input.draft.modeKey) {
+    if (mode === null || mode.mode !== input.draft.modeKey) {
       return;
     }
 
@@ -92,14 +92,16 @@ export class CollaborationModeActionCoordinator {
     try {
       await input.chatClient.setCollaborationMode({
         threadId: input.selectedThreadId,
-        collaborationMode: {
-          mode: mode.mode,
-          settings: {
-            model: input.draft.modelId || null,
-            reasoning_effort: input.draft.reasoningEffort || null,
-            developer_instructions: mode.developer_instructions ?? null
+          collaborationMode: {
+            mode: mode.mode,
+            settings: {
+              model: input.draft.modelId.length > 0 ? input.draft.modelId : null,
+              reasoning_effort: (
+                input.draft.reasoningEffort.length > 0 ? input.draft.reasoningEffort : null
+              ),
+              developer_instructions: mode.developer_instructions ?? null
+            }
           }
-        }
       }, requestOptions);
       await input.onReloadSelectedThread(input.selectedThreadId);
     } catch (error) {

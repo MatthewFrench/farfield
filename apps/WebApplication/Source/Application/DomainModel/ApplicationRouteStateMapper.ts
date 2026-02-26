@@ -43,7 +43,7 @@ export class ApplicationRouteStateMapper {
     if (segments.length === 1 && segments[0] === DEBUG_ROUTE_SEGMENT) {
       return buildRouteState(null, DEBUG_TAB);
     }
-    if (segments[0] === THREADS_ROUTE_SEGMENT && segments[1]) {
+    if (segments[0] === THREADS_ROUTE_SEGMENT && segments[1] !== undefined) {
       const threadId = normalizeRouteThreadId(segments[1]);
       if (threadId === null) {
         return buildNeutralRouteState();

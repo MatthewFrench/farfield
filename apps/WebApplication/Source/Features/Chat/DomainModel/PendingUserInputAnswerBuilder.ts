@@ -26,8 +26,9 @@ export class PendingUserInputAnswerBuilder {
     const answersByQuestionId: PendingUserInputAnswersByQuestionId = {};
     for (const question of input.questions) {
       const draft = input.answerDraftByQuestionId[question.id] ?? createEmptyPendingUserInputAnswerDraft();
-      const answerText = draft.option || draft.freeform.trim();
-      if (answerText) {
+      const normalizedFreeform = draft.freeform.trim();
+      const answerText = draft.option.length > 0 ? draft.option : normalizedFreeform;
+      if (answerText.length > 0) {
         answersByQuestionId[question.id] = {
           answers: [answerText]
         };

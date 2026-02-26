@@ -139,12 +139,14 @@ export function ThreadSidebarPanel({
                 ))}
               {codexConfigured ? (
                 <>
-                  <div>App: {healthState?.appReady ? OK_LABEL : NOT_READY_LABEL}</div>
-                  <div>IPC: {healthState?.ipcConnected ? CONNECTED_LABEL : DISCONNECTED_LABEL}</div>
-                  <div>Init: {healthState?.ipcInitialized ? READY_LABEL : NOT_READY_LABEL}</div>
+                  <div>App: {healthState?.appReady === true ? OK_LABEL : NOT_READY_LABEL}</div>
+                  <div>IPC: {healthState?.ipcConnected === true ? CONNECTED_LABEL : DISCONNECTED_LABEL}</div>
+                  <div>Init: {healthState?.ipcInitialized === true ? READY_LABEL : NOT_READY_LABEL}</div>
                 </>
               ) : null}
-              {healthState?.lastError && (
+              {healthState?.lastError !== undefined
+                && healthState.lastError !== null
+                && healthState.lastError.length > 0 && (
                 <div className="max-w-64 break-words text-destructive">
                   Error: {healthState.lastError}
                 </div>

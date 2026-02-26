@@ -27,20 +27,27 @@ export class CoreDataRefreshConcurrencyCoordinator {
   }
 
   private async runQueuedRefreshes(executeRefresh: () => Promise<void>): Promise<void> {
-    while (true) {
+    for (;;) {
       this.isRefreshQueued = false;
       try {
         await executeRefresh();
-        if (!this.isRefreshQueued) {
-          return;
-        }
       } catch (refreshError) {
         // If another refresh request arrived while this cycle ran, execute the queued cycle
         // and report only the latest cycle failure.
-        if (!this.isRefreshQueued) {
-          throw refreshError;
+        if (this.consumeRefreshQueuedState()) {
+          continue;
         }
+        throw refreshError;
+      }
+      if (!this.consumeRefreshQueuedState()) {
+        return;
       }
     }
+  }
+
+  private consumeRefreshQueuedState(): boolean {
+    const wasRefreshQueued = this.isRefreshQueued;
+    this.isRefreshQueued = false;
+    return wasRefreshQueued;
   }
 }

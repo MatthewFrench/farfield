@@ -10,6 +10,7 @@ import { ThreadListStateController } from "./ThreadListStateController";
 import { PendingThreadMaterializationCoordinator } from "./PendingThreadMaterializationCoordinator";
 import {
   ThreadMutationActionCoordinator,
+  type CreateThreadActionInput,
   type ThreadMutationActionErrorReportInput,
   type ThreadMutationActionRequestOptions,
   type ThreadMutationOperationName
@@ -50,9 +51,8 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
   }, [input.loadCoreDataTracked, input.loadSelectedThreadTracked]);
 
   const createNewThread = useCallback(async (projectPath: string, agentId?: AgentId) => {
-    await input.threadMutationActionCoordinator.createThread({
+    const createThreadInput: CreateThreadActionInput = {
       projectPath,
-      ...(agentId ? { agentId } : {}),
       buildActionRequestOptions: input.buildActionRequestOptions,
       onSetBusy: input.setIsBusy,
       onSetErrorMessage: input.setError,
@@ -70,7 +70,11 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       threadMutationClient: input.threadMutationServerClient,
       onRefreshCreatedThreadData: refreshCreatedThreadData,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
-    });
+    };
+    if (agentId !== undefined) {
+      createThreadInput.agentId = agentId;
+    }
+    await input.threadMutationActionCoordinator.createThread(createThreadInput);
   }, [
     input.buildActionRequestOptions,
     input.loadCoreDataTracked,
@@ -89,7 +93,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
 
   const createThreadForSingleAgent = useCallback((projectPath: string) => {
     const onlyAgentId = input.availableAgentIds[0];
-    if (!onlyAgentId) {
+    if (onlyAgentId === undefined) {
       input.setError("Cannot create thread: no enabled agent");
       return;
     }

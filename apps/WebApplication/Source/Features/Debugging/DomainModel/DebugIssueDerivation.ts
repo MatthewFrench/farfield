@@ -137,7 +137,7 @@ export function buildDebugWarningIssuesFromHistory(
     const warningMeta = readHistoryWarningMeta(entry.meta);
     const method = warningMeta.method;
 
-    if (method && WARNING_MESSAGE_PATTERN.test(method)) {
+    if (method !== null && method.length > 0 && WARNING_MESSAGE_PATTERN.test(method)) {
       const searchText = buildIssueSearchText([
         entry.id,
         method,

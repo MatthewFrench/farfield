@@ -13,7 +13,7 @@ export interface MarkdownTextProps {
 }
 
 function detectLanguage(className: string | undefined): string {
-  if (!className) {
+  if (className === undefined || className.length === 0) {
     return DEFAULT_CODE_LANGUAGE;
   }
   if (!className.startsWith(CODE_LANGUAGE_CLASS_PREFIX)) {

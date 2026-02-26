@@ -3,7 +3,6 @@ import type { ThreadListItem } from "../DomainModel/ThreadGroupTypes";
 
 const THREAD_SIGNATURE_SEGMENT_DELIMITER = "|";
 const THREAD_SIGNATURE_EMPTY_PATH_SEGMENT = "";
-const THREAD_SIGNATURE_DEFAULT_UPDATED_AT_SEGMENT = 0;
 const INITIAL_SELECTION_NOT_HYDRATED = false;
 
 type UnreadThreadIdentifierMap = Record<string, true>;
@@ -103,7 +102,7 @@ export class ThreadListStateStore {
 
   public computeInitialSelectedThreadIdentifier(input: InitialThreadSelectionComputationInput): string | null {
     const currentSelectedThreadIdentifier = input.currentSelectedThreadIdentifier;
-    if (currentSelectedThreadIdentifier) {
+    if (currentSelectedThreadIdentifier !== null && currentSelectedThreadIdentifier.length > 0) {
       this.markInitialSelectionHydrated();
       return currentSelectedThreadIdentifier;
     }
@@ -112,7 +111,7 @@ export class ThreadListStateStore {
     }
 
     const nextSelectedThreadIdentifier = this.readInitialSelectedThreadIdentifier(input);
-    if (nextSelectedThreadIdentifier) {
+    if (nextSelectedThreadIdentifier !== null && nextSelectedThreadIdentifier.length > 0) {
       this.markInitialSelectionHydrated();
     }
     return nextSelectedThreadIdentifier;
@@ -121,7 +120,7 @@ export class ThreadListStateStore {
   public computeUnreadThreadIdentifiersAfterSelectionChange(
     input: UnreadThreadSelectionUpdateInput
   ): UnreadThreadIdentifierMap {
-    if (!input.selectedThreadIdentifier) {
+    if (input.selectedThreadIdentifier === null || input.selectedThreadIdentifier.length === 0) {
       return input.previousUnreadThreadIdentifiers;
     }
     if (input.previousUnreadThreadIdentifiers[input.selectedThreadIdentifier] !== true) {
@@ -145,7 +144,7 @@ export class ThreadListStateStore {
   }
 
   private readInitialSelectedThreadIdentifier(input: InitialThreadSelectionComputationInput): string | null {
-    if (input.preferredAgentIdentifier) {
+    if (input.preferredAgentIdentifier !== null && input.preferredAgentIdentifier.length > 0) {
       const preferredThread = input.nextThreads.find(
         (thread) => thread.agentId === input.preferredAgentIdentifier
       );
@@ -164,7 +163,7 @@ export class ThreadListStateStore {
     // Signature ordering is append-only so state change detection remains deterministic.
     return [
       thread.id,
-      String(thread.updatedAt ?? THREAD_SIGNATURE_DEFAULT_UPDATED_AT_SEGMENT),
+      String(thread.updatedAt),
       thread.preview,
       thread.agentId,
       thread.cwd ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,

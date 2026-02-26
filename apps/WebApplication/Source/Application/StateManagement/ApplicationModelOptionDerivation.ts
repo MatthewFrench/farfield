@@ -4,10 +4,10 @@ import {
 } from "./UseApplicationDerivedStateContracts";
 
 function readModelOptionLabel(model: ModelOptionsInput["models"][number]): string {
-  if (model.displayName && model.displayName !== model.id) {
+  if (model.displayName.length > 0 && model.displayName !== model.id) {
     return `${model.displayName} (${model.id})`;
   }
-  return model.displayName || model.id;
+  return model.displayName.length > 0 ? model.displayName : model.id;
 }
 
 export function readModelOptions(input: ModelOptionsInput): ApplicationModelOption[] {
@@ -18,10 +18,15 @@ export function readModelOptions(input: ModelOptionsInput): ApplicationModelOpti
     modelLabelById.set(model.id, readModelOptionLabel(model));
   }
 
-  if (latestModel && !modelLabelById.has(latestModel)) {
+  if (
+    latestModel !== null
+    && latestModel !== undefined
+    && latestModel.length > 0
+    && !modelLabelById.has(latestModel)
+  ) {
     modelLabelById.set(latestModel, latestModel);
   }
-  if (selectedModelId && !modelLabelById.has(selectedModelId)) {
+  if (selectedModelId.length > 0 && !modelLabelById.has(selectedModelId)) {
     modelLabelById.set(selectedModelId, selectedModelId);
   }
 

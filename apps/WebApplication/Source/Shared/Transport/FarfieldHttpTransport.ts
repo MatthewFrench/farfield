@@ -104,7 +104,7 @@ export class FarfieldHttpRequestFailureError extends Error {
 }
 
 function readNonEmptyTrimmedText(value: string | null | undefined): string | null {
-  if (!value) {
+  if (value === null || value === undefined || value.length === 0) {
     return null;
   }
   const normalized = value.trim();
@@ -268,7 +268,7 @@ function readResponseRequestId(response: Response): string | null {
 }
 
 function appendRequestId(message: string, requestId: string | null): string {
-  if (!requestId) {
+  if (requestId === null || requestId.length === 0) {
     return message;
   }
   if (RequestIdentifierInMessagePattern.test(message)) {
@@ -315,9 +315,11 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
   headers.set(REQUEST_ID_HEADER_NAME, requestId);
   let response: Response;
   const timeoutController = new AbortController();
-  let didTimeout = false;
+  const timeoutState = {
+    didTimeout: false
+  };
   const timeoutHandle = setTimeout(() => {
-    didTimeout = true;
+    timeoutState.didTimeout = true;
     timeoutController.abort();
   }, REQUEST_TIMEOUT_MILLISECONDS);
   const inheritedSignal = init?.signal;
@@ -340,7 +342,7 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (error instanceof Error && isAbortError(error)) {
-      if (didTimeout) {
+      if (timeoutState.didTimeout === true) {
         throw new Error(buildTimeoutErrorMessage(path, requestId));
       }
       throw new RequestCanceledError(path);
@@ -464,11 +466,10 @@ export function applyRequestOptions(init: RequestInit, options?: ApiRequestOptio
     nextInit.signal = options.signal;
   }
 
-  let hasHeaders = false;
-  nextHeaders.forEach(() => {
-    hasHeaders = true;
-  });
-  if (hasHeaders) {
+  const hasRequestOptionHeaders =
+    validatedRequestHeaderOptions.actionId !== undefined
+    || validatedRequestHeaderOptions.actionName !== undefined;
+  if (init.headers !== undefined || hasRequestOptionHeaders) {
     nextInit.headers = nextHeaders;
   }
 

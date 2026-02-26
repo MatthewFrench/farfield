@@ -32,8 +32,8 @@ export function formatTrackedUiErrorMessage(input: {
 }): string {
   const tags = [
     `actionId=${input.actionId}`,
-    input.requestId ? `requestId=${input.requestId}` : "",
-    input.errorId ? `errorId=${input.errorId}` : ""
+    input.requestId !== null && input.requestId.length > 0 ? `requestId=${input.requestId}` : "",
+    input.errorId !== null && input.errorId.length > 0 ? `errorId=${input.errorId}` : ""
   ].filter((value) => value.length > 0);
 
   if (tags.length === 0) {
