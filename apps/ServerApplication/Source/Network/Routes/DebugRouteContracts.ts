@@ -73,24 +73,44 @@ export interface DebugReplayFrameParseErrorDetails {
   issues: ReadonlyArray<DebugReplayFrameParseIssue>;
 }
 
-const ReplayFrameParseErrorPrefix = "Invalid replay frame payload";
+export const DebugReplayFrameParseErrorMessagePrefix = "Invalid replay frame payload";
+const DebugReplayFrameParseErrorMessageLocationPrefix = " at ";
+const DebugReplayFrameParseErrorMessageDetailSeparator = ": ";
+
+function cloneReplayFrameParseIssue(issue: DebugReplayFrameParseIssue): DebugReplayFrameParseIssue {
+  return {
+    path: issue.path,
+    issueCode: issue.issueCode,
+    message: issue.message
+  };
+}
+
+function cloneReplayFrameParseErrorDetails(
+  details: DebugReplayFrameParseErrorDetails
+): DebugReplayFrameParseErrorDetails {
+  return {
+    errorType: details.errorType,
+    issues: details.issues.map(cloneReplayFrameParseIssue)
+  };
+}
 
 function buildReplayFrameParseErrorMessage(details: DebugReplayFrameParseErrorDetails): string {
   const firstIssue = details.issues[0];
   if (!firstIssue) {
-    return ReplayFrameParseErrorPrefix;
+    return DebugReplayFrameParseErrorMessagePrefix;
   }
 
-  return `${ReplayFrameParseErrorPrefix} at ${firstIssue.path}: ${firstIssue.message}`;
+  return `${DebugReplayFrameParseErrorMessagePrefix}${DebugReplayFrameParseErrorMessageLocationPrefix}${firstIssue.path}${DebugReplayFrameParseErrorMessageDetailSeparator}${firstIssue.message}`;
 }
 
 export class DebugReplayFrameParseError extends Error {
   public readonly details: DebugReplayFrameParseErrorDetails;
 
   public constructor(details: DebugReplayFrameParseErrorDetails) {
-    super(buildReplayFrameParseErrorMessage(details));
+    const stableDetails = cloneReplayFrameParseErrorDetails(details);
+    super(buildReplayFrameParseErrorMessage(stableDetails));
     this.name = "DebugReplayFrameParseError";
-    this.details = details;
+    this.details = stableDetails;
   }
 }
 
@@ -128,8 +148,13 @@ export function readFileNameFromPath(filePath: string): string {
 }
 
 export function buildSendRequestOptions(parsedReplayFrame: ParsedReplayFrame): SendRequestOptions {
-  return {
-    ...(parsedReplayFrame.targetClientId ? { targetClientId: parsedReplayFrame.targetClientId } : {}),
-    ...(parsedReplayFrame.version !== undefined ? { version: parsedReplayFrame.version } : {})
-  };
+  const options: SendRequestOptions = {};
+  // Keep optional-field handling explicit so provided values are never dropped by truthy filtering.
+  if (parsedReplayFrame.targetClientId !== undefined) {
+    options.targetClientId = parsedReplayFrame.targetClientId;
+  }
+  if (parsedReplayFrame.version !== undefined) {
+    options.version = parsedReplayFrame.version;
+  }
+  return options;
 }
