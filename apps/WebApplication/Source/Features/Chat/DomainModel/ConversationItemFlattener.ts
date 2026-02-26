@@ -61,14 +61,15 @@ export class ConversationItemFlattener {
       });
     });
 
-    if (flattened.length > 0) {
-      const lastFlattenedItem = flattened[flattened.length - 1];
-      if (lastFlattenedItem !== undefined) {
-        lastFlattenedItem.isLast = true;
-      }
+    const lastItemIndex = flattened.length - 1;
+    if (lastItemIndex < 0) {
+      return flattened;
     }
 
-    return flattened;
+    return flattened.map((flattenedItem, flattenedItemIndex) => ({
+      ...flattenedItem,
+      isLast: flattenedItemIndex === lastItemIndex
+    }));
   }
 
   private shouldRenderConversationItem(item: ConversationTurnItem): boolean {

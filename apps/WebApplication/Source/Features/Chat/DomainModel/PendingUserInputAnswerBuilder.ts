@@ -23,17 +23,18 @@ export class PendingUserInputAnswerBuilder {
     questions: PendingUserInputQuestionLike[];
     answerDraftByQuestionId: PendingUserInputAnswerDraftByQuestionId;
   }): PendingUserInputAnswersByQuestionId {
-    const answersByQuestionId: PendingUserInputAnswersByQuestionId = {};
+    const answerEntries: Array<readonly [string, { answers: string[] }]> = [];
     for (const question of input.questions) {
       const draft = input.answerDraftByQuestionId[question.id] ?? createEmptyPendingUserInputAnswerDraft();
       const normalizedFreeform = draft.freeform.trim();
       const answerText = draft.option.length > 0 ? draft.option : normalizedFreeform;
-      if (answerText.length > 0) {
-        answersByQuestionId[question.id] = {
-          answers: [answerText]
-        };
+      if (answerText.length === 0) {
+        continue;
       }
+      answerEntries.push([question.id, {
+        answers: [answerText]
+      }]);
     }
-    return answersByQuestionId;
+    return Object.fromEntries(answerEntries);
   }
 }

@@ -50,15 +50,15 @@ export class ThreadGroupSelectors {
   }
 
   public static mapThreadUpdatedAtByIdentifier(threads: ThreadListItem[]): ThreadUpdatedAtByIdentifier {
-    const mapped: ThreadUpdatedAtByIdentifier = {};
+    const threadUpdatedAtEntries: Array<readonly [string, number]> = [];
     for (const thread of threads) {
-      mapped[thread.id] = ThreadGroupSelectors.readThreadUpdatedAtTimestamp(thread);
+      threadUpdatedAtEntries.push([thread.id, ThreadGroupSelectors.readThreadUpdatedAtTimestamp(thread)]);
     }
-    return mapped;
+    return Object.fromEntries(threadUpdatedAtEntries);
   }
 
   public static computeUnreadThreadIdentifiers(input: ComputeUnreadThreadIdentifiersInput): UnreadThreadIdentifierMap {
-    const nextUnreadThreadIdentifiers: UnreadThreadIdentifierMap = {};
+    const unreadThreadIdentifierEntries: Array<readonly [string, true]> = [];
     for (const thread of input.nextThreads) {
       if (thread.id === input.selectedThreadIdentifier) {
         continue;
@@ -67,7 +67,7 @@ export class ThreadGroupSelectors {
       // Explicit unread signals from the boundary contract take precedence over timestamp heuristics.
       const unreadSignal = ThreadGroupSelectors.readThreadHasUnreadTurnSignal(thread);
       if (unreadSignal === true) {
-        nextUnreadThreadIdentifiers[thread.id] = true;
+        unreadThreadIdentifierEntries.push([thread.id, true]);
         continue;
       }
       if (unreadSignal === false) {
@@ -79,10 +79,10 @@ export class ThreadGroupSelectors {
         previousThreadUpdatedAtByIdentifier: input.previousThreadUpdatedAtByIdentifier,
         thread
       })) {
-        nextUnreadThreadIdentifiers[thread.id] = true;
+        unreadThreadIdentifierEntries.push([thread.id, true]);
       }
     }
-    return nextUnreadThreadIdentifiers;
+    return Object.fromEntries(unreadThreadIdentifierEntries);
   }
 
   public static unreadThreadIdentifierMapsMatch(
@@ -114,16 +114,13 @@ export class ThreadGroupSelectors {
 
       const existingGroup = groupByKey.get(groupKey);
       if (existingGroup) {
-        existingGroup.threads.push(thread);
-        if (threadCreatedAt > existingGroup.projectCreatedAt) {
-          existingGroup.projectCreatedAt = threadCreatedAt;
-        }
-        if (threadUpdatedAt > existingGroup.latestUpdatedAt) {
-          existingGroup.latestUpdatedAt = threadUpdatedAt;
-        }
-        if (projectMarkedRemoved) {
-          existingGroup.isRemoved = true;
-        }
+        groupByKey.set(groupKey, {
+          ...existingGroup,
+          projectCreatedAt: Math.max(existingGroup.projectCreatedAt, threadCreatedAt),
+          latestUpdatedAt: Math.max(existingGroup.latestUpdatedAt, threadUpdatedAt),
+          threads: [...existingGroup.threads, thread],
+          isRemoved: existingGroup.isRemoved || projectMarkedRemoved
+        });
         continue;
       }
 
@@ -138,15 +135,16 @@ export class ThreadGroupSelectors {
       });
     }
 
-    for (const group of groupByKey.values()) {
-      group.threads.sort((leftThread, rightThread) =>
-        ThreadGroupSelectors.sortThreadsByUpdatedAt(leftThread, rightThread)
+    return Array.from(groupByKey.values())
+      .map((group) => ({
+        ...group,
+        threads: [...group.threads].sort((leftThread, rightThread) =>
+          ThreadGroupSelectors.sortThreadsByUpdatedAt(leftThread, rightThread)
+        )
+      }))
+      .sort((leftGroup, rightGroup) =>
+        ThreadGroupSelectors.sortProjectGroups(leftGroup, rightGroup)
       );
-    }
-
-    return Array.from(groupByKey.values()).sort((leftGroup, rightGroup) =>
-      ThreadGroupSelectors.sortProjectGroups(leftGroup, rightGroup)
-    );
   }
 
   public static mergeProjectGroups(
@@ -155,42 +153,23 @@ export class ThreadGroupSelectors {
   ): ThreadProjectGroup[] {
     const mergedGroupByKey = new Map<string, ThreadProjectGroup>();
 
-    for (const sourceGroup of [...primaryGroups, ...secondaryGroups]) {
-      const existingGroup = mergedGroupByKey.get(sourceGroup.key);
-      if (!existingGroup) {
-        mergedGroupByKey.set(sourceGroup.key, {
-          key: sourceGroup.key,
-          label: sourceGroup.label,
-          projectPath: sourceGroup.projectPath,
-          projectCreatedAt: sourceGroup.projectCreatedAt,
-          latestUpdatedAt: sourceGroup.latestUpdatedAt,
-          threads: [...sourceGroup.threads],
-          isRemoved: sourceGroup.isRemoved
-        });
-        continue;
-      }
-
-      existingGroup.threads.push(...sourceGroup.threads);
-      if (sourceGroup.projectCreatedAt > existingGroup.projectCreatedAt) {
-        existingGroup.projectCreatedAt = sourceGroup.projectCreatedAt;
-      }
-      if (sourceGroup.latestUpdatedAt > existingGroup.latestUpdatedAt) {
-        existingGroup.latestUpdatedAt = sourceGroup.latestUpdatedAt;
-      }
-      if (sourceGroup.isRemoved) {
-        existingGroup.isRemoved = true;
-      }
+    for (const sourceGroup of primaryGroups) {
+      ThreadGroupSelectors.mergeProjectGroupIntoMap(mergedGroupByKey, sourceGroup);
+    }
+    for (const sourceGroup of secondaryGroups) {
+      ThreadGroupSelectors.mergeProjectGroupIntoMap(mergedGroupByKey, sourceGroup);
     }
 
-    for (const group of mergedGroupByKey.values()) {
-      group.threads.sort((leftThread, rightThread) =>
-        ThreadGroupSelectors.sortThreadsByUpdatedAt(leftThread, rightThread)
+    return Array.from(mergedGroupByKey.values())
+      .map((group) => ({
+        ...group,
+        threads: [...group.threads].sort((leftThread, rightThread) =>
+          ThreadGroupSelectors.sortThreadsByUpdatedAt(leftThread, rightThread)
+        )
+      }))
+      .sort((leftGroup, rightGroup) =>
+        ThreadGroupSelectors.sortProjectGroups(leftGroup, rightGroup)
       );
-    }
-
-    return Array.from(mergedGroupByKey.values()).sort((leftGroup, rightGroup) =>
-      ThreadGroupSelectors.sortProjectGroups(leftGroup, rightGroup)
-    );
   }
 
   private static readThreadUpdatedAtTimestamp(thread: Pick<ThreadListItem, "updatedAt">): number {
@@ -304,5 +283,32 @@ export class ThreadGroupSelectors {
       return rightGroup.latestUpdatedAt - leftGroup.latestUpdatedAt;
     }
     return leftGroup.label.localeCompare(rightGroup.label);
+  }
+
+  private static mergeProjectGroupIntoMap(
+    mergedGroupByKey: Map<string, ThreadProjectGroup>,
+    sourceGroup: ThreadProjectGroup
+  ): void {
+    const existingGroup = mergedGroupByKey.get(sourceGroup.key);
+    if (!existingGroup) {
+      mergedGroupByKey.set(sourceGroup.key, {
+        key: sourceGroup.key,
+        label: sourceGroup.label,
+        projectPath: sourceGroup.projectPath,
+        projectCreatedAt: sourceGroup.projectCreatedAt,
+        latestUpdatedAt: sourceGroup.latestUpdatedAt,
+        threads: [...sourceGroup.threads],
+        isRemoved: sourceGroup.isRemoved
+      });
+      return;
+    }
+
+    mergedGroupByKey.set(sourceGroup.key, {
+      ...existingGroup,
+      projectCreatedAt: Math.max(existingGroup.projectCreatedAt, sourceGroup.projectCreatedAt),
+      latestUpdatedAt: Math.max(existingGroup.latestUpdatedAt, sourceGroup.latestUpdatedAt),
+      threads: [...existingGroup.threads, ...sourceGroup.threads],
+      isRemoved: existingGroup.isRemoved || sourceGroup.isRemoved
+    });
   }
 }

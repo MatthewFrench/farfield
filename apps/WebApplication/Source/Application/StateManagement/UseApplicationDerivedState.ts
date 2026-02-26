@@ -22,6 +22,71 @@ const MINIMUM_VISIBLE_CHAT_ITEM_INDEX = 0;
 const CODEX_AGENT_IDENTIFIER = "codex";
 const OPENCODE_AGENT_IDENTIFIER = "opencode";
 
+interface UseDebugIssueDerivedStateInput {
+  debugErrors: UseApplicationDerivedStateInput["debugErrors"];
+  history: UseApplicationDerivedStateInput["history"];
+  debugIssueSeverityFilter: UseApplicationDerivedStateInput["debugIssueSeverityFilter"];
+  debugIssueFilterQuery: UseApplicationDerivedStateInput["debugIssueFilterQuery"];
+  selectedDebugIssueId: UseApplicationDerivedStateInput["selectedDebugIssueId"];
+  debugIssueStateResolver: UseApplicationDerivedStateInput["debugIssueStateResolver"];
+}
+
+interface DebugIssueDerivedState {
+  debugErrorIssues: ApplicationDerivedState["debugErrorIssues"];
+  debugWarningIssues: ApplicationDerivedState["debugWarningIssues"];
+  debugIssues: ApplicationDerivedState["debugIssues"];
+  filteredDebugIssues: ApplicationDerivedState["filteredDebugIssues"];
+  selectedDebugIssue: ApplicationDerivedState["selectedDebugIssue"];
+}
+
+function useDebugIssueDerivedState(input: UseDebugIssueDerivedStateInput): DebugIssueDerivedState {
+  const debugErrorIssues = useMemo(
+    () => input.debugIssueStateResolver.readDebugErrorIssues(input.debugErrors),
+    [input.debugErrors, input.debugIssueStateResolver]
+  );
+
+  const debugWarningIssues = useMemo(
+    () => input.debugIssueStateResolver.readDebugWarningIssues(input.history),
+    [input.debugIssueStateResolver, input.history]
+  );
+
+  const debugIssues = useMemo(
+    () =>
+      input.debugIssueStateResolver.readCombinedDebugIssues({
+        debugErrorIssues,
+        debugWarningIssues
+      }),
+    [debugErrorIssues, input.debugIssueStateResolver, debugWarningIssues]
+  );
+
+  const filteredDebugIssues = useMemo(
+    () =>
+      input.debugIssueStateResolver.readFilteredDebugIssues({
+        debugIssues,
+        severityFilter: input.debugIssueSeverityFilter,
+        filterQuery: input.debugIssueFilterQuery
+      }),
+    [input.debugIssueFilterQuery, input.debugIssueSeverityFilter, input.debugIssueStateResolver, debugIssues]
+  );
+
+  const selectedDebugIssue = useMemo(
+    () =>
+      input.debugIssueStateResolver.readSelectedDebugIssue({
+        debugIssues: filteredDebugIssues,
+        selectedIssueIdentifier: input.selectedDebugIssueId
+      }),
+    [input.debugIssueStateResolver, filteredDebugIssues, input.selectedDebugIssueId]
+  );
+
+  return {
+    debugErrorIssues,
+    debugWarningIssues,
+    debugIssues,
+    filteredDebugIssues,
+    selectedDebugIssue
+  };
+}
+
 function readEffortOptions(
   defaultEffortOptions: readonly string[],
   modes: UseApplicationDerivedStateInput["modes"],
@@ -280,43 +345,20 @@ export function useApplicationDerivedState(
 
   const errorBannerDetails = useMemo(() => toErrorBannerDetails(errorMessage), [errorMessage]);
 
-  const debugErrorIssues = useMemo(
-    () => debugIssueStateResolver.readDebugErrorIssues(debugErrors),
-    [debugErrors, debugIssueStateResolver]
-  );
-
-  const debugWarningIssues = useMemo(
-    () => debugIssueStateResolver.readDebugWarningIssues(history),
-    [debugIssueStateResolver, history]
-  );
-
-  const debugIssues = useMemo(
-    () =>
-      debugIssueStateResolver.readCombinedDebugIssues({
-        debugErrorIssues,
-        debugWarningIssues
-      }),
-    [debugErrorIssues, debugIssueStateResolver, debugWarningIssues]
-  );
-
-  const filteredDebugIssues = useMemo(
-    () =>
-      debugIssueStateResolver.readFilteredDebugIssues({
-        debugIssues,
-        severityFilter: debugIssueSeverityFilter,
-        filterQuery: debugIssueFilterQuery
-      }),
-    [debugIssueFilterQuery, debugIssueSeverityFilter, debugIssueStateResolver, debugIssues]
-  );
-
-  const selectedDebugIssue = useMemo(
-    () =>
-      debugIssueStateResolver.readSelectedDebugIssue({
-        debugIssues: filteredDebugIssues,
-        selectedIssueIdentifier: selectedDebugIssueId
-      }),
-    [debugIssueStateResolver, filteredDebugIssues, selectedDebugIssueId]
-  );
+  const {
+    debugErrorIssues,
+    debugWarningIssues,
+    debugIssues,
+    filteredDebugIssues,
+    selectedDebugIssue
+  } = useDebugIssueDerivedState({
+    debugErrors,
+    history,
+    debugIssueSeverityFilter,
+    debugIssueFilterQuery,
+    selectedDebugIssueId,
+    debugIssueStateResolver
+  });
 
   const flatConversationItems = useMemo<ApplicationDerivedState["flatConversationItems"]>(
     () => conversationItemFlattener.flattenConversationItems(turns, isGenerating),

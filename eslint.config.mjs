@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import functional from "eslint-plugin-functional";
+import importPlugin from "eslint-plugin-import";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
@@ -22,6 +23,42 @@ const webDataAccessBoundaryImportPatterns = [
   {
     group: ["@/Application/DataAccess/*"],
     message: "User-interface modules must consume owner/state APIs instead of application data-access modules."
+  }
+];
+const typescriptTypeRestrictionSelectors = [
+  {
+    selector: "TSUnknownKeyword",
+    message: "Do not use unknown. Parse untrusted data at boundaries and use explicit contracts."
+  },
+  {
+    selector: "TSTypeReference[typeName.name='Parameters']",
+    message: "Do not use Parameters<>. Declare explicit contract types."
+  },
+  {
+    selector: "TSTypeReference[typeName.name='ReturnType']",
+    message: "Do not use ReturnType<>. Declare explicit contract types."
+  },
+  {
+    selector: "TSTypeReference[typeName.name='ConstructorParameters']",
+    message: "Do not use ConstructorParameters<>. Declare explicit contract types."
+  },
+  {
+    selector: "TSTypeReference[typeName.name='InstanceType']",
+    message: "Do not use InstanceType<>. Declare explicit contract types."
+  }
+];
+const memberMutationRestrictionSelectors = [
+  {
+    selector: "AssignmentExpression[left.type='MemberExpression'][left.object.type!='ThisExpression']",
+    message: "Only explicit owner modules may mutate object properties in place."
+  },
+  {
+    selector: "UpdateExpression[argument.type='MemberExpression'][argument.object.type!='ThisExpression']",
+    message: "Only explicit owner modules may mutate object properties in place."
+  },
+  {
+    selector: "UnaryExpression[operator='delete'][argument.type='MemberExpression'][argument.object.type!='ThisExpression']",
+    message: "Only explicit owner modules may mutate object properties in place."
   }
 ];
 
@@ -61,26 +98,7 @@ export default tseslint.config(
       "@typescript-eslint/no-non-null-assertion": "error",
       "no-restricted-syntax": [
         "error",
-        {
-          selector: "TSUnknownKeyword",
-          message: "Do not use unknown. Parse untrusted data at boundaries and use explicit contracts."
-        },
-        {
-          selector: "TSTypeReference[typeName.name='Parameters']",
-          message: "Do not use Parameters<>. Declare explicit contract types."
-        },
-        {
-          selector: "TSTypeReference[typeName.name='ReturnType']",
-          message: "Do not use ReturnType<>. Declare explicit contract types."
-        },
-        {
-          selector: "TSTypeReference[typeName.name='ConstructorParameters']",
-          message: "Do not use ConstructorParameters<>. Declare explicit contract types."
-        },
-        {
-          selector: "TSTypeReference[typeName.name='InstanceType']",
-          message: "Do not use InstanceType<>. Declare explicit contract types."
-        }
+        ...typescriptTypeRestrictionSelectors
       ],
       "@typescript-eslint/no-unused-vars": [
         "error",
@@ -116,12 +134,63 @@ export default tseslint.config(
       "packages/CodexProtocol/Source/Generated/**/*.ts",
       "packages/CodexProtocol/vendor/**/*.ts"
     ],
+    plugins: {
+      import: importPlugin
+    },
+    settings: {
+      "import/resolver": {
+        typescript: true,
+        node: true
+      }
+    },
     rules: {
+      "import/no-cycle": [
+        "error",
+        {
+          ignoreExternal: true
+        }
+      ],
+      "max-lines": [
+        "error",
+        {
+          max: 600,
+          skipBlankLines: true,
+          skipComments: true
+        }
+      ],
+      "max-lines-per-function": [
+        "error",
+        {
+          max: 300,
+          skipBlankLines: true,
+          skipComments: true,
+          IIFEs: true
+        }
+      ],
       "no-param-reassign": [
         "error",
         {
           props: true
         }
+      ]
+    }
+  },
+  {
+    files: [
+      "apps/ServerApplication/Source/Network/Schemas/**/*.ts",
+      "apps/WebApplication/Source/Application/Configuration/**/*.ts",
+      "apps/WebApplication/Source/Features/**/DomainModel/**/*.ts",
+      "apps/WebApplication/Source/Features/**/DomainModel/**/*.tsx",
+      "apps/WebApplication/Source/Shared/Contracts/**/*.ts",
+      "packages/CodexInterfaceAdapter/Source/DomainModel/**/*.ts",
+      "packages/CodexProtocol/Source/Contracts/**/*.ts",
+      "packages/OpenCodeInterfaceAdapter/Source/DomainModel/**/*.ts"
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...typescriptTypeRestrictionSelectors,
+        ...memberMutationRestrictionSelectors
       ]
     }
   },
