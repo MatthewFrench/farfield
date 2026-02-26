@@ -206,17 +206,18 @@ function buildCreateThreadInput(
 ): AgentCreateThreadInput {
   // Codex thread creation requires a working directory; when callers omit cwd,
   // the route injects the default workspace so adapter ownership stays deterministic.
+  const requestedCwd = body.cwd;
   return {
-    ...(body.cwd
-      ? { cwd: body.cwd }
+    ...(requestedCwd !== undefined
+      ? { cwd: requestedCwd }
       : adapterId === "codex"
         ? { cwd: defaultWorkspace }
         : {}),
-    ...(body.model ? { model: body.model } : {}),
-    ...(body.modelProvider ? { modelProvider: body.modelProvider } : {}),
-    ...(body.personality ? { personality: body.personality } : {}),
-    ...(body.sandbox ? { sandbox: body.sandbox } : {}),
-    ...(body.approvalPolicy ? { approvalPolicy: body.approvalPolicy } : {}),
+    ...(body.model !== undefined ? { model: body.model } : {}),
+    ...(body.modelProvider !== undefined ? { modelProvider: body.modelProvider } : {}),
+    ...(body.personality !== undefined ? { personality: body.personality } : {}),
+    ...(body.sandbox !== undefined ? { sandbox: body.sandbox } : {}),
+    ...(body.approvalPolicy !== undefined ? { approvalPolicy: body.approvalPolicy } : {}),
     ...(typeof body.ephemeral === "boolean" ? { ephemeral: body.ephemeral } : {})
   };
 }

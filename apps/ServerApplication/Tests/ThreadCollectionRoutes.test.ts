@@ -225,6 +225,61 @@ describe("handleThreadCollectionRoutes", () => {
     });
   });
 
+  it("preserves explicit create-thread optional values including empty strings", async () => {
+    const createThread = vi.fn(
+      async (input: AgentCreateThreadInput): Promise<AgentCreateThreadResult> => ({
+        threadId: "thread_explicit_values",
+        thread: {
+          id: "thread_explicit_values",
+          preview: "new thread",
+          createdAt: 1_736_100_000_000,
+          updatedAt: 1_736_100_000_001,
+          cwd: input.cwd
+        },
+        cwd: input.cwd
+      })
+    );
+    const adapter = createMockAgentAdapter(
+      "codex",
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [],
+        nextCursor: null
+      }),
+      createThread
+    );
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        method: ThreadCollectionRouteMethodByName.post,
+        url: buildThreadCollectionRouteUrl(),
+        defaultWorkspace: "/workspace/default",
+        listEnabledAdapters: () => [adapter],
+        resolveCreateThreadAdapter: () => adapter,
+        readJsonBody: async () => ({
+          cwd: "",
+          model: "",
+          modelProvider: "",
+          personality: "",
+          sandbox: "",
+          approvalPolicy: "",
+          ephemeral: false
+        }),
+        onJsonResponse: () => {}
+      })
+    );
+
+    expect(handled).toBe(true);
+    expect(createThread).toHaveBeenCalledWith({
+      cwd: "",
+      model: "",
+      modelProvider: "",
+      personality: "",
+      sandbox: "",
+      approvalPolicy: "",
+      ephemeral: false
+    });
+  });
+
   it("returns false when pathname does not match the collection route contract", async () => {
     let wasResponseWritten = false;
     const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
