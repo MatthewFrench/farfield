@@ -4,8 +4,14 @@ export {
 } from "./SessionMapper.js";
 export { messagesToTurns } from "./ConversationTurnMapper.js";
 export { partToTurnItem } from "./TurnItemMapper.js";
-export { mapOpenCodeEventToSsePayload } from "./EventPayloadMapper.js";
-export type { OpenCodeMappedSsePayload } from "./EventPayloadMapper.js";
+export {
+  mapOpenCodeEventToSsePayload,
+  OpenCodeEventPayloadMappingError
+} from "./EventPayloadMapper.js";
+export type {
+  OpenCodeEventPayloadMappingErrorDetails,
+  OpenCodeMappedSsePayload
+} from "./EventPayloadMapper.js";
 export type {
   MappedThreadListItem,
   MappedTurn,

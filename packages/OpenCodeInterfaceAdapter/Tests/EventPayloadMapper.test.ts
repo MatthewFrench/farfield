@@ -6,7 +6,10 @@ import type {
   EventSessionStatus,
   EventSessionUpdated
 } from "@opencode-ai/sdk";
-import { mapOpenCodeEventToSsePayload } from "../Source/EventPayloadMapper.js";
+import {
+  mapOpenCodeEventToSsePayload,
+  OpenCodeEventPayloadMappingError
+} from "../Source/EventPayloadMapper.js";
 import type { OpenCodeStructuredDataValue } from "../Source/Schemas.js";
 
 function makeEventMessageUpdated(sessionId: string): EventMessageUpdated {
@@ -93,6 +96,19 @@ function makeEventPermissionUpdated(sessionId: string): EventPermissionUpdated {
       }
     }
   };
+}
+
+function requireMappingError(thunk: () => void): OpenCodeEventPayloadMappingError {
+  try {
+    thunk();
+  } catch (error) {
+    if (error instanceof OpenCodeEventPayloadMappingError) {
+      return error;
+    }
+    throw error;
+  }
+
+  throw new Error("Expected OpenCodeEventPayloadMappingError");
 }
 
 describe("mapOpenCodeEventToSsePayload", () => {
@@ -194,16 +210,42 @@ describe("mapOpenCodeEventToSsePayload", () => {
     });
   });
 
-  it("throws a parse error when required event session scope is missing", () => {
+  it("throws a typed mapping error when required event session scope is missing", () => {
     const event = makeEventMessageUpdated("sess-1");
     Reflect.deleteProperty(event.properties.info, "sessionID");
 
-    expect(() => mapOpenCodeEventToSsePayload(event, "sess-1")).toThrow(/sessionID/i);
+    const error = requireMappingError(() => {
+      mapOpenCodeEventToSsePayload(event, "sess-1");
+    });
+
+    expect(error.details.eventType).toBe("message.updated");
+    expect(error.details.schemaContext).toBe("MessageUpdatedProperties");
+    expect(error.details.issuePaths).toContain("info.sessionID");
+    expect(error.details.issues.some((issue) => issue.includes("sessionID"))).toBe(true);
   });
 
-  it("throws when requested session identifier is blank", () => {
+  it("throws typed requested-session parsing errors with root issue localization", () => {
     const event = makeEventSessionStatus("sess-1");
 
-    expect(() => mapOpenCodeEventToSsePayload(event, "   ")).toThrow();
+    const error = requireMappingError(() => {
+      mapOpenCodeEventToSsePayload(event, "   ");
+    });
+
+    expect(error.details.eventType).toBe("session.status");
+    expect(error.details.schemaContext).toBe("RequestedSessionIdentifier");
+    expect(error.details.issuePaths).toEqual(["<root>"]);
+  });
+
+  it("localizes nested schema failures for session.status payload mapping", () => {
+    const event = makeEventSessionStatus("sess-1");
+    Reflect.deleteProperty(event.properties.status, "type");
+
+    const error = requireMappingError(() => {
+      mapOpenCodeEventToSsePayload(event, "sess-1");
+    });
+
+    expect(error.details.eventType).toBe("session.status");
+    expect(error.details.schemaContext).toBe("SessionStatusProperties");
+    expect(error.details.issuePaths).toContain("status.type");
   });
 });

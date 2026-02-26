@@ -31,6 +31,21 @@ const OpenCodeMapperFieldNames = {
   delta: "delta",
   status: "status"
 } as const;
+const OPEN_CODE_EVENT_PAYLOAD_MAPPING_ERROR_NAME = "OpenCodeEventPayloadMappingError";
+const ROOT_ISSUE_PATH = "<root>";
+
+const OpenCodeMapperSchemaContext = {
+  requestedSessionIdentifier: "RequestedSessionIdentifier",
+  messageUpdatedProperties: "MessageUpdatedProperties",
+  messagePartUpdatedProperties: "MessagePartUpdatedProperties",
+  sessionUpdatedProperties: "SessionUpdatedProperties",
+  sessionStatusProperties: "SessionStatusProperties",
+  permissionUpdatedProperties: "PermissionUpdatedProperties"
+} as const;
+
+type OpenCodeMapperSchemaContextValue = (
+  typeof OpenCodeMapperSchemaContext
+)[keyof typeof OpenCodeMapperSchemaContext];
 
 interface OpenCodeMessageUpdatedSsePayload {
   type: "opencode-message-updated";
@@ -69,6 +84,34 @@ export type OpenCodeMappedSsePayload =
   | OpenCodeSessionUpdatedSsePayload
   | OpenCodeSessionStatusSsePayload
   | OpenCodePermissionRequestSsePayload;
+
+export interface OpenCodeEventPayloadMappingErrorDetails {
+  eventType: OpenCodeEvent["type"];
+  schemaContext: OpenCodeMapperSchemaContextValue;
+  issues: string[];
+  issuePaths: string[];
+}
+
+/**
+ * Owns deterministic mapper diagnostics for OpenCode event parsing failures.
+ * Consumers can rely on `details` metadata instead of inspecting raw Zod issues.
+ */
+export class OpenCodeEventPayloadMappingError extends Error {
+  public readonly details: OpenCodeEventPayloadMappingErrorDetails;
+  public override readonly cause: z.ZodError;
+
+  public constructor(
+    details: OpenCodeEventPayloadMappingErrorDetails,
+    cause: z.ZodError
+  ) {
+    super(
+      `OpenCode event mapping failed (${details.eventType}, ${details.schemaContext}): ${details.issues.join("; ")}`
+    );
+    this.name = OPEN_CODE_EVENT_PAYLOAD_MAPPING_ERROR_NAME;
+    this.details = details;
+    this.cause = cause;
+  }
+}
 
 const OpenCodeSessionIdentifierSchema = z.string().trim().min(1);
 const OpenCodeStructuredDataObjectSchema = z.record(OpenCodeStructuredDataValueSchema);
@@ -113,6 +156,70 @@ const OpenCodeSessionStatusPropertiesSchema = z
   })
   .strict();
 
+function formatIssuePath(path: (string | number)[]): string {
+  if (path.length === 0) {
+    return ROOT_ISSUE_PATH;
+  }
+
+  return path
+    .map((segment) => (typeof segment === "number" ? `[${segment}]` : segment))
+    .join(".")
+    .replace(/\.\[/g, "[");
+}
+
+function createOpenCodeEventPayloadMappingError(input: {
+  eventType: OpenCodeEvent["type"];
+  schemaContext: OpenCodeMapperSchemaContextValue;
+  error: z.ZodError;
+}): OpenCodeEventPayloadMappingError {
+  const issues = input.error.issues.map((issue) => (
+    `${formatIssuePath(issue.path)}: ${issue.message}`
+  ));
+  const issuePaths = input.error.issues.map((issue) => formatIssuePath(issue.path));
+
+  return new OpenCodeEventPayloadMappingError(
+    {
+      eventType: input.eventType,
+      schemaContext: input.schemaContext,
+      issues,
+      issuePaths
+    },
+    input.error
+  );
+}
+
+function parseMapperSchemaOrThrow<SchemaType extends z.ZodTypeAny>(
+  schema: SchemaType,
+  value: object,
+  eventType: OpenCodeEvent["type"],
+  schemaContext: OpenCodeMapperSchemaContextValue
+): z.output<SchemaType> {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    throw createOpenCodeEventPayloadMappingError({
+      eventType,
+      schemaContext,
+      error: parsed.error
+    });
+  }
+  return parsed.data;
+}
+
+function parseRequestedSessionIdentifierOrThrow(
+  eventType: OpenCodeEvent["type"],
+  sessionId: string
+): string {
+  const parsed = OpenCodeSessionIdentifierSchema.safeParse(sessionId);
+  if (!parsed.success) {
+    throw createOpenCodeEventPayloadMappingError({
+      eventType,
+      schemaContext: OpenCodeMapperSchemaContext.requestedSessionIdentifier,
+      error: parsed.error
+    });
+  }
+  return parsed.data;
+}
+
 function isDifferentSessionIdentifier(
   eventSessionIdentifier: string,
   requestedSessionIdentifier: string
@@ -128,11 +235,16 @@ export function mapOpenCodeEventToSsePayload(
   event: OpenCodeEvent,
   sessionId: string
 ): OpenCodeMappedSsePayload | null {
-  const normalizedSessionId = OpenCodeSessionIdentifierSchema.parse(sessionId);
+  const normalizedSessionId = parseRequestedSessionIdentifierOrThrow(event.type, sessionId);
 
   switch (event.type) {
     case OpenCodeInboundEventTypes.messageUpdated: {
-      const properties = OpenCodeMessageUpdatedPropertiesSchema.parse(event.properties);
+      const properties = parseMapperSchemaOrThrow(
+        OpenCodeMessageUpdatedPropertiesSchema,
+        event.properties,
+        event.type,
+        OpenCodeMapperSchemaContext.messageUpdatedProperties
+      );
       if (
         isDifferentSessionIdentifier(
           properties.info.sessionID,
@@ -150,7 +262,12 @@ export function mapOpenCodeEventToSsePayload(
     }
 
     case OpenCodeInboundEventTypes.messagePartUpdated: {
-      const properties = OpenCodeMessagePartUpdatedPropertiesSchema.parse(event.properties);
+      const properties = parseMapperSchemaOrThrow(
+        OpenCodeMessagePartUpdatedPropertiesSchema,
+        event.properties,
+        event.type,
+        OpenCodeMapperSchemaContext.messagePartUpdatedProperties
+      );
       if (
         isDifferentSessionIdentifier(
           properties.part.sessionID,
@@ -169,7 +286,12 @@ export function mapOpenCodeEventToSsePayload(
     }
 
     case OpenCodeInboundEventTypes.sessionUpdated: {
-      const properties = OpenCodeSessionUpdatedPropertiesSchema.parse(event.properties);
+      const properties = parseMapperSchemaOrThrow(
+        OpenCodeSessionUpdatedPropertiesSchema,
+        event.properties,
+        event.type,
+        OpenCodeMapperSchemaContext.sessionUpdatedProperties
+      );
       if (
         isDifferentSessionIdentifier(
           properties.info.id,
@@ -187,7 +309,12 @@ export function mapOpenCodeEventToSsePayload(
     }
 
     case OpenCodeInboundEventTypes.sessionStatus: {
-      const properties = OpenCodeSessionStatusPropertiesSchema.parse(event.properties);
+      const properties = parseMapperSchemaOrThrow(
+        OpenCodeSessionStatusPropertiesSchema,
+        event.properties,
+        event.type,
+        OpenCodeMapperSchemaContext.sessionStatusProperties
+      );
       if (
         isDifferentSessionIdentifier(
           properties.sessionID,
@@ -205,7 +332,12 @@ export function mapOpenCodeEventToSsePayload(
     }
 
     case OpenCodeInboundEventTypes.permissionUpdated: {
-      const properties = OpenCodeSessionScopedRecordSchema.parse(event.properties);
+      const properties = parseMapperSchemaOrThrow(
+        OpenCodeSessionScopedRecordSchema,
+        event.properties,
+        event.type,
+        OpenCodeMapperSchemaContext.permissionUpdatedProperties
+      );
       if (
         isDifferentSessionIdentifier(
           properties.sessionID,
