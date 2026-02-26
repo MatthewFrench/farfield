@@ -12,7 +12,15 @@ import type {
 
 type OpenCodeToolState = OpenCodeToolPart["state"];
 
-const FILE_EDIT_TOOL_NAMES = new Set<string>(["write", "edit", "multiedit"]);
+/**
+ * Owns projection from OpenCode part payloads into strict adapter turn items.
+ * Boundary parsing happens once here so downstream code can rely on named types.
+ */
+const TOOL_STATUS_RUNNING = "running";
+const TOOL_STATUS_COMPLETED = "completed";
+const TOOL_STATUS_ERROR = "error";
+const FILE_CREATE_TOOL_NAME = "write";
+const FILE_EDIT_TOOL_NAMES = new Set<string>([FILE_CREATE_TOOL_NAME, "edit", "multiedit"]);
 const UNKNOWN_FILE_PATH = "(unknown)";
 
 /**
@@ -45,7 +53,7 @@ export function partToTurnItem(part: OpenCodePart): MappedTurnItem | null {
   switch (part.type) {
     case "text": {
       const textPart = part;
-      if (textPart.synthetic || textPart.ignored) {
+      if (shouldIgnoreTextPart(textPart)) {
         return null;
       }
       return {
@@ -112,7 +120,7 @@ function toolPartToTurnItem(toolPart: OpenCodeToolPart): MappedTurnItem {
   return {
     id: toolPart.id,
     type: "commandExecution",
-    command: input.command ?? toolName,
+    command: resolveCommandText(toolName, input),
     status,
     ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
     aggregatedOutput: extractToolOutput(state),
@@ -135,27 +143,27 @@ function extractFileChanges(
   const output = extractToolOutput(state);
   return [{
     path: filePath,
-    kind: { type: toolName === "write" ? "created" : "modified" },
+    kind: { type: resolveFileChangeKind(toolName) },
     ...(output !== null ? { diff: output } : {})
   }];
 }
 
 function resolveToolStatus(state: OpenCodeToolState): MappedToolLifecycleStatus {
-  return state.status === "error" ? "error" : state.status;
+  return state.status === TOOL_STATUS_ERROR ? TOOL_STATUS_ERROR : state.status;
 }
 
 function extractToolOutput(state: OpenCodeToolState): string | null {
-  if (state.status === "completed") {
+  if (state.status === TOOL_STATUS_COMPLETED) {
     return state.output;
   }
-  if (state.status === "error") {
+  if (state.status === TOOL_STATUS_ERROR) {
     return state.error;
   }
   return null;
 }
 
 function extractExitCode(state: OpenCodeToolState): number | null {
-  if (state.status !== "completed" && state.status !== "error") {
+  if (state.status === TOOL_STATUS_RUNNING) {
     return null;
   }
   if (state.metadata === undefined) {
@@ -166,15 +174,31 @@ function extractExitCode(state: OpenCodeToolState): number | null {
 }
 
 function extractDurationMs(state: OpenCodeToolState): number | null {
-  if (state.status === "completed") {
-    return state.time.end - state.time.start;
+  if (state.status === TOOL_STATUS_RUNNING) {
+    return null;
   }
-  if (state.status === "error") {
-    return state.time.end - state.time.start;
-  }
-  return null;
+  return state.time.end - state.time.start;
 }
 
 function parseToolInput(input: OpenCodeToolState["input"]): OpenCodeToolInputProjection {
   return OpenCodeToolInputProjectionSchema.parse(input);
+}
+
+function shouldIgnoreTextPart(textPart: OpenCodeTextPart): boolean {
+  // OpenCode marks synthetic/ignored text as non-user-facing scaffolding.
+  return textPart.synthetic === true || textPart.ignored === true;
+}
+
+function resolveCommandText(
+  toolName: string,
+  input: OpenCodeToolInputProjection
+): string {
+  // Some tool payloads omit a command string; use the tool name for a stable label.
+  return input.command ?? toolName;
+}
+
+function resolveFileChangeKind(
+  toolName: string
+): MappedFileChangeEntry["kind"]["type"] {
+  return toolName === FILE_CREATE_TOOL_NAME ? "created" : "modified";
 }

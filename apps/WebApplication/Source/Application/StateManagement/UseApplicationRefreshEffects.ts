@@ -20,6 +20,29 @@ function readNextWatchdogDelayMilliseconds(
   return eventsConnected ? connectedMinimumIntervalMilliseconds : disconnectedIntervalMilliseconds;
 }
 
+interface WatchdogRefreshDecisionInput {
+  eventsConnected: boolean;
+  nowMilliseconds: number;
+  lastCoreRefreshAtMilliseconds: number;
+  connectedMinimumIntervalMilliseconds: number;
+}
+
+function isDocumentVisible(): boolean {
+  return document.visibilityState === DOCUMENT_VISIBILITY_STATE_VISIBLE;
+}
+
+function shouldRefreshCoreDataForWatchdogCycle(input: WatchdogRefreshDecisionInput): boolean {
+  if (!input.eventsConnected) {
+    // Invariant: disconnected mode relies on the watchdog as the authoritative refresh cadence.
+    return true;
+  }
+
+  const elapsedSinceLastCoreRefreshMilliseconds = (
+    input.nowMilliseconds - input.lastCoreRefreshAtMilliseconds
+  );
+  return elapsedSinceLastCoreRefreshMilliseconds >= input.connectedMinimumIntervalMilliseconds;
+}
+
 export interface UseApplicationRefreshEffectsInput {
   selectedThreadId: string | null;
   activeTab: "chat" | "debug";
@@ -161,7 +184,7 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
 
   useEffect(() => {
     const onVisibilityChange = () => {
-      if (document.visibilityState !== DOCUMENT_VISIBILITY_STATE_VISIBLE) {
+      if (!isDocumentVisible()) {
         return;
       }
       void input.loadCoreDataTracked().catch((error) => input.handleRuntimeRequestError(error));
@@ -182,20 +205,30 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
       }, delayMilliseconds);
     };
 
+    const scheduleNextWatchdogForCurrentConnectionState = (): void => {
+      scheduleNextWatchdog(
+        readNextWatchdogDelayMilliseconds(
+          input.eventsConnectedRef.current,
+          input.coreRefreshConnectedMinIntervalMs,
+          input.coreRefreshIntervalMs
+        )
+      );
+    };
+
     const runWatchdogCycle = async (): Promise<void> => {
       if (disposed) {
         return;
       }
 
-      if (document.visibilityState === "visible") {
-        const now = Date.now();
-        const shouldRefreshWhenDisconnected = !input.eventsConnectedRef.current;
-        const shouldRefreshWhenConnected = (
-          input.eventsConnectedRef.current
-          && now - input.lastCoreRefreshAtRef.current >= input.coreRefreshConnectedMinIntervalMs
-        );
+      if (isDocumentVisible()) {
+        const shouldRefreshCoreData = shouldRefreshCoreDataForWatchdogCycle({
+          eventsConnected: input.eventsConnectedRef.current,
+          nowMilliseconds: Date.now(),
+          lastCoreRefreshAtMilliseconds: input.lastCoreRefreshAtRef.current,
+          connectedMinimumIntervalMilliseconds: input.coreRefreshConnectedMinIntervalMs
+        });
 
-        if (shouldRefreshWhenDisconnected || shouldRefreshWhenConnected) {
+        if (shouldRefreshCoreData) {
           try {
             await input.loadCoreDataTracked();
           } catch (error) {
@@ -207,22 +240,10 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
       if (disposed) {
         return;
       }
-      scheduleNextWatchdog(
-        readNextWatchdogDelayMilliseconds(
-          input.eventsConnectedRef.current,
-          input.coreRefreshConnectedMinIntervalMs,
-          input.coreRefreshIntervalMs
-        )
-      );
+      scheduleNextWatchdogForCurrentConnectionState();
     };
 
-    scheduleNextWatchdog(
-      readNextWatchdogDelayMilliseconds(
-        input.eventsConnectedRef.current,
-        input.coreRefreshConnectedMinIntervalMs,
-        input.coreRefreshIntervalMs
-      )
-    );
+    scheduleNextWatchdogForCurrentConnectionState();
 
     return () => {
       disposed = true;

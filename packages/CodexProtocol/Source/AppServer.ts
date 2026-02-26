@@ -25,9 +25,14 @@ const AppServerCollaborationModeListResponseBaseSchema =
 const AppServerStartThreadRequestBaseSchema = GeneratedThreadStartParamsSchema.passthrough();
 const AppServerSendUserMessageRequestBaseSchema = GeneratedSendUserMessageParamsSchema.passthrough();
 const AppServerSendUserMessageResponseBaseSchema = GeneratedSendUserMessageResponseSchema;
+const OptionalNullableStringSchema = NullableStringSchema.optional();
+const OptionalNullableStringWithNullDefaultSchema = NullableStringSchema.optional().default(null);
+const DefaultDebugErrorSeverity = "error";
 
 const AppServerGeneratedThreadListItemSchema = AppServerThreadListResponseBaseSchema.shape.data.element;
 
+// Thread list payloads are sourced from both app-server generated contracts and OpenCode sessions.
+// Keep both variants in one owner schema so thread list parsing stays centralized.
 const OpenCodeThreadListItemSchema = z
   .object({
     id: z.string().min(1),
@@ -47,7 +52,7 @@ export const AppServerThreadListItemSchema = z.union([
 export const AppServerListThreadsResponseSchema = z
   .object({
     data: z.array(AppServerThreadListItemSchema),
-    nextCursor: z.union([z.string(), z.null()]).optional(),
+    nextCursor: OptionalNullableStringSchema,
     pages: z.number().int().nonnegative().optional(),
     truncated: z.boolean().optional()
   })
@@ -69,14 +74,10 @@ export const AppServerModelSchema = AppServerModelListResponseBaseSchema.shape.d
 export const AppServerModelReasoningEffortSchema =
   AppServerModelSchema.shape.supportedReasoningEfforts.element;
 
-export const AppServerReasoningEffortSchema = z.enum([
-  "none",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh"
-]);
+// Config/read reasoning effort must stay aligned with model/list reasoning-effort values.
+// Reuse the generated enum owner to avoid literal drift between endpoints.
+export const AppServerReasoningEffortSchema =
+  AppServerModelReasoningEffortSchema.shape.reasoningEffort;
 
 export const AppServerListModelsResponseSchema = AppServerModelListResponseBaseSchema;
 
@@ -96,7 +97,7 @@ export const AppServerStartThreadResponseSchema = z
     cwd: z.string().optional(),
     approvalPolicy: z.string().optional(),
     sandbox: JsonValueSchema.optional(),
-    reasoningEffort: z.union([z.string(), z.null()]).optional()
+    reasoningEffort: OptionalNullableStringSchema
   })
   .passthrough();
 
@@ -104,19 +105,19 @@ export const AppServerSendUserMessageRequestSchema = AppServerSendUserMessageReq
 
 export const AppServerSendUserMessageResponseSchema = AppServerSendUserMessageResponseBaseSchema;
 
-const NullableAppServerReasoningEffortSchema = z.union([AppServerReasoningEffortSchema, z.null()]);
+const NullableAppServerReasoningEffortSchema = AppServerReasoningEffortSchema.nullable();
 
 export const AppServerConfigProfileSchema = z
   .object({
-    model: z.union([z.string(), z.null()]).optional().default(null),
+    model: OptionalNullableStringWithNullDefaultSchema,
     model_reasoning_effort: NullableAppServerReasoningEffortSchema.optional().default(null)
   })
   .passthrough();
 
 export const AppServerConfigReadConfigSchema = z
   .object({
-    profile: z.union([z.string(), z.null()]).optional().default(null),
-    model: z.union([z.string(), z.null()]).optional().default(null),
+    profile: OptionalNullableStringWithNullDefaultSchema,
+    model: OptionalNullableStringWithNullDefaultSchema,
     model_reasoning_effort: NullableAppServerReasoningEffortSchema.optional().default(null),
     profiles: z.record(AppServerConfigProfileSchema).optional().default({})
   })
@@ -143,12 +144,12 @@ export const CreateDebugClientErrorBodySchema = z
     source: NonEmptyStringSchema,
     operation: NonEmptyStringSchema,
     message: NonEmptyStringSchema,
-    severity: DebugErrorSeveritySchema.optional().default("error"),
-    name: NullableStringSchema.optional().default(null),
-    stack: NullableStringSchema.optional().default(null),
-    requestId: NullableStringSchema.optional().default(null),
-    threadId: NullableStringSchema.optional().default(null),
-    url: NullableStringSchema.optional().default(null),
+    severity: DebugErrorSeveritySchema.optional().default(DefaultDebugErrorSeverity),
+    name: OptionalNullableStringWithNullDefaultSchema,
+    stack: OptionalNullableStringWithNullDefaultSchema,
+    requestId: OptionalNullableStringWithNullDefaultSchema,
+    threadId: OptionalNullableStringWithNullDefaultSchema,
+    url: OptionalNullableStringWithNullDefaultSchema,
     occurredAt: z.string().datetime().optional(),
     details: z.record(JsonValueSchema).optional().default({})
   })
@@ -162,7 +163,7 @@ export const DebugErrorEventSchema = z
     source: NonEmptyStringSchema,
     operation: NonEmptyStringSchema,
     message: NonEmptyStringSchema,
-    severity: DebugErrorSeveritySchema.optional().default("error"),
+    severity: DebugErrorSeveritySchema.optional().default(DefaultDebugErrorSeverity),
     name: NullableStringSchema,
     stack: NullableStringSchema,
     requestId: NullableStringSchema,
@@ -256,6 +257,8 @@ export function parseAppServerReadThreadResponse(
     ParseContext.readThreadGeneratedResponse
   );
 
+  // Generated thread/read accepts transport-level thread variants and strips unknown inner keys.
+  // Re-parse the resulting thread payload through the internal conversation-state contract.
   return {
     thread: parseSchemaOrThrow(
       ThreadConversationStateSchema,

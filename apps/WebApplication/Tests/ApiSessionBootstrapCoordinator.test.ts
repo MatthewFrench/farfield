@@ -237,4 +237,35 @@ describe("ApiSessionBootstrapCoordinator", () => {
     await expect(coordinator.submitApiToken("   ", readWithApiToken)).rejects.toThrowError("API token is required");
     expect(readWithApiToken).toHaveBeenCalledTimes(0);
   });
+
+  it("trims api token values before submitting bootstrap requests", async () => {
+    const coordinator = new ApiSessionBootstrapCoordinator();
+    const readWithApiToken = vi.fn(async (_apiToken: string) => ({
+      authRequired: false,
+      bootstrapped: true,
+      expiresAt: null
+    }));
+
+    await expect(coordinator.submitApiToken("  token-123  ", readWithApiToken)).resolves.toEqual({
+      isReady: true,
+      requiresApiToken: false
+    });
+
+    expect(readWithApiToken).toHaveBeenCalledWith("token-123");
+    expect(readWithApiToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws when a bootstrapped protected session has an invalid expiresAt value", async () => {
+    const coordinator = new ApiSessionBootstrapCoordinator();
+    const readSession = vi.fn(async () => ({
+      authRequired: true,
+      bootstrapped: true,
+      expiresAt: "invalid-date-value"
+    }));
+
+    await expect(coordinator.ensureSession(readSession, 1_000)).rejects.toThrowError(
+      "ApiSessionBootstrapCoordinator received an invalid expiresAt value: invalid-date-value"
+    );
+    expect(readSession).toHaveBeenCalledTimes(1);
+  });
 });

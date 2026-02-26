@@ -121,6 +121,23 @@ describe("mapOpenCodeEventToSsePayload", () => {
     });
   });
 
+  it("maps message.part.updated and preserves provided delta values", () => {
+    const delta: OpenCodeStructuredDataValue = {
+      text: "delta",
+      index: 3
+    };
+    const event = makeEventMessagePartUpdated("sess-1", { delta });
+
+    const payload = mapOpenCodeEventToSsePayload(event, "sess-1");
+
+    expect(payload).toEqual({
+      type: "opencode-part-updated",
+      sessionId: "sess-1",
+      part: event.properties.part,
+      delta
+    });
+  });
+
   it("maps session.updated events for the active session", () => {
     const event = makeEventSessionUpdated("sess-1");
 
@@ -163,6 +180,18 @@ describe("mapOpenCodeEventToSsePayload", () => {
     const payload = mapOpenCodeEventToSsePayload(event, "sess-1");
 
     expect(payload).toBeNull();
+  });
+
+  it("trims requested session identifiers before session scope matching", () => {
+    const event = makeEventSessionStatus("sess-1");
+
+    const payload = mapOpenCodeEventToSsePayload(event, "  sess-1  ");
+
+    expect(payload).toEqual({
+      type: "opencode-session-status",
+      sessionId: "sess-1",
+      status: event.properties.status
+    });
   });
 
   it("throws a parse error when required event session scope is missing", () => {

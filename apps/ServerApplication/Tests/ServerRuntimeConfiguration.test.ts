@@ -136,6 +136,46 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.pushTestSendTimeoutMs).toBe(3_000);
   });
 
+  it("parses strict boolean tokens for secure cookie configuration", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const secureCookieEnabledConfiguration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      API_SESSION_SECURE_COOKIE: "1"
+    });
+    const secureCookieDisabledConfiguration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      API_SESSION_SECURE_COOKIE: "0"
+    });
+    const invalidSecureCookieTokenConfiguration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      API_SESSION_SECURE_COOKIE: "TRUE"
+    });
+
+    expect(secureCookieEnabledConfiguration.apiSessionSecureCookie).toBe(true);
+    expect(secureCookieDisabledConfiguration.apiSessionSecureCookie).toBe(false);
+    expect(invalidSecureCookieTokenConfiguration.apiSessionSecureCookie).toBe(false);
+  });
+
+  it("uses default client error maximum entries when configured value is not a positive integer", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const configuration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      DEBUG_CLIENT_ERROR_MAX_ENTRIES: "not-an-integer"
+    });
+
+    expect(configuration.clientErrorMaxEntries).toBe(2_000);
+  });
+
+  it("fails for empty optional path environment values with a clear variable error", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    expect(() => {
+      readServerRuntimeConfiguration({
+        ...buildBaseEnvironment(temporaryDirectoryPath),
+        DEBUG_CLIENT_ERROR_LOG_PATH: "   "
+      });
+    }).toThrow("DEBUG_CLIENT_ERROR_LOG_PATH must be a non-empty path when set");
+  });
+
   it("validates logger level and optional invalid stream log path", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
     const configuredInvalidStreamLogPath = path.join(temporaryDirectoryPath, "invalid-stream-events.ndjson");

@@ -301,6 +301,33 @@ describe("OpenCodeMonitorService", () => {
     ]);
   });
 
+  it("maps getSession request using parsed identifiers", async () => {
+    const clientDouble = createServiceClientDouble();
+    const service = new OpenCodeMonitorService(clientDouble.provider);
+
+    const session = await service.getSession("  session-1  ", "  /tmp/project  ");
+
+    expect(clientDouble.sessionGet).toHaveBeenCalledWith({
+      path: {
+        id: "session-1"
+      },
+      query: {
+        directory: "/tmp/project"
+      }
+    });
+    expect(session.id).toBe("session-1");
+    expect(session.directory).toBe("/tmp/project");
+  });
+
+  it("rejects blank getSession session identifier", async () => {
+    const clientDouble = createServiceClientDouble();
+    const service = new OpenCodeMonitorService(clientDouble.provider);
+
+    await expect(service.getSession("   ")).rejects.toThrow();
+
+    expect(clientDouble.sessionGet).not.toHaveBeenCalled();
+  });
+
   it("validates sendMessage input and maps prompt payload", async () => {
     const clientDouble = createServiceClientDouble();
     const service = new OpenCodeMonitorService(clientDouble.provider);
@@ -364,6 +391,15 @@ describe("OpenCodeMonitorService", () => {
         directory: "/tmp/project"
       }
     });
+  });
+
+  it("rejects blank abort session identifier", async () => {
+    const clientDouble = createServiceClientDouble();
+    const service = new OpenCodeMonitorService(clientDouble.provider);
+
+    await expect(service.abort("   ")).rejects.toThrow();
+
+    expect(clientDouble.sessionAbort).not.toHaveBeenCalled();
   });
 
   it("rejects blank deleteSession session identifier", async () => {

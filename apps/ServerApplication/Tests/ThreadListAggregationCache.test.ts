@@ -79,6 +79,21 @@ describe("ThreadListAggregationCache", () => {
     expect(cache.readStatistics().evictionCount).toBe(1);
   });
 
+  it("normalizes enabled agent identifiers when building cache keys", () => {
+    const cache = new ThreadListAggregationCache(1_000, 4);
+    const writeQuery = buildQuery({
+      enabledAgentIds: ["opencode", "codex"]
+    });
+    const readQuery = buildQuery({
+      enabledAgentIds: ["codex", "opencode"]
+    });
+
+    cache.write(writeQuery, buildSnapshot({ combinedTruncated: true }));
+
+    expect(cache.readFresh(readQuery)?.combinedTruncated).toBe(true);
+    expect(writeQuery.enabledAgentIds).toEqual(["opencode", "codex"]);
+  });
+
   it("coalesces concurrent loads for the same query key", async () => {
     const cache = new ThreadListAggregationCache(1_000, 4);
     const query = buildQuery();
@@ -126,6 +141,25 @@ describe("ThreadListAggregationCache", () => {
     expect(cache.readStatistics().invalidationCount).toBe(1);
   });
 
+  it("does not invalidate cache state when predicate scope does not match entries", async () => {
+    const cache = new ThreadListAggregationCache(1_000, 4);
+    const query = buildQuery({ archived: false });
+
+    let resolveLoad: ((value: ThreadListAggregationSnapshot) => void) | null = null;
+    const readPromise = cache.readFreshOrLoad(query, () => new Promise<ThreadListAggregationSnapshot>((resolve) => {
+      resolveLoad = resolve;
+    }));
+
+    cache.invalidateWhere((candidateQuery) => candidateQuery.archived);
+    expect(cache.readStatistics().invalidationCount).toBe(0);
+    expect(cache.readStatistics().inFlightCount).toBe(1);
+
+    resolveLoad?.(buildSnapshot({ combinedTruncated: true }));
+    await readPromise;
+
+    expect(cache.readFresh(query)?.combinedTruncated).toBe(true);
+  });
+
   it("invalidates matching query scopes without evicting unrelated entries", () => {
     const cache = new ThreadListAggregationCache(1_000, 8);
     const activeQuery = buildQuery({ archived: false });
@@ -139,6 +173,21 @@ describe("ThreadListAggregationCache", () => {
     expect(cache.readFresh(activeQuery)).toBeNull();
     expect(cache.readFresh(archivedQuery)).toEqual(buildSnapshot({ combinedTruncated: false }));
     expect(cache.readStatistics().invalidationCount).toBe(1);
+  });
+
+  it("uses stored query clones for invalidation predicates", () => {
+    const cache = new ThreadListAggregationCache(1_000, 8);
+    const query = buildQuery({ archived: false });
+
+    cache.write(query, buildSnapshot({ combinedTruncated: true }));
+    query.archived = true;
+
+    cache.invalidateWhere((candidateQuery) => candidateQuery.archived);
+
+    expect(cache.readFresh(buildQuery({ archived: false }))).toEqual(
+      buildSnapshot({ combinedTruncated: true })
+    );
+    expect(cache.readStatistics().invalidationCount).toBe(0);
   });
 
   it("returns defensive snapshot clones so caller mutations cannot alter cache state", () => {

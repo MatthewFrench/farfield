@@ -32,6 +32,11 @@ describe("parseJsonRpcResponse", () => {
         id: 3
       })
     ).toThrowError(/result or error/i);
+    expect(() =>
+      parseJsonRpcResponse({
+        id: 3
+      })
+    ).toThrowError(/JsonRpcResponse did not match expected schema/i);
   });
 
   it("rejects response containing both result and error", () => {
@@ -77,15 +82,21 @@ describe("parseJsonRpcIncomingMessage", () => {
   });
 
   it("rejects request-shaped payloads with method and id", () => {
-    expect(() =>
-      parseJsonRpcIncomingMessage({
-        jsonrpc: "2.0",
-        id: 11,
-        method: "thread/read",
-        params: {
-          threadId: "thread-1"
-        }
-      })
-    ).toThrow();
+    const requestShapedPayload = {
+      jsonrpc: "2.0",
+      id: 11,
+      method: "thread/read",
+      params: {
+        threadId: "thread-1"
+      }
+    };
+
+    expect(() => parseJsonRpcIncomingMessage(requestShapedPayload)).toThrow();
+    expect(() => parseJsonRpcIncomingMessage(requestShapedPayload)).toThrowError(
+      /JsonRpcIncomingMessage did not match expected schema/i
+    );
+    expect(() => parseJsonRpcIncomingMessage(requestShapedPayload)).toThrowError(
+      /id: Expected never, received number/i
+    );
   });
 });

@@ -3,16 +3,65 @@ import { NonEmptyStringSchema, NonNegativeIntSchema } from "./Common.js";
 import { ProtocolValidationError } from "./Errors.js";
 import { parseSchemaOrThrow } from "./ProtocolSchemaParsers.js";
 
-const PushStateStoreVersion = 1;
-const PushSendStoreVersion = 1;
-const PushReceiptStoreVersion = 2;
-const LegacyPushReceiptStoreVersion = 1;
+const PushStoreVersion = {
+  state: 1,
+  send: 1,
+  receipt: 2,
+  legacyReceipt: 1
+} as const;
+const PushStoreVersionLabel = {
+  state: "push state",
+  send: "push send store",
+  receipt: "push receipt store"
+} as const;
 const LegacyPushReceiptNotificationIdentifierPrefix = "legacy";
+const Base64UrlPattern = /^[A-Za-z0-9_-]+$/;
+const Base64UrlValidationMessage = "Expected base64url value";
+const IsoDateTimeStringSchema = z.string().datetime();
+const NullableNonEmptyStringSchema = NonEmptyStringSchema.nullable();
+const OptionalNullableNonEmptyStringSchema = NullableNonEmptyStringSchema.optional();
+const PushReceiptEventValues = ["shown", "clicked", "error"] as const;
+
+type VersionedPushStore = {
+  version: number;
+};
+
+function createUnsupportedPushStoreVersionMessage(
+  storeLabel: string,
+  actualVersion: number
+): string {
+  return `Unsupported ${storeLabel} version: ${String(actualVersion)}`;
+}
+
+function createPushStoreVersionRefinement(
+  expectedVersion: number,
+  storeLabel: string
+): (state: VersionedPushStore, ctx: z.RefinementCtx) => void {
+  // Keep the version field numeric before refinement so diagnostics can include
+  // the received version number and remain stable across all push store contracts.
+  return (state, ctx) => {
+    if (state.version !== expectedVersion) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: createUnsupportedPushStoreVersionMessage(storeLabel, state.version)
+      });
+    }
+  };
+}
+
+function buildLegacyPushReceiptNotificationIdentifier(
+  receiptIndex: number,
+  createdAt: string
+): string {
+  // Legacy receipt records do not include notification identifiers; synthesize a deterministic value
+  // from persisted order and timestamp so migration stays stable for repeated parses.
+  return `${LegacyPushReceiptNotificationIdentifierPrefix}-${receiptIndex + 1}-${createdAt}`;
+}
 
 const Base64UrlValueSchema = z
   .string()
   .min(1)
-  .regex(/^[A-Za-z0-9_-]+$/, "Expected base64url value");
+  .regex(Base64UrlPattern, Base64UrlValidationMessage);
 
 export const PushSubscriptionKeysSchema = z
   .object({
@@ -52,8 +101,8 @@ export const StoredPushSubscriptionSchema = z
     id: NonEmptyStringSchema,
     subscription: PushSubscriptionSchema,
     settings: PushSettingsSchema,
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime()
+    createdAt: IsoDateTimeStringSchema,
+    updatedAt: IsoDateTimeStringSchema
   })
   .strict();
 
@@ -71,23 +120,18 @@ export const PushStateStoreSchema = z
     completionWatermarks: z.array(CompletionWatermarkSchema)
   })
   .strict()
-  .superRefine((state, ctx) => {
-    if (state.version !== PushStateStoreVersion) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Unsupported push state version: ${String(state.version)}`
-      });
-    }
-  });
+  .superRefine(
+    createPushStoreVersionRefinement(PushStoreVersion.state, PushStoreVersionLabel.state)
+  );
 
 export const DeclarativePushNotificationSchema = z
   .object({
     title: NonEmptyStringSchema,
     body: z.string().optional(),
-    navigate: z.string().min(1).optional(),
-    icon: z.string().min(1).optional(),
-    badge: z.string().min(1).optional(),
-    tag: z.string().min(1).optional()
+    navigate: NonEmptyStringSchema.optional(),
+    icon: NonEmptyStringSchema.optional(),
+    badge: NonEmptyStringSchema.optional(),
+    tag: NonEmptyStringSchema.optional()
   })
   .strict();
 
@@ -104,23 +148,23 @@ export const PushNotificationPayloadSchema = z
     body: z.string(),
     threadId: NonEmptyStringSchema,
     turnId: NonEmptyStringSchema,
-    url: z.string().min(1),
-    createdAt: z.string().datetime(),
+    url: NonEmptyStringSchema,
+    createdAt: IsoDateTimeStringSchema,
     web_push: DeclarativeWebPushSchema.optional()
   })
   .strict();
 
-export const PushReceiptEventSchema = z.enum(["shown", "clicked", "error"]);
+export const PushReceiptEventSchema = z.enum(PushReceiptEventValues);
 
 export const CreatePushReceiptBodySchema = z
   .object({
     notificationId: NonEmptyStringSchema,
     event: PushReceiptEventSchema,
-    url: z.string().min(1),
-    threadId: NonEmptyStringSchema.nullable().optional(),
-    turnId: NonEmptyStringSchema.nullable().optional(),
+    url: NonEmptyStringSchema,
+    threadId: OptionalNullableNonEmptyStringSchema,
+    turnId: OptionalNullableNonEmptyStringSchema,
     message: z.string().max(500).optional(),
-    createdAt: z.string().datetime()
+    createdAt: IsoDateTimeStringSchema
   })
   .strict();
 
@@ -128,22 +172,22 @@ export const PushReceiptSchema = z
   .object({
     notificationId: NonEmptyStringSchema,
     event: PushReceiptEventSchema,
-    url: z.string().min(1),
-    threadId: NonEmptyStringSchema.nullable(),
-    turnId: NonEmptyStringSchema.nullable(),
+    url: NonEmptyStringSchema,
+    threadId: NullableNonEmptyStringSchema,
+    turnId: NullableNonEmptyStringSchema,
     message: z.string().nullable(),
-    createdAt: z.string().datetime()
+    createdAt: IsoDateTimeStringSchema
   })
   .strict();
 
 const LegacyPushReceiptSchema = z
   .object({
     event: PushReceiptEventSchema,
-    url: z.string().min(1),
-    threadId: NonEmptyStringSchema.nullable(),
-    turnId: NonEmptyStringSchema.nullable(),
+    url: NonEmptyStringSchema,
+    threadId: NullableNonEmptyStringSchema,
+    turnId: NullableNonEmptyStringSchema,
     message: z.string().nullable(),
-    createdAt: z.string().datetime()
+    createdAt: IsoDateTimeStringSchema
   })
   .strict();
 
@@ -165,7 +209,7 @@ export const PushSendSummarySchema = z
     notificationId: NonEmptyStringSchema,
     threadId: NonEmptyStringSchema,
     turnId: NonEmptyStringSchema,
-    sentAt: z.string().datetime(),
+    sentAt: IsoDateTimeStringSchema,
     attempted: NonNegativeIntSchema,
     delivered: NonNegativeIntSchema,
     failures: NonNegativeIntSchema
@@ -184,14 +228,7 @@ export const PushSendStoreSchema = z
     latest: PushSendSummarySchema.nullable()
   })
   .strict()
-  .superRefine((state, ctx) => {
-    if (state.version !== PushSendStoreVersion) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Unsupported push send store version: ${String(state.version)}`
-      });
-    }
-  });
+  .superRefine(createPushStoreVersionRefinement(PushStoreVersion.send, PushStoreVersionLabel.send));
 
 export const PushReceiptStoreSchema = z
   .object({
@@ -199,18 +236,13 @@ export const PushReceiptStoreSchema = z
     receipts: z.array(PushReceiptSchema)
   })
   .strict()
-  .superRefine((state, ctx) => {
-    if (state.version !== PushReceiptStoreVersion) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Unsupported push receipt store version: ${String(state.version)}`
-      });
-    }
-  });
+  .superRefine(
+    createPushStoreVersionRefinement(PushStoreVersion.receipt, PushStoreVersionLabel.receipt)
+  );
 
 const LegacyPushReceiptStoreSchema = z
   .object({
-    version: z.literal(LegacyPushReceiptStoreVersion),
+    version: z.literal(PushStoreVersion.legacyReceipt),
     receipts: z.array(LegacyPushReceiptSchema)
   })
   .strict();
@@ -218,7 +250,7 @@ const LegacyPushReceiptStoreSchema = z
 export const PushLocalCaStatusResponseSchema = z
   .object({
     available: z.boolean(),
-    downloadPath: z.string().min(1).nullable()
+    downloadPath: NullableNonEmptyStringSchema
   })
   .strict();
 
@@ -356,10 +388,9 @@ export function parsePushReceiptStore(
   const legacyResult = LegacyPushReceiptStoreSchema.safeParse(value);
   if (legacyResult.success) {
     return {
-      version: PushReceiptStoreVersion,
+      version: PushStoreVersion.receipt,
       receipts: legacyResult.data.receipts.map((receipt, index) => ({
-        notificationId:
-          `${LegacyPushReceiptNotificationIdentifierPrefix}-${index + 1}-${receipt.createdAt}`,
+        notificationId: buildLegacyPushReceiptNotificationIdentifier(index, receipt.createdAt),
         event: receipt.event,
         url: receipt.url,
         threadId: receipt.threadId,

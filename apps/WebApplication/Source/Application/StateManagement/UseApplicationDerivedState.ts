@@ -18,6 +18,33 @@ import {
 
 const DEFAULT_SELECTED_AGENT_LABEL = "Agent";
 const UNKNOWN_COMMIT_LABEL = "unknown";
+const MINIMUM_VISIBLE_CHAT_ITEM_INDEX = 0;
+const CODEX_AGENT_IDENTIFIER = "codex";
+const OPENCODE_AGENT_IDENTIFIER = "opencode";
+
+function readEffortOptions(
+  defaultEffortOptions: readonly string[],
+  modes: UseApplicationDerivedStateInput["modes"],
+  latestReasoningEffort: string | null | undefined,
+  selectedReasoningEffort: string
+): string[] {
+  const values = new Set<string>(defaultEffortOptions);
+  for (const mode of modes) {
+    if (mode.reasoning_effort) {
+      values.add(mode.reasoning_effort);
+    }
+  }
+
+  if (latestReasoningEffort) {
+    values.add(latestReasoningEffort);
+  }
+
+  if (selectedReasoningEffort) {
+    values.add(selectedReasoningEffort);
+  }
+
+  return Array.from(values);
+}
 
 export function useApplicationDerivedState(
   input: UseApplicationDerivedStateInput
@@ -195,22 +222,16 @@ export function useApplicationDerivedState(
 
   const isPlanModeEnabled = planModeOption !== null && selectedModeKey === planModeOption.mode;
 
-  const effortOptions = useMemo(() => {
-    const values = new Set<string>(defaultEffortOptions);
-    for (const mode of modes) {
-      if (mode.reasoning_effort) {
-        values.add(mode.reasoning_effort);
-      }
-    }
-    const latestEffort = conversationState?.latestReasoningEffort;
-    if (latestEffort) {
-      values.add(latestEffort);
-    }
-    if (selectedReasoningEffort) {
-      values.add(selectedReasoningEffort);
-    }
-    return Array.from(values);
-  }, [conversationState?.latestReasoningEffort, defaultEffortOptions, modes, selectedReasoningEffort]);
+  const effortOptions = useMemo(
+    () =>
+      readEffortOptions(
+        defaultEffortOptions,
+        modes,
+        conversationState?.latestReasoningEffort,
+        selectedReasoningEffort
+      ),
+    [conversationState?.latestReasoningEffort, defaultEffortOptions, modes, selectedReasoningEffort]
+  );
 
   const effortOptionsWithoutAssumedDefault = useMemo(
     () => effortOptions.filter((option) => option !== appDefaultReasoningEffort),
@@ -295,8 +316,12 @@ export function useApplicationDerivedState(
   );
 
   const conversationItemCount = flatConversationItems.length;
-  const firstVisibleChatItemIndex = Math.max(0, conversationItemCount - visibleChatItemLimit);
-  const hasHiddenChatItems = firstVisibleChatItemIndex > 0;
+  // Clamp to zero so slicing never underflows when the visible limit is larger than the list.
+  const firstVisibleChatItemIndex = Math.max(
+    MINIMUM_VISIBLE_CHAT_ITEM_INDEX,
+    conversationItemCount - visibleChatItemLimit
+  );
+  const hasHiddenChatItems = firstVisibleChatItemIndex > MINIMUM_VISIBLE_CHAT_ITEM_INDEX;
 
   const visibleConversationItems = useMemo(
     () => flatConversationItems.slice(firstVisibleChatItemIndex),
@@ -304,8 +329,8 @@ export function useApplicationDerivedState(
   );
 
   const commitLabel = health?.state.gitCommit ?? UNKNOWN_COMMIT_LABEL;
-  const codexConfigured = agentsById.codex?.enabled === true;
-  const openCodeConnected = agentsById.opencode?.connected === true;
+  const codexConfigured = agentsById[CODEX_AGENT_IDENTIFIER]?.enabled === true;
+  const openCodeConnected = agentsById[OPENCODE_AGENT_IDENTIFIER]?.connected === true;
   const { allSystemsReady, hasAnySystemFailure } = readSystemHealthStatus({
     codexConfigured,
     openCodeConnected,

@@ -64,4 +64,72 @@ describe("ConversationItem", () => {
 
     expect(screen.getByText("receivers: none")).toBeDefined();
   });
+
+  it("applies compact spacing when a web-search item is surrounded by tool blocks", () => {
+    renderConversationItem({
+      item: {
+        id: "web-search-between-tools",
+        type: "webSearch",
+        query: "render contracts",
+        action: {
+          type: "search",
+          query: "render contracts"
+        }
+      },
+      previousItemType: "commandExecution",
+      nextItemType: "fileChange"
+    });
+
+    const panel = screen.getByText("Web search").parentElement;
+    if (panel === null) {
+      throw new Error("Expected web search panel container to exist");
+    }
+
+    expect(panel.className).toContain("my-1");
+  });
+
+  it("applies leading spacing when the next item is a tool block", () => {
+    renderConversationItem({
+      item: {
+        id: "web-search-before-tool",
+        type: "webSearch",
+        query: "spacing contracts",
+        action: {
+          type: "search",
+          query: "spacing contracts"
+        }
+      },
+      nextItemType: "commandExecution"
+    });
+
+    const panel = screen.getByText("Web search").parentElement;
+    if (panel === null) {
+      throw new Error("Expected web search panel container to exist");
+    }
+
+    expect(panel.className).toContain("mt-4 mb-1");
+  });
+
+  it("renders user input response answers with deterministic separators", () => {
+    renderConversationItem({
+      item: {
+        id: "user-input-response",
+        type: "userInputResponse",
+        requestId: 1,
+        turnId: "turn-1",
+        questions: [],
+        answers: {
+          q1: ["first", "second"],
+          q2: ["third"]
+        }
+      }
+    });
+
+    const responseTextContainer = screen.getByText("Response").nextElementSibling;
+    if (responseTextContainer === null) {
+      throw new Error("Expected response text container to exist");
+    }
+
+    expect(responseTextContainer.textContent).toBe("first, second\nthird");
+  });
 });

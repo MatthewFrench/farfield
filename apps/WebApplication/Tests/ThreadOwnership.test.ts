@@ -48,6 +48,7 @@ class TestThreadServerClient extends ThreadServerClient {
     archived: ThreadListResponse;
   };
   private listRequestCount: number;
+  private readonly listRequestOptions: ThreadListLoadOptions[];
 
   public constructor(input: { active: ThreadListResponse; archived: ThreadListResponse }) {
     super();
@@ -56,14 +57,20 @@ class TestThreadServerClient extends ThreadServerClient {
       archived: input.archived
     };
     this.listRequestCount = 0;
+    this.listRequestOptions = [];
   }
 
   public getListRequestCount(): number {
     return this.listRequestCount;
   }
 
+  public readListRequestOptions(): ThreadListLoadOptions[] {
+    return this.listRequestOptions;
+  }
+
   public override async listThreads(options: ThreadListLoadOptions): Promise<ThreadListResponse> {
     this.listRequestCount += 1;
+    this.listRequestOptions.push({ ...options });
     return options.archived ? this.responseByArchiveMode.archived : this.responseByArchiveMode.active;
   }
 }
@@ -339,6 +346,121 @@ describe("Thread ownership modules", () => {
     expect(firstRead.loadedFromCache).toBe(false);
     expect(secondRead.loadedFromCache).toBe(true);
     expect(serverClient.getListRequestCount()).toBe(1);
+  });
+
+  it("ThreadListStateController isolates active and archived cache reads", async () => {
+    const active = buildThreadListResponse({
+      threadOneUpdatedAt: 1_700_000_000,
+      threadTwoUpdatedAt: 1_700_000_001
+    });
+    const archived = buildThreadListResponse({
+      threadOneUpdatedAt: 1_600_000_000,
+      threadTwoUpdatedAt: 1_600_000_001
+    });
+    const serverClient = new TestThreadServerClient({ active, archived });
+    const controller = new ThreadListStateController({
+      threadServerClient: serverClient,
+      threadQueryCache: new ThreadQueryCache(10_000, 8),
+      threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
+      threadListStateStore: new ThreadListStateStore(),
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+    });
+
+    const firstActiveRead = await controller.loadActiveThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: "thread-1",
+      readFromCache: true
+    });
+
+    const firstArchivedRead = await controller.loadArchivedThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      readFromCache: true
+    });
+
+    const secondActiveRead = await controller.loadActiveThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: "thread-1",
+      readFromCache: true
+    });
+
+    const secondArchivedRead = await controller.loadArchivedThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      readFromCache: true
+    });
+
+    expect(firstActiveRead.loadedFromCache).toBe(false);
+    expect(firstArchivedRead.loadedFromCache).toBe(false);
+    expect(secondActiveRead.loadedFromCache).toBe(true);
+    expect(secondArchivedRead.loadedFromCache).toBe(true);
+    expect(serverClient.getListRequestCount()).toBe(2);
+  });
+
+  it("ThreadListStateController forwards action metadata to thread list requests", async () => {
+    const active = buildThreadListResponse({
+      threadOneUpdatedAt: 1_700_000_000,
+      threadTwoUpdatedAt: 1_700_000_001
+    });
+    const archived = buildThreadListResponse({
+      threadOneUpdatedAt: 1_600_000_000,
+      threadTwoUpdatedAt: 1_600_000_001
+    });
+    const serverClient = new TestThreadServerClient({ active, archived });
+    const controller = new ThreadListStateController({
+      threadServerClient: serverClient,
+      threadQueryCache: new ThreadQueryCache(10_000, 8),
+      threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
+      threadListStateStore: new ThreadListStateStore(),
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+    });
+
+    await controller.loadActiveThreadState({
+      limit: 30,
+      maxPages: 5,
+      sortKey: "updated_at",
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: null,
+      readFromCache: false,
+      actionId: "action-active",
+      actionName: "thread-list.refresh-active"
+    });
+
+    await controller.loadArchivedThreadState({
+      limit: 10,
+      maxPages: 2,
+      sortKey: "created_at",
+      readFromCache: false,
+      actionId: "action-archived",
+      actionName: "thread-list.refresh-archived"
+    });
+
+    expect(serverClient.readListRequestOptions()).toEqual([
+      {
+        archived: false,
+        limit: 30,
+        maxPages: 5,
+        sortKey: "updated_at",
+        actionId: "action-active",
+        actionName: "thread-list.refresh-active"
+      },
+      {
+        archived: true,
+        limit: 10,
+        maxPages: 2,
+        sortKey: "created_at",
+        actionId: "action-archived",
+        actionName: "thread-list.refresh-archived"
+      }
+    ]);
   });
 
   it("ThreadListStateController marks archived list truncated when pagination cursor exists", async () => {

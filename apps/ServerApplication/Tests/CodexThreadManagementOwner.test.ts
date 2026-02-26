@@ -4,9 +4,11 @@ import {
   type AppServerTransport,
   type ListThreadsAllOptions,
   type ListThreadsOptions,
+  type ReadConfigOptions,
   type StartThreadOptions
 } from "@farfield/api";
 import type {
+  AppServerConfigReadResponse,
   AppServerListThreadsResponse,
   AppServerStartThreadResponse,
   JsonValue
@@ -29,6 +31,15 @@ const EMPTY_LIST_THREADS_RESPONSE: AppServerListThreadsResponse = {
   nextCursor: null
 };
 
+const EMPTY_READ_CONFIG_RESPONSE: AppServerConfigReadResponse = {
+  config: {
+    profile: null,
+    model: null,
+    model_reasoning_effort: null,
+    profiles: {}
+  }
+};
+
 const START_THREAD_RESPONSE: AppServerStartThreadResponse = {
   thread: {
     id: "thread-1",
@@ -46,20 +57,24 @@ class TestAppServerClient extends AppServerClient {
   public readonly listThreadsCalls: ListThreadsOptions[] = [];
   public readonly listThreadsAllCalls: ListThreadsAllOptions[] = [];
   public readonly startThreadCalls: StartThreadOptions[] = [];
+  public readonly readConfigCalls: Array<ReadConfigOptions | undefined> = [];
 
   private readonly listThreadsResult: AppServerListThreadsResponse;
   private readonly listThreadsAllResult: AppServerListThreadsResponse;
   private readonly startThreadResult: AppServerStartThreadResponse;
+  private readonly readConfigResult: AppServerConfigReadResponse;
 
   public constructor(input?: {
     listThreadsResult?: AppServerListThreadsResponse;
     listThreadsAllResult?: AppServerListThreadsResponse;
     startThreadResult?: AppServerStartThreadResponse;
+    readConfigResult?: AppServerConfigReadResponse;
   }) {
     super(NOOP_TRANSPORT);
     this.listThreadsResult = input?.listThreadsResult ?? EMPTY_LIST_THREADS_RESPONSE;
     this.listThreadsAllResult = input?.listThreadsAllResult ?? EMPTY_LIST_THREADS_RESPONSE;
     this.startThreadResult = input?.startThreadResult ?? START_THREAD_RESPONSE;
+    this.readConfigResult = input?.readConfigResult ?? EMPTY_READ_CONFIG_RESPONSE;
   }
 
   public override async listThreads(options: ListThreadsOptions): Promise<AppServerListThreadsResponse> {
@@ -76,6 +91,13 @@ class TestAppServerClient extends AppServerClient {
     this.startThreadCalls.push(options);
     return this.startThreadResult;
   }
+
+  public override async readConfig(
+    options?: ReadConfigOptions
+  ): Promise<AppServerConfigReadResponse> {
+    this.readConfigCalls.push(options);
+    return this.readConfigResult;
+  }
 }
 
 function createOwner(appClient: AppServerClient): CodexThreadManagementOwner {
@@ -86,7 +108,17 @@ function createOwner(appClient: AppServerClient): CodexThreadManagementOwner {
   });
 }
 
-function createListThreadsInput(overrides: Partial<AgentListThreadsInput> = {}): AgentListThreadsInput {
+interface AgentListThreadsInputOverrides {
+  limit?: AgentListThreadsInput["limit"];
+  archived?: AgentListThreadsInput["archived"];
+  all?: AgentListThreadsInput["all"];
+  maxPages?: AgentListThreadsInput["maxPages"];
+  cursor?: AgentListThreadsInput["cursor"];
+  sortKey?: AgentListThreadsInput["sortKey"];
+  cwd?: AgentListThreadsInput["cwd"];
+}
+
+function createListThreadsInput(overrides: AgentListThreadsInputOverrides = {}): AgentListThreadsInput {
   return {
     limit: 20,
     archived: false,
@@ -171,6 +203,22 @@ describe("CodexThreadManagementOwner", () => {
     });
   });
 
+  it("normalizes undefined nextCursor to null for list results", async () => {
+    const appClient = new TestAppServerClient({
+      listThreadsResult: {
+        data: []
+      }
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.listThreads(createListThreadsInput());
+
+    expect(result).toEqual({
+      data: [],
+      nextCursor: null
+    });
+  });
+
   it("rejects create-thread requests when cwd is missing or blank", async () => {
     const owner = createOwner(new TestAppServerClient());
 
@@ -204,5 +252,85 @@ describe("CodexThreadManagementOwner", () => {
     ]);
     expect(result.threadId).toBe("thread-1");
     expect(result.cwd).toBe("/tmp/workspace");
+  });
+
+  it("maps create-thread response contract metadata", async () => {
+    const appClient = new TestAppServerClient({
+      startThreadResult: {
+        ...START_THREAD_RESPONSE,
+        model: "gpt-5",
+        modelProvider: "openai",
+        cwd: "/tmp/workspace",
+        approvalPolicy: "never",
+        sandbox: "workspace-write",
+        reasoningEffort: "medium"
+      }
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.createThread({ cwd: "/tmp/workspace" });
+
+    expect(result).toEqual({
+      threadId: "thread-1",
+      thread: START_THREAD_RESPONSE.thread,
+      model: "gpt-5",
+      modelProvider: "openai",
+      cwd: "/tmp/workspace",
+      approvalPolicy: "never",
+      sandbox: "workspace-write",
+      reasoningEffort: "medium"
+    });
+  });
+
+  it("prefers active profile config defaults and requests config without layers", async () => {
+    const appClient = new TestAppServerClient({
+      readConfigResult: {
+        config: {
+          profile: "work",
+          model: "global-model",
+          model_reasoning_effort: "minimal",
+          profiles: {
+            work: {
+              model: "profile-model",
+              model_reasoning_effort: "high"
+            }
+          }
+        }
+      }
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.readConfigDefaults();
+
+    expect(appClient.readConfigCalls).toEqual([
+      {
+        includeLayers: false
+      }
+    ]);
+    expect(result).toEqual({
+      model: "profile-model",
+      reasoningEffort: "high"
+    });
+  });
+
+  it("uses global config defaults when active profile is missing", async () => {
+    const appClient = new TestAppServerClient({
+      readConfigResult: {
+        config: {
+          profile: "missing",
+          model: "global-model",
+          model_reasoning_effort: "medium",
+          profiles: {}
+        }
+      }
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.readConfigDefaults();
+
+    expect(result).toEqual({
+      model: "global-model",
+      reasoningEffort: "medium"
+    });
   });
 });

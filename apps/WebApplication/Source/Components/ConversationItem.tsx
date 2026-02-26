@@ -8,6 +8,7 @@ import { MarkdownText } from "./MarkdownText";
 
 type TurnItem = z.infer<typeof TurnItemSchema>;
 type UserMessageLikeItem = Extract<TurnItem, { type: "userMessage" | "steeringUserMessage" }>;
+type UserInputResponseItem = Extract<TurnItem, { type: "userInputResponse" }>;
 
 interface Props {
   item: TurnItem;
@@ -25,8 +26,68 @@ const TOOL_BLOCK_TYPES: readonly TurnItem["type"][] = [
   "collabAgentToolCall",
   "collabToolCall"
 ];
+// Tight spacing between adjacent tool cards keeps related tool traces visually grouped.
+const TOOL_BLOCK_SPACING_CLASSES = {
+  betweenToolBlocks: "my-1",
+  afterToolBlock: "mt-1 mb-4",
+  beforeToolBlock: "mt-4 mb-1",
+  default: "my-4"
+} as const;
+const LINE_BREAK = "\n";
+const USER_INPUT_RESPONSE_VALUE_SEPARATOR = ", ";
 const REASONING_DEFAULT_SUMMARY_LINE = "Thinking…";
 const EMPTY_RECEIVER_THREAD_IDS_LABEL = "none";
+const ERROR_PANEL_TITLE = "Error";
+const PLAN_PANEL_TITLE = "Plan";
+const PLAN_IMPLEMENTATION_PANEL_TITLE = "Plan Implementation";
+const PLAN_STEPS_PANEL_TITLE = "Plan Steps";
+const USER_INPUT_RESPONSE_LABEL = "Response";
+const CONTEXT_COMPACTED_NOTICE = "Context compacted";
+const WEB_SEARCH_TOOL_TITLE = "Web search";
+const MCP_TOOL_TITLE = "MCP tool";
+const COLLAB_TOOL_TITLE = "Collab tool";
+const VIEWED_IMAGE_PREFIX = "Viewed image:";
+const ENTERED_REVIEW_MODE_PREFIX = "Entered review mode:";
+const EXITED_REVIEW_MODE_PREFIX = "Exited review mode:";
+const MODEL_CHANGED_NOTICE = "Model changed";
+const SENDER_THREAD_LABEL = "sender:";
+const RECEIVER_THREAD_LABEL = "receivers:";
+const RESULT_PARTS_LABEL = "Result parts:";
+const MILLISECOND_SUFFIX = "ms";
+const USER_MESSAGE_WRAPPER_CLASS = "flex justify-end";
+const USER_MESSAGE_BUBBLE_CLASS =
+  "max-w-[80%] rounded-2xl bg-muted px-4 py-2.5 text-sm text-foreground leading-relaxed";
+const USER_MESSAGE_TEXT_CLASS = "whitespace-pre-wrap break-words";
+const ERROR_PANEL_CLASS = "my-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3";
+const ERROR_PANEL_TITLE_CLASS = "text-[10px] font-semibold uppercase tracking-widest text-red-300 mb-2";
+const ERROR_PANEL_TEXT_CLASS = "text-sm text-red-100 whitespace-pre-wrap break-words leading-relaxed";
+const SECTION_PANEL_CLASS = "my-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3";
+const SECTION_PANEL_TITLE_CLASS =
+  "text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2";
+const SECTION_PANEL_TEXT_CLASS = "text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed";
+const USER_INPUT_RESPONSE_BUBBLE_CLASS = "max-w-[80%] rounded-2xl border border-border bg-muted/30 px-4 py-2.5";
+const USER_INPUT_RESPONSE_LABEL_CLASS =
+  "text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-medium";
+const USER_INPUT_RESPONSE_TEXT_CLASS = "text-sm text-foreground whitespace-pre-wrap";
+const TOOL_PANEL_CLASS = "rounded-lg border border-border bg-muted/20 px-3 py-2";
+const TOOL_PANEL_TITLE_CLASS = "text-[10px] text-muted-foreground font-mono mb-1 uppercase tracking-wider";
+const TOOL_PANEL_PRIMARY_TEXT_CLASS = "text-xs text-foreground/80 whitespace-pre-wrap break-words";
+const TOOL_PANEL_SECONDARY_TEXT_CLASS = "text-xs text-foreground/90 whitespace-pre-wrap break-words";
+const TOOL_PANEL_DURATION_TEXT_CLASS = "mt-1 text-[11px] text-muted-foreground font-mono";
+const TOOL_PANEL_ERROR_TEXT_CLASS = "mt-2 text-xs text-danger whitespace-pre-wrap break-words";
+const TOOL_PANEL_METADATA_TEXT_CLASS = "mt-2 text-xs text-muted-foreground";
+const TOOL_PANEL_ARGUMENTS_TEXT_CLASS =
+  "mt-2 text-[11px] text-muted-foreground font-mono whitespace-pre-wrap break-all";
+const TOOL_PANEL_SENDER_TEXT_CLASS = "mt-1 text-[11px] text-muted-foreground whitespace-pre-wrap break-all";
+const TOOL_PANEL_RECEIVER_TEXT_CLASS = "text-[11px] text-muted-foreground whitespace-pre-wrap break-all";
+const TOOL_PANEL_PROMPT_TEXT_CLASS = "mt-2 text-xs text-foreground/80 whitespace-pre-wrap break-words";
+const PLAN_STEPS_EXPLANATION_CLASS = "mb-2 text-sm text-foreground/90 whitespace-pre-wrap break-words leading-relaxed";
+const PLAN_STEPS_LIST_CLASS = "space-y-1.5";
+const PLAN_STEP_ITEM_CLASS = "text-sm text-foreground/90";
+const PLAN_STEP_STATUS_CLASS =
+  "mr-2 rounded border border-border/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground";
+const PLAN_STEP_TEXT_CLASS = "whitespace-pre-wrap break-words";
+const NOTICE_PANEL_CLASS = "rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground";
 
 function isToolBlockType(type: TurnItem["type"] | undefined): boolean {
   return type !== undefined && TOOL_BLOCK_TYPES.includes(type);
@@ -38,10 +99,10 @@ function toolBlockSpacingClass(
 ): string {
   const previousIsTool = isToolBlockType(previousItemType);
   const nextIsTool = isToolBlockType(nextItemType);
-  if (previousIsTool && nextIsTool) return "my-1";
-  if (previousIsTool) return "mt-1 mb-4";
-  if (nextIsTool) return "mt-4 mb-1";
-  return "my-4";
+  if (previousIsTool && nextIsTool) return TOOL_BLOCK_SPACING_CLASSES.betweenToolBlocks;
+  if (previousIsTool) return TOOL_BLOCK_SPACING_CLASSES.afterToolBlock;
+  if (nextIsTool) return TOOL_BLOCK_SPACING_CLASSES.beforeToolBlock;
+  return TOOL_BLOCK_SPACING_CLASSES.default;
 }
 
 function readTextContent(content: UserMessageLikeItem["content"]): string {
@@ -55,11 +116,34 @@ function readReasoningSummary(summary: string[] | undefined): string[] {
   return summary ?? [];
 }
 
+function readUserInputAnswersText(answers: UserInputResponseItem["answers"]): string {
+  return Object.values(answers)
+    .map((values) => values.join(USER_INPUT_RESPONSE_VALUE_SEPARATOR))
+    .join(LINE_BREAK);
+}
+
 function formatReceiverThreadIds(receiverThreadIds: readonly string[]): string {
   if (receiverThreadIds.length === 0) {
     return EMPTY_RECEIVER_THREAD_IDS_LABEL;
   }
   return receiverThreadIds.join(", ");
+}
+
+function readToolPanelClassName(toolSpacing: string): string {
+  return `${toolSpacing} ${TOOL_PANEL_CLASS}`;
+}
+
+function renderSectionPanel(title: string, content: string) {
+  return (
+    <div className={SECTION_PANEL_CLASS}>
+      <div className={SECTION_PANEL_TITLE_CLASS}>{title}</div>
+      <div className={SECTION_PANEL_TEXT_CLASS}>{content}</div>
+    </div>
+  );
+}
+
+function renderNoticePanel(content: string) {
+  return <div className={NOTICE_PANEL_CLASS}>{content}</div>;
 }
 
 function assertNever(value: never): never {
@@ -83,9 +167,9 @@ function ConversationItemComponent({
       const text = readTextContent(item.content);
       if (!text) return null;
       return (
-        <div className="flex justify-end">
-          <div className="max-w-[80%] rounded-2xl bg-muted px-4 py-2.5 text-sm text-foreground leading-relaxed">
-            <p className="whitespace-pre-wrap break-words">{text}</p>
+        <div className={USER_MESSAGE_WRAPPER_CLASS}>
+          <div className={USER_MESSAGE_BUBBLE_CLASS}>
+            <p className={USER_MESSAGE_TEXT_CLASS}>{text}</p>
           </div>
         </div>
       );
@@ -101,13 +185,9 @@ function ConversationItemComponent({
     /* ── Error message ──────────────────────────────────── */
     case "error":
       return (
-        <div className="my-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-red-300 mb-2">
-            Error
-          </div>
-          <div className="text-sm text-red-100 whitespace-pre-wrap break-words leading-relaxed">
-            {item.message}
-          </div>
+        <div className={ERROR_PANEL_CLASS}>
+          <div className={ERROR_PANEL_TITLE_CLASS}>{ERROR_PANEL_TITLE}</div>
+          <div className={ERROR_PANEL_TEXT_CLASS}>{item.message}</div>
         </div>
       );
 
@@ -126,43 +206,21 @@ function ConversationItemComponent({
 
     /* ── Plan ───────────────────────────────────────────── */
     case "plan":
-      return (
-        <div className="my-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-            Plan
-          </div>
-          <div className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
-            {item.text}
-          </div>
-        </div>
-      );
+      return renderSectionPanel(PLAN_PANEL_TITLE, item.text);
 
     /* ── Plan implementation ────────────────────────────── */
     case "planImplementation":
-      return (
-        <div className="my-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-            Plan Implementation
-          </div>
-          <div className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
-            {item.planContent}
-          </div>
-        </div>
-      );
+      return renderSectionPanel(PLAN_IMPLEMENTATION_PANEL_TITLE, item.planContent);
 
     /* ── User input response ────────────────────────────── */
     case "userInputResponse": {
-      const answersText = Object.entries(item.answers)
-        .map(([_id, vals]) => vals.join(", "))
-        .join("\n");
+      const answersText = readUserInputAnswersText(item.answers);
       if (!answersText) return null;
       return (
-        <div className="flex justify-end">
-          <div className="max-w-[80%] rounded-2xl border border-border bg-muted/30 px-4 py-2.5">
-            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-medium">
-              Response
-            </div>
-            <div className="text-sm text-foreground whitespace-pre-wrap">{answersText}</div>
+        <div className={USER_MESSAGE_WRAPPER_CLASS}>
+          <div className={USER_INPUT_RESPONSE_BUBBLE_CLASS}>
+            <div className={USER_INPUT_RESPONSE_LABEL_CLASS}>{USER_INPUT_RESPONSE_LABEL}</div>
+            <div className={USER_INPUT_RESPONSE_TEXT_CLASS}>{answersText}</div>
           </div>
         </div>
       );
@@ -186,47 +244,37 @@ function ConversationItemComponent({
 
     /* ── Context compaction ─────────────────────────────── */
     case "contextCompaction":
-      return (
-        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          Context compacted
-        </div>
-      );
+      return renderNoticePanel(CONTEXT_COMPACTED_NOTICE);
 
     /* ── Web search ─────────────────────────────────────── */
     case "webSearch":
       return (
-        <div className={`${toolSpacing} rounded-lg border border-border bg-muted/20 px-3 py-2`}>
-          <div className="text-[10px] text-muted-foreground font-mono mb-1 uppercase tracking-wider">
-            Web search
-          </div>
-          <div className="text-xs text-foreground/80 whitespace-pre-wrap break-words">
-            {item.query}
-          </div>
+        <div className={readToolPanelClassName(toolSpacing)}>
+          <div className={TOOL_PANEL_TITLE_CLASS}>{WEB_SEARCH_TOOL_TITLE}</div>
+          <div className={TOOL_PANEL_PRIMARY_TEXT_CLASS}>{item.query}</div>
         </div>
       );
 
     case "mcpToolCall": {
       const argumentsText = JSON.stringify(item.arguments);
       return (
-        <div className={`${toolSpacing} rounded-lg border border-border bg-muted/20 px-3 py-2`}>
-          <div className="text-[10px] text-muted-foreground font-mono mb-1 uppercase tracking-wider">
-            MCP tool
-          </div>
-          <div className="text-xs text-foreground/90 whitespace-pre-wrap break-words">
+        <div className={readToolPanelClassName(toolSpacing)}>
+          <div className={TOOL_PANEL_TITLE_CLASS}>{MCP_TOOL_TITLE}</div>
+          <div className={TOOL_PANEL_SECONDARY_TEXT_CLASS}>
             {item.server}/{item.tool} ({item.status})
           </div>
           {item.durationMs != null && (
-            <div className="mt-1 text-[11px] text-muted-foreground font-mono">{item.durationMs}ms</div>
+            <div className={TOOL_PANEL_DURATION_TEXT_CLASS}>{item.durationMs}{MILLISECOND_SUFFIX}</div>
           )}
           {item.error?.message && (
-            <div className="mt-2 text-xs text-danger whitespace-pre-wrap break-words">{item.error.message}</div>
+            <div className={TOOL_PANEL_ERROR_TEXT_CLASS}>{item.error.message}</div>
           )}
           {item.result?.content && item.result.content.length > 0 && (
-            <div className="mt-2 text-xs text-muted-foreground">
-              Result parts: {item.result.content.length}
+            <div className={TOOL_PANEL_METADATA_TEXT_CLASS}>
+              {RESULT_PARTS_LABEL} {item.result.content.length}
             </div>
           )}
-          <div className="mt-2 text-[11px] text-muted-foreground font-mono whitespace-pre-wrap break-all">
+          <div className={TOOL_PANEL_ARGUMENTS_TEXT_CLASS}>
             {argumentsText}
           </div>
         </div>
@@ -236,21 +284,19 @@ function ConversationItemComponent({
     case "collabAgentToolCall":
     case "collabToolCall":
       return (
-        <div className={`${toolSpacing} rounded-lg border border-border bg-muted/20 px-3 py-2`}>
-          <div className="text-[10px] text-muted-foreground font-mono mb-1 uppercase tracking-wider">
-            Collab tool
-          </div>
-          <div className="text-xs text-foreground/90 whitespace-pre-wrap break-words">
+        <div className={readToolPanelClassName(toolSpacing)}>
+          <div className={TOOL_PANEL_TITLE_CLASS}>{COLLAB_TOOL_TITLE}</div>
+          <div className={TOOL_PANEL_SECONDARY_TEXT_CLASS}>
             {item.tool} ({item.status})
           </div>
-          <div className="mt-1 text-[11px] text-muted-foreground whitespace-pre-wrap break-all">
-            sender: {item.senderThreadId}
+          <div className={TOOL_PANEL_SENDER_TEXT_CLASS}>
+            {SENDER_THREAD_LABEL} {item.senderThreadId}
           </div>
-          <div className="text-[11px] text-muted-foreground whitespace-pre-wrap break-all">
-            receivers: {formatReceiverThreadIds(item.receiverThreadIds)}
+          <div className={TOOL_PANEL_RECEIVER_TEXT_CLASS}>
+            {RECEIVER_THREAD_LABEL} {formatReceiverThreadIds(item.receiverThreadIds)}
           </div>
           {item.prompt && (
-            <div className="mt-2 text-xs text-foreground/80 whitespace-pre-wrap break-words">
+            <div className={TOOL_PANEL_PROMPT_TEXT_CLASS}>
               {item.prompt}
             </div>
           )}
@@ -259,22 +305,20 @@ function ConversationItemComponent({
 
     case "todo-list":
       return (
-        <div className="my-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-            Plan Steps
-          </div>
+        <div className={SECTION_PANEL_CLASS}>
+          <div className={SECTION_PANEL_TITLE_CLASS}>{PLAN_STEPS_PANEL_TITLE}</div>
           {item.explanation && (
-            <div className="mb-2 text-sm text-foreground/90 whitespace-pre-wrap break-words leading-relaxed">
+            <div className={PLAN_STEPS_EXPLANATION_CLASS}>
               {item.explanation}
             </div>
           )}
-          <ul className="space-y-1.5">
+          <ul className={PLAN_STEPS_LIST_CLASS}>
             {item.plan.map((step, index) => (
-              <li key={`${step.step}-${String(index)}`} className="text-sm text-foreground/90">
-                <span className="mr-2 rounded border border-border/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+              <li key={`${step.step}-${String(index)}`} className={PLAN_STEP_ITEM_CLASS}>
+                <span className={PLAN_STEP_STATUS_CLASS}>
                   {step.status}
                 </span>
-                <span className="whitespace-pre-wrap break-words">{step.step}</span>
+                <span className={PLAN_STEP_TEXT_CLASS}>{step.step}</span>
               </li>
             ))}
           </ul>
@@ -282,32 +326,16 @@ function ConversationItemComponent({
       );
 
     case "imageView":
-      return (
-        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          Viewed image: {item.path}
-        </div>
-      );
+      return renderNoticePanel(`${VIEWED_IMAGE_PREFIX} ${item.path}`);
 
     case "enteredReviewMode":
-      return (
-        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          Entered review mode: {item.review}
-        </div>
-      );
+      return renderNoticePanel(`${ENTERED_REVIEW_MODE_PREFIX} ${item.review}`);
 
     case "exitedReviewMode":
-      return (
-        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          Exited review mode: {item.review}
-        </div>
-      );
+      return renderNoticePanel(`${EXITED_REVIEW_MODE_PREFIX} ${item.review}`);
 
     case "modelChanged":
-      return (
-        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          Model changed
-        </div>
-      );
+      return renderNoticePanel(MODEL_CHANGED_NOTICE);
 
     default:
       return assertNever(item);

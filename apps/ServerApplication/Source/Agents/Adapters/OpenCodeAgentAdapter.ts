@@ -29,6 +29,11 @@ export interface OpenCodeAgentOptions {
   port?: number;
 }
 
+const OPEN_CODE_NOT_CONNECTED_ERROR_MESSAGE = "OpenCode backend is not connected";
+const DIRECTORY_REQUIRED_ERROR_MESSAGE = "Directory is required";
+const DIRECTORY_DOES_NOT_EXIST_ERROR_PREFIX = "Directory does not exist";
+const PATH_IS_NOT_DIRECTORY_ERROR_PREFIX = "Path is not a directory";
+
 const OPEN_CODE_THREAD_CURSOR_VERSION = 1;
 const UTF8_ENCODING = "utf8";
 const BASE64_URL_ENCODING = "base64url";
@@ -108,40 +113,10 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
   public async listThreads(input: AgentListThreadsInput): Promise<AgentListThreadsResult> {
     this.ensureConnected();
     if (input.archived) {
-      return {
-        data: [],
-        nextCursor: null,
-        pages: 0,
-        truncated: false
-      };
+      return createEmptyThreadListResult();
     }
 
-    const sessions = new Map<string, MappedThreadListItem>();
-    const directories = input.cwd && input.cwd.trim().length > 0
-      ? [normalizeDirectoryInput(input.cwd)]
-      : await this.listProjectDirectories();
-
-    if (directories.length > 0) {
-      await Promise.all(
-        directories.map(async (directory) => {
-          const result = await this.service.listSessions({ directory });
-          for (const item of result.data) {
-            sessions.set(item.id, item);
-            if (item.cwd && item.cwd.trim()) {
-              this.threadDirectoryById.set(item.id, path.resolve(item.cwd));
-            }
-          }
-        })
-      );
-    } else {
-      const result = await this.service.listSessions();
-      for (const item of result.data) {
-        sessions.set(item.id, item);
-        if (item.cwd && item.cwd.trim()) {
-          this.threadDirectoryById.set(item.id, path.resolve(item.cwd));
-        }
-      }
-    }
+    const sessions = await this.readSessions(input.cwd);
 
     const mappedData = Array.from(sessions.values())
       .map((session) => AppServerThreadListItemSchema.parse(session))
@@ -149,12 +124,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
 
     const cursorOffset = decodeOpenCodeThreadCursor(input.cursor);
     if (cursorOffset >= mappedData.length) {
-      return {
-        data: [],
-        nextCursor: null,
-        pages: 0,
-        truncated: false
-      };
+      return createEmptyThreadListResult();
     }
 
     if (!input.all) {
@@ -195,8 +165,8 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
       ...(directory ? { directory } : {})
     });
 
-    if (result.mapped.cwd && result.mapped.cwd.trim()) {
-      this.threadDirectoryById.set(result.threadId, path.resolve(result.mapped.cwd));
+    if (hasTrimmedText(result.mapped.cwd)) {
+      this.cacheThreadDirectory(result.threadId, result.mapped.cwd);
     } else if (directory) {
       this.threadDirectoryById.set(result.threadId, directory);
     }
@@ -216,9 +186,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
     const directory = this.resolveThreadDirectory(input.threadId);
     const state = await this.service.getSessionState(input.threadId, directory);
 
-    if (state.cwd && state.cwd.trim()) {
-      this.threadDirectoryById.set(input.threadId, path.resolve(state.cwd));
-    }
+    this.cacheThreadDirectory(input.threadId, state.cwd);
 
     return {
       thread: parseThreadConversationState(JsonValueSchema.parse(state))
@@ -252,8 +220,53 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
 
   private ensureConnected(): void {
     if (!this.connection.isConnected()) {
-      throw new Error("OpenCode backend is not connected");
+      throw new Error(OPEN_CODE_NOT_CONNECTED_ERROR_MESSAGE);
     }
+  }
+
+  private async readSessions(inputDirectory: string | null): Promise<Map<string, MappedThreadListItem>> {
+    const directories = await this.resolveSessionDirectories(inputDirectory);
+    const sessionMap = new Map<string, MappedThreadListItem>();
+
+    if (directories.length === 0) {
+      const result = await this.service.listSessions();
+      this.mergeSessions(sessionMap, result.data);
+      return sessionMap;
+    }
+
+    await Promise.all(
+      directories.map(async (directory) => {
+        const result = await this.service.listSessions({ directory });
+        this.mergeSessions(sessionMap, result.data);
+      })
+    );
+
+    return sessionMap;
+  }
+
+  private async resolveSessionDirectories(inputDirectory: string | null): Promise<string[]> {
+    if (hasTrimmedText(inputDirectory)) {
+      return [normalizeDirectoryInput(inputDirectory)];
+    }
+    return this.listProjectDirectories();
+  }
+
+  private mergeSessions(
+    targetSessionMap: Map<string, MappedThreadListItem>,
+    sessions: ReadonlyArray<MappedThreadListItem>
+  ): void {
+    for (const session of sessions) {
+      targetSessionMap.set(session.id, session);
+      this.cacheThreadDirectory(session.id, session.cwd);
+    }
+  }
+
+  private cacheThreadDirectory(threadId: string, directory: string | undefined): void {
+    if (!hasTrimmedText(directory)) {
+      return;
+    }
+    // OpenCode can return workspace paths with outer whitespace; trim before caching so later requests reuse a valid path.
+    this.threadDirectoryById.set(threadId, resolveDirectoryPath(directory));
   }
 
   private resolveThreadDirectory(threadId: string): string | undefined {
@@ -268,16 +281,16 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
 function normalizeDirectoryInput(directory: string): string {
   const trimmed = directory.trim();
   if (trimmed.length === 0) {
-    throw new Error("Directory is required");
+    throw new Error(DIRECTORY_REQUIRED_ERROR_MESSAGE);
   }
 
-  const resolved = path.resolve(trimmed);
+  const resolved = resolveDirectoryPath(trimmed);
   if (!fs.existsSync(resolved)) {
-    throw new Error(`Directory does not exist: ${resolved}`);
+    throw new Error(`${DIRECTORY_DOES_NOT_EXIST_ERROR_PREFIX}: ${resolved}`);
   }
   const stats = fs.statSync(resolved);
   if (!stats.isDirectory()) {
-    throw new Error(`Path is not a directory: ${resolved}`);
+    throw new Error(`${PATH_IS_NOT_DIRECTORY_ERROR_PREFIX}: ${resolved}`);
   }
   return resolved;
 }
@@ -291,6 +304,23 @@ function normalizeDirectoryList(directories: string[]): string[] {
     }
   }
   return Array.from(deduped).sort((left, right) => left.localeCompare(right));
+}
+
+function resolveDirectoryPath(directory: string): string {
+  return path.resolve(directory.trim());
+}
+
+function hasTrimmedText(value: string | null | undefined): value is string {
+  return value !== undefined && value !== null && value.trim().length > 0;
+}
+
+function createEmptyThreadListResult(): AgentListThreadsResult {
+  return {
+    data: [],
+    nextCursor: null,
+    pages: 0,
+    truncated: false
+  };
 }
 
 function compareThreadsBySortKey(

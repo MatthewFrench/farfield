@@ -60,11 +60,23 @@ interface SelectedThreadDataRefreshCoordinatorDependencies {
   isTransientReadError?: (errorMessage: string) => boolean;
 }
 
+interface SelectedThreadReadThreadSnapshotResult {
+  readThreadSnapshot: SelectedThreadReadThreadSnapshot | null;
+  includeTurnsUsedForRead: boolean;
+}
+
+interface SelectedThreadReadThreadRetryState {
+  includeTurnsForRead: boolean;
+  nextRetryDelayMilliseconds: number;
+}
+
 const DEFAULT_RETRY_CONFIGURATION: SelectedThreadDataRefreshRetryConfiguration = {
   maximumAttempts: 6,
   baseDelayMilliseconds: 140,
   maximumDelayMilliseconds: 1_000
 };
+const STREAM_EVENTS_EMPTY_SEQUENCE = 0;
+const READ_THREAD_RETRY_BACKOFF_MULTIPLIER = 2;
 
 async function waitForMilliseconds(durationMilliseconds: number): Promise<void> {
   await new Promise<void>((resolve) => {
@@ -88,12 +100,16 @@ function buildUnreadableStreamEventsSnapshot(threadId: string): SelectedThreadSt
     threadId,
     ownerClientId: null,
     events: [],
-    nextSequence: 0,
-    firstAvailableSequence: 0,
+    nextSequence: STREAM_EVENTS_EMPTY_SEQUENCE,
+    firstAvailableSequence: STREAM_EVENTS_EMPTY_SEQUENCE,
     resetRequired: false
   };
 }
 
+/**
+ * Owns selected-thread refresh reads and deterministic retry behavior for read-thread snapshots.
+ * The coordinator returns explicit default snapshots when a capability is unavailable.
+ */
 export class SelectedThreadDataRefreshCoordinator {
   private readonly retryConfiguration: SelectedThreadDataRefreshRetryConfiguration;
   private readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
@@ -106,73 +122,127 @@ export class SelectedThreadDataRefreshCoordinator {
   }
 
   public async readSnapshot(input: SelectedThreadDataRefreshInput): Promise<SelectedThreadDataRefreshResult> {
-    let includeTurnsForRead = input.includeTurns;
-    let nextRetryDelayMilliseconds = this.retryConfiguration.baseDelayMilliseconds;
-    const readThreadWithRetry = async (): Promise<SelectedThreadReadThreadSnapshot> => {
-      for (let attemptIndex = 0; attemptIndex < this.retryConfiguration.maximumAttempts; attemptIndex += 1) {
-        try {
-          const readOptions = input.signal
-            ? {
-                includeTurns: includeTurnsForRead,
-                signal: input.signal
-              }
-            : {
-                includeTurns: includeTurnsForRead
-              };
-          return await input.chatClient.readThread(input.threadId, readOptions);
-        } catch (error) {
-          const errorMessage = toErrorMessage(error);
-          const canRetry = (
-            this.isTransientReadError(errorMessage)
-            && attemptIndex < this.retryConfiguration.maximumAttempts - 1
-          );
-          if (!canRetry) {
-            throw error;
-          }
+    const readThreadSnapshotPromise: Promise<SelectedThreadReadThreadSnapshotResult> = input.includeReadThread
+      ? this.readThreadSnapshotWithRetry(input)
+      : Promise.resolve({
+        readThreadSnapshot: null,
+        includeTurnsUsedForRead: input.includeTurns
+      });
 
-          includeTurnsForRead = true;
-          await this.waitForMilliseconds(nextRetryDelayMilliseconds);
-          nextRetryDelayMilliseconds = Math.min(
-            nextRetryDelayMilliseconds * 2,
-            this.retryConfiguration.maximumDelayMilliseconds
-          );
-        }
-      }
-
-      throw new Error(
-        `Failed to read thread after ${String(this.retryConfiguration.maximumAttempts)} attempts`
-      );
-    };
-
-    const [liveStateSnapshot, streamEventsSnapshot, readThreadSnapshot] = await Promise.all([
-      input.canReadLiveState
-        ? (
-          input.signal
-            ? input.chatClient.readLiveState(input.threadId, { signal: input.signal })
-            : input.chatClient.readLiveState(input.threadId)
-        )
-        : Promise.resolve(buildUnreadableLiveStateSnapshot(input.threadId)),
-      input.canReadStreamEvents
-        ? input.chatClient.readStreamEvents(
-          input.threadId,
-          this.buildStreamEventsRequestOptions(input.streamEventsSinceSequence, input.signal)
-        )
-        : Promise.resolve(buildUnreadableStreamEventsSnapshot(input.threadId)),
-      input.includeReadThread ? readThreadWithRetry() : Promise.resolve(null)
+    const [liveStateSnapshot, streamEventsSnapshot, readThreadSnapshotResult] = await Promise.all([
+      this.readLiveStateSnapshot(input),
+      this.readStreamEventsSnapshot(input),
+      readThreadSnapshotPromise
     ]);
-
-    const containsAnyTurns = (
-      (liveStateSnapshot.conversationState?.turns.length ?? 0) > 0
-      || (readThreadSnapshot?.thread.turns.length ?? 0) > 0
-    );
 
     return {
       liveStateSnapshot,
       streamEventsSnapshot,
       streamEventsSinceSequenceUsed: input.streamEventsSinceSequence,
-      readThreadSnapshot,
-      includeTurnsUsedForRead: includeTurnsForRead,
-      containsAnyTurns
+      readThreadSnapshot: readThreadSnapshotResult.readThreadSnapshot,
+      includeTurnsUsedForRead: readThreadSnapshotResult.includeTurnsUsedForRead,
+      containsAnyTurns: this.hasAnyTurns(
+        liveStateSnapshot,
+        readThreadSnapshotResult.readThreadSnapshot
+      )
+    };
+  }
+
+  private async readLiveStateSnapshot(
+    input: SelectedThreadDataRefreshInput
+  ): Promise<SelectedThreadLiveStateSnapshot> {
+    if (!input.canReadLiveState) {
+      return buildUnreadableLiveStateSnapshot(input.threadId);
+    }
+    if (!input.signal) {
+      return input.chatClient.readLiveState(input.threadId);
+    }
+    return input.chatClient.readLiveState(input.threadId, { signal: input.signal });
+  }
+
+  private async readStreamEventsSnapshot(
+    input: SelectedThreadDataRefreshInput
+  ): Promise<SelectedThreadStreamEventsSnapshot> {
+    if (!input.canReadStreamEvents) {
+      return buildUnreadableStreamEventsSnapshot(input.threadId);
+    }
+    return input.chatClient.readStreamEvents(
+      input.threadId,
+      this.buildStreamEventsRequestOptions(input.streamEventsSinceSequence, input.signal)
+    );
+  }
+
+  private async readThreadSnapshotWithRetry(
+    input: SelectedThreadDataRefreshInput
+  ): Promise<SelectedThreadReadThreadSnapshotResult> {
+    const retryState: SelectedThreadReadThreadRetryState = {
+      includeTurnsForRead: input.includeTurns,
+      nextRetryDelayMilliseconds: this.retryConfiguration.baseDelayMilliseconds
+    };
+
+    for (let attemptIndex = 0; attemptIndex < this.retryConfiguration.maximumAttempts; attemptIndex += 1) {
+      try {
+        const readThreadSnapshot = await input.chatClient.readThread(
+          input.threadId,
+          this.buildReadThreadRequestOptions(retryState.includeTurnsForRead, input.signal)
+        );
+        return {
+          readThreadSnapshot,
+          includeTurnsUsedForRead: retryState.includeTurnsForRead
+        };
+      } catch (error) {
+        if (!this.canRetryReadThread(error, attemptIndex)) {
+          throw error;
+        }
+
+        // Retrying read-thread with turns guarantees downstream snapshot consumers get full turn state.
+        retryState.includeTurnsForRead = true;
+        await this.waitForMilliseconds(retryState.nextRetryDelayMilliseconds);
+        retryState.nextRetryDelayMilliseconds = this.computeNextRetryDelayMilliseconds(
+          retryState.nextRetryDelayMilliseconds
+        );
+      }
+    }
+
+    throw new Error(
+      `Failed to read thread after ${String(this.retryConfiguration.maximumAttempts)} attempts`
+    );
+  }
+
+  private canRetryReadThread<ErrorType>(error: ErrorType, attemptIndex: number): boolean {
+    if (attemptIndex >= this.retryConfiguration.maximumAttempts - 1) {
+      return false;
+    }
+    return this.isTransientReadError(toErrorMessage(error));
+  }
+
+  private computeNextRetryDelayMilliseconds(currentDelayMilliseconds: number): number {
+    return Math.min(
+      currentDelayMilliseconds * READ_THREAD_RETRY_BACKOFF_MULTIPLIER,
+      this.retryConfiguration.maximumDelayMilliseconds
+    );
+  }
+
+  private hasAnyTurns(
+    liveStateSnapshot: SelectedThreadLiveStateSnapshot,
+    readThreadSnapshot: SelectedThreadReadThreadSnapshot | null
+  ): boolean {
+    return (
+      (liveStateSnapshot.conversationState?.turns.length ?? 0) > 0
+      || (readThreadSnapshot?.thread.turns.length ?? 0) > 0
+    );
+  }
+
+  private buildReadThreadRequestOptions(
+    includeTurns: boolean,
+    signal: AbortSignal | undefined
+  ): ChatReadThreadOptions {
+    if (!signal) {
+      return { includeTurns };
+    }
+    return {
+      includeTurns,
+      signal
     };
   }
 
@@ -180,9 +250,13 @@ export class SelectedThreadDataRefreshCoordinator {
     streamEventsSinceSequence: number | null,
     signal: AbortSignal | undefined
   ): ChatReadStreamEventsOptions {
-    return {
-      ...(streamEventsSinceSequence !== null ? { sinceSequence: streamEventsSinceSequence } : {}),
-      ...(signal ? { signal } : {})
-    };
+    const options: ChatReadStreamEventsOptions = {};
+    if (streamEventsSinceSequence !== null) {
+      options.sinceSequence = streamEventsSinceSequence;
+    }
+    if (signal) {
+      options.signal = signal;
+    }
+    return options;
   }
 }

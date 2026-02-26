@@ -36,6 +36,22 @@ class StructuredRequestFailureError extends Error {
 }
 
 describe("TrackedUserInterfaceErrorReporter", () => {
+  it("throws when reportDeduplicationWindowMs is not a positive integer", () => {
+    expect(() => {
+      return new TrackedUserInterfaceErrorReporter({
+        setErrorMessage: vi.fn(),
+        reportDeduplicationWindowMs: 0
+      });
+    }).toThrow("reportDeduplicationWindowMs must be a positive integer");
+
+    expect(() => {
+      return new TrackedUserInterfaceErrorReporter({
+        setErrorMessage: vi.fn(),
+        reportDeduplicationWindowMs: 1.5
+      });
+    }).toThrow("reportDeduplicationWindowMs must be a positive integer");
+  });
+
   it("reports client errors and writes a tagged error banner message", async () => {
     const setErrorMessage = vi.fn();
     const reportClientErrorFn = vi.fn(async () => ({
@@ -175,6 +191,58 @@ describe("TrackedUserInterfaceErrorReporter", () => {
     await reporter.report({
       operation: "core.load",
       actionId: "action-2",
+      threadId: null,
+      error: new Error("Request timed out for /api/health requestId req-1")
+    });
+
+    expect(reportClientErrorFn).toHaveBeenCalledTimes(2);
+    expect(setErrorMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it("extends duplicate suppression window when repeated duplicates continue", async () => {
+    const setErrorMessage = vi.fn();
+    const reportClientErrorFn = vi.fn(async () => ({
+      ok: true as const,
+      errorId: "error-779",
+      sessionId: "session-1",
+      recordedAt: "2026-01-01T00:00:00.000Z"
+    }));
+    let now = 30_000;
+    const reporter = new TrackedUserInterfaceErrorReporter({
+      setErrorMessage,
+      reportClientErrorFn,
+      readPathnameAndSearch: () => "/",
+      readNow: () => now,
+      reportDeduplicationWindowMs: 3_000
+    });
+
+    await reporter.report({
+      operation: "core.load",
+      actionId: "action-1",
+      threadId: null,
+      error: new Error("Request timed out for /api/health requestId req-1")
+    });
+
+    now += 1_500;
+    await reporter.report({
+      operation: "core.load",
+      actionId: "action-2",
+      threadId: null,
+      error: new Error("Request timed out for /api/health requestId req-1")
+    });
+
+    now += 2_500;
+    await reporter.report({
+      operation: "core.load",
+      actionId: "action-3",
+      threadId: null,
+      error: new Error("Request timed out for /api/health requestId req-1")
+    });
+
+    now += 3_100;
+    await reporter.report({
+      operation: "core.load",
+      actionId: "action-4",
       threadId: null,
       error: new Error("Request timed out for /api/health requestId req-1")
     });

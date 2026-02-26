@@ -47,7 +47,29 @@ import {
 
 const CLIENT_ERROR_RECORDED_LOG_EVENT = "client-error-recorded";
 const COOKIE_HEADER_NAME = "cookie";
+const REQUEST_IDENTIFIER_PREFIX = "request_";
+const STATUS_CODE_BY_NAME = {
+  successOk: 200,
+  successNoContent: 204,
+  clientErrorBadRequest: 400,
+  clientErrorUnauthorized: 401,
+  clientErrorNotFound: 404,
+  serverErrorServiceUnavailable: 503
+} as const;
+const MISSING_REQUEST_URL_ERROR_MESSAGE = "Missing request URL";
 const MALFORMED_REQUEST_URL_ERROR_MESSAGE = "Malformed request URL";
+const SERVER_SHUTTING_DOWN_ERROR_MESSAGE = "Server is shutting down";
+const NOT_FOUND_ERROR_MESSAGE = "Not found";
+
+interface RequestLifecycleContext {
+  requestStartedAtHighResolutionMilliseconds: number;
+  requestStartedAt: string;
+  requestQueueDelayMilliseconds: number;
+  requestMethod: string;
+  requestId: string;
+  requestActionId: string | null;
+  requestActionName: string | null;
+}
 
 export interface ServerRequestHandlerDependencies {
   host: string;
@@ -133,50 +155,15 @@ export class ServerRequestHandler {
   }
 
   public async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const requestStartedAtHighResolutionMilliseconds = performance.now();
-    const requestStartedAt = new Date().toISOString();
-    const requestQueueDelayMilliseconds = this.deps.readCurrentEventLoopLagMs();
+    const requestLifecycleContext = this.createRequestLifecycleContext(req);
+    // Initialize from raw request URL so even missing/invalid URLs map to deterministic metrics routes.
     let pathnameForMetrics = readPathnameForRequestMetricsFromRequestUrl(req.url);
-    const requestMethod = normalizeRequestMethodForRequestMetrics(req.method);
-    const requestId = this.deps.normalizeOptionalString(
-      this.readHeader(req, this.deps.clientRequestIdHeaderName)
-    ) ?? `request_${randomUUID()}`;
-    const requestActionId = this.deps.normalizeOptionalString(
-      this.readHeader(req, this.deps.clientActionIdHeaderName)
-    );
-    const requestActionName = this.deps.normalizeOptionalString(
-      this.readHeader(req, this.deps.clientActionNameHeaderName)
-    );
+    this.writeRequestContextResponseHeaders(res, requestLifecycleContext);
 
-    res.setHeader(this.deps.clientRequestIdResponseHeader, requestId);
-    if (requestActionId) {
-      res.setHeader(this.deps.clientActionIdResponseHeader, requestActionId);
-    }
-    if (requestActionName) {
-      res.setHeader(this.deps.clientActionNameResponseHeader, requestActionName);
-    }
-
-    const requestContext: ServerRequestErrorContext = {
-      requestId,
-      actionId: requestActionId,
-      actionName: requestActionName
-    };
-
-    const requestContextDetails: HistoryEntry["meta"] = {
-      requestId,
-      ...(requestContext.actionId ? { actionId: requestContext.actionId } : {}),
-      ...(requestContext.actionName ? { actionName: requestContext.actionName } : {})
-    };
-
-    this.deps.requestObservabilityOwner.recordRequestStarted({
-      requestId,
-      actionId: requestActionId,
-      actionName: requestActionName,
-      method: requestMethod,
-      pathname: pathnameForMetrics,
-      startedAt: requestStartedAt,
-      queueDelayMs: requestQueueDelayMilliseconds
-    });
+    const requestContext = this.createRequestErrorContext(requestLifecycleContext);
+    const requestContextDetails = this.createRequestContextDetails(requestLifecycleContext);
+    // Record request start before any early-return path so lifecycle timelines stay balanced.
+    this.recordRequestStartedForObservability(requestLifecycleContext, pathnameForMetrics);
 
     const pushActionEventWithRequestContext: ThreadRouteDependencies["pushActionEventWithRequestContext"] = (
       action,
@@ -203,12 +190,15 @@ export class ServerRequestHandler {
 
     try {
       if (!req.url) {
-        this.deps.jsonResponse(res, 400, { ok: false, error: "Missing request URL" });
+        this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.clientErrorBadRequest, {
+          ok: false,
+          error: MISSING_REQUEST_URL_ERROR_MESSAGE
+        });
         return;
       }
 
-      if (requestMethod === RequestMethodByName.options) {
-        this.deps.jsonResponse(res, 204, {});
+      if (requestLifecycleContext.requestMethod === RequestMethodByName.options) {
+        this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.successNoContent, {});
         return;
       }
 
@@ -221,8 +211,9 @@ export class ServerRequestHandler {
         requestUrlPathnameParseResult.status
         === RequestUrlPathnameParseStatusByName.malformedRequestUrl
       ) {
+        // Malformed URL observations must aggregate under one deterministic metrics pathname.
         pathnameForMetrics = RequestPathnameByName.malformedRequestUrl;
-        this.deps.jsonResponse(res, 400, {
+        this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.clientErrorBadRequest, {
           ok: false,
           error: MALFORMED_REQUEST_URL_ERROR_MESSAGE
         });
@@ -236,18 +227,21 @@ export class ServerRequestHandler {
       const url = requestUrlPathnameParseResult.url;
 
       if (this.deps.isShuttingDown() && pathname !== RequestPathnameByName.healthCheck) {
-        this.deps.jsonResponse(res, 503, {
+        this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.serverErrorServiceUnavailable, {
           ok: false,
-          error: "Server is shutting down",
-          requestId,
-          actionId: requestActionId,
-          actionName: requestActionName
+          error: SERVER_SHUTTING_DOWN_ERROR_MESSAGE,
+          requestId: requestLifecycleContext.requestId,
+          actionId: requestLifecycleContext.requestActionId,
+          actionName: requestLifecycleContext.requestActionName
         });
         return;
       }
 
-      if (requestMethod === RequestMethodByName.get && pathname === RequestPathnameByName.healthCheck) {
-        this.deps.jsonResponse(res, 200, {
+      if (
+        requestLifecycleContext.requestMethod === RequestMethodByName.get
+        && pathname === RequestPathnameByName.healthCheck
+      ) {
+        this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.successOk, {
           ok: true,
           service: "farfield-web-shell",
           buildId: this.deps.webHealthBuildId,
@@ -389,7 +383,10 @@ export class ServerRequestHandler {
         return;
       }
 
-      this.deps.jsonResponse(res, 404, { ok: false, error: "Not found" });
+      this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.clientErrorNotFound, {
+        ok: false,
+        error: NOT_FOUND_ERROR_MESSAGE
+      });
     } catch (error) {
       this.requestErrorResponder.respond({
         req,
@@ -398,23 +395,121 @@ export class ServerRequestHandler {
         context: requestContext
       });
     } finally {
-      const durationMilliseconds = Math.max(
-        0,
-        performance.now() - requestStartedAtHighResolutionMilliseconds
-      );
-      this.deps.requestObservabilityOwner.recordRequestCompleted({
-        requestId,
-        actionId: requestActionId,
-        actionName: requestActionName,
-        method: requestMethod,
-        pathname: pathnameForMetrics,
-        startedAt: requestStartedAt,
-        statusCode: res.statusCode,
-        durationMs: durationMilliseconds,
-        queueDelayMs: requestQueueDelayMilliseconds,
-        completedAt: new Date().toISOString()
+      this.recordRequestCompletedForObservability({
+        requestLifecycleContext,
+        pathnameForMetrics,
+        statusCode: res.statusCode
       });
     }
+  }
+
+  private createRequestLifecycleContext(req: IncomingMessage): RequestLifecycleContext {
+    const requestStartedAtHighResolutionMilliseconds = performance.now();
+    const requestStartedAt = new Date().toISOString();
+    // Record queue delay exactly once so started/completed telemetry stays directly comparable.
+    const requestQueueDelayMilliseconds = this.deps.readCurrentEventLoopLagMs();
+    const requestMethod = normalizeRequestMethodForRequestMetrics(req.method);
+    const requestId = this.deps.normalizeOptionalString(
+      this.readHeader(req, this.deps.clientRequestIdHeaderName)
+    ) ?? `${REQUEST_IDENTIFIER_PREFIX}${randomUUID()}`;
+    const requestActionId = this.deps.normalizeOptionalString(
+      this.readHeader(req, this.deps.clientActionIdHeaderName)
+    );
+    const requestActionName = this.deps.normalizeOptionalString(
+      this.readHeader(req, this.deps.clientActionNameHeaderName)
+    );
+
+    return {
+      requestStartedAtHighResolutionMilliseconds,
+      requestStartedAt,
+      requestQueueDelayMilliseconds,
+      requestMethod,
+      requestId,
+      requestActionId,
+      requestActionName
+    };
+  }
+
+  private writeRequestContextResponseHeaders(
+    res: ServerResponse,
+    requestLifecycleContext: RequestLifecycleContext
+  ): void {
+    res.setHeader(this.deps.clientRequestIdResponseHeader, requestLifecycleContext.requestId);
+    if (requestLifecycleContext.requestActionId) {
+      res.setHeader(
+        this.deps.clientActionIdResponseHeader,
+        requestLifecycleContext.requestActionId
+      );
+    }
+    if (requestLifecycleContext.requestActionName) {
+      res.setHeader(
+        this.deps.clientActionNameResponseHeader,
+        requestLifecycleContext.requestActionName
+      );
+    }
+  }
+
+  private createRequestErrorContext(
+    requestLifecycleContext: RequestLifecycleContext
+  ): ServerRequestErrorContext {
+    return {
+      requestId: requestLifecycleContext.requestId,
+      actionId: requestLifecycleContext.requestActionId,
+      actionName: requestLifecycleContext.requestActionName
+    };
+  }
+
+  private createRequestContextDetails(
+    requestLifecycleContext: RequestLifecycleContext
+  ): HistoryEntry["meta"] {
+    return {
+      requestId: requestLifecycleContext.requestId,
+      ...(requestLifecycleContext.requestActionId
+        ? { actionId: requestLifecycleContext.requestActionId }
+        : {}),
+      ...(requestLifecycleContext.requestActionName
+        ? { actionName: requestLifecycleContext.requestActionName }
+        : {})
+    };
+  }
+
+  private recordRequestStartedForObservability(
+    requestLifecycleContext: RequestLifecycleContext,
+    pathnameForMetrics: string
+  ): void {
+    this.deps.requestObservabilityOwner.recordRequestStarted({
+      requestId: requestLifecycleContext.requestId,
+      actionId: requestLifecycleContext.requestActionId,
+      actionName: requestLifecycleContext.requestActionName,
+      method: requestLifecycleContext.requestMethod,
+      pathname: pathnameForMetrics,
+      startedAt: requestLifecycleContext.requestStartedAt,
+      queueDelayMs: requestLifecycleContext.requestQueueDelayMilliseconds
+    });
+  }
+
+  private recordRequestCompletedForObservability(input: {
+    requestLifecycleContext: RequestLifecycleContext;
+    pathnameForMetrics: string;
+    statusCode: number;
+  }): void {
+    const durationMilliseconds = Math.max(
+      0,
+      performance.now() - input.requestLifecycleContext.requestStartedAtHighResolutionMilliseconds
+    );
+    // Keep identity and timing fields aligned with `recordRequestStarted` for deterministic pairing.
+    this.deps.requestObservabilityOwner.recordRequestCompleted({
+      requestId: input.requestLifecycleContext.requestId,
+      actionId: input.requestLifecycleContext.requestActionId,
+      actionName: input.requestLifecycleContext.requestActionName,
+      method: input.requestLifecycleContext.requestMethod,
+      pathname: input.pathnameForMetrics,
+      startedAt: input.requestLifecycleContext.requestStartedAt,
+      statusCode: input.statusCode,
+      durationMs: durationMilliseconds,
+      queueDelayMs: input.requestLifecycleContext.requestQueueDelayMilliseconds,
+      completedAt: new Date().toISOString()
+    });
   }
 
   private readHeader(req: IncomingMessage, name: string): string | null {
@@ -457,7 +552,7 @@ export class ServerRequestHandler {
     }
 
     if (!this.isAuthenticatedRequest(req)) {
-      this.deps.jsonResponse(res, 401, {
+      this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.clientErrorUnauthorized, {
         ok: false,
         error: `Unauthorized: missing or invalid ${this.deps.apiTokenResponseHeader}`
       });

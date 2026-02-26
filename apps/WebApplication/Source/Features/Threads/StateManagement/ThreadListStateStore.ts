@@ -1,20 +1,25 @@
 import { ThreadGroupSelectors } from "../DomainModel/ThreadGroupSelectors";
 import type { ThreadListItem } from "../DomainModel/ThreadGroupTypes";
 
-const THREAD_SIGNATURE_DELIMITER = "|";
-const EMPTY_THREAD_PATH_SIGNATURE_VALUE = "";
-const DEFAULT_UPDATED_AT_SIGNATURE_VALUE = 0;
+const THREAD_SIGNATURE_SEGMENT_DELIMITER = "|";
+const THREAD_SIGNATURE_EMPTY_PATH_SEGMENT = "";
+const THREAD_SIGNATURE_DEFAULT_UPDATED_AT_SEGMENT = 0;
+const INITIAL_SELECTION_NOT_HYDRATED = false;
+
+type UnreadThreadIdentifierMap = Record<string, true>;
+type ThreadUpdatedAtByIdentifier = Record<string, number>;
+type ThreadSignature = string[];
 
 export interface ActiveThreadStateComputationInput {
   nextThreads: ThreadListItem[];
-  previousUnreadThreadIdentifiers: Record<string, true>;
+  previousUnreadThreadIdentifiers: UnreadThreadIdentifierMap;
   selectedThreadIdentifier: string | null;
 }
 
 export interface ActiveThreadStateComputationResult {
   didChangeThreads: boolean;
   nextThreads: ThreadListItem[];
-  nextUnreadThreadIdentifiers: Record<string, true>;
+  nextUnreadThreadIdentifiers: UnreadThreadIdentifierMap;
 }
 
 export interface ArchivedThreadStateComputationInput {
@@ -33,7 +38,7 @@ export interface InitialThreadSelectionComputationInput {
 }
 
 export interface UnreadThreadSelectionUpdateInput {
-  previousUnreadThreadIdentifiers: Record<string, true>;
+  previousUnreadThreadIdentifiers: UnreadThreadIdentifierMap;
   selectedThreadIdentifier: string | null;
 }
 
@@ -43,17 +48,14 @@ export interface UnreadThreadSelectionUpdateInput {
  * and unread markers without re-reading cross-feature state.
  */
 export class ThreadListStateStore {
-  private activeThreadSignature: string[];
-  private archivedThreadSignature: string[];
-  private threadUpdatedAtByIdentifier: Record<string, number>;
+  private activeThreadSignature: ThreadSignature = [];
+  private archivedThreadSignature: ThreadSignature = [];
+  private threadUpdatedAtByIdentifier: ThreadUpdatedAtByIdentifier = {};
   // Guards first-load auto-selection so user-driven selection is not overwritten on later refreshes.
-  private hasHydratedInitialThreadSelection: boolean;
+  private hasHydratedInitialThreadSelection: boolean = INITIAL_SELECTION_NOT_HYDRATED;
 
   public constructor() {
-    this.activeThreadSignature = [];
-    this.archivedThreadSignature = [];
-    this.threadUpdatedAtByIdentifier = {};
-    this.hasHydratedInitialThreadSelection = false;
+    this.resetTrackedState();
   }
 
   public computeActiveThreadState(
@@ -96,42 +98,29 @@ export class ThreadListStateStore {
   }
 
   public resetState(): void {
-    this.activeThreadSignature = [];
-    this.archivedThreadSignature = [];
-    this.threadUpdatedAtByIdentifier = {};
-    this.hasHydratedInitialThreadSelection = false;
+    this.resetTrackedState();
   }
 
   public computeInitialSelectedThreadIdentifier(input: InitialThreadSelectionComputationInput): string | null {
-    if (input.currentSelectedThreadIdentifier) {
-      this.hasHydratedInitialThreadSelection = true;
-      return input.currentSelectedThreadIdentifier;
+    const currentSelectedThreadIdentifier = input.currentSelectedThreadIdentifier;
+    if (currentSelectedThreadIdentifier) {
+      this.markInitialSelectionHydrated();
+      return currentSelectedThreadIdentifier;
     }
     if (this.hasHydratedInitialThreadSelection) {
-      return input.currentSelectedThreadIdentifier;
+      return currentSelectedThreadIdentifier;
     }
 
-    let nextSelectedThreadIdentifier: string | null = null;
-    if (input.preferredAgentIdentifier) {
-      const preferredThread = input.nextThreads.find(
-        (thread) => thread.agentId === input.preferredAgentIdentifier
-      );
-      if (preferredThread) {
-        nextSelectedThreadIdentifier = preferredThread.id;
-      }
-    }
-    if (!nextSelectedThreadIdentifier) {
-      nextSelectedThreadIdentifier = input.nextThreads[0]?.id ?? null;
-    }
+    const nextSelectedThreadIdentifier = this.readInitialSelectedThreadIdentifier(input);
     if (nextSelectedThreadIdentifier) {
-      this.hasHydratedInitialThreadSelection = true;
+      this.markInitialSelectionHydrated();
     }
     return nextSelectedThreadIdentifier;
   }
 
   public computeUnreadThreadIdentifiersAfterSelectionChange(
     input: UnreadThreadSelectionUpdateInput
-  ): Record<string, true> {
+  ): UnreadThreadIdentifierMap {
     if (!input.selectedThreadIdentifier) {
       return input.previousUnreadThreadIdentifiers;
     }
@@ -144,18 +133,42 @@ export class ThreadListStateStore {
     return nextUnreadThreadIdentifiers;
   }
 
-  private buildThreadSignature(threads: ThreadListItem[]): string[] {
+  private resetTrackedState(): void {
+    this.activeThreadSignature = [];
+    this.archivedThreadSignature = [];
+    this.threadUpdatedAtByIdentifier = {};
+    this.hasHydratedInitialThreadSelection = INITIAL_SELECTION_NOT_HYDRATED;
+  }
+
+  private markInitialSelectionHydrated(): void {
+    this.hasHydratedInitialThreadSelection = true;
+  }
+
+  private readInitialSelectedThreadIdentifier(input: InitialThreadSelectionComputationInput): string | null {
+    if (input.preferredAgentIdentifier) {
+      const preferredThread = input.nextThreads.find(
+        (thread) => thread.agentId === input.preferredAgentIdentifier
+      );
+      if (preferredThread) {
+        return preferredThread.id;
+      }
+    }
+    return input.nextThreads[0]?.id ?? null;
+  }
+
+  private buildThreadSignature(threads: ThreadListItem[]): ThreadSignature {
     return threads.map((thread) => this.buildThreadSignatureValue(thread));
   }
 
   private buildThreadSignatureValue(thread: ThreadListItem): string {
+    // Signature ordering is append-only so state change detection remains deterministic.
     return [
       thread.id,
-      String(thread.updatedAt ?? DEFAULT_UPDATED_AT_SIGNATURE_VALUE),
+      String(thread.updatedAt ?? THREAD_SIGNATURE_DEFAULT_UPDATED_AT_SEGMENT),
       thread.preview,
       thread.agentId,
-      thread.cwd ?? EMPTY_THREAD_PATH_SIGNATURE_VALUE,
-      thread.path ?? EMPTY_THREAD_PATH_SIGNATURE_VALUE
-    ].join(THREAD_SIGNATURE_DELIMITER);
+      thread.cwd ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
+      thread.path ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT
+    ].join(THREAD_SIGNATURE_SEGMENT_DELIMITER);
   }
 }

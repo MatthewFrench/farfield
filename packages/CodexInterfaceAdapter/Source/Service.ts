@@ -7,11 +7,14 @@ import {
   parseUserInputResponsePayload,
   type UserInputResponsePayload
 } from "@farfield/protocol";
+
 const THREAD_FOLLOWER_START_TURN_METHOD = "thread-follower-start-turn";
 const THREAD_FOLLOWER_SET_COLLABORATION_MODE_METHOD = "thread-follower-set-collaboration-mode";
 const THREAD_FOLLOWER_SUBMIT_USER_INPUT_METHOD = "thread-follower-submit-user-input";
 const THREAD_FOLLOWER_INTERRUPT_TURN_METHOD = "thread-follower-interrupt-turn";
 const THREAD_FOLLOWER_PROTOCOL_VERSION = 1;
+const MESSAGE_TEXT_REQUIRED_ERROR_MESSAGE = "Message text is required";
+const TURN_START_TEXT_INPUT_PART_TYPE = "text" as const;
 
 /**
  * Normalizes optional and class-backed values into strict structured data.
@@ -73,6 +76,74 @@ export interface InterruptInput {
   ownerClientId: string;
 }
 
+interface ThreadFollowerStartTurnRequestParameters {
+  conversationId: string;
+  turnStartParams: TurnStartParams;
+  isSteering: boolean;
+}
+
+interface ThreadFollowerSetCollaborationModeRequestParameters {
+  conversationId: string;
+  collaborationMode: CollaborationMode;
+}
+
+interface ThreadFollowerSubmitUserInputRequestParameters {
+  conversationId: string;
+  requestId: number;
+  response: UserInputResponsePayload;
+}
+
+interface ThreadFollowerInterruptRequestParameters {
+  conversationId: string;
+}
+
+type ThreadFollowerRequestParameters =
+  | ThreadFollowerStartTurnRequestParameters
+  | ThreadFollowerSetCollaborationModeRequestParameters
+  | ThreadFollowerSubmitUserInputRequestParameters
+  | ThreadFollowerInterruptRequestParameters;
+
+function buildTurnStartParams(input: SendMessageInput, trimmedText: string): TurnStartParams {
+  const textInput = [{ type: TURN_START_TEXT_INPUT_PART_TYPE, text: trimmedText }];
+  const template = input.turnStartTemplate;
+  const turnStartParams: TurnStartParams = template
+    ? {
+        ...template,
+        threadId: input.threadId,
+        input: textInput,
+        cwd: input.cwd ?? template.cwd,
+        attachments: template.attachments ?? []
+      }
+    : {
+        threadId: input.threadId,
+        input: textInput,
+        ...(input.cwd ? { cwd: input.cwd } : {}),
+        attachments: []
+      };
+
+  applyTurnStartOverrides(turnStartParams, input);
+
+  return turnStartParams;
+}
+
+/**
+ * Optional overrides are applied only when provided by the typed service API.
+ * Omitted fields intentionally preserve template values.
+ */
+function applyTurnStartOverrides(turnStartParams: TurnStartParams, input: SendMessageInput): void {
+  if (input.model !== undefined) {
+    turnStartParams.model = input.model;
+  }
+
+  if (input.effort !== undefined) {
+    turnStartParams.effort = input.effort;
+  }
+
+  if (input.collaborationMode !== undefined) {
+    turnStartParams.collaborationMode = input.collaborationMode;
+  }
+}
+
 /**
  * Owns Codex thread-level command payload construction over desktop IPC.
  * IPC transport delivery remains in the owned IPC client implementation.
@@ -85,63 +156,34 @@ export class CodexMonitorService {
   }
 
   public async sendMessage(input: SendMessageInput): Promise<void> {
-    const text = input.text.trim();
-    if (!text) {
-      throw new Error("Message text is required");
+    const trimmedText = input.text.trim();
+    if (!trimmedText) {
+      throw new Error(MESSAGE_TEXT_REQUIRED_ERROR_MESSAGE);
     }
 
-    const template = input.turnStartTemplate;
-
-    const turnStartParams: TurnStartParams = template
-      ? {
-          ...template,
-          threadId: input.threadId,
-          input: [{ type: "text" as const, text }],
-          cwd: input.cwd ?? template.cwd,
-          attachments: Array.isArray(template.attachments) ? template.attachments : []
-        }
-      : {
-          threadId: input.threadId,
-          input: [{ type: "text" as const, text }],
-          ...(input.cwd ? { cwd: input.cwd } : {}),
-          attachments: []
-        };
-
-    if (Object.prototype.hasOwnProperty.call(input, "model")) {
-      turnStartParams.model = input.model ?? null;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(input, "effort")) {
-      turnStartParams.effort = input.effort ?? null;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(input, "collaborationMode")) {
-      turnStartParams.collaborationMode = input.collaborationMode ?? null;
-    }
-
-    const requestParams = normalizeStructuredDataValue({
+    const requestParameters: ThreadFollowerStartTurnRequestParameters = {
       conversationId: input.threadId,
-      turnStartParams,
+      turnStartParams: buildTurnStartParams(input, trimmedText),
       isSteering: Boolean(input.isSteering)
-    });
+    };
 
-    await this.ipcClient.sendRequestAndWait(
+    await this.sendThreadFollowerRequest(
       THREAD_FOLLOWER_START_TURN_METHOD,
-      requestParams,
-      buildThreadFollowerRequestOptions(input.ownerClientId)
+      requestParameters,
+      input.ownerClientId
     );
   }
 
   public async setCollaborationMode(input: SetModeInput): Promise<void> {
-    const requestParams = normalizeStructuredDataValue({
+    const requestParameters: ThreadFollowerSetCollaborationModeRequestParameters = {
       conversationId: input.threadId,
       collaborationMode: input.collaborationMode
-    });
+    };
 
-    await this.ipcClient.sendRequestAndWait(
+    await this.sendThreadFollowerRequest(
       THREAD_FOLLOWER_SET_COLLABORATION_MODE_METHOD,
-      requestParams,
-      buildThreadFollowerRequestOptions(input.ownerClientId)
+      requestParameters,
+      input.ownerClientId
     );
   }
 
@@ -150,28 +192,41 @@ export class CodexMonitorService {
       normalizeStructuredDataValue(input.response)
     );
 
-    const requestParams = normalizeStructuredDataValue({
+    const requestParameters: ThreadFollowerSubmitUserInputRequestParameters = {
       conversationId: input.threadId,
       requestId: input.requestId,
       response: responsePayload
-    });
+    };
 
-    await this.ipcClient.sendRequestAndWait(
+    await this.sendThreadFollowerRequest(
       THREAD_FOLLOWER_SUBMIT_USER_INPUT_METHOD,
-      requestParams,
-      buildThreadFollowerRequestOptions(input.ownerClientId)
+      requestParameters,
+      input.ownerClientId
     );
   }
 
   public async interrupt(input: InterruptInput): Promise<void> {
-    const requestParams = normalizeStructuredDataValue({
+    const requestParameters: ThreadFollowerInterruptRequestParameters = {
       conversationId: input.threadId
-    });
+    };
 
-    await this.ipcClient.sendRequestAndWait(
+    await this.sendThreadFollowerRequest(
       THREAD_FOLLOWER_INTERRUPT_TURN_METHOD,
+      requestParameters,
+      input.ownerClientId
+    );
+  }
+
+  private async sendThreadFollowerRequest(
+    method: string,
+    requestParameters: ThreadFollowerRequestParameters,
+    ownerClientId: string
+  ): Promise<void> {
+    const requestParams = normalizeStructuredDataValue(requestParameters);
+    await this.ipcClient.sendRequestAndWait(
+      method,
       requestParams,
-      buildThreadFollowerRequestOptions(input.ownerClientId)
+      buildThreadFollowerRequestOptions(ownerClientId)
     );
   }
 }

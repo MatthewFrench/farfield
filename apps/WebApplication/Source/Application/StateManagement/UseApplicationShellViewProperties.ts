@@ -117,9 +117,57 @@ export interface ApplicationShellViewProperties {
   apiSessionBootstrapOverlayProperties: ApiSessionBootstrapOverlayProperties;
 }
 
+type AsyncOwnerAction = () => void | Promise<void>;
+
 const CHAT_TAB: ApplicationHeaderBarProps["activeTab"] = "chat";
 const DEBUG_TAB: ApplicationHeaderBarProps["activeTab"] = "debug";
 const EMPTY_ERROR_MESSAGE = "";
+const SIDEBAR_OPEN_STATE = true;
+const CHAT_AT_BOTTOM_STATE = true;
+const MINIMUM_ERROR_LENGTH = EMPTY_ERROR_MESSAGE.length;
+
+function invokeAsyncOwnerAction(action: AsyncOwnerAction): void {
+  void action();
+}
+
+function openSidebarWithChatTab(
+  setActiveTab: UseApplicationShellViewPropertiesInput["setActiveTab"],
+  setSidebarOpen: (nextOpen: boolean) => void
+): void {
+  setActiveTab(CHAT_TAB);
+  setSidebarOpen(SIDEBAR_OPEN_STATE);
+}
+
+function getNextActiveTabWhenTogglingDebug(
+  activeTab: ApplicationHeaderBarProps["activeTab"]
+): ApplicationHeaderBarProps["activeTab"] {
+  return activeTab === DEBUG_TAB ? CHAT_TAB : DEBUG_TAB;
+}
+
+function getNextVisibleChatItemLimit(
+  currentVisibleChatItemLimit: number,
+  conversationItemCount: number,
+  visibleChatItemsStep: number
+): number {
+  return Math.min(
+    conversationItemCount,
+    currentVisibleChatItemLimit + visibleChatItemsStep
+  );
+}
+
+function pinChatToBottomIfScrollElementExists(
+  scrollReference: ChatWorkspacePaneProps["scrollRef"],
+  chatScrollStateCoordinator: ChatScrollStateCoordinator,
+  setIsChatAtBottom: (nextIsAtBottom: boolean) => void
+): void {
+  const scrollElement = scrollReference.current;
+  if (!scrollElement) {
+    return;
+  }
+
+  chatScrollStateCoordinator.pinToBottom(scrollElement);
+  setIsChatAtBottom(CHAT_AT_BOTTOM_STATE);
+}
 
 function buildThreadSidebarHealthState(
   health: CapabilityHealthResponse | null
@@ -142,6 +190,17 @@ function clearErrorMessage(
   setErrorMessage(EMPTY_ERROR_MESSAGE);
 }
 
+function clearApiSessionBootstrapErrorIfPresent(
+  apiSessionBootstrapError: string,
+  setApiSessionBootstrapError: (nextErrorMessage: string) => void
+): void {
+  if (apiSessionBootstrapError.length === MINIMUM_ERROR_LENGTH) {
+    return;
+  }
+
+  setApiSessionBootstrapError(EMPTY_ERROR_MESSAGE);
+}
+
 function buildApplicationHeaderBarProperties(
   input: UseApplicationShellViewPropertiesInput
 ): ApplicationHeaderBarProps {
@@ -158,21 +217,19 @@ function buildApplicationHeaderBarProperties(
     isBusy: input.isBusy,
     theme: input.theme,
     onOpenMobileSidebar: () => {
-      input.setActiveTab(CHAT_TAB);
-      input.setMobileSidebarOpen(true);
+      openSidebarWithChatTab(input.setActiveTab, input.setMobileSidebarOpen);
     },
     onOpenDesktopSidebar: () => {
-      input.setActiveTab(CHAT_TAB);
-      input.setDesktopSidebarOpen(true);
+      openSidebarWithChatTab(input.setActiveTab, input.setDesktopSidebarOpen);
     },
     onEnablePushNotifications: () => {
-      void input.enablePushNotificationsFromToolbar();
+      invokeAsyncOwnerAction(input.enablePushNotificationsFromToolbar);
     },
     onRefresh: () => {
-      void input.refreshCoreDataAndSelectedThread();
+      invokeAsyncOwnerAction(input.refreshCoreDataAndSelectedThread);
     },
     onToggleDebugTab: () => {
-      input.setActiveTab(input.activeTab === DEBUG_TAB ? CHAT_TAB : DEBUG_TAB);
+      input.setActiveTab(getNextActiveTabWhenTogglingDebug(input.activeTab));
     },
     onToggleTheme: input.toggleTheme,
     renderAgentFavicon: input.renderAgentFavicon
@@ -203,8 +260,6 @@ function buildChatWorkspacePaneProperties(
   return {
     chatSurfaceState: input.chatSurfaceState,
     selectedThreadId: input.selectedThreadId,
-    isCoreLoading: input.isCoreLoading,
-    isSelectedThreadLoading: input.isSelectedThreadLoading,
     availableAgentIds: input.availableAgentIds,
     turnCount: input.turnCount,
     scrollRef: input.scrollRef,
@@ -214,28 +269,30 @@ function buildChatWorkspacePaneProperties(
     firstVisibleChatItemIndex: input.firstVisibleChatItemIndex,
     onShowOlderMessages: () => {
       input.setVisibleChatItemLimit((limit) => (
-        Math.min(input.conversationItemCount, limit + input.visibleChatItemsStep)
+        getNextVisibleChatItemLimit(
+          limit,
+          input.conversationItemCount,
+          input.visibleChatItemsStep
+        )
       ));
     },
     isChatAtBottom: input.isChatAtBottom,
     onJumpToBottom: () => {
-      const scrollElement = input.scrollRef.current;
-      if (!scrollElement) {
-        return;
-      }
-
-      input.chatScrollStateCoordinator.pinToBottom(scrollElement);
-      input.setIsChatAtBottom(true);
+      pinChatToBottomIfScrollElementExists(
+        input.scrollRef,
+        input.chatScrollStateCoordinator,
+        input.setIsChatAtBottom
+      );
     },
     activeRequest: input.activeRequest,
     canSubmitUserInputForActiveAgent: input.canSubmitUserInputForActiveAgent,
     answerDraft: input.answerDraft,
     onAnswerDraftChange: input.handleAnswerChange,
     onSubmitPendingRequest: () => {
-      void input.submitPendingRequest();
+      invokeAsyncOwnerAction(input.submitPendingRequest);
     },
     onSkipPendingRequest: () => {
-      void input.skipPendingRequest();
+      invokeAsyncOwnerAction(input.skipPendingRequest);
     },
     isBusy: input.isBusy,
     isGenerating: input.isGenerating,
@@ -295,12 +352,13 @@ function buildApiSessionBootstrapOverlayProperties(
     apiTokenDraft: input.apiSessionTokenDraft,
     onApiTokenDraftChange: (nextTokenValue: string) => {
       input.setApiSessionTokenDraft(nextTokenValue);
-      if (input.apiSessionBootstrapError.length > 0) {
-        input.setApiSessionBootstrapError(EMPTY_ERROR_MESSAGE);
-      }
+      clearApiSessionBootstrapErrorIfPresent(
+        input.apiSessionBootstrapError,
+        input.setApiSessionBootstrapError
+      );
     },
     onSubmitApiToken: () => {
-      void input.submitApiSessionToken();
+      invokeAsyncOwnerAction(input.submitApiSessionToken);
     },
     isSubmitting: input.isApiSessionBootstrapPending,
     errorMessage: input.apiSessionBootstrapError

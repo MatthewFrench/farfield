@@ -160,6 +160,34 @@ describe("AppServerClient.listThreads", () => {
 });
 
 describe("AppServerClient.listThreadsAll", () => {
+  it("starts pagination from an explicit initial cursor", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      data: [createThreadListItem("thread-1")],
+      nextCursor: null
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const response = await client.listThreadsAll({
+      limit: 1,
+      archived: false,
+      cursor: "cursor-start",
+      maxPages: 5
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/list", {
+      limit: 1,
+      archived: false,
+      cursor: "cursor-start"
+    });
+    expect(response).toEqual({
+      data: [createThreadListItem("thread-1")],
+      nextCursor: null,
+      pages: 1,
+      truncated: false
+    });
+  });
+
   it("aggregates pages until nextCursor is null", async () => {
     const transportDouble = createTransportDouble();
     transportDouble.request
@@ -254,12 +282,12 @@ describe("AppServerClient.listThreadsAll", () => {
 });
 
 describe("AppServerClient.readThread", () => {
-  it("uses an extended timeout when includeTurns is true", async () => {
+  it("uses an extended timeout when includeTurns is omitted", async () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue(createThreadConversationResponse("thread-1"));
 
     const client = new AppServerClient(transportDouble.transport);
-    await client.readThread("thread-1", true);
+    await client.readThread("thread-1");
 
     expect(transportDouble.request).toHaveBeenCalledWith("thread/read", {
       threadId: "thread-1",

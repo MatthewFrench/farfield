@@ -43,6 +43,7 @@ interface HandlerTestHarness {
 
 interface HandlerHarnessOptions {
   clientRequestIdHeaderName?: string;
+  readCurrentEventLoopLagMs?: () => number;
 }
 
 const BASE_TEST_REQUEST_HEADER_NAME = "x-farfield-request-id";
@@ -134,7 +135,7 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
     pushSendStore: new PushSendStore(path.join(tempDirectoryPath, "push-send.json")),
     pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
     requestObservabilityOwner,
-    readCurrentEventLoopLagMs: () => 0,
+    readCurrentEventLoopLagMs: options.readCurrentEventLoopLagMs ?? (() => 0),
     readObservabilitySnapshot: () => {
       throw new Error("readObservabilitySnapshot should not run in ServerRequestHandler unit tests");
     },
@@ -269,6 +270,91 @@ describe("ServerRequestHandler", () => {
 
       expect(harness.jsonResponseCalls[0]?.statusCode).toBe(200);
       expect(response.getHeader(BASE_TEST_RESPONSE_HEADER_NAME)).toBe("request_from_header");
+    } finally {
+      harness.cleanup();
+    }
+  });
+
+  it("records paired started and completed lifecycle events with matching request context", async () => {
+    const harness = createHandlerTestHarness();
+    const { request, response } = createRequestResponsePair();
+    request.method = "GET";
+    request.url = RequestPathnameByName.healthCheck;
+    request.headers[BASE_TEST_REQUEST_HEADER_NAME] = "request_context_pair";
+    request.headers[BASE_TEST_ACTION_ID_HEADER_NAME] = "action_context_pair";
+    request.headers[BASE_TEST_ACTION_NAME_HEADER_NAME] = "startup-critical.threads.active";
+
+    try {
+      await harness.requestHandler.handle(request, response);
+
+      const snapshot = harness.requestObservabilityOwner.readSnapshot();
+      const requestLifecycleEvents = snapshot.requestLifecycleEvents;
+      expect(requestLifecycleEvents).toHaveLength(2);
+      const firstLifecycleEvent = requestLifecycleEvents[0];
+      const secondLifecycleEvent = requestLifecycleEvents[1];
+      if (!firstLifecycleEvent || !secondLifecycleEvent) {
+        throw new Error("Expected paired request lifecycle events");
+      }
+      if (firstLifecycleEvent.phase !== "started") {
+        throw new Error("Expected first request lifecycle event to be started");
+      }
+      if (secondLifecycleEvent.phase !== "completed") {
+        throw new Error("Expected second request lifecycle event to be completed");
+      }
+
+      expect(firstLifecycleEvent.requestId).toBe("request_context_pair");
+      expect(secondLifecycleEvent.requestId).toBe("request_context_pair");
+      expect(firstLifecycleEvent.actionId).toBe("action_context_pair");
+      expect(secondLifecycleEvent.actionId).toBe("action_context_pair");
+      expect(firstLifecycleEvent.actionName).toBe("startup-critical.threads.active");
+      expect(secondLifecycleEvent.actionName).toBe("startup-critical.threads.active");
+      expect(secondLifecycleEvent.startedAt).toBe(firstLifecycleEvent.startedAt);
+      expect(secondLifecycleEvent.queueDelayMs).toBe(firstLifecycleEvent.queueDelayMs);
+      expect(secondLifecycleEvent.statusCode).toBe(200);
+      expect(secondLifecycleEvent.outcome).toBe("success");
+    } finally {
+      harness.cleanup();
+    }
+  });
+
+  it("samples event-loop queue delay once per request lifecycle", async () => {
+    let readCurrentEventLoopLagInvocationCount = 0;
+    const harness = createHandlerTestHarness({
+      readCurrentEventLoopLagMs: () => {
+        readCurrentEventLoopLagInvocationCount += 1;
+        return readCurrentEventLoopLagInvocationCount === 1 ? 17 : 91;
+      }
+    });
+    const { request, response } = createRequestResponsePair();
+    request.method = "GET";
+    request.url = RequestPathnameByName.healthCheck;
+
+    try {
+      await harness.requestHandler.handle(request, response);
+
+      expect(readCurrentEventLoopLagInvocationCount).toBe(1);
+      const snapshot = harness.requestObservabilityOwner.readSnapshot();
+      const requestLifecycleEvents = snapshot.requestLifecycleEvents;
+      expect(requestLifecycleEvents).toHaveLength(2);
+      const firstLifecycleEvent = requestLifecycleEvents[0];
+      const secondLifecycleEvent = requestLifecycleEvents[1];
+      if (!firstLifecycleEvent || !secondLifecycleEvent) {
+        throw new Error("Expected paired request lifecycle events");
+      }
+      if (firstLifecycleEvent.phase !== "started") {
+        throw new Error("Expected first request lifecycle event to be started");
+      }
+      if (secondLifecycleEvent.phase !== "completed") {
+        throw new Error("Expected second request lifecycle event to be completed");
+      }
+
+      expect(firstLifecycleEvent.queueDelayMs).toBe(17);
+      expect(secondLifecycleEvent.queueDelayMs).toBe(17);
+      const routeTiming = snapshot.routeTimings[0];
+      if (!routeTiming) {
+        throw new Error("Expected route timing telemetry for health-check request");
+      }
+      expect(routeTiming.lastQueueDelayMs).toBe(17);
     } finally {
       harness.cleanup();
     }

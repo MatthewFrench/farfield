@@ -19,6 +19,7 @@ import {
   requestInitWithOptions,
   requestNoContent
 } from "@/Shared/Transport/FarfieldHttpTransport";
+import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 
 const THREADS_ROUTE_PATH = "/api/threads";
 const LIVE_STATE_ROUTE_SEGMENT = "live-state";
@@ -40,6 +41,9 @@ export type ApiLiveStateResponse = FarfieldThreadLiveStateSnapshot;
 
 export type ApiStreamEventsResponse = FarfieldThreadStreamEventsSnapshot;
 
+const LiveStateResponseWireSchema = FarfieldThreadLiveStateSnapshotSchema.passthrough();
+const StreamEventsResponseWireSchema = FarfieldThreadStreamEventsSnapshotSchema.passthrough();
+
 const StreamEventsQueryOptionsSchema = z
   .object({
     // Query cursor must be an absolute sequence index for deterministic stream replay.
@@ -56,6 +60,10 @@ const SendMessageInputSchema = z
   })
   .strict();
 export type ApiSendMessageInput = z.infer<typeof SendMessageInputSchema>;
+const SendMessageRequestBodySchema = SendMessageInputSchema.omit({
+  threadId: true
+}).strict();
+type ApiSendMessageRequestBody = z.infer<typeof SendMessageRequestBodySchema>;
 
 const SetCollaborationModeInputSchema = z
   .object({
@@ -65,6 +73,10 @@ const SetCollaborationModeInputSchema = z
   })
   .strict();
 export type ApiSetCollaborationModeInput = z.infer<typeof SetCollaborationModeInputSchema>;
+const SetCollaborationModeRequestBodySchema = SetCollaborationModeInputSchema.omit({
+  threadId: true
+}).strict();
+type ApiSetCollaborationModeRequestBody = z.infer<typeof SetCollaborationModeRequestBodySchema>;
 
 const SubmitUserInputInputSchema = z
   .object({
@@ -75,6 +87,10 @@ const SubmitUserInputInputSchema = z
   })
   .strict();
 export type ApiSubmitUserInputInput = z.infer<typeof SubmitUserInputInputSchema>;
+const SubmitUserInputRequestBodySchema = SubmitUserInputInputSchema.omit({
+  threadId: true
+}).strict();
+type ApiSubmitUserInputRequestBody = z.infer<typeof SubmitUserInputRequestBodySchema>;
 
 const InterruptThreadInputSchema = z
   .object({
@@ -83,6 +99,21 @@ const InterruptThreadInputSchema = z
   })
   .strict();
 export type ApiInterruptThreadInput = z.infer<typeof InterruptThreadInputSchema>;
+const InterruptThreadRequestBodySchema = InterruptThreadInputSchema.omit({
+  threadId: true
+}).strict();
+type ApiInterruptThreadRequestBody = z.infer<typeof InterruptThreadRequestBodySchema>;
+
+type ChatMutationRequestBody =
+  | ApiSendMessageRequestBody
+  | ApiSetCollaborationModeRequestBody
+  | ApiSubmitUserInputRequestBody
+  | ApiInterruptThreadRequestBody;
+type ChatMutationRouteSegment =
+  | typeof MESSAGES_ROUTE_SEGMENT
+  | typeof COLLABORATION_MODE_ROUTE_SEGMENT
+  | typeof USER_INPUT_ROUTE_SEGMENT
+  | typeof INTERRUPT_ROUTE_SEGMENT;
 
 export interface ApiReadStreamEventsOptions extends ApiRequestOptions {
   // Cursor to request only stream events after this sequence number.
@@ -91,8 +122,8 @@ export interface ApiReadStreamEventsOptions extends ApiRequestOptions {
 
 export { type ApiReadThreadOptions, type ApiReadThreadResponse, readThread };
 
-function parseLiveStateResponse(data: unknown): ApiLiveStateResponse {
-  const snapshot = FarfieldThreadLiveStateSnapshotSchema.passthrough().parse(data);
+function parseLiveStateResponse(data: StructuredDataValue): ApiLiveStateResponse {
+  const snapshot = LiveStateResponseWireSchema.parse(data);
   return {
     ok: snapshot.ok,
     threadId: snapshot.threadId,
@@ -102,8 +133,8 @@ function parseLiveStateResponse(data: unknown): ApiLiveStateResponse {
   };
 }
 
-function parseStreamEventsResponse(data: unknown): ApiStreamEventsResponse {
-  const snapshot = FarfieldThreadStreamEventsSnapshotSchema.passthrough().parse(data);
+function parseStreamEventsResponse(data: StructuredDataValue): ApiStreamEventsResponse {
+  const snapshot = StreamEventsResponseWireSchema.parse(data);
   return {
     ok: snapshot.ok,
     threadId: snapshot.threadId,
@@ -148,6 +179,18 @@ function createJsonPostRequestInit(bodyText: string, options?: ApiRequestOptions
   );
 }
 
+function postThreadMutation(
+  threadId: string,
+  routeSegment: ChatMutationRouteSegment,
+  requestBody: ChatMutationRequestBody,
+  options?: ApiRequestOptions
+): Promise<void> {
+  return requestNoContent(
+    buildThreadMemberRoutePath(threadId, routeSegment),
+    createJsonPostRequestInit(JSON.stringify(requestBody), options)
+  );
+}
+
 export async function getLiveState(
   threadId: string,
   options?: ApiRequestOptions
@@ -173,18 +216,13 @@ export async function getStreamEvents(
 
 export async function sendMessage(input: ApiSendMessageInput, options?: ApiRequestOptions): Promise<void> {
   const parsedInput = SendMessageInputSchema.parse(input);
+  const parsedRequestBody = SendMessageRequestBodySchema.parse({
+    ownerClientId: parsedInput.ownerClientId,
+    text: parsedInput.text,
+    cwd: parsedInput.cwd
+  });
 
-  await requestNoContent(
-    buildThreadMemberRoutePath(parsedInput.threadId, MESSAGES_ROUTE_SEGMENT),
-    createJsonPostRequestInit(
-      JSON.stringify({
-        ownerClientId: parsedInput.ownerClientId,
-        text: parsedInput.text,
-        cwd: parsedInput.cwd
-      }),
-      options
-    )
-  );
+  await postThreadMutation(parsedInput.threadId, MESSAGES_ROUTE_SEGMENT, parsedRequestBody, options);
 }
 
 export async function setCollaborationMode(
@@ -192,16 +230,16 @@ export async function setCollaborationMode(
   options?: ApiRequestOptions
 ): Promise<void> {
   const parsedInput = SetCollaborationModeInputSchema.parse(input);
+  const parsedRequestBody = SetCollaborationModeRequestBodySchema.parse({
+    ownerClientId: parsedInput.ownerClientId,
+    collaborationMode: parsedInput.collaborationMode
+  });
 
-  await requestNoContent(
-    buildThreadMemberRoutePath(parsedInput.threadId, COLLABORATION_MODE_ROUTE_SEGMENT),
-    createJsonPostRequestInit(
-      JSON.stringify({
-        ownerClientId: parsedInput.ownerClientId,
-        collaborationMode: parsedInput.collaborationMode
-      }),
-      options
-    )
+  await postThreadMutation(
+    parsedInput.threadId,
+    COLLABORATION_MODE_ROUTE_SEGMENT,
+    parsedRequestBody,
+    options
   );
 }
 
@@ -210,18 +248,13 @@ export async function submitUserInput(
   options?: ApiRequestOptions
 ): Promise<void> {
   const parsedInput = SubmitUserInputInputSchema.parse(input);
+  const parsedRequestBody = SubmitUserInputRequestBodySchema.parse({
+    ownerClientId: parsedInput.ownerClientId,
+    requestId: parsedInput.requestId,
+    response: parsedInput.response
+  });
 
-  await requestNoContent(
-    buildThreadMemberRoutePath(parsedInput.threadId, USER_INPUT_ROUTE_SEGMENT),
-    createJsonPostRequestInit(
-      JSON.stringify({
-        ownerClientId: parsedInput.ownerClientId,
-        requestId: parsedInput.requestId,
-        response: parsedInput.response
-      }),
-      options
-    )
-  );
+  await postThreadMutation(parsedInput.threadId, USER_INPUT_ROUTE_SEGMENT, parsedRequestBody, options);
 }
 
 export async function interruptThread(
@@ -229,14 +262,9 @@ export async function interruptThread(
   options?: ApiRequestOptions
 ): Promise<void> {
   const parsedInput = InterruptThreadInputSchema.parse(input);
+  const parsedRequestBody = InterruptThreadRequestBodySchema.parse({
+    ownerClientId: parsedInput.ownerClientId
+  });
 
-  await requestNoContent(
-    buildThreadMemberRoutePath(parsedInput.threadId, INTERRUPT_ROUTE_SEGMENT),
-    createJsonPostRequestInit(
-      JSON.stringify({
-        ownerClientId: parsedInput.ownerClientId
-      }),
-      options
-    )
-  );
+  await postThreadMutation(parsedInput.threadId, INTERRUPT_ROUTE_SEGMENT, parsedRequestBody, options);
 }

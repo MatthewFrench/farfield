@@ -15,7 +15,6 @@ import {
   type ChatReadThreadResponse,
   type ChatStreamEventsResponse
 } from "@/Features/Chat/DataAccess/ChatServerClient";
-import { type LoadSelectedThreadOptions } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import {
   type DebugErrorListResponse,
   type DebugHistoryDetailResponse,
@@ -29,87 +28,202 @@ import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGr
 import { useApplicationArchivedThreadState } from "./UseApplicationArchivedThreadState";
 import { useApplicationPushState } from "./UseApplicationPushState";
 import {
+  type AnswerDraftState,
   type ApplicationShellState,
+  type ApplicationShellTab,
+  type CollapsedProjectGroupMap,
+  type CoreDataLoadFunction,
+  type SelectedThreadLoadFunction,
+  type SignatureTokens,
+  type UnreadThreadIdentifierMap,
   type UseApplicationShellStateInput
 } from "./UseApplicationShellStateContracts";
 
 type AgentDescriptor = CapabilityAgentsResponse["agents"][number];
+interface ShellInitialFlags {
+  isBusy: boolean;
+  isCoreLoading: boolean;
+  waitForReplayResponse: boolean;
+  mobileSidebarOpen: boolean;
+  desktopSidebarOpen: boolean;
+  isChatAtBottom: boolean;
+  hasHydratedModeFromLiveState: boolean;
+  isModeSyncing: boolean;
+  eventsConnected: boolean;
+  hasHydratedAgentSelection: boolean;
+}
+
+interface RouteSeededShellState {
+  selectedThreadIdentifier: string | null;
+  activeTab: ApplicationShellTab;
+  isSelectedThreadLoading: boolean;
+}
+
+const INITIAL_TEXT_VALUE = "";
+const INITIAL_TRACE_LABEL = "capture";
+const INITIAL_DEBUG_WORKSPACE_SECTION: DebugWorkspaceSection = "issues";
+const INITIAL_DEBUG_ISSUE_SEVERITY_FILTER: DebugIssueSeverityFilter = "all";
+const INITIAL_NUMBER_VALUE = 0;
+const INITIAL_NULLABLE_NUMBER_VALUE: number | null = null;
+const DEFAULT_SELECTED_AGENT_IDENTIFIER: AgentId = "codex";
+const INITIAL_SHELL_FLAGS: ShellInitialFlags = {
+  isBusy: false,
+  isCoreLoading: true,
+  waitForReplayResponse: false,
+  mobileSidebarOpen: false,
+  desktopSidebarOpen: true,
+  isChatAtBottom: true,
+  hasHydratedModeFromLiveState: false,
+  isModeSyncing: false,
+  eventsConnected: false,
+  hasHydratedAgentSelection: false
+};
+
+function readRouteSeededShellState(input: UseApplicationShellStateInput): RouteSeededShellState {
+  const selectedThreadIdentifier = input.initialUiState.threadId;
+  return {
+    selectedThreadIdentifier,
+    activeTab: input.initialUiState.tab,
+    isSelectedThreadLoading: selectedThreadIdentifier !== null
+  };
+}
+
+function createInitialThreadCollection(): ThreadListResponse["data"] {
+  return [];
+}
+
+function createInitialUnreadThreadIdentifierMap(): UnreadThreadIdentifierMap {
+  return {};
+}
+
+function createInitialStreamEvents(): ChatStreamEventsResponse["events"] {
+  return [];
+}
+
+function createInitialModes(): CapabilityCollaborationModesResponse["data"] {
+  return [];
+}
+
+function createInitialModels(): CapabilityModelsResponse["data"] {
+  return [];
+}
+
+function createInitialHistoryEntries(): DebugHistoryResponse["history"] {
+  return [];
+}
+
+function createInitialDebugErrors(): DebugErrorListResponse["data"] {
+  return [];
+}
+
+function createInitialAnswerDraftState(): AnswerDraftState {
+  return {};
+}
+
+function createInitialAgentDescriptors(): AgentDescriptor[] {
+  return [];
+}
+
+function createInitialCollapsedProjectGroupMap(): CollapsedProjectGroupMap {
+  return {};
+}
+
+function createInitialSignatureTokens(): SignatureTokens {
+  return [];
+}
+
+function createPendingThreadMaterializationCoordinator(): PendingThreadMaterializationCoordinator {
+  return new PendingThreadMaterializationCoordinator();
+}
 
 export type { ApplicationShellState, UseApplicationShellStateInput } from "./UseApplicationShellStateContracts";
 
 export function useApplicationShellState(input: UseApplicationShellStateInput): ApplicationShellState {
-  const [error, setError] = useState("");
+  // Invariant: route-seeded state and refs must initialize from one snapshot to avoid first-render divergence.
+  const routeSeededShellState = readRouteSeededShellState(input);
+
+  const [error, setError] = useState(INITIAL_TEXT_VALUE);
   const [health, setHealth] = useState<CapabilityHealthResponse | null>(null);
   const [configDefaults, setConfigDefaults] = useState<CapabilityConfigDefaultsResponse | null>(null);
-  const [threads, setThreads] = useState<ThreadListResponse["data"]>([]);
-  const [unreadThreadIds, setUnreadThreadIds] = useState<Record<string, true>>({});
+  const [threads, setThreads] = useState<ThreadListResponse["data"]>(createInitialThreadCollection);
+  const [unreadThreadIds, setUnreadThreadIds] = useState<UnreadThreadIdentifierMap>(
+    createInitialUnreadThreadIdentifierMap
+  );
   const applicationArchivedThreadState = useApplicationArchivedThreadState();
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(input.initialUiState.threadId);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(routeSeededShellState.selectedThreadIdentifier);
   const [liveState, setLiveState] = useState<ChatLiveStateResponse | null>(null);
   const [readThreadState, setReadThreadState] = useState<ChatReadThreadResponse | null>(null);
-  const [isSelectedThreadLoading, setIsSelectedThreadLoading] = useState(Boolean(input.initialUiState.threadId));
-  const [streamEvents, setStreamEvents] = useState<ChatStreamEventsResponse["events"]>([]);
-  const [modes, setModes] = useState<CapabilityCollaborationModesResponse["data"]>([]);
-  const [models, setModels] = useState<CapabilityModelsResponse["data"]>([]);
-  const [selectedModeKey, setSelectedModeKey] = useState("");
-  const [selectedModelId, setSelectedModelId] = useState("");
-  const [selectedReasoningEffort, setSelectedReasoningEffort] = useState("");
-  const [isBusy, setIsBusy] = useState(false);
+  const [isSelectedThreadLoading, setIsSelectedThreadLoading] = useState(routeSeededShellState.isSelectedThreadLoading);
+  const [streamEvents, setStreamEvents] = useState<ChatStreamEventsResponse["events"]>(createInitialStreamEvents);
+  const [modes, setModes] = useState<CapabilityCollaborationModesResponse["data"]>(createInitialModes);
+  const [models, setModels] = useState<CapabilityModelsResponse["data"]>(createInitialModels);
+  const [selectedModeKey, setSelectedModeKey] = useState(INITIAL_TEXT_VALUE);
+  const [selectedModelId, setSelectedModelId] = useState(INITIAL_TEXT_VALUE);
+  const [selectedReasoningEffort, setSelectedReasoningEffort] = useState(INITIAL_TEXT_VALUE);
+  const [isBusy, setIsBusy] = useState(INITIAL_SHELL_FLAGS.isBusy);
   const [traceStatus, setTraceStatus] = useState<DebugTraceStatusResponse | null>(null);
-  const [traceLabel, setTraceLabel] = useState("capture");
-  const [traceNote, setTraceNote] = useState("");
-  const [history, setHistory] = useState<DebugHistoryResponse["history"]>([]);
-  const [debugErrors, setDebugErrors] = useState<DebugErrorListResponse["data"]>([]);
-  const [debugErrorSessionId, setDebugErrorSessionId] = useState("");
-  const [debugErrorSessionLogPath, setDebugErrorSessionLogPath] = useState("");
-  const [selectedHistoryId, setSelectedHistoryId] = useState("");
+  const [traceLabel, setTraceLabel] = useState(INITIAL_TRACE_LABEL);
+  const [traceNote, setTraceNote] = useState(INITIAL_TEXT_VALUE);
+  const [history, setHistory] = useState<DebugHistoryResponse["history"]>(createInitialHistoryEntries);
+  const [debugErrors, setDebugErrors] = useState<DebugErrorListResponse["data"]>(createInitialDebugErrors);
+  const [debugErrorSessionId, setDebugErrorSessionId] = useState(INITIAL_TEXT_VALUE);
+  const [debugErrorSessionLogPath, setDebugErrorSessionLogPath] = useState(INITIAL_TEXT_VALUE);
+  const [selectedHistoryId, setSelectedHistoryId] = useState(INITIAL_TEXT_VALUE);
   const [historyDetail, setHistoryDetail] = useState<DebugHistoryDetailResponse | null>(null);
-  const [isCoreLoading, setIsCoreLoading] = useState(true);
-  const [waitForReplayResponse, setWaitForReplayResponse] = useState(false);
-  const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
-  const [answerDraft, setAnswerDraft] = useState<Record<string, { option: string; freeform: string }>>({});
-  const [agentDescriptors, setAgentDescriptors] = useState<AgentDescriptor[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState<AgentId>("codex");
+  const [isCoreLoading, setIsCoreLoading] = useState(INITIAL_SHELL_FLAGS.isCoreLoading);
+  const [waitForReplayResponse, setWaitForReplayResponse] = useState(INITIAL_SHELL_FLAGS.waitForReplayResponse);
+  const [selectedRequestId, setSelectedRequestId] = useState<number | null>(INITIAL_NULLABLE_NUMBER_VALUE);
+  const [answerDraft, setAnswerDraft] = useState<AnswerDraftState>(createInitialAnswerDraftState);
+  const [agentDescriptors, setAgentDescriptors] = useState<AgentDescriptor[]>(createInitialAgentDescriptors);
+  const [selectedAgentId, setSelectedAgentId] = useState<AgentId>(DEFAULT_SELECTED_AGENT_IDENTIFIER);
   const applicationPushState = useApplicationPushState({
     unsupportedPushClientState: input.unsupportedPushClientState
   });
-  const [activeTab, setActiveTab] = useState<"chat" | "debug">(input.initialUiState.tab);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
-  const [isChatAtBottom, setIsChatAtBottom] = useState(true);
+  const [activeTab, setActiveTab] = useState<ApplicationShellTab>(routeSeededShellState.activeTab);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(INITIAL_SHELL_FLAGS.mobileSidebarOpen);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(INITIAL_SHELL_FLAGS.desktopSidebarOpen);
+  const [isChatAtBottom, setIsChatAtBottom] = useState(INITIAL_SHELL_FLAGS.isChatAtBottom);
   const [visibleChatItemLimit, setVisibleChatItemLimit] = useState(input.initialVisibleChatItems);
-  const [hasHydratedModeFromLiveState, setHasHydratedModeFromLiveState] = useState(false);
-  const [isModeSyncing, setIsModeSyncing] = useState(false);
-  const [collapsedThreadProjectGroups, setCollapsedThreadProjectGroups] = useState<Record<string, boolean>>({});
-  const [debugWorkspaceSection, setDebugWorkspaceSection] = useState<DebugWorkspaceSection>("issues");
-  const [selectedDebugIssueId, setSelectedDebugIssueId] = useState("");
-  const [debugIssueSeverityFilter, setDebugIssueSeverityFilter] = useState<DebugIssueSeverityFilter>("all");
-  const [debugIssueFilterQuery, setDebugIssueFilterQuery] = useState("");
-  const selectedThreadIdRef = useRef<string | null>(input.initialUiState.threadId);
-  const activeTabRef = useRef<"chat" | "debug">(input.initialUiState.tab);
-  const coreRefreshIntervalRef = useRef<number | null>(null);
-  const eventsConnectedRef = useRef(false);
-  const lastCoreRefreshAtRef = useRef(0);
+  const [hasHydratedModeFromLiveState, setHasHydratedModeFromLiveState] = useState(
+    INITIAL_SHELL_FLAGS.hasHydratedModeFromLiveState
+  );
+  const [isModeSyncing, setIsModeSyncing] = useState(INITIAL_SHELL_FLAGS.isModeSyncing);
+  const [collapsedThreadProjectGroups, setCollapsedThreadProjectGroups] = useState<CollapsedProjectGroupMap>(
+    createInitialCollapsedProjectGroupMap
+  );
+  const [debugWorkspaceSection, setDebugWorkspaceSection] = useState<DebugWorkspaceSection>(
+    INITIAL_DEBUG_WORKSPACE_SECTION
+  );
+  const [selectedDebugIssueId, setSelectedDebugIssueId] = useState(INITIAL_TEXT_VALUE);
+  const [debugIssueSeverityFilter, setDebugIssueSeverityFilter] = useState<DebugIssueSeverityFilter>(
+    INITIAL_DEBUG_ISSUE_SEVERITY_FILTER
+  );
+  const [debugIssueFilterQuery, setDebugIssueFilterQuery] = useState(INITIAL_TEXT_VALUE);
+  const selectedThreadIdRef = useRef<string | null>(routeSeededShellState.selectedThreadIdentifier);
+  const activeTabRef = useRef<ApplicationShellTab>(routeSeededShellState.activeTab);
+  const coreRefreshIntervalRef = useRef<number | null>(INITIAL_NULLABLE_NUMBER_VALUE);
+  const eventsConnectedRef = useRef(INITIAL_SHELL_FLAGS.eventsConnected);
+  const lastCoreRefreshAtRef = useRef(INITIAL_NUMBER_VALUE);
   const applicationShellElementRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatContentRef = useRef<HTMLDivElement>(null);
-  const isChatAtBottomRef = useRef(true);
-  const lastAppliedModeSignatureRef = useRef("");
-  const unreadThreadIdsRef = useRef<Record<string, true>>({});
-  const hasHydratedAgentSelectionRef = useRef(false);
+  const isChatAtBottomRef = useRef(INITIAL_SHELL_FLAGS.isChatAtBottom);
+  const lastAppliedModeSignatureRef = useRef(INITIAL_TEXT_VALUE);
+  const unreadThreadIdsRef = useRef<UnreadThreadIdentifierMap>(createInitialUnreadThreadIdentifierMap());
+  const hasHydratedAgentSelectionRef = useRef(INITIAL_SHELL_FLAGS.hasHydratedAgentSelection);
   const pendingThreadMaterializationCoordinatorRef = useRef(
-    new PendingThreadMaterializationCoordinator()
+    createPendingThreadMaterializationCoordinator()
   );
   const pendingThreadMaterializationCoordinator = pendingThreadMaterializationCoordinatorRef.current;
-  const debugErrorsSignatureRef = useRef<string[]>([]);
-  const modesSignatureRef = useRef<string[]>([]);
-  const modelsSignatureRef = useRef<string[]>([]);
-  const selectedThreadLoadTokenRef = useRef(0);
-  const loadCoreDataTrackedRef = useRef<(() => Promise<void>) | null>(null);
-  const loadSelectedThreadRef = useRef<((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null>(null);
+  const debugErrorsSignatureRef = useRef<SignatureTokens>(createInitialSignatureTokens());
+  const modesSignatureRef = useRef<SignatureTokens>(createInitialSignatureTokens());
+  const modelsSignatureRef = useRef<SignatureTokens>(createInitialSignatureTokens());
+  const selectedThreadLoadTokenRef = useRef(INITIAL_NUMBER_VALUE);
+  const loadCoreDataTrackedRef = useRef<CoreDataLoadFunction | null>(null);
+  const loadSelectedThreadRef = useRef<SelectedThreadLoadFunction | null>(null);
   const viewportKeyboardStateRef = useRef<boolean | null>(null);
-  const viewportTelemetryLastReportedAtRef = useRef(0);
-  const keyboardOpenScrollRafRef = useRef<number | null>(null);
+  const viewportTelemetryLastReportedAtRef = useRef(INITIAL_NUMBER_VALUE);
+  const keyboardOpenScrollRafRef = useRef<number | null>(INITIAL_NULLABLE_NUMBER_VALUE);
 
   return {
     error,

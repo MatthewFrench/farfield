@@ -4,6 +4,7 @@ import { logger } from "../Shared/Logging/Logger.js";
 import type { ServerErrorEventRecordInput } from "./ServerErrorEventRecorder.js";
 import {
   ServerTransportErrorClassifier,
+  type ServerTransportErrorCategory,
   type ServerTransportErrorClassification
 } from "./ServerTransportErrorClassifier.js";
 import type { HistoryEntry } from "./Routes/DebugTypes.js";
@@ -14,6 +15,59 @@ const HTTP_REQUEST_OPERATION = "http:request";
 const REQUEST_FAILED_SYSTEM_MESSAGE = "Request failed";
 const UNKNOWN_REQUEST_METHOD = "unknown";
 const UNKNOWN_REQUEST_URL = "unknown";
+
+interface ServerRequestRuntimeMetadata {
+  method: string;
+  url: string;
+  requestId: string;
+  actionId: string | null;
+  actionName: string | null;
+}
+
+interface ServerRequestErrorLogInput extends ServerRequestRuntimeMetadata {
+  error: string;
+  errorCategory: ServerTransportErrorCategory;
+}
+
+interface ServerRequestErrorResponseBehavior {
+  shouldSetRuntimeLastError: boolean;
+  shouldRecordServerError: boolean;
+  shouldPushSystemEvent: boolean;
+  shouldBroadcastRuntimeState: boolean;
+}
+
+interface ServerRequestErrorResponseBody {
+  ok: false;
+  error: string;
+  requestId: string;
+  actionId: string | null;
+  actionName: string | null;
+}
+
+// This table is the single owner for transport-error-category side effects.
+const RESPONSE_BEHAVIOR_BY_ERROR_CATEGORY: Record<
+  ServerTransportErrorCategory,
+  ServerRequestErrorResponseBehavior
+> = {
+  request_validation: {
+    shouldSetRuntimeLastError: false,
+    shouldRecordServerError: true,
+    shouldPushSystemEvent: false,
+    shouldBroadcastRuntimeState: false
+  },
+  shutdown_transport: {
+    shouldSetRuntimeLastError: true,
+    shouldRecordServerError: false,
+    shouldPushSystemEvent: false,
+    shouldBroadcastRuntimeState: false
+  },
+  internal: {
+    shouldSetRuntimeLastError: true,
+    shouldRecordServerError: true,
+    shouldPushSystemEvent: true,
+    shouldBroadcastRuntimeState: true
+  }
+};
 
 export interface ServerRequestErrorContext {
   requestId: string;
@@ -49,63 +103,38 @@ export class ServerRequestErrorResponder {
 
   public respond<ErrorType>(input: ServerRequestErrorResponseInput<ErrorType>): void {
     const { req, res, error, context } = input;
+    const normalizedError = this.normalizeError(error);
+    const classification = normalizedError instanceof z.ZodError
+      ? this.classifier.classifyValidationError(normalizedError.message)
+      : this.classifier.classifyRuntimeError(
+          normalizedError,
+          this.deps.isExpectedShutdownTransportError,
+          this.deps.toErrorMessage
+        );
+    const responseBehavior = RESPONSE_BEHAVIOR_BY_ERROR_CATEGORY[classification.category];
+    const requestRuntimeMetadata = this.createRequestRuntimeMetadata(req, context);
+    const logInput = this.createLogInput(requestRuntimeMetadata, classification);
 
-    if (error instanceof z.ZodError) {
-      const validationClassification = this.classifier.classifyValidationError(error.message);
-      this.recordServerErrorIfNeeded({
-        classification: validationClassification,
-        normalizedError: error,
-        req,
-        context
-      });
-      this.logClassification({
-        classification: validationClassification,
-        req,
-        context
-      });
-      this.writeErrorResponse({
-        res,
-        classification: validationClassification,
-        context
-      });
-      return;
+    if (responseBehavior.shouldSetRuntimeLastError) {
+      this.deps.setRuntimeLastError(classification.runtimeErrorMessage);
     }
 
-    const normalizedError = error instanceof Error
-      ? error
-      : new Error(this.deps.toErrorMessage(error));
-    const classification = this.classifier.classifyRuntimeError(
-      normalizedError,
-      this.deps.isExpectedShutdownTransportError,
-      this.deps.toErrorMessage
-    );
-
-    this.deps.setRuntimeLastError(classification.runtimeErrorMessage);
     this.recordServerErrorIfNeeded({
-      classification,
       normalizedError,
-      req,
-      context
-    });
-    this.logClassification({
+      requestUrl: req.url ?? null,
+      logInput,
       classification,
-      req,
-      context
+      shouldRecordServerError: responseBehavior.shouldRecordServerError
     });
+    this.logClassification(classification, logInput);
 
-    if (classification.shouldPushSystemEvent) {
+    if (responseBehavior.shouldPushSystemEvent) {
       this.deps.pushSystem(REQUEST_FAILED_SYSTEM_MESSAGE, {
-        error: classification.runtimeErrorMessage,
-        errorCategory: classification.category,
-        method: req.method ?? UNKNOWN_REQUEST_METHOD,
-        url: req.url ?? UNKNOWN_REQUEST_URL,
-        requestId: context.requestId,
-        actionId: context.actionId,
-        actionName: context.actionName
+        ...logInput
       });
     }
 
-    if (classification.shouldBroadcastRuntimeState) {
+    if (responseBehavior.shouldBroadcastRuntimeState) {
       this.deps.broadcastRuntimeState();
     }
 
@@ -117,13 +146,14 @@ export class ServerRequestErrorResponder {
   }
 
   private recordServerErrorIfNeeded(input: {
-    classification: ServerTransportErrorClassification;
     normalizedError: Error;
-    req: IncomingMessage;
-    context: ServerRequestErrorContext;
+    requestUrl: string | null;
+    logInput: ServerRequestErrorLogInput;
+    classification: ServerTransportErrorClassification;
+    shouldRecordServerError: boolean;
   }): void {
-    const { classification, normalizedError, req, context } = input;
-    if (!classification.shouldRecordServerError) {
+    const { normalizedError, requestUrl, logInput, classification, shouldRecordServerError } = input;
+    if (!shouldRecordServerError) {
       return;
     }
 
@@ -135,14 +165,14 @@ export class ServerRequestErrorResponder {
         severity: classification.severity,
         name: normalizedError.name,
         stack: normalizedError.stack ?? null,
-        requestId: context.requestId,
+        requestId: logInput.requestId,
         threadId: null,
-        url: req.url ?? null,
+        url: requestUrl,
         details: {
-          method: req.method ?? UNKNOWN_REQUEST_METHOD,
-          actionId: context.actionId,
-          actionName: context.actionName,
-          errorCategory: classification.category
+          method: logInput.method,
+          actionId: logInput.actionId,
+          actionName: logInput.actionName,
+          errorCategory: logInput.errorCategory
         }
       });
     } catch (recordError) {
@@ -157,22 +187,10 @@ export class ServerRequestErrorResponder {
     }
   }
 
-  private logClassification(input: {
-    classification: ServerTransportErrorClassification;
-    req: IncomingMessage;
-    context: ServerRequestErrorContext;
-  }): void {
-    const { classification, req, context } = input;
-    const logInput = {
-      method: req.method ?? UNKNOWN_REQUEST_METHOD,
-      url: req.url ?? UNKNOWN_REQUEST_URL,
-      error: classification.runtimeErrorMessage,
-      errorCategory: classification.category,
-      requestId: context.requestId,
-      actionId: context.actionId,
-      actionName: context.actionName
-    };
-
+  private logClassification(
+    classification: ServerTransportErrorClassification,
+    logInput: ServerRequestErrorLogInput
+  ): void {
     if (classification.logLevel === "info") {
       logger.info(logInput, classification.logEventName);
       return;
@@ -186,6 +204,38 @@ export class ServerRequestErrorResponder {
     logger.error(logInput, classification.logEventName);
   }
 
+  private normalizeError<ErrorType>(error: ErrorType): Error {
+    if (error instanceof Error) {
+      return error;
+    }
+
+    return new Error(this.deps.toErrorMessage(error));
+  }
+
+  private createRequestRuntimeMetadata(
+    req: IncomingMessage,
+    context: ServerRequestErrorContext
+  ): ServerRequestRuntimeMetadata {
+    return {
+      method: req.method ?? UNKNOWN_REQUEST_METHOD,
+      url: req.url ?? UNKNOWN_REQUEST_URL,
+      requestId: context.requestId,
+      actionId: context.actionId,
+      actionName: context.actionName
+    };
+  }
+
+  private createLogInput(
+    runtimeMetadata: ServerRequestRuntimeMetadata,
+    classification: ServerTransportErrorClassification
+  ): ServerRequestErrorLogInput {
+    return {
+      ...runtimeMetadata,
+      error: classification.runtimeErrorMessage,
+      errorCategory: classification.category
+    };
+  }
+
   private writeErrorResponse(input: {
     res: ServerResponse;
     classification: ServerTransportErrorClassification;
@@ -196,12 +246,14 @@ export class ServerRequestErrorResponder {
       return;
     }
 
-    this.deps.jsonResponse(res, classification.statusCode, {
+    const responseBody: ServerRequestErrorResponseBody = {
       ok: false,
       error: classification.runtimeErrorMessage,
       requestId: context.requestId,
       actionId: context.actionId,
       actionName: context.actionName
-    });
+    };
+
+    this.deps.jsonResponse(res, classification.statusCode, responseBody);
   }
 }

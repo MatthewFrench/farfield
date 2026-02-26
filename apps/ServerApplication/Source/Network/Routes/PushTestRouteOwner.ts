@@ -1,5 +1,7 @@
 import {
+  FarfieldApiErrorResponseSchema,
   FarfieldPushTestBodySchema,
+  FarfieldPushTestEnvelopeSchema,
   type JsonValue,
   type PushNotificationPayload,
   type StoredPushSubscription
@@ -16,9 +18,44 @@ import {
   PushRoutePathnameByName
 } from "./PushRouteContracts.js";
 
+type PushTestRequestBody = z.infer<typeof FarfieldPushTestBodySchema>;
+type PushTestResponseBody = z.infer<typeof FarfieldPushTestEnvelopeSchema>;
+type PushTestErrorResponseBody = z.infer<typeof FarfieldApiErrorResponseSchema>;
+type PushTestDispatchModeLabel = "private" | "detailed";
+
+const PushTestReasonByName = {
+  disabled: "Push notifications are disabled",
+  noSubscriptions: "No push subscriptions registered",
+  readyForDryRun: "Push notifications are configured and subscriptions are present",
+  attempted: "Push notification attempted"
+} as const;
+
+const PushTestDispatchModeByName: Record<PushTestDispatchModeLabel, PushTestDispatchModeLabel> = {
+  private: "private",
+  detailed: "detailed"
+};
+
+const PushTestDispatchMissingPayloadErrorMessage = "Push test dispatch did not produce a payload";
+const PushTestSendTimeoutLabelPrefix = "push-test-send";
+const EmptyPushSendSummary = {
+  attempted: 0,
+  delivered: 0,
+  failures: 0
+} as const;
+
 interface PushDispatchAttempt {
   payload: PushNotificationPayload;
   sendResult: PushSendResult;
+}
+
+interface PushTestResponsePayload {
+  dryRun: boolean;
+  notificationId: string | null;
+  ready: boolean;
+  reason: string;
+  attempted: number;
+  delivered: number;
+  failures: number;
 }
 
 interface PushTestRouteOwnerDependencies {
@@ -30,7 +67,7 @@ interface PushTestRouteOwnerDependencies {
   readJsonBody: (req: IncomingMessage) => Promise<JsonValue>;
   jsonResponse: (res: ServerResponse, statusCode: number, body: object) => void;
   buildPushTestPayload: (
-    input: z.infer<typeof FarfieldPushTestBodySchema>,
+    input: PushTestRequestBody,
     privateMode: boolean
   ) => PushNotificationPayload;
   pushTestSendTimeoutMs: number;
@@ -57,7 +94,12 @@ export class PushTestRouteOwner {
     res: ServerResponse;
     pathname: string;
   }): Promise<boolean> {
-    if (!(input.req.method === PushRouteMethodByName.post && input.pathname === PushRoutePathnameByName.test)) {
+    if (
+      !(
+        input.req.method === PushRouteMethodByName.post &&
+        input.pathname === PushRoutePathnameByName.test
+      )
+    ) {
       return false;
     }
 
@@ -68,43 +110,36 @@ export class PushTestRouteOwner {
     const dryRun = body.dryRun === true;
 
     if (!this.dependencies.pushService.isEnabled()) {
-      this.dependencies.jsonResponse(input.res, 200, {
-        ok: true,
+      this.writePushTestResponse(input.res, {
         dryRun,
         notificationId: null,
         ready: false,
-        reason: "Push notifications are disabled",
-        attempted: 0,
-        delivered: 0,
-        failures: 0
+        reason: PushTestReasonByName.disabled,
+        ...EmptyPushSendSummary
       });
       return true;
     }
 
     if (subscriptions.length === 0) {
-      this.dependencies.jsonResponse(input.res, 200, {
-        ok: true,
+      this.writePushTestResponse(input.res, {
         dryRun,
         notificationId: null,
         ready: false,
-        reason: "No push subscriptions registered",
-        attempted: 0,
-        delivered: 0,
-        failures: 0
+        reason: PushTestReasonByName.noSubscriptions,
+        ...EmptyPushSendSummary
       });
       return true;
     }
 
     if (dryRun) {
-      this.dependencies.jsonResponse(input.res, 200, {
-        ok: true,
+      this.writePushTestResponse(input.res, {
         dryRun: true,
         notificationId: null,
         ready: true,
-        reason: "Push notifications are configured and subscriptions are present",
+        reason: PushTestReasonByName.readyForDryRun,
         attempted: subscriptions.length,
-        delivered: 0,
-        failures: 0
+        delivered: EmptyPushSendSummary.delivered,
+        failures: EmptyPushSendSummary.failures
       });
       return true;
     }
@@ -116,10 +151,11 @@ export class PushTestRouteOwner {
     const aggregatedSendResult = this.aggregatePushDispatchAttempts(pushDispatchAttempts);
     const selectedPayload = pushDispatchAttempts[0]?.payload;
     if (!selectedPayload) {
-      this.dependencies.jsonResponse(input.res, 500, {
+      const responseBody: PushTestErrorResponseBody = {
         ok: false,
-        error: "Push test dispatch did not produce a payload"
-      });
+        error: PushTestDispatchMissingPayloadErrorMessage
+      };
+      this.dependencies.jsonResponse(input.res, 500, responseBody);
       return true;
     }
 
@@ -141,17 +177,27 @@ export class PushTestRouteOwner {
       });
     });
 
-    this.dependencies.jsonResponse(input.res, 200, {
-      ok: true,
+    this.writePushTestResponse(input.res, {
       dryRun: false,
       notificationId: selectedPayload.notificationId,
       ready: true,
-      reason: "Push notification attempted",
+      reason: PushTestReasonByName.attempted,
       attempted: aggregatedSendResult.attempted,
       delivered: aggregatedSendResult.delivered,
       failures: aggregatedSendResult.failures
     });
     return true;
+  }
+
+  private writePushTestResponse(
+    response: ServerResponse,
+    payload: PushTestResponsePayload
+  ): void {
+    const responseBody: PushTestResponseBody = {
+      ok: true,
+      ...payload
+    };
+    this.dependencies.jsonResponse(response, 200, responseBody);
   }
 
   private aggregatePushDispatchAttempts(attempts: PushDispatchAttempt[]): {
@@ -184,7 +230,7 @@ export class PushTestRouteOwner {
 
   private async sendPushTestNotificationsByPrivacyMode(input: {
     subscriptions: StoredPushSubscription[];
-    body: z.infer<typeof FarfieldPushTestBodySchema>;
+    body: PushTestRequestBody;
   }): Promise<PushDispatchAttempt[]> {
     const privateModeSubscriptions = input.subscriptions.filter(
       (subscription) => subscription.settings.privateMode
@@ -200,6 +246,8 @@ export class PushTestRouteOwner {
     const alignPayloadWithSharedNotification = (
       payload: PushNotificationPayload
     ): PushNotificationPayload => {
+      // Keep one notification identity across both privacy partitions so send summary state
+      // and route response metadata reference a single test notification.
       if (sharedNotificationIdentifier === null || sharedNotificationTimestamp === null) {
         sharedNotificationIdentifier = payload.notificationId;
         sharedNotificationTimestamp = payload.createdAt;
@@ -220,7 +268,7 @@ export class PushTestRouteOwner {
       dispatchPromises.push(this.sendPushTestNotificationGroup({
         subscriptions: privateModeSubscriptions,
         payload: privatePayload,
-        modeLabel: "private"
+        modeLabel: PushTestDispatchModeByName.private
       }));
     }
 
@@ -231,7 +279,7 @@ export class PushTestRouteOwner {
       dispatchPromises.push(this.sendPushTestNotificationGroup({
         subscriptions: detailedModeSubscriptions,
         payload: detailedPayload,
-        modeLabel: "detailed"
+        modeLabel: PushTestDispatchModeByName.detailed
       }));
     }
 
@@ -241,12 +289,12 @@ export class PushTestRouteOwner {
   private async sendPushTestNotificationGroup(input: {
     subscriptions: StoredPushSubscription[];
     payload: PushNotificationPayload;
-    modeLabel: "private" | "detailed";
+    modeLabel: PushTestDispatchModeLabel;
   }): Promise<PushDispatchAttempt> {
     const sendResult = await this.dependencies.withTimeout(
       this.dependencies.pushService.sendToSubscriptions(input.subscriptions, input.payload),
       this.dependencies.pushTestSendTimeoutMs,
-      `push-test-send:${input.modeLabel}`
+      `${PushTestSendTimeoutLabelPrefix}:${input.modeLabel}`
     );
     return {
       payload: input.payload,

@@ -37,9 +37,13 @@ import { CodexThreadInteractionOwner } from "./CodexThreadInteractionOwner.js";
 import { CodexThreadManagementOwner } from "./CodexThreadManagementOwner.js";
 import { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
 
+const CODEX_AGENT_IDENTIFIER = "codex";
+const CODEX_AGENT_LABEL = "Codex";
 const APP_SERVER_INVALID_REQUEST_ERROR_CODE = -32600;
-const THREAD_NOT_LOADED_ERROR_FRAGMENT = "thread not loaded";
-const CONVERSATION_NOT_FOUND_ERROR_FRAGMENT = "conversation not found";
+const APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT = {
+  threadNotLoaded: "thread not loaded",
+  conversationNotFound: "conversation not found"
+} as const;
 const STEERING_UNSUPPORTED_ENDPOINT_ERROR = "Steering messages are not supported on this endpoint.";
 
 export interface CodexAgentRuntimeState {
@@ -57,6 +61,16 @@ export interface CodexIpcFrameEvent {
   threadId: string | null;
 }
 
+const INBOUND_IPC_FRAME_DIRECTION: CodexIpcFrameEvent["direction"] = "in";
+const CODEX_AGENT_CAPABILITIES: AgentCapabilities = {
+  canListModels: true,
+  canListCollaborationModes: true,
+  canSetCollaborationMode: true,
+  canSubmitUserInput: true,
+  canReadLiveState: true,
+  canReadStreamEvents: true
+};
+
 export interface CodexAgentOptions {
   appExecutable: string;
   appServerBaseEnvironment: NodeJS.ProcessEnv;
@@ -68,17 +82,29 @@ export interface CodexAgentOptions {
   onStateChange?: () => void;
 }
 
+function isInvalidRequestErrorMatchingMessageFragment<ErrorType>(
+  error: ErrorType,
+  messageFragment: string
+): boolean {
+  if (!(error instanceof AppServerRpcError)) {
+    return false;
+  }
+
+  if (error.code !== APP_SERVER_INVALID_REQUEST_ERROR_CODE) {
+    return false;
+  }
+
+  return error.message.includes(messageFragment);
+}
+
+/**
+ * Owns Codex adapter composition and delegates behavior to connection/thread owners.
+ * This class keeps wiring explicit so owner responsibilities stay isolated and testable.
+ */
 export class CodexAgentAdapter implements AgentAdapter {
-  public readonly id = "codex";
-  public readonly label = "Codex";
-  public readonly capabilities: AgentCapabilities = {
-    canListModels: true,
-    canListCollaborationModes: true,
-    canSetCollaborationMode: true,
-    canSubmitUserInput: true,
-    canReadLiveState: true,
-    canReadStreamEvents: true
-  };
+  public readonly id = CODEX_AGENT_IDENTIFIER;
+  public readonly label = CODEX_AGENT_LABEL;
+  public readonly capabilities: AgentCapabilities = CODEX_AGENT_CAPABILITIES;
 
   private readonly appClient: AppServerClient;
   private readonly ipcClient: DesktopIpcClient;
@@ -121,22 +147,21 @@ export class CodexAgentAdapter implements AgentAdapter {
       reconnectDelayMs: options.reconnectDelayMs,
       onStateChange: options.onStateChange ?? null
     });
+    const runAppServerCall = async <ValueType,>(operation: () => Promise<ValueType>): Promise<ValueType> => {
+      return this.connectionLifecycleOwner.runAppServerCall(operation);
+    };
     this.messageDispatchOwner = new CodexMessageDispatchOwner({
       appClient: this.appClient,
       service: this.service,
       threadStreamStateOwner: this.threadStreamStateOwner,
-      runAppServerCall: async <ValueType,>(operation: () => Promise<ValueType>): Promise<ValueType> => {
-        return this.connectionLifecycleOwner.runAppServerCall(operation);
-      },
+      runAppServerCall,
       isConversationNotFoundError: <ErrorType,>(error: ErrorType): boolean => {
         return this.isConversationNotFoundError(error);
       }
     });
     this.threadManagementOwner = new CodexThreadManagementOwner({
       appClient: this.appClient,
-      runAppServerCall: async <ValueType,>(operation: () => Promise<ValueType>): Promise<ValueType> => {
-        return this.connectionLifecycleOwner.runAppServerCall(operation);
-      },
+      runAppServerCall,
       ensureCodexAvailable: () => {
         this.ensureCodexAvailable();
       }
@@ -164,7 +189,7 @@ export class CodexAgentAdapter implements AgentAdapter {
       const frameDescription = this.threadStreamStateOwner.describeFrame(frame);
 
       this.emitIpcFrame({
-        direction: "in",
+        direction: INBOUND_IPC_FRAME_DIRECTION,
         frame,
         method: frameDescription.method,
         threadId: frameDescription.threadId
@@ -189,27 +214,17 @@ export class CodexAgentAdapter implements AgentAdapter {
   }
 
   public isThreadNotLoadedError(error: Error): boolean {
-    if (!(error instanceof AppServerRpcError)) {
-      return false;
-    }
-
-    if (error.code !== APP_SERVER_INVALID_REQUEST_ERROR_CODE) {
-      return false;
-    }
-
-    return error.message.includes(THREAD_NOT_LOADED_ERROR_FRAGMENT);
+    return isInvalidRequestErrorMatchingMessageFragment(
+      error,
+      APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT.threadNotLoaded
+    );
   }
 
   public isConversationNotFoundError<ErrorType>(error: ErrorType): boolean {
-    if (!(error instanceof AppServerRpcError)) {
-      return false;
-    }
-
-    if (error.code !== APP_SERVER_INVALID_REQUEST_ERROR_CODE) {
-      return false;
-    }
-
-    return error.message.includes(CONVERSATION_NOT_FOUND_ERROR_FRAGMENT);
+    return isInvalidRequestErrorMatchingMessageFragment(
+      error,
+      APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT.conversationNotFound
+    );
   }
 
   public isEnabled(): boolean {

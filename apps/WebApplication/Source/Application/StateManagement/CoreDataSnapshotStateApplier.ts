@@ -19,7 +19,10 @@ import type {
 } from "./CoreDataSnapshotContracts";
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
 import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
-import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
+import {
+  type LoadActiveThreadStateResult,
+  ThreadListStateController
+} from "@/Features/Threads/StateManagement/ThreadListStateController";
 import type { AgentId } from "@/Shared/Contracts/ApiContracts";
 import type { DebugWorkspaceDataSnapshot } from "@/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 
@@ -33,6 +36,18 @@ type TraceStatus = CoreDataTraceStatusResponse;
 type HistoryResponse = CoreDataHistoryResponse;
 type DebugErrorsResponse = CoreDataDebugErrorsResponse;
 type AgentDescriptor = CoreDataAgentDescriptor;
+type ModeDescriptor = ModesResponse["data"][number];
+type ModelDescriptor = ModelsResponse["data"][number];
+type SignatureSegment = string | null | undefined;
+type ModeSignatureSegments = readonly [
+  modeIdentifier: ModeDescriptor["mode"],
+  modeName: ModeDescriptor["name"],
+  modeReasoningEffort: ModeDescriptor["reasoning_effort"]
+];
+type ModelSignatureSegments = readonly [
+  modelIdentifier: ModelDescriptor["id"],
+  modelDisplayName: ModelDescriptor["displayName"]
+];
 
 const SIGNATURE_SEGMENT_DELIMITER = "|";
 const EMPTY_SIGNATURE_SEGMENT = "";
@@ -86,20 +101,28 @@ export interface ApplyCoreDataSnapshotStateInput extends CoreDataSnapshotStateDe
 }
 
 function buildSignatureEntry(
-  segments: ReadonlyArray<string | null | undefined>
+  segments: ReadonlyArray<SignatureSegment>
 ): string {
   return segments.map((segment) => segment ?? EMPTY_SIGNATURE_SEGMENT).join(SIGNATURE_SEGMENT_DELIMITER);
 }
 
+function readModeSignatureSegments(mode: ModeDescriptor): ModeSignatureSegments {
+  return [mode.mode, mode.name, mode.reasoning_effort];
+}
+
+function readModelSignatureSegments(model: ModelDescriptor): ModelSignatureSegments {
+  return [model.id, model.displayName];
+}
+
 function buildModesSignature(modes: ModesResponse["data"]): string[] {
   return modes.map((mode) =>
-    buildSignatureEntry([mode.mode, mode.name, mode.reasoning_effort])
+    buildSignatureEntry(readModeSignatureSegments(mode))
   );
 }
 
 function buildModelsSignature(models: ModelsResponse["data"]): string[] {
   return models.map((model) =>
-    buildSignatureEntry([model.id, model.displayName])
+    buildSignatureEntry(readModelSignatureSegments(model))
   );
 }
 
@@ -261,73 +284,175 @@ function applyDebugWorkspaceSnapshot(input: {
   input.setDebugErrorSessionLogPath(input.snapshot.debugErrorSessionLogPath);
 }
 
+function applyHealthSnapshot(input: {
+  nextHealth: Health;
+  setHealth: Dispatch<SetStateAction<Health | null>>;
+}): void {
+  input.setHealth((previousHealth) => {
+    if (shouldReusePreviousHealth(previousHealth, input.nextHealth)) {
+      return previousHealth;
+    }
+    return input.nextHealth;
+  });
+}
+
+function applyActiveThreadSnapshot(input: {
+  nextActiveThreadState: LoadActiveThreadStateResult;
+  setThreads: Dispatch<SetStateAction<ThreadsResponse["data"]>>;
+  setUnreadThreadIds: Dispatch<SetStateAction<Record<string, true>>>;
+}): ThreadsResponse["data"] {
+  if (input.nextActiveThreadState.didChangeThreads) {
+    input.setThreads(input.nextActiveThreadState.nextThreads);
+  }
+
+  input.setUnreadThreadIds((previousUnreadThreadIdentifiers) => {
+    if (
+      ThreadGroupSelectors.unreadThreadIdentifierMapsMatch(
+        previousUnreadThreadIdentifiers,
+        input.nextActiveThreadState.nextUnreadThreadIdentifiers
+      )
+    ) {
+      return previousUnreadThreadIdentifiers;
+    }
+    return input.nextActiveThreadState.nextUnreadThreadIdentifiers;
+  });
+
+  return input.nextActiveThreadState.nextThreads;
+}
+
+function applyCapabilitiesSnapshot(input: {
+  nextCapabilitiesSnapshot: CapabilitiesCollectionSnapshot;
+  modesSignatureRef: MutableRefObject<string[]>;
+  modelsSignatureRef: MutableRefObject<string[]>;
+  setModes: Dispatch<SetStateAction<ModesResponse["data"]>>;
+  setModels: Dispatch<SetStateAction<ModelsResponse["data"]>>;
+  setConfigDefaults: Dispatch<SetStateAction<ConfigDefaults | null>>;
+}): void {
+  applySignedCollectionStateUpdate({
+    previousSignatureRef: input.modesSignatureRef,
+    nextSignature: input.nextCapabilitiesSnapshot.modesSignature,
+    nextCollection: input.nextCapabilitiesSnapshot.modes,
+    setCollection: input.setModes
+  });
+  applySignedCollectionStateUpdate({
+    previousSignatureRef: input.modelsSignatureRef,
+    nextSignature: input.nextCapabilitiesSnapshot.modelsSignature,
+    nextCollection: input.nextCapabilitiesSnapshot.models,
+    setCollection: input.setModels
+  });
+
+  if (!input.nextCapabilitiesSnapshot.defaults) {
+    return;
+  }
+
+  const nextDefaults = input.nextCapabilitiesSnapshot.defaults;
+  input.setConfigDefaults((previousDefaults) => {
+    if (shouldReusePreviousConfigDefaults(previousDefaults, nextDefaults)) {
+      return previousDefaults;
+    }
+    return nextDefaults;
+  });
+}
+
+function applyTraceStatusSnapshot(input: {
+  nextTraceStatus: TraceStatus;
+  setTraceStatus: Dispatch<SetStateAction<TraceStatus | null>>;
+}): void {
+  input.setTraceStatus((previousTraceStatus) => {
+    if (shouldReusePreviousTraceStatus(previousTraceStatus, input.nextTraceStatus)) {
+      return previousTraceStatus;
+    }
+    return input.nextTraceStatus;
+  });
+}
+
+function applyAgentSnapshot(input: {
+  nextAgents: AgentsResponse;
+  hasHydratedAgentSelectionRef: MutableRefObject<boolean>;
+  setAgentDescriptors: Dispatch<SetStateAction<AgentDescriptor[]>>;
+  setSelectedAgentId: Dispatch<SetStateAction<AgentId>>;
+}): AgentId {
+  input.setAgentDescriptors((previousDescriptors) => {
+    if (shouldReusePreviousAgentDescriptors(previousDescriptors, input.nextAgents.agents)) {
+      return previousDescriptors;
+    }
+    return input.nextAgents.agents;
+  });
+
+  const enabledAgents = readEnabledAgentIdentifiers(input.nextAgents);
+  const nextDefaultAgent = readNextDefaultAgentIdentifier(input.nextAgents, enabledAgents);
+  input.setSelectedAgentId((currentAgentId) => {
+    if (!input.hasHydratedAgentSelectionRef.current) {
+      input.hasHydratedAgentSelectionRef.current = true;
+      return nextDefaultAgent;
+    }
+    return enabledAgents.includes(currentAgentId) ? currentAgentId : nextDefaultAgent;
+  });
+  return nextDefaultAgent;
+}
+
+function applySelectedThreadSnapshot(input: {
+  preferredAgentId: AgentId | null;
+  nextThreadsForSelection: ThreadsResponse["data"];
+  threadListStateController: ThreadListStateController;
+  setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
+}): void {
+  input.setSelectedThreadId((currentSelectedThreadIdentifier) =>
+    input.threadListStateController.computeInitialSelectedThreadIdentifier({
+      currentSelectedThreadIdentifier,
+      preferredAgentIdentifier: input.preferredAgentId,
+      nextThreads: input.nextThreadsForSelection
+    })
+  );
+}
+
+function applySelectedModeKeySnapshot(input: {
+  nextCapabilitiesSnapshot: CapabilitiesCollectionSnapshot;
+  readInitialModeKey: (modes: ModesResponse["data"]) => string;
+  setSelectedModeKey: Dispatch<SetStateAction<string>>;
+}): void {
+  input.setSelectedModeKey((currentModeKey) => {
+    if (currentModeKey) {
+      return currentModeKey;
+    }
+    return input.readInitialModeKey(input.nextCapabilitiesSnapshot.modes);
+  });
+}
+
 export function applyCoreDataSnapshotState(input: ApplyCoreDataSnapshotStateInput): void {
   const nextCapabilitiesSnapshot = readCapabilitiesCollectionSnapshot(input.nextCapabilities);
-  const nextHealth = input.nextHealth;
-  const nextActiveThreadState = input.nextActiveThreadState;
-  const nextTraceStatus = input.nextTraceStatus;
-
-  let preferredAgentId: AgentId | null = null;
   let nextThreadsForSelection: ThreadsResponse["data"] | null = null;
 
-  if (nextHealth) {
-    input.setHealth((previousHealth) => {
-      if (shouldReusePreviousHealth(previousHealth, nextHealth)) {
-        return previousHealth;
-      }
-      return nextHealth;
+  if (input.nextHealth) {
+    applyHealthSnapshot({
+      nextHealth: input.nextHealth,
+      setHealth: input.setHealth
     });
   }
 
-  if (nextActiveThreadState) {
-    if (nextActiveThreadState.didChangeThreads) {
-      input.setThreads(nextActiveThreadState.nextThreads);
-    }
-    nextThreadsForSelection = nextActiveThreadState.nextThreads;
-
-    input.setUnreadThreadIds((previousUnreadThreadIdentifiers) => {
-      if (
-        ThreadGroupSelectors.unreadThreadIdentifierMapsMatch(
-          previousUnreadThreadIdentifiers,
-          nextActiveThreadState.nextUnreadThreadIdentifiers
-        )
-      ) {
-        return previousUnreadThreadIdentifiers;
-      }
-      return nextActiveThreadState.nextUnreadThreadIdentifiers;
+  if (input.nextActiveThreadState) {
+    nextThreadsForSelection = applyActiveThreadSnapshot({
+      nextActiveThreadState: input.nextActiveThreadState,
+      setThreads: input.setThreads,
+      setUnreadThreadIds: input.setUnreadThreadIds
     });
   }
 
   if (nextCapabilitiesSnapshot) {
-    applySignedCollectionStateUpdate({
-      previousSignatureRef: input.modesSignatureRef,
-      nextSignature: nextCapabilitiesSnapshot.modesSignature,
-      nextCollection: nextCapabilitiesSnapshot.modes,
-      setCollection: input.setModes
+    applyCapabilitiesSnapshot({
+      nextCapabilitiesSnapshot,
+      modesSignatureRef: input.modesSignatureRef,
+      modelsSignatureRef: input.modelsSignatureRef,
+      setModes: input.setModes,
+      setModels: input.setModels,
+      setConfigDefaults: input.setConfigDefaults
     });
-    applySignedCollectionStateUpdate({
-      previousSignatureRef: input.modelsSignatureRef,
-      nextSignature: nextCapabilitiesSnapshot.modelsSignature,
-      nextCollection: nextCapabilitiesSnapshot.models,
-      setCollection: input.setModels
-    });
-    if (nextCapabilitiesSnapshot.defaults) {
-      const nextDefaults = nextCapabilitiesSnapshot.defaults;
-      input.setConfigDefaults((previousDefaults) => {
-        if (shouldReusePreviousConfigDefaults(previousDefaults, nextDefaults)) {
-          return previousDefaults;
-        }
-        return nextDefaults;
-      });
-    }
   }
 
-  if (nextTraceStatus) {
-    input.setTraceStatus((previousTraceStatus) => {
-      if (shouldReusePreviousTraceStatus(previousTraceStatus, nextTraceStatus)) {
-        return previousTraceStatus;
-      }
-      return nextTraceStatus;
+  if (input.nextTraceStatus) {
+    applyTraceStatusSnapshot({
+      nextTraceStatus: input.nextTraceStatus,
+      setTraceStatus: input.setTraceStatus
     });
   }
 
@@ -343,44 +468,29 @@ export function applyCoreDataSnapshotState(input: ApplyCoreDataSnapshotStateInpu
     });
   }
 
-  const nextAgents = input.nextAgents;
-  if (nextAgents) {
-    input.setAgentDescriptors((previousDescriptors) => {
-      if (shouldReusePreviousAgentDescriptors(previousDescriptors, nextAgents.agents)) {
-        return previousDescriptors;
-      }
-      return nextAgents.agents;
-    });
-
-    const enabledAgents = readEnabledAgentIdentifiers(nextAgents);
-    const nextDefaultAgent = readNextDefaultAgentIdentifier(nextAgents, enabledAgents);
-
-    preferredAgentId = nextDefaultAgent;
-    input.setSelectedAgentId((currentAgentId) => {
-      if (!input.hasHydratedAgentSelectionRef.current) {
-        input.hasHydratedAgentSelectionRef.current = true;
-        return nextDefaultAgent;
-      }
-      return enabledAgents.includes(currentAgentId) ? currentAgentId : nextDefaultAgent;
-    });
-  }
+  const preferredAgentId = input.nextAgents
+    ? applyAgentSnapshot({
+      nextAgents: input.nextAgents,
+      hasHydratedAgentSelectionRef: input.hasHydratedAgentSelectionRef,
+      setAgentDescriptors: input.setAgentDescriptors,
+      setSelectedAgentId: input.setSelectedAgentId
+    })
+    : null;
 
   if (nextThreadsForSelection) {
-    input.setSelectedThreadId((currentSelectedThreadIdentifier) =>
-      input.threadListStateController.computeInitialSelectedThreadIdentifier({
-        currentSelectedThreadIdentifier,
-        preferredAgentIdentifier: preferredAgentId,
-        nextThreads: nextThreadsForSelection
-      })
-    );
+    applySelectedThreadSnapshot({
+      preferredAgentId,
+      nextThreadsForSelection,
+      threadListStateController: input.threadListStateController,
+      setSelectedThreadId: input.setSelectedThreadId
+    });
   }
 
   if (nextCapabilitiesSnapshot) {
-    input.setSelectedModeKey((currentModeKey) => {
-      if (currentModeKey) {
-        return currentModeKey;
-      }
-      return input.readInitialModeKey(nextCapabilitiesSnapshot.modes);
+    applySelectedModeKeySnapshot({
+      nextCapabilitiesSnapshot,
+      readInitialModeKey: input.readInitialModeKey,
+      setSelectedModeKey: input.setSelectedModeKey
     });
   }
 }

@@ -2,10 +2,31 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
 const SESSION_TOKEN_PART_DELIMITER = ".";
-const COOKIE_SEGMENT_DELIMITER = ";";
+const COOKIE_HEADER_SEGMENT_DELIMITER = ";";
+const SET_COOKIE_DIRECTIVE_DELIMITER = "; ";
 const SESSION_TOKEN_PART_COUNT = 4;
 const SESSION_NONCE_RANDOM_BYTE_LENGTH = 18;
 const MINIMUM_MAX_AGE_SECONDS = 1;
+const MILLISECONDS_PER_SECOND = 1_000;
+
+const SetCookieDirectiveByName = {
+  path: "Path=/",
+  httpOnly: "HttpOnly",
+  sameSiteLax: "SameSite=Lax",
+  secure: "Secure"
+} as const;
+
+const BrowserSessionAuthOwnerConfigurationErrorMessageByName = {
+  missingCookieName: "BrowserSessionAuthOwner requires a non-empty cookieName",
+  invalidSessionTimeToLiveMs: "BrowserSessionAuthOwner requires a positive integer sessionTimeToLiveMs",
+  missingSigningSecret: "BrowserSessionAuthOwner requires a non-empty signingSecret",
+  invalidSecureCookie: "BrowserSessionAuthOwner requires secureCookie to be a boolean"
+} as const;
+
+const CookieNameConfigurationSchema = z.string().trim().min(1);
+const SessionTimeToLiveMillisecondsConfigurationSchema = z.number().int().positive();
+const SigningSecretConfigurationSchema = z.string().trim().min(1);
+const SecureCookieConfigurationSchema = z.boolean();
 
 const Base64UrlTokenSegmentSchema = z.string().trim().min(1).regex(/^[A-Za-z0-9_-]+$/);
 const SessionTimestampTokenSegmentSchema = z
@@ -59,6 +80,10 @@ interface ParsedSessionToken {
   signature: string;
 }
 
+/**
+ * Owns browser-session cookie issuance and verification using signed self-contained tokens.
+ * Token format is `<issuedAtMs>.<expiresAtMs>.<nonce>.<signature>`.
+ */
 export class BrowserSessionAuthOwner {
   private readonly cookieName: string;
   private readonly sessionTimeToLiveMs: number;
@@ -71,22 +96,29 @@ export class BrowserSessionAuthOwner {
     configuration: BrowserSessionAuthOwnerConfiguration,
     dependencies?: BrowserSessionAuthOwnerDependencies
   ) {
-    const cookieName = configuration.cookieName.trim();
-    if (cookieName.length === 0) {
-      throw new Error("BrowserSessionAuthOwner requires a non-empty cookieName");
+    const parsedCookieName = CookieNameConfigurationSchema.safeParse(configuration.cookieName);
+    if (!parsedCookieName.success) {
+      throw new Error(BrowserSessionAuthOwnerConfigurationErrorMessageByName.missingCookieName);
     }
-    if (!Number.isInteger(configuration.sessionTimeToLiveMs) || configuration.sessionTimeToLiveMs <= 0) {
-      throw new Error("BrowserSessionAuthOwner requires a positive integer sessionTimeToLiveMs");
+    const parsedSessionTimeToLiveMilliseconds = SessionTimeToLiveMillisecondsConfigurationSchema.safeParse(
+      configuration.sessionTimeToLiveMs
+    );
+    if (!parsedSessionTimeToLiveMilliseconds.success) {
+      throw new Error(BrowserSessionAuthOwnerConfigurationErrorMessageByName.invalidSessionTimeToLiveMs);
     }
-    const signingSecret = configuration.signingSecret.trim();
-    if (signingSecret.length === 0) {
-      throw new Error("BrowserSessionAuthOwner requires a non-empty signingSecret");
+    const parsedSigningSecret = SigningSecretConfigurationSchema.safeParse(configuration.signingSecret);
+    if (!parsedSigningSecret.success) {
+      throw new Error(BrowserSessionAuthOwnerConfigurationErrorMessageByName.missingSigningSecret);
+    }
+    const parsedSecureCookie = SecureCookieConfigurationSchema.safeParse(configuration.secureCookie);
+    if (!parsedSecureCookie.success) {
+      throw new Error(BrowserSessionAuthOwnerConfigurationErrorMessageByName.invalidSecureCookie);
     }
 
-    this.cookieName = cookieName;
-    this.sessionTimeToLiveMs = configuration.sessionTimeToLiveMs;
-    this.signingSecret = signingSecret;
-    this.secureCookie = configuration.secureCookie;
+    this.cookieName = parsedCookieName.data;
+    this.sessionTimeToLiveMs = parsedSessionTimeToLiveMilliseconds.data;
+    this.signingSecret = parsedSigningSecret.data;
+    this.secureCookie = parsedSecureCookie.data;
     this.now = dependencies?.now ?? (() => Date.now());
     this.randomBytesFactory = dependencies?.randomBytesFactory ?? ((size) => randomBytes(size));
   }
@@ -98,7 +130,7 @@ export class BrowserSessionAuthOwner {
     const payload = this.buildPayload(issuedAtMs, expiresAtMs, nonce);
     const signature = this.sign(payload);
     const token = `${payload}${SESSION_TOKEN_PART_DELIMITER}${signature}`;
-    const expiresAt = new Date(expiresAtMs).toISOString();
+    const expiresAt = this.buildIsoTimestamp(expiresAtMs);
 
     return {
       setCookieHeaderValue: this.buildSetCookieHeaderValue(token, expiresAtMs),
@@ -108,26 +140,17 @@ export class BrowserSessionAuthOwner {
 
   public readSession(cookieHeaderValue: string | null): BrowserSessionReadResult {
     if (!cookieHeaderValue) {
-      return {
-        authenticated: false,
-        expiresAt: null
-      };
+      return this.buildUnauthenticatedReadResult();
     }
 
-    const sessionToken = this.readCookieValue(cookieHeaderValue, this.cookieName);
+    const sessionToken = this.readCookieValue(cookieHeaderValue);
     if (!sessionToken) {
-      return {
-        authenticated: false,
-        expiresAt: null
-      };
+      return this.buildUnauthenticatedReadResult();
     }
 
     const parsedSessionToken = this.parseSessionToken(sessionToken);
     if (!parsedSessionToken) {
-      return {
-        authenticated: false,
-        expiresAt: null
-      };
+      return this.buildUnauthenticatedReadResult();
     }
 
     const payload = this.buildPayload(
@@ -137,51 +160,45 @@ export class BrowserSessionAuthOwner {
     );
     const expectedSignature = this.sign(payload);
     if (!this.signaturesMatch(parsedSessionToken.signature, expectedSignature)) {
-      return {
-        authenticated: false,
-        expiresAt: null
-      };
+      return this.buildUnauthenticatedReadResult();
     }
 
     if (this.now() >= parsedSessionToken.expiresAtMs) {
-      return {
-        authenticated: false,
-        expiresAt: null
-      };
+      return this.buildUnauthenticatedReadResult();
     }
 
-    return {
-      authenticated: true,
-      expiresAt: new Date(parsedSessionToken.expiresAtMs).toISOString()
-    };
+    return this.buildAuthenticatedReadResult(parsedSessionToken.expiresAtMs);
   }
 
   private buildSetCookieHeaderValue(token: string, expiresAtMs: number): string {
     // Browsers treat Max-Age=0 as immediate expiry, so keep a minimum one-second lifetime.
-    const maxAgeSeconds = Math.max(MINIMUM_MAX_AGE_SECONDS, Math.floor(this.sessionTimeToLiveMs / 1_000));
+    const maxAgeSeconds = Math.max(
+      MINIMUM_MAX_AGE_SECONDS,
+      Math.floor(this.sessionTimeToLiveMs / MILLISECONDS_PER_SECOND)
+    );
     const directives = [
       `${this.cookieName}=${token}`,
-      "Path=/",
-      "HttpOnly",
-      "SameSite=Lax",
+      SetCookieDirectiveByName.path,
+      SetCookieDirectiveByName.httpOnly,
+      SetCookieDirectiveByName.sameSiteLax,
       `Max-Age=${String(maxAgeSeconds)}`,
-      `Expires=${new Date(expiresAtMs).toUTCString()}`
+      `Expires=${this.buildUtcTimestamp(expiresAtMs)}`
     ];
     if (this.secureCookie) {
-      directives.push("Secure");
+      directives.push(SetCookieDirectiveByName.secure);
     }
-    return directives.join("; ");
+    return directives.join(SET_COOKIE_DIRECTIVE_DELIMITER);
   }
 
-  private readCookieValue(cookieHeaderValue: string, cookieName: string): string | null {
-    const segments = cookieHeaderValue.split(COOKIE_SEGMENT_DELIMITER);
+  private readCookieValue(cookieHeaderValue: string): string | null {
+    const segments = cookieHeaderValue.split(COOKIE_HEADER_SEGMENT_DELIMITER);
     for (const segment of segments) {
       const equalsIndex = segment.indexOf("=");
       if (equalsIndex <= 0) {
         continue;
       }
       const name = segment.slice(0, equalsIndex).trim();
-      if (name !== cookieName) {
+      if (name !== this.cookieName) {
         continue;
       }
       const value = segment.slice(equalsIndex + 1).trim();
@@ -214,6 +231,28 @@ export class BrowserSessionAuthOwner {
 
   private buildPayload(issuedAtMs: number, expiresAtMs: number, nonce: string): string {
     return `${String(issuedAtMs)}${SESSION_TOKEN_PART_DELIMITER}${String(expiresAtMs)}${SESSION_TOKEN_PART_DELIMITER}${nonce}`;
+  }
+
+  private buildAuthenticatedReadResult(expiresAtMs: number): BrowserSessionReadResult {
+    return {
+      authenticated: true,
+      expiresAt: this.buildIsoTimestamp(expiresAtMs)
+    };
+  }
+
+  private buildUnauthenticatedReadResult(): BrowserSessionReadResult {
+    return {
+      authenticated: false,
+      expiresAt: null
+    };
+  }
+
+  private buildIsoTimestamp(timestampMilliseconds: number): string {
+    return new Date(timestampMilliseconds).toISOString();
+  }
+
+  private buildUtcTimestamp(timestampMilliseconds: number): string {
+    return new Date(timestampMilliseconds).toUTCString();
   }
 
   private sign(payload: string): string {

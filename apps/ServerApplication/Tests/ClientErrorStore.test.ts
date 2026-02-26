@@ -23,6 +23,21 @@ afterEach(() => {
 });
 
 describe("ClientErrorStore", () => {
+  it("rejects invalid store constructor contracts", () => {
+    const directory = makeTempDir();
+    const logPath = path.join(directory, "session.ndjson");
+
+    expect(() => new ClientErrorStore("", "session_1", 20)).toThrow(
+      "filePath must be a non-empty string"
+    );
+    expect(() => new ClientErrorStore(logPath, "", 20)).toThrow(
+      "sessionId must be a non-empty string"
+    );
+    expect(() => new ClientErrorStore(logPath, "session_1", 0)).toThrow(
+      "maxEntries must be a positive integer"
+    );
+  });
+
   it("records client and server errors and persists ndjson session log", () => {
     const directory = makeTempDir();
     const logPath = path.join(directory, "session.ndjson");
@@ -108,6 +123,35 @@ describe("ClientErrorStore", () => {
     expect(lines.length).toBe(2);
   });
 
+  it("uses maxEntries when list limit is not a positive integer", () => {
+    const directory = makeTempDir();
+    const logPath = path.join(directory, "session.ndjson");
+    const store = new ClientErrorStore(logPath, "session_4", 3);
+
+    store.recordClientError({
+      source: "web-app",
+      operation: "op-1",
+      message: "one",
+      details: {}
+    });
+    store.recordClientError({
+      source: "web-app",
+      operation: "op-2",
+      message: "two",
+      details: {}
+    });
+    store.recordClientError({
+      source: "web-app",
+      operation: "op-3",
+      message: "three",
+      details: {}
+    });
+
+    expect(store.list(0).map((entry) => entry.operation)).toEqual(["op-1", "op-2", "op-3"]);
+    expect(store.list(-1).map((entry) => entry.operation)).toEqual(["op-1", "op-2", "op-3"]);
+    expect(store.list(1.5).map((entry) => entry.operation)).toEqual(["op-1", "op-2", "op-3"]);
+  });
+
   it("clears stored events and truncates the session log file", () => {
     const directory = makeTempDir();
     const logPath = path.join(directory, "session.ndjson");
@@ -178,5 +222,41 @@ describe("ClientErrorStore", () => {
       sampledLineNumbers: [2, 3]
     });
     expect(warnSpy.mock.calls[0]?.[1]).toBe("client-error-store-skip-malformed-line");
+  });
+
+  it("returns deep-cloned event details from list and getById", () => {
+    const directory = makeTempDir();
+    const logPath = path.join(directory, "session.ndjson");
+    const store = new ClientErrorStore(logPath, "session_5", 20);
+
+    const created = store.recordClientError({
+      source: "web-app",
+      operation: "nested-detail",
+      message: "created",
+      details: {
+        nested: {
+          key: "value"
+        }
+      }
+    });
+
+    const listed = store.list(1)[0];
+    const byId = store.getById(created.errorId);
+    if (!listed || !byId) {
+      throw new Error("Expected created event to be returned");
+    }
+
+    listed.details.nested = {
+      key: "changed-from-list"
+    };
+    byId.details.nested = {
+      key: "changed-from-getById"
+    };
+
+    const stored = store.getById(created.errorId);
+    expect(stored).not.toBeNull();
+    expect(stored?.details.nested).toEqual({
+      key: "value"
+    });
   });
 });

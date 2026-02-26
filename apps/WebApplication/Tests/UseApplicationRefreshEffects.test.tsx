@@ -20,6 +20,12 @@ import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement
 import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import { ThreadListStateController } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
 
+const THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS = 30_000;
+const THREAD_QUERY_CACHE_MAXIMUM_ENTRY_COUNT = 100;
+const DISCONNECTED_CORE_REFRESH_INTERVAL_MILLISECONDS = 60_000;
+const CONNECTED_CORE_REFRESH_MINIMUM_INTERVAL_MILLISECONDS = 300_000;
+const CONNECTED_REFRESH_SUPPRESSION_OFFSET_MILLISECONDS = 1;
+
 interface HarnessProperties {
   input: UseApplicationRefreshEffectsInput;
 }
@@ -32,7 +38,10 @@ function Harness(properties: HarnessProperties): React.JSX.Element {
 function createThreadListStateController(): ThreadListStateController {
   return new ThreadListStateController({
     threadServerClient: new ThreadServerClient(),
-    threadQueryCache: new ThreadQueryCache(30_000, 100),
+    threadQueryCache: new ThreadQueryCache(
+      THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS,
+      THREAD_QUERY_CACHE_MAXIMUM_ENTRY_COUNT
+    ),
     threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
     threadListStateStore: new ThreadListStateStore(),
     threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
@@ -72,14 +81,16 @@ function createBaseInput(): UseApplicationRefreshEffectsInput {
     refreshCoreDataAndSelectedThread: vi.fn(async (): Promise<void> => {}),
     refreshPushClientState: vi.fn(async (): Promise<void> => {}),
     handleRuntimeRequestError: vi.fn(),
-    coreRefreshIntervalMs: 60_000,
-    coreRefreshConnectedMinIntervalMs: 300_000
+    coreRefreshIntervalMs: DISCONNECTED_CORE_REFRESH_INTERVAL_MILLISECONDS,
+    coreRefreshConnectedMinIntervalMs: CONNECTED_CORE_REFRESH_MINIMUM_INTERVAL_MILLISECONDS
   };
 }
 
 describe("useApplicationRefreshEffects", () => {
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("routes push-client refresh failures to runtime request error ownership", async () => {
@@ -108,5 +119,47 @@ describe("useApplicationRefreshEffects", () => {
 
     expect(input.loadArchivedThreads).toHaveBeenCalledTimes(1);
     expect(input.handleRuntimeRequestError).toHaveBeenCalledWith(expectedError);
+  });
+
+  it("refreshes core data on disconnected watchdog cadence when the document is visible", async () => {
+    vi.useFakeTimers();
+    const input = createBaseInput();
+
+    render(<Harness input={input} />);
+    await vi.advanceTimersByTimeAsync(DISCONNECTED_CORE_REFRESH_INTERVAL_MILLISECONDS);
+
+    expect(input.loadCoreDataTracked).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires an elapsed connected watchdog interval before refreshing core data", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(0));
+    const input = createBaseInput();
+    input.eventsConnectedRef.current = true;
+    input.lastCoreRefreshAtRef.current = CONNECTED_REFRESH_SUPPRESSION_OFFSET_MILLISECONDS;
+
+    render(<Harness input={input} />);
+
+    await vi.advanceTimersByTimeAsync(CONNECTED_CORE_REFRESH_MINIMUM_INTERVAL_MILLISECONDS);
+    expect(input.loadCoreDataTracked).toHaveBeenCalledTimes(0);
+
+    await vi.advanceTimersByTimeAsync(CONNECTED_CORE_REFRESH_MINIMUM_INTERVAL_MILLISECONDS);
+    expect(input.loadCoreDataTracked).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips watchdog refreshes while hidden and resumes after visibility returns", async () => {
+    vi.useFakeTimers();
+    const input = createBaseInput();
+    const visibilityStateGet = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockReturnValue("hidden");
+
+    render(<Harness input={input} />);
+    await vi.advanceTimersByTimeAsync(DISCONNECTED_CORE_REFRESH_INTERVAL_MILLISECONDS);
+    expect(input.loadCoreDataTracked).toHaveBeenCalledTimes(0);
+
+    visibilityStateGet.mockReturnValue("visible");
+    await vi.advanceTimersByTimeAsync(DISCONNECTED_CORE_REFRESH_INTERVAL_MILLISECONDS);
+    expect(input.loadCoreDataTracked).toHaveBeenCalledTimes(1);
   });
 });

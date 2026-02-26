@@ -36,9 +36,12 @@ const WebPushErrorSchema = z
 
 const MAX_PUSH_SEND_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 200;
-const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
-const PRUNED_SUBSCRIPTION_STATUS_CODES = new Set([404, 410]);
+const RETRY_BACKOFF_MULTIPLIER = 2;
+const RETRYABLE_PUSH_SEND_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const PRUNED_PUSH_SUBSCRIPTION_STATUS_CODES = new Set([404, 410]);
 const PUSH_SEND_FAILURE_MESSAGE = "Push send failed";
+const PUSH_RETRY_LOOP_EXHAUSTED_ERROR_MESSAGE = "Push send retry loop exhausted";
+const PUSH_NOTIFICATIONS_DISABLED_ERROR_MESSAGE = "Push notifications are disabled";
 const PUSH_REQUEST_TIME_TO_LIVE_SECONDS = 300;
 const PUSH_REQUEST_URGENCY: webPush.Urgency = "high";
 // Keep this bounded so one send cannot starve event-loop work under large subscription sets.
@@ -68,7 +71,7 @@ function shouldRetrySendFailure(statusCode: number | null): boolean {
   if (statusCode === null) {
     return true;
   }
-  return RETRYABLE_STATUS_CODES.has(statusCode);
+  return RETRYABLE_PUSH_SEND_STATUS_CODES.has(statusCode);
 }
 
 function sleep(delayMs: number): Promise<void> {
@@ -97,12 +100,12 @@ async function sendNotificationWithRetry(
         throw error;
       }
 
-      const delayMs = RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
+      const delayMs = RETRY_BASE_DELAY_MS * RETRY_BACKOFF_MULTIPLIER ** (attempt - 1);
       await sleep(delayMs);
     }
   }
 
-  throw new Error("Push send retry loop exhausted");
+  throw new Error(PUSH_RETRY_LOOP_EXHAUSTED_ERROR_MESSAGE);
 }
 
 function toWireSubscription(subscription: StoredPushSubscription): webPush.PushSubscription {
@@ -134,6 +137,7 @@ async function sendSubscriptionsWithConcurrencyLimit(
   const workerCount = Math.min(PUSH_SEND_CONCURRENCY_LIMIT, subscriptions.length);
   const workers = Array.from({ length: workerCount }, async () => {
     while (true) {
+      // Claiming the index before awaiting guarantees each worker receives a unique slot.
       const subscriptionIndex = nextSubscriptionIndex;
       nextSubscriptionIndex += 1;
       const subscription = subscriptions[subscriptionIndex];
@@ -150,6 +154,7 @@ async function sendSubscriptionsWithConcurrencyLimit(
         delivered += 1;
       } catch (error) {
         const described = describePushError(error);
+        // Aggregates are append/count-only; entry order reflects completion timing by design.
         failures.push({
           endpoint: subscription.subscription.endpoint,
           statusCode: described.statusCode,
@@ -157,7 +162,7 @@ async function sendSubscriptionsWithConcurrencyLimit(
         });
         if (
           described.statusCode !== null
-          && PRUNED_SUBSCRIPTION_STATUS_CODES.has(described.statusCode)
+          && PRUNED_PUSH_SUBSCRIPTION_STATUS_CODES.has(described.statusCode)
         ) {
           prunedEndpoints.push(subscription.subscription.endpoint);
         }
@@ -204,7 +209,7 @@ export class PushService {
 
   public getPublicKey(): string {
     if (!this.enabled) {
-      throw new Error("Push notifications are disabled");
+      throw new Error(PUSH_NOTIFICATIONS_DISABLED_ERROR_MESSAGE);
     }
     return this.vapidPublicKey;
   }

@@ -23,6 +23,10 @@ import { PushReceiptStore } from "../Source/Modules/PushNotifications/PushReceip
 import { PushSendStore } from "../Source/Modules/PushNotifications/PushSendStore.js";
 import { PushMutationConcurrencyCoordinator } from "../Source/Network/PushMutationConcurrencyCoordinator.js";
 import {
+  PushRouteMethodByName,
+  PushRoutePathnameByName
+} from "../Source/Network/Routes/PushRouteContracts.js";
+import {
   handlePushRoutes,
   type PushRouteDependencies
 } from "../Source/Network/Routes/PushRoutes.js";
@@ -160,8 +164,8 @@ describe("handlePushRoutes", () => {
       const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
 
       const statusResult = await executePushRoute({
-        method: "GET",
-        pathname: "/api/push/status",
+        method: PushRouteMethodByName.get,
+        pathname: PushRoutePathnameByName.status,
         pushService,
         pushStore,
         pushReceiptStore,
@@ -183,8 +187,8 @@ describe("handlePushRoutes", () => {
       });
 
       const disabledKeyResult = await executePushRoute({
-        method: "GET",
-        pathname: "/api/push/vapid-public-key",
+        method: PushRouteMethodByName.get,
+        pathname: PushRoutePathnameByName.vapidPublicKey,
         pushService,
         pushStore,
         pushReceiptStore,
@@ -208,8 +212,8 @@ describe("handlePushRoutes", () => {
       vi.spyOn(pushService, "getPublicKey").mockReturnValue("PublicVapidKey");
 
       const enabledKeyResult = await executePushRoute({
-        method: "GET",
-        pathname: "/api/push/vapid-public-key",
+        method: PushRouteMethodByName.get,
+        pathname: PushRoutePathnameByName.vapidPublicKey,
         pushService,
         pushStore,
         pushReceiptStore,
@@ -256,8 +260,8 @@ describe("handlePushRoutes", () => {
       const createdAt = "2026-02-26T00:00:00.000Z";
 
       const recordResult = await executePushRoute({
-        method: "POST",
-        pathname: "/api/push/receipts",
+        method: PushRouteMethodByName.post,
+        pathname: PushRoutePathnameByName.receipts,
         pushService,
         pushStore,
         pushReceiptStore,
@@ -284,8 +288,8 @@ describe("handlePushRoutes", () => {
       expect(pushReceiptStore.getCount()).toBe(1);
 
       const latestReceiptResult = await executePushRoute({
-        method: "GET",
-        pathname: "/api/push/receipts/latest",
+        method: PushRouteMethodByName.get,
+        pathname: PushRoutePathnameByName.receiptsLatest,
         pushService,
         pushStore,
         pushReceiptStore,
@@ -341,8 +345,8 @@ describe("handlePushRoutes", () => {
       const pushLocalCaSourcePath = path.join(temporaryDirectory, "rootCA.pem");
 
       const localCaStatusResult = await executePushRoute({
-        method: "GET",
-        pathname: "/api/push/local-ca",
+        method: PushRouteMethodByName.get,
+        pathname: PushRoutePathnameByName.localCa,
         pushService,
         pushStore,
         pushReceiptStore,
@@ -364,8 +368,8 @@ describe("handlePushRoutes", () => {
       });
 
       const missingDownloadResult = await executePushRoute({
-        method: "GET",
-        pathname: "/api/push/local-ca/download",
+        method: PushRouteMethodByName.get,
+        pathname: PushRoutePathnameByName.localCaDownload,
         pushService,
         pushStore,
         pushReceiptStore,
@@ -411,8 +415,8 @@ describe("handlePushRoutes", () => {
       const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
 
       const createResult = await executePushRoute({
-        method: "POST",
-        pathname: "/api/push/subscriptions",
+        method: PushRouteMethodByName.post,
+        pathname: PushRoutePathnameByName.subscriptions,
         pushService,
         pushStore,
         pushReceiptStore,
@@ -443,8 +447,8 @@ describe("handlePushRoutes", () => {
       expect(pushStore.getSubscriptionCount()).toBe(1);
 
       const deleteResult = await executePushRoute({
-        method: "DELETE",
-        pathname: "/api/push/subscriptions",
+        method: PushRouteMethodByName.delete,
+        pathname: PushRoutePathnameByName.subscriptions,
         pushService,
         pushStore,
         pushReceiptStore,
@@ -490,8 +494,49 @@ describe("handlePushRoutes", () => {
       const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
 
       const result = await executePushRoute({
-        method: "GET",
+        method: PushRouteMethodByName.get,
         pathname: "/api/threads",
+        pushService,
+        pushStore,
+        pushReceiptStore,
+        pushSendStore,
+        pushMutationConcurrencyCoordinator,
+        pushLocalCaSourcePath: path.join(temporaryDirectory, "rootCA.pem"),
+        readJsonBody: async () => ({})
+      });
+
+      expect(result.handled).toBe(false);
+      expect(result.statusCode).toBeNull();
+      expect(result.body).toBeNull();
+    } finally {
+      fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("returns false for unowned push route paths", async () => {
+    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "push-routes-unowned-push-path-"));
+    try {
+      const pushService = new PushService({
+        enabled: false,
+        vapidPublicKey: "",
+        vapidPrivateKey: "",
+        vapidSubject: "mailto:test@example.com"
+      });
+      const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
+      pushStore.load();
+      const pushReceiptStore = new PushReceiptStore(
+        path.join(temporaryDirectory, "push-receipts.json"),
+        100,
+        86_400_000
+      );
+      pushReceiptStore.load();
+      const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
+      pushSendStore.load();
+      const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
+
+      const result = await executePushRoute({
+        method: PushRouteMethodByName.get,
+        pathname: "/api/push/not-owned",
         pushService,
         pushStore,
         pushReceiptStore,

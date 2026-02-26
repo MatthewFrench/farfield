@@ -131,6 +131,8 @@ const STARTUP_TAGGED_ERROR_PATTERN = /^[a-z][a-z0-9._-]{1,64}:\s*(.+)$/i;
 const THREAD_LIST_UPDATED_AT_SORT_KEY = "updated_at" as const;
 // Yield one event-loop turn so critical startup reads can commit before non-critical hydration starts.
 const DEFERRED_STARTUP_NEXT_TURN_DELAY_MILLISECONDS = 0;
+const STARTUP_CRITICAL_THREAD_READ_FROM_CACHE = true;
+const STARTUP_THREAD_REVALIDATION_READ_FROM_CACHE = false;
 const CONFIG_DEFAULTS_AGENT_ID: AgentId = "codex";
 
 function createStartupTaggedError<ErrorType>(operation: string, error: ErrorType): Error {
@@ -196,14 +198,38 @@ async function readCapabilitySnapshot(input: CapabilitySnapshotReadInput): Promi
   };
 }
 
+function isDeferredStartupReadStale(
+  deferredStartupSequenceRef: MutableRefObject<number>,
+  deferredStartupSequence: number
+): boolean {
+  return deferredStartupSequenceRef.current !== deferredStartupSequence;
+}
+
+function applyDeferredStartupSnapshotResult<ResultValue>(input: {
+  result: PromiseSettledResult<ResultValue>;
+  operation: string;
+  toSnapshotPartial: (value: ResultValue) => CoreDataSnapshotPartial | null;
+  applySnapshotState: SnapshotStateApplier;
+  reportDeferredStartupFailure: DeferredStartupFailureReporter;
+}): void {
+  applyDeferredStartupResult({
+    result: input.result,
+    operation: input.operation,
+    onFulfilled: (resultValue) => {
+      const nextSnapshotPartial = input.toSnapshotPartial(resultValue);
+      if (nextSnapshotPartial) { input.applySnapshotState(nextSnapshotPartial); }
+    },
+    reportDeferredStartupFailure: input.reportDeferredStartupFailure
+  });
+}
+
 async function runDeferredStartupReads(input: DeferredStartupReadsInput): Promise<void> {
-  if (input.deferredStartupSequenceRef.current !== input.deferredStartupSequence) {
+  if (isDeferredStartupReadStale(input.deferredStartupSequenceRef, input.deferredStartupSequence)) {
     return;
   }
 
   const shouldLoadDebugWorkspaceData = input.activeTabRef.current === "debug";
   const now = Date.now();
-
   const startupDeferredHealthRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_HEALTH_OPERATION);
   const startupDeferredAgentsRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_AGENTS_OPERATION);
   const startupDeferredTraceStatusRequest = input.buildActionRequestOptions(
@@ -223,7 +249,6 @@ async function runDeferredStartupReads(input: DeferredStartupReadsInput): Promis
       }),
     now
   );
-
   const debugWorkspaceDataPromise = shouldLoadDebugWorkspaceData
     ? input.debugWorkspaceDataReader.readSnapshot(
       input.debugHistoryLimit,
@@ -239,6 +264,7 @@ async function runDeferredStartupReads(input: DeferredStartupReadsInput): Promis
     )
     : Promise.resolve<DebugWorkspaceDataSnapshot | null>(null);
 
+  // Deferred startup reads are intentionally parallel so non-critical hydration stays bounded by the slowest read.
   const [nextHealthResult, nextAgentsResult, nextCapabilitiesResult, nextTraceStatusResult, nextDebugWorkspaceDataResult] = await Promise.allSettled([
     input.capabilityServerClient.readHealthStatus(startupDeferredHealthRequest.requestOptions),
     input.capabilityServerClient.listAgents(startupDeferredAgentsRequest.requestOptions),
@@ -249,66 +275,44 @@ async function runDeferredStartupReads(input: DeferredStartupReadsInput): Promis
     debugWorkspaceDataPromise
   ]);
 
-  if (input.deferredStartupSequenceRef.current !== input.deferredStartupSequence) {
+  // If another startup pass advanced the sequence while these reads were in flight, discard stale completion.
+  if (isDeferredStartupReadStale(input.deferredStartupSequenceRef, input.deferredStartupSequence)) {
     return;
   }
 
-  applyDeferredStartupResult({
+  applyDeferredStartupSnapshotResult({
     result: nextHealthResult,
     operation: STARTUP_DEFERRED_HEALTH_OPERATION,
-    onFulfilled: (nextHealth) => {
-      input.applySnapshotState({
-        nextHealth
-      });
-    },
+    toSnapshotPartial: (nextHealth) => ({ nextHealth }),
+    applySnapshotState: input.applySnapshotState,
     reportDeferredStartupFailure: input.reportDeferredStartupFailure
   });
-
-  applyDeferredStartupResult({
+  applyDeferredStartupSnapshotResult({
     result: nextAgentsResult,
     operation: STARTUP_DEFERRED_AGENTS_OPERATION,
-    onFulfilled: (nextAgents) => {
-      input.applySnapshotState({
-        nextAgents
-      });
-    },
+    toSnapshotPartial: (nextAgents) => ({ nextAgents }),
+    applySnapshotState: input.applySnapshotState,
     reportDeferredStartupFailure: input.reportDeferredStartupFailure
   });
-
-  applyDeferredStartupResult({
+  applyDeferredStartupSnapshotResult({
     result: nextCapabilitiesResult,
     operation: STARTUP_DEFERRED_MODES_OPERATION,
-    onFulfilled: (nextCapabilities) => {
-      input.applySnapshotState({
-        nextCapabilities
-      });
-    },
+    toSnapshotPartial: (nextCapabilities) => ({ nextCapabilities }),
+    applySnapshotState: input.applySnapshotState,
     reportDeferredStartupFailure: input.reportDeferredStartupFailure
   });
-
-  applyDeferredStartupResult({
+  applyDeferredStartupSnapshotResult({
     result: nextTraceStatusResult,
     operation: STARTUP_DEFERRED_TRACE_STATUS_OPERATION,
-    onFulfilled: (nextTraceStatus) => {
-      if (nextTraceStatus) {
-        input.applySnapshotState({
-          nextTraceStatus
-        });
-      }
-    },
+    toSnapshotPartial: (nextTraceStatus) => (nextTraceStatus ? { nextTraceStatus } : null),
+    applySnapshotState: input.applySnapshotState,
     reportDeferredStartupFailure: input.reportDeferredStartupFailure
   });
-
-  applyDeferredStartupResult({
+  applyDeferredStartupSnapshotResult({
     result: nextDebugWorkspaceDataResult,
     operation: STARTUP_DEFERRED_DEBUG_HISTORY_OPERATION,
-    onFulfilled: (debugWorkspaceData) => {
-      if (debugWorkspaceData) {
-        input.applySnapshotState({
-          debugWorkspaceData
-        });
-      }
-    },
+    toSnapshotPartial: (debugWorkspaceData) => (debugWorkspaceData ? { debugWorkspaceData } : null),
+    applySnapshotState: input.applySnapshotState,
     reportDeferredStartupFailure: input.reportDeferredStartupFailure
   });
 }
@@ -447,7 +451,7 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
           selectedThreadIdentifier: input.selectedThreadIdRef.current,
           // Prefer hot cache reads for event-driven refresh responsiveness.
           // Mutation owners invalidate this cache key before invoking refresh.
-          readFromCache: true,
+          readFromCache: STARTUP_CRITICAL_THREAD_READ_FROM_CACHE,
           requestOptions: startupCriticalThreadsRequest.requestOptions
         })
       );
@@ -462,6 +466,7 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
     const deferredStartupSequence = deferredStartupSequenceRef.current + 1;
     deferredStartupSequenceRef.current = deferredStartupSequence;
 
+    // Keep startup sequencing deterministic: apply critical thread state first, then defer non-critical reads.
     scheduleDeferredStartupReads({
       activeTabRef: input.activeTabRef,
       debugHistoryLimit: input.debugHistoryLimit,
@@ -476,7 +481,6 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
       applySnapshotState,
       reportDeferredStartupFailure
     });
-
     if (nextActiveThreadState.loadedFromCache) {
       const startupDeferredThreadRevalidateRequest = input.buildActionRequestOptions(
         STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION
@@ -490,7 +494,7 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
           threadListMaxPages: input.threadListMaxPages,
           previousUnreadThreadIdentifiers: nextActiveThreadState.nextUnreadThreadIdentifiers,
           selectedThreadIdentifier: input.selectedThreadIdRef.current,
-          readFromCache: false,
+          readFromCache: STARTUP_THREAD_REVALIDATION_READ_FROM_CACHE,
           requestOptions: startupDeferredThreadRevalidateRequest.requestOptions
         },
         applySnapshotState,

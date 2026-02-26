@@ -30,6 +30,7 @@ const WEB_PUSH_DEFAULT_TITLE = "Farfield thread completed";
 const WEB_PUSH_DEFAULT_BODY = "A response is ready in Farfield.";
 const WEB_PUSH_TITLE_MAX_LENGTH = 120;
 const WEB_PUSH_BODY_MAX_LENGTH = 320;
+const NOTIFICATION_TEXT_TRUNCATION_SUFFIX = "...";
 const PUSH_FAILURE_LOG_SAMPLE_LIMIT = 10; // Keep warning payloads bounded while preserving representative failures.
 
 const CompletionNotificationLogEventName = {
@@ -110,6 +111,12 @@ const EMPTY_WEB_PUSH_COMPLETION_DISPATCH_RESULT: WebPushCompletionDispatchResult
   failures: 0
 };
 
+const DEFAULT_COMPLETION_NOTIFICATION_CONTEXT: CompletionNotificationContext = {
+  preview: DEFAULT_THREAD_NOTIFICATION_PREVIEW,
+  threadName: DEFAULT_THREAD_NOTIFICATION_NAME,
+  projectName: DEFAULT_PROJECT_NAME
+};
+
 // Owns completion notification fan-out and watermark commits.
 // Debounced scheduler reruns are expected; commit only advances after delivery succeeds.
 export class ThreadCompletionNotificationService {
@@ -169,7 +176,7 @@ export class ThreadCompletionNotificationService {
       }
 
       const dispatchTargets = await this.readCompletionDispatchTargets();
-      if (!dispatchTargets.hasNtfyTarget && !dispatchTargets.hasWebPushTarget) {
+      if (!this.hasCompletionDispatchTarget(dispatchTargets)) {
         return;
       }
 
@@ -194,7 +201,7 @@ export class ThreadCompletionNotificationService {
 
       // Watermark commit is gated on at least one successful delivery so future
       // debounced checks can retry the same completion when every channel fails.
-      if (!ntfyDispatchResult.delivered && webPushDispatchResult.delivered === 0) {
+      if (!this.hasCompletionDelivery({ ntfyDispatchResult, webPushDispatchResult })) {
         return;
       }
 
@@ -460,7 +467,35 @@ export class ThreadCompletionNotificationService {
     if (normalized.length <= maxLength) {
       return normalized;
     }
-    return `${normalized.slice(0, maxLength - 3)}...`;
+    return `${normalized.slice(0, maxLength - NOTIFICATION_TEXT_TRUNCATION_SUFFIX.length)}${NOTIFICATION_TEXT_TRUNCATION_SUFFIX}`;
+  }
+
+  private hasCompletionDispatchTarget(dispatchTargets: CompletionDispatchTargets): boolean {
+    return dispatchTargets.hasNtfyTarget || dispatchTargets.hasWebPushTarget;
+  }
+
+  private hasCompletionDelivery(input: {
+    ntfyDispatchResult: NtfyCompletionDispatchResult;
+    webPushDispatchResult: WebPushCompletionDispatchResult;
+  }): boolean {
+    return input.ntfyDispatchResult.delivered || input.webPushDispatchResult.delivered > 0;
+  }
+
+  private resolveThreadNameForNotificationContext(preview: string, title: string): string {
+    return preview.length > 0 ? preview : title;
+  }
+
+  private resolveProjectNameForNotificationContext(
+    cwd: string | null,
+    pathValue: string | null
+  ): string {
+    if (cwd) {
+      return this.projectLabelFromPath(cwd);
+    }
+    if (pathValue) {
+      return this.projectLabelFromPath(pathValue);
+    }
+    return DEFAULT_PROJECT_NAME;
   }
 
   private readThreadNotificationContext(
@@ -476,11 +511,7 @@ export class ThreadCompletionNotificationService {
         },
         CompletionNotificationLogEventName.threadNotificationContextParseFailed
       );
-      return {
-        preview: DEFAULT_THREAD_NOTIFICATION_PREVIEW,
-        threadName: DEFAULT_THREAD_NOTIFICATION_NAME,
-        projectName: DEFAULT_PROJECT_NAME
-      };
+      return DEFAULT_COMPLETION_NOTIFICATION_CONTEXT;
     }
 
     const preview = this.normalizeOptionalString(parsed.data.preview ?? null) ?? "";
@@ -488,12 +519,12 @@ export class ThreadCompletionNotificationService {
     const cwd = this.normalizeOptionalString(parsed.data.cwd ?? null);
     const pathValue = this.normalizeOptionalString(parsed.data.path ?? null);
 
+    // Preserve priority order used by downstream notification owners:
+    // preview text wins for thread label, then title, while cwd outranks path for project label.
     return {
       preview,
-      threadName: preview.length > 0 ? preview : title,
-      projectName: cwd
-        ? this.projectLabelFromPath(cwd)
-        : (pathValue ? this.projectLabelFromPath(pathValue) : DEFAULT_PROJECT_NAME)
+      threadName: this.resolveThreadNameForNotificationContext(preview, title),
+      projectName: this.resolveProjectNameForNotificationContext(cwd, pathValue)
     };
   }
 

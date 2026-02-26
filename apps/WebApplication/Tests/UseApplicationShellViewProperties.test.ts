@@ -1,5 +1,11 @@
-import { createElement, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
-import { cleanup, render } from "@testing-library/react";
+import {
+  createElement,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+  useState
+} from "react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
   afterEach,
   describe,
@@ -29,6 +35,32 @@ function Harness(properties: HarnessProperties): React.JSX.Element {
   const viewProperties = useApplicationShellViewProperties(properties.input);
   properties.onProperties(viewProperties);
   return createElement("div", { "data-testid": "use-application-shell-view-properties-harness" });
+}
+
+interface ShowOlderMessagesHarnessProperties {
+  input: UseApplicationShellViewPropertiesInput;
+  initialVisibleChatItemLimit: number;
+  onVisibleChatItemLimitChange: (nextVisibleChatItemLimit: number) => void;
+}
+
+function ShowOlderMessagesHarness(
+  properties: ShowOlderMessagesHarnessProperties
+): React.JSX.Element {
+  const [visibleChatItemLimit, setVisibleChatItemLimit] = useState<number>(
+    properties.initialVisibleChatItemLimit
+  );
+  const viewProperties = useApplicationShellViewProperties({
+    ...properties.input,
+    setVisibleChatItemLimit
+  });
+
+  properties.onVisibleChatItemLimitChange(visibleChatItemLimit);
+
+  return createElement("button", {
+    type: "button",
+    "data-testid": "show-older-messages-button",
+    onClick: viewProperties.chatWorkspacePaneProperties.onShowOlderMessages
+  });
 }
 
 function createStateSetterSpy<ValueType>(): Dispatch<SetStateAction<ValueType>> {
@@ -258,6 +290,38 @@ function renderViewProperties(
   return capturedProperties.current;
 }
 
+function renderShowOlderMessagesHarness(
+  input: UseApplicationShellViewPropertiesInput,
+  initialVisibleChatItemLimit: number
+): {
+  clickShowOlderMessages: () => void;
+  getLatestVisibleChatItemLimit: () => number;
+} {
+  const visibleChatItemLimitValues: number[] = [];
+
+  render(createElement(ShowOlderMessagesHarness, {
+    input,
+    initialVisibleChatItemLimit,
+    onVisibleChatItemLimitChange: (nextVisibleChatItemLimit) => {
+      visibleChatItemLimitValues.push(nextVisibleChatItemLimit);
+    }
+  }));
+
+  return {
+    clickShowOlderMessages: () => {
+      fireEvent.click(screen.getByTestId("show-older-messages-button"));
+    },
+    getLatestVisibleChatItemLimit: () => {
+      const latestVisibleChatItemLimit = visibleChatItemLimitValues.at(-1);
+      if (latestVisibleChatItemLimit === undefined) {
+        throw new Error("Expected visible chat item limit to be captured.");
+      }
+
+      return latestVisibleChatItemLimit;
+    }
+  };
+}
+
 describe("useApplicationShellViewProperties", () => {
   afterEach(() => {
     cleanup();
@@ -337,6 +401,23 @@ describe("useApplicationShellViewProperties", () => {
     viewProperties.chatWorkspacePaneProperties.onJumpToBottom();
 
     expect(fixture.setIsChatAtBottomSpy).not.toHaveBeenCalled();
+  });
+
+  it("increases the visible chat item limit by step and caps at the total conversation item count", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.conversationItemCount = 100;
+    fixture.input.visibleChatItemsStep = 25;
+
+    const harness = renderShowOlderMessagesHarness(fixture.input, 50);
+
+    harness.clickShowOlderMessages();
+    expect(harness.getLatestVisibleChatItemLimit()).toBe(75);
+
+    harness.clickShowOlderMessages();
+    expect(harness.getLatestVisibleChatItemLimit()).toBe(100);
+
+    harness.clickShowOlderMessages();
+    expect(harness.getLatestVisibleChatItemLimit()).toBe(100);
   });
 
   it("clears api session bootstrap error after token draft changes when an error is currently shown", () => {

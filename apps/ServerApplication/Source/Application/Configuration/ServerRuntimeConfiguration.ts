@@ -117,6 +117,16 @@ const ServerRuntimeParsingConstants = Object.freeze({
   trueText: "true",
   trueNumeric: "1"
 });
+const PositiveIntegerEnvironmentValueSchema = z.coerce
+  .number()
+  .int()
+  .min(ServerRuntimeParsingConstants.minimumPositiveInteger);
+const BooleanEnvironmentValueSchema = z.enum([
+  ServerRuntimeParsingConstants.trueNumeric,
+  ServerRuntimeParsingConstants.trueText,
+  ServerRuntimeParsingConstants.falseNumeric,
+  ServerRuntimeParsingConstants.falseText
+]);
 const ServerRuntimeGitCommandConfiguration = Object.freeze({
   command: "git",
   outputEncoding: "utf8",
@@ -141,32 +151,19 @@ function readTrimmedEnvironmentValue(env: NodeJS.ProcessEnv, variableName: strin
 }
 
 function parsePositiveInteger(value: string | null, defaultValue: number): number {
-  if (!value) {
-    return defaultValue;
-  }
-
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < ServerRuntimeParsingConstants.minimumPositiveInteger) {
-    return defaultValue;
-  }
-
-  return parsed;
+  const parsed = PositiveIntegerEnvironmentValueSchema.safeParse(value);
+  return parsed.success ? parsed.data : defaultValue;
 }
 
 function parseBooleanEnvironmentValue(value: string | null, defaultValue: boolean): boolean {
-  if (!value) {
+  // Keep this strict and case-sensitive so only explicit opt-in tokens toggle behavior.
+  const parsed = BooleanEnvironmentValueSchema.safeParse(value);
+  if (!parsed.success) {
     return defaultValue;
   }
 
-  if (value === ServerRuntimeParsingConstants.trueNumeric || value === ServerRuntimeParsingConstants.trueText) {
-    return true;
-  }
-
-  if (value === ServerRuntimeParsingConstants.falseNumeric || value === ServerRuntimeParsingConstants.falseText) {
-    return false;
-  }
-
-  return defaultValue;
+  return parsed.data === ServerRuntimeParsingConstants.trueNumeric
+    || parsed.data === ServerRuntimeParsingConstants.trueText;
 }
 
 function parseOptionalPathEnvironmentValue(label: string, value: string | undefined): string | null {

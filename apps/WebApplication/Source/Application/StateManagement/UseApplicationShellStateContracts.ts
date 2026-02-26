@@ -29,17 +29,20 @@ import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGr
 type AgentDescriptor = CapabilityAgentsResponse["agents"][number];
 type ApplicationShellStateSetter<Value> = Dispatch<SetStateAction<Value>>;
 type ApplicationShellMutableReference<Value> = MutableRefObject<Value>;
-type UnreadThreadIdentifierMap = Record<string, true>;
-type AnswerDraftEntry = { option: string; freeform: string };
-type AnswerDraftState = Record<string, AnswerDraftEntry>;
-type CollapsedProjectGroupMap = Record<string, boolean>;
-type ApplicationShellTab = "chat" | "debug";
-type CoreDataLoadFunction = () => Promise<void>;
-type SelectedThreadLoadFunction = (
+export type UnreadThreadIdentifierMap = Record<string, true>;
+export interface AnswerDraftEntry {
+  option: string;
+  freeform: string;
+}
+export type AnswerDraftState = Record<string, AnswerDraftEntry>;
+export type CollapsedProjectGroupMap = Record<string, boolean>;
+export type ApplicationShellTab = "chat" | "debug";
+export type CoreDataLoadFunction = () => Promise<void>;
+export type SelectedThreadLoadFunction = (
   threadId: string,
   options?: LoadSelectedThreadOptions
 ) => Promise<void>;
-type SignatureTokens = string[];
+export type SignatureTokens = string[];
 
 export interface UseApplicationShellStateInput {
   initialUiState: ApplicationRouteState;

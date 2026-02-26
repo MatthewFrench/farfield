@@ -55,6 +55,10 @@ const OpenCodeClientOptionsSchema = z
 
 type OpenCodeParsedClientOptions = z.infer<typeof OpenCodeClientOptionsSchema>;
 
+interface OpenCodeSdkResponseEnvelope<DataType> {
+  data: DataType | undefined;
+}
+
 function mapSdkResponseEnvelope<DataType>(
   data: DataType | undefined
 ): OpenCodeApiResponseEnvelope {
@@ -67,6 +71,13 @@ function mapSdkResponseEnvelope<DataType>(
   };
 }
 
+async function mapSdkResponsePromise<DataType>(
+  responsePromise: Promise<OpenCodeSdkResponseEnvelope<DataType>>
+): Promise<OpenCodeApiResponseEnvelope> {
+  const response = await responsePromise;
+  return mapSdkResponseEnvelope(response.data);
+}
+
 function createDefaultOpenCodeClient(
   configuration: OpenCodeClientConfiguration
 ): OpenCodeMonitorClient {
@@ -74,43 +85,21 @@ function createDefaultOpenCodeClient(
     baseUrl: configuration.baseUrl
   };
   const sdkClient = createOpencodeClient(sdkConfiguration);
+  const sdkSessionClient = sdkClient.session;
+  const sdkProjectClient = sdkClient.project;
 
   return {
     session: {
-      list: async (input) => {
-        const result = await sdkClient.session.list(input);
-        return mapSdkResponseEnvelope(result.data);
-      },
-      create: async (input) => {
-        const result = await sdkClient.session.create(input);
-        return mapSdkResponseEnvelope(result.data);
-      },
-      get: async (input) => {
-        const result = await sdkClient.session.get(input);
-        return mapSdkResponseEnvelope(result.data);
-      },
-      messages: async (input) => {
-        const result = await sdkClient.session.messages(input);
-        return mapSdkResponseEnvelope(result.data);
-      },
-      prompt: async (input) => {
-        const result = await sdkClient.session.prompt(input);
-        return mapSdkResponseEnvelope(result.data);
-      },
-      abort: async (input) => {
-        const result = await sdkClient.session.abort(input);
-        return mapSdkResponseEnvelope(result.data);
-      },
-      delete: async (input) => {
-        const result = await sdkClient.session.delete(input);
-        return mapSdkResponseEnvelope(result.data);
-      }
+      list: async (input) => mapSdkResponsePromise(sdkSessionClient.list(input)),
+      create: async (input) => mapSdkResponsePromise(sdkSessionClient.create(input)),
+      get: async (input) => mapSdkResponsePromise(sdkSessionClient.get(input)),
+      messages: async (input) => mapSdkResponsePromise(sdkSessionClient.messages(input)),
+      prompt: async (input) => mapSdkResponsePromise(sdkSessionClient.prompt(input)),
+      abort: async (input) => mapSdkResponsePromise(sdkSessionClient.abort(input)),
+      delete: async (input) => mapSdkResponsePromise(sdkSessionClient.delete(input))
     },
     project: {
-      list: async () => {
-        const result = await sdkClient.project.list();
-        return mapSdkResponseEnvelope(result.data);
-      }
+      list: async () => mapSdkResponsePromise(sdkProjectClient.list())
     }
   };
 }
@@ -150,26 +139,29 @@ export class OpenCodeConnection implements OpenCodeConnectionClientProvider {
     this.dependencies = dependencies;
   }
 
-  public async start(): Promise<void> {
-    if (this.options.url) {
-      this.baseUrl = this.options.url;
-      this.client = this.dependencies.createClient({
-        baseUrl: this.baseUrl
-      });
-      return;
-    }
+  private createClientWithBaseUrl(baseUrl: string): void {
+    this.baseUrl = baseUrl;
+    this.client = this.dependencies.createClient({ baseUrl });
+  }
 
-    const server = await this.dependencies.createServer({
+  private buildServerStartOptions(): OpenCodeServerStartOptions {
+    return {
       hostname: this.options.hostname ?? OPEN_CODE_DEFAULT_HOSTNAME,
       port: this.options.port ?? OPEN_CODE_DEFAULT_PORT,
       timeoutMilliseconds: OPEN_CODE_START_TIMEOUT_MILLISECONDS
-    });
+    };
+  }
+
+  public async start(): Promise<void> {
+    if (this.options.url) {
+      this.createClientWithBaseUrl(this.options.url);
+      return;
+    }
+
+    const server = await this.dependencies.createServer(this.buildServerStartOptions());
 
     const serverUrl = OpenCodeBaseUrlSchema.parse(server.url);
-    this.baseUrl = serverUrl;
-    this.client = this.dependencies.createClient({
-      baseUrl: serverUrl
-    });
+    this.createClientWithBaseUrl(serverUrl);
     this.server = server;
   }
 

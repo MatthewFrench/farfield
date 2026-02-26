@@ -25,6 +25,25 @@ const SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS: SelectedThreadLoaderOptions =
   includeTurns: false
 };
 
+interface ScheduledRefreshExecutionSnapshot {
+  activeTab: "chat" | "debug";
+  selectedThreadId: string | null;
+}
+
+function isScheduledRefreshDocumentVisible(): boolean {
+  return document.visibilityState === DOCUMENT_VISIBILITY_STATE_VISIBLE;
+}
+
+function readScheduledRefreshExecutionSnapshot(
+  activeTabRef: MutableRefObject<"chat" | "debug">,
+  selectedThreadIdRef: MutableRefObject<string | null>
+): ScheduledRefreshExecutionSnapshot {
+  return {
+    activeTab: activeTabRef.current,
+    selectedThreadId: selectedThreadIdRef.current
+  };
+}
+
 function shouldRefreshDebugWorkspace(
   refreshFlags: EventRefreshFlags,
   activeTab: "chat" | "debug"
@@ -64,11 +83,16 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
         selectedThreadId: input.selectedThreadIdRef.current
       }),
       executeScheduledRefresh: async (flags) => {
-        if (document.visibilityState !== DOCUMENT_VISIBILITY_STATE_VISIBLE) {
+        if (!isScheduledRefreshDocumentVisible()) {
           return;
         }
 
         try {
+          // Freeze mutable refs once so each scheduled refresh run applies one consistent snapshot.
+          const scheduledRefreshSnapshot = readScheduledRefreshExecutionSnapshot(
+            input.activeTabRef,
+            input.selectedThreadIdRef
+          );
           const loadCoreDataFunction = input.loadCoreDataTrackedRef.current;
           const loadSelectedThreadFunction = input.loadSelectedThreadRef.current;
           const refreshOperations: Array<Promise<void>> = [];
@@ -77,7 +101,7 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
             if (loadCoreDataFunction) {
               refreshOperations.push(loadCoreDataFunction());
             }
-          } else if (shouldRefreshDebugWorkspace(flags, input.activeTabRef.current)) {
+          } else if (shouldRefreshDebugWorkspace(flags, scheduledRefreshSnapshot.activeTab)) {
             const debugWorkspaceSnapshot = await input.debugWorkspaceDataReader.readSnapshot(
               input.debugHistoryLimit,
               input.debugErrorListLimit
@@ -103,10 +127,14 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
             });
           }
 
-          if (flags.refreshSelectedThread && input.selectedThreadIdRef.current && loadSelectedThreadFunction) {
+          if (
+            flags.refreshSelectedThread
+            && scheduledRefreshSnapshot.selectedThreadId
+            && loadSelectedThreadFunction
+          ) {
             refreshOperations.push(
               loadSelectedThreadFunction(
-                input.selectedThreadIdRef.current,
+                scheduledRefreshSnapshot.selectedThreadId,
                 SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS
               )
             );

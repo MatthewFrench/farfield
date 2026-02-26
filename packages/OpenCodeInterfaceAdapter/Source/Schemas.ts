@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+/**
+ * Owns OpenCode transport-boundary payload schemas and parsing entrypoints.
+ * External payloads are validated once here, then consumed as typed adapter models.
+ */
 export type OpenCodeStructuredDataPrimitive = string | number | boolean | null;
 export type OpenCodeStructuredDataObject = {
   [key: string]: OpenCodeStructuredDataValue | undefined;
@@ -9,6 +13,30 @@ export type OpenCodeStructuredDataValue =
   | OpenCodeStructuredDataPrimitive
   | OpenCodeStructuredDataObject
   | OpenCodeStructuredDataArray;
+
+const OpenCodeNonEmptyStringSchema = z.string().min(1);
+const OpenCodeOptionalStringSchema = z.string().optional();
+const OpenCodeNonNegativeIntegerSchema = z.number().int().nonnegative();
+const OpenCodeMessageRoleValues = ["user", "assistant"] as const;
+const OpenCodeTextPartType = "text";
+const OpenCodeReasoningPartType = "reasoning";
+const OpenCodeToolPartType = "tool";
+const OpenCodeFilePartType = "file";
+const OpenCodeToolRunningStatus = "running";
+const OpenCodeToolCompletedStatus = "completed";
+const OpenCodeToolErrorStatus = "error";
+const OpenCodeToolStatusDiscriminatorKey = "status";
+const OpenCodePartDiscriminatorKey = "type";
+const OpenCodeIgnoredPartTypeValues = [
+  "step-start",
+  "step-finish",
+  "snapshot",
+  "patch",
+  "agent",
+  "retry",
+  "compaction",
+  "subtask"
+] as const;
 
 const OpenCodeStructuredDataPrimitiveSchema = z.union([
   z.string(),
@@ -24,16 +52,33 @@ export const OpenCodeStructuredDataValueSchema: z.ZodType<OpenCodeStructuredData
       z.record(OpenCodeStructuredDataValueSchema)
     ])
 );
+const OpenCodeStructuredDataRecordSchema = z.record(OpenCodeStructuredDataValueSchema);
+const OpenCodeTimeCreatedSchema = z
+  .object({
+    created: OpenCodeNonNegativeIntegerSchema
+  })
+  .passthrough();
+const OpenCodeToolStartTimeSchema = z
+  .object({
+    start: OpenCodeNonNegativeIntegerSchema
+  })
+  .passthrough();
+const OpenCodeToolCompletedTimeSchema = z
+  .object({
+    start: OpenCodeNonNegativeIntegerSchema,
+    end: OpenCodeNonNegativeIntegerSchema
+  })
+  .passthrough();
 
 export const OpenCodeSessionSchema = z
   .object({
-    id: z.string().min(1),
+    id: OpenCodeNonEmptyStringSchema,
     title: z.string().default(""),
-    directory: z.string().min(1),
+    directory: OpenCodeNonEmptyStringSchema,
     time: z
       .object({
-        created: z.number().int().nonnegative(),
-        updated: z.number().int().nonnegative()
+        created: OpenCodeNonNegativeIntegerSchema,
+        updated: OpenCodeNonNegativeIntegerSchema
       })
       .strict()
   })
@@ -43,27 +88,23 @@ export type OpenCodeSession = z.infer<typeof OpenCodeSessionSchema>;
 
 export const OpenCodeProjectSchema = z
   .object({
-    worktree: z.string().min(1)
+    worktree: OpenCodeNonEmptyStringSchema
   })
   .passthrough();
 
 export type OpenCodeProject = z.infer<typeof OpenCodeProjectSchema>;
 
-const OpenCodeMessageRoleSchema = z.enum(["user", "assistant"]);
+const OpenCodeMessageRoleSchema = z.enum(OpenCodeMessageRoleValues);
 
 export const OpenCodeMessageSchema = z
   .object({
-    id: z.string().min(1),
+    id: OpenCodeNonEmptyStringSchema,
     role: OpenCodeMessageRoleSchema,
-    parentID: z.string().min(1),
-    time: z
-      .object({
-        created: z.number().int().nonnegative()
-      })
-      .passthrough(),
-    providerID: z.string().optional(),
-    modelID: z.string().optional(),
-    finish: z.string().optional(),
+    parentID: OpenCodeNonEmptyStringSchema,
+    time: OpenCodeTimeCreatedSchema,
+    providerID: OpenCodeOptionalStringSchema,
+    modelID: OpenCodeOptionalStringSchema,
+    finish: OpenCodeOptionalStringSchema,
     error: OpenCodeStructuredDataValueSchema.optional()
   })
   .passthrough();
@@ -71,44 +112,30 @@ export const OpenCodeMessageSchema = z
 export type OpenCodeMessage = z.infer<typeof OpenCodeMessageSchema>;
 
 const OpenCodeToolStateSchema = z
-  .discriminatedUnion("status", [
+  .discriminatedUnion(OpenCodeToolStatusDiscriminatorKey, [
     z
       .object({
-        status: z.literal("running"),
-        input: z.record(OpenCodeStructuredDataValueSchema),
-        time: z
-          .object({
-            start: z.number().int().nonnegative()
-          })
-          .passthrough()
+        status: z.literal(OpenCodeToolRunningStatus),
+        input: OpenCodeStructuredDataRecordSchema,
+        time: OpenCodeToolStartTimeSchema
       })
       .passthrough(),
     z
       .object({
-        status: z.literal("completed"),
-        input: z.record(OpenCodeStructuredDataValueSchema),
+        status: z.literal(OpenCodeToolCompletedStatus),
+        input: OpenCodeStructuredDataRecordSchema,
         output: z.string(),
-        metadata: z.record(OpenCodeStructuredDataValueSchema).optional(),
-        time: z
-          .object({
-            start: z.number().int().nonnegative(),
-            end: z.number().int().nonnegative()
-          })
-          .passthrough()
+        metadata: OpenCodeStructuredDataRecordSchema.optional(),
+        time: OpenCodeToolCompletedTimeSchema
       })
       .passthrough(),
     z
       .object({
-        status: z.literal("error"),
-        input: z.record(OpenCodeStructuredDataValueSchema),
+        status: z.literal(OpenCodeToolErrorStatus),
+        input: OpenCodeStructuredDataRecordSchema,
         error: z.string(),
-        metadata: z.record(OpenCodeStructuredDataValueSchema).optional(),
-        time: z
-          .object({
-            start: z.number().int().nonnegative(),
-            end: z.number().int().nonnegative()
-          })
-          .passthrough()
+        metadata: OpenCodeStructuredDataRecordSchema.optional(),
+        time: OpenCodeToolCompletedTimeSchema
       })
       .passthrough()
   ]);
@@ -117,61 +144,52 @@ export type OpenCodeToolState = z.infer<typeof OpenCodeToolStateSchema>;
 
 export const OpenCodeTextPartSchema = z
   .object({
-    id: z.string().min(1),
-    type: z.literal("text"),
+    id: OpenCodeNonEmptyStringSchema,
+    type: z.literal(OpenCodeTextPartType),
     text: z.string(),
     synthetic: z.boolean().optional(),
     ignored: z.boolean().optional(),
-    sessionID: z.string().optional()
+    sessionID: OpenCodeOptionalStringSchema
   })
   .passthrough();
 
 export const OpenCodeReasoningPartSchema = z
   .object({
-    id: z.string().min(1),
-    type: z.literal("reasoning"),
+    id: OpenCodeNonEmptyStringSchema,
+    type: z.literal(OpenCodeReasoningPartType),
     text: z.string(),
-    sessionID: z.string().optional()
+    sessionID: OpenCodeOptionalStringSchema
   })
   .passthrough();
 
 export const OpenCodeToolPartSchema = z
   .object({
-    id: z.string().min(1),
-    type: z.literal("tool"),
-    tool: z.string().min(1),
+    id: OpenCodeNonEmptyStringSchema,
+    type: z.literal(OpenCodeToolPartType),
+    tool: OpenCodeNonEmptyStringSchema,
     state: OpenCodeToolStateSchema,
-    sessionID: z.string().optional()
+    sessionID: OpenCodeOptionalStringSchema
   })
   .passthrough();
 
 export const OpenCodeFilePartSchema = z
   .object({
-    id: z.string().min(1),
-    type: z.literal("file"),
-    url: z.string().min(1),
-    sessionID: z.string().optional()
+    id: OpenCodeNonEmptyStringSchema,
+    type: z.literal(OpenCodeFilePartType),
+    url: OpenCodeNonEmptyStringSchema,
+    sessionID: OpenCodeOptionalStringSchema
   })
   .passthrough();
 
 export const OpenCodeIgnoredPartSchema = z
   .object({
-    id: z.string().min(1),
-    type: z.enum([
-      "step-start",
-      "step-finish",
-      "snapshot",
-      "patch",
-      "agent",
-      "retry",
-      "compaction",
-      "subtask"
-    ]),
-    sessionID: z.string().optional()
+    id: OpenCodeNonEmptyStringSchema,
+    type: z.enum(OpenCodeIgnoredPartTypeValues),
+    sessionID: OpenCodeOptionalStringSchema
   })
   .passthrough();
 
-export const OpenCodePartSchema = z.discriminatedUnion("type", [
+export const OpenCodePartSchema = z.discriminatedUnion(OpenCodePartDiscriminatorKey, [
   OpenCodeTextPartSchema,
   OpenCodeReasoningPartSchema,
   OpenCodeToolPartSchema,

@@ -6,8 +6,10 @@ import {
 } from "@farfield/api";
 import type {
   AppServerCollaborationModeListResponse,
+  AppServerConfigReadResponse,
   AppServerListModelsResponse,
-  AppServerListThreadsResponse
+  AppServerListThreadsResponse,
+  AppServerStartThreadResponse
 } from "@farfield/protocol";
 import type {
   AgentArchiveThreadInput,
@@ -22,6 +24,9 @@ import type {
 } from "../Types.js";
 
 const CREATE_THREAD_REQUIRES_WORKING_DIRECTORY_ERROR = "Codex thread creation requires cwd";
+const READ_CONFIG_DEFAULTS_OPTIONS = {
+  includeLayers: false
+};
 
 function buildListThreadsOptions(input: AgentListThreadsInput): ListThreadsOptions {
   return {
@@ -38,6 +43,17 @@ function buildListThreadsAllOptions(input: AgentListThreadsInput): ListThreadsAl
     ...buildListThreadsOptions(input),
     maxPages: input.maxPages
   };
+}
+
+function buildListThreadsOperation(
+  appClient: AppServerClient,
+  input: AgentListThreadsInput
+): () => Promise<AppServerListThreadsResponse> {
+  if (input.all) {
+    return () => appClient.listThreadsAll(buildListThreadsAllOptions(input));
+  }
+
+  return () => appClient.listThreads(buildListThreadsOptions(input));
 }
 
 function mapListThreadsResult(result: AppServerListThreadsResponse): AgentListThreadsResult {
@@ -81,12 +97,49 @@ function buildStartThreadOptions(
   };
 }
 
+function mapCreateThreadResult(result: AppServerStartThreadResponse): AgentCreateThreadResult {
+  return {
+    threadId: result.thread.id,
+    thread: result.thread,
+    model: result.model,
+    modelProvider: result.modelProvider,
+    cwd: result.cwd,
+    approvalPolicy: result.approvalPolicy,
+    sandbox: result.sandbox,
+    reasoningEffort: result.reasoningEffort
+  };
+}
+
+function readActiveConfigProfile(
+  config: AppServerConfigReadResponse["config"]
+): AppServerConfigReadResponse["config"]["profiles"][string] | null {
+  if (!config.profile) {
+    return null;
+  }
+
+  return config.profiles[config.profile] ?? null;
+}
+
+function mapConfigDefaults(configResponse: AppServerConfigReadResponse): AgentConfigDefaults {
+  const activeProfile = readActiveConfigProfile(configResponse.config);
+
+  return {
+    model: activeProfile?.model ?? configResponse.config.model ?? null,
+    reasoningEffort:
+      activeProfile?.model_reasoning_effort ?? configResponse.config.model_reasoning_effort ?? null
+  };
+}
+
 export interface CodexThreadManagementOwnerOptions {
   appClient: AppServerClient;
   runAppServerCall: <ValueType>(operation: () => Promise<ValueType>) => Promise<ValueType>;
   ensureCodexAvailable: () => void;
 }
 
+/**
+ * Owns Codex thread-management calls and maps app-server payload contracts to
+ * server-agent contracts consumed by route and adapter owners.
+ */
 export class CodexThreadManagementOwner {
   private readonly appClient: AppServerClient;
   private readonly runAppServerCall: <ValueType>(operation: () => Promise<ValueType>) => Promise<ValueType>;
@@ -101,11 +154,7 @@ export class CodexThreadManagementOwner {
   public async listThreads(input: AgentListThreadsInput): Promise<AgentListThreadsResult> {
     this.ensureCodexAvailable();
 
-    const result = await this.runAppServerCall(() =>
-      input.all
-        ? this.appClient.listThreadsAll(buildListThreadsAllOptions(input))
-        : this.appClient.listThreads(buildListThreadsOptions(input))
-    );
+    const result = await this.runAppServerCall(buildListThreadsOperation(this.appClient, input));
 
     return mapListThreadsResult(result);
   }
@@ -119,16 +168,7 @@ export class CodexThreadManagementOwner {
       this.appClient.startThread(buildStartThreadOptions(input, workingDirectory))
     );
 
-    return {
-      threadId: result.thread.id,
-      thread: result.thread,
-      model: result.model,
-      modelProvider: result.modelProvider,
-      cwd: result.cwd,
-      approvalPolicy: result.approvalPolicy,
-      sandbox: result.sandbox,
-      reasoningEffort: result.reasoningEffort
-    };
+    return mapCreateThreadResult(result);
   }
 
   public async readThread(input: AgentReadThreadInput): Promise<AgentReadThreadResult> {
@@ -163,17 +203,7 @@ export class CodexThreadManagementOwner {
 
   public async readConfigDefaults(): Promise<AgentConfigDefaults> {
     this.ensureCodexAvailable();
-    const config = await this.runAppServerCall(() =>
-      this.appClient.readConfig({ includeLayers: false })
-    );
-
-    const activeProfileName = config.config.profile;
-    const activeProfile = activeProfileName ? config.config.profiles[activeProfileName] : undefined;
-
-    return {
-      model: activeProfile?.model ?? config.config.model ?? null,
-      reasoningEffort:
-        activeProfile?.model_reasoning_effort ?? config.config.model_reasoning_effort ?? null
-    };
+    const config = await this.runAppServerCall(() => this.appClient.readConfig(READ_CONFIG_DEFAULTS_OPTIONS));
+    return mapConfigDefaults(config);
   }
 }

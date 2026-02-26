@@ -206,6 +206,32 @@ describe("CodexThreadStreamStateOwner", () => {
     expect(projectedState.liveStateError?.patchIndex).toBe(0);
   });
 
+  it("keeps projection empty when patches arrive before a snapshot baseline", () => {
+    const owner = new CodexThreadStreamStateOwner();
+
+    owner.ingestInboundFrame(createPatchEvent());
+    const projectedState = owner.readLiveState("thread-1");
+
+    expect(projectedState.ownerClientId).toBe("client-a");
+    expect(projectedState.conversationState).toBeNull();
+    expect(projectedState.liveStateError).toBeNull();
+  });
+
+  it("clears reduction errors after a replacement snapshot arrives", () => {
+    const owner = new CodexThreadStreamStateOwner();
+    owner.ingestInboundFrame(createSnapshotEvent());
+    owner.ingestInboundFrame(createInvalidPatchEvent());
+
+    const failedState = owner.readLiveState("thread-1");
+    expect(failedState.liveStateError?.kind).toBe("reductionFailed");
+
+    owner.ingestInboundFrame(createSnapshotEvent());
+    const recoveredState = owner.readLiveState("thread-1");
+    expect(recoveredState.liveStateError).toBeNull();
+    expect(recoveredState.conversationState?.id).toBe("thread-1");
+    expect(recoveredState.conversationState?.requests.length).toBe(0);
+  });
+
   it("returns sequence metadata and incremental stream slices for cursor-based reads", () => {
     const owner = new CodexThreadStreamStateOwner();
     owner.ingestInboundFrame(createSnapshotEvent());

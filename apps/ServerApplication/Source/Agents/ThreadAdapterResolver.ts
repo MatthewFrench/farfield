@@ -27,8 +27,24 @@ const UNREGISTERED_DISCOVERY_MISS_ALERT_THRESHOLD = 3;
 // Keep this short to avoid redundant probes during quick repeated retries.
 const DEFAULT_UNREGISTERED_THREAD_MISS_TIME_TO_LIVE_MILLISECONDS = 2_000;
 const THREAD_MISSING_MESSAGE_PATTERN = /\b(conversation|thread)\s+not\s+found\b/i;
+const THREAD_MISSING_RPC_ERROR_CODE = -32600;
+const THREAD_OWNERSHIP_PROBE_INCLUDE_TURNS = false;
+const THREAD_ADAPTER_RESOLUTION_AMBIGUOUS_DISCOVERY_EVENT = "thread-adapter-resolution-ambiguous-discovery";
+const THREAD_ADAPTER_RESOLUTION_PROBE_FAILURE_EVENT = "thread-adapter-resolution-probe-failed";
+const THREAD_ADAPTER_RESOLUTION_DISCOVERY_MISS_THRESHOLD_EVENT = (
+  "thread-adapter-resolution-discovery-miss-threshold-reached"
+);
 
 type UnregisteredDiscoveryMissReason = "no-connected-adapters" | "no-match";
+type AdapterProbeOutcome = "thread-owned" | "thread-missing" | "probe-failed";
+
+const UNREGISTERED_DISCOVERY_MISS_REASON_NO_CONNECTED_ADAPTERS: UnregisteredDiscoveryMissReason = (
+  "no-connected-adapters"
+);
+const UNREGISTERED_DISCOVERY_MISS_REASON_NO_MATCH: UnregisteredDiscoveryMissReason = "no-match";
+const ADAPTER_PROBE_OUTCOME_THREAD_OWNED: AdapterProbeOutcome = "thread-owned";
+const ADAPTER_PROBE_OUTCOME_THREAD_MISSING: AdapterProbeOutcome = "thread-missing";
+const ADAPTER_PROBE_OUTCOME_FAILED: AdapterProbeOutcome = "probe-failed";
 
 export interface ThreadAdapterResolverOptions {
   unregisteredThreadMissTimeToLiveMs?: number;
@@ -76,35 +92,24 @@ export class ThreadAdapterResolver {
 
   public registerThreadOwner(threadId: string, agentId: AgentId): void {
     this.threadIndex.register(threadId, agentId);
-    this.consecutiveUnregisteredDiscoveryMissCountByThreadId.delete(threadId);
-    this.unregisteredDiscoveryMissExpiresAtEpochMsByThreadId.delete(threadId);
+    this.clearUnregisteredDiscoveryMissState(threadId);
   }
 
   public resolveCreateThreadAdapter(requestedAgentId: AgentId | undefined): AgentAdapter | null {
     if (requestedAgentId) {
-      const requestedAdapter = this.registry.getAdapter(requestedAgentId);
-      if (!requestedAdapter || !requestedAdapter.isEnabled() || !requestedAdapter.isConnected()) {
-        return null;
-      }
-
-      return requestedAdapter;
+      return this.resolveConnectedEnabledAdapter(requestedAgentId);
     }
 
     const defaultAgentId = this.registry.resolveDefaultAgentId();
     if (defaultAgentId) {
-      const defaultAdapter = this.registry.getAdapter(defaultAgentId);
-      if (defaultAdapter && defaultAdapter.isEnabled() && defaultAdapter.isConnected()) {
+      const defaultAdapter = this.resolveConnectedEnabledAdapter(defaultAgentId);
+      if (defaultAdapter) {
         return defaultAdapter;
       }
     }
 
-    for (const enabledAdapter of this.registry.listEnabled()) {
-      if (enabledAdapter.isConnected()) {
-        return enabledAdapter;
-      }
-    }
-
-    return null;
+    const connectedEnabledAdapters = this.listConnectedEnabledAdaptersInResolutionOrder();
+    return connectedEnabledAdapters[0] ?? null;
   }
 
   public async resolveAdapterForThread(threadId: string): Promise<ResolvedThreadAdapterResult> {
@@ -116,11 +121,7 @@ export class ThreadAdapterResolver {
 
     if (this.hasFreshUnregisteredDiscoveryMiss(threadId)) {
       this.unregisteredDiscoveryMissCacheHitCount += 1;
-      return {
-        ok: false,
-        status: HTTP_STATUS_NOT_FOUND,
-        error: buildUnregisteredThreadMissingError(threadId)
-      };
+      return this.buildUnregisteredThreadMissingResult(threadId);
     }
 
     this.unregisteredDiscoveryAttemptCount += 1;
@@ -129,12 +130,8 @@ export class ThreadAdapterResolver {
       return discoveredAdapter;
     }
 
-    this.recordUnregisteredDiscoveryMiss(threadId, "no-match");
-    return {
-      ok: false,
-      status: HTTP_STATUS_NOT_FOUND,
-      error: buildUnregisteredThreadMissingError(threadId)
-    };
+    this.recordUnregisteredDiscoveryMiss(threadId, UNREGISTERED_DISCOVERY_MISS_REASON_NO_MATCH);
+    return this.buildUnregisteredThreadMissingResult(threadId);
   }
 
   public readStatistics(): ThreadAdapterResolverStatistics {
@@ -181,12 +178,10 @@ export class ThreadAdapterResolver {
   private async discoverAdapterForUnregisteredThread(
     threadId: string
   ): Promise<ResolvedThreadAdapterResult | null> {
-    const connectedEnabledAdapters = this.registry
-      .listEnabled()
-      .filter((adapter) => adapter.isConnected());
+    const connectedEnabledAdapters = this.listConnectedEnabledAdaptersInResolutionOrder();
 
     if (connectedEnabledAdapters.length === 0) {
-      this.recordUnregisteredDiscoveryMiss(threadId, "no-connected-adapters");
+      this.recordUnregisteredDiscoveryMiss(threadId, UNREGISTERED_DISCOVERY_MISS_REASON_NO_CONNECTED_ADAPTERS);
       return {
         ok: false,
         status: HTTP_STATUS_SERVICE_UNAVAILABLE,
@@ -198,10 +193,10 @@ export class ThreadAdapterResolver {
     let hasProbeFailures = false;
     for (const adapter of connectedEnabledAdapters) {
       const probeOutcome = await this.probeAdapterThreadOwnership(adapter, threadId);
-      if (probeOutcome === "thread-missing") {
+      if (probeOutcome === ADAPTER_PROBE_OUTCOME_THREAD_MISSING) {
         continue;
       }
-      if (probeOutcome === "probe-failed") {
+      if (probeOutcome === ADAPTER_PROBE_OUTCOME_FAILED) {
         hasProbeFailures = true;
         continue;
       }
@@ -214,7 +209,7 @@ export class ThreadAdapterResolver {
             firstAgentId: discoveredAdapter.id,
             secondAgentId: adapter.id
           },
-          "thread-adapter-resolution-ambiguous-discovery"
+          THREAD_ADAPTER_RESOLUTION_AMBIGUOUS_DISCOVERY_EVENT
         );
         return {
           ok: false,
@@ -241,8 +236,7 @@ export class ThreadAdapterResolver {
     }
 
     this.unregisteredDiscoverySuccessCount += 1;
-    this.consecutiveUnregisteredDiscoveryMissCountByThreadId.delete(threadId);
-    this.unregisteredDiscoveryMissExpiresAtEpochMsByThreadId.delete(threadId);
+    this.clearUnregisteredDiscoveryMissState(threadId);
     this.threadIndex.register(threadId, discoveredAdapter.id);
     return {
       ok: true,
@@ -254,15 +248,15 @@ export class ThreadAdapterResolver {
   private async probeAdapterThreadOwnership(
     adapter: AgentAdapter,
     threadId: string
-  ): Promise<"thread-owned" | "thread-missing" | "probe-failed"> {
+  ): Promise<AdapterProbeOutcome> {
     return adapter.readThread({
       threadId,
-      includeTurns: false
+      includeTurns: THREAD_OWNERSHIP_PROBE_INCLUDE_TURNS
     }).then(
-      () => "thread-owned",
+      () => ADAPTER_PROBE_OUTCOME_THREAD_OWNED,
       (error: Error) => {
         if (this.isExplicitThreadMissingError(error)) {
-          return "thread-missing";
+          return ADAPTER_PROBE_OUTCOME_THREAD_MISSING;
         }
 
         this.unregisteredDiscoveryProbeFailureCount += 1;
@@ -272,16 +266,16 @@ export class ThreadAdapterResolver {
             agentId: adapter.id,
             error: error.message
           },
-          "thread-adapter-resolution-probe-failed"
+          THREAD_ADAPTER_RESOLUTION_PROBE_FAILURE_EVENT
         );
-        return "probe-failed";
+        return ADAPTER_PROBE_OUTCOME_FAILED;
       }
     );
   }
 
   private isExplicitThreadMissingError(error: Error): boolean {
     if (error instanceof AppServerRpcError) {
-      return error.code === -32600 && THREAD_MISSING_MESSAGE_PATTERN.test(error.message);
+      return error.code === THREAD_MISSING_RPC_ERROR_CODE && THREAD_MISSING_MESSAGE_PATTERN.test(error.message);
     }
 
     return THREAD_MISSING_MESSAGE_PATTERN.test(error.message);
@@ -292,7 +286,7 @@ export class ThreadAdapterResolver {
     reason: UnregisteredDiscoveryMissReason
   ): void {
     this.unregisteredDiscoveryMissCount += 1;
-    if (reason === "no-connected-adapters") {
+    if (reason === UNREGISTERED_DISCOVERY_MISS_REASON_NO_CONNECTED_ADAPTERS) {
       return;
     }
 
@@ -314,7 +308,7 @@ export class ThreadAdapterResolver {
         reason,
         consecutiveMissCount: nextMissCount
       },
-      "thread-adapter-resolution-discovery-miss-threshold-reached"
+      THREAD_ADAPTER_RESOLUTION_DISCOVERY_MISS_THRESHOLD_EVENT
     );
   }
 
@@ -328,6 +322,32 @@ export class ThreadAdapterResolver {
       return false;
     }
     return true;
+  }
+
+  private resolveConnectedEnabledAdapter(agentId: AgentId): AgentAdapter | null {
+    const adapter = this.registry.getAdapter(agentId);
+    if (!adapter || !adapter.isEnabled() || !adapter.isConnected()) {
+      return null;
+    }
+
+    return adapter;
+  }
+
+  private listConnectedEnabledAdaptersInResolutionOrder(): AgentAdapter[] {
+    return this.registry.listEnabled().filter((adapter) => adapter.isConnected());
+  }
+
+  private buildUnregisteredThreadMissingResult(threadId: string): ResolvedThreadAdapterResult {
+    return {
+      ok: false,
+      status: HTTP_STATUS_NOT_FOUND,
+      error: buildUnregisteredThreadMissingError(threadId)
+    };
+  }
+
+  private clearUnregisteredDiscoveryMissState(threadId: string): void {
+    this.consecutiveUnregisteredDiscoveryMissCountByThreadId.delete(threadId);
+    this.unregisteredDiscoveryMissExpiresAtEpochMsByThreadId.delete(threadId);
   }
 }
 

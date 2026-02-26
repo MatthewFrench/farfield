@@ -105,6 +105,51 @@ describe("FarfieldHttpTransport", () => {
     await expect(requestNoContent("/api/no-content")).rejects.toThrow("Nope");
   });
 
+  it("rejects responses that do not satisfy the api envelope contract", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        data: "missing-ok-field"
+      })
+    );
+
+    await expect(request("/api/missing-envelope")).rejects.toThrow(
+      "Invalid API envelope from /api/missing-envelope"
+    );
+  });
+
+  it("uses generic request failure messages when api error envelopes include extra keys", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse(
+        {
+          ok: false,
+          error: "Nope",
+          details: "unexpected-extra-field"
+        },
+        500
+      )
+    );
+
+    let requestFailureError: FarfieldHttpRequestFailureError | null = null;
+    try {
+      await requestNoContent("/api/no-content-strict-error-envelope");
+    } catch (error) {
+      if (error instanceof FarfieldHttpRequestFailureError) {
+        requestFailureError = error;
+      } else {
+        throw error;
+      }
+    }
+
+    expect(requestFailureError).toBeTruthy();
+    if (!requestFailureError) {
+      return;
+    }
+    expect(requestFailureError.message).toContain(
+      "Request failed for /api/no-content-strict-error-envelope"
+    );
+    expect(requestFailureError.message).not.toContain("Nope");
+  });
+
   it("trims and applies action metadata headers while preserving existing headers", () => {
     const abortController = new AbortController();
     const init: RequestInit = {

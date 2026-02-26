@@ -60,6 +60,24 @@ describe("buildAppServerSpawnEnvironment", () => {
       })
     ).toThrowError(/Unrecognized key/);
   });
+
+  it("throws when codex identity values are empty", () => {
+    expect(() =>
+      buildAppServerSpawnEnvironment({
+        baseEnvironment: {},
+        userAgent: "",
+        clientId: "client-4"
+      })
+    ).toThrowError(/at least 1 character/);
+
+    expect(() =>
+      buildAppServerSpawnEnvironment({
+        baseEnvironment: {},
+        userAgent: "farfield-tests",
+        clientId: ""
+      })
+    ).toThrowError(/at least 1 character/);
+  });
 });
 
 describe("isChildProcessAppServerTransportOptions", () => {

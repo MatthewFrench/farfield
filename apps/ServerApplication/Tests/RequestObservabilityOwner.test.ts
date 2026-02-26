@@ -311,6 +311,126 @@ describe("RequestObservabilityOwner", () => {
     expect(routeTimingByRoute.get("/route-c")?.requestCount).toBe(1);
   });
 
+  it("uses rolling route sample windows for percentile metrics", () => {
+    const owner = new RequestObservabilityOwner(3, 8, 16);
+    const routeObservations = [
+      {
+        requestId: "request_1",
+        durationMs: 10,
+        queueDelayMs: 1
+      },
+      {
+        requestId: "request_2",
+        durationMs: 20,
+        queueDelayMs: 2
+      },
+      {
+        requestId: "request_3",
+        durationMs: 30,
+        queueDelayMs: 3
+      },
+      {
+        requestId: "request_4",
+        durationMs: 40,
+        queueDelayMs: 4
+      }
+    ];
+
+    for (const routeObservation of routeObservations) {
+      owner.recordRequestStarted({
+        requestId: routeObservation.requestId,
+        actionId: null,
+        actionName: null,
+        method: "GET",
+        pathname: "/api/health",
+        startedAt: "2026-02-25T00:00:00.000Z",
+        queueDelayMs: routeObservation.queueDelayMs
+      });
+      owner.recordRequestCompleted({
+        requestId: routeObservation.requestId,
+        actionId: null,
+        actionName: null,
+        method: "GET",
+        pathname: "/api/health",
+        startedAt: "2026-02-25T00:00:00.000Z",
+        statusCode: 200,
+        durationMs: routeObservation.durationMs,
+        queueDelayMs: routeObservation.queueDelayMs,
+        completedAt: "2026-02-25T00:00:00.001Z"
+      });
+    }
+
+    const snapshot = owner.readSnapshot();
+    expect(snapshot.routeTimings[0]).toMatchObject({
+      route: "/api/health",
+      requestCount: 4,
+      lastDurationMs: 40,
+      p50DurationMs: 30,
+      p95DurationMs: 40,
+      p99DurationMs: 40,
+      lastQueueDelayMs: 4,
+      p95QueueDelayMs: 4,
+      maxQueueDelayMs: 4
+    });
+  });
+
+  it("sorts route timing summaries by p95 duration and then request volume", () => {
+    const owner = new RequestObservabilityOwner(8, 8, 16);
+    const routeObservations = [
+      {
+        requestId: "request_slow_1",
+        pathname: "/slow-route",
+        durationMs: 60
+      },
+      {
+        requestId: "request_tied_high_1",
+        pathname: "/tied-high-volume-route",
+        durationMs: 40
+      },
+      {
+        requestId: "request_tied_high_2",
+        pathname: "/tied-high-volume-route",
+        durationMs: 40
+      },
+      {
+        requestId: "request_tied_low_1",
+        pathname: "/tied-low-volume-route",
+        durationMs: 40
+      }
+    ];
+
+    for (const routeObservation of routeObservations) {
+      owner.recordRequestStarted({
+        requestId: routeObservation.requestId,
+        actionId: null,
+        actionName: null,
+        method: "GET",
+        pathname: routeObservation.pathname,
+        startedAt: "2026-02-25T00:00:00.000Z",
+        queueDelayMs: 0
+      });
+      owner.recordRequestCompleted({
+        requestId: routeObservation.requestId,
+        actionId: null,
+        actionName: null,
+        method: "GET",
+        pathname: routeObservation.pathname,
+        startedAt: "2026-02-25T00:00:00.000Z",
+        statusCode: 200,
+        durationMs: routeObservation.durationMs,
+        queueDelayMs: 0,
+        completedAt: "2026-02-25T00:00:00.001Z"
+      });
+    }
+
+    const snapshot = owner.readSnapshot();
+    expect(snapshot.routeTimings.map((routeTiming) => routeTiming.route)).toEqual([
+      "/slow-route",
+      "/tied-high-volume-route",
+      "/tied-low-volume-route"
+    ]);
+  });
+
   it("rejects non-positive route timing entry limits", () => {
     expect(() => new RequestObservabilityOwner(8, 8, 16, 0)).toThrowError(
       "RequestObservabilityOwner requires positive integer maxRouteTimingEntries"

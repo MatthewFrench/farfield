@@ -34,7 +34,8 @@ import {
   type CoreDataLoaders
 } from "@/Application/StateManagement/UseCoreDataLoaders";
 import {
-  RuntimeRefreshObservabilityOwner
+  RuntimeRefreshObservabilityOwner,
+  type RuntimeRefreshMeasurement
 } from "@/Application/StateManagement/RuntimeRefreshObservabilityOwner";
 import {
   useModeAndPendingRequestEffects
@@ -78,25 +79,68 @@ const MISSING_CORE_DATA_LOADER_ERROR_MESSAGE =
   "Runtime refresh invariant violated: core-data loader is unavailable.";
 const MISSING_SELECTED_THREAD_LOADER_ERROR_MESSAGE =
   "Runtime refresh invariant violated: selected-thread loader is unavailable for active selection.";
+const EMPTY_MODE_KEY = "";
+
+type CoreDataLoadFunction = CoreDataLoaders["loadCoreDataTracked"];
+type SelectedThreadLoadFunction = SelectedThreadLoaders["loadSelectedThreadTracked"];
+
+function resolveCoreDataLoadFunction(loadCoreDataFunction: CoreDataLoadFunction | null): CoreDataLoadFunction {
+  if (loadCoreDataFunction === null) {
+    throw new Error(MISSING_CORE_DATA_LOADER_ERROR_MESSAGE);
+  }
+  return loadCoreDataFunction;
+}
+
+async function refreshSelectedThreadIfPresent(
+  selectedThreadIdentifier: string | null,
+  loadSelectedThreadFunction: SelectedThreadLoadFunction | null
+): Promise<void> {
+  if (selectedThreadIdentifier === null) {
+    return;
+  }
+  if (loadSelectedThreadFunction === null) {
+    throw new Error(MISSING_SELECTED_THREAD_LOADER_ERROR_MESSAGE);
+  }
+  await loadSelectedThreadFunction(selectedThreadIdentifier);
+}
+
+function completeRuntimeRefreshMeasurement(
+  runtimeRefreshObservabilityOwner: RuntimeRefreshObservabilityOwner,
+  measurement: RuntimeRefreshMeasurement,
+  didCompleteRefresh: boolean
+): void {
+  if (didCompleteRefresh) {
+    runtimeRefreshObservabilityOwner.completeRefreshSuccess(measurement);
+    return;
+  }
+  runtimeRefreshObservabilityOwner.completeRefreshFailure(measurement);
+}
 
 export function useApplicationRuntimeComposition(
   input: UseApplicationRuntimeCompositionInput
 ): ApplicationRuntimeComposition {
+  // Effect owners retain stable subscriptions and always read the latest loader refs from this runtime owner.
   input.applicationShellState.loadCoreDataTrackedRef.current = input.coreDataLoaders.loadCoreDataTracked;
   input.applicationShellState.loadSelectedThreadRef.current = input.loadSelectedThreadTracked;
+
+  // Push bootstrap can complete at any time; resolve selected-thread refresh from the latest runtime selection ref.
+  const loadSelectedThreadIfPresentFromRuntimeState = useCallback(async (): Promise<void> => {
+    const selectedThreadIdentifier = input.applicationShellState.selectedThreadIdRef.current;
+    if (!selectedThreadIdentifier) {
+      return;
+    }
+    await input.loadSelectedThreadTracked(selectedThreadIdentifier);
+  }, [
+    input.applicationShellState.selectedThreadIdRef,
+    input.loadSelectedThreadTracked
+  ]);
 
   const pushFeatureComposition = useApplicationPushFeatureComposition({
     apiSessionBootstrapCoordinator: input.applicationOwnerDependencies.apiSessionBootstrapCoordinator,
     apiSessionTokenDraft: input.applicationShellState.apiSessionTokenDraft,
     pushNotificationToolbarActionCoordinator: input.applicationOwnerDependencies.pushNotificationToolbarActionCoordinator,
     loadCoreDataTracked: input.coreDataLoaders.loadCoreDataTracked,
-    loadSelectedThreadIfPresent: async (): Promise<void> => {
-      const selectedThreadIdentifier = input.applicationShellState.selectedThreadIdRef.current;
-      if (!selectedThreadIdentifier) {
-        return;
-      }
-      await input.loadSelectedThreadTracked(selectedThreadIdentifier);
-    },
+    loadSelectedThreadIfPresent: loadSelectedThreadIfPresentFromRuntimeState,
     setApiSessionTokenDraft: input.applicationShellState.setApiSessionTokenDraft,
     setApiSessionBootstrapErrorMessage: input.applicationShellState.setApiSessionBootstrapError,
     setErrorMessage: input.applicationShellState.setError,
@@ -115,33 +159,28 @@ export function useApplicationRuntimeComposition(
   // and manual header refresh actions through one runtime-owned operation.
   const refreshCoreDataAndSelectedThread = useCallback(async (): Promise<void> => {
     const handleRuntimeRequestError = input.runtimeRequestHandlers.handleRuntimeRequestError;
-    const loadCoreDataFunction = input.applicationShellState.loadCoreDataTrackedRef.current;
     const measurement = runtimeRefreshObservabilityOwner.beginRefresh();
     let didCompleteRefresh = false;
 
     input.applicationShellState.setIsCoreLoading(true);
     try {
-      if (loadCoreDataFunction === null) {
-        throw new Error(MISSING_CORE_DATA_LOADER_ERROR_MESSAGE);
-      }
+      const loadCoreDataFunction = resolveCoreDataLoadFunction(
+        input.applicationShellState.loadCoreDataTrackedRef.current
+      );
       await loadCoreDataFunction();
-      const selectedThreadIdentifier = input.applicationShellState.selectedThreadIdRef.current;
-      if (selectedThreadIdentifier !== null) {
-        const loadSelectedThreadFunction = input.applicationShellState.loadSelectedThreadRef.current;
-        if (loadSelectedThreadFunction === null) {
-          throw new Error(MISSING_SELECTED_THREAD_LOADER_ERROR_MESSAGE);
-        }
-        await loadSelectedThreadFunction(selectedThreadIdentifier);
-      }
+      await refreshSelectedThreadIfPresent(
+        input.applicationShellState.selectedThreadIdRef.current,
+        input.applicationShellState.loadSelectedThreadRef.current
+      );
       didCompleteRefresh = true;
     } catch (error) {
       handleRuntimeRequestError(error);
     } finally {
-      if (didCompleteRefresh) {
-        runtimeRefreshObservabilityOwner.completeRefreshSuccess(measurement);
-      } else {
-        runtimeRefreshObservabilityOwner.completeRefreshFailure(measurement);
-      }
+      completeRuntimeRefreshMeasurement(
+        runtimeRefreshObservabilityOwner,
+        measurement,
+        didCompleteRefresh
+      );
       input.applicationShellState.setIsCoreLoading(false);
     }
   }, [
@@ -242,7 +281,7 @@ export function useApplicationRuntimeComposition(
     conversationState: input.applicationDerivedState.conversationState,
     appDefaultModel: input.applicationDerivedState.appDefaultModel,
     appDefaultReasoningEffort: input.applicationDerivedState.appDefaultReasoningEffort,
-    defaultModeKey: input.applicationDerivedState.defaultModeOption?.mode || "",
+    defaultModeKey: input.applicationDerivedState.defaultModeOption?.mode || EMPTY_MODE_KEY,
     selectedModeKey: input.applicationShellState.selectedModeKey,
     selectedModelId: input.applicationShellState.selectedModelId,
     selectedReasoningEffort: input.applicationShellState.selectedReasoningEffort,
@@ -256,6 +295,18 @@ export function useApplicationRuntimeComposition(
     setIsModeSyncing: input.applicationShellState.setIsModeSyncing,
     selectedThreadId: input.applicationShellState.selectedThreadId
   });
+
+  const readLastAppliedModeSignature = useCallback((): string => {
+    return input.applicationShellState.lastAppliedModeSignatureRef.current;
+  }, [input.applicationShellState.lastAppliedModeSignatureRef]);
+
+  const writeLastAppliedModeSignature = useCallback((nextModeSignature: string): void => {
+    input.applicationShellState.lastAppliedModeSignatureRef.current = nextModeSignature;
+  }, [input.applicationShellState.lastAppliedModeSignatureRef]);
+
+  const invalidateActiveThreadQuery = useCallback((): void => {
+    input.applicationOwnerDependencies.threadListStateController.invalidateActiveThreadQuery();
+  }, [input.applicationOwnerDependencies.threadListStateController]);
 
   const chatFeatureComposition = useApplicationChatFeatureComposition({
     chatScrollEffectsInput: {
@@ -285,18 +336,14 @@ export function useApplicationRuntimeComposition(
       setSelectedThreadId: input.applicationShellState.setSelectedThreadId,
       selectedThreadIdRef: input.applicationShellState.selectedThreadIdRef,
       pendingThreadMaterializationCoordinator: input.applicationShellState.pendingThreadMaterializationCoordinator,
-      readLastAppliedModeSignature: () => input.applicationShellState.lastAppliedModeSignatureRef.current,
-      writeLastAppliedModeSignature: (nextModeSignature) => {
-        input.applicationShellState.lastAppliedModeSignatureRef.current = nextModeSignature;
-      },
+      readLastAppliedModeSignature,
+      writeLastAppliedModeSignature,
       chatRequestActionCoordinator: input.applicationOwnerDependencies.chatRequestActionCoordinator,
       collaborationModeActionCoordinator: input.applicationOwnerDependencies.collaborationModeActionCoordinator,
       chatClient: input.applicationOwnerDependencies.chatServerClient,
       threadMutationClient: input.applicationOwnerDependencies.threadMutationServerClient,
       pendingUserInputAnswerBuilder: input.applicationOwnerDependencies.pendingUserInputAnswerBuilder,
-      onInvalidateActiveThreadQuery: () => {
-        input.applicationOwnerDependencies.threadListStateController.invalidateActiveThreadQuery();
-      },
+      onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
       loadCoreDataTracked: input.coreDataLoaders.loadCoreDataTracked,
       onReloadSelectedThread: input.loadSelectedThreadTracked,
       reportTrackedUserInterfaceError: input.runtimeRequestHandlers.reportTrackedUserInterfaceError
@@ -319,15 +366,9 @@ export function useApplicationRuntimeComposition(
       effortOptionsWithoutAssumedDefault: input.applicationDerivedState.effortOptionsWithoutAssumedDefault,
       isModeSyncing: input.applicationShellState.isModeSyncing,
       pendingRequestCount: input.applicationDerivedState.pendingRequests.length,
-      setSelectedModeKey: (modeKey) => {
-        input.applicationShellState.setSelectedModeKey(modeKey);
-      },
-      setSelectedModelId: (modelId) => {
-        input.applicationShellState.setSelectedModelId(modelId);
-      },
-      setSelectedReasoningEffort: (reasoningEffort) => {
-        input.applicationShellState.setSelectedReasoningEffort(reasoningEffort);
-      }
+      setSelectedModeKey: input.applicationShellState.setSelectedModeKey,
+      setSelectedModelId: input.applicationShellState.setSelectedModelId,
+      setSelectedReasoningEffort: input.applicationShellState.setSelectedReasoningEffort
     }
   });
 

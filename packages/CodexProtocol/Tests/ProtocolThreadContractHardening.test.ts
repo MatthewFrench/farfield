@@ -103,6 +103,94 @@ describe("codex-protocol thread contract hardening", () => {
     ).toThrowError(/ThreadConversationState did not match expected schema/);
   });
 
+  it("parses tool call items with shared lifecycle status literals", () => {
+    const parsed = parseThreadConversationState({
+      id: "thread-123",
+      turns: [
+        {
+          status: "completed",
+          items: [
+            {
+              id: "item-mcp",
+              type: "mcpToolCall",
+              server: "filesystem",
+              tool: "read_file",
+              status: "failed",
+              arguments: { path: "README.md" }
+            },
+            {
+              id: "item-collab",
+              type: "collabToolCall",
+              tool: "wait",
+              status: "failed",
+              senderThreadId: "thread-123",
+              receiverThreadIds: ["thread-124"],
+              agentsStates: {
+                "thread-124": {
+                  status: "running"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(parsed.turns[0]?.items[0]?.type).toBe("mcpToolCall");
+    expect(parsed.turns[0]?.items[1]?.type).toBe("collabToolCall");
+  });
+
+  it("rejects mcp tool call items with unsupported lifecycle status values", () => {
+    expect(() =>
+      parseThreadConversationState({
+        id: "thread-123",
+        turns: [
+          {
+            status: "completed",
+            items: [
+              {
+                id: "item-mcp",
+                type: "mcpToolCall",
+                server: "filesystem",
+                tool: "read_file",
+                status: "paused",
+                arguments: { path: "README.md" }
+              }
+            ]
+          }
+        ]
+      })
+    ).toThrowError(/ThreadConversationState did not match expected schema/);
+  });
+
+  it("rejects collaboration tool call items with unsupported tool values", () => {
+    expect(() =>
+      parseThreadConversationState({
+        id: "thread-123",
+        turns: [
+          {
+            status: "completed",
+            items: [
+              {
+                id: "item-collab",
+                type: "collabAgentToolCall",
+                tool: "delegateWork",
+                status: "inProgress",
+                senderThreadId: "thread-123",
+                receiverThreadIds: ["thread-124"],
+                agentsStates: {
+                  "thread-124": {
+                    status: "running"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      })
+    ).toThrowError(/ThreadConversationState did not match expected schema/);
+  });
+
   it("rejects requests entries with invalid method tokens", () => {
     expect(() =>
       parseThreadConversationState({

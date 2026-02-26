@@ -17,7 +17,30 @@ import {
 } from "./PushRouteContracts.js";
 import { PushTestRouteOwner } from "./PushTestRouteOwner.js";
 
-const PushReceiptEventSchema = z.enum(["shown", "clicked", "error"]);
+/**
+ * Owns `/api/push/*` route orchestration, including request contract dispatch,
+ * receipt normalization, and local CA download behavior.
+ */
+const PushRouteStatusCodeByName = {
+  ok: 200,
+  notFound: 404,
+  serverError: 500,
+  serviceUnavailable: 503
+} as const;
+
+const PushRouteErrorByName = {
+  notificationsDisabled: "Push notifications are disabled",
+  localCaNotFound: "Local Caddy root certificate not found"
+} as const;
+
+const PushRouteContentTypeByName = {
+  pemFile: "application/x-pem-file"
+} as const;
+
+const PushRouteFileSystemErrorCodeByName = {
+  missingPath: "ENOENT"
+} as const;
+
 const FileSystemErrorSchema = z
   .object({
     code: z.string().optional()
@@ -60,6 +83,39 @@ async function streamBinaryFileDownload(
   });
 }
 
+function isPushRoutePrefix(segments: string[]): boolean {
+  return segments[0] === PushRouteSegmentByName.api && segments[1] === PushRouteSegmentByName.push;
+}
+
+function isPushRouteRequest(
+  method: string | undefined,
+  pathname: string,
+  expectedMethod: string,
+  expectedPathname: string
+): boolean {
+  return method === expectedMethod && pathname === expectedPathname;
+}
+
+function normalizePushReceiptBody(body: CreatePushReceiptBody): CreatePushReceiptBody {
+  return {
+    notificationId: body.notificationId,
+    event: body.event,
+    url: body.url,
+    threadId: body.threadId ?? null,
+    turnId: body.turnId ?? null,
+    ...(body.message ? { message: body.message } : {}),
+    createdAt: body.createdAt
+  };
+}
+
+function isMissingPathError<ErrorType>(error: ErrorType): boolean {
+  const parsedFileSystemError = FileSystemErrorSchema.safeParse(error);
+  return (
+    parsedFileSystemError.success
+    && parsedFileSystemError.data.code === PushRouteFileSystemErrorCodeByName.missingPath
+  );
+}
+
 export type { PushRouteDependencies } from "./PushRouteContracts.js";
 
 export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boolean> {
@@ -95,12 +151,19 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     withTimeout
   });
 
-  if (segments[0] !== PushRouteSegmentByName.api || segments[1] !== PushRouteSegmentByName.push) {
+  if (!isPushRoutePrefix(segments)) {
     return false;
   }
 
-  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.status) {
-    jsonResponse(res, 200, {
+  if (
+    isPushRouteRequest(
+      req.method,
+      pathname,
+      PushRouteMethodByName.get,
+      PushRoutePathnameByName.status
+    )
+  ) {
+    jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
       enabled: pushService.isEnabled(),
       permissionRequired: true,
@@ -110,24 +173,38 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     return true;
   }
 
-  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.vapidPublicKey) {
+  if (
+    isPushRouteRequest(
+      req.method,
+      pathname,
+      PushRouteMethodByName.get,
+      PushRoutePathnameByName.vapidPublicKey
+    )
+  ) {
     if (!pushService.isEnabled()) {
-      jsonResponse(res, 503, {
+      jsonResponse(res, PushRouteStatusCodeByName.serviceUnavailable, {
         ok: false,
-        error: "Push notifications are disabled"
+        error: PushRouteErrorByName.notificationsDisabled
       });
       return true;
     }
 
-    jsonResponse(res, 200, {
+    jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
       publicKey: pushService.getPublicKey()
     });
     return true;
   }
 
-  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.receiptsLatest) {
-    jsonResponse(res, 200, {
+  if (
+    isPushRouteRequest(
+      req.method,
+      pathname,
+      PushRouteMethodByName.get,
+      PushRoutePathnameByName.receiptsLatest
+    )
+  ) {
+    jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
       latest: pushReceiptStore.getLatest(),
       count: pushReceiptStore.getCount()
@@ -135,18 +212,16 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     return true;
   }
 
-  if (req.method === PushRouteMethodByName.post && pathname === PushRoutePathnameByName.receipts) {
+  if (
+    isPushRouteRequest(
+      req.method,
+      pathname,
+      PushRouteMethodByName.post,
+      PushRoutePathnameByName.receipts
+    )
+  ) {
     const body = parseBody(CreatePushReceiptBodySchema, await readJsonBody(req));
-    const event = PushReceiptEventSchema.parse(body.event);
-    const normalizedBody: CreatePushReceiptBody = {
-      notificationId: body.notificationId,
-      event,
-      url: body.url,
-      threadId: body.threadId ?? null,
-      turnId: body.turnId ?? null,
-      ...(body.message ? { message: body.message } : {}),
-      createdAt: body.createdAt
-    };
+    const normalizedBody = normalizePushReceiptBody(body);
 
     pushReceiptStore.add({
       notificationId: normalizedBody.notificationId,
@@ -158,24 +233,38 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       createdAt: normalizedBody.createdAt
     });
 
-    jsonResponse(res, 200, {
+    jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
       recorded: true
     });
     return true;
   }
 
-  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.sendsLatest) {
-    jsonResponse(res, 200, {
+  if (
+    isPushRouteRequest(
+      req.method,
+      pathname,
+      PushRouteMethodByName.get,
+      PushRoutePathnameByName.sendsLatest
+    )
+  ) {
+    jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
       latest: pushSendStore.getLatest()
     });
     return true;
   }
 
-  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.localCa) {
+  if (
+    isPushRouteRequest(
+      req.method,
+      pathname,
+      PushRouteMethodByName.get,
+      PushRoutePathnameByName.localCa
+    )
+  ) {
     const available = fs.existsSync(pushLocalCaSourcePath);
-    jsonResponse(res, 200, {
+    jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
       available,
       downloadPath: available ? PushRoutePathnameByName.localCaDownload : null
@@ -183,26 +272,32 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     return true;
   }
 
-  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.localCaDownload) {
+  if (
+    isPushRouteRequest(
+      req.method,
+      pathname,
+      PushRouteMethodByName.get,
+      PushRoutePathnameByName.localCaDownload
+    )
+  ) {
     const fileName = path.basename(pushLocalCaSourcePath);
     try {
       await streamBinaryFileDownload(
         res,
         pushLocalCaSourcePath,
         fileName,
-        "application/x-pem-file"
+        PushRouteContentTypeByName.pemFile
       );
       return true;
     } catch (error) {
-      const parsedFileSystemError = FileSystemErrorSchema.safeParse(error);
-      if (parsedFileSystemError.success && parsedFileSystemError.data.code === "ENOENT") {
-        jsonResponse(res, 404, {
+      if (isMissingPathError(error)) {
+        jsonResponse(res, PushRouteStatusCodeByName.notFound, {
           ok: false,
-          error: "Local Caddy root certificate not found"
+          error: PushRouteErrorByName.localCaNotFound
         });
         return true;
       }
-      jsonResponse(res, 500, {
+      jsonResponse(res, PushRouteStatusCodeByName.serverError, {
         ok: false,
         error: toErrorMessage(error)
       });
@@ -210,26 +305,40 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     }
   }
 
-  if (req.method === PushRouteMethodByName.post && pathname === PushRoutePathnameByName.subscriptions) {
+  if (
+    isPushRouteRequest(
+      req.method,
+      pathname,
+      PushRouteMethodByName.post,
+      PushRoutePathnameByName.subscriptions
+    )
+  ) {
     const body = parseBody(CreatePushSubscriptionBodySchema, await readJsonBody(req));
     const subscription = await pushMutationConcurrencyCoordinator.runExclusive(async () => {
       return pushStore.upsertSubscription(body.subscription, {
         privateMode: body.settings?.privateMode ?? pushPrivateModeDefault
       });
     });
-    jsonResponse(res, 200, {
+    jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
       subscriptionId: subscription.id
     });
     return true;
   }
 
-  if (req.method === PushRouteMethodByName.delete && pathname === PushRoutePathnameByName.subscriptions) {
+  if (
+    isPushRouteRequest(
+      req.method,
+      pathname,
+      PushRouteMethodByName.delete,
+      PushRoutePathnameByName.subscriptions
+    )
+  ) {
     const body = parseBody(DeletePushSubscriptionBodySchema, await readJsonBody(req));
     const deleted = await pushMutationConcurrencyCoordinator.runExclusive(async () => {
       return pushStore.removeSubscriptionByEndpoint(body.endpoint);
     });
-    jsonResponse(res, 200, {
+    jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
       deleted
     });

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import { ActivityHistoryService } from "../Source/Modules/Activity/ActivityHistoryService.js";
 import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
 
@@ -22,6 +23,17 @@ afterEach(() => {
 });
 
 describe("ActivityHistoryService", () => {
+  it("rejects non-positive constructor limits", () => {
+    const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
+
+    expect(() => new ActivityHistoryService(0, eventStreamClientRegistry)).toThrow(
+      "ActivityHistoryService requires positive integer historyLimit"
+    );
+    expect(() => new ActivityHistoryService(4, eventStreamClientRegistry, 0)).toThrow(
+      "ActivityHistoryService requires positive integer historyPayloadSummaryMaximumBytes"
+    );
+  });
+
   it("enforces bounded history and payload lookup", () => {
     const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
     const service = new ActivityHistoryService(2, eventStreamClientRegistry);
@@ -39,6 +51,56 @@ describe("ActivityHistoryService", () => {
     expect(historyById.has(first.id)).toBe(false);
     expect(historyById.has(second.id)).toBe(true);
     expect(historyById.has(third.id)).toBe(true);
+  });
+
+  it("returns owned snapshots for history maps and trace summaries", async () => {
+    const traceDirectoryPath = createTemporaryDirectory();
+    const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
+    const service = new ActivityHistoryService(4, eventStreamClientRegistry);
+
+    const entry = service.pushHistory("app", "out", { value: "history" }, { threadId: "thread_1" });
+    const firstHistoryByIdSnapshot = service.readHistoryById();
+    firstHistoryByIdSnapshot.delete(entry.id);
+    expect(service.readHistoryById().has(entry.id)).toBe(true);
+
+    const startedTrace = service.startTrace(traceDirectoryPath, "trace", () => {
+      if (!fs.existsSync(traceDirectoryPath)) {
+        fs.mkdirSync(traceDirectoryPath, { recursive: true });
+      }
+    });
+    if (!startedTrace) {
+      throw new Error("expected trace to start");
+    }
+
+    const activeSnapshot = service.readActiveTraceSummary();
+    if (!activeSnapshot) {
+      throw new Error("expected active trace snapshot");
+    }
+    activeSnapshot.eventCount = 999;
+    expect(service.readActiveTraceSummary()?.eventCount).toBe(0);
+
+    const stoppedTrace = service.stopTrace();
+    if (!stoppedTrace) {
+      throw new Error("expected trace to stop");
+    }
+
+    const traceSnapshot = service.readTraceById(stoppedTrace.id);
+    if (!traceSnapshot) {
+      throw new Error("expected trace snapshot by id");
+    }
+    traceSnapshot.label = "mutated";
+    expect(service.readTraceById(stoppedTrace.id)?.label).toBe("trace");
+
+    const recentSnapshot = service.readRecentTraces();
+    if (!recentSnapshot[0]) {
+      throw new Error("expected recent trace snapshot");
+    }
+    recentSnapshot[0].eventCount = 123;
+    expect(service.readRecentTraces()[0]?.eventCount).toBe(0);
+    // Allow trace stream close callbacks to flush before temporary directory cleanup.
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 25);
+    });
   });
 
   it("records action failures as action + system history entries", () => {
@@ -120,9 +182,16 @@ describe("ActivityHistoryService", () => {
     const history = service.readHistoryEntries();
     const payloadFromList = history[0]?.payload;
     const payloadFromLookup = service.readHistoryById().get(entry.id);
+    const payloadSummarySchema = z.object({
+      type: z.literal("history-payload-summary"),
+      truncated: z.literal(true),
+      originalSizeBytes: z.number().int().positive(),
+      preview: z.string()
+    }).strict();
+    const parsedPayloadSummary = payloadSummarySchema.parse(payloadFromList);
 
-    expect(typeof payloadFromList).toBe("object");
-    expect(payloadFromList).not.toEqual(oversizedPayload);
+    expect(parsedPayloadSummary.originalSizeBytes).toBeGreaterThan(64);
+    expect(parsedPayloadSummary.preview.length).toBeLessThanOrEqual(64);
     expect(payloadFromLookup).toEqual(oversizedPayload);
   });
 });

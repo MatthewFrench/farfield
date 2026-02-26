@@ -287,6 +287,62 @@ describe("useSelectedThreadLoaders", () => {
     expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls[1]?.includeReadThread).toBe(false);
   });
 
+  it("defaults includeReadThread to true when no options are provided", async () => {
+    const selectedThreadDataRefreshCoordinator = new TestSelectedThreadDataRefreshCoordinator([
+      {
+        liveStateSnapshot: buildLiveStateSnapshot("thread-1", ["live-turn-1"]),
+        streamEventsSnapshot: buildStreamEventsSnapshot({
+          threadId: "thread-1",
+          events: [],
+          nextSequence: 1,
+          resetRequired: false
+        }),
+        streamEventsSinceSequenceUsed: null,
+        readThreadSnapshot: buildReadThreadSnapshot("thread-1", ["read-turn-1"]),
+        includeTurnsUsedForRead: true,
+        containsAnyTurns: true
+      }
+    ]);
+    const selectedThreadIdRef = { current: "thread-1" };
+    const modeSelectionStateResolver = new ModeSelectionStateResolver();
+    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(modeSelectionStateResolver);
+    const selectedThreadRefreshConcurrencyCoordinator = new SelectedThreadRefreshConcurrencyCoordinator();
+    const snapshotReference: { current: SelectedThreadLoadersHarnessSnapshot | null } = {
+      current: null
+    };
+
+    render(
+      <SelectedThreadLoadersHarness
+        threads={[buildThreadListItem("thread-1")]}
+        selectedAgentId="codex"
+        appDefaultModel="gpt-5.3-codex"
+        appDefaultReasoningEffort="medium"
+        selectedThreadIdRef={selectedThreadIdRef}
+        pendingThreadMaterializationCoordinator={new PendingThreadMaterializationCoordinator()}
+        conversationSyncSignatureBuilder={conversationSyncSignatureBuilder}
+        selectedThreadDataRefreshCoordinator={selectedThreadDataRefreshCoordinator}
+        selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
+        readThreadStateMerger={new ReadThreadStateMerger()}
+        chatServerClient={new ChatServerClient()}
+        onSnapshot={(snapshot) => {
+          snapshotReference.current = snapshot;
+        }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(snapshotReference.current).not.toBeNull();
+    });
+    const loadersSnapshot = readLoadersSnapshot(snapshotReference);
+
+    await loadersSnapshot.loaders.loadSelectedThread("thread-1");
+
+    await waitFor(() => {
+      expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls.length).toBe(1);
+    });
+    expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls[0]?.includeReadThread).toBe(true);
+  });
+
   it("applies thread deltas only for the selected thread and resets on resetRequired snapshots", async () => {
     const selectedThreadDataRefreshCoordinator = new TestSelectedThreadDataRefreshCoordinator([]);
     const selectedThreadIdRef = { current: "thread-1" };

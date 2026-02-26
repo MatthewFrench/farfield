@@ -15,6 +15,36 @@ import type {
  */
 export type AgentId = "codex" | "opencode";
 
+// Agent identifiers are shared across route parsing, adapter selection, and ownership caches.
+// Keep the literals centralized in this contract owner to prevent drift.
+export const AgentIdentifierByName: {
+  codex: AgentId;
+  opencode: AgentId;
+} = {
+  codex: "codex",
+  opencode: "opencode"
+};
+
+export const AgentIdentifierValues: ReadonlyArray<AgentId> = [
+  AgentIdentifierByName.codex,
+  AgentIdentifierByName.opencode
+];
+
+export type AgentThreadListSortKey = "created_at" | "updated_at";
+
+export const AgentThreadListSortKeyByName: {
+  createdAt: AgentThreadListSortKey;
+  updatedAt: AgentThreadListSortKey;
+} = {
+  createdAt: "created_at",
+  updatedAt: "updated_at"
+};
+
+export const AgentThreadListSortKeyValues: ReadonlyArray<AgentThreadListSortKey> = [
+  AgentThreadListSortKeyByName.createdAt,
+  AgentThreadListSortKeyByName.updatedAt
+];
+
 export interface AgentCapabilities {
   canListModels: boolean;
   canListCollaborationModes: boolean;
@@ -30,7 +60,7 @@ export interface AgentListThreadsInput {
   all: boolean;
   maxPages: number;
   cursor: string | null;
-  sortKey: "created_at" | "updated_at";
+  sortKey: AgentThreadListSortKey;
   cwd: string | null;
 }
 
@@ -45,6 +75,14 @@ export interface AgentCreateThreadInput {
 }
 
 export type AgentThreadListItem = AppServerListThreadsResponse["data"][number];
+export type AgentThreadConversationState = AppServerReadThreadResponse["thread"];
+export type AgentCreatedThread = AppServerStartThreadResponse["thread"];
+export type AgentCreatedThreadModel = AppServerStartThreadResponse["model"];
+export type AgentCreatedThreadModelProvider = AppServerStartThreadResponse["modelProvider"];
+export type AgentCreatedThreadWorkingDirectory = AppServerStartThreadResponse["cwd"];
+export type AgentCreatedThreadApprovalPolicy = AppServerStartThreadResponse["approvalPolicy"];
+export type AgentCreatedThreadSandbox = AppServerStartThreadResponse["sandbox"];
+export type AgentCreatedThreadReasoningEffort = AppServerStartThreadResponse["reasoningEffort"];
 
 export interface AgentListThreadsResult {
   data: AgentThreadListItem[];
@@ -55,17 +93,17 @@ export interface AgentListThreadsResult {
 
 export interface AgentCreateThreadResult {
   threadId: string;
-  thread: AppServerStartThreadResponse["thread"];
-  model?: AppServerStartThreadResponse["model"];
-  modelProvider?: AppServerStartThreadResponse["modelProvider"];
-  cwd?: AppServerStartThreadResponse["cwd"];
-  approvalPolicy?: AppServerStartThreadResponse["approvalPolicy"];
-  sandbox?: AppServerStartThreadResponse["sandbox"];
-  reasoningEffort?: AppServerStartThreadResponse["reasoningEffort"];
+  thread: AgentCreatedThread;
+  model?: AgentCreatedThreadModel;
+  modelProvider?: AgentCreatedThreadModelProvider;
+  cwd?: AgentCreatedThreadWorkingDirectory;
+  approvalPolicy?: AgentCreatedThreadApprovalPolicy;
+  sandbox?: AgentCreatedThreadSandbox;
+  reasoningEffort?: AgentCreatedThreadReasoningEffort;
 }
 
 export interface AgentReadThreadResult {
-  thread: AppServerReadThreadResponse["thread"];
+  thread: AgentThreadConversationState;
 }
 
 export interface AgentReadThreadInput {
@@ -107,15 +145,25 @@ export interface AgentUnarchiveThreadInput {
   threadId: string;
 }
 
+export type AgentThreadLiveStateErrorKind = "reductionFailed";
+
+export const AgentThreadLiveStateErrorKindByName: {
+  reductionFailed: AgentThreadLiveStateErrorKind;
+} = {
+  reductionFailed: "reductionFailed"
+};
+
+export interface AgentThreadLiveStateError {
+  kind: AgentThreadLiveStateErrorKind;
+  message: string;
+  eventIndex: number | null;
+  patchIndex: number | null;
+}
+
 export interface AgentThreadLiveState {
   ownerClientId: string | null;
-  conversationState: AppServerReadThreadResponse["thread"] | null;
-  liveStateError: {
-    kind: "reductionFailed";
-    message: string;
-    eventIndex: number | null;
-    patchIndex: number | null;
-  } | null;
+  conversationState: AgentThreadConversationState | null;
+  liveStateError: AgentThreadLiveStateError | null;
 }
 
 export interface AgentThreadStreamEvents {

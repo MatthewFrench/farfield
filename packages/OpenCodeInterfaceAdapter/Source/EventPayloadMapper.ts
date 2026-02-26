@@ -6,6 +6,32 @@ import {
 } from "./Schemas.js";
 import { type OpenCodeEvent } from "./MapperContracts.js";
 
+const OpenCodeInboundEventTypes = {
+  messageUpdated: "message.updated",
+  messagePartUpdated: "message.part.updated",
+  sessionUpdated: "session.updated",
+  sessionStatus: "session.status",
+  permissionUpdated: "permission.updated"
+} as const;
+
+const OpenCodeMappedSsePayloadTypes = {
+  messageUpdated: "opencode-message-updated",
+  partUpdated: "opencode-part-updated",
+  sessionUpdated: "opencode-session-updated",
+  sessionStatus: "opencode-session-status",
+  permissionRequest: "opencode-permission-request"
+} as const;
+
+const OpenCodeMapperFieldNames = {
+  sessionIdentifier: "sessionID",
+  identifier: "id",
+  statusType: "type",
+  info: "info",
+  part: "part",
+  delta: "delta",
+  status: "status"
+} as const;
+
 interface OpenCodeMessageUpdatedSsePayload {
   type: "opencode-message-updated";
   sessionId: string;
@@ -49,43 +75,50 @@ const OpenCodeStructuredDataObjectSchema = z.record(OpenCodeStructuredDataValueS
 const OpenCodeSessionScopedRecordSchema = z.intersection(
   OpenCodeStructuredDataObjectSchema,
   z.object({
-    sessionID: z.string().min(1)
+    [OpenCodeMapperFieldNames.sessionIdentifier]: z.string().min(1)
   })
 );
 const OpenCodeSessionRecordSchema = z.intersection(
   OpenCodeStructuredDataObjectSchema,
   z.object({
-    id: z.string().min(1)
+    [OpenCodeMapperFieldNames.identifier]: z.string().min(1)
   })
 );
 const OpenCodeSessionStatusSchema = z.intersection(
   OpenCodeStructuredDataObjectSchema,
   z.object({
-    type: z.string().min(1)
+    [OpenCodeMapperFieldNames.statusType]: z.string().min(1)
   })
 );
 const OpenCodeMessageUpdatedPropertiesSchema = z
   .object({
-    info: OpenCodeSessionScopedRecordSchema
+    [OpenCodeMapperFieldNames.info]: OpenCodeSessionScopedRecordSchema
   })
   .strict();
 const OpenCodeMessagePartUpdatedPropertiesSchema = z
   .object({
-    part: OpenCodeSessionScopedRecordSchema,
-    delta: OpenCodeStructuredDataValueSchema.optional()
+    [OpenCodeMapperFieldNames.part]: OpenCodeSessionScopedRecordSchema,
+    [OpenCodeMapperFieldNames.delta]: OpenCodeStructuredDataValueSchema.optional()
   })
   .strict();
 const OpenCodeSessionUpdatedPropertiesSchema = z
   .object({
-    info: OpenCodeSessionRecordSchema
+    [OpenCodeMapperFieldNames.info]: OpenCodeSessionRecordSchema
   })
   .strict();
 const OpenCodeSessionStatusPropertiesSchema = z
   .object({
-    sessionID: z.string().min(1),
-    status: OpenCodeSessionStatusSchema
+    [OpenCodeMapperFieldNames.sessionIdentifier]: z.string().min(1),
+    [OpenCodeMapperFieldNames.status]: OpenCodeSessionStatusSchema
   })
   .strict();
+
+function isDifferentSessionIdentifier(
+  eventSessionIdentifier: string,
+  requestedSessionIdentifier: string
+): boolean {
+  return eventSessionIdentifier !== requestedSessionIdentifier;
+}
 
 /**
  * Maps OpenCode SSE events to a Farfield-compatible SSE payload.
@@ -98,67 +131,92 @@ export function mapOpenCodeEventToSsePayload(
   const normalizedSessionId = OpenCodeSessionIdentifierSchema.parse(sessionId);
 
   switch (event.type) {
-    case "message.updated": {
+    case OpenCodeInboundEventTypes.messageUpdated: {
       const properties = OpenCodeMessageUpdatedPropertiesSchema.parse(event.properties);
-      if (properties.info.sessionID !== normalizedSessionId) {
+      if (
+        isDifferentSessionIdentifier(
+          properties.info.sessionID,
+          normalizedSessionId
+        )
+      ) {
         return null;
       }
 
       return {
-        type: "opencode-message-updated",
+        type: OpenCodeMappedSsePayloadTypes.messageUpdated,
         sessionId: normalizedSessionId,
         message: properties.info
       };
     }
 
-    case "message.part.updated": {
+    case OpenCodeInboundEventTypes.messagePartUpdated: {
       const properties = OpenCodeMessagePartUpdatedPropertiesSchema.parse(event.properties);
-      if (properties.part.sessionID !== normalizedSessionId) {
+      if (
+        isDifferentSessionIdentifier(
+          properties.part.sessionID,
+          normalizedSessionId
+        )
+      ) {
         return null;
       }
 
       return {
-        type: "opencode-part-updated",
+        type: OpenCodeMappedSsePayloadTypes.partUpdated,
         sessionId: normalizedSessionId,
         part: properties.part,
         delta: properties.delta ?? null
       };
     }
 
-    case "session.updated": {
+    case OpenCodeInboundEventTypes.sessionUpdated: {
       const properties = OpenCodeSessionUpdatedPropertiesSchema.parse(event.properties);
-      if (properties.info.id !== normalizedSessionId) {
+      if (
+        isDifferentSessionIdentifier(
+          properties.info.id,
+          normalizedSessionId
+        )
+      ) {
         return null;
       }
 
       return {
-        type: "opencode-session-updated",
+        type: OpenCodeMappedSsePayloadTypes.sessionUpdated,
         sessionId: normalizedSessionId,
         session: properties.info
       };
     }
 
-    case "session.status": {
+    case OpenCodeInboundEventTypes.sessionStatus: {
       const properties = OpenCodeSessionStatusPropertiesSchema.parse(event.properties);
-      if (properties.sessionID !== normalizedSessionId) {
+      if (
+        isDifferentSessionIdentifier(
+          properties.sessionID,
+          normalizedSessionId
+        )
+      ) {
         return null;
       }
 
       return {
-        type: "opencode-session-status",
+        type: OpenCodeMappedSsePayloadTypes.sessionStatus,
         sessionId: normalizedSessionId,
         status: properties.status
       };
     }
 
-    case "permission.updated": {
+    case OpenCodeInboundEventTypes.permissionUpdated: {
       const properties = OpenCodeSessionScopedRecordSchema.parse(event.properties);
-      if (properties.sessionID !== normalizedSessionId) {
+      if (
+        isDifferentSessionIdentifier(
+          properties.sessionID,
+          normalizedSessionId
+        )
+      ) {
         return null;
       }
 
       return {
-        type: "opencode-permission-request",
+        type: OpenCodeMappedSsePayloadTypes.permissionRequest,
         sessionId: normalizedSessionId,
         permission: properties
       };

@@ -129,6 +129,13 @@ interface ThreadListStateControllerConfiguration {
   threadQueryCacheMaximumEntries: number;
 }
 
+// These owner instances retain mutable runtime state and must remain stable across rerenders.
+const STABLE_OWNER_MEMO_DEPENDENCIES: readonly [] = [];
+
+function useStableOwner<OwnerType>(ownerFactory: () => OwnerType): OwnerType {
+  return useMemo(ownerFactory, STABLE_OWNER_MEMO_DEPENDENCIES);
+}
+
 function createMobileSidebarSwipeCoordinator(
   configuration: MobileSidebarSwipeConfiguration
 ): MobileSidebarSwipeCoordinator {
@@ -156,6 +163,7 @@ function createSelectedThreadDataRefreshCoordinator(
 function createThreadListStateController(
   configuration: ThreadListStateControllerConfiguration
 ): ThreadListStateController {
+  // The controller owns cache and presentation state and therefore composes these owners together.
   return new ThreadListStateController({
     threadServerClient: new ThreadServerClient(),
     threadQueryCache: new ThreadQueryCache(
@@ -194,22 +202,16 @@ export function useApplicationOwnerDependencies<
     threadQueryCacheMaximumEntries
   } = input;
 
-  const apiAuthenticationErrorClassifier = useMemo(
-    () => new ApiAuthenticationErrorClassifier(),
-    []
+  const apiAuthenticationErrorClassifier = useStableOwner(
+    () => new ApiAuthenticationErrorClassifier()
   );
-  const dateValueFormatter = useMemo(
-    () => new DateValueFormatter(),
-    []
+  const dateValueFormatter = useStableOwner(() => new DateValueFormatter());
+  const capabilityServerClient = useStableOwner(() => new CapabilityServerClient());
+  const apiSessionBootstrapCoordinator = useStableOwner(
+    () => new ApiSessionBootstrapCoordinator()
   );
-  const capabilityServerClient = useMemo(() => new CapabilityServerClient(), []);
-  const apiSessionBootstrapCoordinator = useMemo(
-    () => new ApiSessionBootstrapCoordinator(),
-    []
-  );
-  const coreDataRefreshConcurrencyCoordinator = useMemo(
-    () => new CoreDataRefreshConcurrencyCoordinator(),
-    []
+  const coreDataRefreshConcurrencyCoordinator = useStableOwner(
+    () => new CoreDataRefreshConcurrencyCoordinator()
   );
   const eventStreamRefreshDecisionEngine = useMemo(
     () => new EventStreamRefreshDecisionEngine(Array.from(threadOnlyHistoryMethods)),
@@ -219,17 +221,15 @@ export function useApplicationOwnerDependencies<
     () => new EventRefreshScheduler(eventRefreshScheduleDelayMilliseconds),
     [eventRefreshScheduleDelayMilliseconds]
   );
-  const eventStreamConnectionCoordinator = useMemo(
-    () => new EventStreamConnectionCoordinator(),
-    []
+  const eventStreamConnectionCoordinator = useStableOwner(
+    () => new EventStreamConnectionCoordinator()
   );
   const runtimeViewportSizingCoordinator = useMemo(
     () => new RuntimeViewportSizingCoordinator(mobileVisualViewportKeyboardOpenDeltaPx),
     [mobileVisualViewportKeyboardOpenDeltaPx]
   );
-  const pageTouchOverscrollGuardCoordinator = useMemo(
-    () => new PageTouchOverscrollGuardCoordinator(),
-    []
+  const pageTouchOverscrollGuardCoordinator = useStableOwner(
+    () => new PageTouchOverscrollGuardCoordinator()
   );
   const mobileSidebarSwipeCoordinator = useMemo(
     () =>
@@ -254,26 +254,21 @@ export function useApplicationOwnerDependencies<
     ),
     [capabilitySnapshotRefreshIntervalMilliseconds]
   );
-  const chatServerClient = useMemo(() => new ChatServerClient(), []);
-  const selectedThreadRefreshConcurrencyCoordinator = useMemo(
-    () => new SelectedThreadRefreshConcurrencyCoordinator(),
-    []
+  const chatServerClient = useStableOwner(() => new ChatServerClient());
+  const selectedThreadRefreshConcurrencyCoordinator = useStableOwner(
+    () => new SelectedThreadRefreshConcurrencyCoordinator()
   );
-  const readThreadStateMerger = useMemo(
-    () => new ReadThreadStateMerger(),
-    []
+  const readThreadStateMerger = useStableOwner(() => new ReadThreadStateMerger());
+  const pendingUserInputRequestSelector = useStableOwner(
+    () => new PendingUserInputRequestSelector()
   );
-  const pendingUserInputRequestSelector = useMemo(
-    () => new PendingUserInputRequestSelector(),
-    []
-  );
+  // Both coordinators read the same resolver owner to keep mode synchronization deterministic.
   const modeSelectionSyncCoordinator = useMemo(
     () => new ModeSelectionSyncCoordinator(modeSelectionStateResolver),
     [modeSelectionStateResolver]
   );
-  const userInterfaceActionRequestBuilder = useMemo(
-    () => new UserInterfaceActionRequestBuilder(),
-    []
+  const userInterfaceActionRequestBuilder = useStableOwner(
+    () => new UserInterfaceActionRequestBuilder()
   );
   const trackedUserInterfaceErrorReporter = useMemo(
     () => new TrackedUserInterfaceErrorReporter({
@@ -281,17 +276,15 @@ export function useApplicationOwnerDependencies<
     }),
     [setErrorMessage]
   );
-  const pendingUserInputAnswerBuilder = useMemo(
-    () => new PendingUserInputAnswerBuilder(),
-    []
+  const pendingUserInputAnswerBuilder = useStableOwner(
+    () => new PendingUserInputAnswerBuilder()
   );
   const chatScrollStateCoordinator = useMemo(
     () => new ChatScrollStateCoordinator(chatScrollBottomThresholdPx),
     [chatScrollBottomThresholdPx]
   );
-  const chatRequestActionCoordinator = useMemo(
-    () => new ChatRequestActionCoordinator(),
-    []
+  const chatRequestActionCoordinator = useStableOwner(
+    () => new ChatRequestActionCoordinator()
   );
   const collaborationModeActionCoordinator = useMemo(
     () => new CollaborationModeActionCoordinator(modeSelectionStateResolver),
@@ -309,31 +302,28 @@ export function useApplicationOwnerDependencies<
       readThreadRetryMaximumDelayMilliseconds
     ]
   );
-  const conversationItemFlattener = useMemo(
-    () => new ConversationItemFlattener(),
-    []
+  const conversationItemFlattener = useStableOwner(
+    () => new ConversationItemFlattener()
   );
-  const debugServerClient = useMemo(() => new DebugServerClient(), []);
+  const debugServerClient = useStableOwner(() => new DebugServerClient());
   const debugWorkspaceDataReader = useMemo(
     () => new DebugWorkspaceDataReader(debugServerClient),
     [debugServerClient]
   );
-  const debugWorkspaceStateStore = useMemo(
-    () => new DebugWorkspaceStateStore(),
-    []
+  const debugWorkspaceStateStore = useStableOwner(
+    () => new DebugWorkspaceStateStore()
   );
-  const debugWorkspaceActionCoordinator = useMemo(
-    () => new DebugWorkspaceActionCoordinator(),
-    []
+  const debugWorkspaceActionCoordinator = useStableOwner(
+    () => new DebugWorkspaceActionCoordinator()
   );
-  const debugIssueStateResolver = useMemo(
-    () => new DebugIssueStateResolver(),
-    []
+  const debugIssueStateResolver = useStableOwner(
+    () => new DebugIssueStateResolver()
   );
-  const threadMutationServerClient = useMemo(() => new ThreadMutationServerClient(), []);
-  const threadMutationActionCoordinator = useMemo(
-    () => new ThreadMutationActionCoordinator(),
-    []
+  const threadMutationServerClient = useStableOwner(
+    () => new ThreadMutationServerClient()
+  );
+  const threadMutationActionCoordinator = useStableOwner(
+    () => new ThreadMutationActionCoordinator()
   );
   const threadListStateController = useMemo(
     () =>
@@ -346,9 +336,8 @@ export function useApplicationOwnerDependencies<
       threadQueryCacheTimeToLiveMilliseconds
     ]
   );
-  const pushClientStateManager = useMemo(
-    () => new PushClientStateManager(),
-    []
+  const pushClientStateManager = useStableOwner(
+    () => new PushClientStateManager()
   );
   const pushNotificationToolbarActionCoordinator = useMemo(
     () =>

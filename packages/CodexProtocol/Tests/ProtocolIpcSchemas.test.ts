@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  IpcFrameType,
+  IpcResponseResultType,
   parseIpcFrame,
   parseThreadStreamStateChangedBroadcast,
-  parseUserInputResponsePayload
+  parseUserInputResponsePayload,
+  ThreadStreamStateChangedEventType
 } from "../Source/Index.js";
 
 describe("codex-protocol ipc schemas", () => {
   it("parses generic ipc request frames", () => {
     const parsed = parseIpcFrame({
-      type: "request",
+      type: IpcFrameType.request,
       requestId: "request-5",
       method: "thread-follower-start-turn",
       params: {
@@ -18,15 +21,15 @@ describe("codex-protocol ipc schemas", () => {
       targetClientId: "client-1"
     });
 
-    expect(parsed.type).toBe("request");
+    expect(parsed.type).toBe(IpcFrameType.request);
   });
 
   it("parses client discovery request frames", () => {
     const parsed = parseIpcFrame({
-      type: "client-discovery-request",
+      type: IpcFrameType.clientDiscoveryRequest,
       requestId: "discovery-1",
       request: {
-        type: "request",
+        type: IpcFrameType.request,
         requestId: "inner-1",
         sourceClientId: "desktop-client",
         version: 0,
@@ -37,7 +40,20 @@ describe("codex-protocol ipc schemas", () => {
       }
     });
 
-    expect(parsed.type).toBe("client-discovery-request");
+    expect(parsed.type).toBe(IpcFrameType.clientDiscoveryRequest);
+  });
+
+  it("parses response frames with owned result literals", () => {
+    const parsed = parseIpcFrame({
+      type: IpcFrameType.response,
+      requestId: "request-7",
+      resultType: IpcResponseResultType.success,
+      result: {
+        accepted: true
+      }
+    });
+
+    expect(parsed.type).toBe(IpcFrameType.response);
   });
 
   it("rejects ipc frames with unsupported discriminant values", () => {
@@ -50,15 +66,26 @@ describe("codex-protocol ipc schemas", () => {
     ).toThrowError(/IpcFrame did not match expected schema/);
   });
 
+  it("rejects response frames with unsupported resultType literals", () => {
+    expect(() =>
+      parseIpcFrame({
+        type: IpcFrameType.response,
+        requestId: "request-8",
+        resultType: "partial",
+        result: {}
+      })
+    ).toThrowError(/resultType/);
+  });
+
   it("rejects thread stream state changed broadcasts missing source client ownership", () => {
     expect(() =>
       parseThreadStreamStateChangedBroadcast({
-        type: "broadcast",
-        method: "thread-stream-state-changed",
+        type: IpcFrameType.broadcast,
+        method: ThreadStreamStateChangedEventType,
         version: 4,
         params: {
           conversationId: "thread-123",
-          type: "thread-stream-state-changed",
+          type: ThreadStreamStateChangedEventType,
           version: 4,
           change: {
             type: "patches",
@@ -67,6 +94,26 @@ describe("codex-protocol ipc schemas", () => {
         }
       })
     ).toThrowError(/sourceClientId/);
+  });
+
+  it("rejects thread stream broadcasts with non-thread-stream method literals", () => {
+    expect(() =>
+      parseThreadStreamStateChangedBroadcast({
+        type: IpcFrameType.broadcast,
+        method: "tool-notification",
+        sourceClientId: "client-123",
+        version: 4,
+        params: {
+          conversationId: "thread-123",
+          type: ThreadStreamStateChangedEventType,
+          version: 4,
+          change: {
+            type: "patches",
+            patches: []
+          }
+        }
+      })
+    ).toThrowError(/method/);
   });
 
   it("rejects malformed user input answer payload", () => {

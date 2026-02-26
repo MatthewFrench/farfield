@@ -1,10 +1,12 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
+import type { JsonValue } from "@farfield/protocol";
 import { describe, expect, it, vi } from "vitest";
 import type {
   AgentAdapter,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
+  AgentId,
   AgentInterruptInput,
   AgentListThreadsInput,
   AgentListThreadsResult,
@@ -18,6 +20,10 @@ import {
   type ThreadCollectionRouteDependencies
 } from "../Source/Network/Routes/ThreadCollectionRoutes.js";
 
+type ResolveCreateThreadAdapter = (
+  requestedAgentId: AgentId | undefined
+) => AgentAdapter | null;
+
 function createMockRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
   const socket = new Socket();
   const request = new IncomingMessage(socket);
@@ -30,7 +36,8 @@ function createMockRequestResponsePair(): { request: IncomingMessage; response: 
 
 function createMockAgentAdapter(
   agentId: "codex" | "opencode",
-  listThreads: (input: AgentListThreadsInput) => Promise<AgentListThreadsResult>
+  listThreads: (input: AgentListThreadsInput) => Promise<AgentListThreadsResult>,
+  createThread?: (input: AgentCreateThreadInput) => Promise<AgentCreateThreadResult>
 ): AgentAdapter {
   return {
     id: agentId,
@@ -52,8 +59,11 @@ function createMockAgentAdapter(
       return true;
     },
     listThreads,
-    async createThread(_input: AgentCreateThreadInput): Promise<AgentCreateThreadResult> {
-      throw new Error("Not used in thread collection route test");
+    async createThread(input: AgentCreateThreadInput): Promise<AgentCreateThreadResult> {
+      if (!createThread) {
+        throw new Error("Not used in thread collection route test");
+      }
+      return await createThread(input);
     },
     async readThread(_input: AgentReadThreadInput): Promise<AgentReadThreadResult> {
       throw new Error("Not used in thread collection route test");
@@ -68,8 +78,13 @@ function createMockAgentAdapter(
 }
 
 function createCollectionRouteDependencies(input: {
+  method?: "GET" | "POST";
+  pathname?: string;
   url: URL;
+  defaultWorkspace?: string;
   listEnabledAdapters: () => AgentAdapter[];
+  resolveCreateThreadAdapter?: ResolveCreateThreadAdapter;
+  readJsonBody?: (req: IncomingMessage) => Promise<JsonValue>;
   onJsonResponse: (statusCode: number, body: object) => void;
   withTimeout?: <ValueType>(
     promise: Promise<ValueType>,
@@ -78,14 +93,14 @@ function createCollectionRouteDependencies(input: {
   ) => Promise<ValueType>;
 }): ThreadCollectionRouteDependencies {
   const { request, response } = createMockRequestResponsePair();
-  request.method = "GET";
+  request.method = input.method ?? "GET";
 
   return {
     req: request,
     res: response,
-    pathname: "/api/threads",
+    pathname: input.pathname ?? "/api/threads",
     url: input.url,
-    defaultWorkspace: "/tmp/workspace",
+    defaultWorkspace: input.defaultWorkspace ?? "/tmp/workspace",
     threadListAggregationCache: new ThreadListAggregationCache(1_000, 4),
     listEnabledAdapters: input.listEnabledAdapters,
     registerThreadAdapterOwnership: () => {},
@@ -103,8 +118,8 @@ function createCollectionRouteDependencies(input: {
       return normalized.length > 0 ? normalized : null;
     },
     listThreadsTimeoutMs: 7_500,
-    resolveCreateThreadAdapter: () => null,
-    readJsonBody: async () => ({}),
+    resolveCreateThreadAdapter: input.resolveCreateThreadAdapter ?? (() => null),
+    readJsonBody: input.readJsonBody ?? (async () => ({})),
     jsonResponse: (_res, statusCode, body) => {
       input.onJsonResponse(statusCode, body);
     },
@@ -116,6 +131,86 @@ function createCollectionRouteDependencies(input: {
 }
 
 describe("handleThreadCollectionRoutes", () => {
+  it("returns 503 when a requested create-thread agent is not enabled", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        method: "POST",
+        url: new URL("http://localhost/api/threads"),
+        listEnabledAdapters: () => [],
+        resolveCreateThreadAdapter: () => null,
+        readJsonBody: async () => ({
+          agentId: "codex"
+        }),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        }
+      })
+    );
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(503);
+    expect(capturedBody).toEqual({
+      ok: false,
+      error: "Requested agent codex is not enabled."
+    });
+  });
+
+  it("injects default workspace when creating a codex thread without cwd", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const createThread = vi.fn(
+      async (input: AgentCreateThreadInput): Promise<AgentCreateThreadResult> => ({
+        threadId: "thread_created",
+        thread: {
+          id: "thread_created",
+          preview: "new thread",
+          createdAt: 1_736_100_000_000,
+          updatedAt: 1_736_100_000_001,
+          cwd: input.cwd
+        },
+        cwd: input.cwd
+      })
+    );
+    const adapter = createMockAgentAdapter(
+      "codex",
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [],
+        nextCursor: null
+      }),
+      createThread
+    );
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        method: "POST",
+        url: new URL("http://localhost/api/threads"),
+        defaultWorkspace: "/workspace/default",
+        listEnabledAdapters: () => [adapter],
+        resolveCreateThreadAdapter: () => adapter,
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        }
+      })
+    );
+
+    expect(handled).toBe(true);
+    expect(createThread).toHaveBeenCalledWith({
+      cwd: "/workspace/default"
+    });
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toMatchObject({
+      ok: true,
+      threadId: "thread_created",
+      agentId: "codex"
+    });
+  });
+
   it("returns 400 when limit exceeds the route maximum", async () => {
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
@@ -246,6 +341,32 @@ describe("handleThreadCollectionRoutes", () => {
       ok: true,
       pages: 1,
       truncated: false
+    });
+  });
+
+  it("uses updated_at as the default sort key when query sortKey is omitted", async () => {
+    const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
+      data: [],
+      nextCursor: null
+    }));
+    const adapter = createMockAgentAdapter("codex", listThreads);
+
+    await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        url: new URL("http://localhost/api/threads?limit=10"),
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: () => {}
+      })
+    );
+
+    expect(listThreads).toHaveBeenCalledWith({
+      limit: 10,
+      archived: false,
+      all: true,
+      maxPages: 20,
+      cursor: null,
+      sortKey: "updated_at",
+      cwd: null
     });
   });
 

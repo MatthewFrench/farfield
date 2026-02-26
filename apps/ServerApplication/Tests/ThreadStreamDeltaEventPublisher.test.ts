@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { FarfieldEventStreamEvent, FarfieldThreadStreamDeltaEvent } from "@farfield/protocol";
 import type {
   AgentThreadLiveState,
   AgentThreadStreamEvents
@@ -6,10 +7,18 @@ import type {
 import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
 import { ThreadStreamDeltaEventPublisher } from "../Source/Network/ThreadStreamDeltaEventPublisher.js";
 
+const THREAD_STREAM_DELTA_EVENT_TYPE: FarfieldThreadStreamDeltaEvent["type"] = "thread-stream-delta";
+const THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT = 400;
+
 interface StreamEventsSnapshotInput {
   nextSequence: number;
   firstAvailableSequence: number;
   resetRequired: boolean;
+}
+
+interface DeferredPromise<ValueType> {
+  promise: Promise<ValueType>;
+  resolve: (value: ValueType) => void;
 }
 
 function createLiveStateSnapshot(): AgentThreadLiveState {
@@ -34,6 +43,35 @@ function waitForScheduledPublish(): Promise<void> {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, 0);
   });
+}
+
+function createDeferredPromise<ValueType>(): DeferredPromise<ValueType> {
+  let resolvePromise: ((value: ValueType) => void) | null = null;
+  const promise = new Promise<ValueType>((resolve) => {
+    resolvePromise = resolve;
+  });
+  if (!resolvePromise) {
+    throw new Error("Expected deferred resolve function");
+  }
+  return {
+    promise,
+    resolve: resolvePromise
+  };
+}
+
+function readThreadStreamDeltaEvent(
+  broadcastCall: [FarfieldEventStreamEvent] | undefined,
+  missingEventErrorMessage: string
+): FarfieldThreadStreamDeltaEvent {
+  if (!broadcastCall) {
+    throw new Error(missingEventErrorMessage);
+  }
+  const [broadcastEvent] = broadcastCall;
+  expect(broadcastEvent.type).toBe(THREAD_STREAM_DELTA_EVENT_TYPE);
+  if (broadcastEvent.type !== THREAD_STREAM_DELTA_EVENT_TYPE) {
+    throw new Error("Expected thread-stream-delta event payload");
+  }
+  return broadcastEvent;
 }
 
 describe("ThreadStreamDeltaEventPublisher", () => {
@@ -75,31 +113,31 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     await waitForScheduledPublish();
 
     expect(readThreadLiveState).toHaveBeenCalledTimes(2);
-    expect(readThreadStreamEvents).toHaveBeenNthCalledWith(1, "thread-1", null, 400);
-    expect(readThreadStreamEvents).toHaveBeenNthCalledWith(2, "thread-1", 4, 400);
+    expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
+      1,
+      "thread-1",
+      null,
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+    );
+    expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
+      2,
+      "thread-1",
+      4,
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+    );
     expect(broadcastSpy).toHaveBeenCalledTimes(2);
 
-    const firstBroadcastCall = broadcastSpy.mock.calls[0];
-    if (!firstBroadcastCall) {
-      throw new Error("Expected first thread delta broadcast");
-    }
-    const [firstBroadcastEvent] = firstBroadcastCall;
-    expect(firstBroadcastEvent.type).toBe("thread-stream-delta");
-    if (firstBroadcastEvent.type !== "thread-stream-delta") {
-      throw new Error("Expected thread-stream-delta event payload");
-    }
+    const firstBroadcastEvent = readThreadStreamDeltaEvent(
+      broadcastSpy.mock.calls[0],
+      "Expected first thread delta broadcast"
+    );
     expect(firstBroadcastEvent.delta.streamEventsSinceSequenceUsed).toBeNull();
     expect(firstBroadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(4);
 
-    const secondBroadcastCall = broadcastSpy.mock.calls[1];
-    if (!secondBroadcastCall) {
-      throw new Error("Expected second thread delta broadcast");
-    }
-    const [secondBroadcastEvent] = secondBroadcastCall;
-    expect(secondBroadcastEvent.type).toBe("thread-stream-delta");
-    if (secondBroadcastEvent.type !== "thread-stream-delta") {
-      throw new Error("Expected thread-stream-delta event payload");
-    }
+    const secondBroadcastEvent = readThreadStreamDeltaEvent(
+      broadcastSpy.mock.calls[1],
+      "Expected second thread delta broadcast"
+    );
     expect(secondBroadcastEvent.delta.streamEventsSinceSequenceUsed).toBe(4);
     expect(secondBroadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(9);
     expect(publisher.readStatistics()).toMatchObject({
@@ -151,19 +189,24 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     publisher.schedulePublish("thread-1");
     await waitForScheduledPublish();
 
-    expect(readThreadStreamEvents).toHaveBeenNthCalledWith(1, "thread-1", null, 400);
-    expect(readThreadStreamEvents).toHaveBeenNthCalledWith(2, "thread-1", 5, 400);
+    expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
+      1,
+      "thread-1",
+      null,
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+    );
+    expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
+      2,
+      "thread-1",
+      5,
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+    );
     expect(broadcastSpy).toHaveBeenCalledTimes(1);
 
-    const broadcastCall = broadcastSpy.mock.calls[0];
-    if (!broadcastCall) {
-      throw new Error("Expected thread delta broadcast after reset-required snapshot");
-    }
-    const [broadcastEvent] = broadcastCall;
-    expect(broadcastEvent.type).toBe("thread-stream-delta");
-    if (broadcastEvent.type !== "thread-stream-delta") {
-      throw new Error("Expected thread-stream-delta event payload");
-    }
+    const broadcastEvent = readThreadStreamDeltaEvent(
+      broadcastSpy.mock.calls[0],
+      "Expected thread delta broadcast after reset-required snapshot"
+    );
     expect(broadcastEvent.delta.streamEventsSinceSequenceUsed).toBe(5);
     expect(broadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(8);
     expect(publisher.readStatistics()).toMatchObject({
@@ -207,6 +250,84 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       scheduledPublishCount: 2,
       failedPublishCount: 1,
       broadcastCount: 1
+    });
+  });
+
+  it("drains queued schedules in a single in-flight publish loop", async () => {
+    const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
+    const broadcastSpy = vi.spyOn(eventStreamClientRegistry, "broadcast");
+    const firstLiveStateDeferred = createDeferredPromise<AgentThreadLiveState>();
+    let liveStateReadCount = 0;
+    const readThreadLiveState = vi.fn(async (_threadId: string) => {
+      liveStateReadCount += 1;
+      if (liveStateReadCount === 1) {
+        return firstLiveStateDeferred.promise;
+      }
+      return createLiveStateSnapshot();
+    });
+    const streamEventsSnapshots: AgentThreadStreamEvents[] = [
+      createStreamEventsSnapshot({
+        nextSequence: 2,
+        firstAvailableSequence: 0,
+        resetRequired: true
+      }),
+      createStreamEventsSnapshot({
+        nextSequence: 6,
+        firstAvailableSequence: 0,
+        resetRequired: true
+      })
+    ];
+    const readThreadStreamEvents = vi.fn(
+      async (_threadId: string, _sinceSequence: number | null, _limit: number) => {
+        const nextSnapshot = streamEventsSnapshots.shift();
+        if (!nextSnapshot) {
+          throw new Error("Expected stream-events snapshot fixture");
+        }
+        return nextSnapshot;
+      }
+    );
+    const publisher = new ThreadStreamDeltaEventPublisher({
+      eventStreamClientRegistry,
+      readThreadLiveState,
+      readThreadStreamEvents
+    });
+
+    publisher.schedulePublish("thread-1");
+    await waitForScheduledPublish();
+
+    publisher.schedulePublish("thread-1");
+    firstLiveStateDeferred.resolve(createLiveStateSnapshot());
+    await waitForScheduledPublish();
+    await waitForScheduledPublish();
+
+    expect(readThreadLiveState).toHaveBeenCalledTimes(2);
+    expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
+      1,
+      "thread-1",
+      null,
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+    );
+    expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
+      2,
+      "thread-1",
+      2,
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+    );
+    expect(broadcastSpy).toHaveBeenCalledTimes(2);
+
+    const secondBroadcastEvent = readThreadStreamDeltaEvent(
+      broadcastSpy.mock.calls[1],
+      "Expected drained in-flight second broadcast"
+    );
+    expect(secondBroadcastEvent.delta.streamEventsSinceSequenceUsed).toBe(2);
+    expect(secondBroadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(6);
+    expect(publisher.readStatistics()).toMatchObject({
+      scheduledPublishCount: 2,
+      startedPublishCount: 1,
+      completedPublishCount: 1,
+      failedPublishCount: 0,
+      broadcastCount: 2,
+      suppressedBroadcastCount: 0
     });
   });
 

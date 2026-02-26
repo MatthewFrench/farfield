@@ -51,18 +51,37 @@ const PushTestBodySchema = FarfieldPushTestBodySchema;
 const runtimeConfiguration = readServerRuntimeConfigurationFromCurrentProcessEnvironment();
 configureLogger(runtimeConfiguration.logLevel);
 const serverBootstrapUtilityOwner = new ServerBootstrapUtilityOwner();
+const BootstrapCliMessages = Object.freeze({
+  invalidArgumentsGuidance: "Run with --help to see valid arguments."
+});
+const BootstrapDurationMilliseconds = Object.freeze({
+  day: 24 * 60 * 60 * 1000,
+  // Keepalive cadence balances prompt stale-connection detection with low idle network overhead.
+  eventStreamKeepaliveInterval: 15_000,
+  // Summarize bursty stream-state events once per second to preserve readable activity history.
+  threadStreamHistorySummaryFlushInterval: 1_000
+});
+const BootstrapHistoryEventContract = Object.freeze({
+  runtimeStateChangedType: "runtime-state-changed",
+  ipcTransport: "ipc",
+  ipcInboundDirection: "in"
+});
+const BootstrapLifecycleMessages = Object.freeze({
+  monitorServerFailedToStart: "Monitor server failed to start"
+});
 
 function ensureTraceDirectory(): void {
   serverBootstrapUtilityOwner.ensureDirectoryExists(runtimeConfiguration.traceDirectoryPath);
 }
 
+// Parse CLI options before creating stateful owners so help/error exits stay side-effect free.
 const parsedCli = (() => {
   try {
     return parseServerCliOptions(process.argv.slice(2));
   } catch (error) {
     const message = serverBootstrapUtilityOwner.toErrorMessage(error);
     process.stderr.write(`${message}\n`);
-    process.stderr.write("Run with --help to see valid arguments.\n");
+    process.stderr.write(`${BootstrapCliMessages.invalidArgumentsGuidance}\n`);
     process.exit(1);
   }
 })();
@@ -86,21 +105,13 @@ const pushLocalCaSourcePath = runtimeConfiguration.pushLocalCaSourcePath;
 const pushVapidPublicKey = runtimeConfiguration.pushVapidPublicKey;
 const pushVapidPrivateKey = runtimeConfiguration.pushVapidPrivateKey;
 const pushVapidSubject = runtimeConfiguration.pushVapidSubject;
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
-// Keepalive cadence balances prompt stale-connection detection with low idle network overhead.
-const EVENT_STREAM_KEEPALIVE_INTERVAL_MS = 15_000;
-// Summarize bursty stream-state events once per second to preserve readable activity history.
-const THREAD_STREAM_HISTORY_SUMMARY_FLUSH_INTERVAL_MS = 1_000;
-const RUNTIME_STATE_CHANGED_EVENT_TYPE = "runtime-state-changed";
-const IPC_HISTORY_TRANSPORT = "ipc";
-const IPC_INBOUND_DIRECTION = "in";
 
 const pushStore = new PushStore(pushStatePathResolution.filePath);
 pushStore.load();
 const pushReceiptStore = new PushReceiptStore(
   pushReceiptsPath,
   runtimeConfiguration.pushReceiptsMaxCount,
-  runtimeConfiguration.pushReceiptsMaxAgeDays * MILLISECONDS_PER_DAY
+  runtimeConfiguration.pushReceiptsMaxAgeDays * BootstrapDurationMilliseconds.day
 );
 pushReceiptStore.load();
 const pushSendStore = new PushSendStore(pushSendsPath);
@@ -121,9 +132,12 @@ const clientErrorStore = new ClientErrorStore(
 );
 const serverErrorEventRecorder = new ServerErrorEventRecorder(clientErrorStore);
 let agentRuntimeOwner: AgentRuntimeOwner | null = null;
+function readCodexAdapter() {
+  return agentRuntimeOwner?.readCodexAdapter() ?? null;
+}
 
 const eventStreamClientRegistry = new EventStreamClientRegistry(
-  EVENT_STREAM_KEEPALIVE_INTERVAL_MS
+  BootstrapDurationMilliseconds.eventStreamKeepaliveInterval
 );
 const eventLoopLagObservabilityOwner = new EventLoopLagObservabilityOwner();
 eventLoopLagObservabilityOwner.start();
@@ -140,22 +154,27 @@ const activityHistoryService = new ActivityHistoryService(
 function emitThreadStreamStateChangedHistorySummary(
   summary: ThreadStreamStateChangedBatchSummary
 ): void {
-  activityHistoryService.pushHistory(IPC_HISTORY_TRANSPORT, IPC_INBOUND_DIRECTION, {
-    type: THREAD_STREAM_STATE_CHANGED_BATCH_EVENT_TYPE,
-    count: summary.count,
-    spanMs: summary.spanMs,
-    latestThreadId: summary.latestThreadId
-  }, {
-    method: THREAD_STREAM_STATE_CHANGED_METHOD,
-    threadId: summary.latestThreadId,
-    summarized: true,
-    count: summary.count,
-    spanMs: summary.spanMs
-  });
+  activityHistoryService.pushHistory(
+    BootstrapHistoryEventContract.ipcTransport,
+    BootstrapHistoryEventContract.ipcInboundDirection,
+    {
+      type: THREAD_STREAM_STATE_CHANGED_BATCH_EVENT_TYPE,
+      count: summary.count,
+      spanMs: summary.spanMs,
+      latestThreadId: summary.latestThreadId
+    },
+    {
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
+      threadId: summary.latestThreadId,
+      summarized: true,
+      count: summary.count,
+      spanMs: summary.spanMs
+    }
+  );
 }
 
 const threadStreamStateChangedHistoryBatchOwner = new ThreadStreamStateChangedHistoryBatchOwner({
-  flushIntervalMs: THREAD_STREAM_HISTORY_SUMMARY_FLUSH_INTERVAL_MS,
+  flushIntervalMs: BootstrapDurationMilliseconds.threadStreamHistorySummaryFlushInterval,
   emitSummary: emitThreadStreamStateChangedHistorySummary
 });
 const threadIndex = new ThreadIndex();
@@ -176,9 +195,9 @@ const runtimeStateOwner = new RuntimeStateOwner({
   socketPath: ipcSocketPath,
   workspaceDir: runtimeConfiguration.defaultWorkspacePath,
   gitCommit,
-  readCodexRuntimeState: () => agentRuntimeOwner?.readCodexAdapter()?.getRuntimeState() ?? null,
+  readCodexRuntimeState: () => readCodexAdapter()?.getRuntimeState() ?? null,
   readHistoryCount: () => activityHistoryService.readHistoryCount(),
-  readThreadOwnerCount: () => agentRuntimeOwner?.readCodexAdapter()?.getThreadOwnerCount() ?? 0,
+  readThreadOwnerCount: () => readCodexAdapter()?.getThreadOwnerCount() ?? 0,
   readPushEnabled: () => pushService.isEnabled(),
   readPushSubscriptionCount: () => pushStore.getSubscriptionCount(),
   readPushReceiptCount: () => pushReceiptStore.getCount(),
@@ -188,7 +207,7 @@ const runtimeStateOwner = new RuntimeStateOwner({
 const ntfyNotifier = new NtfyNotifier(runtimeConfiguration.ntfyConfiguration);
 const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
 const threadCompletionNotificationService = new ThreadCompletionNotificationService({
-  readCodexAdapter: () => agentRuntimeOwner?.readCodexAdapter() ?? null,
+  readCodexAdapter,
   threadConcurrencyCoordinator,
   pushMutationConcurrencyCoordinator,
   ntfyNotifier,
@@ -211,7 +230,7 @@ const pushDispatchConcurrencyCoordinator = new PushDispatchConcurrencyCoordinato
 const threadStreamDeltaEventPublisher = new ThreadStreamDeltaEventPublisher({
   eventStreamClientRegistry,
   readThreadLiveState: async (threadId) => {
-    const codexAdapter = agentRuntimeOwner?.readCodexAdapter();
+    const codexAdapter = readCodexAdapter();
     if (!codexAdapter) {
       return {
         ownerClientId: null,
@@ -222,7 +241,7 @@ const threadStreamDeltaEventPublisher = new ThreadStreamDeltaEventPublisher({
     return codexAdapter.readLiveState(threadId);
   },
   readThreadStreamEvents: async (threadId, sinceSequence, limit) => {
-    const codexAdapter = agentRuntimeOwner?.readCodexAdapter();
+    const codexAdapter = readCodexAdapter();
     if (!codexAdapter) {
       return {
         ownerClientId: null,
@@ -254,6 +273,7 @@ function invalidateThreadListAggregationCache(
   threadListCacheInvalidationOwner.invalidate(reason, details);
 }
 
+// Runtime owner must exist before request/lifecycle owners capture adapter readers.
 agentRuntimeOwner = new AgentRuntimeOwner({
   configuredAgentIds,
   codexExecutablePath: codexExecutable,
@@ -272,11 +292,17 @@ agentRuntimeOwner = new AgentRuntimeOwner({
       return;
     }
 
+    // Emit any buffered stream-change summary before this raw frame so history ordering stays stable.
     threadStreamStateChangedHistoryBatchOwner.flushBufferedSummary(nowMs);
-    activityHistoryService.pushHistory("ipc", event.direction, event.frame as JsonValue, {
-      method: event.method,
-      threadId: event.threadId
-    });
+    activityHistoryService.pushHistory(
+      BootstrapHistoryEventContract.ipcTransport,
+      event.direction,
+      event.frame as JsonValue,
+      {
+        method: event.method,
+        threadId: event.threadId
+      }
+    );
   },
   onThreadStreamStateChanged: (threadId) => {
     invalidateThreadListAggregationCache(THREAD_STREAM_STATE_CHANGED_METHOD, {
@@ -302,7 +328,7 @@ const serverObservabilitySnapshotOwner = new ServerObservabilitySnapshotOwner({
 function broadcastRuntimeState(): void {
   const runtimeStateSnapshot = FarfieldHealthStateSchema.parse(runtimeStateOwner.readSnapshot());
   eventStreamClientRegistry.broadcast({
-    type: RUNTIME_STATE_CHANGED_EVENT_TYPE,
+    type: BootstrapHistoryEventContract.runtimeStateChangedType,
     state: runtimeStateSnapshot
   });
 }
@@ -337,7 +363,7 @@ const serverRequestHandler = new ServerRequestHandler({
   configuredAgentIds,
   registry,
   threadAdapterResolver,
-  codexAdapter: agentRuntimeOwner.readCodexAdapter(),
+  codexAdapter: readCodexAdapter(),
   threadListAggregationCache,
   threadConcurrencyCoordinator,
   eventStreamClientRegistry,
@@ -446,7 +472,7 @@ serverLifecycleCoordinator.installSignalHandlers();
 void serverLifecycleCoordinator.start().catch((error) => {
   const runtimeErrorMessage = serverBootstrapUtilityOwner.toErrorMessage(error);
   runtimeStateOwner.setRuntimeLastError(runtimeErrorMessage);
-  pushSystem("Monitor server failed to start", { error: runtimeErrorMessage });
+  pushSystem(BootstrapLifecycleMessages.monitorServerFailedToStart, { error: runtimeErrorMessage });
   logger.fatal({ error: runtimeErrorMessage }, "monitor-server-failed-to-start");
   process.exit(1);
 });

@@ -4,6 +4,9 @@ import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import {
   type FlattenedConversationItem
 } from "@/Features/Chat/DomainModel/ConversationItemFlattener";
+import {
+  type PendingUserInputAnswerDraftByQuestionId
+} from "@/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
 import { type PendingUserInputRequest } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
 import { ConversationItem } from "@/Components/ConversationItem";
 import { ChatComposer } from "@/Components/ChatComposer";
@@ -11,7 +14,14 @@ import { PendingRequestCard } from "@/Components/PendingRequestCard";
 import { Button } from "@/Components/UserInterface/Button";
 import { ChatModeToolbar, type ChatModeToolbarProps } from "./ChatModeToolbar";
 
-type ChatSurfaceState = "loading-threads" | "loading-thread" | "no-messages" | "no-thread" | "ready";
+export type ChatSurfaceState = "loading-threads" | "loading-thread" | "no-messages" | "no-thread" | "ready";
+type PendingRequestDraftField = "option" | "freeform";
+
+const NO_THREAD_MOTION_KEY = "__no_thread__";
+const THREAD_FADE_TRANSITION_DURATION_SECONDS = 0.14;
+const JUMP_TO_BOTTOM_TRANSITION_DURATION_SECONDS = 0.18;
+const THINKING_BANNER_TRANSITION_DURATION_SECONDS = 0.15;
+const CHAT_LOG_ARIA_LABEL = "Conversation updates";
 
 interface ChatEmptyStateDescriptor {
   testId: string;
@@ -23,46 +33,56 @@ function readChatEmptyStateDescriptor(
   chatSurfaceState: ChatSurfaceState,
   canCreateNewThread: boolean
 ): ChatEmptyStateDescriptor {
-  if (chatSurfaceState === "loading-threads") {
-    return {
-      testId: "chat-empty-loading-threads",
-      message: "Loading threads...",
-      showLoadingIndicator: true
-    };
+  switch (chatSurfaceState) {
+    case "loading-threads":
+      return {
+        testId: "chat-empty-loading-threads",
+        message: "Loading threads...",
+        showLoadingIndicator: true
+      };
+    case "loading-thread":
+      return {
+        testId: "chat-empty-loading-thread",
+        message: "Loading thread...",
+        showLoadingIndicator: true
+      };
+    case "no-messages":
+      return {
+        testId: "chat-empty-no-messages",
+        message: "No messages yet",
+        showLoadingIndicator: false
+      };
+    case "no-thread":
+      return {
+        testId: "chat-empty-no-thread",
+        message: canCreateNewThread ? "Start typing to create a new thread" : "Select a thread from the sidebar",
+        showLoadingIndicator: false
+      };
+    case "ready":
+      // Empty-state rendering should never happen once the surface is marked ready.
+      throw new Error("ChatWorkspacePane received an empty-state render with chatSurfaceState set to 'ready'.");
   }
+}
 
-  if (chatSurfaceState === "loading-thread") {
-    return {
-      testId: "chat-empty-loading-thread",
-      message: "Loading thread...",
-      showLoadingIndicator: true
-    };
-  }
+function readCanCreateNewThread(availableAgentIds: readonly AgentId[]): boolean {
+  return availableAgentIds.length > 0;
+}
 
-  if (chatSurfaceState === "no-messages") {
-    return {
-      testId: "chat-empty-no-messages",
-      message: "No messages yet",
-      showLoadingIndicator: false
-    };
-  }
+function readCanSendMessage(selectedThreadId: string | null, canCreateNewThread: boolean): boolean {
+  return selectedThreadId !== null || canCreateNewThread;
+}
 
-  if (chatSurfaceState === "no-thread") {
-    return {
-      testId: "chat-empty-no-thread",
-      message: canCreateNewThread ? "Start typing to create a new thread" : "Select a thread from the sidebar",
-      showLoadingIndicator: false
-    };
-  }
-
-  throw new Error("ChatWorkspacePane received an empty-state render with chatSurfaceState set to 'ready'.");
+function readComposerPlaceholder(
+  selectedThreadId: string | null,
+  activeAgentLabel: string,
+  selectedAgentLabel: string
+): string {
+  return selectedThreadId ? `Message ${activeAgentLabel}…` : `Message ${selectedAgentLabel}…`;
 }
 
 export interface ChatWorkspacePaneProps {
   chatSurfaceState: ChatSurfaceState;
   selectedThreadId: string | null;
-  isCoreLoading: boolean;
-  isSelectedThreadLoading: boolean;
   availableAgentIds: readonly AgentId[];
   turnCount: number;
   scrollRef: React.RefObject<HTMLDivElement | null>;
@@ -75,8 +95,8 @@ export interface ChatWorkspacePaneProps {
   onJumpToBottom: () => void;
   activeRequest: PendingUserInputRequest | null;
   canSubmitUserInputForActiveAgent: boolean;
-  answerDraft: Record<string, { option: string; freeform: string }>;
-  onAnswerDraftChange: (questionId: string, field: "option" | "freeform", value: string) => void;
+  answerDraft: PendingUserInputAnswerDraftByQuestionId;
+  onAnswerDraftChange: (questionId: string, field: PendingRequestDraftField, value: string) => void;
   onSubmitPendingRequest: () => void;
   onSkipPendingRequest: () => void;
   isBusy: boolean;
@@ -115,9 +135,14 @@ export function ChatWorkspacePane({
   onSendMessage,
   chatModeToolbarProperties
 }: ChatWorkspacePaneProps): React.JSX.Element {
-  const emptyStateDescriptor = turnCount === 0
-    ? readChatEmptyStateDescriptor(chatSurfaceState, availableAgentIds.length > 0)
+  const shouldRenderEmptyState = turnCount === 0;
+  const canCreateNewThread = readCanCreateNewThread(availableAgentIds);
+  const canSendMessage = readCanSendMessage(selectedThreadId, canCreateNewThread);
+  const composerPlaceholder = readComposerPlaceholder(selectedThreadId, activeAgentLabel, selectedAgentLabel);
+  const emptyStateDescriptor = shouldRenderEmptyState
+    ? readChatEmptyStateDescriptor(chatSurfaceState, canCreateNewThread)
     : null;
+  const shouldRenderJumpToBottomButton = !isChatAtBottom && turnCount > 0;
 
   return (
     <div
@@ -134,14 +159,14 @@ export function ChatWorkspacePane({
       <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-y-contain">
         <AnimatePresence initial={false} mode="wait">
           <motion.div
-            key={selectedThreadId ?? "__no_thread__"}
+            key={selectedThreadId ?? NO_THREAD_MOTION_KEY}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.14, ease: "easeOut" }}
+            transition={{ duration: THREAD_FADE_TRANSITION_DURATION_SECONDS, ease: "easeOut" }}
             className="w-full px-4 md:px-6 lg:px-8 pt-8 pb-6"
           >
-            {turnCount === 0 ? (
+            {shouldRenderEmptyState ? (
               <div data-testid="chat-empty-state" className="text-center py-20 text-sm text-muted-foreground">
                 {emptyStateDescriptor?.showLoadingIndicator
                   ? (
@@ -159,7 +184,7 @@ export function ChatWorkspacePane({
                 aria-live="polite"
                 aria-relevant="additions text"
                 aria-atomic="false"
-                aria-label="Conversation updates"
+                aria-label={CHAT_LOG_ARIA_LABEL}
                 className="space-y-0"
               >
                 {hasHiddenChatItems && (
@@ -193,12 +218,12 @@ export function ChatWorkspacePane({
       </div>
 
       <AnimatePresence initial={false}>
-        {!isChatAtBottom && turnCount > 0 && (
+        {shouldRenderJumpToBottomButton && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.18 }}
+            transition={{ duration: JUMP_TO_BOTTOM_TRANSITION_DURATION_SECONDS }}
             className="absolute left-1/2 -translate-x-1/2 bottom-[7.25rem] md:bottom-[7.75rem] z-20"
           >
             <Button
@@ -244,7 +269,7 @@ export function ChatWorkspacePane({
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 4 }}
-                transition={{ duration: 0.15 }}
+                transition={{ duration: THINKING_BANNER_TRANSITION_DURATION_SECONDS }}
                 className="px-1 flex items-center gap-1.5 text-xs text-muted-foreground"
               >
                 <Loader2 size={11} className="animate-spin" />
@@ -255,14 +280,10 @@ export function ChatWorkspacePane({
 
           <div className="flex flex-col gap-2">
             <ChatComposer
-              canSend={Boolean(selectedThreadId) || availableAgentIds.length > 0}
+              canSend={canSendMessage}
               isBusy={isBusy}
               isGenerating={isGenerating}
-              placeholder={
-                selectedThreadId
-                  ? `Message ${activeAgentLabel}…`
-                  : `Message ${selectedAgentLabel}…`
-              }
+              placeholder={composerPlaceholder}
               onInterrupt={onInterrupt}
               onSend={onSendMessage}
             />

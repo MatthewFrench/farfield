@@ -17,13 +17,12 @@ import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/
 
 type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 type DebugHistory = DebugWorkspaceDataSnapshot["history"];
+type DebugErrorCollection = DebugWorkspaceDataSnapshot["debugErrors"];
 type CapabilityModeDescriptor = CapabilityCollaborationModesResponse["data"][number];
 
 const DEFAULT_MODE_KEY = "default";
 const DEFAULT_MODE_NAME = "Balanced";
 const DEFAULT_MODEL_ID = "gpt-5";
-const SIGNATURE_SEGMENT_DELIMITER = "|";
-const EMPTY_SIGNATURE_SEGMENT = "";
 const THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS = 60_000;
 const THREAD_QUERY_CACHE_MAXIMUM_ENTRIES = 10;
 
@@ -40,10 +39,13 @@ function createThreadListStateController(): ThreadListStateController {
   });
 }
 
-function createModelDescriptor(displayName: string): CapabilityModelsResponse["data"][number] {
+function createModelDescriptor(
+  displayName: string,
+  modelIdentifier = DEFAULT_MODEL_ID
+): CapabilityModelsResponse["data"][number] {
   return {
-    id: DEFAULT_MODEL_ID,
-    model: DEFAULT_MODEL_ID,
+    id: modelIdentifier,
+    model: modelIdentifier,
     displayName,
     description: "default model",
     hidden: false,
@@ -66,7 +68,8 @@ function createModelDescriptor(displayName: string): CapabilityModelsResponse["d
 
 function createCapabilitiesSnapshot(
   modeReasoningEffort: ReasoningEffort,
-  modelDisplayName: string
+  modelDisplayName: string,
+  modelIdentifier = DEFAULT_MODEL_ID
 ): {
   modes: CapabilityCollaborationModesResponse;
   models: CapabilityModelsResponse;
@@ -79,12 +82,13 @@ function createCapabilitiesSnapshot(
     model: DEFAULT_MODEL_ID,
     reasoning_effort: modeReasoningEffort
   };
-  return createCapabilitiesSnapshotFromMode(modeDescriptor, modelDisplayName);
+  return createCapabilitiesSnapshotFromMode(modeDescriptor, modelDisplayName, modelIdentifier);
 }
 
 function createCapabilitiesSnapshotFromMode(
   modeDescriptor: CapabilityModeDescriptor,
-  modelDisplayName: string
+  modelDisplayName: string,
+  modelIdentifier = DEFAULT_MODEL_ID
 ): {
   modes: CapabilityCollaborationModesResponse;
   models: CapabilityModelsResponse;
@@ -96,18 +100,12 @@ function createCapabilitiesSnapshotFromMode(
       data: [modeDescriptor]
     },
     models: {
-      data: [createModelDescriptor(modelDisplayName)],
+      data: [createModelDescriptor(modelDisplayName, modelIdentifier)],
       nextCursor: null
     },
     defaults: null,
     fetchedAt: Date.now()
   };
-}
-
-function buildExpectedSignatureEntry(
-  segments: ReadonlyArray<string | null | undefined>
-): string {
-  return segments.map((segment) => segment ?? EMPTY_SIGNATURE_SEGMENT).join(SIGNATURE_SEGMENT_DELIMITER);
 }
 
 function createDebugHistoryEntry(entryId: string): DebugHistory[number] {
@@ -127,13 +125,43 @@ function createDebugHistoryCollection(entryCount: number): DebugHistory {
   );
 }
 
-function createDebugWorkspaceSnapshot(history: DebugHistory): DebugWorkspaceDataSnapshot {
+function createDebugErrorEntry(input: {
+  errorId: string;
+  message: string;
+  recordedAt: string;
+}): DebugErrorCollection[number] {
   return {
-    history,
-    debugErrors: [],
-    debugErrorSessionId: "session-1",
-    debugErrorSessionLogPath: "/tmp/session-1.ndjson",
-    debugErrorsSignature: []
+    errorId: input.errorId,
+    sessionId: "session-1",
+    origin: "client",
+    source: "farfield-web",
+    operation: "debug-read",
+    message: input.message,
+    severity: "error",
+    name: null,
+    stack: null,
+    requestId: null,
+    threadId: null,
+    url: null,
+    occurredAt: input.recordedAt,
+    recordedAt: input.recordedAt,
+    details: {}
+  };
+}
+
+function createDebugWorkspaceSnapshot(input: {
+  history: DebugHistory;
+  debugErrors?: DebugErrorCollection;
+  debugErrorsSignature?: string[];
+  debugErrorSessionId?: string;
+  debugErrorSessionLogPath?: string;
+}): DebugWorkspaceDataSnapshot {
+  return {
+    history: input.history,
+    debugErrors: input.debugErrors ?? [],
+    debugErrorSessionId: input.debugErrorSessionId ?? "session-1",
+    debugErrorSessionLogPath: input.debugErrorSessionLogPath ?? "/tmp/session-1.ndjson",
+    debugErrorsSignature: input.debugErrorsSignature ?? []
   };
 }
 
@@ -141,6 +169,7 @@ function createHarness() {
   const setModesMock = vi.fn();
   const setModelsMock = vi.fn();
   const setHistoryMock = vi.fn<(value: SetStateAction<DebugHistory>) => void>();
+  const setDebugErrorsMock = vi.fn();
   const input: ApplyCoreDataSnapshotStateInput = {
     debugWorkspaceStateStore: new DebugWorkspaceStateStore(),
     threadListStateController: createThreadListStateController(),
@@ -156,7 +185,7 @@ function createHarness() {
     setConfigDefaults: vi.fn(),
     setTraceStatus: vi.fn(),
     setHistory: setHistoryMock,
-    setDebugErrors: vi.fn(),
+    setDebugErrors: setDebugErrorsMock,
     setDebugErrorSessionId: vi.fn(),
     setDebugErrorSessionLogPath: vi.fn(),
     setAgentDescriptors: vi.fn(),
@@ -170,7 +199,8 @@ function createHarness() {
     input,
     setModesMock,
     setModelsMock,
-    setHistoryMock
+    setHistoryMock,
+    setDebugErrorsMock
   };
 }
 
@@ -192,7 +222,7 @@ describe("CoreDataSnapshotStateApplier", () => {
     expect(harness.setModesMock).toHaveBeenCalledWith(changedSnapshot.modes.data);
     expect(harness.setModelsMock).not.toHaveBeenCalled();
     expect(harness.input.modesSignatureRef.current).toEqual([
-      buildExpectedSignatureEntry([DEFAULT_MODE_KEY, DEFAULT_MODE_NAME, "high"])
+      "default|Balanced|high"
     ]);
   });
 
@@ -211,10 +241,10 @@ describe("CoreDataSnapshotStateApplier", () => {
     expect(harness.setModesMock).not.toHaveBeenCalled();
     expect(harness.setModelsMock).not.toHaveBeenCalled();
     expect(harness.input.modesSignatureRef.current).toEqual([
-      buildExpectedSignatureEntry([DEFAULT_MODE_KEY, DEFAULT_MODE_NAME, "medium"])
+      "default|Balanced|medium"
     ]);
     expect(harness.input.modelsSignatureRef.current).toEqual([
-      buildExpectedSignatureEntry([DEFAULT_MODEL_ID, "GPT-5"])
+      "gpt-5|GPT-5"
     ]);
   });
 
@@ -235,7 +265,28 @@ describe("CoreDataSnapshotStateApplier", () => {
     expect(harness.setModelsMock).toHaveBeenCalledWith(changedSnapshot.models.data);
     expect(harness.setModesMock).not.toHaveBeenCalled();
     expect(harness.input.modelsSignatureRef.current).toEqual([
-      buildExpectedSignatureEntry([DEFAULT_MODEL_ID, "GPT-5 Turbo"])
+      "gpt-5|GPT-5 Turbo"
+    ]);
+  });
+
+  it("updates models when model identifier changes", () => {
+    const harness = createHarness();
+
+    harness.input.nextCapabilities = createCapabilitiesSnapshot("medium", "GPT-5");
+    applyCoreDataSnapshotState(harness.input);
+
+    harness.setModesMock.mockClear();
+    harness.setModelsMock.mockClear();
+
+    const changedSnapshot = createCapabilitiesSnapshot("medium", "GPT-5", "gpt-5-pro");
+    harness.input.nextCapabilities = changedSnapshot;
+    applyCoreDataSnapshotState(harness.input);
+
+    expect(harness.setModelsMock).toHaveBeenCalledTimes(1);
+    expect(harness.setModelsMock).toHaveBeenCalledWith(changedSnapshot.models.data);
+    expect(harness.setModesMock).not.toHaveBeenCalled();
+    expect(harness.input.modelsSignatureRef.current).toEqual([
+      "gpt-5-pro|GPT-5"
     ]);
   });
 
@@ -264,8 +315,78 @@ describe("CoreDataSnapshotStateApplier", () => {
     expect(harness.setModesMock).not.toHaveBeenCalled();
     expect(harness.setModelsMock).not.toHaveBeenCalled();
     expect(harness.input.modesSignatureRef.current).toEqual([
-      buildExpectedSignatureEntry([null, DEFAULT_MODE_NAME, null])
+      "|Balanced|"
     ]);
+  });
+
+  it("does not apply debug errors when debug-error signature is unchanged", () => {
+    const harness = createHarness();
+    const firstDebugError = createDebugErrorEntry({
+      errorId: "error-1",
+      message: "first failure",
+      recordedAt: "2026-02-26T00:00:01.000Z"
+    });
+    const signature = ["error-1|2026-02-26T00:00:01.000Z|first failure"];
+
+    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
+      history: [],
+      debugErrors: [firstDebugError],
+      debugErrorsSignature: signature
+    });
+    applyCoreDataSnapshotState(harness.input);
+
+    expect(harness.setDebugErrorsMock).toHaveBeenCalledTimes(1);
+    expect(harness.setDebugErrorsMock).toHaveBeenCalledWith([firstDebugError]);
+    harness.setDebugErrorsMock.mockClear();
+
+    const replacedDebugError = createDebugErrorEntry({
+      errorId: "error-1",
+      message: "second failure with reused signature",
+      recordedAt: "2026-02-26T00:00:02.000Z"
+    });
+    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
+      history: [],
+      debugErrors: [replacedDebugError],
+      debugErrorsSignature: signature
+    });
+    applyCoreDataSnapshotState(harness.input);
+
+    expect(harness.setDebugErrorsMock).not.toHaveBeenCalled();
+    expect(harness.input.debugErrorsSignatureRef.current).toEqual(signature);
+  });
+
+  it("applies debug errors when debug-error signature changes", () => {
+    const harness = createHarness();
+    const firstDebugError = createDebugErrorEntry({
+      errorId: "error-1",
+      message: "first failure",
+      recordedAt: "2026-02-26T00:00:01.000Z"
+    });
+
+    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
+      history: [],
+      debugErrors: [firstDebugError],
+      debugErrorsSignature: ["error-1|2026-02-26T00:00:01.000Z|first failure"]
+    });
+    applyCoreDataSnapshotState(harness.input);
+    harness.setDebugErrorsMock.mockClear();
+
+    const secondDebugError = createDebugErrorEntry({
+      errorId: "error-2",
+      message: "second failure",
+      recordedAt: "2026-02-26T00:00:03.000Z"
+    });
+    const nextSignature = ["error-2|2026-02-26T00:00:03.000Z|second failure"];
+    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
+      history: [],
+      debugErrors: [secondDebugError],
+      debugErrorsSignature: nextSignature
+    });
+    applyCoreDataSnapshotState(harness.input);
+
+    expect(harness.setDebugErrorsMock).toHaveBeenCalledTimes(1);
+    expect(harness.setDebugErrorsMock).toHaveBeenCalledWith([secondDebugError]);
+    expect(harness.input.debugErrorsSignatureRef.current).toEqual(nextSignature);
   });
 
   it("reuses previous large history when debug snapshot boundaries match", () => {
@@ -274,7 +395,7 @@ describe("CoreDataSnapshotStateApplier", () => {
     const incomingHistory = createDebugHistoryCollection(2_000);
     incomingHistory[1_000] = createDebugHistoryEntry("history-middle-updated");
 
-    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot(incomingHistory);
+    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({ history: incomingHistory });
     applyCoreDataSnapshotState(harness.input);
 
     expect(harness.setHistoryMock).toHaveBeenCalledTimes(1);
@@ -294,7 +415,7 @@ describe("CoreDataSnapshotStateApplier", () => {
     const incomingHistory = createDebugHistoryCollection(2_000);
     incomingHistory[1_999] = createDebugHistoryEntry("history-tail-updated");
 
-    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot(incomingHistory);
+    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({ history: incomingHistory });
     applyCoreDataSnapshotState(harness.input);
 
     expect(harness.setHistoryMock).toHaveBeenCalledTimes(1);

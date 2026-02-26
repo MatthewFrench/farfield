@@ -3,7 +3,10 @@ import {
   hasEventRefreshWork,
   type EventRefreshFlags
 } from "./EventRefreshScheduler";
-import { EventStreamRefreshDecisionEngine } from "./EventStreamRefreshDecisionEngine";
+import {
+  EventStreamRefreshDecisionEngine,
+  type EventStreamRefreshDecision
+} from "./EventStreamRefreshDecisionEngine";
 import type { FarfieldThreadStreamDelta } from "@farfield/protocol";
 
 export interface EventSourceLike {
@@ -49,6 +52,34 @@ interface EventStreamConnectionCoordinatorDependencies {
 const DEFAULT_INITIAL_RECONNECT_DELAY_MS = 1_000;
 const DEFAULT_MAXIMUM_RECONNECT_DELAY_MS = 10_000;
 const DEFAULT_EVENTS_URL = "/events";
+const DEBUG_ACTIVE_TAB: EventStreamConnectionSnapshot["activeTab"] = "debug";
+const RECONNECT_DELAY_PROPERTY_NAME_INITIAL = "initialReconnectDelayMs";
+const RECONNECT_DELAY_PROPERTY_NAME_MAXIMUM = "maximumReconnectDelayMs";
+const RECONNECT_DELAY_VALIDATION_ERROR_PREFIX =
+  "EventStreamConnectionCoordinator requires a non-negative integer";
+const RECONNECT_DELAY_RELATIONSHIP_ERROR_MESSAGE =
+  "EventStreamConnectionCoordinator requires maximumReconnectDelayMs to be greater than or equal to initialReconnectDelayMs";
+const RECONNECT_DELAY_BACKOFF_MULTIPLIER = 2;
+
+function createNonNegativeReconnectDelayError(propertyName: string): Error {
+  return new Error(`${RECONNECT_DELAY_VALIDATION_ERROR_PREFIX} ${propertyName}`);
+}
+
+function readInitialRefreshFlags(snapshot: EventStreamConnectionSnapshot): EventRefreshFlags {
+  return {
+    refreshCore: true,
+    refreshHistory: snapshot.activeTab === DEBUG_ACTIVE_TAB,
+    refreshSelectedThread: Boolean(snapshot.selectedThreadId)
+  };
+}
+
+function readRefreshFlagsFromDecision(decision: EventStreamRefreshDecision): EventRefreshFlags {
+  return {
+    refreshCore: decision.refreshCore,
+    refreshHistory: decision.refreshHistory,
+    refreshSelectedThread: decision.refreshSelectedThread
+  };
+}
 
 function readValidatedReconnectDelayMilliseconds(
   delayMilliseconds: number | undefined,
@@ -57,9 +88,7 @@ function readValidatedReconnectDelayMilliseconds(
 ): number {
   const nextDelayMilliseconds = delayMilliseconds ?? defaultDelayMilliseconds;
   if (!Number.isInteger(nextDelayMilliseconds) || nextDelayMilliseconds < 0) {
-    throw new Error(
-      `EventStreamConnectionCoordinator requires a non-negative integer ${propertyName}`
-    );
+    throw createNonNegativeReconnectDelayError(propertyName);
   }
   return nextDelayMilliseconds;
 }
@@ -84,17 +113,15 @@ export class EventStreamConnectionCoordinator {
     const initialReconnectDelayMilliseconds = readValidatedReconnectDelayMilliseconds(
       dependencies?.initialReconnectDelayMs,
       DEFAULT_INITIAL_RECONNECT_DELAY_MS,
-      "initialReconnectDelayMs"
+      RECONNECT_DELAY_PROPERTY_NAME_INITIAL
     );
     const maximumReconnectDelayMilliseconds = readValidatedReconnectDelayMilliseconds(
       dependencies?.maximumReconnectDelayMs,
       DEFAULT_MAXIMUM_RECONNECT_DELAY_MS,
-      "maximumReconnectDelayMs"
+      RECONNECT_DELAY_PROPERTY_NAME_MAXIMUM
     );
     if (maximumReconnectDelayMilliseconds < initialReconnectDelayMilliseconds) {
-      throw new Error(
-        "EventStreamConnectionCoordinator requires maximumReconnectDelayMs to be greater than or equal to initialReconnectDelayMs"
-      );
+      throw new Error(RECONNECT_DELAY_RELATIONSHIP_ERROR_MESSAGE);
     }
 
     this.createEventSource = dependencies?.createEventSource ?? ((url) => new EventSource(url));
@@ -149,45 +176,52 @@ export class EventStreamConnectionCoordinator {
 
     this.source = this.createEventSource(this.context.eventsUrl);
     this.source.onopen = () => {
-      if (!this.context) {
-        return;
-      }
-      this.context.onConnectionStatusChange(true);
-      this.reconnectDelayMs = this.initialReconnectDelayMs;
-      const snapshot = this.context.readSnapshot();
-      this.scheduleRefresh({
-        refreshCore: true,
-        refreshHistory: snapshot.activeTab === "debug",
-        refreshSelectedThread: Boolean(snapshot.selectedThreadId)
-      });
+      this.handleEventSourceOpen();
     };
     this.source.onmessage = (event) => {
-      if (!this.context) {
-        return;
-      }
-      const snapshot = this.context.readSnapshot();
-      const refreshDecision = this.context.eventStreamRefreshDecisionEngine.readDecision({
-        activeTab: snapshot.activeTab,
-        selectedThreadId: snapshot.selectedThreadId,
-        eventData: event.data
-      });
-      this.scheduleRefresh({
-        refreshCore: refreshDecision.refreshCore,
-        refreshHistory: refreshDecision.refreshHistory,
-        refreshSelectedThread: refreshDecision.refreshSelectedThread
-      });
-      if (refreshDecision.threadStreamDelta) {
-        this.context.applyThreadStreamDelta(refreshDecision.threadStreamDelta);
-      }
+      this.handleEventSourceMessage(event);
     };
     this.source.onerror = () => {
-      if (!this.context) {
-        return;
-      }
-      this.context.onConnectionStatusChange(false);
-      this.closeSource();
-      this.scheduleReconnect();
+      this.handleEventSourceError();
     };
+  }
+
+  private handleEventSourceOpen(): void {
+    if (!this.context) {
+      return;
+    }
+
+    this.context.onConnectionStatusChange(true);
+    this.reconnectDelayMs = this.initialReconnectDelayMs;
+    const snapshot = this.context.readSnapshot();
+    this.scheduleRefresh(readInitialRefreshFlags(snapshot));
+  }
+
+  private handleEventSourceMessage(event: MessageEvent<string>): void {
+    if (!this.context) {
+      return;
+    }
+
+    const snapshot = this.context.readSnapshot();
+    const refreshDecision = this.context.eventStreamRefreshDecisionEngine.readDecision({
+      activeTab: snapshot.activeTab,
+      selectedThreadId: snapshot.selectedThreadId,
+      eventData: event.data
+    });
+    this.scheduleRefresh(readRefreshFlagsFromDecision(refreshDecision));
+    if (refreshDecision.threadStreamDelta) {
+      this.context.applyThreadStreamDelta(refreshDecision.threadStreamDelta);
+    }
+  }
+
+  private handleEventSourceError(): void {
+    if (!this.context) {
+      return;
+    }
+
+    this.context.onConnectionStatusChange(false);
+    this.closeSource();
+    this.scheduleReconnect();
   }
 
   private scheduleRefresh(refreshFlags: EventRefreshFlags): void {
@@ -213,7 +247,10 @@ export class EventStreamConnectionCoordinator {
       this.reconnectTimerId = null;
       this.connectEvents();
     }, this.reconnectDelayMs);
-    this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, this.maximumReconnectDelayMs);
+    this.reconnectDelayMs = Math.min(
+      this.reconnectDelayMs * RECONNECT_DELAY_BACKOFF_MULTIPLIER,
+      this.maximumReconnectDelayMs
+    );
   }
 
   private closeSource(): void {

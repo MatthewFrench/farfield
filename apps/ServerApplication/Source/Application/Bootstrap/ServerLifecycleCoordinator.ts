@@ -15,6 +15,14 @@ import type { PushStore } from "../../Modules/PushNotifications/PushStore.js";
 
 const AppServerTransportClosedErrorMessage = "app-server transport closed";
 const AppServerExitedErrorMessagePrefix = "app-server exited (";
+const OpenCodeAgentIdentifier: AgentId = "opencode";
+const ServerListenErrorEventName = "error";
+const ServerUrlProtocol = "http";
+const ConfiguredAgentIdentifierDelimiter = ",";
+const AgentStartFailedLogMessage = "agent-start-failed";
+const MonitorServerReadyLogMessage = "monitor-server-ready";
+const GracefulShutdownSignals: readonly NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
+const ProcessSuccessfulExitCode = 0;
 const ServerLifecycleMessages = Object.freeze({
   agentConnected: "Agent connected",
   agentFailedToConnect: "Agent failed to connect",
@@ -57,6 +65,7 @@ export interface ServerLifecycleCoordinatorDependencies {
   broadcastRuntimeState: () => void;
 }
 
+// Owns monitor-server and adapter lifecycle ordering so startup and teardown stay deterministic.
 export class ServerLifecycleCoordinator {
   private readonly deps: ServerLifecycleCoordinatorDependencies;
   private isShutdownInProgress: boolean;
@@ -94,17 +103,7 @@ export class ServerLifecycleCoordinator {
       agentIds: this.readConfiguredAgentIdentifierSummary()
     });
 
-    await new Promise<void>((resolve, reject) => {
-      const onError = (error: Error): void => {
-        reject(error);
-      };
-
-      this.deps.server.once("error", onError);
-      this.deps.server.listen(this.deps.port, this.deps.host, () => {
-        this.deps.server.off("error", onError);
-        resolve();
-      });
-    });
+    await this.startMonitorServer();
 
     this.deps.pushSystem(ServerLifecycleMessages.monitorServerReady, {
       url: this.readServerUrl(),
@@ -145,7 +144,7 @@ export class ServerLifecycleCoordinator {
           connected: adapter.isConnected()
         });
 
-        if (adapter.id === "opencode") {
+        if (adapter.id === OpenCodeAgentIdentifier) {
           const openCodeAdapter = this.deps.readOpenCodeAdapter();
           if (openCodeAdapter) {
             this.deps.pushSystem(ServerLifecycleMessages.openCodeBackendConnected, {
@@ -164,13 +163,13 @@ export class ServerLifecycleCoordinator {
             agentId: adapter.id,
             error: errorMessage
           },
-          "agent-start-failed"
+          AgentStartFailedLogMessage
         );
       }
     }
 
     this.deps.broadcastRuntimeState();
-    logger.info({ url: this.readServerUrl() }, "monitor-server-ready");
+    logger.info({ url: this.readServerUrl() }, MonitorServerReadyLogMessage);
   }
 
   public async shutdown(): Promise<void> {
@@ -178,10 +177,12 @@ export class ServerLifecycleCoordinator {
       return;
     }
 
+    // Mark shutdown state before async teardown so transport errors are classified deterministically.
     this.isShutdownInProgress = true;
 
     this.deps.activityHistoryService.closeActiveTraceIfPresent();
 
+    // Stop background producers first so no new dispatch/keepalive work is queued during teardown.
     this.deps.pushDispatchConcurrencyCoordinator.stop();
     this.deps.eventStreamClientRegistry.stopKeepalive();
 
@@ -190,13 +191,11 @@ export class ServerLifecycleCoordinator {
   }
 
   public installSignalHandlers(): void {
-    process.on("SIGINT", () => {
-      void this.shutdown().then(() => process.exit(0));
-    });
-
-    process.on("SIGTERM", () => {
-      void this.shutdown().then(() => process.exit(0));
-    });
+    for (const signal of GracefulShutdownSignals) {
+      process.on(signal, () => {
+        void this.shutdown().then(() => process.exit(ProcessSuccessfulExitCode));
+      });
+    }
   }
 
   private errorMessageFromValue<ErrorValue>(error: ErrorValue): string {
@@ -212,10 +211,25 @@ export class ServerLifecycleCoordinator {
   }
 
   private readConfiguredAgentIdentifierSummary(): string {
-    return this.deps.configuredAgentIds.join(",");
+    return this.deps.configuredAgentIds.join(ConfiguredAgentIdentifierDelimiter);
   }
 
   private readServerUrl(): string {
-    return `http://${this.deps.host}:${String(this.deps.port)}`;
+    return `${ServerUrlProtocol}://${this.deps.host}:${String(this.deps.port)}`;
+  }
+
+  private async startMonitorServer(): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      const onListenError = (error: Error): void => {
+        reject(error);
+      };
+
+      // Keep a startup-scoped error listener until `listen` succeeds, then remove it.
+      this.deps.server.once(ServerListenErrorEventName, onListenError);
+      this.deps.server.listen(this.deps.port, this.deps.host, () => {
+        this.deps.server.off(ServerListenErrorEventName, onListenError);
+        resolve();
+      });
+    });
   }
 }

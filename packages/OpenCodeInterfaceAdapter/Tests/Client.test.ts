@@ -123,6 +123,25 @@ describe("OpenCodeConnection", () => {
     expect(connection.getUrl()).toBe("http://127.0.0.1:6142");
   });
 
+  it("uses parsed host and explicit port for local server startup options", async () => {
+    const dependenciesDouble = createConnectionDependenciesDouble();
+    const connection = new OpenCodeConnection(
+      {
+        hostname: "  localhost  ",
+        port: 6143
+      },
+      dependenciesDouble.dependencies
+    );
+
+    await connection.start();
+
+    expect(dependenciesDouble.createServer).toHaveBeenCalledWith({
+      hostname: "localhost",
+      port: 6143,
+      timeoutMilliseconds: 30_000
+    });
+  });
+
   it("closes owned server resources on stop", async () => {
     const dependenciesDouble = createConnectionDependenciesDouble();
     const connection = new OpenCodeConnection({}, dependenciesDouble.dependencies);
@@ -142,5 +161,22 @@ describe("OpenCodeConnection", () => {
     });
 
     expect(connection.getUrl()).toBe("http://localhost:8888");
+  });
+
+  it("keeps configured URL available after stopping external connection mode", async () => {
+    const dependenciesDouble = createConnectionDependenciesDouble();
+    const connection = new OpenCodeConnection(
+      {
+        url: "http://localhost:8888"
+      },
+      dependenciesDouble.dependencies
+    );
+
+    await connection.start();
+    await connection.stop();
+
+    expect(dependenciesDouble.closeServer).not.toHaveBeenCalled();
+    expect(connection.getUrl()).toBe("http://localhost:8888");
+    expect(connection.isConnected()).toBe(false);
   });
 });

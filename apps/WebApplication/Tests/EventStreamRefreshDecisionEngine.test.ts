@@ -102,6 +102,77 @@ describe("EventStreamRefreshDecisionEngine", () => {
     });
   });
 
+  it("refreshes core for non-thread-only history events without thread metadata", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "chat",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 7,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: "entry-7",
+            at: "2026-02-26T00:00:00.000Z",
+            source: "ipc",
+            direction: "out",
+            payload: {
+              type: "action",
+              action: "thread-created"
+            },
+            meta: {
+              method: "thread-created"
+            }
+          }
+        }
+      })
+    });
+
+    expect(decision).toEqual({
+      refreshCore: true,
+      refreshHistory: false,
+      refreshSelectedThread: false,
+      threadStreamDelta: null
+    });
+  });
+
+  it("skips selected-thread refresh for stream-state-changed history methods", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "debug",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 8,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: "entry-8",
+            at: "2026-02-26T00:00:00.000Z",
+            source: "app",
+            direction: "out",
+            payload: {
+              type: "action",
+              action: "thread-stream-state-changed"
+            },
+            meta: {
+              method: "thread-stream-state-changed",
+              threadId: "thread-1"
+            }
+          }
+        }
+      })
+    });
+
+    expect(decision).toEqual({
+      refreshCore: false,
+      refreshHistory: true,
+      refreshSelectedThread: false,
+      threadStreamDelta: null
+    });
+  });
+
   it("normalizes non-string history metadata and keeps selected-thread refresh deterministic", () => {
     const engine = createEngine();
 

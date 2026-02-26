@@ -301,6 +301,45 @@ describe("partToTurnItem", () => {
     expect(result.aggregatedOutput).toBe("file1.txt\nfile2.txt");
   });
 
+  it("uses tool name when command input is missing", () => {
+    const part = makeToolPart("p1", "bash", {
+      status: "running",
+      input: { cwd: "/tmp" }
+    });
+    const result = partToTurnItem(part);
+
+    expect(result).not.toBeNull();
+    if (result === null || result.type !== "commandExecution") {
+      throw new Error("Expected a commandExecution item");
+    }
+    expect(result.command).toBe("bash");
+    expect(result.cwd).toBe("/tmp");
+    expect(result.aggregatedOutput).toBeNull();
+    expect(result.exitCode).toBeNull();
+    expect(result.durationMs).toBeNull();
+    expect(result.status).toBe("running");
+  });
+
+  it("maps error tool output and metadata on commandExecution items", () => {
+    const part = makeToolPart("p1", "bash", {
+      status: "error",
+      input: { command: "npm test" },
+      error: "tests failed",
+      metadata: { exit_code: 2 }
+    });
+    const result = partToTurnItem(part);
+
+    expect(result).not.toBeNull();
+    if (result === null || result.type !== "commandExecution") {
+      throw new Error("Expected a commandExecution item");
+    }
+    expect(result.command).toBe("npm test");
+    expect(result.aggregatedOutput).toBe("tests failed");
+    expect(result.exitCode).toBe(2);
+    expect(result.durationMs).toBe(100);
+    expect(result.status).toBe("error");
+  });
+
   it("maps write tool part to fileChange", () => {
     const part = makeToolPart("p1", "write", {
       status: "completed",
@@ -331,6 +370,23 @@ describe("partToTurnItem", () => {
       throw new Error("Expected a fileChange item");
     }
     expect(result.changes[0].kind.type).toBe("modified");
+  });
+
+  it("omits file diff details when a file-change tool is still running", () => {
+    const part = makeToolPart("p1", "edit", {
+      status: "running",
+      input: { path: "/tmp/bar.ts" }
+    });
+    const result = partToTurnItem(part);
+
+    expect(result).not.toBeNull();
+    if (result === null || result.type !== "fileChange") {
+      throw new Error("Expected a fileChange item");
+    }
+    expect(result.status).toBe("running");
+    expect(result.changes).toHaveLength(1);
+    expect(result.changes[0].path).toBe("/tmp/bar.ts");
+    expect(result.changes[0].diff).toBeUndefined();
   });
 
   it("uses unknown path placeholder when file-edit tool input has no path", () => {

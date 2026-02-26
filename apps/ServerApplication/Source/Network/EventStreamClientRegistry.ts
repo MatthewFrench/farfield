@@ -4,6 +4,7 @@ import {
   type FarfieldEventStreamEvent
 } from "@farfield/protocol";
 
+const EVENT_STREAM_RESPONSE_STATUS_CODE_OK = 200;
 const EVENT_STREAM_HEADERS = {
   "Content-Type": "text/event-stream",
   "Cache-Control": "no-cache",
@@ -14,6 +15,12 @@ const EVENT_STREAM_HEADERS = {
 } as const;
 const EVENT_STREAM_RETRY_DIRECTIVE = "retry: 1000\n\n";
 const EVENT_STREAM_KEEPALIVE_FRAME = ": keepalive\n\n";
+const EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME = "close";
+
+interface EventStreamClientLifecycleBinding {
+  request: IncomingMessage;
+  closeHandler: () => void;
+}
 
 export interface EventStreamClientRegistryStatistics {
   activeClientCount: number;
@@ -26,9 +33,13 @@ export interface EventStreamClientRegistryStatistics {
   keepaliveWriteFailureCount: number;
 }
 
+// Owns server-sent-events client lifecycle registration and teardown for active responses.
+// Listener bindings are tracked per response so every removal path detaches request/response
+// close handlers deterministically, including write-failure cleanup paths.
 export class EventStreamClientRegistry {
   private readonly keepaliveIntervalMs: number;
   private readonly clientSet: Set<ServerResponse>;
+  private readonly clientLifecycleBindingByResponse: Map<ServerResponse, EventStreamClientLifecycleBinding>;
   private keepaliveTimer: NodeJS.Timeout | null;
   private lastBroadcastSequence: number;
   private addedClientCount: number;
@@ -45,6 +56,7 @@ export class EventStreamClientRegistry {
 
     this.keepaliveIntervalMs = keepaliveIntervalMs;
     this.clientSet = new Set<ServerResponse>();
+    this.clientLifecycleBindingByResponse = new Map<ServerResponse, EventStreamClientLifecycleBinding>();
     this.keepaliveTimer = null;
     this.lastBroadcastSequence = 0;
     this.addedClientCount = 0;
@@ -71,6 +83,7 @@ export class EventStreamClientRegistry {
       this.keepaliveTimer = null;
     }
 
+    // Iterate a snapshot so close handlers can mutate the owner set during teardown.
     for (const client of Array.from(this.clientSet.values())) {
       try {
         client.end();
@@ -82,21 +95,13 @@ export class EventStreamClientRegistry {
   }
 
   public addClient(req: IncomingMessage, res: ServerResponse, initialEvent: FarfieldEventStreamEvent): void {
-    res.writeHead(200, EVENT_STREAM_HEADERS);
+    res.writeHead(EVENT_STREAM_RESPONSE_STATUS_CODE_OK, EVENT_STREAM_HEADERS);
     res.write(EVENT_STREAM_RETRY_DIRECTIVE);
 
-    this.clientSet.add(res);
-    this.addedClientCount += 1;
+    this.bindClientLifecycle(req, res);
     this.writeEvent(res, {
       sequence: this.lastBroadcastSequence,
       event: initialEvent
-    });
-
-    req.on("close", () => {
-      this.removeClient(res);
-    });
-    res.on("close", () => {
-      this.removeClient(res);
     });
   }
 
@@ -150,8 +155,38 @@ export class EventStreamClientRegistry {
     }
   }
 
+  private bindClientLifecycle(req: IncomingMessage, res: ServerResponse): void {
+    this.unbindClientLifecycle(res);
+
+    const closeHandler = (): void => {
+      this.removeClient(res);
+    };
+    req.on(EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME, closeHandler);
+    res.on(EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME, closeHandler);
+
+    this.clientSet.add(res);
+    this.clientLifecycleBindingByResponse.set(res, {
+      request: req,
+      closeHandler
+    });
+    this.addedClientCount += 1;
+  }
+
+  private unbindClientLifecycle(client: ServerResponse): void {
+    const lifecycleBinding = this.clientLifecycleBindingByResponse.get(client);
+    if (!lifecycleBinding) {
+      return;
+    }
+
+    lifecycleBinding.request.off(EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME, lifecycleBinding.closeHandler);
+    client.off(EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME, lifecycleBinding.closeHandler);
+    this.clientLifecycleBindingByResponse.delete(client);
+  }
+
   private removeClient(client: ServerResponse): void {
-    if (!this.clientSet.delete(client)) {
+    const removedActiveClient = this.clientSet.delete(client);
+    this.unbindClientLifecycle(client);
+    if (!removedActiveClient) {
       return;
     }
     this.removedClientCount += 1;

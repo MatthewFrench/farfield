@@ -9,8 +9,6 @@ import {
 const baseChatWorkspacePaneProperties: ChatWorkspacePaneProps = {
   chatSurfaceState: "loading-threads",
   selectedThreadId: null,
-  isCoreLoading: true,
-  isSelectedThreadLoading: false,
   availableAgentIds: ["codex"],
   turnCount: 0,
   scrollRef: createRef<HTMLDivElement>(),
@@ -72,17 +70,36 @@ describe("ChatWorkspacePane", () => {
     expect(screen.getByTestId("chat-empty-loading-threads")).toBeDefined();
   });
 
-  it("renders no-thread empty state from chatSurfaceState even when loading flags are true", () => {
+  it("renders no-thread empty state from chatSurfaceState", () => {
     renderChatWorkspacePane({
       chatSurfaceState: "no-thread",
-      isCoreLoading: true,
-      isSelectedThreadLoading: true,
       selectedThreadId: null,
       turnCount: 0
     });
 
     expect(screen.getByTestId("chat-empty-no-thread").textContent).toBe("Start typing to create a new thread");
     expect(screen.queryByTestId("chat-empty-loading-threads")).toBeNull();
+  });
+
+  it("renders no-thread sidebar selection guidance when no agent is available for new-thread creation", () => {
+    renderChatWorkspacePane({
+      chatSurfaceState: "no-thread",
+      selectedThreadId: null,
+      availableAgentIds: [],
+      turnCount: 0
+    });
+
+    expect(screen.getByTestId("chat-empty-no-thread").textContent).toBe("Select a thread from the sidebar");
+  });
+
+  it("fails fast when an empty-state render is requested while the surface state is ready", () => {
+    expect(() => {
+      renderChatWorkspacePane({
+        chatSurfaceState: "ready",
+        selectedThreadId: null,
+        turnCount: 0
+      });
+    }).toThrowError("ChatWorkspacePane received an empty-state render with chatSurfaceState set to 'ready'.");
   });
 
   it("invokes show older messages callback when hidden messages are available", () => {
@@ -122,5 +139,23 @@ describe("ChatWorkspacePane", () => {
     });
 
     expect(screen.getByRole("log", { name: "Conversation updates" })).toBeDefined();
+  });
+
+  it("uses the selected-agent placeholder when no thread is selected", () => {
+    renderChatWorkspacePane({
+      selectedThreadId: null,
+      selectedAgentLabel: "OpenCode"
+    });
+
+    expect(screen.getByPlaceholderText("Message OpenCode…")).toBeDefined();
+  });
+
+  it("uses the active-agent placeholder when a thread is selected", () => {
+    renderChatWorkspacePane({
+      selectedThreadId: "thread-001",
+      activeAgentLabel: "OpenCode"
+    });
+
+    expect(screen.getByPlaceholderText("Message OpenCode…")).toBeDefined();
   });
 });

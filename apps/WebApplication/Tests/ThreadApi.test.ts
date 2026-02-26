@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { listThreads } from "@/Features/Threads/DataAccess/ThreadApi";
+import {
+  archiveThread,
+  listThreads,
+  unarchiveThread
+} from "@/Features/Threads/DataAccess/ThreadApi";
 import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 
 const DEFAULT_LIST_THREADS_OPTIONS = {
@@ -136,5 +140,79 @@ describe("ThreadApi", () => {
     const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
 
     expect(result.nextCursor).toBeNull();
+  });
+
+  it("treats removed and projectRemoved wire flags as project-removal signals", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        data: [
+          {
+            id: "thread_removed",
+            preview: "removed",
+            createdAt: 10,
+            updatedAt: 11,
+            cwd: "/tmp/workspace",
+            agentId: "codex",
+            source: "opencode",
+            removed: true
+          },
+          {
+            id: "thread_project_removed",
+            preview: "project removed",
+            createdAt: 12,
+            updatedAt: 13,
+            cwd: "/tmp/workspace",
+            agentId: "codex",
+            source: "opencode",
+            projectRemoved: true
+          },
+          {
+            id: "thread_active",
+            preview: "active",
+            createdAt: 14,
+            updatedAt: 15,
+            cwd: "/tmp/workspace",
+            agentId: "codex",
+            source: "opencode",
+            projectState: "active"
+          }
+        ],
+        nextCursor: null
+      })
+    );
+
+    const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
+
+    expect(result.data[0]?.isProjectRemoved).toBe(true);
+    expect(result.data[1]?.isProjectRemoved).toBe(true);
+    expect(result.data[2]?.isProjectRemoved).toBe(false);
+  });
+
+  it("posts archive and unarchive mutations through encoded thread member routes", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(createJsonResponse({
+        ok: true,
+        threadId: "thread_123"
+      }))
+      .mockResolvedValueOnce(createJsonResponse({
+        ok: true,
+        threadId: "thread_123"
+      }));
+
+    await archiveThread("thread 123/with slash");
+    await unarchiveThread("thread 123/with slash");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const firstRequestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
+    const secondRequestUrl = String(fetchMock.mock.calls[1]?.[0] ?? "");
+    expect(firstRequestUrl).toBe("/api/threads/thread%20123%2Fwith%20slash/archive");
+    expect(secondRequestUrl).toBe("/api/threads/thread%20123%2Fwith%20slash/unarchive");
+
+    const firstRequestInit = fetchMock.mock.calls[0]?.[1];
+    const secondRequestInit = fetchMock.mock.calls[1]?.[1];
+    expect(firstRequestInit?.method).toBe("POST");
+    expect(secondRequestInit?.method).toBe("POST");
   });
 });

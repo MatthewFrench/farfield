@@ -12,9 +12,17 @@ import {
 const PUSH_STATE_STORE_VERSION = 1;
 const JSON_INDENT_SPACES = 2;
 const LINE_FEED = "\n";
+const UTF8_FILE_ENCODING = "utf8";
 const TEMP_FILE_EXTENSION = "tmp";
+const TEMP_FILE_NAME_SEGMENT_DELIMITER = ".";
 const OWNER_READ_WRITE_PERMISSIONS = 0o600;
+const WRITE_FILE_OPEN_FLAG = "w";
+const READ_FILE_OPEN_FLAG = "r";
 const WINDOWS_PLATFORM = "win32";
+const PUSH_SUBSCRIPTION_IDENTIFIER_PREFIX = "sub_";
+const SUBSCRIPTION_INDEX_RESOLUTION_ERROR_MESSAGE = "Push subscription index resolution failed";
+const COMPLETION_WATERMARK_INDEX_RESOLUTION_ERROR_MESSAGE =
+  "Push completion watermark index resolution failed";
 
 function buildDefaultState(): PushStateStore {
   return parsePushStateStore({
@@ -30,6 +38,10 @@ function buildDefaultState(): PushStateStore {
 export class PushStore {
   private readonly filePath: string;
   private state: PushStateStore;
+  /**
+   * Serializes persistence work so state-file replacements remain deterministic under concurrent writes.
+   * The queue also continues processing after failures to avoid stalling later durable writes.
+   */
   private persistQueue: Promise<void>;
 
   public constructor(filePath: string) {
@@ -44,7 +56,7 @@ export class PushStore {
       return;
     }
 
-    const raw = fs.readFileSync(this.filePath, "utf8");
+    const raw = fs.readFileSync(this.filePath, UTF8_FILE_ENCODING);
     if (raw.trim().length === 0) {
       this.state = buildDefaultState();
       return;
@@ -75,7 +87,7 @@ export class PushStore {
     if (existingIndex >= 0) {
       const existing = this.state.subscriptions[existingIndex];
       if (!existing) {
-        throw new Error("Push subscription index resolution failed");
+        throw new Error(SUBSCRIPTION_INDEX_RESOLUTION_ERROR_MESSAGE);
       }
       nextSubscription = {
         ...existing,
@@ -86,7 +98,7 @@ export class PushStore {
       this.state.subscriptions[existingIndex] = nextSubscription;
     } else {
       nextSubscription = {
-        id: `sub_${randomUUID()}`,
+        id: `${PUSH_SUBSCRIPTION_IDENTIFIER_PREFIX}${randomUUID()}`,
         subscription,
         settings,
         createdAt: now,
@@ -130,7 +142,7 @@ export class PushStore {
     if (existingIndex >= 0) {
       const existing = this.state.completionWatermarks[existingIndex];
       if (!existing) {
-        throw new Error("Push completion watermark index resolution failed");
+        throw new Error(COMPLETION_WATERMARK_INDEX_RESOLUTION_ERROR_MESSAGE);
       }
       if (existing.marker === marker) {
         return false;
@@ -152,6 +164,8 @@ export class PushStore {
   }
 
   private persist(): Promise<void> {
+    // Mutations update in-memory state first, then enqueue asynchronous durable writes.
+    // Capturing the encoded snapshot here ensures each queued write matches mutation order.
     const encodedState = `${JSON.stringify(this.state, null, JSON_INDENT_SPACES)}${LINE_FEED}`;
     const runPersistWrite = async (): Promise<void> => {
       await this.persistEncodedState(encodedState);
@@ -165,10 +179,14 @@ export class PushStore {
     const directory = path.dirname(this.filePath);
     await fs.promises.mkdir(directory, { recursive: true });
 
-    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.${TEMP_FILE_EXTENSION}`;
-    const fileHandle = await fs.promises.open(tempPath, "w", OWNER_READ_WRITE_PERMISSIONS);
+    const tempPath = this.buildTemporaryStatePath();
+    const fileHandle = await fs.promises.open(
+      tempPath,
+      WRITE_FILE_OPEN_FLAG,
+      OWNER_READ_WRITE_PERMISSIONS
+    );
     try {
-      await fileHandle.writeFile(encodedState, "utf8");
+      await fileHandle.writeFile(encodedState, UTF8_FILE_ENCODING);
       await fileHandle.sync();
     } finally {
       await fileHandle.close();
@@ -186,12 +204,21 @@ export class PushStore {
     }
 
     if (process.platform !== WINDOWS_PLATFORM) {
-      const directoryHandle = await fs.promises.open(directory, "r");
+      const directoryHandle = await fs.promises.open(directory, READ_FILE_OPEN_FLAG);
       try {
         await directoryHandle.sync();
       } finally {
         await directoryHandle.close();
       }
     }
+  }
+
+  private buildTemporaryStatePath(): string {
+    return [
+      this.filePath,
+      String(process.pid),
+      String(Date.now()),
+      TEMP_FILE_EXTENSION
+    ].join(TEMP_FILE_NAME_SEGMENT_DELIMITER);
   }
 }

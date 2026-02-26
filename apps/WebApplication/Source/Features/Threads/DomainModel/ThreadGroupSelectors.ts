@@ -1,24 +1,44 @@
 import type { ThreadListItem, ThreadProjectGroup } from "./ThreadGroupTypes";
 
+type UnreadThreadIdentifierMap = Record<string, true>;
+type ThreadUpdatedAtByIdentifier = Record<string, number>;
+
 interface ComputeUnreadThreadIdentifiersInput {
-  previousUnreadThreadIdentifiers: Record<string, true>;
-  previousThreadUpdatedAtByIdentifier: Record<string, number>;
+  previousUnreadThreadIdentifiers: UnreadThreadIdentifierMap;
+  previousThreadUpdatedAtByIdentifier: ThreadUpdatedAtByIdentifier;
   nextThreads: ThreadListItem[];
   selectedThreadIdentifier: string | null;
 }
 
+interface ComputeUnreadThreadFromHistoryInput {
+  previousUnreadThreadIdentifiers: UnreadThreadIdentifierMap;
+  previousThreadUpdatedAtByIdentifier: ThreadUpdatedAtByIdentifier;
+  thread: ThreadListItem;
+}
+
+const EMPTY_TEXT = "";
+const DEFAULT_THREAD_TIMESTAMP = 0;
+const THREAD_LABEL_IDENTIFIER_LENGTH = 8;
 const THREAD_LABEL_PREFIX = "thread ";
 const PROJECT_KEY_PREFIX = "project:";
 const UNKNOWN_PROJECT_KEY = `${PROJECT_KEY_PREFIX}unknown`;
 const UNKNOWN_PROJECT_LABEL = "No project";
 const REMOVED_PROJECT_STATE = "removed";
 const UNKNOWN_UNREAD_SIGNAL = null;
+const WINDOWS_PATH_SEPARATOR = "\\";
+const PROJECT_PATH_SEPARATOR = "/";
+const TRAILING_PROJECT_PATH_SEPARATOR_PATTERN = /\/+$/;
 
+/**
+ * Derives thread-list labels, unread maps, and project groupings from trusted thread models.
+ * Shared literals and helper contracts remain centralized here so state owners and UI renderers
+ * stay deterministic across active and archived thread surfaces.
+ */
 export class ThreadGroupSelectors {
   public static threadLabel(thread: Pick<ThreadListItem, "id" | "preview">): string {
     const text = thread.preview.trim();
     if (!text) {
-      return `${THREAD_LABEL_PREFIX}${thread.id.slice(0, 8)}`;
+      return `${THREAD_LABEL_PREFIX}${thread.id.slice(0, THREAD_LABEL_IDENTIFIER_LENGTH)}`;
     }
     return text;
   }
@@ -30,16 +50,16 @@ export class ThreadGroupSelectors {
     return previousSignature.every((value, index) => value === nextSignature[index]);
   }
 
-  public static mapThreadUpdatedAtByIdentifier(threads: ThreadListItem[]): Record<string, number> {
-    const mapped: Record<string, number> = {};
+  public static mapThreadUpdatedAtByIdentifier(threads: ThreadListItem[]): ThreadUpdatedAtByIdentifier {
+    const mapped: ThreadUpdatedAtByIdentifier = {};
     for (const thread of threads) {
       mapped[thread.id] = ThreadGroupSelectors.readThreadUpdatedAtTimestamp(thread);
     }
     return mapped;
   }
 
-  public static computeUnreadThreadIdentifiers(input: ComputeUnreadThreadIdentifiersInput): Record<string, true> {
-    const nextUnreadThreadIdentifiers: Record<string, true> = {};
+  public static computeUnreadThreadIdentifiers(input: ComputeUnreadThreadIdentifiersInput): UnreadThreadIdentifierMap {
+    const nextUnreadThreadIdentifiers: UnreadThreadIdentifierMap = {};
     for (const thread of input.nextThreads) {
       if (thread.id === input.selectedThreadIdentifier) {
         continue;
@@ -55,11 +75,11 @@ export class ThreadGroupSelectors {
         continue;
       }
 
-      const wasUnread = input.previousUnreadThreadIdentifiers[thread.id] === true;
-      const previousUpdatedAt = input.previousThreadUpdatedAtByIdentifier[thread.id];
-      const hasNewUpdate = previousUpdatedAt !== undefined
-        && ThreadGroupSelectors.readThreadUpdatedAtTimestamp(thread) > previousUpdatedAt;
-      if (wasUnread || hasNewUpdate) {
+      if (ThreadGroupSelectors.shouldMarkThreadUnreadFromHistory({
+        previousUnreadThreadIdentifiers: input.previousUnreadThreadIdentifiers,
+        previousThreadUpdatedAtByIdentifier: input.previousThreadUpdatedAtByIdentifier,
+        thread
+      })) {
         nextUnreadThreadIdentifiers[thread.id] = true;
       }
     }
@@ -67,8 +87,8 @@ export class ThreadGroupSelectors {
   }
 
   public static unreadThreadIdentifierMapsMatch(
-    previousUnreadThreadIdentifiers: Record<string, true>,
-    nextUnreadThreadIdentifiers: Record<string, true>
+    previousUnreadThreadIdentifiers: UnreadThreadIdentifierMap,
+    nextUnreadThreadIdentifiers: UnreadThreadIdentifierMap
   ): boolean {
     const previousKeys = Object.keys(previousUnreadThreadIdentifiers);
     const nextKeys = Object.keys(nextUnreadThreadIdentifiers);
@@ -89,7 +109,7 @@ export class ThreadGroupSelectors {
       const projectPath = ThreadGroupSelectors.normalizeProjectPathFromThread(thread);
       const groupKey = ThreadGroupSelectors.buildProjectGroupKey(projectPath);
       const groupLabel = ThreadGroupSelectors.buildProjectGroupLabel(projectPath);
-      const threadCreatedAt = thread.createdAt ?? 0;
+      const threadCreatedAt = thread.createdAt ?? DEFAULT_THREAD_TIMESTAMP;
       const threadUpdatedAt = ThreadGroupSelectors.readThreadUpdatedAtTimestamp(thread);
       const projectMarkedRemoved = ThreadGroupSelectors.threadProjectIsMarkedRemoved(thread);
 
@@ -175,16 +195,29 @@ export class ThreadGroupSelectors {
   }
 
   private static readThreadUpdatedAtTimestamp(thread: Pick<ThreadListItem, "updatedAt">): number {
-    return thread.updatedAt ?? 0;
+    return thread.updatedAt ?? DEFAULT_THREAD_TIMESTAMP;
+  }
+
+  private static shouldMarkThreadUnreadFromHistory(input: ComputeUnreadThreadFromHistoryInput): boolean {
+    const wasUnread = input.previousUnreadThreadIdentifiers[input.thread.id] === true;
+    const previousUpdatedAt = input.previousThreadUpdatedAtByIdentifier[input.thread.id];
+    if (previousUpdatedAt === undefined) {
+      return wasUnread;
+    }
+
+    return wasUnread || ThreadGroupSelectors.readThreadUpdatedAtTimestamp(input.thread) > previousUpdatedAt;
   }
 
   private static normalizeProjectPath(value: string): string {
     const trimmed = value.trim();
     if (trimmed.length === 0) {
-      return "";
+      return EMPTY_TEXT;
     }
-    const normalized = trimmed.replaceAll("\\", "/").replace(/\/+$/, "");
-    return normalized.length > 0 ? normalized : trimmed.replaceAll("\\", "/");
+
+    const normalizedPathSeparators = trimmed.replaceAll(WINDOWS_PATH_SEPARATOR, PROJECT_PATH_SEPARATOR);
+    const normalized = normalizedPathSeparators.replace(TRAILING_PROJECT_PATH_SEPARATOR_PATTERN, EMPTY_TEXT);
+    // Preserve root-like paths such as "/" after trailing separator trimming.
+    return normalized.length > 0 ? normalized : normalizedPathSeparators;
   }
 
   private static normalizeProjectPathFromThread(thread: ThreadListItem): string | null {
@@ -207,7 +240,7 @@ export class ThreadGroupSelectors {
       return projectPath;
     }
 
-    const pathParts = normalized.split("/").filter((part) => part.length > 0);
+    const pathParts = normalized.split(PROJECT_PATH_SEPARATOR).filter((part) => part.length > 0);
     return pathParts[pathParts.length - 1] ?? normalized;
   }
 
@@ -231,7 +264,7 @@ export class ThreadGroupSelectors {
 
   private static normalizeOptionalProjectPath(value: string | null | undefined): string {
     if (!value) {
-      return "";
+      return EMPTY_TEXT;
     }
     return ThreadGroupSelectors.normalizeProjectPath(value);
   }

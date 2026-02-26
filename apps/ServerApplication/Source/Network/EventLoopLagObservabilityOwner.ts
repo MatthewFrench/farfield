@@ -1,27 +1,59 @@
-interface PercentileSample {
-  values: number[];
-  percentile: number;
+interface PercentileReadRequest {
+  values: readonly number[];
+  percentileRank: number;
 }
 
 const DEFAULT_SAMPLE_INTERVAL_MILLISECONDS = 1_000;
 const DEFAULT_MAXIMUM_SAMPLE_COUNT = 600;
-const FIFTIETH_PERCENTILE = 50;
-const NINETY_FIFTH_PERCENTILE = 95;
-const NINETY_NINTH_PERCENTILE = 99;
+const MINIMUM_POSITIVE_INTEGER = 1;
+const NO_LAG_MILLISECONDS = 0;
+const PERCENTILE_DENOMINATOR = 100;
+const LAG_PERCENTILE_RANK_BY_NAME = {
+  p50: 50,
+  p95: 95,
+  p99: 99
+} as const;
 
-function readPercentile(sample: PercentileSample): number {
-  if (sample.values.length === 0) {
-    return 0;
+type PositiveIntegerConfigurationFieldName = "sampleIntervalMs" | "maxSamples";
+
+const POSITIVE_INTEGER_CONFIGURATION_ERROR_MESSAGE_BY_FIELD_NAME: Readonly<
+  Record<PositiveIntegerConfigurationFieldName, string>
+> = {
+  sampleIntervalMs: "EventLoopLagObservabilityOwner requires a positive integer sampleIntervalMs",
+  maxSamples: "EventLoopLagObservabilityOwner requires a positive integer maxSamples"
+};
+
+function assertPositiveIntegerConfiguration(
+  value: number,
+  fieldName: PositiveIntegerConfigurationFieldName
+): void {
+  if (!Number.isInteger(value) || value < MINIMUM_POSITIVE_INTEGER) {
+    throw new Error(POSITIVE_INTEGER_CONFIGURATION_ERROR_MESSAGE_BY_FIELD_NAME[fieldName]);
   }
-  const sortedValues = [...sample.values].sort((left, right) => left - right);
-  const percentileIndex = Math.max(
+}
+
+function readNearestRankPercentileIndex(sampleCount: number, percentileRank: number): number {
+  return Math.max(
     0,
     Math.min(
-      sortedValues.length - 1,
-      Math.ceil((sample.percentile / 100) * sortedValues.length) - 1
+      sampleCount - 1,
+      Math.ceil((percentileRank / PERCENTILE_DENOMINATOR) * sampleCount) - 1
     )
   );
-  return sortedValues[percentileIndex] ?? 0;
+}
+
+function readPercentileValue(request: PercentileReadRequest): number {
+  if (request.values.length === 0) {
+    return NO_LAG_MILLISECONDS;
+  }
+
+  // Nearest-rank keeps percentile values pinned to observed lag samples.
+  const sortedValues = [...request.values].sort((left, right) => left - right);
+  const percentileIndex = readNearestRankPercentileIndex(
+    sortedValues.length,
+    request.percentileRank
+  );
+  return sortedValues[percentileIndex] ?? NO_LAG_MILLISECONDS;
 }
 
 export interface EventLoopLagStatistics {
@@ -60,12 +92,8 @@ export class EventLoopLagObservabilityOwner {
     maxSamples = DEFAULT_MAXIMUM_SAMPLE_COUNT,
     dependencies?: EventLoopLagObservabilityOwnerDependencies
   ) {
-    if (!Number.isInteger(sampleIntervalMs) || sampleIntervalMs <= 0) {
-      throw new Error("EventLoopLagObservabilityOwner requires a positive integer sampleIntervalMs");
-    }
-    if (!Number.isInteger(maxSamples) || maxSamples <= 0) {
-      throw new Error("EventLoopLagObservabilityOwner requires a positive integer maxSamples");
-    }
+    assertPositiveIntegerConfiguration(sampleIntervalMs, "sampleIntervalMs");
+    assertPositiveIntegerConfiguration(maxSamples, "maxSamples");
 
     this.sampleIntervalMs = sampleIntervalMs;
     this.maxSamples = maxSamples;
@@ -75,11 +103,11 @@ export class EventLoopLagObservabilityOwner {
     this.lagSamplesMs = [];
     this.expectedTickAtEpochMs = null;
     this.timerHandle = null;
-    this.lastLagMs = 0;
+    this.lastLagMs = NO_LAG_MILLISECONDS;
   }
 
   public start(): void {
-    if (this.timerHandle) {
+    if (this.timerHandle !== null) {
       return;
     }
 
@@ -88,15 +116,15 @@ export class EventLoopLagObservabilityOwner {
       const nowEpochMs = this.now();
       const expectedTickAtEpochMs = this.expectedTickAtEpochMs;
       const lagMs = expectedTickAtEpochMs === null
-        ? 0
-        : Math.max(0, nowEpochMs - expectedTickAtEpochMs);
+        ? NO_LAG_MILLISECONDS
+        : Math.max(NO_LAG_MILLISECONDS, nowEpochMs - expectedTickAtEpochMs);
       this.recordLagSample(lagMs);
       this.expectedTickAtEpochMs = nowEpochMs + this.sampleIntervalMs;
     }, this.sampleIntervalMs);
   }
 
   public stop(): void {
-    if (!this.timerHandle) {
+    if (this.timerHandle === null) {
       return;
     }
     this.clearScheduledInterval(this.timerHandle);
@@ -113,10 +141,19 @@ export class EventLoopLagObservabilityOwner {
       sampleIntervalMs: this.sampleIntervalMs,
       sampleCount: this.lagSamplesMs.length,
       lastLagMs: this.lastLagMs,
-      p50LagMs: readPercentile({ values: this.lagSamplesMs, percentile: FIFTIETH_PERCENTILE }),
-      p95LagMs: readPercentile({ values: this.lagSamplesMs, percentile: NINETY_FIFTH_PERCENTILE }),
-      p99LagMs: readPercentile({ values: this.lagSamplesMs, percentile: NINETY_NINTH_PERCENTILE }),
-      maxLagMs: this.lagSamplesMs.length > 0 ? Math.max(...this.lagSamplesMs) : 0
+      p50LagMs: readPercentileValue({
+        values: this.lagSamplesMs,
+        percentileRank: LAG_PERCENTILE_RANK_BY_NAME.p50
+      }),
+      p95LagMs: readPercentileValue({
+        values: this.lagSamplesMs,
+        percentileRank: LAG_PERCENTILE_RANK_BY_NAME.p95
+      }),
+      p99LagMs: readPercentileValue({
+        values: this.lagSamplesMs,
+        percentileRank: LAG_PERCENTILE_RANK_BY_NAME.p99
+      }),
+      maxLagMs: this.lagSamplesMs.length > 0 ? Math.max(...this.lagSamplesMs) : NO_LAG_MILLISECONDS
     };
   }
 

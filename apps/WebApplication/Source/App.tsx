@@ -42,6 +42,7 @@ import {
   type CoreDataCapabilitySnapshot,
   useCoreDataLoaders
 } from "@/Application/StateManagement/UseCoreDataLoaders";
+import type { CoreDataModesResponse } from "@/Application/StateManagement/CoreDataSnapshotContracts";
 import {
   useApplicationDerivedState
 } from "@/Application/StateManagement/UseApplicationDerivedState";
@@ -77,6 +78,17 @@ import {
 const modeSelectionStateResolver = new ModeSelectionStateResolver();
 const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(modeSelectionStateResolver);
 const applicationRouteStateMapper = new ApplicationRouteStateMapper();
+const APPLICATION_SHELL_TOOLTIP_DELAY_MILLISECONDS = 120;
+const THREAD_ONLY_HISTORY_METHOD_IDENTIFIERS = Array.from(THREAD_ONLY_HISTORY_METHOD_NAMES);
+
+/**
+ * Select the initial startup mode key, preferring a non-plan option when available.
+ * This preserves chat-first startup while still honoring plan-only agent capability sets.
+ */
+export function readInitialModeKeyFromModes(availableModes: CoreDataModesResponse["data"]): string {
+  const nonPlanDefault = availableModes.find((mode) => !modeSelectionStateResolver.isPlanModeOption(mode));
+  return nonPlanDefault?.mode ?? availableModes[0]?.mode ?? "";
+}
 
 export function App(): React.JSX.Element {
   const { theme, toggle: toggleTheme } = useTheme();
@@ -95,7 +107,7 @@ export function App(): React.JSX.Element {
     setErrorMessage: applicationShellState.setError,
     modeSelectionStateResolver,
     unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
-    threadOnlyHistoryMethods: Array.from(THREAD_ONLY_HISTORY_METHOD_NAMES),
+    threadOnlyHistoryMethods: THREAD_ONLY_HISTORY_METHOD_IDENTIFIERS,
     eventRefreshScheduleDelayMilliseconds: EVENT_REFRESH_SCHEDULE_DELAY_MS,
     mobileVisualViewportKeyboardOpenDeltaPx: MOBILE_VISUAL_VIEWPORT_KEYBOARD_OPEN_DELTA_PX,
     mobileLayoutMaximumWidthPx: MOBILE_LAYOUT_MAXIMUM_WIDTH_PX,
@@ -217,10 +229,7 @@ export function App(): React.JSX.Element {
     setHasLoadedArchivedThreads: applicationShellState.setHasLoadedArchivedThreads,
     ensureApiSessionBootstrapped: runtimeRequestHandlers.ensureApiSessionBootstrapped,
     buildActionRequestOptions: runtimeRequestHandlers.buildActionRequestOptions,
-    readInitialModeKey: (availableModes) => {
-      const nonPlanDefault = availableModes.find((mode) => !modeSelectionStateResolver.isPlanModeOption(mode));
-      return nonPlanDefault?.mode ?? availableModes[0]?.mode ?? "";
-    },
+    readInitialModeKey: readInitialModeKeyFromModes,
     handleRuntimeRequestError: runtimeRequestHandlers.handleRuntimeRequestError
   });
 
@@ -267,36 +276,41 @@ export function App(): React.JSX.Element {
     renderAgentFavicon,
     formatDateValue
   });
+  const { shellComposition } = runtimeComposition;
+
+  const handleCloseMobileSidebar = (): void => {
+    applicationShellState.setMobileSidebarOpen(false);
+  };
+
+  const handleHideDesktopSidebar = (): void => {
+    applicationShellState.setDesktopSidebarOpen(false);
+  };
 
   return (
-    <TooltipProvider delayDuration={120}>
+    <TooltipProvider delayDuration={APPLICATION_SHELL_TOOLTIP_DELAY_MILLISECONDS}>
       <ApplicationShellLayout
         applicationShellElementRef={applicationShellState.applicationShellElementRef}
-        onAppShellTouchStart={runtimeComposition.shellComposition.handleAppShellTouchStart}
-        onAppShellTouchMove={runtimeComposition.shellComposition.handleAppShellTouchMove}
-        onEndSidebarSwipeTracking={runtimeComposition.shellComposition.endSidebarSwipeTracking}
+        onAppShellTouchStart={shellComposition.handleAppShellTouchStart}
+        onAppShellTouchMove={shellComposition.handleAppShellTouchMove}
+        onEndSidebarSwipeTracking={shellComposition.endSidebarSwipeTracking}
         mobileSidebarOpen={applicationShellState.mobileSidebarOpen}
         desktopSidebarOpen={applicationShellState.desktopSidebarOpen}
-        onCloseMobileSidebar={() => {
-          applicationShellState.setMobileSidebarOpen(false);
-        }}
-        onHideDesktopSidebar={() => {
-          applicationShellState.setDesktopSidebarOpen(false);
-        }}
-        threadListPaneProperties={runtimeComposition.shellComposition.threadListPaneProperties}
+        onCloseMobileSidebar={handleCloseMobileSidebar}
+        onHideDesktopSidebar={handleHideDesktopSidebar}
+        threadListPaneProperties={shellComposition.threadListPaneProperties}
         allSystemsReady={applicationDerivedState.allSystemsReady}
         hasAnySystemFailure={applicationDerivedState.hasAnySystemFailure}
         commitLabel={applicationDerivedState.commitLabel}
         agentDescriptors={applicationShellState.agentDescriptors}
         codexConfigured={applicationDerivedState.codexConfigured}
-        threadSidebarHealthState={runtimeComposition.shellComposition.threadSidebarHealthState}
+        threadSidebarHealthState={shellComposition.threadSidebarHealthState}
         activeTab={applicationShellState.activeTab}
-        applicationHeaderBarProperties={runtimeComposition.shellComposition.applicationHeaderBarProperties}
-        debugStatusBannersProperties={runtimeComposition.shellComposition.debugStatusBannersProperties}
-        chatWorkspacePaneProperties={runtimeComposition.shellComposition.chatWorkspacePaneProperties}
-        debugWorkspacePaneProperties={runtimeComposition.shellComposition.debugWorkspacePaneProperties}
+        applicationHeaderBarProperties={shellComposition.applicationHeaderBarProperties}
+        debugStatusBannersProperties={shellComposition.debugStatusBannersProperties}
+        chatWorkspacePaneProperties={shellComposition.chatWorkspacePaneProperties}
+        debugWorkspacePaneProperties={shellComposition.debugWorkspacePaneProperties}
         showApiSessionBootstrapOverlay={applicationShellState.requiresApiSessionToken}
-        apiSessionBootstrapOverlayProperties={runtimeComposition.shellComposition.apiSessionBootstrapOverlayProperties}
+        apiSessionBootstrapOverlayProperties={shellComposition.apiSessionBootstrapOverlayProperties}
       />
     </TooltipProvider>
   );

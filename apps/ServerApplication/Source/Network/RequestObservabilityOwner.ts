@@ -7,7 +7,7 @@ import {
 } from "./RequestPathContracts.js";
 
 interface PercentileSample {
-  values: number[];
+  values: readonly number[];
   percentile: number;
 }
 
@@ -15,6 +15,7 @@ function readPercentile(sample: PercentileSample): number {
   if (sample.values.length === 0) {
     return 0;
   }
+  // Nearest-rank percentile keeps reported values pinned to observed samples.
   const sortedValues = [...sample.values].sort((left, right) => left - right);
   const percentileIndex = Math.max(
     0,
@@ -88,13 +89,25 @@ const DEBUG_TRACE_DOWNLOAD_ROUTE_PREFIX_SEGMENTS = [
   RequestPathSegmentByName.trace
 ] as const;
 
-/**
- * Route classification mirrors dynamic segments owned by Network route owners so
- * static paths (for example `session-log`) cannot collapse into identifier aggregates.
- */
 interface MetricsRouteClassification {
   replacementBySegmentIndex: Readonly<Record<number, string>>;
 }
+
+interface PathSegmentMatchConstraint {
+  pathSegmentIndex: number;
+  expectedPathSegment: string;
+}
+
+interface MetricsRoutePathDefinition {
+  leadingPathSegments: readonly string[];
+  minimumSegmentCount: number | null;
+  exactSegmentCount: number | null;
+  requiredPathSegmentMatches: readonly PathSegmentMatchConstraint[];
+  excludedPathSegmentMatches: readonly PathSegmentMatchConstraint[];
+  classification: MetricsRouteClassification;
+}
+
+const NO_PATH_SEGMENT_MATCH_CONSTRAINTS: readonly PathSegmentMatchConstraint[] = [];
 
 const THREAD_MEMBER_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
   replacementBySegmentIndex: {
@@ -120,55 +133,99 @@ const DEBUG_TRACE_DOWNLOAD_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
   }
 };
 
+const DEBUG_TRACE_DOWNLOAD_REQUIRED_PATH_SEGMENT_MATCH: PathSegmentMatchConstraint = {
+  pathSegmentIndex: PATH_SEGMENT_INDEX_BY_NAME.fifth,
+  expectedPathSegment: RequestPathSegmentByName.download
+};
+
+const DEBUG_CLIENT_ERROR_SESSION_LOG_EXCLUDED_PATH_SEGMENT_MATCH: PathSegmentMatchConstraint = {
+  pathSegmentIndex: PATH_SEGMENT_INDEX_BY_NAME.fourth,
+  expectedPathSegment: RequestPathSegmentByName.sessionLog
+};
+
+/**
+ * Route classification mirrors dynamic segments owned by Network route owners so
+ * static paths (for example `session-log`) cannot collapse into identifier aggregates.
+ */
+const METRICS_ROUTE_PATH_DEFINITIONS: readonly MetricsRoutePathDefinition[] = [
+  {
+    leadingPathSegments: THREAD_MEMBER_ROUTE_PREFIX_SEGMENTS,
+    minimumSegmentCount: PATH_SEGMENT_COUNT_BY_NAME.threadMemberMinimum,
+    exactSegmentCount: null,
+    requiredPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
+    excludedPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
+    classification: THREAD_MEMBER_ROUTE_CLASSIFICATION
+  },
+  {
+    leadingPathSegments: DEBUG_HISTORY_ENTRY_ROUTE_PREFIX_SEGMENTS,
+    minimumSegmentCount: null,
+    exactSegmentCount: PATH_SEGMENT_COUNT_BY_NAME.debugHistoryEntry,
+    requiredPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
+    excludedPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
+    classification: DEBUG_HISTORY_ENTRY_ROUTE_CLASSIFICATION
+  },
+  {
+    leadingPathSegments: DEBUG_CLIENT_ERROR_ENTRY_ROUTE_PREFIX_SEGMENTS,
+    minimumSegmentCount: null,
+    exactSegmentCount: PATH_SEGMENT_COUNT_BY_NAME.debugClientErrorEntry,
+    requiredPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
+    excludedPathSegmentMatches: [DEBUG_CLIENT_ERROR_SESSION_LOG_EXCLUDED_PATH_SEGMENT_MATCH],
+    classification: DEBUG_CLIENT_ERROR_ENTRY_ROUTE_CLASSIFICATION
+  },
+  {
+    leadingPathSegments: DEBUG_TRACE_DOWNLOAD_ROUTE_PREFIX_SEGMENTS,
+    minimumSegmentCount: null,
+    exactSegmentCount: PATH_SEGMENT_COUNT_BY_NAME.debugTraceDownload,
+    requiredPathSegmentMatches: [DEBUG_TRACE_DOWNLOAD_REQUIRED_PATH_SEGMENT_MATCH],
+    excludedPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
+    classification: DEBUG_TRACE_DOWNLOAD_ROUTE_CLASSIFICATION
+  }
+] as const;
+
 function classifyMetricsRoutePathname(pathSegments: readonly string[]): MetricsRouteClassification | null {
-  if (isThreadMemberRoutePath(pathSegments)) {
-    return THREAD_MEMBER_ROUTE_CLASSIFICATION;
-  }
-
-  if (isDebugHistoryEntryRoutePath(pathSegments)) {
-    return DEBUG_HISTORY_ENTRY_ROUTE_CLASSIFICATION;
-  }
-
-  if (isDebugClientErrorEntryRoutePath(pathSegments)) {
-    return DEBUG_CLIENT_ERROR_ENTRY_ROUTE_CLASSIFICATION;
-  }
-
-  if (isDebugTraceDownloadRoutePath(pathSegments)) {
-    return DEBUG_TRACE_DOWNLOAD_ROUTE_CLASSIFICATION;
+  for (const metricsRoutePathDefinition of METRICS_ROUTE_PATH_DEFINITIONS) {
+    if (isMetricsRoutePathMatch(pathSegments, metricsRoutePathDefinition)) {
+      return metricsRoutePathDefinition.classification;
+    }
   }
 
   return null;
 }
 
-function isThreadMemberRoutePath(pathSegments: readonly string[]): boolean {
-  return (
-    pathSegments.length >= PATH_SEGMENT_COUNT_BY_NAME.threadMemberMinimum
-    && hasLeadingPathSegments(pathSegments, THREAD_MEMBER_ROUTE_PREFIX_SEGMENTS)
-  );
-}
+function isMetricsRoutePathMatch(
+  pathSegments: readonly string[],
+  metricsRoutePathDefinition: MetricsRoutePathDefinition
+): boolean {
+  if (
+    metricsRoutePathDefinition.minimumSegmentCount !== null
+    && pathSegments.length < metricsRoutePathDefinition.minimumSegmentCount
+  ) {
+    return false;
+  }
 
-function isDebugHistoryEntryRoutePath(pathSegments: readonly string[]): boolean {
-  return (
-    pathSegments.length === PATH_SEGMENT_COUNT_BY_NAME.debugHistoryEntry
-    && hasLeadingPathSegments(pathSegments, DEBUG_HISTORY_ENTRY_ROUTE_PREFIX_SEGMENTS)
-  );
-}
+  if (
+    metricsRoutePathDefinition.exactSegmentCount !== null
+    && pathSegments.length !== metricsRoutePathDefinition.exactSegmentCount
+  ) {
+    return false;
+  }
 
-function isDebugClientErrorEntryRoutePath(pathSegments: readonly string[]): boolean {
-  return (
-    pathSegments.length === PATH_SEGMENT_COUNT_BY_NAME.debugClientErrorEntry
-    && hasLeadingPathSegments(pathSegments, DEBUG_CLIENT_ERROR_ENTRY_ROUTE_PREFIX_SEGMENTS)
-    // `session-log` is a static diagnostics endpoint, not a dynamic client-error identifier.
-    && pathSegments[PATH_SEGMENT_INDEX_BY_NAME.fourth] !== RequestPathSegmentByName.sessionLog
-  );
-}
+  if (!hasLeadingPathSegments(pathSegments, metricsRoutePathDefinition.leadingPathSegments)) {
+    return false;
+  }
 
-function isDebugTraceDownloadRoutePath(pathSegments: readonly string[]): boolean {
-  return (
-    pathSegments.length === PATH_SEGMENT_COUNT_BY_NAME.debugTraceDownload
-    && hasLeadingPathSegments(pathSegments, DEBUG_TRACE_DOWNLOAD_ROUTE_PREFIX_SEGMENTS)
-    && pathSegments[PATH_SEGMENT_INDEX_BY_NAME.fifth] === RequestPathSegmentByName.download
-  );
+  if (!hasMatchingPathSegments(pathSegments, metricsRoutePathDefinition.requiredPathSegmentMatches)) {
+    return false;
+  }
+
+  if (
+    metricsRoutePathDefinition.excludedPathSegmentMatches.length > 0
+    && hasMatchingPathSegments(pathSegments, metricsRoutePathDefinition.excludedPathSegmentMatches)
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 function hasLeadingPathSegments(
@@ -181,6 +238,19 @@ function hasLeadingPathSegments(
 
   for (const [pathSegmentIndex, leadingPathSegment] of leadingPathSegments.entries()) {
     if (pathSegments[pathSegmentIndex] !== leadingPathSegment) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasMatchingPathSegments(
+  pathSegments: readonly string[],
+  pathSegmentMatches: readonly PathSegmentMatchConstraint[]
+): boolean {
+  for (const pathSegmentMatch of pathSegmentMatches) {
+    if (pathSegments[pathSegmentMatch.pathSegmentIndex] !== pathSegmentMatch.expectedPathSegment) {
       return false;
     }
   }
@@ -387,6 +457,7 @@ export class RequestObservabilityOwner {
     routeAccumulator.lastQueueDelayMs = observation.queueDelayMs;
     routeAccumulator.durationSamplesMs.push(observation.durationMs);
     routeAccumulator.queueDelaySamplesMs.push(observation.queueDelayMs);
+    // Keep rolling windows bounded so percentile work stays proportional to configured sample limits.
     if (routeAccumulator.durationSamplesMs.length > this.maxSamplesPerRoute) {
       routeAccumulator.durationSamplesMs.shift();
     }
@@ -452,11 +523,13 @@ export class RequestObservabilityOwner {
         p99DurationMs: readPercentile({ values: routeAccumulator.durationSamplesMs, percentile: 99 }),
         lastQueueDelayMs: routeAccumulator.lastQueueDelayMs,
         p95QueueDelayMs: readPercentile({ values: routeAccumulator.queueDelaySamplesMs, percentile: 95 }),
+        // Preserve one worst-case queueing signal alongside percentile smoothing.
         maxQueueDelayMs: routeAccumulator.queueDelaySamplesMs.length > 0
           ? Math.max(...routeAccumulator.queueDelaySamplesMs)
           : 0
       }))
       .sort((left, right) => {
+        // Surface slower routes first; request volume breaks p95 ties deterministically.
         if (left.p95DurationMs !== right.p95DurationMs) {
           return right.p95DurationMs - left.p95DurationMs;
         }

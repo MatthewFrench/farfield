@@ -6,7 +6,10 @@ import type {
 } from "../Agents/Types.js";
 import type { EventStreamClientRegistry } from "./EventStreamClientRegistry.js";
 
-const STREAM_EVENT_LIMIT = 400;
+// Stream deltas stay bounded to keep per-publish work predictable under bursty traffic.
+const THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT = 400;
+const THREAD_STREAM_DELTA_EVENT_TYPE: FarfieldThreadStreamDeltaEvent["type"] = "thread-stream-delta";
+const FARFIELD_DELTA_SNAPSHOT_OK = true as const;
 const THREAD_STREAM_DELTA_PUBLISH_FAILED_LOG_EVENT = "thread-stream-delta-publish-failed";
 
 export interface ThreadStreamDeltaEventPublisherStatistics {
@@ -28,6 +31,13 @@ export interface ThreadStreamDeltaEventPublisherDependencies {
     sinceSequence: number | null,
     limit: number
   ) => Promise<AgentThreadStreamEvents>;
+}
+
+interface ThreadStreamDeltaEventBuildInput {
+  threadId: string;
+  sinceSequence: number | null;
+  liveStateSnapshot: AgentThreadLiveState;
+  streamEventsSnapshot: AgentThreadStreamEvents;
 }
 
 /**
@@ -102,6 +112,7 @@ export class ThreadStreamDeltaEventPublisher {
   private async publishPendingThread(threadId: string): Promise<void> {
     this.startedPublishCount += 1;
     try {
+      // Drain every queued signal for this thread while one in-flight loop owns progression.
       while (this.pendingThreadIdSet.delete(threadId)) {
         await this.publishThreadDelta(threadId);
       }
@@ -127,41 +138,58 @@ export class ThreadStreamDeltaEventPublisher {
     const sinceSequence = this.lastPublishedSequenceByThreadId.get(threadId) ?? null;
     const [liveStateSnapshot, streamEventsSnapshot] = await Promise.all([
       this.readThreadLiveState(threadId),
-      this.readThreadStreamEvents(threadId, sinceSequence, STREAM_EVENT_LIMIT)
+      this.readThreadStreamEvents(threadId, sinceSequence, THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT)
     ]);
+    // Cursor progression is persisted even when broadcast is suppressed.
     this.lastPublishedSequenceByThreadId.set(threadId, streamEventsSnapshot.nextSequence);
 
-    if (streamEventsSnapshot.events.length === 0 && !streamEventsSnapshot.resetRequired) {
+    if (shouldSuppressBroadcast(streamEventsSnapshot)) {
       this.suppressedBroadcastCount += 1;
       return;
     }
 
-    const event: FarfieldThreadStreamDeltaEvent = {
-      type: "thread-stream-delta",
-      delta: {
+    this.eventStreamClientRegistry.broadcast(
+      this.buildThreadStreamDeltaEvent({
         threadId,
-        liveStateSnapshot: {
-          ok: true,
-          threadId,
-          ownerClientId: liveStateSnapshot.ownerClientId,
-          conversationState: liveStateSnapshot.conversationState,
-          liveStateError: liveStateSnapshot.liveStateError
-        },
-        streamEventsSnapshot: {
-          ok: true,
-          threadId,
-          ownerClientId: streamEventsSnapshot.ownerClientId,
-          events: streamEventsSnapshot.events,
-          nextSequence: streamEventsSnapshot.nextSequence,
-          firstAvailableSequence: streamEventsSnapshot.firstAvailableSequence,
-          resetRequired: streamEventsSnapshot.resetRequired
-        },
-        streamEventsSinceSequenceUsed: sinceSequence
-      }
-    };
-    this.eventStreamClientRegistry.broadcast(event);
+        sinceSequence,
+        liveStateSnapshot,
+        streamEventsSnapshot
+      })
+    );
     this.broadcastCount += 1;
   }
+
+  private buildThreadStreamDeltaEvent(
+    input: ThreadStreamDeltaEventBuildInput
+  ): FarfieldThreadStreamDeltaEvent {
+    return {
+      type: THREAD_STREAM_DELTA_EVENT_TYPE,
+      delta: {
+        threadId: input.threadId,
+        liveStateSnapshot: {
+          ok: FARFIELD_DELTA_SNAPSHOT_OK,
+          threadId: input.threadId,
+          ownerClientId: input.liveStateSnapshot.ownerClientId,
+          conversationState: input.liveStateSnapshot.conversationState,
+          liveStateError: input.liveStateSnapshot.liveStateError
+        },
+        streamEventsSnapshot: {
+          ok: FARFIELD_DELTA_SNAPSHOT_OK,
+          threadId: input.threadId,
+          ownerClientId: input.streamEventsSnapshot.ownerClientId,
+          events: input.streamEventsSnapshot.events,
+          nextSequence: input.streamEventsSnapshot.nextSequence,
+          firstAvailableSequence: input.streamEventsSnapshot.firstAvailableSequence,
+          resetRequired: input.streamEventsSnapshot.resetRequired
+        },
+        streamEventsSinceSequenceUsed: input.sinceSequence
+      }
+    };
+  }
+}
+
+function shouldSuppressBroadcast(streamEventsSnapshot: AgentThreadStreamEvents): boolean {
+  return streamEventsSnapshot.events.length === 0 && !streamEventsSnapshot.resetRequired;
 }
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {

@@ -36,6 +36,18 @@ export interface ThreadListAggregationCacheStatistics {
   inFlightCount: number;
 }
 
+type ThreadListAggregationCacheKey = string;
+
+interface ThreadListAggregationCacheKeyPayload {
+  enabledAgentIds: AgentId[];
+  limit: number;
+  archived: boolean;
+  all: boolean;
+  maxPages: number;
+  sortKey: ThreadListSortKey;
+  cwd: string | null;
+}
+
 interface ThreadListAggregationCacheEntry {
   query: ThreadListAggregationQuery;
   snapshot: ThreadListAggregationSnapshot;
@@ -48,11 +60,24 @@ interface ThreadListAggregationInFlightSnapshot {
   snapshotPromise: Promise<ThreadListAggregationSnapshot>;
 }
 
+/**
+ * Owns process-local aggregation cache state for thread-list snapshots.
+ *
+ * Ownership contract:
+ * 1. Cache key strategy: normalize query inputs first, then build a deterministic
+ *    serialized key payload from the normalized query.
+ * 2. Invalidation strategy: mutation owners call explicit invalidation APIs;
+ *    write-version gating prevents stale in-flight loads from writing into a newer cache epoch.
+ * 3. Bounds strategy: keep LRU ordering in `entryByKey` and evict oldest entries once
+ *    `maximumEntries` is exceeded.
+ * 4. Observability strategy: expose monotonic read/write/invalidation counters through
+ *    `readStatistics` for debug snapshot owners.
+ */
 export class ThreadListAggregationCache {
   private readonly timeToLiveMs: number;
   private readonly maximumEntries: number;
-  private readonly entryByKey: Map<string, ThreadListAggregationCacheEntry>;
-  private readonly inFlightSnapshotByKey: Map<string, ThreadListAggregationInFlightSnapshot>;
+  private readonly entryByKey: Map<ThreadListAggregationCacheKey, ThreadListAggregationCacheEntry>;
+  private readonly inFlightSnapshotByKey: Map<ThreadListAggregationCacheKey, ThreadListAggregationInFlightSnapshot>;
   private hitCount: number;
   private missCount: number;
   private coalescedCount: number;
@@ -69,8 +94,8 @@ export class ThreadListAggregationCache {
     }
     this.timeToLiveMs = timeToLiveMs;
     this.maximumEntries = maximumEntries;
-    this.entryByKey = new Map<string, ThreadListAggregationCacheEntry>();
-    this.inFlightSnapshotByKey = new Map<string, ThreadListAggregationInFlightSnapshot>();
+    this.entryByKey = new Map<ThreadListAggregationCacheKey, ThreadListAggregationCacheEntry>();
+    this.inFlightSnapshotByKey = new Map<ThreadListAggregationCacheKey, ThreadListAggregationInFlightSnapshot>();
     this.hitCount = 0;
     this.missCount = 0;
     this.coalescedCount = 0;
@@ -143,6 +168,7 @@ export class ThreadListAggregationCache {
   }
 
   public readStatistics(): ThreadListAggregationCacheStatistics {
+    // These counters are process-lifetime observability values, not per-request metrics.
     return {
       hitCount: this.hitCount,
       missCount: this.missCount,
@@ -165,31 +191,16 @@ export class ThreadListAggregationCache {
   }
 
   public invalidateWhere(predicate: (query: ThreadListAggregationQuery) => boolean): void {
-    let invalidated = false;
-
-    for (const [key, entry] of this.entryByKey.entries()) {
-      if (!predicate(entry.query)) {
-        continue;
-      }
-      this.entryByKey.delete(key);
-      invalidated = true;
-    }
-
-    for (const [key, inFlightSnapshot] of this.inFlightSnapshotByKey.entries()) {
-      if (!predicate(inFlightSnapshot.query)) {
-        continue;
-      }
-      this.inFlightSnapshotByKey.delete(key);
-      invalidated = true;
-    }
-
-    if (invalidated) {
+    const invalidatedEntryCount = this.invalidateEntries(predicate);
+    const invalidatedInFlightCount = this.invalidateInFlightSnapshots(predicate);
+    if (invalidatedEntryCount + invalidatedInFlightCount > 0) {
       this.invalidationCount += 1;
+      // Advance cache epoch so stale in-flight operations cannot write into a newer invalidated state.
       this.writeVersion += 1;
     }
   }
 
-  private readFreshByKey(key: string): ThreadListAggregationCacheEntry | null {
+  private readFreshByKey(key: ThreadListAggregationCacheKey): ThreadListAggregationCacheEntry | null {
     const entry = this.entryByKey.get(key);
     if (!entry) {
       return null;
@@ -214,7 +225,7 @@ export class ThreadListAggregationCache {
 
   private writeByKey(
     query: ThreadListAggregationQuery,
-    key: string,
+    key: ThreadListAggregationCacheKey,
     snapshot: ThreadListAggregationSnapshot
   ): void {
     if (this.entryByKey.has(key)) {
@@ -232,13 +243,37 @@ export class ThreadListAggregationCache {
 
   private evictUntilWithinBounds(): void {
     while (this.entryByKey.size > this.maximumEntries) {
-      const oldestEntryKey = this.entryByKey.keys().next().value;
-      if (!oldestEntryKey) {
+      const oldestEntryResult = this.entryByKey.keys().next();
+      if (oldestEntryResult.done) {
         return;
       }
-      this.entryByKey.delete(oldestEntryKey);
+      this.entryByKey.delete(oldestEntryResult.value);
       this.evictionCount += 1;
     }
+  }
+
+  private invalidateEntries(predicate: (query: ThreadListAggregationQuery) => boolean): number {
+    let invalidatedEntryCount = 0;
+    for (const [key, entry] of this.entryByKey.entries()) {
+      if (!predicate(entry.query)) {
+        continue;
+      }
+      this.entryByKey.delete(key);
+      invalidatedEntryCount += 1;
+    }
+    return invalidatedEntryCount;
+  }
+
+  private invalidateInFlightSnapshots(predicate: (query: ThreadListAggregationQuery) => boolean): number {
+    let invalidatedInFlightCount = 0;
+    for (const [key, inFlightSnapshot] of this.inFlightSnapshotByKey.entries()) {
+      if (!predicate(inFlightSnapshot.query)) {
+        continue;
+      }
+      this.inFlightSnapshotByKey.delete(key);
+      invalidatedInFlightCount += 1;
+    }
+    return invalidatedInFlightCount;
   }
 
   private normalizeQuery(query: ThreadListAggregationQuery): ThreadListAggregationQuery {
@@ -271,8 +306,8 @@ export class ThreadListAggregationCache {
     };
   }
 
-  private buildKey(query: ThreadListAggregationQuery): string {
-    return JSON.stringify({
+  private buildKeyPayload(query: ThreadListAggregationQuery): ThreadListAggregationCacheKeyPayload {
+    return {
       enabledAgentIds: query.enabledAgentIds,
       limit: query.limit,
       archived: query.archived,
@@ -280,6 +315,10 @@ export class ThreadListAggregationCache {
       maxPages: query.maxPages,
       sortKey: query.sortKey,
       cwd: query.cwd
-    });
+    };
+  }
+
+  private buildKey(query: ThreadListAggregationQuery): ThreadListAggregationCacheKey {
+    return JSON.stringify(this.buildKeyPayload(query));
   }
 }

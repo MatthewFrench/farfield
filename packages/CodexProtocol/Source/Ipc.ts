@@ -11,11 +11,33 @@ import {
 } from "./Contracts/Thread/StreamStateContracts.js";
 import { parseSchemaOrThrow } from "./ProtocolSchemaParsers.js";
 
+/**
+ * Owns IPC envelope contracts consumed by transport adapters.
+ * Schemas keep passthrough behavior so newer peers can add envelope metadata without breaking older clients.
+ */
+export const IpcFrameType = {
+  request: "request",
+  response: "response",
+  broadcast: "broadcast",
+  clientDiscoveryRequest: "client-discovery-request",
+  clientDiscoveryResponse: "client-discovery-response"
+} as const;
+
+export const IpcResponseResultType = {
+  success: "success",
+  error: "error"
+} as const;
+
+export const IpcResponseResultTypeSchema = z.enum([
+  IpcResponseResultType.success,
+  IpcResponseResultType.error
+]);
+
 export const IpcRequestIdSchema = NonEmptyStringSchema;
 
 export const IpcRequestFrameSchema = z
   .object({
-    type: z.literal("request"),
+    type: z.literal(IpcFrameType.request),
     requestId: IpcRequestIdSchema,
     method: NonEmptyStringSchema,
     params: JsonValueSchema.optional(),
@@ -27,11 +49,11 @@ export const IpcRequestFrameSchema = z
 
 export const IpcResponseFrameSchema = z
   .object({
-    type: z.literal("response"),
+    type: z.literal(IpcFrameType.response),
     requestId: IpcRequestIdSchema,
     method: NonEmptyStringSchema.optional(),
     handledByClientId: NonEmptyStringSchema.optional(),
-    resultType: z.enum(["success", "error"]),
+    resultType: IpcResponseResultTypeSchema,
     result: JsonValueSchema.optional(),
     error: JsonValueSchema.optional()
   })
@@ -39,7 +61,7 @@ export const IpcResponseFrameSchema = z
 
 export const IpcBroadcastFrameSchema = z
   .object({
-    type: z.literal("broadcast"),
+    type: z.literal(IpcFrameType.broadcast),
     method: NonEmptyStringSchema,
     params: JsonValueSchema.optional(),
     sourceClientId: NonEmptyStringSchema.optional(),
@@ -50,7 +72,7 @@ export const IpcBroadcastFrameSchema = z
 
 export const IpcClientDiscoveryRequestFrameSchema = z
   .object({
-    type: z.literal("client-discovery-request"),
+    type: z.literal(IpcFrameType.clientDiscoveryRequest),
     requestId: IpcRequestIdSchema,
     request: IpcRequestFrameSchema
   })
@@ -58,7 +80,7 @@ export const IpcClientDiscoveryRequestFrameSchema = z
 
 export const IpcClientDiscoveryResponseFrameSchema = z
   .object({
-    type: z.literal("client-discovery-response"),
+    type: z.literal(IpcFrameType.clientDiscoveryResponse),
     requestId: IpcRequestIdSchema,
     response: z
       .object({
@@ -87,7 +109,7 @@ export const IpcFrameSchema: z.ZodDiscriminatedUnion<
 
 export const ThreadStreamStateChangedBroadcastSchema: z.ZodObject<
   {
-    type: z.ZodLiteral<"broadcast">;
+    type: z.ZodLiteral<typeof IpcFrameType.broadcast>;
     method: z.ZodLiteral<typeof ThreadStreamStateChangedEventType>;
     sourceClientId: typeof NonEmptyStringSchema;
     params: typeof ThreadStreamStateChangedParamsSchema;
@@ -96,7 +118,8 @@ export const ThreadStreamStateChangedBroadcastSchema: z.ZodObject<
   "passthrough"
 > = z
   .object({
-    type: z.literal("broadcast"),
+    // Stream consumers depend on sender identity and envelope version for deterministic replay/ownership.
+    type: z.literal(IpcFrameType.broadcast),
     method: z.literal(ThreadStreamStateChangedEventType),
     sourceClientId: NonEmptyStringSchema,
     params: ThreadStreamStateChangedParamsSchema,

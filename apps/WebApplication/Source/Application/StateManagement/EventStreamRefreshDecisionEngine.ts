@@ -4,7 +4,12 @@ import {
 } from "@farfield/protocol";
 import { z } from "zod";
 
+const DEBUG_ACTIVE_TAB = "debug";
+const EVENT_TYPE_RUNTIME_STATE_CHANGED = "runtime-state-changed";
+const EVENT_TYPE_ACTIVITY_HISTORY_APPENDED = "activity-history-appended";
+const EVENT_TYPE_THREAD_STREAM_DELTA = "thread-stream-delta";
 const THREAD_STREAM_STATE_CHANGED_METHOD = "thread-stream-state-changed";
+const CORE_REFRESH_HISTORY_ENTRY_SOURCES = new Set(["app", "system"]);
 const EVENT_HISTORY_REFRESH_METADATA_STRING_SCHEMA = z.preprocess(
   (value) => (typeof value === "string" && value.length > 0 ? value : null),
   z.string().min(1).nullable()
@@ -30,7 +35,8 @@ export interface EventStreamRefreshDecision {
 }
 
 /**
- * Parses event-stream payloads and decides the minimum refresh scope needed for UI consistency.
+ * Parses event-stream payloads and decides the smallest refresh scope that keeps UI state coherent.
+ * History refresh is intentionally debug-tab-only because history data powers the debug workspace.
  */
 export class EventStreamRefreshDecisionEngine {
   private readonly threadOnlyHistoryMethods: Set<string>;
@@ -44,16 +50,17 @@ export class EventStreamRefreshDecisionEngine {
     let refreshHistory = false;
     let refreshSelectedThread = false;
     let threadStreamDelta: FarfieldThreadStreamDelta | null = null;
+    const refreshHistoryForDebugTab = input.activeTab === DEBUG_ACTIVE_TAB;
 
     try {
       const parseResult = FarfieldEventStreamEnvelopeSchema.safeParse(JSON.parse(input.eventData));
       if (!parseResult.success) {
         refreshCore = true;
-        refreshHistory = input.activeTab === "debug";
-      } else if (parseResult.data.event.type === "runtime-state-changed") {
+        refreshHistory = refreshHistoryForDebugTab;
+      } else if (parseResult.data.event.type === EVENT_TYPE_RUNTIME_STATE_CHANGED) {
         refreshCore = true;
-      } else if (parseResult.data.event.type === "activity-history-appended") {
-        refreshHistory = input.activeTab === "debug";
+      } else if (parseResult.data.event.type === EVENT_TYPE_ACTIVITY_HISTORY_APPENDED) {
+        refreshHistory = refreshHistoryForDebugTab;
         const eventHistoryRefreshMetadata = EVENT_HISTORY_REFRESH_METADATA_SCHEMA.parse(
           parseResult.data.event.entry.meta
         );
@@ -63,10 +70,11 @@ export class EventStreamRefreshDecisionEngine {
 
         if (
           !isThreadOnlyMethod
-          && (parseResult.data.event.entry.source === "app" || parseResult.data.event.entry.source === "system")
+          && CORE_REFRESH_HISTORY_ENTRY_SOURCES.has(parseResult.data.event.entry.source)
         ) {
           refreshCore = true;
         }
+        // This method has its own delta channel; skipping selected-thread refresh avoids duplicate work.
         if (
           eventMethod !== THREAD_STREAM_STATE_CHANGED_METHOD
           && eventThreadId !== null
@@ -75,10 +83,11 @@ export class EventStreamRefreshDecisionEngine {
         ) {
           refreshSelectedThread = true;
         }
+        // Non-thread-only history without thread metadata cannot be scoped to one thread.
         if (eventThreadId === null && !isThreadOnlyMethod) {
           refreshCore = true;
         }
-      } else {
+      } else if (parseResult.data.event.type === EVENT_TYPE_THREAD_STREAM_DELTA) {
         if (
           input.selectedThreadId
           && parseResult.data.event.delta.threadId === input.selectedThreadId
@@ -88,7 +97,7 @@ export class EventStreamRefreshDecisionEngine {
       }
     } catch {
       refreshCore = true;
-      refreshHistory = input.activeTab === "debug";
+      refreshHistory = refreshHistoryForDebugTab;
     }
 
     return {

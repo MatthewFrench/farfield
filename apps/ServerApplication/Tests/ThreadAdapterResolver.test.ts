@@ -163,6 +163,51 @@ describe("ThreadAdapterResolver", () => {
     expect(threadIndex.resolve("thread_discovered")).toBe("codex");
   });
 
+  it("probes connected enabled adapters in registry order during discovery", async () => {
+    const probeOrder: AgentId[] = [];
+    const codexAdapter = createAdapter({
+      id: "codex",
+      enabled: true,
+      connected: true,
+      readThread: async () => {
+        probeOrder.push("codex");
+        throw createThreadMissingError();
+      }
+    });
+    const opencodeAdapter = createAdapter({
+      id: "opencode",
+      enabled: true,
+      connected: true,
+      readThread: async (input) => {
+        probeOrder.push("opencode");
+        if (input.threadId !== "thread_ordered_discovery") {
+          throw createThreadMissingError();
+        }
+        return {
+          thread: parseThreadConversationState({
+            id: input.threadId,
+            turns: [],
+            requests: []
+          })
+        };
+      }
+    });
+    const threadIndex = new ThreadIndex();
+    const resolver = new ThreadAdapterResolver(
+      new AgentRegistry([codexAdapter, opencodeAdapter]),
+      threadIndex
+    );
+
+    const discovered = await resolver.resolveAdapterForThread("thread_ordered_discovery");
+    expect(discovered.ok).toBe(true);
+    if (!discovered.ok) {
+      throw new Error("expected ordered discovery to resolve");
+    }
+    expect(discovered.agentId).toBe("opencode");
+    expect(probeOrder).toStrictEqual(["codex", "opencode"]);
+    expect(threadIndex.resolve("thread_ordered_discovery")).toBe("opencode");
+  });
+
   it("tracks repeated discovery misses and aggregates threshold alerts", async () => {
     const codexAdapter = createAdapter({
       id: "codex",

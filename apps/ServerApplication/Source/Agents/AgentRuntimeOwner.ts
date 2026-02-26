@@ -7,6 +7,10 @@ import {
 } from "./ThreadStreamStateChangedContract.js";
 import type { AgentAdapter, AgentId } from "./Types.js";
 
+const CODEX_AGENT_IDENTIFIER: AgentId = "codex";
+const OPEN_CODE_AGENT_IDENTIFIER: AgentId = "opencode";
+const INBOUND_IPC_FRAME_DIRECTION = "in";
+
 export interface AgentRuntimeOwnerDependencies {
   configuredAgentIds: AgentId[];
   codexExecutablePath: string;
@@ -21,6 +25,13 @@ export interface AgentRuntimeOwnerDependencies {
   onThreadStreamStateChanged: (threadId: string) => void;
 }
 
+function hasNonWhitespaceThreadIdentifier(threadId: string | null): threadId is string {
+  if (threadId === null) {
+    return false;
+  }
+  return threadId.trim().length > 0;
+}
+
 /**
  * Completion scheduling should only react to real inbound stream updates.
  * Outbound replay preview frames are diagnostic-only and must not trigger side effects.
@@ -32,18 +43,20 @@ export function shouldScheduleThreadStreamStateChanged(
   method: ThreadStreamStateChangedMethod;
   threadId: string;
 } {
-  if (event.direction !== "in") {
+  if (event.direction !== INBOUND_IPC_FRAME_DIRECTION) {
     return false;
   }
   if (event.method !== THREAD_STREAM_STATE_CHANGED_METHOD) {
     return false;
   }
-  if (event.threadId === null) {
-    return false;
-  }
-  return event.threadId.trim().length > 0;
+  return hasNonWhitespaceThreadIdentifier(event.threadId);
 }
 
+/**
+ * Owns one-time runtime adapter composition and lifecycle wiring.
+ * Adapter registration order is preserved from `configuredAgentIds` so downstream
+ * default-resolution behavior remains deterministic.
+ */
 export class AgentRuntimeOwner {
   private readonly registry: AgentRegistry;
   private codexAdapter: CodexAgentAdapter | null;
@@ -72,35 +85,56 @@ export class AgentRuntimeOwner {
     const adapters: AgentAdapter[] = [];
 
     for (const agentId of dependencies.configuredAgentIds) {
-      if (agentId === "codex") {
-        this.codexAdapter = new CodexAgentAdapter({
-          appExecutable: dependencies.codexExecutablePath,
-          appServerBaseEnvironment: dependencies.appServerBaseEnvironment,
-          socketPath: dependencies.ipcSocketPath,
-          invalidStreamEventsLogPath: dependencies.invalidStreamEventsLogPath,
-          workspaceDir: dependencies.defaultWorkspacePath,
-          userAgent: dependencies.userAgent,
-          reconnectDelayMs: dependencies.ipcReconnectDelayMs,
-          onStateChange: dependencies.onCodexStateChange
-        });
-
-        this.codexAdapter.onIpcFrame((event) => {
-          dependencies.onCodexFrame(event);
-          if (shouldScheduleThreadStreamStateChanged(event)) {
-            dependencies.onThreadStreamStateChanged(event.threadId);
-          }
-        });
-
-        adapters.push(this.codexAdapter);
+      if (agentId === CODEX_AGENT_IDENTIFIER) {
+        adapters.push(this.createAndWireCodexAdapter(dependencies));
         continue;
       }
 
-      if (agentId === "opencode") {
-        this.openCodeAdapter = new OpenCodeAgentAdapter();
-        adapters.push(this.openCodeAdapter);
+      if (agentId === OPEN_CODE_AGENT_IDENTIFIER) {
+        adapters.push(this.createOpenCodeAdapter());
       }
     }
 
     return adapters;
+  }
+
+  private createAndWireCodexAdapter(
+    dependencies: AgentRuntimeOwnerDependencies
+  ): CodexAgentAdapter {
+    const codexAdapter = new CodexAgentAdapter({
+      appExecutable: dependencies.codexExecutablePath,
+      appServerBaseEnvironment: dependencies.appServerBaseEnvironment,
+      socketPath: dependencies.ipcSocketPath,
+      invalidStreamEventsLogPath: dependencies.invalidStreamEventsLogPath,
+      workspaceDir: dependencies.defaultWorkspacePath,
+      userAgent: dependencies.userAgent,
+      reconnectDelayMs: dependencies.ipcReconnectDelayMs,
+      onStateChange: dependencies.onCodexStateChange
+    });
+
+    codexAdapter.onIpcFrame((event) => {
+      this.handleCodexIpcFrame(dependencies, event);
+    });
+    this.codexAdapter = codexAdapter;
+
+    return codexAdapter;
+  }
+
+  private createOpenCodeAdapter(): OpenCodeAgentAdapter {
+    const openCodeAdapter = new OpenCodeAgentAdapter();
+    this.openCodeAdapter = openCodeAdapter;
+    return openCodeAdapter;
+  }
+
+  private handleCodexIpcFrame(
+    dependencies: AgentRuntimeOwnerDependencies,
+    event: CodexIpcFrameEvent
+  ): void {
+    // Consumers should always observe the raw frame before completion side effects are scheduled.
+    dependencies.onCodexFrame(event);
+    if (!shouldScheduleThreadStreamStateChanged(event)) {
+      return;
+    }
+    dependencies.onThreadStreamStateChanged(event.threadId);
   }
 }

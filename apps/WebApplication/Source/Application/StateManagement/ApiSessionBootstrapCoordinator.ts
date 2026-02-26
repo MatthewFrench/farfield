@@ -9,8 +9,36 @@ export interface ApiSessionBootstrapDecision {
   requiresApiToken: boolean;
 }
 
+interface ApiSessionReadinessSnapshot {
+  decision: ApiSessionBootstrapDecision;
+  shouldRefreshInBackground: boolean;
+}
+
 const DEFAULT_REFRESH_LEAD_TIME_MS = 30_000;
 const EMPTY_API_TOKEN_ERROR_MESSAGE = "API token is required";
+const INVALID_EXPIRES_AT_ERROR_MESSAGE =
+  "ApiSessionBootstrapCoordinator received an invalid expiresAt value";
+const READY_DECISION: ApiSessionBootstrapDecision = {
+  isReady: true,
+  requiresApiToken: false
+};
+const API_TOKEN_REQUIRED_DECISION: ApiSessionBootstrapDecision = {
+  isReady: false,
+  requiresApiToken: true
+};
+const BOOTSTRAP_PENDING_DECISION: ApiSessionBootstrapDecision = {
+  isReady: false,
+  requiresApiToken: false
+};
+
+function cloneDecision(
+  template: ApiSessionBootstrapDecision
+): ApiSessionBootstrapDecision {
+  return {
+    isReady: template.isReady,
+    requiresApiToken: template.requiresApiToken
+  };
+}
 
 /**
  * Owns API session bootstrap readiness and refresh behavior for the web shell.
@@ -48,19 +76,19 @@ export class ApiSessionBootstrapCoordinator {
     loadSession: () => Promise<ApiSessionBootstrapResponse>,
     nowEpochMs: number = Date.now()
   ): Promise<ApiSessionBootstrapDecision> {
-    const currentDecision = this.readDecision(nowEpochMs);
-    if (currentDecision.isReady || currentDecision.requiresApiToken) {
-      return currentDecision;
+    const sessionReadinessSnapshot = this.readSessionReadinessSnapshot(nowEpochMs);
+    if (
+      sessionReadinessSnapshot.decision.isReady
+      || sessionReadinessSnapshot.decision.requiresApiToken
+    ) {
+      return cloneDecision(sessionReadinessSnapshot.decision);
     }
 
     // Keep the app interactive while proactively refreshing a still-valid session.
     // The lead-time window is for refresh scheduling, not for blocking reads.
-    if (this.hasValidSessionAt(nowEpochMs)) {
+    if (sessionReadinessSnapshot.shouldRefreshInBackground) {
       this.runBackgroundRefresh(loadSession);
-      return {
-        isReady: true,
-        requiresApiToken: false
-      };
+      return cloneDecision(READY_DECISION);
     }
 
     return this.executeBootstrapRequest(loadSession);
@@ -90,7 +118,7 @@ export class ApiSessionBootstrapCoordinator {
     const inFlightBootstrapDecision = loadSession()
       .then((session) => {
         this.applyBootstrapResponse(session);
-        return this.readDecision(Date.now());
+        return cloneDecision(this.readSessionReadinessSnapshot(Date.now()).decision);
       })
       .finally(() => {
         this.inFlightBootstrapDecision = null;
@@ -119,40 +147,50 @@ export class ApiSessionBootstrapCoordinator {
     this.sessionExpiresAtEpochMs = this.readExpiresAtEpochMs(session.expiresAt);
   }
 
-  private readDecision(nowEpochMs: number): ApiSessionBootstrapDecision {
+  private readSessionReadinessSnapshot(
+    nowEpochMs: number
+  ): ApiSessionReadinessSnapshot {
     if (this.authRequired === false) {
       return {
-        isReady: true,
-        requiresApiToken: false
+        decision: READY_DECISION,
+        shouldRefreshInBackground: false
       };
     }
 
     if (this.isApiTokenRequired) {
       return {
-        isReady: false,
-        requiresApiToken: true
+        decision: API_TOKEN_REQUIRED_DECISION,
+        shouldRefreshInBackground: false
       };
     }
 
     if (this.authRequired === true) {
       if (this.sessionExpiresAtEpochMs === null) {
         return {
-          isReady: false,
-          requiresApiToken: false
+          decision: BOOTSTRAP_PENDING_DECISION,
+          shouldRefreshInBackground: false
         };
       }
 
       const refreshThresholdEpochMs = this.sessionExpiresAtEpochMs - this.refreshLeadTimeMs;
-      const sessionStillFresh = nowEpochMs < refreshThresholdEpochMs;
+      const sessionShouldStayReady = nowEpochMs < refreshThresholdEpochMs;
+      if (sessionShouldStayReady) {
+        return {
+          decision: READY_DECISION,
+          shouldRefreshInBackground: false
+        };
+      }
+
+      const hasUnexpiredSession = nowEpochMs < this.sessionExpiresAtEpochMs;
       return {
-        isReady: sessionStillFresh,
-        requiresApiToken: false
+        decision: BOOTSTRAP_PENDING_DECISION,
+        shouldRefreshInBackground: hasUnexpiredSession
       };
     }
 
     return {
-      isReady: false,
-      requiresApiToken: false
+      decision: BOOTSTRAP_PENDING_DECISION,
+      shouldRefreshInBackground: false
     };
   }
 
@@ -162,19 +200,10 @@ export class ApiSessionBootstrapCoordinator {
     }
     const expiresAtEpochMs = Date.parse(expiresAt);
     if (!Number.isFinite(expiresAtEpochMs)) {
-      return null;
+      // Boundary schemas guarantee datetime strings; throw hard if contract drift slips through.
+      throw new Error(`${INVALID_EXPIRES_AT_ERROR_MESSAGE}: ${expiresAt}`);
     }
     return expiresAtEpochMs;
-  }
-
-  private hasValidSessionAt(nowEpochMs: number): boolean {
-    if (this.authRequired !== true || this.isApiTokenRequired) {
-      return false;
-    }
-    if (this.sessionExpiresAtEpochMs === null) {
-      return false;
-    }
-    return nowEpochMs < this.sessionExpiresAtEpochMs;
   }
 
   private runBackgroundRefresh(

@@ -11,11 +11,14 @@ const TRACE_FILE_EXTENSION = ".ndjson";
 const TRACE_STREAM_OPEN_FLAGS = "a";
 const TRACE_MARKER_EVENT_TYPE = "trace-marker";
 const TRACE_HISTORY_EVENT_TYPE = "history";
+const HISTORY_PAYLOAD_SUMMARY_TYPE = "history-payload-summary";
 const HISTORY_PAYLOAD_PREVIEW_MAXIMUM_BYTES = 4_096;
 const TRACE_STREAM_WRITE_FAILED_LOG_EVENT = "trace-stream-write-failed";
 const ACTION_EVENT_LOG_EVENT = "action-event";
 const ACTION_ERROR_LOG_EVENT = "action-error";
 const SYSTEM_EVENT_LOG_EVENT = "system-event";
+const ACTIVITY_HISTORY_APPENDED_EVENT_TYPE = "activity-history-appended";
+const TRACE_RECORD_LINE_ENDING = "\n";
 const ACTION_DETAIL_SUMMARY_KEYS = [
   "agentId",
   "threadId",
@@ -83,7 +86,8 @@ export class ActivityHistoryService {
   }
 
   public readTraceById(traceId: string): TraceSummary | null {
-    return this.recentTraces.find((traceSummary) => traceSummary.id === traceId) ?? null;
+    const traceSummary = this.recentTraces.find((summary) => summary.id === traceId);
+    return traceSummary ? { ...traceSummary } : null;
   }
 
   public readHistoryCount(): number {
@@ -91,7 +95,8 @@ export class ActivityHistoryService {
   }
 
   public readActiveTraceSummary(): TraceSummary | null {
-    return this.activeTraceRef.current?.summary ?? null;
+    const summary = this.activeTraceRef.current?.summary;
+    return summary ? { ...summary } : null;
   }
 
   public startTrace(
@@ -121,7 +126,7 @@ export class ActivityHistoryService {
     const summary: TraceSummary = {
       id: traceIdentifier,
       label,
-      startedAt: new Date().toISOString(),
+      startedAt: this.readCurrentTimestampIsoString(),
       stoppedAt: null,
       eventCount: 0,
       path: tracePath
@@ -136,47 +141,33 @@ export class ActivityHistoryService {
   }
 
   public markTrace(note: string): boolean {
-    if (!this.activeTraceRef.current) {
-      return false;
-    }
-
-    const marker = {
+    const marker: HistoryEntry["payload"] = {
       type: TRACE_MARKER_EVENT_TYPE,
-      at: new Date().toISOString(),
+      at: this.readCurrentTimestampIsoString(),
       note
     };
 
-    this.activeTraceRef.current.stream.write(`${JSON.stringify(marker)}\n`);
-    this.activeTraceRef.current.summary.eventCount += 1;
-    return true;
+    return this.appendTraceRecordIfActive(marker);
   }
 
   public stopTrace(): TraceSummary | null {
-    if (!this.activeTraceRef.current) {
+    const trace = this.detachActiveTrace();
+    if (!trace) {
       return null;
     }
-
-    const trace = this.activeTraceRef.current;
-    this.activeTraceRef.current = null;
-
-    trace.summary.stoppedAt = new Date().toISOString();
+    trace.summary.stoppedAt = this.readCurrentTimestampIsoString();
     trace.stream.end();
-
-    this.recentTraces.unshift(trace.summary);
-    if (this.recentTraces.length > this.recentTraceLimit) {
-      this.recentTraces.splice(this.recentTraceLimit);
-    }
+    this.appendRecentTraceSummary(trace.summary);
 
     return trace.summary;
   }
 
   public closeActiveTraceIfPresent(): void {
-    if (!this.activeTraceRef.current) {
+    const trace = this.detachActiveTrace();
+    if (!trace) {
       return;
     }
-
-    this.activeTraceRef.current.stream.end();
-    this.activeTraceRef.current = null;
+    trace.stream.end();
   }
 
   public pushHistory(
@@ -186,28 +177,19 @@ export class ActivityHistoryService {
     meta: HistoryEntry["meta"] = {}
   ): HistoryEntry {
     const historyPayload = this.summarizePayloadForHistory(payload);
+    const historyMeta = { ...meta };
     const entry: HistoryEntry = {
       id: randomUUID(),
-      at: new Date().toISOString(),
+      at: this.readCurrentTimestampIsoString(),
       source,
       direction,
       payload: historyPayload,
-      meta
+      meta: historyMeta
     };
-
-    this.history.push(entry);
-    this.historyById.set(entry.id, payload);
-
-    if (this.history.length > this.historyLimit) {
-      const removed = this.history.shift();
-      if (removed) {
-        this.historyById.delete(removed.id);
-      }
-    }
-
-    this.recordTraceEvent({ type: TRACE_HISTORY_EVENT_TYPE, ...entry });
+    this.appendHistoryEntry(entry, payload);
+    this.appendTraceRecordIfActive({ type: TRACE_HISTORY_EVENT_TYPE, ...entry });
     this.eventStreamClientRegistry.broadcast({
-      type: "activity-history-appended",
+      type: ACTIVITY_HISTORY_APPENDED_EVENT_TYPE,
       entry
     });
     return entry;
@@ -259,14 +241,55 @@ export class ActivityHistoryService {
     this.pushHistory("system", "system", { message, details });
   }
 
-  private recordTraceEvent(event: HistoryEntry["payload"]): void {
+  private detachActiveTrace(): ActiveTrace | null {
     const activeTrace = this.activeTraceRef.current;
     if (!activeTrace) {
-      return;
+      return null;
+    }
+
+    this.activeTraceRef.current = null;
+    return activeTrace;
+  }
+
+  private appendTraceRecordIfActive(event: HistoryEntry["payload"]): boolean {
+    const activeTrace = this.activeTraceRef.current;
+    if (!activeTrace) {
+      return false;
     }
 
     activeTrace.summary.eventCount += 1;
-    activeTrace.stream.write(`${JSON.stringify(event)}\n`);
+    activeTrace.stream.write(this.serializeTraceRecord(event));
+    return true;
+  }
+
+  private serializeTraceRecord(event: HistoryEntry["payload"]): string {
+    return `${JSON.stringify(event)}${TRACE_RECORD_LINE_ENDING}`;
+  }
+
+  private appendHistoryEntry(
+    entry: HistoryEntry,
+    originalPayload: HistoryEntry["payload"]
+  ): void {
+    this.history.push(entry);
+    this.historyById.set(entry.id, originalPayload);
+
+    if (this.history.length > this.historyLimit) {
+      const removedEntry = this.history.shift();
+      if (removedEntry) {
+        this.historyById.delete(removedEntry.id);
+      }
+    }
+  }
+
+  private appendRecentTraceSummary(summary: TraceSummary): void {
+    this.recentTraces.unshift(summary);
+    if (this.recentTraces.length > this.recentTraceLimit) {
+      this.recentTraces.splice(this.recentTraceLimit);
+    }
+  }
+
+  private readCurrentTimestampIsoString(): string {
+    return new Date().toISOString();
   }
 
   private summarizeActionDetails(details: HistoryEntry["meta"]): HistoryEntry["meta"] {
@@ -288,13 +311,14 @@ export class ActivityHistoryService {
       return payload;
     }
 
+    // Keep preview size bounded so activity history remains responsive under very large payloads.
     const previewMaximumBytes = Math.min(
       HISTORY_PAYLOAD_PREVIEW_MAXIMUM_BYTES,
       this.historyPayloadSummaryMaximumBytes
     );
     const preview = serializedPayload.slice(0, previewMaximumBytes);
     return {
-      type: "history-payload-summary",
+      type: HISTORY_PAYLOAD_SUMMARY_TYPE,
       truncated: true,
       originalSizeBytes: serializedPayloadBytes,
       preview

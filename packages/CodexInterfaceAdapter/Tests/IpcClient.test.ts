@@ -362,6 +362,76 @@ describe("DesktopIpcClient", () => {
     await client.disconnect();
   });
 
+  it("formats primitive response error payloads in rejection messages", async () => {
+    const socket = new InMemorySocket();
+    const client = await connectClient(socket);
+
+    const responsePromise = client.sendRequestAndWait(REQUEST_METHOD_SUBMIT_USER_INPUT, {});
+    const requestFrame = requireWrittenFrame(socket, 0);
+    if (requestFrame.type !== IPC_REQUEST_FRAME_TYPE) {
+      throw new Error("Expected request frame");
+    }
+
+    socket.pushInboundData(
+      encodeFrame(
+        IpcResponseFrameSchema.parse({
+          type: IPC_RESPONSE_FRAME_TYPE,
+          requestId: requestFrame.requestId,
+          resultType: IPC_ERROR_RESULT_TYPE,
+          error: false
+        })
+      )
+    );
+
+    await expect(responsePromise).rejects.toThrowError(
+      `IPC ${REQUEST_METHOD_SUBMIT_USER_INPUT} failed: false`
+    );
+
+    await client.disconnect();
+  });
+
+  it("ignores unmatched response frames until matching request ids arrive", async () => {
+    const socket = new InMemorySocket();
+    const client = await connectClient(socket);
+
+    const responsePromise = client.sendRequestAndWait(REQUEST_METHOD_START_TURN, {});
+    const requestFrame = requireWrittenFrame(socket, 0);
+    if (requestFrame.type !== IPC_REQUEST_FRAME_TYPE) {
+      throw new Error("Expected request frame");
+    }
+
+    socket.pushInboundData(
+      encodeFrame(
+        IpcResponseFrameSchema.parse({
+          type: IPC_RESPONSE_FRAME_TYPE,
+          requestId: "different-request-id",
+          resultType: IPC_SUCCESS_RESULT_TYPE,
+          result: {
+            ignored: true
+          }
+        })
+      )
+    );
+
+    socket.pushInboundData(
+      encodeFrame(
+        IpcResponseFrameSchema.parse({
+          type: IPC_RESPONSE_FRAME_TYPE,
+          requestId: requestFrame.requestId,
+          resultType: IPC_SUCCESS_RESULT_TYPE,
+          result: {
+            ok: true
+          }
+        })
+      )
+    );
+
+    const response = await responsePromise;
+    expect(response.resultType).toBe(IPC_SUCCESS_RESULT_TYPE);
+
+    await client.disconnect();
+  });
+
   it("rejects timed out requests", async () => {
     vi.useFakeTimers();
     const socket = new InMemorySocket();

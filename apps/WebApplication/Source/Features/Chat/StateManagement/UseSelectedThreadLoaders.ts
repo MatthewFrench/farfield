@@ -43,6 +43,15 @@ export interface ApplySelectedThreadStreamDeltaInput {
   streamEventsSinceSequenceUsed: number | null;
 }
 
+interface ApplySnapshotsToStateInput {
+  threadId: string;
+  liveStateSnapshot: LiveStateResponse;
+  streamEventsSnapshot: StreamEventsResponse;
+  streamEventsSinceSequenceUsed: number | null;
+  readThreadSnapshot: ReadThreadResponse | null;
+  includeTurnsUsedForRead: boolean;
+}
+
 type LiveStateResponse = ChatLiveStateResponse;
 type StreamEventsResponse = ChatStreamEventsResponse;
 type ReadThreadResponse = ChatReadThreadResponse;
@@ -80,20 +89,15 @@ export interface SelectedThreadLoaders {
 // Bounds client-owned stream history to avoid unbounded growth during long-lived sessions.
 const STREAM_EVENT_RETENTION_LIMIT = 400;
 const DEFAULT_STREAM_READ_CAPABLE_AGENT_ID: AgentId = "codex";
+const DEFAULT_INCLUDE_READ_THREAD = true;
 
 export function useSelectedThreadLoaders(
   input: UseSelectedThreadLoadersInput
 ): SelectedThreadLoaders {
-  const nextStreamSequenceByThreadReference = useRef<Map<string, number>>(new Map());
+  // Tracks the per-thread stream cursor so readStreamEvents can request only unseen events.
+  const nextStreamSequenceByThreadIdReference = useRef<Map<string, number>>(new Map());
 
-  const applySnapshotsToState = useCallback((snapshotInput: {
-    threadId: string;
-    liveStateSnapshot: LiveStateResponse;
-    streamEventsSnapshot: StreamEventsResponse;
-    streamEventsSinceSequenceUsed: number | null;
-    readThreadSnapshot: ReadThreadResponse | null;
-    includeTurnsUsedForRead: boolean;
-  }) => {
+  const applySnapshotsToState = useCallback((snapshotInput: ApplySnapshotsToStateInput) => {
     const containsAnyTurns = hasTurnsInSelectedThreadSnapshots(
       snapshotInput.liveStateSnapshot,
       snapshotInput.readThreadSnapshot
@@ -102,7 +106,7 @@ export function useSelectedThreadLoaders(
       input.pendingThreadMaterializationCoordinator.clearPending(snapshotInput.threadId);
     }
 
-    nextStreamSequenceByThreadReference.current.set(
+    nextStreamSequenceByThreadIdReference.current.set(
       snapshotInput.threadId,
       snapshotInput.streamEventsSnapshot.nextSequence
     );
@@ -154,31 +158,11 @@ export function useSelectedThreadLoaders(
         });
       }
 
-      input.setStreamEvents((previousStreamEvents) => {
-        if (snapshotInput.streamEventsSnapshot.resetRequired) {
-          if (matchesStreamEventTail(previousStreamEvents, snapshotInput.streamEventsSnapshot.events)) {
-            return previousStreamEvents;
-          }
-          return snapshotInput.streamEventsSnapshot.events;
-        }
-
-        if (snapshotInput.streamEventsSinceSequenceUsed !== null) {
-          if (snapshotInput.streamEventsSnapshot.events.length === 0) {
-            return previousStreamEvents;
-          }
-
-          // Cursor-based reads return only unseen events, so state can append deterministically.
-          const mergedEvents = previousStreamEvents.concat(snapshotInput.streamEventsSnapshot.events);
-          return mergedEvents.length > STREAM_EVENT_RETENTION_LIMIT
-            ? mergedEvents.slice(-STREAM_EVENT_RETENTION_LIMIT)
-            : mergedEvents;
-        }
-
-        if (matchesStreamEventTail(previousStreamEvents, snapshotInput.streamEventsSnapshot.events)) {
-          return previousStreamEvents;
-        }
-        return snapshotInput.streamEventsSnapshot.events;
-      });
+      input.setStreamEvents((previousStreamEvents) => resolveNextStreamEventsState({
+        previousStreamEvents,
+        streamEventsSnapshot: snapshotInput.streamEventsSnapshot,
+        streamEventsSinceSequenceUsed: snapshotInput.streamEventsSinceSequenceUsed
+      }));
     });
   }, [
     input.appDefaultModel,
@@ -201,7 +185,7 @@ export function useSelectedThreadLoaders(
       threadId,
       input.pendingThreadMaterializationCoordinator
     );
-    const includeReadThread = options?.includeReadThread ?? true;
+    const includeReadThread = resolveIncludeReadThreadForThreadRead(options?.includeReadThread);
     const readCapabilities = resolveReadCapabilitiesForThread({
       threadId,
       threads: input.threads,
@@ -211,7 +195,7 @@ export function useSelectedThreadLoaders(
     const canReadLiveState = readCapabilities.canReadLiveState;
     const canReadStreamEvents = readCapabilities.canReadStreamEvents;
     const streamEventsSinceSequence = canReadStreamEvents
-      ? (nextStreamSequenceByThreadReference.current.get(threadId) ?? null)
+      ? (nextStreamSequenceByThreadIdReference.current.get(threadId) ?? null)
       : null;
 
     const snapshot = await input.selectedThreadDataRefreshCoordinator.readSnapshot({
@@ -225,7 +209,7 @@ export function useSelectedThreadLoaders(
       ...(signal ? { signal } : {})
     });
 
-    if (signal?.aborted || input.selectedThreadIdRef.current !== threadId) {
+    if (shouldSkipSelectedThreadSnapshotApply(threadId, input.selectedThreadIdRef, signal)) {
       return;
     }
 
@@ -256,7 +240,7 @@ export function useSelectedThreadLoaders(
         threadId,
         input.pendingThreadMaterializationCoordinator
       ),
-      includeReadThread: options?.includeReadThread ?? true
+      includeReadThread: resolveIncludeReadThreadForThreadRead(options?.includeReadThread)
     };
 
     await input.selectedThreadRefreshConcurrencyCoordinator.run({
@@ -304,11 +288,44 @@ export function useSelectedThreadLoaders(
   };
 }
 
+interface ResolveNextStreamEventsStateInput {
+  previousStreamEvents: StreamEventsResponse["events"];
+  streamEventsSnapshot: StreamEventsResponse;
+  streamEventsSinceSequenceUsed: number | null;
+}
+
+function resolveNextStreamEventsState(input: ResolveNextStreamEventsStateInput): StreamEventsResponse["events"] {
+  if (input.streamEventsSnapshot.resetRequired) {
+    if (matchesStreamEventTail(input.previousStreamEvents, input.streamEventsSnapshot.events)) {
+      return input.previousStreamEvents;
+    }
+    return input.streamEventsSnapshot.events;
+  }
+
+  if (input.streamEventsSinceSequenceUsed !== null) {
+    if (input.streamEventsSnapshot.events.length === 0) {
+      return input.previousStreamEvents;
+    }
+
+    // Cursor-scoped reads include only unseen events, so append order is deterministic.
+    const mergedEvents = input.previousStreamEvents.concat(input.streamEventsSnapshot.events);
+    return mergedEvents.length > STREAM_EVENT_RETENTION_LIMIT
+      ? mergedEvents.slice(-STREAM_EVENT_RETENTION_LIMIT)
+      : mergedEvents;
+  }
+
+  if (matchesStreamEventTail(input.previousStreamEvents, input.streamEventsSnapshot.events)) {
+    return input.previousStreamEvents;
+  }
+  return input.streamEventsSnapshot.events;
+}
+
 function matchesStreamEventTail(previousEvents: StreamEventsResponse["events"], nextEvents: StreamEventsResponse["events"]): boolean {
   const previousLastEvent = previousEvents[previousEvents.length - 1];
   const nextLastEvent = nextEvents[nextEvents.length - 1];
   const previousLastSignature = previousLastEvent ? JSON.stringify(previousLastEvent) : "";
   const nextLastSignature = nextLastEvent ? JSON.stringify(nextLastEvent) : "";
+  // Deliberately coarse guard: when lengths and trailing signatures match, treat snapshots as equivalent.
   return previousEvents.length === nextEvents.length && previousLastSignature === nextLastSignature;
 }
 
@@ -328,6 +345,18 @@ function resolveIncludeTurnsForThreadRead(
   pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator
 ): boolean {
   return includeTurns ?? !pendingThreadMaterializationCoordinator.isPending(threadId);
+}
+
+function resolveIncludeReadThreadForThreadRead(includeReadThread: boolean | undefined): boolean {
+  return includeReadThread ?? DEFAULT_INCLUDE_READ_THREAD;
+}
+
+function shouldSkipSelectedThreadSnapshotApply(
+  threadId: string,
+  selectedThreadIdRef: MutableRefObject<string | null>,
+  signal?: AbortSignal
+): boolean {
+  return Boolean(signal?.aborted) || selectedThreadIdRef.current !== threadId;
 }
 
 interface ReadCapabilities {

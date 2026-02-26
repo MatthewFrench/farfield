@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   parseThreadStreamStateChangedBroadcast,
+  ThreadStreamStateChangedEventType,
   type ThreadConversationState,
+  type ThreadStreamStateChangedBroadcast,
   type ThreadStreamPatch
 } from "@farfield/protocol";
 import {
@@ -15,6 +17,7 @@ import {
 
 type ConversationTurn = ThreadConversationState["turns"][number];
 const STREAM_EVENT_VERSION = 4;
+const THREAD_STREAM_EVENT_TYPE = ThreadStreamStateChangedEventType;
 
 function createUserMessageTurn(itemIdentifier: string): ConversationTurn {
   return {
@@ -33,15 +36,15 @@ function createSnapshotStreamEvent(input: {
   threadId: string;
   sourceClientId: string;
   turns: ThreadConversationState["turns"];
-}) {
+}): ThreadStreamStateChangedBroadcast {
   return parseThreadStreamStateChangedBroadcast({
     type: "broadcast",
-    method: "thread-stream-state-changed",
+    method: THREAD_STREAM_EVENT_TYPE,
     sourceClientId: input.sourceClientId,
     version: STREAM_EVENT_VERSION,
     params: {
       conversationId: input.threadId,
-      type: "thread-stream-state-changed",
+      type: THREAD_STREAM_EVENT_TYPE,
       version: STREAM_EVENT_VERSION,
       change: {
         type: "snapshot",
@@ -59,15 +62,15 @@ function createPatchStreamEvent(input: {
   threadId: string;
   sourceClientId: string;
   patches: ThreadStreamPatch[];
-}) {
+}): ThreadStreamStateChangedBroadcast {
   return parseThreadStreamStateChangedBroadcast({
     type: "broadcast",
-    method: "thread-stream-state-changed",
+    method: THREAD_STREAM_EVENT_TYPE,
     sourceClientId: input.sourceClientId,
     version: STREAM_EVENT_VERSION,
     params: {
       conversationId: input.threadId,
-      type: "thread-stream-state-changed",
+      type: THREAD_STREAM_EVENT_TYPE,
       version: STREAM_EVENT_VERSION,
       change: {
         type: "patches",
@@ -87,81 +90,57 @@ function createAppendTurnPatch(itemIdentifier: string): ThreadStreamPatch {
 
 describe("live-state reducer", () => {
   it("applies snapshot then patches", () => {
-    const snapshotEvent = parseThreadStreamStateChangedBroadcast({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
+    const snapshotEvent = createSnapshotStreamEvent({
+      threadId: "thread-1",
       sourceClientId: "client-a",
-      version: 4,
-      params: {
-        conversationId: "thread-1",
-        type: "thread-stream-state-changed",
-        version: 4,
-        change: {
-          type: "snapshot",
-          conversationState: {
-            id: "thread-1",
-            turns: [
-              {
-                params: {
-                  threadId: "thread-1",
-                  input: [{ type: "text", text: "hello" }],
-                  attachments: []
-                },
-                status: "completed",
-                items: []
-              }
-            ],
-            requests: []
-          }
+      turns: [
+        {
+          params: {
+            threadId: "thread-1",
+            input: [{ type: "text", text: "hello" }],
+            attachments: []
+          },
+          status: "completed",
+          items: []
         }
-      }
+      ]
     });
 
-    const patchEvent = parseThreadStreamStateChangedBroadcast({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
+    const patchEvent = createPatchStreamEvent({
+      threadId: "thread-1",
       sourceClientId: "client-a",
-      version: 4,
-      params: {
-        conversationId: "thread-1",
-        type: "thread-stream-state-changed",
-        version: 4,
-        change: {
-          type: "patches",
-          patches: [
+      patches: [
+        {
+          op: "replace",
+          path: ["requests"],
+          value: [
             {
-              op: "replace",
-              path: ["requests"],
-              value: [
-                {
-                  method: "item/tool/requestUserInput",
-                  id: 3,
-                  params: {
-                    threadId: "thread-1",
-                    turnId: "turn-2",
-                    itemId: "item-9",
-                    questions: [
+              method: "item/tool/requestUserInput",
+              id: 3,
+              params: {
+                threadId: "thread-1",
+                turnId: "turn-2",
+                itemId: "item-9",
+                questions: [
+                  {
+                    id: "q1",
+                    header: "Header",
+                    question: "Choose",
+                    isOther: true,
+                    isSecret: false,
+                    options: [
                       {
-                        id: "q1",
-                        header: "Header",
-                        question: "Choose",
-                        isOther: true,
-                        isSecret: false,
-                        options: [
-                          {
-                            label: "A",
-                            description: "A desc"
-                          }
-                        ]
+                        label: "A",
+                        description: "A desc"
                       }
                     ]
                   }
-                }
-              ]
+                ]
+              }
             }
           ]
         }
-      }
+      ]
     });
 
     const state = reduceThreadStreamEvents([snapshotEvent, patchEvent]);
@@ -171,49 +150,25 @@ describe("live-state reducer", () => {
   });
 
   it("keeps reducer alive when patches arrive before snapshot", () => {
-    const patchEvent = parseThreadStreamStateChangedBroadcast({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
+    const patchEvent = createPatchStreamEvent({
+      threadId: "thread-2",
       sourceClientId: "client-a",
-      version: 4,
-      params: {
-        conversationId: "thread-2",
-        type: "thread-stream-state-changed",
-        version: 4,
-        change: {
-          type: "patches",
-          patches: [
-            {
-              op: "add",
-              path: ["turns", 0],
-              value: {
-                status: "inProgress",
-                items: []
-              }
-            }
-          ]
-        }
-      }
-    });
-
-    const snapshotEvent = parseThreadStreamStateChangedBroadcast({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
-      sourceClientId: "client-a",
-      version: 4,
-      params: {
-        conversationId: "thread-2",
-        type: "thread-stream-state-changed",
-        version: 4,
-        change: {
-          type: "snapshot",
-          conversationState: {
-            id: "thread-2",
-            turns: [],
-            requests: []
+      patches: [
+        {
+          op: "add",
+          path: ["turns", 0],
+          value: {
+            status: "inProgress",
+            items: []
           }
         }
-      }
+      ]
+    });
+
+    const snapshotEvent = createSnapshotStreamEvent({
+      threadId: "thread-2",
+      sourceClientId: "client-a",
+      turns: []
     });
 
     const state = reduceThreadStreamEvents([patchEvent, snapshotEvent]);
@@ -260,61 +215,99 @@ describe("live-state reducer", () => {
     expect(thread?.ownerClientId).toBe("client-b");
   });
 
-  it("throws reduction error with raw payload details when patch introduces invalid item type", () => {
-    const snapshotEvent = parseThreadStreamStateChangedBroadcast({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
-      sourceClientId: "client-a",
-      version: 4,
-      params: {
-        conversationId: "thread-3",
-        type: "thread-stream-state-changed",
-        version: 4,
-        change: {
-          type: "snapshot",
-          conversationState: {
-            id: "thread-3",
-            turns: [
-              {
-                status: "completed",
-                items: [
-                  {
-                    id: "item-1",
-                    type: "userMessage",
-                    content: [{ type: "text", text: "hello" }]
-                  }
-                ]
-              }
-            ],
-            requests: []
-          }
-        }
-      }
-    });
+  it("reduces interleaved thread events independently in event order", () => {
+    const firstThreadId = "thread-interleaved-a";
+    const secondThreadId = "thread-interleaved-b";
+    const state = reduceThreadStreamEvents([
+      createSnapshotStreamEvent({
+        threadId: firstThreadId,
+        sourceClientId: "client-a1",
+        turns: [createUserMessageTurn("a-seed")]
+      }),
+      createSnapshotStreamEvent({
+        threadId: secondThreadId,
+        sourceClientId: "client-b1",
+        turns: [createUserMessageTurn("b-seed")]
+      }),
+      createPatchStreamEvent({
+        threadId: firstThreadId,
+        sourceClientId: "client-a2",
+        patches: [createAppendTurnPatch("a-next")]
+      }),
+      createPatchStreamEvent({
+        threadId: secondThreadId,
+        sourceClientId: "client-b2",
+        patches: [createAppendTurnPatch("b-next")]
+      })
+    ]);
 
-    const patchEvent = parseThreadStreamStateChangedBroadcast({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
+    const firstThread = state.get(firstThreadId);
+    const secondThread = state.get(secondThreadId);
+
+    expect(firstThread?.ownerClientId).toBe("client-a2");
+    expect(firstThread?.conversationState?.turns.map((turn) => turn.items[0]?.id)).toEqual([
+      "a-seed",
+      "a-next"
+    ]);
+    expect(secondThread?.ownerClientId).toBe("client-b2");
+    expect(secondThread?.conversationState?.turns.map((turn) => turn.items[0]?.id)).toEqual([
+      "b-seed",
+      "b-next"
+    ]);
+  });
+
+  it("advances owner client on empty patch events without changing conversation state", () => {
+    const threadId = "thread-owner-transition";
+    const state = reduceThreadStreamEvents([
+      createSnapshotStreamEvent({
+        threadId,
+        sourceClientId: "client-a",
+        turns: [createUserMessageTurn("seed")]
+      }),
+      createPatchStreamEvent({
+        threadId,
+        sourceClientId: "client-b",
+        patches: []
+      })
+    ]);
+
+    const thread = state.get(threadId);
+
+    expect(thread?.ownerClientId).toBe("client-b");
+    expect(thread?.conversationState?.turns.map((turn) => turn.items[0]?.id)).toEqual(["seed"]);
+  });
+
+  it("throws reduction error with raw payload details when patch introduces invalid item type", () => {
+    const snapshotEvent = createSnapshotStreamEvent({
+      threadId: "thread-3",
       sourceClientId: "client-a",
-      version: 4,
-      params: {
-        conversationId: "thread-3",
-        type: "thread-stream-state-changed",
-        version: 4,
-        change: {
-          type: "patches",
-          patches: [
+      turns: [
+        {
+          status: "completed",
+          items: [
             {
-              op: "replace",
-              path: ["turns", 0, "items", 0],
-              value: {
-                id: "item-2",
-                type: "newUnknownItemType"
-              }
+              id: "item-1",
+              type: "userMessage",
+              content: [{ type: "text", text: "hello" }]
             }
           ]
         }
-      }
+      ]
+    });
+
+    const patchEvent = createPatchStreamEvent({
+      threadId: "thread-3",
+      sourceClientId: "client-a",
+      patches: [
+        {
+          op: "replace",
+          path: ["turns", 0, "items", 0],
+          value: {
+            id: "item-2",
+            type: "newUnknownItemType"
+          }
+        }
+      ]
     });
 
     let captured: ThreadStreamReductionError | null = null;

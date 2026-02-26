@@ -8,14 +8,35 @@ import {
 } from "../Source/Network/ServerRequestErrorResponder.js";
 import type { ServerErrorEventRecordInput } from "../Source/Network/ServerErrorEventRecorder.js";
 
+const JsonResponseBodySchema = z.object({
+  ok: z.literal(false),
+  error: z.string(),
+  requestId: z.string(),
+  actionId: z.string().nullable(),
+  actionName: z.string().nullable()
+});
+
+const PushedSystemEventDetailsSchema = z.object({
+  requestId: z.string(),
+  actionId: z.string().nullable(),
+  actionName: z.string().nullable(),
+  errorCategory: z.enum(["request_validation", "shutdown_transport", "internal"]),
+  error: z.string(),
+  method: z.string(),
+  url: z.string()
+});
+
+type JsonResponseBody = z.infer<typeof JsonResponseBodySchema>;
+type PushedSystemEventDetails = z.infer<typeof PushedSystemEventDetailsSchema>;
+
 interface JsonResponseCall {
   statusCode: number;
-  body: Record<string, string | boolean | null>;
+  body: JsonResponseBody;
 }
 
 interface PushedSystemEvent {
   message: string;
-  details: Record<string, string | null | undefined>;
+  details: PushedSystemEventDetails;
 }
 
 interface TestHarness {
@@ -27,10 +48,19 @@ interface TestHarness {
   broadcastCount: number;
 }
 
-function createHttpPair(method: string, url: string): { req: IncomingMessage; res: ServerResponse } {
+interface HttpPairInput {
+  method?: string;
+  url?: string;
+}
+
+function createHttpPair(input: HttpPairInput = {}): { req: IncomingMessage; res: ServerResponse } {
   const request = new IncomingMessage(new Socket());
-  request.method = method;
-  request.url = url;
+  if (input.method !== undefined) {
+    request.method = input.method;
+  }
+  if (input.url !== undefined) {
+    request.url = input.url;
+  }
   const response = new ServerResponse(request);
   return { req: request, res: response };
 }
@@ -60,7 +90,7 @@ function createHarness(
   const dependencies: ServerRequestErrorResponderDependencies = {
     jsonResponse: (res, statusCode, body) => {
       res.statusCode = statusCode;
-      const parsedBody = z.record(z.union([z.string(), z.boolean(), z.null()])).parse(body);
+      const parsedBody = JsonResponseBodySchema.parse(body);
       jsonResponseCalls.push({
         statusCode,
         body: parsedBody
@@ -83,15 +113,10 @@ function createHarness(
       runtimeLastErrors.push(message);
     },
     pushSystem: (message, details) => {
+      const parsedDetails = PushedSystemEventDetailsSchema.parse(details);
       pushedSystemEvents.push({
         message,
-        details: {
-          requestId: typeof details?.requestId === "string" ? details.requestId : null,
-          actionId: typeof details?.actionId === "string" ? details.actionId : null,
-          actionName: typeof details?.actionName === "string" ? details.actionName : null,
-          errorCategory: typeof details?.errorCategory === "string" ? details.errorCategory : null,
-          error: typeof details?.error === "string" ? details.error : null
-        }
+        details: parsedDetails
       });
     },
     broadcastRuntimeState: () => {
@@ -112,9 +137,9 @@ function createHarness(
 }
 
 describe("ServerRequestErrorResponder", () => {
-  it("returns validation mapping without server error recording", () => {
+  it("returns validation mapping with warning error recording", () => {
     const harness = createHarness(() => false);
-    const { req, res } = createHttpPair("POST", "/api/threads");
+    const { req, res } = createHttpPair({ method: "POST", url: "/api/threads" });
 
     harness.responder.respond({
       req,
@@ -146,7 +171,7 @@ describe("ServerRequestErrorResponder", () => {
 
   it("records and reports internal runtime errors", () => {
     const harness = createHarness(() => false);
-    const { req, res } = createHttpPair("PATCH", "/api/threads/thread_123");
+    const { req, res } = createHttpPair({ method: "PATCH", url: "/api/threads/thread_123" });
 
     harness.responder.respond({
       req,
@@ -171,7 +196,9 @@ describe("ServerRequestErrorResponder", () => {
           actionId: "action_2",
           actionName: "archive-thread",
           errorCategory: "internal",
-          error: "request handler crashed"
+          error: "request handler crashed",
+          method: "PATCH",
+          url: "/api/threads/thread_123"
         }
       }
     ]);
@@ -192,7 +219,7 @@ describe("ServerRequestErrorResponder", () => {
 
   it("returns shutdown mapping without server error recording", () => {
     const harness = createHarness((error) => error.message.includes("transport closed"));
-    const { req, res } = createHttpPair("GET", "/api/threads");
+    const { req, res } = createHttpPair({ method: "GET", url: "/api/threads" });
 
     harness.responder.respond({
       req,
@@ -225,7 +252,7 @@ describe("ServerRequestErrorResponder", () => {
 
   it("does not write a second error payload when response headers were already sent", () => {
     const harness = createHarness(() => false);
-    const { req, res } = createHttpPair("GET", "/api/threads");
+    const { req, res } = createHttpPair({ method: "GET", url: "/api/threads" });
     res.writeHead(202);
 
     harness.responder.respond({
@@ -242,5 +269,41 @@ describe("ServerRequestErrorResponder", () => {
     expect(harness.jsonResponseCalls).toHaveLength(0);
     expect(harness.runtimeLastErrors).toEqual(["request handler crashed"]);
     expect(harness.broadcastCount).toBe(1);
+  });
+
+  it("uses owned unknown literals when method and url are missing", () => {
+    const harness = createHarness(() => false);
+    const { req, res } = createHttpPair({ method: "POST", url: "/api/threads" });
+    req.method = undefined;
+    req.url = undefined;
+
+    harness.responder.respond({
+      req,
+      res,
+      error: new Error("request handler crashed"),
+      context: {
+        requestId: "request_5",
+        actionId: "action_5",
+        actionName: "send-message"
+      }
+    });
+
+    expect(harness.pushedSystemEvents).toEqual([
+      {
+        message: "Request failed",
+        details: {
+          requestId: "request_5",
+          actionId: "action_5",
+          actionName: "send-message",
+          errorCategory: "internal",
+          error: "request handler crashed",
+          method: "unknown",
+          url: "unknown"
+        }
+      }
+    ]);
+    expect(harness.recordedServerErrors).toHaveLength(1);
+    expect(harness.recordedServerErrors[0]?.url).toBeNull();
+    expect(harness.recordedServerErrors[0]?.details?.method).toBe("unknown");
   });
 });

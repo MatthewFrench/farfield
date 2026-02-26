@@ -11,6 +11,65 @@ import {
 import { EventStreamRefreshDecisionEngine } from "../Source/Application/StateManagement/EventStreamRefreshDecisionEngine";
 
 const THREAD_ONLY_METHODS = ["thread-stream-state-changed", "thread-queued-followups-changed"] as const;
+const EVENT_NAME_OPEN = "open";
+const EVENT_NAME_ERROR = "error";
+const EVENT_NAME_MESSAGE = "message";
+const INITIAL_RECONNECT_DELAY_VALIDATION_ERROR_MESSAGE =
+  "EventStreamConnectionCoordinator requires a non-negative integer initialReconnectDelayMs";
+const RECONNECT_DELAY_RELATIONSHIP_ERROR_MESSAGE =
+  "EventStreamConnectionCoordinator requires maximumReconnectDelayMs to be greater than or equal to initialReconnectDelayMs";
+
+function createActivityHistoryAppendedMessageData(): string {
+  return JSON.stringify({
+    sequence: 4,
+    event: {
+      type: "activity-history-appended",
+      entry: {
+        id: "entry-1",
+        at: "2026-02-26T00:00:00.000Z",
+        source: "app",
+        direction: "out",
+        payload: {
+          type: "action",
+          action: "thread-stream-state-changed"
+        },
+        meta: {
+          method: "thread-queued-followups-changed",
+          threadId: "thread-1"
+        }
+      }
+    }
+  });
+}
+
+function createThreadStreamDeltaMessageData(): string {
+  return JSON.stringify({
+    sequence: 5,
+    event: {
+      type: "thread-stream-delta",
+      delta: {
+        threadId: "thread-1",
+        liveStateSnapshot: {
+          ok: true,
+          threadId: "thread-1",
+          ownerClientId: "client-a",
+          conversationState: null,
+          liveStateError: null
+        },
+        streamEventsSnapshot: {
+          ok: true,
+          threadId: "thread-1",
+          ownerClientId: "client-a",
+          events: [],
+          nextSequence: 2,
+          firstAvailableSequence: 0,
+          resetRequired: false
+        },
+        streamEventsSinceSequenceUsed: 1
+      }
+    }
+  });
+}
 
 class TestEventSource implements EventSourceLike {
   public onopen: ((event: Event) => void) | null;
@@ -93,7 +152,7 @@ describe("EventStreamConnectionCoordinator", () => {
     });
 
     expect(createdSources).toHaveLength(1);
-    createdSources[0]?.onopen?.(new Event("open"));
+    createdSources[0]?.onopen?.(new Event(EVENT_NAME_OPEN));
     await vi.advanceTimersByTimeAsync(20);
 
     expect(executedRefreshes).toEqual([
@@ -138,7 +197,7 @@ describe("EventStreamConnectionCoordinator", () => {
       throw new Error("Expected event source instance");
     }
 
-    source.onopen?.(new Event("open"));
+    source.onopen?.(new Event(EVENT_NAME_OPEN));
     await vi.advanceTimersByTimeAsync(20);
     executedRefreshes.length = 0;
 
@@ -147,27 +206,8 @@ describe("EventStreamConnectionCoordinator", () => {
       selectedThreadId: "thread-1"
     };
     source.onmessage?.(
-      new MessageEvent<string>("message", {
-        data: JSON.stringify({
-          sequence: 4,
-          event: {
-            type: "activity-history-appended",
-            entry: {
-              id: "entry-1",
-              at: "2026-02-26T00:00:00.000Z",
-              source: "app",
-              direction: "out",
-              payload: {
-                type: "action",
-                action: "thread-stream-state-changed"
-              },
-              meta: {
-                method: "thread-queued-followups-changed",
-                threadId: "thread-1"
-              }
-            }
-          }
-        })
+      new MessageEvent<string>(EVENT_NAME_MESSAGE, {
+        data: createActivityHistoryAppendedMessageData()
       })
     );
     await vi.advanceTimersByTimeAsync(20);
@@ -213,38 +253,13 @@ describe("EventStreamConnectionCoordinator", () => {
       throw new Error("Expected event source instance");
     }
 
-    source.onopen?.(new Event("open"));
+    source.onopen?.(new Event(EVENT_NAME_OPEN));
     await vi.advanceTimersByTimeAsync(20);
     executedRefreshes.length = 0;
 
     source.onmessage?.(
-      new MessageEvent<string>("message", {
-        data: JSON.stringify({
-          sequence: 5,
-          event: {
-            type: "thread-stream-delta",
-            delta: {
-              threadId: "thread-1",
-              liveStateSnapshot: {
-                ok: true,
-                threadId: "thread-1",
-                ownerClientId: "client-a",
-                conversationState: null,
-                liveStateError: null
-              },
-              streamEventsSnapshot: {
-                ok: true,
-                threadId: "thread-1",
-                ownerClientId: "client-a",
-                events: [],
-                nextSequence: 2,
-                firstAvailableSequence: 0,
-                resetRequired: false
-              },
-              streamEventsSinceSequenceUsed: 1
-            }
-          }
-        })
+      new MessageEvent<string>(EVENT_NAME_MESSAGE, {
+        data: createThreadStreamDeltaMessageData()
       })
     );
     await vi.advanceTimersByTimeAsync(20);
@@ -282,7 +297,7 @@ describe("EventStreamConnectionCoordinator", () => {
     if (!firstSource) {
       throw new Error("Expected initial event source instance");
     }
-    firstSource.onerror?.(new Event("error"));
+    firstSource.onerror?.(new Event(EVENT_NAME_ERROR));
 
     await vi.advanceTimersByTimeAsync(24);
     expect(createdSources).toHaveLength(1);
@@ -293,7 +308,7 @@ describe("EventStreamConnectionCoordinator", () => {
     if (!secondSource) {
       throw new Error("Expected second event source instance");
     }
-    secondSource.onerror?.(new Event("error"));
+    secondSource.onerror?.(new Event(EVENT_NAME_ERROR));
 
     await vi.advanceTimersByTimeAsync(49);
     expect(createdSources).toHaveLength(2);
@@ -304,7 +319,7 @@ describe("EventStreamConnectionCoordinator", () => {
     if (!thirdSource) {
       throw new Error("Expected third event source instance");
     }
-    thirdSource.onerror?.(new Event("error"));
+    thirdSource.onerror?.(new Event(EVENT_NAME_ERROR));
     coordinator.stop();
 
     await vi.advanceTimersByTimeAsync(200);
@@ -319,7 +334,7 @@ describe("EventStreamConnectionCoordinator", () => {
         initialReconnectDelayMs: -1
       });
     }).toThrowError(
-      "EventStreamConnectionCoordinator requires a non-negative integer initialReconnectDelayMs"
+      INITIAL_RECONNECT_DELAY_VALIDATION_ERROR_MESSAGE
     );
   });
 
@@ -331,7 +346,7 @@ describe("EventStreamConnectionCoordinator", () => {
         maximumReconnectDelayMs: 99
       });
     }).toThrowError(
-      "EventStreamConnectionCoordinator requires maximumReconnectDelayMs to be greater than or equal to initialReconnectDelayMs"
+      RECONNECT_DELAY_RELATIONSHIP_ERROR_MESSAGE
     );
   });
 });

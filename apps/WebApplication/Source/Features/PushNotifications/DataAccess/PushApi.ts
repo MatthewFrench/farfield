@@ -22,16 +22,42 @@ import {
  * Owns push HTTP boundary parsing and envelope normalization.
  * All transport envelopes are parsed once and mapped to push-owned response contracts before leaving this module.
  */
-const JSON_CONTENT_TYPE_HEADERS = {
-  "Content-Type": "application/json"
+const PUSH_ROUTE_PATH = "/api/push";
+const PUSH_STATUS_ROUTE_SEGMENT = "status";
+const PUSH_VAPID_PUBLIC_KEY_ROUTE_SEGMENT = "vapid-public-key";
+const PUSH_RECEIPT_LATEST_ROUTE_SEGMENT = "receipts/latest";
+const PUSH_SEND_LATEST_ROUTE_SEGMENT = "sends/latest";
+const PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_ROUTE_SEGMENT = "local-ca";
+const PUSH_SUBSCRIPTIONS_ROUTE_SEGMENT = "subscriptions";
+const PUSH_TEST_ROUTE_SEGMENT = "test";
+const REQUEST_METHOD_POST = "POST";
+const REQUEST_METHOD_DELETE = "DELETE";
+const REQUEST_CONTENT_TYPE_HEADER_NAME = "Content-Type";
+const REQUEST_CONTENT_TYPE_HEADER_VALUE = "application/json";
+const NON_EMPTY_TRIMMED_TEXT_MIN_LENGTH = 1;
+
+type PushRouteSegment =
+  | typeof PUSH_STATUS_ROUTE_SEGMENT
+  | typeof PUSH_VAPID_PUBLIC_KEY_ROUTE_SEGMENT
+  | typeof PUSH_RECEIPT_LATEST_ROUTE_SEGMENT
+  | typeof PUSH_SEND_LATEST_ROUTE_SEGMENT
+  | typeof PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_ROUTE_SEGMENT
+  | typeof PUSH_SUBSCRIPTIONS_ROUTE_SEGMENT
+  | typeof PUSH_TEST_ROUTE_SEGMENT;
+type PushMutationRequestMethod = typeof REQUEST_METHOD_POST | typeof REQUEST_METHOD_DELETE;
+
+const APPLICATION_JSON_REQUEST_HEADERS = {
+  [REQUEST_CONTENT_TYPE_HEADER_NAME]: REQUEST_CONTENT_TYPE_HEADER_VALUE
 };
-const PUSH_STATUS_ENDPOINT = "/api/push/status";
-const PUSH_VAPID_PUBLIC_KEY_ENDPOINT = "/api/push/vapid-public-key";
-const PUSH_RECEIPT_LATEST_ENDPOINT = "/api/push/receipts/latest";
-const PUSH_SEND_LATEST_ENDPOINT = "/api/push/sends/latest";
-const PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_ENDPOINT = "/api/push/local-ca";
-const PUSH_SUBSCRIPTIONS_ENDPOINT = "/api/push/subscriptions";
-const PUSH_TEST_ENDPOINT = "/api/push/test";
+const PUSH_STATUS_ENDPOINT = buildPushRoutePath(PUSH_STATUS_ROUTE_SEGMENT);
+const PUSH_VAPID_PUBLIC_KEY_ENDPOINT = buildPushRoutePath(PUSH_VAPID_PUBLIC_KEY_ROUTE_SEGMENT);
+const PUSH_RECEIPT_LATEST_ENDPOINT = buildPushRoutePath(PUSH_RECEIPT_LATEST_ROUTE_SEGMENT);
+const PUSH_SEND_LATEST_ENDPOINT = buildPushRoutePath(PUSH_SEND_LATEST_ROUTE_SEGMENT);
+const PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_ENDPOINT = buildPushRoutePath(
+  PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_ROUTE_SEGMENT
+);
+const PUSH_SUBSCRIPTIONS_ENDPOINT = buildPushRoutePath(PUSH_SUBSCRIPTIONS_ROUTE_SEGMENT);
+const PUSH_TEST_ENDPOINT = buildPushRoutePath(PUSH_TEST_ROUTE_SEGMENT);
 
 const PushStatusResponseSchema = FarfieldPushStatusEnvelopeSchema.transform(
   ({ ok: _ok, ...pushStatusResponse }) => pushStatusResponse
@@ -88,13 +114,32 @@ export interface ApiPushTestNotificationInput {
 
 const PushTestNotificationInputSchema = z
   .object({
-    threadId: z.string().trim().min(1),
-    turnId: z.string().trim().min(1),
+    threadId: z.string().trim().min(NON_EMPTY_TRIMMED_TEXT_MIN_LENGTH),
+    turnId: z.string().trim().min(NON_EMPTY_TRIMMED_TEXT_MIN_LENGTH),
     title: z.string().optional(),
     body: z.string().optional(),
     dryRun: z.boolean().optional()
   })
   .strict();
+
+function buildPushRoutePath(routeSegment: PushRouteSegment): string {
+  return `${PUSH_ROUTE_PATH}/${routeSegment}`;
+}
+
+function buildPushJsonMutationRequestInit(
+  method: PushMutationRequestMethod,
+  body: string,
+  options?: ApiRequestOptions
+): RequestInit {
+  return applyRequestOptions(
+    {
+      method,
+      headers: APPLICATION_JSON_REQUEST_HEADERS,
+      body
+    },
+    options
+  );
+}
 
 export async function getPushStatus(options?: ApiRequestOptions): Promise<ApiPushStatusResponse> {
   const data = await request(PUSH_STATUS_ENDPOINT, requestInitWithOptions(options));
@@ -137,14 +182,7 @@ export async function savePushSubscription(
   const body = CreatePushSubscriptionBodySchema.parse(input);
   const data = await request(
     PUSH_SUBSCRIPTIONS_ENDPOINT,
-    applyRequestOptions(
-      {
-        method: "POST",
-        headers: JSON_CONTENT_TYPE_HEADERS,
-        body: JSON.stringify(body)
-      },
-      options
-    )
+    buildPushJsonMutationRequestInit(REQUEST_METHOD_POST, JSON.stringify(body), options)
   );
   return CreatePushSubscriptionResponseSchema.parse(data);
 }
@@ -156,14 +194,7 @@ export async function deletePushSubscription(
   const body = DeletePushSubscriptionBodySchema.parse(input);
   const data = await request(
     PUSH_SUBSCRIPTIONS_ENDPOINT,
-    applyRequestOptions(
-      {
-        method: "DELETE",
-        headers: JSON_CONTENT_TYPE_HEADERS,
-        body: JSON.stringify(body)
-      },
-      options
-    )
+    buildPushJsonMutationRequestInit(REQUEST_METHOD_DELETE, JSON.stringify(body), options)
   );
   return DeletePushSubscriptionResponseSchema.parse(data);
 }
@@ -175,14 +206,7 @@ export async function sendPushTestNotification(
   const body = PushTestNotificationInputSchema.parse(input);
   const data = await request(
     PUSH_TEST_ENDPOINT,
-    applyRequestOptions(
-      {
-        method: "POST",
-        headers: JSON_CONTENT_TYPE_HEADERS,
-        body: JSON.stringify(body)
-      },
-      options
-    )
+    buildPushJsonMutationRequestInit(REQUEST_METHOD_POST, JSON.stringify(body), options)
   );
   return PushTestNotificationResponseSchema.parse(data);
 }

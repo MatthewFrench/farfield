@@ -25,7 +25,13 @@ interface ServiceIpcClientDouble {
   sendRequestAndWait: SendRequestAndWaitMock;
 }
 
-function createThread(): ThreadConversationState {
+interface ThreadTemplateOverrides {
+  model?: string | null;
+  effort?: string | null;
+  collaborationMode?: TurnStartParams["collaborationMode"];
+}
+
+function createThread(templateOverrides?: ThreadTemplateOverrides): ThreadConversationState {
   return {
     id: "thread-1",
     turns: [
@@ -33,7 +39,12 @@ function createThread(): ThreadConversationState {
         params: {
           threadId: "thread-1",
           input: [{ type: "text", text: "hello" }],
-          attachments: []
+          attachments: [],
+          ...(templateOverrides?.model !== undefined ? { model: templateOverrides.model } : {}),
+          ...(templateOverrides?.effort !== undefined ? { effort: templateOverrides.effort } : {}),
+          ...(templateOverrides?.collaborationMode !== undefined
+            ? { collaborationMode: templateOverrides.collaborationMode }
+            : {})
         },
         status: "completed",
         items: []
@@ -130,6 +141,75 @@ describe("CodexMonitorService", () => {
           collaborationMode: expect.objectContaining({
             mode: "plan"
           })
+        })
+      }),
+      expect.any(Object)
+    );
+  });
+
+  it("preserves template overrides when message-level overrides are omitted", async () => {
+    const serviceIpcClientDouble = createServiceIpcClientDouble();
+    const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
+
+    await service.sendMessage({
+      threadId: "thread-1",
+      ownerClientId: "client-1",
+      text: "new message",
+      turnStartTemplate: requireTurnStartTemplate(
+        createThread({
+          model: "template-model",
+          effort: "medium",
+          collaborationMode: {
+            mode: "plan"
+          }
+        })
+      )
+    });
+
+    expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
+      "thread-follower-start-turn",
+      expect.objectContaining({
+        turnStartParams: expect.objectContaining({
+          model: "template-model",
+          effort: "medium",
+          collaborationMode: expect.objectContaining({
+            mode: "plan"
+          })
+        })
+      }),
+      expect.any(Object)
+    );
+  });
+
+  it("applies explicit null overrides for mode and model", async () => {
+    const serviceIpcClientDouble = createServiceIpcClientDouble();
+    const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
+
+    await service.sendMessage({
+      threadId: "thread-1",
+      ownerClientId: "client-1",
+      text: "new message",
+      turnStartTemplate: requireTurnStartTemplate(
+        createThread({
+          model: "template-model",
+          effort: "medium",
+          collaborationMode: {
+            mode: "plan"
+          }
+        })
+      ),
+      model: null,
+      effort: null,
+      collaborationMode: null
+    });
+
+    expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
+      "thread-follower-start-turn",
+      expect.objectContaining({
+        turnStartParams: expect.objectContaining({
+          model: null,
+          effort: null,
+          collaborationMode: null
         })
       }),
       expect.any(Object)

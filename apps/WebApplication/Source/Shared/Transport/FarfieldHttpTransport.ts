@@ -27,12 +27,20 @@ const ApiEnvelopeSchema = z
     ok: z.boolean()
   })
   .passthrough();
+type ApiEnvelope = z.infer<typeof ApiEnvelopeSchema>;
 
 // Thread and capability reads can exceed one minute on cold local agent startup.
 // Keep request budgets above that window so startup does not fail into error state.
 const REQUEST_TIMEOUT_MILLISECONDS = 120_000;
 const MAX_RESPONSE_TEXT_LENGTH = 4_000;
 const RESPONSE_TEXT_TRUNCATION_SUFFIX = "... [truncated]";
+const REQUEST_FAILURE_ERROR_NAME = "FarfieldHttpRequestFailureError";
+const REQUEST_FAILURE_MESSAGE_PREFIX = "Request failed for";
+const INVALID_JSON_RESPONSE_MESSAGE_PREFIX = "Invalid JSON response from";
+const INVALID_API_ENVELOPE_MESSAGE_PREFIX = "Invalid API envelope from";
+const REQUEST_TIMEOUT_MESSAGE_PREFIX = "Request timed out for";
+const EMPTY_RESPONSE_REASON = "empty response";
+const STATUS_LABEL = "status=";
 const MISSING_STATUS_LABEL = "n/a";
 const FETCH_ABORT_ERROR_NAME = "AbortError";
 const CLIENT_REQUEST_ID_RANDOM_MAX_EXCLUSIVE = 1_000_000_000;
@@ -51,6 +59,30 @@ interface ResponseBodyReadResult {
   responseTextSummary: ResponseTextSummary;
 }
 
+interface StructuredDataDecodeSuccess {
+  kind: "success";
+  data: StructuredDataValue;
+}
+
+interface StructuredDataDecodeFailure {
+  kind: "failure";
+  reason: string;
+}
+
+type StructuredDataDecodeResult = StructuredDataDecodeSuccess | StructuredDataDecodeFailure;
+
+interface ApiEnvelopeDecodeSuccess {
+  kind: "success";
+  envelope: ApiEnvelope;
+}
+
+interface ApiEnvelopeDecodeFailure {
+  kind: "failure";
+  reason: string;
+}
+
+type ApiEnvelopeDecodeResult = ApiEnvelopeDecodeSuccess | ApiEnvelopeDecodeFailure;
+
 export interface FarfieldHttpRequestFailureDetails {
   path: string;
   status: number | null;
@@ -66,7 +98,7 @@ export class FarfieldHttpRequestFailureError extends Error {
 
   public constructor(message: string, requestFailureDetails: FarfieldHttpRequestFailureDetails) {
     super(message);
-    this.name = "FarfieldHttpRequestFailureError";
+    this.name = REQUEST_FAILURE_ERROR_NAME;
     this.requestFailureDetails = requestFailureDetails;
   }
 }
@@ -97,12 +129,8 @@ function buildFailureMessage(
   const statusTextValue = readNonEmptyTrimmedText(context.statusText);
   const statusText = statusTextValue === null ? "" : ` ${statusTextValue}`;
   const requestId = readNonEmptyTrimmedText(context.requestId);
-  const statusTextParts = [
-    "status=",
-    String(context.status ?? MISSING_STATUS_LABEL),
-    statusText
-  ];
-  const message = `${baseMessage} ${statusTextParts.join("")}`.trim();
+  const status = String(context.status ?? MISSING_STATUS_LABEL);
+  const message = `${baseMessage} ${STATUS_LABEL}${status}${statusText}`.trim();
   return appendRequestId(message, requestId);
 }
 
@@ -166,6 +194,50 @@ async function readResponseBody(response: Response): Promise<ResponseBodyReadRes
   }
 }
 
+function decodeStructuredDataValue(parseText: string): StructuredDataDecodeResult {
+  try {
+    const rawJsonData = JSON.parse(parseText);
+    const parsedStructuredData = StructuredDataValueSchema.safeParse(rawJsonData);
+    if (!parsedStructuredData.success) {
+      return {
+        kind: "failure",
+        reason: parsedStructuredData.error.message
+      };
+    }
+    return {
+      kind: "success",
+      data: parsedStructuredData.data
+    };
+  } catch (error) {
+    return {
+      kind: "failure",
+      reason: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+function decodeApiEnvelope(data: StructuredDataValue): ApiEnvelopeDecodeResult {
+  const parsedEnvelope = ApiEnvelopeSchema.safeParse(data);
+  if (!parsedEnvelope.success) {
+    return {
+      kind: "failure",
+      reason: parsedEnvelope.error.message
+    };
+  }
+  return {
+    kind: "success",
+    envelope: parsedEnvelope.data
+  };
+}
+
+function buildInvalidJsonResponseMessage(path: string, reason: string): string {
+  return `${INVALID_JSON_RESPONSE_MESSAGE_PREFIX} ${path}: ${reason}`;
+}
+
+function buildInvalidApiEnvelopeMessage(path: string, reason: string): string {
+  return `${INVALID_API_ENVELOPE_MESSAGE_PREFIX} ${path}: ${reason}`;
+}
+
 function createRequestFailureError(
   path: string,
   requestId: string | null,
@@ -206,7 +278,7 @@ function appendRequestId(message: string, requestId: string | null): string {
 }
 
 function buildRequestFailureMessage(path: string): string {
-  return `Request failed for ${path}`;
+  return `${REQUEST_FAILURE_MESSAGE_PREFIX} ${path}`;
 }
 
 function buildRequestFailureMessageWithReason(path: string, reason: string): string {
@@ -214,11 +286,25 @@ function buildRequestFailureMessageWithReason(path: string, reason: string): str
 }
 
 function buildTimeoutErrorMessage(path: string, requestId: string): string {
-  return `Request timed out for ${path} after ${String(REQUEST_TIMEOUT_MILLISECONDS)}ms requestId ${requestId}`;
+  return `${REQUEST_TIMEOUT_MESSAGE_PREFIX} ${path} after ${String(REQUEST_TIMEOUT_MILLISECONDS)}ms ${REQUEST_ID_LABEL} ${requestId}`;
 }
 
 function isAbortError(error: Error): boolean {
   return error.name === FETCH_ABORT_ERROR_NAME;
+}
+
+// Parse strict error envelopes only; extra keys are treated as contract drift and revert to generic failures.
+function readApiErrorMessage(data: StructuredDataValue | null): string | null {
+  if (data === null) {
+    return null;
+  }
+  const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
+  return parsedError.success ? parsedError.data.error : null;
+}
+
+function resolveFailureBaseMessage(path: string, data: StructuredDataValue | null): string {
+  const apiErrorMessage = readApiErrorMessage(data);
+  return apiErrorMessage ?? buildRequestFailureMessage(path);
 }
 
 // Timeout semantics: the request budget starts when fetch is dispatched, and timeout aborts are
@@ -281,53 +367,47 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
   const responseRequestId = readResponseRequestId(response);
   const responseBody = await readResponseBody(response);
 
-  let data: StructuredDataValue;
   if (responseBody.parseText === null) {
     throw createRequestFailureError(
       normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      `Invalid JSON response from ${normalizedPath}: empty response`
+      buildInvalidJsonResponseMessage(normalizedPath, EMPTY_RESPONSE_REASON)
     );
   }
 
-  try {
-    const rawJsonData = JSON.parse(responseBody.parseText);
-    data = StructuredDataValueSchema.parse(rawJsonData);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+  const decodedStructuredData = decodeStructuredDataValue(responseBody.parseText);
+  if (decodedStructuredData.kind === "failure") {
     throw createRequestFailureError(
       normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      `Invalid JSON response from ${normalizedPath}: ${message}`
+      buildInvalidJsonResponseMessage(normalizedPath, decodedStructuredData.reason)
     );
   }
+  const data = decodedStructuredData.data;
 
-  let envelope: z.infer<typeof ApiEnvelopeSchema>;
-  try {
-    envelope = ApiEnvelopeSchema.parse(data);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+  const decodedEnvelope = decodeApiEnvelope(data);
+  if (decodedEnvelope.kind === "failure") {
     throw createRequestFailureError(
       normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      `Invalid API envelope from ${normalizedPath}: ${message}`
+      buildInvalidApiEnvelopeMessage(normalizedPath, decodedEnvelope.reason)
     );
   }
+  const envelope = decodedEnvelope.envelope;
 
   if (!response.ok || envelope.ok === false) {
-    const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
     throw createRequestFailureError(
       normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      parsedError.success ? parsedError.data.error : buildRequestFailureMessage(normalizedPath)
+      resolveFailureBaseMessage(normalizedPath, data)
     );
   }
 
@@ -348,26 +428,18 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      buildRequestFailureMessageWithReason(normalizedPath, "empty response")
+      buildRequestFailureMessageWithReason(normalizedPath, EMPTY_RESPONSE_REASON)
     );
   }
 
-  let data: StructuredDataValue | null = null;
-  try {
-    const rawJsonData = JSON.parse(responseBody.parseText);
-    const parsedJsonData = StructuredDataValueSchema.safeParse(rawJsonData);
-    data = parsedJsonData.success ? parsedJsonData.data : null;
-  } catch {
-    // Ignore parse failures here and surface status-based failure below.
-  }
-
-  const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
+  const decodedStructuredData = decodeStructuredDataValue(responseBody.parseText);
+  const data = decodedStructuredData.kind === "success" ? decodedStructuredData.data : null;
   throw createRequestFailureError(
     normalizedPath,
     responseRequestId,
     response,
     responseBody.responseTextSummary,
-    parsedError.success ? parsedError.data.error : buildRequestFailureMessage(normalizedPath)
+    resolveFailureBaseMessage(normalizedPath, data)
   );
 }
 

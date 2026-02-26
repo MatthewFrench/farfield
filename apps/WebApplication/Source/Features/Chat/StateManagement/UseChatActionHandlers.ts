@@ -8,6 +8,7 @@ import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts
 import {
   createEmptyPendingUserInputAnswerDraft,
   PendingUserInputAnswerBuilder,
+  type PendingUserInputAnswerDraft,
   type PendingUserInputAnswerDraftByQuestionId
 } from "../DomainModel/PendingUserInputAnswerBuilder";
 import { type PendingUserInputRequest } from "../DomainModel/PendingUserInputRequestSelector";
@@ -20,6 +21,7 @@ import {
 } from "./ChatRequestActionCoordinator";
 import {
   CollaborationModeActionCoordinator,
+  type CollaborationModeActionDraft,
   type CollaborationModeActionChatClient,
   type CollaborationModeActionErrorReportInput,
   type CollaborationModeActionModeOption
@@ -31,6 +33,35 @@ interface ActionRequestOptions {
 }
 
 type ChatActionErrorReportInput = ChatRequestActionErrorReportInput | CollaborationModeActionErrorReportInput;
+type PendingUserInputAnswerField = "option" | "freeform";
+type ChatActionModeDraft = CollaborationModeActionDraft;
+
+const PENDING_USER_INPUT_ANSWER_OPTION_FIELD: PendingUserInputAnswerField = "option";
+const PENDING_USER_INPUT_ANSWER_FREEFORM_FIELD: PendingUserInputAnswerField = "freeform";
+
+function buildNextAnswerDraftByQuestionId(input: {
+  previousAnswerDraftByQuestionId: PendingUserInputAnswerDraftByQuestionId;
+  questionId: string;
+  field: PendingUserInputAnswerField;
+  value: string;
+}): PendingUserInputAnswerDraftByQuestionId {
+  const previousQuestionDraft = input.previousAnswerDraftByQuestionId[input.questionId] ?? createEmptyPendingUserInputAnswerDraft();
+  const nextQuestionDraft: PendingUserInputAnswerDraft = {
+    option: previousQuestionDraft.option,
+    freeform: previousQuestionDraft.freeform
+  };
+
+  if (input.field === PENDING_USER_INPUT_ANSWER_OPTION_FIELD) {
+    nextQuestionDraft.option = input.value;
+  } else if (input.field === PENDING_USER_INPUT_ANSWER_FREEFORM_FIELD) {
+    nextQuestionDraft.freeform = input.value;
+  }
+
+  return {
+    ...input.previousAnswerDraftByQuestionId,
+    [input.questionId]: nextQuestionDraft
+  };
+}
 
 export interface UseChatActionHandlersInput {
   selectedThreadId: string | null;
@@ -61,15 +92,11 @@ export interface UseChatActionHandlersInput {
 
 export interface ChatActionHandlers {
   submitMessage: (draft: string) => Promise<void>;
-  applyModeDraft: (draft: {
-    modeKey: string;
-    modelId: string;
-    reasoningEffort: string;
-  }) => Promise<void>;
+  applyModeDraft: (draft: ChatActionModeDraft) => Promise<void>;
   submitPendingRequest: () => Promise<void>;
   skipPendingRequest: () => Promise<void>;
   runInterrupt: () => Promise<void>;
-  handleAnswerChange: (questionId: string, field: "option" | "freeform", value: string) => void;
+  handleAnswerChange: (questionId: string, field: PendingUserInputAnswerField, value: string) => void;
 }
 
 export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatActionHandlers {
@@ -78,6 +105,20 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     await input.onReloadSelectedThread(threadId);
   }, [input.loadCoreDataTracked, input.onReloadSelectedThread]);
 
+  const handleThreadSelected = useCallback((threadId: string): void => {
+    // Keep state and ref synchronized so async request callbacks observe the same thread selection.
+    input.setSelectedThreadId(threadId);
+    input.selectedThreadIdRef.current = threadId;
+  }, [input.selectedThreadIdRef, input.setSelectedThreadId]);
+
+  const markThreadPendingMaterialization = useCallback((threadId: string): void => {
+    input.pendingThreadMaterializationCoordinator.markPending(threadId);
+  }, [input.pendingThreadMaterializationCoordinator]);
+
+  const clearThreadPendingMaterialization = useCallback((threadId: string): void => {
+    input.pendingThreadMaterializationCoordinator.clearPending(threadId);
+  }, [input.pendingThreadMaterializationCoordinator]);
+
   const submitMessage = useCallback(async (draft: string) => {
     await input.chatRequestActionCoordinator.sendMessage({
       draft,
@@ -85,16 +126,9 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       selectedAgentId: input.selectedAgentId,
       buildActionRequestOptions: input.buildActionRequestOptions,
       onSetBusy: input.setIsBusy,
-      onThreadSelected: (threadId) => {
-        input.setSelectedThreadId(threadId);
-        input.selectedThreadIdRef.current = threadId;
-      },
-      onMarkThreadPendingMaterialization: (threadId) => {
-        input.pendingThreadMaterializationCoordinator.markPending(threadId);
-      },
-      onClearThreadPendingMaterialization: (threadId) => {
-        input.pendingThreadMaterializationCoordinator.clearPending(threadId);
-      },
+      onThreadSelected: handleThreadSelected,
+      onMarkThreadPendingMaterialization: markThreadPendingMaterialization,
+      onClearThreadPendingMaterialization: clearThreadPendingMaterialization,
       chatClient: input.chatClient,
       threadMutationClient: input.threadMutationClient,
       onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
@@ -105,23 +139,19 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.buildActionRequestOptions,
     input.chatClient,
     input.chatRequestActionCoordinator,
-    input.pendingThreadMaterializationCoordinator,
+    clearThreadPendingMaterialization,
+    handleThreadSelected,
+    markThreadPendingMaterialization,
     input.onInvalidateActiveThreadQuery,
     refreshThreadData,
     input.reportTrackedUserInterfaceError,
     input.selectedAgentId,
     input.selectedThreadId,
-    input.selectedThreadIdRef,
     input.setIsBusy,
-    input.setSelectedThreadId,
     input.threadMutationClient
   ]);
 
-  const applyModeDraft = useCallback(async (draft: {
-    modeKey: string;
-    modelId: string;
-    reasoningEffort: string;
-  }) => {
+  const applyModeDraft = useCallback(async (draft: ChatActionModeDraft) => {
     await input.collaborationModeActionCoordinator.applyDraft({
       draft,
       selectedThreadId: input.selectedThreadId,
@@ -230,14 +260,15 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
   ]);
 
   const handleAnswerChange = useCallback(
-    (questionId: string, field: "option" | "freeform", value: string) => {
-      input.setAnswerDraft((previousAnswerDraft) => ({
-        ...previousAnswerDraft,
-        [questionId]: {
-          ...(previousAnswerDraft[questionId] ?? createEmptyPendingUserInputAnswerDraft()),
-          [field]: value
-        }
-      }));
+    (questionId: string, field: PendingUserInputAnswerField, value: string) => {
+      input.setAnswerDraft((previousAnswerDraft) =>
+        buildNextAnswerDraftByQuestionId({
+          previousAnswerDraftByQuestionId: previousAnswerDraft,
+          questionId,
+          field,
+          value
+        })
+      );
     },
     [input.setAnswerDraft]
   );

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import webPush from "web-push";
-import { type StoredPushSubscription } from "@farfield/protocol";
+import { type PushNotificationPayload, type StoredPushSubscription } from "@farfield/protocol";
 import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
 
 vi.mock("web-push", () => {
@@ -30,6 +30,30 @@ function buildStoredSubscription(endpoint: string): StoredPushSubscription {
   };
 }
 
+const ENABLED_PUSH_SERVICE_CONFIG = {
+  enabled: true,
+  vapidPublicKey:
+    "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U",
+  vapidPrivateKey: "tfyAO9n9LMLXTy7ZaZwfDafDifFhnKz0MLC8nOxDmds",
+  vapidSubject: "mailto:test@example.com"
+};
+
+function buildEnabledPushService(): PushService {
+  return new PushService(ENABLED_PUSH_SERVICE_CONFIG);
+}
+
+function buildNotificationPayload(notificationId: string): PushNotificationPayload {
+  return {
+    notificationId,
+    title: "Codex response ready",
+    body: "A response is ready in Farfield.",
+    threadId: "thread_1",
+    turnId: "turn_1",
+    url: "/threads/thread_1",
+    createdAt: "2026-02-18T00:00:00.000Z"
+  };
+}
+
 describe("PushService", () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -44,24 +68,12 @@ describe("PushService", () => {
       headers: {}
     });
 
-    const service = new PushService({
-      enabled: true,
-      vapidPublicKey:
-        "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U",
-      vapidPrivateKey: "tfyAO9n9LMLXTy7ZaZwfDafDifFhnKz0MLC8nOxDmds",
-      vapidSubject: "mailto:test@example.com"
-    });
+    const service = buildEnabledPushService();
 
     const result = await service.sendToSubscriptions(
       [buildStoredSubscription("https://push.example.test/subscriptions/sub_123")],
       {
-        notificationId: "notif_1",
-        title: "Codex response ready",
-        body: "A response is ready in Farfield.",
-        threadId: "thread_1",
-        turnId: "turn_1",
-        url: "/threads/thread_1",
-        createdAt: "2026-02-18T00:00:00.000Z",
+        ...buildNotificationPayload("notif_1"),
         web_push: {
           notification: {
             title: "Codex response ready",
@@ -89,6 +101,37 @@ describe("PushService", () => {
     });
   });
 
+  it("dispatches every subscription when the workload exceeds the worker limit", async () => {
+    vi.mocked(webPush.sendNotification).mockResolvedValue({
+      statusCode: 201,
+      body: "",
+      headers: {}
+    });
+
+    const service = buildEnabledPushService();
+    const subscriptionCount = 12;
+    const subscriptions = Array.from({ length: subscriptionCount }, (_, index) =>
+      buildStoredSubscription(`https://push.example.test/subscriptions/sub_${index}`)
+    );
+
+    const result = await service.sendToSubscriptions(
+      subscriptions,
+      buildNotificationPayload("notif_dispatch_saturation")
+    );
+
+    expect(result.attempted).toBe(subscriptionCount);
+    expect(result.delivered).toBe(subscriptionCount);
+    expect(result.failures).toEqual([]);
+    expect(result.prunedEndpoints).toEqual([]);
+    expect(vi.mocked(webPush.sendNotification)).toHaveBeenCalledTimes(subscriptionCount);
+
+    const dispatchedEndpoints = vi
+      .mocked(webPush.sendNotification)
+      .mock.calls
+      .map(([subscription]) => subscription.endpoint);
+    expect(new Set(dispatchedEndpoints).size).toBe(subscriptionCount);
+  });
+
   it("marks gone subscriptions for pruning", async () => {
     vi.mocked(webPush.sendNotification).mockRejectedValue({
       statusCode: 410,
@@ -96,25 +139,11 @@ describe("PushService", () => {
     });
 
     const endpoint = "https://push.example.test/subscriptions/sub_410";
-    const service = new PushService({
-      enabled: true,
-      vapidPublicKey:
-        "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U",
-      vapidPrivateKey: "tfyAO9n9LMLXTy7ZaZwfDafDifFhnKz0MLC8nOxDmds",
-      vapidSubject: "mailto:test@example.com"
-    });
+    const service = buildEnabledPushService();
 
     const result = await service.sendToSubscriptions(
       [buildStoredSubscription(endpoint)],
-      {
-        notificationId: "notif_2",
-        title: "Codex response ready",
-        body: "A response is ready in Farfield.",
-        threadId: "thread_1",
-        turnId: "turn_1",
-        url: "/threads/thread_1",
-        createdAt: "2026-02-18T00:00:00.000Z"
-      }
+      buildNotificationPayload("notif_2")
     );
 
     expect(result.attempted).toBe(1);
@@ -141,25 +170,11 @@ describe("PushService", () => {
         headers: {}
       });
 
-    const service = new PushService({
-      enabled: true,
-      vapidPublicKey:
-        "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U",
-      vapidPrivateKey: "tfyAO9n9LMLXTy7ZaZwfDafDifFhnKz0MLC8nOxDmds",
-      vapidSubject: "mailto:test@example.com"
-    });
+    const service = buildEnabledPushService();
 
     const resultPromise = service.sendToSubscriptions(
       [buildStoredSubscription("https://push.example.test/subscriptions/sub_retry")],
-      {
-        notificationId: "notif_3",
-        title: "Codex response ready",
-        body: "A response is ready in Farfield.",
-        threadId: "thread_1",
-        turnId: "turn_1",
-        url: "/threads/thread_1",
-        createdAt: "2026-02-18T00:00:00.000Z"
-      }
+      buildNotificationPayload("notif_3")
     );
 
     await vi.runAllTimersAsync();
@@ -188,25 +203,11 @@ describe("PushService", () => {
       });
 
     const endpoint = "https://push.example.test/subscriptions/sub_retry_fail";
-    const service = new PushService({
-      enabled: true,
-      vapidPublicKey:
-        "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U",
-      vapidPrivateKey: "tfyAO9n9LMLXTy7ZaZwfDafDifFhnKz0MLC8nOxDmds",
-      vapidSubject: "mailto:test@example.com"
-    });
+    const service = buildEnabledPushService();
 
     const resultPromise = service.sendToSubscriptions(
       [buildStoredSubscription(endpoint)],
-      {
-        notificationId: "notif_4",
-        title: "Codex response ready",
-        body: "A response is ready in Farfield.",
-        threadId: "thread_1",
-        turnId: "turn_1",
-        url: "/threads/thread_1",
-        createdAt: "2026-02-18T00:00:00.000Z"
-      }
+      buildNotificationPayload("notif_4")
     );
 
     await vi.runAllTimersAsync();
@@ -216,6 +217,37 @@ describe("PushService", () => {
     expect(result.delivered).toBe(0);
     expect(result.failures.length).toBe(1);
     expect(result.failures[0]?.statusCode).toBe(503);
+    expect(result.prunedEndpoints).toEqual([]);
+    expect(vi.mocked(webPush.sendNotification)).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries non-object send errors and reports default failure message", async () => {
+    vi.useFakeTimers();
+    vi.mocked(webPush.sendNotification)
+      .mockRejectedValueOnce("non-object-push-error")
+      .mockRejectedValueOnce("non-object-push-error")
+      .mockRejectedValueOnce("non-object-push-error");
+
+    const endpoint = "https://push.example.test/subscriptions/sub_non_object_error";
+    const service = buildEnabledPushService();
+
+    const resultPromise = service.sendToSubscriptions(
+      [buildStoredSubscription(endpoint)],
+      buildNotificationPayload("notif_non_object_error")
+    );
+
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result.attempted).toBe(1);
+    expect(result.delivered).toBe(0);
+    expect(result.failures).toEqual([
+      {
+        endpoint,
+        statusCode: null,
+        message: "Push send failed"
+      }
+    ]);
     expect(result.prunedEndpoints).toEqual([]);
     expect(vi.mocked(webPush.sendNotification)).toHaveBeenCalledTimes(3);
   });
@@ -231,13 +263,9 @@ describe("PushService", () => {
     const result = await service.sendToSubscriptions(
       [buildStoredSubscription("https://push.example.test/subscriptions/sub_disabled")],
       {
-        notificationId: "notif_disabled",
+        ...buildNotificationPayload("notif_disabled"),
         title: "Disabled",
-        body: "Should not send",
-        threadId: "thread_1",
-        turnId: "turn_1",
-        url: "/threads/thread_1",
-        createdAt: "2026-02-18T00:00:00.000Z"
+        body: "Should not send"
       }
     );
 

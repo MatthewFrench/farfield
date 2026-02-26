@@ -10,6 +10,9 @@ import {
 
 type PatchPathSegment = number | string;
 
+const PATCH_OPERATION_ADD = "add";
+const PATCH_OPERATION_REPLACE = "replace";
+const PATCH_OPERATION_REMOVE = "remove";
 const PATCH_APPEND_PATH_SEGMENT = "-";
 const NON_NEGATIVE_ARRAY_INDEX_SEGMENT_PATTERN = /^(0|[1-9]\d*)$/;
 const EMPTY_PATCH_PATH_ERROR_MESSAGE = "Patch path cannot be empty";
@@ -17,6 +20,13 @@ const PATCH_SEQUENCE_FAILURE_MESSAGE_PREFIX = "Patch sequence failed at index";
 const PATCH_SEQUENCE_INVALID_STATE_MESSAGE_PREFIX =
   "Patch sequence produced invalid conversation state at index";
 const NO_TURN_PARAMS_TEMPLATE_ERROR_MESSAGE = "No turn params template found in conversation state";
+const PATCH_TARGET_TYPE_MISMATCH_ERROR_MESSAGE = "Patch target type mismatch";
+const THREAD_STREAM_CHANGE_TYPE_SNAPSHOT = "snapshot";
+const THREAD_STREAM_CHANGE_TYPE_PATCHES = "patches";
+const STRICT_PATCH_SEQUENCE_ERROR_NAME = "StrictPatchSequenceError";
+const THREAD_STREAM_REDUCTION_ERROR_NAME = "ThreadStreamReductionError";
+const UNSUPPORTED_PATCH_OPERATION_ERROR_MESSAGE_PREFIX = "Unsupported patch operation";
+const UNSUPPORTED_THREAD_STREAM_CHANGE_TYPE_ERROR_MESSAGE = "Unsupported thread stream change type";
 
 function cloneState<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -41,6 +51,10 @@ function parseArrayIndex(segment: PatchPathSegment): number {
 
 function toObjectPathKey(segment: PatchPathSegment): string {
   return typeof segment === "number" ? String(segment) : segment;
+}
+
+function hasOwnJsonProperty(target: JsonObject, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(target, key);
 }
 
 function isJsonArray(value: JsonValue): value is JsonValue[] {
@@ -88,7 +102,7 @@ function resolvePathValue(target: JsonValue, path: PatchPathSegment[]): JsonValu
 
     if (isJsonObject(cursor)) {
       const key = toObjectPathKey(segment);
-      if (!Object.prototype.hasOwnProperty.call(cursor, key)) {
+      if (!hasOwnJsonProperty(cursor, key)) {
         throw new Error(`Patch path segment missing: ${patchPathSegmentLabel(segment)}`);
       }
       const next = cursor[key];
@@ -112,60 +126,84 @@ function requirePatchValue(patch: ThreadStreamPatch): JsonValue {
   return patch.value;
 }
 
-function applyPatchToState(state: JsonValue, patch: ThreadStreamPatch): void {
-  const stateValue = state;
-
-  const { parentPath, lastSegment } = splitPatchPath(patch.path);
-  const parent = resolvePathValue(stateValue, parentPath);
-
-  if (isJsonArray(parent)) {
-    if (patch.op === "add" && lastSegment === PATCH_APPEND_PATH_SEGMENT) {
-      parent.push(requirePatchValue(patch));
-      return;
-    }
-
-    const arrayIndex = parseArrayIndex(lastSegment);
-
-    if (patch.op === "add") {
-      if (arrayIndex < 0 || arrayIndex > parent.length) {
-        throw new Error(`Patch add index out of range: ${String(lastSegment)}`);
-      }
-      parent.splice(arrayIndex, 0, requirePatchValue(patch));
-      return;
-    }
-
-    if (patch.op === "replace") {
-      if (arrayIndex < 0 || arrayIndex >= parent.length) {
-        throw new Error(`Patch replace index out of range: ${String(lastSegment)}`);
-      }
-      parent[arrayIndex] = requirePatchValue(patch);
-      return;
-    }
-
-    if (patch.op === "remove") {
-      if (arrayIndex < 0 || arrayIndex >= parent.length) {
-        throw new Error(`Patch remove index out of range: ${String(lastSegment)}`);
-      }
-      parent.splice(arrayIndex, 1);
-      return;
-    }
-  }
-
-  if (isJsonObject(parent)) {
-    const key = toObjectPathKey(lastSegment);
-    if (patch.op === "remove") {
-      if (!Object.prototype.hasOwnProperty.call(parent, key)) {
-        throw new Error(`Patch remove key missing: ${key}`);
-      }
-      delete parent[key];
-      return;
-    }
-
-    parent[key] = requirePatchValue(patch);
+function applyArrayPatch(
+  target: JsonValue[],
+  lastSegment: PatchPathSegment,
+  patch: ThreadStreamPatch
+): void {
+  const operation = patch.op;
+  if (operation === PATCH_OPERATION_ADD && lastSegment === PATCH_APPEND_PATH_SEGMENT) {
+    target.push(requirePatchValue(patch));
     return;
   }
 
-  throw new Error("Patch target type mismatch");
+  const arrayIndex = parseArrayIndex(lastSegment);
+
+  if (operation === PATCH_OPERATION_ADD) {
+    if (arrayIndex < 0 || arrayIndex > target.length) {
+      throw new Error(`Patch add index out of range: ${String(lastSegment)}`);
+    }
+    target.splice(arrayIndex, 0, requirePatchValue(patch));
+    return;
+  }
+
+  if (operation === PATCH_OPERATION_REPLACE) {
+    if (arrayIndex < 0 || arrayIndex >= target.length) {
+      throw new Error(`Patch replace index out of range: ${String(lastSegment)}`);
+    }
+    target[arrayIndex] = requirePatchValue(patch);
+    return;
+  }
+
+  if (operation === PATCH_OPERATION_REMOVE) {
+    if (arrayIndex < 0 || arrayIndex >= target.length) {
+      throw new Error(`Patch remove index out of range: ${String(lastSegment)}`);
+    }
+    target.splice(arrayIndex, 1);
+    return;
+  }
+
+  throw new Error(`${UNSUPPORTED_PATCH_OPERATION_ERROR_MESSAGE_PREFIX}: ${String(operation)}`);
+}
+
+function applyObjectPatch(
+  target: JsonObject,
+  lastSegment: PatchPathSegment,
+  patch: ThreadStreamPatch
+): void {
+  const operation = patch.op;
+  const key = toObjectPathKey(lastSegment);
+  if (operation === PATCH_OPERATION_REMOVE) {
+    if (!hasOwnJsonProperty(target, key)) {
+      throw new Error(`Patch remove key missing: ${key}`);
+    }
+    delete target[key];
+    return;
+  }
+
+  if (operation === PATCH_OPERATION_ADD || operation === PATCH_OPERATION_REPLACE) {
+    target[key] = requirePatchValue(patch);
+    return;
+  }
+
+  throw new Error(`${UNSUPPORTED_PATCH_OPERATION_ERROR_MESSAGE_PREFIX}: ${String(operation)}`);
+}
+
+function applyPatchToState(state: JsonValue, patch: ThreadStreamPatch): void {
+  const { parentPath, lastSegment } = splitPatchPath(patch.path);
+  const parent = resolvePathValue(state, parentPath);
+
+  if (isJsonArray(parent)) {
+    applyArrayPatch(parent, lastSegment, patch);
+    return;
+  }
+
+  if (isJsonObject(parent)) {
+    applyObjectPatch(parent, lastSegment, patch);
+    return;
+  }
+
+  throw new Error(PATCH_TARGET_TYPE_MISMATCH_ERROR_MESSAGE);
 }
 
 export class StrictPatchSequenceError extends Error {
@@ -178,7 +216,7 @@ export class StrictPatchSequenceError extends Error {
     cause?: Error | string | JsonValue
   ) {
     super(message);
-    this.name = "StrictPatchSequenceError";
+    this.name = STRICT_PATCH_SEQUENCE_ERROR_NAME;
     this.patchIndex = patchIndex;
     this.cause = cause;
   }
@@ -327,7 +365,7 @@ export class ThreadStreamReductionError extends Error {
     cause?: Error | string | JsonValue
   ) {
     super(message);
-    this.name = "ThreadStreamReductionError";
+    this.name = THREAD_STREAM_REDUCTION_ERROR_NAME;
     this.details = details;
     this.cause = cause;
   }
@@ -407,50 +445,76 @@ function applyEventPatchSequence(
   return updatedConversationState;
 }
 
+function createEmptyThreadStreamDerivedState(): ThreadStreamDerivedState {
+  return {
+    ownerClientId: null,
+    conversationState: null
+  };
+}
+
+function createNextThreadStreamDerivedState(
+  previous: ThreadStreamDerivedState,
+  sourceClientId: string
+): ThreadStreamDerivedState {
+  return {
+    ownerClientId: sourceClientId,
+    conversationState: previous.conversationState
+  };
+}
+
+function reduceThreadStreamEvent(
+  byThread: Map<string, ThreadStreamDerivedState>,
+  event: ThreadStreamStateChangedBroadcast,
+  eventIndex: number
+): void {
+  const threadId = event.params.conversationId;
+  const previous = byThread.get(threadId) ?? createEmptyThreadStreamDerivedState();
+  const next = createNextThreadStreamDerivedState(previous, event.sourceClientId);
+  const change = event.params.change;
+  const changeType = change.type;
+
+  if (changeType === THREAD_STREAM_CHANGE_TYPE_SNAPSHOT) {
+    next.conversationState = change.conversationState;
+    byThread.set(threadId, next);
+    return;
+  }
+
+  if (changeType === THREAD_STREAM_CHANGE_TYPE_PATCHES) {
+    if (next.conversationState) {
+      next.conversationState = applyEventPatchSequence(
+        threadId,
+        eventIndex,
+        event,
+        next.conversationState,
+        change.patches
+      );
+      byThread.set(threadId, next);
+      return;
+    }
+
+    // Event ownership still advances to the most recent producer even when
+    // patch events arrive before a thread has emitted its first snapshot.
+    byThread.set(threadId, next);
+    return;
+  }
+
+  throw new Error(
+    `${UNSUPPORTED_THREAD_STREAM_CHANGE_TYPE_ERROR_MESSAGE}: ${String(changeType)}`
+  );
+}
+
 export function reduceThreadStreamEvents(
   events: ThreadStreamStateChangedBroadcast[]
 ): Map<string, ThreadStreamDerivedState> {
   const byThread = new Map<string, ThreadStreamDerivedState>();
 
+  // Apply events strictly in caller-provided order so replay remains deterministic.
   for (let eventIndex = 0; eventIndex < events.length; eventIndex += 1) {
     const event = events[eventIndex];
     if (!event) {
       continue;
     }
-    const threadId = event.params.conversationId;
-    const previous = byThread.get(threadId) ?? {
-      ownerClientId: null,
-      conversationState: null
-    };
-
-    const next: ThreadStreamDerivedState = {
-      ownerClientId: event.sourceClientId,
-      conversationState: previous.conversationState
-    };
-
-    const change = event.params.change;
-
-    if (change.type === "snapshot") {
-      next.conversationState = change.conversationState;
-      byThread.set(threadId, next);
-      continue;
-    }
-
-    if (!next.conversationState) {
-      // The desktop app can emit patches before the first snapshot for a thread.
-      // Ignore these until we have a concrete base state.
-      byThread.set(threadId, next);
-      continue;
-    }
-
-    next.conversationState = applyEventPatchSequence(
-      threadId,
-      eventIndex,
-      event,
-      next.conversationState,
-      change.patches
-    );
-    byThread.set(threadId, next);
+    reduceThreadStreamEvent(byThread, event, eventIndex);
   }
 
   return byThread;

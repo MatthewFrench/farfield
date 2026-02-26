@@ -179,6 +179,44 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     expect(snapshot.containsAnyTurns).toBe(true);
   });
 
+  it("caps retry delay growth at configured maximum across repeated transient retries", async () => {
+    const waitDurations: number[] = [];
+    const coordinator = new SelectedThreadDataRefreshCoordinator({
+      retryConfiguration: {
+        maximumAttempts: 4,
+        baseDelayMilliseconds: 10,
+        maximumDelayMilliseconds: 25
+      },
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      }
+    });
+    const readThreadCalls: boolean[] = [];
+    const chatClient = createChatClient({
+      readThread: vi.fn(async (threadId: string, options) => {
+        readThreadCalls.push(options?.includeTurns === true);
+        if (readThreadCalls.length < 4) {
+          throw new Error("thread not loaded in app-server");
+        }
+        return buildReadThreadSnapshot(threadId, []);
+      })
+    });
+
+    const snapshot = await coordinator.readSnapshot({
+      threadId: "thread-2a",
+      includeTurns: false,
+      includeReadThread: true,
+      canReadLiveState: false,
+      canReadStreamEvents: false,
+      streamEventsSinceSequence: null,
+      chatClient
+    });
+
+    expect(waitDurations).toEqual([10, 20, 25]);
+    expect(readThreadCalls).toEqual([false, true, true, true]);
+    expect(snapshot.includeTurnsUsedForRead).toBe(true);
+  });
+
   it("returns deterministic default snapshots when capabilities do not allow reads", async () => {
     const coordinator = new SelectedThreadDataRefreshCoordinator();
     const chatClient = createChatClient();
@@ -213,7 +251,26 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       resetRequired: false
     });
     expect(snapshot.readThreadSnapshot).toBeNull();
+    expect(snapshot.includeTurnsUsedForRead).toBe(false);
     expect(snapshot.containsAnyTurns).toBe(false);
+  });
+
+  it("preserves requested includeTurns value when read-thread snapshots are disabled", async () => {
+    const coordinator = new SelectedThreadDataRefreshCoordinator();
+    const chatClient = createChatClient();
+
+    const snapshot = await coordinator.readSnapshot({
+      threadId: "thread-3a",
+      includeTurns: true,
+      includeReadThread: false,
+      canReadLiveState: false,
+      canReadStreamEvents: false,
+      streamEventsSinceSequence: null,
+      chatClient
+    });
+
+    expect(snapshot.readThreadSnapshot).toBeNull();
+    expect(snapshot.includeTurnsUsedForRead).toBe(true);
   });
 
   it("passes stream event cursor options to stream-event reads", async () => {

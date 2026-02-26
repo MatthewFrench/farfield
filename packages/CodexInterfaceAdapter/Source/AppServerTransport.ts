@@ -21,45 +21,60 @@ interface PendingRequest {
 }
 
 const APP_SERVER_COMMAND = "app-server";
+const APP_SERVER_PROCESS_NAME = APP_SERVER_COMMAND;
 const APP_SERVER_CLIENT_NAME = "farfield";
 const APP_SERVER_CLIENT_VERSION = "0.2.0";
 const APP_SERVER_INITIALIZE_METHOD = "initialize";
 const APP_SERVER_JSON_RPC_VERSION = "2.0";
 const DEFAULT_APP_SERVER_REQUEST_TIMEOUT_MS = 30_000;
+const APP_SERVER_STANDARD_INPUT_LINE_TERMINATOR = "\n";
+const APP_SERVER_CODEX_USER_AGENT_ENVIRONMENT_KEY = "CODEX_USER_AGENT";
+const APP_SERVER_CODEX_CLIENT_IDENTIFIER_ENVIRONMENT_KEY = "CODEX_CLIENT_ID";
 
 const ProcessEnvironmentSchema = z.record(z.string(), z.string().optional());
 const InitializeResultSchema = z.object({}).passthrough();
+const SpawnEnvironmentVariableSchema = z.string().min(1).optional();
+// This allowlist intentionally covers cross-platform process execution context only.
+// Any key not listed here is blocked from child-process startup.
 const AppServerSpawnEnvironmentShape = {
-  HOME: z.string().min(1).optional(),
-  PATH: z.string().min(1).optional(),
-  SHELL: z.string().min(1).optional(),
-  USER: z.string().min(1).optional(),
-  USERNAME: z.string().min(1).optional(),
-  TMPDIR: z.string().min(1).optional(),
-  TMP: z.string().min(1).optional(),
-  TEMP: z.string().min(1).optional(),
-  LANG: z.string().min(1).optional(),
-  LC_ALL: z.string().min(1).optional(),
-  TERM: z.string().min(1).optional(),
-  TZ: z.string().min(1).optional(),
-  SSL_CERT_FILE: z.string().min(1).optional(),
-  SSL_CERT_DIR: z.string().min(1).optional(),
-  NODE_EXTRA_CA_CERTS: z.string().min(1).optional(),
-  HTTP_PROXY: z.string().min(1).optional(),
-  HTTPS_PROXY: z.string().min(1).optional(),
-  NO_PROXY: z.string().min(1).optional(),
-  ALL_PROXY: z.string().min(1).optional(),
-  CODEX_HOME: z.string().min(1).optional(),
-  XDG_CONFIG_HOME: z.string().min(1).optional(),
-  XDG_CACHE_HOME: z.string().min(1).optional(),
-  APPDATA: z.string().min(1).optional(),
-  LOCALAPPDATA: z.string().min(1).optional(),
-  USERPROFILE: z.string().min(1).optional(),
-  SystemRoot: z.string().min(1).optional(),
-  ComSpec: z.string().min(1).optional()
+  HOME: SpawnEnvironmentVariableSchema,
+  PATH: SpawnEnvironmentVariableSchema,
+  SHELL: SpawnEnvironmentVariableSchema,
+  USER: SpawnEnvironmentVariableSchema,
+  USERNAME: SpawnEnvironmentVariableSchema,
+  TMPDIR: SpawnEnvironmentVariableSchema,
+  TMP: SpawnEnvironmentVariableSchema,
+  TEMP: SpawnEnvironmentVariableSchema,
+  LANG: SpawnEnvironmentVariableSchema,
+  LC_ALL: SpawnEnvironmentVariableSchema,
+  TERM: SpawnEnvironmentVariableSchema,
+  TZ: SpawnEnvironmentVariableSchema,
+  SSL_CERT_FILE: SpawnEnvironmentVariableSchema,
+  SSL_CERT_DIR: SpawnEnvironmentVariableSchema,
+  NODE_EXTRA_CA_CERTS: SpawnEnvironmentVariableSchema,
+  HTTP_PROXY: SpawnEnvironmentVariableSchema,
+  HTTPS_PROXY: SpawnEnvironmentVariableSchema,
+  NO_PROXY: SpawnEnvironmentVariableSchema,
+  ALL_PROXY: SpawnEnvironmentVariableSchema,
+  CODEX_HOME: SpawnEnvironmentVariableSchema,
+  XDG_CONFIG_HOME: SpawnEnvironmentVariableSchema,
+  XDG_CACHE_HOME: SpawnEnvironmentVariableSchema,
+  APPDATA: SpawnEnvironmentVariableSchema,
+  LOCALAPPDATA: SpawnEnvironmentVariableSchema,
+  USERPROFILE: SpawnEnvironmentVariableSchema,
+  SystemRoot: SpawnEnvironmentVariableSchema,
+  ComSpec: SpawnEnvironmentVariableSchema
 } as const;
 const AppServerSpawnInheritedEnvironmentSchema = z.object(AppServerSpawnEnvironmentShape).strip();
 const AppServerSpawnOverrideEnvironmentSchema = z.object(AppServerSpawnEnvironmentShape).strict();
+const BuildAppServerSpawnEnvironmentInputSchema = z
+  .object({
+    baseEnvironment: ProcessEnvironmentSchema,
+    overrideEnvironment: ProcessEnvironmentSchema.optional(),
+    userAgent: z.string().min(1),
+    clientId: z.string().min(1)
+  })
+  .strict();
 
 export interface BuildAppServerSpawnEnvironmentInput {
   baseEnvironment: NodeJS.ProcessEnv;
@@ -73,14 +88,15 @@ export interface BuildAppServerSpawnEnvironmentInput {
  * Only allowlisted keys may cross the process boundary so configuration remains explicit and reviewable.
  */
 export function buildAppServerSpawnEnvironment(input: BuildAppServerSpawnEnvironmentInput): NodeJS.ProcessEnv {
-  const inheritedEnvironment = AppServerSpawnInheritedEnvironmentSchema.parse(input.baseEnvironment);
-  const overrideEnvironment = AppServerSpawnOverrideEnvironmentSchema.parse(input.overrideEnvironment ?? {});
+  const parsedInput = BuildAppServerSpawnEnvironmentInputSchema.parse(input);
+  const inheritedEnvironment = AppServerSpawnInheritedEnvironmentSchema.parse(parsedInput.baseEnvironment);
+  const overrideEnvironment = AppServerSpawnOverrideEnvironmentSchema.parse(parsedInput.overrideEnvironment ?? {});
 
   return {
     ...inheritedEnvironment,
     ...overrideEnvironment,
-    CODEX_USER_AGENT: input.userAgent,
-    CODEX_CLIENT_ID: input.clientId
+    [APP_SERVER_CODEX_USER_AGENT_ENVIRONMENT_KEY]: parsedInput.userAgent,
+    [APP_SERVER_CODEX_CLIENT_IDENTIFIER_ENVIRONMENT_KEY]: parsedInput.clientId
   };
 }
 
@@ -120,6 +136,10 @@ export function isChildProcessAppServerTransportOptions(
   return ChildProcessAppServerTransportOptionsSchema.safeParse(value).success;
 }
 
+/**
+ * Owns request/response transport state for a single spawned `app-server` process.
+ * `pending` and `initializeInFlight` enforce deterministic single-settle request behavior under concurrent calls.
+ */
 export class ChildProcessAppServerTransport implements AppServerTransport {
   private readonly executablePath: string;
   private readonly userAgent: string;
@@ -170,7 +190,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       spawnEnvironment = buildAppServerSpawnEnvironment(spawnEnvironmentInput);
     } catch (error) {
       throw new AppServerTransportError(
-        `app-server environment configuration invalid: ${toErrorMessage(error)}`
+        `${APP_SERVER_PROCESS_NAME} environment configuration invalid: ${toErrorMessage(error)}`
       );
     }
 
@@ -181,13 +201,13 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     });
 
     child.on("exit", (code, signal) => {
-      const reason = `app-server exited (code=${String(code)}, signal=${String(signal)})`;
+      const reason = `${APP_SERVER_PROCESS_NAME} exited (code=${String(code)}, signal=${String(signal)})`;
       this.rejectAll(new AppServerTransportError(reason));
       this.resetProcessState();
     });
 
     child.on("error", (error) => {
-      this.rejectAll(new AppServerTransportError(`app-server process error: ${error.message}`));
+      this.rejectAll(new AppServerTransportError(`${APP_SERVER_PROCESS_NAME} process error: ${error.message}`));
       this.resetProcessState();
     });
 
@@ -202,7 +222,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       try {
         raw = JsonValueSchema.parse(JSON.parse(trimmed));
       } catch {
-        this.rejectAll(new AppServerTransportError("app-server returned invalid JSON"));
+        this.rejectAll(new AppServerTransportError(`${APP_SERVER_PROCESS_NAME} returned invalid JSON`));
         return;
       }
 
@@ -212,7 +232,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       } catch (error) {
         this.rejectAll(
           new AppServerTransportError(
-            `app-server response schema mismatch: ${toErrorMessage(error)}`
+            `${APP_SERVER_PROCESS_NAME} response schema mismatch: ${toErrorMessage(error)}`
           )
         );
         return;
@@ -244,7 +264,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       if (message.value.result === undefined) {
         pending.reject(
           new AppServerTransportError(
-            `app-server response missing result for request id ${String(message.value.id)}`
+            `${APP_SERVER_PROCESS_NAME} response missing result for request id ${String(message.value.id)}`
           )
         );
         return;
@@ -285,7 +305,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
   ): Promise<JsonValue> {
     const processHandle = this.process;
     if (!processHandle) {
-      throw new AppServerTransportError("app-server failed to start");
+      throw new AppServerTransportError(`${APP_SERVER_PROCESS_NAME} failed to start`);
     }
 
     const id = ++this.requestId;
@@ -296,12 +316,13 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       method,
       params: JsonValueSchema.parse(params)
     });
-    const encoded = JSON.stringify(requestPayload) + "\n";
+    const encoded = JSON.stringify(requestPayload) + APP_SERVER_STANDARD_INPUT_LINE_TERMINATOR;
 
     return new Promise((resolve, reject) => {
+      // Timeout completion and write callbacks can race during shutdown. `pending` ownership ensures one settle path.
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new AppServerTransportError(`app-server request timed out: ${method}`));
+        reject(new AppServerTransportError(`${APP_SERVER_PROCESS_NAME} request timed out: ${method}`));
       }, timeout);
 
       this.pending.set(id, { timer, resolve, reject });
@@ -318,7 +339,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
 
         clearTimeout(pending.timer);
         this.pending.delete(id);
-        pending.reject(new AppServerTransportError(`failed to write app-server request: ${error.message}`));
+        pending.reject(new AppServerTransportError(`failed to write ${APP_SERVER_PROCESS_NAME} request: ${error.message}`));
       });
     });
   }
@@ -332,6 +353,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       return this.initializeInFlight;
     }
 
+    // Concurrent request callers share one initialize handshake so request ordering and error propagation stay deterministic.
     this.initializeInFlight = (async () => {
       const result = await this.sendRequest(
         APP_SERVER_INITIALIZE_METHOD,
@@ -364,6 +386,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
   ): Promise<JsonValue> {
     this.ensureStarted();
 
+    // The initialize RPC must not recursively trigger initialize orchestration.
     if (method !== APP_SERVER_INITIALIZE_METHOD) {
       await this.ensureInitialized();
     }
@@ -382,7 +405,8 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     }
 
     this.resetProcessState();
-    this.rejectAll(new AppServerTransportError("app-server transport closed"));
+    // Reject before SIGTERM so close callers and in-flight callers observe deterministic closure semantics.
+    this.rejectAll(new AppServerTransportError(`${APP_SERVER_PROCESS_NAME} transport closed`));
 
     processHandle.kill("SIGTERM");
   }

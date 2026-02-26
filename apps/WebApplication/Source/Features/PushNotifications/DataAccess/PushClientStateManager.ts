@@ -9,12 +9,16 @@ import {
   type PushNotificationSettingsUpdateResult,
   type PushRecoveryResult,
   PushSubscriptionReconcileInputSchema,
+  type PushSubscriptionReconcileReason,
   PushSubscriptionReconcileReasonSchema,
   type PushSubscriptionReconcileInput,
   type PushSubscriptionReconcileResult
 } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { PushPreferenceStore } from "@/Features/PushNotifications/DataAccess/PushPreferenceStore";
-import { PushServerClient } from "@/Features/PushNotifications/DataAccess/PushServerClient";
+import {
+  type PushCreateSubscriptionResponse,
+  PushServerClient
+} from "@/Features/PushNotifications/DataAccess/PushServerClient";
 
 interface WindowWithSwReloadSuppression extends Window {
   __farfieldSuppressSwReload?: boolean;
@@ -23,6 +27,11 @@ interface WindowWithSwReloadSuppression extends Window {
 interface PushClientStateManagerDependencies {
   pushPreferenceStore: PushPreferenceStore;
   pushServerClient: PushServerClient;
+}
+
+interface SavePushSubscriptionWithSettingsInput {
+  browserSubscription: PushSubscription;
+  privateMode: boolean;
 }
 
 const PUSH_NOT_SUPPORTED_ERROR_MESSAGE = "Push notifications are not supported in this browser";
@@ -120,12 +129,9 @@ export class PushClientStateManager {
       });
     }
 
-    const payload = this.strictSubscriptionPayload(browserSubscription);
-    const saved = await this.pushServerClient.savePushSubscription({
-      subscription: payload,
-      settings: {
-        privateMode: parsedInput.privateMode
-      }
+    const saved = await this.savePushSubscriptionWithSettings({
+      browserSubscription,
+      privateMode: parsedInput.privateMode
     });
     this.pushPreferenceStore.writeAutoHealPreferenceEnabled(true);
 
@@ -150,12 +156,9 @@ export class PushClientStateManager {
       throw new Error(NO_ACTIVE_PUSH_SUBSCRIPTION_ERROR_MESSAGE);
     }
 
-    const payload = this.strictSubscriptionPayload(browserSubscription);
-    await this.pushServerClient.savePushSubscription({
-      subscription: payload,
-      settings: {
-        privateMode: parsedInput.privateMode
-      }
+    await this.savePushSubscriptionWithSettings({
+      browserSubscription,
+      privateMode: parsedInput.privateMode
     });
 
     return { updated: true };
@@ -206,40 +209,22 @@ export class PushClientStateManager {
   ): Promise<PushSubscriptionReconcileResult> {
     const parsedInput = PushSubscriptionReconcileInputSchema.parse(input ?? {});
     if (!this.isPushSupported()) {
-      return {
-        attempted: false,
-        subscribed: false,
-        repaired: false,
-        reason: PushSubscriptionReconcileReasons.unsupported
-      };
+      return this.createReconcileSkippedResult(PushSubscriptionReconcileReasons.unsupported);
     }
 
     if (!this.pushPreferenceStore.readAutoHealPreferenceEnabled()) {
-      return {
-        attempted: false,
-        subscribed: false,
-        repaired: false,
-        reason: PushSubscriptionReconcileReasons["not-enabled"]
-      };
+      return this.createReconcileSkippedResult(PushSubscriptionReconcileReasons["not-enabled"]);
     }
 
     if (Notification.permission !== NOTIFICATION_PERMISSION_GRANTED) {
-      return {
-        attempted: false,
-        subscribed: false,
-        repaired: false,
-        reason: PushSubscriptionReconcileReasons["permission-not-granted"]
-      };
+      return this.createReconcileSkippedResult(
+        PushSubscriptionReconcileReasons["permission-not-granted"]
+      );
     }
 
     const status = await this.pushServerClient.readPushStatus();
     if (!status.enabled) {
-      return {
-        attempted: false,
-        subscribed: false,
-        repaired: false,
-        reason: PushSubscriptionReconcileReasons["server-disabled"]
-      };
+      return this.createReconcileSkippedResult(PushSubscriptionReconcileReasons["server-disabled"]);
     }
 
     const registration = await this.registerPushServiceWorker();
@@ -255,13 +240,10 @@ export class PushClientStateManager {
       repaired = true;
     }
 
-    const payload = this.strictSubscriptionPayload(browserSubscription);
     const privateMode = parsedInput.privateMode ?? status.privateModeDefault;
-    await this.pushServerClient.savePushSubscription({
-      subscription: payload,
-      settings: {
-        privateMode
-      }
+    await this.savePushSubscriptionWithSettings({
+      browserSubscription,
+      privateMode
     });
 
     return {
@@ -347,6 +329,29 @@ export class PushClientStateManager {
       keys: {
         p256dh: raw.keys?.[PUSH_SUBSCRIPTION_P256DH_KEY_NAME] ?? PUSH_SUBSCRIPTION_EMPTY_KEY_DEFAULT,
         auth: raw.keys?.[PUSH_SUBSCRIPTION_AUTH_KEY_NAME] ?? PUSH_SUBSCRIPTION_EMPTY_KEY_DEFAULT
+      }
+    });
+  }
+
+  private createReconcileSkippedResult(
+    reason: PushSubscriptionReconcileReason
+  ): PushSubscriptionReconcileResult {
+    return {
+      attempted: false,
+      subscribed: false,
+      repaired: false,
+      reason
+    };
+  }
+
+  private async savePushSubscriptionWithSettings(
+    input: SavePushSubscriptionWithSettingsInput
+  ): Promise<PushCreateSubscriptionResponse> {
+    const payload = this.strictSubscriptionPayload(input.browserSubscription);
+    return await this.pushServerClient.savePushSubscription({
+      subscription: payload,
+      settings: {
+        privateMode: input.privateMode
       }
     });
   }

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   FarfieldEventStreamEnvelopeSchema,
   FarfieldDebugObservabilityEnvelopeSchema,
+  FarfieldHealthResponseSchema,
+  FarfieldPushStatusEnvelopeSchema,
   parseAppServerCollaborationModeListResponse,
   parseAppServerConfigReadResponse,
   parseAppServerListModelsResponse,
@@ -142,6 +144,32 @@ describe("codex-protocol app-server schemas", () => {
     expect(parsed.thread.turns[0]?.status).toBe("completed");
   });
 
+  it("returns a normalized read-thread contract and removes unknown envelope payload fields", () => {
+    const parsed = parseAppServerReadThreadResponse({
+      thread: {
+        id: "thread-transport-shape",
+        preview: "hello",
+        modelProvider: "openai",
+        createdAt: 1700000000,
+        updatedAt: 1700000000,
+        cwd: "/tmp/workspace",
+        source: "cli",
+        path: "/tmp/thread.jsonl",
+        cliVersion: "0.1.0",
+        turns: [],
+        threadRuntimeMetadata: {
+          sourceRequestId: "request-1"
+        }
+      },
+      responseEnvelopeMetadata: {
+        nextCursor: null
+      }
+    });
+
+    expect(Object.keys(parsed)).toEqual(["thread"]);
+    expect(parsed.thread["threadRuntimeMetadata"]).toBeUndefined();
+  });
+
   it("rejects app-server thread/read response when normalized thread contract fails", () => {
     expect(() =>
       parseAppServerReadThreadResponse({
@@ -228,6 +256,27 @@ describe("codex-protocol app-server schemas", () => {
     expect(parsed.config.profile).toBe("personal");
     expect(parsed.config.model_reasoning_effort).toBe("medium");
     expect(parsed.config.profiles["personal"]?.model_reasoning_effort).toBe("xhigh");
+  });
+
+  it("normalizes app-server config/read response defaults when optional fields are absent", () => {
+    const parsed = parseAppServerConfigReadResponse({
+      config: {}
+    });
+
+    expect(parsed.config.profile).toBeNull();
+    expect(parsed.config.model).toBeNull();
+    expect(parsed.config.model_reasoning_effort).toBeNull();
+    expect(parsed.config.profiles).toEqual({});
+  });
+
+  it("rejects app-server config/read response when reasoning effort is invalid", () => {
+    expect(() =>
+      parseAppServerConfigReadResponse({
+        config: {
+          model_reasoning_effort: "ultra"
+        }
+      })
+    ).toThrowError(/model_reasoning_effort/);
   });
 
   it("parses debug error create body defaults", () => {
@@ -389,6 +438,36 @@ describe("codex-protocol app-server schemas", () => {
     });
 
     expect(parsed.snapshot.routing.threadAdapterResolver.unregisteredDiscoveryMissCacheHitCount).toBe(5);
+  });
+
+  it("parses farfield health response with additive diagnostics keys", () => {
+    const parsed = FarfieldHealthResponseSchema.parse({
+      ok: true,
+      state: {
+        appReady: true,
+        ipcConnected: true,
+        ipcInitialized: true,
+        workspaceDir: null,
+        gitCommit: null,
+        lastError: null,
+        historyCount: 12,
+        threadOwnerCount: 2,
+        pushSubscriptionCount: 1,
+        diagnosticsBuild: "2026-02-26"
+      }
+    });
+
+    expect(Object.keys(parsed.state)).toContain("diagnosticsBuild");
+  });
+
+  it("rejects farfield push status envelope when ok is false", () => {
+    expect(() => FarfieldPushStatusEnvelopeSchema.parse({
+      ok: false,
+      enabled: true,
+      permissionRequired: false,
+      subscriptionCount: 0,
+      privateModeDefault: false
+    })).toThrowError(/Invalid literal value, expected true/);
   });
 
   it("parses farfield event-stream envelope for thread stream delta payloads", () => {

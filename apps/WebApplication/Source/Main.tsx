@@ -1,5 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { z } from "zod";
 import { App } from "./App";
 import "./Index.css";
 import { reconcilePushSubscription } from "./Features/PushNotifications/DataAccess/PushClientApi";
@@ -9,6 +10,24 @@ import { ApplicationRouteStateMapper } from "./Application/DomainModel/Applicati
 
 const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";
 const BOOT_STATUS_EVENT_NAME = "farfield:boot-status";
+const APPLICATION_ROOT_ELEMENT_IDENTIFIER = "root";
+const SERVICE_WORKER_SCRIPT_PATH = "/sw.js";
+const DISPLAY_MODE_STANDALONE_MEDIA_QUERY = "(display-mode: standalone)";
+const STANDALONE_DISPLAY_MODE_CLASS_NAME = "standalone-display-mode";
+const BOOT_SPLASH_ELEMENT_IDENTIFIER = "boot-splash";
+const BOOT_SPLASH_HIDDEN_CLASS_NAME = "boot-splash--hidden";
+const BOOT_SPLASH_REMOVE_DELAY_MILLISECONDS = 220;
+const CLIENT_CRASH_REPORT_SOURCE = "farfield-web";
+const DEVELOPMENT_BOOT_STATUS_LOADING_MESSAGE = "Loading Farfield";
+const DEVELOPMENT_BOOT_STATUS_WAITING_FOR_SERVER_MESSAGE = "Waiting for development server";
+const DEVELOPMENT_BOOT_STATUS_WAITING_FOR_SERVER_DETAILS =
+  "Lost connection to Vite. Start or restart the dev server, then press Retry.";
+const DEVELOPMENT_BOOT_STATUS_APPLYING_UPDATE_MESSAGE = "Applying update";
+const DEVELOPMENT_BOOT_STATUS_COMPILE_ERROR_MESSAGE = "Vite compile error";
+const DEVELOPMENT_HMR_STATUS_CONNECTED = "HMR connected";
+const DEVELOPMENT_HMR_STATUS_DISCONNECTED = "HMR disconnected";
+const DEVELOPMENT_HMR_STATUS_UPDATING = "HMR updating";
+const DEVELOPMENT_HMR_STATUS_COMPILE_FAILED = "HMR compile failed";
 const applicationRouteStateMapper = new ApplicationRouteStateMapper();
 
 interface BootStatusDetail {
@@ -20,14 +39,20 @@ interface BootStatusDetail {
   hmrStatus?: string;
 }
 
-interface ViteErrorPayload {
-  err: {
-    message: string;
-    stack?: string;
-    plugin?: string;
-    id?: string;
-  };
-}
+const ViteErrorPayloadSchema = z
+  .object({
+    err: z
+      .object({
+        message: z.string(),
+        stack: z.string().optional(),
+        plugin: z.string().optional(),
+        id: z.string().optional()
+      })
+      .strict()
+  })
+  .strict();
+
+type ViteErrorPayload = z.infer<typeof ViteErrorPayloadSchema>;
 
 interface NavigatorWithStandalone extends Navigator {
   standalone?: boolean;
@@ -46,127 +71,141 @@ function publishBootStatus(detail: BootStatusDetail): void {
   window.dispatchEvent(new CustomEvent<BootStatusDetail>(BOOT_STATUS_EVENT_NAME, { detail }));
 }
 
+function publishConnectedDevelopmentBootStatus(): void {
+  publishBootStatus({
+    message: DEVELOPMENT_BOOT_STATUS_LOADING_MESSAGE,
+    details: "",
+    isError: false,
+    showActions: false,
+    detailsOpen: false,
+    hmrStatus: DEVELOPMENT_HMR_STATUS_CONNECTED
+  });
+}
+
+function publishDisconnectedDevelopmentBootStatus(): void {
+  publishBootStatus({
+    message: DEVELOPMENT_BOOT_STATUS_WAITING_FOR_SERVER_MESSAGE,
+    details: DEVELOPMENT_BOOT_STATUS_WAITING_FOR_SERVER_DETAILS,
+    isError: true,
+    showActions: true,
+    detailsOpen: true,
+    hmrStatus: DEVELOPMENT_HMR_STATUS_DISCONNECTED
+  });
+}
+
+function publishUpdatingDevelopmentBootStatus(): void {
+  publishBootStatus({
+    message: DEVELOPMENT_BOOT_STATUS_APPLYING_UPDATE_MESSAGE,
+    details: "",
+    isError: false,
+    showActions: false,
+    detailsOpen: false,
+    hmrStatus: DEVELOPMENT_HMR_STATUS_UPDATING
+  });
+}
+
+function publishCompileFailedDevelopmentBootStatus(details: string): void {
+  publishBootStatus({
+    message: DEVELOPMENT_BOOT_STATUS_COMPILE_ERROR_MESSAGE,
+    details,
+    isError: true,
+    showActions: true,
+    detailsOpen: true,
+    hmrStatus: DEVELOPMENT_HMR_STATUS_COMPILE_FAILED
+  });
+}
+
 function isStandaloneDisplayMode(): boolean {
   const navigatorWithStandalone = window.navigator as NavigatorWithStandalone;
   return (
-    window.matchMedia("(display-mode: standalone)").matches ||
+    window.matchMedia(DISPLAY_MODE_STANDALONE_MEDIA_QUERY).matches ||
     navigatorWithStandalone.standalone === true
   );
 }
 
 function syncDisplayModeClass(): void {
   document.documentElement.classList.toggle(
-    "standalone-display-mode",
+    STANDALONE_DISPLAY_MODE_CLASS_NAME,
     isStandaloneDisplayMode()
   );
 }
 
 function installDisplayModeSync(): void {
-  const displayModeQuery = window.matchMedia("(display-mode: standalone)");
+  const displayModeQuery = window.matchMedia(DISPLAY_MODE_STANDALONE_MEDIA_QUERY);
 
   syncDisplayModeClass();
   window.addEventListener("focus", syncDisplayModeClass);
   window.addEventListener("pageshow", syncDisplayModeClass);
-  if (typeof displayModeQuery.addEventListener === "function") {
-    displayModeQuery.addEventListener("change", syncDisplayModeClass);
-  }
+  displayModeQuery.addEventListener("change", syncDisplayModeClass);
 }
 
-if (typeof window !== "undefined") {
+function installBootstrapWindowOwners(): void {
   installDisplayModeSync();
   installGlobalClientCrashReporter({
-    source: "farfield-web",
+    source: CLIENT_CRASH_REPORT_SOURCE,
     readThreadId: () => applicationRouteStateMapper.parseFromPathname(window.location.pathname).threadId,
     readUrl: () => window.location.pathname + window.location.search
   });
 }
 
-if (import.meta.env.DEV && import.meta.hot) {
-  publishBootStatus({
-    message: "Loading Farfield",
-    hmrStatus: "HMR connected"
-  });
+if (typeof window !== "undefined") {
+  installBootstrapWindowOwners();
+}
+
+function installDevelopmentBootStatusPublisher(): void {
+  if (!import.meta.env.DEV || !import.meta.hot) {
+    return;
+  }
+
+  publishConnectedDevelopmentBootStatus();
 
   import.meta.hot.on("vite:ws:connect", () => {
-    publishBootStatus({
-      message: "Loading Farfield",
-      isError: false,
-      showActions: false,
-      detailsOpen: false,
-      details: "",
-      hmrStatus: "HMR connected"
-    });
+    publishConnectedDevelopmentBootStatus();
   });
 
   import.meta.hot.on("vite:ws:disconnect", () => {
-    publishBootStatus({
-      message: "Waiting for development server",
-      details: "Lost connection to Vite. Start or restart the dev server, then press Retry.",
-      isError: true,
-      showActions: true,
-      detailsOpen: true,
-      hmrStatus: "HMR disconnected"
-    });
+    publishDisconnectedDevelopmentBootStatus();
   });
 
   import.meta.hot.on("vite:beforeUpdate", () => {
-    publishBootStatus({
-      message: "Applying update",
-      isError: false,
-      showActions: false,
-      detailsOpen: false,
-      details: "",
-      hmrStatus: "HMR updating"
-    });
+    publishUpdatingDevelopmentBootStatus();
   });
 
   import.meta.hot.on("vite:error", (payload: ViteErrorPayload) => {
+    const parsedPayload = ViteErrorPayloadSchema.parse(payload);
     const pluginLabel =
-      typeof payload.err.plugin === "string" && payload.err.plugin.length > 0
-        ? `[${payload.err.plugin}] `
+      parsedPayload.err.plugin && parsedPayload.err.plugin.length > 0
+        ? `[${parsedPayload.err.plugin}] `
         : "";
     const fileLabel =
-      typeof payload.err.id === "string" && payload.err.id.length > 0
-        ? `\n${payload.err.id}`
+      parsedPayload.err.id && parsedPayload.err.id.length > 0
+        ? `\n${parsedPayload.err.id}`
         : "";
-    const summary = `${pluginLabel}${payload.err.message}${fileLabel}`.trim();
+    const summary = `${pluginLabel}${parsedPayload.err.message}${fileLabel}`.trim();
     const details =
-      typeof payload.err.stack === "string" && payload.err.stack.trim().length > 0
-        ? payload.err.stack
+      parsedPayload.err.stack && parsedPayload.err.stack.trim().length > 0
+        ? parsedPayload.err.stack
         : summary;
 
-    publishBootStatus({
-      message: "Vite compile error",
-      details,
-      isError: true,
-      showActions: true,
-      detailsOpen: true,
-      hmrStatus: "HMR compile failed"
-    });
+    publishCompileFailedDevelopmentBootStatus(details);
   });
 
   import.meta.hot.on("vite:afterUpdate", () => {
-    publishBootStatus({
-      message: "Loading Farfield",
-      details: "",
-      isError: false,
-      showActions: false,
-      detailsOpen: false,
-      hmrStatus: "HMR connected"
-    });
+    publishConnectedDevelopmentBootStatus();
   });
 }
 
 function dismissBootSplash(): void {
-  const splash = document.getElementById("boot-splash");
+  const splash = document.getElementById(BOOT_SPLASH_ELEMENT_IDENTIFIER);
   if (!splash) {
     return;
   }
 
-  splash.classList.add("boot-splash--hidden");
+  splash.classList.add(BOOT_SPLASH_HIDDEN_CLASS_NAME);
+  // Delay removal so any boot-splash exit transition can finish before the node is detached.
   window.setTimeout(() => {
     splash.remove();
-  }, 220);
+  }, BOOT_SPLASH_REMOVE_DELAY_MILLISECONDS);
 }
 
 function notifyServiceWorkerUpdateAvailable(): void {
@@ -179,16 +218,21 @@ function reconcilePushSubscriptionOnStartup(): void {
   });
 }
 
-if ("serviceWorker" in navigator) {
+function installServiceWorkerStartupRegistration(): void {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    return;
+  }
+
   window.addEventListener("load", () => {
+    const serviceWorkerContainer = navigator.serviceWorker;
     const serviceWorkerControllerChangeReloadOwner = new ServiceWorkerControllerChangeReloadOwner(
-      navigator.serviceWorker.controller !== null
+      serviceWorkerContainer.controller !== null
     );
 
-    void navigator.serviceWorker
-      .register("/sw.js")
+    void serviceWorkerContainer
+      .register(SERVICE_WORKER_SCRIPT_PATH)
       .then((registration) => {
-        if (registration.waiting && navigator.serviceWorker.controller) {
+        if (registration.waiting && serviceWorkerContainer.controller) {
           notifyServiceWorkerUpdateAvailable();
         }
 
@@ -199,13 +243,13 @@ if ("serviceWorker" in navigator) {
           }
 
           installing.addEventListener("statechange", () => {
-            if (installing.state === "installed" && navigator.serviceWorker.controller) {
+            if (installing.state === "installed" && serviceWorkerContainer.controller) {
               notifyServiceWorkerUpdateAvailable();
             }
           });
         });
 
-        navigator.serviceWorker.addEventListener("controllerchange", () => {
+        serviceWorkerContainer.addEventListener("controllerchange", () => {
           const reloadDecision = serviceWorkerControllerChangeReloadOwner.readDecision({
             reloadSuppressed: isServiceWorkerReloadSuppressed()
           });
@@ -223,21 +267,33 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-const applicationRootElement = document.getElementById("root");
-if (!applicationRootElement) {
-  throw new Error("Failed to mount Farfield: missing #root element");
+function mountApplication(): void {
+  const applicationRootElement = document.getElementById(APPLICATION_ROOT_ELEMENT_IDENTIFIER);
+  if (!applicationRootElement) {
+    throw new Error("Failed to mount Farfield: missing #root element");
+  }
+
+  createRoot(applicationRootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
 }
 
-createRoot(applicationRootElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+function scheduleBootSplashDismissal(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
 
-if (typeof window !== "undefined") {
+  // Wait two paint ticks so React has rendered before removing the static bootstrap splash.
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
       dismissBootSplash();
     });
   });
 }
+
+installDevelopmentBootStatusPublisher();
+installServiceWorkerStartupRegistration();
+mountApplication();
+scheduleBootSplashDismissal();

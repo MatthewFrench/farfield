@@ -24,10 +24,13 @@ import {
 import type { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
 
 const MONITOR_PREVIEW_REQUEST_IDENTIFIER = "monitor-preview-request-id";
+const OUTBOUND_IPC_FRAME_DIRECTION: CodexIpcFrameEvent["direction"] = "out";
+
+type IpcRequestParameters = IpcRequestFrame["params"];
 
 function createPreviewRequestFrame(
   method: string,
-  params: IpcRequestFrame["params"],
+  params: IpcRequestParameters,
   options: SendRequestOptions
 ): IpcRequestFrame {
   return {
@@ -42,7 +45,7 @@ function createPreviewRequestFrame(
 
 function createPreviewBroadcastFrame(
   method: string,
-  params: IpcRequestFrame["params"],
+  params: IpcRequestParameters,
   options: SendRequestOptions
 ): IpcFrame {
   return {
@@ -63,6 +66,10 @@ export interface CodexThreadInteractionOwnerOptions {
   emitIpcFrame: (event: CodexIpcFrameEvent) => void;
 }
 
+/**
+ * Owns thread interaction command orchestration that requires a resolved owner client.
+ * Outbound replay previews are emitted through this owner before IPC transport calls complete.
+ */
 export class CodexThreadInteractionOwner {
   private readonly service: CodexMonitorService;
   private readonly ipcClient: DesktopIpcClient;
@@ -81,13 +88,8 @@ export class CodexThreadInteractionOwner {
   }
 
   public async interrupt(input: AgentInterruptInput): Promise<void> {
-    this.ensureCodexAvailable();
-    this.ensureIpcReady();
-
-    const ownerClientId = this.threadStreamStateOwner.resolveRequiredOwnerClientId(
-      input.threadId,
-      input.ownerClientId
-    );
+    this.ensureInteractionReady();
+    const ownerClientId = this.resolveRequiredOwnerClientId(input.threadId, input.ownerClientId);
 
     await this.service.interrupt({
       threadId: input.threadId,
@@ -98,13 +100,8 @@ export class CodexThreadInteractionOwner {
   public async setCollaborationMode(
     input: AgentSetCollaborationModeInput
   ): Promise<{ ownerClientId: string }> {
-    this.ensureCodexAvailable();
-    this.ensureIpcReady();
-
-    const ownerClientId = this.threadStreamStateOwner.resolveRequiredOwnerClientId(
-      input.threadId,
-      input.ownerClientId
-    );
+    this.ensureInteractionReady();
+    const ownerClientId = this.resolveRequiredOwnerClientId(input.threadId, input.ownerClientId);
 
     await this.service.setCollaborationMode({
       threadId: input.threadId,
@@ -120,13 +117,8 @@ export class CodexThreadInteractionOwner {
   public async submitUserInput(
     input: AgentSubmitUserInputInput
   ): Promise<{ ownerClientId: string; requestId: number }> {
-    this.ensureCodexAvailable();
-    this.ensureIpcReady();
-
-    const ownerClientId = this.threadStreamStateOwner.resolveRequiredOwnerClientId(
-      input.threadId,
-      input.ownerClientId
-    );
+    this.ensureInteractionReady();
+    const ownerClientId = this.resolveRequiredOwnerClientId(input.threadId, input.ownerClientId);
 
     await this.service.submitUserInput({
       threadId: input.threadId,
@@ -154,18 +146,12 @@ export class CodexThreadInteractionOwner {
 
   public async replayRequest(
     method: string,
-    params: IpcRequestFrame["params"],
+    params: IpcRequestParameters,
     options: SendRequestOptions = {}
   ): Promise<IpcResponseFrame["result"]> {
     this.ensureIpcReady();
     const previewFrame = createPreviewRequestFrame(method, params, options);
-    const previewFrameDescription = this.threadStreamStateOwner.describeFrame(previewFrame);
-    this.emitIpcFrame({
-      direction: "out",
-      frame: previewFrame,
-      method,
-      threadId: previewFrameDescription.threadId
-    });
+    this.emitOutboundPreviewFrame(method, previewFrame, previewFrame);
 
     const response = await this.ipcClient.sendRequestAndWait(method, params, options);
     return response.result;
@@ -173,20 +159,42 @@ export class CodexThreadInteractionOwner {
 
   public replayBroadcast(
     method: string,
-    params: IpcRequestFrame["params"],
+    params: IpcRequestParameters,
     options: SendRequestOptions = {}
   ): void {
     this.ensureIpcReady();
     const previewFrame = createPreviewBroadcastFrame(method, params, options);
     const previewRequestFrame = createPreviewRequestFrame(method, params, options);
-    const previewRequestDescription = this.threadStreamStateOwner.describeFrame(previewRequestFrame);
-    this.emitIpcFrame({
-      direction: "out",
-      frame: previewFrame,
-      method,
-      threadId: previewRequestDescription.threadId
-    });
+    // Request-shape preview is used for thread-id extraction because describeFrame
+    // intentionally reports thread identifiers only for request frames on most methods.
+    this.emitOutboundPreviewFrame(method, previewFrame, previewRequestFrame);
 
     this.ipcClient.sendBroadcast(method, params, options);
+  }
+
+  private ensureInteractionReady(): void {
+    this.ensureCodexAvailable();
+    this.ensureIpcReady();
+  }
+
+  private resolveRequiredOwnerClientId(
+    threadId: string,
+    ownerClientId: string | undefined
+  ): string {
+    return this.threadStreamStateOwner.resolveRequiredOwnerClientId(threadId, ownerClientId);
+  }
+
+  private emitOutboundPreviewFrame(
+    method: string,
+    frame: IpcFrame,
+    descriptionFrame: IpcFrame
+  ): void {
+    const frameDescription = this.threadStreamStateOwner.describeFrame(descriptionFrame);
+    this.emitIpcFrame({
+      direction: OUTBOUND_IPC_FRAME_DIRECTION,
+      frame,
+      method,
+      threadId: frameDescription.threadId
+    });
   }
 }

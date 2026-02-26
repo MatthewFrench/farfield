@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FarfieldEventStreamEvent } from "@farfield/protocol";
 import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
 
+const EVENT_STREAM_RETRY_DIRECTIVE = "retry: 1000\n\n";
+const EVENT_STREAM_KEEPALIVE_FRAME = ": keepalive\n\n";
+
 function createHttpPair(): { req: IncomingMessage; res: ServerResponse } {
   const req = new IncomingMessage(new Socket());
   req.method = "GET";
@@ -55,6 +58,44 @@ describe("EventStreamClientRegistry", () => {
     expect(writeSpy).toHaveBeenCalled();
   });
 
+  it("removes one active client when both request and response close events fire", () => {
+    const registry = new EventStreamClientRegistry(1_000);
+    const { req, res } = createHttpPair();
+    vi.spyOn(res, "write").mockImplementation(() => true);
+    const initialEvent = buildRuntimeStateChangedEvent();
+
+    registry.addClient(req, res, initialEvent);
+    expect(req.listenerCount("close")).toBe(1);
+    expect(res.listenerCount("close")).toBe(1);
+    req.emit("close");
+    res.emit("close");
+
+    const statistics = registry.readStatistics();
+    expect(statistics.activeClientCount).toBe(0);
+    expect(statistics.addedClientCount).toBe(1);
+    expect(statistics.removedClientCount).toBe(1);
+    expect(req.listenerCount("close")).toBe(0);
+    expect(res.listenerCount("close")).toBe(0);
+  });
+
+  it("writes initial events for new clients using the latest broadcast sequence", () => {
+    const registry = new EventStreamClientRegistry(1_000);
+    const firstClient = createHttpPair();
+    const secondClient = createHttpPair();
+    const firstWriteSpy = vi.spyOn(firstClient.res, "write").mockImplementation(() => true);
+    const secondWriteSpy = vi.spyOn(secondClient.res, "write").mockImplementation(() => true);
+    const initialEvent = buildRuntimeStateChangedEvent();
+
+    registry.addClient(firstClient.req, firstClient.res, initialEvent);
+    registry.broadcast(initialEvent);
+    registry.addClient(secondClient.req, secondClient.res, initialEvent);
+
+    expect(firstWriteSpy).toHaveBeenCalled();
+    expect(secondWriteSpy).toHaveBeenNthCalledWith(1, EVENT_STREAM_RETRY_DIRECTIVE);
+    expect(secondWriteSpy).toHaveBeenNthCalledWith(2, "id: 1\n");
+    expect(secondWriteSpy).toHaveBeenNthCalledWith(3, expect.stringContaining("\"sequence\":1"));
+  });
+
   it("removes clients and increments failure counters when event writes throw", () => {
     const registry = new EventStreamClientRegistry(1_000);
     const { req, res } = createHttpPair();
@@ -73,6 +114,23 @@ describe("EventStreamClientRegistry", () => {
     expect(statistics.removedClientCount).toBe(1);
     expect(statistics.eventWriteFailureCount).toBe(1);
     expect(statistics.broadcastDeliveryAttemptCount).toBe(1);
+  });
+
+  it("starts one keepalive interval when called repeatedly", async () => {
+    vi.useFakeTimers();
+    const registry = new EventStreamClientRegistry(1_000);
+    const { req, res } = createHttpPair();
+    const writeSpy = vi.spyOn(res, "write").mockImplementation(() => true);
+    const initialEvent = buildRuntimeStateChangedEvent();
+
+    registry.addClient(req, res, initialEvent);
+    registry.startKeepalive();
+    registry.startKeepalive();
+    await vi.advanceTimersByTimeAsync(1_000);
+    registry.stopKeepalive();
+
+    expect(writeSpy).toHaveBeenCalledTimes(4);
+    expect(writeSpy).toHaveBeenLastCalledWith(EVENT_STREAM_KEEPALIVE_FRAME);
   });
 
   it("counts keepalive write failures without leaving stale clients", async () => {
