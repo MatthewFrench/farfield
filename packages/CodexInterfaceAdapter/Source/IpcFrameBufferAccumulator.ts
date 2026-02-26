@@ -4,7 +4,14 @@ export type NextIpcPayloadReadResult =
   | { type: "payload"; payload: Buffer };
 
 const FRAME_LENGTH_HEADER_BYTES = 4;
+const FRAME_LENGTH_HEADER_OFFSET_BYTES = 0;
+const FRAME_LENGTH_MAXIMUM_BYTES = 0xffff_ffff;
+const FRAME_SIZE_LIMIT_MINIMUM_BYTES = 0;
 const BUFFER_COMPACTION_MINIMUM_CONSUMED_BYTES = 64 * 1024;
+const BUFFER_COMPACTION_CONSUMED_RATIO_MULTIPLIER = 2;
+const INVALID_MAX_FRAME_SIZE_ERROR_MESSAGE =
+  `IPC max frame size must be an integer between ${String(FRAME_SIZE_LIMIT_MINIMUM_BYTES)} and ` +
+  `${String(FRAME_LENGTH_MAXIMUM_BYTES)} bytes`;
 
 /**
  * Owns framed IPC payload accumulation so DesktopIpcClient can focus on protocol behavior.
@@ -39,12 +46,14 @@ export class IpcFrameBufferAccumulator {
   }
 
   public readNextPayload(maxFrameSizeBytes: number): NextIpcPayloadReadResult {
-    if (this.getUnreadByteCount() < FRAME_LENGTH_HEADER_BYTES) {
+    this.assertMaxFrameSizeBytes(maxFrameSizeBytes);
+
+    if (!this.hasCompleteFrameLengthHeader()) {
       this.compactBufferIfNeeded();
       return { type: "none" };
     }
 
-    const size = this.buffer.readUInt32LE(this.bufferOffset);
+    const size = this.readFramePayloadSizeBytes();
     if (size > maxFrameSizeBytes) {
       return {
         type: "frame-too-large",
@@ -52,7 +61,7 @@ export class IpcFrameBufferAccumulator {
       };
     }
 
-    if (this.getUnreadByteCount() < FRAME_LENGTH_HEADER_BYTES + size) {
+    if (!this.hasCompleteFramePayload(size)) {
       this.compactBufferIfNeeded();
       return { type: "none" };
     }
@@ -74,21 +83,51 @@ export class IpcFrameBufferAccumulator {
     }
 
     if (this.bufferOffset >= this.buffer.length) {
-      this.buffer = Buffer.alloc(0);
-      this.bufferOffset = 0;
+      this.clear();
       return;
     }
 
-    const hasConsumedAtLeastHalfOfBuffer = this.bufferOffset * 2 >= this.buffer.length;
-    // Also compact for larger consumed prefixes even when unread data remains significant.
-    const hasReachedCompactionByteThreshold =
-      this.bufferOffset >= BUFFER_COMPACTION_MINIMUM_CONSUMED_BYTES;
-    if (!hasConsumedAtLeastHalfOfBuffer && !hasReachedCompactionByteThreshold) {
+    if (!this.shouldCompactBuffer()) {
       return;
     }
 
     this.buffer = Buffer.from(this.buffer.subarray(this.bufferOffset));
     this.bufferOffset = 0;
+  }
+
+  private hasCompleteFrameLengthHeader(): boolean {
+    return this.getUnreadByteCount() >= FRAME_LENGTH_HEADER_BYTES;
+  }
+
+  private readFramePayloadSizeBytes(): number {
+    return this.buffer.readUInt32LE(this.bufferOffset + FRAME_LENGTH_HEADER_OFFSET_BYTES);
+  }
+
+  private hasCompleteFramePayload(size: number): boolean {
+    return this.getUnreadByteCount() >= FRAME_LENGTH_HEADER_BYTES + size;
+  }
+
+  private shouldCompactBuffer(): boolean {
+    const hasConsumedAtLeastHalfOfBuffer =
+      this.bufferOffset * BUFFER_COMPACTION_CONSUMED_RATIO_MULTIPLIER >= this.buffer.length;
+    if (hasConsumedAtLeastHalfOfBuffer) {
+      return true;
+    }
+
+    // Protects against retaining very large consumed prefixes after partial frame reads.
+    return this.bufferOffset >= BUFFER_COMPACTION_MINIMUM_CONSUMED_BYTES;
+  }
+
+  private assertMaxFrameSizeBytes(maxFrameSizeBytes: number): void {
+    if (
+      Number.isInteger(maxFrameSizeBytes) &&
+      maxFrameSizeBytes >= FRAME_SIZE_LIMIT_MINIMUM_BYTES &&
+      maxFrameSizeBytes <= FRAME_LENGTH_MAXIMUM_BYTES
+    ) {
+      return;
+    }
+
+    throw new RangeError(INVALID_MAX_FRAME_SIZE_ERROR_MESSAGE);
   }
 
   private getUnreadByteCount(): number {
