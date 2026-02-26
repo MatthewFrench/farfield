@@ -11,6 +11,35 @@ import {
   streamDebugFileDownload
 } from "./DebugFileDownload.js";
 
+const DebugTraceRouteStatusCodeByName = {
+  successOk: 200,
+  clientErrorBadRequest: 400,
+  clientErrorConflict: 409,
+  clientErrorNotFound: 404,
+  serverErrorInternal: 500
+} as const;
+
+const DebugTraceRouteErrorMessageByName = {
+  traceAlreadyActive: "A trace is already active",
+  noActiveTrace: "No active trace",
+  invalidTraceIdentifier: "Invalid trace identifier",
+  traceNotFound: "Trace not found"
+} as const;
+
+const DebugTraceRouteSegmentIndexByName = {
+  traceCollection: 2,
+  traceIdentifier: 3,
+  traceDownloadOperation: 4
+} as const;
+
+const DebugTraceRouteSegmentCountByName = {
+  downloadByIdentifier: 5
+} as const;
+
+const RoutePathSegmentSeparator = "/";
+const TraceIdentifierDownloadRoutePathPrefix = "/api/debug/trace/";
+const TraceDownloadRoutePathSuffix = "/download";
+
 export class DebugTraceRouteOwner {
   private readonly dependencies: DebugRouteDependencies;
 
@@ -45,7 +74,7 @@ export class DebugTraceRouteOwner {
       return false;
     }
 
-    jsonResponse(res, 200, {
+    jsonResponse(res, DebugTraceRouteStatusCodeByName.successOk, {
       ok: true,
       active: activityHistoryService.readActiveTraceSummary(),
       recent: activityHistoryService.readRecentTraces()
@@ -77,9 +106,9 @@ export class DebugTraceRouteOwner {
       ensureTraceDirectory
     );
     if (!summary) {
-      jsonResponse(res, 409, {
+      jsonResponse(res, DebugTraceRouteStatusCodeByName.clientErrorConflict, {
         ok: false,
-        error: "A trace is already active"
+        error: DebugTraceRouteErrorMessageByName.traceAlreadyActive
       });
       return true;
     }
@@ -89,7 +118,7 @@ export class DebugTraceRouteOwner {
       label: body.label
     });
 
-    jsonResponse(res, 200, {
+    jsonResponse(res, DebugTraceRouteStatusCodeByName.successOk, {
       ok: true,
       trace: summary
     });
@@ -106,11 +135,14 @@ export class DebugTraceRouteOwner {
     const body = parseTraceMarkBody(await readJsonBody(req));
     const marked = activityHistoryService.markTrace(body.note);
     if (!marked) {
-      jsonResponse(res, 409, { ok: false, error: "No active trace" });
+      jsonResponse(res, DebugTraceRouteStatusCodeByName.clientErrorConflict, {
+        ok: false,
+        error: DebugTraceRouteErrorMessageByName.noActiveTrace
+      });
       return true;
     }
 
-    jsonResponse(res, 200, { ok: true });
+    jsonResponse(res, DebugTraceRouteStatusCodeByName.successOk, { ok: true });
     return true;
   }
 
@@ -123,13 +155,16 @@ export class DebugTraceRouteOwner {
 
     const summary = activityHistoryService.stopTrace();
     if (!summary) {
-      jsonResponse(res, 409, { ok: false, error: "No active trace" });
+      jsonResponse(res, DebugTraceRouteStatusCodeByName.clientErrorConflict, {
+        ok: false,
+        error: DebugTraceRouteErrorMessageByName.noActiveTrace
+      });
       return true;
     }
 
     pushSystem("Trace stopped", { traceId: summary.id });
 
-    jsonResponse(res, 200, {
+    jsonResponse(res, DebugTraceRouteStatusCodeByName.successOk, {
       ok: true,
       trace: summary
     });
@@ -138,7 +173,6 @@ export class DebugTraceRouteOwner {
 
   private async handleTraceDownloadRoute(): Promise<boolean> {
     const {
-      req,
       segments,
       activityHistoryService,
       jsonResponse,
@@ -146,28 +180,30 @@ export class DebugTraceRouteOwner {
       toErrorMessage
     } = this.dependencies;
 
-    const traceIdentifierSegment = segments[3];
-    const isTraceDownloadRouteRequest =
-      req.method === DebugRouteMethodByName.get
-      && segments[2] === DebugRouteSegmentByName.trace
-      && typeof traceIdentifierSegment === "string"
-      && segments[4] === DebugRouteSegmentByName.download;
-    if (!isTraceDownloadRouteRequest) {
+    const traceIdentifierSegment = segments[DebugTraceRouteSegmentIndexByName.traceIdentifier];
+    if (
+      typeof traceIdentifierSegment !== "string"
+      || !this.isTraceDownloadRouteRequest(traceIdentifierSegment)
+    ) {
       return false;
     }
 
-    let traceId: string;
-    try {
-      traceId = decodeURIComponent(traceIdentifierSegment);
-    } catch {
-      jsonResponse(res, 400, { ok: false, error: "Invalid trace identifier" });
+    const traceId = this.tryDecodeTraceIdentifier(traceIdentifierSegment);
+    if (traceId === null) {
+      jsonResponse(res, DebugTraceRouteStatusCodeByName.clientErrorBadRequest, {
+        ok: false,
+        error: DebugTraceRouteErrorMessageByName.invalidTraceIdentifier
+      });
       return true;
     }
 
     const trace = activityHistoryService.readTraceById(traceId);
 
     if (!trace) {
-      jsonResponse(res, 404, { ok: false, error: "Trace not found" });
+      jsonResponse(res, DebugTraceRouteStatusCodeByName.clientErrorNotFound, {
+        ok: false,
+        error: DebugTraceRouteErrorMessageByName.traceNotFound
+      });
       return true;
     }
 
@@ -181,13 +217,52 @@ export class DebugTraceRouteOwner {
           || error.code === DebugFileDownloadErrorCodeByName.notFile
         )
       ) {
-        jsonResponse(res, 404, { ok: false, error: "Trace not found" });
+        jsonResponse(res, DebugTraceRouteStatusCodeByName.clientErrorNotFound, {
+          ok: false,
+          error: DebugTraceRouteErrorMessageByName.traceNotFound
+        });
         return true;
       }
 
-      jsonResponse(res, 500, { ok: false, error: toErrorMessage(error) });
+      jsonResponse(res, DebugTraceRouteStatusCodeByName.serverErrorInternal, {
+        ok: false,
+        error: toErrorMessage(error)
+      });
       return true;
     }
     return true;
+  }
+
+  /**
+   * Exact pathname ownership keeps near-match trace download paths on the shared top-level not-found contract.
+   */
+  private isTraceDownloadRouteRequest(traceIdentifierSegment: string): boolean {
+    const { req, pathname, segments } = this.dependencies;
+
+    if (
+      req.method !== DebugRouteMethodByName.get
+      || segments.length !== DebugTraceRouteSegmentCountByName.downloadByIdentifier
+      || segments[DebugTraceRouteSegmentIndexByName.traceCollection] !== DebugRouteSegmentByName.trace
+      || segments[DebugTraceRouteSegmentIndexByName.traceDownloadOperation] !== DebugRouteSegmentByName.download
+      || pathname.endsWith(RoutePathSegmentSeparator)
+    ) {
+      return false;
+    }
+
+    return pathname ===
+      `${TraceIdentifierDownloadRoutePathPrefix}${traceIdentifierSegment}${TraceDownloadRoutePathSuffix}`;
+  }
+
+  private tryDecodeTraceIdentifier(traceIdentifierSegment: string): string | null {
+    try {
+      const decodedTraceIdentifier = decodeURIComponent(traceIdentifierSegment);
+      if (decodedTraceIdentifier.includes(RoutePathSegmentSeparator)) {
+        return null;
+      }
+
+      return decodedTraceIdentifier;
+    } catch {
+      return null;
+    }
   }
 }

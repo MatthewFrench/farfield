@@ -28,6 +28,8 @@ const DebugHistoryRouteExtraSegmentPath = "/api/debug/history/history_missing/ex
 const DebugTraceRoutePathPrefix = "/api/debug/trace";
 const DebugObservabilityRoutePath = "/api/debug/observability";
 const DebugTraceRouteWithoutDownloadPath = "/api/debug/trace/trace_missing";
+const DebugTraceDownloadRouteWithTrailingSlashPath = "/api/debug/trace/trace_missing/download/";
+const DebugTraceDownloadRouteWithExtraSegmentPath = "/api/debug/trace/trace_missing/download/extra";
 const DebugRouteNearMatchClientErrorsPath = "/api/debugging/client-errors";
 const DebugRouteNearMatchHistoryPath = "/api/debug/history-snapshot";
 const DebugClientErrorsListLimit = 20;
@@ -37,6 +39,7 @@ const MalformedIdentifier = "%E0%A4%A";
 const EncodedPathSeparatorIdentifier = "%2F";
 const InvalidClientErrorIdentifierErrorMessage = "Invalid client error identifier";
 const InvalidHistoryEntryIdentifierErrorMessage = "Invalid history entry identifier";
+const InvalidTraceIdentifierErrorMessage = "Invalid trace identifier";
 const NotFoundErrorMessage = "Not found";
 
 async function expectApiErrorResponse(
@@ -205,8 +208,25 @@ describe("server route integration debug routes", () => {
         headers: authHeaders
       }
     );
-    expect(malformedTraceResponse.status).toBe(400);
-    ApiErrorEnvelopeSchema.parse(await malformedTraceResponse.json());
+    await expectApiErrorResponse(
+      malformedTraceResponse,
+      400,
+      InvalidTraceIdentifierErrorMessage
+    );
+
+    const encodedTracePathSeparatorResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(
+        `${DebugTraceRoutePathPrefix}/${EncodedPathSeparatorIdentifier}/download`
+      ),
+      {
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(
+      encodedTracePathSeparatorResponse,
+      400,
+      InvalidTraceIdentifierErrorMessage
+    );
   });
 
   it("supports debug observability snapshot contracts", async () => {
@@ -265,6 +285,22 @@ describe("server route integration debug routes", () => {
       }
     );
     await expectApiErrorResponse(missingTraceDownloadSegmentResponse, 404, NotFoundErrorMessage);
+
+    const trailingSlashTraceDownloadResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(DebugTraceDownloadRouteWithTrailingSlashPath),
+      {
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(trailingSlashTraceDownloadResponse, 404, NotFoundErrorMessage);
+
+    const extraTraceDownloadSegmentResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(DebugTraceDownloadRouteWithExtraSegmentPath),
+      {
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(extraTraceDownloadSegmentResponse, 404, NotFoundErrorMessage);
 
     const extraClientErrorSegmentResponse = await fetch(
       integrationEnvironment.buildApiRouteUrl(DebugClientErrorsSessionLogExtraRoutePath),
