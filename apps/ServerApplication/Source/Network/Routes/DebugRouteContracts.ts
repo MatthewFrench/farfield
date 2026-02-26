@@ -55,6 +55,45 @@ export interface ParsedReplayFrame {
   version?: number;
 }
 
+export const DebugReplayFrameParseErrorTypeByName = {
+  invalidReplayFramePayload: "invalid-replay-frame-payload"
+} as const;
+
+export type DebugReplayFrameParseErrorType =
+  typeof DebugReplayFrameParseErrorTypeByName[keyof typeof DebugReplayFrameParseErrorTypeByName];
+
+export interface DebugReplayFrameParseIssue {
+  path: string;
+  issueCode: string;
+  message: string;
+}
+
+export interface DebugReplayFrameParseErrorDetails {
+  errorType: DebugReplayFrameParseErrorType;
+  issues: ReadonlyArray<DebugReplayFrameParseIssue>;
+}
+
+const ReplayFrameParseErrorPrefix = "Invalid replay frame payload";
+
+function buildReplayFrameParseErrorMessage(details: DebugReplayFrameParseErrorDetails): string {
+  const firstIssue = details.issues[0];
+  if (!firstIssue) {
+    return ReplayFrameParseErrorPrefix;
+  }
+
+  return `${ReplayFrameParseErrorPrefix} at ${firstIssue.path}: ${firstIssue.message}`;
+}
+
+export class DebugReplayFrameParseError extends Error {
+  public readonly details: DebugReplayFrameParseErrorDetails;
+
+  public constructor(details: DebugReplayFrameParseErrorDetails) {
+    super(buildReplayFrameParseErrorMessage(details));
+    this.name = "DebugReplayFrameParseError";
+    this.details = details;
+  }
+}
+
 export interface DebugRouteDependencies {
   req: IncomingMessage;
   res: ServerResponse;
