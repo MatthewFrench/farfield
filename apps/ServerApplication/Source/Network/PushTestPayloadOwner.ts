@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   FarfieldPushTestBodySchema,
+  parsePushNotificationPayload,
   type PushNotificationPayload
 } from "@farfield/protocol";
 import { z } from "zod";
@@ -15,6 +16,12 @@ interface PushTestPayloadOwnerDependencies {
   createNotificationIdSuffix?: () => string;
 }
 
+type PushTestPayloadInput = z.infer<typeof FarfieldPushTestBodySchema>;
+
+/**
+ * Owns deterministic push-test payload construction from already parsed route input
+ * and enforces the final push payload contract before dispatch.
+ */
 export class PushTestPayloadOwner {
   private readonly readNowIsoString: () => string;
   private readonly createNotificationIdSuffix: () => string;
@@ -25,7 +32,7 @@ export class PushTestPayloadOwner {
   }
 
   public buildPayload(
-    input: z.infer<typeof FarfieldPushTestBodySchema>,
+    input: PushTestPayloadInput,
     privateMode: boolean
   ): PushNotificationPayload {
     const now = this.readNowIsoString();
@@ -36,7 +43,7 @@ export class PushTestPayloadOwner {
       ? DEFAULT_NOTIFICATION_BODY
       : (input.body ?? DEFAULT_NOTIFICATION_BODY);
 
-    return {
+    return parsePushNotificationPayload({
       notificationId,
       title,
       body,
@@ -54,6 +61,6 @@ export class PushTestPayloadOwner {
           tag: `thread:${input.threadId}`
         }
       }
-    };
+    });
   }
 }
