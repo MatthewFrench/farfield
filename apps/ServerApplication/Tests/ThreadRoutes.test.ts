@@ -1,12 +1,22 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import { describe, expect, it, vi } from "vitest";
+import type { AgentAdapter, AgentCapabilities } from "../Source/Agents/Types.js";
 import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 import { ThreadListAggregationCache } from "../Source/Network/ThreadListAggregationCache.js";
 import {
   handleThreadRoutes,
   type ThreadRouteDependencies
 } from "../Source/Network/Routes/ThreadRoutes.js";
+
+const ThreadRouteTestAdapterCapabilities: AgentCapabilities = {
+  canListModels: false,
+  canListCollaborationModes: false,
+  canSetCollaborationMode: false,
+  canSubmitUserInput: false,
+  canReadLiveState: false,
+  canReadStreamEvents: false
+};
 
 function createMockRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
   const socket = new Socket();
@@ -15,6 +25,37 @@ function createMockRequestResponsePair(): { request: IncomingMessage; response: 
   return {
     request,
     response
+  };
+}
+
+function createThreadRouteTestAdapter(id: "codex" | "opencode"): AgentAdapter {
+  return {
+    id,
+    label: id,
+    capabilities: ThreadRouteTestAdapterCapabilities,
+    async start(): Promise<void> {},
+    async stop(): Promise<void> {},
+    isEnabled(): boolean {
+      return true;
+    },
+    isConnected(): boolean {
+      return true;
+    },
+    async listThreads(): Promise<never> {
+      throw new Error("Unexpected listThreads invocation in ThreadRoutes test");
+    },
+    async createThread(): Promise<never> {
+      throw new Error("Unexpected createThread invocation in ThreadRoutes test");
+    },
+    async readThread(): Promise<never> {
+      throw new Error("Unexpected readThread invocation in ThreadRoutes test");
+    },
+    async sendMessage(): Promise<never> {
+      throw new Error("Unexpected sendMessage invocation in ThreadRoutes test");
+    },
+    async interrupt(): Promise<never> {
+      throw new Error("Unexpected interrupt invocation in ThreadRoutes test");
+    }
   };
 }
 
@@ -154,5 +195,77 @@ describe("handleThreadRoutes", () => {
       error: "Thread not found",
       threadId: "thread_missing"
     });
+  });
+
+  it("returns false when neither collection nor member routes own the request", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "GET";
+
+    const resolveAdapterForThread = vi.fn<
+      ThreadRouteDependencies["resolveAdapterForThread"]
+    >(async () => ({
+      ok: false,
+      status: 404,
+      error: "Thread not found"
+    }));
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const handled = await handleThreadRoutes(
+      createThreadRouteDependencies({
+        request,
+        response,
+        pathname: "/api/capabilities",
+        segments: ["api", "capabilities"],
+        url: new URL("http://localhost/api/capabilities"),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        resolveAdapterForThread
+      })
+    );
+
+    expect(handled).toBe(false);
+    expect(resolveAdapterForThread).not.toHaveBeenCalled();
+    expect(capturedStatusCode).toBeNull();
+    expect(capturedBody).toBeNull();
+  });
+
+  it("returns false when member route owners do not claim a decoded thread subresource", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const resolveAdapterForThread = vi.fn<
+      ThreadRouteDependencies["resolveAdapterForThread"]
+    >(async () => ({
+      ok: true,
+      adapter: createThreadRouteTestAdapter("codex"),
+      agentId: "codex"
+    }));
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const handled = await handleThreadRoutes(
+      createThreadRouteDependencies({
+        request,
+        response,
+        pathname: "/api/threads/thread_known/messages/extra",
+        segments: ["api", "threads", "thread_known", "messages", "extra"],
+        url: new URL("http://localhost/api/threads/thread_known/messages/extra"),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        resolveAdapterForThread
+      })
+    );
+
+    expect(handled).toBe(false);
+    expect(resolveAdapterForThread).toHaveBeenCalledWith("thread_known");
+    expect(capturedStatusCode).toBeNull();
+    expect(capturedBody).toBeNull();
   });
 });
