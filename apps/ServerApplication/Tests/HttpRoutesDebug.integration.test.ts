@@ -23,16 +23,20 @@ const DebugClientErrorsSessionLogExtraRoutePath = "/api/debug/client-errors/sess
 const DebugClientErrorsMissingIdentifierWithTrailingSlashRoutePath = "/api/debug/client-errors/error_missing/";
 const DebugRoutePathPrefix = "/api/debug";
 const DebugHistoryRoutePathPrefix = "/api/debug/history";
+const DebugHistoryRouteWithTrailingSlashPath = "/api/debug/history/";
+const DebugHistoryRouteExtraSegmentPath = "/api/debug/history/history_missing/extra";
 const DebugTraceRoutePathPrefix = "/api/debug/trace";
 const DebugObservabilityRoutePath = "/api/debug/observability";
 const DebugTraceRouteWithoutDownloadPath = "/api/debug/trace/trace_missing";
 const DebugRouteNearMatchClientErrorsPath = "/api/debugging/client-errors";
+const DebugRouteNearMatchHistoryPath = "/api/debug/history-snapshot";
 const DebugClientErrorsListLimit = 20;
 const JsonContentTypeHeaderName = "Content-Type";
 const JsonContentTypeHeaderValue = "application/json";
 const MalformedIdentifier = "%E0%A4%A";
 const EncodedPathSeparatorIdentifier = "%2F";
 const InvalidClientErrorIdentifierErrorMessage = "Invalid client error identifier";
+const InvalidHistoryEntryIdentifierErrorMessage = "Invalid history entry identifier";
 const NotFoundErrorMessage = "Not found";
 
 async function expectApiErrorResponse(
@@ -166,13 +170,32 @@ describe("server route integration debug routes", () => {
     );
 
     const malformedHistoryResponse = await fetch(
-      integrationEnvironment.buildApiRouteUrl(`${DebugHistoryRoutePathPrefix}/${MalformedIdentifier}`),
+      integrationEnvironment.buildApiRouteUrl(
+        `${DebugHistoryRoutePathPrefix}/${MalformedIdentifier}`
+      ),
       {
         headers: authHeaders
       }
     );
-    expect(malformedHistoryResponse.status).toBe(400);
-    ApiErrorEnvelopeSchema.parse(await malformedHistoryResponse.json());
+    await expectApiErrorResponse(
+      malformedHistoryResponse,
+      400,
+      InvalidHistoryEntryIdentifierErrorMessage
+    );
+
+    const encodedHistoryPathSeparatorResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(
+        `${DebugHistoryRoutePathPrefix}/${EncodedPathSeparatorIdentifier}`
+      ),
+      {
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(
+      encodedHistoryPathSeparatorResponse,
+      400,
+      InvalidHistoryEntryIdentifierErrorMessage
+    );
 
     const malformedTraceResponse = await fetch(
       integrationEnvironment.buildApiRouteUrl(
@@ -219,6 +242,22 @@ describe("server route integration debug routes", () => {
     );
     await expectApiErrorResponse(unsupportedDebugHistoryMethodResponse, 404, NotFoundErrorMessage);
 
+    const trailingSlashHistoryCollectionResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(DebugHistoryRouteWithTrailingSlashPath),
+      {
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(trailingSlashHistoryCollectionResponse, 404, NotFoundErrorMessage);
+
+    const extraHistoryEntrySegmentResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(DebugHistoryRouteExtraSegmentPath),
+      {
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(extraHistoryEntrySegmentResponse, 404, NotFoundErrorMessage);
+
     const missingTraceDownloadSegmentResponse = await fetch(
       integrationEnvironment.buildApiRouteUrl(DebugTraceRouteWithoutDownloadPath),
       {
@@ -258,5 +297,13 @@ describe("server route integration debug routes", () => {
       }
     );
     await expectApiErrorResponse(nearMatchDebugPrefixResponse, 404, NotFoundErrorMessage);
+
+    const nearMatchDebugHistoryResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(DebugRouteNearMatchHistoryPath),
+      {
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(nearMatchDebugHistoryResponse, 404, NotFoundErrorMessage);
   });
 });

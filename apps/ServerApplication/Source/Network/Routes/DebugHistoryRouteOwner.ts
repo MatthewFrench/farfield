@@ -6,6 +6,31 @@ import {
   type DebugRouteDependencies
 } from "./DebugRouteContracts.js";
 
+const DebugHistoryRouteStatusCodeByName = {
+  successOk: 200,
+  clientErrorBadRequest: 400,
+  clientErrorNotFound: 404
+} as const;
+
+const DebugHistoryRouteErrorMessageByName = {
+  invalidHistoryEntryIdentifier: "Invalid history entry identifier",
+  historyEntryNotFound: "History entry not found"
+} as const;
+
+const DebugHistoryRouteSegmentIndexByName = {
+  historyCollection: 2,
+  historyEntryIdentifier: 3
+} as const;
+
+const DebugHistoryRouteSegmentCountByName = {
+  readByIdentifier: 4
+} as const;
+
+const DebugHistoryRouteDefaultHistoryListLimit = 120;
+const RoutePathSegmentSeparator = "/";
+const HistoryEntryIdentifierRoutePathPrefix =
+  `${DebugRoutePathnameByName.history}${RoutePathSegmentSeparator}`;
+
 export class DebugHistoryRouteOwner {
   private readonly dependencies: DebugRouteDependencies;
 
@@ -26,36 +51,40 @@ export class DebugHistoryRouteOwner {
   }
 
   private handleReadHistoryEntryRoute(): boolean {
-    const { req, segments, activityHistoryService, jsonResponse, res } = this.dependencies;
+    const { segments, activityHistoryService, jsonResponse, res } = this.dependencies;
 
-    const historyEntrySegment = segments[3];
-    const isReadHistoryEntryRouteRequest =
-      req.method === DebugRouteMethodByName.get
-      && segments[2] === DebugRouteSegmentByName.history
-      && segments.length === 4
-      && typeof historyEntrySegment === "string";
-    if (!isReadHistoryEntryRouteRequest) {
+    const historyEntryIdentifierSegment =
+      segments[DebugHistoryRouteSegmentIndexByName.historyEntryIdentifier];
+    if (
+      typeof historyEntryIdentifierSegment !== "string"
+      || !this.isReadHistoryEntryRouteRequest(historyEntryIdentifierSegment)
+    ) {
       return false;
     }
 
-    let entryId: string;
-    try {
-      entryId = decodeURIComponent(historyEntrySegment);
-    } catch {
-      jsonResponse(res, 400, { ok: false, error: "Invalid history entry identifier" });
+    const historyEntryIdentifier = this.tryDecodeHistoryEntryIdentifier(historyEntryIdentifierSegment);
+    if (historyEntryIdentifier === null) {
+      jsonResponse(res, DebugHistoryRouteStatusCodeByName.clientErrorBadRequest, {
+        ok: false,
+        error: DebugHistoryRouteErrorMessageByName.invalidHistoryEntryIdentifier
+      });
       return true;
     }
 
-    const entry = activityHistoryService.readHistoryEntries().find((item) => item.id === entryId) ?? null;
-    if (!entry) {
-      jsonResponse(res, 404, { ok: false, error: "History entry not found" });
+    const historyEntry =
+      activityHistoryService.readHistoryEntries().find((entry) => entry.id === historyEntryIdentifier) ?? null;
+    if (!historyEntry) {
+      jsonResponse(res, DebugHistoryRouteStatusCodeByName.clientErrorNotFound, {
+        ok: false,
+        error: DebugHistoryRouteErrorMessageByName.historyEntryNotFound
+      });
       return true;
     }
 
-    jsonResponse(res, 200, {
+    jsonResponse(res, DebugHistoryRouteStatusCodeByName.successOk, {
       ok: true,
-      entry,
-      fullPayload: activityHistoryService.readHistoryById().get(entryId) ?? null
+      entry: historyEntry,
+      fullPayload: activityHistoryService.readHistoryById().get(historyEntryIdentifier) ?? null
     });
     return true;
   }
@@ -67,9 +96,12 @@ export class DebugHistoryRouteOwner {
       return false;
     }
 
-    const limit = parseInteger(url.searchParams.get("limit"), 120);
+    const limit = parseInteger(
+      url.searchParams.get("limit"),
+      DebugHistoryRouteDefaultHistoryListLimit
+    );
     const data = activityHistoryService.readHistoryEntries().slice(-limit);
-    jsonResponse(res, 200, { ok: true, history: data });
+    jsonResponse(res, DebugHistoryRouteStatusCodeByName.successOk, { ok: true, history: data });
     return true;
   }
 
@@ -80,10 +112,45 @@ export class DebugHistoryRouteOwner {
       return false;
     }
 
-    jsonResponse(res, 200, FarfieldDebugObservabilityEnvelopeSchema.parse({
-      ok: true,
-      snapshot: readObservabilitySnapshot()
-    }));
+    jsonResponse(
+      res,
+      DebugHistoryRouteStatusCodeByName.successOk,
+      FarfieldDebugObservabilityEnvelopeSchema.parse({
+        ok: true,
+        snapshot: readObservabilitySnapshot()
+      })
+    );
     return true;
+  }
+
+  /**
+   * Exact pathname ownership keeps near-match debug paths on the shared top-level not-found contract.
+   */
+  private isReadHistoryEntryRouteRequest(historyEntryIdentifierSegment: string): boolean {
+    const { req, pathname, segments } = this.dependencies;
+
+    if (
+      req.method !== DebugRouteMethodByName.get
+      || segments.length !== DebugHistoryRouteSegmentCountByName.readByIdentifier
+      || segments[DebugHistoryRouteSegmentIndexByName.historyCollection] !== DebugRouteSegmentByName.history
+      || pathname.endsWith(RoutePathSegmentSeparator)
+    ) {
+      return false;
+    }
+
+    return pathname === `${HistoryEntryIdentifierRoutePathPrefix}${historyEntryIdentifierSegment}`;
+  }
+
+  private tryDecodeHistoryEntryIdentifier(historyEntryIdentifierSegment: string): string | null {
+    try {
+      const decodedHistoryEntryIdentifier = decodeURIComponent(historyEntryIdentifierSegment);
+      if (decodedHistoryEntryIdentifier.includes(RoutePathSegmentSeparator)) {
+        return null;
+      }
+
+      return decodedHistoryEntryIdentifier;
+    } catch {
+      return null;
+    }
   }
 }
