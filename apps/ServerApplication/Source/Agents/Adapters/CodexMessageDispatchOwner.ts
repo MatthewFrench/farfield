@@ -50,7 +50,7 @@ export class CodexMessageDispatchOwner {
             threadId: input.threadId,
             ownerClientId,
             text: input.text,
-            ...(input.cwd ? { cwd: input.cwd } : {}),
+            ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
             ...(typeof input.isSteering === "boolean" ? { isSteering: input.isSteering } : {}),
             turnStartTemplate
           });
