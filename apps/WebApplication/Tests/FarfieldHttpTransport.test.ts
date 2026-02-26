@@ -231,7 +231,7 @@ describe("FarfieldHttpTransport", () => {
   it("maps caller-initiated aborts to RequestCanceledError", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
       return new Promise<Response>((_resolve, reject) => {
-        if (init?.signal?.aborted) {
+        if (init?.signal?.aborted === true) {
           reject(createAbortError());
           return;
         }

@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-26 21:31:38Z
+Last Updated (UTC): 2026-02-26 23:07:00Z
 
 ## Scope Model
 
@@ -66,6 +66,40 @@ Exit criteria for this focus wave:
 1. Each area has a short owner registry/checklist entry in this tracker or linked decision notes.
 2. High-risk mutation/query paths have explicit owner API tests.
 3. No new cross-layer shortcuts bypassing owner APIs are introduced during hardening.
+
+## Frontend Strict Enforcement Wave (Completed)
+
+This frontend hardening wave is now complete and enforced in CI lint scope.
+
+1. `35fb94e` `lint: enforce strict frontend runtime checks`
+   - Added strict type-aware lint checks to `apps/WebApplication/Source/**/*`.
+   - Fixed strict-condition and narrowing issues across frontend owners/components.
+2. strict frontend test and contract-policy enforcement wave
+   - Added strict type-aware lint checks to `apps/WebApplication/Tests/**/*`.
+   - Added lint enforcement that forbids:
+     - `unknown` type usage
+     - type-introspection utility contracts (`Parameters<>`, `ReturnType<>`, `ConstructorParameters<>`, `InstanceType<>`)
+   - Updated frontend tests to satisfy strict boolean and unnecessary-condition policies.
+
+## Next Concern Groups (Owner API Hardening Queue)
+
+Focus order for upcoming waves:
+
+1. `apps/WebApplication/Source/Application`
+   - Ensure composition owners only wire dependencies and never absorb domain mutation/query logic.
+   - Verify owner APIs remain the sole mutation channels for app shell/runtime state.
+2. `apps/WebApplication/Source/Features`
+   - Validate each feature keeps one explicit mutable-state owner and no UI-driven boundary calls.
+   - Confirm feature data-access modules stay as boundary-only adapters with strict mapping contracts.
+3. `apps/WebApplication/Source/Shared`
+   - Enforce transport/error modules as pure boundary/shared-contract owners, with no feature state behavior.
+   - Confirm request options, error descriptors, and telemetry contracts remain explicit and centralized.
+4. `apps/ServerApplication/Source/Agents` and `apps/ServerApplication/Source/Network`
+   - Validate adapter/route owner APIs are the only mutation/query channels crossing runtime boundaries.
+   - Confirm no transport-shape checks leak into core owners after ingress parsing.
+5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
+   - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
+   - Validate options/cursor semantics remain explicit from caller contract to wire request.
 
 ## Latest Continuation Commit Wave
 

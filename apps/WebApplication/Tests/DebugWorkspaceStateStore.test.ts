@@ -82,9 +82,14 @@ describe("DebugWorkspaceStateStore", () => {
     nextHistory[1_200] = createHistoryEntry("history-middle-replaced");
 
     const result = store.readNextHistory(previousHistory, nextHistory);
+    const previousMiddleHistoryEntry = previousHistory[1_200];
+    const nextMiddleHistoryEntry = nextHistory[1_200];
+    if (previousMiddleHistoryEntry === undefined) {
+      throw new Error("Expected middle history entries to be present");
+    }
 
-    expect(previousHistory[1_200]?.id).toBe("history-1200");
-    expect(nextHistory[1_200]?.id).toBe("history-middle-replaced");
+    expect(previousMiddleHistoryEntry.id).toBe("history-1200");
+    expect(nextMiddleHistoryEntry.id).toBe("history-middle-replaced");
     expect(result).toBe(previousHistory);
   });
 

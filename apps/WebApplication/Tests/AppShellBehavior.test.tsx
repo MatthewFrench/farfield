@@ -22,12 +22,12 @@ interface Deferred<ValueType> {
 }
 
 function createDeferred<ValueType>(): Deferred<ValueType> {
-  let resolver: ((value: ValueType) => void) | null = null;
+  let resolver: ((value: ValueType) => void) | undefined;
   const promise = new Promise<ValueType>((resolve) => {
     resolver = resolve;
   });
 
-  if (resolver === null) {
+  if (resolver === undefined) {
     throw new Error("Expected deferred resolver to be assigned");
   }
 

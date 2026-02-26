@@ -278,9 +278,6 @@ describe("recoverPushNotifications", () => {
       throw new Error("Expected savePushSubscription to be called at least once");
     }
     const firstSaveRequest = firstSaveCall[0];
-    if (!firstSaveRequest) {
-      throw new Error("Expected savePushSubscription to receive a payload");
-    }
     const firstSaveSettings = firstSaveRequest.settings;
     if (!firstSaveSettings) {
       throw new Error("Expected savePushSubscription payload to include settings");
@@ -327,9 +324,6 @@ describe("recoverPushNotifications", () => {
       throw new Error("Expected savePushSubscription to be called at least once");
     }
     const firstSaveRequest = firstSaveCall[0];
-    if (!firstSaveRequest) {
-      throw new Error("Expected savePushSubscription to receive a payload");
-    }
     const firstSaveSettings = firstSaveRequest.settings;
     if (!firstSaveSettings) {
       throw new Error("Expected savePushSubscription payload to include settings");

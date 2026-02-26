@@ -61,22 +61,21 @@ function createActionIdentifierReader(): () => string {
 function mountRuntimeRequestHandlers(
   input: UseApplicationRuntimeRequestHandlersInput
 ): ApplicationRuntimeRequestHandlers {
-  let capturedRuntimeRequestHandlers: ApplicationRuntimeRequestHandlers | null = null;
+  const onSnapshot = vi.fn<(snapshot: ApplicationRuntimeRequestHandlers) => void>();
 
   render(
     <RuntimeRequestHandlersHarness
       input={input}
-      onSnapshot={(snapshot): void => {
-        capturedRuntimeRequestHandlers = snapshot;
-      }}
+      onSnapshot={onSnapshot}
     />
   );
 
-  if (capturedRuntimeRequestHandlers === null) {
+  const firstSnapshotCall = onSnapshot.mock.calls[0];
+  if (firstSnapshotCall === undefined) {
     throw new Error("Expected runtime request handlers snapshot to be captured");
   }
 
-  return capturedRuntimeRequestHandlers;
+  return firstSnapshotCall[0];
 }
 
 function createBootstrapResponse(input: {

@@ -39,6 +39,29 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-empty-object-type": "off",
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "TSUnknownKeyword",
+          message: "Do not use unknown. Parse untrusted data at boundaries and use explicit contracts."
+        },
+        {
+          selector: "TSTypeReference[typeName.name='Parameters']",
+          message: "Do not use Parameters<>. Declare explicit contract types."
+        },
+        {
+          selector: "TSTypeReference[typeName.name='ReturnType']",
+          message: "Do not use ReturnType<>. Declare explicit contract types."
+        },
+        {
+          selector: "TSTypeReference[typeName.name='ConstructorParameters']",
+          message: "Do not use ConstructorParameters<>. Declare explicit contract types."
+        },
+        {
+          selector: "TSTypeReference[typeName.name='InstanceType']",
+          message: "Do not use InstanceType<>. Declare explicit contract types."
+        }
+      ],
       "@typescript-eslint/no-unused-vars": [
         "error",
         {
@@ -68,6 +91,8 @@ export default tseslint.config(
       "apps/ServerApplication/Source/**/*.ts",
       "apps/WebApplication/Source/**/*.ts",
       "apps/WebApplication/Source/**/*.tsx",
+      "apps/WebApplication/Tests/**/*.ts",
+      "apps/WebApplication/Tests/**/*.tsx",
       "packages/CodexInterfaceAdapter/Source/**/*.ts",
       "packages/CodexProtocol/Source/**/*.ts",
       "packages/OpenCodeInterfaceAdapter/Source/**/*.ts"

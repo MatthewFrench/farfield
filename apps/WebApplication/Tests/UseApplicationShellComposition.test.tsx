@@ -27,6 +27,7 @@ import { ThreadMutationActionCoordinator } from "../Source/Features/Threads/Stat
 import { ThreadListStateController } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
 import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
 import * as ThreadListPanePropertiesModule from "../Source/Features/Threads/StateManagement/UseThreadListPaneProperties";
+import { type ThreadListPaneProperties } from "../Source/Features/Threads/UserInterface/ThreadListPaneContracts";
 import {
   type ThreadActionHandlers
 } from "../Source/Features/Threads/StateManagement/UseThreadActionHandlers";
@@ -433,13 +434,17 @@ describe("useApplicationShellComposition", () => {
       streamEventCards: fixture.streamEventCards
     }));
 
-    const mobileSidebarTouchHandlersResult = useMobileSidebarTouchHandlersSpy.mock.results[0]?.value;
-    if (!mobileSidebarTouchHandlersResult) {
+    const mobileSidebarTouchHandlersResult = (
+      useMobileSidebarTouchHandlersSpy.mock.results[0]?.value
+    ) as MobileSidebarTouchHandlersModule.MobileSidebarTouchHandlers | undefined;
+    if (mobileSidebarTouchHandlersResult === undefined) {
       throw new Error("Expected useMobileSidebarTouchHandlers result");
     }
 
-    const threadListPanePropertiesResult = useThreadListPanePropertiesSpy.mock.results[0]?.value;
-    if (!threadListPanePropertiesResult) {
+    const threadListPanePropertiesResult = (
+      useThreadListPanePropertiesSpy.mock.results[0]?.value
+    ) as ThreadListPaneProperties | undefined;
+    if (threadListPanePropertiesResult === undefined) {
       throw new Error("Expected useThreadListPaneProperties result");
     }
 

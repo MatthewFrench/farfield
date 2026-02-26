@@ -77,7 +77,8 @@ describe("App", () => {
     environment.setPathname(`/threads/${THREAD_ID}`);
     environment.renderApp();
 
-    const initialErrorBannerMessage = (await screen.findByTestId("error-banner-message")).textContent ?? "";
+    const initialErrorBannerElement = await screen.findByTestId("error-banner-message");
+    const initialErrorBannerMessage = initialErrorBannerElement.textContent;
     expect(initialErrorBannerMessage.length).toBeGreaterThan(0);
     fireEvent.click(await screen.findByTestId("error-banner-open-debug"));
 

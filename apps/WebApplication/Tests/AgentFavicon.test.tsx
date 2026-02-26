@@ -7,7 +7,7 @@ const DATA_URL_PREFIX = "data:image/svg+xml,";
 function readDecodedSvgMarkup(imageName: string): string {
   const image = screen.getByRole("img", { name: imageName });
   const source = image.getAttribute("src");
-  if (!source) {
+  if (source === null) {
     throw new Error("AgentFavicon image src must be present");
   }
   expect(source.startsWith(DATA_URL_PREFIX)).toBe(true);

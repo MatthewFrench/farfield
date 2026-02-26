@@ -248,7 +248,7 @@ function installGlobals(): void {
       const parsedUrl = new URL(url, "http://localhost");
       const pathname = parsedUrl.pathname;
       const segments = pathname.split("/").filter((segment) => segment.length > 0);
-      const threadId = segments[2] ? decodeURIComponent(segments[2]) : "";
+      const threadId = segments[2] !== undefined ? decodeURIComponent(segments[2]) : "";
 
       if (pathname === "/api/events/session") {
         const maybeJsonBody = init?.body;
