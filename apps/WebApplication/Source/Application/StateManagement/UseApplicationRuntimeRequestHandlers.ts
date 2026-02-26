@@ -29,6 +29,64 @@ interface ActionRequestOptions {
 
 const RUNTIME_REQUEST_ERROR_OPERATION = "runtime-request-error";
 const RUNTIME_REQUEST_ERROR_HANDLER_NAME = "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError";
+const RUNTIME_REQUEST_ERROR_HANDLER_DETAIL_KEY = "handler";
+const API_SESSION_BOOTSTRAP_EMPTY_ERROR_MESSAGE = "";
+
+interface RuntimeRequestErrorReportContract {
+  operation: string;
+  actionId: string;
+  trackingErrorMessage: string;
+  bannerErrorMessage: string;
+}
+
+interface ApiSessionTokenRequirementStateInput {
+  setRequiresApiSessionToken: Dispatch<SetStateAction<boolean>>;
+  setApiSessionBootstrapErrorMessage: Dispatch<SetStateAction<string>>;
+}
+
+interface ApiSessionReadyStateInput extends ApiSessionTokenRequirementStateInput {
+  requiresApiSessionToken: boolean;
+  apiSessionBootstrapErrorMessage: string;
+}
+
+function clearApiSessionBootstrapErrorMessage(
+  setApiSessionBootstrapErrorMessage: Dispatch<SetStateAction<string>>
+): void {
+  setApiSessionBootstrapErrorMessage(API_SESSION_BOOTSTRAP_EMPTY_ERROR_MESSAGE);
+}
+
+function applyApiSessionTokenRequiredState(
+  input: ApiSessionTokenRequirementStateInput
+): void {
+  input.setRequiresApiSessionToken(true);
+  clearApiSessionBootstrapErrorMessage(input.setApiSessionBootstrapErrorMessage);
+}
+
+function applyApiSessionReadyState(input: ApiSessionReadyStateInput): void {
+  if (input.requiresApiSessionToken) {
+    input.setRequiresApiSessionToken(false);
+  }
+  if (input.apiSessionBootstrapErrorMessage.length > 0) {
+    clearApiSessionBootstrapErrorMessage(input.setApiSessionBootstrapErrorMessage);
+  }
+}
+
+function createRuntimeRequestErrorReportContract(
+  rawMessage: string,
+  actionId: string
+): RuntimeRequestErrorReportContract {
+  const runtimeErrorDescriptor = resolveRuntimeRequestErrorDescriptor({
+    rawMessage,
+    defaultOperation: RUNTIME_REQUEST_ERROR_OPERATION,
+    actionId
+  });
+  return {
+    operation: runtimeErrorDescriptor.operation,
+    actionId,
+    trackingErrorMessage: runtimeErrorDescriptor.trackingErrorMessage,
+    bannerErrorMessage: runtimeErrorDescriptor.bannerErrorMessage
+  };
+}
 
 export interface UseApplicationRuntimeRequestHandlersInput {
   trackedUserInterfaceErrorReporter: TrackedUserInterfaceErrorReporter;
@@ -70,27 +128,25 @@ export function useApplicationRuntimeRequestHandlers(
     const message = toErrorMessage(error);
     if (input.apiAuthenticationErrorClassifier.isApiTokenAuthenticationError(message)) {
       input.apiSessionBootstrapCoordinator.markApiTokenRequired();
-      input.setRequiresApiSessionToken(true);
-      input.setApiSessionBootstrapErrorMessage("");
+      applyApiSessionTokenRequiredState({
+        setRequiresApiSessionToken: input.setRequiresApiSessionToken,
+        setApiSessionBootstrapErrorMessage: input.setApiSessionBootstrapErrorMessage
+      });
       return;
     }
 
     const actionId = input.userInterfaceActionRequestBuilder.create(RUNTIME_REQUEST_ERROR_OPERATION).actionId;
-    const runtimeErrorDescriptor = resolveRuntimeRequestErrorDescriptor({
-      rawMessage: message,
-      defaultOperation: RUNTIME_REQUEST_ERROR_OPERATION,
-      actionId
-    });
+    const runtimeRequestErrorReport = createRuntimeRequestErrorReportContract(message, actionId);
     void input.trackedUserInterfaceErrorReporter.report({
-      operation: runtimeErrorDescriptor.operation,
-      actionId,
+      operation: runtimeRequestErrorReport.operation,
+      actionId: runtimeRequestErrorReport.actionId,
       threadId: null,
-      error: runtimeErrorDescriptor.trackingErrorMessage,
+      error: runtimeRequestErrorReport.trackingErrorMessage,
       details: {
-        handler: RUNTIME_REQUEST_ERROR_HANDLER_NAME
+        [RUNTIME_REQUEST_ERROR_HANDLER_DETAIL_KEY]: RUNTIME_REQUEST_ERROR_HANDLER_NAME
       }
     });
-    input.setErrorMessage(runtimeErrorDescriptor.bannerErrorMessage);
+    input.setErrorMessage(runtimeRequestErrorReport.bannerErrorMessage);
   }, [
     input.apiAuthenticationErrorClassifier,
     input.apiSessionBootstrapCoordinator,
@@ -112,24 +168,27 @@ export function useApplicationRuntimeRequestHandlers(
     );
 
     if (bootstrapDecision.isReady) {
-      if (input.requiresApiSessionToken) {
-        input.setRequiresApiSessionToken(false);
-      }
-      if (input.apiSessionBootstrapErrorMessage.length > 0) {
-        input.setApiSessionBootstrapErrorMessage("");
-      }
+      applyApiSessionReadyState({
+        requiresApiSessionToken: input.requiresApiSessionToken,
+        apiSessionBootstrapErrorMessage: input.apiSessionBootstrapErrorMessage,
+        setRequiresApiSessionToken: input.setRequiresApiSessionToken,
+        setApiSessionBootstrapErrorMessage: input.setApiSessionBootstrapErrorMessage
+      });
       return true;
     }
 
     if (bootstrapDecision.requiresApiToken) {
-      input.setRequiresApiSessionToken(true);
-      input.setApiSessionBootstrapErrorMessage("");
+      applyApiSessionTokenRequiredState({
+        setRequiresApiSessionToken: input.setRequiresApiSessionToken,
+        setApiSessionBootstrapErrorMessage: input.setApiSessionBootstrapErrorMessage
+      });
     }
     return false;
   }, [
     input.apiSessionBootstrapCoordinator,
     input.apiSessionBootstrapErrorMessage.length,
     input.requiresApiSessionToken,
+    input.userInterfaceActionRequestBuilder,
     input.setApiSessionBootstrapErrorMessage,
     input.setRequiresApiSessionToken
   ]);
