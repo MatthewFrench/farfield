@@ -5,6 +5,7 @@ import {
 } from "vitest";
 import {
   RuntimeRefreshObservabilityOwner,
+  type RuntimeRefreshMeasurement,
   type RuntimeRefreshObservabilityClock
 } from "../Source/Application/StateManagement/RuntimeRefreshObservabilityOwner";
 
@@ -38,7 +39,7 @@ describe("RuntimeRefreshObservabilityOwner", () => {
 
     const measurement = owner.beginRefresh();
     clock.advanceBy(25);
-    owner.completeRefreshSuccess(measurement);
+    expect(owner.completeRefreshSuccess(measurement)).toBe(true);
 
     const snapshot = owner.readSnapshot();
     expect(snapshot.totalRefreshCount).toBe(1);
@@ -58,7 +59,7 @@ describe("RuntimeRefreshObservabilityOwner", () => {
 
     const measurement = owner.beginRefresh();
     clock.advanceBy(10);
-    owner.completeRefreshFailure(measurement);
+    expect(owner.completeRefreshFailure(measurement)).toBe(true);
 
     const snapshot = owner.readSnapshot();
     expect(snapshot.totalRefreshCount).toBe(1);
@@ -78,11 +79,11 @@ describe("RuntimeRefreshObservabilityOwner", () => {
     expect(owner.readSnapshot().inFlightRefreshCount).toBe(2);
 
     clock.advanceBy(15);
-    owner.completeRefreshSuccess(firstMeasurement);
+    expect(owner.completeRefreshSuccess(firstMeasurement)).toBe(true);
     expect(owner.readSnapshot().inFlightRefreshCount).toBe(1);
 
     clock.advanceBy(20);
-    owner.completeRefreshFailure(secondMeasurement);
+    expect(owner.completeRefreshFailure(secondMeasurement)).toBe(true);
     const snapshot = owner.readSnapshot();
     expect(snapshot.totalRefreshCount).toBe(2);
     expect(snapshot.succeededRefreshCount).toBe(1);
@@ -93,15 +94,51 @@ describe("RuntimeRefreshObservabilityOwner", () => {
     expect(snapshot.averageDurationMilliseconds).toBe(27.5);
   });
 
-  it("never reports negative in-flight counts when completion is invoked more than once", () => {
+  it("treats refresh measurements as one-time completion tokens", () => {
     const clock = new DeterministicRuntimeRefreshObservabilityClock(20_000, 30_000);
     const owner = new RuntimeRefreshObservabilityOwner(clock);
 
     const measurement = owner.beginRefresh();
     clock.advanceBy(12);
-    owner.completeRefreshSuccess(measurement);
-    owner.completeRefreshFailure(measurement);
+    expect(owner.completeRefreshSuccess(measurement)).toBe(true);
+    const completedSnapshot = owner.readSnapshot();
 
-    expect(owner.readSnapshot().inFlightRefreshCount).toBe(0);
+    clock.advanceBy(50);
+    expect(owner.completeRefreshSuccess(measurement)).toBe(false);
+    expect(owner.completeRefreshFailure(measurement)).toBe(false);
+
+    const untrackedMeasurement: RuntimeRefreshMeasurement = {
+      startedAtEpochMilliseconds: 20_000,
+      startedAtHighResolutionMilliseconds: 30_000
+    };
+    expect(owner.completeRefreshFailure(untrackedMeasurement)).toBe(false);
+
+    const duplicateSnapshot = owner.readSnapshot();
+    expect(duplicateSnapshot).toEqual(completedSnapshot);
+    expect(duplicateSnapshot.succeededRefreshCount).toBe(1);
+    expect(duplicateSnapshot.failedRefreshCount).toBe(0);
+    expect(duplicateSnapshot.averageDurationMilliseconds).toBe(12);
+    expect(duplicateSnapshot.inFlightRefreshCount).toBe(0);
+  });
+
+  it("does not inflate failed refresh aggregates when duplicate completion is attempted", () => {
+    const clock = new DeterministicRuntimeRefreshObservabilityClock(40_000, 50_000);
+    const owner = new RuntimeRefreshObservabilityOwner(clock);
+
+    const measurement = owner.beginRefresh();
+    clock.advanceBy(14);
+    expect(owner.completeRefreshFailure(measurement)).toBe(true);
+    const completedSnapshot = owner.readSnapshot();
+
+    clock.advanceBy(31);
+    expect(owner.completeRefreshFailure(measurement)).toBe(false);
+    expect(owner.completeRefreshSuccess(measurement)).toBe(false);
+
+    const duplicateSnapshot = owner.readSnapshot();
+    expect(duplicateSnapshot).toEqual(completedSnapshot);
+    expect(duplicateSnapshot.succeededRefreshCount).toBe(0);
+    expect(duplicateSnapshot.failedRefreshCount).toBe(1);
+    expect(duplicateSnapshot.averageDurationMilliseconds).toBe(14);
+    expect(duplicateSnapshot.longestDurationMilliseconds).toBe(14);
   });
 });

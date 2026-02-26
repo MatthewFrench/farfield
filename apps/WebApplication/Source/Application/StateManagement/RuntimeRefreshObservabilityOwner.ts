@@ -20,6 +20,8 @@ export interface RuntimeRefreshObservabilitySnapshot {
   lastCompletedAtEpochMilliseconds: number | null;
 }
 
+type RuntimeRefreshCompletionStatus = "succeeded" | "failed";
+
 const RUNTIME_REFRESH_OBSERVABILITY_DEFAULT_CLOCK: RuntimeRefreshObservabilityClock = {
   readEpochMilliseconds: () => Date.now(),
   readHighResolutionMilliseconds: () => performance.now()
@@ -31,10 +33,10 @@ const RUNTIME_REFRESH_OBSERVABILITY_DEFAULT_CLOCK: RuntimeRefreshObservabilityCl
  */
 export class RuntimeRefreshObservabilityOwner {
   private readonly clock: RuntimeRefreshObservabilityClock;
+  private readonly inFlightMeasurements: Set<RuntimeRefreshMeasurement>;
   private totalRefreshCount: number;
   private succeededRefreshCount: number;
   private failedRefreshCount: number;
-  private inFlightRefreshCount: number;
   private totalDurationMilliseconds: number;
   private lastDurationMilliseconds: number | null;
   private longestDurationMilliseconds: number | null;
@@ -43,10 +45,10 @@ export class RuntimeRefreshObservabilityOwner {
 
   public constructor(clock: RuntimeRefreshObservabilityClock = RUNTIME_REFRESH_OBSERVABILITY_DEFAULT_CLOCK) {
     this.clock = clock;
+    this.inFlightMeasurements = new Set<RuntimeRefreshMeasurement>();
     this.totalRefreshCount = 0;
     this.succeededRefreshCount = 0;
     this.failedRefreshCount = 0;
-    this.inFlightRefreshCount = 0;
     this.totalDurationMilliseconds = 0;
     this.lastDurationMilliseconds = null;
     this.longestDurationMilliseconds = null;
@@ -57,25 +59,24 @@ export class RuntimeRefreshObservabilityOwner {
   public beginRefresh(): RuntimeRefreshMeasurement {
     const startedAtEpochMilliseconds = this.clock.readEpochMilliseconds();
     const startedAtHighResolutionMilliseconds = this.clock.readHighResolutionMilliseconds();
-
-    this.totalRefreshCount += 1;
-    this.inFlightRefreshCount += 1;
-    this.lastStartedAtEpochMilliseconds = startedAtEpochMilliseconds;
-
-    return {
+    const measurement: RuntimeRefreshMeasurement = {
       startedAtEpochMilliseconds,
       startedAtHighResolutionMilliseconds
     };
+
+    this.totalRefreshCount += 1;
+    this.inFlightMeasurements.add(measurement);
+    this.lastStartedAtEpochMilliseconds = startedAtEpochMilliseconds;
+
+    return measurement;
   }
 
-  public completeRefreshSuccess(measurement: RuntimeRefreshMeasurement): void {
-    this.succeededRefreshCount += 1;
-    this.completeRefresh(measurement);
+  public completeRefreshSuccess(measurement: RuntimeRefreshMeasurement): boolean {
+    return this.completeRefresh(measurement, "succeeded");
   }
 
-  public completeRefreshFailure(measurement: RuntimeRefreshMeasurement): void {
-    this.failedRefreshCount += 1;
-    this.completeRefresh(measurement);
+  public completeRefreshFailure(measurement: RuntimeRefreshMeasurement): boolean {
+    return this.completeRefresh(measurement, "failed");
   }
 
   public readSnapshot(): RuntimeRefreshObservabilitySnapshot {
@@ -88,7 +89,7 @@ export class RuntimeRefreshObservabilityOwner {
       totalRefreshCount: this.totalRefreshCount,
       succeededRefreshCount: this.succeededRefreshCount,
       failedRefreshCount: this.failedRefreshCount,
-      inFlightRefreshCount: this.inFlightRefreshCount,
+      inFlightRefreshCount: this.inFlightMeasurements.size,
       lastDurationMilliseconds: this.lastDurationMilliseconds,
       averageDurationMilliseconds,
       longestDurationMilliseconds: this.longestDurationMilliseconds,
@@ -97,7 +98,18 @@ export class RuntimeRefreshObservabilityOwner {
     };
   }
 
-  private completeRefresh(measurement: RuntimeRefreshMeasurement): void {
+  private completeRefresh(measurement: RuntimeRefreshMeasurement, completionStatus: RuntimeRefreshCompletionStatus): boolean {
+    // Measurements are linear tokens: exactly one completion call may consume each token.
+    if (!this.inFlightMeasurements.delete(measurement)) {
+      return false;
+    }
+
+    if (completionStatus === "succeeded") {
+      this.succeededRefreshCount += 1;
+    } else {
+      this.failedRefreshCount += 1;
+    }
+
     const durationMilliseconds = Math.max(
       0,
       this.clock.readHighResolutionMilliseconds() - measurement.startedAtHighResolutionMilliseconds
@@ -109,6 +121,6 @@ export class RuntimeRefreshObservabilityOwner {
       ? durationMilliseconds
       : Math.max(this.longestDurationMilliseconds, durationMilliseconds);
     this.lastCompletedAtEpochMilliseconds = this.clock.readEpochMilliseconds();
-    this.inFlightRefreshCount = Math.max(0, this.inFlightRefreshCount - 1);
+    return true;
   }
 }
