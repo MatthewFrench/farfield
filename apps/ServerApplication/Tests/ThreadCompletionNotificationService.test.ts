@@ -405,4 +405,77 @@ describe("ThreadCompletionNotificationService", () => {
       warningSpy.mockRestore();
     }
   });
+
+  it("does not commit completion watermark when all notification deliveries fail", async () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const pushStore = new PushStore(path.join(temporaryDirectoryPath, "push-state.json"));
+    const pushSendStore = new PushSendStore(path.join(temporaryDirectoryPath, "push-send.json"));
+    pushStore.load();
+    pushSendStore.load();
+
+    await pushStore.upsertSubscription(
+      {
+        endpoint: "https://push.example.test/subscriptions/fail_only",
+        keys: {
+          p256dh: "fail_only_key",
+          auth: "fail_only_auth"
+        }
+      },
+      {
+        privateMode: false
+      }
+    );
+
+    const conversationState = parseThreadConversationState({
+      id: "thread_no_delivery",
+      preview: "No delivery preview",
+      turns: [
+        {
+          turnId: "turn_no_delivery",
+          status: "completed",
+          items: [
+            {
+              id: "item_agent_no_delivery",
+              type: "agentMessage",
+              text: "No channel delivers this completion"
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    const codexAdapter = {
+      readLiveState: async (_threadId: string) => ({
+        ownerClientId: null,
+        conversationState,
+        liveStateError: null
+      })
+    } as CodexAgentAdapter;
+
+    const pushSystemEvents: string[] = [];
+    const service = new ThreadCompletionNotificationService({
+      readCodexAdapter: () => codexAdapter,
+      threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
+      pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
+      ntfyNotifier: new NtfyNotifier({
+        enabled: false,
+        topic: null,
+        baseUrl: "https://ntfy.sh",
+        bearerToken: null,
+        priority: "3"
+      }),
+      pushService: new FailingPushService(),
+      pushStore,
+      pushSendStore,
+      pushSystem: (message) => {
+        pushSystemEvents.push(message);
+      }
+    });
+
+    await service.checkAndNotifyThreadCompletion("thread_no_delivery");
+
+    expect(pushStore.getCompletionWatermark("thread_no_delivery")).toBeNull();
+    expect(pushSystemEvents).toHaveLength(0);
+  });
 });

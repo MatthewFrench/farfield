@@ -64,10 +64,12 @@ const ServerRuntimeDefaultValues = Object.freeze({
   capabilityListTimeoutMilliseconds: 8_000,
   clientErrorMaximumEntries: 2_000,
   historyLimit: 2_000,
+  // Keep payload summaries bounded at 128 KiB to cap log/memory overhead in debug flows.
   historyPayloadSummaryMaximumBytes: 131_072,
   host: "127.0.0.1",
   ipcReconnectDelayMilliseconds: 1_000,
   logLevel: "info",
+  // Debounce completion events to coalesce brief bursts into one push dispatch pass.
   notificationCompletionDebounceMilliseconds: 250,
   port: 4_311,
   pushEnabled: false,
@@ -77,6 +79,7 @@ const ServerRuntimeDefaultValues = Object.freeze({
   pushTestSendTimeoutMilliseconds: 7_500,
   runtimeStateSnapshotCacheTimeToLiveMilliseconds: 250,
   threadListAdapterTimeoutMilliseconds: 7_500,
+  // Bound thread-list aggregation cache cardinality to keep memory growth predictable.
   threadListAggregationCacheMaximumEntries: 48,
   threadListAggregationCacheTimeToLiveMilliseconds: 2_000,
   webHealthBuildId: "dev"
@@ -107,6 +110,27 @@ const ServerRuntimeStaticConfiguration = Object.freeze({
   userAgent: "farfield/0.2.0",
   windowsCodexIpcSocketPath: "\\\\.\\pipe\\codex-ipc"
 });
+const ServerRuntimeParsingConstants = Object.freeze({
+  falseText: "false",
+  falseNumeric: "0",
+  minimumPositiveInteger: 1,
+  trueText: "true",
+  trueNumeric: "1"
+});
+const ServerRuntimeGitCommandConfiguration = Object.freeze({
+  command: "git",
+  outputEncoding: "utf8",
+  shortHeadArguments: Object.freeze(["rev-parse", "--short", "HEAD"])
+});
+const ServerRuntimeFormattingConstants = Object.freeze({
+  clientErrorSessionTimestampUnsafeCharactersPattern: /[:.]/g,
+  clientErrorSessionTimestampSeparator: "-"
+});
+const MissingPushVapidConfigurationErrorMessage =
+  `${ServerRuntimeEnvironmentVariableNames.pushEnabled}=true requires `
+  + `${ServerRuntimeEnvironmentVariableNames.pushVapidPublicKey}, `
+  + `${ServerRuntimeEnvironmentVariableNames.pushVapidPrivateKey}, and `
+  + ServerRuntimeEnvironmentVariableNames.pushVapidSubject;
 
 function readEnvironmentValue(env: NodeJS.ProcessEnv, variableName: string): string | null {
   return env[variableName] ?? null;
@@ -122,7 +146,7 @@ function parsePositiveInteger(value: string | null, defaultValue: number): numbe
   }
 
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
+  if (!Number.isInteger(parsed) || parsed < ServerRuntimeParsingConstants.minimumPositiveInteger) {
     return defaultValue;
   }
 
@@ -134,11 +158,11 @@ function parseBooleanEnvironmentValue(value: string | null, defaultValue: boolea
     return defaultValue;
   }
 
-  if (value === "1" || value === "true") {
+  if (value === ServerRuntimeParsingConstants.trueNumeric || value === ServerRuntimeParsingConstants.trueText) {
     return true;
   }
 
-  if (value === "0" || value === "false") {
+  if (value === ServerRuntimeParsingConstants.falseNumeric || value === ServerRuntimeParsingConstants.falseText) {
     return false;
   }
 
@@ -242,10 +266,14 @@ function resolveIpcSocketPathFromEnvironment(env: NodeJS.ProcessEnv): string {
 
 function resolveGitCommitHash(defaultWorkspacePath: string): string | null {
   try {
-    const hash = execFileSync("git", ["rev-parse", "--short", "HEAD"], {
-      cwd: defaultWorkspacePath,
-      encoding: "utf8"
-    }).trim();
+    const hash = execFileSync(
+      ServerRuntimeGitCommandConfiguration.command,
+      ServerRuntimeGitCommandConfiguration.shortHeadArguments,
+      {
+        cwd: defaultWorkspacePath,
+        encoding: ServerRuntimeGitCommandConfiguration.outputEncoding
+      }
+    ).trim();
     return hash.length > 0 ? hash : null;
   } catch {
     return null;
@@ -476,13 +504,14 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
     pushEnabled
     && (pushVapidPublicKey.length === 0 || pushVapidPrivateKey.length === 0 || pushVapidSubject.length === 0)
   ) {
-    throw new Error(
-      "PUSH_ENABLED=true requires PUSH_VAPID_PUBLIC_KEY, PUSH_VAPID_PRIVATE_KEY, and PUSH_VAPID_SUBJECT"
-    );
+    throw new Error(MissingPushVapidConfigurationErrorMessage);
   }
 
   const clientErrorSessionStartedAt = new Date().toISOString();
-  const clientErrorSessionTimestamp = clientErrorSessionStartedAt.replace(/[:.]/g, "-");
+  const clientErrorSessionTimestamp = clientErrorSessionStartedAt.replace(
+    ServerRuntimeFormattingConstants.clientErrorSessionTimestampUnsafeCharactersPattern,
+    ServerRuntimeFormattingConstants.clientErrorSessionTimestampSeparator
+  );
   const clientErrorSessionId =
     `${ServerRuntimeStaticConfiguration.sessionIdentifierPrefix}${clientErrorSessionTimestamp}-${String(process.pid)}`;
   const clientErrorLogPath =

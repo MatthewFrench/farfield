@@ -1,6 +1,9 @@
 const QUERY_SEPARATOR = "?";
 const HASH_SEPARATOR = "#";
 const ABSOLUTE_URL_PROTOCOL_SEPARATOR = "://";
+const REQUEST_BASE_URL_PROTOCOL = "http";
+const REQUEST_BASE_URL_PROTOCOL_SEPARATOR = "://";
+const REQUEST_BASE_URL_PORT_SEPARATOR = ":";
 
 /**
  * Owns request method/path literals and path normalization used by request-routing and
@@ -36,6 +39,32 @@ export const RequestPathSegmentByName = {
   trace: "trace",
   download: "download"
 } as const;
+
+export const RequestUrlPathnameParseStatusByName = {
+  resolved: "resolved",
+  malformedRequestUrl: "malformed-request-url"
+} as const;
+
+export interface RequestUrlPathnameParseInput {
+  requestUrl: string;
+  host: string;
+  port: number;
+}
+
+export interface RequestUrlPathnameParseResolvedResult {
+  status: typeof RequestUrlPathnameParseStatusByName.resolved;
+  url: URL;
+  pathname: string;
+  pathSegments: string[];
+}
+
+export interface RequestUrlPathnameParseMalformedResult {
+  status: typeof RequestUrlPathnameParseStatusByName.malformedRequestUrl;
+}
+
+export type RequestUrlPathnameParseResult =
+  | RequestUrlPathnameParseResolvedResult
+  | RequestUrlPathnameParseMalformedResult;
 
 /**
  * Request method normalization is owned here so handlers and observability use the same method label policy.
@@ -99,6 +128,25 @@ export function readPathSegmentsFromPathname(pathname: string): string[] {
     .filter((segment) => segment.length > 0);
 }
 
+export function parseRequestUrlPathname(
+  input: RequestUrlPathnameParseInput
+): RequestUrlPathnameParseResult {
+  try {
+    const url = new URL(input.requestUrl, readRequestBaseUrl(input.host, input.port));
+    const pathname = normalizePathnameForRequestMetrics(url.pathname);
+    return {
+      status: RequestUrlPathnameParseStatusByName.resolved,
+      url,
+      pathname,
+      pathSegments: readPathSegmentsFromPathname(pathname)
+    };
+  } catch {
+    return {
+      status: RequestUrlPathnameParseStatusByName.malformedRequestUrl
+    };
+  }
+}
+
 function stripPathnameSuffix(pathname: string): string {
   const querySeparatorIndex = pathname.indexOf(QUERY_SEPARATOR);
   const hashSeparatorIndex = pathname.indexOf(HASH_SEPARATOR);
@@ -138,4 +186,8 @@ function readPathnameFromAbsoluteUrl(urlValue: string): AbsoluteUrlPathnameResol
       pathname: null
     };
   }
+}
+
+function readRequestBaseUrl(host: string, port: number): string {
+  return `${REQUEST_BASE_URL_PROTOCOL}${REQUEST_BASE_URL_PROTOCOL_SEPARATOR}${host}${REQUEST_BASE_URL_PORT_SEPARATOR}${String(port)}`;
 }

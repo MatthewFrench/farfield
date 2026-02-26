@@ -17,10 +17,13 @@ import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/
 
 type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 type DebugHistory = DebugWorkspaceDataSnapshot["history"];
+type CapabilityModeDescriptor = CapabilityCollaborationModesResponse["data"][number];
 
 const DEFAULT_MODE_KEY = "default";
 const DEFAULT_MODE_NAME = "Balanced";
 const DEFAULT_MODEL_ID = "gpt-5";
+const SIGNATURE_SEGMENT_DELIMITER = "|";
+const EMPTY_SIGNATURE_SEGMENT = "";
 const THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS = 60_000;
 const THREAD_QUERY_CACHE_MAXIMUM_ENTRIES = 10;
 
@@ -70,16 +73,27 @@ function createCapabilitiesSnapshot(
   defaults: CapabilityConfigDefaultsResponse | null;
   fetchedAt: number;
 } {
+  const modeDescriptor: CapabilityModeDescriptor = {
+    name: DEFAULT_MODE_NAME,
+    mode: DEFAULT_MODE_KEY,
+    model: DEFAULT_MODEL_ID,
+    reasoning_effort: modeReasoningEffort
+  };
+  return createCapabilitiesSnapshotFromMode(modeDescriptor, modelDisplayName);
+}
+
+function createCapabilitiesSnapshotFromMode(
+  modeDescriptor: CapabilityModeDescriptor,
+  modelDisplayName: string
+): {
+  modes: CapabilityCollaborationModesResponse;
+  models: CapabilityModelsResponse;
+  defaults: CapabilityConfigDefaultsResponse | null;
+  fetchedAt: number;
+} {
   return {
     modes: {
-      data: [
-        {
-          name: DEFAULT_MODE_NAME,
-          mode: DEFAULT_MODE_KEY,
-          model: DEFAULT_MODEL_ID,
-          reasoning_effort: modeReasoningEffort
-        }
-      ]
+      data: [modeDescriptor]
     },
     models: {
       data: [createModelDescriptor(modelDisplayName)],
@@ -88,6 +102,12 @@ function createCapabilitiesSnapshot(
     defaults: null,
     fetchedAt: Date.now()
   };
+}
+
+function buildExpectedSignatureEntry(
+  segments: ReadonlyArray<string | null | undefined>
+): string {
+  return segments.map((segment) => segment ?? EMPTY_SIGNATURE_SEGMENT).join(SIGNATURE_SEGMENT_DELIMITER);
 }
 
 function createDebugHistoryEntry(entryId: string): DebugHistory[number] {
@@ -171,7 +191,9 @@ describe("CoreDataSnapshotStateApplier", () => {
     expect(harness.setModesMock).toHaveBeenCalledTimes(1);
     expect(harness.setModesMock).toHaveBeenCalledWith(changedSnapshot.modes.data);
     expect(harness.setModelsMock).not.toHaveBeenCalled();
-    expect(harness.input.modesSignatureRef.current).toEqual(["default|Balanced|high"]);
+    expect(harness.input.modesSignatureRef.current).toEqual([
+      buildExpectedSignatureEntry([DEFAULT_MODE_KEY, DEFAULT_MODE_NAME, "high"])
+    ]);
   });
 
   it("does not update modes or models when signatures are unchanged", () => {
@@ -188,8 +210,12 @@ describe("CoreDataSnapshotStateApplier", () => {
 
     expect(harness.setModesMock).not.toHaveBeenCalled();
     expect(harness.setModelsMock).not.toHaveBeenCalled();
-    expect(harness.input.modesSignatureRef.current).toEqual(["default|Balanced|medium"]);
-    expect(harness.input.modelsSignatureRef.current).toEqual(["gpt-5|GPT-5"]);
+    expect(harness.input.modesSignatureRef.current).toEqual([
+      buildExpectedSignatureEntry([DEFAULT_MODE_KEY, DEFAULT_MODE_NAME, "medium"])
+    ]);
+    expect(harness.input.modelsSignatureRef.current).toEqual([
+      buildExpectedSignatureEntry([DEFAULT_MODEL_ID, "GPT-5"])
+    ]);
   });
 
   it("updates models when model display name changes", () => {
@@ -208,7 +234,38 @@ describe("CoreDataSnapshotStateApplier", () => {
     expect(harness.setModelsMock).toHaveBeenCalledTimes(1);
     expect(harness.setModelsMock).toHaveBeenCalledWith(changedSnapshot.models.data);
     expect(harness.setModesMock).not.toHaveBeenCalled();
-    expect(harness.input.modelsSignatureRef.current).toEqual(["gpt-5|GPT-5 Turbo"]);
+    expect(harness.input.modelsSignatureRef.current).toEqual([
+      buildExpectedSignatureEntry([DEFAULT_MODEL_ID, "GPT-5 Turbo"])
+    ]);
+  });
+
+  it("normalizes null and omitted mode signature segments to the same signature", () => {
+    const harness = createHarness();
+    const nullSegmentMode: CapabilityModeDescriptor = {
+      name: DEFAULT_MODE_NAME,
+      mode: null,
+      model: DEFAULT_MODEL_ID,
+      reasoning_effort: null
+    };
+
+    harness.input.nextCapabilities = createCapabilitiesSnapshotFromMode(nullSegmentMode, "GPT-5");
+    applyCoreDataSnapshotState(harness.input);
+
+    harness.setModesMock.mockClear();
+    harness.setModelsMock.mockClear();
+
+    const omittedSegmentMode: CapabilityModeDescriptor = {
+      name: DEFAULT_MODE_NAME,
+      model: DEFAULT_MODEL_ID
+    };
+    harness.input.nextCapabilities = createCapabilitiesSnapshotFromMode(omittedSegmentMode, "GPT-5");
+    applyCoreDataSnapshotState(harness.input);
+
+    expect(harness.setModesMock).not.toHaveBeenCalled();
+    expect(harness.setModelsMock).not.toHaveBeenCalled();
+    expect(harness.input.modesSignatureRef.current).toEqual([
+      buildExpectedSignatureEntry([null, DEFAULT_MODE_NAME, null])
+    ]);
   });
 
   it("reuses previous large history when debug snapshot boundaries match", () => {

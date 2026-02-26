@@ -8,25 +8,39 @@ import {
   type ThreadStreamStateChangedBroadcast
 } from "@farfield/protocol";
 
+type PatchPathSegment = number | string;
+
+const PATCH_APPEND_PATH_SEGMENT = "-";
+const NON_NEGATIVE_ARRAY_INDEX_SEGMENT_PATTERN = /^(0|[1-9]\d*)$/;
+const EMPTY_PATCH_PATH_ERROR_MESSAGE = "Patch path cannot be empty";
+const PATCH_SEQUENCE_FAILURE_MESSAGE_PREFIX = "Patch sequence failed at index";
+const PATCH_SEQUENCE_INVALID_STATE_MESSAGE_PREFIX =
+  "Patch sequence produced invalid conversation state at index";
+const NO_TURN_PARAMS_TEMPLATE_ERROR_MESSAGE = "No turn params template found in conversation state";
+
 function cloneState<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function patchPathSegmentLabel(segment: number | string): string {
+function patchPathSegmentLabel(segment: PatchPathSegment): string {
   return typeof segment === "number" ? `[${segment}]` : segment;
 }
 
-function parseArrayIndex(segment: number | string): number {
+function parseArrayIndex(segment: PatchPathSegment): number {
   if (typeof segment === "number") {
     if (!Number.isInteger(segment) || segment < 0) {
       throw new Error(`Patch array index invalid: ${String(segment)}`);
     }
     return segment;
   }
-  if (!/^(0|[1-9]\d*)$/.test(segment)) {
+  if (!NON_NEGATIVE_ARRAY_INDEX_SEGMENT_PATTERN.test(segment)) {
     throw new Error(`Patch array index invalid: ${String(segment)}`);
   }
   return Number(segment);
+}
+
+function toObjectPathKey(segment: PatchPathSegment): string {
+  return typeof segment === "number" ? String(segment) : segment;
 }
 
 function isJsonArray(value: JsonValue): value is JsonValue[] {
@@ -37,7 +51,26 @@ function isJsonObject(value: JsonValue): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function assertPathExists(target: JsonValue, path: (number | string)[]): void {
+function splitPatchPath(path: PatchPathSegment[]): {
+  parentPath: PatchPathSegment[];
+  lastSegment: PatchPathSegment;
+} {
+  if (path.length === 0) {
+    throw new Error(EMPTY_PATCH_PATH_ERROR_MESSAGE);
+  }
+
+  const lastSegment = path[path.length - 1];
+  if (lastSegment === undefined) {
+    throw new Error(EMPTY_PATCH_PATH_ERROR_MESSAGE);
+  }
+
+  return {
+    parentPath: path.slice(0, -1),
+    lastSegment
+  };
+}
+
+function resolvePathValue(target: JsonValue, path: PatchPathSegment[]): JsonValue {
   let cursor = target;
   for (const segment of path) {
     if (isJsonArray(cursor)) {
@@ -54,7 +87,7 @@ function assertPathExists(target: JsonValue, path: (number | string)[]): void {
     }
 
     if (isJsonObject(cursor)) {
-      const key = typeof segment === "number" ? String(segment) : segment;
+      const key = toObjectPathKey(segment);
       if (!Object.prototype.hasOwnProperty.call(cursor, key)) {
         throw new Error(`Patch path segment missing: ${patchPathSegmentLabel(segment)}`);
       }
@@ -68,6 +101,8 @@ function assertPathExists(target: JsonValue, path: (number | string)[]): void {
 
     throw new Error(`Patch path invalid at segment ${patchPathSegmentLabel(segment)}`);
   }
+
+  return cursor;
 }
 
 function requirePatchValue(patch: ThreadStreamPatch): JsonValue {
@@ -80,52 +115,20 @@ function requirePatchValue(patch: ThreadStreamPatch): JsonValue {
 function applyPatchToState(state: JsonValue, patch: ThreadStreamPatch): void {
   const stateValue = state;
 
-  if (patch.path.length === 0) {
-    throw new Error("Patch path cannot be empty");
-  }
-
-  const parentPath = patch.path.slice(0, -1);
-  const last = patch.path[patch.path.length - 1];
-  if (last === undefined) {
-    throw new Error("Patch path cannot be empty");
-  }
-
-  assertPathExists(stateValue, parentPath);
-
-  let parent: JsonValue = stateValue;
-  for (const segment of parentPath) {
-    if (isJsonArray(parent)) {
-      const index = parseArrayIndex(segment);
-      const next = parent[index];
-      if (next === undefined) {
-        throw new Error(`Patch path segment missing: ${patchPathSegmentLabel(segment)}`);
-      }
-      parent = next;
-      continue;
-    }
-
-    const key = typeof segment === "number" ? String(segment) : segment;
-    if (!isJsonObject(parent)) {
-      throw new Error(`Patch path invalid at segment ${patchPathSegmentLabel(segment)}`);
-    }
-    const next = parent[key];
-    if (next === undefined) {
-      throw new Error(`Patch path segment missing: ${patchPathSegmentLabel(segment)}`);
-    }
-    parent = next;
-  }
+  const { parentPath, lastSegment } = splitPatchPath(patch.path);
+  const parent = resolvePathValue(stateValue, parentPath);
 
   if (isJsonArray(parent)) {
-    if (patch.op === "add" && last === "-") {
+    if (patch.op === "add" && lastSegment === PATCH_APPEND_PATH_SEGMENT) {
       parent.push(requirePatchValue(patch));
       return;
     }
 
-    const arrayIndex = parseArrayIndex(last);
+    const arrayIndex = parseArrayIndex(lastSegment);
 
     if (patch.op === "add") {
       if (arrayIndex < 0 || arrayIndex > parent.length) {
-        throw new Error(`Patch add index out of range: ${String(last)}`);
+        throw new Error(`Patch add index out of range: ${String(lastSegment)}`);
       }
       parent.splice(arrayIndex, 0, requirePatchValue(patch));
       return;
@@ -133,7 +136,7 @@ function applyPatchToState(state: JsonValue, patch: ThreadStreamPatch): void {
 
     if (patch.op === "replace") {
       if (arrayIndex < 0 || arrayIndex >= parent.length) {
-        throw new Error(`Patch replace index out of range: ${String(last)}`);
+        throw new Error(`Patch replace index out of range: ${String(lastSegment)}`);
       }
       parent[arrayIndex] = requirePatchValue(patch);
       return;
@@ -141,7 +144,7 @@ function applyPatchToState(state: JsonValue, patch: ThreadStreamPatch): void {
 
     if (patch.op === "remove") {
       if (arrayIndex < 0 || arrayIndex >= parent.length) {
-        throw new Error(`Patch remove index out of range: ${String(last)}`);
+        throw new Error(`Patch remove index out of range: ${String(lastSegment)}`);
       }
       parent.splice(arrayIndex, 1);
       return;
@@ -149,7 +152,7 @@ function applyPatchToState(state: JsonValue, patch: ThreadStreamPatch): void {
   }
 
   if (isJsonObject(parent)) {
-    const key = typeof last === "number" ? String(last) : last;
+    const key = toObjectPathKey(lastSegment);
     if (patch.op === "remove") {
       if (!Object.prototype.hasOwnProperty.call(parent, key)) {
         throw new Error(`Patch remove key missing: ${key}`);
@@ -181,6 +184,80 @@ export class StrictPatchSequenceError extends Error {
   }
 }
 
+function getLastAppliedPatchIndex(patchCount: number): number {
+  return patchCount > 0 ? patchCount - 1 : 0;
+}
+
+function createPatchSequenceFailureError(
+  patchIndex: number,
+  cause: Error | string | JsonValue
+): StrictPatchSequenceError {
+  return new StrictPatchSequenceError(
+    `${PATCH_SEQUENCE_FAILURE_MESSAGE_PREFIX} ${String(patchIndex)}: ${toErrorMessage(cause)}`,
+    patchIndex,
+    cause
+  );
+}
+
+function createPatchSequenceInvalidStateError(
+  patchIndex: number,
+  cause: Error | string | JsonValue
+): StrictPatchSequenceError {
+  return new StrictPatchSequenceError(
+    `${PATCH_SEQUENCE_INVALID_STATE_MESSAGE_PREFIX} ${String(patchIndex)}: ${toErrorMessage(cause)}`,
+    patchIndex,
+    cause
+  );
+}
+
+function applyPatchSequenceToMutableState(
+  mutableState: JsonValue,
+  patches: ThreadStreamPatch[]
+): void {
+  for (let patchIndex = 0; patchIndex < patches.length; patchIndex += 1) {
+    const patch = patches[patchIndex];
+    if (!patch) {
+      continue;
+    }
+
+    try {
+      applyPatchToState(mutableState, patch);
+    } catch (error) {
+      const normalizedCause = normalizeErrorCause(error);
+      throw createPatchSequenceFailureError(patchIndex, normalizedCause);
+    }
+  }
+}
+
+function localizeFirstInvalidFinalStatePatchIndex(
+  source: ThreadConversationState,
+  patches: ThreadStreamPatch[]
+): number {
+  const defaultFailingPatchIndex = getLastAppliedPatchIndex(patches.length);
+  if (patches.length === 0) {
+    return defaultFailingPatchIndex;
+  }
+
+  // Replay runs only for terminal validation failures so steady-state reduction
+  // avoids per-patch schema parsing in this strict sequence helper.
+  const replayState = JsonValueSchema.parse(cloneState(source));
+  for (let patchIndex = 0; patchIndex < patches.length; patchIndex += 1) {
+    const patch = patches[patchIndex];
+    if (!patch) {
+      continue;
+    }
+
+    applyPatchToState(replayState, patch);
+    try {
+      parseThreadConversationState(replayState);
+    } catch {
+      return patchIndex;
+    }
+  }
+
+  return defaultFailingPatchIndex;
+}
+
 export function applyStrictPatch(
   source: ThreadConversationState,
   patch: ThreadStreamPatch
@@ -195,56 +272,14 @@ export function applyStrictPatchSequence(
   patches: ThreadStreamPatch[]
 ): ThreadConversationState {
   const state = JsonValueSchema.parse(cloneState(source));
-
-  for (let patchIndex = 0; patchIndex < patches.length; patchIndex += 1) {
-    const patch = patches[patchIndex];
-    if (!patch) {
-      continue;
-    }
-
-    try {
-      applyPatchToState(state, patch);
-    } catch (error) {
-      const normalizedCause = normalizeErrorCause(error);
-      throw new StrictPatchSequenceError(
-        `Patch sequence failed at index ${String(patchIndex)}: ${toErrorMessage(normalizedCause)}`,
-        patchIndex,
-        normalizedCause
-      );
-    }
-  }
+  applyPatchSequenceToMutableState(state, patches);
 
   try {
     return parseThreadConversationState(state);
   } catch (error) {
-    let failingPatchIndex = patches.length > 0 ? patches.length - 1 : 0;
-
-    if (patches.length > 0) {
-      const replayState = JsonValueSchema.parse(cloneState(source));
-      for (let patchIndex = 0; patchIndex < patches.length; patchIndex += 1) {
-        const patch = patches[patchIndex];
-        if (!patch) {
-          continue;
-        }
-
-        applyPatchToState(replayState, patch);
-        try {
-          parseThreadConversationState(replayState);
-        } catch {
-          failingPatchIndex = patchIndex;
-          break;
-        }
-      }
-    }
-
+    const failingPatchIndex = localizeFirstInvalidFinalStatePatchIndex(source, patches);
     const normalizedCause = normalizeErrorCause(error);
-    throw new StrictPatchSequenceError(
-      `Patch sequence produced invalid conversation state at index ${String(failingPatchIndex)}: ${
-        toErrorMessage(normalizedCause)
-      }`,
-      failingPatchIndex,
-      normalizedCause
-    );
+    throw createPatchSequenceInvalidStateError(failingPatchIndex, normalizedCause);
   }
 }
 
@@ -258,36 +293,14 @@ export function applyTrustedPatchSequence(
   patches: ThreadStreamPatch[]
 ): ThreadConversationState {
   const mutableState = source as JsonValue;
-
-  for (let patchIndex = 0; patchIndex < patches.length; patchIndex += 1) {
-    const patch = patches[patchIndex];
-    if (!patch) {
-      continue;
-    }
-
-    try {
-      applyPatchToState(mutableState, patch);
-    } catch (error) {
-      const normalizedCause = normalizeErrorCause(error);
-      throw new StrictPatchSequenceError(
-        `Patch sequence failed at index ${String(patchIndex)}: ${toErrorMessage(normalizedCause)}`,
-        patchIndex,
-        normalizedCause
-      );
-    }
-  }
+  applyPatchSequenceToMutableState(mutableState, patches);
 
   try {
     return parseThreadConversationState(mutableState);
   } catch (error) {
+    const failingPatchIndex = getLastAppliedPatchIndex(patches.length);
     const normalizedCause = normalizeErrorCause(error);
-    throw new StrictPatchSequenceError(
-      `Patch sequence produced invalid conversation state at index ${String(
-        patches.length > 0 ? patches.length - 1 : 0
-      )}: ${toErrorMessage(normalizedCause)}`,
-      patches.length > 0 ? patches.length - 1 : 0,
-      normalizedCause
-    );
+    throw createPatchSequenceInvalidStateError(failingPatchIndex, normalizedCause);
   }
 }
 
@@ -320,6 +333,29 @@ export class ThreadStreamReductionError extends Error {
   }
 }
 
+function createThreadStreamReductionError(
+  threadId: string,
+  eventIndex: number,
+  patchIndex: number,
+  event: ThreadStreamStateChangedBroadcast,
+  patch: ThreadStreamPatch,
+  cause: Error | string | JsonValue
+): ThreadStreamReductionError {
+  return new ThreadStreamReductionError(
+    `Thread stream reduction failed for thread ${threadId} at event ${eventIndex}, patch ${patchIndex}: ${toErrorMessage(
+      cause
+    )}`,
+    {
+      threadId,
+      eventIndex,
+      patchIndex,
+      event,
+      patch
+    },
+    cause
+  );
+}
+
 function toErrorMessage(error: Error | string | JsonValue): string {
   if (error instanceof Error) {
     return error.message;
@@ -337,6 +373,38 @@ function normalizeErrorCause<ErrorType>(error: ErrorType): Error | string | Json
 
   const structuredError = JsonValueSchema.safeParse(error);
   return structuredError.success ? structuredError.data : String(error);
+}
+
+function applyEventPatchSequence(
+  threadId: string,
+  eventIndex: number,
+  event: ThreadStreamStateChangedBroadcast,
+  sourceConversationState: ThreadConversationState,
+  patches: ThreadStreamPatch[]
+): ThreadConversationState {
+  // Stream reduction keeps strict per-patch validation so failures retain
+  // deterministic event/patch localization metadata for diagnostics.
+  let updatedConversationState = sourceConversationState;
+  for (let patchIndex = 0; patchIndex < patches.length; patchIndex += 1) {
+    const patch = patches[patchIndex];
+    if (!patch) {
+      continue;
+    }
+    try {
+      updatedConversationState = applyStrictPatch(updatedConversationState, patch);
+    } catch (error) {
+      const normalizedCause = normalizeErrorCause(error);
+      throw createThreadStreamReductionError(
+        threadId,
+        eventIndex,
+        patchIndex,
+        event,
+        patch,
+        normalizedCause
+      );
+    }
+  }
+  return updatedConversationState;
 }
 
 export function reduceThreadStreamEvents(
@@ -375,33 +443,13 @@ export function reduceThreadStreamEvents(
       continue;
     }
 
-    let updated = next.conversationState;
-    for (let patchIndex = 0; patchIndex < change.patches.length; patchIndex += 1) {
-      const patch = change.patches[patchIndex];
-      if (!patch) {
-        continue;
-      }
-      try {
-        updated = applyStrictPatch(updated, patch);
-      } catch (error) {
-        const normalizedCause = normalizeErrorCause(error);
-        throw new ThreadStreamReductionError(
-          `Thread stream reduction failed for thread ${threadId} at event ${eventIndex}, patch ${patchIndex}: ${toErrorMessage(
-            normalizedCause
-          )}`,
-          {
-            threadId,
-            eventIndex,
-            patchIndex,
-            event,
-            patch
-          },
-          normalizedCause
-        );
-      }
-    }
-
-    next.conversationState = updated;
+    next.conversationState = applyEventPatchSequence(
+      threadId,
+      eventIndex,
+      event,
+      next.conversationState,
+      change.patches
+    );
     byThread.set(threadId, next);
   }
 
@@ -418,5 +466,5 @@ export function findLatestTurnParamsTemplate(
     }
   }
 
-  throw new Error("No turn params template found in conversation state");
+  throw new Error(NO_TURN_PARAMS_TEMPLATE_ERROR_MESSAGE);
 }

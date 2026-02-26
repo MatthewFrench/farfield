@@ -43,6 +43,7 @@ import { ThreadStreamDeltaEventPublisher } from "../Network/ThreadStreamDeltaEve
 import {
   THREAD_STREAM_STATE_CHANGED_BATCH_EVENT_TYPE,
   THREAD_STREAM_STATE_CHANGED_METHOD,
+  type ThreadStreamStateChangedBatchSummary,
   ThreadStreamStateChangedHistoryBatchOwner
 } from "./ThreadStreamStateChangedHistoryBatchOwner.js";
 
@@ -86,9 +87,13 @@ const pushVapidPublicKey = runtimeConfiguration.pushVapidPublicKey;
 const pushVapidPrivateKey = runtimeConfiguration.pushVapidPrivateKey;
 const pushVapidSubject = runtimeConfiguration.pushVapidSubject;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+// Keepalive cadence balances prompt stale-connection detection with low idle network overhead.
 const EVENT_STREAM_KEEPALIVE_INTERVAL_MS = 15_000;
 // Summarize bursty stream-state events once per second to preserve readable activity history.
 const THREAD_STREAM_HISTORY_SUMMARY_FLUSH_INTERVAL_MS = 1_000;
+const RUNTIME_STATE_CHANGED_EVENT_TYPE = "runtime-state-changed";
+const IPC_HISTORY_TRANSPORT = "ipc";
+const IPC_INBOUND_DIRECTION = "in";
 
 const pushStore = new PushStore(pushStatePathResolution.filePath);
 pushStore.load();
@@ -131,22 +136,27 @@ const activityHistoryService = new ActivityHistoryService(
   eventStreamClientRegistry,
   runtimeConfiguration.historyPayloadSummaryMaximumBytes
 );
+
+function emitThreadStreamStateChangedHistorySummary(
+  summary: ThreadStreamStateChangedBatchSummary
+): void {
+  activityHistoryService.pushHistory(IPC_HISTORY_TRANSPORT, IPC_INBOUND_DIRECTION, {
+    type: THREAD_STREAM_STATE_CHANGED_BATCH_EVENT_TYPE,
+    count: summary.count,
+    spanMs: summary.spanMs,
+    latestThreadId: summary.latestThreadId
+  }, {
+    method: THREAD_STREAM_STATE_CHANGED_METHOD,
+    threadId: summary.latestThreadId,
+    summarized: true,
+    count: summary.count,
+    spanMs: summary.spanMs
+  });
+}
+
 const threadStreamStateChangedHistoryBatchOwner = new ThreadStreamStateChangedHistoryBatchOwner({
   flushIntervalMs: THREAD_STREAM_HISTORY_SUMMARY_FLUSH_INTERVAL_MS,
-  emitSummary: (summary) => {
-    activityHistoryService.pushHistory("ipc", "in", {
-      type: THREAD_STREAM_STATE_CHANGED_BATCH_EVENT_TYPE,
-      count: summary.count,
-      spanMs: summary.spanMs,
-      latestThreadId: summary.latestThreadId
-    }, {
-      method: THREAD_STREAM_STATE_CHANGED_METHOD,
-      threadId: summary.latestThreadId,
-      summarized: true,
-      count: summary.count,
-      spanMs: summary.spanMs
-    });
-  }
+  emitSummary: emitThreadStreamStateChangedHistorySummary
 });
 const threadIndex = new ThreadIndex();
 const threadListAggregationCache = new ThreadListAggregationCache(
@@ -292,7 +302,7 @@ const serverObservabilitySnapshotOwner = new ServerObservabilitySnapshotOwner({
 function broadcastRuntimeState(): void {
   const runtimeStateSnapshot = FarfieldHealthStateSchema.parse(runtimeStateOwner.readSnapshot());
   eventStreamClientRegistry.broadcast({
-    type: "runtime-state-changed",
+    type: RUNTIME_STATE_CHANGED_EVENT_TYPE,
     state: runtimeStateSnapshot
   });
 }

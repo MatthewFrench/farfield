@@ -644,6 +644,47 @@ describe("live-state reducer", () => {
     expect(capturedError.patchIndex).toBe(0);
   });
 
+  it("reports trusted final-state validation failures at the last applied patch index", () => {
+    const sourceState = {
+      id: "thread-trusted-sequence-4",
+      turns: [
+        {
+          status: "completed",
+          items: []
+        }
+      ],
+      requests: []
+    };
+
+    let capturedError: StrictPatchSequenceError | null = null;
+    try {
+      applyTrustedPatchSequence(sourceState, [
+        {
+          op: "replace",
+          path: ["turns", 0, "status"],
+          value: "inProgress"
+        },
+        {
+          op: "remove",
+          path: ["turns", 0, "items"]
+        }
+      ]);
+    } catch (error) {
+      if (error instanceof StrictPatchSequenceError) {
+        capturedError = error;
+      } else {
+        throw error;
+      }
+    }
+
+    expect(capturedError).toBeInstanceOf(StrictPatchSequenceError);
+    if (!capturedError) {
+      throw new Error("Expected StrictPatchSequenceError");
+    }
+    expect(capturedError.patchIndex).toBe(1);
+    expect(capturedError.message).toContain("produced invalid conversation state at index 1");
+  });
+
   it("returns latest available turn params template", () => {
     const template = findLatestTurnParamsTemplate({
       id: "thread-template-1",

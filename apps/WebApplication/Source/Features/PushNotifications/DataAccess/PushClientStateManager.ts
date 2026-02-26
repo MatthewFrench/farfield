@@ -33,7 +33,17 @@ const PUSH_DISABLE_FAILED_ERROR_MESSAGE = "Failed to disable push notifications"
 const PUSH_SERVICE_WORKER_PATH = "/sw.js";
 // Keep service worker recovery from stalling indefinitely when browsers skip the controllerchange event.
 const CONTROLLER_CHANGE_WAIT_TIMEOUT_MILLISECONDS = 2_000;
+const BASE64_PADDING_GROUP_LENGTH = 4;
+const BASE64_PADDING_CHARACTER = "=";
+const BROWSER_CACHE_STORAGE_PROPERTY_NAME = "caches";
+const NOTIFICATION_PERMISSION_UNSUPPORTED = "unsupported";
+const PUSH_SUPPORT_SERVICE_WORKER_PROPERTY_NAME = "serviceWorker";
+const PUSH_SUPPORT_PUSH_MANAGER_PROPERTY_NAME = "PushManager";
+const PUSH_SUPPORT_NOTIFICATION_PROPERTY_NAME = "Notification";
+const PUSH_SUBSCRIPTION_EMPTY_KEY_DEFAULT = "";
 const SERVICE_WORKER_SKIP_WAITING_MESSAGE_TYPE = "SKIP_WAITING";
+const SERVICE_WORKER_CONTROLLER_CHANGE_EVENT_NAME = "controllerchange";
+const SERVICE_WORKER_RELOAD_SUPPRESSION_WINDOW_PROPERTY_NAME = "__farfieldSuppressSwReload" as const;
 const NOTIFICATION_PERMISSION_DEFAULT: NotificationPermission = "default";
 const NOTIFICATION_PERMISSION_GRANTED: NotificationPermission = "granted";
 const PUSH_SUBSCRIPTION_P256DH_KEY_NAME = "p256dh";
@@ -58,7 +68,7 @@ export class PushClientStateManager {
       return {
         supported: false,
         serviceWorkerRegistered: false,
-        permission: "unsupported",
+        permission: NOTIFICATION_PERMISSION_UNSUPPORTED,
         subscribed: false
       };
     }
@@ -283,6 +293,7 @@ export class PushClientStateManager {
 
     this.setServiceWorkerReloadSuppressed(true);
     try {
+      // Recovery intentionally rebuilds the service-worker layer to eliminate stale worker/cached-script state.
       const updatedServiceWorker = await this.activateWaitingServiceWorker(registration);
       await this.unregisterServiceWorkers();
       await this.clearServiceWorkerCaches();
@@ -301,11 +312,18 @@ export class PushClientStateManager {
   }
 
   private isPushSupported(): boolean {
-    return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+    return (
+      PUSH_SUPPORT_SERVICE_WORKER_PROPERTY_NAME in navigator &&
+      PUSH_SUPPORT_PUSH_MANAGER_PROPERTY_NAME in window &&
+      PUSH_SUPPORT_NOTIFICATION_PROPERTY_NAME in window
+    );
   }
 
   private decodeBase64Url(value: string): ArrayBuffer {
-    const padding = "=".repeat((4 - (value.length % 4)) % 4);
+    const padding = BASE64_PADDING_CHARACTER.repeat(
+      (BASE64_PADDING_GROUP_LENGTH - (value.length % BASE64_PADDING_GROUP_LENGTH)) %
+        BASE64_PADDING_GROUP_LENGTH
+    );
     const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
@@ -327,8 +345,8 @@ export class PushClientStateManager {
     return PushSubscriptionSchema.parse({
       endpoint: raw.endpoint ?? subscription.endpoint,
       keys: {
-        p256dh: raw.keys?.[PUSH_SUBSCRIPTION_P256DH_KEY_NAME] ?? "",
-        auth: raw.keys?.[PUSH_SUBSCRIPTION_AUTH_KEY_NAME] ?? ""
+        p256dh: raw.keys?.[PUSH_SUBSCRIPTION_P256DH_KEY_NAME] ?? PUSH_SUBSCRIPTION_EMPTY_KEY_DEFAULT,
+        auth: raw.keys?.[PUSH_SUBSCRIPTION_AUTH_KEY_NAME] ?? PUSH_SUBSCRIPTION_EMPTY_KEY_DEFAULT
       }
     });
   }
@@ -336,34 +354,44 @@ export class PushClientStateManager {
   private setServiceWorkerReloadSuppressed(suppressed: boolean): void {
     const windowWithSuppression = window as WindowWithSwReloadSuppression;
     if (suppressed) {
-      windowWithSuppression.__farfieldSuppressSwReload = true;
+      // The app shell watches this flag to avoid a full-page reload during forced worker replacement.
+      windowWithSuppression[SERVICE_WORKER_RELOAD_SUPPRESSION_WINDOW_PROPERTY_NAME] = true;
       return;
     }
-    delete windowWithSuppression.__farfieldSuppressSwReload;
+    delete windowWithSuppression[SERVICE_WORKER_RELOAD_SUPPRESSION_WINDOW_PROPERTY_NAME];
   }
 
   private async waitForControllerChange(timeoutMs: number): Promise<void> {
     await new Promise<void>((resolve) => {
-      let settled = false;
-      const onControllerChange = () => {
-        if (settled) {
+      let hasSettled = false;
+      let controllerChangeTimeoutIdentifier = 0;
+
+      const completeControllerChangeWait = (): void => {
+        if (hasSettled) {
           return;
         }
-        settled = true;
-        window.clearTimeout(timer);
-        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+        hasSettled = true;
+        window.clearTimeout(controllerChangeTimeoutIdentifier);
+        navigator.serviceWorker.removeEventListener(
+          SERVICE_WORKER_CONTROLLER_CHANGE_EVENT_NAME,
+          handleControllerChange
+        );
         resolve();
       };
-      const timer = window.setTimeout(() => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-        resolve();
-      }, timeoutMs);
 
-      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+      const handleControllerChange = (): void => {
+        completeControllerChangeWait();
+      };
+
+      const handleControllerChangeTimeout = (): void => {
+        completeControllerChangeWait();
+      };
+
+      controllerChangeTimeoutIdentifier = window.setTimeout(handleControllerChangeTimeout, timeoutMs);
+      navigator.serviceWorker.addEventListener(
+        SERVICE_WORKER_CONTROLLER_CHANGE_EVENT_NAME,
+        handleControllerChange
+      );
     });
   }
 
@@ -392,9 +420,10 @@ export class PushClientStateManager {
   }
 
   private async clearServiceWorkerCaches(): Promise<void> {
-    if (!("caches" in window)) {
+    if (!(BROWSER_CACHE_STORAGE_PROPERTY_NAME in window)) {
       return;
     }
+    // Clear every service-worker cache namespace to avoid carrying stale runtime assets into recovery.
     const cacheKeys = await window.caches.keys();
     await Promise.all(
       cacheKeys.map(async (cacheKey) => {

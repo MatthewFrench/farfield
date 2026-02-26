@@ -7,7 +7,9 @@ import {
   parseThreadStreamStateChangedBroadcast,
   ProtocolValidationError,
   type JsonValue,
+  type IpcBroadcastFrame,
   type IpcFrame,
+  type IpcRequestFrame,
   type ThreadStreamStateChangedBroadcast
 } from "@farfield/protocol";
 import { logger } from "../../Shared/Logging/Logger.js";
@@ -63,6 +65,14 @@ const DEFAULT_STREAM_EVENT_LIMIT = 400;
 const MINIMUM_STREAM_EVENT_LIMIT = 1;
 const INITIAL_STREAM_EVENT_SEQUENCE = 0;
 const RESET_CURSOR_SEQUENCE_OFFSET = 1;
+const IPC_FRAME_TYPE_REQUEST = "request";
+const IPC_FRAME_TYPE_RESPONSE = "response";
+const IPC_FRAME_TYPE_BROADCAST = "broadcast";
+const IPC_FRAME_TYPE_CLIENT_DISCOVERY_REQUEST = "client-discovery-request";
+const IPC_FRAME_TYPE_CLIENT_DISCOVERY_RESPONSE = "client-discovery-response";
+const THREAD_STREAM_CHANGE_TYPE_SNAPSHOT = "snapshot";
+const THREAD_STREAM_CHANGE_TYPE_PATCHES = "patches";
+const LIVE_STATE_ERROR_KIND_REDUCTION_FAILED = "reductionFailed";
 const RESPONSE_METHOD_DESCRIPTION = "response";
 const INVALID_THREAD_STREAM_EVENT_DETAIL_LOG_NAME = "codex-invalid-thread-stream-event-detail";
 const THREAD_STREAM_REDUCTION_FAILED_LOG_NAME = "codex-thread-stream-reduction-failed";
@@ -287,13 +297,16 @@ export class CodexThreadStreamStateOwner {
     };
 
     const change = event.params.change;
-    if (change.type === "snapshot") {
-      this.liveStateProjectionByThreadId.set(threadId, {
-        ownerClientId: event.sourceClientId,
-        conversationState: change.conversationState,
-        liveStateError: null
-      });
-      return;
+    switch (change.type) {
+      case THREAD_STREAM_CHANGE_TYPE_SNAPSHOT:
+        this.liveStateProjectionByThreadId.set(threadId, {
+          ownerClientId: event.sourceClientId,
+          conversationState: change.conversationState,
+          liveStateError: null
+        });
+        return;
+      case THREAD_STREAM_CHANGE_TYPE_PATCHES:
+        break;
     }
 
     if (!previousProjection.conversationState) {
@@ -322,12 +335,7 @@ export class CodexThreadStreamStateOwner {
       this.liveStateProjectionByThreadId.set(threadId, {
         ownerClientId: event.sourceClientId,
         conversationState: null,
-        liveStateError: {
-          kind: "reductionFailed",
-          message: reductionFailureLocalization.message,
-          eventIndex: reductionFailureLocalization.eventIndex,
-          patchIndex: reductionFailureLocalization.patchIndex
-        }
+        liveStateError: this.createReductionFailedLiveStateError(reductionFailureLocalization)
       });
       return;
     }
@@ -375,18 +383,32 @@ export class CodexThreadStreamStateOwner {
   }
 
   private extractThreadId(frame: IpcFrame): string | null {
-    if (this.isThreadStreamStateChangedFrame(frame)) {
-      const parsedBroadcastParams = this.parseThreadIdentifierCandidates(frame.params);
-      if (parsedBroadcastParams === null) {
+    switch (frame.type) {
+      case IPC_FRAME_TYPE_BROADCAST:
+        return this.extractThreadIdFromBroadcastFrame(frame);
+      case IPC_FRAME_TYPE_REQUEST:
+        return this.extractThreadIdFromRequestFrame(frame);
+      case IPC_FRAME_TYPE_RESPONSE:
+      case IPC_FRAME_TYPE_CLIENT_DISCOVERY_REQUEST:
+      case IPC_FRAME_TYPE_CLIENT_DISCOVERY_RESPONSE:
         return null;
-      }
-      return normalizeNullableIdentifier(parsedBroadcastParams.conversationId);
     }
+  }
 
-    if (frame.type !== "request") {
+  private extractThreadIdFromBroadcastFrame(frame: IpcBroadcastFrame): string | null {
+    if (!this.isThreadStreamStateChangedFrame(frame)) {
       return null;
     }
 
+    const parsedBroadcastParams = this.parseThreadIdentifierCandidates(frame.params);
+    if (parsedBroadcastParams === null) {
+      return null;
+    }
+
+    return normalizeNullableIdentifier(parsedBroadcastParams.conversationId);
+  }
+
+  private extractThreadIdFromRequestFrame(frame: IpcRequestFrame): string | null {
     const parsedRequestParams = this.parseThreadIdentifierCandidates(frame.params);
     if (parsedRequestParams === null) {
       return null;
@@ -409,17 +431,20 @@ export class CodexThreadStreamStateOwner {
   }
 
   private readFrameMethod(frame: IpcFrame): string {
-    if (frame.type === "request" || frame.type === "broadcast") {
-      return frame.method;
+    switch (frame.type) {
+      case IPC_FRAME_TYPE_REQUEST:
+      case IPC_FRAME_TYPE_BROADCAST:
+        return frame.method;
+      case IPC_FRAME_TYPE_RESPONSE:
+        return frame.method ?? RESPONSE_METHOD_DESCRIPTION;
+      case IPC_FRAME_TYPE_CLIENT_DISCOVERY_REQUEST:
+      case IPC_FRAME_TYPE_CLIENT_DISCOVERY_RESPONSE:
+        return frame.type;
     }
-    if (frame.type === "response") {
-      return frame.method ?? RESPONSE_METHOD_DESCRIPTION;
-    }
-    return frame.type;
   }
 
   private isThreadStreamStateChangedFrame(frame: IpcFrame): boolean {
-    return frame.type === "broadcast" && frame.method === THREAD_STREAM_STATE_CHANGED_METHOD;
+    return frame.type === IPC_FRAME_TYPE_BROADCAST && frame.method === THREAD_STREAM_STATE_CHANGED_METHOD;
   }
 
   private parseThreadIdentifierCandidates(
@@ -453,6 +478,17 @@ export class CodexThreadStreamStateOwner {
       message: toErrorMessage(error),
       eventIndex,
       patchIndex: readPatchIndex(error)
+    };
+  }
+
+  private createReductionFailedLiveStateError(
+    reductionFailureLocalization: ThreadStreamReductionFailureLocalization
+  ): AgentThreadLiveState["liveStateError"] {
+    return {
+      kind: LIVE_STATE_ERROR_KIND_REDUCTION_FAILED,
+      message: reductionFailureLocalization.message,
+      eventIndex: reductionFailureLocalization.eventIndex,
+      patchIndex: reductionFailureLocalization.patchIndex
     };
   }
 }

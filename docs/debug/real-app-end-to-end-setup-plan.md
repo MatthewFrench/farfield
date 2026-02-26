@@ -19,11 +19,11 @@ This plan is setup and workflow only. It does not include turning manual session
 - Frontend proxies `/api` and `/events` to backend (`apps/WebApplication/vite.config.ts`).
 - API token injection in dev proxy is restricted to trusted origins (`localhost` defaults, configurable via `VITE_DEV_PROXY_TRUSTED_ORIGINS`) when `API_TOKEN` or `PUSH_API_TOKEN` is set (`apps/WebApplication/vite.config.ts`).
 - When `API_TOKEN` is configured, `/events` requires the same token as `/api/*`; browser flows should run through the trusted dev proxy/Caddy path.
-- `scripts/with-env.mjs` already loads `.env` and `.env.local` for wrapped commands.
+- `scripts/tooling/with-env.mjs` already loads `.env` and `.env.local` for wrapped commands.
 
 ### Existing observability and smoke checks
 
-- Runtime endpoint smoke command exists: `pnpm smoke:app` (`scripts/app-smoke.mjs`).
+- Runtime endpoint smoke command exists: `pnpm smoke:app` (`scripts/smoke/app-smoke.mjs`).
 - Real-device iOS smoke commands exist:
   - `pnpm smoke:ios-device` (single target)
   - `pnpm smoke:ios-matrix` (multi-target matrix via `IOS_DEVICE_SMOKE_MATRIX`)
@@ -149,7 +149,7 @@ A clean run means:
 - `pnpm verify:end-to-end:real`
   - `pnpm smoke:app` then `pnpm end-to-end:real:safe-run`.
 
-Note: these commands should be wrapped via `scripts/with-env.mjs` so `.env.local` token config is respected.
+Note: these commands should be wrapped via `scripts/tooling/with-env.mjs` so `.env.local` token config is respected.
 
 ## File-by-File Implementation Plan
 
@@ -160,7 +160,7 @@ Note: these commands should be wrapped via `scripts/with-env.mjs` so `.env.local
 - Add Playwright commands listed above.
 - Keep existing `smoke:app` unchanged.
 - Add `verify:end-to-end:real` composite script for one-shot verification.
-- Ensure each `end-to-end:real:*` script is executed via `scripts/with-env.mjs` for env parity with `pnpm dev`.
+- Ensure each `end-to-end:real:*` script is executed via `scripts/tooling/with-env.mjs` for env parity with `pnpm dev`.
 
 #### `.gitignore`
 

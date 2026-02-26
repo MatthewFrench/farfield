@@ -30,8 +30,13 @@ const ApiEnvelopeSchema = z
 
 // Thread and capability reads can exceed one minute on cold local agent startup.
 // Keep request budgets above that window so startup does not fail into error state.
-const REQUEST_TIMEOUT_MS = 120_000;
-const MAX_RESPONSE_TEXT_LENGTH = 4000;
+const REQUEST_TIMEOUT_MILLISECONDS = 120_000;
+const MAX_RESPONSE_TEXT_LENGTH = 4_000;
+const RESPONSE_TEXT_TRUNCATION_SUFFIX = "... [truncated]";
+const MISSING_STATUS_LABEL = "n/a";
+const FETCH_ABORT_ERROR_NAME = "AbortError";
+const CLIENT_REQUEST_ID_RANDOM_MAX_EXCLUSIVE = 1_000_000_000;
+const CLIENT_REQUEST_ID_HEX_RADIX = 16;
 const ApiErrorEnvelopeSchema = FarfieldApiErrorResponseSchema;
 const RequestPathSchema = z.string().trim().min(1, "Request path must not be blank.");
 
@@ -94,7 +99,7 @@ function buildFailureMessage(
   const requestId = readNonEmptyTrimmedText(context.requestId);
   const statusTextParts = [
     "status=",
-    String(context.status ?? "n/a"),
+    String(context.status ?? MISSING_STATUS_LABEL),
     statusText
   ];
   const message = `${baseMessage} ${statusTextParts.join("")}`.trim();
@@ -106,7 +111,7 @@ function trimRequestBody(text: string): string {
   if (normalized.length <= MAX_RESPONSE_TEXT_LENGTH) {
     return normalized;
   }
-  return `${normalized.slice(0, MAX_RESPONSE_TEXT_LENGTH)}... [truncated]`;
+  return `${normalized.slice(0, MAX_RESPONSE_TEXT_LENGTH)}${RESPONSE_TEXT_TRUNCATION_SUFFIX}`;
 }
 
 function createEmptyResponseTextSummary(): ResponseTextSummary {
@@ -182,7 +187,7 @@ function createRequestFailureError(
 }
 
 function createClientRequestId(): string {
-  return `req_${String(Date.now())}_${Math.floor(Math.random() * 1_000_000_000).toString(16)}`;
+  return `req_${String(Date.now())}_${Math.floor(Math.random() * CLIENT_REQUEST_ID_RANDOM_MAX_EXCLUSIVE).toString(CLIENT_REQUEST_ID_HEX_RADIX)}`;
 }
 
 function readResponseRequestId(response: Response): string | null {
@@ -200,6 +205,24 @@ function appendRequestId(message: string, requestId: string | null): string {
   return `${message} ${REQUEST_ID_LABEL} ${requestId}`;
 }
 
+function buildRequestFailureMessage(path: string): string {
+  return `Request failed for ${path}`;
+}
+
+function buildRequestFailureMessageWithReason(path: string, reason: string): string {
+  return `${buildRequestFailureMessage(path)}: ${reason}`;
+}
+
+function buildTimeoutErrorMessage(path: string, requestId: string): string {
+  return `Request timed out for ${path} after ${String(REQUEST_TIMEOUT_MILLISECONDS)}ms requestId ${requestId}`;
+}
+
+function isAbortError(error: Error): boolean {
+  return error.name === FETCH_ABORT_ERROR_NAME;
+}
+
+// Timeout semantics: the request budget starts when fetch is dispatched, and timeout aborts are
+// treated differently from caller-signal aborts so cancellation reporting stays deterministic.
 async function performRequest(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
   const requestId = createClientRequestId();
@@ -210,7 +233,7 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
   const timeoutHandle = setTimeout(() => {
     didTimeout = true;
     timeoutController.abort();
-  }, REQUEST_TIMEOUT_MS);
+  }, REQUEST_TIMEOUT_MILLISECONDS);
   const inheritedSignal = init?.signal;
   const onAbortInheritedSignal = () => {
     timeoutController.abort();
@@ -230,11 +253,9 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (error instanceof Error && error.name === "AbortError") {
+    if (error instanceof Error && isAbortError(error)) {
       if (didTimeout) {
-        throw new Error(
-          `Request timed out for ${path} after ${String(REQUEST_TIMEOUT_MS)}ms requestId ${requestId}`
-        );
+        throw new Error(buildTimeoutErrorMessage(path, requestId));
       }
       throw new RequestCanceledError(path);
     }
@@ -243,7 +264,7 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
       requestId,
       null,
       createEmptyResponseTextSummary(),
-      `Request failed for ${path}: ${message}`
+      buildRequestFailureMessageWithReason(path, message)
     );
   } finally {
     clearTimeout(timeoutHandle);
@@ -306,7 +327,7 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      parsedError.success ? parsedError.data.error : `Request failed for ${normalizedPath}`
+      parsedError.success ? parsedError.data.error : buildRequestFailureMessage(normalizedPath)
     );
   }
 
@@ -327,7 +348,7 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      `Request failed for ${normalizedPath}: empty response`
+      buildRequestFailureMessageWithReason(normalizedPath, "empty response")
     );
   }
 
@@ -346,7 +367,7 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
     responseRequestId,
     response,
     responseBody.responseTextSummary,
-    parsedError.success ? parsedError.data.error : `Request failed for ${normalizedPath}`
+    parsedError.success ? parsedError.data.error : buildRequestFailureMessage(normalizedPath)
   );
 }
 

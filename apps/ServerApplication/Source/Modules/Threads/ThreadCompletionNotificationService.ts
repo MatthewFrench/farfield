@@ -21,13 +21,24 @@ type CompletionNotificationContext = {
 const DEFAULT_THREAD_NOTIFICATION_PREVIEW = "";
 const DEFAULT_THREAD_NOTIFICATION_NAME = "";
 const DEFAULT_PROJECT_NAME = "No project";
-const THREAD_COMPLETION_PUSH_SYSTEM_MESSAGE = "thread completion notification sent";
-const LOG_EVENT_NTFY_PUBLISH_FAILED = "ntfy-publish-failed";
-const LOG_EVENT_PUSH_COMPLETION_SEND_FAILED = "push-completion-send-failed";
-const LOG_EVENT_PUSH_COMPLETION_SEND_THREW = "push-completion-send-threw";
-const LOG_EVENT_COMPLETION_NOTIFICATION_CHECK_FAILED = "completion-notification-check-failed";
-const LOG_EVENT_THREAD_NOTIFICATION_CONTEXT_PARSE_FAILED = "thread-notification-context-parse-failed";
-const PUSH_FAILURE_LOG_SAMPLE_LIMIT = 10;
+const THREAD_COMPLETION_PUSH_SYSTEM_OPERATION_NAME = "thread completion notification sent";
+const THREAD_ROUTE_PREFIX = "/threads/";
+const WEB_PUSH_NOTIFICATION_IDENTIFIER_PREFIX = "notif_";
+const WEB_PUSH_NOTIFICATION_TAG_PREFIX = "thread:";
+const WEB_PUSH_NOTIFICATION_ICON_PATH = "/icons/icon-192.png";
+const WEB_PUSH_DEFAULT_TITLE = "Farfield thread completed";
+const WEB_PUSH_DEFAULT_BODY = "A response is ready in Farfield.";
+const WEB_PUSH_TITLE_MAX_LENGTH = 120;
+const WEB_PUSH_BODY_MAX_LENGTH = 320;
+const PUSH_FAILURE_LOG_SAMPLE_LIMIT = 10; // Keep warning payloads bounded while preserving representative failures.
+
+const CompletionNotificationLogEventName = {
+  ntfyPublishFailed: "ntfy-publish-failed",
+  pushCompletionSendFailed: "push-completion-send-failed",
+  pushCompletionSendThrew: "push-completion-send-threw",
+  completionNotificationCheckFailed: "completion-notification-check-failed",
+  threadNotificationContextParseFailed: "thread-notification-context-parse-failed"
+} as const;
 
 const ThreadNotificationContextSchema = z
   .object({
@@ -71,6 +82,36 @@ interface CompletionPushFailureLogSummary {
   omittedFailureCount: number;
 }
 
+interface CompletionDispatchTargets {
+  hasNtfyTarget: boolean;
+  hasWebPushTarget: boolean;
+  subscriptions: StoredPushSubscription[];
+}
+
+interface NtfyCompletionDispatchResult {
+  delivered: boolean;
+  messageId: string | null;
+}
+
+interface WebPushCompletionDispatchResult {
+  attempted: number;
+  delivered: number;
+  failures: number;
+}
+
+const NO_NTFY_COMPLETION_DISPATCH_RESULT: NtfyCompletionDispatchResult = {
+  delivered: false,
+  messageId: null
+};
+
+const EMPTY_WEB_PUSH_COMPLETION_DISPATCH_RESULT: WebPushCompletionDispatchResult = {
+  attempted: 0,
+  delivered: 0,
+  failures: 0
+};
+
+// Owns completion notification fan-out and watermark commits.
+// Debounced scheduler reruns are expected; commit only advances after delivery succeeds.
 export class ThreadCompletionNotificationService {
   private readonly readCodexAdapter: () => CodexAgentAdapter | null;
   private readonly threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
@@ -120,79 +161,40 @@ export class ThreadCompletionNotificationService {
 
     try {
       const liveState = await codexAdapter.readLiveState(threadId);
+      // Debounced scheduler reruns may re-check the same completion marker.
+      // CompletionDetector keeps this path idempotent until commit advances the marker.
       const completionCandidate = this.completionDetector.detect(threadId, liveState.conversationState);
       if (!completionCandidate) {
         return;
       }
 
-      const hasNtfyTarget = this.ntfyNotifier.isEnabled();
-      const subscriptions = this.pushService.isEnabled()
-        ? await this.pushMutationConcurrencyCoordinator.runExclusive(async () => this.pushStore.listSubscriptions())
-        : [];
-      const hasWebPushTarget = subscriptions.length > 0;
-      if (!hasNtfyTarget && !hasWebPushTarget) {
+      const dispatchTargets = await this.readCompletionDispatchTargets();
+      if (!dispatchTargets.hasNtfyTarget && !dispatchTargets.hasWebPushTarget) {
         return;
       }
 
       const context = this.readThreadNotificationContext(threadId, liveState.conversationState);
 
-      let ntfyDelivered = false;
-      let ntfyMessageId: string | null = null;
-      if (hasNtfyTarget) {
-        try {
-          const publishResult = await this.ntfyNotifier.publishThreadCompleted({
-            threadId: completionCandidate.threadId,
-            preview: context.preview,
-            projectName: context.projectName,
-            threadName: context.threadName,
-            agentText: completionCandidate.agentText
-          });
-          ntfyDelivered = true;
-          ntfyMessageId = publishResult.messageId;
-        } catch (error) {
-          logger.warn(
-            {
-              threadId,
-              error: this.errorMessageFromValue(error)
-            },
-            LOG_EVENT_NTFY_PUBLISH_FAILED
-          );
-        }
-      }
+      const ntfyDispatchResult = dispatchTargets.hasNtfyTarget
+        ? await this.publishNtfyCompletionNotification({
+          threadId,
+          completionCandidate,
+          context
+        })
+        : NO_NTFY_COMPLETION_DISPATCH_RESULT;
 
-      let webPushAttempted = 0;
-      let webPushDelivered = 0;
-      let webPushFailures = 0;
-      if (hasWebPushTarget) {
-        const sendAggregate = await this.sendCompletionPushNotifications({
-          subscriptions,
-          threadId: completionCandidate.threadId,
-          turnId: completionCandidate.turnId,
-          preview: context.preview,
-          agentText: completionCandidate.agentText
-        });
+      const webPushDispatchResult = dispatchTargets.hasWebPushTarget
+        ? await this.dispatchWebPushCompletionNotifications({
+          threadId,
+          completionCandidate,
+          context,
+          subscriptions: dispatchTargets.subscriptions
+        })
+        : EMPTY_WEB_PUSH_COMPLETION_DISPATCH_RESULT;
 
-        webPushAttempted = sendAggregate.attempted;
-        webPushDelivered = sendAggregate.delivered;
-        webPushFailures = sendAggregate.failures;
-
-        await this.pushMutationConcurrencyCoordinator.runExclusive(async () => {
-          await this.applyWebPushDispatchResultUnderPushMutationLock(sendAggregate, completionCandidate);
-        });
-
-        if (sendAggregate.failureDetails.length > 0) {
-          const failureSummary = this.buildPushFailureLogSummary(sendAggregate.failureDetails);
-          logger.warn(
-            {
-              threadId,
-              ...failureSummary
-            },
-            LOG_EVENT_PUSH_COMPLETION_SEND_FAILED
-          );
-        }
-      }
-
-      if (!ntfyDelivered && webPushDelivered === 0) {
+      // Watermark commit is gated on at least one successful delivery so future
+      // debounced checks can retry the same completion when every channel fails.
+      if (!ntfyDispatchResult.delivered && webPushDispatchResult.delivered === 0) {
         return;
       }
 
@@ -200,13 +202,13 @@ export class ThreadCompletionNotificationService {
         await this.pushStore.setCompletionWatermark(threadId, completionCandidate.marker);
       });
       this.completionDetector.commit(threadId, completionCandidate.marker);
-      this.pushSystem(THREAD_COMPLETION_PUSH_SYSTEM_MESSAGE, {
+      this.pushSystem(THREAD_COMPLETION_PUSH_SYSTEM_OPERATION_NAME, {
         threadId,
-        ntfyDelivered,
-        ...(ntfyMessageId ? { ntfyMessageId } : {}),
-        webPushAttempted,
-        webPushDelivered,
-        webPushFailures
+        ntfyDelivered: ntfyDispatchResult.delivered,
+        ...(ntfyDispatchResult.messageId ? { ntfyMessageId: ntfyDispatchResult.messageId } : {}),
+        webPushAttempted: webPushDispatchResult.attempted,
+        webPushDelivered: webPushDispatchResult.delivered,
+        webPushFailures: webPushDispatchResult.failures
       });
     } catch (error) {
       logger.warn(
@@ -214,9 +216,95 @@ export class ThreadCompletionNotificationService {
           threadId,
           error: this.errorMessageFromValue(error)
         },
-        LOG_EVENT_COMPLETION_NOTIFICATION_CHECK_FAILED
+        CompletionNotificationLogEventName.completionNotificationCheckFailed
       );
     }
+  }
+
+  private async readCompletionDispatchTargets(): Promise<CompletionDispatchTargets> {
+    const hasNtfyTarget = this.ntfyNotifier.isEnabled();
+    if (!this.pushService.isEnabled()) {
+      return {
+        hasNtfyTarget,
+        hasWebPushTarget: false,
+        subscriptions: []
+      };
+    }
+
+    // Read subscriptions under the push-mutation lane so eligibility checks and later pruning stay ordered.
+    const subscriptions = await this.pushMutationConcurrencyCoordinator.runExclusive(
+      async () => this.pushStore.listSubscriptions()
+    );
+    return {
+      hasNtfyTarget,
+      hasWebPushTarget: subscriptions.length > 0,
+      subscriptions
+    };
+  }
+
+  private async publishNtfyCompletionNotification(input: {
+    threadId: string;
+    completionCandidate: CompletionCandidate;
+    context: CompletionNotificationContext;
+  }): Promise<NtfyCompletionDispatchResult> {
+    try {
+      const publishResult = await this.ntfyNotifier.publishThreadCompleted({
+        threadId: input.completionCandidate.threadId,
+        preview: input.context.preview,
+        projectName: input.context.projectName,
+        threadName: input.context.threadName,
+        agentText: input.completionCandidate.agentText
+      });
+      return {
+        delivered: true,
+        messageId: publishResult.messageId
+      };
+    } catch (error) {
+      logger.warn(
+        {
+          threadId: input.threadId,
+          error: this.errorMessageFromValue(error)
+        },
+        CompletionNotificationLogEventName.ntfyPublishFailed
+      );
+      return NO_NTFY_COMPLETION_DISPATCH_RESULT;
+    }
+  }
+
+  private async dispatchWebPushCompletionNotifications(input: {
+    threadId: string;
+    completionCandidate: CompletionCandidate;
+    context: CompletionNotificationContext;
+    subscriptions: StoredPushSubscription[];
+  }): Promise<WebPushCompletionDispatchResult> {
+    const sendAggregate = await this.sendCompletionPushNotifications({
+      subscriptions: input.subscriptions,
+      threadId: input.completionCandidate.threadId,
+      turnId: input.completionCandidate.turnId,
+      preview: input.context.preview,
+      agentText: input.completionCandidate.agentText
+    });
+
+    await this.pushMutationConcurrencyCoordinator.runExclusive(async () => {
+      await this.applyWebPushDispatchResultUnderPushMutationLock(sendAggregate, input.completionCandidate);
+    });
+
+    if (sendAggregate.failureDetails.length > 0) {
+      const failureSummary = this.buildPushFailureLogSummary(sendAggregate.failureDetails);
+      logger.warn(
+        {
+          threadId: input.threadId,
+          ...failureSummary
+        },
+        CompletionNotificationLogEventName.pushCompletionSendFailed
+      );
+    }
+
+    return {
+      attempted: sendAggregate.attempted,
+      delivered: sendAggregate.delivered,
+      failures: sendAggregate.failures
+    };
   }
 
   // Web-push mutation ownership stays under one coordinator lane so subscription
@@ -255,20 +343,20 @@ export class ThreadCompletionNotificationService {
     agentText: string;
     privateMode: boolean;
   }): PushNotificationPayload {
-    const url = `/threads/${encodeURIComponent(input.threadId)}`;
+    const url = `${THREAD_ROUTE_PREFIX}${encodeURIComponent(input.threadId)}`;
 
     const title = input.privateMode
-      ? "Farfield thread completed"
+      ? WEB_PUSH_DEFAULT_TITLE
       : (() => {
-        const candidate = this.trimNotificationText(input.preview, 120);
-        return candidate.length > 0 ? candidate : "Farfield thread completed";
+        const candidate = this.trimNotificationText(input.preview, WEB_PUSH_TITLE_MAX_LENGTH);
+        return candidate.length > 0 ? candidate : WEB_PUSH_DEFAULT_TITLE;
       })();
 
     const body = input.privateMode
-      ? "A response is ready in Farfield."
+      ? WEB_PUSH_DEFAULT_BODY
       : (() => {
-        const candidate = this.trimNotificationText(input.agentText, 320);
-        return candidate.length > 0 ? candidate : "A response is ready in Farfield.";
+        const candidate = this.trimNotificationText(input.agentText, WEB_PUSH_BODY_MAX_LENGTH);
+        return candidate.length > 0 ? candidate : WEB_PUSH_DEFAULT_BODY;
       })();
 
     return {
@@ -284,9 +372,9 @@ export class ThreadCompletionNotificationService {
           title,
           body,
           navigate: url,
-          icon: "/icons/icon-192.png",
-          badge: "/icons/icon-192.png",
-          tag: `thread:${input.threadId}`
+          icon: WEB_PUSH_NOTIFICATION_ICON_PATH,
+          badge: WEB_PUSH_NOTIFICATION_ICON_PATH,
+          tag: `${WEB_PUSH_NOTIFICATION_TAG_PREFIX}${input.threadId}`
         }
       }
     };
@@ -299,7 +387,9 @@ export class ThreadCompletionNotificationService {
     preview: string;
     agentText: string;
   }): Promise<CompletionPushSendAggregate> {
-    const notificationId = `notif_${randomUUID()}`;
+    // One logical completion send may fan out into private and detailed payload batches.
+    // Sharing id/time keeps diagnostics and client dedupe aligned with that single operation.
+    const notificationId = `${WEB_PUSH_NOTIFICATION_IDENTIFIER_PREFIX}${randomUUID()}`;
     const sentAt = new Date().toISOString();
     const privateModeSubscriptions = input.subscriptions.filter((subscription) => subscription.settings.privateMode);
     const detailedModeSubscriptions = input.subscriptions.filter((subscription) => !subscription.settings.privateMode);
@@ -346,7 +436,7 @@ export class ThreadCompletionNotificationService {
             error: this.errorMessageFromValue(error),
             privateMode
           },
-          LOG_EVENT_PUSH_COMPLETION_SEND_THREW
+          CompletionNotificationLogEventName.pushCompletionSendThrew
         );
       }
     };
@@ -384,7 +474,7 @@ export class ThreadCompletionNotificationService {
           threadId,
           issueCount: parsed.error.issues.length
         },
-        LOG_EVENT_THREAD_NOTIFICATION_CONTEXT_PARSE_FAILED
+        CompletionNotificationLogEventName.threadNotificationContextParseFailed
       );
       return {
         preview: DEFAULT_THREAD_NOTIFICATION_PREVIEW,

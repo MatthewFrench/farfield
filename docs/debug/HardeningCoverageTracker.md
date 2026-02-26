@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-26 04:34:57Z
+Last Updated (UTC): 2026-02-26 05:33:11Z
 
 ## Scope Model
 
@@ -24,10 +24,10 @@ Last Updated (UTC): 2026-02-26 04:34:57Z
 ## Program Summary
 
 - Total files in workspace inventory: 1838
-- Files touched in current wave: 16 (0.9%)
-- Files not touched in current wave: 1822
-- Line churn across touched files: +987 / -205 (net +782)
-- Product-surface churn excluding tracker docs in docs/debug: 16 files, +987 / -205 (net +782)
+- Files touched in current wave: 48 (2.6%)
+- Files not touched in current wave: 1790
+- Line churn across touched files: +1502 / -700 (net +802)
+- Product-surface churn excluding tracker docs in docs/debug: 44 files, +1349 / -579 (net +770)
 
 ## Repository Segment Coverage
 
@@ -36,32 +36,32 @@ Last Updated (UTC): 2026-02-26 04:34:57Z
 | `(root)` | 13 | 1 | 7.7% | in-progress |
 | `.claude` | 1 | 0 | 0.0% | not-started |
 | `.github` | 3 | 1 | 33.3% | in-progress |
-| `apps` | 429 | 10 | 2.3% | in-progress |
-| `docs` | 23 | 6 | 26.1% | in-progress |
+| `apps` | 429 | 17 | 4.0% | in-progress |
+| `docs` | 23 | 7 | 30.4% | in-progress |
 | `end-to-end` | 17 | 0 | 0.0% | not-started |
 | `operations` | 2 | 0 | 0.0% | not-started |
-| `packages` | 1325 | 1 | 0.1% | in-progress |
+| `packages` | 1325 | 4 | 0.3% | in-progress |
 | `public` | 5 | 0 | 0.0% | not-started |
-| `scripts` | 18 | 0 | 0.0% | not-started |
+| `scripts` | 18 | 18 | 100.0% | in-progress |
 | `skills` | 2 | 0 | 0.0% | not-started |
 
 ## Architecture Group Coverage
 
 | Group Root | Total Files | Touched Files | Coverage | Progress |
 | --- | ---: | ---: | ---: | --- |
-| `apps/WebApplication/Source` | 172 | 6 | 3.5% | in-progress |
+| `apps/WebApplication/Source` | 172 | 5 | 2.9% | in-progress |
 | `apps/WebApplication/Tests` | 107 | 4 | 3.7% | in-progress |
 | `apps/WebApplication/public` | 5 | 0 | 0.0% | not-started |
-| `apps/ServerApplication/Source` | 78 | 0 | 0.0% | not-started |
-| `apps/ServerApplication/Tests` | 57 | 0 | 0.0% | not-started |
+| `apps/ServerApplication/Source` | 78 | 7 | 9.0% | in-progress |
+| `apps/ServerApplication/Tests` | 57 | 1 | 1.8% | in-progress |
 | `packages/CodexProtocol/Source` | 25 | 0 | 0.0% | not-started |
 | `packages/CodexProtocol/Tests` | 10 | 0 | 0.0% | not-started |
-| `packages/CodexInterfaceAdapter/Source` | 9 | 0 | 0.0% | not-started |
-| `packages/CodexInterfaceAdapter/Tests` | 9 | 1 | 11.1% | in-progress |
+| `packages/CodexInterfaceAdapter/Source` | 9 | 2 | 22.2% | in-progress |
+| `packages/CodexInterfaceAdapter/Tests` | 9 | 2 | 22.2% | in-progress |
 | `packages/OpenCodeInterfaceAdapter/Source` | 11 | 0 | 0.0% | not-started |
 | `packages/OpenCodeInterfaceAdapter/Tests` | 4 | 0 | 0.0% | not-started |
-| `docs` | 23 | 6 | 26.1% | in-progress |
-| `scripts` | 18 | 0 | 0.0% | not-started |
+| `docs` | 23 | 7 | 30.4% | in-progress |
+| `scripts` | 18 | 18 | 100.0% | in-progress |
 | `end-to-end` | 17 | 0 | 0.0% | not-started |
 | `operations` | 2 | 0 | 0.0% | not-started |
 | `public` | 5 | 0 | 0.0% | not-started |
@@ -71,64 +71,104 @@ Last Updated (UTC): 2026-02-26 04:34:57Z
 
 | Group Root | Immediate Folder | Total Files | Touched Files | Coverage | Progress |
 | --- | --- | ---: | ---: | ---: | --- |
-| `apps/ServerApplication/Source` | `Agents` | 15 | 0 | 0.0% | not-started |
-| `apps/ServerApplication/Source` | `Application` | 7 | 0 | 0.0% | not-started |
-| `apps/ServerApplication/Source` | `Modules` | 11 | 0 | 0.0% | not-started |
-| `apps/ServerApplication/Source` | `Network` | 44 | 0 | 0.0% | not-started |
-| `apps/ServerApplication/Source` | `Shared` | 1 | 0 | 0.0% | not-started |
-| `apps/ServerApplication/Tests` | `(direct-files)` | 57 | 0 | 0.0% | not-started |
 | `apps/WebApplication/Source` | `(direct-files)` | 3 | 0 | 0.0% | not-started |
-| `apps/WebApplication/Source` | `Application` | 49 | 6 | 12.2% | in-progress |
+| `apps/WebApplication/Source` | `Application` | 49 | 2 | 4.1% | in-progress |
 | `apps/WebApplication/Source` | `Components` | 30 | 0 | 0.0% | not-started |
-| `apps/WebApplication/Source` | `Features` | 82 | 0 | 0.0% | not-started |
-| `apps/WebApplication/Source` | `Shared` | 8 | 0 | 0.0% | not-started |
+| `apps/WebApplication/Source` | `Features` | 82 | 2 | 2.4% | in-progress |
+| `apps/WebApplication/Source` | `Shared` | 8 | 1 | 12.5% | in-progress |
 | `apps/WebApplication/Tests` | `(direct-files)` | 107 | 4 | 3.7% | in-progress |
-| `docs` | `(direct-files)` | 4 | 1 | 25.0% | in-progress |
-| `docs` | `debug` | 16 | 3 | 18.8% | in-progress |
-| `docs` | `decisions` | 3 | 2 | 66.7% | in-progress |
-| `end-to-end` | `real` | 17 | 0 | 0.0% | not-started |
-| `operations` | `caddy` | 2 | 0 | 0.0% | not-started |
-| `packages/CodexInterfaceAdapter/Source` | `(direct-files)` | 9 | 0 | 0.0% | not-started |
-| `packages/CodexInterfaceAdapter/Tests` | `(direct-files)` | 9 | 1 | 11.1% | in-progress |
+| `apps/WebApplication/public` | `(direct-files)` | 2 | 0 | 0.0% | not-started |
+| `apps/WebApplication/public` | `icons` | 3 | 0 | 0.0% | not-started |
+| `apps/ServerApplication/Source` | `Agents` | 15 | 1 | 6.7% | in-progress |
+| `apps/ServerApplication/Source` | `Application` | 7 | 2 | 28.6% | in-progress |
+| `apps/ServerApplication/Source` | `Modules` | 11 | 1 | 9.1% | in-progress |
+| `apps/ServerApplication/Source` | `Network` | 44 | 3 | 6.8% | in-progress |
+| `apps/ServerApplication/Source` | `Shared` | 1 | 0 | 0.0% | not-started |
+| `apps/ServerApplication/Tests` | `(direct-files)` | 57 | 1 | 1.8% | in-progress |
 | `packages/CodexProtocol/Source` | `(direct-files)` | 8 | 0 | 0.0% | not-started |
 | `packages/CodexProtocol/Source` | `Contracts` | 6 | 0 | 0.0% | not-started |
 | `packages/CodexProtocol/Source` | `Generated` | 10 | 0 | 0.0% | not-started |
 | `packages/CodexProtocol/Source` | `Parsers` | 1 | 0 | 0.0% | not-started |
 | `packages/CodexProtocol/Tests` | `(direct-files)` | 8 | 0 | 0.0% | not-started |
 | `packages/CodexProtocol/Tests` | `fixtures` | 2 | 0 | 0.0% | not-started |
+| `packages/CodexInterfaceAdapter/Source` | `(direct-files)` | 9 | 2 | 22.2% | in-progress |
+| `packages/CodexInterfaceAdapter/Tests` | `(direct-files)` | 9 | 2 | 22.2% | in-progress |
 | `packages/OpenCodeInterfaceAdapter/Source` | `(direct-files)` | 11 | 0 | 0.0% | not-started |
 | `packages/OpenCodeInterfaceAdapter/Tests` | `(direct-files)` | 4 | 0 | 0.0% | not-started |
+| `docs` | `(direct-files)` | 4 | 1 | 25.0% | in-progress |
+| `docs` | `debug` | 16 | 5 | 31.3% | in-progress |
+| `docs` | `decisions` | 3 | 1 | 33.3% | in-progress |
+| `scripts` | `development` | 2 | 2 | 100.0% | in-progress |
+| `scripts` | `operations` | 4 | 4 | 100.0% | in-progress |
+| `scripts` | `setup` | 5 | 5 | 100.0% | in-progress |
+| `scripts` | `smoke` | 3 | 3 | 100.0% | in-progress |
+| `scripts` | `tooling` | 4 | 4 | 100.0% | in-progress |
+| `end-to-end` | `real` | 17 | 0 | 0.0% | not-started |
+| `operations` | `caddy` | 2 | 0 | 0.0% | not-started |
 | `public` | `(direct-files)` | 5 | 0 | 0.0% | not-started |
-| `scripts` | `(direct-files)` | 18 | 0 | 0.0% | not-started |
 
 ## Concern Coverage
 
 | Concern | Touched Files | Added Lines | Removed Lines | Net Lines | Progress |
 | --- | ---: | ---: | ---: | ---: | --- |
-| Other | 9 | 690 | 18 | 672 | in-progress |
-| Web Core Data State Management | 7 | 297 | 187 | 110 | in-progress |
-| Repository Areas Without Current-Wave Touches | 1822 | 0 | 0 | 0 | not-started |
+| Server Runtime and Network Hardening | 8 | 514 | 170 | +344 | in-progress |
+| Web State and Debugging Hardening | 9 | 380 | 106 | +274 | in-progress |
+| Adapter and Protocol Hardening | 4 | 408 | 252 | +156 | in-progress |
+| Scripts, Docs, and Tooling Governance | 27 | 200 | 172 | +28 | in-progress |
+| Repository Areas Without Current-Wave Touches | 1790 | 0 | 0 | 0 | not-started |
 
 ## Touched File Inventory (Current Wave)
 
 | File | Added Lines | Removed Lines | Net Lines |
 | --- | ---: | ---: | ---: |
-| `.github/workflows/mock-runtime-checks.yml` | 6 | 6 | 0 |
-| `apps/WebApplication/Source/Application/StateManagement/ApplicationConversationStateDerivation.ts` | 45 | 0 | 45 |
-| `apps/WebApplication/Source/Application/StateManagement/ApplicationModelOptionDerivation.ts` | 29 | 0 | 29 |
-| `apps/WebApplication/Source/Application/StateManagement/ApplicationSystemHealthDerivation.ts` | 26 | 0 | 26 |
-| `apps/WebApplication/Source/Application/StateManagement/ApplicationThreadAndChatSurfaceDerivation.ts` | 52 | 0 | 52 |
-| `apps/WebApplication/Source/Application/StateManagement/UseApplicationDerivedState.ts` | 11 | 179 | -168 |
-| `apps/WebApplication/Source/Application/StateManagement/UseApplicationDerivedStateContracts.ts` | 60 | 6 | 54 |
-| `apps/WebApplication/Tests/AppSessionAndDebug.test.tsx` | 1 | 4 | -3 |
-| `apps/WebApplication/Tests/CoreDataSnapshotStateApplier.test.ts` | 74 | 2 | 72 |
-| `apps/WebApplication/Tests/DebugWorkspaceStateStore.test.ts` | 34 | 2 | 32 |
-| `apps/WebApplication/Tests/UseApplicationShellViewProperties.test.ts` | 362 | 0 | 362 |
-| `docs/decisions/2026-02-26-ExcludedSurfaceHardeningGovernance.md` | 83 | 0 | 83 |
-| `docs/decisions/README.md` | 14 | 0 | 14 |
-| `docs/proposed-structure-and-migration.md` | 27 | 4 | 23 |
-| `package.json` | 8 | 1 | 7 |
-| `packages/CodexInterfaceAdapter/Tests/LiveState.test.ts` | 155 | 1 | 154 |
+| `.github/workflows/ios-setup-checks.yml` | 8 | 8 | +0 |
+| `apps/ServerApplication/Source/Agents/Adapters/CodexThreadStreamStateOwner.ts` | 62 | 26 | +36 |
+| `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfiguration.ts` | 40 | 11 | +29 |
+| `apps/ServerApplication/Source/Application/ServerBootstrap.ts` | 25 | 15 | +10 |
+| `apps/ServerApplication/Source/Modules/Threads/ThreadCompletionNotificationService.ts` | 179 | 89 | +90 |
+| `apps/ServerApplication/Source/Network/RequestObservabilityOwner.ts` | 66 | 21 | +45 |
+| `apps/ServerApplication/Source/Network/RequestPathContracts.ts` | 52 | 0 | +52 |
+| `apps/ServerApplication/Source/Network/ServerRequestHandler.ts` | 17 | 8 | +9 |
+| `apps/ServerApplication/Tests/ThreadCompletionNotificationService.test.ts` | 73 | 0 | +73 |
+| `apps/WebApplication/Source/Application/StateManagement/CoreDataSnapshotStateApplier.ts` | 76 | 33 | +43 |
+| `apps/WebApplication/Source/Application/StateManagement/UseCoreDataLoaders.ts` | 34 | 18 | +16 |
+| `apps/WebApplication/Source/Features/Debugging/StateManagement/TrackedUserInterfaceErrorPolicy.ts` | 8 | 2 | +6 |
+| `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushClientStateManager.ts` | 52 | 23 | +29 |
+| `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransport.ts` | 35 | 14 | +21 |
+| `apps/WebApplication/Tests/CoreDataSnapshotStateApplier.test.ts` | 69 | 12 | +57 |
+| `apps/WebApplication/Tests/FarfieldHttpTransport.test.ts` | 59 | 0 | +59 |
+| `apps/WebApplication/Tests/Push.test.ts` | 40 | 3 | +37 |
+| `apps/WebApplication/Tests/TrackedUserInterfaceErrorPolicy.test.ts` | 7 | 1 | +6 |
+| `docs/debug/HardeningCoverageFileInventory.tsv` | 49 | 49 | +0 |
+| `docs/debug/HardeningCoverageFolderInventory.tsv` | 20 | 16 | +4 |
+| `docs/debug/HardeningCoverageGroupInventory.tsv` | 6 | 6 | +0 |
+| `docs/debug/HardeningCoverageTracker.md` | 78 | 50 | +28 |
+| `docs/debug/real-app-end-to-end-setup-plan.md` | 4 | 4 | +0 |
+| `docs/decisions/2026-02-26-ExcludedSurfaceHardeningGovernance.md` | 1 | 1 | +0 |
+| `docs/proposed-structure-and-migration.md` | 13 | 17 | -4 |
+| `package.json` | 20 | 20 | +0 |
+| `packages/CodexInterfaceAdapter/Source/IpcClient.ts` | 67 | 34 | +33 |
+| `packages/CodexInterfaceAdapter/Source/LiveState.ts` | 191 | 143 | +48 |
+| `packages/CodexInterfaceAdapter/Tests/IpcClient.test.ts` | 109 | 75 | +34 |
+| `packages/CodexInterfaceAdapter/Tests/LiveState.test.ts` | 41 | 0 | +41 |
+| `scripts/development/caddy-local.mjs` | 0 | 0 | +0 |
+| `scripts/development/dev.mjs` | 0 | 0 | +0 |
+| `scripts/operations/end-to-end-real-safe-run.mjs` | 0 | 0 | +0 |
+| `scripts/operations/push-doctor.mjs` | 0 | 0 | +0 |
+| `scripts/operations/rotate-api-token.mjs` | 0 | 0 | +0 |
+| `scripts/operations/stream-burst.mjs` | 0 | 0 | +0 |
+| `scripts/setup/generate-vapid-keys.mjs` | 0 | 0 | +0 |
+| `scripts/setup/ios-trust-local-ca.mjs` | 0 | 0 | +0 |
+| `scripts/setup/setup-domain-https.mjs` | 1 | 1 | +0 |
+| `scripts/setup/setup-ios-push.mjs` | 0 | 0 | +0 |
+| `scripts/setup/setup-ntfy.mjs` | 0 | 0 | +0 |
+| `scripts/smoke/app-smoke.mjs` | 0 | 0 | +0 |
+| `scripts/smoke/ios-device-smoke-matrix.mjs` | 0 | 0 | +0 |
+| `scripts/smoke/ios-device-smoke.mjs` | 0 | 0 | +0 |
+| `scripts/tooling/generate-codex-schema.mjs` | 0 | 0 | +0 |
+| `scripts/tooling/sanitize-traces.mjs` | 0 | 0 | +0 |
+| `scripts/tooling/validate-end-to-end-governance.mjs` | 0 | 0 | +0 |
+| `scripts/tooling/with-env.mjs` | 0 | 0 | +0 |
 
 ## Full Inventories
 

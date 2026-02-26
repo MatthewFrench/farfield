@@ -5,6 +5,7 @@ import {
   request,
   requestNoContent
 } from "../Source/Shared/Transport/FarfieldHttpTransport";
+import { RequestCanceledError } from "../Source/Shared/Errors/RequestCanceledError";
 import { type StructuredDataValue } from "../Source/Shared/Contracts/StructuredDataValue";
 
 function createJsonResponse(body: StructuredDataValue, status = 200): Response {
@@ -21,6 +22,12 @@ function createLargeEnvelope(payloadLength: number): StructuredDataValue {
     ok: true,
     data: "x".repeat(payloadLength)
   };
+}
+
+function createAbortError(): Error {
+  const abortError = new Error("The operation was aborted.");
+  abortError.name = "AbortError";
+  return abortError;
 }
 
 afterEach(() => {
@@ -146,5 +153,57 @@ describe("FarfieldHttpTransport", () => {
 
     await expect(request("   ")).rejects.toThrow("Request path must not be blank");
     expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("includes timeout duration and request id when a request exceeds the timeout budget", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          "abort",
+          () => {
+            reject(createAbortError());
+          },
+          { once: true }
+        );
+      });
+    });
+
+    try {
+      const requestPromise = request("/api/slow");
+      const rejectionExpectation = expect(requestPromise).rejects.toThrow(
+        "Request timed out for /api/slow after 120000ms requestId req_1700000000000_1dcd6500"
+      );
+      await vi.advanceTimersByTimeAsync(120_000);
+      await rejectionExpectation;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("maps caller-initiated aborts to RequestCanceledError", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
+      return new Promise<Response>((_resolve, reject) => {
+        if (init?.signal?.aborted) {
+          reject(createAbortError());
+          return;
+        }
+        init?.signal?.addEventListener(
+          "abort",
+          () => {
+            reject(createAbortError());
+          },
+          { once: true }
+        );
+      });
+    });
+
+    const abortController = new AbortController();
+    const requestPromise = request("/api/threads", { signal: abortController.signal });
+    abortController.abort();
+
+    await expect(requestPromise).rejects.toBeInstanceOf(RequestCanceledError);
   });
 });

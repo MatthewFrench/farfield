@@ -6,6 +6,7 @@ import type {
 import type {
   CoreDataAgentDescriptor,
   CoreDataAgentsResponse,
+  CoreDataCapabilitySnapshot,
   CoreDataConfigDefaultsResponse,
   CoreDataDebugErrorsResponse,
   CoreDataHealthResponse,
@@ -35,6 +36,24 @@ type AgentDescriptor = CoreDataAgentDescriptor;
 
 const SIGNATURE_SEGMENT_DELIMITER = "|";
 const EMPTY_SIGNATURE_SEGMENT = "";
+const FIRST_ENABLED_AGENT_INDEX = 0;
+const PRIMARY_RECENT_TRACE_INDEX = 0;
+
+interface CapabilitiesCollectionSnapshot {
+  modes: ModesResponse["data"];
+  models: ModelsResponse["data"];
+  defaults: ConfigDefaults | null;
+  modesSignature: string[];
+  modelsSignature: string[];
+}
+
+interface TraceStatusComparisonSnapshot {
+  activeIdentifier: string | null;
+  activeEventCount: number | null;
+  recentTraceCount: number;
+  primaryRecentIdentifier: string | null;
+  primaryRecentEventCount: number | null;
+}
 
 /**
  * Applies one core data snapshot into app shell state with strict identity checks.
@@ -84,6 +103,38 @@ function buildModelsSignature(models: ModelsResponse["data"]): string[] {
   );
 }
 
+function readCapabilitiesCollectionSnapshot(
+  capabilities: CoreDataCapabilitySnapshot | undefined
+): CapabilitiesCollectionSnapshot | null {
+  if (!capabilities) {
+    return null;
+  }
+
+  const nextModes = capabilities.modes.data;
+  const nextModels = capabilities.models.data;
+  return {
+    modes: nextModes,
+    models: nextModels,
+    defaults: capabilities.defaults,
+    modesSignature: buildModesSignature(nextModes),
+    modelsSignature: buildModelsSignature(nextModels)
+  };
+}
+
+function readTraceStatusComparisonSnapshot(
+  traceStatus: TraceStatus
+): TraceStatusComparisonSnapshot {
+  const activeTrace = traceStatus.active;
+  const primaryRecentTrace = traceStatus.recent[PRIMARY_RECENT_TRACE_INDEX];
+  return {
+    activeIdentifier: activeTrace?.id ?? null,
+    activeEventCount: activeTrace?.eventCount ?? null,
+    recentTraceCount: traceStatus.recent.length,
+    primaryRecentIdentifier: primaryRecentTrace?.id ?? null,
+    primaryRecentEventCount: primaryRecentTrace?.eventCount ?? null
+  };
+}
+
 function shouldReusePreviousHealth(previousHealth: Health | null, nextHealth: Health): boolean {
   if (!previousHealth) {
     return false;
@@ -123,12 +174,14 @@ function shouldReusePreviousTraceStatus(
     return false;
   }
 
+  const previousTraceStatusSnapshot = readTraceStatusComparisonSnapshot(previousTraceStatus);
+  const nextTraceStatusSnapshot = readTraceStatusComparisonSnapshot(nextTraceStatus);
   return (
-    previousTraceStatus.active?.id === nextTraceStatus.active?.id
-    && previousTraceStatus.active?.eventCount === nextTraceStatus.active?.eventCount
-    && previousTraceStatus.recent.length === nextTraceStatus.recent.length
-    && previousTraceStatus.recent[0]?.id === nextTraceStatus.recent[0]?.id
-    && previousTraceStatus.recent[0]?.eventCount === nextTraceStatus.recent[0]?.eventCount
+    previousTraceStatusSnapshot.activeIdentifier === nextTraceStatusSnapshot.activeIdentifier
+    && previousTraceStatusSnapshot.activeEventCount === nextTraceStatusSnapshot.activeEventCount
+    && previousTraceStatusSnapshot.recentTraceCount === nextTraceStatusSnapshot.recentTraceCount
+    && previousTraceStatusSnapshot.primaryRecentIdentifier === nextTraceStatusSnapshot.primaryRecentIdentifier
+    && previousTraceStatusSnapshot.primaryRecentEventCount === nextTraceStatusSnapshot.primaryRecentEventCount
   );
 }
 
@@ -164,7 +217,7 @@ function readNextDefaultAgentIdentifier(
 ): AgentId {
   return enabledAgentIdentifiers.includes(nextAgents.defaultAgentId)
     ? nextAgents.defaultAgentId
-    : (enabledAgentIdentifiers[0] ?? nextAgents.defaultAgentId);
+    : (enabledAgentIdentifiers[FIRST_ENABLED_AGENT_INDEX] ?? nextAgents.defaultAgentId);
 }
 
 function applySignedCollectionStateUpdate<InputCollection>(input: {
@@ -209,16 +262,10 @@ function applyDebugWorkspaceSnapshot(input: {
 }
 
 export function applyCoreDataSnapshotState(input: ApplyCoreDataSnapshotStateInput): void {
-  const nextCapabilities = input.nextCapabilities;
+  const nextCapabilitiesSnapshot = readCapabilitiesCollectionSnapshot(input.nextCapabilities);
   const nextHealth = input.nextHealth;
   const nextActiveThreadState = input.nextActiveThreadState;
   const nextTraceStatus = input.nextTraceStatus;
-  const nextModesSignature = nextCapabilities
-    ? buildModesSignature(nextCapabilities.modes.data)
-    : null;
-  const nextModelsSignature = nextCapabilities
-    ? buildModelsSignature(nextCapabilities.models.data)
-    : null;
 
   let preferredAgentId: AgentId | null = null;
   let nextThreadsForSelection: ThreadsResponse["data"] | null = null;
@@ -251,32 +298,28 @@ export function applyCoreDataSnapshotState(input: ApplyCoreDataSnapshotStateInpu
     });
   }
 
-  if (nextCapabilities && nextModesSignature) {
+  if (nextCapabilitiesSnapshot) {
     applySignedCollectionStateUpdate({
       previousSignatureRef: input.modesSignatureRef,
-      nextSignature: nextModesSignature,
-      nextCollection: nextCapabilities.modes.data,
+      nextSignature: nextCapabilitiesSnapshot.modesSignature,
+      nextCollection: nextCapabilitiesSnapshot.modes,
       setCollection: input.setModes
     });
-  }
-
-  if (nextCapabilities && nextModelsSignature) {
     applySignedCollectionStateUpdate({
       previousSignatureRef: input.modelsSignatureRef,
-      nextSignature: nextModelsSignature,
-      nextCollection: nextCapabilities.models.data,
+      nextSignature: nextCapabilitiesSnapshot.modelsSignature,
+      nextCollection: nextCapabilitiesSnapshot.models,
       setCollection: input.setModels
     });
-  }
-
-  if (nextCapabilities?.defaults) {
-    const nextDefaults = nextCapabilities.defaults;
-    input.setConfigDefaults((previousDefaults) => {
-      if (shouldReusePreviousConfigDefaults(previousDefaults, nextDefaults)) {
-        return previousDefaults;
-      }
-      return nextDefaults;
-    });
+    if (nextCapabilitiesSnapshot.defaults) {
+      const nextDefaults = nextCapabilitiesSnapshot.defaults;
+      input.setConfigDefaults((previousDefaults) => {
+        if (shouldReusePreviousConfigDefaults(previousDefaults, nextDefaults)) {
+          return previousDefaults;
+        }
+        return nextDefaults;
+      });
+    }
   }
 
   if (nextTraceStatus) {
@@ -332,12 +375,12 @@ export function applyCoreDataSnapshotState(input: ApplyCoreDataSnapshotStateInpu
     );
   }
 
-  if (nextCapabilities) {
+  if (nextCapabilitiesSnapshot) {
     input.setSelectedModeKey((currentModeKey) => {
       if (currentModeKey) {
         return currentModeKey;
       }
-      return input.readInitialModeKey(nextCapabilities.modes.data);
+      return input.readInitialModeKey(nextCapabilitiesSnapshot.modes);
     });
   }
 }

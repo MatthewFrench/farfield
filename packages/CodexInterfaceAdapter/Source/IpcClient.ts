@@ -43,14 +43,39 @@ export interface IpcConnectionState {
 export type IpcConnectionListener = (state: IpcConnectionState) => void;
 
 const MAX_FRAME_SIZE_BYTES = 256 * 1024 * 1024;
+const IPC_FRAME_HEADER_SIZE_BYTES = 4;
+const IPC_FRAME_HEADER_LENGTH_OFFSET_BYTES = 0;
+const IPC_FRAME_PAYLOAD_ENCODING = "utf8";
 const DEFAULT_IPC_REQUEST_TIMEOUT_MS = 20_000;
 const INITIALIZING_CLIENT_ID = "initializing-client";
 const IPC_FRAME_EVENT = "frame";
 const IPC_CONNECTION_STATE_EVENT = "connection-state";
+const IPC_SOCKET_CONNECT_EVENT = "connect";
+const IPC_SOCKET_DATA_EVENT = "data";
+const IPC_SOCKET_CLOSE_EVENT = "close";
+const IPC_SOCKET_ERROR_EVENT = "error";
+const IPC_BROADCAST_FRAME_TYPE = "broadcast";
+const IPC_REQUEST_FRAME_TYPE = "request";
+const IPC_RESPONSE_FRAME_TYPE = "response";
+const IPC_CLIENT_DISCOVERY_REQUEST_FRAME_TYPE = "client-discovery-request";
+const IPC_CLIENT_DISCOVERY_RESPONSE_FRAME_TYPE = "client-discovery-response";
+const IPC_ERROR_RESULT_TYPE = "error";
 const IPC_INITIALIZE_METHOD = "initialize";
 const IPC_PROTOCOL_VERSION = 1;
 const FARFIELD_CLIENT_TYPE = "farfield";
 const NO_HANDLER_FOR_REQUEST_ERROR = "no-handler-for-request";
+const IPC_ALREADY_CONNECTED_ERROR = "IPC client is already connected";
+const IPC_SOCKET_CLOSED_ERROR = "IPC socket closed";
+const IPC_SOCKET_ERROR_PREFIX = "IPC socket error";
+const IPC_CLIENT_DISCONNECTED_ERROR = "IPC client disconnected";
+const IPC_SOCKET_NOT_CONNECTED_ERROR = "IPC socket is not connected";
+const IPC_FRAME_TOO_LARGE_ERROR_PREFIX = "IPC frame exceeded limit";
+const IPC_INVALID_JSON_FRAME_ERROR = "IPC frame contained invalid JSON";
+const IPC_SCHEMA_VALIDATION_FAILURE_ERROR_PREFIX = "IPC frame schema validation failed";
+const IPC_REQUEST_TIMEOUT_ERROR_PREFIX = "IPC request timed out";
+const IPC_REQUEST_WRITE_FAILURE_ERROR_PREFIX = "IPC request write failed for";
+const IPC_INITIALIZE_TIMEOUT_ERROR = "IPC initialize request timed out";
+const IPC_INITIALIZE_WRITE_FAILURE_ERROR = "IPC initialize write failed";
 const InitializeResultSchema = z
   .object({
     clientId: z.string().min(1)
@@ -111,32 +136,33 @@ export class DesktopIpcClient {
 
   public async connect(): Promise<void> {
     if (this.socket) {
-      throw new DesktopIpcError("IPC client is already connected");
+      throw new DesktopIpcError(IPC_ALREADY_CONNECTED_ERROR);
     }
 
     this.socket = await new Promise<net.Socket>((resolve, reject) => {
       const socket = net.createConnection(this.socketPath);
 
-      socket.once("connect", () => resolve(socket));
-      socket.once("error", (error) => reject(new DesktopIpcError(error.message)));
+      socket.once(IPC_SOCKET_CONNECT_EVENT, () => resolve(socket));
+      socket.once(IPC_SOCKET_ERROR_EVENT, (error) => reject(new DesktopIpcError(error.message)));
     });
 
-    this.socket.on("data", (chunk) => this.handleData(chunk));
-    this.socket.on("close", () => {
-      this.rejectAll(new DesktopIpcError("IPC socket closed"));
+    this.socket.on(IPC_SOCKET_DATA_EVENT, (chunk) => this.handleData(chunk));
+    this.socket.on(IPC_SOCKET_CLOSE_EVENT, () => {
+      this.rejectAll(new DesktopIpcError(IPC_SOCKET_CLOSED_ERROR));
       this.socket = null;
       this.frameBuffer.clear();
       this.clientId = null;
       this.emitConnectionState({
         connected: false,
-        reason: "IPC socket closed"
+        reason: IPC_SOCKET_CLOSED_ERROR
       });
     });
-    this.socket.on("error", (error) => {
-      this.rejectAll(new DesktopIpcError(`IPC socket error: ${error.message}`));
+    this.socket.on(IPC_SOCKET_ERROR_EVENT, (error) => {
+      const socketError = `${IPC_SOCKET_ERROR_PREFIX}: ${error.message}`;
+      this.rejectAll(new DesktopIpcError(socketError));
       this.emitConnectionState({
         connected: false,
-        reason: `IPC socket error: ${error.message}`
+        reason: socketError
       });
     });
 
@@ -151,10 +177,10 @@ export class DesktopIpcClient {
 
     this.socket = null;
     this.clientId = null;
-    this.rejectAll(new DesktopIpcError("IPC client disconnected"));
+    this.rejectAll(new DesktopIpcError(IPC_CLIENT_DISCONNECTED_ERROR));
 
     await new Promise<void>((resolve) => {
-      socket.once("close", () => resolve());
+      socket.once(IPC_SOCKET_CLOSE_EVENT, () => resolve());
       socket.end();
     });
   }
@@ -169,7 +195,7 @@ export class DesktopIpcClient {
 
   private ensureSocket(): net.Socket {
     if (!this.socket) {
-      throw new DesktopIpcError("IPC socket is not connected");
+      throw new DesktopIpcError(IPC_SOCKET_NOT_CONNECTED_ERROR);
     }
     return this.socket;
   }
@@ -224,9 +250,9 @@ export class DesktopIpcClient {
 
   private writeFrame(frame: IpcFrame): void {
     const socket = this.ensureSocket();
-    const encoded = Buffer.from(JSON.stringify(frame), "utf8");
-    const header = Buffer.alloc(4);
-    header.writeUInt32LE(encoded.length, 0);
+    const encoded = Buffer.from(JSON.stringify(frame), IPC_FRAME_PAYLOAD_ENCODING);
+    const header = Buffer.alloc(IPC_FRAME_HEADER_SIZE_BYTES);
+    header.writeUInt32LE(encoded.length, IPC_FRAME_HEADER_LENGTH_OFFSET_BYTES);
     socket.write(Buffer.concat([header, encoded]));
   }
 
@@ -243,7 +269,7 @@ export class DesktopIpcClient {
 
   private respondClientDiscovery(requestId: string): void {
     const response = IpcClientDiscoveryResponseFrameSchema.parse({
-      type: "client-discovery-response",
+      type: IPC_CLIENT_DISCOVERY_RESPONSE_FRAME_TYPE,
       requestId,
       response: {
         canHandle: false
@@ -255,9 +281,9 @@ export class DesktopIpcClient {
 
   private respondNoHandler(requestId: string): void {
     const response = IpcResponseFrameSchema.parse({
-      type: "response",
+      type: IPC_RESPONSE_FRAME_TYPE,
       requestId,
-      resultType: "error",
+      resultType: IPC_ERROR_RESULT_TYPE,
       error: NO_HANDLER_FOR_REQUEST_ERROR
     });
 
@@ -276,7 +302,9 @@ export class DesktopIpcClient {
       if (readResult.type === "frame-too-large") {
         this.rejectAll(
           new DesktopIpcError(
-            `IPC frame exceeded limit (${String(readResult.size)} > ${String(MAX_FRAME_SIZE_BYTES)})`
+            `${IPC_FRAME_TOO_LARGE_ERROR_PREFIX} (${String(readResult.size)} > ${String(
+              MAX_FRAME_SIZE_BYTES
+            )})`
           )
         );
         this.socket?.destroy();
@@ -287,9 +315,9 @@ export class DesktopIpcClient {
 
       let raw: JsonValue;
       try {
-        raw = JsonValueSchema.parse(JSON.parse(payloadBuffer.toString("utf8")));
+        raw = JsonValueSchema.parse(JSON.parse(payloadBuffer.toString(IPC_FRAME_PAYLOAD_ENCODING)));
       } catch {
-        this.rejectAll(new DesktopIpcError("IPC frame contained invalid JSON"));
+        this.rejectAll(new DesktopIpcError(IPC_INVALID_JSON_FRAME_ERROR));
         return;
       }
 
@@ -299,7 +327,7 @@ export class DesktopIpcClient {
       } catch (error) {
         this.rejectAll(
           new DesktopIpcError(
-            `IPC frame schema validation failed: ${toErrorMessage(error)}`
+            `${IPC_SCHEMA_VALIDATION_FAILURE_ERROR_PREFIX}: ${toErrorMessage(error)}`
           )
         );
         this.socket?.destroy();
@@ -307,17 +335,17 @@ export class DesktopIpcClient {
       }
       this.emitFrame(frame);
 
-      if (frame.type === "client-discovery-request") {
+      if (frame.type === IPC_CLIENT_DISCOVERY_REQUEST_FRAME_TYPE) {
         this.respondClientDiscovery(frame.requestId);
         continue;
       }
 
-      if (frame.type === "request") {
+      if (frame.type === IPC_REQUEST_FRAME_TYPE) {
         this.respondNoHandler(frame.requestId);
         continue;
       }
 
-      if (frame.type !== "response") {
+      if (frame.type !== IPC_RESPONSE_FRAME_TYPE) {
         continue;
       }
 
@@ -329,7 +357,7 @@ export class DesktopIpcClient {
       this.pending.delete(frame.requestId);
       clearTimeout(pending.timer);
 
-      if (frame.resultType === "error") {
+      if (frame.resultType === IPC_ERROR_RESULT_TYPE) {
         pending.reject(
           new DesktopIpcError(
             `IPC ${pending.method} failed: ${toErrorMessage(frame.error)}`
@@ -339,6 +367,7 @@ export class DesktopIpcClient {
       }
 
       if (frame.method === IPC_INITIALIZE_METHOD) {
+        // Some hosts append extra initialize fields. We only adopt a validated client identifier.
         const parsedInitializeResult = InitializeResultSchema.safeParse(frame.result);
         if (parsedInitializeResult.success) {
           this.clientId = parsedInitializeResult.data.clientId;
@@ -355,7 +384,7 @@ export class DesktopIpcClient {
     options: SendRequestOptions = {}
   ): void {
     const frame = IpcBroadcastFrameSchema.parse({
-      type: "broadcast",
+      type: IPC_BROADCAST_FRAME_TYPE,
       method,
       params,
       sourceClientId: this.sourceClientId(),
@@ -374,7 +403,7 @@ export class DesktopIpcClient {
     const requestId = randomUUID();
 
     const frame = IpcRequestFrameSchema.parse({
-      type: "request",
+      type: IPC_REQUEST_FRAME_TYPE,
       requestId,
       method,
       params,
@@ -388,17 +417,21 @@ export class DesktopIpcClient {
       requestId,
       method,
       timeout,
-      `IPC request timed out: ${method}`
+      `${IPC_REQUEST_TIMEOUT_ERROR_PREFIX}: ${method}`
     );
 
-    this.writeRequestFrameOrReject(requestId, frame, `IPC request write failed for ${method}`);
+    this.writeRequestFrameOrReject(
+      requestId,
+      frame,
+      `${IPC_REQUEST_WRITE_FAILURE_ERROR_PREFIX} ${method}`
+    );
     return responsePromise;
   }
 
   public async initialize(_userAgent: string): Promise<IpcResponseFrame> {
     const requestId = randomUUID();
     const frame = IpcRequestFrameSchema.parse({
-      type: "request",
+      type: IPC_REQUEST_FRAME_TYPE,
       requestId,
       sourceClientId: INITIALIZING_CLIENT_ID,
       version: IPC_PROTOCOL_VERSION,
@@ -412,10 +445,10 @@ export class DesktopIpcClient {
       requestId,
       IPC_INITIALIZE_METHOD,
       this.requestTimeoutMs,
-      "IPC initialize request timed out"
+      IPC_INITIALIZE_TIMEOUT_ERROR
     );
 
-    this.writeRequestFrameOrReject(requestId, frame, "IPC initialize write failed");
+    this.writeRequestFrameOrReject(requestId, frame, IPC_INITIALIZE_WRITE_FAILURE_ERROR);
     return responsePromise;
   }
 }

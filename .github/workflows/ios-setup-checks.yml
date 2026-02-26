@@ -56,13 +56,13 @@ jobs:
 
       - name: Validate script syntax
         run: |
-          node --check scripts/with-env.mjs
-          node --check scripts/setup-ios-push.mjs
-          node --check scripts/setup-domain-https.mjs
-          node --check scripts/rotate-api-token.mjs
-          node --check scripts/ios-trust-local-ca.mjs
-          node --check scripts/caddy-local.mjs
-          node --check scripts/push-doctor.mjs
+          node --check scripts/tooling/with-env.mjs
+          node --check scripts/setup/setup-ios-push.mjs
+          node --check scripts/setup/setup-domain-https.mjs
+          node --check scripts/operations/rotate-api-token.mjs
+          node --check scripts/setup/ios-trust-local-ca.mjs
+          node --check scripts/development/caddy-local.mjs
+          node --check scripts/operations/push-doctor.mjs
 
       - name: Validate Caddy templates and generated configs
         run: |
@@ -74,4 +74,4 @@ jobs:
           grep -nE "header_up X-Farfield-Token \\{env.API_TOKEN\\}" operations/caddy/Caddyfile.domain
 
       - name: Verify env autoload helper
-        run: node scripts/with-env.mjs "node -e \"if (!process.env.API_TOKEN) { process.exit(1); }\""
+        run: node scripts/tooling/with-env.mjs "node -e \"if (!process.env.API_TOKEN) { process.exit(1); }\""

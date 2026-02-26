@@ -38,10 +38,11 @@ import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js
 import type { PushMutationConcurrencyCoordinator } from "./PushMutationConcurrencyCoordinator.js";
 import {
   normalizeRequestMethodForRequestMetrics,
+  parseRequestUrlPathname,
   RequestMethodByName,
   RequestPathnameByName,
-  readPathnameForRequestMetricsFromRequestUrl,
-  readPathSegmentsFromPathname
+  RequestUrlPathnameParseStatusByName,
+  readPathnameForRequestMetricsFromRequestUrl
 } from "./RequestPathContracts.js";
 
 const CLIENT_ERROR_RECORDED_LOG_EVENT = "client-error-recorded";
@@ -211,10 +212,15 @@ export class ServerRequestHandler {
         return;
       }
 
-      let url: URL;
-      try {
-        url = new URL(req.url, `http://${this.deps.host}:${String(this.deps.port)}`);
-      } catch {
+      const requestUrlPathnameParseResult = parseRequestUrlPathname({
+        requestUrl: req.url,
+        host: this.deps.host,
+        port: this.deps.port
+      });
+      if (
+        requestUrlPathnameParseResult.status
+        === RequestUrlPathnameParseStatusByName.malformedRequestUrl
+      ) {
         pathnameForMetrics = RequestPathnameByName.malformedRequestUrl;
         this.deps.jsonResponse(res, 400, {
           ok: false,
@@ -222,9 +228,12 @@ export class ServerRequestHandler {
         });
         return;
       }
-      const pathname = url.pathname;
+
+      const pathname = requestUrlPathnameParseResult.pathname;
+      // Metrics and route dispatch intentionally share one normalized pathname contract.
       pathnameForMetrics = pathname;
-      const segments = readPathSegmentsFromPathname(pathname);
+      const segments = requestUrlPathnameParseResult.pathSegments;
+      const url = requestUrlPathnameParseResult.url;
 
       if (this.deps.isShuttingDown() && pathname !== RequestPathnameByName.healthCheck) {
         this.deps.jsonResponse(res, 503, {

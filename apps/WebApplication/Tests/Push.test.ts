@@ -16,6 +16,10 @@ import {
 import { PushPreferenceStore } from "../Source/Features/PushNotifications/DataAccess/PushPreferenceStore";
 import { disablePushNotifications, recoverPushNotifications } from "../Source/Features/PushNotifications/DataAccess/PushClientApi";
 
+const SERVICE_WORKER_SKIP_WAITING_MESSAGE_TYPE = "SKIP_WAITING";
+const SERVICE_WORKER_CONTROLLER_CHANGE_EVENT_NAME = "controllerchange";
+const CONTROLLER_CHANGE_WAIT_TIMEOUT_MILLISECONDS = 2_000;
+
 interface PushRecoveryHarness {
   registerMock: Mock<() => Promise<ServiceWorkerRegistration>>;
   getRegistrationsMock: Mock<() => Promise<Array<ServiceWorkerRegistration>>>;
@@ -25,6 +29,11 @@ interface PushRecoveryHarness {
   existingSubscriptionUnsubscribeMock: Mock<() => Promise<boolean>>;
   cacheKeysMock: Mock<() => Promise<Array<string>>>;
   cacheDeleteMock: Mock<(cacheName: string) => Promise<boolean>>;
+}
+
+interface InstallPushRecoveryHarnessInput {
+  waitingWorker: boolean;
+  emitControllerChangeOnSkipWaiting?: boolean;
 }
 
 function installLocalStorageMock(): void {
@@ -101,7 +110,8 @@ function createMockPushSubscription(
   } as PushSubscription;
 }
 
-function installPushRecoveryHarness(options: { waitingWorker: boolean }): PushRecoveryHarness {
+function installPushRecoveryHarness(options: InstallPushRecoveryHarnessInput): PushRecoveryHarness {
+  const emitControllerChangeOnSkipWaiting = options.emitControllerChangeOnSkipWaiting ?? true;
   const existingSubscriptionUnsubscribeMock = vi.fn(async () => true);
   const existingSubscription = createMockPushSubscription(
     "https://push.example.test/subscriptions/existing",
@@ -127,8 +137,13 @@ function installPushRecoveryHarness(options: { waitingWorker: boolean }): PushRe
   const waitingWorker = options.waitingWorker
     ? ({
         postMessage: (message: { type?: string }) => {
-          if (message.type === "SKIP_WAITING") {
-            serviceWorkerContainerEvents.dispatchEvent(new Event("controllerchange"));
+          if (
+            message.type === SERVICE_WORKER_SKIP_WAITING_MESSAGE_TYPE &&
+            emitControllerChangeOnSkipWaiting
+          ) {
+            serviceWorkerContainerEvents.dispatchEvent(
+              new Event(SERVICE_WORKER_CONTROLLER_CHANGE_EVENT_NAME)
+            );
           }
         }
       } as ServiceWorker)
@@ -273,6 +288,28 @@ describe("recoverPushNotifications", () => {
     expect(firstSaveSettings.privateMode).toBe(false);
     expect(harness.registerMock).toHaveBeenCalledTimes(3);
     expect((window as { __farfieldSuppressSwReload?: boolean }).__farfieldSuppressSwReload).toBeUndefined();
+  });
+
+  it("completes recovery if controllerchange is never emitted", async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = installPushRecoveryHarness({
+        waitingWorker: true,
+        emitControllerChangeOnSkipWaiting: false
+      });
+
+      const recoveryPromise = recoverPushNotifications({
+        privateMode: true
+      });
+      await vi.advanceTimersByTimeAsync(CONTROLLER_CHANGE_WAIT_TIMEOUT_MILLISECONDS);
+      const result = await recoveryPromise;
+
+      expect(result.updatedServiceWorker).toBe(true);
+      expect(result.subscribed).toBe(true);
+      expect(harness.subscribeMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("recovers when no waiting worker is present", async () => {

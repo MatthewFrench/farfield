@@ -129,7 +129,8 @@ interface DeferredStartupReadsInput {
 
 const STARTUP_TAGGED_ERROR_PATTERN = /^[a-z][a-z0-9._-]{1,64}:\s*(.+)$/i;
 const THREAD_LIST_UPDATED_AT_SORT_KEY = "updated_at" as const;
-const DEFERRED_STARTUP_DELAY_MILLISECONDS = 0;
+// Yield one event-loop turn so critical startup reads can commit before non-critical hydration starts.
+const DEFERRED_STARTUP_NEXT_TURN_DELAY_MILLISECONDS = 0;
 const CONFIG_DEFAULTS_AGENT_ID: AgentId = "codex";
 
 function createStartupTaggedError<ErrorType>(operation: string, error: ErrorType): Error {
@@ -313,9 +314,25 @@ async function runDeferredStartupReads(input: DeferredStartupReadsInput): Promis
 }
 
 function scheduleDeferredStartupReads(input: DeferredStartupReadsInput): void {
-  window.setTimeout(() => {
-    void runDeferredStartupReads(input);
-  }, DEFERRED_STARTUP_DELAY_MILLISECONDS);
+  window.setTimeout(runDeferredStartupReads, DEFERRED_STARTUP_NEXT_TURN_DELAY_MILLISECONDS, input);
+}
+
+async function runDeferredThreadRevalidation(
+  threadListStateController: ThreadListStateController,
+  threadLoadRequest: BuildActiveThreadStateLoadRequestInput,
+  applySnapshotState: SnapshotStateApplier,
+  reportDeferredStartupFailure: DeferredStartupFailureReporter
+): Promise<void> {
+  try {
+    const networkActiveThreadState = await threadListStateController.loadActiveThreadState(
+      createActiveThreadStateLoadRequest(threadLoadRequest)
+    );
+    applySnapshotState({
+      nextActiveThreadState: networkActiveThreadState
+    });
+  } catch (error) {
+    reportDeferredStartupFailure(STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION, error);
+  }
 }
 
 export interface UseCoreDataLoadersInput {
@@ -466,20 +483,19 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
       );
       // Keep cache-first responsiveness but revalidate active threads in the background so
       // external updates (for example event-stream-driven updates) still converge quickly.
-      void input.threadListStateController.loadActiveThreadState(createActiveThreadStateLoadRequest({
-        threadListLimit: input.threadListLimit,
-        threadListMaxPages: input.threadListMaxPages,
-        previousUnreadThreadIdentifiers: nextActiveThreadState.nextUnreadThreadIdentifiers,
-        selectedThreadIdentifier: input.selectedThreadIdRef.current,
-        readFromCache: false,
-        requestOptions: startupDeferredThreadRevalidateRequest.requestOptions
-      })).then((networkActiveThreadState) => {
-        applySnapshotState({
-          nextActiveThreadState: networkActiveThreadState
-        });
-      }).catch((error) => {
-        reportDeferredStartupFailure(STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION, error);
-      });
+      void runDeferredThreadRevalidation(
+        input.threadListStateController,
+        {
+          threadListLimit: input.threadListLimit,
+          threadListMaxPages: input.threadListMaxPages,
+          previousUnreadThreadIdentifiers: nextActiveThreadState.nextUnreadThreadIdentifiers,
+          selectedThreadIdentifier: input.selectedThreadIdRef.current,
+          readFromCache: false,
+          requestOptions: startupDeferredThreadRevalidateRequest.requestOptions
+        },
+        applySnapshotState,
+        reportDeferredStartupFailure
+      );
     }
   }, [
     input.activeTabRef,

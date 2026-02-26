@@ -1,5 +1,11 @@
-// Accept both "requestId=req-1" and "request id: req-1" message styles.
-const REQUEST_IDENTIFIER_CAPTURE_PATTERN = /\brequest\s*id[ =:]+([a-z0-9._-]+)/i;
+const REQUEST_IDENTIFIER_PREFIX_PATTERN = String.raw`\brequest\s*id`;
+const REQUEST_IDENTIFIER_SEPARATOR_PATTERN = String.raw`[ =:]+`;
+const REQUEST_IDENTIFIER_VALUE_CAPTURE_PATTERN = String.raw`([a-z0-9._-]+)`;
+// Accepts "requestId=req-1", "request id: req-1", and equivalent casing/spacing variants.
+const REQUEST_IDENTIFIER_CAPTURE_PATTERN = new RegExp(
+  `${REQUEST_IDENTIFIER_PREFIX_PATTERN}${REQUEST_IDENTIFIER_SEPARATOR_PATTERN}${REQUEST_IDENTIFIER_VALUE_CAPTURE_PATTERN}`,
+  "i"
+);
 const REQUEST_CANCELED_ERROR_MESSAGE_PATTERN = /^Request canceled for /i;
 const SERVER_SHUTTING_DOWN_ERROR_MESSAGE_PATTERN = /Server is shutting down/i;
 const TRACKED_UI_ERROR_PREFIX_SEPARATOR = ": ";

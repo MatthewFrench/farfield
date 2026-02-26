@@ -31,6 +31,17 @@ const LONG_IDENTIFIER_SEGMENT_THRESHOLD = 28;
 const HEXADECIMAL_IDENTIFIER_SEGMENT_PATTERN = /^[0-9a-f]{16,}$/i;
 const ERROR_STATUS_CODE_MINIMUM = 400;
 const ROUTE_KEY_SEPARATOR = " ";
+const PATH_SEGMENT_INDEX_BY_NAME = {
+  third: 2,
+  fourth: 3,
+  fifth: 4
+} as const;
+const PATH_SEGMENT_COUNT_BY_NAME = {
+  threadMemberMinimum: 3,
+  debugHistoryEntry: 4,
+  debugClientErrorEntry: 4,
+  debugTraceDownload: 5
+} as const;
 
 const METRICS_ROUTE_PLACEHOLDER_BY_NAME = {
   threadIdentifier: ":threadId",
@@ -54,6 +65,29 @@ const STARTUP_ACTION_DESCRIPTION_BY_NAME: Readonly<Record<string, string>> = {
   "startup-deferred.threads.active.revalidate": "Revalidate active thread list from network"
 };
 
+const THREAD_MEMBER_ROUTE_PREFIX_SEGMENTS = [
+  RequestPathSegmentByName.api,
+  RequestPathSegmentByName.threads
+] as const;
+
+const DEBUG_HISTORY_ENTRY_ROUTE_PREFIX_SEGMENTS = [
+  RequestPathSegmentByName.api,
+  RequestPathSegmentByName.debug,
+  RequestPathSegmentByName.history
+] as const;
+
+const DEBUG_CLIENT_ERROR_ENTRY_ROUTE_PREFIX_SEGMENTS = [
+  RequestPathSegmentByName.api,
+  RequestPathSegmentByName.debug,
+  RequestPathSegmentByName.clientErrors
+] as const;
+
+const DEBUG_TRACE_DOWNLOAD_ROUTE_PREFIX_SEGMENTS = [
+  RequestPathSegmentByName.api,
+  RequestPathSegmentByName.debug,
+  RequestPathSegmentByName.trace
+] as const;
+
 /**
  * Route classification mirrors dynamic segments owned by Network route owners so
  * static paths (for example `session-log`) cannot collapse into identifier aggregates.
@@ -64,25 +98,25 @@ interface MetricsRouteClassification {
 
 const THREAD_MEMBER_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
   replacementBySegmentIndex: {
-    2: METRICS_ROUTE_PLACEHOLDER_BY_NAME.threadIdentifier
+    [PATH_SEGMENT_INDEX_BY_NAME.third]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.threadIdentifier
   }
 };
 
 const DEBUG_HISTORY_ENTRY_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
   replacementBySegmentIndex: {
-    3: METRICS_ROUTE_PLACEHOLDER_BY_NAME.historyEntryIdentifier
+    [PATH_SEGMENT_INDEX_BY_NAME.fourth]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.historyEntryIdentifier
   }
 };
 
 const DEBUG_CLIENT_ERROR_ENTRY_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
   replacementBySegmentIndex: {
-    3: METRICS_ROUTE_PLACEHOLDER_BY_NAME.clientErrorIdentifier
+    [PATH_SEGMENT_INDEX_BY_NAME.fourth]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.clientErrorIdentifier
   }
 };
 
 const DEBUG_TRACE_DOWNLOAD_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
   replacementBySegmentIndex: {
-    3: METRICS_ROUTE_PLACEHOLDER_BY_NAME.traceIdentifier
+    [PATH_SEGMENT_INDEX_BY_NAME.fourth]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.traceIdentifier
   }
 };
 
@@ -108,39 +142,50 @@ function classifyMetricsRoutePathname(pathSegments: readonly string[]): MetricsR
 
 function isThreadMemberRoutePath(pathSegments: readonly string[]): boolean {
   return (
-    pathSegments.length >= 3
-    && pathSegments[0] === RequestPathSegmentByName.api
-    && pathSegments[1] === RequestPathSegmentByName.threads
+    pathSegments.length >= PATH_SEGMENT_COUNT_BY_NAME.threadMemberMinimum
+    && hasLeadingPathSegments(pathSegments, THREAD_MEMBER_ROUTE_PREFIX_SEGMENTS)
   );
 }
 
 function isDebugHistoryEntryRoutePath(pathSegments: readonly string[]): boolean {
   return (
-    pathSegments.length === 4
-    && pathSegments[0] === RequestPathSegmentByName.api
-    && pathSegments[1] === RequestPathSegmentByName.debug
-    && pathSegments[2] === RequestPathSegmentByName.history
+    pathSegments.length === PATH_SEGMENT_COUNT_BY_NAME.debugHistoryEntry
+    && hasLeadingPathSegments(pathSegments, DEBUG_HISTORY_ENTRY_ROUTE_PREFIX_SEGMENTS)
   );
 }
 
 function isDebugClientErrorEntryRoutePath(pathSegments: readonly string[]): boolean {
   return (
-    pathSegments.length === 4
-    && pathSegments[0] === RequestPathSegmentByName.api
-    && pathSegments[1] === RequestPathSegmentByName.debug
-    && pathSegments[2] === RequestPathSegmentByName.clientErrors
-    && pathSegments[3] !== RequestPathSegmentByName.sessionLog
+    pathSegments.length === PATH_SEGMENT_COUNT_BY_NAME.debugClientErrorEntry
+    && hasLeadingPathSegments(pathSegments, DEBUG_CLIENT_ERROR_ENTRY_ROUTE_PREFIX_SEGMENTS)
+    // `session-log` is a static diagnostics endpoint, not a dynamic client-error identifier.
+    && pathSegments[PATH_SEGMENT_INDEX_BY_NAME.fourth] !== RequestPathSegmentByName.sessionLog
   );
 }
 
 function isDebugTraceDownloadRoutePath(pathSegments: readonly string[]): boolean {
   return (
-    pathSegments.length === 5
-    && pathSegments[0] === RequestPathSegmentByName.api
-    && pathSegments[1] === RequestPathSegmentByName.debug
-    && pathSegments[2] === RequestPathSegmentByName.trace
-    && pathSegments[4] === RequestPathSegmentByName.download
+    pathSegments.length === PATH_SEGMENT_COUNT_BY_NAME.debugTraceDownload
+    && hasLeadingPathSegments(pathSegments, DEBUG_TRACE_DOWNLOAD_ROUTE_PREFIX_SEGMENTS)
+    && pathSegments[PATH_SEGMENT_INDEX_BY_NAME.fifth] === RequestPathSegmentByName.download
   );
+}
+
+function hasLeadingPathSegments(
+  pathSegments: readonly string[],
+  leadingPathSegments: readonly string[]
+): boolean {
+  if (pathSegments.length < leadingPathSegments.length) {
+    return false;
+  }
+
+  for (const [pathSegmentIndex, leadingPathSegment] of leadingPathSegments.entries()) {
+    if (pathSegments[pathSegmentIndex] !== leadingPathSegment) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function readClassifiedPathSegmentReplacement(

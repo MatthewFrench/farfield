@@ -936,7 +936,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] `ApiSessionBootstrapCoordinator` now explicitly consumes non-blocking background refresh rejections and keeps retry behavior deterministic; focused coordinator tests now cover rejection-handling and retry sequencing.
 - [x] Progress audit confirmed architecture migration governance status in code and review systems: no unresolved PR review threads remain on `MatthewFrench/farfield#1`.
 - [x] `ThreadCompletionNotificationService` replaced cross-module `ReturnType` contract derivation with explicit `StoredPushSubscription[]` contracts to keep boundary types explicit and standards-compliant.
-- [x] Child-process environment propagation now avoids direct full `process.env` spread in remaining script/test spawn paths (`scripts/ios-device-smoke-matrix.mjs` and route-integration harness ownership under `apps/ServerApplication/Tests/HttpRoutesIntegrationEnvironment.ts`) by using schema-owned allowlisted environment builders.
+- [x] Child-process environment propagation now avoids direct full `process.env` spread in remaining script/test spawn paths (`scripts/smoke/ios-device-smoke-matrix.mjs` and route-integration harness ownership under `apps/ServerApplication/Tests/HttpRoutesIntegrationEnvironment.ts`) by using schema-owned allowlisted environment builders.
 - [x] Chat and thread mutation coordinators now refresh through explicit scoped owner composition (`loadCoreDataTracked` + selected-thread reload callbacks) instead of broad `refreshAll` paths in `ChatRequestActionCoordinator`, `ThreadMutationActionCoordinator`, `UseChatActionHandlers`, and `UseThreadActionHandlers`.
 - [x] API session token bootstrap success path now refreshes through explicit scoped owner callbacks (`loadCoreDataTracked` + selected-thread reload-if-present) in `UseApplicationPushFeatureComposition`.
 - [x] Broad `refreshAll` call sites were removed from web source; startup and manual refresh now run through explicit runtime-owned core + selected-thread refresh composition paths.
@@ -950,7 +950,7 @@ Use this checklist as the single at-a-glance cleanup tracker.
 - [x] Push test dispatch ownership (`/api/push/test`) was extracted from `PushRoutes.ts` into `PushTestRouteOwner.ts`, and route contracts were split into `PushRouteContracts.ts`.
 - [x] Server bootstrap cache-invalidation policy ownership was extracted into `Application/Bootstrap/ThreadListCacheInvalidationOwner.ts`, reducing composition-root concentration in `ServerBootstrap.ts`.
 - [x] Browser push client convenience API wrappers were split out of `PushClientStateManager.ts` into `PushClientApi.ts` so class ownership remains focused on lifecycle behavior.
-- [x] `scripts/with-env.mjs` now builds spawned-process environment from a schema-owned allowlist instead of propagating the full `process.env` surface, while still loading explicit `.env` and `.env.local` values.
+- [x] `scripts/tooling/with-env.mjs` now builds spawned-process environment from a schema-owned allowlist instead of propagating the full `process.env` surface, while still loading explicit `.env` and `.env.local` values.
 - [x] `CodexThreadStreamStateOwner` default invalid stream-event log path now resolves to `.runtime/logs/threads/invalid-thread-stream-events.ndjson` to keep runtime artifacts out of source roots.
 - [x] Real-app Playwright suite now contains `7` scenarios (`bunx playwright test -c playwright.real.config.ts --list`), including startup/header-refresh coverage; full execution requires the local Farfield server at `127.0.0.1:4311` and fails fast with `ECONNREFUSED` when that prerequisite is not running.
 - [x] Codex app-server spawn environment ownership now uses strict allowlisted schema parsing in `packages/CodexInterfaceAdapter/Source/AppServerTransport.ts` (`buildAppServerSpawnEnvironment`), removing direct full-environment propagation to child process startup.
@@ -1111,7 +1111,7 @@ When folder and file paths are moved to this end-state layout, update all path-d
    - root `tsconfig.base.json`
    - per-application and per-package `tsconfig.json`
 3. Build/dev/runtime scripts:
-   - `scripts/*.mjs`
+   - `scripts/**/*.mjs`
    - runtime bootstrap paths referenced by scripts
 4. Test and end-to-end runners:
    - `playwright.real.config.ts`
@@ -1266,21 +1266,18 @@ All path families above must remain internally consistent after each rename/move
    - Reason: removes request-path event-loop blocking, improves push throughput, and keeps thread list reads fresher during live updates.
 
 18. Date: 2026-02-24 (updated 2026-02-26)
-   - Status: scheduled hardening.
-   - Exception Owner: repository operations maintainers.
-   - Exception: `scripts/*.mjs` remains flat temporarily instead of the proposed grouped structure under `scripts/development`, `scripts/setup`, `scripts/smoke`, `scripts/operations`, and `scripts/tooling`.
+   - Status: completed.
+   - Owner: repository operations maintainers.
+   - Decision: close the temporary flat-script layout exception by moving runtime command ownership into grouped folders (`scripts/development`, `scripts/setup`, `scripts/smoke`, `scripts/operations`, and `scripts/tooling`) in one path-consistent change set.
    - Affected Files/Modules:
      - root `package.json` script entrypoints
-     - `scripts/*.mjs` runtime command ownership
-     - this end-state structure section in `docs/proposed-structure-and-migration.md`
-   - Review Date: 2026-04-30
-   - Mitigation Plan:
-     - keep script names explicit and ownership-aligned in their command prefixes
-     - keep all environment-sensitive script execution behind `scripts/with-env.mjs`
-     - 2026-03-12: publish grouped-folder migration map and command path rewiring plan
-     - 2026-04-05: execute grouped-folder migration in one path-consistent move set that updates scripts, tests, docs, and workflow paths together
-     - 2026-04-30: close the exception after post-move validation
-   - Planned Removal Date: 2026-04-30
+     - `.github/workflows/ios-setup-checks.yml` script syntax and helper path checks
+     - grouped script runtime command ownership under `scripts/**/*.mjs`
+     - docs references that describe script execution paths
+   - Validation Evidence:
+     - root command rewiring now points to grouped script paths
+     - workflow syntax checks and env-loader invocation now target grouped paths
+     - migration/docs references now point to grouped script ownership
 
 19. Date: 2026-02-26
    - Decision: Codify boundary and hot-path hardening governance outcomes and classify excluded surfaces by policy status.
@@ -1298,7 +1295,6 @@ All path families above must remain internally consistent after each rename/move
 | `packages/CodexProtocol/Source/Generated` | accepted exclusion | protocol contracts owner | 2026-06-30 | not applicable | 2026-03-15: verify generated contract parity checks remain green. 2026-06-30: re-validate exclusion scope and regeneration workflow ownership. |
 | `packages/CodexProtocol/Tests/fixtures` | accepted exclusion | protocol testing owner | 2026-06-30 | not applicable | 2026-03-15: run fixture sanitization and sensitive-data scan policy audit. 2026-06-30: review fixture lifecycle ownership and retention policy. |
 | `end-to-end` | scheduled hardening | end-to-end ownership maintainer | 2026-04-15 | 2026-05-15 | 2026-03-11: publish owner map for `real/fixtures`, `real/helpers`, and `real/scenarios`. 2026-03-29: add explicit boundary schemas for scenario fixture loading and route/test harness contracts. 2026-04-26: run path and naming hardening pass with docs/test-runner alignment. |
-| `scripts` | scheduled hardening | repository operations maintainers | 2026-04-30 | 2026-04-30 | 2026-03-12: publish grouped-folder migration map and command path rewiring plan. 2026-04-05: execute grouped-folder migration with script/workflow/docs/test path updates. 2026-04-30: close exception after post-move validation. |
 
 ## End-State Completion Criteria
 

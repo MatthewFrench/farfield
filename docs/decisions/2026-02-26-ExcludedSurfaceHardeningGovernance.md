@@ -28,7 +28,6 @@ Adopt a two-class excluded-surface governance policy with explicit status, owner
 | `packages/CodexProtocol/Source/Generated` | accepted exclusion | protocol contracts owner | 2026-06-30 | not applicable | Generator-owned output only. Manual architecture sweeps do not edit generated artifacts directly. 2026-03-15: verify generated contract parity checks remain green. 2026-06-30: re-validate exclusion scope and regeneration workflow ownership. |
 | `packages/CodexProtocol/Tests/fixtures` | accepted exclusion | protocol testing owner | 2026-06-30 | not applicable | Fixture packs remain tooling/test-input owned. Manual structure naming sweeps do not rewrite fixture content. 2026-03-15: run fixture sanitization and sensitive-data scan policy audit. 2026-06-30: review fixture lifecycle ownership and retention policy. |
 | `end-to-end` | scheduled hardening | end-to-end ownership maintainer | 2026-04-15 | 2026-05-15 | Exclusion remains temporary while test-owner boundaries are formalized. 2026-03-11: publish owner map for `real/fixtures`, `real/helpers`, and `real/scenarios`. 2026-03-29: add explicit boundary schemas for scenario fixture loading and route/test harness contracts. 2026-04-26: run full path and naming hardening pass with docs/test-runner alignment. |
-| `scripts` | scheduled hardening | repository operations maintainers | 2026-04-30 | 2026-04-30 | Flat `scripts/*.mjs` layout exception remains temporary. 2026-03-12: publish grouped-folder migration map and command path rewiring plan. 2026-04-05: execute grouped-folder move with script, workflow, docs, and test-path updates in one set. 2026-04-30: close exception after post-move validation. |
 
 ### Governance enforcement requirements
 
@@ -57,6 +56,7 @@ Adopt a two-class excluded-surface governance policy with explicit status, owner
 1. Excluded surfaces now have explicit policy ownership and review dates.
 2. Hardening backlog is converted into dated milestones instead of open-ended exceptions.
 3. Boundary and hot-path hardening outcomes become an enforceable baseline rather than historical notes.
+4. The temporary `scripts` exclusion was closed after grouped-folder migration and removed from the active exclusion register.
 
 ### Costs and risks
 
