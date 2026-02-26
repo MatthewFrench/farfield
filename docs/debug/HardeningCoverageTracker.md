@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-26 21:01:56Z
+Last Updated (UTC): 2026-02-26 21:31:38Z
 
 ## Scope Model
 
@@ -27,6 +27,45 @@ Last Updated (UTC): 2026-02-26 21:01:56Z
 - Files touched in current wave: 155 (8.4%)
 - Files not touched in current wave: 1701
 - Line churn across touched files: +19850 / -6085 (net +13765)
+
+## Next Concern Focus: Ownership and Separation
+
+The next concern waves should prioritize separation-of-concerns and owner API discipline by group/area, not file count alone.
+
+Core ownership checks for every area:
+
+1. One explicit owner per mutable state/cache/persistence surface.
+2. Query/mutation entry points route through owner APIs only (no side-channel state writes).
+3. Boundary parsing/normalization stays in boundary owners; internal modules consume app-owned contracts only.
+4. Cross-layer dependencies follow the documented direction (UI -> state/logic -> data access/boundary).
+5. Observability for owner-controlled flows includes operation identity, start/end, and error context.
+
+Priority areas to inspect next:
+
+1. `apps/ServerApplication/Source/Agents`
+   - Confirm adapters only orchestrate through owner classes and never mutate shared state outside owned surfaces.
+   - Verify thread ownership resolution and message/interaction channels remain centralized in owner APIs.
+2. `apps/ServerApplication/Source/Network`
+   - Confirm route owners are the sole mutation/query channels for request-scoped behavior.
+   - Verify route contracts remain strict and no transport-shape checks leak into downstream modules.
+3. `apps/ServerApplication/Source/Modules`
+   - Confirm push/thread/activity services own their own state transitions and expose explicit mutation APIs.
+   - Validate cache/concurrency owners have deterministic sequencing and explicit invalidation rules.
+4. `apps/WebApplication/Source/Application`
+   - Confirm composition hooks wire owners but do not absorb domain logic.
+   - Ensure refresh/concurrency decisions stay in dedicated coordinators and not mixed into UI bindings.
+5. `apps/WebApplication/Source/Features`
+   - Confirm feature state owners are the only place that mutates feature state.
+   - Verify UI components consume owner/state APIs and do not directly perform boundary/data-access logic.
+6. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
+   - Confirm transport mapping stays in adapter boundary modules and does not leak into callers.
+   - Verify request option builders preserve explicit caller intent and avoid implicit truthy filtering.
+
+Exit criteria for this focus wave:
+
+1. Each area has a short owner registry/checklist entry in this tracker or linked decision notes.
+2. High-risk mutation/query paths have explicit owner API tests.
+3. No new cross-layer shortcuts bypassing owner APIs are introduced during hardening.
 
 ## Latest Continuation Commit Wave
 
