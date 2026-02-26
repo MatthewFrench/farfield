@@ -14,9 +14,9 @@ import type { PushReceiptStore } from "../Modules/PushNotifications/PushReceiptS
 import type { PushSendStore } from "../Modules/PushNotifications/PushSendStore.js";
 import type { PushService } from "../Modules/PushNotifications/PushService.js";
 import type { PushStore } from "../Modules/PushNotifications/PushStore.js";
-import type { RuntimeStateOwner } from "../Application/StateManagement/RuntimeStateOwner.js";
 import type { ServerErrorEventRecordInput } from "./ServerErrorEventRecorder.js";
 import type { ServerObservabilitySnapshot } from "./ServerObservabilitySnapshotOwner.js";
+import type { HistoryEntry } from "./DebugContracts.js";
 import {
   ServerRequestErrorResponder,
   type ServerRequestErrorContext
@@ -25,11 +25,10 @@ import type { BrowserSessionAuthOwner } from "./BrowserSessionAuthOwner.js";
 import type { RequestObservabilityOwner } from "./RequestObservabilityOwner.js";
 import { handleAgentRoutes } from "./Routes/AgentRoutes.js";
 import { handleCapabilityRoutes } from "./Routes/CapabilityRoutes.js";
-import type { HistoryEntry } from "./Routes/DebugTypes.js";
 import type { DebugRouteDependencies } from "./Routes/DebugRoutes.js";
 import { handleDebugRoutes } from "./Routes/DebugRoutes.js";
 import { handlePushRoutes } from "./Routes/PushRoutes.js";
-import { handleRuntimeRoutes } from "./Routes/RuntimeRoutes.js";
+import { handleRuntimeRoutes, type RuntimeStateSnapshotReader } from "./Routes/RuntimeRoutes.js";
 import type { ThreadRouteDependencies } from "./Routes/ThreadRoutes.js";
 import { handleThreadRoutes } from "./Routes/ThreadRoutes.js";
 import type { EventStreamClientRegistry } from "./EventStreamClientRegistry.js";
@@ -102,7 +101,7 @@ export interface ServerRequestHandlerDependencies {
   threadListAggregationCache: ThreadListAggregationCache;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   eventStreamClientRegistry: EventStreamClientRegistry;
-  runtimeStateOwner: RuntimeStateOwner;
+  runtimeStateOwner: RuntimeStateSnapshotReader;
   activityHistoryService: ActivityHistoryService;
   clientErrorStore: ClientErrorStore;
   pushService: PushService;

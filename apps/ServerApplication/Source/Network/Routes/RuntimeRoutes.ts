@@ -6,7 +6,6 @@ import {
 } from "@farfield/protocol";
 import { z } from "zod";
 import type { EventStreamClientRegistry } from "../EventStreamClientRegistry.js";
-import type { RuntimeStateOwner } from "../../Application/StateManagement/RuntimeStateOwner.js";
 import type { BrowserSessionAuthOwner } from "../BrowserSessionAuthOwner.js";
 import {
   RequestMethodByName,
@@ -76,6 +75,10 @@ type EventsSessionBootstrapBodyParseResult =
     issues: EventsSessionBootstrapBodyIssue[];
   };
 
+export interface RuntimeStateSnapshotReader {
+  readSnapshot: () => object;
+}
+
 export interface RuntimeRouteDependencies {
   req: IncomingMessage;
   res: ServerResponse;
@@ -85,7 +88,7 @@ export interface RuntimeRouteDependencies {
   apiTokenHeaderName: string;
   browserSessionAuthOwner: BrowserSessionAuthOwner;
   eventStreamClientRegistry: EventStreamClientRegistry;
-  runtimeStateOwner: RuntimeStateOwner;
+  runtimeStateOwner: RuntimeStateSnapshotReader;
   readJsonBody: (req: IncomingMessage) => Promise<JsonValue>;
   jsonResponse: (res: ServerResponse, statusCode: number, body: object) => void;
 }

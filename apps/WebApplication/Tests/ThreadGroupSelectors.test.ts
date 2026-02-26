@@ -246,4 +246,32 @@ describe("ThreadGroupSelectors", () => {
     ]);
     expect(mergedProjectGroups[mergedProjectGroups.length - 1]?.key).toBe("project:unknown");
   });
+
+  it("keeps thread grouping and unread derivation performant for large thread lists", () => {
+    const threadCount = 3000;
+    const generatedThreads = Array.from({ length: threadCount }, (_value, index) =>
+      buildThread({
+        id: `thread-${String(index)}`,
+        createdAt: index,
+        updatedAt: index * 2,
+        cwd: `/workspace/project-${String(index % 30)}`,
+        hasUnreadTurn: index % 9 === 0 ? true : null
+      })
+    );
+    const previousThreadUpdatedAtByIdentifier = ThreadGroupSelectors.mapThreadUpdatedAtByIdentifier(generatedThreads);
+
+    const startedAtMilliseconds = performance.now();
+    const groupedThreads = ThreadGroupSelectors.groupThreadsByProject(generatedThreads);
+    const unreadThreadIdentifiers = ThreadGroupSelectors.computeUnreadThreadIdentifiers({
+      previousUnreadThreadIdentifiers: {},
+      previousThreadUpdatedAtByIdentifier,
+      nextThreads: generatedThreads,
+      selectedThreadIdentifier: null
+    });
+    const elapsedMilliseconds = performance.now() - startedAtMilliseconds;
+
+    expect(groupedThreads.length).toBe(30);
+    expect(Object.keys(unreadThreadIdentifiers).length).toBeGreaterThan(0);
+    expect(elapsedMilliseconds).toBeLessThan(1_500);
+  });
 });

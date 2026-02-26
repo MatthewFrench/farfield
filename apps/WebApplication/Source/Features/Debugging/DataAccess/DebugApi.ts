@@ -139,30 +139,34 @@ function mapDebugErrorDetailsWireToContract(
   value: z.infer<typeof FarfieldDebugErrorListEnvelopeSchema.shape.data.element.shape.details>
 ): ApiDebugErrorDetails {
   const details = z.record(StructuredDataValueSchema).parse(value);
-  const mappedDetails: Record<string, StructuredDataValue> = {};
-
-  for (const [detailKey, detailValue] of Object.entries(details)) {
-    if (
-      detailKey === DEBUG_ERROR_DETAIL_ACTION_IDENTIFIER_KEY
-      || detailKey === DEBUG_ERROR_DETAIL_ACTION_NAME_KEY
-    ) {
-      continue;
-    }
-    mappedDetails[detailKey] = detailValue;
-  }
-
   const actionIdentifierValue = details[DEBUG_ERROR_DETAIL_ACTION_IDENTIFIER_KEY];
-  if (actionIdentifierValue !== undefined) {
-    mappedDetails[DEBUG_ERROR_DETAIL_ACTION_IDENTIFIER_KEY] =
-      DebugErrorActionIdentifierSchema.parse(actionIdentifierValue);
-  }
-
   const actionNameValue = details[DEBUG_ERROR_DETAIL_ACTION_NAME_KEY];
-  if (actionNameValue !== undefined) {
-    mappedDetails[DEBUG_ERROR_DETAIL_ACTION_NAME_KEY] = DebugErrorActionNameSchema.parse(actionNameValue);
-  }
+  const mappedDetailEntries = Object.entries(details).filter(([detailKey]) =>
+    detailKey !== DEBUG_ERROR_DETAIL_ACTION_IDENTIFIER_KEY
+    && detailKey !== DEBUG_ERROR_DETAIL_ACTION_NAME_KEY
+  );
+  const mappedDetails = mappedDetailEntries.reduce<Record<string, StructuredDataValue>>(
+    (accumulatedDetails, [detailKey, detailValue]) => ({
+      ...accumulatedDetails,
+      [detailKey]: detailValue
+    }),
+    {}
+  );
+  const mappedDetailsWithActionIdentifier = actionIdentifierValue === undefined
+    ? mappedDetails
+    : {
+        ...mappedDetails,
+        [DEBUG_ERROR_DETAIL_ACTION_IDENTIFIER_KEY]:
+          DebugErrorActionIdentifierSchema.parse(actionIdentifierValue)
+      };
+  const mappedDetailsWithActionIdentifierAndName = actionNameValue === undefined
+    ? mappedDetailsWithActionIdentifier
+    : {
+        ...mappedDetailsWithActionIdentifier,
+        [DEBUG_ERROR_DETAIL_ACTION_NAME_KEY]: DebugErrorActionNameSchema.parse(actionNameValue)
+      };
 
-  return DebugErrorDetailsSchema.parse(mappedDetails);
+  return DebugErrorDetailsSchema.parse(mappedDetailsWithActionIdentifierAndName);
 }
 
 function mapDebugErrorEventWireToContract(value: DebugErrorEventWire): DebugErrorEventContract {

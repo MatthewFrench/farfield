@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { logger } from "../../Shared/Logging/Logger.js";
 import type { EventStreamClientRegistry } from "../../Network/EventStreamClientRegistry.js";
-import type { ActiveTrace, HistoryEntry, TraceSummary } from "../../Network/Routes/DebugTypes.js";
+import type { ActiveTrace, HistoryEntry, TraceSummary } from "../../Network/DebugContracts.js";
 
 const DEFAULT_HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES = 131_072;
 const RECENT_TRACE_LIMIT = 20;

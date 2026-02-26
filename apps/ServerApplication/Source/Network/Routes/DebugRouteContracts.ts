@@ -148,13 +148,13 @@ export function readFileNameFromPath(filePath: string): string {
 }
 
 export function buildSendRequestOptions(parsedReplayFrame: ParsedReplayFrame): SendRequestOptions {
-  const options: SendRequestOptions = {};
   // Keep optional-field handling explicit so provided values are never dropped by truthy filtering.
-  if (parsedReplayFrame.targetClientId !== undefined) {
-    options.targetClientId = parsedReplayFrame.targetClientId;
-  }
-  if (parsedReplayFrame.version !== undefined) {
-    options.version = parsedReplayFrame.version;
-  }
-  return options;
+  return {
+    ...(parsedReplayFrame.targetClientId === undefined
+      ? {}
+      : { targetClientId: parsedReplayFrame.targetClientId }),
+    ...(parsedReplayFrame.version === undefined
+      ? {}
+      : { version: parsedReplayFrame.version })
+  };
 }

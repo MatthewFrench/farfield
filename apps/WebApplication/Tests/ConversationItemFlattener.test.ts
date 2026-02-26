@@ -129,4 +129,26 @@ describe("ConversationItemFlattener", () => {
 
     expect(flattened[0]?.turnIsInProgress).toBe(false);
   });
+
+  it("flattens large conversations within bounded time and preserves terminal markers", () => {
+    const flattener = new ConversationItemFlattener();
+    const turnCount = 250;
+    const itemsPerTurn = 20;
+    const turns: ConversationTurn[] = Array.from({ length: turnCount }, (_turn, turnIndex) => ({
+      status: turnIndex === turnCount - 1 ? "inProgress" : "completed",
+      items: Array.from({ length: itemsPerTurn }, (_item, itemIndex) => ({
+        id: `turn-${String(turnIndex)}-item-${String(itemIndex)}`,
+        type: "agentMessage",
+        text: "message"
+      }))
+    }));
+
+    const startedAtMilliseconds = performance.now();
+    const flattenedItems = flattener.flattenConversationItems(turns, true);
+    const elapsedMilliseconds = performance.now() - startedAtMilliseconds;
+
+    expect(flattenedItems.length).toBe(turnCount * itemsPerTurn);
+    expect(flattenedItems[flattenedItems.length - 1]?.isLast).toBe(true);
+    expect(elapsedMilliseconds).toBeLessThan(1_000);
+  });
 });

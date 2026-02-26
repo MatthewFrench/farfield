@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-26 23:07:00Z
+Last Updated (UTC): 2026-02-26 23:11:41Z
 
 ## Scope Model
 
@@ -27,6 +27,28 @@ Last Updated (UTC): 2026-02-26 23:07:00Z
 - Files touched in current wave: 155 (8.4%)
 - Files not touched in current wave: 1701
 - Line churn across touched files: +19850 / -6085 (net +13765)
+
+## Concern Status Snapshot (Current Wave)
+
+1. Enforcement now active for ownership and separation:
+   - `import/no-cycle` is enforced across application and package source roots.
+   - `max-lines` and `max-lines-per-function` are enforced for source ownership budgets.
+   - non-owner mutable-member writes are blocked with explicit owner allowlist patterns in lint configuration.
+   - server layer boundaries are enforced:
+     - `Network/Routes` must not import `Application/*`
+     - `Network/*` (non-routes) must not import `Application/*`
+     - `Modules/*` must not import `Network/Routes/*` or `Network/RequestSchemas/*`
+2. Ownership refactors completed for boundary compliance:
+   - debug contracts moved out of route layer to [`apps/ServerApplication/Source/Network/DebugContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/DebugContracts.ts).
+   - runtime-route dependencies now consume explicit network-owned reader contracts instead of `Application` state-owner types.
+   - debug-data mapping helpers were rewritten to immutable construction where mutable member writes were previously used.
+3. High-priority hotspots still queued by concern:
+   - `apps/WebApplication/Source/Application/StateManagement`
+     - large orchestrator hooks still need decomposition into explicit owner classes/modules.
+   - `apps/ServerApplication/Source/Network/ServerRequestHandler.ts`
+     - central request orchestrator remains high fan-in and should be split by route concern owners.
+   - `packages/CodexInterfaceAdapter/Source/LiveState.ts`
+     - live-state reduction and merge complexity remains high and should be segmented into smaller owner modules with focused invariants/tests.
 
 ## Next Concern Focus: Ownership and Separation
 

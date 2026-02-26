@@ -25,6 +25,24 @@ const webDataAccessBoundaryImportPatterns = [
     message: "User-interface modules must consume owner/state APIs instead of application data-access modules."
   }
 ];
+const serverNetworkRouteApplicationImportPattern = {
+  group: ["**/Application/**"],
+  message: "Network route modules must not import application composition or state owners."
+};
+const serverNetworkApplicationImportPattern = {
+  group: ["**/Application/**"],
+  message: "Network modules must depend on explicit network contracts instead of application owners."
+};
+const serverModuleRouteImportPatterns = [
+  {
+    group: ["**/Network/Routes/**"],
+    message: "Server module owners must not import route modules."
+  },
+  {
+    group: ["**/Network/RequestSchemas/**"],
+    message: "Server module owners must not import request-schema ingress modules."
+  }
+];
 const typescriptTypeRestrictionSelectors = [
   {
     selector: "TSUnknownKeyword",
@@ -49,17 +67,48 @@ const typescriptTypeRestrictionSelectors = [
 ];
 const memberMutationRestrictionSelectors = [
   {
-    selector: "AssignmentExpression[left.type='MemberExpression'][left.object.type!='ThisExpression']",
+    selector: "AssignmentExpression[left.type='MemberExpression'][left.object.type='Identifier'][left.property.name!='displayName'][left.property.name!='current']",
     message: "Only explicit owner modules may mutate object properties in place."
   },
   {
-    selector: "UpdateExpression[argument.type='MemberExpression'][argument.object.type!='ThisExpression']",
+    selector: "UpdateExpression[argument.type='MemberExpression'][argument.object.type='Identifier'][argument.property.name!='current']",
     message: "Only explicit owner modules may mutate object properties in place."
   },
   {
-    selector: "UnaryExpression[operator='delete'][argument.type='MemberExpression'][argument.object.type!='ThisExpression']",
+    selector: "UnaryExpression[operator='delete'][argument.type='MemberExpression'][argument.object.type='Identifier']",
     message: "Only explicit owner modules may mutate object properties in place."
   }
+];
+const mutationOwnerAllowlistPatterns = [
+  "**/*Owner.ts",
+  "**/*Owner.tsx",
+  "**/*Store.ts",
+  "**/*Store.tsx",
+  "**/*Coordinator.ts",
+  "**/*Coordinator.tsx",
+  "**/*Cache.ts",
+  "**/*Cache.tsx",
+  "**/*Service.ts",
+  "**/*Service.tsx",
+  "**/*Registry.ts",
+  "**/*Registry.tsx",
+  "**/*Adapter.ts",
+  "**/*Adapter.tsx",
+  "**/*Manager.ts",
+  "**/*Manager.tsx",
+  "**/*Client.ts",
+  "**/*Client.tsx",
+  "**/*Transport.ts",
+  "**/*Transport.tsx",
+  "**/*Notifier.ts",
+  "**/*Notifier.tsx",
+  "**/*Logger.ts",
+  "**/*Logger.tsx",
+  "**/LiveState.ts",
+  "apps/**/Source/**/StateManagement/**/*.ts",
+  "apps/**/Source/**/StateManagement/**/*.tsx",
+  "packages/CodexProtocol/Source/Generated/**/*.ts",
+  "packages/CodexProtocol/vendor/**/*.ts"
 ];
 
 export default tseslint.config(
@@ -177,20 +226,70 @@ export default tseslint.config(
   },
   {
     files: [
-      "apps/ServerApplication/Source/Network/Schemas/**/*.ts",
-      "apps/WebApplication/Source/Application/Configuration/**/*.ts",
-      "apps/WebApplication/Source/Features/**/DomainModel/**/*.ts",
-      "apps/WebApplication/Source/Features/**/DomainModel/**/*.tsx",
-      "apps/WebApplication/Source/Shared/Contracts/**/*.ts",
-      "packages/CodexInterfaceAdapter/Source/DomainModel/**/*.ts",
-      "packages/CodexProtocol/Source/Contracts/**/*.ts",
-      "packages/OpenCodeInterfaceAdapter/Source/DomainModel/**/*.ts"
+      "apps/ServerApplication/Source/**/*.ts",
+      "apps/WebApplication/Source/**/*.ts",
+      "apps/WebApplication/Source/**/*.tsx",
+      "packages/CodexInterfaceAdapter/Source/**/*.ts",
+      "packages/CodexProtocol/Source/**/*.ts",
+      "packages/OpenCodeInterfaceAdapter/Source/**/*.ts"
     ],
+    ignores: mutationOwnerAllowlistPatterns,
     rules: {
       "no-restricted-syntax": [
         "error",
         ...typescriptTypeRestrictionSelectors,
         ...memberMutationRestrictionSelectors
+      ]
+    }
+  },
+  {
+    files: [
+      "apps/ServerApplication/Source/Network/Routes/**/*.ts"
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            noInternalIndexBarrelImportPattern,
+            serverNetworkRouteApplicationImportPattern
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: [
+      "apps/ServerApplication/Source/Network/**/*.ts"
+    ],
+    ignores: [
+      "apps/ServerApplication/Source/Network/Routes/**/*.ts"
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            noInternalIndexBarrelImportPattern,
+            serverNetworkApplicationImportPattern
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: [
+      "apps/ServerApplication/Source/Modules/**/*.ts"
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            noInternalIndexBarrelImportPattern,
+            ...serverModuleRouteImportPatterns
+          ]
+        }
       ]
     }
   },

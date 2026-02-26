@@ -7,7 +7,7 @@ import {
   type ServerTransportErrorCategory,
   type ServerTransportErrorClassification
 } from "./ServerTransportErrorClassifier.js";
-import type { HistoryEntry } from "./Routes/DebugTypes.js";
+import type { HistoryEntry } from "./DebugContracts.js";
 import type { ThreadRouteDependencies } from "./Routes/ThreadRoutes.js";
 
 const SERVER_ERROR_SOURCE = "farfield-server";

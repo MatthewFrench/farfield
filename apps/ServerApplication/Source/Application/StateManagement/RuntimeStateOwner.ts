@@ -1,5 +1,5 @@
 import type { CodexAgentRuntimeState } from "../../Agents/Adapters/CodexAgentAdapter.js";
-import type { TraceSummary } from "../../Network/Routes/DebugTypes.js";
+import type { TraceSummary } from "../../Network/DebugContracts.js";
 
 // Keep runtime snapshot reads cheap while still allowing near-real-time diagnostics refresh.
 const DEFAULT_SNAPSHOT_CACHE_TIME_TO_LIVE_MILLISECONDS = 250;

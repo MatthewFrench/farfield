@@ -22,7 +22,7 @@ import { PushStore } from "../Modules/PushNotifications/PushStore.js";
 import { ThreadCompletionNotificationService } from "../Modules/Threads/ThreadCompletionNotificationService.js";
 import { readServerRuntimeConfigurationFromCurrentProcessEnvironment } from "./Configuration/ServerRuntimeConfiguration.js";
 import { ServerLifecycleCoordinator } from "./Bootstrap/ServerLifecycleCoordinator.js";
-import type { HistoryEntry } from "../Network/Routes/DebugTypes.js";
+import type { HistoryEntry } from "../Network/DebugContracts.js";
 import { EventStreamClientRegistry } from "../Network/EventStreamClientRegistry.js";
 import { EventLoopLagObservabilityOwner } from "../Network/EventLoopLagObservabilityOwner.js";
 import { PushDispatchConcurrencyCoordinator } from "../Network/PushDispatchConcurrencyCoordinator.js";

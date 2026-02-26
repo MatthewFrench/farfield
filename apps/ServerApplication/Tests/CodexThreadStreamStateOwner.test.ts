@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import { describe, expect, it } from "vitest";
 import { parseThreadStreamStateChangedBroadcast, type IpcFrame } from "@farfield/protocol";
 import { CodexThreadStreamStateOwner } from "../Source/Agents/Adapters/CodexThreadStreamStateOwner.js";
@@ -340,6 +341,23 @@ describe("CodexThreadStreamStateOwner", () => {
     owner.ingestInboundFrame(malformedFrame);
 
     expect(fs.existsSync(invalidStreamEventsLogPath)).toBe(true);
+  });
+
+  it("reduces high patch volumes without entering reduction-failure state", () => {
+    const owner = new CodexThreadStreamStateOwner();
+    const patchCount = 1000;
+    owner.ingestInboundFrame(createSnapshotEvent());
+
+    const startedAtMilliseconds = performance.now();
+    for (let patchIndex = 0; patchIndex < patchCount; patchIndex += 1) {
+      owner.ingestInboundFrame(createPatchEvent());
+    }
+    const elapsedMilliseconds = performance.now() - startedAtMilliseconds;
+
+    const projectedState = owner.readLiveState("thread-1");
+    expect(projectedState.liveStateError).toBeNull();
+    expect(projectedState.conversationState?.requests.length).toBe(1);
+    expect(elapsedMilliseconds).toBeLessThan(3_000);
   });
 
   it("rejects non-positive stream event limits", () => {
