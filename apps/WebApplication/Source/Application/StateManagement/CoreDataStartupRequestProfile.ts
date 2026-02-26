@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type StartupRequestTier = "critical" | "deferred";
 
 export interface StartupRequestProfileEntry {
@@ -6,8 +8,27 @@ export interface StartupRequestProfileEntry {
   description: string;
 }
 
+export const STARTUP_REQUEST_ALLOWED_TIERS = ["critical", "deferred"] as const;
+
 const STARTUP_REQUEST_PROFILE_DUPLICATE_ACTION_NAME_ERROR_PREFIX =
   "Startup request profile contains duplicate action name: ";
+const STARTUP_REQUEST_PROFILE_ACTION_NAME_EMPTY_ERROR_PREFIX =
+  "Startup request profile contains empty action name at entry index: ";
+const STARTUP_REQUEST_PROFILE_ENTRY_UNDEFINED_ERROR_PREFIX =
+  "Startup request profile contains undefined entry at index: ";
+const STARTUP_REQUEST_PROFILE_DESCRIPTION_EMPTY_ERROR_PREFIX =
+  "Startup request profile contains empty description for action name: ";
+const STARTUP_REQUEST_PROFILE_DISALLOWED_TIER_ERROR_PREFIX =
+  "Startup request profile contains disallowed tier for action name: ";
+const STARTUP_REQUEST_PROFILE_SCHEMA_ERROR_PREFIX = "Startup request profile schema validation failed";
+const STARTUP_REQUEST_PROFILE_CRITICAL_BUDGET_ERROR_PREFIX =
+  "Startup request profile critical request count exceeds budget maximum: ";
+
+const StartupRequestProfileEntrySchema = z.object({
+  actionName: z.string(),
+  tier: z.enum(STARTUP_REQUEST_ALLOWED_TIERS),
+  description: z.string()
+}).strict();
 
 export const STARTUP_CRITICAL_EVENTS_SESSION_OPERATION = "startup-critical.events-session";
 export const STARTUP_CRITICAL_THREADS_OPERATION = "startup-critical.threads.active";
@@ -84,27 +105,97 @@ export const STARTUP_REQUEST_PROFILE: readonly StartupRequestProfileEntry[] = [
 ];
 
 export const STARTUP_CRITICAL_REQUEST_BUDGET_MAXIMUM = 2;
+const STARTUP_REQUEST_ALLOWED_TIER_SET = new Set<StartupRequestTier>(STARTUP_REQUEST_ALLOWED_TIERS);
 
-const STARTUP_ACTION_NAME_SET = new Set<string>();
-const STARTUP_REQUEST_DESCRIPTION_BY_ACTION_NAME = new Map<string, string>();
-
-for (const startupRequestProfileEntry of STARTUP_REQUEST_PROFILE) {
-  if (STARTUP_ACTION_NAME_SET.has(startupRequestProfileEntry.actionName)) {
-    throw new Error(
-      `${STARTUP_REQUEST_PROFILE_DUPLICATE_ACTION_NAME_ERROR_PREFIX}${startupRequestProfileEntry.actionName}`
-    );
-  }
-  STARTUP_ACTION_NAME_SET.add(startupRequestProfileEntry.actionName);
-  STARTUP_REQUEST_DESCRIPTION_BY_ACTION_NAME.set(
-    startupRequestProfileEntry.actionName,
-    startupRequestProfileEntry.description
-  );
+interface StartupRequestProfileOwnerState {
+  actionNameSet: ReadonlySet<string>;
+  requestDescriptionByActionName: ReadonlyMap<string, string>;
 }
 
+function readStartupRequestProfileSchemaError(entryIndex: number, error: z.ZodError): Error {
+  const issueMessages = error.issues.map((issue) => issue.message).join(", ");
+  const profileSchemaErrorMessage =
+    `${STARTUP_REQUEST_PROFILE_SCHEMA_ERROR_PREFIX} at entry index ${String(entryIndex)}: ${issueMessages}`;
+  return new Error(profileSchemaErrorMessage);
+}
+
+function parseStartupRequestProfileEntry(
+  entry: StartupRequestProfileEntry,
+  entryIndex: number
+): StartupRequestProfileEntry {
+  const parseResult = StartupRequestProfileEntrySchema.safeParse(entry);
+  if (!parseResult.success) {
+    throw readStartupRequestProfileSchemaError(entryIndex, parseResult.error);
+  }
+  return parseResult.data;
+}
+
+function initializeStartupRequestProfileOwnerState(
+  startupRequestProfileEntries: readonly StartupRequestProfileEntry[]
+): StartupRequestProfileOwnerState {
+  const actionNameSet = new Set<string>();
+  const requestDescriptionByActionName = new Map<string, string>();
+  let criticalRequestCount = 0;
+
+  for (let profileEntryIndex = 0; profileEntryIndex < startupRequestProfileEntries.length; profileEntryIndex += 1) {
+    const rawStartupRequestProfileEntry = startupRequestProfileEntries[profileEntryIndex];
+    if (rawStartupRequestProfileEntry === undefined) {
+      throw new Error(
+        `${STARTUP_REQUEST_PROFILE_ENTRY_UNDEFINED_ERROR_PREFIX}${String(profileEntryIndex)}`
+      );
+    }
+    const startupRequestProfileEntry = parseStartupRequestProfileEntry(
+      rawStartupRequestProfileEntry,
+      profileEntryIndex
+    );
+    if (startupRequestProfileEntry.actionName.trim().length === 0) {
+      throw new Error(
+        `${STARTUP_REQUEST_PROFILE_ACTION_NAME_EMPTY_ERROR_PREFIX}${String(profileEntryIndex)}`
+      );
+    }
+    if (!STARTUP_REQUEST_ALLOWED_TIER_SET.has(startupRequestProfileEntry.tier)) {
+      throw new Error(
+        `${STARTUP_REQUEST_PROFILE_DISALLOWED_TIER_ERROR_PREFIX}${startupRequestProfileEntry.actionName} (${startupRequestProfileEntry.tier})`
+      );
+    }
+    if (startupRequestProfileEntry.description.trim().length === 0) {
+      throw new Error(
+        `${STARTUP_REQUEST_PROFILE_DESCRIPTION_EMPTY_ERROR_PREFIX}${startupRequestProfileEntry.actionName}`
+      );
+    }
+    if (actionNameSet.has(startupRequestProfileEntry.actionName)) {
+      throw new Error(
+        `${STARTUP_REQUEST_PROFILE_DUPLICATE_ACTION_NAME_ERROR_PREFIX}${startupRequestProfileEntry.actionName}`
+      );
+    }
+    actionNameSet.add(startupRequestProfileEntry.actionName);
+    requestDescriptionByActionName.set(
+      startupRequestProfileEntry.actionName,
+      startupRequestProfileEntry.description
+    );
+    if (startupRequestProfileEntry.tier === "critical") {
+      criticalRequestCount += 1;
+    }
+  }
+
+  if (criticalRequestCount > STARTUP_CRITICAL_REQUEST_BUDGET_MAXIMUM) {
+    throw new Error(
+      `${STARTUP_REQUEST_PROFILE_CRITICAL_BUDGET_ERROR_PREFIX}${String(criticalRequestCount)} > ${String(STARTUP_CRITICAL_REQUEST_BUDGET_MAXIMUM)}`
+    );
+  }
+
+  return {
+    actionNameSet,
+    requestDescriptionByActionName
+  };
+}
+
+const STARTUP_REQUEST_PROFILE_OWNER_STATE = initializeStartupRequestProfileOwnerState(STARTUP_REQUEST_PROFILE);
+
 export function isStartupActionName(actionName: string): boolean {
-  return STARTUP_ACTION_NAME_SET.has(actionName);
+  return STARTUP_REQUEST_PROFILE_OWNER_STATE.actionNameSet.has(actionName);
 }
 
 export function readStartupRequestDescription(actionName: string): string {
-  return STARTUP_REQUEST_DESCRIPTION_BY_ACTION_NAME.get(actionName) ?? actionName;
+  return STARTUP_REQUEST_PROFILE_OWNER_STATE.requestDescriptionByActionName.get(actionName) ?? actionName;
 }
