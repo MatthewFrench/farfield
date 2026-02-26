@@ -1,6 +1,7 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import {
+  FarfieldThreadLiveStateSnapshotSchema,
   parseThreadConversationState,
   ThreadConversationStateSchema
 } from "@farfield/protocol";
@@ -17,6 +18,9 @@ import type {
   AgentInterruptInput,
   AgentListThreadsInput,
   AgentListThreadsResult,
+  AgentReadStreamEventsInput,
+  AgentThreadLiveState,
+  AgentThreadStreamEvents,
   AgentReadThreadInput,
   AgentReadThreadResult,
   AgentSendMessageInput
@@ -34,6 +38,8 @@ import { ServerRequestUtilityOwner } from "../Source/Network/ServerRequestUtilit
 const LocalhostBaseUrl = "http://localhost";
 const AmbiguousThreadIdentifier = "thread_ambiguous";
 const SingleOwnerThreadIdentifier = "thread_single_owner";
+const LiveStateThreadIdentifier = "thread_live_state";
+const StreamEventsThreadIdentifier = "thread_stream_events";
 const NestedMessagesPathThreadIdentifier = "thread_nested_messages_path";
 const InvalidThreadIdentifierSegment = "%E0%A4%A";
 const ActionErrorIdentifier = "action-error-id";
@@ -47,6 +53,16 @@ const defaultCapabilities: AgentCapabilities = {
   canSubmitUserInput: false,
   canReadLiveState: false,
   canReadStreamEvents: false
+};
+
+const liveStateReadCapabilities: AgentCapabilities = {
+  ...defaultCapabilities,
+  canReadLiveState: true
+};
+
+const streamEventsReadCapabilities: AgentCapabilities = {
+  ...defaultCapabilities,
+  canReadStreamEvents: true
 };
 
 const AmbiguousThreadResolutionResponseSchema = z
@@ -69,6 +85,20 @@ const InvalidThreadIdentifierResponseSchema = z
   .object({
     ok: z.literal(false),
     error: z.literal("Invalid thread identifier")
+  })
+  .strict();
+
+const StreamEventsQueryValidationErrorResponseSchema = z
+  .object({
+    ok: z.literal(false),
+    error: z.literal("Invalid stream event query parameters"),
+    details: z.array(
+      z
+        .object({
+          message: z.string().min(1)
+        })
+        .passthrough()
+    )
   })
   .strict();
 
@@ -178,15 +208,23 @@ function createThreadMemberRouteDependencies(
   };
 }
 
-function createAdapter(
-  id: "codex" | "opencode",
-  readThread: (input: AgentReadThreadInput) => Promise<AgentReadThreadResult>,
-  sendMessage?: (input: AgentSendMessageInput) => Promise<void>
-): AgentAdapter {
+interface ThreadMemberRouteTestAdapterOptions {
+  id: "codex" | "opencode";
+  capabilities?: AgentCapabilities;
+  readThread: (input: AgentReadThreadInput) => Promise<AgentReadThreadResult>;
+  sendMessage?: (input: AgentSendMessageInput) => Promise<void>;
+  readLiveState?: (threadId: string) => Promise<AgentThreadLiveState>;
+  readStreamEvents?: (
+    threadId: string,
+    input: AgentReadStreamEventsInput
+  ) => Promise<AgentThreadStreamEvents>;
+}
+
+function createAdapter(options: ThreadMemberRouteTestAdapterOptions): AgentAdapter {
   return {
-    id,
-    label: id,
-    capabilities: defaultCapabilities,
+    id: options.id,
+    label: options.id,
+    capabilities: options.capabilities ?? defaultCapabilities,
     async start(): Promise<void> {},
     async stop(): Promise<void> {},
     isEnabled(): boolean {
@@ -202,17 +240,19 @@ function createAdapter(
       throw new Error("not used in this test");
     },
     async readThread(input: AgentReadThreadInput): Promise<AgentReadThreadResult> {
-      return readThread(input);
+      return options.readThread(input);
     },
     async sendMessage(input: AgentSendMessageInput): Promise<void> {
-      if (!sendMessage) {
+      if (!options.sendMessage) {
         throw new Error("not used in this test");
       }
-      await sendMessage(input);
+      await options.sendMessage(input);
     },
     async interrupt(_input: AgentInterruptInput): Promise<void> {
       throw new Error("not used in this test");
-    }
+    },
+    readLiveState: options.readLiveState,
+    readStreamEvents: options.readStreamEvents
   };
 }
 
@@ -257,17 +297,23 @@ describe("ThreadMemberRoutes integration", () => {
     const { request, response } = createMockRequestResponsePair();
     request.method = ThreadMemberRouteMethodByName.get;
 
-    const codexAdapter = createAdapter("codex", async (input) => {
-      if (input.threadId !== AmbiguousThreadIdentifier) {
-        throw new Error("thread not found");
+    const codexAdapter = createAdapter({
+      id: "codex",
+      readThread: async (input) => {
+        if (input.threadId !== AmbiguousThreadIdentifier) {
+          throw new Error("thread not found");
+        }
+        return createThreadReadResult(input.threadId);
       }
-      return createThreadReadResult(input.threadId);
     });
-    const opencodeAdapter = createAdapter("opencode", async (input) => {
-      if (input.threadId !== AmbiguousThreadIdentifier) {
-        throw new Error("thread not found");
+    const opencodeAdapter = createAdapter({
+      id: "opencode",
+      readThread: async (input) => {
+        if (input.threadId !== AmbiguousThreadIdentifier) {
+          throw new Error("thread not found");
+        }
+        return createThreadReadResult(input.threadId);
       }
-      return createThreadReadResult(input.threadId);
     });
 
     const threadAdapterResolver = new ThreadAdapterResolver(
@@ -303,15 +349,21 @@ describe("ThreadMemberRoutes integration", () => {
     request.method = ThreadMemberRouteMethodByName.get;
 
     const readThreadIncludeTurnsValues: boolean[] = [];
-    const codexAdapter = createAdapter("codex", async (input) => {
-      if (input.threadId !== SingleOwnerThreadIdentifier) {
+    const codexAdapter = createAdapter({
+      id: "codex",
+      readThread: async (input) => {
+        if (input.threadId !== SingleOwnerThreadIdentifier) {
+          throw new Error("thread not found");
+        }
+        readThreadIncludeTurnsValues.push(input.includeTurns);
+        return createThreadReadResult(input.threadId);
+      }
+    });
+    const opencodeAdapter = createAdapter({
+      id: "opencode",
+      readThread: async () => {
         throw new Error("thread not found");
       }
-      readThreadIncludeTurnsValues.push(input.includeTurns);
-      return createThreadReadResult(input.threadId);
-    });
-    const opencodeAdapter = createAdapter("opencode", async () => {
-      throw new Error("thread not found");
     });
 
     const threadAdapterResolver = new ThreadAdapterResolver(
@@ -372,20 +424,125 @@ describe("ThreadMemberRoutes integration", () => {
     });
   });
 
+  it("returns 200 for canonical live-state reads when adapter supports live-state", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = ThreadMemberRouteMethodByName.get;
+
+    const readLiveState = vi.fn(async () => ({
+      ownerClientId: "client-live-state",
+      conversationState: null,
+      liveStateError: null
+    }));
+    const codexAdapter = createAdapter({
+      id: "codex",
+      capabilities: liveStateReadCapabilities,
+      readThread: async () => {
+        throw new Error("not used in this test");
+      },
+      readLiveState
+    });
+    const resolveAdapterForThread = vi.fn<
+      ThreadMemberRouteDependencies["resolveAdapterForThread"]
+    >(async () => ({
+      ok: true,
+      adapter: codexAdapter,
+      agentId: "codex"
+    }));
+
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(LiveStateThreadIdentifier, ThreadMemberRouteSegmentByName.liveState),
+      createThreadRouteUrl(LiveStateThreadIdentifier, ThreadMemberRouteSegmentByName.liveState),
+      resolveAdapterForThread,
+      async () => ({}),
+      capturedResponse
+    );
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+    expect(handled).toBe(true);
+    expect(resolveAdapterForThread).toHaveBeenCalledWith(LiveStateThreadIdentifier);
+    expect(readLiveState).toHaveBeenCalledTimes(1);
+    expect(readLiveState).toHaveBeenCalledWith(LiveStateThreadIdentifier);
+    expect(capturedResponse.statusCode).toBe(200);
+    expect(FarfieldThreadLiveStateSnapshotSchema.parse(capturedResponse.body)).toEqual({
+      ok: true,
+      threadId: LiveStateThreadIdentifier,
+      ownerClientId: "client-live-state",
+      conversationState: null,
+      liveStateError: null
+    });
+  });
+
+  it("returns 400 for canonical stream-events reads when query is invalid", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = ThreadMemberRouteMethodByName.get;
+
+    const readStreamEvents = vi.fn(async () => ({
+      ownerClientId: "client-stream-events",
+      events: [],
+      nextSequence: 0,
+      firstAvailableSequence: 0,
+      resetRequired: false
+    }));
+    const codexAdapter = createAdapter({
+      id: "codex",
+      capabilities: streamEventsReadCapabilities,
+      readThread: async () => {
+        throw new Error("not used in this test");
+      },
+      readStreamEvents
+    });
+    const resolveAdapterForThread = vi.fn<
+      ThreadMemberRouteDependencies["resolveAdapterForThread"]
+    >(async () => ({
+      ok: true,
+      adapter: codexAdapter,
+      agentId: "codex"
+    }));
+
+    const streamEventsUrl = createThreadRouteUrl(
+      StreamEventsThreadIdentifier,
+      ThreadMemberRouteSegmentByName.streamEvents
+    );
+    streamEventsUrl.searchParams.set("sinceSequence", "-1");
+
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(StreamEventsThreadIdentifier, ThreadMemberRouteSegmentByName.streamEvents),
+      streamEventsUrl,
+      resolveAdapterForThread,
+      async () => ({}),
+      capturedResponse
+    );
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+    expect(handled).toBe(true);
+    expect(readStreamEvents).not.toHaveBeenCalled();
+    expect(capturedResponse.statusCode).toBe(400);
+    const validationResponse = StreamEventsQueryValidationErrorResponseSchema.parse(
+      capturedResponse.body
+    );
+    expect(validationResponse.details.length).toBeGreaterThan(0);
+  });
+
   it("does not treat nested messages paths as send-message mutation endpoints", async () => {
     const { request, response } = createMockRequestResponsePair();
     request.method = ThreadMemberRouteMethodByName.post;
 
     const sentMessages: AgentSendMessageInput[] = [];
-    const codexAdapter = createAdapter(
-      "codex",
-      async () => {
+    const codexAdapter = createAdapter({
+      id: "codex",
+      readThread: async () => {
         throw new Error("not used in this test");
       },
-      async (input) => {
+      sendMessage: async (input) => {
         sentMessages.push(input);
       }
-    );
+    });
     const resolveAdapterForThread = vi.fn<
       ThreadMemberRouteDependencies["resolveAdapterForThread"]
     >(async () => ({
