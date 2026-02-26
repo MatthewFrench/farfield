@@ -1,4 +1,5 @@
-import type { JsonValue } from "@farfield/protocol";
+import { z } from "zod";
+import { JsonValueSchema, type JsonValue } from "@farfield/protocol";
 
 /**
  * Owns exported error contracts for the Codex adapter package.
@@ -14,18 +15,70 @@ const APP_SERVER_ERROR_NAME = "AppServerError";
 const APP_SERVER_TRANSPORT_ERROR_NAME = "AppServerTransportError";
 const APP_SERVER_RPC_ERROR_NAME = "AppServerRpcError";
 const DESKTOP_IPC_ERROR_NAME = "DesktopIpcError";
+const NON_EMPTY_ERROR_MESSAGE_VALIDATION_ERROR = "Error message must be a non-empty string";
+const APP_SERVER_RPC_CODE_VALIDATION_ERROR = "RPC error code must be an integer";
+
+const ErrorMessageSchema = z.string().min(1, NON_EMPTY_ERROR_MESSAGE_VALIDATION_ERROR);
+const AppServerRpcErrorConstructorSchema = z
+  .object({
+    code: z.number().int(APP_SERVER_RPC_CODE_VALIDATION_ERROR),
+    message: ErrorMessageSchema,
+    data: JsonValueSchema.optional()
+  })
+  .strict();
+
+type AppServerRpcErrorConstructorArguments = {
+  code: number;
+  message: string;
+  data: JsonValue | undefined;
+};
+
+function buildConstructorContractError(errorName: string, issues: readonly z.ZodIssue[]): Error {
+  const details = issues.map((issue) => issue.message).join("; ");
+  return new Error(`${errorName} constructor argument mismatch: ${details}`);
+}
+
+function parseErrorMessageOrThrow(message: string, errorName: string): string {
+  const parsed = ErrorMessageSchema.safeParse(message);
+  if (!parsed.success) {
+    throw buildConstructorContractError(errorName, parsed.error.issues);
+  }
+
+  return parsed.data;
+}
+
+function parseAppServerRpcErrorConstructorArgumentsOrThrow(
+  code: number,
+  message: string,
+  data: JsonValue | undefined
+): AppServerRpcErrorConstructorArguments {
+  const parsed = AppServerRpcErrorConstructorSchema.safeParse({
+    code,
+    message,
+    data
+  });
+  if (!parsed.success) {
+    throw buildConstructorContractError(APP_SERVER_RPC_ERROR_NAME, parsed.error.issues);
+  }
+
+  return {
+    code: parsed.data.code,
+    message: parsed.data.message,
+    data: parsed.data.data
+  };
+}
 
 export class AppServerError extends Error {
   public readonly category: CodexInterfaceAdapterErrorCategory = "app-server";
 
   public constructor(message: string) {
-    super(message);
+    super(parseErrorMessageOrThrow(message, APP_SERVER_ERROR_NAME));
     this.name = APP_SERVER_ERROR_NAME;
   }
 }
 
 export class AppServerTransportError extends AppServerError {
-  public override readonly category = "app-server-transport" as const;
+  public override readonly category: CodexInterfaceAdapterErrorCategory = "app-server-transport";
 
   public constructor(message: string) {
     super(message);
@@ -34,23 +87,24 @@ export class AppServerTransportError extends AppServerError {
 }
 
 export class AppServerRpcError extends AppServerError {
-  public override readonly category = "app-server-rpc" as const;
+  public override readonly category: CodexInterfaceAdapterErrorCategory = "app-server-rpc";
   public readonly code: number;
   public readonly data: JsonValue | undefined;
 
   public constructor(code: number, message: string, data?: JsonValue) {
-    super(`app-server error ${code}: ${message}`);
+    const parsed = parseAppServerRpcErrorConstructorArgumentsOrThrow(code, message, data);
+    super(`app-server error ${parsed.code}: ${parsed.message}`);
     this.name = APP_SERVER_RPC_ERROR_NAME;
-    this.code = code;
-    this.data = data;
+    this.code = parsed.code;
+    this.data = parsed.data;
   }
 }
 
 export class DesktopIpcError extends Error {
-  public readonly category = "desktop-ipc" as const;
+  public readonly category: CodexInterfaceAdapterErrorCategory = "desktop-ipc";
 
   public constructor(message: string) {
-    super(message);
+    super(parseErrorMessageOrThrow(message, DESKTOP_IPC_ERROR_NAME));
     this.name = DESKTOP_IPC_ERROR_NAME;
   }
 }

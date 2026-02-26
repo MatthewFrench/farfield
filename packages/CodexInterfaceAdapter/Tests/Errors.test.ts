@@ -34,6 +34,14 @@ describe("Errors", () => {
     expect(error.message).toBe("app-server error -32600: conversation not found");
   });
 
+  it("keeps rpc error data as explicit undefined when omitted", () => {
+    const error = new AppServerRpcError(-32_003, "server overloaded");
+
+    expect(error.code).toBe(-32_003);
+    expect(error.data).toBeUndefined();
+    expect(error.message).toBe("app-server error -32003: server overloaded");
+  });
+
   it("exposes desktop ipc errors with explicit category", () => {
     const error = new DesktopIpcError("socket closed");
 
@@ -42,5 +50,29 @@ describe("Errors", () => {
     expect(error.name).toBe("DesktopIpcError");
     expect(error.category).toBe("desktop-ipc");
     expect(error.message).toBe("socket closed");
+  });
+
+  it("rejects empty app-server error messages", () => {
+    expect(() => new AppServerError("")).toThrowError(
+      "AppServerError constructor argument mismatch: Error message must be a non-empty string"
+    );
+  });
+
+  it("rejects rpc constructor code that is not an integer", () => {
+    expect(() => new AppServerRpcError(-32_600.5, "invalid request")).toThrowError(
+      "AppServerRpcError constructor argument mismatch: RPC error code must be an integer"
+    );
+  });
+
+  it("rejects rpc constructor messages that are empty", () => {
+    expect(() => new AppServerRpcError(-32_600, "")).toThrowError(
+      "AppServerRpcError constructor argument mismatch: Error message must be a non-empty string"
+    );
+  });
+
+  it("rejects empty desktop ipc messages", () => {
+    expect(() => new DesktopIpcError("")).toThrowError(
+      "DesktopIpcError constructor argument mismatch: Error message must be a non-empty string"
+    );
   });
 });
