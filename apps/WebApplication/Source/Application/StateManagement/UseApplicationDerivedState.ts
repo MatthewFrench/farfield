@@ -1,191 +1,23 @@
 import { useDeferredValue, useMemo } from "react";
+import {
+  readActiveRequestSelection,
+  readConversationStateSelection
+} from "./ApplicationConversationStateDerivation";
+import { readModelOptions } from "./ApplicationModelOptionDerivation";
+import { readSystemHealthStatus } from "./ApplicationSystemHealthDerivation";
+import {
+  readChatSurfaceState,
+  readSelectedThreadLabel,
+  readThreadListState
+} from "./ApplicationThreadAndChatSurfaceDerivation";
 import { toErrorBannerDetails } from "@/Features/Debugging/DomainModel/ErrorBannerDetailsParser";
-import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
 import {
   type ApplicationDerivedState,
   type UseApplicationDerivedStateInput
 } from "./UseApplicationDerivedStateContracts";
 
 const DEFAULT_SELECTED_AGENT_LABEL = "Agent";
-const LOADING_THREAD_LABEL = "Loading thread...";
-const NO_THREAD_SELECTED_LABEL = "No thread selected";
 const UNKNOWN_COMMIT_LABEL = "unknown";
-
-type ConversationState = ApplicationDerivedState["conversationState"];
-type SystemHealthState = UseApplicationDerivedStateInput["health"];
-
-interface ConversationStateSelectionInput {
-  liveConversationState: ConversationState;
-  readConversationState: ConversationState;
-  conversationSyncSignatureBuilder: UseApplicationDerivedStateInput["conversationSyncSignatureBuilder"];
-}
-
-interface ActiveRequestSelectionInput {
-  pendingRequests: ApplicationDerivedState["pendingRequests"];
-  selectedRequestId: number | null;
-}
-
-interface SelectedThreadLabelInput {
-  selectedThread: ApplicationDerivedState["selectedThread"];
-  selectedThreadId: string | null;
-  isSelectedThreadLoading: boolean;
-}
-
-interface ThreadListStateInput {
-  isCoreLoading: boolean;
-  threadCount: number;
-}
-
-interface ChatSurfaceStateInput {
-  selectedThreadId: string | null;
-  isCoreLoading: boolean;
-  isSelectedThreadLoading: boolean;
-  turnCount: number;
-}
-
-interface ModelOptionsInput {
-  models: UseApplicationDerivedStateInput["models"];
-  latestModel: string | null | undefined;
-  selectedModelId: string;
-}
-
-interface SystemHealthStatus {
-  allSystemsReady: boolean;
-  hasAnySystemFailure: boolean;
-}
-
-interface SystemHealthStatusInput {
-  codexConfigured: boolean;
-  openCodeConnected: boolean;
-  health: SystemHealthState;
-}
-
-function readConversationStateSelection(
-  input: ConversationStateSelectionInput
-): ConversationState {
-  const {
-    liveConversationState,
-    readConversationState,
-    conversationSyncSignatureBuilder
-  } = input;
-  if (!liveConversationState) {
-    return readConversationState;
-  }
-  if (!readConversationState) {
-    return liveConversationState;
-  }
-
-  // Use the newest snapshot so streamed updates and read-thread responses remain aligned.
-  const liveUpdatedAt = conversationSyncSignatureBuilder.readConversationStateUpdatedAt(
-    liveConversationState
-  );
-  const readUpdatedAt = conversationSyncSignatureBuilder.readConversationStateUpdatedAt(
-    readConversationState
-  );
-  return liveUpdatedAt > readUpdatedAt ? liveConversationState : readConversationState;
-}
-
-function readActiveRequestSelection(
-  input: ActiveRequestSelectionInput
-): ApplicationDerivedState["activeRequest"] {
-  const { pendingRequests, selectedRequestId } = input;
-  const firstPendingRequest = pendingRequests[0] ?? null;
-  if (!firstPendingRequest) {
-    return null;
-  }
-  if (selectedRequestId === null) {
-    return firstPendingRequest;
-  }
-  return pendingRequests.find((request) => request.id === selectedRequestId) ?? firstPendingRequest;
-}
-
-function readSelectedThreadLabel(input: SelectedThreadLabelInput): string {
-  const { selectedThread, selectedThreadId, isSelectedThreadLoading } = input;
-  if (selectedThread) {
-    return ThreadGroupSelectors.threadLabel(selectedThread);
-  }
-  if (selectedThreadId && isSelectedThreadLoading) {
-    return LOADING_THREAD_LABEL;
-  }
-  return NO_THREAD_SELECTED_LABEL;
-}
-
-function readThreadListState(input: ThreadListStateInput): ApplicationDerivedState["threadListState"] {
-  const { isCoreLoading, threadCount } = input;
-  if (isCoreLoading) {
-    return "loading";
-  }
-  if (threadCount === 0) {
-    return "empty";
-  }
-  return "ready";
-}
-
-function readChatSurfaceState(input: ChatSurfaceStateInput): ApplicationDerivedState["chatSurfaceState"] {
-  const {
-    selectedThreadId,
-    isCoreLoading,
-    isSelectedThreadLoading,
-    turnCount
-  } = input;
-  if (!selectedThreadId && isCoreLoading) {
-    return "loading-threads";
-  }
-  if (selectedThreadId && isSelectedThreadLoading) {
-    return "loading-thread";
-  }
-  if (turnCount === 0) {
-    return selectedThreadId ? "no-messages" : "no-thread";
-  }
-  return "ready";
-}
-
-function readModelOptionLabel(model: UseApplicationDerivedStateInput["models"][number]): string {
-  if (model.displayName && model.displayName !== model.id) {
-    return `${model.displayName} (${model.id})`;
-  }
-  return model.displayName || model.id;
-}
-
-function readModelOptions(input: ModelOptionsInput): ApplicationDerivedState["modelOptions"] {
-  const { models, latestModel, selectedModelId } = input;
-  const modelLabelById = new Map<string, string>();
-
-  for (const model of models) {
-    modelLabelById.set(model.id, readModelOptionLabel(model));
-  }
-
-  if (latestModel && !modelLabelById.has(latestModel)) {
-    modelLabelById.set(latestModel, latestModel);
-  }
-  if (selectedModelId && !modelLabelById.has(selectedModelId)) {
-    modelLabelById.set(selectedModelId, selectedModelId);
-  }
-
-  return Array.from(modelLabelById.entries()).map(([id, label]) => ({ id, label }));
-}
-
-function readSystemHealthStatus(input: SystemHealthStatusInput): SystemHealthStatus {
-  const { codexConfigured, openCodeConnected, health } = input;
-
-  if (!codexConfigured) {
-    return {
-      allSystemsReady: openCodeConnected,
-      hasAnySystemFailure: !openCodeConnected
-    };
-  }
-
-  return {
-    allSystemsReady:
-      health?.state.appReady === true
-      && health?.state.ipcConnected === true
-      && health?.state.ipcInitialized === true,
-    hasAnySystemFailure:
-      health?.state.appReady === false
-      || health?.state.ipcConnected === false
-      || health?.state.ipcInitialized === false
-  };
-}
 
 export function useApplicationDerivedState(
   input: UseApplicationDerivedStateInput

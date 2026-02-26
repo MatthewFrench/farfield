@@ -1,12 +1,12 @@
 Group	TotalFiles	TouchedFiles	CoveragePercent	AddedLines	RemovedLines	NetLines	ProgressStatus
-(root)	13	0	0.00	0	0	0	not-started
+(root)	13	1	7.69	8	1	7	in-progress
 .claude	1	0	0.00	0	0	0	not-started
-.github	3	0	0.00	0	0	0	not-started
-apps	424	412	97.17	18914	4283	14631	in-progress
-docs	22	5	22.73	2654	0	2654	in-progress
+.github	3	1	33.33	6	6	0	in-progress
+apps	429	10	2.33	694	193	501	in-progress
+docs	23	3	13.04	124	4	120	in-progress
 end-to-end	17	0	0.00	0	0	0	not-started
 operations	2	0	0.00	0	0	0	not-started
-packages	1326	64	4.83	4176	961	3215	in-progress
+packages	1325	1	0.08	155	1	154	in-progress
 public	5	0	0.00	0	0	0	not-started
 scripts	18	0	0.00	0	0	0	not-started
 skills	2	0	0.00	0	0	0	not-started

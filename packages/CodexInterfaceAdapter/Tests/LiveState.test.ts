@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseThreadStreamStateChangedBroadcast } from "@farfield/protocol";
+import {
+  parseThreadStreamStateChangedBroadcast,
+  type ThreadConversationState,
+  type ThreadStreamPatch
+} from "@farfield/protocol";
 import {
   applyStrictPatchSequence,
   applyTrustedPatchSequence,
@@ -8,6 +12,78 @@ import {
   StrictPatchSequenceError,
   ThreadStreamReductionError
 } from "../Source/LiveState.js";
+
+type ConversationTurn = ThreadConversationState["turns"][number];
+const STREAM_EVENT_VERSION = 4;
+
+function createUserMessageTurn(itemIdentifier: string): ConversationTurn {
+  return {
+    status: "completed",
+    items: [
+      {
+        id: itemIdentifier,
+        type: "userMessage",
+        content: [{ type: "text", text: itemIdentifier }]
+      }
+    ]
+  };
+}
+
+function createSnapshotStreamEvent(input: {
+  threadId: string;
+  sourceClientId: string;
+  turns: ThreadConversationState["turns"];
+}) {
+  return parseThreadStreamStateChangedBroadcast({
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: input.sourceClientId,
+    version: STREAM_EVENT_VERSION,
+    params: {
+      conversationId: input.threadId,
+      type: "thread-stream-state-changed",
+      version: STREAM_EVENT_VERSION,
+      change: {
+        type: "snapshot",
+        conversationState: {
+          id: input.threadId,
+          turns: input.turns,
+          requests: []
+        }
+      }
+    }
+  });
+}
+
+function createPatchStreamEvent(input: {
+  threadId: string;
+  sourceClientId: string;
+  patches: ThreadStreamPatch[];
+}) {
+  return parseThreadStreamStateChangedBroadcast({
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: input.sourceClientId,
+    version: STREAM_EVENT_VERSION,
+    params: {
+      conversationId: input.threadId,
+      type: "thread-stream-state-changed",
+      version: STREAM_EVENT_VERSION,
+      change: {
+        type: "patches",
+        patches: input.patches
+      }
+    }
+  });
+}
+
+function createAppendTurnPatch(itemIdentifier: string): ThreadStreamPatch {
+  return {
+    op: "add",
+    path: ["turns", "-"],
+    value: createUserMessageTurn(itemIdentifier)
+  };
+}
 
 describe("live-state reducer", () => {
   it("applies snapshot then patches", () => {
@@ -146,6 +222,42 @@ describe("live-state reducer", () => {
     expect(thread?.conversationState?.id).toBe("thread-2");
     expect(thread?.conversationState?.turns.length).toBe(0);
     expect(thread?.ownerClientId).toBe("client-a");
+  });
+
+  it("resets thread state when a newer snapshot arrives after append patches", () => {
+    const threadId = "thread-append-reset";
+    const state = reduceThreadStreamEvents([
+      createSnapshotStreamEvent({
+        threadId,
+        sourceClientId: "client-a",
+        turns: [createUserMessageTurn("seed-turn")]
+      }),
+      createPatchStreamEvent({
+        threadId,
+        sourceClientId: "client-a",
+        patches: [
+          createAppendTurnPatch("appended-turn-1"),
+          createAppendTurnPatch("appended-turn-2")
+        ]
+      }),
+      createSnapshotStreamEvent({
+        threadId,
+        sourceClientId: "client-b",
+        turns: [createUserMessageTurn("reset-base-turn")]
+      }),
+      createPatchStreamEvent({
+        threadId,
+        sourceClientId: "client-b",
+        patches: [createAppendTurnPatch("post-reset-turn")]
+      })
+    ]);
+    const thread = state.get(threadId);
+
+    expect(thread?.conversationState?.turns.map((turn) => turn.items[0]?.id)).toEqual([
+      "reset-base-turn",
+      "post-reset-turn"
+    ]);
+    expect(thread?.ownerClientId).toBe("client-b");
   });
 
   it("throws reduction error with raw payload details when patch introduces invalid item type", () => {
@@ -357,6 +469,27 @@ describe("live-state reducer", () => {
     expect(capturedError.message).toContain("produced invalid conversation state at index 1");
   });
 
+  it("applies large strict append sequences without mutating source state", () => {
+    const appendPatchCount = 250;
+    const sourceState = {
+      id: "thread-large-strict",
+      turns: [createUserMessageTurn("seed-turn")],
+      requests: []
+    };
+    const patches = Array.from({ length: appendPatchCount }, (_value, index) =>
+      createAppendTurnPatch(`strict-append-${String(index)}`)
+    );
+
+    const patchedState = applyStrictPatchSequence(sourceState, patches);
+
+    expect(sourceState.turns).toHaveLength(1);
+    expect(patchedState.turns).toHaveLength(appendPatchCount + 1);
+    expect(patchedState.turns[1]?.items[0]?.id).toBe("strict-append-0");
+    expect(patchedState.turns[appendPatchCount]?.items[0]?.id).toBe(
+      `strict-append-${String(appendPatchCount - 1)}`
+    );
+  });
+
   it("applies trusted patch sequences for parsed stream patches", () => {
     const sourceState = {
       id: "thread-trusted-sequence-1",
@@ -407,6 +540,27 @@ describe("live-state reducer", () => {
 
     expect(patchedState.turns[0]?.status).toBe("inProgress");
     expect(patchedState.requests.length).toBe(1);
+  });
+
+  it("applies large trusted append sequences in place while preserving append order", () => {
+    const appendPatchCount = 250;
+    const sourceState = {
+      id: "thread-large-trusted",
+      turns: [createUserMessageTurn("seed-turn")],
+      requests: []
+    };
+    const patches = Array.from({ length: appendPatchCount }, (_value, index) =>
+      createAppendTurnPatch(`trusted-append-${String(index)}`)
+    );
+
+    const patchedState = applyTrustedPatchSequence(sourceState, patches);
+
+    expect(sourceState.turns).toHaveLength(appendPatchCount + 1);
+    expect(patchedState.turns).toHaveLength(appendPatchCount + 1);
+    expect(sourceState.turns[1]?.items[0]?.id).toBe("trusted-append-0");
+    expect(patchedState.turns[appendPatchCount]?.items[0]?.id).toBe(
+      `trusted-append-${String(appendPatchCount - 1)}`
+    );
   });
 
   it("supports append, remove, and index-shift patch application", () => {

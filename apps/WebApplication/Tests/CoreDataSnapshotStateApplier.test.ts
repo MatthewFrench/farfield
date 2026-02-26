@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import type { SetStateAction } from "react";
 import { applyCoreDataSnapshotState, type ApplyCoreDataSnapshotStateInput } from "../Source/Application/StateManagement/CoreDataSnapshotStateApplier";
 import type {
   CapabilityCollaborationModesResponse,
   CapabilityConfigDefaultsResponse,
   CapabilityModelsResponse
 } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
+import type { DebugWorkspaceDataSnapshot } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
 import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
@@ -14,6 +16,7 @@ import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement
 import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
 
 type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
+type DebugHistory = DebugWorkspaceDataSnapshot["history"];
 
 const DEFAULT_MODE_KEY = "default";
 const DEFAULT_MODE_NAME = "Balanced";
@@ -87,9 +90,37 @@ function createCapabilitiesSnapshot(
   };
 }
 
+function createDebugHistoryEntry(entryId: string): DebugHistory[number] {
+  return {
+    id: entryId,
+    at: "2026-02-26T00:00:00.000Z",
+    source: "app",
+    direction: "in",
+    payload: {},
+    meta: {}
+  };
+}
+
+function createDebugHistoryCollection(entryCount: number): DebugHistory {
+  return Array.from({ length: entryCount }, (_value, index) =>
+    createDebugHistoryEntry(`history-${String(index)}`)
+  );
+}
+
+function createDebugWorkspaceSnapshot(history: DebugHistory): DebugWorkspaceDataSnapshot {
+  return {
+    history,
+    debugErrors: [],
+    debugErrorSessionId: "session-1",
+    debugErrorSessionLogPath: "/tmp/session-1.ndjson",
+    debugErrorsSignature: []
+  };
+}
+
 function createHarness() {
   const setModesMock = vi.fn();
   const setModelsMock = vi.fn();
+  const setHistoryMock = vi.fn<(value: SetStateAction<DebugHistory>) => void>();
   const input: ApplyCoreDataSnapshotStateInput = {
     debugWorkspaceStateStore: new DebugWorkspaceStateStore(),
     threadListStateController: createThreadListStateController(),
@@ -104,7 +135,7 @@ function createHarness() {
     setModels: setModelsMock,
     setConfigDefaults: vi.fn(),
     setTraceStatus: vi.fn(),
-    setHistory: vi.fn(),
+    setHistory: setHistoryMock,
     setDebugErrors: vi.fn(),
     setDebugErrorSessionId: vi.fn(),
     setDebugErrorSessionLogPath: vi.fn(),
@@ -118,7 +149,8 @@ function createHarness() {
   return {
     input,
     setModesMock,
-    setModelsMock
+    setModelsMock,
+    setHistoryMock
   };
 }
 
@@ -177,5 +209,45 @@ describe("CoreDataSnapshotStateApplier", () => {
     expect(harness.setModelsMock).toHaveBeenCalledWith(changedSnapshot.models.data);
     expect(harness.setModesMock).not.toHaveBeenCalled();
     expect(harness.input.modelsSignatureRef.current).toEqual(["gpt-5|GPT-5 Turbo"]);
+  });
+
+  it("reuses previous large history when debug snapshot boundaries match", () => {
+    const harness = createHarness();
+    const previousHistory = createDebugHistoryCollection(2_000);
+    const incomingHistory = createDebugHistoryCollection(2_000);
+    incomingHistory[1_000] = createDebugHistoryEntry("history-middle-updated");
+
+    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot(incomingHistory);
+    applyCoreDataSnapshotState(harness.input);
+
+    expect(harness.setHistoryMock).toHaveBeenCalledTimes(1);
+    const updateAction = harness.setHistoryMock.mock.calls[0]?.[0];
+    if (!updateAction) {
+      throw new Error("Expected history state updater");
+    }
+    const applyHistoryUpdate = updateAction as (previousEntries: DebugHistory) => DebugHistory;
+    const mergedHistory = applyHistoryUpdate(previousHistory);
+
+    expect(mergedHistory).toBe(previousHistory);
+  });
+
+  it("applies incoming large history when debug snapshot tail identifier changes", () => {
+    const harness = createHarness();
+    const previousHistory = createDebugHistoryCollection(2_000);
+    const incomingHistory = createDebugHistoryCollection(2_000);
+    incomingHistory[1_999] = createDebugHistoryEntry("history-tail-updated");
+
+    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot(incomingHistory);
+    applyCoreDataSnapshotState(harness.input);
+
+    expect(harness.setHistoryMock).toHaveBeenCalledTimes(1);
+    const updateAction = harness.setHistoryMock.mock.calls[0]?.[0];
+    if (!updateAction) {
+      throw new Error("Expected history state updater");
+    }
+    const applyHistoryUpdate = updateAction as (previousEntries: DebugHistory) => DebugHistory;
+    const mergedHistory = applyHistoryUpdate(previousHistory);
+
+    expect(mergedHistory).toBe(incomingHistory);
   });
 });

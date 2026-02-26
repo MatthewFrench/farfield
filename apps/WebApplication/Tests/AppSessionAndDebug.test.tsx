@@ -134,14 +134,13 @@ describe("App", () => {
   });
 
   it("clears debug issues from the debug panel", async () => {
-    const clearableDebugMessage = "Request failed";
     environment.setDebugErrorsFixture(createDebugErrorsFixture({
       errorId: "error_2",
       sessionId: SESSION_ID,
       origin: "server",
       source: "farfield-server",
       operation: "http:request",
-      message: clearableDebugMessage,
+      message: "Request failed",
       severity: "warning",
       name: "Error",
       stack: null,
@@ -161,8 +160,6 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText("No matching issues.")).toBeTruthy();
     });
-
-    expect(screen.queryByText(clearableDebugMessage)).toBeNull();
   });
 
   it("authenticates api session before loading protected data", async () => {

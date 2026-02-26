@@ -1145,8 +1145,8 @@ All path families above must remain internally consistent after each rename/move
 1. Architecture decisions are tracked either:
    - in `docs/decisions`
    - or in a dedicated decision-log section in this document
-2. Structural exceptions are tracked with owner, reason, and planned removal date.
-3. Exception records must reference affected files/modules and mitigation plan.
+2. Structural exceptions are tracked with status, owner, reason, review date, and planned removal date when applicable.
+3. Exception records must reference affected files/modules and mitigation plan with dated follow-up milestones.
 4. Migration and architecture changes update decision/exception records in the same change.
 
 ### Current Decision Entries
@@ -1265,18 +1265,40 @@ All path families above must remain internally consistent after each rename/move
      - thread-stream updates invalidate thread-list aggregation cache in `apps/ServerApplication/Source/Application/ServerBootstrap.ts`
    - Reason: removes request-path event-loop blocking, improves push throughput, and keeps thread list reads fresher during live updates.
 
-18. Date: 2026-02-24
+18. Date: 2026-02-24 (updated 2026-02-26)
+   - Status: scheduled hardening.
    - Exception Owner: repository operations maintainers.
    - Exception: `scripts/*.mjs` remains flat temporarily instead of the proposed grouped structure under `scripts/development`, `scripts/setup`, `scripts/smoke`, `scripts/operations`, and `scripts/tooling`.
    - Affected Files/Modules:
      - root `package.json` script entrypoints
      - `scripts/*.mjs` runtime command ownership
      - this end-state structure section in `docs/proposed-structure-and-migration.md`
+   - Review Date: 2026-04-30
    - Mitigation Plan:
      - keep script names explicit and ownership-aligned in their command prefixes
      - keep all environment-sensitive script execution behind `scripts/with-env.mjs`
-     - execute grouped-folder migration in one path-consistent move set that updates scripts, tests, docs, and workflow paths together
+     - 2026-03-12: publish grouped-folder migration map and command path rewiring plan
+     - 2026-04-05: execute grouped-folder migration in one path-consistent move set that updates scripts, tests, docs, and workflow paths together
+     - 2026-04-30: close the exception after post-move validation
    - Planned Removal Date: 2026-04-30
+
+19. Date: 2026-02-26
+   - Decision: Codify boundary and hot-path hardening governance outcomes and classify excluded surfaces by policy status.
+   - Rule:
+     - boundary and hot-path hardening outcomes are baseline governance requirements for stream/cache/concurrency owner changes
+     - excluded surfaces must be recorded with status (`accepted exclusion` or `scheduled hardening`), owner, review date, and dated follow-up milestones
+     - scheduled hardening entries must include a planned removal date and explicit milestone evidence
+   - Reason: keeps exclusions bounded and reviewable while preserving hardening progress accountability.
+   - Record: `docs/decisions/2026-02-26-ExcludedSurfaceHardeningGovernance.md`
+
+### Current Excluded Surface Hardening Register
+
+| Surface | Status | Owner | Review Date | Planned Removal Date | Dated Follow-up Schedule |
+| --- | --- | --- | --- | --- | --- |
+| `packages/CodexProtocol/Source/Generated` | accepted exclusion | protocol contracts owner | 2026-06-30 | not applicable | 2026-03-15: verify generated contract parity checks remain green. 2026-06-30: re-validate exclusion scope and regeneration workflow ownership. |
+| `packages/CodexProtocol/Tests/fixtures` | accepted exclusion | protocol testing owner | 2026-06-30 | not applicable | 2026-03-15: run fixture sanitization and sensitive-data scan policy audit. 2026-06-30: review fixture lifecycle ownership and retention policy. |
+| `end-to-end` | scheduled hardening | end-to-end ownership maintainer | 2026-04-15 | 2026-05-15 | 2026-03-11: publish owner map for `real/fixtures`, `real/helpers`, and `real/scenarios`. 2026-03-29: add explicit boundary schemas for scenario fixture loading and route/test harness contracts. 2026-04-26: run path and naming hardening pass with docs/test-runner alignment. |
+| `scripts` | scheduled hardening | repository operations maintainers | 2026-04-30 | 2026-04-30 | 2026-03-12: publish grouped-folder migration map and command path rewiring plan. 2026-04-05: execute grouped-folder migration with script/workflow/docs/test path updates. 2026-04-30: close exception after post-move validation. |
 
 ## End-State Completion Criteria
 
@@ -1298,3 +1320,4 @@ All path families above must remain internally consistent after each rename/move
 16. Data lifecycle and retention/eviction rules are documented for each owned surface.
 17. Migration governance rules are followed for all structural moves.
 18. Decision records and temporary exceptions are documented and current.
+19. Excluded-surface entries are classified as `accepted exclusion` or `scheduled hardening` with explicit owner, review date, and dated follow-up schedule.
