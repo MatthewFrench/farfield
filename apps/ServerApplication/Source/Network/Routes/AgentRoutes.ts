@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { z } from "zod";
 import { logger } from "../../Shared/Logging/Logger.js";
 import type { AgentRegistry } from "../../Agents/Registry.js";
 import type { AgentAdapter, AgentDescriptor, AgentId } from "../../Agents/Types.js";
@@ -26,6 +27,7 @@ const AgentRouteErrorMessageByName = {
 
 const AgentRouteMaximumLoggedErrorLength = 240;
 const AgentRouteTruncatedErrorSuffix = "...";
+const AgentRouteProjectDirectoryListSchema = z.array(z.string());
 
 type AgentRouteBuildDescriptor = (
   adapter: AgentAdapter,
@@ -71,9 +73,7 @@ export async function handleAgentRoutes(deps: AgentRouteDependencies): Promise<b
   const descriptors = await Promise.all(
     registry
       .listAdapters()
-      .map(async (adapter) => {
-        return await buildAgentDescriptorWithProjectDirectories(adapter, buildAgentDescriptor);
-      })
+      .map((adapter) => buildAgentDescriptorWithProjectDirectories(adapter, buildAgentDescriptor))
   );
 
   const responseBody: AgentRouteListResponseBody = {
@@ -99,16 +99,12 @@ async function buildAgentDescriptorWithProjectDirectories(
   }
 
   try {
-    const projectDirectories = await adapter.listProjectDirectories();
+    const projectDirectories = AgentRouteProjectDirectoryListSchema.parse(
+      await adapter.listProjectDirectories()
+    );
     return buildAgentDescriptor(adapter, projectDirectories);
   } catch (error) {
-    logger.warn(
-      {
-        agentId: adapter.id,
-        error: truncateRouteErrorMessage(String(error))
-      },
-      AgentRouteLogEventByName.projectDirectoryListFailed
-    );
+    logProjectDirectoryListFailure(adapter.id, String(error));
     return buildAgentDescriptor(adapter, createEmptyProjectDirectoryList());
   }
 }
@@ -127,8 +123,11 @@ function resolveDefaultAgentIdentifier(
     return enabledAgentIdentifier;
   }
 
-  const configuredAgentIdentifier = configuredAgentIds[0];
-  if (configuredAgentIdentifier !== undefined) {
+  const configuredAgentIdentifier = resolveConfiguredDefaultAgentIdentifier(
+    configuredAgentIds,
+    descriptors
+  );
+  if (configuredAgentIdentifier !== null) {
     return configuredAgentIdentifier;
   }
 
@@ -138,6 +137,38 @@ function resolveDefaultAgentIdentifier(
   }
 
   throw new Error(AgentRouteErrorMessageByName.missingDefaultAgentIdentifier);
+}
+
+/**
+ * Keeps configured defaults deterministic while ensuring listed-agent responses
+ * do not point at identifiers absent from the returned descriptor collection.
+ */
+function resolveConfiguredDefaultAgentIdentifier(
+  configuredAgentIds: AgentId[],
+  descriptors: AgentDescriptor[]
+): AgentId | null {
+  if (descriptors.length === 0) {
+    return configuredAgentIds[0] ?? null;
+  }
+
+  const listedAgentIdentifiers = new Set(descriptors.map((descriptor) => descriptor.id));
+  for (const configuredAgentIdentifier of configuredAgentIds) {
+    if (listedAgentIdentifiers.has(configuredAgentIdentifier)) {
+      return configuredAgentIdentifier;
+    }
+  }
+
+  return null;
+}
+
+function logProjectDirectoryListFailure(agentId: AgentId, errorMessage: string): void {
+  logger.warn(
+    {
+      agentId,
+      error: truncateRouteErrorMessage(errorMessage)
+    },
+    AgentRouteLogEventByName.projectDirectoryListFailed
+  );
 }
 
 function truncateRouteErrorMessage(errorMessage: string): string {

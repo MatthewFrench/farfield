@@ -20,6 +20,21 @@ import type {
 import { handleAgentRoutes } from "../Source/Network/Routes/AgentRoutes.js";
 import { logger } from "../Source/Shared/Logging/Logger.js";
 
+const AgentRoutePathnameByName = {
+  listAgents: "/api/agents"
+} as const;
+
+const AgentRouteStatusCodeByName = {
+  successOk: 200
+} as const;
+
+const AgentRouteLogEventByName = {
+  projectDirectoryListFailed: "agent-project-directory-list-failed"
+} as const;
+
+const AgentRouteMaximumLoggedErrorLength = 240;
+const AgentRouteTruncatedErrorSuffix = "...";
+
 const AgentIdentifierSchema = z.union([z.literal("codex"), z.literal("opencode")]);
 
 const AgentCapabilitiesSchema = z
@@ -160,6 +175,10 @@ function readRouteBody(result: AgentRouteExecutionResult): object {
   return result.body;
 }
 
+function parseAgentListResponse(result: AgentRouteExecutionResult) {
+  return AgentListResponseSchema.parse(readRouteBody(result));
+}
+
 async function executeAgentRoute(input: ExecuteAgentRouteInput): Promise<AgentRouteExecutionResult> {
   const { request, response } = createMockRequestResponsePair();
   request.method = input.method ?? "GET";
@@ -191,7 +210,7 @@ describe("handleAgentRoutes", () => {
   it("returns false when list-agents route method does not match", async () => {
     const result = await executeAgentRoute({
       method: "POST",
-      pathname: "/api/agents"
+      pathname: AgentRoutePathnameByName.listAgents
     });
 
     expect(result.handled).toBe(false);
@@ -216,14 +235,14 @@ describe("handleAgentRoutes", () => {
     });
 
     const result = await executeAgentRoute({
-      pathname: "/api/agents",
+      pathname: AgentRoutePathnameByName.listAgents,
       adapters: [codexAdapter, opencodeAdapter],
       configuredAgentIds: ["opencode"]
     });
 
     expect(result.handled).toBe(true);
-    expect(result.statusCode).toBe(200);
-    const parsedResponse = AgentListResponseSchema.parse(readRouteBody(result));
+    expect(result.statusCode).toBe(AgentRouteStatusCodeByName.successOk);
+    const parsedResponse = parseAgentListResponse(result);
     expect(parsedResponse).toEqual({
       ok: true,
       agents: [
@@ -262,6 +281,98 @@ describe("handleAgentRoutes", () => {
     });
   });
 
+  it("returns configured default when no enabled agent exists and configured id is listed", async () => {
+    const codexAdapter = createMockAgentAdapter({
+      id: "codex",
+      enabled: false
+    });
+    const opencodeAdapter = createMockAgentAdapter({
+      id: "opencode",
+      enabled: false
+    });
+
+    const result = await executeAgentRoute({
+      pathname: AgentRoutePathnameByName.listAgents,
+      adapters: [codexAdapter, opencodeAdapter],
+      configuredAgentIds: ["opencode"]
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(AgentRouteStatusCodeByName.successOk);
+    const parsedResponse = parseAgentListResponse(result);
+    expect(parsedResponse.defaultAgentId).toBe("opencode");
+  });
+
+  it("uses first listed descriptor as default when configured id is not listed", async () => {
+    const codexAdapter = createMockAgentAdapter({
+      id: "codex",
+      enabled: false
+    });
+
+    const result = await executeAgentRoute({
+      pathname: AgentRoutePathnameByName.listAgents,
+      adapters: [codexAdapter],
+      configuredAgentIds: ["opencode"]
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(AgentRouteStatusCodeByName.successOk);
+    const parsedResponse = parseAgentListResponse(result);
+    expect(parsedResponse.defaultAgentId).toBe("codex");
+  });
+
+  it("keeps configured default when no adapters are listed", async () => {
+    const result = await executeAgentRoute({
+      pathname: AgentRoutePathnameByName.listAgents,
+      adapters: [],
+      configuredAgentIds: ["opencode"]
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(AgentRouteStatusCodeByName.successOk);
+    const parsedResponse = parseAgentListResponse(result);
+    expect(parsedResponse.agents).toEqual([]);
+    expect(parsedResponse.defaultAgentId).toBe("opencode");
+  });
+
+  it("throws a clear error when no enabled, configured, or listed agent can resolve the default", async () => {
+    await expect(
+      executeAgentRoute({
+        pathname: AgentRoutePathnameByName.listAgents,
+        adapters: [],
+        configuredAgentIds: []
+      })
+    ).rejects.toThrow(
+      "Agent route cannot resolve a default agent identifier from enabled, configured, or listed agents."
+    );
+  });
+
+  it("returns empty project directories without warning when adapter is disconnected", async () => {
+    const listProjectDirectories = vi.fn(async (): Promise<string[]> => ["/workspace/ignored"]);
+    const codexAdapter = createMockAgentAdapter({
+      id: "codex",
+      connected: false,
+      listProjectDirectories
+    });
+    const warningSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+
+    try {
+      const result = await executeAgentRoute({
+        pathname: AgentRoutePathnameByName.listAgents,
+        adapters: [codexAdapter]
+      });
+
+      expect(result.handled).toBe(true);
+      expect(result.statusCode).toBe(AgentRouteStatusCodeByName.successOk);
+      const parsedResponse = parseAgentListResponse(result);
+      expect(parsedResponse.agents[0]?.projectDirectories).toEqual([]);
+      expect(listProjectDirectories).not.toHaveBeenCalled();
+      expect(warningSpy).not.toHaveBeenCalled();
+    } finally {
+      warningSpy.mockRestore();
+    }
+  });
+
   it("keeps response deterministic and logs a warning when listProjectDirectories fails", async () => {
     const longErrorMessage = "project-directory-read-failed ".repeat(60);
     const codexAdapter = createMockAgentAdapter({
@@ -276,14 +387,14 @@ describe("handleAgentRoutes", () => {
     const warningSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     try {
       const result = await executeAgentRoute({
-        pathname: "/api/agents",
+        pathname: AgentRoutePathnameByName.listAgents,
         adapters: [codexAdapter],
         configuredAgentIds: ["codex"]
       });
 
       expect(result.handled).toBe(true);
-      expect(result.statusCode).toBe(200);
-      const parsedResponse = AgentListResponseSchema.parse(readRouteBody(result));
+      expect(result.statusCode).toBe(AgentRouteStatusCodeByName.successOk);
+      const parsedResponse = parseAgentListResponse(result);
       expect(parsedResponse.agents[0]?.projectDirectories).toEqual([]);
 
       expect(warningSpy).toHaveBeenCalledTimes(1);
@@ -292,9 +403,13 @@ describe("handleAgentRoutes", () => {
         throw new Error("Expected logger warning call for listProjectDirectories failure");
       }
       const warningContext = AgentRouteWarningContextSchema.parse(firstWarningCall[0]);
-      expect(firstWarningCall[1]).toBe("agent-project-directory-list-failed");
+      expect(firstWarningCall[1]).toBe(AgentRouteLogEventByName.projectDirectoryListFailed);
       expect(warningContext.agentId).toBe("codex");
       expect(warningContext.error.length).toBeLessThan(longErrorMessage.length);
+      expect(warningContext.error.length).toBe(
+        AgentRouteMaximumLoggedErrorLength + AgentRouteTruncatedErrorSuffix.length
+      );
+      expect(warningContext.error.endsWith(AgentRouteTruncatedErrorSuffix)).toBe(true);
     } finally {
       warningSpy.mockRestore();
     }
