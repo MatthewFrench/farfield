@@ -143,6 +143,29 @@ describe("AppServerClient.listThreads", () => {
     });
   });
 
+  it("preserves explicit empty cursor and cwd values", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      data: [],
+      nextCursor: null
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.listThreads({
+      limit: 50,
+      archived: false,
+      cursor: "",
+      cwd: ""
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/list", {
+      limit: 50,
+      archived: false,
+      cursor: "",
+      cwd: ""
+    });
+  });
+
   it("throws protocol validation errors when list response shape is invalid", async () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
@@ -185,6 +208,30 @@ describe("AppServerClient.listThreadsAll", () => {
       nextCursor: null,
       pages: 1,
       truncated: false
+    });
+  });
+
+  it("preserves explicit empty initial cursor and cwd values", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      data: [createThreadListItem("thread-1")],
+      nextCursor: null
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.listThreadsAll({
+      limit: 1,
+      archived: false,
+      cursor: "",
+      cwd: "",
+      maxPages: 1
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/list", {
+      limit: 1,
+      archived: false,
+      cursor: "",
+      cwd: ""
     });
   });
 

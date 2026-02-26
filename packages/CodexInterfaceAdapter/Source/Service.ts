@@ -117,7 +117,7 @@ function buildTurnStartParams(input: SendMessageInput, trimmedText: string): Tur
     : {
         threadId: input.threadId,
         input: textInput,
-        ...(input.cwd ? { cwd: input.cwd } : {}),
+        ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
         attachments: []
       };
 

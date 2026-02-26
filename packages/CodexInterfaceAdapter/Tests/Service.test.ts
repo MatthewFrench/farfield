@@ -246,6 +246,30 @@ describe("CodexMonitorService", () => {
     );
   });
 
+  it("preserves an explicit empty cwd when no template is available", async () => {
+    const serviceIpcClientDouble = createServiceIpcClientDouble();
+    const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
+
+    await service.sendMessage({
+      threadId: "thread-1",
+      ownerClientId: "client-1",
+      text: "message with explicit empty cwd",
+      cwd: ""
+    });
+
+    expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
+      "thread-follower-start-turn",
+      expect.objectContaining({
+        conversationId: "thread-1",
+        turnStartParams: expect.objectContaining({
+          threadId: "thread-1",
+          cwd: ""
+        })
+      }),
+      expect.any(Object)
+    );
+  });
+
   it("rejects empty message text before sending IPC requests", async () => {
     const serviceIpcClientDouble = createServiceIpcClientDouble();
     const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);

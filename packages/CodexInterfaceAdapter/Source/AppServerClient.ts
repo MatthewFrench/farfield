@@ -120,8 +120,8 @@ function buildListThreadsRequestParameters(
     limit: options.limit,
     archived: options.archived,
     cursor: options.cursor ?? null,
-    ...(options.sortKey ? { sortKey: options.sortKey } : {}),
-    ...(options.cwd ? { cwd: options.cwd } : {})
+    ...(options.sortKey !== undefined ? { sortKey: options.sortKey } : {}),
+    ...(options.cwd !== undefined ? { cwd: options.cwd } : {})
   };
 }
 
@@ -132,9 +132,9 @@ function buildListThreadsAllPageOptions(
   return {
     limit: options.limit,
     archived: options.archived,
-    ...(cursor ? { cursor } : {}),
-    ...(options.sortKey ? { sortKey: options.sortKey } : {}),
-    ...(options.cwd ? { cwd: options.cwd } : {})
+    ...(cursor !== undefined ? { cursor } : {}),
+    ...(options.sortKey !== undefined ? { sortKey: options.sortKey } : {}),
+    ...(options.cwd !== undefined ? { cwd: options.cwd } : {})
   };
 }
 
