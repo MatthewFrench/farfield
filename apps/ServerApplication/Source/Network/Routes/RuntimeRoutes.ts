@@ -13,11 +13,47 @@ import {
   RequestPathnameByName
 } from "../RequestPathContracts.js";
 
+const RuntimeRouteStatusCodeByName = {
+  successOk: 200,
+  clientErrorBadRequest: 400
+} as const;
+
+const RuntimeRouteErrorMessageByName = {
+  invalidEventsSessionBootstrapPayload: "Invalid events session bootstrap payload"
+} as const;
+
+const RuntimeRouteHeaderNameByName = {
+  cookie: "cookie",
+  setCookie: "Set-Cookie"
+} as const;
+
+const RuntimeStateChangedEventType = "runtime-state-changed";
+const EventsSessionBootstrapIssuePathPrefix = "body";
+
 const EventsSessionBootstrapBodySchema = z
   .object({
     apiToken: z.string().trim().min(1).optional()
   })
   .strict();
+
+interface EventsSessionBootstrapBody {
+  apiToken?: string | undefined;
+}
+
+interface EventsSessionBootstrapBodyIssue {
+  path: string;
+  message: string;
+}
+
+type EventsSessionBootstrapBodyParseResult =
+  | {
+    ok: true;
+    body: EventsSessionBootstrapBody;
+  }
+  | {
+    ok: false;
+    issues: EventsSessionBootstrapBodyIssue[];
+  };
 
 export interface RuntimeRouteDependencies {
   req: IncomingMessage;
@@ -33,6 +69,11 @@ export interface RuntimeRouteDependencies {
   jsonResponse: (res: ServerResponse, statusCode: number, body: object) => void;
 }
 
+/**
+ * Owns server runtime-network route dispatch for runtime health/event-stream/session bootstrap.
+ * This owner keeps events-session bootstrap parsing and token resolution deterministic so auth
+ * behavior remains explicit across cookie/session and header/body token inputs.
+ */
 export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promise<boolean> {
   const {
     req,
@@ -51,41 +92,47 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
   if (req.method === RequestMethodByName.get && pathname === RequestPathnameByName.events) {
     const runtimeStateSnapshot = FarfieldHealthStateSchema.parse(runtimeStateOwner.readSnapshot());
     eventStreamClientRegistry.addClient(req, res, {
-      type: "runtime-state-changed",
+      type: RuntimeStateChangedEventType,
       state: runtimeStateSnapshot
     });
     return true;
   }
 
   if (req.method === RequestMethodByName.get && pathname === RequestPathnameByName.apiHealth) {
-    jsonResponse(res, 200, {
+    const runtimeStateSnapshot = FarfieldHealthStateSchema.parse(runtimeStateOwner.readSnapshot());
+    jsonResponse(res, RuntimeRouteStatusCodeByName.successOk, {
       ok: true,
-      state: runtimeStateOwner.readSnapshot()
+      state: runtimeStateSnapshot
     });
     return true;
   }
 
   if (req.method === RequestMethodByName.post && pathname === RequestPathnameByName.apiEventsSession) {
-    const currentSession = browserSessionAuthOwner.readSession(readHeaderValue(req, "cookie"));
+    const currentSession = browserSessionAuthOwner.readSession(
+      readHeaderValue(req, RuntimeRouteHeaderNameByName.cookie)
+    );
     let bootstrapped = !apiAuthRequired || currentSession.authenticated;
     let expiresAt = currentSession.expiresAt;
 
     if (!bootstrapped && apiAuthRequired) {
-      const parsedBody = EventsSessionBootstrapBodySchema.safeParse(await readJsonBody(req));
-      if (!parsedBody.success) {
-        jsonResponse(res, 400, {
+      const parsedBody = parseEventsSessionBootstrapBody(await readJsonBody(req));
+      if (!parsedBody.ok) {
+        jsonResponse(res, RuntimeRouteStatusCodeByName.clientErrorBadRequest, {
           ok: false,
-          error: "Invalid events session bootstrap payload"
+          error: RuntimeRouteErrorMessageByName.invalidEventsSessionBootstrapPayload,
+          issues: parsedBody.issues
         });
         return true;
       }
 
-      const providedHeaderToken = normalizeOptionalHeaderValue(readHeaderValue(req, apiTokenHeaderName));
-      const providedBodyToken = parsedBody.data.apiToken ?? null;
-      const providedToken = providedHeaderToken ?? providedBodyToken;
+      const providedToken = resolveEventsSessionBootstrapToken(
+        req,
+        apiTokenHeaderName,
+        parsedBody.body.apiToken
+      );
       if (providedToken && providedToken === apiToken) {
         const issuedSession = browserSessionAuthOwner.issueSessionCookie();
-        res.setHeader("Set-Cookie", issuedSession.setCookieHeaderValue);
+        res.setHeader(RuntimeRouteHeaderNameByName.setCookie, issuedSession.setCookieHeaderValue);
         bootstrapped = true;
         expiresAt = issuedSession.expiresAt;
       }
@@ -97,11 +144,47 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
       bootstrapped,
       expiresAt: bootstrapped ? expiresAt : null
     });
-    jsonResponse(res, 200, response);
+    jsonResponse(res, RuntimeRouteStatusCodeByName.successOk, response);
     return true;
   }
 
   return false;
+}
+
+function parseEventsSessionBootstrapBody(value: JsonValue): EventsSessionBootstrapBodyParseResult {
+  const parsedBody = EventsSessionBootstrapBodySchema.safeParse(value);
+  if (parsedBody.success) {
+    return {
+      ok: true,
+      body: parsedBody.data
+    };
+  }
+
+  return {
+    ok: false,
+    issues: parsedBody.error.issues.map((issue) => ({
+      path: buildEventsSessionBootstrapIssuePath(issue.path),
+      message: issue.message
+    }))
+  };
+}
+
+function buildEventsSessionBootstrapIssuePath(pathSegments: readonly (string | number)[]): string {
+  if (pathSegments.length === 0) {
+    return EventsSessionBootstrapIssuePathPrefix;
+  }
+  return `${EventsSessionBootstrapIssuePathPrefix}.${pathSegments.map((segment) => String(segment)).join(".")}`;
+}
+
+function resolveEventsSessionBootstrapToken(
+  req: IncomingMessage,
+  apiTokenHeaderName: string,
+  bodyApiToken: string | undefined
+): string | null {
+  // Header token stays authoritative so trusted proxy headers override request-body values.
+  const providedHeaderToken = normalizeOptionalHeaderValue(readHeaderValue(req, apiTokenHeaderName));
+  const providedBodyToken = bodyApiToken ?? null;
+  return providedHeaderToken ?? providedBodyToken;
 }
 
 function readHeaderValue(req: IncomingMessage, name: string): string | null {
