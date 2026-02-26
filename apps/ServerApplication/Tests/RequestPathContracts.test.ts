@@ -42,6 +42,8 @@ describe("RequestPathContracts", () => {
     expect(readPathnameForRequestMetricsFromRequestUrl(undefined)).toBe(
       RequestPathnameByName.missingRequestUrl
     );
+    expect(readPathnameForRequestMetricsFromRequestUrl("")).toBe(RequestPathnameByName.root);
+    expect(readPathnameForRequestMetricsFromRequestUrl("   ")).toBe(RequestPathnameByName.root);
     expect(readPathnameForRequestMetricsFromRequestUrl("/api/events/session?token=abc")).toBe(
       "/api/events/session"
     );
@@ -60,6 +62,7 @@ describe("RequestPathContracts", () => {
       "client-errors",
       "session-log"
     ]);
+    expect(readPathSegmentsFromPathname("https://[invalid")).toEqual(["malformed-request-url"]);
     expect(readPathSegmentsFromPathname(RequestPathnameByName.root)).toEqual([]);
   });
 
@@ -101,6 +104,56 @@ describe("RequestPathContracts", () => {
       port: 4311
     });
     expect(malformedResult.status).toBe(
+      RequestUrlPathnameParseStatusByName.malformedRequestUrl
+    );
+  });
+
+  it("parses absolute request urls into deterministic normalized route segments", () => {
+    const resolvedAbsoluteResult = parseRequestUrlPathname({
+      requestUrl: "https://example.test/api/debug/history/entry_1?limit=5#fragment",
+      host: "localhost",
+      port: 4311
+    });
+    expect(resolvedAbsoluteResult.status).toBe(RequestUrlPathnameParseStatusByName.resolved);
+    if (resolvedAbsoluteResult.status !== RequestUrlPathnameParseStatusByName.resolved) {
+      throw new Error("Expected absolute request URL parsing to resolve to a normalized pathname");
+    }
+
+    expect(resolvedAbsoluteResult.pathname).toBe("/api/debug/history/entry_1");
+    expect(resolvedAbsoluteResult.pathSegments).toEqual([
+      "api",
+      "debug",
+      "history",
+      "entry_1"
+    ]);
+    expect(resolvedAbsoluteResult.url.pathname).toBe("/api/debug/history/entry_1");
+  });
+
+  it("rejects malformed parse-input contracts with deterministic malformed status", () => {
+    const malformedHostResult = parseRequestUrlPathname({
+      requestUrl: "/api/events/session",
+      host: "",
+      port: 4311
+    });
+    expect(malformedHostResult.status).toBe(
+      RequestUrlPathnameParseStatusByName.malformedRequestUrl
+    );
+
+    const malformedPortRangeResult = parseRequestUrlPathname({
+      requestUrl: "/api/events/session",
+      host: "localhost",
+      port: 70_000
+    });
+    expect(malformedPortRangeResult.status).toBe(
+      RequestUrlPathnameParseStatusByName.malformedRequestUrl
+    );
+
+    const malformedPortNumberResult = parseRequestUrlPathname({
+      requestUrl: "/api/events/session",
+      host: "localhost",
+      port: Number.NaN
+    });
+    expect(malformedPortNumberResult.status).toBe(
       RequestUrlPathnameParseStatusByName.malformedRequestUrl
     );
   });

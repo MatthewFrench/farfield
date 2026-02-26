@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 const QUERY_SEPARATOR = "?";
 const HASH_SEPARATOR = "#";
 const ABSOLUTE_URL_PREFIX_PATTERN = /^[A-Za-z][A-Za-z\d+.-]*:\/\//u;
@@ -5,6 +7,20 @@ const ROOT_ONLY_PATHNAME_PATTERN = /^\/+$/u;
 const REQUEST_BASE_URL_PROTOCOL = "http";
 const REQUEST_BASE_URL_PROTOCOL_SEPARATOR = "://";
 const REQUEST_BASE_URL_PORT_SEPARATOR = ":";
+const REQUEST_PORT_MINIMUM = 0;
+const REQUEST_PORT_MAXIMUM = 65_535;
+
+const RequestUrlForRequestMetricsSchema = z.string();
+
+/**
+ * Owns request-path parse input validation for Node request-url and runtime host/port values so malformed
+ * boundary inputs collapse into one deterministic malformed-path classification.
+ */
+const RequestUrlPathnameParseInputSchema = z.object({
+  requestUrl: z.string(),
+  host: z.string().min(1),
+  port: z.number().int().min(REQUEST_PORT_MINIMUM).max(REQUEST_PORT_MAXIMUM)
+}).strict();
 
 /**
  * Owns request method/path literals and path normalization used by request-routing and
@@ -104,27 +120,30 @@ export function normalizePathnameForRequestMetrics(pathnameOrRequestUrl: string)
 export function readPathnameForRequestMetricsFromRequestUrl(
   requestUrl: string | undefined
 ): string {
-  if (typeof requestUrl !== "string") {
+  const requestUrlParseResult = RequestUrlForRequestMetricsSchema.safeParse(requestUrl);
+  if (!requestUrlParseResult.success) {
     return RequestPathnameByName.missingRequestUrl;
   }
-  return normalizePathnameForRequestMetrics(requestUrl);
+
+  return normalizePathnameForRequestMetrics(requestUrlParseResult.data);
 }
 
 export function readPathSegmentsFromPathname(pathname: string): string[] {
   const normalizedPathname = normalizePathnameForRequestMetrics(pathname);
-  if (normalizedPathname === RequestPathnameByName.root) {
-    return [];
-  }
-
-  return normalizedPathname
-    .split(REQUEST_PATH_SEGMENT_SEPARATOR)
-    .filter((segment) => segment.length > 0);
+  return readPathSegmentsFromNormalizedPathname(normalizedPathname);
 }
 
 export function parseRequestUrlPathname(
   input: RequestUrlPathnameParseInput
 ): RequestUrlPathnameParseResult {
-  const url = readUrlFromRequestPathnameParseInput(input);
+  const inputParseResult = RequestUrlPathnameParseInputSchema.safeParse(input);
+  if (!inputParseResult.success) {
+    return {
+      status: RequestUrlPathnameParseStatusByName.malformedRequestUrl
+    };
+  }
+
+  const url = readUrlFromRequestPathnameParseInput(inputParseResult.data);
   if (url === null) {
     return {
       status: RequestUrlPathnameParseStatusByName.malformedRequestUrl
@@ -136,7 +155,7 @@ export function parseRequestUrlPathname(
     status: RequestUrlPathnameParseStatusByName.resolved,
     url,
     pathname,
-    pathSegments: readPathSegmentsFromPathname(pathname)
+    pathSegments: readPathSegmentsFromNormalizedPathname(pathname)
   };
 }
 
@@ -171,6 +190,16 @@ function normalizePathnameCandidate(pathnameCandidate: string): string {
   return `${REQUEST_PATH_SEGMENT_SEPARATOR}${pathnameWithoutSuffix}`;
 }
 
+function readPathSegmentsFromNormalizedPathname(normalizedPathname: string): string[] {
+  if (normalizedPathname === RequestPathnameByName.root) {
+    return [];
+  }
+
+  return normalizedPathname
+    .split(REQUEST_PATH_SEGMENT_SEPARATOR)
+    .filter((segment) => segment.length > 0);
+}
+
 interface AbsoluteUrlPathnameResolution {
   isAbsoluteUrl: boolean;
   pathname: string | null;
@@ -201,7 +230,9 @@ function isAbsoluteUrlValue(urlValue: string): boolean {
   return ABSOLUTE_URL_PREFIX_PATTERN.test(urlValue);
 }
 
-function readUrlFromRequestPathnameParseInput(input: RequestUrlPathnameParseInput): URL | null {
+function readUrlFromRequestPathnameParseInput(
+  input: RequestUrlPathnameParseInput
+): URL | null {
   try {
     return new URL(input.requestUrl, readRequestBaseUrl(input.host, input.port));
   } catch {
