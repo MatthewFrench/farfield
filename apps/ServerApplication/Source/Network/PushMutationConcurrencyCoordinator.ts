@@ -5,6 +5,17 @@ export interface PushMutationConcurrencyCoordinatorStatistics {
   hasInFlightOperation: boolean;
 }
 
+const MINIMUM_PENDING_EXECUTION_COUNT = 0;
+
+interface QueuedExecution {
+  previousTail: Promise<void>;
+  releaseCurrentTail: () => void;
+}
+
+/**
+ * Owns process-wide serialization for push mutation operations.
+ * Invariant: at most one operation executes at a time, and queued operations continue even after failures.
+ */
 export class PushMutationConcurrencyCoordinator {
   private executionTail: Promise<void>;
   private pendingExecutionCount: number;
@@ -23,18 +34,10 @@ export class PushMutationConcurrencyCoordinator {
   public async runExclusive<ResultType>(
     operation: () => Promise<ResultType>
   ): Promise<ResultType> {
-    this.queuedExecutionCount += 1;
-    this.pendingExecutionCount += 1;
-
-    const previousTail = this.executionTail;
-    let releaseCurrentTail: () => void = () => {};
-    const currentTail = new Promise<void>((resolve) => {
-      releaseCurrentTail = resolve;
-    });
-    this.executionTail = previousTail.then(() => currentTail);
-
-    await previousTail;
+    this.recordQueuedExecution();
+    const queuedExecution = this.enqueueExecution();
     try {
+      await queuedExecution.previousTail;
       const result = await operation();
       this.completedExecutionCount += 1;
       return result;
@@ -42,8 +45,7 @@ export class PushMutationConcurrencyCoordinator {
       this.failedExecutionCount += 1;
       throw error;
     } finally {
-      this.pendingExecutionCount = Math.max(0, this.pendingExecutionCount - 1);
-      releaseCurrentTail();
+      this.finishQueuedExecution(queuedExecution);
     }
   }
 
@@ -54,5 +56,36 @@ export class PushMutationConcurrencyCoordinator {
       failedExecutionCount: this.failedExecutionCount,
       hasInFlightOperation: this.pendingExecutionCount > 0
     };
+  }
+
+  private recordQueuedExecution(): void {
+    this.queuedExecutionCount += 1;
+    this.pendingExecutionCount += 1;
+  }
+
+  private enqueueExecution(): QueuedExecution {
+    const previousTail = this.executionTail;
+    let releaseCurrentTail: () => void = () => {};
+    const currentTail = new Promise<void>((resolve) => {
+      releaseCurrentTail = resolve;
+    });
+    // Keep the queue moving even if a prior tail unexpectedly rejects.
+    this.executionTail = previousTail.then(
+      () => currentTail,
+      () => currentTail
+    );
+
+    return {
+      previousTail,
+      releaseCurrentTail
+    };
+  }
+
+  private finishQueuedExecution(queuedExecution: QueuedExecution): void {
+    this.pendingExecutionCount = Math.max(
+      MINIMUM_PENDING_EXECUTION_COUNT,
+      this.pendingExecutionCount - 1
+    );
+    queuedExecution.releaseCurrentTail();
   }
 }
