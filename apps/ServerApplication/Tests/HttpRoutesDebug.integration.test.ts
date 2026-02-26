@@ -1,4 +1,5 @@
 import { CreateDebugClientErrorBodySchema } from "@farfield/protocol";
+import { z } from "zod";
 import {
   afterAll,
   beforeAll,
@@ -25,6 +26,8 @@ const DebugRoutePathPrefix = "/api/debug";
 const DebugHistoryRoutePathPrefix = "/api/debug/history";
 const DebugHistoryRouteWithTrailingSlashPath = "/api/debug/history/";
 const DebugHistoryRouteExtraSegmentPath = "/api/debug/history/history_missing/extra";
+const DebugReplayRoutePath = "/api/debug/replay";
+const DebugReplayRouteWithExtraSegmentPath = "/api/debug/replay/extra";
 const DebugTraceRoutePathPrefix = "/api/debug/trace";
 const DebugObservabilityRoutePath = "/api/debug/observability";
 const DebugTraceRouteWithoutDownloadPath = "/api/debug/trace/trace_missing";
@@ -40,7 +43,28 @@ const EncodedPathSeparatorIdentifier = "%2F";
 const InvalidClientErrorIdentifierErrorMessage = "Invalid client error identifier";
 const InvalidHistoryEntryIdentifierErrorMessage = "Invalid history entry identifier";
 const InvalidTraceIdentifierErrorMessage = "Invalid trace identifier";
+const CodexAdapterNotEnabledErrorMessage = "Codex adapter is not enabled";
+const DesktopIpcNotConnectedErrorMessage = "Desktop IPC is not connected";
+const InvalidReplayFramePayloadErrorPrefix = "Invalid replay frame payload";
 const NotFoundErrorMessage = "Not found";
+
+const DebugHistoryEnvelopeForReplaySchema = z
+  .object({
+    ok: z.literal(true),
+    history: z.array(
+      z
+        .object({
+          id: z.string().min(1)
+        })
+        .passthrough()
+    )
+  })
+  .strict();
+
+interface ReplayBodyContract {
+  entryId: string;
+  waitForResponse: boolean;
+}
 
 async function expectApiErrorResponse(
   response: Response,
@@ -58,6 +82,43 @@ function buildDebugClientErrorListRouteUrl(
   const url = new URL(integrationEnvironment.buildApiRouteUrl(DebugClientErrorsRoutePath));
   url.searchParams.set("limit", String(DebugClientErrorsListLimit));
   return url.toString();
+}
+
+async function postReplayRequest(
+  integrationEnvironment: HttpRoutesIntegrationEnvironment,
+  authHeaders: Record<string, string>,
+  body: ReplayBodyContract
+): Promise<Response> {
+  return fetch(
+    integrationEnvironment.buildApiRouteUrl(DebugReplayRoutePath),
+    {
+      method: "POST",
+      headers: {
+        ...authHeaders,
+        [JsonContentTypeHeaderName]: JsonContentTypeHeaderValue
+      },
+      body: JSON.stringify(body)
+    }
+  );
+}
+
+async function readHistoryEntryIdentifierForReplay(
+  integrationEnvironment: HttpRoutesIntegrationEnvironment,
+  authHeaders: Record<string, string>
+): Promise<string> {
+  const response = await fetch(
+    integrationEnvironment.buildApiRouteUrl(`${DebugHistoryRoutePathPrefix}?limit=1`),
+    {
+      headers: authHeaders
+    }
+  );
+  expect(response.status).toBe(200);
+  const payload = DebugHistoryEnvelopeForReplaySchema.parse(await response.json());
+  const replayHistoryEntry = payload.history[0];
+  if (!replayHistoryEntry) {
+    throw new Error("Expected at least one debug history entry for replay route integration checks");
+  }
+  return replayHistoryEntry.id;
 }
 
 describe("server route integration debug routes", () => {
@@ -245,6 +306,37 @@ describe("server route integration debug routes", () => {
     expect(payload.snapshot.performance.requestRouting.requestLifecycleEvents.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("returns deterministic replay-route contracts across adapter-unready and replay-parse states", async () => {
+    const authHeaders = integrationEnvironment.readAuthHeaders();
+    const replayHistoryEntryIdentifier = await readHistoryEntryIdentifierForReplay(
+      integrationEnvironment,
+      authHeaders
+    );
+
+    const replayResponse = await postReplayRequest(integrationEnvironment, authHeaders, {
+      entryId: replayHistoryEntryIdentifier,
+      waitForResponse: false
+    });
+    const replayError = ApiErrorEnvelopeSchema.parse(await replayResponse.json());
+
+    if (replayResponse.status === 503) {
+      expect(
+        replayError.error === DesktopIpcNotConnectedErrorMessage
+        || replayError.error === CodexAdapterNotEnabledErrorMessage
+      ).toBe(true);
+      return;
+    }
+
+    if (replayResponse.status === 409) {
+      expect(replayError.error.startsWith(InvalidReplayFramePayloadErrorPrefix)).toBe(true);
+      return;
+    }
+
+    throw new Error(
+      `Expected replay route error status 503 or 409, received ${String(replayResponse.status)}`
+    );
+  });
+
   it("returns deterministic 404 contracts for unowned and near-match debug routes", async () => {
     const authHeaders = integrationEnvironment.readAuthHeaders();
 
@@ -277,6 +369,14 @@ describe("server route integration debug routes", () => {
       }
     );
     await expectApiErrorResponse(extraHistoryEntrySegmentResponse, 404, NotFoundErrorMessage);
+
+    const extraReplaySegmentResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(DebugReplayRouteWithExtraSegmentPath),
+      {
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(extraReplaySegmentResponse, 404, NotFoundErrorMessage);
 
     const missingTraceDownloadSegmentResponse = await fetch(
       integrationEnvironment.buildApiRouteUrl(DebugTraceRouteWithoutDownloadPath),

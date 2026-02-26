@@ -2,6 +2,7 @@ import { type SendRequestOptions } from "@farfield/api";
 import { parseReplayBody } from "../RequestSchemas/HttpSchemas.js";
 import {
   buildSendRequestOptions,
+  DebugReplayFrameParseError,
   DebugReplayFrameTypeByName,
   DebugRouteMethodByName,
   DebugRoutePathnameByName,
@@ -9,6 +10,22 @@ import {
   type ParsedReplayFrame
 } from "./DebugRouteContracts.js";
 import { parseReplayFrame } from "./DebugReplayFrameParser.js";
+
+const DebugReplayRouteStatusCodeByName = {
+  successOk: 200,
+  clientErrorNotFound: 404,
+  clientErrorConflict: 409,
+  serverErrorServiceUnavailable: 503
+} as const;
+
+const DebugReplayRouteErrorMessageByName = {
+  codexAdapterNotEnabled: "Codex adapter is not enabled",
+  desktopIpcNotConnected: "Desktop IPC is not connected",
+  historyEntryNotFound: "History entry not found",
+  historyPayloadNotFound: "History payload not found"
+} as const;
+
+const ReplayRequestFailedSystemMessage = "Replay request failed";
 
 export class DebugReplayRouteOwner {
   private readonly dependencies: DebugRouteDependencies;
@@ -35,17 +52,18 @@ export class DebugReplayRouteOwner {
     }
 
     if (!codexAdapter) {
-      jsonResponse(res, 503, {
+      jsonResponse(res, DebugReplayRouteStatusCodeByName.serverErrorServiceUnavailable, {
         ok: false,
-        error: "Codex adapter is not enabled"
+        error: DebugReplayRouteErrorMessageByName.codexAdapterNotEnabled
       });
       return true;
     }
 
     if (!codexAdapter.isIpcReady()) {
-      jsonResponse(res, 503, {
+      jsonResponse(res, DebugReplayRouteStatusCodeByName.serverErrorServiceUnavailable, {
         ok: false,
-        error: codexAdapter.getRuntimeState().lastError ?? "Desktop IPC is not connected"
+        error: codexAdapter.getRuntimeState().lastError
+          ?? DebugReplayRouteErrorMessageByName.desktopIpcNotConnected
       });
       return true;
     }
@@ -53,15 +71,18 @@ export class DebugReplayRouteOwner {
     const body = parseReplayBody(await readJsonBody(req));
     const entry = activityHistoryService.readHistoryEntries().find((item) => item.id === body.entryId);
     if (!entry) {
-      jsonResponse(res, 404, { ok: false, error: "History entry not found" });
+      jsonResponse(res, DebugReplayRouteStatusCodeByName.clientErrorNotFound, {
+        ok: false,
+        error: DebugReplayRouteErrorMessageByName.historyEntryNotFound
+      });
       return true;
     }
 
     const replayPayload = activityHistoryService.readHistoryById().get(entry.id);
     if (replayPayload === undefined) {
-      jsonResponse(res, 409, {
+      jsonResponse(res, DebugReplayRouteStatusCodeByName.clientErrorConflict, {
         ok: false,
-        error: "History payload not found"
+        error: DebugReplayRouteErrorMessageByName.historyPayloadNotFound
       });
       return true;
     }
@@ -70,11 +91,16 @@ export class DebugReplayRouteOwner {
     try {
       frame = parseReplayFrame(replayPayload);
     } catch (error) {
-      jsonResponse(res, 409, {
-        ok: false,
-        error: toErrorMessage(error)
-      });
-      return true;
+      // Replay-frame parse failures are a deterministic contract error, not a generic transport failure.
+      if (error instanceof DebugReplayFrameParseError) {
+        jsonResponse(res, DebugReplayRouteStatusCodeByName.clientErrorConflict, {
+          ok: false,
+          error: error.message
+        });
+        return true;
+      }
+
+      throw error;
     }
 
     const options: SendRequestOptions = buildSendRequestOptions(frame);
@@ -84,7 +110,7 @@ export class DebugReplayRouteOwner {
 
       if (body.waitForResponse) {
         const response = await replayPromise;
-        jsonResponse(res, 200, {
+        jsonResponse(res, DebugReplayRouteStatusCodeByName.successOk, {
           ok: true,
           replayed: true,
           response
@@ -93,13 +119,13 @@ export class DebugReplayRouteOwner {
       }
 
       void replayPromise.catch((error) => {
-        pushSystem("Replay request failed", {
+        pushSystem(ReplayRequestFailedSystemMessage, {
           error: toErrorMessage(error),
           entryId: entry.id
         });
       });
 
-      jsonResponse(res, 200, {
+      jsonResponse(res, DebugReplayRouteStatusCodeByName.successOk, {
         ok: true,
         replayed: true,
         queued: true
@@ -108,7 +134,7 @@ export class DebugReplayRouteOwner {
     }
 
     codexAdapter.replayBroadcast(frame.method, frame.params, options);
-    jsonResponse(res, 200, { ok: true, replayed: true });
+    jsonResponse(res, DebugReplayRouteStatusCodeByName.successOk, { ok: true, replayed: true });
     return true;
   }
 }
