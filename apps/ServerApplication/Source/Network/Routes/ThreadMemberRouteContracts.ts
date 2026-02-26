@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { type JsonValue } from "@farfield/protocol";
+import { z } from "zod";
 import type { CodexAgentAdapter } from "../../Agents/Adapters/CodexAgentAdapter.js";
 import type { AgentAdapter, AgentId } from "../../Agents/Types.js";
 import type { ThreadConcurrencyCoordinator } from "../ThreadConcurrencyCoordinator.js";
@@ -33,13 +34,42 @@ export const ThreadMemberRouteSegmentCountByName = {
 } as const;
 
 export const ThreadMemberMutationActionByName = {
-  messages: "messages",
+  messages: ThreadMemberRouteSegmentByName.messages,
   threadArchive: "thread-archive",
   threadUnarchive: "thread-unarchive",
-  collaborationMode: "collaboration-mode",
-  userInput: "user-input",
-  interrupt: "interrupt"
+  collaborationMode: ThreadMemberRouteSegmentByName.collaborationMode,
+  userInput: ThreadMemberRouteSegmentByName.userInput,
+  interrupt: ThreadMemberRouteSegmentByName.interrupt
 } as const;
+
+const ThreadMemberSubresourceRouteSegmentSchema = z.enum([
+  ThreadMemberRouteSegmentByName.liveState,
+  ThreadMemberRouteSegmentByName.streamEvents,
+  ThreadMemberRouteSegmentByName.messages,
+  ThreadMemberRouteSegmentByName.archive,
+  ThreadMemberRouteSegmentByName.unarchive,
+  ThreadMemberRouteSegmentByName.collaborationMode,
+  ThreadMemberRouteSegmentByName.userInput,
+  ThreadMemberRouteSegmentByName.interrupt
+]);
+
+type ThreadMemberSubresourceRouteSegment =
+  | typeof ThreadMemberRouteSegmentByName.liveState
+  | typeof ThreadMemberRouteSegmentByName.streamEvents
+  | typeof ThreadMemberRouteSegmentByName.messages
+  | typeof ThreadMemberRouteSegmentByName.archive
+  | typeof ThreadMemberRouteSegmentByName.unarchive
+  | typeof ThreadMemberRouteSegmentByName.collaborationMode
+  | typeof ThreadMemberRouteSegmentByName.userInput
+  | typeof ThreadMemberRouteSegmentByName.interrupt;
+
+const ThreadMemberSubresourceRouteSegmentsSchema = z
+  .tuple([
+    z.literal(ThreadMemberRouteSegmentByName.api),
+    z.literal(ThreadMemberRouteSegmentByName.threads),
+    z.string().min(1),
+    ThreadMemberSubresourceRouteSegmentSchema
+  ]);
 
 export type ResolvedThreadAdapterResult =
   | { ok: true; adapter: AgentAdapter; agentId: AgentId }
@@ -79,10 +109,12 @@ export interface ThreadMemberResolvedRouteContext {
 // Canonical thread-member subresource matching keeps nested paths from mutating unrelated routes.
 export function isThreadMemberSubresourceRoute(
   segments: readonly string[],
-  subresource: string
+  subresource: ThreadMemberSubresourceRouteSegment
 ): boolean {
-  return (
-    segments.length === ThreadMemberRouteSegmentCountByName.threadSubresource
-    && segments[ThreadMemberRouteSegmentIndexByName.threadSubresource] === subresource
-  );
+  const parsedSegments = ThreadMemberSubresourceRouteSegmentsSchema.safeParse(segments);
+  if (!parsedSegments.success) {
+    return false;
+  }
+
+  return parsedSegments.data[ThreadMemberRouteSegmentIndexByName.threadSubresource] === subresource;
 }

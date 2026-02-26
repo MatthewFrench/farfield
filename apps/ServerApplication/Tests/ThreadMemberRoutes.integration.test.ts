@@ -23,6 +23,8 @@ import type {
 } from "../Source/Agents/Types.js";
 import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 import {
+  isThreadMemberSubresourceRoute,
+  ThreadMemberRouteMethodByName,
   ThreadMemberRouteSegmentByName,
   type ThreadMemberRouteDependencies
 } from "../Source/Network/Routes/ThreadMemberRouteContracts.js";
@@ -36,6 +38,7 @@ const NestedMessagesPathThreadIdentifier = "thread_nested_messages_path";
 const InvalidThreadIdentifierSegment = "%E0%A4%A";
 const ActionErrorIdentifier = "action-error-id";
 const MessageBodyText = "hello";
+const NestedRouteTailSegment = "extra";
 
 const defaultCapabilities: AgentCapabilities = {
   canListModels: false,
@@ -214,9 +217,45 @@ function createAdapter(
 }
 
 describe("ThreadMemberRoutes integration", () => {
+  it("matches only canonical thread-member subresource routes", () => {
+    expect(
+      isThreadMemberSubresourceRoute(
+        createRouteSegments(SingleOwnerThreadIdentifier, ThreadMemberRouteSegmentByName.messages),
+        ThreadMemberRouteSegmentByName.messages
+      )
+    ).toBe(true);
+    expect(
+      isThreadMemberSubresourceRoute(
+        [
+          "not-api",
+          ThreadMemberRouteSegmentByName.threads,
+          SingleOwnerThreadIdentifier,
+          ThreadMemberRouteSegmentByName.messages
+        ],
+        ThreadMemberRouteSegmentByName.messages
+      )
+    ).toBe(false);
+    expect(
+      isThreadMemberSubresourceRoute(
+        createRouteSegments("", ThreadMemberRouteSegmentByName.messages),
+        ThreadMemberRouteSegmentByName.messages
+      )
+    ).toBe(false);
+    expect(
+      isThreadMemberSubresourceRoute(
+        createRouteSegments(
+          SingleOwnerThreadIdentifier,
+          ThreadMemberRouteSegmentByName.messages,
+          NestedRouteTailSegment
+        ),
+        ThreadMemberRouteSegmentByName.messages
+      )
+    ).toBe(false);
+  });
+
   it("returns 409 when unregistered thread discovery matches multiple adapters", async () => {
     const { request, response } = createMockRequestResponsePair();
-    request.method = "GET";
+    request.method = ThreadMemberRouteMethodByName.get;
 
     const codexAdapter = createAdapter("codex", async (input) => {
       if (input.threadId !== AmbiguousThreadIdentifier) {
@@ -261,7 +300,7 @@ describe("ThreadMemberRoutes integration", () => {
 
   it("returns 200 when unregistered thread discovery resolves to one adapter", async () => {
     const { request, response } = createMockRequestResponsePair();
-    request.method = "GET";
+    request.method = ThreadMemberRouteMethodByName.get;
 
     const readThreadIncludeTurnsValues: boolean[] = [];
     const codexAdapter = createAdapter("codex", async (input) => {
@@ -302,7 +341,7 @@ describe("ThreadMemberRoutes integration", () => {
 
   it("returns 400 and does not resolve adapter when thread identifier decoding fails", async () => {
     const { request, response } = createMockRequestResponsePair();
-    request.method = "GET";
+    request.method = ThreadMemberRouteMethodByName.get;
 
     const resolveAdapterForThread = vi.fn<
       ThreadMemberRouteDependencies["resolveAdapterForThread"]
@@ -335,7 +374,7 @@ describe("ThreadMemberRoutes integration", () => {
 
   it("does not treat nested messages paths as send-message mutation endpoints", async () => {
     const { request, response } = createMockRequestResponsePair();
-    request.method = "POST";
+    request.method = ThreadMemberRouteMethodByName.post;
 
     const sentMessages: AgentSendMessageInput[] = [];
     const codexAdapter = createAdapter(
@@ -362,12 +401,12 @@ describe("ThreadMemberRoutes integration", () => {
       createRouteSegments(
         NestedMessagesPathThreadIdentifier,
         ThreadMemberRouteSegmentByName.messages,
-        "extra"
+        NestedRouteTailSegment
       ),
       createThreadRouteUrl(
         NestedMessagesPathThreadIdentifier,
         ThreadMemberRouteSegmentByName.messages,
-        "extra"
+        NestedRouteTailSegment
       ),
       resolveAdapterForThread,
       async () => ({
