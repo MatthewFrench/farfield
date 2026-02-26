@@ -29,6 +29,27 @@ const RuntimeRouteHeaderNameByName = {
 
 const RuntimeStateChangedEventType = "runtime-state-changed";
 const EventsSessionBootstrapIssuePathPrefix = "body";
+const RuntimeRouteHeaderLookupNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((value) => value.toLowerCase());
+const RuntimeRouteHeaderValueListSchema = z
+  .union([z.string(), z.array(z.string())])
+  .transform((value) => (Array.isArray(value) ? value : [value]));
+const EventsSessionBootstrapBodyIssueSchema = z
+  .object({
+    path: z.string(),
+    message: z.string()
+  })
+  .strict();
+const InvalidEventsSessionBootstrapResponseSchema = z
+  .object({
+    ok: z.literal(false),
+    error: z.literal(RuntimeRouteErrorMessageByName.invalidEventsSessionBootstrapPayload),
+    issues: z.array(EventsSessionBootstrapBodyIssueSchema)
+  })
+  .strict();
 
 const EventsSessionBootstrapBodySchema = z
   .object({
@@ -117,10 +138,13 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
     if (!bootstrapped && apiAuthRequired) {
       const parsedBody = parseEventsSessionBootstrapBody(await readJsonBody(req));
       if (!parsedBody.ok) {
-        jsonResponse(res, RuntimeRouteStatusCodeByName.clientErrorBadRequest, {
+        const invalidResponse = InvalidEventsSessionBootstrapResponseSchema.parse({
           ok: false,
           error: RuntimeRouteErrorMessageByName.invalidEventsSessionBootstrapPayload,
           issues: parsedBody.issues
+        });
+        jsonResponse(res, RuntimeRouteStatusCodeByName.clientErrorBadRequest, {
+          ...invalidResponse
         });
         return true;
       }
@@ -182,20 +206,32 @@ function resolveEventsSessionBootstrapToken(
   bodyApiToken: string | undefined
 ): string | null {
   // Header token stays authoritative so trusted proxy headers override request-body values.
-  const providedHeaderToken = normalizeOptionalHeaderValue(readHeaderValue(req, apiTokenHeaderName));
+  const providedHeaderToken = readHeaderValue(req, apiTokenHeaderName);
   const providedBodyToken = bodyApiToken ?? null;
   return providedHeaderToken ?? providedBodyToken;
 }
 
 function readHeaderValue(req: IncomingMessage, name: string): string | null {
-  const raw = req.headers[name.toLowerCase()];
-  if (typeof raw === "string") {
-    return raw;
+  const parsedHeaderLookupName = RuntimeRouteHeaderLookupNameSchema.safeParse(name);
+  if (!parsedHeaderLookupName.success) {
+    return null;
   }
-  if (Array.isArray(raw)) {
-    const first = raw[0];
-    return typeof first === "string" ? first : null;
+
+  const parsedHeaderValueList = RuntimeRouteHeaderValueListSchema.safeParse(
+    req.headers[parsedHeaderLookupName.data]
+  );
+  if (!parsedHeaderValueList.success) {
+    return null;
   }
+
+  // Repeated headers may include blank artifacts; first non-empty value is authoritative.
+  for (const rawHeaderValue of parsedHeaderValueList.data) {
+    const normalizedHeaderValue = normalizeOptionalHeaderValue(rawHeaderValue);
+    if (normalizedHeaderValue) {
+      return normalizedHeaderValue;
+    }
+  }
+
   return null;
 }
 

@@ -230,6 +230,26 @@ describe("RuntimeRoutes", () => {
     expect(parsedEnvelope.issues.some((issue) => issue.path === "body.apiToken")).toBe(true);
   });
 
+  it("returns root body issue path for non-object events-session bootstrap body", async () => {
+    const harness = createRuntimeRouteHarness({
+      method: RequestMethodByName.post,
+      pathname: RequestPathnameByName.apiEventsSession
+    });
+    harness.setReadJsonBodyValue([]);
+
+    const handled = await handleRuntimeRoutes(harness.dependencies);
+
+    expect(handled).toBe(true);
+    expect(harness.jsonResponseCalls).toHaveLength(1);
+    expect(harness.jsonResponseCalls[0]?.statusCode).toBe(400);
+    const responseBody = harness.jsonResponseCalls[0]?.body;
+    if (!responseBody) {
+      throw new Error("Expected events-session validation error response");
+    }
+    const parsedEnvelope = InvalidEventsSessionBootstrapEnvelopeSchema.parse(responseBody);
+    expect(parsedEnvelope.issues.some((issue) => issue.path === "body")).toBe(true);
+  });
+
   it("prefers header api token over request body api token", async () => {
     const harness = createRuntimeRouteHarness({
       method: RequestMethodByName.post,
@@ -251,6 +271,53 @@ describe("RuntimeRoutes", () => {
     const parsedResponse = FarfieldEventsSessionResponseSchema.parse(responseBody);
     expect(parsedResponse.bootstrapped).toBe(true);
     expect(harness.res.getHeader("Set-Cookie")).toEqual(expect.any(String));
+  });
+
+  it("ignores empty repeated header token values and uses first non-empty header token", async () => {
+    const harness = createRuntimeRouteHarness({
+      method: RequestMethodByName.post,
+      pathname: RequestPathnameByName.apiEventsSession
+    });
+    harness.setReadJsonBodyValue({
+      apiToken: "incorrect-token"
+    });
+    harness.req.headers[TestApiTokenHeaderName] = ["   ", TestApiToken];
+
+    const handled = await handleRuntimeRoutes(harness.dependencies);
+
+    expect(handled).toBe(true);
+    expect(harness.jsonResponseCalls).toHaveLength(1);
+    const responseBody = harness.jsonResponseCalls[0]?.body;
+    if (!responseBody) {
+      throw new Error("Expected events-session response");
+    }
+    const parsedResponse = FarfieldEventsSessionResponseSchema.parse(responseBody);
+    expect(parsedResponse.bootstrapped).toBe(true);
+    expect(harness.res.getHeader("Set-Cookie")).toEqual(expect.any(String));
+  });
+
+  it("keeps first non-empty repeated header token authoritative over request body token", async () => {
+    const harness = createRuntimeRouteHarness({
+      method: RequestMethodByName.post,
+      pathname: RequestPathnameByName.apiEventsSession
+    });
+    harness.setReadJsonBodyValue({
+      apiToken: TestApiToken
+    });
+    harness.req.headers[TestApiTokenHeaderName] = ["incorrect-token", TestApiToken];
+
+    const handled = await handleRuntimeRoutes(harness.dependencies);
+
+    expect(handled).toBe(true);
+    expect(harness.jsonResponseCalls).toHaveLength(1);
+    const responseBody = harness.jsonResponseCalls[0]?.body;
+    if (!responseBody) {
+      throw new Error("Expected events-session response");
+    }
+    const parsedResponse = FarfieldEventsSessionResponseSchema.parse(responseBody);
+    expect(parsedResponse.bootstrapped).toBe(false);
+    expect(parsedResponse.expiresAt).toBeNull();
+    expect(harness.res.getHeader("Set-Cookie")).toBeUndefined();
   });
 
   it("does not read request body when cookie session is already authenticated", async () => {
