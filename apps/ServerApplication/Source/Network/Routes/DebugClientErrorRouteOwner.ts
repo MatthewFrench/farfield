@@ -13,6 +13,32 @@ import {
   type DebugRouteDependencies
 } from "./DebugRouteContracts.js";
 
+const DebugClientErrorRouteStatusCodeByName = {
+  successOk: 200,
+  clientErrorBadRequest: 400,
+  clientErrorNotFound: 404,
+  serverErrorInternal: 500
+} as const;
+
+const DebugClientErrorRouteErrorMessageByName = {
+  invalidClientErrorIdentifier: "Invalid client error identifier",
+  clientErrorNotFound: "Client error not found",
+  clientErrorSessionLogNotFound: "Client error session log not found"
+} as const;
+
+const DebugClientErrorRouteSegmentIndexByName = {
+  clientErrorCollection: 2,
+  clientErrorIdentifier: 3
+} as const;
+
+const DebugClientErrorRouteSegmentCountByName = {
+  readByIdentifier: 4
+} as const;
+
+const RoutePathSegmentSeparator = "/";
+const ClientErrorIdentifierRoutePathPrefix =
+  `${DebugRoutePathnameByName.clientErrors}${RoutePathSegmentSeparator}`;
+
 export class DebugClientErrorRouteOwner {
   private readonly dependencies: DebugRouteDependencies;
 
@@ -67,7 +93,7 @@ export class DebugClientErrorRouteOwner {
       threadId: event.threadId,
       message: event.message
     });
-    jsonResponse(res, 200, {
+    jsonResponse(res, DebugClientErrorRouteStatusCodeByName.successOk, {
       ok: true,
       errorId: event.errorId,
       sessionId: event.sessionId,
@@ -84,7 +110,7 @@ export class DebugClientErrorRouteOwner {
     }
 
     const clearedCount = clientErrorStore.clear();
-    jsonResponse(res, 200, {
+    jsonResponse(res, DebugClientErrorRouteStatusCodeByName.successOk, {
       ok: true,
       clearedCount,
       sessionId: clientErrorStore.getSessionId(),
@@ -102,7 +128,7 @@ export class DebugClientErrorRouteOwner {
 
     const limit = parseInteger(url.searchParams.get("limit"), 120);
     const data = clientErrorStore.list(limit);
-    jsonResponse(res, 200, {
+    jsonResponse(res, DebugClientErrorRouteStatusCodeByName.successOk, {
       ok: true,
       data,
       sessionId: clientErrorStore.getSessionId(),
@@ -131,14 +157,14 @@ export class DebugClientErrorRouteOwner {
           || error.code === DebugFileDownloadErrorCodeByName.notFile
         )
       ) {
-        jsonResponse(res, 404, {
+        jsonResponse(res, DebugClientErrorRouteStatusCodeByName.clientErrorNotFound, {
           ok: false,
-          error: "Client error session log not found"
+          error: DebugClientErrorRouteErrorMessageByName.clientErrorSessionLogNotFound
         });
         return true;
       }
 
-      jsonResponse(res, 500, {
+      jsonResponse(res, DebugClientErrorRouteStatusCodeByName.serverErrorInternal, {
         ok: false,
         error: toErrorMessage(error)
       });
@@ -147,44 +173,71 @@ export class DebugClientErrorRouteOwner {
   }
 
   private handleReadClientErrorByIdentifierRoute(): boolean {
-    const { req, segments, clientErrorStore, jsonResponse, res } = this.dependencies;
+    const { segments, clientErrorStore, jsonResponse, res } = this.dependencies;
 
-    const clientErrorIdSegment = segments[3];
-    const isReadClientErrorByIdentifierRequest =
-      req.method === DebugRouteMethodByName.get
-      && segments[2] === DebugRouteSegmentByName.clientErrors
-      && segments.length === 4
-      && typeof clientErrorIdSegment === "string";
-    if (!isReadClientErrorByIdentifierRequest) {
+    const clientErrorIdentifierSegment =
+      segments[DebugClientErrorRouteSegmentIndexByName.clientErrorIdentifier];
+    if (
+      typeof clientErrorIdentifierSegment !== "string"
+      || !this.isReadClientErrorByIdentifierRequest(clientErrorIdentifierSegment)
+    ) {
       return false;
     }
 
-    let errorId: string;
-    try {
-      errorId = decodeURIComponent(clientErrorIdSegment);
-    } catch {
-      jsonResponse(res, 400, {
+    const errorId = this.tryDecodeClientErrorIdentifier(clientErrorIdentifierSegment);
+    if (errorId === null) {
+      jsonResponse(res, DebugClientErrorRouteStatusCodeByName.clientErrorBadRequest, {
         ok: false,
-        error: "Invalid client error identifier"
+        error: DebugClientErrorRouteErrorMessageByName.invalidClientErrorIdentifier
       });
       return true;
     }
 
     const errorEvent = clientErrorStore.getById(errorId);
     if (!errorEvent) {
-      jsonResponse(res, 404, {
+      jsonResponse(res, DebugClientErrorRouteStatusCodeByName.clientErrorNotFound, {
         ok: false,
-        error: "Client error not found"
+        error: DebugClientErrorRouteErrorMessageByName.clientErrorNotFound
       });
       return true;
     }
 
-    jsonResponse(res, 200, {
+    jsonResponse(res, DebugClientErrorRouteStatusCodeByName.successOk, {
       ok: true,
       error: errorEvent,
       sessionId: clientErrorStore.getSessionId(),
       sessionLogPath: clientErrorStore.getSessionLogPath()
     });
     return true;
+  }
+
+  /**
+   * Keep identifier route ownership strict so near-match path shapes return the global not-found contract.
+   */
+  private isReadClientErrorByIdentifierRequest(clientErrorIdentifierSegment: string): boolean {
+    const { req, pathname, segments } = this.dependencies;
+
+    if (
+      req.method !== DebugRouteMethodByName.get
+      || segments.length !== DebugClientErrorRouteSegmentCountByName.readByIdentifier
+      || segments[DebugClientErrorRouteSegmentIndexByName.clientErrorCollection] !== DebugRouteSegmentByName.clientErrors
+      || pathname.endsWith(RoutePathSegmentSeparator)
+    ) {
+      return false;
+    }
+
+    return pathname === `${ClientErrorIdentifierRoutePathPrefix}${clientErrorIdentifierSegment}`;
+  }
+
+  private tryDecodeClientErrorIdentifier(clientErrorIdentifierSegment: string): string | null {
+    try {
+      const decodedClientErrorIdentifier = decodeURIComponent(clientErrorIdentifierSegment);
+      if (decodedClientErrorIdentifier.includes(RoutePathSegmentSeparator)) {
+        return null;
+      }
+      return decodedClientErrorIdentifier;
+    } catch {
+      return null;
+    }
   }
 }
