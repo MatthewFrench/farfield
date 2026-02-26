@@ -165,6 +165,28 @@ describe("CodexThreadManagementOwner", () => {
     expect(result).not.toHaveProperty("truncated");
   });
 
+  it("preserves explicit empty-string list-thread optional values", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    await owner.listThreads(
+      createListThreadsInput({
+        cursor: "",
+        cwd: ""
+      })
+    );
+
+    expect(appClient.listThreadsCalls).toEqual([
+      {
+        limit: 20,
+        archived: false,
+        cursor: "",
+        sortKey: "updated_at",
+        cwd: ""
+      }
+    ]);
+  });
+
   it("maps all-pages list request options and preserves optional pagination metadata", async () => {
     const appClient = new TestAppServerClient({
       listThreadsAllResult: {
@@ -252,6 +274,33 @@ describe("CodexThreadManagementOwner", () => {
     ]);
     expect(result.threadId).toBe("thread-1");
     expect(result.cwd).toBe("/tmp/workspace");
+  });
+
+  it("preserves explicit empty-string optional create-thread values", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    await owner.createThread({
+      cwd: "  /tmp/workspace  ",
+      model: "",
+      modelProvider: "",
+      personality: "",
+      sandbox: "",
+      approvalPolicy: "",
+      ephemeral: false
+    });
+
+    expect(appClient.startThreadCalls).toEqual([
+      {
+        cwd: "/tmp/workspace",
+        model: "",
+        modelProvider: "",
+        personality: "",
+        sandbox: "",
+        approvalPolicy: "",
+        ephemeral: false
+      }
+    ]);
   });
 
   it("maps create-thread response contract metadata", async () => {

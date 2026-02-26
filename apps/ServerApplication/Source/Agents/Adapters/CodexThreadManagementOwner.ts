@@ -33,8 +33,8 @@ function buildListThreadsOptions(input: AgentListThreadsInput): ListThreadsOptio
     limit: input.limit,
     archived: input.archived,
     sortKey: input.sortKey,
-    ...(input.cursor ? { cursor: input.cursor } : {}),
-    ...(input.cwd ? { cwd: input.cwd } : {})
+    ...(input.cursor !== undefined && input.cursor !== null ? { cursor: input.cursor } : {}),
+    ...(input.cwd !== undefined && input.cwd !== null ? { cwd: input.cwd } : {})
   };
 }
 
@@ -88,11 +88,11 @@ function buildStartThreadOptions(
 ): StartThreadOptions {
   return {
     cwd: workingDirectory,
-    ...(input.model ? { model: input.model } : {}),
-    ...(input.modelProvider ? { modelProvider: input.modelProvider } : {}),
-    ...(input.personality ? { personality: input.personality } : {}),
-    ...(input.sandbox ? { sandbox: input.sandbox } : {}),
-    ...(input.approvalPolicy ? { approvalPolicy: input.approvalPolicy } : {}),
+    ...(input.model !== undefined ? { model: input.model } : {}),
+    ...(input.modelProvider !== undefined ? { modelProvider: input.modelProvider } : {}),
+    ...(input.personality !== undefined ? { personality: input.personality } : {}),
+    ...(input.sandbox !== undefined ? { sandbox: input.sandbox } : {}),
+    ...(input.approvalPolicy !== undefined ? { approvalPolicy: input.approvalPolicy } : {}),
     ...(input.ephemeral !== undefined ? { ephemeral: input.ephemeral } : {})
   };
 }
