@@ -11,7 +11,8 @@ import {
 
 const ReplayFrameMethodSchema = z.string().trim().min(1);
 const ReplayFrameTargetClientIdentifierSchema = z.string().trim().min(1);
-const ReplayFrameIssuePathPrefix = "frame";
+const ReplayFrameVersionSchema = z.number().int().nonnegative();
+const ReplayFrameIssuePathRoot = "frame";
 const ReplayFrameIssuePathSeparator = ".";
 
 function createReplayFrameSchema(frameType: DebugReplayFrameType) {
@@ -21,7 +22,7 @@ function createReplayFrameSchema(frameType: DebugReplayFrameType) {
       method: ReplayFrameMethodSchema,
       params: JsonValueSchema.optional(),
       targetClientId: ReplayFrameTargetClientIdentifierSchema.optional(),
-      version: z.number().int().optional()
+      version: ReplayFrameVersionSchema.optional()
     })
     .passthrough();
 }
@@ -32,6 +33,10 @@ const ReplayFrameSchema = z
     createReplayFrameSchema(DebugReplayFrameTypeByName.broadcast)
   ]);
 
+/**
+ * Owns debug replay frame boundary parsing so route handlers consume a strict, route-owned contract.
+ * Issue ordering is canonicalized to keep diagnostics deterministic across invalid payload shapes.
+ */
 export function parseReplayFrame(payload: JsonValue): ParsedReplayFrame {
   const parsedReplayFrameResult = ReplayFrameSchema.safeParse(payload);
   if (!parsedReplayFrameResult.success) {
@@ -57,19 +62,38 @@ export function parseReplayFrame(payload: JsonValue): ParsedReplayFrame {
 }
 
 function mapReplayFrameIssues(issues: ReadonlyArray<z.ZodIssue>): DebugReplayFrameParseIssue[] {
-  return issues.map((issue) => ({
-    path: buildReplayFrameIssuePath(issue.path),
-    issueCode: issue.code,
-    message: issue.message
-  }));
+  return issues
+    .map((issue) => ({
+      path: buildReplayFrameIssuePath(issue.path),
+      issueCode: issue.code,
+      message: issue.message
+    }))
+    .sort(compareReplayFrameIssues);
+}
+
+function compareReplayFrameIssues(
+  leftIssue: DebugReplayFrameParseIssue,
+  rightIssue: DebugReplayFrameParseIssue
+): number {
+  const pathOrder = leftIssue.path.localeCompare(rightIssue.path);
+  if (pathOrder !== 0) {
+    return pathOrder;
+  }
+
+  const issueCodeOrder = leftIssue.issueCode.localeCompare(rightIssue.issueCode);
+  if (issueCodeOrder !== 0) {
+    return issueCodeOrder;
+  }
+
+  return leftIssue.message.localeCompare(rightIssue.message);
 }
 
 function buildReplayFrameIssuePath(pathSegments: ReadonlyArray<string | number>): string {
   if (pathSegments.length === 0) {
-    return ReplayFrameIssuePathPrefix;
+    return ReplayFrameIssuePathRoot;
   }
 
-  return `${ReplayFrameIssuePathPrefix}${ReplayFrameIssuePathSeparator}${pathSegments
+  return `${ReplayFrameIssuePathRoot}${ReplayFrameIssuePathSeparator}${pathSegments
     .map((segment) => String(segment))
     .join(ReplayFrameIssuePathSeparator)}`;
 }
