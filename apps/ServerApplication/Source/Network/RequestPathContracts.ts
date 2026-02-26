@@ -1,6 +1,7 @@
 const QUERY_SEPARATOR = "?";
 const HASH_SEPARATOR = "#";
-const ABSOLUTE_URL_PROTOCOL_SEPARATOR = "://";
+const ABSOLUTE_URL_PREFIX_PATTERN = /^[A-Za-z][A-Za-z\d+.-]*:\/\//u;
+const ROOT_ONLY_PATHNAME_PATTERN = /^\/+$/u;
 const REQUEST_BASE_URL_PROTOCOL = "http";
 const REQUEST_BASE_URL_PROTOCOL_SEPARATOR = "://";
 const REQUEST_BASE_URL_PORT_SEPARATOR = ":";
@@ -95,17 +96,9 @@ export function normalizePathnameForRequestMetrics(pathnameOrRequestUrl: string)
   ) {
     return RequestPathnameByName.malformedRequestUrl;
   }
-  const pathnameCandidate = absoluteUrlPathnameResolution.pathname ?? trimmedValue;
-  const pathnameWithoutSuffix = stripPathnameSuffix(pathnameCandidate);
-  if (pathnameWithoutSuffix.length === 0) {
-    return RequestPathnameByName.root;
-  }
-
-  if (pathnameWithoutSuffix.startsWith(REQUEST_PATH_SEGMENT_SEPARATOR)) {
-    return pathnameWithoutSuffix;
-  }
-
-  return `${REQUEST_PATH_SEGMENT_SEPARATOR}${pathnameWithoutSuffix}`;
+  return normalizePathnameCandidate(
+    absoluteUrlPathnameResolution.pathname ?? trimmedValue
+  );
 }
 
 export function readPathnameForRequestMetricsFromRequestUrl(
@@ -131,20 +124,20 @@ export function readPathSegmentsFromPathname(pathname: string): string[] {
 export function parseRequestUrlPathname(
   input: RequestUrlPathnameParseInput
 ): RequestUrlPathnameParseResult {
-  try {
-    const url = new URL(input.requestUrl, readRequestBaseUrl(input.host, input.port));
-    const pathname = normalizePathnameForRequestMetrics(url.pathname);
-    return {
-      status: RequestUrlPathnameParseStatusByName.resolved,
-      url,
-      pathname,
-      pathSegments: readPathSegmentsFromPathname(pathname)
-    };
-  } catch {
+  const url = readUrlFromRequestPathnameParseInput(input);
+  if (url === null) {
     return {
       status: RequestUrlPathnameParseStatusByName.malformedRequestUrl
     };
   }
+
+  const pathname = normalizePathnameForRequestMetrics(url.pathname);
+  return {
+    status: RequestUrlPathnameParseStatusByName.resolved,
+    url,
+    pathname,
+    pathSegments: readPathSegmentsFromPathname(pathname)
+  };
 }
 
 function stripPathnameSuffix(pathname: string): string {
@@ -162,13 +155,29 @@ function stripPathnameSuffix(pathname: string): string {
   return pathname.slice(0, suffixStartIndex).trim();
 }
 
+function normalizePathnameCandidate(pathnameCandidate: string): string {
+  const pathnameWithoutSuffix = stripPathnameSuffix(pathnameCandidate);
+  if (
+    pathnameWithoutSuffix.length === 0
+    || ROOT_ONLY_PATHNAME_PATTERN.test(pathnameWithoutSuffix)
+  ) {
+    return RequestPathnameByName.root;
+  }
+
+  if (pathnameWithoutSuffix.startsWith(REQUEST_PATH_SEGMENT_SEPARATOR)) {
+    return pathnameWithoutSuffix;
+  }
+
+  return `${REQUEST_PATH_SEGMENT_SEPARATOR}${pathnameWithoutSuffix}`;
+}
+
 interface AbsoluteUrlPathnameResolution {
   isAbsoluteUrl: boolean;
   pathname: string | null;
 }
 
 function readPathnameFromAbsoluteUrl(urlValue: string): AbsoluteUrlPathnameResolution {
-  if (!urlValue.includes(ABSOLUTE_URL_PROTOCOL_SEPARATOR)) {
+  if (!isAbsoluteUrlValue(urlValue)) {
     return {
       isAbsoluteUrl: false,
       pathname: null
@@ -185,6 +194,18 @@ function readPathnameFromAbsoluteUrl(urlValue: string): AbsoluteUrlPathnameResol
       isAbsoluteUrl: true,
       pathname: null
     };
+  }
+}
+
+function isAbsoluteUrlValue(urlValue: string): boolean {
+  return ABSOLUTE_URL_PREFIX_PATTERN.test(urlValue);
+}
+
+function readUrlFromRequestPathnameParseInput(input: RequestUrlPathnameParseInput): URL | null {
+  try {
+    return new URL(input.requestUrl, readRequestBaseUrl(input.host, input.port));
+  } catch {
+    return null;
   }
 }
 
