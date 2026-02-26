@@ -2,6 +2,7 @@ import type { IpcFrame } from "@farfield/protocol";
 import { describe, expect, it } from "vitest";
 import type { CodexIpcFrameEvent } from "../Source/Agents/Adapters/CodexAgentAdapter.js";
 import {
+  THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE,
   THREAD_STREAM_STATE_CHANGED_METHOD,
   type ThreadStreamStateChangedBatchSummary,
   ThreadStreamStateChangedHistoryBatchOwner
@@ -25,6 +26,18 @@ function createIpcFrameEvent(method: string, threadId: string | null): CodexIpcF
 }
 
 describe("ThreadStreamStateChangedHistoryBatchOwner", () => {
+  it("rejects non-integer and non-positive flush intervals", () => {
+    const invalidFlushIntervals = [0, -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY];
+    for (const flushIntervalMs of invalidFlushIntervals) {
+      expect(() => new ThreadStreamStateChangedHistoryBatchOwner({
+        flushIntervalMs,
+        emitSummary: () => {
+          throw new Error("emitSummary must not run during constructor validation.");
+        }
+      })).toThrowError(THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE);
+    }
+  });
+
   it("ignores non stream-state methods", () => {
     const summaries: ThreadStreamStateChangedBatchSummary[] = [];
     const owner = new ThreadStreamStateChangedHistoryBatchOwner({
@@ -40,7 +53,7 @@ describe("ThreadStreamStateChangedHistoryBatchOwner", () => {
     expect(summaries).toHaveLength(0);
   });
 
-  it("emits a summary when the flush interval is reached", () => {
+  it("flushes only when elapsed time reaches the flush interval boundary", () => {
     const summaries: ThreadStreamStateChangedBatchSummary[] = [];
     const owner = new ThreadStreamStateChangedHistoryBatchOwner({
       flushIntervalMs: 1_000,
@@ -50,7 +63,7 @@ describe("ThreadStreamStateChangedHistoryBatchOwner", () => {
     });
 
     expect(owner.handleFrame(createIpcFrameEvent(THREAD_STREAM_STATE_CHANGED_METHOD, "thread-1"), 0)).toBe(true);
-    expect(owner.handleFrame(createIpcFrameEvent(THREAD_STREAM_STATE_CHANGED_METHOD, "thread-2"), 400)).toBe(true);
+    expect(owner.handleFrame(createIpcFrameEvent(THREAD_STREAM_STATE_CHANGED_METHOD, "thread-2"), 999)).toBe(true);
     expect(summaries).toHaveLength(0);
 
     expect(owner.handleFrame(createIpcFrameEvent(THREAD_STREAM_STATE_CHANGED_METHOD, "thread-3"), 1_000)).toBe(true);
@@ -82,5 +95,28 @@ describe("ThreadStreamStateChangedHistoryBatchOwner", () => {
 
     owner.flushBufferedSummary(120);
     expect(summaries).toHaveLength(1);
+  });
+
+  it("treats flush as a no-op when no events are buffered", () => {
+    const summaries: ThreadStreamStateChangedBatchSummary[] = [];
+    const owner = new ThreadStreamStateChangedHistoryBatchOwner({
+      flushIntervalMs: 1_000,
+      emitSummary: (summary) => {
+        summaries.push(summary);
+      }
+    });
+
+    owner.flushBufferedSummary(25);
+    owner.flushBufferedSummary(50);
+    expect(summaries).toHaveLength(0);
+
+    expect(owner.handleFrame(createIpcFrameEvent(THREAD_STREAM_STATE_CHANGED_METHOD, "thread-1"), 80)).toBe(true);
+    owner.flushBufferedSummary(100);
+
+    expect(summaries).toEqual([{
+      count: 1,
+      spanMs: 20,
+      latestThreadId: "thread-1"
+    }]);
   });
 });

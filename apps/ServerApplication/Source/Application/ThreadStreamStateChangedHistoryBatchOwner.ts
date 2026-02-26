@@ -1,7 +1,26 @@
+import { z } from "zod";
 import type { CodexIpcFrameEvent } from "../Agents/Adapters/CodexAgentAdapter.js";
 
 export const THREAD_STREAM_STATE_CHANGED_METHOD = "thread-stream-state-changed";
 export const THREAD_STREAM_STATE_CHANGED_BATCH_EVENT_TYPE = "thread-stream-state-changed-batch";
+export const THREAD_STREAM_STATE_CHANGED_MINIMUM_FLUSH_INTERVAL_MILLISECONDS = 1;
+export const THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE =
+  "flushIntervalMs must be a finite positive integer number of milliseconds.";
+
+const ThreadStreamStateChangedFlushIntervalMillisecondsSchema = z
+  .number({
+    invalid_type_error: THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE,
+    required_error: THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE
+  })
+  .finite(THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE)
+  .int(THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE)
+  .min(
+    THREAD_STREAM_STATE_CHANGED_MINIMUM_FLUSH_INTERVAL_MILLISECONDS,
+    THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE
+  );
+
+const THREAD_STREAM_STATE_CHANGED_BUFFER_INVARIANT_VIOLATION_MESSAGE =
+  "Thread stream batch owner buffered state became inconsistent. bufferedEventCount and bufferedFirstAtMs must be either both empty or both populated.";
 
 export interface ThreadStreamStateChangedBatchSummary {
   count: number;
@@ -21,16 +40,13 @@ export interface ThreadStreamStateChangedHistoryBatchOwnerDependencies {
 export class ThreadStreamStateChangedHistoryBatchOwner {
   private readonly flushIntervalMs: number;
   private readonly emitSummary: (summary: ThreadStreamStateChangedBatchSummary) => void;
-  private bufferedEventCount: number;
-  private bufferedFirstAtMs: number | null;
-  private bufferedLatestThreadId: string | null;
+  private bufferedEventCount = 0;
+  private bufferedFirstAtMs: number | null = null;
+  private bufferedLatestThreadId: string | null = null;
 
   public constructor(dependencies: ThreadStreamStateChangedHistoryBatchOwnerDependencies) {
-    this.flushIntervalMs = dependencies.flushIntervalMs;
+    this.flushIntervalMs = ThreadStreamStateChangedFlushIntervalMillisecondsSchema.parse(dependencies.flushIntervalMs);
     this.emitSummary = dependencies.emitSummary;
-    this.bufferedEventCount = 0;
-    this.bufferedFirstAtMs = null;
-    this.bufferedLatestThreadId = null;
   }
 
   public handleFrame(event: CodexIpcFrameEvent, nowMs: number): boolean {
@@ -44,7 +60,7 @@ export class ThreadStreamStateChangedHistoryBatchOwner {
     }
     this.bufferedLatestThreadId = event.threadId;
 
-    if (nowMs - this.bufferedFirstAtMs >= this.flushIntervalMs) {
+    if (this.shouldFlushBufferedSummary(nowMs)) {
       this.flushBufferedSummary(nowMs);
     }
 
@@ -52,8 +68,12 @@ export class ThreadStreamStateChangedHistoryBatchOwner {
   }
 
   public flushBufferedSummary(nowMs: number): void {
-    if (this.bufferedEventCount === 0 || this.bufferedFirstAtMs === null) {
+    if (this.bufferedEventCount === 0 && this.bufferedFirstAtMs === null) {
       return;
+    }
+
+    if (this.bufferedEventCount === 0 || this.bufferedFirstAtMs === null) {
+      throw new Error(THREAD_STREAM_STATE_CHANGED_BUFFER_INVARIANT_VIOLATION_MESSAGE);
     }
 
     const spanMs = Math.max(0, nowMs - this.bufferedFirstAtMs);
@@ -63,6 +83,18 @@ export class ThreadStreamStateChangedHistoryBatchOwner {
       latestThreadId: this.bufferedLatestThreadId
     });
 
+    this.resetBufferedSummaryState();
+  }
+
+  private shouldFlushBufferedSummary(nowMs: number): boolean {
+    if (this.bufferedFirstAtMs === null) {
+      return false;
+    }
+    const elapsedSinceFirstBufferedEventMilliseconds = nowMs - this.bufferedFirstAtMs;
+    return elapsedSinceFirstBufferedEventMilliseconds >= this.flushIntervalMs;
+  }
+
+  private resetBufferedSummaryState(): void {
     this.bufferedEventCount = 0;
     this.bufferedFirstAtMs = null;
     this.bufferedLatestThreadId = null;
