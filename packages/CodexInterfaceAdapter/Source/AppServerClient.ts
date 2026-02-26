@@ -20,9 +20,10 @@ import {
 import { ProtocolValidationError } from "@farfield/protocol";
 import { z } from "zod";
 import {
-  AppServerTransport,
+  type AppServerTransport,
   ChildProcessAppServerTransport,
-  type ChildProcessAppServerTransportOptions
+  type ChildProcessAppServerTransportOptions,
+  isChildProcessAppServerTransportOptions
 } from "./AppServerTransport.js";
 
 function parseWithSchema<SchemaType extends z.ZodTypeAny>(
@@ -64,6 +65,26 @@ export interface StartThreadOptions {
   ephemeral?: boolean;
 }
 
+interface ListThreadsRequestParameters {
+  limit: number;
+  archived: boolean;
+  cursor: string | null;
+  sortKey?: "created_at" | "updated_at";
+  cwd?: string;
+}
+
+function buildListThreadsRequestParameters(
+  options: Pick<ListThreadsOptions, "limit" | "archived" | "cursor" | "sortKey" | "cwd">
+): ListThreadsRequestParameters {
+  return {
+    limit: options.limit,
+    archived: options.archived,
+    cursor: options.cursor ?? null,
+    ...(options.sortKey ? { sortKey: options.sortKey } : {}),
+    ...(options.cwd ? { cwd: options.cwd } : {})
+  };
+}
+
 const AppServerResumeThreadRequestSchema = z
   .object({
     threadId: z.string().min(1),
@@ -96,12 +117,12 @@ export class AppServerClient {
   private readonly transport: AppServerTransport;
 
   public constructor(transportOrOptions: AppServerTransport | ChildProcessAppServerTransportOptions) {
-    if ("request" in transportOrOptions && "close" in transportOrOptions) {
-      this.transport = transportOrOptions;
+    if (isChildProcessAppServerTransportOptions(transportOrOptions)) {
+      this.transport = new ChildProcessAppServerTransport(transportOrOptions);
       return;
     }
 
-    this.transport = new ChildProcessAppServerTransport(transportOrOptions);
+    this.transport = transportOrOptions;
   }
 
   public async close(): Promise<void> {
@@ -109,13 +130,7 @@ export class AppServerClient {
   }
 
   public async listThreads(options: ListThreadsOptions): Promise<AppServerListThreadsResponse> {
-    const result = await this.transport.request("thread/list", {
-      limit: options.limit,
-      archived: options.archived,
-      cursor: options.cursor ?? null,
-      ...(options.sortKey ? { sortKey: options.sortKey } : {}),
-      ...(options.cwd ? { cwd: options.cwd } : {})
-    });
+    const result = await this.transport.request("thread/list", buildListThreadsRequestParameters(options));
 
     return parseWithSchema(AppServerListThreadsResponseSchema, result, "AppServerListThreadsResponse");
   }
@@ -127,22 +142,13 @@ export class AppServerClient {
     let pages = 0;
 
     while (pages < options.maxPages) {
-      const page = await this.listThreads(
-        cursor
-          ? {
-              limit: options.limit,
-              archived: options.archived,
-              cursor,
-              ...(options.sortKey ? { sortKey: options.sortKey } : {}),
-              ...(options.cwd ? { cwd: options.cwd } : {})
-            }
-          : {
-              limit: options.limit,
-              archived: options.archived,
-              ...(options.sortKey ? { sortKey: options.sortKey } : {}),
-              ...(options.cwd ? { cwd: options.cwd } : {})
-            }
-      );
+      const page = await this.listThreads({
+        limit: options.limit,
+        archived: options.archived,
+        ...(cursor ? { cursor } : {}),
+        ...(options.sortKey ? { sortKey: options.sortKey } : {}),
+        ...(options.cwd ? { cwd: options.cwd } : {})
+      });
 
       listItems.push(...page.data);
       pages += 1;

@@ -4,39 +4,55 @@ import type { ThreadListItem, ThreadProjectGroup } from "@/Features/Threads/Doma
 
 export interface ThreadListPaneAgentDescriptor {
   label: string;
-  projectDirectories: string[];
+  projectDirectories: readonly string[];
 }
 
+export type ThreadListPaneState = "loading" | "empty" | "ready";
+export type ThreadListPaneCollapsedProjectGroups = Record<string, boolean>;
+export type ThreadListPaneUnreadThreadIdentifiers = Record<string, true>;
+export type ThreadListPaneArchivedThreadIdentifiers = Set<string>;
+export type ThreadListPaneToggleProjectGroup = (groupKey: string, nextCollapsed: boolean) => void;
+export type ThreadListPaneCreateThreadForSingleAgent = (projectPath: string) => void;
+export type ThreadListPaneCreateThread = (projectPath: string, agentId: AgentId) => void;
+export type ThreadListPaneThreadSelectionHandler = (threadId: string) => void;
+export type ThreadListPaneArchiveToggle = (nextOpen: boolean) => void;
+export type ThreadListPaneDateFormatter = (value: number | string | null | undefined) => string;
+export type ThreadListPaneAgentFaviconRenderer = (
+  agentId: AgentId,
+  label: string,
+  className: string
+) => React.ReactNode;
+
 export interface ThreadListPaneProperties {
-  threadListState: "loading" | "empty" | "ready";
+  threadListState: ThreadListPaneState;
   threads: ThreadListItem[];
   isCoreLoading: boolean;
   availableAgentIds: AgentId[];
   selectedAgentDescriptor: ThreadListPaneAgentDescriptor | null;
   selectedAgentLabel: string;
-  agentsById: Partial<Record<AgentId, ThreadListPaneAgentDescriptor>>;
+  agentsById: Readonly<Partial<Record<AgentId, ThreadListPaneAgentDescriptor>>>;
   isBusy: boolean;
   activeProjectGroups: ThreadProjectGroup[];
   selectedThreadId: string | null;
-  collapsedThreadProjectGroups: Record<string, boolean>;
-  unreadThreadIds: Record<string, true>;
+  collapsedThreadProjectGroups: ThreadListPaneCollapsedProjectGroups;
+  unreadThreadIds: ThreadListPaneUnreadThreadIdentifiers;
   isGenerating: boolean;
-  onToggleThreadProjectGroup: (groupKey: string, nextCollapsed: boolean) => void;
-  onCreateThreadForSingleAgent: (projectPath: string) => void;
-  onCreateNewThread: (projectPath: string, agentId: AgentId) => void;
-  onSelectThread: (threadId: string) => void;
-  onArchiveThread: (threadId: string) => void;
+  onToggleThreadProjectGroup: ThreadListPaneToggleProjectGroup;
+  onCreateThreadForSingleAgent: ThreadListPaneCreateThreadForSingleAgent;
+  onCreateNewThread: ThreadListPaneCreateThread;
+  onSelectThread: ThreadListPaneThreadSelectionHandler;
+  onArchiveThread: ThreadListPaneThreadSelectionHandler;
   isArchivedThreadsOpen: boolean;
-  onToggleArchivedThreads: (nextOpen: boolean) => void;
+  onToggleArchivedThreads: ThreadListPaneArchiveToggle;
   isArchivedThreadsLoading: boolean;
   hasLoadedArchivedThreads: boolean;
   archivedSectionThreadCount: number;
   archivedThreadsTruncated: boolean;
   archivedProjectGroups: ThreadProjectGroup[];
-  collapsedArchivedProjectGroups: Record<string, boolean>;
-  archivedThreadIds: Set<string>;
-  onToggleArchivedProjectGroup: (groupKey: string, nextCollapsed: boolean) => void;
-  onUnarchiveThread: (threadId: string) => void;
-  formatDate: (value: number | string | null | undefined) => string;
-  renderAgentFavicon: (agentId: AgentId, label: string, className: string) => React.ReactNode;
+  collapsedArchivedProjectGroups: ThreadListPaneCollapsedProjectGroups;
+  archivedThreadIds: ThreadListPaneArchivedThreadIdentifiers;
+  onToggleArchivedProjectGroup: ThreadListPaneToggleProjectGroup;
+  onUnarchiveThread: ThreadListPaneThreadSelectionHandler;
+  formatDate: ThreadListPaneDateFormatter;
+  renderAgentFavicon: ThreadListPaneAgentFaviconRenderer;
 }

@@ -1,5 +1,7 @@
 import type { AgentAdapter, AgentCapabilities, AgentId } from "./Types.js";
 
+const DUPLICATE_AGENT_ADAPTER_IDENTIFIER_ERROR_PREFIX = "Duplicate agent adapter id";
+
 export class AgentRegistry {
   private readonly ordered: AgentAdapter[];
   private readonly byId: Map<AgentId, AgentAdapter>;
@@ -10,7 +12,7 @@ export class AgentRegistry {
 
     for (const adapter of adapters) {
       if (this.byId.has(adapter.id)) {
-        throw new Error(`Duplicate agent adapter id: ${adapter.id}`);
+        throw new Error(`${DUPLICATE_AGENT_ADAPTER_IDENTIFIER_ERROR_PREFIX}: ${adapter.id}`);
       }
       this.byId.set(adapter.id, adapter);
       this.ordered.push(adapter);
@@ -30,21 +32,24 @@ export class AgentRegistry {
   }
 
   public resolveDefaultAgentId(): AgentId | null {
-    const firstEnabled = this.listEnabled()[0];
-    return firstEnabled ? firstEnabled.id : null;
+    for (const adapter of this.ordered) {
+      if (adapter.isEnabled()) {
+        return adapter.id;
+      }
+    }
+
+    return null;
   }
 
   public resolveFirstWithCapability(
     capability: keyof AgentCapabilities
   ): AgentAdapter | null {
-    for (const adapter of this.listEnabled()) {
-      if (!adapter.isConnected()) {
-        continue;
-      }
-      if (adapter.capabilities[capability]) {
+    for (const adapter of this.ordered) {
+      if (adapter.isEnabled() && adapter.isConnected() && adapter.capabilities[capability]) {
         return adapter;
       }
     }
+
     return null;
   }
 

@@ -12,8 +12,30 @@ import {
   OPENCODE_CAPABILITIES,
   registerAppTestEnvironment
 } from "./AppTestEnvironment";
+import { type ReadThreadFixture } from "./AppTestFixtureContracts";
 
 const environment = registerAppTestEnvironment();
+
+interface Deferred<ValueType> {
+  promise: Promise<ValueType>;
+  resolve: (value: ValueType) => void;
+}
+
+function createDeferred<ValueType>(): Deferred<ValueType> {
+  let resolver: ((value: ValueType) => void) | null = null;
+  const promise = new Promise<ValueType>((resolve) => {
+    resolver = resolve;
+  });
+
+  if (resolver === null) {
+    throw new Error("Expected deferred resolver to be assigned");
+  }
+
+  return {
+    promise,
+    resolve: resolver
+  };
+}
 
 describe("App", () => {
   it("renders core sections", async () => {
@@ -24,6 +46,7 @@ describe("App", () => {
 
   it("shows selected-thread loading state before thread hydrate completes", async () => {
     const threadId = "thread-loading";
+    const readThreadDeferred = createDeferred<ReadThreadFixture | null>();
     environment.setPathname(`/threads/${threadId}`);
 
     environment.setThreadsFixture({
@@ -46,20 +69,21 @@ describe("App", () => {
 
     const conversationState = environment.buildConversationStateFixture(threadId, "gpt-5.3-codex");
     conversationState.turns = [];
-    environment.setReadThreadResolver((targetThreadId: string, _includeTurns: boolean) => ({
-      ok: true,
-      thread: {
-        ...conversationState,
-        id: targetThreadId
-      },
-      agentId: "codex"
-    }));
-    environment.setReadThreadDelayMilliseconds(220);
+    environment.setReadThreadResolver((_targetThreadId: string, _includeTurns: boolean) => readThreadDeferred.promise);
 
     environment.renderApp();
 
     expect(await screen.findByTestId("chat-empty-loading-thread")).toBeTruthy();
     expect(screen.queryByTestId("chat-empty-no-messages")).toBeNull();
+
+    readThreadDeferred.resolve({
+      ok: true,
+      thread: {
+        ...conversationState,
+        id: threadId
+      },
+      agentId: "codex"
+    });
 
     await waitFor(() => {
       expect(screen.queryByTestId("chat-empty-loading-thread")).toBeNull();

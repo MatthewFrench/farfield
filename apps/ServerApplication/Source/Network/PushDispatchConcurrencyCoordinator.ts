@@ -2,6 +2,7 @@ export interface PushDispatchConcurrencyCoordinatorStatistics {
   scheduledCheckCount: number;
   startedCheckCount: number;
   completedCheckCount: number;
+  failedCheckCount: number;
   skippedWhileInFlightCount: number;
   activeTimerCount: number;
   inFlightThreadCount: number;
@@ -17,6 +18,7 @@ export class PushDispatchConcurrencyCoordinator {
   private scheduledCheckCount: number;
   private startedCheckCount: number;
   private completedCheckCount: number;
+  private failedCheckCount: number;
   private skippedWhileInFlightCount: number;
   private isStopped: boolean;
 
@@ -38,6 +40,7 @@ export class PushDispatchConcurrencyCoordinator {
     this.scheduledCheckCount = 0;
     this.startedCheckCount = 0;
     this.completedCheckCount = 0;
+    this.failedCheckCount = 0;
     this.skippedWhileInFlightCount = 0;
     this.isStopped = false;
   }
@@ -83,6 +86,7 @@ export class PushDispatchConcurrencyCoordinator {
       scheduledCheckCount: this.scheduledCheckCount,
       startedCheckCount: this.startedCheckCount,
       completedCheckCount: this.completedCheckCount,
+      failedCheckCount: this.failedCheckCount,
       skippedWhileInFlightCount: this.skippedWhileInFlightCount,
       activeTimerCount: this.timerByThreadId.size,
       inFlightThreadCount: this.inFlightThreadIdSet.size
@@ -101,6 +105,9 @@ export class PushDispatchConcurrencyCoordinator {
     try {
       await this.runCheck(threadId);
       this.completedCheckCount += 1;
+    } catch {
+      // Check failures should not surface as unhandled rejections from scheduler-owned microtasks.
+      this.failedCheckCount += 1;
     } finally {
       this.inFlightThreadIdSet.delete(threadId);
 

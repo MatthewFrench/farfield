@@ -4,16 +4,17 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseThreadStreamStateChangedBroadcast, type IpcFrame } from "@farfield/protocol";
 import { CodexThreadStreamStateOwner } from "../Source/Agents/Adapters/CodexThreadStreamStateOwner.js";
+import { THREAD_STREAM_STATE_CHANGED_METHOD } from "../Source/Agents/ThreadStreamStateChangedContract.js";
 
 function createSnapshotEvent(): IpcFrame {
   return parseThreadStreamStateChangedBroadcast({
     type: "broadcast",
-    method: "thread-stream-state-changed",
+    method: THREAD_STREAM_STATE_CHANGED_METHOD,
     sourceClientId: "client-a",
     version: 4,
     params: {
       conversationId: "thread-1",
-      type: "thread-stream-state-changed",
+      type: THREAD_STREAM_STATE_CHANGED_METHOD,
       version: 4,
       change: {
         type: "snapshot",
@@ -40,12 +41,12 @@ function createSnapshotEvent(): IpcFrame {
 function createPatchEvent(): IpcFrame {
   return parseThreadStreamStateChangedBroadcast({
     type: "broadcast",
-    method: "thread-stream-state-changed",
+    method: THREAD_STREAM_STATE_CHANGED_METHOD,
     sourceClientId: "client-a",
     version: 4,
     params: {
       conversationId: "thread-1",
-      type: "thread-stream-state-changed",
+      type: THREAD_STREAM_STATE_CHANGED_METHOD,
       version: 4,
       change: {
         type: "patches",
@@ -89,12 +90,12 @@ function createPatchEvent(): IpcFrame {
 function createInvalidPatchEvent(): IpcFrame {
   return parseThreadStreamStateChangedBroadcast({
     type: "broadcast",
-    method: "thread-stream-state-changed",
+    method: THREAD_STREAM_STATE_CHANGED_METHOD,
     sourceClientId: "client-a",
     version: 4,
     params: {
       conversationId: "thread-1",
-      type: "thread-stream-state-changed",
+      type: THREAD_STREAM_STATE_CHANGED_METHOD,
       version: 4,
       change: {
         type: "patches",
@@ -121,7 +122,8 @@ describe("CodexThreadStreamStateOwner", () => {
       requestId: "request-1",
       method: "thread-read",
       params: {
-        threadId: "thread-1"
+        conversationId: " thread-1 ",
+        threadId: "thread-2"
       }
     };
 
@@ -142,16 +144,37 @@ describe("CodexThreadStreamStateOwner", () => {
     expect(owner.readLiveState("thread-1").conversationState?.requests.length).toBe(1);
   });
 
+  it("uses stable frame method descriptions for response and discovery frames", () => {
+    const owner = new CodexThreadStreamStateOwner();
+    const responseFrame: IpcFrame = {
+      type: "response",
+      requestId: "request-1",
+      resultType: "success"
+    };
+    const discoveryRequestFrame: IpcFrame = {
+      type: "client-discovery-request",
+      requestId: "request-2",
+      request: {
+        type: "request",
+        requestId: "request-3",
+        method: "thread-read"
+      }
+    };
+
+    expect(owner.describeFrame(responseFrame).method).toBe("response");
+    expect(owner.describeFrame(discoveryRequestFrame).method).toBe("client-discovery-request");
+  });
+
   it("stores reduction errors when patch application fails", () => {
     const owner = new CodexThreadStreamStateOwner();
     owner.ingestInboundFrame(parseThreadStreamStateChangedBroadcast({
       type: "broadcast",
-      method: "thread-stream-state-changed",
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
       sourceClientId: "client-a",
       version: 4,
       params: {
         conversationId: "thread-1",
-        type: "thread-stream-state-changed",
+        type: THREAD_STREAM_STATE_CHANGED_METHOD,
         version: 4,
         change: {
           type: "snapshot",
@@ -179,6 +202,7 @@ describe("CodexThreadStreamStateOwner", () => {
     const projectedState = owner.readLiveState("thread-1");
     expect(projectedState.conversationState).toBeNull();
     expect(projectedState.liveStateError?.kind).toBe("reductionFailed");
+    expect(projectedState.liveStateError?.eventIndex).toBe(1);
     expect(projectedState.liveStateError?.patchIndex).toBe(0);
   });
 
@@ -229,6 +253,26 @@ describe("CodexThreadStreamStateOwner", () => {
     expect(staleCursorSlice.events.length).toBe(20);
   });
 
+  it("keeps reduction event indexes monotonic after retained history eviction", () => {
+    const streamEventLimit = 40;
+    const patchEventCountBeforeFailure = 50;
+    const snapshotSequenceCount = 1;
+    const expectedFailureEventIndex = snapshotSequenceCount + patchEventCountBeforeFailure;
+    const owner = new CodexThreadStreamStateOwner({
+      streamEventLimit
+    });
+    owner.ingestInboundFrame(createSnapshotEvent());
+    for (let eventIndex = 0; eventIndex < patchEventCountBeforeFailure; eventIndex += 1) {
+      owner.ingestInboundFrame(createPatchEvent());
+    }
+
+    owner.ingestInboundFrame(createInvalidPatchEvent());
+    const projectedState = owner.readLiveState("thread-1");
+    expect(projectedState.liveStateError?.kind).toBe("reductionFailed");
+    expect(projectedState.liveStateError?.eventIndex).toBe(expectedFailureEventIndex);
+    expect(projectedState.liveStateError?.patchIndex).toBe(0);
+  });
+
   it("writes malformed stream events to the invalid-event detail log", () => {
     const logDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "codex-stream-owner-test-"));
     const invalidStreamEventsLogPath = path.join(logDirectory, "invalid-stream-events.ndjson");
@@ -238,7 +282,7 @@ describe("CodexThreadStreamStateOwner", () => {
 
     const malformedFrame: IpcFrame = {
       type: "broadcast",
-      method: "thread-stream-state-changed",
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
       sourceClientId: "client-a",
       version: 4,
       params: {}
@@ -248,7 +292,8 @@ describe("CodexThreadStreamStateOwner", () => {
     expect(fs.existsSync(invalidStreamEventsLogPath)).toBe(true);
     const content = fs.readFileSync(invalidStreamEventsLogPath, "utf8").trim();
     expect(content.length > 0).toBe(true);
-    expect(content.includes("\"thread-stream-state-changed\"")).toBe(true);
+    expect(content.includes(`"${THREAD_STREAM_STATE_CHANGED_METHOD}"`)).toBe(true);
+    expect(content.includes("\"threadId\"")).toBe(true);
     expect(content.includes("\"error\"")).toBe(true);
   });
 
@@ -261,7 +306,7 @@ describe("CodexThreadStreamStateOwner", () => {
 
     const malformedFrame: IpcFrame = {
       type: "broadcast",
-      method: "thread-stream-state-changed",
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
       sourceClientId: "client-a",
       version: 4,
       params: {}

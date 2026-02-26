@@ -33,6 +33,19 @@ describe("parseJsonRpcResponse", () => {
       })
     ).toThrowError(/result or error/i);
   });
+
+  it("rejects response containing both result and error", () => {
+    expect(() =>
+      parseJsonRpcResponse({
+        id: 4,
+        result: { ok: true },
+        error: {
+          code: -32600,
+          message: "bad"
+        }
+      })
+    ).toThrowError(/must not include both/i);
+  });
 });
 
 describe("parseJsonRpcIncomingMessage", () => {
@@ -61,5 +74,18 @@ describe("parseJsonRpcIncomingMessage", () => {
       expect(parsed.value.id).toBe(7);
       expect(parsed.value.result).toEqual({ ok: true });
     }
+  });
+
+  it("rejects request-shaped payloads with method and id", () => {
+    expect(() =>
+      parseJsonRpcIncomingMessage({
+        jsonrpc: "2.0",
+        id: 11,
+        method: "thread/read",
+        params: {
+          threadId: "thread-1"
+        }
+      })
+    ).toThrow();
   });
 });

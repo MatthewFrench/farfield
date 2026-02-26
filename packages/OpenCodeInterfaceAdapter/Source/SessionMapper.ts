@@ -9,10 +9,14 @@ import {
 } from "./MapperContracts.js";
 import { messagesToTurns } from "./ConversationTurnMapper.js";
 
+const UNTITLED_SESSION_PREVIEW = "(untitled)";
+
 export function sessionToThreadListItem(session: OpenCodeSession): MappedThreadListItem {
+  const sessionTitle = normalizeSessionTitle(session.title);
+
   return {
     id: session.id,
-    preview: session.title || "(untitled)",
+    preview: sessionTitle ?? UNTITLED_SESSION_PREVIEW,
     createdAt: session.time.created,
     updatedAt: session.time.updated,
     cwd: session.directory,
@@ -27,10 +31,11 @@ export function sessionToConversationState(
 ): MappedThreadConversationState {
   const turns = messagesToTurns(messages, partsByMessage);
 
-  const lastAssistant = messages.filter((message) => message.role === "assistant").at(-1);
-  const latestModel = lastAssistant?.providerID && lastAssistant?.modelID
-    ? `${lastAssistant.providerID}/${lastAssistant.modelID}`
+  const latestAssistant = resolveLatestAssistantMessage(messages);
+  const latestModel = latestAssistant?.providerID && latestAssistant?.modelID
+    ? `${latestAssistant.providerID}/${latestAssistant.modelID}`
     : null;
+  const sessionTitle = normalizeSessionTitle(session.title);
 
   return {
     id: session.id,
@@ -38,9 +43,42 @@ export function sessionToConversationState(
     requests: [],
     createdAt: session.time.created,
     updatedAt: session.time.updated,
-    title: session.title || null,
+    title: sessionTitle,
     latestModel,
     cwd: session.directory,
     source: "opencode"
   };
+}
+
+function normalizeSessionTitle(title: string): string | null {
+  return title.trim().length > 0 ? title : null;
+}
+
+function resolveLatestAssistantMessage(messages: OpenCodeMessage[]): OpenCodeMessage | null {
+  let latestAssistant: OpenCodeMessage | null = null;
+
+  for (const message of messages) {
+    if (message.role !== "assistant") {
+      continue;
+    }
+
+    if (latestAssistant === null) {
+      latestAssistant = message;
+      continue;
+    }
+
+    if (message.time.created > latestAssistant.time.created) {
+      latestAssistant = message;
+      continue;
+    }
+
+    if (
+      message.time.created === latestAssistant.time.created &&
+      message.id.localeCompare(latestAssistant.id) > 0
+    ) {
+      latestAssistant = message;
+    }
+  }
+
+  return latestAssistant;
 }

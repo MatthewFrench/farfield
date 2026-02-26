@@ -1,6 +1,9 @@
-import type {
-  ThreadMemberRouteDependencies,
-  ThreadMemberResolvedRouteContext
+import {
+  ThreadMemberMutationActionByName,
+  ThreadMemberRouteMethodByName,
+  ThreadMemberRouteSegmentByName,
+  type ThreadMemberRouteDependencies,
+  type ThreadMemberResolvedRouteContext
 } from "./ThreadMemberRouteContracts.js";
 
 export interface ThreadMemberArchiveMutationRouteOwnerOptions {
@@ -36,7 +39,7 @@ export class ThreadMemberArchiveMutationRouteOwner {
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
-    if (!(req.method === "POST" && this.dependencies.segments[3] === "archive")) {
+    if (!(req.method === ThreadMemberRouteMethodByName.post && this.dependencies.segments[3] === ThreadMemberRouteSegmentByName.archive)) {
       return false;
     }
 
@@ -50,7 +53,7 @@ export class ThreadMemberArchiveMutationRouteOwner {
       return true;
     }
 
-    pushActionEventWithRequestContext("thread-archive", "attempt", {
+    pushActionEventWithRequestContext(ThreadMemberMutationActionByName.threadArchive, "attempt", {
       agentId,
       threadId
     });
@@ -59,7 +62,7 @@ export class ThreadMemberArchiveMutationRouteOwner {
       await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
         await archiveThread({ threadId });
       });
-      pushActionEventWithRequestContext("thread-archive", "success", {
+      pushActionEventWithRequestContext(ThreadMemberMutationActionByName.threadArchive, "success", {
         agentId,
         threadId
       });
@@ -72,7 +75,7 @@ export class ThreadMemberArchiveMutationRouteOwner {
         threadId
       });
     } catch (error) {
-      const message = pushActionErrorWithRequestContext("thread-archive", error, {
+      const message = pushActionErrorWithRequestContext(ThreadMemberMutationActionByName.threadArchive, error, {
         agentId,
         threadId
       });
@@ -96,7 +99,7 @@ export class ThreadMemberArchiveMutationRouteOwner {
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
-    if (!(req.method === "POST" && this.dependencies.segments[3] === "unarchive")) {
+    if (!(req.method === ThreadMemberRouteMethodByName.post && this.dependencies.segments[3] === ThreadMemberRouteSegmentByName.unarchive)) {
       return false;
     }
 
@@ -110,7 +113,7 @@ export class ThreadMemberArchiveMutationRouteOwner {
       return true;
     }
 
-    pushActionEventWithRequestContext("thread-unarchive", "attempt", {
+    pushActionEventWithRequestContext(ThreadMemberMutationActionByName.threadUnarchive, "attempt", {
       agentId,
       threadId
     });
@@ -119,7 +122,7 @@ export class ThreadMemberArchiveMutationRouteOwner {
       await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
         await unarchiveThread({ threadId });
       });
-      pushActionEventWithRequestContext("thread-unarchive", "success", {
+      pushActionEventWithRequestContext(ThreadMemberMutationActionByName.threadUnarchive, "success", {
         agentId,
         threadId
       });
@@ -132,7 +135,7 @@ export class ThreadMemberArchiveMutationRouteOwner {
         threadId
       });
     } catch (error) {
-      const message = pushActionErrorWithRequestContext("thread-unarchive", error, {
+      const message = pushActionErrorWithRequestContext(ThreadMemberMutationActionByName.threadUnarchive, error, {
         agentId,
         threadId
       });

@@ -1,6 +1,10 @@
 import type { CodexAgentRuntimeState } from "../../Agents/Adapters/CodexAgentAdapter.js";
 import type { TraceSummary } from "../../Network/Routes/DebugTypes.js";
 
+// Keep runtime snapshot reads cheap while still allowing near-real-time diagnostics refresh.
+const DEFAULT_SNAPSHOT_CACHE_TIME_TO_LIVE_MILLISECONDS = 250;
+const EMPTY_CACHE_TIMESTAMP_EPOCH_MILLISECONDS = -1;
+
 export interface RuntimeStateSnapshot {
   appExecutable: string;
   socketPath: string;
@@ -42,7 +46,10 @@ export class RuntimeStateOwner {
   private cachedSnapshot: RuntimeStateSnapshot | null;
   private cachedSnapshotAtEpochMs: number;
 
-  public constructor(readModel: RuntimeStateReadModel, snapshotCacheTimeToLiveMs = 250) {
+  public constructor(
+    readModel: RuntimeStateReadModel,
+    snapshotCacheTimeToLiveMs = DEFAULT_SNAPSHOT_CACHE_TIME_TO_LIVE_MILLISECONDS
+  ) {
     if (!Number.isInteger(snapshotCacheTimeToLiveMs) || snapshotCacheTimeToLiveMs < 0) {
       throw new Error("RuntimeStateOwner requires non-negative integer snapshotCacheTimeToLiveMs");
     }
@@ -50,13 +57,13 @@ export class RuntimeStateOwner {
     this.snapshotCacheTimeToLiveMs = snapshotCacheTimeToLiveMs;
     this.runtimeLastError = null;
     this.cachedSnapshot = null;
-    this.cachedSnapshotAtEpochMs = 0;
+    this.cachedSnapshotAtEpochMs = EMPTY_CACHE_TIMESTAMP_EPOCH_MILLISECONDS;
   }
 
   public setRuntimeLastError(message: string | null): void {
     this.runtimeLastError = message;
     this.cachedSnapshot = null;
-    this.cachedSnapshotAtEpochMs = 0;
+    this.cachedSnapshotAtEpochMs = EMPTY_CACHE_TIMESTAMP_EPOCH_MILLISECONDS;
   }
 
   public readRuntimeLastError(): string | null {
@@ -64,9 +71,15 @@ export class RuntimeStateOwner {
   }
 
   public readSnapshot(nowEpochMs: number = Date.now()): RuntimeStateSnapshot {
+    if (!Number.isFinite(nowEpochMs)) {
+      throw new Error("RuntimeStateOwner requires finite nowEpochMs");
+    }
+
+    const cacheAgeMilliseconds = nowEpochMs - this.cachedSnapshotAtEpochMs;
     if (
       this.cachedSnapshot
-      && nowEpochMs - this.cachedSnapshotAtEpochMs <= this.snapshotCacheTimeToLiveMs
+      && cacheAgeMilliseconds >= 0
+      && cacheAgeMilliseconds <= this.snapshotCacheTimeToLiveMs
     ) {
       return this.cachedSnapshot;
     }

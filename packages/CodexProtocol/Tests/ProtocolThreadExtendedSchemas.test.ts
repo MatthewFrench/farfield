@@ -182,6 +182,46 @@ describe("codex-protocol thread extended schemas", () => {
     expect(parsed.turns[0]?.items[0]?.type).toBe("contextCompaction");
   });
 
+  it("parses strict collaboration mode settings contracts", () => {
+    const parsed = parseThreadConversationState({
+      id: "thread-123",
+      turns: [],
+      latestCollaborationMode: {
+        mode: "delegate",
+        settings: {
+          model: "gpt-5.3-codex",
+          reasoning_effort: null,
+          developer_instructions: "Keep responses concise."
+        }
+      }
+    });
+
+    expect(parsed.latestCollaborationMode?.settings.model).toBe("gpt-5.3-codex");
+    expect(parsed.latestCollaborationMode?.settings.reasoning_effort).toBeNull();
+    expect(parsed.latestCollaborationMode?.settings.developer_instructions).toBe(
+      "Keep responses concise."
+    );
+  });
+
+  it("rejects collaboration mode contracts with unknown fields", () => {
+    expect(() =>
+      parseThreadConversationState({
+        id: "thread-123",
+        turns: [],
+        latestCollaborationMode: {
+          mode: "delegate",
+          settings: {
+            model: null,
+            reasoning_effort: null,
+            developer_instructions: null,
+            extraSetting: "not-allowed"
+          },
+          extraModeField: "not-allowed"
+        }
+      })
+    ).toThrowError(/ThreadConversationState did not match expected schema/);
+  });
+
   it("parses thread conversation state with modelChanged item", () => {
     const parsed = parseThreadConversationState({
       id: "thread-123",

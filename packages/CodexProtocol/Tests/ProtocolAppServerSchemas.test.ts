@@ -8,6 +8,7 @@ import {
   parseAppServerListThreadsResponse,
   parseAppServerReadThreadResponse,
   parseAppServerStartThreadResponse,
+  parseCreateDebugClientErrorBody,
   parseDebugErrorEvent
 } from "../Source/Index.js";
 
@@ -141,6 +142,27 @@ describe("codex-protocol app-server schemas", () => {
     expect(parsed.thread.turns[0]?.status).toBe("completed");
   });
 
+  it("rejects app-server thread/read response when normalized thread contract fails", () => {
+    expect(() =>
+      parseAppServerReadThreadResponse({
+        thread: {
+          id: "thread-789",
+          preview: "example",
+          modelProvider: "openai",
+          createdAt: 1700000000,
+          updatedAt: 1700000000,
+          cwd: "/tmp/workspace",
+          path: "/tmp/thread.jsonl",
+          cliVersion: "0.1.0",
+          source: {
+            subAgent: "review"
+          },
+          turns: []
+        }
+      })
+    ).toThrowError(/AppServerReadThreadResponse\.thread did not match expected schema/);
+  });
+
   it("parses app-server thread/start response", () => {
     const parsed = parseAppServerStartThreadResponse({
       thread: {
@@ -206,6 +228,29 @@ describe("codex-protocol app-server schemas", () => {
     expect(parsed.config.profile).toBe("personal");
     expect(parsed.config.model_reasoning_effort).toBe("medium");
     expect(parsed.config.profiles["personal"]?.model_reasoning_effort).toBe("xhigh");
+  });
+
+  it("parses debug error create body defaults", () => {
+    const parsed = parseCreateDebugClientErrorBody({
+      source: "farfield-web",
+      operation: "capture-error",
+      message: "Network request failed"
+    });
+
+    expect(parsed.severity).toBe("error");
+    expect(parsed.name).toBeNull();
+    expect(parsed.details).toEqual({});
+  });
+
+  it("rejects debug error create body with unknown keys", () => {
+    expect(() =>
+      parseCreateDebugClientErrorBody({
+        source: "farfield-web",
+        operation: "capture-error",
+        message: "Network request failed",
+        extraField: "unexpected"
+      })
+    ).toThrowError(/Unrecognized key\(s\) in object: 'extraField'/);
   });
 
   it("parses farfield debug observability envelope", () => {

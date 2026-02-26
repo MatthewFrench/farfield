@@ -11,6 +11,10 @@ import type { PushSendStore } from "../../Modules/PushNotifications/PushSendStor
 import type { PushService, PushSendResult } from "../../Modules/PushNotifications/PushService.js";
 import type { PushStore } from "../../Modules/PushNotifications/PushStore.js";
 import type { PushMutationConcurrencyCoordinator } from "../PushMutationConcurrencyCoordinator.js";
+import {
+  PushRouteMethodByName,
+  PushRoutePathnameByName
+} from "./PushRouteContracts.js";
 
 interface PushDispatchAttempt {
   payload: PushNotificationPayload;
@@ -53,7 +57,7 @@ export class PushTestRouteOwner {
     res: ServerResponse;
     pathname: string;
   }): Promise<boolean> {
-    if (!(input.req.method === "POST" && input.pathname === "/api/push/test")) {
+    if (!(input.req.method === PushRouteMethodByName.post && input.pathname === PushRoutePathnameByName.test)) {
       return false;
     }
 

@@ -1,9 +1,38 @@
 import { motion } from "framer-motion";
+import {
+  createEmptyPendingUserInputAnswerDraft,
+  type PendingUserInputAnswerDraftByQuestionId
+} from "@/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
 import { type PendingUserInputRequest } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
 import { Button } from "@/Components/UserInterface/Button";
 import { Input } from "@/Components/UserInterface/Input";
 import { Label } from "@/Components/UserInterface/Label";
 import { RadioGroup, RadioGroupItem } from "@/Components/UserInterface/RadioGroup";
+
+type PendingRequestDraftField = "option" | "freeform";
+
+const FREEFORM_INPUT_PLACEHOLDER = "Free-form answer…";
+const OPTION_CONTAINER_CLASS_NAME = "space-y-1";
+const SELECTED_OPTION_CLASS_NAME = "bg-muted text-foreground";
+const UNSELECTED_OPTION_CLASS_NAME = "hover:bg-muted/50 text-muted-foreground hover:text-foreground";
+
+export interface PendingRequestCardProps {
+  request: PendingUserInputRequest;
+  answerDraft: PendingUserInputAnswerDraftByQuestionId;
+  onDraftChange: (questionId: string, field: PendingRequestDraftField, value: string) => void;
+  onSubmit: () => void;
+  onSkip: () => void;
+  isBusy: boolean;
+}
+
+function readOptionInputIdentifier(questionIndex: number, optionIndex: number): string {
+  return `pending-request-question-${String(questionIndex)}-option-${String(optionIndex)}`;
+}
+
+function readQuestionDescription(description: string): string | null {
+  const trimmedDescription = description.trim();
+  return trimmedDescription.length > 0 ? trimmedDescription : null;
+}
 
 export function PendingRequestCard({
   request,
@@ -12,70 +41,64 @@ export function PendingRequestCard({
   onSubmit,
   onSkip,
   isBusy
-}: {
-  request: PendingUserInputRequest;
-  answerDraft: Record<string, { option: string; freeform: string }>;
-  onDraftChange: (questionId: string, field: "option" | "freeform", value: string) => void;
-  onSubmit: () => void;
-  onSkip: () => void;
-  isBusy: boolean;
-}): React.JSX.Element {
+}: PendingRequestCardProps): React.JSX.Element {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       className="rounded-xl border border-border bg-card p-4 space-y-3"
     >
-      {request.params.questions.map((q) => {
-        const draft = answerDraft[q.id] ?? { option: "", freeform: "" };
+      {request.params.questions.map((question, questionIndex) => {
+        const draft = answerDraft[question.id] ?? createEmptyPendingUserInputAnswerDraft();
         return (
-          <div key={q.id} className="space-y-2">
+          <div key={question.id} className="space-y-2">
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-              {q.header}
+              {question.header}
             </div>
-            <div className="text-sm font-medium text-foreground">{q.question}</div>
-            <div className="space-y-1">
+            <div className="text-sm font-medium text-foreground">{question.question}</div>
+            <div className={OPTION_CONTAINER_CLASS_NAME}>
               <RadioGroup
                 value={draft.option}
-                onValueChange={(value) => onDraftChange(q.id, "option", value)}
+                onValueChange={(value) => onDraftChange(question.id, "option", value)}
                 className="space-y-1"
               >
-                {q.options.map((opt, optionIndex) => {
-                  const optionId = `q-${q.id}-opt-${optionIndex}`;
+                {question.options.map((option, optionIndex) => {
+                  const optionInputIdentifier = readOptionInputIdentifier(questionIndex, optionIndex);
+                  const descriptionText = readQuestionDescription(option.description);
                   return (
                     <Label
-                      key={opt.label}
-                      htmlFor={optionId}
+                      key={optionInputIdentifier}
+                      htmlFor={optionInputIdentifier}
                       className={`flex items-start gap-2.5 cursor-pointer p-2 rounded-lg transition-colors ${
-                        draft.option === opt.label
-                          ? "bg-muted text-foreground"
-                          : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                        draft.option === option.label
+                          ? SELECTED_OPTION_CLASS_NAME
+                          : UNSELECTED_OPTION_CLASS_NAME
                       }`}
                     >
                       <RadioGroupItem
-                        id={optionId}
-                        value={opt.label}
+                        id={optionInputIdentifier}
+                        value={option.label}
                         className="mt-0.5 shrink-0"
                       />
                       <span className="text-sm">
-                        <span className="font-medium">{opt.label}</span>
-                        {opt.description && (
+                        <span className="font-medium">{option.label}</span>
+                        {descriptionText ? (
                           <span className="block text-xs text-muted-foreground/70 mt-0.5">
-                            {opt.description}
+                            {descriptionText}
                           </span>
-                        )}
+                        ) : null}
                       </span>
                     </Label>
                   );
                 })}
               </RadioGroup>
             </div>
-            {q.isOther && (
+            {question.isOther && (
               <Input
-                type={q.isSecret ? "password" : "text"}
+                type={question.isSecret ? "password" : "text"}
                 value={draft.freeform}
-                onChange={(e) => onDraftChange(q.id, "freeform", e.target.value)}
-                placeholder="Free-form answer…"
+                onChange={(event) => onDraftChange(question.id, "freeform", event.target.value)}
+                placeholder={FREEFORM_INPUT_PLACEHOLDER}
                 className="h-8 bg-background text-base md:text-sm"
               />
             )}

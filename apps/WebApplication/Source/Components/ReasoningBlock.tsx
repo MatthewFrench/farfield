@@ -3,17 +3,31 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/Components/UserInterface/Button";
 
+const BOLD_MARKER_TOKEN = "**";
+const DEFAULT_REASONING_LINE = "Thinking…";
+const MINIMUM_EXPANDABLE_LINE_COUNT = 2;
+
 interface ReasoningBlockProps {
   summary: string[];
   text?: string | undefined;
   isActive: boolean;
 }
 
-export function ReasoningBlock({ summary, text, isActive }: ReasoningBlockProps) {
+function sanitizeSummaryLines(summary: readonly string[]): string[] {
+  return summary
+    .map((line) => line.replaceAll(BOLD_MARKER_TOKEN, "").trim())
+    .filter((line) => line.length > 0);
+}
+
+function hasExpandedReasoningText(text: string | undefined): boolean {
+  return text !== undefined && text.trim().length > 0;
+}
+
+export function ReasoningBlock({ summary, text, isActive }: ReasoningBlockProps): React.JSX.Element {
   const [expanded, setExpanded] = useState(false);
-  const sanitizedSummary = summary.map((line) => line.replaceAll("**", "").trim());
-  const currentLine = sanitizedSummary[sanitizedSummary.length - 1] ?? "Thinking…";
-  const canExpand = sanitizedSummary.length > 1;
+  const sanitizedSummary = sanitizeSummaryLines(summary);
+  const currentLine = sanitizedSummary[sanitizedSummary.length - 1] ?? DEFAULT_REASONING_LINE;
+  const canExpand = sanitizedSummary.length >= MINIMUM_EXPANDABLE_LINE_COUNT;
 
   return (
     <div className="my-4">
@@ -38,7 +52,7 @@ export function ReasoningBlock({ summary, text, isActive }: ReasoningBlockProps)
           </motion.span>
         </AnimatePresence>
 
-        {!isActive && sanitizedSummary.length > 1 && (
+        {!isActive && canExpand && (
           <span className="text-xs text-muted-foreground/50 shrink-0">
             {sanitizedSummary.length} steps
           </span>
@@ -64,12 +78,15 @@ export function ReasoningBlock({ summary, text, isActive }: ReasoningBlockProps)
             className="overflow-hidden"
           >
             <div className="mt-2 ml-5 space-y-1 border-l border-border pl-3">
-              {sanitizedSummary.map((line, i) => (
-                <p key={i} className="text-xs font-semibold text-muted-foreground leading-5">
+              {sanitizedSummary.map((line, summaryIndex) => (
+                <p
+                  key={`${String(summaryIndex)}-${line}`}
+                  className="text-xs font-semibold text-muted-foreground leading-5"
+                >
                   {line}
                 </p>
               ))}
-              {text && (
+              {hasExpandedReasoningText(text) && (
                 <div className="mt-3 pt-3 border-t border-border/60">
                   <pre className="text-[11px] text-muted-foreground/60 font-mono leading-5 whitespace-pre-wrap break-words">
                     {text}

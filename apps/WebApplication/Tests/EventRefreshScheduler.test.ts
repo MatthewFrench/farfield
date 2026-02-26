@@ -81,4 +81,25 @@ describe("EventRefreshScheduler", () => {
 
     expect(executedRefreshCount).toBe(0);
   });
+
+  it("ignores no-op refresh requests that contain no work", async () => {
+    vi.useFakeTimers();
+    const scheduler = new EventRefreshScheduler(REFRESH_DELAY_MS);
+    let executedRefreshCount = 0;
+
+    scheduler.enqueueRefresh(
+      createRefreshFlags({
+        refreshCore: false,
+        refreshHistory: false,
+        refreshSelectedThread: false
+      }),
+      async () => {
+        executedRefreshCount += 1;
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(REFRESH_DELAY_MS);
+
+    expect(executedRefreshCount).toBe(0);
+  });
 });

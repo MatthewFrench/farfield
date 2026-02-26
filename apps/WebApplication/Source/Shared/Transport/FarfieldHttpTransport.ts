@@ -4,7 +4,18 @@
  */
 import { FarfieldApiErrorResponseSchema } from "@farfield/protocol";
 import { z } from "zod";
-import { type ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
+import {
+  ApiRequestHeaderOptionsSchema,
+  type ApiRequestHeaderOptions,
+  type ApiRequestOptions
+} from "@/Shared/Contracts/ApiContracts";
+import {
+  ACTION_ID_HEADER_NAME,
+  ACTION_NAME_HEADER_NAME,
+  REQUEST_ID_HEADER_NAME,
+  REQUEST_ID_LABEL,
+  RequestIdentifierInMessagePattern
+} from "@/Shared/Contracts/RequestMetadataContracts";
 import {
   StructuredDataValueSchema,
   type StructuredDataValue
@@ -20,11 +31,9 @@ const ApiEnvelopeSchema = z
 // Thread and capability reads can exceed one minute on cold local agent startup.
 // Keep request budgets above that window so startup does not fail into error state.
 const REQUEST_TIMEOUT_MS = 120_000;
-const REQUEST_ID_HEADER_NAME = "X-Farfield-Request-Id";
-const ACTION_ID_HEADER_NAME = "X-Farfield-Action-Id";
-const ACTION_NAME_HEADER_NAME = "X-Farfield-Action-Name";
 const MAX_RESPONSE_TEXT_LENGTH = 4000;
 const ApiErrorEnvelopeSchema = FarfieldApiErrorResponseSchema;
+const RequestPathSchema = z.string().trim().min(1, "Request path must not be blank.");
 
 interface ResponseTextSummary {
   responseText: string | null;
@@ -57,12 +66,32 @@ export class FarfieldHttpRequestFailureError extends Error {
   }
 }
 
+function readNonEmptyTrimmedText(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeRequestPath(path: string): string {
+  return RequestPathSchema.parse(path);
+}
+
+function readValidatedRequestHeaderOptions(options: ApiRequestOptions): ApiRequestHeaderOptions {
+  return ApiRequestHeaderOptionsSchema.parse({
+    actionId: options.actionId,
+    actionName: options.actionName
+  });
+}
+
 function buildFailureMessage(
   baseMessage: string,
   context: FarfieldHttpRequestFailureDetails
 ): string {
-  const statusText = context.statusText?.trim().length ? ` ${context.statusText}` : "";
-  const requestId = context.requestId && context.requestId.trim().length > 0 ? context.requestId : null;
+  const statusTextValue = readNonEmptyTrimmedText(context.statusText);
+  const statusText = statusTextValue === null ? "" : ` ${statusTextValue}`;
+  const requestId = readNonEmptyTrimmedText(context.requestId);
   const statusTextParts = [
     "status=",
     String(context.status ?? "n/a"),
@@ -157,26 +186,18 @@ function createClientRequestId(): string {
 }
 
 function readResponseRequestId(response: Response): string | null {
-  if (!response.headers || typeof response.headers.get !== "function") {
-    return null;
-  }
-
   const rawValue = response.headers.get(REQUEST_ID_HEADER_NAME);
-  if (!rawValue) {
-    return null;
-  }
-  const normalized = rawValue.trim();
-  return normalized.length > 0 ? normalized : null;
+  return readNonEmptyTrimmedText(rawValue);
 }
 
 function appendRequestId(message: string, requestId: string | null): string {
   if (!requestId) {
     return message;
   }
-  if (/\brequest(?:Id)?[ =:]+[a-z0-9._-]+/i.test(message)) {
+  if (RequestIdentifierInMessagePattern.test(message)) {
     return message;
   }
-  return `${message} requestId ${requestId}`;
+  return `${message} ${REQUEST_ID_LABEL} ${requestId}`;
 }
 
 async function performRequest(path: string, init?: RequestInit): Promise<Response> {
@@ -234,18 +255,19 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
 }
 
 export async function request(path: string, init?: RequestInit): Promise<StructuredDataValue> {
-  const response = await performRequest(path, init);
+  const normalizedPath = normalizeRequestPath(path);
+  const response = await performRequest(normalizedPath, init);
   const responseRequestId = readResponseRequestId(response);
   const responseBody = await readResponseBody(response);
 
   let data: StructuredDataValue;
   if (responseBody.parseText === null) {
     throw createRequestFailureError(
-      path,
+      normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      `Invalid JSON response from ${path}: empty response`
+      `Invalid JSON response from ${normalizedPath}: empty response`
     );
   }
 
@@ -255,11 +277,11 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw createRequestFailureError(
-      path,
+      normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      `Invalid JSON response from ${path}: ${message}`
+      `Invalid JSON response from ${normalizedPath}: ${message}`
     );
   }
 
@@ -269,22 +291,22 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw createRequestFailureError(
-      path,
+      normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      `Invalid API envelope from ${path}: ${message}`
+      `Invalid API envelope from ${normalizedPath}: ${message}`
     );
   }
 
   if (!response.ok || envelope.ok === false) {
     const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
     throw createRequestFailureError(
-      path,
+      normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      parsedError.success ? parsedError.data.error : `Request failed for ${path}`
+      parsedError.success ? parsedError.data.error : `Request failed for ${normalizedPath}`
     );
   }
 
@@ -292,7 +314,8 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
 }
 
 export async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
-  const response = await performRequest(path, init);
+  const normalizedPath = normalizeRequestPath(path);
+  const response = await performRequest(normalizedPath, init);
   const responseRequestId = readResponseRequestId(response);
   if (response.ok) {
     return;
@@ -300,11 +323,11 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
   const responseBody = await readResponseBody(response);
   if (responseBody.parseText === null) {
     throw createRequestFailureError(
-      path,
+      normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      `Request failed for ${path}: empty response`
+      `Request failed for ${normalizedPath}: empty response`
     );
   }
 
@@ -319,11 +342,11 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
 
   const parsedError = ApiErrorEnvelopeSchema.safeParse(data);
   throw createRequestFailureError(
-    path,
+    normalizedPath,
     responseRequestId,
     response,
     responseBody.responseTextSummary,
-    parsedError.success ? parsedError.data.error : `Request failed for ${path}`
+    parsedError.success ? parsedError.data.error : `Request failed for ${normalizedPath}`
   );
 }
 
@@ -332,12 +355,13 @@ export function applyRequestOptions(init: RequestInit, options?: ApiRequestOptio
     return init;
   }
 
+  const validatedRequestHeaderOptions = readValidatedRequestHeaderOptions(options);
   const nextHeaders = new Headers(init.headers);
-  if (options.actionId && options.actionId.trim().length > 0) {
-    nextHeaders.set(ACTION_ID_HEADER_NAME, options.actionId.trim());
+  if (validatedRequestHeaderOptions.actionId !== undefined) {
+    nextHeaders.set(ACTION_ID_HEADER_NAME, validatedRequestHeaderOptions.actionId);
   }
-  if (options.actionName && options.actionName.trim().length > 0) {
-    nextHeaders.set(ACTION_NAME_HEADER_NAME, options.actionName.trim());
+  if (validatedRequestHeaderOptions.actionName !== undefined) {
+    nextHeaders.set(ACTION_NAME_HEADER_NAME, validatedRequestHeaderOptions.actionName);
   }
 
   const nextInit: RequestInit = {

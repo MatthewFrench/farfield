@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { PushNotificationPayload, StoredPushSubscription } from "@farfield/protocol";
-import { CompletionDetector } from "./CompletionDetector.js";
+import { CompletionDetector, type CompletionCandidate } from "./CompletionDetector.js";
 import { logger } from "../../Shared/Logging/Logger.js";
 import type { CodexAgentAdapter } from "../../Agents/Adapters/CodexAgentAdapter.js";
 import type { AgentThreadLiveState } from "../../Agents/Types.js";
@@ -17,6 +17,17 @@ type CompletionNotificationContext = {
   threadName: string;
   projectName: string;
 };
+
+const DEFAULT_THREAD_NOTIFICATION_PREVIEW = "";
+const DEFAULT_THREAD_NOTIFICATION_NAME = "";
+const DEFAULT_PROJECT_NAME = "No project";
+const THREAD_COMPLETION_PUSH_SYSTEM_MESSAGE = "thread completion notification sent";
+const LOG_EVENT_NTFY_PUBLISH_FAILED = "ntfy-publish-failed";
+const LOG_EVENT_PUSH_COMPLETION_SEND_FAILED = "push-completion-send-failed";
+const LOG_EVENT_PUSH_COMPLETION_SEND_THREW = "push-completion-send-threw";
+const LOG_EVENT_COMPLETION_NOTIFICATION_CHECK_FAILED = "completion-notification-check-failed";
+const LOG_EVENT_THREAD_NOTIFICATION_CONTEXT_PARSE_FAILED = "thread-notification-context-parse-failed";
+const PUSH_FAILURE_LOG_SAMPLE_LIMIT = 10;
 
 const ThreadNotificationContextSchema = z
   .object({
@@ -44,8 +55,20 @@ interface CompletionPushSendAggregate {
   attempted: number;
   delivered: number;
   failures: number;
-  failureDetails: Array<{ endpoint: string; statusCode: number | null; message: string }>;
+  failureDetails: CompletionPushFailureDetail[];
   prunedEndpoints: string[];
+}
+
+interface CompletionPushFailureDetail {
+  endpoint: string;
+  statusCode: number | null;
+  message: string;
+}
+
+interface CompletionPushFailureLogSummary {
+  failureCount: number;
+  failureSamples: CompletionPushFailureDetail[];
+  omittedFailureCount: number;
 }
 
 export class ThreadCompletionNotificationService {
@@ -111,7 +134,7 @@ export class ThreadCompletionNotificationService {
         return;
       }
 
-      const context = this.readThreadNotificationContext(liveState.conversationState);
+      const context = this.readThreadNotificationContext(threadId, liveState.conversationState);
 
       let ntfyDelivered = false;
       let ntfyMessageId: string | null = null;
@@ -132,7 +155,7 @@ export class ThreadCompletionNotificationService {
               threadId,
               error: this.errorMessageFromValue(error)
             },
-            "ntfy-publish-failed"
+            LOG_EVENT_NTFY_PUBLISH_FAILED
           );
         }
       }
@@ -154,30 +177,17 @@ export class ThreadCompletionNotificationService {
         webPushFailures = sendAggregate.failures;
 
         await this.pushMutationConcurrencyCoordinator.runExclusive(async () => {
-          await Promise.all(
-            sendAggregate.prunedEndpoints.map(async (endpoint) => this.pushStore.removeSubscriptionByEndpoint(endpoint))
-          );
-
-          if (sendAggregate.attempted > 0) {
-            this.pushSendStore.setLatest({
-              notificationId: sendAggregate.notificationId,
-              threadId: completionCandidate.threadId,
-              turnId: completionCandidate.turnId,
-              sentAt: sendAggregate.sentAt,
-              attempted: sendAggregate.attempted,
-              delivered: sendAggregate.delivered,
-              failures: sendAggregate.failures
-            });
-          }
+          await this.applyWebPushDispatchResultUnderPushMutationLock(sendAggregate, completionCandidate);
         });
 
         if (sendAggregate.failureDetails.length > 0) {
+          const failureSummary = this.buildPushFailureLogSummary(sendAggregate.failureDetails);
           logger.warn(
             {
               threadId,
-              failures: sendAggregate.failureDetails
+              ...failureSummary
             },
-            "push-completion-send-failed"
+            LOG_EVENT_PUSH_COMPLETION_SEND_FAILED
           );
         }
       }
@@ -190,7 +200,7 @@ export class ThreadCompletionNotificationService {
         await this.pushStore.setCompletionWatermark(threadId, completionCandidate.marker);
       });
       this.completionDetector.commit(threadId, completionCandidate.marker);
-      this.pushSystem("thread completion notification sent", {
+      this.pushSystem(THREAD_COMPLETION_PUSH_SYSTEM_MESSAGE, {
         threadId,
         ntfyDelivered,
         ...(ntfyMessageId ? { ntfyMessageId } : {}),
@@ -204,9 +214,36 @@ export class ThreadCompletionNotificationService {
           threadId,
           error: this.errorMessageFromValue(error)
         },
-        "completion-notification-check-failed"
+        LOG_EVENT_COMPLETION_NOTIFICATION_CHECK_FAILED
       );
     }
+  }
+
+  // Web-push mutation ownership stays under one coordinator lane so subscription
+  // pruning and send-summary cache writes remain deterministic.
+  private async applyWebPushDispatchResultUnderPushMutationLock(
+    sendAggregate: CompletionPushSendAggregate,
+    completionCandidate: CompletionCandidate
+  ): Promise<void> {
+    await Promise.all(
+      sendAggregate.prunedEndpoints.map(
+        async (endpoint) => this.pushStore.removeSubscriptionByEndpoint(endpoint)
+      )
+    );
+
+    if (sendAggregate.attempted === 0) {
+      return;
+    }
+
+    this.pushSendStore.setLatest({
+      notificationId: sendAggregate.notificationId,
+      threadId: completionCandidate.threadId,
+      turnId: completionCandidate.turnId,
+      sentAt: sendAggregate.sentAt,
+      attempted: sendAggregate.attempted,
+      delivered: sendAggregate.delivered,
+      failures: sendAggregate.failures
+    });
   }
 
   private buildThreadCompletionPushPayload(input: {
@@ -270,7 +307,7 @@ export class ThreadCompletionNotificationService {
     let attempted = 0;
     let delivered = 0;
     let failures = 0;
-    const failureDetails: Array<{ endpoint: string; statusCode: number | null; message: string }> = [];
+    const failureDetails: CompletionPushFailureDetail[] = [];
     const prunedEndpointSet = new Set<string>();
 
     const dispatchByPrivacyMode = async (
@@ -309,7 +346,7 @@ export class ThreadCompletionNotificationService {
             error: this.errorMessageFromValue(error),
             privateMode
           },
-          "push-completion-send-threw"
+          LOG_EVENT_PUSH_COMPLETION_SEND_THREW
         );
       }
     };
@@ -337,14 +374,22 @@ export class ThreadCompletionNotificationService {
   }
 
   private readThreadNotificationContext(
+    threadId: string,
     value: AgentThreadLiveState["conversationState"]
   ): CompletionNotificationContext {
     const parsed = ThreadNotificationContextSchema.safeParse(value);
     if (!parsed.success) {
+      logger.warn(
+        {
+          threadId,
+          issueCount: parsed.error.issues.length
+        },
+        LOG_EVENT_THREAD_NOTIFICATION_CONTEXT_PARSE_FAILED
+      );
       return {
-        preview: "",
-        threadName: "",
-        projectName: "No project"
+        preview: DEFAULT_THREAD_NOTIFICATION_PREVIEW,
+        threadName: DEFAULT_THREAD_NOTIFICATION_NAME,
+        projectName: DEFAULT_PROJECT_NAME
       };
     }
 
@@ -358,7 +403,7 @@ export class ThreadCompletionNotificationService {
       threadName: preview.length > 0 ? preview : title,
       projectName: cwd
         ? this.projectLabelFromPath(cwd)
-        : (pathValue ? this.projectLabelFromPath(pathValue) : "No project")
+        : (pathValue ? this.projectLabelFromPath(pathValue) : DEFAULT_PROJECT_NAME)
     };
   }
 
@@ -373,7 +418,7 @@ export class ThreadCompletionNotificationService {
   private projectLabelFromPath(value: string): string {
     const normalized = this.normalizeProjectPathForLabel(value);
     if (normalized.length === 0) {
-      return "No project";
+      return DEFAULT_PROJECT_NAME;
     }
     const segments = normalized.split("/").filter((segment) => segment.length > 0);
     return segments[segments.length - 1] ?? normalized;
@@ -393,5 +438,16 @@ export class ThreadCompletionNotificationService {
     }
 
     return String(error);
+  }
+
+  private buildPushFailureLogSummary(
+    failureDetails: CompletionPushFailureDetail[]
+  ): CompletionPushFailureLogSummary {
+    const failureSamples = failureDetails.slice(0, PUSH_FAILURE_LOG_SAMPLE_LIMIT);
+    return {
+      failureCount: failureDetails.length,
+      failureSamples,
+      omittedFailureCount: failureDetails.length - failureSamples.length
+    };
   }
 }

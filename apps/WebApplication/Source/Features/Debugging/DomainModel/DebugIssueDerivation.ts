@@ -6,7 +6,7 @@ import {
   type DebugIssue,
   type DebugWarningIssue
 } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
-import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
+import { buildDebugErrorIssueIdentifier } from "@/Features/Debugging/DomainModel/DebugIssueIdentifier";
 
 const SystemHistoryPayloadSchema = z
   .object({
@@ -24,13 +24,11 @@ const HistoryWarningMetaSchema = z
   })
   .passthrough();
 
-function parseOptionalNonEmptyString(value: StructuredDataValue | undefined): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
+const WARNING_MESSAGE_PATTERN = /warning|deprecat/i;
+const IPC_WARNING_SOURCE_LABEL = "IPC warning";
+const SYSTEM_WARNING_SOURCE_LABEL = "System warning";
+const HISTORY_METHOD_WARNING_IDENTIFIER_PREFIX = "warning:history-method:";
+const SYSTEM_WARNING_IDENTIFIER_PREFIX = "warning:system:";
 
 function toTimestampMilliseconds(value: string): number {
   const timestamp = Date.parse(value);
@@ -47,8 +45,8 @@ export function sortDebugIssuesByTimeDesc(left: DebugIssue, right: DebugIssue): 
 }
 
 export function buildDebugErrorIssue(event: DebugErrorLike): DebugErrorIssue {
-  const actionId = parseOptionalNonEmptyString(event.details["actionId"]);
-  const actionName = parseOptionalNonEmptyString(event.details["actionName"]);
+  const actionId = event.details.actionId ?? null;
+  const actionName = event.details.actionName ?? null;
   const sourceLabel = event.origin === "server"
     ? `Server (${event.operation})`
     : `Client (${event.operation})`;
@@ -65,7 +63,7 @@ export function buildDebugErrorIssue(event: DebugErrorLike): DebugErrorIssue {
   ].join(" ").toLowerCase();
 
   return {
-    id: `error:${event.errorId}`,
+    id: buildDebugErrorIssueIdentifier(event.errorId),
     kind: "debug-error",
     severity: event.severity,
     occurredAt: event.occurredAt,
@@ -93,29 +91,30 @@ export function buildDebugWarningIssuesFromHistory(
 
   for (const entry of history) {
     const parsedMeta = HistoryWarningMetaSchema.safeParse(entry.meta);
-    const method = parsedMeta.success ? parsedMeta.data.method ?? null : null;
+    const warningMeta = parsedMeta.success ? parsedMeta.data : null;
+    const method = warningMeta?.method ?? null;
 
-    if (method && /warning|deprecat/i.test(method)) {
+    if (method && WARNING_MESSAGE_PATTERN.test(method)) {
       const searchText = [
         entry.id,
         method,
-        parsedMeta.success ? parsedMeta.data.threadId ?? "" : "",
-        parsedMeta.success ? parsedMeta.data.requestId ?? "" : "",
-        parsedMeta.success ? parsedMeta.data.actionId ?? "" : ""
+        warningMeta?.threadId ?? "",
+        warningMeta?.requestId ?? "",
+        warningMeta?.actionId ?? ""
       ].join(" ").toLowerCase();
       warningIssues.push({
-        id: `warning:history-method:${entry.id}`,
+        id: `${HISTORY_METHOD_WARNING_IDENTIFIER_PREFIX}${entry.id}`,
         kind: "history-warning",
         severity: "warning",
         warningType: "ipc-method",
         historyEntryId: entry.id,
         occurredAt: entry.at,
         message: `IPC method ${method}`,
-        sourceLabel: "IPC warning",
-        threadId: parsedMeta.success ? parsedMeta.data.threadId ?? null : null,
-        requestId: parsedMeta.success ? parsedMeta.data.requestId ?? null : null,
-        actionId: parsedMeta.success ? parsedMeta.data.actionId ?? null : null,
-        actionName: parsedMeta.success ? parsedMeta.data.actionName ?? null : null,
+        sourceLabel: IPC_WARNING_SOURCE_LABEL,
+        threadId: warningMeta?.threadId ?? null,
+        requestId: warningMeta?.requestId ?? null,
+        actionId: warningMeta?.actionId ?? null,
+        actionName: warningMeta?.actionName ?? null,
         payloadText: JSON.stringify(entry.payload, null, 2),
         searchText
       });
@@ -131,30 +130,30 @@ export function buildDebugWarningIssuesFromHistory(
       continue;
     }
     const systemMessage = parsedPayload.data.message;
-    if (!/warning|deprecat/i.test(systemMessage)) {
+    if (!WARNING_MESSAGE_PATTERN.test(systemMessage)) {
       continue;
     }
 
     const searchText = [
       entry.id,
       systemMessage,
-      parsedMeta.success ? parsedMeta.data.threadId ?? "" : "",
-      parsedMeta.success ? parsedMeta.data.requestId ?? "" : "",
-      parsedMeta.success ? parsedMeta.data.actionId ?? "" : ""
+      warningMeta?.threadId ?? "",
+      warningMeta?.requestId ?? "",
+      warningMeta?.actionId ?? ""
     ].join(" ").toLowerCase();
     warningIssues.push({
-      id: `warning:system:${entry.id}`,
+      id: `${SYSTEM_WARNING_IDENTIFIER_PREFIX}${entry.id}`,
       kind: "history-warning",
       severity: "warning",
       warningType: "system-message",
       historyEntryId: entry.id,
       occurredAt: entry.at,
       message: systemMessage,
-      sourceLabel: "System warning",
-      threadId: parsedMeta.success ? parsedMeta.data.threadId ?? null : null,
-      requestId: parsedMeta.success ? parsedMeta.data.requestId ?? null : null,
-      actionId: parsedMeta.success ? parsedMeta.data.actionId ?? null : null,
-      actionName: parsedMeta.success ? parsedMeta.data.actionName ?? null : null,
+      sourceLabel: SYSTEM_WARNING_SOURCE_LABEL,
+      threadId: warningMeta?.threadId ?? null,
+      requestId: warningMeta?.requestId ?? null,
+      actionId: warningMeta?.actionId ?? null,
+      actionName: warningMeta?.actionName ?? null,
       payloadText: JSON.stringify(entry.payload, null, 2),
       searchText
     });

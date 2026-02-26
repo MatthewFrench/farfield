@@ -5,18 +5,36 @@ import {
 } from "@farfield/protocol";
 import { z } from "zod";
 
+const DEFAULT_NOTIFICATION_TITLE = "Farfield notification";
+const DEFAULT_NOTIFICATION_BODY = "A response is ready in Farfield.";
+const NOTIFICATION_ID_PREFIX = "notif_";
+const DEFAULT_NOTIFICATION_ICON_PATH = "/icons/icon-192.png";
+
+interface PushTestPayloadOwnerDependencies {
+  readNowIsoString?: () => string;
+  createNotificationIdSuffix?: () => string;
+}
+
 export class PushTestPayloadOwner {
+  private readonly readNowIsoString: () => string;
+  private readonly createNotificationIdSuffix: () => string;
+
+  public constructor(dependencies?: PushTestPayloadOwnerDependencies) {
+    this.readNowIsoString = dependencies?.readNowIsoString ?? (() => new Date().toISOString());
+    this.createNotificationIdSuffix = dependencies?.createNotificationIdSuffix ?? (() => randomUUID());
+  }
+
   public buildPayload(
     input: z.infer<typeof FarfieldPushTestBodySchema>,
     privateMode: boolean
   ): PushNotificationPayload {
-    const now = new Date().toISOString();
-    const notificationId = `notif_${randomUUID()}`;
+    const now = this.readNowIsoString();
+    const notificationId = `${NOTIFICATION_ID_PREFIX}${this.createNotificationIdSuffix()}`;
     const url = `/threads/${encodeURIComponent(input.threadId)}`;
-    const title = input.title ?? "Farfield notification";
+    const title = input.title ?? DEFAULT_NOTIFICATION_TITLE;
     const body = privateMode
-      ? "A response is ready in Farfield."
-      : (input.body ?? "A response is ready in Farfield.");
+      ? DEFAULT_NOTIFICATION_BODY
+      : (input.body ?? DEFAULT_NOTIFICATION_BODY);
 
     return {
       notificationId,
@@ -31,8 +49,8 @@ export class PushTestPayloadOwner {
           title,
           body,
           navigate: url,
-          icon: "/icons/icon-192.png",
-          badge: "/icons/icon-192.png",
+          icon: DEFAULT_NOTIFICATION_ICON_PATH,
+          badge: DEFAULT_NOTIFICATION_ICON_PATH,
           tag: `thread:${input.threadId}`
         }
       }

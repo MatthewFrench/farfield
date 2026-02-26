@@ -17,6 +17,9 @@ import {
   PushNotificationToolbarActionCoordinator
 } from "@/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";
 
+const API_TOKEN_REQUIRED_ERROR_MESSAGE = "API token is required";
+const INVALID_API_TOKEN_ERROR_MESSAGE = "Invalid API token";
+
 export interface UseApplicationPushFeatureCompositionInput {
   apiSessionBootstrapCoordinator: ApiSessionBootstrapCoordinator;
   apiSessionTokenDraft: string;
@@ -44,7 +47,7 @@ export function useApplicationPushFeatureComposition(
   const submitApiSessionToken = useCallback(async (): Promise<void> => {
     const tokenValue = input.apiSessionTokenDraft.trim();
     if (tokenValue.length === 0) {
-      input.setApiSessionBootstrapErrorMessage("API token is required");
+      input.setApiSessionBootstrapErrorMessage(API_TOKEN_REQUIRED_ERROR_MESSAGE);
       return;
     }
 
@@ -59,7 +62,7 @@ export function useApplicationPushFeatureComposition(
           input.apiSessionBootstrapCoordinator.markApiTokenRequired();
         }
         input.setRequiresApiSessionToken(true);
-        input.setApiSessionBootstrapErrorMessage("Invalid API token");
+        input.setApiSessionBootstrapErrorMessage(INVALID_API_TOKEN_ERROR_MESSAGE);
         return;
       }
 

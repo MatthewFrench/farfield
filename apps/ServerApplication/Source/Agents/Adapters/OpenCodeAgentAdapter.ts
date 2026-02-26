@@ -29,9 +29,13 @@ export interface OpenCodeAgentOptions {
   port?: number;
 }
 
+const OPEN_CODE_THREAD_CURSOR_VERSION = 1;
+const UTF8_ENCODING = "utf8";
+const BASE64_URL_ENCODING = "base64url";
+
 const OpenCodeThreadCursorSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(OPEN_CODE_THREAD_CURSOR_VERSION),
     offset: z.number().int().nonnegative()
   })
   .strict();
@@ -39,11 +43,11 @@ const OpenCodeThreadCursorSchema = z
 function encodeOpenCodeThreadCursor(offset: number): string {
   return Buffer.from(
     JSON.stringify({
-      version: 1,
+      version: OPEN_CODE_THREAD_CURSOR_VERSION,
       offset
     }),
-    "utf8"
-  ).toString("base64url");
+    UTF8_ENCODING
+  ).toString(BASE64_URL_ENCODING);
 }
 
 function decodeOpenCodeThreadCursor(cursor: string | null): number {
@@ -51,7 +55,7 @@ function decodeOpenCodeThreadCursor(cursor: string | null): number {
     return 0;
   }
 
-  const decodedPayload = Buffer.from(cursor, "base64url").toString("utf8");
+  const decodedPayload = Buffer.from(cursor, BASE64_URL_ENCODING).toString(UTF8_ENCODING);
   const parsedJson = JSON.parse(decodedPayload);
   const parsedCursor = OpenCodeThreadCursorSchema.parse(parsedJson);
   return parsedCursor.offset;

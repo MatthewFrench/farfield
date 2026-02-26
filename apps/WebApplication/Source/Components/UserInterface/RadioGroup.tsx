@@ -4,6 +4,9 @@ import { Circle } from "lucide-react"
 
 import { cn } from "@/Shared/Styling/ClassNameMerge"
 
+const RADIO_GROUP_COMPONENT_DISPLAY_NAME = "RadioGroup"
+const RADIO_GROUP_ITEM_COMPONENT_DISPLAY_NAME = "RadioGroupItem"
+
 const RadioGroup = React.forwardRef<
   React.ElementRef<typeof RadioGroupPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root>
@@ -16,7 +19,7 @@ const RadioGroup = React.forwardRef<
     />
   )
 })
-RadioGroup.displayName = RadioGroupPrimitive.Root.displayName
+RadioGroup.displayName = RADIO_GROUP_COMPONENT_DISPLAY_NAME
 
 const RadioGroupItem = React.forwardRef<
   React.ElementRef<typeof RadioGroupPrimitive.Item>,
@@ -37,6 +40,6 @@ const RadioGroupItem = React.forwardRef<
     </RadioGroupPrimitive.Item>
   )
 })
-RadioGroupItem.displayName = RadioGroupPrimitive.Item.displayName
+RadioGroupItem.displayName = RADIO_GROUP_ITEM_COMPONENT_DISPLAY_NAME
 
 export { RadioGroup, RadioGroupItem }

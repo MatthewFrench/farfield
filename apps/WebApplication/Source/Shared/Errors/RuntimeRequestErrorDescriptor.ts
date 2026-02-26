@@ -1,11 +1,38 @@
+/**
+ * Normalizes runtime request failures into stable operation-scoped and banner-safe messages.
+ * Ownership note: this module controls action-id enrichment so callers do not duplicate suffix logic.
+ */
+import { z } from "zod";
+import {
+  ACTION_ID_LABEL,
+  ActionIdentifierInMessagePattern,
+  RequestMetadataTokenSchema
+} from "@/Shared/Contracts/RequestMetadataContracts";
+
 const OPERATION_PREFIX_PATTERN = /^([a-z][a-z0-9._-]{1,64}):\s*(.+)$/i;
-const ACTION_IDENTIFIER_PATTERN = /\baction(?:Id)?[ =:]+([a-z0-9._-]+)/i;
 const DEFAULT_RUNTIME_ERROR_MESSAGE = "Unknown runtime request failure";
+const OPERATION_DELIMITER = ": ";
+
+const RuntimeRequestOperationSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-z][a-z0-9._-]{1,64}$/i,
+    "Runtime request operation must start with a letter and include only letters, numbers, periods, underscores, and hyphens."
+  );
+
+const RuntimeRequestErrorDescriptorInputSchema = z
+  .object({
+    rawMessage: z.string(),
+    defaultOperation: RuntimeRequestOperationSchema,
+    actionId: RequestMetadataTokenSchema.optional()
+  })
+  .strict();
 
 export interface RuntimeRequestErrorDescriptorInput {
   rawMessage: string;
   defaultOperation: string;
-  actionId: string;
+  actionId?: string;
 }
 
 export interface RuntimeRequestErrorDescriptor {
@@ -14,12 +41,13 @@ export interface RuntimeRequestErrorDescriptor {
   bannerErrorMessage: string;
 }
 
+function readNonEmptyTrimmedValue(value: string): string | null {
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 function normalizeMessage(rawMessage: string): string {
-  const normalized = rawMessage.trim();
-  if (normalized.length > 0) {
-    return normalized;
-  }
-  return DEFAULT_RUNTIME_ERROR_MESSAGE;
+  return readNonEmptyTrimmedValue(rawMessage) ?? DEFAULT_RUNTIME_ERROR_MESSAGE;
 }
 
 function readOperationFromMessage(message: string): string | null {
@@ -31,26 +59,40 @@ function readOperationFromMessage(message: string): string | null {
   return operation;
 }
 
-function appendActionIdentifier(message: string, actionId: string): string {
-  if (ACTION_IDENTIFIER_PATTERN.test(message)) {
+function appendActionIdentifier(message: string, actionId: string | undefined): string {
+  if (actionId === undefined || ActionIdentifierInMessagePattern.test(message)) {
     return message;
   }
-  return `${message} actionId=${actionId}`;
+  return `${message} ${ACTION_ID_LABEL}=${actionId}`;
+}
+
+function buildOperationScopedMessage(
+  operation: string,
+  trackingErrorMessage: string,
+  parsedOperation: string | null
+): string {
+  if (parsedOperation) {
+    return trackingErrorMessage;
+  }
+  return `${operation}${OPERATION_DELIMITER}${trackingErrorMessage}`;
 }
 
 export function resolveRuntimeRequestErrorDescriptor(
   input: RuntimeRequestErrorDescriptorInput
 ): RuntimeRequestErrorDescriptor {
-  const trackingErrorMessage = normalizeMessage(input.rawMessage);
+  const parsedInput = RuntimeRequestErrorDescriptorInputSchema.parse(input);
+  const trackingErrorMessage = normalizeMessage(parsedInput.rawMessage);
   const parsedOperation = readOperationFromMessage(trackingErrorMessage);
-  const operation = parsedOperation ?? input.defaultOperation;
-  const operationScopedMessage = parsedOperation
-    ? trackingErrorMessage
-    : `${operation}: ${trackingErrorMessage}`;
+  const operation = parsedOperation ?? parsedInput.defaultOperation;
+  const operationScopedMessage = buildOperationScopedMessage(
+    operation,
+    trackingErrorMessage,
+    parsedOperation
+  );
 
   return {
     operation,
     trackingErrorMessage,
-    bannerErrorMessage: appendActionIdentifier(operationScopedMessage, input.actionId)
+    bannerErrorMessage: appendActionIdentifier(operationScopedMessage, parsedInput.actionId)
   };
 }

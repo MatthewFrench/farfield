@@ -3,6 +3,14 @@ import { logger } from "../../Shared/Logging/Logger.js";
 import type { AgentRegistry } from "../../Agents/Registry.js";
 import type { AgentAdapter, AgentDescriptor, AgentId } from "../../Agents/Types.js";
 
+const AgentRouteMethodByName = {
+  get: "GET"
+} as const;
+
+const AgentRoutePathnameByName = {
+  listAgents: "/api/agents"
+} as const;
+
 export interface AgentRouteDependencies {
   req: IncomingMessage;
   res: ServerResponse;
@@ -24,7 +32,7 @@ export async function handleAgentRoutes(deps: AgentRouteDependencies): Promise<b
     jsonResponse
   } = deps;
 
-  if (!(req.method === "GET" && pathname === "/api/agents")) {
+  if (!(req.method === AgentRouteMethodByName.get && pathname === AgentRoutePathnameByName.listAgents)) {
     return false;
   }
 

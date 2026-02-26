@@ -1,6 +1,15 @@
-import { parseBody, TraceMarkBodySchema, TraceStartBodySchema } from "../RequestSchemas/HttpSchemas.js";
-import { type DebugRouteDependencies } from "./DebugRouteContracts.js";
-import { streamDebugFileDownload } from "./DebugFileDownload.js";
+import { parseTraceMarkBody, parseTraceStartBody } from "../RequestSchemas/HttpSchemas.js";
+import {
+  DebugRouteMethodByName,
+  DebugRoutePathnameByName,
+  DebugRouteSegmentByName,
+  type DebugRouteDependencies
+} from "./DebugRouteContracts.js";
+import {
+  DebugFileDownloadError,
+  DebugFileDownloadErrorCodeByName,
+  streamDebugFileDownload
+} from "./DebugFileDownload.js";
 
 export class DebugTraceRouteOwner {
   private readonly dependencies: DebugRouteDependencies;
@@ -32,7 +41,7 @@ export class DebugTraceRouteOwner {
   private handleTraceStatusRoute(): boolean {
     const { req, pathname, activityHistoryService, jsonResponse, res } = this.dependencies;
 
-    if (!(req.method === "GET" && pathname === "/api/debug/trace/status")) {
+    if (!(req.method === DebugRouteMethodByName.get && pathname === DebugRoutePathnameByName.traceStatus)) {
       return false;
     }
 
@@ -57,11 +66,11 @@ export class DebugTraceRouteOwner {
       res
     } = this.dependencies;
 
-    if (!(req.method === "POST" && pathname === "/api/debug/trace/start")) {
+    if (!(req.method === DebugRouteMethodByName.post && pathname === DebugRoutePathnameByName.traceStart)) {
       return false;
     }
 
-    const body = parseBody(TraceStartBodySchema, await readJsonBody(req));
+    const body = parseTraceStartBody(await readJsonBody(req));
     const summary = activityHistoryService.startTrace(
       traceDirectoryPath,
       body.label,
@@ -90,11 +99,11 @@ export class DebugTraceRouteOwner {
   private async handleTraceMarkRoute(): Promise<boolean> {
     const { req, pathname, readJsonBody, activityHistoryService, jsonResponse, res } = this.dependencies;
 
-    if (!(req.method === "POST" && pathname === "/api/debug/trace/mark")) {
+    if (!(req.method === DebugRouteMethodByName.post && pathname === DebugRoutePathnameByName.traceMark)) {
       return false;
     }
 
-    const body = parseBody(TraceMarkBodySchema, await readJsonBody(req));
+    const body = parseTraceMarkBody(await readJsonBody(req));
     const marked = activityHistoryService.markTrace(body.note);
     if (!marked) {
       jsonResponse(res, 409, { ok: false, error: "No active trace" });
@@ -108,7 +117,7 @@ export class DebugTraceRouteOwner {
   private handleTraceStopRoute(): boolean {
     const { req, pathname, activityHistoryService, pushSystem, jsonResponse, res } = this.dependencies;
 
-    if (!(req.method === "POST" && pathname === "/api/debug/trace/stop")) {
+    if (!(req.method === DebugRouteMethodByName.post && pathname === DebugRoutePathnameByName.traceStop)) {
       return false;
     }
 
@@ -137,18 +146,19 @@ export class DebugTraceRouteOwner {
       toErrorMessage
     } = this.dependencies;
 
-    if (
-      !(req.method === "GET"
-      && segments[2] === "trace"
-      && segments[3]
-      && segments[4] === "download")
-    ) {
+    const traceIdentifierSegment = segments[3];
+    const isTraceDownloadRouteRequest =
+      req.method === DebugRouteMethodByName.get
+      && segments[2] === DebugRouteSegmentByName.trace
+      && typeof traceIdentifierSegment === "string"
+      && segments[4] === DebugRouteSegmentByName.download;
+    if (!isTraceDownloadRouteRequest) {
       return false;
     }
 
     let traceId: string;
     try {
-      traceId = decodeURIComponent(segments[3]);
+      traceId = decodeURIComponent(traceIdentifierSegment);
     } catch {
       jsonResponse(res, 400, { ok: false, error: "Invalid trace identifier" });
       return true;
@@ -164,10 +174,17 @@ export class DebugTraceRouteOwner {
     try {
       await streamDebugFileDownload(res, trace.path, `${trace.id}.ndjson`);
     } catch (error) {
-      if (toErrorMessage(error).includes("ENOENT")) {
+      if (
+        error instanceof DebugFileDownloadError
+        && (
+          error.code === DebugFileDownloadErrorCodeByName.notFound
+          || error.code === DebugFileDownloadErrorCodeByName.notFile
+        )
+      ) {
         jsonResponse(res, 404, { ok: false, error: "Trace not found" });
         return true;
       }
+
       jsonResponse(res, 500, { ok: false, error: toErrorMessage(error) });
       return true;
     }

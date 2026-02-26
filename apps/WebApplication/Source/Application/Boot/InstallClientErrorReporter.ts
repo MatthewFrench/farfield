@@ -31,6 +31,13 @@ const ErrorObjectSchema = z
     stack: z.string().trim().min(1).optional()
   })
   .passthrough();
+const NonSymbolPrimitiveReasonSchema = z.union([z.number(), z.boolean(), z.bigint()]);
+const SymbolReasonSchema = z.symbol();
+
+const WINDOW_ERROR_OPERATION = "window-error";
+const WINDOW_UNHANDLED_REJECTION_OPERATION = "window-unhandledrejection";
+const UNHANDLED_BROWSER_ERROR_MESSAGE = "Unhandled browser error";
+const UNHANDLED_PROMISE_REJECTION_MESSAGE = "Unhandled promise rejection";
 
 function parseOptionalText(value: string | null | undefined): string | null {
   const parsed = OptionalNonEmptyStringSchema.safeParse(value ?? null);
@@ -79,34 +86,16 @@ function normalizeBrowserError(
     };
   }
 
-  const parsedNumber = z.number().safeParse(reason);
-  if (parsedNumber.success) {
+  const parsedNonSymbolPrimitive = NonSymbolPrimitiveReasonSchema.safeParse(reason);
+  if (parsedNonSymbolPrimitive.success) {
     return {
-      message: String(parsedNumber.data),
+      message: String(parsedNonSymbolPrimitive.data),
       name: null,
       stack: null
     };
   }
 
-  const parsedBoolean = z.boolean().safeParse(reason);
-  if (parsedBoolean.success) {
-    return {
-      message: String(parsedBoolean.data),
-      name: null,
-      stack: null
-    };
-  }
-
-  const parsedBigInt = z.bigint().safeParse(reason);
-  if (parsedBigInt.success) {
-    return {
-      message: String(parsedBigInt.data),
-      name: null,
-      stack: null
-    };
-  }
-
-  const parsedSymbol = z.symbol().safeParse(reason);
+  const parsedSymbol = SymbolReasonSchema.safeParse(reason);
   if (parsedSymbol.success) {
     return {
       message: parsedSymbol.data.toString(),
@@ -119,6 +108,21 @@ function normalizeBrowserError(
     message: defaultMessage,
     name: null,
     stack: null
+  };
+}
+
+function buildWindowErrorDetails(event: ErrorEvent): ClientErrorReportInput["details"] {
+  return {
+    eventType: WINDOW_ERROR_OPERATION,
+    fileName: parseOptionalText(event.filename),
+    line: event.lineno,
+    column: event.colno
+  };
+}
+
+function buildUnhandledRejectionDetails(): ClientErrorReportInput["details"] {
+  return {
+    eventType: WINDOW_UNHANDLED_REJECTION_OPERATION
   };
 }
 
@@ -157,36 +161,26 @@ export function installGlobalClientCrashReporter(
   const onWindowError = (event: ErrorEvent): void => {
     const normalized = normalizeBrowserError(
       event.error,
-      parseOptionalText(event.message) ?? "Unhandled browser error"
+      parseOptionalText(event.message) ?? UNHANDLED_BROWSER_ERROR_MESSAGE
     );
 
-    const details: ClientErrorReportInput["details"] = {
-      eventType: "window-error",
-      fileName: parseOptionalText(event.filename),
-      line: event.lineno,
-      column: event.colno
-    };
-
     reportGlobalBrowserError(options, {
-      operation: "window-error",
+      operation: WINDOW_ERROR_OPERATION,
       message: normalized.message,
       name: normalized.name,
       stack: normalized.stack,
-      details
+      details: buildWindowErrorDetails(event)
     });
   };
 
   const onUnhandledRejection = (event: PromiseRejectionEvent): void => {
-    const normalized = normalizeBrowserError(event.reason, "Unhandled promise rejection");
-    const details: ClientErrorReportInput["details"] = {
-      eventType: "window-unhandledrejection"
-    };
+    const normalized = normalizeBrowserError(event.reason, UNHANDLED_PROMISE_REJECTION_MESSAGE);
     reportGlobalBrowserError(options, {
-      operation: "window-unhandledrejection",
+      operation: WINDOW_UNHANDLED_REJECTION_OPERATION,
       message: normalized.message,
       name: normalized.name,
       stack: normalized.stack,
-      details
+      details: buildUnhandledRejectionDetails()
     });
   };
 

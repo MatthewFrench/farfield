@@ -2,6 +2,19 @@ import {
   FarfieldEventStreamEnvelopeSchema,
   type FarfieldThreadStreamDelta
 } from "@farfield/protocol";
+import { z } from "zod";
+
+const THREAD_STREAM_STATE_CHANGED_METHOD = "thread-stream-state-changed";
+const EVENT_HISTORY_REFRESH_METADATA_STRING_SCHEMA = z.preprocess(
+  (value) => (typeof value === "string" && value.length > 0 ? value : null),
+  z.string().min(1).nullable()
+);
+const EVENT_HISTORY_REFRESH_METADATA_SCHEMA = z
+  .object({
+    method: EVENT_HISTORY_REFRESH_METADATA_STRING_SCHEMA,
+    threadId: EVENT_HISTORY_REFRESH_METADATA_STRING_SCHEMA
+  })
+  .passthrough();
 
 export interface EventStreamRefreshDecisionInput {
   activeTab: "chat" | "debug";
@@ -41,12 +54,12 @@ export class EventStreamRefreshDecisionEngine {
         refreshCore = true;
       } else if (parseResult.data.event.type === "activity-history-appended") {
         refreshHistory = input.activeTab === "debug";
-        const eventMethodValue = parseResult.data.event.entry.meta["method"];
-        const eventThreadIdValue = parseResult.data.event.entry.meta["threadId"];
-        const eventMethod = typeof eventMethodValue === "string" ? eventMethodValue : null;
-        const eventThreadId = typeof eventThreadIdValue === "string" ? eventThreadIdValue : null;
-        const isThreadOnlyMethod = typeof eventMethod === "string"
-          && this.threadOnlyHistoryMethods.has(eventMethod);
+        const eventHistoryRefreshMetadata = EVENT_HISTORY_REFRESH_METADATA_SCHEMA.parse(
+          parseResult.data.event.entry.meta
+        );
+        const eventMethod = eventHistoryRefreshMetadata.method;
+        const eventThreadId = eventHistoryRefreshMetadata.threadId;
+        const isThreadOnlyMethod = eventMethod !== null && this.threadOnlyHistoryMethods.has(eventMethod);
 
         if (
           !isThreadOnlyMethod
@@ -55,14 +68,14 @@ export class EventStreamRefreshDecisionEngine {
           refreshCore = true;
         }
         if (
-          eventMethod !== "thread-stream-state-changed"
-          && eventThreadId
+          eventMethod !== THREAD_STREAM_STATE_CHANGED_METHOD
+          && eventThreadId !== null
           && input.selectedThreadId
           && eventThreadId === input.selectedThreadId
         ) {
           refreshSelectedThread = true;
         }
-        if (!eventThreadId && !isThreadOnlyMethod) {
+        if (eventThreadId === null && !isThreadOnlyMethod) {
           refreshCore = true;
         }
       } else {

@@ -6,6 +6,187 @@ import {
   type UseApplicationDerivedStateInput
 } from "./UseApplicationDerivedStateContracts";
 
+const DEFAULT_SELECTED_AGENT_LABEL = "Agent";
+const LOADING_THREAD_LABEL = "Loading thread...";
+const NO_THREAD_SELECTED_LABEL = "No thread selected";
+const UNKNOWN_COMMIT_LABEL = "unknown";
+
+type ConversationState = ApplicationDerivedState["conversationState"];
+type SystemHealthState = UseApplicationDerivedStateInput["health"];
+
+interface ConversationStateSelectionInput {
+  liveConversationState: ConversationState;
+  readConversationState: ConversationState;
+  conversationSyncSignatureBuilder: UseApplicationDerivedStateInput["conversationSyncSignatureBuilder"];
+}
+
+interface ActiveRequestSelectionInput {
+  pendingRequests: ApplicationDerivedState["pendingRequests"];
+  selectedRequestId: number | null;
+}
+
+interface SelectedThreadLabelInput {
+  selectedThread: ApplicationDerivedState["selectedThread"];
+  selectedThreadId: string | null;
+  isSelectedThreadLoading: boolean;
+}
+
+interface ThreadListStateInput {
+  isCoreLoading: boolean;
+  threadCount: number;
+}
+
+interface ChatSurfaceStateInput {
+  selectedThreadId: string | null;
+  isCoreLoading: boolean;
+  isSelectedThreadLoading: boolean;
+  turnCount: number;
+}
+
+interface ModelOptionsInput {
+  models: UseApplicationDerivedStateInput["models"];
+  latestModel: string | null | undefined;
+  selectedModelId: string;
+}
+
+interface SystemHealthStatus {
+  allSystemsReady: boolean;
+  hasAnySystemFailure: boolean;
+}
+
+interface SystemHealthStatusInput {
+  codexConfigured: boolean;
+  openCodeConnected: boolean;
+  health: SystemHealthState;
+}
+
+function readConversationStateSelection(
+  input: ConversationStateSelectionInput
+): ConversationState {
+  const {
+    liveConversationState,
+    readConversationState,
+    conversationSyncSignatureBuilder
+  } = input;
+  if (!liveConversationState) {
+    return readConversationState;
+  }
+  if (!readConversationState) {
+    return liveConversationState;
+  }
+
+  // Use the newest snapshot so streamed updates and read-thread responses remain aligned.
+  const liveUpdatedAt = conversationSyncSignatureBuilder.readConversationStateUpdatedAt(
+    liveConversationState
+  );
+  const readUpdatedAt = conversationSyncSignatureBuilder.readConversationStateUpdatedAt(
+    readConversationState
+  );
+  return liveUpdatedAt > readUpdatedAt ? liveConversationState : readConversationState;
+}
+
+function readActiveRequestSelection(
+  input: ActiveRequestSelectionInput
+): ApplicationDerivedState["activeRequest"] {
+  const { pendingRequests, selectedRequestId } = input;
+  const firstPendingRequest = pendingRequests[0] ?? null;
+  if (!firstPendingRequest) {
+    return null;
+  }
+  if (selectedRequestId === null) {
+    return firstPendingRequest;
+  }
+  return pendingRequests.find((request) => request.id === selectedRequestId) ?? firstPendingRequest;
+}
+
+function readSelectedThreadLabel(input: SelectedThreadLabelInput): string {
+  const { selectedThread, selectedThreadId, isSelectedThreadLoading } = input;
+  if (selectedThread) {
+    return ThreadGroupSelectors.threadLabel(selectedThread);
+  }
+  if (selectedThreadId && isSelectedThreadLoading) {
+    return LOADING_THREAD_LABEL;
+  }
+  return NO_THREAD_SELECTED_LABEL;
+}
+
+function readThreadListState(input: ThreadListStateInput): ApplicationDerivedState["threadListState"] {
+  const { isCoreLoading, threadCount } = input;
+  if (isCoreLoading) {
+    return "loading";
+  }
+  if (threadCount === 0) {
+    return "empty";
+  }
+  return "ready";
+}
+
+function readChatSurfaceState(input: ChatSurfaceStateInput): ApplicationDerivedState["chatSurfaceState"] {
+  const {
+    selectedThreadId,
+    isCoreLoading,
+    isSelectedThreadLoading,
+    turnCount
+  } = input;
+  if (!selectedThreadId && isCoreLoading) {
+    return "loading-threads";
+  }
+  if (selectedThreadId && isSelectedThreadLoading) {
+    return "loading-thread";
+  }
+  if (turnCount === 0) {
+    return selectedThreadId ? "no-messages" : "no-thread";
+  }
+  return "ready";
+}
+
+function readModelOptionLabel(model: UseApplicationDerivedStateInput["models"][number]): string {
+  if (model.displayName && model.displayName !== model.id) {
+    return `${model.displayName} (${model.id})`;
+  }
+  return model.displayName || model.id;
+}
+
+function readModelOptions(input: ModelOptionsInput): ApplicationDerivedState["modelOptions"] {
+  const { models, latestModel, selectedModelId } = input;
+  const modelLabelById = new Map<string, string>();
+
+  for (const model of models) {
+    modelLabelById.set(model.id, readModelOptionLabel(model));
+  }
+
+  if (latestModel && !modelLabelById.has(latestModel)) {
+    modelLabelById.set(latestModel, latestModel);
+  }
+  if (selectedModelId && !modelLabelById.has(selectedModelId)) {
+    modelLabelById.set(selectedModelId, selectedModelId);
+  }
+
+  return Array.from(modelLabelById.entries()).map(([id, label]) => ({ id, label }));
+}
+
+function readSystemHealthStatus(input: SystemHealthStatusInput): SystemHealthStatus {
+  const { codexConfigured, openCodeConnected, health } = input;
+
+  if (!codexConfigured) {
+    return {
+      allSystemsReady: openCodeConnected,
+      hasAnySystemFailure: !openCodeConnected
+    };
+  }
+
+  return {
+    allSystemsReady:
+      health?.state.appReady === true
+      && health?.state.ipcConnected === true
+      && health?.state.ipcInitialized === true,
+    hasAnySystemFailure:
+      health?.state.appReady === false
+      || health?.state.ipcConnected === false
+      || health?.state.ipcInitialized === false
+  };
+}
+
 export function useApplicationDerivedState(
   input: UseApplicationDerivedStateInput
 ): ApplicationDerivedState {
@@ -78,7 +259,7 @@ export function useApplicationDerivedState(
 
   const appDefaultModel = configDefaults?.model ?? assumedAppDefaultModelIdentifier;
   const appDefaultReasoningEffort = configDefaults?.reasoningEffort ?? assumedAppDefaultReasoningEffort;
-  const selectedAgentLabel = selectedAgentDescriptor?.label ?? "Agent";
+  const selectedAgentLabel = selectedAgentDescriptor?.label ?? DEFAULT_SELECTED_AGENT_LABEL;
   const selectedAgentCapabilities = selectedAgentDescriptor?.capabilities ?? null;
   const activeProjectGroups = threadListPresentationState.activeProjectGroups;
   const archivedProjectGroups = threadListPresentationState.archivedProjectGroups;
@@ -88,19 +269,11 @@ export function useApplicationDerivedState(
   const conversationState = useMemo<ApplicationDerivedState["conversationState"]>(() => {
     const liveConversationState = liveState?.conversationState ?? null;
     const readConversationState = readThreadState?.thread ?? null;
-    if (!liveConversationState) {
-      return readConversationState;
-    }
-    if (!readConversationState) {
-      return liveConversationState;
-    }
-    const liveUpdatedAt = conversationSyncSignatureBuilder.readConversationStateUpdatedAt(
-      liveConversationState
-    );
-    const readUpdatedAt = conversationSyncSignatureBuilder.readConversationStateUpdatedAt(
-      readConversationState
-    );
-    return liveUpdatedAt > readUpdatedAt ? liveConversationState : readConversationState;
+    return readConversationStateSelection({
+      liveConversationState,
+      readConversationState,
+      conversationSyncSignatureBuilder
+    });
   }, [conversationSyncSignatureBuilder, liveState?.conversationState, readThreadState?.thread]);
 
   const pendingRequests = useMemo<ApplicationDerivedState["pendingRequests"]>(() => {
@@ -119,14 +292,10 @@ export function useApplicationDerivedState(
   }, [liveState?.liveStateError]);
 
   const activeRequest = useMemo<ApplicationDerivedState["activeRequest"]>(() => {
-    const firstPendingRequest = pendingRequests[0] ?? null;
-    if (!firstPendingRequest) {
-      return null;
-    }
-    if (selectedRequestId === null) {
-      return firstPendingRequest;
-    }
-    return pendingRequests.find((request) => request.id === selectedRequestId) ?? firstPendingRequest;
+    return readActiveRequestSelection({
+      pendingRequests,
+      selectedRequestId
+    });
   }, [pendingRequests, selectedRequestId]);
 
   const activeThreadAgentId = useMemo<ApplicationDerivedState["activeThreadAgentId"]>(
@@ -139,11 +308,11 @@ export function useApplicationDerivedState(
     [activeThreadAgentId, agentsById, selectedAgentDescriptor]
   );
 
-  const selectedThreadLabel = selectedThread
-    ? ThreadGroupSelectors.threadLabel(selectedThread)
-    : selectedThreadId && isSelectedThreadLoading
-      ? "Loading thread..."
-      : "No thread selected";
+  const selectedThreadLabel = readSelectedThreadLabel({
+    selectedThread,
+    selectedThreadId,
+    isSelectedThreadLoading
+  });
 
   const historyDetailPayloadText = useMemo(() => {
     if (!historyDetail) {
@@ -216,24 +385,15 @@ export function useApplicationDerivedState(
     [appDefaultReasoningEffort, effortOptions]
   );
 
-  const modelOptions = useMemo(() => {
-    const modelLabelById = new Map<string, string>();
-    for (const model of models) {
-      const label =
-        model.displayName && model.displayName !== model.id
-          ? `${model.displayName} (${model.id})`
-          : model.displayName || model.id;
-      modelLabelById.set(model.id, label);
-    }
-    const latestModel = conversationState?.latestModel;
-    if (latestModel && !modelLabelById.has(latestModel)) {
-      modelLabelById.set(latestModel, latestModel);
-    }
-    if (selectedModelId && !modelLabelById.has(selectedModelId)) {
-      modelLabelById.set(selectedModelId, selectedModelId);
-    }
-    return Array.from(modelLabelById.entries()).map(([id, label]) => ({ id, label }));
-  }, [conversationState?.latestModel, models, selectedModelId]);
+  const modelOptions = useMemo(
+    () =>
+      readModelOptions({
+        models,
+        latestModel: conversationState?.latestModel,
+        selectedModelId
+      }),
+    [conversationState?.latestModel, models, selectedModelId]
+  );
 
   const modelOptionsWithoutAssumedDefault = useMemo(
     () => modelOptions.filter((option) => option.id !== appDefaultModel),
@@ -245,21 +405,17 @@ export function useApplicationDerivedState(
   const lastTurn = turns[turns.length - 1];
   const isGenerating = conversationItemFlattener.isTurnInProgressStatus(lastTurn?.status);
 
-  const threadListState: ApplicationDerivedState["threadListState"] = isCoreLoading
-    ? "loading"
-    : threads.length === 0
-      ? "empty"
-      : "ready";
+  const threadListState = readThreadListState({
+    isCoreLoading,
+    threadCount: threads.length
+  });
 
-  const chatSurfaceState: ApplicationDerivedState["chatSurfaceState"] = !selectedThreadId && isCoreLoading
-    ? "loading-threads"
-    : selectedThreadId && isSelectedThreadLoading
-      ? "loading-thread"
-      : turns.length === 0
-        ? selectedThreadId
-          ? "no-messages"
-          : "no-thread"
-        : "ready";
+  const chatSurfaceState = readChatSurfaceState({
+    selectedThreadId,
+    isCoreLoading,
+    isSelectedThreadLoading,
+    turnCount: turns.length
+  });
 
   const errorBannerDetails = useMemo(() => toErrorBannerDetails(errorMessage), [errorMessage]);
 
@@ -315,25 +471,14 @@ export function useApplicationDerivedState(
     [firstVisibleChatItemIndex, flatConversationItems]
   );
 
-  const commitLabel = health?.state.gitCommit ?? "unknown";
+  const commitLabel = health?.state.gitCommit ?? UNKNOWN_COMMIT_LABEL;
   const codexConfigured = agentsById.codex?.enabled === true;
   const openCodeConnected = agentsById.opencode?.connected === true;
-
-  const allSystemsReady = codexConfigured
-    ? (
-      health?.state.appReady === true
-      && health?.state.ipcConnected === true
-      && health?.state.ipcInitialized === true
-    )
-    : openCodeConnected;
-
-  const hasAnySystemFailure = codexConfigured
-    ? (
-      health?.state.appReady === false
-      || health?.state.ipcConnected === false
-      || health?.state.ipcInitialized === false
-    )
-    : !openCodeConnected;
+  const { allSystemsReady, hasAnySystemFailure } = readSystemHealthStatus({
+    codexConfigured,
+    openCodeConnected,
+    health
+  });
 
   return {
     threadListPresentationState,

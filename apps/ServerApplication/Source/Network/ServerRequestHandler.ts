@@ -36,6 +36,17 @@ import type { EventStreamClientRegistry } from "./EventStreamClientRegistry.js";
 import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinator.js";
 import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js";
 import type { PushMutationConcurrencyCoordinator } from "./PushMutationConcurrencyCoordinator.js";
+import {
+  normalizeRequestMethodForRequestMetrics,
+  RequestMethodByName,
+  RequestPathnameByName,
+  readPathnameForRequestMetricsFromRequestUrl,
+  readPathSegmentsFromPathname
+} from "./RequestPathContracts.js";
+
+const CLIENT_ERROR_RECORDED_LOG_EVENT = "client-error-recorded";
+const COOKIE_HEADER_NAME = "cookie";
+const MALFORMED_REQUEST_URL_ERROR_MESSAGE = "Malformed request URL";
 
 export interface ServerRequestHandlerDependencies {
   host: string;
@@ -124,7 +135,8 @@ export class ServerRequestHandler {
     const requestStartedAtHighResolutionMilliseconds = performance.now();
     const requestStartedAt = new Date().toISOString();
     const requestQueueDelayMilliseconds = this.deps.readCurrentEventLoopLagMs();
-    let pathnameForMetrics = req.url?.split("?")[0] ?? "/missing-url";
+    let pathnameForMetrics = readPathnameForRequestMetricsFromRequestUrl(req.url);
+    const requestMethod = normalizeRequestMethodForRequestMetrics(req.method);
     const requestId = this.deps.normalizeOptionalString(
       this.readHeader(req, this.deps.clientRequestIdHeaderName)
     ) ?? `request_${randomUUID()}`;
@@ -159,7 +171,7 @@ export class ServerRequestHandler {
       requestId,
       actionId: requestActionId,
       actionName: requestActionName,
-      method: req.method ?? "UNKNOWN",
+      method: requestMethod,
       pathname: pathnameForMetrics,
       startedAt: requestStartedAt,
       queueDelayMs: requestQueueDelayMilliseconds
@@ -194,17 +206,27 @@ export class ServerRequestHandler {
         return;
       }
 
-      if (req.method === "OPTIONS") {
+      if (requestMethod === RequestMethodByName.options) {
         this.deps.jsonResponse(res, 204, {});
         return;
       }
 
-      const url = new URL(req.url, `http://${this.deps.host}:${String(this.deps.port)}`);
+      let url: URL;
+      try {
+        url = new URL(req.url, `http://${this.deps.host}:${String(this.deps.port)}`);
+      } catch {
+        pathnameForMetrics = RequestPathnameByName.malformedRequestUrl;
+        this.deps.jsonResponse(res, 400, {
+          ok: false,
+          error: MALFORMED_REQUEST_URL_ERROR_MESSAGE
+        });
+        return;
+      }
       const pathname = url.pathname;
       pathnameForMetrics = pathname;
-      const segments = pathname.split("/").filter(Boolean);
+      const segments = readPathSegmentsFromPathname(pathname);
 
-      if (this.deps.isShuttingDown() && pathname !== "/healthz") {
+      if (this.deps.isShuttingDown() && pathname !== RequestPathnameByName.healthCheck) {
         this.deps.jsonResponse(res, 503, {
           ok: false,
           error: "Server is shutting down",
@@ -215,7 +237,7 @@ export class ServerRequestHandler {
         return;
       }
 
-      if (req.method === "GET" && pathname === "/healthz") {
+      if (requestMethod === RequestMethodByName.get && pathname === RequestPathnameByName.healthCheck) {
         this.deps.jsonResponse(res, 200, {
           ok: true,
           service: "farfield-web-shell",
@@ -349,10 +371,10 @@ export class ServerRequestHandler {
         readJsonBody: this.deps.readJsonBody,
         onClientErrorRecorded: (input) => {
           if (input.severity === "warning") {
-            logger.warn(input, "client-error-recorded");
+            logger.warn(input, CLIENT_ERROR_RECORDED_LOG_EVENT);
             return;
           }
-          logger.error(input, "client-error-recorded");
+          logger.error(input, CLIENT_ERROR_RECORDED_LOG_EVENT);
         }
       })) {
         return;
@@ -375,7 +397,7 @@ export class ServerRequestHandler {
         requestId,
         actionId: requestActionId,
         actionName: requestActionName,
-        method: req.method ?? "UNKNOWN",
+        method: requestMethod,
         pathname: pathnameForMetrics,
         startedAt: requestStartedAt,
         statusCode: res.statusCode,
@@ -387,7 +409,9 @@ export class ServerRequestHandler {
   }
 
   private readHeader(req: IncomingMessage, name: string): string | null {
-    const raw = req.headers[name];
+    // Node request-header maps are normalized to lowercase keys at ingress.
+    const normalizedHeaderName = name.toLowerCase();
+    const raw = req.headers[normalizedHeaderName];
     if (typeof raw === "string") {
       return raw;
     }
@@ -402,7 +426,9 @@ export class ServerRequestHandler {
     if (!this.deps.apiAuthRequired) {
       return true;
     }
-    const session = this.deps.browserSessionAuthOwner.readSession(this.readHeader(req, "cookie"));
+    const session = this.deps.browserSessionAuthOwner.readSession(
+      this.readHeader(req, COOKIE_HEADER_NAME)
+    );
     if (session.authenticated) {
       return true;
     }
@@ -414,10 +440,10 @@ export class ServerRequestHandler {
   }
 
   private requireApiAuth(req: IncomingMessage, res: ServerResponse, pathname: string): boolean {
-    if (pathname === "/api/events/session") {
+    if (pathname === RequestPathnameByName.apiEventsSession) {
       return true;
     }
-    if (!pathname.startsWith("/api/") && pathname !== "/events") {
+    if (!pathname.startsWith(RequestPathnameByName.apiPrefix) && pathname !== RequestPathnameByName.events) {
       return true;
     }
 

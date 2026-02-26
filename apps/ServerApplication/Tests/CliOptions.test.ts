@@ -22,4 +22,21 @@ describe("server cli options", () => {
       /Unknown agent id/
     );
   });
+
+  it("rejects empty comma-delimited agent tokens", () => {
+    expect(() => parseServerCliOptions(["--agents=codex,,opencode"])).toThrowError(
+      /Missing value for --agents/
+    );
+  });
+
+  it("sets showHelp for both help flags", () => {
+    expect(parseServerCliOptions(["--help"]).showHelp).toBe(true);
+    expect(parseServerCliOptions(["-h"]).showHelp).toBe(true);
+  });
+
+  it("rejects --agents when the next token is another flag", () => {
+    expect(() => parseServerCliOptions(["--agents", "--help"])).toThrowError(
+      /Missing value for --agents/
+    );
+  });
 });

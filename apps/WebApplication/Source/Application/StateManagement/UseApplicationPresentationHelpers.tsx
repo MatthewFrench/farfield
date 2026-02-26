@@ -17,22 +17,39 @@ interface IndexedStreamEvent {
   stableIndex: number;
 }
 
+const STREAM_EVENT_CARD_KEY_PREFIX = "stream-event-";
+
+function buildStreamEventCardKey(stableIndex: number): string {
+  return `${STREAM_EVENT_CARD_KEY_PREFIX}${String(stableIndex)}`;
+}
+
+function indexStreamEvents(
+  streamEvents: ChatStreamEventsResponse["events"]
+): IndexedStreamEvent[] {
+  return streamEvents.map<IndexedStreamEvent>((streamEvent, stableIndex) => ({
+    streamEvent,
+    stableIndex
+  }));
+}
+
+function buildStreamEventCard(
+  indexedStreamEvent: IndexedStreamEvent
+): React.JSX.Element {
+  return (
+    <StreamEventCard
+      key={buildStreamEventCardKey(indexedStreamEvent.stableIndex)}
+      event={indexedStreamEvent.streamEvent}
+    />
+  );
+}
+
 export function useStreamEventCards(input: UseStreamEventCardsInput): React.JSX.Element[] {
   return useMemo<React.JSX.Element[]>(() => (
-    input.streamEvents
+    indexStreamEvents(input.streamEvents)
       // Preserve each event's original index as a stable key seed so appends do not
       // remount every existing card (which would reset local expand/collapse state).
-      .map<IndexedStreamEvent>((streamEvent, stableIndex) => ({
-        streamEvent,
-        stableIndex
-      }))
       .reverse()
-      .map((indexedStreamEvent) => (
-        <StreamEventCard
-          key={`stream-event-${String(indexedStreamEvent.stableIndex)}`}
-          event={indexedStreamEvent.streamEvent}
-        />
-      ))
+      .map(buildStreamEventCard)
   ), [input.streamEvents]);
 }
 

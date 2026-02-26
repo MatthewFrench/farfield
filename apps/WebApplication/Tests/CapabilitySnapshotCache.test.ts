@@ -72,4 +72,36 @@ describe("CapabilitySnapshotCache", () => {
     expect(first).toEqual(second);
     expect(second.revision).toBe(1);
   });
+
+  it("does not overwrite cleared cache with stale in-flight snapshots", async () => {
+    const cache = new CapabilitySnapshotCache<TestCapabilitySnapshot>(1_000);
+    let resolveLoader: (value: TestCapabilitySnapshot) => void = () => {
+      throw new Error("Expected resolveLoader to be initialized");
+    };
+    const inFlightLoadSnapshot = new Promise<TestCapabilitySnapshot>((resolve) => {
+      resolveLoader = resolve;
+    });
+    const loadSnapshot = async (): Promise<TestCapabilitySnapshot> => inFlightLoadSnapshot;
+
+    const firstPromise = cache.readSnapshot(loadSnapshot, 1_000);
+    cache.clearSnapshot();
+    resolveLoader({
+      fetchedAt: 1_000,
+      revision: 1
+    });
+    await firstPromise;
+
+    expect(cache.readSnapshotIfFresh(1_001)).toBeNull();
+  });
+
+  it("rejects invalid epoch timestamp values with clear errors", () => {
+    const cache = new CapabilitySnapshotCache<TestCapabilitySnapshot>(1_000);
+
+    expect(() => cache.readSnapshotIfFresh(Number.NaN)).toThrowError(
+      "CapabilitySnapshotCache requires nowEpochMs to be a finite non-negative epoch timestamp"
+    );
+    expect(() => cache.overwriteSnapshot({ fetchedAt: Number.NaN, revision: 1 })).toThrowError(
+      "CapabilitySnapshotCache requires snapshot.fetchedAt to be a finite non-negative epoch timestamp"
+    );
+  });
 });

@@ -160,7 +160,32 @@ describe("codex-protocol thread core schemas", () => {
           }
         }
       })
-    ).toThrowError(/remove patches must not include value/);
+    ).toThrowError(/patches\[0\]\.value/);
+  });
+
+  it("rejects add patches without value", () => {
+    expect(() =>
+      parseThreadStreamStateChangedBroadcast({
+        type: "broadcast",
+        method: "thread-stream-state-changed",
+        sourceClientId: "client-123",
+        version: 4,
+        params: {
+          conversationId: "thread-123",
+          type: "thread-stream-state-changed",
+          version: 4,
+          change: {
+            type: "patches",
+            patches: [
+              {
+                op: "add",
+                path: ["requests", 0]
+              }
+            ]
+          }
+        }
+      })
+    ).toThrowError(/patches\[0\]\.value/);
   });
 
   it("parses thread conversation state with userInputResponse item", () => {

@@ -85,7 +85,7 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
   const [selectedDebugIssueId, setSelectedDebugIssueId] = useState("");
   const [debugIssueSeverityFilter, setDebugIssueSeverityFilter] = useState<DebugIssueSeverityFilter>("all");
   const [debugIssueFilterQuery, setDebugIssueFilterQuery] = useState("");
-  const selectedThreadIdRef = useRef<string | null>(null);
+  const selectedThreadIdRef = useRef<string | null>(input.initialUiState.threadId);
   const activeTabRef = useRef<"chat" | "debug">(input.initialUiState.tab);
   const coreRefreshIntervalRef = useRef<number | null>(null);
   const eventsConnectedRef = useRef(false);

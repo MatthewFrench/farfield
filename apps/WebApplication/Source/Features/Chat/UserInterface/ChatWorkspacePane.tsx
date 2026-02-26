@@ -13,6 +13,51 @@ import { ChatModeToolbar, type ChatModeToolbarProps } from "./ChatModeToolbar";
 
 type ChatSurfaceState = "loading-threads" | "loading-thread" | "no-messages" | "no-thread" | "ready";
 
+interface ChatEmptyStateDescriptor {
+  testId: string;
+  message: string;
+  showLoadingIndicator: boolean;
+}
+
+function readChatEmptyStateDescriptor(
+  chatSurfaceState: ChatSurfaceState,
+  canCreateNewThread: boolean
+): ChatEmptyStateDescriptor {
+  if (chatSurfaceState === "loading-threads") {
+    return {
+      testId: "chat-empty-loading-threads",
+      message: "Loading threads...",
+      showLoadingIndicator: true
+    };
+  }
+
+  if (chatSurfaceState === "loading-thread") {
+    return {
+      testId: "chat-empty-loading-thread",
+      message: "Loading thread...",
+      showLoadingIndicator: true
+    };
+  }
+
+  if (chatSurfaceState === "no-messages") {
+    return {
+      testId: "chat-empty-no-messages",
+      message: "No messages yet",
+      showLoadingIndicator: false
+    };
+  }
+
+  if (chatSurfaceState === "no-thread") {
+    return {
+      testId: "chat-empty-no-thread",
+      message: canCreateNewThread ? "Start typing to create a new thread" : "Select a thread from the sidebar",
+      showLoadingIndicator: false
+    };
+  }
+
+  throw new Error("ChatWorkspacePane received an empty-state render with chatSurfaceState set to 'ready'.");
+}
+
 export interface ChatWorkspacePaneProps {
   chatSurfaceState: ChatSurfaceState;
   selectedThreadId: string | null;
@@ -46,8 +91,6 @@ export interface ChatWorkspacePaneProps {
 export function ChatWorkspacePane({
   chatSurfaceState,
   selectedThreadId,
-  isCoreLoading,
-  isSelectedThreadLoading,
   availableAgentIds,
   turnCount,
   scrollRef,
@@ -72,6 +115,10 @@ export function ChatWorkspacePane({
   onSendMessage,
   chatModeToolbarProperties
 }: ChatWorkspacePaneProps): React.JSX.Element {
+  const emptyStateDescriptor = turnCount === 0
+    ? readChatEmptyStateDescriptor(chatSurfaceState, availableAgentIds.length > 0)
+    : null;
+
   return (
     <div
       data-testid="chat-surface"
@@ -96,25 +143,14 @@ export function ChatWorkspacePane({
           >
             {turnCount === 0 ? (
               <div data-testid="chat-empty-state" className="text-center py-20 text-sm text-muted-foreground">
-                {!selectedThreadId && isCoreLoading
+                {emptyStateDescriptor?.showLoadingIndicator
                   ? (
-                    <span data-testid="chat-empty-loading-threads" className="inline-flex items-center gap-2">
+                    <span data-testid={emptyStateDescriptor.testId} className="inline-flex items-center gap-2">
                       <Loader2 size={14} className="animate-spin" />
-                      Loading threads...
+                      {emptyStateDescriptor.message}
                     </span>
                   )
-                  : selectedThreadId && isSelectedThreadLoading
-                    ? (
-                      <span data-testid="chat-empty-loading-thread" className="inline-flex items-center gap-2">
-                        <Loader2 size={14} className="animate-spin" />
-                        Loading thread...
-                      </span>
-                    )
-                  : selectedThreadId
-                    ? <span data-testid="chat-empty-no-messages">No messages yet</span>
-                    : availableAgentIds.length > 0
-                      ? <span data-testid="chat-empty-no-thread">Start typing to create a new thread</span>
-                      : <span data-testid="chat-empty-no-thread">Select a thread from the sidebar</span>}
+                  : <span data-testid={emptyStateDescriptor?.testId}>{emptyStateDescriptor?.message}</span>}
               </div>
             ) : (
               <div

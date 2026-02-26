@@ -9,6 +9,12 @@ import {
 import type { HistoryEntry } from "./Routes/DebugTypes.js";
 import type { ThreadRouteDependencies } from "./Routes/ThreadRoutes.js";
 
+const SERVER_ERROR_SOURCE = "farfield-server";
+const HTTP_REQUEST_OPERATION = "http:request";
+const REQUEST_FAILED_SYSTEM_MESSAGE = "Request failed";
+const UNKNOWN_REQUEST_METHOD = "unknown";
+const UNKNOWN_REQUEST_URL = "unknown";
+
 export interface ServerRequestErrorContext {
   requestId: string;
   actionId: string | null;
@@ -88,11 +94,11 @@ export class ServerRequestErrorResponder {
     });
 
     if (classification.shouldPushSystemEvent) {
-      this.deps.pushSystem("Request failed", {
+      this.deps.pushSystem(REQUEST_FAILED_SYSTEM_MESSAGE, {
         error: classification.runtimeErrorMessage,
         errorCategory: classification.category,
-        method: req.method ?? "unknown",
-        url: req.url ?? "unknown",
+        method: req.method ?? UNKNOWN_REQUEST_METHOD,
+        url: req.url ?? UNKNOWN_REQUEST_URL,
         requestId: context.requestId,
         actionId: context.actionId,
         actionName: context.actionName
@@ -123,8 +129,8 @@ export class ServerRequestErrorResponder {
 
     try {
       this.deps.recordServerErrorEvent({
-        source: "farfield-server",
-        operation: "http:request",
+        source: SERVER_ERROR_SOURCE,
+        operation: HTTP_REQUEST_OPERATION,
         message: classification.runtimeErrorMessage,
         severity: classification.severity,
         name: normalizedError.name,
@@ -133,7 +139,7 @@ export class ServerRequestErrorResponder {
         threadId: null,
         url: req.url ?? null,
         details: {
-          method: req.method ?? "unknown",
+          method: req.method ?? UNKNOWN_REQUEST_METHOD,
           actionId: context.actionId,
           actionName: context.actionName,
           errorCategory: classification.category
@@ -158,8 +164,8 @@ export class ServerRequestErrorResponder {
   }): void {
     const { classification, req, context } = input;
     const logInput = {
-      method: req.method ?? "unknown",
-      url: req.url ?? "unknown",
+      method: req.method ?? UNKNOWN_REQUEST_METHOD,
+      url: req.url ?? UNKNOWN_REQUEST_URL,
       error: classification.runtimeErrorMessage,
       errorCategory: classification.category,
       requestId: context.requestId,

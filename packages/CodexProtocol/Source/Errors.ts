@@ -8,7 +8,7 @@ function formatIssuePath(path: (string | number)[]): string {
   return path
     .map((segment) => (typeof segment === "number" ? `[${segment}]` : segment))
     .join(".")
-    .replace(".[", "[");
+    .replace(/\.\[/g, "[");
 }
 
 export class ProtocolValidationError extends Error {
@@ -22,7 +22,7 @@ export class ProtocolValidationError extends Error {
 
   public static fromZod(context: string, error: ZodError): ProtocolValidationError {
     const issues = error.issues.map((issue) => {
-      const path = formatIssuePath(issue.path as (string | number)[]);
+      const path = formatIssuePath(issue.path);
       return `${path}: ${issue.message}`;
     });
 

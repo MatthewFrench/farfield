@@ -5,6 +5,15 @@ import type {
   ThreadListAggregationCache
 } from "../ThreadListAggregationCache.js";
 
+export const ThreadCollectionRouteMethodByName = {
+  get: "GET",
+  post: "POST"
+} as const;
+
+export const ThreadCollectionRoutePathnameByName = {
+  threads: "/api/threads"
+} as const;
+
 export interface ThreadCollectionRouteDependencies {
   req: IncomingMessage;
   res: ServerResponse;

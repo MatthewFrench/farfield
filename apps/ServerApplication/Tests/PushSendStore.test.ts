@@ -54,4 +54,34 @@ describe("PushSendStore", () => {
       failures: 1
     });
   });
+
+  it("returns defensive copies from latest send reads", () => {
+    const { store } = createStoreWithTempPath();
+    store.load();
+    store.setLatest({
+      notificationId: "notif_send_2",
+      threadId: "thread_2",
+      turnId: "turn_2",
+      sentAt: "2026-02-19T00:00:00.000Z",
+      attempted: 1,
+      delivered: 1,
+      failures: 0
+    });
+
+    const firstRead = store.getLatest();
+    if (!firstRead) {
+      throw new Error("Expected latest send summary");
+    }
+    firstRead.notificationId = "mutated";
+
+    expect(store.getLatest()).toEqual({
+      notificationId: "notif_send_2",
+      threadId: "thread_2",
+      turnId: "turn_2",
+      sentAt: "2026-02-19T00:00:00.000Z",
+      attempted: 1,
+      delivered: 1,
+      failures: 0
+    });
+  });
 });

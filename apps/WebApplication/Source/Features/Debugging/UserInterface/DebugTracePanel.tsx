@@ -1,6 +1,9 @@
 import { Button } from "@/Components/UserInterface/Button";
 import { Input } from "@/Components/UserInterface/Input";
 
+const TRACE_STATE_RECORDING_LABEL = "recording";
+const TRACE_STATE_IDLE_LABEL = "idle";
+
 export interface DebugTraceSummary {
   id: string;
   label: string;
@@ -42,7 +45,7 @@ export function DebugTracePanel({
               : "bg-muted text-muted-foreground"
           }`}
         >
-          {isRecording ? "recording" : "idle"}
+          {isRecording ? TRACE_STATE_RECORDING_LABEL : TRACE_STATE_IDLE_LABEL}
         </span>
       </div>
       <Input

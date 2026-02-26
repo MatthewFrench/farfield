@@ -5,9 +5,11 @@ import "./Index.css";
 import { reconcilePushSubscription } from "./Features/PushNotifications/DataAccess/PushClientApi";
 import { installGlobalClientCrashReporter } from "./Application/Boot/InstallClientErrorReporter";
 import { ServiceWorkerControllerChangeReloadOwner } from "./Application/Boot/ServiceWorkerControllerChangeReloadOwner";
+import { ApplicationRouteStateMapper } from "./Application/DomainModel/ApplicationRouteStateMapper";
 
 const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";
 const BOOT_STATUS_EVENT_NAME = "farfield:boot-status";
+const applicationRouteStateMapper = new ApplicationRouteStateMapper();
 
 interface BootStatusDetail {
   message: string;
@@ -59,20 +61,6 @@ function syncDisplayModeClass(): void {
   );
 }
 
-function readThreadIdFromPathname(pathname: string): string | null {
-  const threadMatch = /^\/threads\/([^/?#]+)/.exec(pathname);
-  const encodedThreadId = threadMatch?.[1];
-  if (!encodedThreadId) {
-    return null;
-  }
-  try {
-    const decodedThreadId = decodeURIComponent(encodedThreadId).trim();
-    return decodedThreadId.length > 0 ? decodedThreadId : null;
-  } catch {
-    return null;
-  }
-}
-
 function installDisplayModeSync(): void {
   const displayModeQuery = window.matchMedia("(display-mode: standalone)");
 
@@ -88,7 +76,7 @@ if (typeof window !== "undefined") {
   installDisplayModeSync();
   installGlobalClientCrashReporter({
     source: "farfield-web",
-    readThreadId: () => readThreadIdFromPathname(window.location.pathname),
+    readThreadId: () => applicationRouteStateMapper.parseFromPathname(window.location.pathname).threadId,
     readUrl: () => window.location.pathname + window.location.search
   });
 }

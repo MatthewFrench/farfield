@@ -1,3 +1,8 @@
+/**
+ * Root web-shell composition owner.
+ * This module wires typed owner hooks into the shell layout while keeping
+ * feature behavior in dedicated owner modules.
+ */
 import {
   useMemo
 } from "react";

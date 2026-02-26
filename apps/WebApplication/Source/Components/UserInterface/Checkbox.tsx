@@ -6,6 +6,8 @@ import { Check } from "lucide-react"
 
 import { cn } from "@/Shared/Styling/ClassNameMerge"
 
+const CHECKBOX_COMPONENT_DISPLAY_NAME = "Checkbox"
+
 const Checkbox = React.forwardRef<
   React.ElementRef<typeof CheckboxPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>
@@ -25,6 +27,6 @@ const Checkbox = React.forwardRef<
     </CheckboxPrimitive.Indicator>
   </CheckboxPrimitive.Root>
 ))
-Checkbox.displayName = CheckboxPrimitive.Root.displayName
+Checkbox.displayName = CHECKBOX_COMPONENT_DISPLAY_NAME
 
 export { Checkbox }

@@ -1,8 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
 import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
-import { CollaborationModeActionCoordinator } from "../Source/Features/Chat/StateManagement/CollaborationModeActionCoordinator";
+import {
+  CollaborationModeActionCoordinator,
+  type CollaborationModeActionChatClient,
+  type CollaborationModeActionModeOption
+} from "../Source/Features/Chat/StateManagement/CollaborationModeActionCoordinator";
 
 const modeSelectionStateResolver = new ModeSelectionStateResolver();
+const DEFAULT_THREAD_ID = "thread-1";
+const APPLY_THREAD_ID = "thread-2";
+const FAILED_THREAD_ID = "thread-3";
+
+const DEFAULT_MODE_OPTIONS: CollaborationModeActionModeOption[] = [
+  {
+    mode: "default",
+    developer_instructions: "Use explicit reasoning."
+  }
+];
+const PLAN_MODE_OPTIONS: CollaborationModeActionModeOption[] = [
+  {
+    mode: "plan",
+    developer_instructions: null
+  }
+];
 
 const buildActionRequestOptions = (actionName: string) => ({
   actionId: `action-${actionName}`,
@@ -12,14 +32,24 @@ const buildActionRequestOptions = (actionName: string) => ({
   }
 });
 
+function createCoordinator(): CollaborationModeActionCoordinator {
+  return new CollaborationModeActionCoordinator(modeSelectionStateResolver);
+}
+
+function createChatClient(
+  setCollaborationModeImplementation?: () => Promise<void>
+): CollaborationModeActionChatClient {
+  return {
+    setCollaborationMode: vi.fn(setCollaborationModeImplementation ?? (async () => {}))
+  };
+}
+
 describe("CollaborationModeActionCoordinator", () => {
   it("returns when no selected thread is available", async () => {
-    const coordinator = new CollaborationModeActionCoordinator(modeSelectionStateResolver);
+    const coordinator = createCoordinator();
     let modeSignature = "";
     const onSetModeSyncing = vi.fn();
-    const chatClient = {
-      setCollaborationMode: vi.fn(async () => {})
-    };
+    const chatClient = createChatClient();
     const onReloadSelectedThread = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
 
@@ -50,12 +80,10 @@ describe("CollaborationModeActionCoordinator", () => {
   });
 
   it("returns when selected mode cannot be resolved", async () => {
-    const coordinator = new CollaborationModeActionCoordinator(modeSelectionStateResolver);
+    const coordinator = createCoordinator();
     let modeSignature = "";
     const onSetModeSyncing = vi.fn();
-    const chatClient = {
-      setCollaborationMode: vi.fn(async () => {})
-    };
+    const chatClient = createChatClient();
     const onReloadSelectedThread = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
 
@@ -65,7 +93,7 @@ describe("CollaborationModeActionCoordinator", () => {
         modelId: "",
         reasoningEffort: ""
       },
-      selectedThreadId: "thread-1",
+      selectedThreadId: DEFAULT_THREAD_ID,
       modes: [
         {
           mode: "default",
@@ -91,12 +119,10 @@ describe("CollaborationModeActionCoordinator", () => {
   });
 
   it("does not submit mode update when signature is already applied and not syncing", async () => {
-    const coordinator = new CollaborationModeActionCoordinator(modeSelectionStateResolver);
+    const coordinator = createCoordinator();
     const modeSignature = modeSelectionStateResolver.buildModeSignature("default", "gpt-5", "medium");
     const onSetModeSyncing = vi.fn();
-    const chatClient = {
-      setCollaborationMode: vi.fn(async () => {})
-    };
+    const chatClient = createChatClient();
     const onReloadSelectedThread = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
 
@@ -106,7 +132,7 @@ describe("CollaborationModeActionCoordinator", () => {
         modelId: "gpt-5",
         reasoningEffort: "medium"
       },
-      selectedThreadId: "thread-1",
+      selectedThreadId: DEFAULT_THREAD_ID,
       modes: [
         {
           mode: "default",
@@ -129,14 +155,44 @@ describe("CollaborationModeActionCoordinator", () => {
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
   });
 
+  it("submits mode update while mode sync confirmation is still in progress", async () => {
+    const coordinator = createCoordinator();
+    const modeSignature = modeSelectionStateResolver.buildModeSignature("default", "gpt-5", "medium");
+    const onSetModeSyncing = vi.fn();
+    const chatClient = createChatClient();
+    const onReloadSelectedThread = vi.fn(async () => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+
+    await coordinator.applyDraft({
+      draft: {
+        modeKey: "default",
+        modelId: "gpt-5",
+        reasoningEffort: "medium"
+      },
+      selectedThreadId: DEFAULT_THREAD_ID,
+      modes: DEFAULT_MODE_OPTIONS,
+      isModeSyncing: true,
+      readLastAppliedModeSignature: () => modeSignature,
+      writeLastAppliedModeSignature: vi.fn(),
+      buildActionRequestOptions,
+      onSetModeSyncing,
+      chatClient,
+      onReloadSelectedThread,
+      reportTrackedUserInterfaceError
+    });
+
+    expect(chatClient.setCollaborationMode).toHaveBeenCalledTimes(1);
+    expect(onReloadSelectedThread).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(onSetModeSyncing.mock.calls).toEqual([[true], [false]]);
+  });
+
   it("applies collaboration mode and refreshes selected thread", async () => {
-    const coordinator = new CollaborationModeActionCoordinator(modeSelectionStateResolver);
+    const coordinator = createCoordinator();
     let modeSignature = "previous-signature";
     const modeSignatureUpdates: string[] = [];
     const modeSyncingStates: boolean[] = [];
-    const chatClient = {
-      setCollaborationMode: vi.fn(async () => {})
-    };
+    const chatClient = createChatClient();
     const onReloadSelectedThread = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
 
@@ -146,13 +202,8 @@ describe("CollaborationModeActionCoordinator", () => {
         modelId: "",
         reasoningEffort: "high"
       },
-      selectedThreadId: "thread-2",
-      modes: [
-        {
-          mode: "default",
-          developer_instructions: "Use explicit reasoning."
-        }
-      ],
+      selectedThreadId: APPLY_THREAD_ID,
+      modes: DEFAULT_MODE_OPTIONS,
       isModeSyncing: false,
       readLastAppliedModeSignature: () => modeSignature,
       writeLastAppliedModeSignature: (nextModeSignature) => {
@@ -170,7 +221,7 @@ describe("CollaborationModeActionCoordinator", () => {
 
     expect(chatClient.setCollaborationMode).toHaveBeenCalledWith(
       {
-        threadId: "thread-2",
+        threadId: APPLY_THREAD_ID,
         collaborationMode: {
           mode: "default",
           settings: {
@@ -185,7 +236,7 @@ describe("CollaborationModeActionCoordinator", () => {
         actionName: "set-collaboration-mode"
       }
     );
-    expect(onReloadSelectedThread).toHaveBeenCalledWith("thread-2");
+    expect(onReloadSelectedThread).toHaveBeenCalledWith(APPLY_THREAD_ID);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(modeSignatureUpdates).toEqual([
       modeSelectionStateResolver.buildModeSignature("default", "", "high")
@@ -193,16 +244,59 @@ describe("CollaborationModeActionCoordinator", () => {
     expect(modeSyncingStates).toEqual([true, false]);
   });
 
+  it("normalizes empty model and reasoning settings to null when applying a mode", async () => {
+    const coordinator = createCoordinator();
+    const chatClient = createChatClient();
+    const onReloadSelectedThread = vi.fn(async () => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+
+    await coordinator.applyDraft({
+      draft: {
+        modeKey: "plan",
+        modelId: "",
+        reasoningEffort: ""
+      },
+      selectedThreadId: DEFAULT_THREAD_ID,
+      modes: PLAN_MODE_OPTIONS,
+      isModeSyncing: false,
+      readLastAppliedModeSignature: () => "previous-signature",
+      writeLastAppliedModeSignature: vi.fn(),
+      buildActionRequestOptions,
+      onSetModeSyncing: vi.fn(),
+      chatClient,
+      onReloadSelectedThread,
+      reportTrackedUserInterfaceError
+    });
+
+    expect(chatClient.setCollaborationMode).toHaveBeenCalledWith(
+      {
+        threadId: DEFAULT_THREAD_ID,
+        collaborationMode: {
+          mode: "plan",
+          settings: {
+            model: null,
+            reasoning_effort: null,
+            developer_instructions: null
+          }
+        }
+      },
+      {
+        actionId: "action-set-collaboration-mode",
+        actionName: "set-collaboration-mode"
+      }
+    );
+    expect(onReloadSelectedThread).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+  });
+
   it("restores previous signature and reports errors on mutation failure", async () => {
-    const coordinator = new CollaborationModeActionCoordinator(modeSelectionStateResolver);
+    const coordinator = createCoordinator();
     let modeSignature = "stable-signature";
     const modeSignatureUpdates: string[] = [];
     const modeSyncingStates: boolean[] = [];
-    const chatClient = {
-      setCollaborationMode: vi.fn(async () => {
-        throw new Error("set mode failed");
-      })
-    };
+    const chatClient = createChatClient(async () => {
+      throw new Error("set mode failed");
+    });
     const onReloadSelectedThread = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
 
@@ -212,13 +306,8 @@ describe("CollaborationModeActionCoordinator", () => {
         modelId: "gpt-5",
         reasoningEffort: "medium"
       },
-      selectedThreadId: "thread-3",
-      modes: [
-        {
-          mode: "plan",
-          developer_instructions: null
-        }
-      ],
+      selectedThreadId: FAILED_THREAD_ID,
+      modes: PLAN_MODE_OPTIONS,
       isModeSyncing: false,
       readLastAppliedModeSignature: () => modeSignature,
       writeLastAppliedModeSignature: (nextModeSignature) => {
@@ -238,7 +327,7 @@ describe("CollaborationModeActionCoordinator", () => {
     expect(reportTrackedUserInterfaceError).toHaveBeenCalledWith({
       operation: "set-collaboration-mode",
       actionId: "action-set-collaboration-mode",
-      threadId: "thread-3",
+      threadId: FAILED_THREAD_ID,
       error: "set mode failed",
       details: {
         modeKey: "plan"

@@ -102,6 +102,42 @@ describe("EventStreamRefreshDecisionEngine", () => {
     });
   });
 
+  it("normalizes non-string history metadata and keeps selected-thread refresh deterministic", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "chat",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 3,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: "entry-2",
+            at: "2026-02-26T00:00:00.000Z",
+            source: "app",
+            direction: "out",
+            payload: {
+              type: "action",
+              action: "thread-created"
+            },
+            meta: {
+              method: 77,
+              threadId: 42
+            }
+          }
+        }
+      })
+    });
+
+    expect(decision).toEqual({
+      refreshCore: true,
+      refreshHistory: false,
+      refreshSelectedThread: false,
+      threadStreamDelta: null
+    });
+  });
+
   it("exposes pushed thread stream deltas for selected thread and skips selected-thread refresh", () => {
     const engine = createEngine();
 

@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClientErrorStore } from "../Source/Modules/Debugging/ClientErrorStore.js";
+import { logger } from "../Source/Shared/Logging/Logger.js";
 
 const tempDirectories: string[] = [];
 
@@ -18,6 +19,7 @@ afterEach(() => {
       fs.rmSync(directory, { recursive: true, force: true });
     }
   }
+  vi.restoreAllMocks();
 });
 
 describe("ClientErrorStore", () => {
@@ -128,6 +130,7 @@ describe("ClientErrorStore", () => {
   it("skips malformed ndjson lines while loading existing events", () => {
     const directory = makeTempDir();
     const logPath = path.join(directory, "session.ndjson");
+    const warnSpy = vi.spyOn(logger, "warn");
     const validEvent = {
       errorId: "error_valid",
       sessionId: "session_3",
@@ -167,5 +170,13 @@ describe("ClientErrorStore", () => {
     expect(store.getCount()).toBe(1);
     expect(store.getById("error_valid")?.operation).toBe("valid-op");
     expect(store.getById("error_invalid_schema")).toBeNull();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toMatchObject({
+      sessionId: "session_3",
+      logPath,
+      malformedLineCount: 2,
+      sampledLineNumbers: [2, 3]
+    });
+    expect(warnSpy.mock.calls[0]?.[1]).toBe("client-error-store-skip-malformed-line");
   });
 });

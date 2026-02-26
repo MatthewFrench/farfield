@@ -219,4 +219,34 @@ describe("PushService", () => {
     expect(result.prunedEndpoints).toEqual([]);
     expect(vi.mocked(webPush.sendNotification)).toHaveBeenCalledTimes(3);
   });
+
+  it("returns zeroed result and skips dispatch when disabled", async () => {
+    const service = new PushService({
+      enabled: false,
+      vapidPublicKey: "public_key_unused_when_disabled",
+      vapidPrivateKey: "private_key_unused_when_disabled",
+      vapidSubject: "mailto:test@example.com"
+    });
+
+    const result = await service.sendToSubscriptions(
+      [buildStoredSubscription("https://push.example.test/subscriptions/sub_disabled")],
+      {
+        notificationId: "notif_disabled",
+        title: "Disabled",
+        body: "Should not send",
+        threadId: "thread_1",
+        turnId: "turn_1",
+        url: "/threads/thread_1",
+        createdAt: "2026-02-18T00:00:00.000Z"
+      }
+    );
+
+    expect(result).toEqual({
+      attempted: 0,
+      delivered: 0,
+      failures: [],
+      prunedEndpoints: []
+    });
+    expect(vi.mocked(webPush.sendNotification)).not.toHaveBeenCalled();
+  });
 });

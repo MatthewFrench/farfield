@@ -5,8 +5,11 @@ import {
   NonNegativeIntSchema,
   type JsonValue
 } from "./Common.js";
-import { ProtocolValidationError } from "./Errors.js";
-import { ThreadStreamStateChangedParamsSchema } from "./Contracts/Thread/StreamStateContracts.js";
+import {
+  ThreadStreamStateChangedEventType,
+  ThreadStreamStateChangedParamsSchema
+} from "./Contracts/Thread/StreamStateContracts.js";
+import { parseSchemaOrThrow } from "./ProtocolSchemaParsers.js";
 
 export const IpcRequestIdSchema = NonEmptyStringSchema;
 
@@ -65,7 +68,16 @@ export const IpcClientDiscoveryResponseFrameSchema = z
   })
   .passthrough();
 
-export const IpcFrameSchema = z.union([
+export const IpcFrameSchema: z.ZodDiscriminatedUnion<
+  "type",
+  [
+    typeof IpcRequestFrameSchema,
+    typeof IpcResponseFrameSchema,
+    typeof IpcBroadcastFrameSchema,
+    typeof IpcClientDiscoveryRequestFrameSchema,
+    typeof IpcClientDiscoveryResponseFrameSchema
+  ]
+> = z.discriminatedUnion("type", [
   IpcRequestFrameSchema,
   IpcResponseFrameSchema,
   IpcBroadcastFrameSchema,
@@ -76,7 +88,7 @@ export const IpcFrameSchema = z.union([
 export const ThreadStreamStateChangedBroadcastSchema: z.ZodObject<
   {
     type: z.ZodLiteral<"broadcast">;
-    method: z.ZodLiteral<"thread-stream-state-changed">;
+    method: z.ZodLiteral<typeof ThreadStreamStateChangedEventType>;
     sourceClientId: typeof NonEmptyStringSchema;
     params: typeof ThreadStreamStateChangedParamsSchema;
     version: typeof NonNegativeIntSchema;
@@ -85,7 +97,7 @@ export const ThreadStreamStateChangedBroadcastSchema: z.ZodObject<
 > = z
   .object({
     type: z.literal("broadcast"),
-    method: z.literal("thread-stream-state-changed"),
+    method: z.literal(ThreadStreamStateChangedEventType),
     sourceClientId: NonEmptyStringSchema,
     params: ThreadStreamStateChangedParamsSchema,
     version: NonNegativeIntSchema
@@ -101,24 +113,21 @@ export type IpcClientDiscoveryResponseFrame = z.infer<typeof IpcClientDiscoveryR
 export type ThreadStreamStateChangedBroadcast = z.infer<
   typeof ThreadStreamStateChangedBroadcastSchema
 >;
+const ParseContext = {
+  ipcFrame: "IpcFrame",
+  threadStreamStateChangedBroadcast: "ThreadStreamStateChangedBroadcast"
+} as const;
 
 export function parseIpcFrame(value: JsonValue): IpcFrame {
-  const result = IpcFrameSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("IpcFrame", result.error);
-  }
-  return result.data;
+  return parseSchemaOrThrow(IpcFrameSchema, value, ParseContext.ipcFrame);
 }
 
 export function parseThreadStreamStateChangedBroadcast(
   value: JsonValue
 ): ThreadStreamStateChangedBroadcast {
-  const result = ThreadStreamStateChangedBroadcastSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod(
-      "ThreadStreamStateChangedBroadcast",
-      result.error
-    );
-  }
-  return result.data;
+  return parseSchemaOrThrow(
+    ThreadStreamStateChangedBroadcastSchema,
+    value,
+    ParseContext.threadStreamStateChangedBroadcast
+  );
 }

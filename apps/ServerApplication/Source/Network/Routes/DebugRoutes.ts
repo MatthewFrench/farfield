@@ -10,14 +10,17 @@ import {
 import {
   DebugTraceRouteOwner
 } from "./DebugTraceRouteOwner.js";
-import { type DebugRouteDependencies } from "./DebugRouteContracts.js";
+import {
+  DebugRouteSegmentByName,
+  type DebugRouteDependencies
+} from "./DebugRouteContracts.js";
 
 export type { DebugRouteDependencies } from "./DebugRouteContracts.js";
 
 export async function handleDebugRoutes(dependencies: DebugRouteDependencies): Promise<boolean> {
   const { segments } = dependencies;
 
-  if (segments[0] !== "api" || segments[1] !== "debug") {
+  if (segments[0] !== DebugRouteSegmentByName.api || segments[1] !== DebugRouteSegmentByName.debug) {
     return false;
   }
 

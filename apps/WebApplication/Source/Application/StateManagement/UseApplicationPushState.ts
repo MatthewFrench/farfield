@@ -1,6 +1,15 @@
 import { type Dispatch, type SetStateAction, useState } from "react";
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 
+const INITIAL_PUSH_STATE_FLAGS = {
+  isEnablingPushNotifications: false,
+  requiresApiSessionToken: false,
+  isApiSessionBootstrapPending: false
+};
+
+const INITIAL_API_SESSION_TOKEN_DRAFT = "";
+const INITIAL_API_SESSION_BOOTSTRAP_ERROR_MESSAGE = "";
+
 export interface UseApplicationPushStateInput {
   unsupportedPushClientState: PushClientState;
 }
@@ -21,14 +30,25 @@ export interface ApplicationPushStateSlice {
 }
 
 export function useApplicationPushState(input: UseApplicationPushStateInput): ApplicationPushStateSlice {
+  const { unsupportedPushClientState } = input;
   const [pushClientState, setPushClientState] = useState<PushClientState>(
-    input.unsupportedPushClientState
+    unsupportedPushClientState
   );
-  const [isEnablingPushNotifications, setIsEnablingPushNotifications] = useState(false);
-  const [requiresApiSessionToken, setRequiresApiSessionToken] = useState(false);
-  const [apiSessionTokenDraft, setApiSessionTokenDraft] = useState("");
-  const [apiSessionBootstrapError, setApiSessionBootstrapError] = useState("");
-  const [isApiSessionBootstrapPending, setIsApiSessionBootstrapPending] = useState(false);
+  const [isEnablingPushNotifications, setIsEnablingPushNotifications] = useState(
+    INITIAL_PUSH_STATE_FLAGS.isEnablingPushNotifications
+  );
+  const [requiresApiSessionToken, setRequiresApiSessionToken] = useState(
+    INITIAL_PUSH_STATE_FLAGS.requiresApiSessionToken
+  );
+  const [apiSessionTokenDraft, setApiSessionTokenDraft] = useState(
+    INITIAL_API_SESSION_TOKEN_DRAFT
+  );
+  const [apiSessionBootstrapError, setApiSessionBootstrapError] = useState(
+    INITIAL_API_SESSION_BOOTSTRAP_ERROR_MESSAGE
+  );
+  const [isApiSessionBootstrapPending, setIsApiSessionBootstrapPending] = useState(
+    INITIAL_PUSH_STATE_FLAGS.isApiSessionBootstrapPending
+  );
 
   return {
     pushClientState,

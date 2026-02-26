@@ -12,6 +12,8 @@ const EVENT_STREAM_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "x-farfield-token, x-farfield-request-id, x-farfield-action-id, x-farfield-action-name"
 } as const;
+const EVENT_STREAM_RETRY_DIRECTIVE = "retry: 1000\n\n";
+const EVENT_STREAM_KEEPALIVE_FRAME = ": keepalive\n\n";
 
 export interface EventStreamClientRegistryStatistics {
   activeClientCount: number;
@@ -69,20 +71,19 @@ export class EventStreamClientRegistry {
       this.keepaliveTimer = null;
     }
 
-    for (const client of this.clientSet) {
+    for (const client of Array.from(this.clientSet.values())) {
       try {
         client.end();
       } catch {
         // No-op: client can already be disconnected.
       }
+      this.removeClient(client);
     }
-    this.removedClientCount += this.clientSet.size;
-    this.clientSet.clear();
   }
 
   public addClient(req: IncomingMessage, res: ServerResponse, initialEvent: FarfieldEventStreamEvent): void {
     res.writeHead(200, EVENT_STREAM_HEADERS);
-    res.write("retry: 1000\n\n");
+    res.write(EVENT_STREAM_RETRY_DIRECTIVE);
 
     this.clientSet.add(res);
     this.addedClientCount += 1;
@@ -92,10 +93,10 @@ export class EventStreamClientRegistry {
     });
 
     req.on("close", () => {
-      const removed = this.clientSet.delete(res);
-      if (removed) {
-        this.removedClientCount += 1;
-      }
+      this.removeClient(res);
+    });
+    res.on("close", () => {
+      this.removeClient(res);
     });
   }
 
@@ -134,18 +135,25 @@ export class EventStreamClientRegistry {
       client.write(`data: ${JSON.stringify(envelope)}\n\n`);
     } catch {
       this.eventWriteFailureCount += 1;
-      this.clientSet.delete(client);
+      this.removeClient(client);
     }
   }
 
   private writeKeepalive(): void {
     for (const client of this.clientSet) {
       try {
-        client.write(": keepalive\n\n");
+        client.write(EVENT_STREAM_KEEPALIVE_FRAME);
       } catch {
         this.keepaliveWriteFailureCount += 1;
-        this.clientSet.delete(client);
+        this.removeClient(client);
       }
     }
+  }
+
+  private removeClient(client: ServerResponse): void {
+    if (!this.clientSet.delete(client)) {
+      return;
+    }
+    this.removedClientCount += 1;
   }
 }

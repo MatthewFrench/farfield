@@ -4,6 +4,10 @@ import {
   type MutableRefObject,
   type SetStateAction
 } from "react";
+import {
+  createEmptyPendingUserInputAnswerDraft,
+  type PendingUserInputAnswerDraftByQuestionId
+} from "../DomainModel/PendingUserInputAnswerBuilder";
 import type { ModeSelectionConversationState } from "../DomainModel/ModeSelectionStateResolver";
 import { type PendingUserInputRequest } from "../DomainModel/PendingUserInputRequestSelector";
 import { ModeSelectionSyncCoordinator } from "./ModeSelectionSyncCoordinator";
@@ -11,7 +15,7 @@ import { ModeSelectionSyncCoordinator } from "./ModeSelectionSyncCoordinator";
 export interface UseModeAndPendingRequestEffectsInput {
   activeRequest: PendingUserInputRequest | null;
   setSelectedRequestId: Dispatch<SetStateAction<number | null>>;
-  setAnswerDraft: Dispatch<SetStateAction<Record<string, { option: string; freeform: string }>>>;
+  setAnswerDraft: Dispatch<SetStateAction<PendingUserInputAnswerDraftByQuestionId>>;
   modeSelectionSyncCoordinator: ModeSelectionSyncCoordinator;
   conversationState: ModeSelectionConversationState | null;
   appDefaultModel: string;
@@ -33,17 +37,20 @@ export interface UseModeAndPendingRequestEffectsInput {
 
 export function useModeAndPendingRequestEffects(input: UseModeAndPendingRequestEffectsInput): void {
   useEffect(() => {
-    if (!input.activeRequest) {
+    const activeRequest = input.activeRequest;
+    if (!activeRequest) {
       input.setSelectedRequestId(null);
       input.setAnswerDraft({});
       return;
     }
 
-    input.setSelectedRequestId((currentRequestId) => currentRequestId ?? input.activeRequest?.id ?? null);
+    input.setSelectedRequestId((currentRequestId) => currentRequestId ?? activeRequest.id);
     input.setAnswerDraft((previousAnswerDraft) => {
-      const nextAnswerDraft: Record<string, { option: string; freeform: string }> = {};
-      for (const question of input.activeRequest?.params.questions ?? []) {
-        nextAnswerDraft[question.id] = previousAnswerDraft[question.id] ?? { option: "", freeform: "" };
+      const nextAnswerDraft: PendingUserInputAnswerDraftByQuestionId = {};
+      for (const question of activeRequest.params.questions) {
+        nextAnswerDraft[question.id] = (
+          previousAnswerDraft[question.id] ?? createEmptyPendingUserInputAnswerDraft()
+        );
       }
       return nextAnswerDraft;
     });

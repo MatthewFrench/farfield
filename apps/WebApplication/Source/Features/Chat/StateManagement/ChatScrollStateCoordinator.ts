@@ -25,7 +25,8 @@ export class ChatScrollStateCoordinator {
   }
 
   public readDistanceFromBottom(scrollElement: ChatScrollElementLike): number {
-    return scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight;
+    const distanceFromBottom = scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight;
+    return distanceFromBottom > 0 ? distanceFromBottom : 0;
   }
 
   public readIsAtBottom(scrollElement: ChatScrollElementLike): boolean {

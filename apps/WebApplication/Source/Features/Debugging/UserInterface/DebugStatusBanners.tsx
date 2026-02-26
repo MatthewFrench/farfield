@@ -8,6 +8,9 @@ interface LiveStateReductionErrorSummary {
   patchIndex: number | null;
 }
 
+const ERROR_BANNER_OPEN_DEBUG_BUTTON_LABEL = "Open in Debug";
+const LIVE_STATE_REDUCTION_WARNING_MESSAGE = "Live updates failed for this thread. Showing saved messages only.";
+
 export interface DebugStatusBannersProps {
   activeTab: "chat" | "debug";
   errorMessage: string;
@@ -83,7 +86,7 @@ export function DebugStatusBanners({
                   size="sm"
                   className="h-7 px-2 text-xs text-destructive-foreground/90 hover:text-destructive-foreground hover:bg-black/10"
                 >
-                  Open in Debug
+                  {ERROR_BANNER_OPEN_DEBUG_BUTTON_LABEL}
                 </Button>
                 <Button
                   type="button"
@@ -109,7 +112,7 @@ export function DebugStatusBanners({
             className="relative z-30 overflow-hidden shrink-0"
           >
             <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 text-sm text-amber-200">
-              Live updates failed for this thread. Showing saved messages only.
+              {LIVE_STATE_REDUCTION_WARNING_MESSAGE}
               {liveStateReductionError.eventIndex !== null && (
                 <span className="ml-2 text-xs text-amber-300/90">
                   event {liveStateReductionError.eventIndex}

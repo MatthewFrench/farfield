@@ -1,5 +1,7 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
+import { FarfieldThreadStreamEventsSnapshotSchema } from "@farfield/protocol";
+import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 import type {
   AgentAdapter,
@@ -18,6 +20,27 @@ import type {
   ThreadMemberRouteDependencies,
   ThreadMemberResolvedRouteContext
 } from "../Source/Network/Routes/ThreadMemberRouteContracts.js";
+
+const ThreadMemberReadRouteValidationErrorSchema = z
+  .object({
+    ok: z.literal(false),
+    error: z.literal("Invalid stream event query parameters"),
+    details: z.array(
+      z
+        .object({
+          message: z.string().min(1)
+        })
+        .passthrough()
+    )
+  })
+  .strict();
+
+function readJsonResponseBody(responseBody: object | null): object {
+  if (!responseBody) {
+    throw new Error("Expected a JSON response body");
+  }
+  return responseBody;
+}
 
 function createMockRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
   const socket = new Socket();
@@ -139,7 +162,10 @@ describe("ThreadMemberReadRouteOwner", () => {
       sinceSequence: 14
     });
     expect(capturedStatusCode).toBe(200);
-    expect(capturedResponseBody).toEqual({
+    const parsedResponse = FarfieldThreadStreamEventsSnapshotSchema.parse(
+      readJsonResponseBody(capturedResponseBody)
+    );
+    expect(parsedResponse).toEqual({
       ok: true,
       threadId: "thread-1",
       ownerClientId: "client-a",
@@ -218,10 +244,10 @@ describe("ThreadMemberReadRouteOwner", () => {
     expect(handled).toBe(true);
     expect(readStreamEvents).not.toHaveBeenCalled();
     expect(capturedStatusCode).toBe(400);
-    expect(capturedResponseBody).toMatchObject({
-      ok: false,
-      error: "Invalid stream event query parameters"
-    });
+    const parsedValidationErrorResponse = ThreadMemberReadRouteValidationErrorSchema.parse(
+      readJsonResponseBody(capturedResponseBody)
+    );
+    expect(parsedValidationErrorResponse.details.length).toBeGreaterThan(0);
   });
 
   it("returns 400 when stream-event limit exceeds route maximum", async () => {
@@ -291,9 +317,9 @@ describe("ThreadMemberReadRouteOwner", () => {
     expect(handled).toBe(true);
     expect(readStreamEvents).not.toHaveBeenCalled();
     expect(capturedStatusCode).toBe(400);
-    expect(capturedResponseBody).toMatchObject({
-      ok: false,
-      error: "Invalid stream event query parameters"
-    });
+    const parsedValidationErrorResponse = ThreadMemberReadRouteValidationErrorSchema.parse(
+      readJsonResponseBody(capturedResponseBody)
+    );
+    expect(parsedValidationErrorResponse.details.length).toBeGreaterThan(0);
   });
 });

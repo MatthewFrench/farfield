@@ -38,4 +38,22 @@ describe("PushTestPayloadOwner", () => {
     expect(payload.url).toBe("/threads/thread_2");
     expect(payload.web_push.notification.navigate).toBe("/threads/thread_2");
   });
+
+  it("supports deterministic id and timestamp dependencies for test payload generation", () => {
+    const owner = new PushTestPayloadOwner({
+      readNowIsoString: () => "2026-02-25T00:00:00.000Z",
+      createNotificationIdSuffix: () => "deterministic-id"
+    });
+
+    const payload = owner.buildPayload(
+      {
+        threadId: "thread_3",
+        turnId: "turn_3"
+      },
+      false
+    );
+
+    expect(payload.notificationId).toBe("notif_deterministic-id");
+    expect(payload.createdAt).toBe("2026-02-25T00:00:00.000Z");
+  });
 });

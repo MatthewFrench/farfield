@@ -2,53 +2,46 @@ import { z } from "zod";
 import type { AgentId } from "../Agents/Types.js";
 
 const AgentIdParameterSchema = z.enum(["codex", "opencode"]);
+const PositiveIntegerParameterSchema = z.coerce.number().int().positive();
+const BooleanParameterSchema = z
+  .enum(["1", "0", "true", "false"])
+  .transform((value) => value === "1" || value === "true");
+const NonEmptyTrimmedStringSchema = z.string().trim().min(1);
 
 export class ServerRequestUtilityOwner {
   public parseInteger(value: string | null, defaultValue: number): number {
-    if (!value) {
-      return defaultValue;
+    const parsedDefaultValue = PositiveIntegerParameterSchema.parse(defaultValue);
+    if (value === null) {
+      return parsedDefaultValue;
     }
-
-    const parsed = Number(value);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      return defaultValue;
-    }
-
-    return parsed;
+    const parsedValue = PositiveIntegerParameterSchema.safeParse(value);
+    return parsedValue.success ? parsedValue.data : parsedDefaultValue;
   }
 
   public parseBoolean(value: string | null, defaultValue: boolean): boolean {
-    if (!value) {
+    if (value === null) {
       return defaultValue;
     }
-
-    if (value === "1" || value === "true") {
-      return true;
-    }
-
-    if (value === "0" || value === "false") {
-      return false;
-    }
-
-    return defaultValue;
+    const normalizedValue = value.trim().toLowerCase();
+    const parsedValue = BooleanParameterSchema.safeParse(normalizedValue);
+    return parsedValue.success ? parsedValue.data : defaultValue;
   }
 
   public parseAgentId(value: string | null): AgentId | null {
-    if (!value) {
+    if (value === null) {
       return null;
     }
 
-    const parsed = AgentIdParameterSchema.safeParse(value);
+    const parsed = AgentIdParameterSchema.safeParse(value.trim().toLowerCase());
     return parsed.success ? parsed.data : null;
   }
 
   public normalizeOptionalString(value: string | null): string | null {
-    if (!value) {
+    if (value === null) {
       return null;
     }
-
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : null;
+    const parsedValue = NonEmptyTrimmedStringSchema.safeParse(value);
+    return parsedValue.success ? parsedValue.data : null;
   }
 
   public async withTimeout<ValueType>(
@@ -56,11 +49,13 @@ export class ServerRequestUtilityOwner {
     timeoutMs: number,
     label: string
   ): Promise<ValueType> {
+    const parsedTimeoutMs = PositiveIntegerParameterSchema.parse(timeoutMs);
+    const parsedLabel = NonEmptyTrimmedStringSchema.parse(label);
     let timeoutHandle: NodeJS.Timeout | null = null;
     const timeoutPromise = new Promise<ValueType>((_resolve, reject) => {
       timeoutHandle = setTimeout(() => {
-        reject(new Error(`${label} timed out after ${String(timeoutMs)}ms`));
-      }, timeoutMs);
+        reject(new Error(`${parsedLabel} timed out after ${String(parsedTimeoutMs)}ms`));
+      }, parsedTimeoutMs);
     });
 
     try {

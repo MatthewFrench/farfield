@@ -9,6 +9,8 @@ import { ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/Chat
 import { PageTouchOverscrollGuardCoordinator } from "./PageTouchOverscrollGuardCoordinator";
 import { RuntimeViewportSizingCoordinator } from "./RuntimeViewportSizingCoordinator";
 
+const POINTER_COARSE_MEDIA_QUERY = "(pointer: coarse)";
+
 export interface UseViewportShellEffectsInput {
   applicationShellElementRef: RefObject<HTMLDivElement | null>;
   scrollRef: RefObject<HTMLDivElement | null>;
@@ -20,6 +22,28 @@ export interface UseViewportShellEffectsInput {
   runtimeViewportSizingCoordinator: RuntimeViewportSizingCoordinator;
   pageTouchOverscrollGuardCoordinator: PageTouchOverscrollGuardCoordinator;
   chatScrollStateCoordinator: ChatScrollStateCoordinator;
+}
+
+function cancelScheduledKeyboardOpenPin(
+  keyboardOpenScrollRafReference: MutableRefObject<number | null>
+): void {
+  if (keyboardOpenScrollRafReference.current === null) {
+    return;
+  }
+  window.cancelAnimationFrame(keyboardOpenScrollRafReference.current);
+  keyboardOpenScrollRafReference.current = null;
+}
+
+function scheduleKeyboardOpenPin(
+  keyboardOpenScrollRafReference: MutableRefObject<number | null>,
+  callback: () => void
+): void {
+  keyboardOpenScrollRafReference.current = window.requestAnimationFrame(() => {
+    keyboardOpenScrollRafReference.current = window.requestAnimationFrame(() => {
+      callback();
+      keyboardOpenScrollRafReference.current = null;
+    });
+  });
 }
 
 export function useViewportShellEffects(input: UseViewportShellEffectsInput): void {
@@ -39,25 +63,18 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
       if (
         metrics.keyboardOpen
         && previousKeyboardState !== true
-        && window.matchMedia("(pointer: coarse)").matches
+        && window.matchMedia(POINTER_COARSE_MEDIA_QUERY).matches
         && input.activeTabRef.current === "chat"
       ) {
-        if (input.keyboardOpenScrollRafRef.current !== null) {
-          window.cancelAnimationFrame(input.keyboardOpenScrollRafRef.current);
-        }
-
-        input.keyboardOpenScrollRafRef.current = window.requestAnimationFrame(() => {
-          input.keyboardOpenScrollRafRef.current = window.requestAnimationFrame(() => {
-            const scroller = input.scrollRef.current;
-            if (!scroller) {
-              input.keyboardOpenScrollRafRef.current = null;
-              return;
-            }
-            input.chatScrollStateCoordinator.pinToBottom(scroller);
-            input.isChatAtBottomRef.current = true;
-            input.setIsChatAtBottom(true);
-            input.keyboardOpenScrollRafRef.current = null;
-          });
+        cancelScheduledKeyboardOpenPin(input.keyboardOpenScrollRafRef);
+        scheduleKeyboardOpenPin(input.keyboardOpenScrollRafRef, () => {
+          const scroller = input.scrollRef.current;
+          if (!scroller) {
+            return;
+          }
+          input.chatScrollStateCoordinator.pinToBottom(scroller);
+          input.isChatAtBottomRef.current = true;
+          input.setIsChatAtBottom(true);
         });
       }
 
@@ -91,9 +108,7 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
       if (rafId !== null) {
         window.cancelAnimationFrame(rafId);
       }
-      if (input.keyboardOpenScrollRafRef.current !== null) {
-        window.cancelAnimationFrame(input.keyboardOpenScrollRafRef.current);
-      }
+      cancelScheduledKeyboardOpenPin(input.keyboardOpenScrollRafRef);
       window.removeEventListener("resize", scheduleApply);
       window.removeEventListener("orientationchange", scheduleApply);
       window.removeEventListener("pageshow", scheduleApply);
@@ -105,7 +120,6 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
     };
   }, [
     input.activeTabRef,
-    input.applicationShellElementRef,
     input.chatScrollStateCoordinator,
     input.isChatAtBottomRef,
     input.keyboardOpenScrollRafRef,

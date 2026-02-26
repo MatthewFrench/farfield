@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type { ThreadListItem, ThreadProjectGroup } from "./ThreadGroupTypes";
 
 interface ComputeUnreadThreadIdentifiersInput {
@@ -8,21 +7,18 @@ interface ComputeUnreadThreadIdentifiersInput {
   selectedThreadIdentifier: string | null;
 }
 
-const ThreadUnreadStateSchema = z
-  .object({
-    hasUnreadTurn: z.boolean().optional()
-  })
-  .passthrough();
-
-const OptionalProjectPathSchema = z
-  .union([z.string(), z.null(), z.undefined()])
-  .transform((value) => value ?? "");
+const THREAD_LABEL_PREFIX = "thread ";
+const PROJECT_KEY_PREFIX = "project:";
+const UNKNOWN_PROJECT_KEY = `${PROJECT_KEY_PREFIX}unknown`;
+const UNKNOWN_PROJECT_LABEL = "No project";
+const REMOVED_PROJECT_STATE = "removed";
+const UNKNOWN_UNREAD_SIGNAL = null;
 
 export class ThreadGroupSelectors {
   public static threadLabel(thread: Pick<ThreadListItem, "id" | "preview">): string {
     const text = thread.preview.trim();
     if (!text) {
-      return `thread ${thread.id.slice(0, 8)}`;
+      return `${THREAD_LABEL_PREFIX}${thread.id.slice(0, 8)}`;
     }
     return text;
   }
@@ -49,12 +45,13 @@ export class ThreadGroupSelectors {
         continue;
       }
 
-      const parsedUnreadState = ThreadUnreadStateSchema.parse(thread);
-      if (parsedUnreadState.hasUnreadTurn === true) {
+      // Explicit unread signals from the boundary contract take precedence over timestamp heuristics.
+      const unreadSignal = ThreadGroupSelectors.readThreadHasUnreadTurnSignal(thread);
+      if (unreadSignal === true) {
         nextUnreadThreadIdentifiers[thread.id] = true;
         continue;
       }
-      if (parsedUnreadState.hasUnreadTurn === false) {
+      if (unreadSignal === false) {
         continue;
       }
 
@@ -90,10 +87,8 @@ export class ThreadGroupSelectors {
     const groupByKey = new Map<string, ThreadProjectGroup>();
     for (const thread of threads) {
       const projectPath = ThreadGroupSelectors.normalizeProjectPathFromThread(thread);
-      const groupKey = projectPath ? `project:${projectPath}` : "project:unknown";
-      const groupLabel = projectPath
-        ? ThreadGroupSelectors.projectLabelFromPath(projectPath)
-        : "No project";
+      const groupKey = ThreadGroupSelectors.buildProjectGroupKey(projectPath);
+      const groupLabel = ThreadGroupSelectors.buildProjectGroupLabel(projectPath);
       const threadCreatedAt = thread.createdAt ?? 0;
       const threadUpdatedAt = ThreadGroupSelectors.readThreadUpdatedAtTimestamp(thread);
       const projectMarkedRemoved = ThreadGroupSelectors.threadProjectIsMarkedRemoved(thread);
@@ -193,18 +188,14 @@ export class ThreadGroupSelectors {
   }
 
   private static normalizeProjectPathFromThread(thread: ThreadListItem): string | null {
-    const currentWorkingDirectory = OptionalProjectPathSchema.parse(thread.cwd).trim();
+    const currentWorkingDirectory = ThreadGroupSelectors.normalizeOptionalProjectPath(thread.cwd);
     if (currentWorkingDirectory.length > 0) {
-      const normalizedCurrentWorkingDirectory = ThreadGroupSelectors.normalizeProjectPath(currentWorkingDirectory);
-      return normalizedCurrentWorkingDirectory.length > 0
-        ? normalizedCurrentWorkingDirectory
-        : currentWorkingDirectory;
+      return currentWorkingDirectory;
     }
 
-    const threadPath = OptionalProjectPathSchema.parse(thread.path).trim();
+    const threadPath = ThreadGroupSelectors.normalizeOptionalProjectPath(thread.path);
     if (threadPath.length > 0) {
-      const normalizedThreadPath = ThreadGroupSelectors.normalizeProjectPath(threadPath);
-      return normalizedThreadPath.length > 0 ? normalizedThreadPath : threadPath;
+      return threadPath;
     }
 
     return null;
@@ -221,7 +212,42 @@ export class ThreadGroupSelectors {
   }
 
   private static threadProjectIsMarkedRemoved(thread: ThreadListItem): boolean {
-    return thread.projectRemoved === true || thread.removed === true || thread.projectState === "removed";
+    if (thread.isProjectRemoved !== undefined) {
+      return thread.isProjectRemoved;
+    }
+
+    return (
+      thread.projectRemoved === true
+      || thread.removed === true
+      || thread.projectState === REMOVED_PROJECT_STATE
+    );
+  }
+
+  private static readThreadHasUnreadTurnSignal(
+    thread: Pick<ThreadListItem, "hasUnreadTurn">
+  ): boolean | null {
+    return thread.hasUnreadTurn ?? UNKNOWN_UNREAD_SIGNAL;
+  }
+
+  private static normalizeOptionalProjectPath(value: string | null | undefined): string {
+    if (!value) {
+      return "";
+    }
+    return ThreadGroupSelectors.normalizeProjectPath(value);
+  }
+
+  private static buildProjectGroupKey(projectPath: string | null): string {
+    if (!projectPath) {
+      return UNKNOWN_PROJECT_KEY;
+    }
+    return `${PROJECT_KEY_PREFIX}${projectPath}`;
+  }
+
+  private static buildProjectGroupLabel(projectPath: string | null): string {
+    if (!projectPath) {
+      return UNKNOWN_PROJECT_LABEL;
+    }
+    return ThreadGroupSelectors.projectLabelFromPath(projectPath);
   }
 
   private static sortThreadsByUpdatedAt(leftThread: ThreadListItem, rightThread: ThreadListItem): number {

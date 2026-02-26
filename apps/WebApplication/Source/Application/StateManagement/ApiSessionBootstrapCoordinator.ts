@@ -10,6 +10,7 @@ export interface ApiSessionBootstrapDecision {
 }
 
 const DEFAULT_REFRESH_LEAD_TIME_MS = 30_000;
+const EMPTY_API_TOKEN_ERROR_MESSAGE = "API token is required";
 
 /**
  * Owns API session bootstrap readiness and refresh behavior for the web shell.
@@ -71,7 +72,7 @@ export class ApiSessionBootstrapCoordinator {
   ): Promise<ApiSessionBootstrapDecision> {
     const normalizedApiToken = apiToken.trim();
     if (normalizedApiToken.length === 0) {
-      throw new Error("API token is required");
+      throw new Error(EMPTY_API_TOKEN_ERROR_MESSAGE);
     }
     this.clearApiTokenRequired();
     return this.executeBootstrapRequest(

@@ -205,13 +205,7 @@ export function applyStrictPatchSequence(
     try {
       applyPatchToState(state, patch);
     } catch (error) {
-      const normalizedCause = (() => {
-        if (error instanceof Error || typeof error === "string") {
-          return error;
-        }
-        const structuredError = JsonValueSchema.safeParse(error);
-        return structuredError.success ? structuredError.data : String(error);
-      })();
+      const normalizedCause = normalizeErrorCause(error);
       throw new StrictPatchSequenceError(
         `Patch sequence failed at index ${String(patchIndex)}: ${toErrorMessage(normalizedCause)}`,
         patchIndex,
@@ -243,13 +237,7 @@ export function applyStrictPatchSequence(
       }
     }
 
-    const normalizedCause = (() => {
-      if (error instanceof Error || typeof error === "string") {
-        return error;
-      }
-      const structuredError = JsonValueSchema.safeParse(error);
-      return structuredError.success ? structuredError.data : String(error);
-    })();
+    const normalizedCause = normalizeErrorCause(error);
     throw new StrictPatchSequenceError(
       `Patch sequence produced invalid conversation state at index ${String(failingPatchIndex)}: ${
         toErrorMessage(normalizedCause)
@@ -280,13 +268,7 @@ export function applyTrustedPatchSequence(
     try {
       applyPatchToState(mutableState, patch);
     } catch (error) {
-      const normalizedCause = (() => {
-        if (error instanceof Error || typeof error === "string") {
-          return error;
-        }
-        const structuredError = JsonValueSchema.safeParse(error);
-        return structuredError.success ? structuredError.data : String(error);
-      })();
+      const normalizedCause = normalizeErrorCause(error);
       throw new StrictPatchSequenceError(
         `Patch sequence failed at index ${String(patchIndex)}: ${toErrorMessage(normalizedCause)}`,
         patchIndex,
@@ -298,13 +280,7 @@ export function applyTrustedPatchSequence(
   try {
     return parseThreadConversationState(mutableState);
   } catch (error) {
-    const normalizedCause = (() => {
-      if (error instanceof Error || typeof error === "string") {
-        return error;
-      }
-      const structuredError = JsonValueSchema.safeParse(error);
-      return structuredError.success ? structuredError.data : String(error);
-    })();
+    const normalizedCause = normalizeErrorCause(error);
     throw new StrictPatchSequenceError(
       `Patch sequence produced invalid conversation state at index ${String(
         patches.length > 0 ? patches.length - 1 : 0
@@ -354,13 +330,25 @@ function toErrorMessage(error: Error | string | JsonValue): string {
   return String(error);
 }
 
+function normalizeErrorCause<ErrorType>(error: ErrorType): Error | string | JsonValue {
+  if (error instanceof Error || typeof error === "string") {
+    return error;
+  }
+
+  const structuredError = JsonValueSchema.safeParse(error);
+  return structuredError.success ? structuredError.data : String(error);
+}
+
 export function reduceThreadStreamEvents(
   events: ThreadStreamStateChangedBroadcast[]
 ): Map<string, ThreadStreamDerivedState> {
   const byThread = new Map<string, ThreadStreamDerivedState>();
 
   for (let eventIndex = 0; eventIndex < events.length; eventIndex += 1) {
-    const event = events[eventIndex] as ThreadStreamStateChangedBroadcast;
+    const event = events[eventIndex];
+    if (!event) {
+      continue;
+    }
     const threadId = event.params.conversationId;
     const previous = byThread.get(threadId) ?? {
       ownerClientId: null,
@@ -389,17 +377,14 @@ export function reduceThreadStreamEvents(
 
     let updated = next.conversationState;
     for (let patchIndex = 0; patchIndex < change.patches.length; patchIndex += 1) {
-      const patch = change.patches[patchIndex] as ThreadStreamPatch;
+      const patch = change.patches[patchIndex];
+      if (!patch) {
+        continue;
+      }
       try {
         updated = applyStrictPatch(updated, patch);
       } catch (error) {
-        const normalizedCause = (() => {
-          if (error instanceof Error || typeof error === "string") {
-            return error;
-          }
-          const structuredError = JsonValueSchema.safeParse(error);
-          return structuredError.success ? structuredError.data : String(error);
-        })();
+        const normalizedCause = normalizeErrorCause(error);
         throw new ThreadStreamReductionError(
           `Thread stream reduction failed for thread ${threadId} at event ${eventIndex}, patch ${patchIndex}: ${toErrorMessage(
             normalizedCause

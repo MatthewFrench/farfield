@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPane";
+import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 import { ThreadSidebarPanel } from "@/Features/Threads/UserInterface/ThreadSidebarPanel";
 import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 
@@ -42,6 +42,8 @@ function renderThreadSidebarPanel(input: {
   viewport: "desktop" | "mobile";
   onHideDesktopSidebar?: () => void;
   onCloseMobileSidebar?: () => void;
+  allSystemsReady?: boolean;
+  hasAnySystemFailure?: boolean;
 }): void {
   cleanup();
   render(
@@ -51,8 +53,8 @@ function renderThreadSidebarPanel(input: {
         threadListPaneProperties={BASE_THREAD_LIST_PANE_PROPERTIES}
         onHideDesktopSidebar={input.onHideDesktopSidebar ?? (() => {})}
         onCloseMobileSidebar={input.onCloseMobileSidebar ?? (() => {})}
-        allSystemsReady={true}
-        hasAnySystemFailure={false}
+        allSystemsReady={input.allSystemsReady ?? true}
+        hasAnySystemFailure={input.hasAnySystemFailure ?? false}
         commitLabel="abc123"
         agentDescriptors={[
           {
@@ -97,5 +99,25 @@ describe("ThreadSidebarPanel", () => {
     const closeButton = screen.getByRole("button", { name: "Close sidebar" });
     fireEvent.click(closeButton);
     expect(onCloseMobileSidebar).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders ready health indicator state when all systems are healthy", () => {
+    renderThreadSidebarPanel({
+      viewport: "desktop",
+      allSystemsReady: true,
+      hasAnySystemFailure: false
+    });
+
+    expect(screen.getByTestId("sidebar-health-indicator").getAttribute("data-state")).toBe("ready");
+  });
+
+  it("renders failure health indicator state when a system failure is present", () => {
+    renderThreadSidebarPanel({
+      viewport: "desktop",
+      allSystemsReady: false,
+      hasAnySystemFailure: true
+    });
+
+    expect(screen.getByTestId("sidebar-health-indicator").getAttribute("data-state")).toBe("failure");
   });
 });

@@ -5,7 +5,11 @@ import {
   type SetStateAction
 } from "react";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
-import { PendingUserInputAnswerBuilder } from "../DomainModel/PendingUserInputAnswerBuilder";
+import {
+  createEmptyPendingUserInputAnswerDraft,
+  PendingUserInputAnswerBuilder,
+  type PendingUserInputAnswerDraftByQuestionId
+} from "../DomainModel/PendingUserInputAnswerBuilder";
 import { type PendingUserInputRequest } from "../DomainModel/PendingUserInputRequestSelector";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import {
@@ -34,8 +38,8 @@ export interface UseChatActionHandlersInput {
   modes: CollaborationModeActionModeOption[];
   isModeSyncing: boolean;
   activeRequest: PendingUserInputRequest | null;
-  answerDraft: Record<string, { option: string; freeform: string }>;
-  setAnswerDraft: Dispatch<SetStateAction<Record<string, { option: string; freeform: string }>>>;
+  answerDraft: PendingUserInputAnswerDraftByQuestionId;
+  setAnswerDraft: Dispatch<SetStateAction<PendingUserInputAnswerDraftByQuestionId>>;
   buildActionRequestOptions: (actionName: string) => ActionRequestOptions;
   setIsBusy: Dispatch<SetStateAction<boolean>>;
   setIsModeSyncing: Dispatch<SetStateAction<boolean>>;
@@ -230,7 +234,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       input.setAnswerDraft((previousAnswerDraft) => ({
         ...previousAnswerDraft,
         [questionId]: {
-          ...(previousAnswerDraft[questionId] ?? { option: "", freeform: "" }),
+          ...(previousAnswerDraft[questionId] ?? createEmptyPendingUserInputAnswerDraft()),
           [field]: value
         }
       }));

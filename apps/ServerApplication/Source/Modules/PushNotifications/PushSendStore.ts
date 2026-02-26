@@ -6,13 +6,23 @@ import {
   type PushSendSummary
 } from "@farfield/protocol";
 
+const PUSH_SEND_STORE_VERSION = 1;
+const JSON_INDENT_SPACES = 2;
+const LINE_FEED = "\n";
+const TEMP_FILE_EXTENSION = "tmp";
+const OWNER_READ_WRITE_PERMISSIONS = 0o600;
+const WINDOWS_PLATFORM = "win32";
+
 function buildDefaultState(): PushSendStoreState {
   return parsePushSendStore({
-    version: 1,
+    version: PUSH_SEND_STORE_VERSION,
     latest: null
   });
 }
 
+/**
+ * Owns persistence for the latest push send summary shown in debug and status surfaces.
+ */
 export class PushSendStore {
   private readonly filePath: string;
   private state: PushSendStoreState;
@@ -54,9 +64,9 @@ export class PushSendStore {
     const directory = path.dirname(this.filePath);
     fs.mkdirSync(directory, { recursive: true });
 
-    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
-    const encoded = `${JSON.stringify(this.state, null, 2)}\n`;
-    const fd = fs.openSync(tempPath, "w", 0o600);
+    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.${TEMP_FILE_EXTENSION}`;
+    const encoded = `${JSON.stringify(this.state, null, JSON_INDENT_SPACES)}${LINE_FEED}`;
+    const fd = fs.openSync(tempPath, "w", OWNER_READ_WRITE_PERMISSIONS);
     try {
       fs.writeFileSync(fd, encoded, "utf8");
       fs.fsyncSync(fd);
@@ -73,7 +83,7 @@ export class PushSendStore {
       throw error;
     }
 
-    if (process.platform !== "win32") {
+    if (process.platform !== WINDOWS_PLATFORM) {
       const dirFd = fs.openSync(directory, "r");
       try {
         fs.fsyncSync(dirFd);

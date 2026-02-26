@@ -194,4 +194,47 @@ describe("ApiSessionBootstrapCoordinator", () => {
 
     expect(readSession).toHaveBeenCalledTimes(0);
   });
+
+  it("coalesces concurrent bootstrap requests into one in-flight read", async () => {
+    const coordinator = new ApiSessionBootstrapCoordinator();
+    let resolveBootstrapRead: (response: ApiSessionBootstrapResponse) => void = () => {
+      throw new Error("Expected bootstrap resolver to be initialized");
+    };
+    const readSession = vi.fn(() =>
+      new Promise<ApiSessionBootstrapResponse>((resolve) => {
+        resolveBootstrapRead = resolve;
+      })
+    );
+
+    const firstDecisionPromise = coordinator.ensureSession(readSession, 1_000);
+    const secondDecisionPromise = coordinator.ensureSession(readSession, 1_000);
+
+    expect(readSession).toHaveBeenCalledTimes(1);
+    resolveBootstrapRead({
+      authRequired: false,
+      bootstrapped: true,
+      expiresAt: null
+    });
+
+    await expect(firstDecisionPromise).resolves.toEqual({
+      isReady: true,
+      requiresApiToken: false
+    });
+    await expect(secondDecisionPromise).resolves.toEqual({
+      isReady: true,
+      requiresApiToken: false
+    });
+  });
+
+  it("rejects empty api tokens before attempting bootstrap", async () => {
+    const coordinator = new ApiSessionBootstrapCoordinator();
+    const readWithApiToken = vi.fn(async (_apiToken: string) => ({
+      authRequired: true,
+      bootstrapped: true,
+      expiresAt: "2099-01-01T00:00:20.000Z"
+    }));
+
+    await expect(coordinator.submitApiToken("   ", readWithApiToken)).rejects.toThrowError("API token is required");
+    expect(readWithApiToken).toHaveBeenCalledTimes(0);
+  });
 });

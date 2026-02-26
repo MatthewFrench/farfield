@@ -20,6 +20,14 @@ interface PendingRequest {
   reject: (error: Error) => void;
 }
 
+const APP_SERVER_COMMAND = "app-server";
+const APP_SERVER_CLIENT_NAME = "farfield";
+const APP_SERVER_CLIENT_VERSION = "0.2.0";
+const APP_SERVER_INITIALIZE_METHOD = "initialize";
+const APP_SERVER_JSON_RPC_VERSION = "2.0";
+const DEFAULT_APP_SERVER_REQUEST_TIMEOUT_MS = 30_000;
+
+const ProcessEnvironmentSchema = z.record(z.string(), z.string().optional());
 const InitializeResultSchema = z.object({}).passthrough();
 const AppServerSpawnEnvironmentShape = {
   HOME: z.string().min(1).optional(),
@@ -86,6 +94,32 @@ export interface ChildProcessAppServerTransportOptions {
   onStderr?: (line: string) => void;
 }
 
+const ChildProcessAppServerTransportOptionsSchema = z
+  .object({
+    executablePath: z.string().min(1),
+    userAgent: z.string().min(1),
+    baseEnvironment: ProcessEnvironmentSchema,
+    cwd: z.string().min(1).optional(),
+    env: ProcessEnvironmentSchema.optional(),
+    requestTimeoutMs: z.number().int().positive().optional(),
+    onStderr: z.function().args(z.string()).returns(z.void()).optional()
+  })
+  .strict();
+
+function toErrorMessage<ValueType>(value: ValueType): string {
+  if (value instanceof Error) {
+    return value.message;
+  }
+
+  return String(value);
+}
+
+export function isChildProcessAppServerTransportOptions(
+  value: AppServerTransport | ChildProcessAppServerTransportOptions
+): value is ChildProcessAppServerTransportOptions {
+  return ChildProcessAppServerTransportOptionsSchema.safeParse(value).success;
+}
+
 export class ChildProcessAppServerTransport implements AppServerTransport {
   private readonly executablePath: string;
   private readonly userAgent: string;
@@ -101,13 +135,20 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
   private initializeInFlight: Promise<void> | null = null;
 
   public constructor(options: ChildProcessAppServerTransportOptions) {
-    this.executablePath = options.executablePath;
-    this.userAgent = options.userAgent;
-    this.baseEnvironment = options.baseEnvironment;
-    this.cwd = options.cwd;
-    this.env = options.env;
-    this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
-    this.onStderr = options.onStderr;
+    const parsedOptions = ChildProcessAppServerTransportOptionsSchema.parse(options);
+    this.executablePath = parsedOptions.executablePath;
+    this.userAgent = parsedOptions.userAgent;
+    this.baseEnvironment = parsedOptions.baseEnvironment;
+    this.cwd = parsedOptions.cwd;
+    this.env = parsedOptions.env;
+    this.requestTimeoutMs = parsedOptions.requestTimeoutMs ?? DEFAULT_APP_SERVER_REQUEST_TIMEOUT_MS;
+    this.onStderr = parsedOptions.onStderr;
+  }
+
+  private resetProcessState(): void {
+    this.process = null;
+    this.initialized = false;
+    this.initializeInFlight = null;
   }
 
   private ensureStarted(): void {
@@ -129,11 +170,11 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       spawnEnvironment = buildAppServerSpawnEnvironment(spawnEnvironmentInput);
     } catch (error) {
       throw new AppServerTransportError(
-        `app-server environment configuration invalid: ${error instanceof Error ? error.message : String(error)}`
+        `app-server environment configuration invalid: ${toErrorMessage(error)}`
       );
     }
 
-    const child = spawn(this.executablePath, ["app-server"], {
+    const child = spawn(this.executablePath, [APP_SERVER_COMMAND], {
       cwd: this.cwd,
       env: spawnEnvironment,
       stdio: ["pipe", "pipe", "pipe"]
@@ -142,16 +183,12 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     child.on("exit", (code, signal) => {
       const reason = `app-server exited (code=${String(code)}, signal=${String(signal)})`;
       this.rejectAll(new AppServerTransportError(reason));
-      this.process = null;
-      this.initialized = false;
-      this.initializeInFlight = null;
+      this.resetProcessState();
     });
 
     child.on("error", (error) => {
       this.rejectAll(new AppServerTransportError(`app-server process error: ${error.message}`));
-      this.process = null;
-      this.initialized = false;
-      this.initializeInFlight = null;
+      this.resetProcessState();
     });
 
     const lineReader = readline.createInterface({ input: child.stdout });
@@ -175,7 +212,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       } catch (error) {
         this.rejectAll(
           new AppServerTransportError(
-            `app-server response schema mismatch: ${error instanceof Error ? error.message : String(error)}`
+            `app-server response schema mismatch: ${toErrorMessage(error)}`
           )
         );
         return;
@@ -254,7 +291,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     const id = ++this.requestId;
     const timeout = timeoutMs ?? this.requestTimeoutMs;
     const requestPayload = JsonRpcRequestSchema.parse({
-      jsonrpc: "2.0",
+      jsonrpc: APP_SERVER_JSON_RPC_VERSION,
       id,
       method,
       params: JsonValueSchema.parse(params)
@@ -297,11 +334,11 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
 
     this.initializeInFlight = (async () => {
       const result = await this.sendRequest(
-        "initialize",
+        APP_SERVER_INITIALIZE_METHOD,
         {
           clientInfo: {
-            name: "farfield",
-            version: "0.2.0"
+            name: APP_SERVER_CLIENT_NAME,
+            version: APP_SERVER_CLIENT_VERSION
           },
           capabilities: {
             experimentalApi: true
@@ -327,12 +364,12 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
   ): Promise<JsonValue> {
     this.ensureStarted();
 
-    if (method !== "initialize") {
+    if (method !== APP_SERVER_INITIALIZE_METHOD) {
       await this.ensureInitialized();
     }
 
     const result = await this.sendRequest(method, params, timeoutMs);
-    if (method === "initialize") {
+    if (method === APP_SERVER_INITIALIZE_METHOD) {
       this.initialized = true;
     }
     return result;
@@ -344,9 +381,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       return;
     }
 
-    this.process = null;
-    this.initialized = false;
-    this.initializeInFlight = null;
+    this.resetProcessState();
     this.rejectAll(new AppServerTransportError("app-server transport closed"));
 
     processHandle.kill("SIGTERM");

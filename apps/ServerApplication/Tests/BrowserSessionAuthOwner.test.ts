@@ -65,4 +65,41 @@ describe("BrowserSessionAuthOwner", () => {
     expect(session.authenticated).toBe(false);
     expect(session.expiresAt).toBeNull();
   });
+
+  it("uses at least one second for cookie max-age when ttl is sub-second", () => {
+    const owner = new BrowserSessionAuthOwner(
+      {
+        cookieName: "farfield_session",
+        sessionTimeToLiveMs: 500,
+        signingSecret: "secret_value",
+        secureCookie: false
+      },
+      {
+        now: () => 1_700_000_000_000,
+        randomBytesFactory: () => Buffer.from("session_nonce_value_3")
+      }
+    );
+
+    const issued = owner.issueSessionCookie();
+    expect(issued.setCookieHeaderValue).toContain("Max-Age=1");
+  });
+
+  it("rejects malformed token segments with non-base64url content", () => {
+    const owner = new BrowserSessionAuthOwner(
+      {
+        cookieName: "farfield_session",
+        sessionTimeToLiveMs: 60_000,
+        signingSecret: "secret_value",
+        secureCookie: false
+      },
+      {
+        now: () => 1_700_000_000_000,
+        randomBytesFactory: () => Buffer.from("session_nonce_value_4")
+      }
+    );
+
+    const malformedSession = owner.readSession("farfield_session=1700000000000.1700000060000.bad+segment.signature");
+    expect(malformedSession.authenticated).toBe(false);
+    expect(malformedSession.expiresAt).toBeNull();
+  });
 });

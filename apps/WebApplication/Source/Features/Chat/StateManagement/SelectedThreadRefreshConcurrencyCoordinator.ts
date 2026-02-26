@@ -13,6 +13,10 @@ export interface SelectedThreadRefreshRunInput {
   isCanceledError: (error: Error) => boolean;
 }
 
+function normalizeExecutionError<ErrorType>(error: ErrorType): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 export class SelectedThreadRefreshConcurrencyCoordinator {
   private inFlightRefresh: Promise<void> | null;
   private queuedRefreshRequest: SelectedThreadRefreshRequest | null;
@@ -54,15 +58,12 @@ export class SelectedThreadRefreshConcurrencyCoordinator {
         try {
           await input.executeRefresh(nextRequest, abortController.signal);
         } catch (error) {
-          if (
-            error instanceof Error
-            && input.isCanceledError(error)
-            && this.queuedRefreshRequest
-          ) {
+          const normalizedError = normalizeExecutionError(error);
+          if (input.isCanceledError(normalizedError) && this.queuedRefreshRequest) {
             nextRequest = this.queuedRefreshRequest;
             continue;
           }
-          throw error;
+          throw normalizedError;
         }
 
         nextRequest = this.queuedRefreshRequest;

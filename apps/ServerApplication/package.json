@@ -8,8 +8,10 @@
     "dev:remote": "HOST=0.0.0.0 PORT=4311 tsx watch Source/Application/ServerBootstrap.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/Application/ServerBootstrap.js",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "bun run test:unit",
+    "test:unit": "vitest run --config vitest.config.ts --exclude \"Tests/**/*.integration.test.ts\"",
+    "test:integration": "vitest run --config vitest.config.ts \"Tests/**/*.integration.test.ts\"",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage --exclude \"Tests/**/*.integration.test.ts\"",
     "lint": "eslint Source Tests --max-warnings=0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

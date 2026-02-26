@@ -3,9 +3,32 @@ export interface ApplicationRouteState {
   tab: "chat" | "debug";
 }
 
-function decodeRouteThreadId(segment: string): string | null {
+const CHAT_TAB = "chat";
+const DEBUG_TAB = "debug";
+const DEBUG_ROUTE_SEGMENT = "debug";
+const THREADS_ROUTE_SEGMENT = "threads";
+const CHAT_ROOT_PATH = "/";
+const DEBUG_ROOT_PATH = "/debug";
+const THREAD_ROUTE_PATH_PREFIX = "/threads/";
+const DEBUG_ROUTE_PATH_SUFFIX = "/debug";
+
+function buildRouteState(threadId: string | null, tab: "chat" | "debug"): ApplicationRouteState {
+  return {
+    threadId,
+    tab
+  };
+}
+
+function buildNeutralRouteState(): ApplicationRouteState {
+  return buildRouteState(null, CHAT_TAB);
+}
+
+// Empty or whitespace-only identifiers are treated as no-selection state to prevent
+// invalid route ids from propagating into application-owned thread selection state.
+function normalizeRouteThreadId(segment: string): string | null {
   try {
-    return decodeURIComponent(segment);
+    const decodedThreadId = decodeURIComponent(segment).trim();
+    return decodedThreadId.length > 0 ? decodedThreadId : null;
   } catch {
     return null;
   }
@@ -15,31 +38,32 @@ export class ApplicationRouteStateMapper {
   public parseFromPathname(pathname: string): ApplicationRouteState {
     const segments = pathname.split("/").filter((segment) => segment.length > 0);
     if (segments.length === 0) {
-      return { threadId: null, tab: "chat" };
+      return buildNeutralRouteState();
     }
-    if (segments.length === 1 && segments[0] === "debug") {
-      return { threadId: null, tab: "debug" };
+    if (segments.length === 1 && segments[0] === DEBUG_ROUTE_SEGMENT) {
+      return buildRouteState(null, DEBUG_TAB);
     }
-    if (segments[0] === "threads" && typeof segments[1] === "string" && segments[1].length > 0) {
-      const threadId = decodeRouteThreadId(segments[1]);
+    if (segments[0] === THREADS_ROUTE_SEGMENT && segments[1]) {
+      const threadId = normalizeRouteThreadId(segments[1]);
       if (threadId === null) {
-        return { threadId: null, tab: "chat" };
+        return buildNeutralRouteState();
       }
-      if (segments[2] === "debug") {
-        return { threadId, tab: "debug" };
+      if (segments[2] === DEBUG_ROUTE_SEGMENT) {
+        return buildRouteState(threadId, DEBUG_TAB);
       }
-      return { threadId, tab: "chat" };
+      return buildRouteState(threadId, CHAT_TAB);
     }
-    return { threadId: null, tab: "chat" };
+    return buildNeutralRouteState();
   }
 
   public buildPath(state: ApplicationRouteState): string {
-    if (!state.threadId) {
-      return state.tab === "debug" ? "/debug" : "/";
+    const normalizedThreadId = state.threadId?.trim() ?? "";
+    if (normalizedThreadId.length === 0) {
+      return state.tab === DEBUG_TAB ? DEBUG_ROOT_PATH : CHAT_ROOT_PATH;
     }
-    if (state.tab === "debug") {
-      return `/threads/${encodeURIComponent(state.threadId)}/debug`;
+    if (state.tab === DEBUG_TAB) {
+      return `${THREAD_ROUTE_PATH_PREFIX}${encodeURIComponent(normalizedThreadId)}${DEBUG_ROUTE_PATH_SUFFIX}`;
     }
-    return `/threads/${encodeURIComponent(state.threadId)}`;
+    return `${THREAD_ROUTE_PATH_PREFIX}${encodeURIComponent(normalizedThreadId)}`;
   }
 }

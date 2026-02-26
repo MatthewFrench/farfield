@@ -1,5 +1,9 @@
 import { Button } from "@/Components/UserInterface/Button";
 
+/**
+ * Blocks shell interaction until the API session is authenticated.
+ * Ownership is limited to token-entry presentation and submit intent wiring.
+ */
 export interface ApiSessionBootstrapOverlayProperties {
   apiTokenDraft: string;
   onApiTokenDraftChange: (nextValue: string) => void;
@@ -40,7 +44,9 @@ export function ApiSessionBootstrapOverlay({
           autoFocus
         />
         {errorMessage.length > 0 && (
-          <p className="text-xs text-danger">{errorMessage}</p>
+          <p className="text-xs text-danger" role="alert">
+            {errorMessage}
+          </p>
         )}
         <div className="flex justify-end">
           <Button

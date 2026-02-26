@@ -18,6 +18,9 @@ import { CodeSnippet } from "./CodeSnippet";
 
 type CommandItem = z.infer<typeof CommandExecutionItemSchema>;
 
+const COMMAND_PREVIEW_MAXIMUM_LENGTH = 140;
+const COMMAND_EMPTY_OUTPUT_LABEL = "No output";
+
 const ACTION_ICONS: Record<string, React.ElementType> = {
   search: Search,
   listFiles: FolderOpen,
@@ -28,7 +31,9 @@ const ACTION_ICONS: Record<string, React.ElementType> = {
 };
 
 function simplifyCommand(cmd: string): string {
-  return cmd.length > 140 ? cmd.slice(0, 140) + "…" : cmd;
+  return cmd.length > COMMAND_PREVIEW_MAXIMUM_LENGTH
+    ? cmd.slice(0, COMMAND_PREVIEW_MAXIMUM_LENGTH) + "…"
+    : cmd;
 }
 
 interface CommandBlockProps {
@@ -40,9 +45,10 @@ function CommandBlockComponent({ item, isActive }: CommandBlockProps) {
   const [expanded, setExpanded] = useState(false);
   const isCompleted = item.status === "completed";
   const isSuccess = item.exitCode === 0 || item.exitCode == null;
-  const output = typeof item.aggregatedOutput === "string" ? item.aggregatedOutput : "";
+  const output = item.aggregatedOutput ?? "";
   const hasOutput = output.trim().length > 0;
-  const hasActions = (item.commandActions?.length ?? 0) > 0;
+  const commandActions = item.commandActions ?? [];
+  const hasActions = commandActions.length > 0;
 
   return (
     <div className="rounded-xl border border-border overflow-hidden text-sm">
@@ -94,7 +100,7 @@ function CommandBlockComponent({ item, isActive }: CommandBlockProps) {
               {/* Command actions */}
               {hasActions && (
                 <div className="px-3 py-2 space-y-1.5">
-                  {item.commandActions!.map((action, i) => {
+                  {commandActions.map((action, i) => {
                     const Icon = ACTION_ICONS[action.type] ?? Terminal;
                     const label = action.name ?? action.command ?? action.path ?? action.type;
                     return (
@@ -130,7 +136,7 @@ function CommandBlockComponent({ item, isActive }: CommandBlockProps) {
               )}
 
               {!hasActions && !hasOutput && (
-                <div className="px-3 py-2 text-xs text-muted-foreground">No output</div>
+                <div className="px-3 py-2 text-xs text-muted-foreground">{COMMAND_EMPTY_OUTPUT_LABEL}</div>
               )}
             </div>
           </motion.div>

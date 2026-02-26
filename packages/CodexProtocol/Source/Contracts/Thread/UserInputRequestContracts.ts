@@ -5,6 +5,8 @@ import {
 } from "../../Common.js";
 import { ToolRequestUserInputResponseSchema } from "../../Generated/app-server/index.js";
 
+export const UserInputRequestMethod = "item/tool/requestUserInput";
+
 export const UserInputOptionSchema = z
   .object({
     label: z.string(),
@@ -34,7 +36,7 @@ export const UserInputRequestParamsSchema = z
 
 export const UserInputRequestSchema = z
   .object({
-    method: z.literal("item/tool/requestUserInput"),
+    method: z.literal(UserInputRequestMethod),
     id: NonNegativeIntSchema,
     params: UserInputRequestParamsSchema,
     completed: z.boolean().optional()

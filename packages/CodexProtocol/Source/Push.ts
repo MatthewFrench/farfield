@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { NonEmptyStringSchema, NonNegativeIntSchema } from "./Common.js";
 import { ProtocolValidationError } from "./Errors.js";
+import { parseSchemaOrThrow } from "./ProtocolSchemaParsers.js";
+
+const PushStateStoreVersion = 1;
+const PushSendStoreVersion = 1;
+const PushReceiptStoreVersion = 2;
+const LegacyPushReceiptStoreVersion = 1;
+const LegacyPushReceiptNotificationIdentifierPrefix = "legacy";
 
 const Base64UrlValueSchema = z
   .string()
@@ -65,7 +72,7 @@ export const PushStateStoreSchema = z
   })
   .strict()
   .superRefine((state, ctx) => {
-    if (state.version !== 1) {
+    if (state.version !== PushStateStoreVersion) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Unsupported push state version: ${String(state.version)}`
@@ -178,7 +185,7 @@ export const PushSendStoreSchema = z
   })
   .strict()
   .superRefine((state, ctx) => {
-    if (state.version !== 1) {
+    if (state.version !== PushSendStoreVersion) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Unsupported push send store version: ${String(state.version)}`
@@ -193,7 +200,7 @@ export const PushReceiptStoreSchema = z
   })
   .strict()
   .superRefine((state, ctx) => {
-    if (state.version !== 2) {
+    if (state.version !== PushReceiptStoreVersion) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Unsupported push receipt store version: ${String(state.version)}`
@@ -203,7 +210,7 @@ export const PushReceiptStoreSchema = z
 
 const LegacyPushReceiptStoreSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(LegacyPushReceiptStoreVersion),
     receipts: z.array(LegacyPushReceiptSchema)
   })
   .strict();
@@ -265,66 +272,82 @@ export type PushLocalCaStatusResponse = z.infer<typeof PushLocalCaStatusResponse
 export type PushStatusResponse = z.infer<typeof PushStatusResponseSchema>;
 export type CreatePushSubscriptionResponse = z.infer<typeof CreatePushSubscriptionResponseSchema>;
 export type DeletePushSubscriptionResponse = z.infer<typeof DeletePushSubscriptionResponseSchema>;
+export type VapidPublicKeyResponse = z.infer<typeof VapidPublicKeyResponseSchema>;
 
-export function parseCreatePushSubscriptionBody(value: z.input<typeof CreatePushSubscriptionBodySchema>): CreatePushSubscriptionBody {
-  const result = CreatePushSubscriptionBodySchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("CreatePushSubscriptionBody", result.error);
-  }
-  return result.data;
+const ParseContext = {
+  createPushSubscriptionBody: "CreatePushSubscriptionBody",
+  deletePushSubscriptionBody: "DeletePushSubscriptionBody",
+  pushStateStore: "PushStateStore",
+  pushNotificationPayload: "PushNotificationPayload",
+  createPushReceiptBody: "CreatePushReceiptBody",
+  pushSendLatestResponse: "PushSendLatestResponse",
+  pushSendStore: "PushSendStore",
+  pushReceiptStore: "PushReceiptStore",
+  pushLocalCaStatusResponse: "PushLocalCaStatusResponse",
+  vapidPublicKeyResponse: "VapidPublicKeyResponse"
+} as const;
+
+export function parseCreatePushSubscriptionBody(
+  value: z.input<typeof CreatePushSubscriptionBodySchema>
+): CreatePushSubscriptionBody {
+  return parseSchemaOrThrow(
+    CreatePushSubscriptionBodySchema,
+    value,
+    ParseContext.createPushSubscriptionBody
+  );
 }
 
-export function parseDeletePushSubscriptionBody(value: z.input<typeof DeletePushSubscriptionBodySchema>): DeletePushSubscriptionBody {
-  const result = DeletePushSubscriptionBodySchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("DeletePushSubscriptionBody", result.error);
-  }
-  return result.data;
+export function parseDeletePushSubscriptionBody(
+  value: z.input<typeof DeletePushSubscriptionBodySchema>
+): DeletePushSubscriptionBody {
+  return parseSchemaOrThrow(
+    DeletePushSubscriptionBodySchema,
+    value,
+    ParseContext.deletePushSubscriptionBody
+  );
 }
 
 export function parsePushStateStore(value: z.input<typeof PushStateStoreSchema>): PushStateStore {
-  const result = PushStateStoreSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("PushStateStore", result.error);
-  }
-  return result.data;
+  return parseSchemaOrThrow(PushStateStoreSchema, value, ParseContext.pushStateStore);
 }
 
-export function parsePushNotificationPayload(value: z.input<typeof PushNotificationPayloadSchema>): PushNotificationPayload {
-  const result = PushNotificationPayloadSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("PushNotificationPayload", result.error);
-  }
-  return result.data;
+export function parsePushNotificationPayload(
+  value: z.input<typeof PushNotificationPayloadSchema>
+): PushNotificationPayload {
+  return parseSchemaOrThrow(
+    PushNotificationPayloadSchema,
+    value,
+    ParseContext.pushNotificationPayload
+  );
 }
 
-export function parseCreatePushReceiptBody(value: z.input<typeof CreatePushReceiptBodySchema>): CreatePushReceiptBody {
-  const result = CreatePushReceiptBodySchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("CreatePushReceiptBody", result.error);
-  }
-  return result.data;
+export function parseCreatePushReceiptBody(
+  value: z.input<typeof CreatePushReceiptBodySchema>
+): CreatePushReceiptBody {
+  return parseSchemaOrThrow(
+    CreatePushReceiptBodySchema,
+    value,
+    ParseContext.createPushReceiptBody
+  );
 }
 
 export function parsePushSendLatestResponse(
   value: z.input<typeof PushSendLatestResponseSchema>
 ): PushSendLatestResponse {
-  const result = PushSendLatestResponseSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("PushSendLatestResponse", result.error);
-  }
-  return result.data;
+  return parseSchemaOrThrow(
+    PushSendLatestResponseSchema,
+    value,
+    ParseContext.pushSendLatestResponse
+  );
 }
 
 export function parsePushSendStore(value: z.input<typeof PushSendStoreSchema>): PushSendStore {
-  const result = PushSendStoreSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("PushSendStore", result.error);
-  }
-  return result.data;
+  return parseSchemaOrThrow(PushSendStoreSchema, value, ParseContext.pushSendStore);
 }
 
-export function parsePushReceiptStore(value: z.input<typeof PushReceiptStoreSchema>): PushReceiptStore {
+export function parsePushReceiptStore(
+  value: z.input<typeof PushReceiptStoreSchema>
+): PushReceiptStore {
   const currentResult = PushReceiptStoreSchema.safeParse(value);
   if (currentResult.success) {
     return currentResult.data;
@@ -333,9 +356,10 @@ export function parsePushReceiptStore(value: z.input<typeof PushReceiptStoreSche
   const legacyResult = LegacyPushReceiptStoreSchema.safeParse(value);
   if (legacyResult.success) {
     return {
-      version: 2,
+      version: PushReceiptStoreVersion,
       receipts: legacyResult.data.receipts.map((receipt, index) => ({
-        notificationId: `legacy-${index + 1}-${receipt.createdAt}`,
+        notificationId:
+          `${LegacyPushReceiptNotificationIdentifierPrefix}-${index + 1}-${receipt.createdAt}`,
         event: receipt.event,
         url: receipt.url,
         threadId: receipt.threadId,
@@ -346,23 +370,25 @@ export function parsePushReceiptStore(value: z.input<typeof PushReceiptStoreSche
     };
   }
 
-  throw ProtocolValidationError.fromZod("PushReceiptStore", currentResult.error);
+  throw ProtocolValidationError.fromZod(ParseContext.pushReceiptStore, currentResult.error);
 }
 
 export function parsePushLocalCaStatusResponse(
   value: z.input<typeof PushLocalCaStatusResponseSchema>
 ): PushLocalCaStatusResponse {
-  const result = PushLocalCaStatusResponseSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("PushLocalCaStatusResponse", result.error);
-  }
-  return result.data;
+  return parseSchemaOrThrow(
+    PushLocalCaStatusResponseSchema,
+    value,
+    ParseContext.pushLocalCaStatusResponse
+  );
 }
 
-export function parseVapidPublicKeyResponse(value: z.input<typeof VapidPublicKeyResponseSchema>): z.infer<typeof VapidPublicKeyResponseSchema> {
-  const result = VapidPublicKeyResponseSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("VapidPublicKeyResponse", result.error);
-  }
-  return result.data;
+export function parseVapidPublicKeyResponse(
+  value: z.input<typeof VapidPublicKeyResponseSchema>
+): VapidPublicKeyResponse {
+  return parseSchemaOrThrow(
+    VapidPublicKeyResponseSchema,
+    value,
+    ParseContext.vapidPublicKeyResponse
+  );
 }

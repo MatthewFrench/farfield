@@ -24,6 +24,10 @@ describe("PushDispatchConcurrencyCoordinator", () => {
     await vi.advanceTimersByTimeAsync(100);
 
     expect(calls).toEqual(["thread_1"]);
+    expect(coordinator.readStatistics()).toMatchObject({
+      completedCheckCount: 1,
+      failedCheckCount: 0
+    });
     coordinator.stop();
   });
 
@@ -57,6 +61,11 @@ describe("PushDispatchConcurrencyCoordinator", () => {
     await vi.advanceTimersByTimeAsync(100);
 
     expect(runCount).toBe(2);
+    expect(coordinator.readStatistics()).toMatchObject({
+      startedCheckCount: 2,
+      completedCheckCount: 2,
+      failedCheckCount: 0
+    });
     coordinator.stop();
   });
 
@@ -77,5 +86,45 @@ describe("PushDispatchConcurrencyCoordinator", () => {
     await vi.advanceTimersByTimeAsync(100);
 
     expect(runCount).toBe(0);
+  });
+
+  it("records failed checks without surfacing unhandled scheduler failures", async () => {
+    vi.useFakeTimers();
+    const coordinator = new PushDispatchConcurrencyCoordinator(
+      100,
+      () => true,
+      async () => {
+        throw new Error("check failed");
+      }
+    );
+
+    coordinator.schedule("thread_1");
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(coordinator.readStatistics()).toMatchObject({
+      startedCheckCount: 1,
+      completedCheckCount: 0,
+      failedCheckCount: 1
+    });
+    coordinator.stop();
+  });
+
+  it("ignores disabled scheduling and blank thread identifiers", async () => {
+    vi.useFakeTimers();
+    const coordinator = new PushDispatchConcurrencyCoordinator(
+      100,
+      () => false,
+      async () => {}
+    );
+
+    coordinator.schedule("thread_1");
+    coordinator.schedule("   ");
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(coordinator.readStatistics()).toMatchObject({
+      scheduledCheckCount: 0,
+      startedCheckCount: 0
+    });
+    coordinator.stop();
   });
 });

@@ -4,6 +4,22 @@ import { ThreadListPane, type ThreadListPaneProperties } from "./ThreadListPane"
 import { Button } from "@/Components/UserInterface/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/UserInterface/Tooltip";
 
+const SIDEBAR_HEALTH_STATE_READY = "ready";
+const SIDEBAR_HEALTH_STATE_FAILURE = "failure";
+const SIDEBAR_HEALTH_STATE_PARTIAL = "partial";
+const SIDEBAR_HEALTH_CLASS_READY = "bg-success";
+const SIDEBAR_HEALTH_CLASS_FAILURE = "bg-danger";
+const SIDEBAR_HEALTH_CLASS_PARTIAL = "bg-muted-foreground/40";
+const CONNECTED_LABEL = "connected";
+const DISCONNECTED_LABEL = "disconnected";
+const READY_LABEL = "ready";
+const NOT_READY_LABEL = "not ready";
+const OK_LABEL = "ok";
+type SidebarHealthState =
+  | typeof SIDEBAR_HEALTH_STATE_READY
+  | typeof SIDEBAR_HEALTH_STATE_FAILURE
+  | typeof SIDEBAR_HEALTH_STATE_PARTIAL;
+
 export interface ThreadSidebarAgentDescriptor {
   id: AgentId;
   label: string;
@@ -102,13 +118,12 @@ export function ThreadSidebarPanel({
             <TooltipTrigger asChild>
               <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/40 transition-colors cursor-default min-w-0">
                 <span
-                  className={`h-2 w-2 rounded-full shrink-0 ${
-                    allSystemsReady
-                      ? "bg-success"
-                      : hasAnySystemFailure
-                        ? "bg-danger"
-                        : "bg-muted-foreground/40"
-                  }`}
+                  data-testid="sidebar-health-indicator"
+                  data-state={readSidebarHealthState(allSystemsReady, hasAnySystemFailure)}
+                  className={`h-2 w-2 rounded-full shrink-0 ${readSidebarHealthClassName(
+                    allSystemsReady,
+                    hasAnySystemFailure
+                  )}`}
                 />
                 <span className="font-mono truncate">commit {commitLabel}</span>
               </div>
@@ -119,14 +134,14 @@ export function ThreadSidebarPanel({
                 .filter((descriptor) => descriptor.enabled)
                 .map((descriptor) => (
                   <div key={descriptor.id}>
-                    {descriptor.label}: {descriptor.connected ? "connected" : "disconnected"}
+                    {descriptor.label}: {descriptor.connected ? CONNECTED_LABEL : DISCONNECTED_LABEL}
                   </div>
                 ))}
               {codexConfigured ? (
                 <>
-                  <div>App: {healthState?.appReady ? "ok" : "not ready"}</div>
-                  <div>IPC: {healthState?.ipcConnected ? "connected" : "disconnected"}</div>
-                  <div>Init: {healthState?.ipcInitialized ? "ready" : "not ready"}</div>
+                  <div>App: {healthState?.appReady ? OK_LABEL : NOT_READY_LABEL}</div>
+                  <div>IPC: {healthState?.ipcConnected ? CONNECTED_LABEL : DISCONNECTED_LABEL}</div>
+                  <div>Init: {healthState?.ipcInitialized ? READY_LABEL : NOT_READY_LABEL}</div>
                 </>
               ) : null}
               {healthState?.lastError && (
@@ -155,4 +170,27 @@ export function ThreadSidebarPanel({
       </div>
     </>
   );
+}
+
+function readSidebarHealthClassName(allSystemsReady: boolean, hasAnySystemFailure: boolean): string {
+  if (allSystemsReady) {
+    return SIDEBAR_HEALTH_CLASS_READY;
+  }
+  if (hasAnySystemFailure) {
+    return SIDEBAR_HEALTH_CLASS_FAILURE;
+  }
+  return SIDEBAR_HEALTH_CLASS_PARTIAL;
+}
+
+function readSidebarHealthState(
+  allSystemsReady: boolean,
+  hasAnySystemFailure: boolean
+): SidebarHealthState {
+  if (allSystemsReady) {
+    return SIDEBAR_HEALTH_STATE_READY;
+  }
+  if (hasAnySystemFailure) {
+    return SIDEBAR_HEALTH_STATE_FAILURE;
+  }
+  return SIDEBAR_HEALTH_STATE_PARTIAL;
 }

@@ -13,6 +13,19 @@ import type { PushReceiptStore } from "../../Modules/PushNotifications/PushRecei
 import type { PushService } from "../../Modules/PushNotifications/PushService.js";
 import type { PushStore } from "../../Modules/PushNotifications/PushStore.js";
 
+const AppServerTransportClosedErrorMessage = "app-server transport closed";
+const AppServerExitedErrorMessagePrefix = "app-server exited (";
+const ServerLifecycleMessages = Object.freeze({
+  agentConnected: "Agent connected",
+  agentFailedToConnect: "Agent failed to connect",
+  clientErrorStoreReady: "Client error store ready",
+  monitorServerReady: "Monitor server ready",
+  ntfyNotifierReady: "ntfy notifier ready",
+  openCodeBackendConnected: "OpenCode backend connected",
+  pushSubsystemReady: "Push subsystem ready",
+  startingMonitorServer: "Starting Farfield monitor server"
+});
+
 export interface ServerLifecycleCoordinatorDependencies {
   server: Server;
   host: string;
@@ -67,18 +80,18 @@ export class ServerLifecycleCoordinator {
     }
 
     return (
-      error.message === "app-server transport closed"
-      || error.message.startsWith("app-server exited (")
+      error.message === AppServerTransportClosedErrorMessage
+      || error.message.startsWith(AppServerExitedErrorMessagePrefix)
     );
   }
 
   public async start(): Promise<void> {
     this.deps.ensureTraceDirectory();
 
-    this.deps.pushSystem("Starting Farfield monitor server", {
+    this.deps.pushSystem(ServerLifecycleMessages.startingMonitorServer, {
       appExecutable: this.deps.appExecutablePath,
       socketPath: this.deps.socketPath,
-      agentIds: this.deps.configuredAgentIds.join(",")
+      agentIds: this.readConfiguredAgentIdentifierSummary()
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -93,14 +106,14 @@ export class ServerLifecycleCoordinator {
       });
     });
 
-    this.deps.pushSystem("Monitor server ready", {
-      url: `http://${this.deps.host}:${String(this.deps.port)}`,
+    this.deps.pushSystem(ServerLifecycleMessages.monitorServerReady, {
+      url: this.readServerUrl(),
       appExecutable: this.deps.appExecutablePath,
       socketPath: this.deps.socketPath,
-      agentIds: this.deps.configuredAgentIds.join(",")
+      agentIds: this.readConfiguredAgentIdentifierSummary()
     });
 
-    this.deps.pushSystem("Push subsystem ready", {
+    this.deps.pushSystem(ServerLifecycleMessages.pushSubsystemReady, {
       enabled: this.deps.pushService.isEnabled(),
       configured: this.deps.pushEnabledConfigured,
       requiresAuth: this.deps.apiAuthRequired,
@@ -116,18 +129,18 @@ export class ServerLifecycleCoordinator {
       receiptCount: this.deps.pushReceiptStore.getCount()
     });
 
-    this.deps.pushSystem("Client error store ready", {
+    this.deps.pushSystem(ServerLifecycleMessages.clientErrorStoreReady, {
       sessionId: this.deps.clientErrorStore.getSessionId(),
       sessionLogPath: this.deps.clientErrorStore.getSessionLogPath(),
       maxEntries: this.deps.clientErrorMaxEntries
     });
 
-    this.deps.pushSystem("ntfy notifier ready", this.deps.ntfyNotifier.getSummary());
+    this.deps.pushSystem(ServerLifecycleMessages.ntfyNotifierReady, this.deps.ntfyNotifier.getSummary());
 
     for (const adapter of this.deps.registry.listAdapters()) {
       try {
         await adapter.start();
-        this.deps.pushSystem("Agent connected", {
+        this.deps.pushSystem(ServerLifecycleMessages.agentConnected, {
           agentId: adapter.id,
           connected: adapter.isConnected()
         });
@@ -135,14 +148,14 @@ export class ServerLifecycleCoordinator {
         if (adapter.id === "opencode") {
           const openCodeAdapter = this.deps.readOpenCodeAdapter();
           if (openCodeAdapter) {
-            this.deps.pushSystem("OpenCode backend connected", {
+            this.deps.pushSystem(ServerLifecycleMessages.openCodeBackendConnected, {
               url: openCodeAdapter.getUrl()
             });
           }
         }
       } catch (error) {
         const errorMessage = this.errorMessageFromValue(error);
-        this.deps.pushSystem("Agent failed to connect", {
+        this.deps.pushSystem(ServerLifecycleMessages.agentFailedToConnect, {
           agentId: adapter.id,
           error: errorMessage
         });
@@ -157,7 +170,7 @@ export class ServerLifecycleCoordinator {
     }
 
     this.deps.broadcastRuntimeState();
-    logger.info({ url: `http://${this.deps.host}:${String(this.deps.port)}` }, "monitor-server-ready");
+    logger.info({ url: this.readServerUrl() }, "monitor-server-ready");
   }
 
   public async shutdown(): Promise<void> {
@@ -196,5 +209,13 @@ export class ServerLifecycleCoordinator {
     }
 
     return String(error);
+  }
+
+  private readConfiguredAgentIdentifierSummary(): string {
+    return this.deps.configuredAgentIds.join(",");
+  }
+
+  private readServerUrl(): string {
+    return `http://${this.deps.host}:${String(this.deps.port)}`;
   }
 }

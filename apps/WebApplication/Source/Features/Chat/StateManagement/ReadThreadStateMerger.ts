@@ -1,7 +1,7 @@
-export interface ReadThreadStateLike {
+export interface ReadThreadStateLike<TTurn = object> {
   thread: {
     id: string;
-    turns: object[];
+    turns: TTurn[];
   };
 }
 
@@ -15,26 +15,26 @@ export class ReadThreadStateMerger {
   public merge<TReadThreadState extends ReadThreadStateLike>(
     input: ReadThreadStateMergeInput<TReadThreadState>
   ): TReadThreadState {
+    const previousState = input.previous;
     if (input.includeTurns) {
       return input.incoming;
     }
-    if (!input.previous) {
+    if (!previousState) {
       return input.incoming;
     }
-    if (input.previous.thread.id !== input.incoming.thread.id) {
+    if (previousState.thread.id !== input.incoming.thread.id) {
       return input.incoming;
     }
-    if (input.incoming.thread.turns.length > 0 || input.previous.thread.turns.length === 0) {
+    if (input.incoming.thread.turns.length > 0 || previousState.thread.turns.length === 0) {
       return input.incoming;
     }
 
-    const mergedResponse: TReadThreadState = {
-      ...input.incoming
+    return {
+      ...input.incoming,
+      thread: {
+        ...input.incoming.thread,
+        turns: previousState.thread.turns
+      }
     };
-    mergedResponse.thread = {
-      ...input.incoming.thread,
-      turns: input.previous.thread.turns
-    };
-    return mergedResponse;
   }
 }

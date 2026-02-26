@@ -9,21 +9,19 @@ import {
   SelectValue
 } from "@/Components/UserInterface/Select";
 
-interface Mode {
+export interface PlanPanelModeOption {
   mode: string;
   name: string;
-  developer_instructions?: string | null;
-  reasoning_effort?: string | null;
 }
 
-interface ModelOption {
+export interface PlanPanelModelOption {
   id: string;
   label: string;
 }
 
-interface PlanPanelProps {
-  modes: Mode[];
-  modelOptions: ModelOption[];
+export interface PlanPanelProps {
+  modes: PlanPanelModeOption[];
+  modelOptions: PlanPanelModelOption[];
   effortOptions: string[];
   selectedModeKey: string;
   selectedModelId: string;
@@ -38,6 +36,17 @@ interface PlanPanelProps {
 }
 
 const APP_DEFAULT_VALUE = "__app_default__";
+const APP_DEFAULT_LABEL = "App default";
+const SETTINGS_LABEL = "Settings";
+const MODE_PLACEHOLDER_LABEL = "Select mode";
+
+function readSelectValue(value: string): string {
+  return value.length > 0 ? value : APP_DEFAULT_VALUE;
+}
+
+function readDomainValue(value: string): string {
+  return value === APP_DEFAULT_VALUE ? "" : value;
+}
 
 export function PlanPanel({
   modes,
@@ -53,7 +62,7 @@ export function PlanPanel({
   isBusy,
   hasThread,
   hasMode
-}: PlanPanelProps) {
+}: PlanPanelProps): React.JSX.Element {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -62,7 +71,7 @@ export function PlanPanel({
       transition={{ duration: 0.15 }}
       className="rounded-xl border border-border bg-card p-4 space-y-4"
     >
-      <div className="text-sm font-medium">Settings</div>
+      <div className="text-sm font-medium">{SETTINGS_LABEL}</div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {/* Mode */}
@@ -73,7 +82,7 @@ export function PlanPanel({
             onValueChange={onModeChange}
           >
             <SelectTrigger id="plan-mode" className="w-full">
-              <SelectValue placeholder="Select mode" />
+              <SelectValue placeholder={MODE_PLACEHOLDER_LABEL} />
             </SelectTrigger>
             <SelectContent position="popper">
               {modes.map((m) => (
@@ -89,16 +98,16 @@ export function PlanPanel({
         <div className="space-y-2">
           <Label htmlFor="plan-model">Model</Label>
           <Select
-            value={selectedModelId || APP_DEFAULT_VALUE}
+            value={readSelectValue(selectedModelId)}
             onValueChange={(value) =>
-              onModelChange(value === APP_DEFAULT_VALUE ? "" : value)
+              onModelChange(readDomainValue(value))
             }
           >
             <SelectTrigger id="plan-model" className="w-full">
-              <SelectValue placeholder="App default" />
+              <SelectValue placeholder={APP_DEFAULT_LABEL} />
             </SelectTrigger>
             <SelectContent position="popper">
-              <SelectItem value={APP_DEFAULT_VALUE}>App default</SelectItem>
+              <SelectItem value={APP_DEFAULT_VALUE}>{APP_DEFAULT_LABEL}</SelectItem>
               {modelOptions.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   {m.label}
@@ -112,16 +121,16 @@ export function PlanPanel({
         <div className="space-y-2">
           <Label htmlFor="plan-effort">Effort</Label>
           <Select
-            value={selectedReasoningEffort || APP_DEFAULT_VALUE}
+            value={readSelectValue(selectedReasoningEffort)}
             onValueChange={(value) =>
-              onEffortChange(value === APP_DEFAULT_VALUE ? "" : value)
+              onEffortChange(readDomainValue(value))
             }
           >
             <SelectTrigger id="plan-effort" className="w-full">
-              <SelectValue placeholder="App default" />
+              <SelectValue placeholder={APP_DEFAULT_LABEL} />
             </SelectTrigger>
             <SelectContent position="popper">
-              <SelectItem value={APP_DEFAULT_VALUE}>App default</SelectItem>
+              <SelectItem value={APP_DEFAULT_VALUE}>{APP_DEFAULT_LABEL}</SelectItem>
               {effortOptions.map((e) => (
                 <SelectItem key={e} value={e}>
                   {e}

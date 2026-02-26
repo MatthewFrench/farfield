@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   archiveThread,
   createThread,
@@ -9,6 +10,10 @@ import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
 export type ThreadMutationCreateThreadInput = ApiCreateThreadInput;
 export type ThreadMutationCreateThreadResponse = ApiCreateThreadResponse;
+
+const ThreadIdentifierSchema = z.string().trim().min(1);
+const INVALID_THREAD_IDENTIFIER_MESSAGE =
+  "ThreadMutationServerClient requires threadId to be a non-empty string";
 
 /**
  * Owns thread mutation endpoints.
@@ -23,10 +28,18 @@ export class ThreadMutationServerClient {
   }
 
   public async archiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {
-    return archiveThread(threadId, options);
+    return archiveThread(readThreadIdentifier(threadId), options);
   }
 
   public async unarchiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {
-    return unarchiveThread(threadId, options);
+    return unarchiveThread(readThreadIdentifier(threadId), options);
   }
+}
+
+function readThreadIdentifier(value: string): string {
+  const parsedValue = ThreadIdentifierSchema.safeParse(value);
+  if (!parsedValue.success) {
+    throw new Error(INVALID_THREAD_IDENTIFIER_MESSAGE);
+  }
+  return parsedValue.data;
 }

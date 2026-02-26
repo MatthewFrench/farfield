@@ -1,3 +1,9 @@
+import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
+
+/**
+ * App shell integration-test fixture contracts.
+ * These mirror API response payloads consumed by the web-shell owners.
+ */
 type AgentIdentifier = "codex" | "opencode";
 
 export interface CapabilityFixture {
@@ -133,9 +139,13 @@ export interface ConversationStateFixture {
   };
 }
 
+type ThreadConversationStructuredValue = {
+  [key: string]: StructuredDataValue;
+};
+
 type ThreadConversationPayload =
   | ConversationStateFixture
-  | Record<string, object | string | number | boolean | null | undefined>;
+  | ThreadConversationStructuredValue;
 
 export interface ReadThreadFixture {
   ok: true;
@@ -151,7 +161,10 @@ export interface LiveStateFixture {
   liveStateError: null;
 }
 
-export type ReadThreadResolver = (threadId: string, includeTurns: boolean) => ReadThreadFixture | null;
+export type ReadThreadResolver = (
+  threadId: string,
+  includeTurns: boolean
+) => ReadThreadFixture | Promise<ReadThreadFixture | null> | null;
 export type LiveStateResolver = (threadId: string) => LiveStateFixture;
 
 export interface EventsSessionFixture {

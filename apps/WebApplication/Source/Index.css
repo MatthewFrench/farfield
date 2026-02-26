@@ -1,3 +1,6 @@
+/* Global application-shell styling contract:
+ * Defines safe-area, viewport, and shared markdown/token surfaces.
+ */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";

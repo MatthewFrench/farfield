@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { type ChatModeToolbarProps } from "@/Features/Chat/UserInterface/ChatModeToolbar";
 import {
   ChatModeToolbarPropertiesBuilder
@@ -68,6 +68,10 @@ export function useChatModeToolbarProperties(
     setSelectedReasoningEffort,
     applyModeDraft
   } = input;
+  const handleApplyModeDraft = useCallback((draft: ModeDraft): void => {
+    // Draft application owns error handling and optimistic state policy.
+    void applyModeDraft(draft);
+  }, [applyModeDraft]);
 
   return useMemo<ChatModeToolbarProps>(
     () =>
@@ -89,30 +93,22 @@ export function useChatModeToolbarProperties(
         effortOptionsWithoutAssumedDefault,
         isModeSyncing,
         pendingRequestCount,
-        onSetSelectedModeKey: (modeKey) => {
-          setSelectedModeKey(modeKey);
-        },
-        onSetSelectedModelId: (modelId) => {
-          setSelectedModelId(modelId);
-        },
-        onSetSelectedReasoningEffort: (reasoningEffort) => {
-          setSelectedReasoningEffort(reasoningEffort);
-        },
-        onApplyModeDraft: (draft) => {
-          void applyModeDraft(draft);
-        }
+        onSetSelectedModeKey: setSelectedModeKey,
+        onSetSelectedModelId: setSelectedModelId,
+        onSetSelectedReasoningEffort: setSelectedReasoningEffort,
+        onApplyModeDraft: handleApplyModeDraft
       }),
     [
       appDefaultModel,
       appDefaultReasoningEffort,
       appDefaultValue,
-      applyModeDraft,
       canListCollaborationModes,
       canListModels,
       canSetCollaborationMode,
       chatModeToolbarPropertiesBuilder,
       defaultModeKey,
       effortOptionsWithoutAssumedDefault,
+      handleApplyModeDraft,
       isModeSyncing,
       isPlanModeEnabled,
       modelOptionsWithoutAssumedDefault,

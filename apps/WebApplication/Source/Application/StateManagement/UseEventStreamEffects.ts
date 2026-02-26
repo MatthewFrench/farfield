@@ -14,9 +14,23 @@ import { DebugWorkspaceDataReader } from "@/Features/Debugging/StateManagement/D
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
 import { type ApplySelectedThreadStreamDeltaInput } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import type { SelectedThreadLoaderOptions } from "./UseCoreDataLoaders";
-import { EventRefreshScheduler } from "./EventRefreshScheduler";
+import { EventRefreshScheduler, type EventRefreshFlags } from "./EventRefreshScheduler";
 import { EventStreamConnectionCoordinator } from "./EventStreamConnectionCoordinator";
 import { EventStreamRefreshDecisionEngine } from "./EventStreamRefreshDecisionEngine";
+
+const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
+const DEBUG_APPLICATION_TAB = "debug";
+const SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS: SelectedThreadLoaderOptions = {
+  includeReadThread: true,
+  includeTurns: false
+};
+
+function shouldRefreshDebugWorkspace(
+  refreshFlags: EventRefreshFlags,
+  activeTab: "chat" | "debug"
+): boolean {
+  return !refreshFlags.refreshCore && refreshFlags.refreshHistory && activeTab === DEBUG_APPLICATION_TAB;
+}
 
 export interface UseEventStreamEffectsInput {
   debugHistoryLimit: number;
@@ -50,7 +64,7 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
         selectedThreadId: input.selectedThreadIdRef.current
       }),
       executeScheduledRefresh: async (flags) => {
-        if (document.visibilityState !== "visible") {
+        if (document.visibilityState !== DOCUMENT_VISIBILITY_STATE_VISIBLE) {
           return;
         }
 
@@ -63,7 +77,7 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
             if (loadCoreDataFunction) {
               refreshOperations.push(loadCoreDataFunction());
             }
-          } else if (flags.refreshHistory && input.activeTabRef.current === "debug") {
+          } else if (shouldRefreshDebugWorkspace(flags, input.activeTabRef.current)) {
             const debugWorkspaceSnapshot = await input.debugWorkspaceDataReader.readSnapshot(
               input.debugHistoryLimit,
               input.debugErrorListLimit
@@ -90,10 +104,12 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
           }
 
           if (flags.refreshSelectedThread && input.selectedThreadIdRef.current && loadSelectedThreadFunction) {
-            refreshOperations.push(loadSelectedThreadFunction(input.selectedThreadIdRef.current, {
-              includeReadThread: true,
-              includeTurns: false
-            }));
+            refreshOperations.push(
+              loadSelectedThreadFunction(
+                input.selectedThreadIdRef.current,
+                SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS
+              )
+            );
           }
 
           if (refreshOperations.length > 0) {

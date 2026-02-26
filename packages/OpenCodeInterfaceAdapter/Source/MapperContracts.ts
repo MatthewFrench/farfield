@@ -7,6 +7,10 @@ import type {
 } from "@opencode-ai/sdk";
 import type { OpenCodeStructuredDataValue } from "./Schemas.js";
 
+export type MappedToolLifecycleStatus = "running" | "completed" | "error";
+export type MappedTurnStatus = "pending" | MappedToolLifecycleStatus;
+export type MappedFileChangeKindType = "created" | "modified";
+
 /**
  * Mapped thread list item, matching the shape of AppServerThreadListItemSchema.
  */
@@ -19,29 +23,58 @@ export interface MappedThreadListItem {
   source: "opencode";
 }
 
+export interface MappedUserMessageTurnItem {
+  id: string;
+  type: "userMessage";
+  content: Array<{ type: "text"; text: string }>;
+}
+
+export interface MappedAgentMessageTurnItem {
+  id: string;
+  type: "agentMessage";
+  text: string;
+}
+
+export interface MappedReasoningTurnItem {
+  id: string;
+  type: "reasoning";
+  text: string;
+  summary?: string[];
+}
+
+export interface MappedCommandExecutionTurnItem {
+  id: string;
+  type: "commandExecution";
+  command: string;
+  status: MappedToolLifecycleStatus;
+  cwd?: string;
+  aggregatedOutput?: string | null;
+  exitCode?: number | null;
+  durationMs?: number | null;
+}
+
+export interface MappedFileChangeEntry {
+  path: string;
+  kind: { type: MappedFileChangeKindType };
+  diff?: string;
+}
+
+export interface MappedFileChangeTurnItem {
+  id: string;
+  type: "fileChange";
+  changes: MappedFileChangeEntry[];
+  status: MappedToolLifecycleStatus;
+}
+
 /**
  * Mapped turn item, matching the shape of TurnItemSchema discriminated union.
  */
 export type MappedTurnItem =
-  | { id: string; type: "userMessage"; content: Array<{ type: "text"; text: string }> }
-  | { id: string; type: "agentMessage"; text: string }
-  | { id: string; type: "reasoning"; text: string; summary?: string[] }
-  | {
-      id: string;
-      type: "commandExecution";
-      command: string;
-      status: string;
-      cwd?: string;
-      aggregatedOutput?: string | null;
-      exitCode?: number | null;
-      durationMs?: number | null;
-    }
-  | {
-      id: string;
-      type: "fileChange";
-      changes: Array<{ path: string; kind: { type: string }; diff?: string }>;
-      status: string;
-    };
+  | MappedUserMessageTurnItem
+  | MappedAgentMessageTurnItem
+  | MappedReasoningTurnItem
+  | MappedCommandExecutionTurnItem
+  | MappedFileChangeTurnItem;
 
 /**
  * Mapped turn, matching the shape of ThreadTurnSchema.
@@ -49,7 +82,7 @@ export type MappedTurnItem =
 export interface MappedTurn {
   turnId: string | null;
   id: string;
-  status: string;
+  status: MappedTurnStatus;
   turnStartedAtMs: number | null;
   finalAssistantStartedAtMs: number | null;
   error: OpenCodeStructuredDataValue | null;

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import net from "node:net";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   FarfieldApiErrorResponseSchema,
   FarfieldCreatePushSubscriptionEnvelopeSchema,
@@ -38,6 +39,23 @@ export const DebugErrorListEnvelopeSchema = FarfieldDebugErrorListEnvelopeSchema
 export const DebugErrorDetailEnvelopeSchema = FarfieldDebugErrorDetailEnvelopeSchema;
 export const DebugObservabilityEnvelopeSchema = FarfieldDebugObservabilityEnvelopeSchema;
 
+const SERVER_HOST = "127.0.0.1";
+const SERVER_STARTUP_TIMEOUT_MILLISECONDS = 10_000;
+const SERVER_READINESS_POLL_INTERVAL_MILLISECONDS = 100;
+const SERVER_STOP_TIMEOUT_MILLISECONDS = 5_000;
+const API_ROUTE_PATH_PATTERN = /^\/api(?:\/|$)/;
+const API_TOKEN_HEADER_NAME = "X-Farfield-Token";
+const SET_COOKIE_HEADER_NAME = "set-cookie";
+const SESSION_COOKIE_HEADER_PATTERN = /\bfarfield_session=/;
+
+const ServerApplicationDirectoryPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ServerBootstrapEntryPath = path.join(
+  ServerApplicationDirectoryPath,
+  "Source",
+  "Application",
+  "ServerBootstrap.ts"
+);
+
 const AddressSchema = z
   .object({
     address: z.string(),
@@ -69,6 +87,21 @@ const InheritedServerProcessEnvironmentSchema = z
   })
   .strict();
 
+const ApiRoutePathSchema = z
+  .string()
+  .regex(API_ROUTE_PATH_PATTERN, "Expected API route path beginning with /api");
+
+const SetCookieHeaderSchema = z
+  .string({
+    invalid_type_error: "Expected response set-cookie header to be present",
+    required_error: "Expected response set-cookie header to be present"
+  })
+  .min(1)
+  .regex(
+    SESSION_COOKIE_HEADER_PATTERN,
+    "Expected response set-cookie header to include farfield_session cookie"
+  );
+
 function buildInheritedServerProcessEnvironment(
   sourceEnvironment: NodeJS.ProcessEnv
 ): NodeJS.ProcessEnv {
@@ -98,33 +131,49 @@ async function getAvailablePort(): Promise<number> {
   return await new Promise<number>((resolve, reject) => {
     const server = net.createServer();
     server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const parsedAddress = AddressSchema.safeParse(server.address());
-      if (!parsedAddress.success) {
-        server.close(() => reject(new Error("Could not resolve temporary port")));
-        return;
+    server.listen(0, SERVER_HOST, () => {
+      try {
+        const parsedAddress = AddressSchema.parse(server.address());
+        const port = parsedAddress.port;
+        server.close((closeError) => {
+          if (closeError) {
+            reject(closeError);
+            return;
+          }
+          resolve(port);
+        });
+      } catch (error) {
+        server.close(() => {
+          reject(error);
+        });
       }
-
-      const port = parsedAddress.data.port;
-      server.close((closeError) => {
-        if (closeError) {
-          reject(closeError);
-          return;
-        }
-        resolve(port);
-      });
     });
   });
 }
 
-async function waitForServerReady(baseUrl: string, token: string, timeoutMs: number): Promise<void> {
+function hasServerProcessExited(serverProcess: ChildProcessWithoutNullStreams): boolean {
+  return serverProcess.exitCode !== null || serverProcess.signalCode !== null;
+}
+
+async function waitForServerReady(
+  baseUrl: string,
+  token: string,
+  timeoutMs: number,
+  serverProcess: ChildProcessWithoutNullStreams
+): Promise<void> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
+    if (hasServerProcessExited(serverProcess)) {
+      throw new Error(
+        `Server process exited before readiness check completed (exitCode=${String(serverProcess.exitCode)}, signal=${String(serverProcess.signalCode)})`
+      );
+    }
+
     try {
       const response = await fetch(`${baseUrl}/api/health`, {
         method: "GET",
         headers: {
-          "X-Farfield-Token": token
+          [API_TOKEN_HEADER_NAME]: token
         }
       });
       if (response.status === 200) {
@@ -134,11 +183,45 @@ async function waitForServerReady(baseUrl: string, token: string, timeoutMs: num
       // Server is still starting.
     }
     await new Promise<void>((resolve) => {
-      setTimeout(resolve, 100);
+      setTimeout(resolve, SERVER_READINESS_POLL_INTERVAL_MILLISECONDS);
     });
   }
 
   throw new Error(`Timed out waiting for server readiness at ${baseUrl}`);
+}
+
+async function waitForServerProcessExit(
+  serverProcess: ChildProcessWithoutNullStreams,
+  timeoutMs: number
+): Promise<void> {
+  if (hasServerProcessExited(serverProcess)) {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    let timeoutHandle: NodeJS.Timeout | null = null;
+    const handleExit = (): void => {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+      resolve();
+    };
+
+    timeoutHandle = setTimeout(() => {
+      serverProcess.off("exit", handleExit);
+      reject(
+        new Error(
+          `Timed out waiting for server process to exit (exitCode=${String(serverProcess.exitCode)}, signal=${String(serverProcess.signalCode)})`
+        )
+      );
+    }, timeoutMs);
+
+    serverProcess.once("exit", handleExit);
+    if (hasServerProcessExited(serverProcess)) {
+      serverProcess.off("exit", handleExit);
+      handleExit();
+    }
+  });
 }
 
 /**
@@ -161,6 +244,15 @@ export class HttpRoutesIntegrationEnvironment {
     return this.apiToken;
   }
 
+  public buildApiRouteUrl(pathname: string): string {
+    const parsedPathname = ApiRoutePathSchema.parse(pathname);
+    return `${this.readBaseUrl()}${parsedPathname}`;
+  }
+
+  public readSessionCookieFromResponse(response: Response): string {
+    return SetCookieHeaderSchema.parse(response.headers.get(SET_COOKIE_HEADER_NAME));
+  }
+
   public readVapidPublicKey(): string {
     return this.vapidPublicKey;
   }
@@ -174,31 +266,31 @@ export class HttpRoutesIntegrationEnvironment {
 
   public readAuthHeaders(): Record<string, string> {
     return {
-      "X-Farfield-Token": this.apiToken
+      [API_TOKEN_HEADER_NAME]: this.apiToken
     };
   }
 
   public async start(): Promise<void> {
+    if (this.serverProcess !== null) {
+      throw new Error("Integration environment start() called while server process is already running");
+    }
+
+    this.serverLogs = "";
+
     const port = await getAvailablePort();
-    this.baseUrl = `http://127.0.0.1:${String(port)}`;
+    this.baseUrl = `http://${SERVER_HOST}:${String(port)}`;
     this.tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-server-integration-"));
     const localCaPath = path.join(this.tempDirectory, "root.crt");
     fs.writeFileSync(localCaPath, "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n", "utf8");
 
-    const serverEntryPath = path.resolve(
-      process.cwd(),
-      "Source",
-      "Application",
-      "ServerBootstrap.ts"
-    );
     this.serverProcess = spawn(
       process.execPath,
-      ["--import", "tsx", serverEntryPath, "--agents=codex"],
+      ["--import", "tsx", ServerBootstrapEntryPath, "--agents=codex"],
       {
-        cwd: process.cwd(),
+        cwd: ServerApplicationDirectoryPath,
         env: {
           ...buildInheritedServerProcessEnvironment(process.env),
-          HOST: "127.0.0.1",
+          HOST: SERVER_HOST,
           PORT: String(port),
           API_TOKEN: this.apiToken,
           PUSH_ENABLED: "true",
@@ -223,25 +315,40 @@ export class HttpRoutesIntegrationEnvironment {
     });
 
     try {
-      await waitForServerReady(this.baseUrl, this.apiToken, 10_000);
+      await waitForServerReady(
+        this.baseUrl,
+        this.apiToken,
+        SERVER_STARTUP_TIMEOUT_MILLISECONDS,
+        this.serverProcess
+      );
     } catch (error) {
+      const startupErrorMessage = error instanceof Error ? error.message : String(error);
+      try {
+        await this.stop();
+      } catch {
+        // Preserve startup failure details even if shutdown fails.
+      }
       throw new Error(
-        `Server failed to become ready: ${error instanceof Error ? error.message : String(error)}\n${this.serverLogs}`
+        `Server failed to become ready: ${startupErrorMessage}\n${this.serverLogs}`
       );
     }
   }
 
   public async stop(): Promise<void> {
-    if (this.serverProcess) {
-      this.serverProcess.kill("SIGTERM");
-      await new Promise<void>((resolve) => {
-        this.serverProcess?.once("exit", () => resolve());
-      });
-      this.serverProcess = null;
+    const activeServerProcess = this.serverProcess;
+    this.serverProcess = null;
+
+    if (activeServerProcess) {
+      if (!hasServerProcessExited(activeServerProcess)) {
+        activeServerProcess.kill("SIGTERM");
+        await waitForServerProcessExit(activeServerProcess, SERVER_STOP_TIMEOUT_MILLISECONDS);
+      }
     }
 
     if (this.tempDirectory.length > 0 && fs.existsSync(this.tempDirectory)) {
       fs.rmSync(this.tempDirectory, { recursive: true, force: true });
     }
+    this.tempDirectory = "";
+    this.baseUrl = "";
   }
 }

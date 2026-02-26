@@ -42,4 +42,34 @@ describe("resolvePushStatePath", () => {
       })
     ).toThrowError(/PUSH_STATE_PATH/);
   });
+
+  it("uses APPDATA on win32 when PUSH_STATE_PATH is not configured", () => {
+    const resolved = resolvePushStatePath({
+      envPath: undefined,
+      appDataPath: "C:/Users/test-user/AppData/Roaming",
+      xdgStateHome: undefined,
+      homeDirectory: "C:/Users/test-user",
+      platform: "win32"
+    });
+
+    expect(resolved.source).toBe("default");
+    expect(resolved.filePath).toBe(
+      path.resolve("C:/Users/test-user/AppData/Roaming/farfield/push-state.json")
+    );
+  });
+
+  it("uses XDG_STATE_HOME on linux when provided", () => {
+    const resolved = resolvePushStatePath({
+      envPath: undefined,
+      appDataPath: undefined,
+      xdgStateHome: "/home/test-user/.cache/state",
+      homeDirectory: "/home/test-user",
+      platform: "linux"
+    });
+
+    expect(resolved.source).toBe("default");
+    expect(resolved.filePath).toBe(
+      path.resolve("/home/test-user/.cache/state/farfield/push-state.json")
+    );
+  });
 });

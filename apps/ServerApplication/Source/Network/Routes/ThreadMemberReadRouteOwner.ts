@@ -1,5 +1,10 @@
 import { z } from "zod";
-import type { ThreadMemberRouteDependencies, ThreadMemberResolvedRouteContext } from "./ThreadMemberRouteContracts.js";
+import {
+  ThreadMemberRouteMethodByName,
+  ThreadMemberRouteSegmentByName,
+  type ThreadMemberRouteDependencies,
+  type ThreadMemberResolvedRouteContext
+} from "./ThreadMemberRouteContracts.js";
 
 export interface ThreadMemberReadRouteOwnerOptions {
   dependencies: ThreadMemberRouteDependencies;
@@ -19,7 +24,7 @@ export class ThreadMemberReadRouteOwner {
     const { req, res, segments, url, codexAdapter, parseBoolean, jsonResponse } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
-    if (req.method === "GET" && segments.length === 3) {
+    if (req.method === ThreadMemberRouteMethodByName.get && segments.length === 3) {
       const includeTurns = parseBoolean(url.searchParams.get("includeTurns"), true);
 
       try {
@@ -48,7 +53,7 @@ export class ThreadMemberReadRouteOwner {
       }
     }
 
-    if (req.method === "GET" && segments[3] === "live-state") {
+    if (req.method === ThreadMemberRouteMethodByName.get && segments[3] === ThreadMemberRouteSegmentByName.liveState) {
       if (!adapter.capabilities.canReadLiveState || !adapter.readLiveState) {
         jsonResponse(res, 400, {
           ok: false,
@@ -69,7 +74,7 @@ export class ThreadMemberReadRouteOwner {
       return true;
     }
 
-    if (req.method === "GET" && segments[3] === "stream-events") {
+    if (req.method === ThreadMemberRouteMethodByName.get && segments[3] === ThreadMemberRouteSegmentByName.streamEvents) {
       if (!adapter.capabilities.canReadStreamEvents || !adapter.readStreamEvents) {
         jsonResponse(res, 400, {
           ok: false,

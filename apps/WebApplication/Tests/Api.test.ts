@@ -119,6 +119,42 @@ describe("API envelope parsing", () => {
     expect(String(requestInit?.body)).toBe(JSON.stringify({ apiToken: "token_123" }));
   });
 
+  it("trims the token payload before posting events session bootstrap", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        authRequired: true,
+        bootstrapped: true,
+        expiresAt: "2026-02-19T00:00:00.000Z"
+      })
+    );
+
+    await bootstrapEventsSession({
+      apiToken: "  token_123  "
+    });
+
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    expect(String(requestInit?.body)).toBe(JSON.stringify({ apiToken: "token_123" }));
+  });
+
+  it("rejects blank token payload before dispatching the bootstrap request", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        authRequired: true,
+        bootstrapped: true,
+        expiresAt: "2026-02-19T00:00:00.000Z"
+      })
+    );
+
+    await expect(
+      bootstrapEventsSession({
+        apiToken: "    "
+      })
+    ).rejects.toThrow("String must contain at least 1 character(s)");
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
   it("clears debug client errors through the debug endpoint", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({

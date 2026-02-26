@@ -1,29 +1,48 @@
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CodeSnippet } from "./CodeSnippet";
 
-interface MarkdownTextProps {
+const DEFAULT_CODE_LANGUAGE = "text";
+const CODE_LANGUAGE_CLASS_PREFIX = "language-";
+const TRAILING_BLOCK_NEWLINE_PATTERN = /\n$/;
+const INLINE_CODE_CLASS_NAME = "rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em]";
+
+export interface MarkdownTextProps {
   text: string;
 }
 
 function detectLanguage(className: string | undefined): string {
-  if (!className) return "text";
-  const prefix = "language-";
-  if (!className.startsWith(prefix)) return "text";
-  const name = className.slice(prefix.length).trim();
-  return name.length > 0 ? name : "text";
+  if (!className) {
+    return DEFAULT_CODE_LANGUAGE;
+  }
+  if (!className.startsWith(CODE_LANGUAGE_CLASS_PREFIX)) {
+    return DEFAULT_CODE_LANGUAGE;
+  }
+  const languageName = className.slice(CODE_LANGUAGE_CLASS_PREFIX.length).trim();
+  return languageName.length > 0 ? languageName : DEFAULT_CODE_LANGUAGE;
+}
+
+function readCodeText(children: ReactNode): string {
+  return String(children ?? "");
+}
+
+function isCodeBlock(code: string, className: string | undefined): boolean {
+  if (code.includes("\n")) {
+    return true;
+  }
+  return className?.startsWith(CODE_LANGUAGE_CLASS_PREFIX) ?? false;
 }
 
 const components: Components = {
   pre: ({ children }) => <>{children}</>,
   code: ({ className, children }) => {
-    const code = String(children ?? "");
-    const isBlock = code.includes("\n") || (className?.startsWith("language-") ?? false);
+    const code = readCodeText(children);
+    const isBlock = isCodeBlock(code, className);
 
     if (!isBlock) {
       return (
-        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em]">
+        <code className={INLINE_CODE_CLASS_NAME}>
           {code}
         </code>
       );
@@ -31,14 +50,14 @@ const components: Components = {
 
     return (
       <CodeSnippet
-        code={code.replace(/\n$/, "")}
+        code={code.replace(TRAILING_BLOCK_NEWLINE_PATTERN, "")}
         language={detectLanguage(className)}
       />
     );
   }
 };
 
-function MarkdownTextComponent({ text }: MarkdownTextProps) {
+function MarkdownTextComponent({ text }: MarkdownTextProps): React.JSX.Element {
   return (
     <div className="markdown-content text-sm leading-relaxed text-foreground break-words">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
@@ -49,3 +68,4 @@ function MarkdownTextComponent({ text }: MarkdownTextProps) {
 }
 
 export const MarkdownText = memo(MarkdownTextComponent);
+MarkdownText.displayName = "MarkdownText";

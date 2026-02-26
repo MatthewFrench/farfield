@@ -19,9 +19,16 @@ export interface ThreadAdapterResolverStatistics {
   unregisteredDiscoveryAlertCount: number;
 }
 
-const UnregisteredDiscoveryMissAlertThreshold = 3;
-const DefaultUnregisteredThreadMissTimeToLiveMs = 2_000;
-const ThreadMissingMessagePattern = /\b(conversation|thread)\s+not\s+found\b/i;
+const HTTP_STATUS_NOT_FOUND = 404;
+const HTTP_STATUS_SERVICE_UNAVAILABLE = 503;
+const HTTP_STATUS_CONFLICT = 409;
+// Alert every third consecutive miss so operators get periodic signal without per-request noise.
+const UNREGISTERED_DISCOVERY_MISS_ALERT_THRESHOLD = 3;
+// Keep this short to avoid redundant probes during quick repeated retries.
+const DEFAULT_UNREGISTERED_THREAD_MISS_TIME_TO_LIVE_MILLISECONDS = 2_000;
+const THREAD_MISSING_MESSAGE_PATTERN = /\b(conversation|thread)\s+not\s+found\b/i;
+
+type UnregisteredDiscoveryMissReason = "no-connected-adapters" | "no-match";
 
 export interface ThreadAdapterResolverOptions {
   unregisteredThreadMissTimeToLiveMs?: number;
@@ -49,20 +56,11 @@ export class ThreadAdapterResolver {
   private readonly unregisteredDiscoveryMissExpiresAtEpochMsByThreadId: Map<string, number>;
 
   public constructor(registry: AgentRegistry, threadIndex: ThreadIndex, options: ThreadAdapterResolverOptions = {}) {
-    const configuredUnregisteredThreadMissTimeToLiveMs = (
-      options.unregisteredThreadMissTimeToLiveMs
-      ?? DefaultUnregisteredThreadMissTimeToLiveMs
-    );
-    if (
-      !Number.isInteger(configuredUnregisteredThreadMissTimeToLiveMs)
-      || configuredUnregisteredThreadMissTimeToLiveMs <= 0
-    ) {
-      throw new Error("ThreadAdapterResolver requires positive integer unregisteredThreadMissTimeToLiveMs");
-    }
-
     this.registry = registry;
     this.threadIndex = threadIndex;
-    this.unregisteredThreadMissTimeToLiveMs = configuredUnregisteredThreadMissTimeToLiveMs;
+    this.unregisteredThreadMissTimeToLiveMs = resolveUnregisteredThreadMissTimeToLiveMilliseconds(
+      options.unregisteredThreadMissTimeToLiveMs
+    );
     this.now = options.now ?? (() => Date.now());
     this.registeredLookupCount = 0;
     this.unregisteredDiscoveryAttemptCount = 0;
@@ -120,8 +118,8 @@ export class ThreadAdapterResolver {
       this.unregisteredDiscoveryMissCacheHitCount += 1;
       return {
         ok: false,
-        status: 404,
-        error: `Thread ${threadId} is not registered and could not be discovered. Refresh thread list and try again.`
+        status: HTTP_STATUS_NOT_FOUND,
+        error: buildUnregisteredThreadMissingError(threadId)
       };
     }
 
@@ -134,8 +132,8 @@ export class ThreadAdapterResolver {
     this.recordUnregisteredDiscoveryMiss(threadId, "no-match");
     return {
       ok: false,
-      status: 404,
-      error: `Thread ${threadId} is not registered and could not be discovered. Refresh thread list and try again.`
+      status: HTTP_STATUS_NOT_FOUND,
+      error: buildUnregisteredThreadMissingError(threadId)
     };
   }
 
@@ -160,7 +158,7 @@ export class ThreadAdapterResolver {
     if (!adapter || !adapter.isEnabled()) {
       return {
         ok: false,
-        status: 503,
+        status: HTTP_STATUS_SERVICE_UNAVAILABLE,
         error: `Agent ${registeredAgentId} is not enabled for thread ${threadId}.`
       };
     }
@@ -168,7 +166,7 @@ export class ThreadAdapterResolver {
     if (!adapter.isConnected()) {
       return {
         ok: false,
-        status: 503,
+        status: HTTP_STATUS_SERVICE_UNAVAILABLE,
         error: `Agent ${registeredAgentId} is not connected for thread ${threadId}.`
       };
     }
@@ -191,7 +189,7 @@ export class ThreadAdapterResolver {
       this.recordUnregisteredDiscoveryMiss(threadId, "no-connected-adapters");
       return {
         ok: false,
-        status: 503,
+        status: HTTP_STATUS_SERVICE_UNAVAILABLE,
         error: `No connected enabled agents are available to resolve thread ${threadId}.`
       };
     }
@@ -220,7 +218,7 @@ export class ThreadAdapterResolver {
         );
         return {
           ok: false,
-          status: 409,
+          status: HTTP_STATUS_CONFLICT,
           error: (
             `Thread ${threadId} matched multiple connected enabled agents `
             + `(${discoveredAdapter.id}, ${adapter.id}). Refresh thread list and retry.`
@@ -235,7 +233,7 @@ export class ThreadAdapterResolver {
       if (hasProbeFailures) {
         return {
           ok: false,
-          status: 503,
+          status: HTTP_STATUS_SERVICE_UNAVAILABLE,
           error: `Thread ${threadId} ownership probe failed for one or more agents. Retry the request.`
         };
       }
@@ -283,15 +281,15 @@ export class ThreadAdapterResolver {
 
   private isExplicitThreadMissingError(error: Error): boolean {
     if (error instanceof AppServerRpcError) {
-      return error.code === -32600 && ThreadMissingMessagePattern.test(error.message);
+      return error.code === -32600 && THREAD_MISSING_MESSAGE_PATTERN.test(error.message);
     }
 
-    return ThreadMissingMessagePattern.test(error.message);
+    return THREAD_MISSING_MESSAGE_PATTERN.test(error.message);
   }
 
   private recordUnregisteredDiscoveryMiss(
     threadId: string,
-    reason: "no-connected-adapters" | "no-match"
+    reason: UnregisteredDiscoveryMissReason
   ): void {
     this.unregisteredDiscoveryMissCount += 1;
     if (reason === "no-connected-adapters") {
@@ -305,7 +303,7 @@ export class ThreadAdapterResolver {
       this.now() + this.unregisteredThreadMissTimeToLiveMs
     );
 
-    if (nextMissCount % UnregisteredDiscoveryMissAlertThreshold !== 0) {
+    if (nextMissCount % UNREGISTERED_DISCOVERY_MISS_ALERT_THRESHOLD !== 0) {
       return;
     }
 
@@ -331,4 +329,24 @@ export class ThreadAdapterResolver {
     }
     return true;
   }
+}
+
+function resolveUnregisteredThreadMissTimeToLiveMilliseconds(
+  configuredUnregisteredThreadMissTimeToLiveMs: number | undefined
+): number {
+  const unregisteredThreadMissTimeToLiveMilliseconds = (
+    configuredUnregisteredThreadMissTimeToLiveMs
+    ?? DEFAULT_UNREGISTERED_THREAD_MISS_TIME_TO_LIVE_MILLISECONDS
+  );
+  if (
+    !Number.isInteger(unregisteredThreadMissTimeToLiveMilliseconds)
+    || unregisteredThreadMissTimeToLiveMilliseconds <= 0
+  ) {
+    throw new Error("ThreadAdapterResolver requires positive integer unregisteredThreadMissTimeToLiveMs");
+  }
+  return unregisteredThreadMissTimeToLiveMilliseconds;
+}
+
+function buildUnregisteredThreadMissingError(threadId: string): string {
+  return `Thread ${threadId} is not registered and could not be discovered. Refresh thread list and try again.`;
 }

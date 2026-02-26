@@ -1,6 +1,10 @@
 import { ThreadGroupSelectors } from "../DomainModel/ThreadGroupSelectors";
 import type { ThreadListItem } from "../DomainModel/ThreadGroupTypes";
 
+const THREAD_SIGNATURE_DELIMITER = "|";
+const EMPTY_THREAD_PATH_SIGNATURE_VALUE = "";
+const DEFAULT_UPDATED_AT_SIGNATURE_VALUE = 0;
+
 export interface ActiveThreadStateComputationInput {
   nextThreads: ThreadListItem[];
   previousUnreadThreadIdentifiers: Record<string, true>;
@@ -33,10 +37,16 @@ export interface UnreadThreadSelectionUpdateInput {
   selectedThreadIdentifier: string | null;
 }
 
+/**
+ * Owns thread-list signature and unread-state transitions.
+ * This owner keeps a compact previous-thread snapshot so list refreshes can detect changes
+ * and unread markers without re-reading cross-feature state.
+ */
 export class ThreadListStateStore {
   private activeThreadSignature: string[];
   private archivedThreadSignature: string[];
   private threadUpdatedAtByIdentifier: Record<string, number>;
+  // Guards first-load auto-selection so user-driven selection is not overwritten on later refreshes.
   private hasHydratedInitialThreadSelection: boolean;
 
   public constructor() {
@@ -135,15 +145,17 @@ export class ThreadListStateStore {
   }
 
   private buildThreadSignature(threads: ThreadListItem[]): string[] {
-    return threads.map((thread) =>
-      [
-        thread.id,
-        String(thread.updatedAt ?? 0),
-        thread.preview,
-        thread.agentId,
-        thread.cwd ?? "",
-        thread.path ?? ""
-      ].join("|")
-    );
+    return threads.map((thread) => this.buildThreadSignatureValue(thread));
+  }
+
+  private buildThreadSignatureValue(thread: ThreadListItem): string {
+    return [
+      thread.id,
+      String(thread.updatedAt ?? DEFAULT_UPDATED_AT_SIGNATURE_VALUE),
+      thread.preview,
+      thread.agentId,
+      thread.cwd ?? EMPTY_THREAD_PATH_SIGNATURE_VALUE,
+      thread.path ?? EMPTY_THREAD_PATH_SIGNATURE_VALUE
+    ].join(THREAD_SIGNATURE_DELIMITER);
   }
 }

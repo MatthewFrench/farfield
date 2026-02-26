@@ -9,6 +9,10 @@ import type {
   UserInputResponsePayload
 } from "@farfield/protocol";
 
+/**
+ * Owns canonical cross-adapter server contracts used by routing, thread ownership,
+ * and runtime composition modules.
+ */
 export type AgentId = "codex" | "opencode";
 
 export interface AgentCapabilities {
@@ -141,6 +145,15 @@ export interface AgentConfigDefaults {
   reasoningEffort: string | null;
 }
 
+export interface AgentSetCollaborationModeResult {
+  ownerClientId: string;
+}
+
+export interface AgentSubmitUserInputResult {
+  ownerClientId: string;
+  requestId: number;
+}
+
 export interface AgentAdapter {
   readonly id: AgentId;
   readonly label: string;
@@ -161,10 +174,8 @@ export interface AgentAdapter {
 
   listModels?(limit: number): Promise<AppServerListModelsResponse>;
   listCollaborationModes?(): Promise<AppServerCollaborationModeListResponse>;
-  setCollaborationMode?(input: AgentSetCollaborationModeInput): Promise<{ ownerClientId: string }>;
-  submitUserInput?(
-    input: AgentSubmitUserInputInput
-  ): Promise<{ ownerClientId: string; requestId: number }>;
+  setCollaborationMode?(input: AgentSetCollaborationModeInput): Promise<AgentSetCollaborationModeResult>;
+  submitUserInput?(input: AgentSubmitUserInputInput): Promise<AgentSubmitUserInputResult>;
   readLiveState?(threadId: string): Promise<AgentThreadLiveState>;
   readStreamEvents?(threadId: string, input: AgentReadStreamEventsInput): Promise<AgentThreadStreamEvents>;
   listProjectDirectories?(): Promise<string[]>;

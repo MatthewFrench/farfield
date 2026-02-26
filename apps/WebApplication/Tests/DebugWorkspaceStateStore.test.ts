@@ -51,6 +51,22 @@ describe("DebugWorkspaceStateStore", () => {
     expect(result).toBe(nextHistory);
   });
 
+  it("uses incoming history when first identifier changes even if tail matches", () => {
+    const store = new DebugWorkspaceStateStore();
+    const previousHistory = [
+      createHistoryEntry("history-1"),
+      createHistoryEntry("history-2")
+    ];
+    const nextHistory = [
+      createHistoryEntry("history-9"),
+      createHistoryEntry("history-2")
+    ];
+
+    const result = store.readNextHistory(previousHistory, nextHistory);
+
+    expect(result).toBe(nextHistory);
+  });
+
   it("detects changed debug error signatures", () => {
     const store = new DebugWorkspaceStateStore();
 

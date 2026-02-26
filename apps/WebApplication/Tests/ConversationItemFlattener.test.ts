@@ -109,4 +109,24 @@ describe("ConversationItemFlattener", () => {
 
     expect(flattened.map((item) => item.key)).toEqual(["context-compaction"]);
   });
+
+  it("does not flag completed turns as in-progress when generation flag is true", () => {
+    const flattener = new ConversationItemFlattener();
+    const turns: ConversationTurn[] = [
+      createTurn({
+        status: "completed",
+        items: [
+          {
+            id: "agent-visible",
+            type: "agentMessage",
+            text: "hello"
+          }
+        ]
+      })
+    ];
+
+    const flattened = flattener.flattenConversationItems(turns, true);
+
+    expect(flattened[0]?.turnIsInProgress).toBe(false);
+  });
 });

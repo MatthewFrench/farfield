@@ -1,31 +1,21 @@
+import type { AppServerCollaborationModeListResponse, ThreadConversationState } from "@farfield/protocol";
+
 export interface ModeSelectionState {
   modeKey: string;
   modelId: string;
   reasoningEffort: string;
 }
 
-export interface CollaborationModeOption {
-  mode?: string | null | undefined;
-  name: string;
-}
-
-export interface ModeSelectionConversationState {
-  latestCollaborationMode?: {
-    mode: string;
-    settings: {
-      model?: string | null | undefined;
-      reasoning_effort?: string | null | undefined;
-      developer_instructions?: string | null | undefined;
-    };
-  } | null | undefined;
-  latestModel?: string | null | undefined;
-  latestReasoningEffort?: string | null | undefined;
-}
+export type CollaborationModeOption = AppServerCollaborationModeListResponse["data"][number];
+export type ModeSelectionConversationState = Pick<
+  ThreadConversationState,
+  "latestCollaborationMode" | "latestModel" | "latestReasoningEffort"
+>;
 
 export class ModeSelectionStateResolver {
   public isPlanModeOption(mode: CollaborationModeOption): boolean {
-    const modeKey = typeof mode.mode === "string" ? mode.mode : "";
-    return modeKey.toLowerCase().includes("plan") || mode.name.toLowerCase().includes("plan");
+    const modeKey = (mode.mode ?? "").toLowerCase();
+    return modeKey.includes("plan") || mode.name.toLowerCase().includes("plan");
   }
 
   public buildModeSignature(modeKey: string, modelId: string, effort: string): string {
@@ -38,11 +28,7 @@ export class ModeSelectionStateResolver {
     appDefaultEffort: string
   ): ModeSelectionState {
     if (!state) {
-      return {
-        modeKey: "",
-        modelId: "",
-        reasoningEffort: ""
-      };
+      return this.readEmptyModeSelectionState();
     }
 
     if (state.latestCollaborationMode) {
@@ -79,8 +65,16 @@ export class ModeSelectionStateResolver {
     return this.buildModeSignature(selection.modeKey, selection.modelId, selection.reasoningEffort);
   }
 
+  private readEmptyModeSelectionState(): ModeSelectionState {
+    return {
+      modeKey: "",
+      modelId: "",
+      reasoningEffort: ""
+    };
+  }
+
   private normalizeNullableModeValue(value: string | null | undefined): string {
-    if (typeof value !== "string") {
+    if (value === null || value === undefined) {
       return "";
     }
     const normalized = value.trim();

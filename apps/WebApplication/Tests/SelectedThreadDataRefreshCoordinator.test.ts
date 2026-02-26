@@ -238,6 +238,63 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     });
   });
 
+  it("passes abort signals to live-state, stream-events, and read-thread reads", async () => {
+    const coordinator = new SelectedThreadDataRefreshCoordinator();
+    const abortController = new AbortController();
+    const chatClient = createChatClient({
+      readThread: vi.fn(async (threadId: string) => buildReadThreadSnapshot(threadId, [])),
+      readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId))
+    });
+
+    await coordinator.readSnapshot({
+      threadId: "thread-6",
+      includeTurns: false,
+      includeReadThread: true,
+      canReadLiveState: true,
+      canReadStreamEvents: true,
+      streamEventsSinceSequence: null,
+      chatClient,
+      signal: abortController.signal
+    });
+
+    expect(chatClient.readLiveState).toHaveBeenCalledWith("thread-6", {
+      signal: abortController.signal
+    });
+    expect(chatClient.readStreamEvents).toHaveBeenCalledWith("thread-6", {
+      signal: abortController.signal
+    });
+    expect(chatClient.readThread).toHaveBeenCalledWith("thread-6", {
+      includeTurns: false,
+      signal: abortController.signal
+    });
+  });
+
+  it("passes both stream cursor and abort signal to stream-event reads", async () => {
+    const coordinator = new SelectedThreadDataRefreshCoordinator();
+    const abortController = new AbortController();
+    const chatClient = createChatClient({
+      readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId))
+    });
+
+    await coordinator.readSnapshot({
+      threadId: "thread-7",
+      includeTurns: false,
+      includeReadThread: false,
+      canReadLiveState: true,
+      canReadStreamEvents: true,
+      streamEventsSinceSequence: 9,
+      chatClient,
+      signal: abortController.signal
+    });
+
+    expect(chatClient.readStreamEvents).toHaveBeenCalledWith("thread-7", {
+      sinceSequence: 9,
+      signal: abortController.signal
+    });
+  });
+
   it("throws non-transient read-thread errors without retrying", async () => {
     const waitDurations: number[] = [];
     const coordinator = new SelectedThreadDataRefreshCoordinator({

@@ -9,7 +9,12 @@ import {
 } from "@farfield/protocol";
 import { z } from "zod";
 import { parseBody } from "../RequestSchemas/HttpSchemas.js";
-import type { PushRouteDependencies } from "./PushRouteContracts.js";
+import {
+  PushRouteMethodByName,
+  PushRoutePathnameByName,
+  PushRouteSegmentByName,
+  type PushRouteDependencies
+} from "./PushRouteContracts.js";
 import { PushTestRouteOwner } from "./PushTestRouteOwner.js";
 
 const PushReceiptEventSchema = z.enum(["shown", "clicked", "error"]);
@@ -90,11 +95,11 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     withTimeout
   });
 
-  if (segments[0] !== "api" || segments[1] !== "push") {
+  if (segments[0] !== PushRouteSegmentByName.api || segments[1] !== PushRouteSegmentByName.push) {
     return false;
   }
 
-  if (req.method === "GET" && pathname === "/api/push/status") {
+  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.status) {
     jsonResponse(res, 200, {
       ok: true,
       enabled: pushService.isEnabled(),
@@ -105,7 +110,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     return true;
   }
 
-  if (req.method === "GET" && pathname === "/api/push/vapid-public-key") {
+  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.vapidPublicKey) {
     if (!pushService.isEnabled()) {
       jsonResponse(res, 503, {
         ok: false,
@@ -121,7 +126,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     return true;
   }
 
-  if (req.method === "GET" && pathname === "/api/push/receipts/latest") {
+  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.receiptsLatest) {
     jsonResponse(res, 200, {
       ok: true,
       latest: pushReceiptStore.getLatest(),
@@ -130,7 +135,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     return true;
   }
 
-  if (req.method === "POST" && pathname === "/api/push/receipts") {
+  if (req.method === PushRouteMethodByName.post && pathname === PushRoutePathnameByName.receipts) {
     const body = parseBody(CreatePushReceiptBodySchema, await readJsonBody(req));
     const event = PushReceiptEventSchema.parse(body.event);
     const normalizedBody: CreatePushReceiptBody = {
@@ -160,7 +165,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     return true;
   }
 
-  if (req.method === "GET" && pathname === "/api/push/sends/latest") {
+  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.sendsLatest) {
     jsonResponse(res, 200, {
       ok: true,
       latest: pushSendStore.getLatest()
@@ -168,17 +173,17 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     return true;
   }
 
-  if (req.method === "GET" && pathname === "/api/push/local-ca") {
+  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.localCa) {
     const available = fs.existsSync(pushLocalCaSourcePath);
     jsonResponse(res, 200, {
       ok: true,
       available,
-      downloadPath: available ? "/api/push/local-ca/download" : null
+      downloadPath: available ? PushRoutePathnameByName.localCaDownload : null
     });
     return true;
   }
 
-  if (req.method === "GET" && pathname === "/api/push/local-ca/download") {
+  if (req.method === PushRouteMethodByName.get && pathname === PushRoutePathnameByName.localCaDownload) {
     const fileName = path.basename(pushLocalCaSourcePath);
     try {
       await streamBinaryFileDownload(
@@ -205,7 +210,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     }
   }
 
-  if (req.method === "POST" && pathname === "/api/push/subscriptions") {
+  if (req.method === PushRouteMethodByName.post && pathname === PushRoutePathnameByName.subscriptions) {
     const body = parseBody(CreatePushSubscriptionBodySchema, await readJsonBody(req));
     const subscription = await pushMutationConcurrencyCoordinator.runExclusive(async () => {
       return pushStore.upsertSubscription(body.subscription, {
@@ -219,7 +224,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     return true;
   }
 
-  if (req.method === "DELETE" && pathname === "/api/push/subscriptions") {
+  if (req.method === PushRouteMethodByName.delete && pathname === PushRoutePathnameByName.subscriptions) {
     const body = parseBody(DeletePushSubscriptionBodySchema, await readJsonBody(req));
     const deleted = await pushMutationConcurrencyCoordinator.runExclusive(async () => {
       return pushStore.removeSubscriptionByEndpoint(body.endpoint);

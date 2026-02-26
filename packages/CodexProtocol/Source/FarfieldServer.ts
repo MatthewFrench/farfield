@@ -421,6 +421,8 @@ export const FarfieldRequestLifecycleStartedEventSchema = z
   })
   .strict();
 
+const FarfieldRequestLifecycleOutcomeSchema = z.enum(["success", "error"]);
+
 export const FarfieldRequestLifecycleCompletedEventSchema = z
   .object({
     phase: z.literal("completed"),
@@ -434,11 +436,17 @@ export const FarfieldRequestLifecycleCompletedEventSchema = z
     durationMs: z.number().nonnegative(),
     queueDelayMs: z.number().nonnegative(),
     completedAt: z.string().datetime(),
-    outcome: z.union([z.literal("success"), z.literal("error")])
+    outcome: FarfieldRequestLifecycleOutcomeSchema
   })
   .strict();
 
-export const FarfieldRequestLifecycleEventSchema = z.union([
+export const FarfieldRequestLifecycleEventSchema: z.ZodDiscriminatedUnion<
+  "phase",
+  [
+    typeof FarfieldRequestLifecycleStartedEventSchema,
+    typeof FarfieldRequestLifecycleCompletedEventSchema
+  ]
+> = z.discriminatedUnion("phase", [
   FarfieldRequestLifecycleStartedEventSchema,
   FarfieldRequestLifecycleCompletedEventSchema
 ]);

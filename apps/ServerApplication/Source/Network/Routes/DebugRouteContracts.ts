@@ -12,8 +12,43 @@ import type { ActivityHistoryService } from "../../Modules/Activity/ActivityHist
 import type { ClientErrorStore } from "../../Modules/Debugging/ClientErrorStore.js";
 import type { ServerObservabilitySnapshot } from "../ServerObservabilitySnapshotOwner.js";
 
+export const DebugRouteMethodByName = {
+  get: "GET",
+  post: "POST",
+  delete: "DELETE"
+} as const;
+
+export const DebugRoutePathnameByName = {
+  clientErrors: "/api/debug/client-errors",
+  clientErrorSessionLog: "/api/debug/client-errors/session-log",
+  history: "/api/debug/history",
+  observability: "/api/debug/observability",
+  replay: "/api/debug/replay",
+  traceStatus: "/api/debug/trace/status",
+  traceStart: "/api/debug/trace/start",
+  traceMark: "/api/debug/trace/mark",
+  traceStop: "/api/debug/trace/stop"
+} as const;
+
+export const DebugRouteSegmentByName = {
+  api: "api",
+  debug: "debug",
+  clientErrors: "client-errors",
+  history: "history",
+  trace: "trace",
+  download: "download"
+} as const;
+
+export const DebugReplayFrameTypeByName = {
+  request: "request",
+  broadcast: "broadcast"
+} as const;
+
+export type DebugReplayFrameType =
+  typeof DebugReplayFrameTypeByName[keyof typeof DebugReplayFrameTypeByName];
+
 export interface ParsedReplayFrame {
-  type: "request" | "broadcast";
+  type: DebugReplayFrameType;
   method: string;
   params: IpcRequestFrame["params"];
   targetClientId?: string;
@@ -56,6 +91,6 @@ export function readFileNameFromPath(filePath: string): string {
 export function buildSendRequestOptions(parsedReplayFrame: ParsedReplayFrame): SendRequestOptions {
   return {
     ...(parsedReplayFrame.targetClientId ? { targetClientId: parsedReplayFrame.targetClientId } : {}),
-    ...(typeof parsedReplayFrame.version === "number" ? { version: parsedReplayFrame.version } : {})
+    ...(parsedReplayFrame.version !== undefined ? { version: parsedReplayFrame.version } : {})
   };
 }

@@ -4,8 +4,9 @@ import {
 import {
   ThreadMemberReadRouteOwner
 } from "./ThreadMemberReadRouteOwner.js";
-import type {
-  ThreadMemberRouteDependencies
+import {
+  ThreadMemberRouteSegmentByName,
+  type ThreadMemberRouteDependencies
 } from "./ThreadMemberRouteContracts.js";
 
 export type { ThreadMemberRouteDependencies } from "./ThreadMemberRouteContracts.js";
@@ -15,7 +16,11 @@ export async function handleThreadMemberRoutes(
 ): Promise<boolean> {
   const { segments, resolveAdapterForThread, jsonResponse, res } = dependencies;
 
-  if (!(segments[0] === "api" && segments[1] === "threads" && segments[2])) {
+  if (
+    !(segments[0] === ThreadMemberRouteSegmentByName.api
+    && segments[1] === ThreadMemberRouteSegmentByName.threads
+    && segments[2])
+  ) {
     return false;
   }
 

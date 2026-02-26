@@ -4,7 +4,15 @@ import path from "node:path";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import {
+  FarfieldApiErrorResponseSchema,
+  FarfieldCreatePushSubscriptionEnvelopeSchema,
+  FarfieldDeletePushSubscriptionEnvelopeSchema,
+  FarfieldPushLocalCaStatusEnvelopeSchema,
+  FarfieldPushReceiptCreateEnvelopeSchema,
+  FarfieldPushReceiptLatestEnvelopeSchema,
+  FarfieldPushStatusEnvelopeSchema,
   FarfieldPushTestBodySchema,
+  FarfieldPushVapidPublicKeyEnvelopeSchema,
   type JsonValue,
   type PushNotificationPayload
 } from "@farfield/protocol";
@@ -23,6 +31,13 @@ interface RouteExecutionResult {
   handled: boolean;
   statusCode: number | null;
   body: object | null;
+}
+
+function readRouteBody(result: RouteExecutionResult): object {
+  if (!result.body) {
+    throw new Error("Expected route handler to produce a response body");
+  }
+  return result.body;
 }
 
 function createRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
@@ -158,7 +173,8 @@ describe("handlePushRoutes", () => {
 
       expect(statusResult.handled).toBe(true);
       expect(statusResult.statusCode).toBe(200);
-      expect(statusResult.body).toMatchObject({
+      const parsedStatusResponse = FarfieldPushStatusEnvelopeSchema.parse(readRouteBody(statusResult));
+      expect(parsedStatusResponse).toEqual({
         ok: true,
         enabled: false,
         permissionRequired: true,
@@ -180,7 +196,10 @@ describe("handlePushRoutes", () => {
 
       expect(disabledKeyResult.handled).toBe(true);
       expect(disabledKeyResult.statusCode).toBe(503);
-      expect(disabledKeyResult.body).toMatchObject({
+      const parsedDisabledPublicKeyResponse = FarfieldApiErrorResponseSchema.parse(
+        readRouteBody(disabledKeyResult)
+      );
+      expect(parsedDisabledPublicKeyResponse).toEqual({
         ok: false,
         error: "Push notifications are disabled"
       });
@@ -202,7 +221,10 @@ describe("handlePushRoutes", () => {
 
       expect(enabledKeyResult.handled).toBe(true);
       expect(enabledKeyResult.statusCode).toBe(200);
-      expect(enabledKeyResult.body).toMatchObject({
+      const parsedEnabledPublicKeyResponse = FarfieldPushVapidPublicKeyEnvelopeSchema.parse(
+        readRouteBody(enabledKeyResult)
+      );
+      expect(parsedEnabledPublicKeyResponse).toEqual({
         ok: true,
         publicKey: "PublicVapidKey"
       });
@@ -231,7 +253,7 @@ describe("handlePushRoutes", () => {
       const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
       pushSendStore.load();
       const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
-      const createdAt = new Date().toISOString();
+      const createdAt = "2026-02-26T00:00:00.000Z";
 
       const recordResult = await executePushRoute({
         method: "POST",
@@ -255,7 +277,10 @@ describe("handlePushRoutes", () => {
 
       expect(recordResult.handled).toBe(true);
       expect(recordResult.statusCode).toBe(200);
-      expect(recordResult.body).toMatchObject({ ok: true, recorded: true });
+      const parsedReceiptCreateResponse = FarfieldPushReceiptCreateEnvelopeSchema.parse(
+        readRouteBody(recordResult)
+      );
+      expect(parsedReceiptCreateResponse).toEqual({ ok: true, recorded: true });
       expect(pushReceiptStore.getCount()).toBe(1);
 
       const latestReceiptResult = await executePushRoute({
@@ -272,7 +297,10 @@ describe("handlePushRoutes", () => {
 
       expect(latestReceiptResult.handled).toBe(true);
       expect(latestReceiptResult.statusCode).toBe(200);
-      expect(latestReceiptResult.body).toMatchObject({
+      const parsedLatestReceiptResponse = FarfieldPushReceiptLatestEnvelopeSchema.parse(
+        readRouteBody(latestReceiptResult)
+      );
+      expect(parsedLatestReceiptResponse).toEqual({
         ok: true,
         count: 1,
         latest: {
@@ -326,12 +354,14 @@ describe("handlePushRoutes", () => {
 
       expect(localCaStatusResult.handled).toBe(true);
       expect(localCaStatusResult.statusCode).toBe(200);
-      expect(localCaStatusResult.body).toMatchObject({
+      const parsedLocalCaStatusResponse = FarfieldPushLocalCaStatusEnvelopeSchema.parse(
+        readRouteBody(localCaStatusResult)
+      );
+      expect(parsedLocalCaStatusResponse).toEqual({
         ok: true,
         available: false,
         downloadPath: null
       });
-      expect(localCaStatusResult.body).not.toHaveProperty("sourcePath");
 
       const missingDownloadResult = await executePushRoute({
         method: "GET",
@@ -347,7 +377,10 @@ describe("handlePushRoutes", () => {
 
       expect(missingDownloadResult.handled).toBe(true);
       expect(missingDownloadResult.statusCode).toBe(404);
-      expect(missingDownloadResult.body).toMatchObject({
+      const parsedMissingDownloadResponse = FarfieldApiErrorResponseSchema.parse(
+        readRouteBody(missingDownloadResult)
+      );
+      expect(parsedMissingDownloadResponse).toEqual({
         ok: false,
         error: "Local Caddy root certificate not found"
       });
@@ -402,7 +435,11 @@ describe("handlePushRoutes", () => {
 
       expect(createResult.handled).toBe(true);
       expect(createResult.statusCode).toBe(200);
-      expect(createResult.body).toMatchObject({ ok: true });
+      const parsedCreateSubscriptionResponse = FarfieldCreatePushSubscriptionEnvelopeSchema.parse(
+        readRouteBody(createResult)
+      );
+      expect(parsedCreateSubscriptionResponse.ok).toBe(true);
+      expect(parsedCreateSubscriptionResponse.subscriptionId.length).toBeGreaterThan(0);
       expect(pushStore.getSubscriptionCount()).toBe(1);
 
       const deleteResult = await executePushRoute({
@@ -421,7 +458,10 @@ describe("handlePushRoutes", () => {
 
       expect(deleteResult.handled).toBe(true);
       expect(deleteResult.statusCode).toBe(200);
-      expect(deleteResult.body).toMatchObject({ ok: true, deleted: true });
+      const parsedDeleteSubscriptionResponse = FarfieldDeletePushSubscriptionEnvelopeSchema.parse(
+        readRouteBody(deleteResult)
+      );
+      expect(parsedDeleteSubscriptionResponse).toEqual({ ok: true, deleted: true });
       expect(pushStore.getSubscriptionCount()).toBe(0);
     } finally {
       fs.rmSync(temporaryDirectory, { recursive: true, force: true });

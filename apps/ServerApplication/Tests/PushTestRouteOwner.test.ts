@@ -9,7 +9,7 @@ import {
   type PushNotificationPayload
 } from "@farfield/protocol";
 import { describe, expect, it, vi } from "vitest";
-import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
+import { PushService, type PushSendResult } from "../Source/Modules/PushNotifications/PushService.js";
 import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
 import { PushSendStore } from "../Source/Modules/PushNotifications/PushSendStore.js";
 import { PushMutationConcurrencyCoordinator } from "../Source/Network/PushMutationConcurrencyCoordinator.js";
@@ -108,31 +108,28 @@ describe("PushTestRouteOwner", () => {
       });
       vi.spyOn(pushService, "isEnabled").mockReturnValue(true);
 
-      const privateDeferred = createDeferred<{
-        attempted: number;
-        delivered: number;
-        failures: [];
-        prunedEndpoints: [];
-      }>();
-      const detailedDeferred = createDeferred<{
-        attempted: number;
-        delivered: number;
-        failures: [];
-        prunedEndpoints: [];
-      }>();
+      const privateDeferred = createDeferred<PushSendResult>();
+      const detailedDeferred = createDeferred<PushSendResult>();
+      const privateDispatchStarted = createDeferred<void>();
+      const detailedDispatchStarted = createDeferred<void>();
+      let privateDispatchObserved = false;
+      let detailedDispatchObserved = false;
       const sendToSubscriptionsSpy = vi.spyOn(pushService, "sendToSubscriptions").mockImplementation(
-        async (subscriptions): Promise<{
-          attempted: number;
-          delivered: number;
-          failures: [];
-          prunedEndpoints: [];
-        }> => {
+        async (subscriptions): Promise<PushSendResult> => {
           const firstSubscription = subscriptions[0];
           if (!firstSubscription) {
             throw new Error("Expected at least one subscription for push send");
           }
           if (firstSubscription.settings.privateMode) {
+            if (!privateDispatchObserved) {
+              privateDispatchObserved = true;
+              privateDispatchStarted.resolve();
+            }
             return privateDeferred.promise;
+          }
+          if (!detailedDispatchObserved) {
+            detailedDispatchObserved = true;
+            detailedDispatchStarted.resolve();
           }
           return detailedDeferred.promise;
         }
@@ -173,17 +170,7 @@ describe("PushTestRouteOwner", () => {
         pathname: "/api/push/test"
       });
 
-      const pollStartTime = Date.now();
-      while (sendToSubscriptionsSpy.mock.calls.length < 2) {
-        if (Date.now() - pollStartTime > 1_000) {
-          throw new Error(
-            `Spy was called ${String(sendToSubscriptionsSpy.mock.calls.length)} times; expected 2`
-          );
-        }
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 5);
-        });
-      }
+      await Promise.all([privateDispatchStarted.promise, detailedDispatchStarted.promise]);
       expect(timeoutLabels).toEqual([
         "push-test-send:private",
         "push-test-send:detailed"
@@ -258,18 +245,8 @@ describe("PushTestRouteOwner", () => {
         vapidSubject: "mailto:test@example.com"
       });
       vi.spyOn(pushService, "isEnabled").mockReturnValue(true);
-      vi.spyOn(pushService, "sendToSubscriptions").mockImplementation(async (): Promise<{
-        attempted: number;
-        delivered: number;
-        failures: [];
-        prunedEndpoints: [];
-      }> => {
-        return new Promise<{
-          attempted: number;
-          delivered: number;
-          failures: [];
-          prunedEndpoints: [];
-        }>(() => {
+      vi.spyOn(pushService, "sendToSubscriptions").mockImplementation(async (): Promise<PushSendResult> => {
+        return new Promise<PushSendResult>(() => {
           // Intentionally unresolved to verify timeout propagation.
         });
       });

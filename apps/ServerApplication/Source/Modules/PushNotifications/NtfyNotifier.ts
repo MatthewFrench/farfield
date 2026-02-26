@@ -2,6 +2,19 @@ import { z } from "zod";
 
 const NtfyEnabledSchema = z.enum(["0", "1", "false", "true"]);
 const NtfyPrioritySchema = z.enum(["1", "2", "3", "4", "5"]);
+const DEFAULT_NTFY_ENABLED = "false";
+const DEFAULT_NTFY_PRIORITY = "3";
+const DEFAULT_NTFY_BASE_URL = "https://ntfy.sh";
+const DEFAULT_NOTIFICATION_BODY = "Response ready.";
+const DEFAULT_NOTIFICATION_PROJECT_TITLE = "No project";
+const DEFAULT_NOTIFICATION_THREAD_TITLE = "Thread";
+const NOTIFICATION_TITLE_SEPARATOR = " - ";
+const NOTIFICATION_BODY_MAXIMUM_CHARACTERS = 3_000;
+const NOTIFICATION_BODY_TRUNCATED_SUFFIX = "...";
+const NOTIFICATION_BODY_PREVIEW_CHARACTERS =
+  NOTIFICATION_BODY_MAXIMUM_CHARACTERS - NOTIFICATION_BODY_TRUNCATED_SUFFIX.length;
+const NTFY_TAGS_HEADER_VALUE = "white_check_mark,robot_face";
+const NTFY_CONTENT_TYPE_HEADER_VALUE = "text/plain; charset=utf-8";
 
 const RawNtfyEnvSchema = z
   .object({
@@ -60,35 +73,37 @@ function normalizeOptionalString(value: string | undefined): string | null {
 }
 
 function normalizeEnabledValue(value: string | undefined): boolean {
-  const normalized = (value ?? "false").trim().toLowerCase();
+  const normalized = (value ?? DEFAULT_NTFY_ENABLED).trim().toLowerCase();
   const parsed = NtfyEnabledSchema.parse(normalized);
   return parsed === "1" || parsed === "true";
 }
 
 function normalizePriorityValue(value: string | undefined): z.infer<typeof NtfyPrioritySchema> {
-  return NtfyPrioritySchema.parse((value ?? "3").trim());
+  return NtfyPrioritySchema.parse((value ?? DEFAULT_NTFY_PRIORITY).trim());
 }
 
 function normalizeBaseUrl(value: string | undefined): string {
-  const normalized = normalizeOptionalString(value) ?? "https://ntfy.sh";
+  const normalized = normalizeOptionalString(value) ?? DEFAULT_NTFY_BASE_URL;
   return z.string().url().parse(normalized);
 }
 
 function buildNotificationTitle(payload: NtfyThreadCompletedPayload): string {
   const projectName = payload.projectName.trim();
   const threadName = payload.threadName.trim();
-  const normalizedProjectName = projectName.length > 0 ? projectName : "No project";
-  const normalizedThreadName = threadName.length > 0 ? threadName : "Thread";
-  return `${normalizedProjectName} - ${normalizedThreadName}`;
+  const normalizedProjectName =
+    projectName.length > 0 ? projectName : DEFAULT_NOTIFICATION_PROJECT_TITLE;
+  const normalizedThreadName =
+    threadName.length > 0 ? threadName : DEFAULT_NOTIFICATION_THREAD_TITLE;
+  return `${normalizedProjectName}${NOTIFICATION_TITLE_SEPARATOR}${normalizedThreadName}`;
 }
 
 function buildNotificationBody(payload: NtfyThreadCompletedPayload): string {
   const agentText = payload.agentText.trim();
-  const body = agentText.length > 0 ? agentText : "Response ready.";
-  if (body.length <= 3_000) {
+  const body = agentText.length > 0 ? agentText : DEFAULT_NOTIFICATION_BODY;
+  if (body.length <= NOTIFICATION_BODY_MAXIMUM_CHARACTERS) {
     return body;
   }
-  return `${body.slice(0, 2_997)}...`;
+  return `${body.slice(0, NOTIFICATION_BODY_PREVIEW_CHARACTERS)}${NOTIFICATION_BODY_TRUNCATED_SUFFIX}`;
 }
 
 export function parseNtfyConfigFromEnv(env: NodeJS.ProcessEnv): NtfyConfig {
@@ -150,8 +165,8 @@ export class NtfyNotifier {
         ...(this.config.bearerToken ? { Authorization: `Bearer ${this.config.bearerToken}` } : {}),
         Title: buildNotificationTitle(payload),
         Priority: this.config.priority,
-        Tags: "white_check_mark,robot_face",
-        "Content-Type": "text/plain; charset=utf-8"
+        Tags: NTFY_TAGS_HEADER_VALUE,
+        "Content-Type": NTFY_CONTENT_TYPE_HEADER_VALUE
       },
       body: buildNotificationBody(payload)
     });

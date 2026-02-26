@@ -1,6 +1,29 @@
-import { describe, expect, it, vi } from "vitest";
-import type { ThreadConversationState } from "@farfield/protocol";
-import { CodexMonitorService } from "../Source/Service.js";
+import { describe, expect, it, vi, type Mock } from "vitest";
+import {
+  IpcResponseFrameSchema,
+  type IpcResponseFrame,
+  type JsonValue,
+  type ThreadConversationState,
+  type TurnStartParams
+} from "@farfield/protocol";
+import {
+  CodexMonitorService,
+  type CodexMonitorIpcClient,
+  type ThreadFollowerRequestOptions
+} from "../Source/Service.js";
+
+type SendRequestAndWaitFunction = (
+  method: string,
+  params: JsonValue,
+  options: ThreadFollowerRequestOptions
+) => Promise<IpcResponseFrame>;
+
+type SendRequestAndWaitMock = Mock<SendRequestAndWaitFunction>;
+
+interface ServiceIpcClientDouble {
+  ipcClient: CodexMonitorIpcClient;
+  sendRequestAndWait: SendRequestAndWaitMock;
+}
 
 function createThread(): ThreadConversationState {
   return {
@@ -20,49 +43,72 @@ function createThread(): ThreadConversationState {
   };
 }
 
+function createIpcSuccessResponse(): IpcResponseFrame {
+  return IpcResponseFrameSchema.parse({
+    type: "response",
+    requestId: "request-1",
+    resultType: "success",
+    result: {}
+  });
+}
+
+function createServiceIpcClientDouble(): ServiceIpcClientDouble {
+  const sendRequestAndWait: SendRequestAndWaitMock = vi.fn<SendRequestAndWaitFunction>();
+  sendRequestAndWait.mockResolvedValue(createIpcSuccessResponse());
+
+  const ipcClient: CodexMonitorIpcClient = {
+    sendRequestAndWait
+  };
+
+  return {
+    ipcClient,
+    sendRequestAndWait
+  };
+}
+
+function requireTurnStartTemplate(
+  thread: ThreadConversationState
+): TurnStartParams {
+  const template = thread.turns[0]?.params;
+  if (!template) {
+    throw new Error("Expected turn start template");
+  }
+  return template;
+}
+
 describe("CodexMonitorService", () => {
   it("sends message using strict thread template", async () => {
-    const ipcClient = {
-      sendRequestAndWait: vi.fn().mockResolvedValue({ type: "response", requestId: 1 })
-    };
-
-    const service = new CodexMonitorService(ipcClient as never);
+    const serviceIpcClientDouble = createServiceIpcClientDouble();
+    const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
 
     await service.sendMessage({
       threadId: "thread-1",
       ownerClientId: "client-1",
       text: "new message",
-      turnStartTemplate: createThread().turns[0]?.params as NonNullable<
-        ThreadConversationState["turns"][number]["params"]
-      >
+      turnStartTemplate: requireTurnStartTemplate(createThread())
     });
 
-    expect(ipcClient.sendRequestAndWait).toHaveBeenCalledWith(
+    expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
       "thread-follower-start-turn",
       expect.objectContaining({
         conversationId: "thread-1"
       }),
-      expect.objectContaining({
+      {
         targetClientId: "client-1",
         version: 1
-      })
+      }
     );
   });
 
   it("overrides template mode and model when provided", async () => {
-    const ipcClient = {
-      sendRequestAndWait: vi.fn().mockResolvedValue({ type: "response", requestId: 1 })
-    };
-
-    const service = new CodexMonitorService(ipcClient as never);
+    const serviceIpcClientDouble = createServiceIpcClientDouble();
+    const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
 
     await service.sendMessage({
       threadId: "thread-1",
       ownerClientId: "client-1",
       text: "new message",
-      turnStartTemplate: createThread().turns[0]?.params as NonNullable<
-        ThreadConversationState["turns"][number]["params"]
-      >,
+      turnStartTemplate: requireTurnStartTemplate(createThread()),
       model: "gpt-5.3-codex",
       effort: "high",
       collaborationMode: {
@@ -75,7 +121,7 @@ describe("CodexMonitorService", () => {
       }
     });
 
-    expect(ipcClient.sendRequestAndWait).toHaveBeenCalledWith(
+    expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
       "thread-follower-start-turn",
       expect.objectContaining({
         turnStartParams: expect.objectContaining({
@@ -91,11 +137,8 @@ describe("CodexMonitorService", () => {
   });
 
   it("sends message without a template when none is available", async () => {
-    const ipcClient = {
-      sendRequestAndWait: vi.fn().mockResolvedValue({ type: "response", requestId: 1 })
-    };
-
-    const service = new CodexMonitorService(ipcClient as never);
+    const serviceIpcClientDouble = createServiceIpcClientDouble();
+    const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
 
     await service.sendMessage({
       threadId: "thread-1",
@@ -104,7 +147,7 @@ describe("CodexMonitorService", () => {
       cwd: "/tmp/project"
     });
 
-    expect(ipcClient.sendRequestAndWait).toHaveBeenCalledWith(
+    expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
       "thread-follower-start-turn",
       expect.objectContaining({
         conversationId: "thread-1",
@@ -123,8 +166,51 @@ describe("CodexMonitorService", () => {
     );
   });
 
+  it("rejects empty message text before sending IPC requests", async () => {
+    const serviceIpcClientDouble = createServiceIpcClientDouble();
+    const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
+
+    await expect(
+      service.sendMessage({
+        threadId: "thread-1",
+        ownerClientId: "client-1",
+        text: "   "
+      })
+    ).rejects.toThrowError("Message text is required");
+
+    expect(serviceIpcClientDouble.sendRequestAndWait).not.toHaveBeenCalled();
+  });
+
+  it("sends collaboration mode updates to the owner client", async () => {
+    const serviceIpcClientDouble = createServiceIpcClientDouble();
+    const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
+
+    await service.setCollaborationMode({
+      threadId: "thread-1",
+      ownerClientId: "client-1",
+      collaborationMode: {
+        mode: "plan"
+      }
+    });
+
+    expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
+      "thread-follower-set-collaboration-mode",
+      expect.objectContaining({
+        conversationId: "thread-1",
+        collaborationMode: expect.objectContaining({
+          mode: "plan"
+        })
+      }),
+      {
+        targetClientId: "client-1",
+        version: 1
+      }
+    );
+  });
+
   it("submits user input with validated payload", async () => {
-    const service = new CodexMonitorService({ sendRequestAndWait: vi.fn().mockResolvedValue({}) } as never);
+    const serviceIpcClientDouble = createServiceIpcClientDouble();
+    const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
 
     await service.submitUserInput({
       threadId: "thread-1",
@@ -139,6 +225,64 @@ describe("CodexMonitorService", () => {
       }
     });
 
-    expect(true).toBe(true);
+    expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
+      "thread-follower-submit-user-input",
+      expect.objectContaining({
+        conversationId: "thread-1",
+        requestId: 7,
+        response: {
+          answers: {
+            q1: {
+              answers: ["Option A"]
+            }
+          }
+        }
+      }),
+      {
+        targetClientId: "client-1",
+        version: 1
+      }
+    );
+  });
+
+  it("sends interrupt requests to the current owner client", async () => {
+    const serviceIpcClientDouble = createServiceIpcClientDouble();
+    const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
+
+    await service.interrupt({
+      threadId: "thread-1",
+      ownerClientId: "client-1"
+    });
+
+    expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
+      "thread-follower-interrupt-turn",
+      expect.objectContaining({
+        conversationId: "thread-1"
+      }),
+      {
+        targetClientId: "client-1",
+        version: 1
+      }
+    );
+  });
+
+  it("rejects invalid user input payloads", async () => {
+    const serviceIpcClientDouble = createServiceIpcClientDouble();
+    const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
+
+    await expect(
+      service.submitUserInput({
+        threadId: "thread-1",
+        ownerClientId: "client-1",
+        requestId: 7,
+        response: {
+          answers: {
+            q1: {
+              freeResponse: ""
+            }
+          }
+        }
+      })
+    ).rejects.toThrowError(/did not match expected schema/i);
   });
 });

@@ -132,4 +132,29 @@ describe("SelectedThreadRefreshConcurrencyCoordinator", () => {
       })
     ]);
   });
+
+  it("normalizes non-Error refresh failures into Error instances", async () => {
+    const coordinator = new SelectedThreadRefreshConcurrencyCoordinator();
+
+    try {
+      await coordinator.run({
+        request: createRefreshRequest({
+          threadId: "thread-1",
+          includeTurns: true,
+          includeReadThread: true
+        }),
+        executeRefresh: async () => {
+          throw "refresh failed";
+        },
+        isCanceledError: isCanceledRefreshError
+      });
+      throw new Error("Expected coordinator.run to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      if (!(error instanceof Error)) {
+        throw new Error("Expected error to be an Error instance");
+      }
+      expect(error.message).toBe("refresh failed");
+    }
+  });
 });

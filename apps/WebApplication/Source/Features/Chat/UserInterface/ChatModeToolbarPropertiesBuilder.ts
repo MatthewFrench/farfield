@@ -6,6 +6,12 @@ interface ModeDraftInput {
   reasoningEffort: string;
 }
 
+interface ModeDraftOverrides {
+  modeKey?: string;
+  modelId?: string;
+  reasoningEffort?: string;
+}
+
 interface PlanModeOption {
   mode?: string | null | undefined;
 }
@@ -34,8 +40,14 @@ export interface BuildChatModeToolbarPropertiesInput {
   onApplyModeDraft: (draft: ModeDraftInput) => void;
 }
 
+const EMPTY_MODE_KEY = "";
+
 export class ChatModeToolbarPropertiesBuilder {
   public build(input: BuildChatModeToolbarPropertiesInput): ChatModeToolbarProps {
+    const applyModeDraft = (modeDraftOverrides: ModeDraftOverrides): void => {
+      input.onApplyModeDraft(this.buildModeDraft(input, modeDraftOverrides));
+    };
+
     return {
       canSetCollaborationMode: input.canSetCollaborationMode,
       canListCollaborationModes: input.canListCollaborationModes,
@@ -54,35 +66,39 @@ export class ChatModeToolbarPropertiesBuilder {
       isModeSyncing: input.isModeSyncing,
       pendingRequestCount: input.pendingRequestCount,
       onTogglePlanMode: () => {
-        const nextModeKey = input.isPlanModeEnabled
-          ? (input.defaultModeKey ?? input.selectedModeKey)
-          : (input.planModeOption?.mode ?? "");
+        const nextModeKey = this.readNextModeKeyForPlanToggle(input);
         if (!nextModeKey) {
           return;
         }
         input.onSetSelectedModeKey(nextModeKey);
-        input.onApplyModeDraft({
-          modeKey: nextModeKey,
-          modelId: input.selectedModelId,
-          reasoningEffort: input.selectedReasoningEffort
-        });
+        applyModeDraft({ modeKey: nextModeKey });
       },
       onModelChange: (nextModelId) => {
         input.onSetSelectedModelId(nextModelId);
-        input.onApplyModeDraft({
-          modeKey: input.selectedModeKey,
-          modelId: nextModelId,
-          reasoningEffort: input.selectedReasoningEffort
-        });
+        applyModeDraft({ modelId: nextModelId });
       },
       onReasoningEffortChange: (nextReasoningEffort) => {
         input.onSetSelectedReasoningEffort(nextReasoningEffort);
-        input.onApplyModeDraft({
-          modeKey: input.selectedModeKey,
-          modelId: input.selectedModelId,
-          reasoningEffort: nextReasoningEffort
-        });
+        applyModeDraft({ reasoningEffort: nextReasoningEffort });
       }
+    };
+  }
+
+  private readNextModeKeyForPlanToggle(input: BuildChatModeToolbarPropertiesInput): string {
+    if (input.isPlanModeEnabled) {
+      return input.defaultModeKey ?? input.selectedModeKey;
+    }
+    return input.planModeOption?.mode ?? EMPTY_MODE_KEY;
+  }
+
+  private buildModeDraft(
+    input: BuildChatModeToolbarPropertiesInput,
+    modeDraftOverrides: ModeDraftOverrides
+  ): ModeDraftInput {
+    return {
+      modeKey: modeDraftOverrides.modeKey ?? input.selectedModeKey,
+      modelId: modeDraftOverrides.modelId ?? input.selectedModelId,
+      reasoningEffort: modeDraftOverrides.reasoningEffort ?? input.selectedReasoningEffort
     };
   }
 }

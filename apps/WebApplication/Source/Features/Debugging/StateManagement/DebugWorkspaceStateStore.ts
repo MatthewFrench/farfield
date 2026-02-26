@@ -1,16 +1,14 @@
 import type { DebugWorkspaceDataSnapshot } from "./DebugWorkspaceDataReader";
 
 type DebugHistoryEntries = DebugWorkspaceDataSnapshot["history"];
+const FIRST_COLLECTION_INDEX = 0;
 
 export class DebugWorkspaceStateStore {
   public readNextHistory(
     previousHistory: DebugHistoryEntries,
     nextHistory: DebugHistoryEntries
   ): DebugHistoryEntries {
-    if (
-      previousHistory.length === nextHistory.length
-      && previousHistory[previousHistory.length - 1]?.id === nextHistory[nextHistory.length - 1]?.id
-    ) {
+    if (this.readHistoryCollectionIdentifiersMatch(previousHistory, nextHistory)) {
       return previousHistory;
     }
     return nextHistory;
@@ -21,6 +19,37 @@ export class DebugWorkspaceStateStore {
     nextSignature: readonly string[]
   ): boolean {
     return !this.readSignaturesMatch(previousSignature, nextSignature);
+  }
+
+  private readHistoryCollectionIdentifiersMatch(
+    previousHistory: DebugHistoryEntries,
+    nextHistory: DebugHistoryEntries
+  ): boolean {
+    if (previousHistory.length !== nextHistory.length) {
+      return false;
+    }
+
+    if (previousHistory.length === 0) {
+      return true;
+    }
+
+    const previousFirstHistoryEntryIdentifier = previousHistory[FIRST_COLLECTION_INDEX]?.id ?? null;
+    const nextFirstHistoryEntryIdentifier = nextHistory[FIRST_COLLECTION_INDEX]?.id ?? null;
+    const previousLastHistoryEntryIdentifier = previousHistory[previousHistory.length - 1]?.id ?? null;
+    const nextLastHistoryEntryIdentifier = nextHistory[nextHistory.length - 1]?.id ?? null;
+    if (
+      previousFirstHistoryEntryIdentifier === null
+      || nextFirstHistoryEntryIdentifier === null
+      || previousLastHistoryEntryIdentifier === null
+      || nextLastHistoryEntryIdentifier === null
+    ) {
+      return false;
+    }
+
+    return (
+      previousFirstHistoryEntryIdentifier === nextFirstHistoryEntryIdentifier
+      && previousLastHistoryEntryIdentifier === nextLastHistoryEntryIdentifier
+    );
   }
 
   private readSignaturesMatch(

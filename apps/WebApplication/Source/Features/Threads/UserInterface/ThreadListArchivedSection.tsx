@@ -2,6 +2,10 @@ import { Archive, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
 import { Button } from "@/Components/UserInterface/Button";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
+import {
+  THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER,
+  THREAD_GROUP_NO_PROJECT_TOOLTIP
+} from "@/Features/Threads/UserInterface/ThreadListUserInterfaceConstants";
 
 interface ThreadListArchivedSectionProps {
   properties: ThreadListPaneProperties;
@@ -69,7 +73,7 @@ export function ThreadListArchivedSection({
                   ) : (
                     <ChevronDown size={13} className="shrink-0" />
                   )}
-                  <span className="flex-1 truncate" title={group.projectPath ?? "No project"}>
+                  <span className="flex-1 truncate" title={group.projectPath ?? THREAD_GROUP_NO_PROJECT_TOOLTIP}>
                     {group.label}
                   </span>
                   {group.isRemoved && (
@@ -83,7 +87,8 @@ export function ThreadListArchivedSection({
                   <div className="space-y-1 pl-4">
                     {group.threads.map((thread) => {
                       const isArchivedThread = properties.archivedThreadIds.has(thread.id);
-                      const canUnarchive = isArchivedThread && thread.agentId === "codex";
+                      const canUnarchive = isArchivedThread
+                        && thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
                       return (
                         <div
                           key={thread.id}

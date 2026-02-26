@@ -56,6 +56,28 @@ describe("DebugWorkspaceActionCoordinator", () => {
     expect(onHistoryDetailLoaded).toHaveBeenCalledWith(null);
   });
 
+  it("treats whitespace history identifiers as empty selections", async () => {
+    const coordinator = new DebugWorkspaceActionCoordinator();
+    const debugClient = {
+      readHistoryEntry: vi.fn(async () => buildHistoryDetail("entry-1")),
+      clearClientErrors: vi.fn(async () => buildClearClientErrorsResponse()),
+      replayHistoryEntry: vi.fn(async () => ({})),
+      startTrace: vi.fn(async () => {}),
+      markTrace: vi.fn(async () => {}),
+      stopTrace: vi.fn(async () => {})
+    };
+    const onHistoryDetailLoaded = vi.fn();
+
+    await coordinator.loadHistoryDetail({
+      historyEntryId: "   ",
+      debugClient,
+      onHistoryDetailLoaded
+    });
+
+    expect(debugClient.readHistoryEntry).not.toHaveBeenCalled();
+    expect(onHistoryDetailLoaded).toHaveBeenCalledWith(null);
+  });
+
   it("loads and applies history detail for selected history entry", async () => {
     const coordinator = new DebugWorkspaceActionCoordinator();
     const detail = buildHistoryDetail("entry-9");

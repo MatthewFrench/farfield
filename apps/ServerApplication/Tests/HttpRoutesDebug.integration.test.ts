@@ -16,6 +16,24 @@ import {
   HttpRoutesIntegrationEnvironment
 } from "./HttpRoutesIntegrationEnvironment";
 
+const DebugClientErrorsRoutePath = "/api/debug/client-errors";
+const DebugClientErrorsSessionLogRoutePath = "/api/debug/client-errors/session-log";
+const DebugHistoryRoutePathPrefix = "/api/debug/history";
+const DebugTraceRoutePathPrefix = "/api/debug/trace";
+const DebugObservabilityRoutePath = "/api/debug/observability";
+const DebugClientErrorsListLimit = 20;
+const JsonContentTypeHeaderName = "Content-Type";
+const JsonContentTypeHeaderValue = "application/json";
+const MalformedIdentifier = "%E0%A4%A";
+
+function buildDebugClientErrorListRouteUrl(
+  integrationEnvironment: HttpRoutesIntegrationEnvironment
+): string {
+  const url = new URL(integrationEnvironment.buildApiRouteUrl(DebugClientErrorsRoutePath));
+  url.searchParams.set("limit", String(DebugClientErrorsListLimit));
+  return url.toString();
+}
+
 describe("server route integration debug routes", () => {
   const integrationEnvironment = new HttpRoutesIntegrationEnvironment();
 
@@ -28,7 +46,6 @@ describe("server route integration debug routes", () => {
   });
 
   it("supports debug client-error contracts", async () => {
-    const baseUrl = integrationEnvironment.readBaseUrl();
     const authHeaders = integrationEnvironment.readAuthHeaders();
 
     const createBody = CreateDebugClientErrorBodySchema.parse({
@@ -40,18 +57,18 @@ describe("server route integration debug routes", () => {
       }
     });
 
-    const createResponse = await fetch(`${baseUrl}/api/debug/client-errors`, {
+    const createResponse = await fetch(integrationEnvironment.buildApiRouteUrl(DebugClientErrorsRoutePath), {
       method: "POST",
       headers: {
         ...authHeaders,
-        "Content-Type": "application/json"
+        [JsonContentTypeHeaderName]: JsonContentTypeHeaderValue
       },
       body: JSON.stringify(createBody)
     });
     expect(createResponse.status).toBe(200);
     const created = DebugErrorCreateEnvelopeSchema.parse(await createResponse.json());
 
-    const listResponse = await fetch(`${baseUrl}/api/debug/client-errors?limit=20`, {
+    const listResponse = await fetch(buildDebugClientErrorListRouteUrl(integrationEnvironment), {
       headers: authHeaders
     });
     expect(listResponse.status).toBe(200);
@@ -61,7 +78,9 @@ describe("server route integration debug routes", () => {
     expect(listedEvent?.severity).toBe("error");
 
     const detailResponse = await fetch(
-      `${baseUrl}/api/debug/client-errors/${encodeURIComponent(created.errorId)}`,
+      integrationEnvironment.buildApiRouteUrl(
+        `${DebugClientErrorsRoutePath}/${encodeURIComponent(created.errorId)}`
+      ),
       {
         headers: authHeaders
       }
@@ -70,14 +89,17 @@ describe("server route integration debug routes", () => {
     const detail = DebugErrorDetailEnvelopeSchema.parse(await detailResponse.json());
     expect(detail.error.errorId).toBe(created.errorId);
 
-    const sessionLogResponse = await fetch(`${baseUrl}/api/debug/client-errors/session-log`, {
-      headers: authHeaders
-    });
+    const sessionLogResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(DebugClientErrorsSessionLogRoutePath),
+      {
+        headers: authHeaders
+      }
+    );
     expect(sessionLogResponse.status).toBe(200);
     const sessionLog = await sessionLogResponse.text();
     expect(sessionLog.includes(created.errorId)).toBe(true);
 
-    const clearResponse = await fetch(`${baseUrl}/api/debug/client-errors`, {
+    const clearResponse = await fetch(integrationEnvironment.buildApiRouteUrl(DebugClientErrorsRoutePath), {
       method: "DELETE",
       headers: authHeaders
     });
@@ -85,7 +107,7 @@ describe("server route integration debug routes", () => {
     const cleared = DebugErrorClearEnvelopeSchema.parse(await clearResponse.json());
     expect(cleared.clearedCount).toBeGreaterThanOrEqual(1);
 
-    const listAfterClearResponse = await fetch(`${baseUrl}/api/debug/client-errors?limit=20`, {
+    const listAfterClearResponse = await fetch(buildDebugClientErrorListRouteUrl(integrationEnvironment), {
       headers: authHeaders
     });
     expect(listAfterClearResponse.status).toBe(200);
@@ -94,12 +116,12 @@ describe("server route integration debug routes", () => {
   });
 
   it("returns 400 for malformed debug identifier segments", async () => {
-    const baseUrl = integrationEnvironment.readBaseUrl();
     const authHeaders = integrationEnvironment.readAuthHeaders();
-    const malformedIdentifier = "%E0%A4%A";
 
     const malformedClientErrorResponse = await fetch(
-      `${baseUrl}/api/debug/client-errors/${malformedIdentifier}`,
+      integrationEnvironment.buildApiRouteUrl(
+        `${DebugClientErrorsRoutePath}/${MalformedIdentifier}`
+      ),
       {
         headers: authHeaders
       }
@@ -108,7 +130,7 @@ describe("server route integration debug routes", () => {
     ApiErrorEnvelopeSchema.parse(await malformedClientErrorResponse.json());
 
     const malformedHistoryResponse = await fetch(
-      `${baseUrl}/api/debug/history/${malformedIdentifier}`,
+      integrationEnvironment.buildApiRouteUrl(`${DebugHistoryRoutePathPrefix}/${MalformedIdentifier}`),
       {
         headers: authHeaders
       }
@@ -117,7 +139,9 @@ describe("server route integration debug routes", () => {
     ApiErrorEnvelopeSchema.parse(await malformedHistoryResponse.json());
 
     const malformedTraceResponse = await fetch(
-      `${baseUrl}/api/debug/trace/${malformedIdentifier}/download`,
+      integrationEnvironment.buildApiRouteUrl(
+        `${DebugTraceRoutePathPrefix}/${MalformedIdentifier}/download`
+      ),
       {
         headers: authHeaders
       }
@@ -127,10 +151,9 @@ describe("server route integration debug routes", () => {
   });
 
   it("supports debug observability snapshot contracts", async () => {
-    const baseUrl = integrationEnvironment.readBaseUrl();
     const authHeaders = integrationEnvironment.readAuthHeaders();
 
-    const response = await fetch(`${baseUrl}/api/debug/observability`, {
+    const response = await fetch(integrationEnvironment.buildApiRouteUrl(DebugObservabilityRoutePath), {
       headers: authHeaders
     });
 

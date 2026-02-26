@@ -1,5 +1,10 @@
 import { FarfieldDebugObservabilityEnvelopeSchema } from "@farfield/protocol";
-import { type DebugRouteDependencies } from "./DebugRouteContracts.js";
+import {
+  DebugRouteMethodByName,
+  DebugRoutePathnameByName,
+  DebugRouteSegmentByName,
+  type DebugRouteDependencies
+} from "./DebugRouteContracts.js";
 
 export class DebugHistoryRouteOwner {
   private readonly dependencies: DebugRouteDependencies;
@@ -24,12 +29,12 @@ export class DebugHistoryRouteOwner {
     const { req, segments, activityHistoryService, jsonResponse, res } = this.dependencies;
 
     const historyEntrySegment = segments[3];
-    if (
-      !(req.method === "GET"
-      && segments[2] === "history"
+    const isReadHistoryEntryRouteRequest =
+      req.method === DebugRouteMethodByName.get
+      && segments[2] === DebugRouteSegmentByName.history
       && segments.length === 4
-      && typeof historyEntrySegment === "string")
-    ) {
+      && typeof historyEntrySegment === "string";
+    if (!isReadHistoryEntryRouteRequest) {
       return false;
     }
 
@@ -58,7 +63,7 @@ export class DebugHistoryRouteOwner {
   private handleListHistoryRoute(): boolean {
     const { req, pathname, parseInteger, url, activityHistoryService, jsonResponse, res } = this.dependencies;
 
-    if (!(req.method === "GET" && pathname === "/api/debug/history")) {
+    if (!(req.method === DebugRouteMethodByName.get && pathname === DebugRoutePathnameByName.history)) {
       return false;
     }
 
@@ -71,7 +76,7 @@ export class DebugHistoryRouteOwner {
   private handleObservabilitySnapshotRoute(): boolean {
     const { req, pathname, jsonResponse, readObservabilitySnapshot, res } = this.dependencies;
 
-    if (!(req.method === "GET" && pathname === "/api/debug/observability")) {
+    if (!(req.method === DebugRouteMethodByName.get && pathname === DebugRoutePathnameByName.observability)) {
       return false;
     }
 

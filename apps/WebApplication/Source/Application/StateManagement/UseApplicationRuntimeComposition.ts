@@ -73,6 +73,12 @@ export interface ApplicationRuntimeComposition {
   shellComposition: ApplicationShellComposition;
 }
 
+// Refresh handlers are required runtime-owned dependencies; missing refs indicate a composition bug.
+const MISSING_CORE_DATA_LOADER_ERROR_MESSAGE =
+  "Runtime refresh invariant violated: core-data loader is unavailable.";
+const MISSING_SELECTED_THREAD_LOADER_ERROR_MESSAGE =
+  "Runtime refresh invariant violated: selected-thread loader is unavailable for active selection.";
+
 export function useApplicationRuntimeComposition(
   input: UseApplicationRuntimeCompositionInput
 ): ApplicationRuntimeComposition {
@@ -110,17 +116,21 @@ export function useApplicationRuntimeComposition(
   const refreshCoreDataAndSelectedThread = useCallback(async (): Promise<void> => {
     const handleRuntimeRequestError = input.runtimeRequestHandlers.handleRuntimeRequestError;
     const loadCoreDataFunction = input.applicationShellState.loadCoreDataTrackedRef.current;
-    const loadSelectedThreadFunction = input.applicationShellState.loadSelectedThreadRef.current;
     const measurement = runtimeRefreshObservabilityOwner.beginRefresh();
     let didCompleteRefresh = false;
 
     input.applicationShellState.setIsCoreLoading(true);
     try {
-      if (loadCoreDataFunction) {
-        await loadCoreDataFunction();
+      if (loadCoreDataFunction === null) {
+        throw new Error(MISSING_CORE_DATA_LOADER_ERROR_MESSAGE);
       }
+      await loadCoreDataFunction();
       const selectedThreadIdentifier = input.applicationShellState.selectedThreadIdRef.current;
-      if (selectedThreadIdentifier && loadSelectedThreadFunction) {
+      if (selectedThreadIdentifier !== null) {
+        const loadSelectedThreadFunction = input.applicationShellState.loadSelectedThreadRef.current;
+        if (loadSelectedThreadFunction === null) {
+          throw new Error(MISSING_SELECTED_THREAD_LOADER_ERROR_MESSAGE);
+        }
         await loadSelectedThreadFunction(selectedThreadIdentifier);
       }
       didCompleteRefresh = true;

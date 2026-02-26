@@ -311,4 +311,27 @@ describe("EventStreamConnectionCoordinator", () => {
     expect(createdSources).toHaveLength(3);
     expect(createdSources[2]?.closed).toBe(true);
   });
+
+  it("rejects negative reconnect delay configuration", () => {
+    expect(() => {
+      createCoordinator({
+        createdSources: [],
+        initialReconnectDelayMs: -1
+      });
+    }).toThrowError(
+      "EventStreamConnectionCoordinator requires a non-negative integer initialReconnectDelayMs"
+    );
+  });
+
+  it("rejects maximum reconnect delay lower than initial delay", () => {
+    expect(() => {
+      createCoordinator({
+        createdSources: [],
+        initialReconnectDelayMs: 100,
+        maximumReconnectDelayMs: 99
+      });
+    }).toThrowError(
+      "EventStreamConnectionCoordinator requires maximumReconnectDelayMs to be greater than or equal to initialReconnectDelayMs"
+    );
+  });
 });

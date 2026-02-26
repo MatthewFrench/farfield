@@ -128,4 +128,192 @@ describe("RequestObservabilityOwner", () => {
       })
     ]);
   });
+
+  it("normalizes metrics route paths with explicit debug and thread route classification", () => {
+    const owner = new RequestObservabilityOwner(8, 8, 16);
+    const observations = [
+      {
+        requestId: "request_1",
+        method: "GET",
+        pathname: "/api/debug/client-errors/session-log",
+        durationMs: 10
+      },
+      {
+        requestId: "request_2",
+        method: "GET",
+        pathname: "/api/debug/client-errors/error_identifier",
+        durationMs: 11
+      },
+      {
+        requestId: "request_3",
+        method: "GET",
+        pathname: "/api/debug/history/history_entry_1",
+        durationMs: 12
+      },
+      {
+        requestId: "request_4",
+        method: "GET",
+        pathname: "/api/debug/trace/1700000000000-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/download",
+        durationMs: 13
+      },
+      {
+        requestId: "request_5",
+        method: "POST",
+        pathname: "/api/threads/thread_123/messages",
+        durationMs: 14
+      },
+      {
+        requestId: "request_6",
+        method: "GET",
+        pathname: "/api/debug/replay/0123456789abcdef",
+        durationMs: 15
+      }
+    ];
+
+    for (const observation of observations) {
+      owner.recordRequestStarted({
+        requestId: observation.requestId,
+        actionId: null,
+        actionName: null,
+        method: observation.method,
+        pathname: observation.pathname,
+        startedAt: "2026-02-25T00:00:00.000Z",
+        queueDelayMs: 0
+      });
+      owner.recordRequestCompleted({
+        requestId: observation.requestId,
+        actionId: null,
+        actionName: null,
+        method: observation.method,
+        pathname: observation.pathname,
+        startedAt: "2026-02-25T00:00:00.000Z",
+        statusCode: 200,
+        durationMs: observation.durationMs,
+        queueDelayMs: 0,
+        completedAt: "2026-02-25T00:00:00.001Z"
+      });
+    }
+
+    const snapshot = owner.readSnapshot();
+    const routeTimingByMethodAndRoute = new Map(
+      snapshot.routeTimings.map((routeTiming) => [
+        `${routeTiming.method} ${routeTiming.route}`,
+        routeTiming
+      ])
+    );
+
+    expect(routeTimingByMethodAndRoute.get("GET /api/debug/client-errors/session-log")?.requestCount).toBe(1);
+    expect(routeTimingByMethodAndRoute.get("GET /api/debug/client-errors/:clientErrorId")?.requestCount).toBe(1);
+    expect(routeTimingByMethodAndRoute.get("GET /api/debug/history/:historyEntryId")?.requestCount).toBe(1);
+    expect(routeTimingByMethodAndRoute.get("GET /api/debug/trace/:traceId/download")?.requestCount).toBe(1);
+    expect(routeTimingByMethodAndRoute.get("POST /api/threads/:threadId/messages")?.requestCount).toBe(1);
+    expect(routeTimingByMethodAndRoute.get("GET /api/debug/replay/:id")?.requestCount).toBe(1);
+  });
+
+  it("normalizes lifecycle pathnames before storing start and completion events", () => {
+    const owner = new RequestObservabilityOwner(8, 8, 16);
+    const rawPathname = "https://example.test/api/threads/thread_123/messages?include=history";
+
+    owner.recordRequestStarted({
+      requestId: "request_1",
+      actionId: null,
+      actionName: null,
+      method: "POST",
+      pathname: rawPathname,
+      startedAt: "2026-02-25T00:00:00.000Z",
+      queueDelayMs: 1
+    });
+    owner.recordRequestCompleted({
+      requestId: "request_1",
+      actionId: null,
+      actionName: null,
+      method: "POST",
+      pathname: rawPathname,
+      startedAt: "2026-02-25T00:00:00.000Z",
+      statusCode: 200,
+      durationMs: 12,
+      queueDelayMs: 1,
+      completedAt: "2026-02-25T00:00:00.012Z"
+    });
+
+    const snapshot = owner.readSnapshot();
+    expect(snapshot.requestLifecycleEvents[0]).toMatchObject({
+      phase: "started",
+      pathname: "/api/threads/thread_123/messages"
+    });
+    expect(snapshot.requestLifecycleEvents[1]).toMatchObject({
+      phase: "completed",
+      pathname: "/api/threads/thread_123/messages",
+      outcome: "success"
+    });
+    expect(snapshot.routeTimings[0]?.route).toBe("/api/threads/:threadId/messages");
+  });
+
+  it("bounds tracked route timing entries and retains recently touched routes", () => {
+    const owner = new RequestObservabilityOwner(8, 8, 16, 2);
+    const routeObservations = [
+      {
+        requestId: "request_a1",
+        pathname: "/route-a",
+        durationMs: 10
+      },
+      {
+        requestId: "request_b1",
+        pathname: "/route-b",
+        durationMs: 11
+      },
+      {
+        requestId: "request_a2",
+        pathname: "/route-a",
+        durationMs: 12
+      },
+      {
+        requestId: "request_c1",
+        pathname: "/route-c",
+        durationMs: 13
+      }
+    ];
+
+    for (const routeObservation of routeObservations) {
+      owner.recordRequestStarted({
+        requestId: routeObservation.requestId,
+        actionId: null,
+        actionName: null,
+        method: "GET",
+        pathname: routeObservation.pathname,
+        startedAt: "2026-02-25T00:00:00.000Z",
+        queueDelayMs: 0
+      });
+      owner.recordRequestCompleted({
+        requestId: routeObservation.requestId,
+        actionId: null,
+        actionName: null,
+        method: "GET",
+        pathname: routeObservation.pathname,
+        startedAt: "2026-02-25T00:00:00.000Z",
+        statusCode: 200,
+        durationMs: routeObservation.durationMs,
+        queueDelayMs: 0,
+        completedAt: "2026-02-25T00:00:00.001Z"
+      });
+    }
+
+    const snapshot = owner.readSnapshot();
+    const routeTimingByRoute = new Map(
+      snapshot.routeTimings.map((routeTiming) => [routeTiming.route, routeTiming])
+    );
+
+    expect(snapshot.routeTimings).toHaveLength(2);
+    expect(routeTimingByRoute.has("/route-a")).toBe(true);
+    expect(routeTimingByRoute.has("/route-b")).toBe(false);
+    expect(routeTimingByRoute.has("/route-c")).toBe(true);
+    expect(routeTimingByRoute.get("/route-a")?.requestCount).toBe(2);
+    expect(routeTimingByRoute.get("/route-c")?.requestCount).toBe(1);
+  });
+
+  it("rejects non-positive route timing entry limits", () => {
+    expect(() => new RequestObservabilityOwner(8, 8, 16, 0)).toThrowError(
+      "RequestObservabilityOwner requires positive integer maxRouteTimingEntries"
+    );
+  });
 });

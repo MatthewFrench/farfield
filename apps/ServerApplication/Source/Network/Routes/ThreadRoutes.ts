@@ -10,10 +10,19 @@ import {
 export interface ThreadRouteDependencies
   extends ThreadCollectionRouteDependencies, ThreadMemberRouteDependencies {}
 
+type ThreadRouteHandler = (dependencies: ThreadRouteDependencies) => Promise<boolean>;
+
+const ThreadRouteHandlers: readonly ThreadRouteHandler[] = [
+  handleThreadCollectionRoutes,
+  handleThreadMemberRoutes
+];
+
 export async function handleThreadRoutes(deps: ThreadRouteDependencies): Promise<boolean> {
-  if (await handleThreadCollectionRoutes(deps)) {
-    return true;
+  for (const handleRoute of ThreadRouteHandlers) {
+    if (await handleRoute(deps)) {
+      return true;
+    }
   }
 
-  return handleThreadMemberRoutes(deps);
+  return false;
 }

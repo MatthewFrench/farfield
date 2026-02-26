@@ -2,6 +2,15 @@ import { z } from "zod";
 import type { AgentId } from "./Types.js";
 
 const AgentIdSchema = z.enum(["codex", "opencode"]);
+const AgentTokenSchema = z.union([AgentIdSchema, z.literal("all")]);
+
+const ALL_AGENTS_TOKEN = "all";
+const AGENTS_LONG_OPTION = "--agents";
+const AGENTS_EQUALS_PREFIX = `${AGENTS_LONG_OPTION}=`;
+const HELP_LONG_OPTION = "--help";
+const HELP_SHORT_OPTION = "-h";
+const OPTION_TERMINATOR = "--";
+const MISSING_AGENTS_VALUE_ERROR = `Missing value for ${AGENTS_LONG_OPTION}`;
 
 export const ALL_AGENT_IDS: AgentId[] = ["codex", "opencode"];
 export const DEFAULT_AGENT_IDS: AgentId[] = ["codex"];
@@ -15,50 +24,59 @@ function formatAllowedAgentIds(): string {
   return ALL_AGENT_IDS.join(", ");
 }
 
+function buildUnknownAgentIdError(token: string): string {
+  return `Unknown agent id "${token}". Allowed values: ${formatAllowedAgentIds()}, ${ALL_AGENTS_TOKEN}`;
+}
+
+function dedupeAgentIds(expandedAgentIds: AgentId[]): AgentId[] {
+  const dedupedAgentIds: AgentId[] = [];
+  const seenAgentIds = new Set<AgentId>();
+  for (const agentId of expandedAgentIds) {
+    if (seenAgentIds.has(agentId)) {
+      continue;
+    }
+
+    seenAgentIds.add(agentId);
+    dedupedAgentIds.push(agentId);
+  }
+
+  return dedupedAgentIds;
+}
+
 function parseAgentsArg(raw: string): AgentId[] {
   const trimmed = raw.trim();
   if (trimmed.length === 0) {
-    throw new Error("Missing value for --agents");
+    throw new Error(MISSING_AGENTS_VALUE_ERROR);
   }
 
   const tokens = trimmed
     .split(",")
-    .map((token) => token.trim())
-    .filter((token) => token.length > 0);
+    .map((token) => token.trim());
 
-  if (tokens.length === 0) {
-    throw new Error("Missing value for --agents");
+  if (tokens.length === 0 || tokens.some((token) => token.length === 0)) {
+    throw new Error(MISSING_AGENTS_VALUE_ERROR);
   }
 
   const expanded: AgentId[] = [];
   for (const token of tokens) {
-    if (token === "all") {
+    const parsedToken = AgentTokenSchema.safeParse(token);
+    if (!parsedToken.success) {
+      throw new Error(buildUnknownAgentIdError(token));
+    }
+
+    if (parsedToken.data === ALL_AGENTS_TOKEN) {
       expanded.push(...ALL_AGENT_IDS);
       continue;
     }
 
-    const parsed = AgentIdSchema.safeParse(token);
-    if (!parsed.success) {
-      throw new Error(
-        `Unknown agent id "${token}". Allowed values: ${formatAllowedAgentIds()}, all`
-      );
-    }
-    expanded.push(parsed.data);
+    expanded.push(parsedToken.data);
   }
 
-  const deduped: AgentId[] = [];
-  const seen = new Set<AgentId>();
-  for (const id of expanded) {
-    if (seen.has(id)) {
-      continue;
-    }
-    seen.add(id);
-    deduped.push(id);
-  }
+  const deduped = dedupeAgentIds(expanded);
 
   if (deduped.length === 0) {
     throw new Error(
-      `No valid agent ids were provided. Allowed values: ${formatAllowedAgentIds()}, all`
+      `No valid agent ids were provided. Allowed values: ${formatAllowedAgentIds()}, ${ALL_AGENTS_TOKEN}`
     );
   }
 
@@ -69,11 +87,11 @@ export function formatServerHelpText(): string {
   return [
     "Farfield server",
     "",
-    "Usage: tsx watch Source/Application/ServerBootstrap.ts [--agents=<ids>]",
+    `Usage: tsx watch Source/Application/ServerBootstrap.ts [${AGENTS_LONG_OPTION}=<ids>]`,
     "",
     "Flags:",
-    "  --agents=<ids>   Comma-separated agent ids. Allowed: codex, opencode, all",
-    "  --help           Show this help message"
+    `  ${AGENTS_LONG_OPTION}=<ids>   Comma-separated agent ids. Allowed: ${formatAllowedAgentIds()}, ${ALL_AGENTS_TOKEN}`,
+    `  ${HELP_LONG_OPTION}           Show this help message`
   ].join("\n");
 }
 
@@ -87,25 +105,25 @@ export function parseServerCliOptions(argv: string[]): ServerCliOptions {
       continue;
     }
 
-    if (arg === "--") {
+    if (arg === OPTION_TERMINATOR) {
       continue;
     }
 
-    if (arg === "--help" || arg === "-h") {
+    if (arg === HELP_LONG_OPTION || arg === HELP_SHORT_OPTION) {
       showHelp = true;
       continue;
     }
 
-    if (arg.startsWith("--agents=")) {
-      const value = arg.slice("--agents=".length);
+    if (arg.startsWith(AGENTS_EQUALS_PREFIX)) {
+      const value = arg.slice(AGENTS_EQUALS_PREFIX.length);
       parsedAgents = parseAgentsArg(value);
       continue;
     }
 
-    if (arg === "--agents") {
+    if (arg === AGENTS_LONG_OPTION) {
       const nextArg = argv[index + 1];
       if (!nextArg || nextArg.startsWith("--")) {
-        throw new Error("Missing value for --agents");
+        throw new Error(MISSING_AGENTS_VALUE_ERROR);
       }
       parsedAgents = parseAgentsArg(nextArg);
       index += 1;

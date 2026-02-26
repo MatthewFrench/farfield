@@ -9,7 +9,16 @@ import {
   type DebugIssue
 } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 
-export type DebugIssueSeverityFilter = "all" | "error" | "warning";
+export const DEBUG_ISSUE_SEVERITY_FILTER_ALL = "all";
+export const DEBUG_ISSUE_SEVERITY_FILTER_ERROR = "error";
+export const DEBUG_ISSUE_SEVERITY_FILTER_WARNING = "warning";
+
+const EMPTY_DEBUG_ISSUE_IDENTIFIER = "";
+
+export type DebugIssueSeverityFilter =
+  | typeof DEBUG_ISSUE_SEVERITY_FILTER_ALL
+  | typeof DEBUG_ISSUE_SEVERITY_FILTER_ERROR
+  | typeof DEBUG_ISSUE_SEVERITY_FILTER_WARNING;
 
 export interface ReadCombinedDebugIssuesInput {
   debugErrorIssues: DebugIssue[];
@@ -25,6 +34,10 @@ export interface ReadFilteredDebugIssuesInput {
 export interface ReadSelectedDebugIssueInput {
   debugIssues: DebugIssue[];
   selectedIssueIdentifier: string;
+}
+
+function normalizeDebugIssueFilterQuery(filterQuery: string): string {
+  return filterQuery.trim().toLowerCase();
 }
 
 export class DebugIssueStateResolver {
@@ -48,9 +61,12 @@ export class DebugIssueStateResolver {
   }
 
   public readFilteredDebugIssues(input: ReadFilteredDebugIssuesInput): DebugIssue[] {
-    const normalizedQuery = input.filterQuery.trim().toLowerCase();
+    const normalizedQuery = normalizeDebugIssueFilterQuery(input.filterQuery);
     return input.debugIssues.filter((issue) => {
-      if (input.severityFilter !== "all" && issue.severity !== input.severityFilter) {
+      if (
+        input.severityFilter !== DEBUG_ISSUE_SEVERITY_FILTER_ALL
+        && issue.severity !== input.severityFilter
+      ) {
         return false;
       }
       if (normalizedQuery.length === 0) {
@@ -69,7 +85,7 @@ export class DebugIssueStateResolver {
 
   public readNextSelectedDebugIssueIdentifier(input: ReadSelectedDebugIssueInput): string {
     if (input.debugIssues.length === 0) {
-      return "";
+      return EMPTY_DEBUG_ISSUE_IDENTIFIER;
     }
     const hasSelectedIssue = input.debugIssues.some(
       (issue) => issue.id === input.selectedIssueIdentifier
@@ -77,6 +93,6 @@ export class DebugIssueStateResolver {
     if (hasSelectedIssue) {
       return input.selectedIssueIdentifier;
     }
-    return input.debugIssues[0]?.id ?? "";
+    return input.debugIssues[0]?.id ?? EMPTY_DEBUG_ISSUE_IDENTIFIER;
   }
 }

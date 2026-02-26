@@ -3,6 +3,7 @@ import {
   JsonValueSchema,
   NonEmptyStringSchema,
   NonNegativeIntSchema,
+  NullableNonEmptyStringSchema,
   NullableStringSchema
 } from "../../Common.js";
 import { CollaborationModeSchema } from "./CollaborationModeContracts.js";
@@ -10,16 +11,22 @@ import { TurnStartParamsSchema } from "./TurnInputContracts.js";
 import { TurnItemSchema } from "./TurnItemContracts.js";
 import { UserInputRequestSchema } from "./UserInputRequestContracts.js";
 
+const OptionalNullableTurnIdentifierSchema = NullableNonEmptyStringSchema.optional();
+const OptionalNullableJsonValueSchema = z.union([JsonValueSchema, z.null()]).optional();
+const OptionalNullableCollaborationModeSchema = z
+  .union([CollaborationModeSchema, z.null()])
+  .optional();
+
 export const ThreadTurnSchema = z
   .object({
     params: TurnStartParamsSchema.optional(),
-    turnId: z.union([NonEmptyStringSchema, z.null()]).optional(),
+    turnId: OptionalNullableTurnIdentifierSchema,
     id: NonEmptyStringSchema.optional(),
     status: NonEmptyStringSchema,
     turnStartedAtMs: z.union([NonNegativeIntSchema, z.null()]).optional(),
     finalAssistantStartedAtMs: z.union([NonNegativeIntSchema, z.null()]).optional(),
-    error: z.union([JsonValueSchema, z.null()]).optional(),
-    diff: z.union([JsonValueSchema, z.null()]).optional(),
+    error: OptionalNullableJsonValueSchema,
+    diff: OptionalNullableJsonValueSchema,
     items: z.array(TurnItemSchema)
   })
   .passthrough();
@@ -35,11 +42,11 @@ export const ThreadConversationStateSchema = z
     latestModel: NullableStringSchema.optional(),
     latestReasoningEffort: NullableStringSchema.optional(),
     previousTurnModel: NullableStringSchema.optional(),
-    latestCollaborationMode: z.union([CollaborationModeSchema, z.null()]).optional(),
+    latestCollaborationMode: OptionalNullableCollaborationModeSchema,
     hasUnreadTurn: z.boolean().optional(),
     rolloutPath: z.string().optional(),
     cwd: z.string().optional(),
-    gitInfo: z.union([JsonValueSchema, z.null()]).optional(),
+    gitInfo: OptionalNullableJsonValueSchema,
     resumeState: z.string().optional(),
     latestTokenUsageInfo: JsonValueSchema.optional(),
     source: z.string().optional()

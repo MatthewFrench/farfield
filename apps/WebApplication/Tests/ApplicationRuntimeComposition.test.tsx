@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface PushFeatureCompositionMock {
@@ -529,6 +529,72 @@ describe("useApplicationRuntimeComposition", () => {
     );
     expect(synchronizationEffectsInput.loadHistoryDetail).toBe(
       debugFeatureCompositionMock.loadHistoryDetail
+    );
+  });
+
+  it("reads current loader refs for each runtime refresh invocation", async () => {
+    render(<RuntimeCompositionHarness />);
+    const harnessSnapshot = latestRuntimeHarnessSnapshot;
+    if (!harnessSnapshot) {
+      throw new Error("Expected runtime harness snapshot to be captured");
+    }
+    const refreshEffectsInput = applicationRefreshEffectsCapture;
+    if (!refreshEffectsInput) {
+      throw new Error("Expected refresh effects input to be captured");
+    }
+
+    const firstCoreLoader = vi.fn(async (): Promise<void> => {});
+    const secondCoreLoader = vi.fn(async (): Promise<void> => {});
+    const firstSelectedThreadLoader = vi.fn(async (_threadId: string): Promise<void> => {});
+    const secondSelectedThreadLoader = vi.fn(async (_threadId: string): Promise<void> => {});
+
+    harnessSnapshot.applicationShellState.loadCoreDataTrackedRef.current = firstCoreLoader;
+    harnessSnapshot.applicationShellState.loadSelectedThreadRef.current = firstSelectedThreadLoader;
+    harnessSnapshot.applicationShellState.selectedThreadIdRef.current = "thread-1";
+    await act(async (): Promise<void> => {
+      await refreshEffectsInput.refreshCoreDataAndSelectedThread();
+    });
+
+    harnessSnapshot.applicationShellState.loadCoreDataTrackedRef.current = secondCoreLoader;
+    harnessSnapshot.applicationShellState.loadSelectedThreadRef.current = secondSelectedThreadLoader;
+    harnessSnapshot.applicationShellState.selectedThreadIdRef.current = "thread-2";
+    await act(async (): Promise<void> => {
+      await refreshEffectsInput.refreshCoreDataAndSelectedThread();
+    });
+
+    expect(firstCoreLoader).toHaveBeenCalledTimes(1);
+    expect(secondCoreLoader).toHaveBeenCalledTimes(1);
+    expect(firstSelectedThreadLoader).toHaveBeenCalledWith("thread-1");
+    expect(secondSelectedThreadLoader).toHaveBeenCalledWith("thread-2");
+  });
+
+  it("reports invariant violation when selected-thread loader ref is missing", async () => {
+    render(<RuntimeCompositionHarness />);
+    const harnessSnapshot = latestRuntimeHarnessSnapshot;
+    if (!harnessSnapshot) {
+      throw new Error("Expected runtime harness snapshot to be captured");
+    }
+    const refreshEffectsInput = applicationRefreshEffectsCapture;
+    if (!refreshEffectsInput) {
+      throw new Error("Expected refresh effects input to be captured");
+    }
+
+    const coreLoader = vi.fn(async (): Promise<void> => {});
+    harnessSnapshot.applicationShellState.loadCoreDataTrackedRef.current = coreLoader;
+    harnessSnapshot.applicationShellState.selectedThreadIdRef.current = "thread-invariant";
+    harnessSnapshot.applicationShellState.loadSelectedThreadRef.current = null;
+
+    await act(async (): Promise<void> => {
+      await refreshEffectsInput.refreshCoreDataAndSelectedThread();
+    });
+
+    expect(coreLoader).toHaveBeenCalledTimes(1);
+    const updatedHarnessSnapshot = latestRuntimeHarnessSnapshot;
+    if (!updatedHarnessSnapshot) {
+      throw new Error("Expected runtime harness snapshot after refresh");
+    }
+    expect(updatedHarnessSnapshot.applicationShellState.error).toContain(
+      "Runtime refresh invariant violated: selected-thread loader is unavailable for active selection."
     );
   });
 });

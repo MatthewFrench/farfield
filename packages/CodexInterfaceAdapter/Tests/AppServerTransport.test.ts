@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildAppServerSpawnEnvironment } from "../Source/AppServerTransport.js";
+import {
+  buildAppServerSpawnEnvironment,
+  isChildProcessAppServerTransportOptions,
+  type AppServerTransport
+} from "../Source/AppServerTransport.js";
 
 describe("buildAppServerSpawnEnvironment", () => {
   it("keeps only allowlisted inherited keys and injects codex identity keys", () => {
@@ -55,5 +59,30 @@ describe("buildAppServerSpawnEnvironment", () => {
         clientId: "client-3"
       })
     ).toThrowError(/Unrecognized key/);
+  });
+});
+
+describe("isChildProcessAppServerTransportOptions", () => {
+  it("returns true for child-process transport option shapes", () => {
+    const isOptions = isChildProcessAppServerTransportOptions({
+      executablePath: "/usr/local/bin/codex",
+      userAgent: "farfield-tests",
+      baseEnvironment: {
+        PATH: "/usr/bin"
+      },
+      cwd: "/tmp/project",
+      requestTimeoutMs: 5_000
+    });
+
+    expect(isOptions).toBe(true);
+  });
+
+  it("returns false for pre-built transport implementations", () => {
+    const transport: AppServerTransport = {
+      request: async () => ({}),
+      close: async () => Promise.resolve()
+    };
+
+    expect(isChildProcessAppServerTransportOptions(transport)).toBe(false);
   });
 });

@@ -5,6 +5,8 @@ import type {
 } from "../DataAccess/DebugServerClient";
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
+const DEBUG_ERROR_SIGNATURE_SEGMENT_SEPARATOR = "|";
+
 export interface DebugWorkspaceDataSnapshot {
   history: DebugHistoryResponse["history"];
   debugErrors: DebugErrorListResponse["data"];
@@ -41,7 +43,7 @@ export class DebugWorkspaceDataReader {
       debugErrorSessionId: debugErrorsResponse.sessionId,
       debugErrorSessionLogPath: debugErrorsResponse.sessionLogPath,
       debugErrorsSignature: debugErrorsResponse.data.map((entry) =>
-        [entry.errorId, entry.recordedAt, entry.message].join("|")
+        [entry.errorId, entry.recordedAt, entry.message].join(DEBUG_ERROR_SIGNATURE_SEGMENT_SEPARATOR)
       )
     };
   }

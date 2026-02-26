@@ -28,6 +28,17 @@ function buildSnapshot(
   };
 }
 
+function buildThreadListItem(preview: string): ThreadListAggregationSnapshot["mergedData"][number] {
+  return {
+    id: `thread-${preview}`,
+    preview,
+    createdAt: 1,
+    updatedAt: 1,
+    source: "opencode",
+    agentId: "opencode"
+  };
+}
+
 describe("ThreadListAggregationCache", () => {
   it("reads a fresh written entry", () => {
     const cache = new ThreadListAggregationCache(200, 4);
@@ -128,5 +139,25 @@ describe("ThreadListAggregationCache", () => {
     expect(cache.readFresh(activeQuery)).toBeNull();
     expect(cache.readFresh(archivedQuery)).toEqual(buildSnapshot({ combinedTruncated: false }));
     expect(cache.readStatistics().invalidationCount).toBe(1);
+  });
+
+  it("returns defensive snapshot clones so caller mutations cannot alter cache state", () => {
+    const cache = new ThreadListAggregationCache(1_000, 4);
+    const query = buildQuery();
+    const originalSnapshot = buildSnapshot({
+      mergedData: [buildThreadListItem("original")]
+    });
+
+    cache.write(query, originalSnapshot);
+    const firstRead = cache.readFresh(query);
+    if (!firstRead?.mergedData[0]) {
+      throw new Error("Expected cached thread list item");
+    }
+
+    originalSnapshot.mergedData[0] = buildThreadListItem("mutated-source");
+    firstRead.mergedData[0].preview = "mutated-read";
+
+    const secondRead = cache.readFresh(query);
+    expect(secondRead?.mergedData[0]?.preview).toBe("original");
   });
 });

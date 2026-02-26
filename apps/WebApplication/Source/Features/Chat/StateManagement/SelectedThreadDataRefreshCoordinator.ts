@@ -9,8 +9,6 @@ import type {
 } from "../DataAccess/ChatServerClient";
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
-type ErrorInput = Error | string | number | boolean | bigint | symbol | null | undefined | object;
-
 export type SelectedThreadLiveStateSnapshot = ChatLiveStateResponse;
 export type SelectedThreadStreamEventsSnapshot = ChatStreamEventsResponse;
 export type SelectedThreadReadThreadSnapshot = ChatReadThreadResponse;
@@ -59,7 +57,6 @@ export interface SelectedThreadDataRefreshResult {
 interface SelectedThreadDataRefreshCoordinatorDependencies {
   retryConfiguration?: SelectedThreadDataRefreshRetryConfiguration;
   waitForMilliseconds?: (durationMilliseconds: number) => Promise<void>;
-  readErrorMessage?: (error: ErrorInput) => string;
   isTransientReadError?: (errorMessage: string) => boolean;
 }
 
@@ -75,16 +72,36 @@ async function waitForMilliseconds(durationMilliseconds: number): Promise<void> 
   });
 }
 
+function buildUnreadableLiveStateSnapshot(threadId: string): SelectedThreadLiveStateSnapshot {
+  return {
+    ok: true,
+    threadId,
+    ownerClientId: null,
+    conversationState: null,
+    liveStateError: null
+  };
+}
+
+function buildUnreadableStreamEventsSnapshot(threadId: string): SelectedThreadStreamEventsSnapshot {
+  return {
+    ok: true,
+    threadId,
+    ownerClientId: null,
+    events: [],
+    nextSequence: 0,
+    firstAvailableSequence: 0,
+    resetRequired: false
+  };
+}
+
 export class SelectedThreadDataRefreshCoordinator {
   private readonly retryConfiguration: SelectedThreadDataRefreshRetryConfiguration;
   private readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
-  private readonly readErrorMessage: (error: ErrorInput) => string;
   private readonly isTransientReadError: (errorMessage: string) => boolean;
 
   public constructor(dependencies?: SelectedThreadDataRefreshCoordinatorDependencies) {
     this.retryConfiguration = dependencies?.retryConfiguration ?? DEFAULT_RETRY_CONFIGURATION;
     this.waitForMilliseconds = dependencies?.waitForMilliseconds ?? waitForMilliseconds;
-    this.readErrorMessage = dependencies?.readErrorMessage ?? toErrorMessage;
     this.isTransientReadError = dependencies?.isTransientReadError ?? isTransientReadThreadError;
   }
 
@@ -96,15 +113,15 @@ export class SelectedThreadDataRefreshCoordinator {
         try {
           const readOptions = input.signal
             ? {
-              includeTurns: includeTurnsForRead,
-              signal: input.signal
-            }
+                includeTurns: includeTurnsForRead,
+                signal: input.signal
+              }
             : {
-              includeTurns: includeTurnsForRead
-            };
+                includeTurns: includeTurnsForRead
+              };
           return await input.chatClient.readThread(input.threadId, readOptions);
         } catch (error) {
-          const errorMessage = this.readErrorMessage(toErrorMessage(error));
+          const errorMessage = toErrorMessage(error);
           const canRetry = (
             this.isTransientReadError(errorMessage)
             && attemptIndex < this.retryConfiguration.maximumAttempts - 1
@@ -134,27 +151,13 @@ export class SelectedThreadDataRefreshCoordinator {
             ? input.chatClient.readLiveState(input.threadId, { signal: input.signal })
             : input.chatClient.readLiveState(input.threadId)
         )
-        : Promise.resolve({
-          ok: true as const,
-          threadId: input.threadId,
-          ownerClientId: null,
-          conversationState: null,
-          liveStateError: null
-        }),
+        : Promise.resolve(buildUnreadableLiveStateSnapshot(input.threadId)),
       input.canReadStreamEvents
         ? input.chatClient.readStreamEvents(
           input.threadId,
           this.buildStreamEventsRequestOptions(input.streamEventsSinceSequence, input.signal)
         )
-        : Promise.resolve({
-          ok: true as const,
-          threadId: input.threadId,
-          ownerClientId: null,
-          events: [],
-          nextSequence: 0,
-          firstAvailableSequence: 0,
-          resetRequired: false
-        }),
+        : Promise.resolve(buildUnreadableStreamEventsSnapshot(input.threadId)),
       input.includeReadThread ? readThreadWithRetry() : Promise.resolve(null)
     ]);
 

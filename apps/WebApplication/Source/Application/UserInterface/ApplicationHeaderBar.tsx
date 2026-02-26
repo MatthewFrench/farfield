@@ -5,6 +5,16 @@ import { PushStatusButton } from "@/Features/PushNotifications/UserInterface/Pus
 import { Button } from "@/Components/UserInterface/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/UserInterface/Tooltip";
 
+const DEBUG_TAB = "debug";
+const CHAT_TAB = "chat";
+
+function readHeaderIconButtonClassName(active: boolean | undefined): string {
+  if (active) {
+    return "h-8 w-8 rounded-lg bg-muted text-foreground hover:bg-muted";
+  }
+  return "h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted";
+}
+
 interface HeaderIconButtonProps {
   onClick?: () => void;
   disabled?: boolean;
@@ -32,11 +42,7 @@ function HeaderIconButton({
       title={title}
       variant="ghost"
       size="icon"
-      className={`h-8 w-8 rounded-lg ${
-        active
-          ? "bg-muted text-foreground hover:bg-muted"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-      }`}
+      className={readHeaderIconButtonClassName(active)}
     >
       {children}
     </Button>
@@ -54,8 +60,10 @@ function HeaderIconButton({
   );
 }
 
+export type ApplicationHeaderBarTab = "chat" | "debug";
+
 export interface ApplicationHeaderBarProps {
-  activeTab: "chat" | "debug";
+  activeTab: ApplicationHeaderBarTab;
   desktopSidebarOpen: boolean;
   selectedThreadLabel: string;
   hasSelectedThread: boolean;
@@ -73,6 +81,27 @@ export interface ApplicationHeaderBarProps {
   onToggleDebugTab: () => void;
   onToggleTheme: () => void;
   renderAgentFavicon: (agentId: AgentId, label: string, className: string) => React.ReactNode;
+}
+
+function buildSidebarOpenHandler(
+  onOpenSidebar: () => void,
+  activeTab: ApplicationHeaderBarTab,
+  onToggleDebugTab: () => void
+): () => void {
+  return () => {
+    onOpenSidebar();
+    if (activeTab === DEBUG_TAB) {
+      onToggleDebugTab();
+    }
+  };
+}
+
+function readHeaderContainerClassName(activeTab: ApplicationHeaderBarTab): string {
+  return `flex items-center justify-between px-3 h-14 shrink-0 gap-2 ${
+    activeTab === CHAT_TAB
+      ? "absolute inset-x-0 top-0 z-20 bg-transparent"
+      : "border-b border-border"
+  }`;
 }
 
 export function ApplicationHeaderBar({
@@ -95,28 +124,19 @@ export function ApplicationHeaderBar({
   onToggleTheme,
   renderAgentFavicon
 }: ApplicationHeaderBarProps): React.JSX.Element {
-  const handleOpenMobileSidebar = (): void => {
-    onOpenMobileSidebar();
-    if (activeTab === "debug") {
-      onToggleDebugTab();
-    }
-  };
-
-  const handleOpenDesktopSidebar = (): void => {
-    onOpenDesktopSidebar();
-    if (activeTab === "debug") {
-      onToggleDebugTab();
-    }
-  };
+  const handleOpenMobileSidebar = buildSidebarOpenHandler(
+    onOpenMobileSidebar,
+    activeTab,
+    onToggleDebugTab
+  );
+  const handleOpenDesktopSidebar = buildSidebarOpenHandler(
+    onOpenDesktopSidebar,
+    activeTab,
+    onToggleDebugTab
+  );
 
   return (
-    <header
-      className={`flex items-center justify-between px-3 h-14 shrink-0 gap-2 ${
-        activeTab === "chat"
-          ? "absolute inset-x-0 top-0 z-20 bg-transparent"
-          : "border-b border-border"
-      }`}
-    >
+    <header className={readHeaderContainerClassName(activeTab)}>
       <div className="flex items-center gap-2 min-w-0">
         <div className="md:hidden">
           <HeaderIconButton
@@ -172,7 +192,7 @@ export function ApplicationHeaderBar({
         </HeaderIconButton>
         <HeaderIconButton
           onClick={onToggleDebugTab}
-          active={activeTab === "debug"}
+          active={activeTab === DEBUG_TAB}
           title="Debug"
           testId="tab-debug"
         >

@@ -3,6 +3,9 @@ export type NextIpcPayloadReadResult =
   | { type: "frame-too-large"; size: number }
   | { type: "payload"; payload: Buffer };
 
+const FRAME_LENGTH_HEADER_BYTES = 4;
+const BUFFER_COMPACTION_MINIMUM_CONSUMED_BYTES = 64 * 1024;
+
 /**
  * Owns framed IPC payload accumulation so DesktopIpcClient can focus on protocol behavior.
  * Frames are length-prefixed with a 4-byte little-endian header.
@@ -17,6 +20,10 @@ export class IpcFrameBufferAccumulator {
   }
 
   public appendChunk(chunk: Buffer): void {
+    if (chunk.length === 0) {
+      return;
+    }
+
     if (this.buffer.length === 0 || this.bufferOffset === this.buffer.length) {
       this.buffer = Buffer.from(chunk);
       this.bufferOffset = 0;
@@ -32,7 +39,7 @@ export class IpcFrameBufferAccumulator {
   }
 
   public readNextPayload(maxFrameSizeBytes: number): NextIpcPayloadReadResult {
-    if (this.buffer.length - this.bufferOffset < 4) {
+    if (this.getUnreadByteCount() < FRAME_LENGTH_HEADER_BYTES) {
       this.compactBufferIfNeeded();
       return { type: "none" };
     }
@@ -45,12 +52,12 @@ export class IpcFrameBufferAccumulator {
       };
     }
 
-    if (this.buffer.length - this.bufferOffset < 4 + size) {
+    if (this.getUnreadByteCount() < FRAME_LENGTH_HEADER_BYTES + size) {
       this.compactBufferIfNeeded();
       return { type: "none" };
     }
 
-    const payloadStart = this.bufferOffset + 4;
+    const payloadStart = this.bufferOffset + FRAME_LENGTH_HEADER_BYTES;
     const payload = this.buffer.subarray(payloadStart, payloadStart + size);
     this.bufferOffset = payloadStart + size;
     this.compactBufferIfNeeded();
@@ -72,11 +79,19 @@ export class IpcFrameBufferAccumulator {
       return;
     }
 
-    if (this.bufferOffset * 2 < this.buffer.length && this.bufferOffset < 64 * 1024) {
+    const hasConsumedAtLeastHalfOfBuffer = this.bufferOffset * 2 >= this.buffer.length;
+    // Also compact for larger consumed prefixes even when unread data remains significant.
+    const hasReachedCompactionByteThreshold =
+      this.bufferOffset >= BUFFER_COMPACTION_MINIMUM_CONSUMED_BYTES;
+    if (!hasConsumedAtLeastHalfOfBuffer && !hasReachedCompactionByteThreshold) {
       return;
     }
 
     this.buffer = Buffer.from(this.buffer.subarray(this.bufferOffset));
     this.bufferOffset = 0;
+  }
+
+  private getUnreadByteCount(): number {
+    return this.buffer.length - this.bufferOffset;
   }
 }

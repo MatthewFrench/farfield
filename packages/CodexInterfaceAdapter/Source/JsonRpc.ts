@@ -5,9 +5,11 @@ import {
   type JsonValue
 } from "@farfield/protocol";
 
+const JSON_RPC_VERSION = "2.0";
+
 export const JsonRpcRequestSchema = z
   .object({
-    jsonrpc: z.literal("2.0"),
+    jsonrpc: z.literal(JSON_RPC_VERSION),
     id: z.number().int().nonnegative(),
     method: z.string().min(1),
     params: JsonValueSchema.optional()
@@ -16,7 +18,7 @@ export const JsonRpcRequestSchema = z
 
 export const JsonRpcResponseSchema = z
   .object({
-    jsonrpc: z.literal("2.0").optional(),
+    jsonrpc: z.literal(JSON_RPC_VERSION).optional(),
     id: z.number().int().nonnegative(),
     result: JsonValueSchema.optional(),
     error: z
@@ -56,9 +58,12 @@ export function parseJsonRpcResponse(value: JsonValue): JsonRpcResponse {
 
 export const JsonRpcNotificationSchema = z
   .object({
-    jsonrpc: z.literal("2.0").optional(),
+    jsonrpc: z.literal(JSON_RPC_VERSION).optional(),
     method: z.string().min(1),
-    params: JsonValueSchema.optional()
+    params: JsonValueSchema.optional(),
+    id: z.never().optional(),
+    result: z.never().optional(),
+    error: z.never().optional()
   })
   .passthrough();
 

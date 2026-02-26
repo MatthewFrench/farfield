@@ -8,6 +8,10 @@ import { z } from "zod";
 import type { EventStreamClientRegistry } from "../EventStreamClientRegistry.js";
 import type { RuntimeStateOwner } from "../../Application/StateManagement/RuntimeStateOwner.js";
 import type { BrowserSessionAuthOwner } from "../BrowserSessionAuthOwner.js";
+import {
+  RequestMethodByName,
+  RequestPathnameByName
+} from "../RequestPathContracts.js";
 
 const EventsSessionBootstrapBodySchema = z
   .object({
@@ -44,7 +48,7 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
     jsonResponse
   } = deps;
 
-  if (req.method === "GET" && pathname === "/events") {
+  if (req.method === RequestMethodByName.get && pathname === RequestPathnameByName.events) {
     const runtimeStateSnapshot = FarfieldHealthStateSchema.parse(runtimeStateOwner.readSnapshot());
     eventStreamClientRegistry.addClient(req, res, {
       type: "runtime-state-changed",
@@ -53,7 +57,7 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
     return true;
   }
 
-  if (req.method === "GET" && pathname === "/api/health") {
+  if (req.method === RequestMethodByName.get && pathname === RequestPathnameByName.apiHealth) {
     jsonResponse(res, 200, {
       ok: true,
       state: runtimeStateOwner.readSnapshot()
@@ -61,7 +65,7 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
     return true;
   }
 
-  if (req.method === "POST" && pathname === "/api/events/session") {
+  if (req.method === RequestMethodByName.post && pathname === RequestPathnameByName.apiEventsSession) {
     const currentSession = browserSessionAuthOwner.readSession(readHeaderValue(req, "cookie"));
     let bootstrapped = !apiAuthRequired || currentSession.authenticated;
     let expiresAt = currentSession.expiresAt;

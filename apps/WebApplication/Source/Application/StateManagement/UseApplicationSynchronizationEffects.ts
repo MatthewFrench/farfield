@@ -6,6 +6,8 @@ import {
   type LoadSelectedThreadOptions
 } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 
+const EMPTY_HISTORY_ENTRY_IDENTIFIER = "";
+
 export interface UseApplicationSynchronizationEffectsInput {
   loadCoreDataTracked: () => Promise<void>;
   loadCoreDataTrackedRef: MutableRefObject<(() => Promise<void>) | null>;
@@ -28,6 +30,10 @@ export function useApplicationSynchronizationEffects(
   }, [input.loadSelectedThreadTracked, input.loadSelectedThreadRef]);
 
   useEffect(() => {
+    if (input.selectedHistoryId === EMPTY_HISTORY_ENTRY_IDENTIFIER) {
+      return;
+    }
+
     void input.loadHistoryDetail(input.selectedHistoryId).catch((error) => {
       input.handleRuntimeRequestError(error);
     });

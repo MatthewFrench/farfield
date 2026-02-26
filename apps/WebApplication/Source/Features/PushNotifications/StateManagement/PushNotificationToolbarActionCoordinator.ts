@@ -1,10 +1,13 @@
 import type { PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
+import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { PushClientStateManager } from "../DataAccess/PushClientStateManager";
 
 interface PushNotificationToolbarActionCoordinatorDependencies {
   pushClientStateManager: PushClientStateManager;
   unsupportedPushClientState: PushClientState;
 }
+
+const PUSH_ENABLE_OPERATION_NAME = "push.enable";
 
 export interface RefreshPushClientStateInput {
   onPushClientStateRead: (state: PushClientState) => void;
@@ -30,6 +33,7 @@ export class PushNotificationToolbarActionCoordinator {
       const nextPushClientState = await this.pushClientStateManager.readPushClientState();
       input.onPushClientStateRead(nextPushClientState);
     } catch {
+      // Treat browser push read failures as unsupported so toolbar state is deterministic after capability loss.
       input.onPushClientStateRead(this.unsupportedPushClientState);
     }
   }
@@ -44,7 +48,7 @@ export class PushNotificationToolbarActionCoordinator {
         onPushClientStateRead: input.onPushClientStateRead
       });
     } catch (error) {
-      input.onSetErrorMessage(`push.enable: ${String(error)}`);
+      input.onSetErrorMessage(`${PUSH_ENABLE_OPERATION_NAME}: ${toErrorMessage(error)}`);
     } finally {
       input.onSetEnablingPushNotifications(false);
     }

@@ -349,6 +349,49 @@ describe("service worker notifications", () => {
     expect(receipt.url).toBe("/threads/thread_3");
   });
 
+  it("records error receipt when notification-click client navigation fails", async () => {
+    const harness = loadServiceWorkerHarness();
+    const clickHandler = harness.handlers.notificationclick;
+    expect(clickHandler).toBeDefined();
+
+    const failingNavigateMock = vi.fn(async () => {
+      throw new Error("navigation failed");
+    });
+    harness.matchAllMock.mockResolvedValueOnce([
+      {
+        url: "https://example.test/threads/thread_2",
+        focus: vi.fn(async () => undefined),
+        navigate: failingNavigateMock
+      }
+    ]);
+
+    const waitUntilPromises: Promise<void>[] = [];
+    clickHandler?.({
+      notification: {
+        close: vi.fn(),
+        data: {
+          notificationId: "notif_navigation_error",
+          url: "/threads/thread_1",
+          threadId: "thread_1",
+          turnId: "turn_1"
+        }
+      },
+      waitUntil: (promise) => {
+        waitUntilPromises.push(promise.then(() => undefined));
+      }
+    });
+
+    await Promise.all(waitUntilPromises);
+
+    expect(failingNavigateMock).toHaveBeenCalledTimes(1);
+    expect(harness.openWindowMock).not.toHaveBeenCalled();
+    expect(harness.fetchMock).toHaveBeenCalledTimes(1);
+    const receipt = receiptFromFetchCall(harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined);
+    expect(receipt.notificationId).toBe("notif_navigation_error");
+    expect(receipt.event).toBe("error");
+    expect(receipt.message).toContain("navigation failed");
+  });
+
   it("applies skip waiting command from message event", async () => {
     const harness = loadServiceWorkerHarness();
     const messageHandler = harness.handlers.message;
@@ -366,5 +409,24 @@ describe("service worker notifications", () => {
 
     await Promise.all(waitUntilPromises);
     expect(harness.skipWaitingMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores non skip-waiting message types", async () => {
+    const harness = loadServiceWorkerHarness();
+    const messageHandler = harness.handlers.message;
+    expect(messageHandler).toBeDefined();
+
+    const waitUntilPromises: Promise<void>[] = [];
+    messageHandler?.({
+      data: {
+        type: "NO_OPERATION"
+      },
+      waitUntil: (promise) => {
+        waitUntilPromises.push(promise.then(() => undefined));
+      }
+    });
+
+    await Promise.all(waitUntilPromises);
+    expect(harness.skipWaitingMock).not.toHaveBeenCalled();
   });
 });

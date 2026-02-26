@@ -9,6 +9,10 @@ import { logger } from "../../Shared/Logging/Logger.js";
 import type { AgentSendMessageInput } from "../Types.js";
 import type { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
 
+const RESUME_WITH_EXTENDED_HISTORY = true;
+const IPC_SEND_MESSAGE_FAILURE_LOG_EVENT = "codex-ipc-send-message-failed";
+const TURN_START_TEMPLATE_UNAVAILABLE_LOG_EVENT = "codex-turn-start-template-unavailable";
+
 export interface CodexMessageDispatchOwnerOptions {
   appClient: AppServerClient;
   service: CodexMonitorService;
@@ -61,7 +65,7 @@ export class CodexMessageDispatchOwner {
               ownerClientId,
               error: toErrorMessage(error)
             },
-            "codex-ipc-send-message-failed"
+            IPC_SEND_MESSAGE_FAILURE_LOG_EVENT
           );
           this.threadStreamStateOwner.clearThreadOwner(input.threadId);
         }
@@ -80,7 +84,7 @@ export class CodexMessageDispatchOwner {
     }
 
     await this.runAppServerCall(() =>
-      this.appClient.resumeThread(input.threadId, { persistExtendedHistory: true })
+      this.appClient.resumeThread(input.threadId, { persistExtendedHistory: RESUME_WITH_EXTENDED_HISTORY })
     );
     await this.runAppServerCall(() =>
       this.appClient.sendUserMessage(input.threadId, input.text)
@@ -120,7 +124,7 @@ export class CodexMessageDispatchOwner {
           ownerClientId,
           error: toErrorMessage(error)
         },
-        "codex-turn-start-template-unavailable"
+        TURN_START_TEMPLATE_UNAVAILABLE_LOG_EVENT
       );
       return null;
     }

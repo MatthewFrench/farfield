@@ -1,39 +1,78 @@
 import { describe, expect, it, vi } from "vitest";
-import { ChatRequestActionCoordinator } from "../Source/Features/Chat/StateManagement/ChatRequestActionCoordinator";
+import {
+  ChatRequestActionCoordinator,
+  type ChatRequestActionChatClient,
+  type ChatRequestActionThreadMutationClient
+} from "../Source/Features/Chat/StateManagement/ChatRequestActionCoordinator";
+
+const DEFAULT_AGENT_ID = "codex";
+const DEFAULT_THREAD_ID = "thread-1";
+const EXISTING_THREAD_ID = "thread-4";
+const SKIP_REQUEST_ID = 17;
+
+const buildActionRequestOptions = (actionName: string) => ({
+  actionId: `action-${actionName}`,
+  requestOptions: {
+    actionId: `action-${actionName}`,
+    actionName
+  }
+});
+
+function createChatClient(overrides?: {
+  sendMessage?: () => Promise<void>;
+  submitUserInput?: () => Promise<void>;
+  interruptThread?: () => Promise<void>;
+}): ChatRequestActionChatClient {
+  return {
+    sendMessage: vi.fn(overrides?.sendMessage ?? (async () => {})),
+    submitUserInput: vi.fn(overrides?.submitUserInput ?? (async () => {})),
+    interruptThread: vi.fn(overrides?.interruptThread ?? (async () => {}))
+  };
+}
+
+function createThreadMutationClient(
+  threadId: string = DEFAULT_THREAD_ID
+): ChatRequestActionThreadMutationClient {
+  return {
+    createThread: vi.fn(async () => ({ threadId }))
+  };
+}
+
+function createActionCallbacks() {
+  const busyStates: boolean[] = [];
+  return {
+    busyStates,
+    onSetBusy: (isBusy: boolean) => {
+      busyStates.push(isBusy);
+    },
+    onInvalidateActiveThreadQuery: vi.fn(),
+    onRefreshThreadData: vi.fn(async (_threadId: string) => {}),
+    reportTrackedUserInterfaceError: vi.fn(async () => {})
+  };
+}
 
 describe("ChatRequestActionCoordinator", () => {
   it("auto-creates thread for send-message when no thread is selected", async () => {
     const coordinator = new ChatRequestActionCoordinator();
-    const busyStates: boolean[] = [];
+    const {
+      busyStates,
+      onSetBusy,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError
+    } = createActionCallbacks();
     const markedThreads: string[] = [];
     const clearedThreads: string[] = [];
     const selectedThreads: string[] = [];
-    const onRefreshThreadData = vi.fn(async (_threadId: string) => {});
-    const onInvalidateActiveThreadQuery = vi.fn();
-    const reportTrackedUserInterfaceError = vi.fn(async () => {});
-    const chatClient = {
-      sendMessage: vi.fn(async () => {}),
-      submitUserInput: vi.fn(async () => {}),
-      interruptThread: vi.fn(async () => {})
-    };
-    const threadMutationClient = {
-      createThread: vi.fn(async () => ({ threadId: "thread-1" }))
-    };
+    const chatClient = createChatClient();
+    const threadMutationClient = createThreadMutationClient();
 
     await coordinator.sendMessage({
       draft: "hello world",
       selectedThreadId: null,
-      selectedAgentId: "codex",
-      buildActionRequestOptions: (actionName) => ({
-        actionId: `action-${actionName}`,
-        requestOptions: {
-          actionId: `action-${actionName}`,
-          actionName
-        }
-      }),
-      onSetBusy: (isBusy) => {
-        busyStates.push(isBusy);
-      },
+      selectedAgentId: DEFAULT_AGENT_ID,
+      buildActionRequestOptions,
+      onSetBusy,
       onThreadSelected: (threadId) => {
         selectedThreads.push(threadId);
       },
@@ -51,30 +90,66 @@ describe("ChatRequestActionCoordinator", () => {
     });
 
     expect(threadMutationClient.createThread).toHaveBeenCalledWith(
-      { agentId: "codex" },
+      { agentId: DEFAULT_AGENT_ID },
       { actionId: "action-send-message", actionName: "send-message" }
     );
     expect(chatClient.sendMessage).toHaveBeenCalledWith(
-      { threadId: "thread-1", text: "hello world" },
+      { threadId: DEFAULT_THREAD_ID, text: "hello world" },
       { actionId: "action-send-message", actionName: "send-message" }
     );
-    expect(markedThreads).toEqual(["thread-1"]);
-    expect(selectedThreads).toEqual(["thread-1"]);
-    expect(clearedThreads).toEqual(["thread-1"]);
+    expect(markedThreads).toEqual([DEFAULT_THREAD_ID]);
+    expect(selectedThreads).toEqual([DEFAULT_THREAD_ID]);
+    expect(clearedThreads).toEqual([DEFAULT_THREAD_ID]);
     expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
-    expect(onRefreshThreadData).toHaveBeenCalledWith("thread-1");
+    expect(onRefreshThreadData).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
     expect(onRefreshThreadData).toHaveBeenCalledTimes(1);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(busyStates).toEqual([true, false]);
   });
 
+  it("skips send-message when draft is blank after trimming", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const {
+      onSetBusy,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError
+    } = createActionCallbacks();
+    const onThreadSelected = vi.fn();
+    const onMarkThreadPendingMaterialization = vi.fn();
+    const onClearThreadPendingMaterialization = vi.fn();
+    const chatClient = createChatClient();
+    const threadMutationClient = createThreadMutationClient();
+
+    await coordinator.sendMessage({
+      draft: "   ",
+      selectedThreadId: null,
+      selectedAgentId: DEFAULT_AGENT_ID,
+      buildActionRequestOptions,
+      onSetBusy,
+      onThreadSelected,
+      onMarkThreadPendingMaterialization,
+      onClearThreadPendingMaterialization,
+      chatClient,
+      threadMutationClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError
+    });
+
+    expect(onThreadSelected).not.toHaveBeenCalled();
+    expect(onMarkThreadPendingMaterialization).not.toHaveBeenCalled();
+    expect(onClearThreadPendingMaterialization).not.toHaveBeenCalled();
+    expect(threadMutationClient.createThread).not.toHaveBeenCalled();
+    expect(chatClient.sendMessage).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
+    expect(onRefreshThreadData).not.toHaveBeenCalled();
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+  });
+
   it("skips submit-user-input when no selected thread exists", async () => {
     const coordinator = new ChatRequestActionCoordinator();
-    const chatClient = {
-      sendMessage: vi.fn(async () => {}),
-      submitUserInput: vi.fn(async () => {}),
-      interruptThread: vi.fn(async () => {})
-    };
+    const chatClient = createChatClient();
     const onRefreshThreadData = vi.fn(async (_threadId: string) => {});
     const onInvalidateActiveThreadQuery = vi.fn();
     const onSetBusy = vi.fn();
@@ -84,13 +159,7 @@ describe("ChatRequestActionCoordinator", () => {
       selectedThreadId: null,
       requestId: 12,
       answers: {},
-      buildActionRequestOptions: (actionName) => ({
-        actionId: `action-${actionName}`,
-        requestOptions: {
-          actionId: `action-${actionName}`,
-          actionName
-        }
-      }),
+      buildActionRequestOptions,
       onSetBusy,
       chatClient,
       onInvalidateActiveThreadQuery,
@@ -105,30 +174,73 @@ describe("ChatRequestActionCoordinator", () => {
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
   });
 
+  it("submits pending user input and refreshes selected thread", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const {
+      busyStates,
+      onSetBusy,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError
+    } = createActionCallbacks();
+    const chatClient = createChatClient();
+    const answers = {
+      question_1: {
+        answers: ["alpha"]
+      }
+    };
+
+    await coordinator.submitPendingUserInput({
+      selectedThreadId: DEFAULT_THREAD_ID,
+      requestId: 12,
+      answers,
+      buildActionRequestOptions,
+      onSetBusy,
+      chatClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError
+    });
+
+    expect(chatClient.submitUserInput).toHaveBeenCalledWith(
+      {
+        threadId: DEFAULT_THREAD_ID,
+        requestId: 12,
+        response: {
+          answers
+        }
+      },
+      {
+        actionId: "action-submit-user-input",
+        actionName: "submit-user-input"
+      }
+    );
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onRefreshThreadData).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
+    expect(onRefreshThreadData).toHaveBeenCalledTimes(1);
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
+  });
+
   it("reports skip-user-input errors and resets busy state", async () => {
     const coordinator = new ChatRequestActionCoordinator();
-    const onSetBusy = vi.fn();
-    const onInvalidateActiveThreadQuery = vi.fn();
-    const onRefreshThreadData = vi.fn(async (_threadId: string) => {});
-    const reportTrackedUserInterfaceError = vi.fn(async () => {});
-    const chatClient = {
-      sendMessage: vi.fn(async () => {}),
-      submitUserInput: vi.fn(async () => {
+    const {
+      busyStates,
+      onSetBusy,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError
+    } = createActionCallbacks();
+    const chatClient = createChatClient({
+      submitUserInput: async () => {
         throw new Error("skip failed");
-      }),
-      interruptThread: vi.fn(async () => {})
-    };
+      }
+    });
 
     await coordinator.skipPendingUserInput({
       selectedThreadId: "thread-2",
-      requestId: 17,
-      buildActionRequestOptions: (actionName) => ({
-        actionId: `action-${actionName}`,
-        requestOptions: {
-          actionId: `action-${actionName}`,
-          actionName
-        }
-      }),
+      requestId: SKIP_REQUEST_ID,
+      buildActionRequestOptions,
       onSetBusy,
       chatClient,
       onInvalidateActiveThreadQuery,
@@ -139,7 +251,7 @@ describe("ChatRequestActionCoordinator", () => {
     expect(chatClient.submitUserInput).toHaveBeenCalledWith(
       {
         threadId: "thread-2",
-        requestId: 17,
+        requestId: SKIP_REQUEST_ID,
         response: { answers: {} }
       },
       {
@@ -155,33 +267,26 @@ describe("ChatRequestActionCoordinator", () => {
       threadId: "thread-2",
       error: "skip failed",
       details: {
-        requestId: 17
+        requestId: SKIP_REQUEST_ID
       }
     });
-    expect(onSetBusy.mock.calls).toEqual([[true], [false]]);
+    expect(busyStates).toEqual([true, false]);
   });
 
   it("interrupts selected thread and refreshes data", async () => {
     const coordinator = new ChatRequestActionCoordinator();
-    const onSetBusy = vi.fn();
-    const onInvalidateActiveThreadQuery = vi.fn();
-    const onRefreshThreadData = vi.fn(async (_threadId: string) => {});
-    const reportTrackedUserInterfaceError = vi.fn(async () => {});
-    const chatClient = {
-      sendMessage: vi.fn(async () => {}),
-      submitUserInput: vi.fn(async () => {}),
-      interruptThread: vi.fn(async () => {})
-    };
+    const {
+      busyStates,
+      onSetBusy,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError
+    } = createActionCallbacks();
+    const chatClient = createChatClient();
 
     await coordinator.interruptThread({
-      selectedThreadId: "thread-4",
-      buildActionRequestOptions: (actionName) => ({
-        actionId: `action-${actionName}`,
-        requestOptions: {
-          actionId: `action-${actionName}`,
-          actionName
-        }
-      }),
+      selectedThreadId: EXISTING_THREAD_ID,
+      buildActionRequestOptions,
       onSetBusy,
       chatClient,
       onInvalidateActiveThreadQuery,
@@ -190,13 +295,38 @@ describe("ChatRequestActionCoordinator", () => {
     });
 
     expect(chatClient.interruptThread).toHaveBeenCalledWith(
-      { threadId: "thread-4" },
+      { threadId: EXISTING_THREAD_ID },
       { actionId: "action-interrupt-thread", actionName: "interrupt-thread" }
     );
     expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
-    expect(onRefreshThreadData).toHaveBeenCalledWith("thread-4");
+    expect(onRefreshThreadData).toHaveBeenCalledWith(EXISTING_THREAD_ID);
     expect(onRefreshThreadData).toHaveBeenCalledTimes(1);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
-    expect(onSetBusy.mock.calls).toEqual([[true], [false]]);
+    expect(busyStates).toEqual([true, false]);
+  });
+
+  it("skips interrupt-thread when no selected thread exists", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const onSetBusy = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onRefreshThreadData = vi.fn(async (_threadId: string) => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const chatClient = createChatClient();
+
+    await coordinator.interruptThread({
+      selectedThreadId: null,
+      buildActionRequestOptions,
+      onSetBusy,
+      chatClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError
+    });
+
+    expect(onSetBusy).not.toHaveBeenCalled();
+    expect(chatClient.interruptThread).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
+    expect(onRefreshThreadData).not.toHaveBeenCalled();
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
   });
 });

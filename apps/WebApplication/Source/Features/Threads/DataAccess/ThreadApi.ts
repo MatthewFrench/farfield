@@ -15,6 +15,28 @@ import {
   requestInitWithOptions
 } from "@/Shared/Transport/FarfieldHttpTransport";
 
+const THREADS_ROUTE_PATH = "/api/threads";
+const LIST_THREADS_LIMIT_QUERY_KEY = "limit";
+const LIST_THREADS_ARCHIVED_QUERY_KEY = "archived";
+const LIST_THREADS_ALL_QUERY_KEY = "all";
+const LIST_THREADS_MAX_PAGES_QUERY_KEY = "maxPages";
+const LIST_THREADS_SORT_KEY_QUERY_KEY = "sortKey";
+const LIST_THREADS_CURRENT_WORKING_DIRECTORY_QUERY_KEY = "cwd";
+const READ_THREAD_INCLUDE_TURNS_QUERY_KEY = "includeTurns";
+const BOOLEAN_TRUE_QUERY_VALUE = "true";
+const BOOLEAN_FALSE_QUERY_VALUE = "false";
+const THREAD_PROJECT_STATE_ACTIVE = "active";
+const THREAD_PROJECT_STATE_REMOVED = "removed";
+const NO_UNREAD_TURN_SIGNAL = null;
+
+const ThreadProjectStateSchema = z.enum([
+  THREAD_PROJECT_STATE_ACTIVE,
+  THREAD_PROJECT_STATE_REMOVED
+]);
+const OptionalThreadListCursorSchema = z
+  .union([z.string(), z.null(), z.undefined()])
+  .transform((value) => value ?? null);
+
 // Thread-list responses come from heterogeneous adapters; parse permissive wire payloads once,
 // then immediately normalize to a strict app-owned contract used by thread state owners.
 const ThreadListItemWireSchema = AppServerListThreadsResponseSchema.shape.data.element.and(
@@ -23,7 +45,8 @@ const ThreadListItemWireSchema = AppServerListThreadsResponseSchema.shape.data.e
     source: z.string().optional(),
     removed: z.boolean().optional(),
     projectRemoved: z.boolean().optional(),
-    projectState: z.enum(["active", "removed"]).optional()
+    projectState: ThreadProjectStateSchema.optional(),
+    hasUnreadTurn: z.boolean().optional()
   }).passthrough()
 );
 
@@ -37,11 +60,23 @@ const ThreadListItemContractSchema = z
     path: z.string().nullable().optional(),
     agentId: AgentIdSchema,
     source: z.string().optional(),
-    removed: z.boolean().optional(),
-    projectRemoved: z.boolean().optional(),
-    projectState: z.enum(["active", "removed"]).optional()
+    hasUnreadTurn: z.union([z.boolean(), z.null()]),
+    isProjectRemoved: z.boolean()
   })
   .strict();
+type ThreadListItemWire = z.infer<typeof ThreadListItemWireSchema>;
+
+function readThreadHasUnreadTurnSignal(value: boolean | undefined): boolean | null {
+  return value ?? NO_UNREAD_TURN_SIGNAL;
+}
+
+function readThreadProjectRemovedState(value: ThreadListItemWire): boolean {
+  return (
+    value.projectRemoved === true
+    || value.removed === true
+    || value.projectState === THREAD_PROJECT_STATE_REMOVED
+  );
+}
 
 const ThreadListItemSchema = ThreadListItemWireSchema.transform((value) => {
   return ThreadListItemContractSchema.parse({
@@ -53,16 +88,15 @@ const ThreadListItemSchema = ThreadListItemWireSchema.transform((value) => {
     path: value.path,
     agentId: value.agentId,
     source: value.source,
-    removed: value.removed,
-    projectRemoved: value.projectRemoved,
-    projectState: value.projectState
+    hasUnreadTurn: readThreadHasUnreadTurnSignal(value.hasUnreadTurn),
+    isProjectRemoved: readThreadProjectRemovedState(value)
   });
 });
 
 const ThreadListResponseSchema = z
   .object({
     data: z.array(ThreadListItemSchema),
-    nextCursor: z.union([z.string(), z.null(), z.undefined()]).transform((v) => v ?? null),
+    nextCursor: OptionalThreadListCursorSchema,
     pages: z.number().int().nonnegative().optional(),
     truncated: z.boolean().optional()
   })
@@ -89,7 +123,7 @@ const ThreadListEnvelopeSchema = z
   .transform(({ ok: _ok, ...threadListResponse }) => threadListResponse);
 
 const ReadThreadResponseWithAgentSchema = AppServerReadThreadResponseSchema.extend({
-  agentId: z.enum(["codex", "opencode"])
+  agentId: AgentIdSchema
 });
 export type ApiReadThreadResponse = z.infer<typeof ReadThreadResponseWithAgentSchema>;
 
@@ -102,6 +136,7 @@ const ReadThreadResponseEnvelopeSchema = z
     ok: z.literal(true)
   })
   .merge(ReadThreadResponseWithAgentSchema)
+  .strict()
   .transform(({ ok: _ok, ...readThreadResponse }) => readThreadResponse);
 
 const CreateThreadResponseWireSchema = z
@@ -121,14 +156,7 @@ const CreateThreadResponseSchema = z
   .strict();
 export type ApiCreateThreadResponse = z.infer<typeof CreateThreadResponseSchema>;
 
-const ArchiveThreadResponseSchema = z
-  .object({
-    ok: z.literal(true),
-    threadId: z.string().min(1)
-  })
-  .strict();
-
-const UnarchiveThreadResponseSchema = z
+const ThreadMutationResponseSchema = z
   .object({
     ok: z.literal(true),
     threadId: z.string().min(1)
@@ -146,20 +174,40 @@ export interface ApiCreateThreadInput {
   ephemeral?: boolean;
 }
 
-export async function listThreads(options: ApiListThreadsOptions): Promise<ApiThreadListResponse> {
-  const params = new URLSearchParams();
-  params.set("limit", String(options.limit));
-  params.set("archived", options.archived ? "true" : "false");
-  params.set("all", options.all ? "true" : "false");
-  params.set("maxPages", String(options.maxPages));
+function readBooleanQueryValue(value: boolean): string {
+  return value ? BOOLEAN_TRUE_QUERY_VALUE : BOOLEAN_FALSE_QUERY_VALUE;
+}
+
+function buildThreadListSearchParameters(options: ApiListThreadsOptions): URLSearchParams {
+  const parameters = new URLSearchParams();
+  parameters.set(LIST_THREADS_LIMIT_QUERY_KEY, String(options.limit));
+  parameters.set(LIST_THREADS_ARCHIVED_QUERY_KEY, readBooleanQueryValue(options.archived));
+  parameters.set(LIST_THREADS_ALL_QUERY_KEY, readBooleanQueryValue(options.all));
+  parameters.set(LIST_THREADS_MAX_PAGES_QUERY_KEY, String(options.maxPages));
+
   if (options.sortKey) {
-    params.set("sortKey", options.sortKey);
+    parameters.set(LIST_THREADS_SORT_KEY_QUERY_KEY, options.sortKey);
   }
   if (options.cwd) {
-    params.set("cwd", options.cwd);
+    parameters.set(LIST_THREADS_CURRENT_WORKING_DIRECTORY_QUERY_KEY, options.cwd);
   }
 
-  const data = await request(`/api/threads?${params.toString()}`, requestInitWithOptions(options));
+  return parameters;
+}
+
+function buildReadThreadRequestPath(threadId: string, includeTurns: boolean): string {
+  const threadRoutePath = `${THREADS_ROUTE_PATH}/${encodeURIComponent(threadId)}`;
+  const queryParameters = new URLSearchParams();
+  queryParameters.set(READ_THREAD_INCLUDE_TURNS_QUERY_KEY, readBooleanQueryValue(includeTurns));
+  return `${threadRoutePath}?${queryParameters.toString()}`;
+}
+
+export async function listThreads(options: ApiListThreadsOptions): Promise<ApiThreadListResponse> {
+  const queryParameters = buildThreadListSearchParameters(options);
+  const data = await request(
+    `${THREADS_ROUTE_PATH}?${queryParameters.toString()}`,
+    requestInitWithOptions(options)
+  );
   return ThreadListEnvelopeSchema.parse(data);
 }
 
@@ -169,7 +217,7 @@ export async function readThread(
 ): Promise<ApiReadThreadResponse> {
   const includeTurns = options?.includeTurns ?? true;
   const data = await request(
-    `/api/threads/${encodeURIComponent(threadId)}?includeTurns=${includeTurns ? "true" : "false"}`,
+    buildReadThreadRequestPath(threadId, includeTurns),
     requestInitWithOptions(options)
   );
   return ReadThreadResponseEnvelopeSchema.parse(data);
@@ -180,7 +228,7 @@ export async function createThread(
   options?: ApiRequestOptions
 ): Promise<ApiCreateThreadResponse> {
   const data = await request(
-    "/api/threads",
+    THREADS_ROUTE_PATH,
     applyRequestOptions(
       {
         method: "POST",
@@ -201,7 +249,7 @@ export async function createThread(
 
 export async function archiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {
   const data = await request(
-    `/api/threads/${encodeURIComponent(threadId)}/archive`,
+    `${THREADS_ROUTE_PATH}/${encodeURIComponent(threadId)}/archive`,
     applyRequestOptions(
       {
         method: "POST"
@@ -209,12 +257,12 @@ export async function archiveThread(threadId: string, options?: ApiRequestOption
       options
     )
   );
-  ArchiveThreadResponseSchema.parse(data);
+  ThreadMutationResponseSchema.parse(data);
 }
 
 export async function unarchiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {
   const data = await request(
-    `/api/threads/${encodeURIComponent(threadId)}/unarchive`,
+    `${THREADS_ROUTE_PATH}/${encodeURIComponent(threadId)}/unarchive`,
     applyRequestOptions(
       {
         method: "POST"
@@ -222,5 +270,5 @@ export async function unarchiveThread(threadId: string, options?: ApiRequestOpti
       options
     )
   );
-  UnarchiveThreadResponseSchema.parse(data);
+  ThreadMutationResponseSchema.parse(data);
 }

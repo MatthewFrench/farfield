@@ -12,11 +12,31 @@ type ChatComposerProps = {
   onSend: (text: string) => void | Promise<void>;
 };
 
+const DEFAULT_PLACEHOLDER_TEXT = "Message Codex…";
+const MAX_TEXTAREA_HEIGHT_PIXELS = 200;
+const SUBMIT_DRAFT_KEY = "Enter";
+const SEND_ACTION_LABEL = "Send";
+const STOP_ACTION_LABEL = "Stop";
+
+type DraftSubmissionState = {
+  canSend: boolean;
+  isBusy: boolean;
+  draft: string;
+};
+
+function canSubmitDraft(state: DraftSubmissionState): boolean {
+  return state.canSend && !state.isBusy && state.draft.trim().length > 0;
+}
+
+function isSubmitShortcutPressed(event: React.KeyboardEvent<HTMLTextAreaElement>): boolean {
+  return event.key === SUBMIT_DRAFT_KEY && (event.metaKey || event.ctrlKey);
+}
+
 export function ChatComposer({
   canSend,
   isBusy,
   isGenerating,
-  placeholder = "Message Codex…",
+  placeholder = DEFAULT_PLACEHOLDER_TEXT,
   onInterrupt,
   onSend
 }: ChatComposerProps): React.JSX.Element {
@@ -31,9 +51,9 @@ export function ChatComposer({
       return;
     }
 
-    const maxHeight = 200;
     textarea.style.height = "auto";
-    const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
+    // Keep draft growth bounded so long messages do not displace chat history.
+    const nextHeight = Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT_PIXELS);
     const currentHeight = previousHeightRef.current;
 
     if (currentHeight <= 0) {
@@ -80,7 +100,7 @@ export function ChatComposer({
       await onInterrupt();
       return;
     }
-    if (!draft.trim() || !canSend || isBusy) {
+    if (!canSubmitDraft({ canSend, isBusy, draft })) {
       return;
     }
 
@@ -89,7 +109,9 @@ export function ChatComposer({
     previousHeightRef.current = 0;
   }, [canSend, draft, isBusy, isGenerating, onInterrupt, onSend]);
 
-  const disableSend = isGenerating ? !canSend || isBusy : !canSend || isBusy || !draft.trim();
+  const canSubmitCurrentDraft = canSubmitDraft({ canSend, isBusy, draft });
+  const disableSend = isGenerating ? !canSend || isBusy : !canSubmitCurrentDraft;
+  const sendActionLabel = isGenerating ? STOP_ACTION_LABEL : SEND_ACTION_LABEL;
 
   return (
     <div className="flex items-end gap-2 rounded-[28px] border border-border bg-card pl-4 pr-2.5 py-2.5 focus-within:border-muted-foreground/40 transition-colors">
@@ -101,14 +123,15 @@ export function ChatComposer({
           resizeTextarea();
         }}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+          if (isSubmitShortcutPressed(e)) {
             e.preventDefault();
             void sendDraft();
           }
         }}
         placeholder={placeholder}
         rows={1}
-        className="flex-1 min-h-9 max-h-[200px] resize-none overflow-y-auto border-0 bg-transparent px-0 py-2 text-base leading-5 shadow-none transition-[height] duration-90 ease-out focus-visible:ring-0 md:text-sm"
+        style={{ maxHeight: `${MAX_TEXTAREA_HEIGHT_PIXELS}px` }}
+        className="flex-1 min-h-9 resize-none overflow-y-auto border-0 bg-transparent px-0 py-2 text-base leading-5 shadow-none transition-[height] duration-90 ease-out focus-visible:ring-0 md:text-sm"
       />
       <Button
         type="button"
@@ -116,8 +139,8 @@ export function ChatComposer({
           void sendDraft();
         }}
         disabled={disableSend}
-        title={isGenerating ? "Stop" : "Send"}
-        aria-label={isGenerating ? "Stop" : "Send"}
+        title={sendActionLabel}
+        aria-label={sendActionLabel}
         size="icon"
         className={`h-9 w-9 shrink-0 self-end rounded-full disabled:opacity-30 ${
           isGenerating

@@ -1,7 +1,10 @@
-import { parseBody, SendMessageBodySchema } from "../RequestSchemas/HttpSchemas.js";
-import type {
-  ThreadMemberRouteDependencies,
-  ThreadMemberResolvedRouteContext
+import { parseSendMessageBody } from "../RequestSchemas/HttpSchemas.js";
+import {
+  ThreadMemberMutationActionByName,
+  ThreadMemberRouteMethodByName,
+  ThreadMemberRouteSegmentByName,
+  type ThreadMemberRouteDependencies,
+  type ThreadMemberResolvedRouteContext
 } from "./ThreadMemberRouteContracts.js";
 
 export interface ThreadMemberMessageMutationRouteOwnerOptions {
@@ -31,16 +34,16 @@ export class ThreadMemberMessageMutationRouteOwner {
     const { adapter, agentId, threadId } = this.context;
 
     if (!(
-      req.method === "POST"
+      req.method === ThreadMemberRouteMethodByName.post
       && this.dependencies.segments.length === 4
-      && this.dependencies.segments[3] === "messages"
+      && this.dependencies.segments[3] === ThreadMemberRouteSegmentByName.messages
     )) {
       return false;
     }
 
-    const body = parseBody(SendMessageBodySchema, await readJsonBody(req));
+    const body = parseSendMessageBody(await readJsonBody(req));
 
-    pushActionEventWithRequestContext("messages", "attempt", {
+    pushActionEventWithRequestContext(ThreadMemberMutationActionByName.messages, "attempt", {
       agentId,
       threadId,
       textLength: body.text.length
@@ -57,7 +60,7 @@ export class ThreadMemberMessageMutationRouteOwner {
         });
       });
     } catch (error) {
-      const message = pushActionErrorWithRequestContext("messages", error, {
+      const message = pushActionErrorWithRequestContext(ThreadMemberMutationActionByName.messages, error, {
         agentId,
         threadId
       });
@@ -65,7 +68,7 @@ export class ThreadMemberMessageMutationRouteOwner {
       return true;
     }
 
-    pushActionEventWithRequestContext("messages", "success", {
+    pushActionEventWithRequestContext(ThreadMemberMutationActionByName.messages, "success", {
       agentId,
       threadId
     });

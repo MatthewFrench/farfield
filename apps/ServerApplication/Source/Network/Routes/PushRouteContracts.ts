@@ -11,6 +11,29 @@ import type { PushService } from "../../Modules/PushNotifications/PushService.js
 import type { PushStore } from "../../Modules/PushNotifications/PushStore.js";
 import type { PushMutationConcurrencyCoordinator } from "../PushMutationConcurrencyCoordinator.js";
 
+export const PushRouteMethodByName = {
+  get: "GET",
+  post: "POST",
+  delete: "DELETE"
+} as const;
+
+export const PushRoutePathnameByName = {
+  status: "/api/push/status",
+  vapidPublicKey: "/api/push/vapid-public-key",
+  receiptsLatest: "/api/push/receipts/latest",
+  receipts: "/api/push/receipts",
+  sendsLatest: "/api/push/sends/latest",
+  localCa: "/api/push/local-ca",
+  localCaDownload: "/api/push/local-ca/download",
+  subscriptions: "/api/push/subscriptions",
+  test: "/api/push/test"
+} as const;
+
+export const PushRouteSegmentByName = {
+  api: "api",
+  push: "push"
+} as const;
+
 export interface PushRouteDependencies {
   req: IncomingMessage;
   res: ServerResponse;

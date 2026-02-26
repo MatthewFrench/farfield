@@ -117,6 +117,35 @@ describe("DebugIssueStateResolver", () => {
     expect(filteredWarningIssuesByQuery[0]?.severity).toBe("warning");
   });
 
+  it("normalizes filter query casing and surrounding whitespace", () => {
+    const resolver = new DebugIssueStateResolver();
+    const debugIssues = resolver.readCombinedDebugIssues({
+      debugErrorIssues: resolver.readDebugErrorIssues([
+        buildDebugError({
+          errorId: "error-alpha",
+          operation: "alpha.operation",
+          message: "alpha failure",
+          occurredAt: "2025-01-01T10:00:00.000Z"
+        })
+      ]),
+      debugWarningIssues: resolver.readDebugWarningIssues([
+        buildHistoryWarningEntry({
+          id: "warning-beta",
+          at: "2025-01-01T10:30:00.000Z",
+          method: "warning.beta"
+        })
+      ])
+    });
+
+    const filteredIssues = resolver.readFilteredDebugIssues({
+      debugIssues,
+      severityFilter: "all",
+      filterQuery: "   ALPHA FAILURE   "
+    });
+
+    expect(filteredIssues.map((issue) => issue.id)).toEqual(["error:error-alpha"]);
+  });
+
   it("resolves selected issue and next selected identifier", () => {
     const resolver = new DebugIssueStateResolver();
     const debugIssues = resolver.readCombinedDebugIssues({

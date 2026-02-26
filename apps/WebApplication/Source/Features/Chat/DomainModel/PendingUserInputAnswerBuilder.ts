@@ -11,6 +11,13 @@ export type PendingUserInputAnswerDraftByQuestionId = Record<string, PendingUser
 
 export type PendingUserInputAnswersByQuestionId = Record<string, { answers: string[] }>;
 
+export function createEmptyPendingUserInputAnswerDraft(): PendingUserInputAnswerDraft {
+  return {
+    option: "",
+    freeform: ""
+  };
+}
+
 export class PendingUserInputAnswerBuilder {
   public buildAnswersByQuestionId(input: {
     questions: PendingUserInputQuestionLike[];
@@ -18,10 +25,7 @@ export class PendingUserInputAnswerBuilder {
   }): PendingUserInputAnswersByQuestionId {
     const answersByQuestionId: PendingUserInputAnswersByQuestionId = {};
     for (const question of input.questions) {
-      const draft = input.answerDraftByQuestionId[question.id] ?? {
-        option: "",
-        freeform: ""
-      };
+      const draft = input.answerDraftByQuestionId[question.id] ?? createEmptyPendingUserInputAnswerDraft();
       const answerText = draft.option || draft.freeform.trim();
       if (answerText) {
         answersByQuestionId[question.id] = {

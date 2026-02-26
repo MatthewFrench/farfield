@@ -7,6 +7,8 @@ import {
 } from "react";
 import { ChatScrollStateCoordinator } from "./ChatScrollStateCoordinator";
 
+const CHAT_TAB_IDENTIFIER = "chat";
+
 export interface UseChatScrollEffectsInput {
   activeTab: "chat" | "debug";
   selectedThreadId: string | null;
@@ -22,26 +24,40 @@ export interface UseChatScrollEffectsInput {
 }
 
 export function useChatScrollEffects(input: UseChatScrollEffectsInput): void {
-  useEffect(() => {
-    input.isChatAtBottomRef.current = input.isChatAtBottom;
-  }, [input.isChatAtBottom, input.isChatAtBottomRef]);
+  const {
+    activeTab,
+    selectedThreadId,
+    conversationItemCount,
+    initialVisibleChatItemCount,
+    scrollRef,
+    chatContentRef,
+    isChatAtBottom,
+    isChatAtBottomRef,
+    setIsChatAtBottom,
+    setVisibleChatItemLimit,
+    chatScrollStateCoordinator
+  } = input;
 
   useEffect(() => {
-    if (input.activeTab !== "chat" || !input.scrollRef.current) {
+    isChatAtBottomRef.current = isChatAtBottom;
+  }, [isChatAtBottom, isChatAtBottomRef]);
+
+  useEffect(() => {
+    if (activeTab !== CHAT_TAB_IDENTIFIER || !scrollRef.current) {
       return;
     }
 
-    const scroller = input.scrollRef.current;
+    const scroller = scrollRef.current;
     let rafId: number | null = null;
 
     const syncBottomState = () => {
-      const synchronizationResult = input.chatScrollStateCoordinator.synchronizeBottomState({
+      const synchronizationResult = chatScrollStateCoordinator.synchronizeBottomState({
         scrollElement: scroller,
-        previousIsAtBottom: input.isChatAtBottomRef.current
+        previousIsAtBottom: isChatAtBottomRef.current
       });
       if (synchronizationResult.changed) {
-        input.isChatAtBottomRef.current = synchronizationResult.nextIsAtBottom;
-        input.setIsChatAtBottom(synchronizationResult.nextIsAtBottom);
+        isChatAtBottomRef.current = synchronizationResult.nextIsAtBottom;
+        setIsChatAtBottom(synchronizationResult.nextIsAtBottom);
       }
       rafId = null;
     };
@@ -62,44 +78,44 @@ export function useChatScrollEffects(input: UseChatScrollEffectsInput): void {
       }
     };
   }, [
-    input.activeTab,
-    input.chatScrollStateCoordinator,
-    input.isChatAtBottomRef,
-    input.scrollRef,
-    input.selectedThreadId,
-    input.setIsChatAtBottom
+    activeTab,
+    chatScrollStateCoordinator,
+    isChatAtBottomRef,
+    scrollRef,
+    selectedThreadId,
+    setIsChatAtBottom
   ]);
 
   useEffect(() => {
-    if (input.activeTab === "chat" && input.isChatAtBottomRef.current && input.scrollRef.current) {
-      input.chatScrollStateCoordinator.pinToBottom(input.scrollRef.current);
+    if (activeTab === CHAT_TAB_IDENTIFIER && isChatAtBottomRef.current && scrollRef.current) {
+      chatScrollStateCoordinator.pinToBottom(scrollRef.current);
     }
   }, [
-    input.activeTab,
-    input.chatScrollStateCoordinator,
-    input.conversationItemCount,
-    input.isChatAtBottomRef,
-    input.scrollRef
+    activeTab,
+    chatScrollStateCoordinator,
+    conversationItemCount,
+    isChatAtBottomRef,
+    scrollRef
   ]);
 
   useEffect(() => {
-    if (input.activeTab !== "chat" || !input.scrollRef.current || !input.chatContentRef.current) {
+    if (activeTab !== CHAT_TAB_IDENTIFIER || !scrollRef.current || !chatContentRef.current) {
       return;
     }
 
-    const scroller = input.scrollRef.current;
-    const content = input.chatContentRef.current;
+    const scroller = scrollRef.current;
+    const content = chatContentRef.current;
     let rafId: number | null = null;
 
     const observer = new ResizeObserver(() => {
-      if (!input.isChatAtBottomRef.current) {
+      if (!isChatAtBottomRef.current) {
         return;
       }
       if (rafId !== null) {
         return;
       }
       rafId = window.requestAnimationFrame(() => {
-        input.chatScrollStateCoordinator.pinToBottom(scroller);
+        chatScrollStateCoordinator.pinToBottom(scroller);
         rafId = null;
       });
     });
@@ -111,30 +127,30 @@ export function useChatScrollEffects(input: UseChatScrollEffectsInput): void {
       }
     };
   }, [
-    input.activeTab,
-    input.chatContentRef,
-    input.chatScrollStateCoordinator,
-    input.isChatAtBottomRef,
-    input.scrollRef,
-    input.selectedThreadId
+    activeTab,
+    chatContentRef,
+    chatScrollStateCoordinator,
+    isChatAtBottomRef,
+    scrollRef,
+    selectedThreadId
   ]);
 
   useEffect(() => {
-    if (input.activeTab !== "chat" || !input.scrollRef.current) {
+    if (activeTab !== CHAT_TAB_IDENTIFIER || !scrollRef.current) {
       return;
     }
-    input.chatScrollStateCoordinator.pinToBottom(input.scrollRef.current);
-    input.isChatAtBottomRef.current = true;
-    input.setIsChatAtBottom(true);
-    input.setVisibleChatItemLimit(input.initialVisibleChatItemCount);
+    chatScrollStateCoordinator.pinToBottom(scrollRef.current);
+    isChatAtBottomRef.current = true;
+    setIsChatAtBottom(true);
+    setVisibleChatItemLimit(initialVisibleChatItemCount);
   }, [
-    input.activeTab,
-    input.chatScrollStateCoordinator,
-    input.initialVisibleChatItemCount,
-    input.isChatAtBottomRef,
-    input.scrollRef,
-    input.selectedThreadId,
-    input.setIsChatAtBottom,
-    input.setVisibleChatItemLimit
+    activeTab,
+    chatScrollStateCoordinator,
+    initialVisibleChatItemCount,
+    isChatAtBottomRef,
+    scrollRef,
+    selectedThreadId,
+    setIsChatAtBottom,
+    setVisibleChatItemLimit
   ]);
 }

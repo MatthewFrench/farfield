@@ -7,6 +7,7 @@ import { cn } from "@/Shared/Styling/ClassNameMerge"
 const labelVariants = cva(
   "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
 )
+const LABEL_COMPONENT_DISPLAY_NAME = "Label"
 
 const Label = React.forwardRef<
   React.ElementRef<typeof LabelPrimitive.Root>,
@@ -19,6 +20,6 @@ const Label = React.forwardRef<
     {...props}
   />
 ))
-Label.displayName = LabelPrimitive.Root.displayName
+Label.displayName = LABEL_COMPONENT_DISPLAY_NAME
 
 export { Label }

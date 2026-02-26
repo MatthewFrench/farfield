@@ -33,41 +33,44 @@ export type ChatInterruptThreadInput = ApiInterruptThreadInput;
  * Concurrency, retry, and snapshot-merge policy are handled by state coordinators.
  */
 export class ChatServerClient {
-  public async readThread(threadId: string, options?: ApiReadThreadOptions): Promise<ApiReadThreadResponse> {
+  public async readThread(
+    threadId: string,
+    options?: ChatReadThreadOptions
+  ): Promise<ChatReadThreadResponse> {
     return readThread(threadId, options);
   }
 
-  public async readLiveState(threadId: string, options?: ApiRequestOptions): Promise<ApiLiveStateResponse> {
+  public async readLiveState(threadId: string, options?: ApiRequestOptions): Promise<ChatLiveStateResponse> {
     return getLiveState(threadId, options);
   }
 
   public async readStreamEvents(
     threadId: string,
-    options?: ApiReadStreamEventsOptions
-  ): Promise<ApiStreamEventsResponse> {
+    options?: ChatReadStreamEventsOptions
+  ): Promise<ChatStreamEventsResponse> {
     return getStreamEvents(threadId, options);
   }
 
-  public async sendMessage(input: ApiSendMessageInput, options?: ApiRequestOptions): Promise<void> {
+  public async sendMessage(input: ChatSendMessageInput, options?: ApiRequestOptions): Promise<void> {
     return sendMessage(input, options);
   }
 
   public async setCollaborationMode(
-    input: ApiSetCollaborationModeInput,
+    input: ChatSetCollaborationModeInput,
     options?: ApiRequestOptions
   ): Promise<void> {
     return setCollaborationMode(input, options);
   }
 
   public async submitUserInput(
-    input: ApiSubmitUserInputInput,
+    input: ChatSubmitUserInputInput,
     options?: ApiRequestOptions
   ): Promise<void> {
     return submitUserInput(input, options);
   }
 
   public async interruptThread(
-    input: ApiInterruptThreadInput,
+    input: ChatInterruptThreadInput,
     options?: ApiRequestOptions
   ): Promise<void> {
     return interruptThread(input, options);

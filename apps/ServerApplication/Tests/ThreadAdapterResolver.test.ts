@@ -330,4 +330,21 @@ describe("ThreadAdapterResolver", () => {
     expect(statistics.unregisteredDiscoveryProbeFailureCount).toBe(1);
     expect(statistics.unregisteredDiscoveryMissCount).toBe(0);
   });
+
+  it("rejects non-positive or non-integer miss cache ttl configuration", () => {
+    const registry = new AgentRegistry([]);
+    const threadIndex = new ThreadIndex();
+
+    expect(() => {
+      new ThreadAdapterResolver(registry, threadIndex, {
+        unregisteredThreadMissTimeToLiveMs: 0
+      });
+    }).toThrowError("ThreadAdapterResolver requires positive integer unregisteredThreadMissTimeToLiveMs");
+
+    expect(() => {
+      new ThreadAdapterResolver(registry, threadIndex, {
+        unregisteredThreadMissTimeToLiveMs: 1.5
+      });
+    }).toThrowError("ThreadAdapterResolver requires positive integer unregisteredThreadMissTimeToLiveMs");
+  });
 });

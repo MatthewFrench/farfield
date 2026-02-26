@@ -75,11 +75,12 @@ describe("ServerObservabilitySnapshotOwner", () => {
       eventStreamClientRegistry,
       threadAdapterResolver,
       requestObservabilityOwner,
-      eventLoopLagObservabilityOwner
+      eventLoopLagObservabilityOwner,
+      readNowIsoString: () => "2026-02-25T00:00:00.000Z"
     });
     const snapshot = owner.readSnapshot();
 
-    expect(snapshot.recordedAt.length).toBeGreaterThan(0);
+    expect(snapshot.recordedAt).toBe("2026-02-25T00:00:00.000Z");
     expect(snapshot.cache.threadListAggregation.entryCount).toBeGreaterThanOrEqual(1);
     expect(snapshot.concurrency.thread.queuedExecutionCount).toBeGreaterThanOrEqual(1);
     expect(snapshot.concurrency.pushDispatch.scheduledCheckCount).toBeGreaterThanOrEqual(1);

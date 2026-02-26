@@ -1,21 +1,15 @@
-import { ThreadConversationStateSchema, UserInputRequestSchema } from "@farfield/protocol";
-import { z } from "zod";
+import type { ThreadConversationState, UserInputRequest } from "@farfield/protocol";
 
-export type PendingUserInputRequest = z.infer<typeof UserInputRequestSchema>;
+export type PendingUserInputRequest = UserInputRequest;
 
 export class PendingUserInputRequestSelector {
   public readPendingUserInputRequests(
-    conversationState: z.infer<typeof ThreadConversationStateSchema> | null
+    conversationState: ThreadConversationState | null
   ): PendingUserInputRequest[] {
     if (!conversationState) {
       return [];
     }
 
-    return conversationState.requests.filter((request) => {
-      if (request.method !== "item/tool/requestUserInput") {
-        return false;
-      }
-      return request.completed !== true;
-    });
+    return conversationState.requests.filter((request) => request.completed !== true);
   }
 }

@@ -111,4 +111,18 @@ describe("RuntimeViewportSizingCoordinator", () => {
     expect(document.documentElement.style.getPropertyValue("--app-height")).toBe("");
     expect(document.documentElement.style.getPropertyValue("--composer-safe-bottom-inset")).toBe("");
   });
+
+  it("uses layout viewport height when visual viewport metrics are not finite", () => {
+    installOrientation(false);
+    installInnerHeight(640);
+    installVisualViewportHeight(Number.NaN);
+    const coordinator = new RuntimeViewportSizingCoordinator(120);
+
+    const metrics = coordinator.applyViewportSizingVariables();
+
+    expect(metrics.visualViewportHeight).toBe(640);
+    expect(metrics.layoutViewportHeight).toBe(640);
+    expect(metrics.appHeight).toBe(640);
+    expect(metrics.keyboardOpen).toBe(false);
+  });
 });

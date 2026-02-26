@@ -2,6 +2,8 @@ import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { ModeSelectionStateResolver } from "../DomainModel/ModeSelectionStateResolver";
 
+const SET_COLLABORATION_MODE_ACTION_NAME = "set-collaboration-mode";
+
 export interface CollaborationModeActionRequestOptions {
   actionId: string;
   requestOptions: ApiRequestOptions;
@@ -84,7 +86,7 @@ export class CollaborationModeActionCoordinator {
       return;
     }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions("set-collaboration-mode");
+    const { actionId, requestOptions } = input.buildActionRequestOptions(SET_COLLABORATION_MODE_ACTION_NAME);
     input.writeLastAppliedModeSignature(modeSignature);
     input.onSetModeSyncing(true);
     try {
@@ -103,7 +105,7 @@ export class CollaborationModeActionCoordinator {
     } catch (error) {
       input.writeLastAppliedModeSignature(lastAppliedModeSignature);
       await input.reportTrackedUserInterfaceError({
-        operation: "set-collaboration-mode",
+        operation: SET_COLLABORATION_MODE_ACTION_NAME,
         actionId,
         threadId: input.selectedThreadId,
         error: toErrorMessage(error),

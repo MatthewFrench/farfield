@@ -89,6 +89,41 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.apiSessionSigningSecret).toBe("push_token");
   });
 
+  it("prefers API_TOKEN when set, even when PUSH_API_TOKEN is also set", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const configuration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      API_TOKEN: "primary_token",
+      PUSH_API_TOKEN: "secondary_token"
+    });
+
+    expect(configuration.apiToken).toBe("primary_token");
+    expect(configuration.apiAuthRequired).toBe(true);
+  });
+
+  it("treats an explicitly empty API_TOKEN as authoritative over PUSH_API_TOKEN", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const configuration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      API_TOKEN: "   ",
+      PUSH_API_TOKEN: "secondary_token"
+    });
+
+    expect(configuration.apiToken).toBe("");
+    expect(configuration.apiAuthRequired).toBe(false);
+  });
+
+  it("uses WEB_BUILD_ID nullish precedence before VITE_APP_BUILD_ID", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const configuration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      WEB_BUILD_ID: "  ",
+      VITE_APP_BUILD_ID: "vite-build-id"
+    });
+
+    expect(configuration.webHealthBuildId).toBe("dev");
+  });
+
   it("accepts timeout overrides from environment", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
     const configuration = readServerRuntimeConfiguration({

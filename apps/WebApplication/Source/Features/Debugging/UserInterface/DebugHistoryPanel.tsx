@@ -11,6 +11,13 @@ export interface DebugHistoryEntryListItem {
   direction: "in" | "out" | "system";
 }
 
+type DebugHistoryDirection = DebugHistoryEntryListItem["direction"];
+const HISTORY_ENTRY_DIRECTION_BADGE_CLASS_NAME_BY_DIRECTION: Record<DebugHistoryDirection, string> = {
+  in: "bg-success/15 text-success",
+  out: "bg-blue-500/15 text-blue-400",
+  system: "bg-muted text-muted-foreground"
+};
+
 interface DebugHistoryPanelProps {
   historyEntries: readonly DebugHistoryEntryListItem[];
   selectedHistoryEntryId: string;
@@ -53,11 +60,7 @@ export function DebugHistoryPanel({
               <div className="flex items-center gap-1.5 mb-0.5">
                 <span
                   className={`text-[9px] px-1.5 py-0.5 rounded font-mono uppercase leading-4 ${
-                    entry.direction === "in"
-                      ? "bg-success/15 text-success"
-                      : entry.direction === "out"
-                      ? "bg-blue-500/15 text-blue-400"
-                      : "bg-muted text-muted-foreground"
+                    HISTORY_ENTRY_DIRECTION_BADGE_CLASS_NAME_BY_DIRECTION[entry.direction]
                   }`}
                 >
                   {entry.source} {entry.direction}

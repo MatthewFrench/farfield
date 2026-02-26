@@ -1,17 +1,46 @@
 import {
   JsonValueSchema,
   type JsonValue,
+  type IpcResponseFrame,
   type TurnStartParams,
   type CollaborationMode,
   parseUserInputResponsePayload,
   type UserInputResponsePayload
 } from "@farfield/protocol";
-import type { DesktopIpcClient } from "./IpcClient.js";
+const THREAD_FOLLOWER_START_TURN_METHOD = "thread-follower-start-turn";
+const THREAD_FOLLOWER_SET_COLLABORATION_MODE_METHOD = "thread-follower-set-collaboration-mode";
+const THREAD_FOLLOWER_SUBMIT_USER_INPUT_METHOD = "thread-follower-submit-user-input";
+const THREAD_FOLLOWER_INTERRUPT_TURN_METHOD = "thread-follower-interrupt-turn";
+const THREAD_FOLLOWER_PROTOCOL_VERSION = 1;
 
+/**
+ * Normalizes optional and class-backed values into strict structured data.
+ * JSON round-tripping intentionally removes `undefined` so payloads match transport contracts.
+ */
 function normalizeStructuredDataValue(value: object): JsonValue {
   const serialized = JSON.stringify(value);
   const parsed = JSON.parse(serialized);
   return JsonValueSchema.parse(parsed);
+}
+
+export interface ThreadFollowerRequestOptions {
+  targetClientId: string;
+  version: number;
+}
+
+export interface CodexMonitorIpcClient {
+  sendRequestAndWait(
+    method: string,
+    params: JsonValue,
+    options: ThreadFollowerRequestOptions
+  ): Promise<IpcResponseFrame>;
+}
+
+function buildThreadFollowerRequestOptions(ownerClientId: string): ThreadFollowerRequestOptions {
+  return {
+    targetClientId: ownerClientId,
+    version: THREAD_FOLLOWER_PROTOCOL_VERSION
+  };
 }
 
 export interface SendMessageInput {
@@ -46,12 +75,12 @@ export interface InterruptInput {
 
 /**
  * Owns Codex thread-level command payload construction over desktop IPC.
- * IPC transport delivery remains in `DesktopIpcClient`.
+ * IPC transport delivery remains in the owned IPC client implementation.
  */
 export class CodexMonitorService {
-  private readonly ipcClient: DesktopIpcClient;
+  private readonly ipcClient: CodexMonitorIpcClient;
 
-  public constructor(ipcClient: DesktopIpcClient) {
+  public constructor(ipcClient: CodexMonitorIpcClient) {
     this.ipcClient = ipcClient;
   }
 
@@ -97,12 +126,9 @@ export class CodexMonitorService {
     });
 
     await this.ipcClient.sendRequestAndWait(
-      "thread-follower-start-turn",
+      THREAD_FOLLOWER_START_TURN_METHOD,
       requestParams,
-      {
-        targetClientId: input.ownerClientId,
-        version: 1
-      }
+      buildThreadFollowerRequestOptions(input.ownerClientId)
     );
   }
 
@@ -113,12 +139,9 @@ export class CodexMonitorService {
     });
 
     await this.ipcClient.sendRequestAndWait(
-      "thread-follower-set-collaboration-mode",
+      THREAD_FOLLOWER_SET_COLLABORATION_MODE_METHOD,
       requestParams,
-      {
-        targetClientId: input.ownerClientId,
-        version: 1
-      }
+      buildThreadFollowerRequestOptions(input.ownerClientId)
     );
   }
 
@@ -134,12 +157,9 @@ export class CodexMonitorService {
     });
 
     await this.ipcClient.sendRequestAndWait(
-      "thread-follower-submit-user-input",
+      THREAD_FOLLOWER_SUBMIT_USER_INPUT_METHOD,
       requestParams,
-      {
-        targetClientId: input.ownerClientId,
-        version: 1
-      }
+      buildThreadFollowerRequestOptions(input.ownerClientId)
     );
   }
 
@@ -149,12 +169,9 @@ export class CodexMonitorService {
     });
 
     await this.ipcClient.sendRequestAndWait(
-      "thread-follower-interrupt-turn",
+      THREAD_FOLLOWER_INTERRUPT_TURN_METHOD,
       requestParams,
-      {
-        targetClientId: input.ownerClientId,
-        version: 1
-      }
+      buildThreadFollowerRequestOptions(input.ownerClientId)
     );
   }
 }

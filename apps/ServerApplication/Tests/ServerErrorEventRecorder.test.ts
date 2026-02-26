@@ -29,7 +29,9 @@ describe("ServerErrorEventRecorder", () => {
       "session-test",
       100
     );
-    const recorder = new ServerErrorEventRecorder(store);
+    const recorder = new ServerErrorEventRecorder(store, {
+      readNowIsoString: () => "2026-02-25T00:00:00.000Z"
+    });
 
     recorder.record({
       source: "farfield-server",
@@ -58,5 +60,31 @@ describe("ServerErrorEventRecorder", () => {
     expect(entries[0]?.requestId).toBe("request_1");
     expect(entries[0]?.threadId).toBe("thread_1");
     expect(entries[0]?.url).toBe("/api/threads");
+    expect(entries[0]?.occurredAt).toBe("2026-02-25T00:00:00.000Z");
+  });
+
+  it("rejects malformed server error payloads at the owner boundary", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const store = new ClientErrorStore(
+      path.join(temporaryDirectoryPath, "client-errors.ndjson"),
+      "session-test",
+      100
+    );
+    const recorder = new ServerErrorEventRecorder(store);
+
+    expect(() => {
+      recorder.record({
+        source: "",
+        operation: "http:request",
+        message: "Request failed",
+        severity: "error",
+        name: null,
+        stack: null,
+        requestId: null,
+        threadId: null,
+        url: null,
+        details: {}
+      });
+    }).toThrow();
   });
 });

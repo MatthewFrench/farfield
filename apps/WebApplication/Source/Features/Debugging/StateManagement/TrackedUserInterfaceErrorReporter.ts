@@ -46,6 +46,21 @@ const RequestFailureErrorSchema = z.object({
   requestFailureDetails: RequestFailureDetailsSchema
 }).passthrough();
 
+const DEFAULT_REPORT_DEDUPLICATION_WINDOW_MILLISECONDS = 15_000;
+const CLIENT_ERROR_SOURCE = "farfield-web";
+const CLIENT_ERROR_SEVERITY = "error";
+const REPORT_KEY_SEGMENT_SEPARATOR = "|";
+const REPORT_KEY_MISSING_REQUEST_IDENTIFIER = "no-request-id";
+const REPORT_KEY_MISSING_THREAD_IDENTIFIER = "no-thread-id";
+const CLIENT_ERROR_DETAIL_ACTION_IDENTIFIER_KEY = "actionId";
+const CLIENT_ERROR_DETAIL_ACTION_NAME_KEY = "actionName";
+const CLIENT_ERROR_DETAIL_PATH_KEY = "path";
+const CLIENT_ERROR_DETAIL_REQUEST_STATUS_KEY = "requestStatus";
+const CLIENT_ERROR_DETAIL_REQUEST_STATUS_TEXT_KEY = "requestStatusText";
+const CLIENT_ERROR_DETAIL_RESPONSE_TEXT_KEY = "responseText";
+const CLIENT_ERROR_DETAIL_RESPONSE_TEXT_LENGTH_KEY = "responseTextLength";
+const CLIENT_ERROR_DETAIL_RESPONSE_TEXT_TRUNCATED_KEY = "responseTextTruncated";
+
 export class TrackedUserInterfaceErrorReporter {
   private readonly reportDeduplicationWindowMs: number;
   private readonly setErrorMessage: (errorMessage: string) => void;
@@ -55,7 +70,8 @@ export class TrackedUserInterfaceErrorReporter {
   private readonly mostRecentErrorReportTimestampByKey: Map<string, number>;
 
   public constructor(dependencies: TrackedUserInterfaceErrorReporterDependencies) {
-    const reportDeduplicationWindowMs = dependencies.reportDeduplicationWindowMs ?? 15_000;
+    const reportDeduplicationWindowMs = dependencies.reportDeduplicationWindowMs
+      ?? DEFAULT_REPORT_DEDUPLICATION_WINDOW_MILLISECONDS;
     if (!Number.isInteger(reportDeduplicationWindowMs) || reportDeduplicationWindowMs <= 0) {
       throw new Error("reportDeduplicationWindowMs must be a positive integer");
     }
@@ -90,27 +106,27 @@ export class TrackedUserInterfaceErrorReporter {
     }
 
     const details: Record<string, string | number | boolean | null> = {
-      actionId: input.actionId,
-      actionName: input.operation,
       ...(input.details ?? {})
     };
+    details[CLIENT_ERROR_DETAIL_ACTION_IDENTIFIER_KEY] = input.actionId;
+    details[CLIENT_ERROR_DETAIL_ACTION_NAME_KEY] = input.operation;
 
     if (requestFailureDetails !== null) {
-      details["path"] = requestFailureDetails.path;
-      details["requestStatus"] = requestFailureDetails.status;
-      details["requestStatusText"] = requestFailureDetails.statusText;
-      details["responseText"] = requestFailureDetails.responseText;
-      details["responseTextLength"] = requestFailureDetails.responseTextLength;
-      details["responseTextTruncated"] = requestFailureDetails.responseTextTruncated;
+      details[CLIENT_ERROR_DETAIL_PATH_KEY] = requestFailureDetails.path;
+      details[CLIENT_ERROR_DETAIL_REQUEST_STATUS_KEY] = requestFailureDetails.status;
+      details[CLIENT_ERROR_DETAIL_REQUEST_STATUS_TEXT_KEY] = requestFailureDetails.statusText;
+      details[CLIENT_ERROR_DETAIL_RESPONSE_TEXT_KEY] = requestFailureDetails.responseText;
+      details[CLIENT_ERROR_DETAIL_RESPONSE_TEXT_LENGTH_KEY] = requestFailureDetails.responseTextLength;
+      details[CLIENT_ERROR_DETAIL_RESPONSE_TEXT_TRUNCATED_KEY] = requestFailureDetails.responseTextTruncated;
     }
 
     let errorId: string | null = null;
     try {
       const report = await this.reportClientErrorFn({
-        source: "farfield-web",
+        source: CLIENT_ERROR_SOURCE,
         operation: input.operation,
         message: errorMessage,
-        severity: "error",
+        severity: CLIENT_ERROR_SEVERITY,
         name: null,
         stack: null,
         requestId,
@@ -142,7 +158,8 @@ export class TrackedUserInterfaceErrorReporter {
     this.pruneExpiredReportKeys(now);
     const reportKey = this.createReportKey(input);
     const previousReportTimestamp = this.mostRecentErrorReportTimestampByKey.get(reportKey);
-    if (typeof previousReportTimestamp === "number") {
+    const hasReportInDeduplicationWindow = previousReportTimestamp !== undefined;
+    if (hasReportInDeduplicationWindow) {
       this.mostRecentErrorReportTimestampByKey.set(reportKey, now);
       return true;
     }
@@ -165,8 +182,13 @@ export class TrackedUserInterfaceErrorReporter {
     requestId: string | null;
     threadId: string | null;
   }): string {
-    const requestIdentifier = input.requestId ?? "no-request-id";
-    const threadIdentifier = input.threadId ?? "no-thread-id";
-    return `${input.operation}|${requestIdentifier}|${threadIdentifier}|${input.errorMessage}`;
+    const requestIdentifier = input.requestId ?? REPORT_KEY_MISSING_REQUEST_IDENTIFIER;
+    const threadIdentifier = input.threadId ?? REPORT_KEY_MISSING_THREAD_IDENTIFIER;
+    return [
+      input.operation,
+      requestIdentifier,
+      threadIdentifier,
+      input.errorMessage
+    ].join(REPORT_KEY_SEGMENT_SEPARATOR);
   }
 }

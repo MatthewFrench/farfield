@@ -5,6 +5,8 @@ import type {
 } from "../DataAccess/DebugServerClient";
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
+const EMPTY_HISTORY_ENTRY_IDENTIFIER = "";
+
 export interface DebugWorkspaceActionClient {
   readHistoryEntry(
     entryId: string,
@@ -58,12 +60,13 @@ export interface StopDebugTraceActionInput {
 
 export class DebugWorkspaceActionCoordinator {
   public async loadHistoryDetail(input: LoadDebugHistoryDetailActionInput): Promise<void> {
-    if (!input.historyEntryId) {
+    const historyEntryIdentifier = input.historyEntryId.trim();
+    if (historyEntryIdentifier === EMPTY_HISTORY_ENTRY_IDENTIFIER) {
       input.onHistoryDetailLoaded(null);
       return;
     }
 
-    const detail = await input.debugClient.readHistoryEntry(input.historyEntryId);
+    const detail = await input.debugClient.readHistoryEntry(historyEntryIdentifier);
     input.onHistoryDetailLoaded(detail);
   }
 

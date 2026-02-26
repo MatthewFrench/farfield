@@ -1,4 +1,5 @@
 import {
+  DEFAULT_DEBUG_LIST_LIMIT,
   clearDebugClientErrors,
   type ApiDebugErrorClearResponse,
   type ApiDebugErrorDetailResponse,
@@ -51,7 +52,7 @@ export class DebugServerClient {
   }
 
   public async listHistory(
-    limit = 120,
+    limit = DEFAULT_DEBUG_LIST_LIMIT,
     options?: ApiRequestOptions
   ): Promise<ApiDebugHistoryResponse> {
     return listDebugHistory(limit, options);
@@ -65,7 +66,7 @@ export class DebugServerClient {
   }
 
   public async listClientErrors(
-    limit = 120,
+    limit = DEFAULT_DEBUG_LIST_LIMIT,
     options?: ApiRequestOptions
   ): Promise<ApiDebugErrorListResponse> {
     return listDebugClientErrors(limit, options);

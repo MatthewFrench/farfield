@@ -14,6 +14,16 @@ export interface ThreadMemberMutationRouteOwnerOptions {
   context: ThreadMemberResolvedRouteContext;
 }
 
+type ThreadMemberMutationHandlerFactory = (
+  options: ThreadMemberMutationRouteOwnerOptions
+) => { handle: () => Promise<boolean> };
+
+const ThreadMemberMutationHandlerFactories: readonly ThreadMemberMutationHandlerFactory[] = [
+  (options) => new ThreadMemberMessageMutationRouteOwner(options),
+  (options) => new ThreadMemberArchiveMutationRouteOwner(options),
+  (options) => new ThreadMemberInteractionMutationRouteOwner(options)
+];
+
 export class ThreadMemberMutationRouteOwner {
   private readonly dependencies: ThreadMemberRouteDependencies;
   private readonly context: ThreadMemberResolvedRouteContext;
@@ -24,26 +34,17 @@ export class ThreadMemberMutationRouteOwner {
   }
 
   public async handle(): Promise<boolean> {
-    const messageMutationRouteOwner = new ThreadMemberMessageMutationRouteOwner({
+    const ownerOptions: ThreadMemberMutationRouteOwnerOptions = {
       dependencies: this.dependencies,
       context: this.context
-    });
-    if (await messageMutationRouteOwner.handle()) {
-      return true;
+    };
+    for (const createHandler of ThreadMemberMutationHandlerFactories) {
+      const routeOwner = createHandler(ownerOptions);
+      if (await routeOwner.handle()) {
+        return true;
+      }
     }
 
-    const archiveMutationRouteOwner = new ThreadMemberArchiveMutationRouteOwner({
-      dependencies: this.dependencies,
-      context: this.context
-    });
-    if (await archiveMutationRouteOwner.handle()) {
-      return true;
-    }
-
-    const interactionMutationRouteOwner = new ThreadMemberInteractionMutationRouteOwner({
-      dependencies: this.dependencies,
-      context: this.context
-    });
-    return interactionMutationRouteOwner.handle();
+    return false;
   }
 }

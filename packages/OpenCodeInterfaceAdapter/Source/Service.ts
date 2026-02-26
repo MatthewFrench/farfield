@@ -1,4 +1,13 @@
-import type { OpenCodeConnection } from "./Client.js";
+import { z } from "zod";
+import type {
+  OpenCodeConnectionClientProvider,
+  OpenCodeDirectoryQuery,
+  OpenCodeSessionCreateRequest,
+  OpenCodeSessionListRequest,
+  OpenCodeSessionPromptBody,
+  OpenCodeSessionPromptRequest,
+  OpenCodeSessionReadRequest
+} from "./ClientContracts.js";
 import {
   sessionToConversationState,
   sessionToThreadListItem
@@ -15,7 +24,8 @@ import {
   parseOpenCodeSessionMessages,
   type OpenCodeMessage,
   type OpenCodePart,
-  type OpenCodeSession
+  type OpenCodeSession,
+  type OpenCodeStructuredDataValue
 } from "./Schemas.js";
 
 export interface OpenCodeSendMessageInput {
@@ -29,13 +39,147 @@ export interface OpenCodeCreateSessionInput {
   directory?: string;
 }
 
+const OPEN_CODE_MESSAGE_TEXT_REQUIRED_ERROR = "Message text is required";
+const OpenCodeEmptyCollectionValue: OpenCodeStructuredDataValue = [];
+const OpenCodeSessionIdentifierSchema = z.string().trim().min(1);
+const OpenCodeDirectorySchema = z.string().trim().min(1);
+const OpenCodeListSessionsInputSchema = z
+  .object({
+    directory: OpenCodeDirectorySchema.optional()
+  })
+  .strict();
+const OpenCodeCreateSessionInputSchema = z
+  .object({
+    title: z.string().trim().min(1).optional(),
+    directory: OpenCodeDirectorySchema.optional()
+  })
+  .strict();
+const OpenCodeSessionLookupInputSchema = z
+  .object({
+    sessionId: OpenCodeSessionIdentifierSchema,
+    directory: OpenCodeDirectorySchema.optional()
+  })
+  .strict();
+const OpenCodeSendMessageInputSchema = z
+  .object({
+    sessionId: OpenCodeSessionIdentifierSchema,
+    text: z.string().trim().min(1, OPEN_CODE_MESSAGE_TEXT_REQUIRED_ERROR),
+    directory: OpenCodeDirectorySchema.optional()
+  })
+  .strict();
+
+type OpenCodeListSessionsParsedInput = z.infer<typeof OpenCodeListSessionsInputSchema>;
+type OpenCodeCreateSessionParsedInput = z.infer<typeof OpenCodeCreateSessionInputSchema>;
+type OpenCodeSessionLookupInput = z.infer<typeof OpenCodeSessionLookupInputSchema>;
+type OpenCodeSendMessageParsedInput = z.infer<typeof OpenCodeSendMessageInputSchema>;
+
+function parseStructuredDataValue(
+  value: OpenCodeStructuredDataValue | undefined
+): OpenCodeStructuredDataValue {
+  return OpenCodeStructuredDataValueSchema.parse(value);
+}
+
+function parseStructuredCollectionValue(
+  value: OpenCodeStructuredDataValue | undefined
+): OpenCodeStructuredDataValue {
+  return OpenCodeStructuredDataValueSchema.parse(value ?? OpenCodeEmptyCollectionValue);
+}
+
+function buildDirectoryQuery(directory: string | undefined): OpenCodeDirectoryQuery | undefined {
+  if (directory === undefined) {
+    return undefined;
+  }
+
+  return {
+    directory
+  };
+}
+
+function buildSessionListRequest(
+  input: OpenCodeListSessionsParsedInput
+): OpenCodeSessionListRequest {
+  const directoryQuery = buildDirectoryQuery(input.directory);
+  if (directoryQuery === undefined) {
+    return {};
+  }
+
+  return {
+    query: directoryQuery
+  };
+}
+
+function buildSessionCreateRequest(
+  input: OpenCodeCreateSessionParsedInput
+): OpenCodeSessionCreateRequest {
+  const body = input.title === undefined
+    ? {}
+    : {
+        title: input.title
+      };
+  const directoryQuery = buildDirectoryQuery(input.directory);
+
+  if (directoryQuery === undefined) {
+    return { body };
+  }
+
+  return {
+    body,
+    query: directoryQuery
+  };
+}
+
+function buildSessionReadRequest(
+  input: OpenCodeSessionLookupInput
+): OpenCodeSessionReadRequest {
+  const directoryQuery = buildDirectoryQuery(input.directory);
+  const path = { id: input.sessionId };
+  if (directoryQuery === undefined) {
+    return { path };
+  }
+
+  return {
+    path,
+    query: directoryQuery
+  };
+}
+
+function buildPromptBody(text: string): OpenCodeSessionPromptBody {
+  return {
+    parts: [{
+      type: "text",
+      text
+    }]
+  };
+}
+
+function buildSessionPromptRequest(
+  input: OpenCodeSendMessageParsedInput
+): OpenCodeSessionPromptRequest {
+  const directoryQuery = buildDirectoryQuery(input.directory);
+  const path = { id: input.sessionId };
+  const body = buildPromptBody(input.text);
+
+  if (directoryQuery === undefined) {
+    return {
+      path,
+      body
+    };
+  }
+
+  return {
+    path,
+    query: directoryQuery,
+    body
+  };
+}
+
 /**
  * Owns OpenCode session/thread API mapping from SDK payloads into Farfield contracts.
  */
 export class OpenCodeMonitorService {
-  private readonly connection: OpenCodeConnection;
+  private readonly connection: OpenCodeConnectionClientProvider;
 
-  public constructor(connection: OpenCodeConnection) {
+  public constructor(connection: OpenCodeConnectionClientProvider) {
     this.connection = connection;
   }
 
@@ -53,18 +197,10 @@ export class OpenCodeMonitorService {
     data: MappedThreadListItem[];
   }> {
     const client = this.connection.getClient();
-    const directory = input?.directory?.trim();
-    const result = await client.session.list(
-      directory
-        ? {
-            query: {
-              directory
-            }
-          }
-        : {}
-    );
+    const parsedInput = OpenCodeListSessionsInputSchema.parse(input ?? {});
+    const result = await client.session.list(buildSessionListRequest(parsedInput));
     const sessions = parseOpenCodeSessionList(
-      OpenCodeStructuredDataValueSchema.parse(result.data ?? [])
+      parseStructuredCollectionValue(result.data)
     );
 
     return {
@@ -76,11 +212,9 @@ export class OpenCodeMonitorService {
     const client = this.connection.getClient();
     const result = await client.project.list();
     const projects = parseOpenCodeProjectList(
-      OpenCodeStructuredDataValueSchema.parse(result.data ?? [])
+      parseStructuredCollectionValue(result.data)
     );
-    return projects
-      .map((project) => project.worktree)
-      .filter((directory) => directory.trim().length > 0);
+    return projects.map((project) => OpenCodeDirectorySchema.parse(project.worktree));
   }
 
   public async createSession(input?: OpenCodeCreateSessionInput): Promise<{
@@ -89,24 +223,11 @@ export class OpenCodeMonitorService {
     mapped: MappedThreadListItem;
   }> {
     const client = this.connection.getClient();
-    const directory = input?.directory?.trim();
-    const body: Record<string, string> = {};
-    if (input?.title) {
-      body["title"] = input.title;
-    }
-    const result = await client.session.create({
-      body,
-      ...(directory
-        ? {
-            query: {
-              directory
-            }
-          }
-        : {})
-    });
+    const parsedInput = OpenCodeCreateSessionInputSchema.parse(input ?? {});
+    const result = await client.session.create(buildSessionCreateRequest(parsedInput));
 
     const session = parseOpenCodeSession(
-      OpenCodeStructuredDataValueSchema.parse(result.data)
+      parseStructuredDataValue(result.data)
     );
     return {
       threadId: session.id,
@@ -117,18 +238,12 @@ export class OpenCodeMonitorService {
 
   public async getSession(sessionId: string, directory?: string): Promise<OpenCodeSession> {
     const client = this.connection.getClient();
-    const normalizedDirectory = directory?.trim();
-    const result = await client.session.get({
-      path: { id: sessionId },
-      ...(normalizedDirectory
-        ? {
-            query: {
-              directory: normalizedDirectory
-            }
-          }
-        : {})
+    const parsedInput = OpenCodeSessionLookupInputSchema.parse({
+      sessionId,
+      directory
     });
-    return parseOpenCodeSession(OpenCodeStructuredDataValueSchema.parse(result.data));
+    const result = await client.session.get(buildSessionReadRequest(parsedInput));
+    return parseOpenCodeSession(parseStructuredDataValue(result.data));
   }
 
   public async getSessionState(
@@ -136,36 +251,22 @@ export class OpenCodeMonitorService {
     directory?: string
   ): Promise<MappedThreadConversationState> {
     const client = this.connection.getClient();
-    const normalizedDirectory = directory?.trim();
+    const parsedInput = OpenCodeSessionLookupInputSchema.parse({
+      sessionId,
+      directory
+    });
+    const sessionReadRequest = buildSessionReadRequest(parsedInput);
 
     const [sessionResult, messagesResult] = await Promise.all([
-      client.session.get({
-        path: { id: sessionId },
-        ...(normalizedDirectory
-          ? {
-              query: {
-                directory: normalizedDirectory
-              }
-            }
-          : {})
-      }),
-      client.session.messages({
-        path: { id: sessionId },
-        ...(normalizedDirectory
-          ? {
-              query: {
-                directory: normalizedDirectory
-              }
-            }
-          : {})
-      })
+      client.session.get(sessionReadRequest),
+      client.session.messages(sessionReadRequest)
     ]);
 
     const session = parseOpenCodeSession(
-      OpenCodeStructuredDataValueSchema.parse(sessionResult.data)
+      parseStructuredDataValue(sessionResult.data)
     );
     const messages = parseOpenCodeSessionMessages(
-      OpenCodeStructuredDataValueSchema.parse(messagesResult.data ?? [])
+      parseStructuredCollectionValue(messagesResult.data)
     );
 
     const messageList: OpenCodeMessage[] = [];
@@ -180,57 +281,26 @@ export class OpenCodeMonitorService {
   }
 
   public async sendMessage(input: OpenCodeSendMessageInput): Promise<void> {
-    const text = input.text.trim();
-    if (!text) {
-      throw new Error("Message text is required");
-    }
-
+    const parsedInput = OpenCodeSendMessageInputSchema.parse(input);
     const client = this.connection.getClient();
-    const directory = input.directory?.trim();
-    await client.session.prompt({
-      path: { id: input.sessionId },
-      ...(directory
-        ? {
-            query: {
-              directory
-            }
-          }
-        : {}),
-      body: {
-        parts: [
-          { type: "text", text }
-        ]
-      }
-    });
+    await client.session.prompt(buildSessionPromptRequest(parsedInput));
   }
 
   public async abort(sessionId: string, directory?: string): Promise<void> {
     const client = this.connection.getClient();
-    const normalizedDirectory = directory?.trim();
-    await client.session.abort({
-      path: { id: sessionId },
-      ...(normalizedDirectory
-        ? {
-            query: {
-              directory: normalizedDirectory
-            }
-          }
-        : {})
+    const parsedInput = OpenCodeSessionLookupInputSchema.parse({
+      sessionId,
+      directory
     });
+    await client.session.abort(buildSessionReadRequest(parsedInput));
   }
 
   public async deleteSession(sessionId: string, directory?: string): Promise<void> {
     const client = this.connection.getClient();
-    const normalizedDirectory = directory?.trim();
-    await client.session.delete({
-      path: { id: sessionId },
-      ...(normalizedDirectory
-        ? {
-            query: {
-              directory: normalizedDirectory
-            }
-          }
-        : {})
+    const parsedInput = OpenCodeSessionLookupInputSchema.parse({
+      sessionId,
+      directory
     });
+    await client.session.delete(buildSessionReadRequest(parsedInput));
   }
 }

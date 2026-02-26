@@ -16,7 +16,105 @@ import {
   type LoggerLevel
 } from "../../Shared/Logging/Logger.js";
 
+// Owner note: this module is the single startup boundary for server environment
+// parsing, including key ownership, defaults, and precedence decisions.
 const OptionalPathEnvSchema = z.string().trim().min(1).optional();
+const ServerRuntimeEnvironmentVariableNames = Object.freeze({
+  appDataPath: "APPDATA",
+  apiSessionSecret: "API_SESSION_SECRET",
+  apiSessionSecureCookie: "API_SESSION_SECURE_COOKIE",
+  apiSessionTimeToLiveMilliseconds: "API_SESSION_TIME_TO_LIVE_MS",
+  apiToken: "API_TOKEN",
+  codexCliPath: "CODEX_CLI_PATH",
+  codexIpcSocketPath: "CODEX_IPC_SOCKET",
+  debugClientErrorLogPath: "DEBUG_CLIENT_ERROR_LOG_PATH",
+  debugClientErrorMaximumEntries: "DEBUG_CLIENT_ERROR_MAX_ENTRIES",
+  historyPayloadSummaryMaximumBytes: "HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES",
+  host: "HOST",
+  invalidThreadStreamEventsLogPath: "FARFIELD_INVALID_STREAM_LOG_PATH",
+  logLevel: "LOG_LEVEL",
+  port: "PORT",
+  pushApiToken: "PUSH_API_TOKEN",
+  pushEnabled: "PUSH_ENABLED",
+  pushLocalCaPath: "PUSH_LOCAL_CA_PATH",
+  pushPrivateModeDefault: "PUSH_PRIVATE_MODE_DEFAULT",
+  pushReceiptsMaxAgeDays: "PUSH_RECEIPTS_MAX_AGE_DAYS",
+  pushReceiptsMaxCount: "PUSH_RECEIPTS_MAX_COUNT",
+  pushReceiptsPath: "PUSH_RECEIPTS_PATH",
+  pushSendsPath: "PUSH_SENDS_PATH",
+  pushStatePath: "PUSH_STATE_PATH",
+  pushTestSendTimeoutMilliseconds: "PUSH_TEST_SEND_TIMEOUT_MS",
+  pushVapidPrivateKey: "PUSH_VAPID_PRIVATE_KEY",
+  pushVapidPublicKey: "PUSH_VAPID_PUBLIC_KEY",
+  pushVapidSubject: "PUSH_VAPID_SUBJECT",
+  runtimeStateSnapshotCacheTimeToLiveMilliseconds: "RUNTIME_STATE_SNAPSHOT_CACHE_TIME_TO_LIVE_MS",
+  threadListAdapterTimeoutMilliseconds: "THREAD_LIST_ADAPTER_TIMEOUT_MS",
+  threadListAggregationCacheMaximumEntries: "THREAD_LIST_AGGREGATION_CACHE_MAXIMUM_ENTRIES",
+  threadListAggregationCacheTimeToLiveMilliseconds: "THREAD_LIST_AGGREGATION_CACHE_TIME_TO_LIVE_MS",
+  webApplicationBuildId: "VITE_APP_BUILD_ID",
+  webBuildId: "WEB_BUILD_ID",
+  webServiceWorkerVersion: "WEB_SERVICE_WORKER_VERSION",
+  xdgDataHome: "XDG_DATA_HOME",
+  xdgStateHome: "XDG_STATE_HOME"
+});
+const ServerRuntimeDefaultValues = Object.freeze({
+  apiSessionSecureCookie: false,
+  apiSessionSigningSecret: "farfield_session_secret",
+  apiSessionTimeToLiveMilliseconds: 28_800_000,
+  capabilityListTimeoutMilliseconds: 8_000,
+  clientErrorMaximumEntries: 2_000,
+  historyLimit: 2_000,
+  historyPayloadSummaryMaximumBytes: 131_072,
+  host: "127.0.0.1",
+  ipcReconnectDelayMilliseconds: 1_000,
+  logLevel: "info",
+  notificationCompletionDebounceMilliseconds: 250,
+  port: 4_311,
+  pushEnabled: false,
+  pushPrivateModeDefault: true,
+  pushReceiptsMaxAgeDays: 7,
+  pushReceiptsMaxCount: 100,
+  pushTestSendTimeoutMilliseconds: 7_500,
+  runtimeStateSnapshotCacheTimeToLiveMilliseconds: 250,
+  threadListAdapterTimeoutMilliseconds: 7_500,
+  threadListAggregationCacheMaximumEntries: 48,
+  threadListAggregationCacheTimeToLiveMilliseconds: 2_000,
+  webHealthBuildId: "dev"
+});
+const ServerRuntimeStaticConfiguration = Object.freeze({
+  apiSessionCookieName: "farfield_session",
+  apiTokenHeaderName: "x-farfield-token",
+  apiTokenResponseHeader: "X-Farfield-Token",
+  clientActionIdentifierHeaderName: "x-farfield-action-id",
+  clientActionIdentifierResponseHeader: "X-Farfield-Action-Id",
+  clientActionNameHeaderName: "x-farfield-action-name",
+  clientActionNameResponseHeader: "X-Farfield-Action-Name",
+  clientErrorLogFileName: "client-errors.ndjson",
+  clientRequestIdentifierHeaderName: "x-farfield-request-id",
+  clientRequestIdentifierResponseHeader: "X-Farfield-Request-Id",
+  codexDesktopExecutablePath: "/Applications/Codex.app/Contents/Resources/codex",
+  codexExecutablePath: "codex",
+  codexIpcDirectoryName: "codex-ipc",
+  errorsLogDirectoryName: "errors",
+  invalidThreadStreamEventsLogFileName: "invalid-thread-stream-events.ndjson",
+  logsDirectoryName: "logs",
+  pushReceiptsFileName: "push-receipts.json",
+  pushSendsFileName: "push-sends.json",
+  runtimeDirectoryName: ".runtime",
+  sessionIdentifierPrefix: "session-",
+  threadLogsDirectoryName: "threads",
+  traceDirectoryName: "traces",
+  userAgent: "farfield/0.2.0",
+  windowsCodexIpcSocketPath: "\\\\.\\pipe\\codex-ipc"
+});
+
+function readEnvironmentValue(env: NodeJS.ProcessEnv, variableName: string): string | null {
+  return env[variableName] ?? null;
+}
+
+function readTrimmedEnvironmentValue(env: NodeJS.ProcessEnv, variableName: string): string {
+  return (readEnvironmentValue(env, variableName) ?? "").trim();
+}
 
 function parsePositiveInteger(value: string | null, defaultValue: number): number {
   if (!value) {
@@ -60,30 +158,86 @@ function parseOptionalPathEnvironmentValue(label: string, value: string | undefi
   return path.resolve(parsed.data);
 }
 
-function resolveCodexExecutablePathFromEnvironment(env: NodeJS.ProcessEnv): string {
-  if (env["CODEX_CLI_PATH"]) {
-    return env["CODEX_CLI_PATH"];
+function readPositiveIntegerEnvironmentValue(
+  env: NodeJS.ProcessEnv,
+  variableName: string,
+  defaultValue: number
+): number {
+  return parsePositiveInteger(readEnvironmentValue(env, variableName), defaultValue);
+}
+
+function readBooleanEnvironmentValue(
+  env: NodeJS.ProcessEnv,
+  variableName: string,
+  defaultValue: boolean
+): boolean {
+  return parseBooleanEnvironmentValue(readEnvironmentValue(env, variableName), defaultValue);
+}
+
+function readOptionalPathEnvironmentValue(env: NodeJS.ProcessEnv, variableName: string): string | null {
+  return parseOptionalPathEnvironmentValue(variableName, env[variableName]);
+}
+
+function resolveApiTokenFromEnvironment(env: NodeJS.ProcessEnv): string {
+  const apiTokenValue = readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.apiToken);
+  if (apiTokenValue !== null) {
+    return apiTokenValue.trim();
   }
 
-  const desktopPath = "/Applications/Codex.app/Contents/Resources/codex";
+  return readTrimmedEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushApiToken);
+}
+
+function resolveWebHealthBuildIdentifierFromEnvironment(env: NodeJS.ProcessEnv): string {
+  const buildIdentifierCandidate =
+    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.webBuildId)
+    ?? readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.webApplicationBuildId)
+    ?? ServerRuntimeDefaultValues.webHealthBuildId;
+  const normalizedBuildIdentifier = buildIdentifierCandidate.trim();
+  return normalizedBuildIdentifier.length > 0
+    ? normalizedBuildIdentifier
+    : ServerRuntimeDefaultValues.webHealthBuildId;
+}
+
+function resolveApiSessionSigningSecret(env: NodeJS.ProcessEnv, apiToken: string): string {
+  const sessionSecretCandidate =
+    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.apiSessionSecret)
+    ?? apiToken;
+  const normalizedSessionSecret = sessionSecretCandidate.trim();
+  return normalizedSessionSecret.length > 0
+    ? normalizedSessionSecret
+    : ServerRuntimeDefaultValues.apiSessionSigningSecret;
+}
+
+function resolveCodexExecutablePathFromEnvironment(env: NodeJS.ProcessEnv): string {
+  const configuredPath = readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.codexCliPath);
+  if (configuredPath) {
+    return configuredPath;
+  }
+
+  const desktopPath = ServerRuntimeStaticConfiguration.codexDesktopExecutablePath;
   if (fs.existsSync(desktopPath)) {
     return desktopPath;
   }
 
-  return "codex";
+  return ServerRuntimeStaticConfiguration.codexExecutablePath;
 }
 
 function resolveIpcSocketPathFromEnvironment(env: NodeJS.ProcessEnv): string {
-  if (env["CODEX_IPC_SOCKET"]) {
-    return env["CODEX_IPC_SOCKET"];
+  const configuredPath = readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.codexIpcSocketPath);
+  if (configuredPath) {
+    return configuredPath;
   }
 
   if (process.platform === "win32") {
-    return "\\\\.\\pipe\\codex-ipc";
+    return ServerRuntimeStaticConfiguration.windowsCodexIpcSocketPath;
   }
 
   const userIdentifier = process.getuid?.() ?? 0;
-  return path.join(os.tmpdir(), "codex-ipc", `ipc-${String(userIdentifier)}.sock`);
+  return path.join(
+    os.tmpdir(),
+    ServerRuntimeStaticConfiguration.codexIpcDirectoryName,
+    `ipc-${String(userIdentifier)}.sock`
+  );
 }
 
 function resolveGitCommitHash(defaultWorkspacePath: string): string | null {
@@ -99,7 +253,7 @@ function resolveGitCommitHash(defaultWorkspacePath: string): string | null {
 }
 
 function resolvePushLocalCaSourcePath(env: NodeJS.ProcessEnv): string {
-  const configuredPath = parseOptionalPathEnvironmentValue("PUSH_LOCAL_CA_PATH", env["PUSH_LOCAL_CA_PATH"]);
+  const configuredPath = readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushLocalCaPath);
   if (configuredPath) {
     return configuredPath;
   }
@@ -120,13 +274,13 @@ function resolvePushLocalCaSourcePath(env: NodeJS.ProcessEnv): string {
 
   if (process.platform === "win32") {
     const appDataDirectory =
-      parseOptionalPathEnvironmentValue("APPDATA", env["APPDATA"])
+      readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.appDataPath)
       ?? path.join(homeDirectory, "AppData", "Roaming");
     return path.join(appDataDirectory, "Caddy", "pki", "authorities", "local", "root.crt");
   }
 
   const xdgDataHome =
-    parseOptionalPathEnvironmentValue("XDG_DATA_HOME", env["XDG_DATA_HOME"])
+    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.xdgDataHome)
     ?? path.join(homeDirectory, ".local", "share");
   return path.join(xdgDataHome, "caddy", "pki", "authorities", "local", "root.crt");
 }
@@ -194,87 +348,129 @@ export function readServerRuntimeConfigurationFromCurrentProcessEnvironment(): S
 
 export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRuntimeConfiguration {
   const defaultWorkspacePath = path.resolve(process.cwd());
-  const logLevel = LoggerLevelSchema.parse((env["LOG_LEVEL"] ?? "info").trim().toLowerCase());
-  const host = env["HOST"] ?? "127.0.0.1";
-  const port = parsePositiveInteger(env["PORT"] ?? null, 4311);
-  const historyLimit = 2_000;
-  const historyPayloadSummaryMaximumBytes = parsePositiveInteger(
-    env["HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES"] ?? null,
-    131_072
+  const logLevel = LoggerLevelSchema.parse(
+    (readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.logLevel) ?? ServerRuntimeDefaultValues.logLevel)
+      .trim()
+      .toLowerCase()
   );
-  const userAgent = "farfield/0.2.0";
-  const runtimeStateSnapshotCacheTimeToLiveMs = parsePositiveInteger(
-    env["RUNTIME_STATE_SNAPSHOT_CACHE_TIME_TO_LIVE_MS"] ?? null,
-    250
+  const host = readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.host) ?? ServerRuntimeDefaultValues.host;
+  const port = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.port,
+    ServerRuntimeDefaultValues.port
   );
-  const ipcReconnectDelayMs = 1_000;
-  const ntfyCompletionDebounceMs = 250;
-  const capabilityListTimeoutMs = 8_000;
-  const threadListAdapterTimeoutMs = parsePositiveInteger(
-    env["THREAD_LIST_ADAPTER_TIMEOUT_MS"] ?? null,
-    7_500
+  const historyLimit = ServerRuntimeDefaultValues.historyLimit;
+  const historyPayloadSummaryMaximumBytes = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.historyPayloadSummaryMaximumBytes,
+    ServerRuntimeDefaultValues.historyPayloadSummaryMaximumBytes
   );
-  const pushTestSendTimeoutMs = parsePositiveInteger(
-    env["PUSH_TEST_SEND_TIMEOUT_MS"] ?? null,
-    7_500
+  const userAgent = ServerRuntimeStaticConfiguration.userAgent;
+  const runtimeStateSnapshotCacheTimeToLiveMs = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.runtimeStateSnapshotCacheTimeToLiveMilliseconds,
+    ServerRuntimeDefaultValues.runtimeStateSnapshotCacheTimeToLiveMilliseconds
+  );
+  const ipcReconnectDelayMs = ServerRuntimeDefaultValues.ipcReconnectDelayMilliseconds;
+  const ntfyCompletionDebounceMs = ServerRuntimeDefaultValues.notificationCompletionDebounceMilliseconds;
+  const capabilityListTimeoutMs = ServerRuntimeDefaultValues.capabilityListTimeoutMilliseconds;
+  const threadListAdapterTimeoutMs = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.threadListAdapterTimeoutMilliseconds,
+    ServerRuntimeDefaultValues.threadListAdapterTimeoutMilliseconds
+  );
+  const pushTestSendTimeoutMs = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.pushTestSendTimeoutMilliseconds,
+    ServerRuntimeDefaultValues.pushTestSendTimeoutMilliseconds
   );
 
-  const traceDirectoryPath = path.resolve(process.cwd(), "traces");
+  const traceDirectoryPath = path.resolve(defaultWorkspacePath, ServerRuntimeStaticConfiguration.traceDirectoryName);
 
-  const apiTokenHeaderName = "x-farfield-token";
-  const apiTokenResponseHeader = "X-Farfield-Token";
-  const apiSessionCookieName = "farfield_session";
-  const apiSessionTimeToLiveMs = parsePositiveInteger(env["API_SESSION_TIME_TO_LIVE_MS"] ?? null, 28_800_000);
-  const clientRequestIdHeaderName = "x-farfield-request-id";
-  const clientRequestIdResponseHeader = "X-Farfield-Request-Id";
-  const clientActionIdHeaderName = "x-farfield-action-id";
-  const clientActionIdResponseHeader = "X-Farfield-Action-Id";
-  const clientActionNameHeaderName = "x-farfield-action-name";
-  const clientActionNameResponseHeader = "X-Farfield-Action-Name";
-  const apiToken = (env["API_TOKEN"] ?? env["PUSH_API_TOKEN"] ?? "").trim();
+  const apiTokenHeaderName = ServerRuntimeStaticConfiguration.apiTokenHeaderName;
+  const apiTokenResponseHeader = ServerRuntimeStaticConfiguration.apiTokenResponseHeader;
+  const apiSessionCookieName = ServerRuntimeStaticConfiguration.apiSessionCookieName;
+  const apiSessionTimeToLiveMs = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.apiSessionTimeToLiveMilliseconds,
+    ServerRuntimeDefaultValues.apiSessionTimeToLiveMilliseconds
+  );
+  const clientRequestIdHeaderName = ServerRuntimeStaticConfiguration.clientRequestIdentifierHeaderName;
+  const clientRequestIdResponseHeader = ServerRuntimeStaticConfiguration.clientRequestIdentifierResponseHeader;
+  const clientActionIdHeaderName = ServerRuntimeStaticConfiguration.clientActionIdentifierHeaderName;
+  const clientActionIdResponseHeader = ServerRuntimeStaticConfiguration.clientActionIdentifierResponseHeader;
+  const clientActionNameHeaderName = ServerRuntimeStaticConfiguration.clientActionNameHeaderName;
+  const clientActionNameResponseHeader = ServerRuntimeStaticConfiguration.clientActionNameResponseHeader;
+  const apiToken = resolveApiTokenFromEnvironment(env);
   const apiAuthRequired = apiToken.length > 0;
-  const apiSessionSigningSecret = (env["API_SESSION_SECRET"] ?? apiToken ?? "").trim() || "farfield_session_secret";
-  const apiSessionSecureCookie = parseBooleanEnvironmentValue(env["API_SESSION_SECURE_COOKIE"] ?? null, false);
-
-  const pushEnabled = parseBooleanEnvironmentValue(env["PUSH_ENABLED"] ?? null, false);
-  const pushPrivateModeDefault = parseBooleanEnvironmentValue(env["PUSH_PRIVATE_MODE_DEFAULT"] ?? null, true);
-  const pushReceiptsMaxCount = parsePositiveInteger(env["PUSH_RECEIPTS_MAX_COUNT"] ?? null, 100);
-  const pushReceiptsMaxAgeDays = parsePositiveInteger(env["PUSH_RECEIPTS_MAX_AGE_DAYS"] ?? null, 7);
-  const threadListAggregationCacheTimeToLiveMs = parsePositiveInteger(
-    env["THREAD_LIST_AGGREGATION_CACHE_TIME_TO_LIVE_MS"] ?? null,
-    2_000
-  );
-  const threadListAggregationCacheMaximumEntries = parsePositiveInteger(
-    env["THREAD_LIST_AGGREGATION_CACHE_MAXIMUM_ENTRIES"] ?? null,
-    48
+  const apiSessionSigningSecret = resolveApiSessionSigningSecret(env, apiToken);
+  const apiSessionSecureCookie = readBooleanEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.apiSessionSecureCookie,
+    ServerRuntimeDefaultValues.apiSessionSecureCookie
   );
 
-  const webHealthBuildId = (env["WEB_BUILD_ID"] ?? env["VITE_APP_BUILD_ID"] ?? "dev").trim() || "dev";
-  const webHealthServiceWorkerVersion = (env["WEB_SERVICE_WORKER_VERSION"] ?? "").trim() || null;
+  const pushEnabled = readBooleanEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.pushEnabled,
+    ServerRuntimeDefaultValues.pushEnabled
+  );
+  const pushPrivateModeDefault = readBooleanEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.pushPrivateModeDefault,
+    ServerRuntimeDefaultValues.pushPrivateModeDefault
+  );
+  const pushReceiptsMaxCount = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.pushReceiptsMaxCount,
+    ServerRuntimeDefaultValues.pushReceiptsMaxCount
+  );
+  const pushReceiptsMaxAgeDays = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.pushReceiptsMaxAgeDays,
+    ServerRuntimeDefaultValues.pushReceiptsMaxAgeDays
+  );
+  const threadListAggregationCacheTimeToLiveMs = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.threadListAggregationCacheTimeToLiveMilliseconds,
+    ServerRuntimeDefaultValues.threadListAggregationCacheTimeToLiveMilliseconds
+  );
+  const threadListAggregationCacheMaximumEntries = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.threadListAggregationCacheMaximumEntries,
+    ServerRuntimeDefaultValues.threadListAggregationCacheMaximumEntries
+  );
+
+  const webHealthBuildId = resolveWebHealthBuildIdentifierFromEnvironment(env);
+  const webHealthServiceWorkerVersion =
+    readTrimmedEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.webServiceWorkerVersion) || null;
 
   const codexExecutablePath = resolveCodexExecutablePathFromEnvironment(env);
   const ipcSocketPath = resolveIpcSocketPathFromEnvironment(env);
   const gitCommit = resolveGitCommitHash(defaultWorkspacePath);
 
   const pushStatePathResolution = resolvePushStatePath({
-    envPath: env["PUSH_STATE_PATH"],
-    appDataPath: env["APPDATA"],
-    xdgStateHome: env["XDG_STATE_HOME"],
+    envPath: readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushStatePath) ?? undefined,
+    appDataPath: readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.appDataPath) ?? undefined,
+    xdgStateHome: readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.xdgStateHome) ?? undefined,
     homeDirectory: os.homedir(),
     platform: process.platform
   });
 
   const pushReceiptsPath =
-    parseOptionalPathEnvironmentValue("PUSH_RECEIPTS_PATH", env["PUSH_RECEIPTS_PATH"])
-    ?? path.join(path.dirname(pushStatePathResolution.filePath), "push-receipts.json");
+    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushReceiptsPath)
+    ?? path.join(path.dirname(pushStatePathResolution.filePath), ServerRuntimeStaticConfiguration.pushReceiptsFileName);
   const pushSendsPath =
-    parseOptionalPathEnvironmentValue("PUSH_SENDS_PATH", env["PUSH_SENDS_PATH"])
-    ?? path.join(path.dirname(pushStatePathResolution.filePath), "push-sends.json");
+    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushSendsPath)
+    ?? path.join(path.dirname(pushStatePathResolution.filePath), ServerRuntimeStaticConfiguration.pushSendsFileName);
 
   const pushLocalCaSourcePath = resolvePushLocalCaSourcePath(env);
-  const pushVapidPublicKey = (env["PUSH_VAPID_PUBLIC_KEY"] ?? "").trim();
-  const pushVapidPrivateKey = (env["PUSH_VAPID_PRIVATE_KEY"] ?? "").trim();
-  const pushVapidSubject = (env["PUSH_VAPID_SUBJECT"] ?? "").trim();
+  const pushVapidPublicKey = readTrimmedEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushVapidPublicKey);
+  const pushVapidPrivateKey = readTrimmedEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.pushVapidPrivateKey
+  );
+  const pushVapidSubject = readTrimmedEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushVapidSubject);
 
   if (
     pushEnabled
@@ -287,14 +483,31 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
 
   const clientErrorSessionStartedAt = new Date().toISOString();
   const clientErrorSessionTimestamp = clientErrorSessionStartedAt.replace(/[:.]/g, "-");
-  const clientErrorSessionId = `session-${clientErrorSessionTimestamp}-${String(process.pid)}`;
+  const clientErrorSessionId =
+    `${ServerRuntimeStaticConfiguration.sessionIdentifierPrefix}${clientErrorSessionTimestamp}-${String(process.pid)}`;
   const clientErrorLogPath =
-    parseOptionalPathEnvironmentValue("DEBUG_CLIENT_ERROR_LOG_PATH", env["DEBUG_CLIENT_ERROR_LOG_PATH"])
-    ?? path.join(defaultWorkspacePath, ".runtime", "logs", "errors", "client-errors.ndjson");
-  const clientErrorMaxEntries = parsePositiveInteger(env["DEBUG_CLIENT_ERROR_MAX_ENTRIES"] ?? null, 2000);
+    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.debugClientErrorLogPath)
+    ?? path.join(
+      defaultWorkspacePath,
+      ServerRuntimeStaticConfiguration.runtimeDirectoryName,
+      ServerRuntimeStaticConfiguration.logsDirectoryName,
+      ServerRuntimeStaticConfiguration.errorsLogDirectoryName,
+      ServerRuntimeStaticConfiguration.clientErrorLogFileName
+    );
+  const clientErrorMaxEntries = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.debugClientErrorMaximumEntries,
+    ServerRuntimeDefaultValues.clientErrorMaximumEntries
+  );
   const invalidThreadStreamEventsLogPath =
-    parseOptionalPathEnvironmentValue("FARFIELD_INVALID_STREAM_LOG_PATH", env["FARFIELD_INVALID_STREAM_LOG_PATH"])
-    ?? path.resolve(defaultWorkspacePath, ".runtime", "logs", "threads", "invalid-thread-stream-events.ndjson");
+    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.invalidThreadStreamEventsLogPath)
+    ?? path.resolve(
+      defaultWorkspacePath,
+      ServerRuntimeStaticConfiguration.runtimeDirectoryName,
+      ServerRuntimeStaticConfiguration.logsDirectoryName,
+      ServerRuntimeStaticConfiguration.threadLogsDirectoryName,
+      ServerRuntimeStaticConfiguration.invalidThreadStreamEventsLogFileName
+    );
   const ntfyConfiguration = parseNtfyConfigFromEnv(env);
 
   return {

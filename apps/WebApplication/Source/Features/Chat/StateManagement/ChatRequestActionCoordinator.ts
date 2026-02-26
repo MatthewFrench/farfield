@@ -1,6 +1,12 @@
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 
+const SEND_MESSAGE_ACTION_NAME = "send-message";
+const SUBMIT_USER_INPUT_ACTION_NAME = "submit-user-input";
+const SKIP_USER_INPUT_ACTION_NAME = "skip-user-input";
+const INTERRUPT_THREAD_ACTION_NAME = "interrupt-thread";
+const NO_THREAD_AVAILABLE_SEND_ERROR_MESSAGE = "No thread available for send-message";
+
 export interface ChatRequestActionRequestOptions {
   actionId: string;
   requestOptions: ApiRequestOptions;
@@ -107,7 +113,7 @@ export class ChatRequestActionCoordinator {
       return;
     }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions("send-message");
+    const { actionId, requestOptions } = input.buildActionRequestOptions(SEND_MESSAGE_ACTION_NAME);
     let threadId: string | null = input.selectedThreadId;
     input.onSetBusy(true);
     try {
@@ -121,7 +127,7 @@ export class ChatRequestActionCoordinator {
       }
 
       if (!threadId) {
-        throw new Error("No thread available for send-message");
+        throw new Error(NO_THREAD_AVAILABLE_SEND_ERROR_MESSAGE);
       }
 
       await input.chatClient.sendMessage({ threadId, text: input.draft }, requestOptions);
@@ -130,7 +136,7 @@ export class ChatRequestActionCoordinator {
       await input.onRefreshThreadData(threadId);
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
-        operation: "send-message",
+        operation: SEND_MESSAGE_ACTION_NAME,
         actionId,
         threadId,
         error: toErrorMessage(error),
@@ -148,7 +154,7 @@ export class ChatRequestActionCoordinator {
       return;
     }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions("submit-user-input");
+    const { actionId, requestOptions } = input.buildActionRequestOptions(SUBMIT_USER_INPUT_ACTION_NAME);
     input.onSetBusy(true);
     try {
       await input.chatClient.submitUserInput({
@@ -162,7 +168,7 @@ export class ChatRequestActionCoordinator {
       await input.onRefreshThreadData(input.selectedThreadId);
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
-        operation: "submit-user-input",
+        operation: SUBMIT_USER_INPUT_ACTION_NAME,
         actionId,
         threadId: input.selectedThreadId,
         error: toErrorMessage(error),
@@ -180,7 +186,7 @@ export class ChatRequestActionCoordinator {
       return;
     }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions("skip-user-input");
+    const { actionId, requestOptions } = input.buildActionRequestOptions(SKIP_USER_INPUT_ACTION_NAME);
     input.onSetBusy(true);
     try {
       await input.chatClient.submitUserInput({
@@ -194,7 +200,7 @@ export class ChatRequestActionCoordinator {
       await input.onRefreshThreadData(input.selectedThreadId);
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
-        operation: "skip-user-input",
+        operation: SKIP_USER_INPUT_ACTION_NAME,
         actionId,
         threadId: input.selectedThreadId,
         error: toErrorMessage(error),
@@ -212,7 +218,7 @@ export class ChatRequestActionCoordinator {
       return;
     }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions("interrupt-thread");
+    const { actionId, requestOptions } = input.buildActionRequestOptions(INTERRUPT_THREAD_ACTION_NAME);
     input.onSetBusy(true);
     try {
       await input.chatClient.interruptThread({
@@ -222,7 +228,7 @@ export class ChatRequestActionCoordinator {
       await input.onRefreshThreadData(input.selectedThreadId);
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
-        operation: "interrupt-thread",
+        operation: INTERRUPT_THREAD_ACTION_NAME,
         actionId,
         threadId: input.selectedThreadId,
         error: toErrorMessage(error)

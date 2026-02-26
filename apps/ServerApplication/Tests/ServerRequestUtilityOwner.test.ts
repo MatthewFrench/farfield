@@ -17,6 +17,7 @@ describe("ServerRequestUtilityOwner", () => {
 
     expect(owner.parseBoolean("1", false)).toBe(true);
     expect(owner.parseBoolean("true", false)).toBe(true);
+    expect(owner.parseBoolean(" TRUE ", false)).toBe(true);
     expect(owner.parseBoolean("0", true)).toBe(false);
     expect(owner.parseBoolean("false", true)).toBe(false);
     expect(owner.parseBoolean("yes", true)).toBe(true);
@@ -28,6 +29,7 @@ describe("ServerRequestUtilityOwner", () => {
 
     expect(owner.parseAgentId("codex")).toBe("codex");
     expect(owner.parseAgentId("opencode")).toBe("opencode");
+    expect(owner.parseAgentId(" CODEX ")).toBe("codex");
     expect(owner.parseAgentId("invalid")).toBeNull();
     expect(owner.parseAgentId(null)).toBeNull();
 
@@ -58,5 +60,17 @@ describe("ServerRequestUtilityOwner", () => {
         "slow"
       )
     ).rejects.toThrow("slow timed out after 10ms");
+  });
+
+  it("rejects invalid timeout inputs and invalid integer defaults", async () => {
+    const owner = new ServerRequestUtilityOwner();
+
+    expect(() => owner.parseInteger("5", 0)).toThrow();
+    await expect(
+      owner.withTimeout(Promise.resolve("ok"), 0, "invalid")
+    ).rejects.toThrow();
+    await expect(
+      owner.withTimeout(Promise.resolve("ok"), 10, "   ")
+    ).rejects.toThrow();
   });
 });

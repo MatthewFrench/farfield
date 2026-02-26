@@ -6,6 +6,11 @@ import {
   NullableStringSchema
 } from "../../Common.js";
 
+const OptionalNullableStringSchema = NullableStringSchema.optional();
+const OptionalNullableJsonValueSchema = z.union([JsonValueSchema, z.null()]).optional();
+const OptionalNullableIntegerSchema = z.union([z.number().int(), z.null()]).optional();
+const OptionalNullableNonNegativeIntSchema = z.union([NonNegativeIntSchema, z.null()]).optional();
+
 export const UserMessageContentPartSchema = z
   .object({
     type: z.literal("text"),
@@ -57,8 +62,8 @@ export const ErrorItemSchema = z
     type: z.literal("error"),
     message: z.string(),
     willRetry: z.boolean().optional(),
-    errorInfo: z.union([z.string(), z.null()]).optional(),
-    additionalDetails: z.union([JsonValueSchema, z.null()]).optional()
+    errorInfo: OptionalNullableStringSchema,
+    additionalDetails: OptionalNullableJsonValueSchema
   })
   .passthrough();
 
@@ -103,7 +108,7 @@ export const TodoListItemSchema = z
   .object({
     id: NonEmptyStringSchema,
     type: z.literal("todo-list"),
-    explanation: z.union([z.string(), z.null()]).optional(),
+    explanation: OptionalNullableStringSchema,
     plan: z.array(TodoListPlanStepSchema)
   })
   .passthrough();
@@ -133,7 +138,7 @@ export const CommandActionSchema = z
     type: NonEmptyStringSchema,
     command: z.string().optional(),
     name: z.string().optional(),
-    path: z.union([z.string(), z.null()]).optional(),
+    path: OptionalNullableStringSchema,
     query: z.string().optional()
   })
   .passthrough();
@@ -147,16 +152,16 @@ export const CommandExecutionItemSchema = z
     processId: z.string().optional(),
     status: NonEmptyStringSchema,
     commandActions: z.array(CommandActionSchema).optional(),
-    aggregatedOutput: z.union([z.string(), z.null()]).optional(),
-    exitCode: z.union([z.number().int(), z.null()]).optional(),
-    durationMs: z.union([NonNegativeIntSchema, z.null()]).optional()
+    aggregatedOutput: OptionalNullableStringSchema,
+    exitCode: OptionalNullableIntegerSchema,
+    durationMs: OptionalNullableNonNegativeIntSchema
   })
   .passthrough();
 
 export const FileChangeKindSchema = z
   .object({
     type: NonEmptyStringSchema,
-    move_path: z.union([z.string(), z.null()]).optional()
+    move_path: OptionalNullableStringSchema
   })
   .passthrough();
 
@@ -211,12 +216,14 @@ export const ModelChangedItemSchema = z
   })
   .passthrough();
 
-export const McpToolCallStatusSchema = z.enum(["inProgress", "completed", "failed"]);
+const ToolCallLifecycleStatusValues = ["inProgress", "completed", "failed"] as const;
+
+export const McpToolCallStatusSchema = z.enum(ToolCallLifecycleStatusValues);
 
 export const McpToolCallResultSchema = z
   .object({
     content: z.array(JsonValueSchema),
-    structuredContent: z.union([JsonValueSchema, z.null()]).optional()
+    structuredContent: OptionalNullableJsonValueSchema
   })
   .passthrough();
 
@@ -236,7 +243,7 @@ export const McpToolCallItemSchema = z
     arguments: JsonValueSchema,
     result: z.union([McpToolCallResultSchema, z.null()]).optional(),
     error: z.union([McpToolCallErrorSchema, z.null()]).optional(),
-    durationMs: z.union([NonNegativeIntSchema, z.null()]).optional()
+    durationMs: OptionalNullableNonNegativeIntSchema
   })
   .passthrough();
 
@@ -260,29 +267,29 @@ export const CollabAgentStatusSchema = z.enum([
 export const CollabAgentStateSchema = z
   .object({
     status: CollabAgentStatusSchema,
-    message: z.union([z.string(), z.null()]).optional()
+    message: OptionalNullableStringSchema
   })
   .passthrough();
 
-export const CollabAgentToolCallStatusSchema = z.enum(["inProgress", "completed", "failed"]);
+export const CollabAgentToolCallStatusSchema = z.enum(ToolCallLifecycleStatusValues);
 
-const CollabToolCallItemSharedSchema = z
+const CollaborationToolCallItemSharedSchema = z
   .object({
     id: NonEmptyStringSchema,
     tool: CollabAgentToolSchema,
     status: CollabAgentToolCallStatusSchema,
     senderThreadId: z.string(),
     receiverThreadIds: z.array(z.string()),
-    prompt: z.union([z.string(), z.null()]).optional(),
+    prompt: OptionalNullableStringSchema,
     agentsStates: z.record(CollabAgentStateSchema)
   })
   .passthrough();
 
-export const CollabAgentToolCallItemSchema = CollabToolCallItemSharedSchema.extend({
+export const CollabAgentToolCallItemSchema = CollaborationToolCallItemSharedSchema.extend({
   type: z.literal("collabAgentToolCall")
 }).passthrough();
 
-export const CollabToolCallItemSchema = CollabToolCallItemSharedSchema.extend({
+export const CollabToolCallItemSchema = CollaborationToolCallItemSharedSchema.extend({
   type: z.literal("collabToolCall")
 }).passthrough();
 
@@ -310,7 +317,7 @@ export const ExitedReviewModeItemSchema = z
   })
   .passthrough();
 
-export const TurnItemSchema = z.discriminatedUnion("type", [
+const TurnItemVariantSchemas = [
   UserMessageItemSchema,
   SteeringUserMessageItemSchema,
   AgentMessageItemSchema,
@@ -331,4 +338,6 @@ export const TurnItemSchema = z.discriminatedUnion("type", [
   EnteredReviewModeItemSchema,
   ExitedReviewModeItemSchema,
   ModelChangedItemSchema
-]);
+] as const;
+
+export const TurnItemSchema = z.discriminatedUnion("type", TurnItemVariantSchemas);

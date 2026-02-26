@@ -1,7 +1,10 @@
 import { type SendRequestOptions } from "@farfield/api";
-import { parseBody, ReplayBodySchema } from "../RequestSchemas/HttpSchemas.js";
+import { parseReplayBody } from "../RequestSchemas/HttpSchemas.js";
 import {
   buildSendRequestOptions,
+  DebugReplayFrameTypeByName,
+  DebugRouteMethodByName,
+  DebugRoutePathnameByName,
   type DebugRouteDependencies,
   type ParsedReplayFrame
 } from "./DebugRouteContracts.js";
@@ -27,7 +30,7 @@ export class DebugReplayRouteOwner {
       pushSystem
     } = this.dependencies;
 
-    if (!(req.method === "POST" && pathname === "/api/debug/replay")) {
+    if (!(req.method === DebugRouteMethodByName.post && pathname === DebugRoutePathnameByName.replay)) {
       return false;
     }
 
@@ -47,7 +50,7 @@ export class DebugReplayRouteOwner {
       return true;
     }
 
-    const body = parseBody(ReplayBodySchema, await readJsonBody(req));
+    const body = parseReplayBody(await readJsonBody(req));
     const entry = activityHistoryService.readHistoryEntries().find((item) => item.id === body.entryId);
     if (!entry) {
       jsonResponse(res, 404, { ok: false, error: "History entry not found" });
@@ -76,7 +79,7 @@ export class DebugReplayRouteOwner {
 
     const options: SendRequestOptions = buildSendRequestOptions(frame);
 
-    if (frame.type === "request") {
+    if (frame.type === DebugReplayFrameTypeByName.request) {
       const replayPromise = codexAdapter.replayRequest(frame.method, frame.params, options);
 
       if (body.waitForResponse) {

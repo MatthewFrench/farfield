@@ -12,6 +12,8 @@ export interface ThreadListItem {
   removed?: boolean | undefined;
   projectRemoved?: boolean | undefined;
   projectState?: "active" | "removed" | undefined;
+  isProjectRemoved?: boolean | undefined;
+  hasUnreadTurn?: boolean | null | undefined;
 }
 
 export interface ThreadListResponse {

@@ -151,6 +151,97 @@ describe("Thread ownership modules", () => {
     expect(second.nextUnreadThreadIdentifiers).toEqual({ "thread-2": true });
   });
 
+  it("ThreadListStateStore honors explicit hasUnreadTurn values from thread list contracts", () => {
+    const store = new ThreadListStateStore();
+
+    const state = store.computeActiveThreadState({
+      nextThreads: [
+        {
+          id: "thread-explicit-unread",
+          preview: "Thread unread",
+          createdAt: 1_700_000_000,
+          updatedAt: 1_700_000_001,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+          hasUnreadTurn: true
+        },
+        {
+          id: "thread-explicit-read",
+          preview: "Thread read",
+          createdAt: 1_700_000_002,
+          updatedAt: 1_700_000_003,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+          hasUnreadTurn: false
+        },
+        {
+          id: "thread-selected",
+          preview: "Thread selected",
+          createdAt: 1_700_000_004,
+          updatedAt: 1_700_000_005,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+          hasUnreadTurn: true
+        }
+      ],
+      previousUnreadThreadIdentifiers: {
+        "thread-explicit-read": true,
+        "thread-selected": true
+      },
+      selectedThreadIdentifier: "thread-selected"
+    });
+
+    expect(state.nextUnreadThreadIdentifiers).toEqual({
+      "thread-explicit-unread": true
+    });
+  });
+
+  it("ThreadListStateStore treats null unread signals as heuristic-managed state", () => {
+    const store = new ThreadListStateStore();
+
+    const first = store.computeActiveThreadState({
+      nextThreads: [
+        {
+          id: "thread-heuristic",
+          preview: "Thread heuristic",
+          createdAt: 1_700_000_000,
+          updatedAt: 1_700_000_001,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+          hasUnreadTurn: null
+        }
+      ],
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: null
+    });
+    expect(first.nextUnreadThreadIdentifiers).toEqual({});
+
+    const second = store.computeActiveThreadState({
+      nextThreads: [
+        {
+          id: "thread-heuristic",
+          preview: "Thread heuristic",
+          createdAt: 1_700_000_000,
+          updatedAt: 1_700_000_010,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+          hasUnreadTurn: null
+        }
+      ],
+      previousUnreadThreadIdentifiers: first.nextUnreadThreadIdentifiers,
+      selectedThreadIdentifier: null
+    });
+
+    expect(second.nextUnreadThreadIdentifiers).toEqual({
+      "thread-heuristic": true
+    });
+  });
+
   it("ThreadListStateStore hydrates initial selected thread once using preferred agent", () => {
     const store = new ThreadListStateStore();
     const nextThreads: ThreadListItem[] = [
@@ -248,5 +339,67 @@ describe("Thread ownership modules", () => {
     expect(firstRead.loadedFromCache).toBe(false);
     expect(secondRead.loadedFromCache).toBe(true);
     expect(serverClient.getListRequestCount()).toBe(1);
+  });
+
+  it("ThreadListStateController marks archived list truncated when pagination cursor exists", async () => {
+    const active = buildThreadListResponse({
+      threadOneUpdatedAt: 1_700_000_000,
+      threadTwoUpdatedAt: 1_700_000_001
+    });
+    const archived: ThreadListResponse = {
+      ...buildThreadListResponse({
+        threadOneUpdatedAt: 1_600_000_000,
+        threadTwoUpdatedAt: 1_600_000_001
+      }),
+      nextCursor: "cursor-2",
+      truncated: false
+    };
+    const controller = new ThreadListStateController({
+      threadServerClient: new TestThreadServerClient({ active, archived }),
+      threadQueryCache: new ThreadQueryCache(10_000, 8),
+      threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
+      threadListStateStore: new ThreadListStateStore(),
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+    });
+
+    const archivedState = await controller.loadArchivedThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      readFromCache: false
+    });
+
+    expect(archivedState.isTruncated).toBe(true);
+  });
+
+  it("ThreadListStateController leaves archived list untruncated when cursor and flag are absent", async () => {
+    const active = buildThreadListResponse({
+      threadOneUpdatedAt: 1_700_000_000,
+      threadTwoUpdatedAt: 1_700_000_001
+    });
+    const archived: ThreadListResponse = {
+      ...buildThreadListResponse({
+        threadOneUpdatedAt: 1_600_000_000,
+        threadTwoUpdatedAt: 1_600_000_001
+      }),
+      nextCursor: null,
+      truncated: false
+    };
+    const controller = new ThreadListStateController({
+      threadServerClient: new TestThreadServerClient({ active, archived }),
+      threadQueryCache: new ThreadQueryCache(10_000, 8),
+      threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
+      threadListStateStore: new ThreadListStateStore(),
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+    });
+
+    const archivedState = await controller.loadArchivedThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      readFromCache: false
+    });
+
+    expect(archivedState.isTruncated).toBe(false);
   });
 });

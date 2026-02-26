@@ -81,4 +81,16 @@ describe("ChatScrollStateCoordinator", () => {
 
     expect(scrollElement.scrollTop).toBe(1250);
   });
+
+  it("clamps overscroll distance to zero", () => {
+    const coordinator = new ChatScrollStateCoordinator(48);
+    const overscrolledElement = createScrollElement({
+      scrollHeight: 1000,
+      scrollTop: 700,
+      clientHeight: 400
+    });
+
+    expect(coordinator.readDistanceFromBottom(overscrolledElement)).toBe(0);
+    expect(coordinator.readIsAtBottom(overscrolledElement)).toBe(true);
+  });
 });

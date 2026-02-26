@@ -63,10 +63,9 @@ describe("NtfyNotifier.publishThreadCompleted", () => {
   });
 
   it("publishes a completion notification", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      text: async () => "msg_123"
-    } as Response);
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("msg_123", { status: 200 }));
 
     const notifier = new NtfyNotifier(
       parseNtfyConfigFromEnv({
@@ -91,11 +90,11 @@ describe("NtfyNotifier.publishThreadCompleted", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://ntfy.example.com/farfield");
 
     const requestInit = fetchMock.mock.calls[0]?.[1];
-    const headers = requestInit?.headers as Record<string, string>;
+    const requestHeaders = new Headers(requestInit?.headers);
     expect(requestInit?.method).toBe("POST");
-    expect(headers.Authorization).toBe("Bearer token-123");
-    expect(headers.Priority).toBe("4");
-    expect(headers.Title).toBe("Farfield - Fix flaky tests");
+    expect(requestHeaders.get("Authorization")).toBe("Bearer token-123");
+    expect(requestHeaders.get("Priority")).toBe("4");
+    expect(requestHeaders.get("Title")).toBe("Farfield - Fix flaky tests");
     expect(String(requestInit?.body ?? "")).toBe("Done and green.");
   });
 });

@@ -18,12 +18,12 @@ import type {
   AgentConfigDefaults,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
-    AgentInterruptInput,
-    AgentListThreadsInput,
-    AgentListThreadsResult,
-    AgentReadStreamEventsInput,
-    AgentReadThreadInput,
-    AgentReadThreadResult,
+  AgentInterruptInput,
+  AgentListThreadsInput,
+  AgentListThreadsResult,
+  AgentReadStreamEventsInput,
+  AgentReadThreadInput,
+  AgentReadThreadResult,
   AgentSendMessageInput,
   AgentSetCollaborationModeInput,
   AgentSubmitUserInputInput,
@@ -36,6 +36,11 @@ import { CodexMessageDispatchOwner } from "./CodexMessageDispatchOwner.js";
 import { CodexThreadInteractionOwner } from "./CodexThreadInteractionOwner.js";
 import { CodexThreadManagementOwner } from "./CodexThreadManagementOwner.js";
 import { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
+
+const APP_SERVER_INVALID_REQUEST_ERROR_CODE = -32600;
+const THREAD_NOT_LOADED_ERROR_FRAGMENT = "thread not loaded";
+const CONVERSATION_NOT_FOUND_ERROR_FRAGMENT = "conversation not found";
+const STEERING_UNSUPPORTED_ENDPOINT_ERROR = "Steering messages are not supported on this endpoint.";
 
 export interface CodexAgentRuntimeState {
   appReady: boolean;
@@ -188,11 +193,11 @@ export class CodexAgentAdapter implements AgentAdapter {
       return false;
     }
 
-    if (error.code !== -32600) {
+    if (error.code !== APP_SERVER_INVALID_REQUEST_ERROR_CODE) {
       return false;
     }
 
-    return error.message.includes("thread not loaded");
+    return error.message.includes(THREAD_NOT_LOADED_ERROR_FRAGMENT);
   }
 
   public isConversationNotFoundError<ErrorType>(error: ErrorType): boolean {
@@ -200,11 +205,11 @@ export class CodexAgentAdapter implements AgentAdapter {
       return false;
     }
 
-    if (error.code !== -32600) {
+    if (error.code !== APP_SERVER_INVALID_REQUEST_ERROR_CODE) {
       return false;
     }
 
-    return error.message.includes("conversation not found");
+    return error.message.includes(CONVERSATION_NOT_FOUND_ERROR_FRAGMENT);
   }
 
   public isEnabled(): boolean {
@@ -249,7 +254,7 @@ export class CodexAgentAdapter implements AgentAdapter {
   public async sendMessage(input: AgentSendMessageInput): Promise<void> {
     this.ensureCodexAvailable();
     if (input.isSteering === true) {
-      throw new Error("Steering messages are not supported on this endpoint.");
+      throw new Error(STEERING_UNSUPPORTED_ENDPOINT_ERROR);
     }
     await this.messageDispatchOwner.sendMessage(input, this.isIpcReady());
   }

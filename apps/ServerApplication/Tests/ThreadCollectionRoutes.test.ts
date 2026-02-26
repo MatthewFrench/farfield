@@ -167,6 +167,39 @@ describe("handleThreadCollectionRoutes", () => {
     expect(capturedStatusCode).toBe(400);
   });
 
+  it("returns 400 when cursor payload cannot be decoded", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
+      data: [],
+      nextCursor: null
+    }));
+    const adapter = createMockAgentAdapter("codex", listThreads);
+
+    await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        url: new URL("http://localhost/api/threads?cursor=invalid-cursor"),
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        }
+      })
+    );
+
+    expect(listThreads).not.toHaveBeenCalled();
+    expect(capturedStatusCode).toBe(400);
+    expect(capturedBody).toMatchObject({
+      ok: false,
+      error: "Invalid cursor",
+      issues: [
+        {
+          path: "cursor"
+        }
+      ]
+    });
+  });
+
   it("parses validated query parameters and forwards typed list input", async () => {
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
@@ -213,6 +246,68 @@ describe("handleThreadCollectionRoutes", () => {
       ok: true,
       pages: 1,
       truncated: false
+    });
+  });
+
+  it("uses decoded cursor offset to select the response page", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const encodedCursor = Buffer.from(
+      JSON.stringify({
+        version: 1,
+        offset: 1
+      }),
+      "utf8"
+    ).toString("base64url");
+    const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
+      data: [
+        {
+          id: "thread_3",
+          preview: "third",
+          createdAt: 3,
+          updatedAt: 3
+        },
+        {
+          id: "thread_2",
+          preview: "second",
+          createdAt: 2,
+          updatedAt: 2
+        },
+        {
+          id: "thread_1",
+          preview: "first",
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ],
+      nextCursor: null,
+      pages: 3,
+      truncated: false
+    }));
+    const adapter = createMockAgentAdapter("codex", listThreads);
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        url: new URL(`http://localhost/api/threads?limit=1&cursor=${encodedCursor}`),
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        }
+      })
+    );
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toMatchObject({
+      ok: true,
+      data: [
+        {
+          id: "thread_2",
+          agentId: "codex"
+        }
+      ],
+      pages: 1
     });
   });
 

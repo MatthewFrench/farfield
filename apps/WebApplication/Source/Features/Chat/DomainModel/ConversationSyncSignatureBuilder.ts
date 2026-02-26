@@ -1,23 +1,11 @@
+import type { ThreadConversationState } from "@farfield/protocol";
 import type { ModeSelectionConversationState } from "./ModeSelectionStateResolver";
 import type { ModeSelectionStateResolver } from "./ModeSelectionStateResolver";
 
-export interface ConversationTurnItemLike {
-  id?: string | null | undefined;
-  type?: string | null | undefined;
-}
-
-export interface ConversationTurnLike {
-  id?: string | null | undefined;
-  turnId?: string | null | undefined;
-  status?: string | null | undefined;
-  items?: ConversationTurnItemLike[] | null | undefined;
-}
-
-export interface ConversationStateLike extends ModeSelectionConversationState {
-  id?: string | undefined;
-  updatedAt?: number | undefined;
-  turns: ConversationTurnLike[];
-}
+export type ConversationStateLike = ModeSelectionConversationState & Pick<
+  ThreadConversationState,
+  "id" | "updatedAt" | "turns"
+>;
 
 export interface LiveStateLike {
   threadId: string;
@@ -39,10 +27,7 @@ export class ConversationSyncSignatureBuilder {
   public readConversationStateUpdatedAt(
     state: ConversationStateLike | null | undefined
   ): number {
-    if (!state || typeof state.updatedAt !== "number") {
-      return Number.NEGATIVE_INFINITY;
-    }
-    return state.updatedAt;
+    return state?.updatedAt ?? Number.NEGATIVE_INFINITY;
   }
 
   public buildLiveStateSyncSignature(
@@ -105,7 +90,7 @@ export class ConversationSyncSignatureBuilder {
     }
 
     const lastTurnId = lastTurn.id ?? lastTurn.turnId ?? "";
-    const items = lastTurn.items ?? [];
+    const items = lastTurn.items;
     const lastItem = items[items.length - 1];
 
     return [

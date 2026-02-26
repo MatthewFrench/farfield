@@ -1,5 +1,11 @@
 import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 
+export interface DebugErrorDetails {
+  actionId?: string | undefined;
+  actionName?: string | undefined;
+  [detailKey: string]: StructuredDataValue | undefined;
+}
+
 export interface DebugErrorLike {
   errorId: string;
   origin: "client" | "server";
@@ -12,7 +18,7 @@ export interface DebugErrorLike {
   requestId: string | null;
   threadId: string | null;
   occurredAt: string;
-  details: Record<string, StructuredDataValue>;
+  details: DebugErrorDetails;
 }
 
 export interface DebugHistoryEntryLike {

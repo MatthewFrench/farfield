@@ -1,11 +1,27 @@
-import type { JsonValue } from "@farfield/protocol";
+import { JsonValueSchema, type JsonValue } from "@farfield/protocol";
+import { z } from "zod";
 import { logger } from "../../Shared/Logging/Logger.js";
 import type {
   ThreadListAggregationCache,
   ThreadListAggregationQuery
 } from "../../Network/ThreadListAggregationCache.js";
+import { THREAD_STREAM_STATE_CHANGED_METHOD } from "../ThreadStreamStateChangedHistoryBatchOwner.js";
 
-type ThreadListInvalidationScope = "all" | "active" | "archived";
+type ThreadListInvalidationScope = "all" | "active";
+
+const ThreadListInvalidationReasonValues = [
+  THREAD_STREAM_STATE_CHANGED_METHOD,
+  "thread-created",
+  "thread-message-sent",
+  "thread-user-input-submitted",
+  "thread-interrupted",
+  "thread-archived",
+  "thread-unarchived"
+] as const;
+const ThreadListInvalidationReasonSchema = z.enum(ThreadListInvalidationReasonValues);
+type ThreadListInvalidationReason = z.infer<typeof ThreadListInvalidationReasonSchema>;
+const ThreadListInvalidationDetailsSchema = z.record(JsonValueSchema);
+const ThreadStreamStateChangeThreadIdentifierSchema = z.string().trim().min(1).optional();
 
 const ThreadStreamCacheInvalidationMinimumIntervalMilliseconds = 2_000;
 
@@ -22,35 +38,37 @@ export class ThreadListCacheInvalidationOwner {
   }
 
   public invalidate(reason: string, details: Record<string, JsonValue> = {}): void {
+    const parsedReason = ThreadListInvalidationReasonSchema.parse(reason);
+    const parsedDetails = ThreadListInvalidationDetailsSchema.parse(details);
     if (
-      reason === "thread-stream-state-changed"
-      && !this.shouldInvalidateForThreadStreamStateChange(details)
+      parsedReason === THREAD_STREAM_STATE_CHANGED_METHOD
+      && !this.shouldInvalidateForThreadStreamStateChange(parsedDetails)
     ) {
       logger.debug(
         {
-          reason,
-          ...details
+          reason: parsedReason,
+          ...parsedDetails
         },
         "thread-list-aggregation-cache-invalidation-skipped"
       );
       return;
     }
 
-    const invalidationScope = this.readThreadListInvalidationScope(reason);
+    const invalidationScope = this.readThreadListInvalidationScope(parsedReason);
     this.threadListAggregationCache.invalidateWhere(this.buildThreadListInvalidationPredicate(invalidationScope));
     const statistics = this.threadListAggregationCache.readStatistics();
     logger.debug(
       {
-        reason,
+        reason: parsedReason,
         invalidationScope,
-        ...details,
+        ...parsedDetails,
         statistics
       },
       "thread-list-aggregation-cache-invalidated"
     );
   }
 
-  private readThreadListInvalidationScope(reason: string): ThreadListInvalidationScope {
+  private readThreadListInvalidationScope(reason: ThreadListInvalidationReason): ThreadListInvalidationScope {
     if (reason === "thread-archived" || reason === "thread-unarchived") {
       return "all";
     }
@@ -58,13 +76,8 @@ export class ThreadListCacheInvalidationOwner {
   }
 
   private shouldInvalidateForThreadStreamStateChange(details: Record<string, JsonValue>): boolean {
-    const threadIdValue = details["threadId"];
-    if (typeof threadIdValue !== "string") {
-      return true;
-    }
-
-    const threadId = threadIdValue.trim();
-    if (threadId.length === 0) {
+    const threadId = ThreadStreamStateChangeThreadIdentifierSchema.parse(details["threadId"]);
+    if (threadId === undefined) {
       return true;
     }
 
@@ -73,7 +86,7 @@ export class ThreadListCacheInvalidationOwner {
     // Stream state events can arrive in tight bursts; debounce invalidation per
     // thread to avoid repeatedly blowing hot cache entries during active generation.
     if (
-      typeof lastInvalidationAt === "number"
+      lastInvalidationAt !== undefined
       && now - lastInvalidationAt < ThreadStreamCacheInvalidationMinimumIntervalMilliseconds
     ) {
       return false;
@@ -88,9 +101,6 @@ export class ThreadListCacheInvalidationOwner {
   ): (query: ThreadListAggregationQuery) => boolean {
     if (scope === "all") {
       return () => true;
-    }
-    if (scope === "archived") {
-      return (query) => query.archived;
     }
     return (query) => !query.archived;
   }

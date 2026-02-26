@@ -80,4 +80,12 @@ describe("ThreadConcurrencyCoordinator", () => {
     expect(statistics.completedExecutionCount).toBe(1);
     expect(statistics.activeThreadCount).toBe(0);
   });
+
+  it("rejects blank thread identifiers at the owner boundary", async () => {
+    const coordinator = new ThreadConcurrencyCoordinator();
+
+    await expect(
+      coordinator.runExclusive("   ", async () => "never")
+    ).rejects.toThrow("ThreadConcurrencyCoordinator requires non-empty threadId");
+  });
 });

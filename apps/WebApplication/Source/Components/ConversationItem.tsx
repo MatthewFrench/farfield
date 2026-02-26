@@ -25,6 +25,8 @@ const TOOL_BLOCK_TYPES: readonly TurnItem["type"][] = [
   "collabAgentToolCall",
   "collabToolCall"
 ];
+const REASONING_DEFAULT_SUMMARY_LINE = "Thinking…";
+const EMPTY_RECEIVER_THREAD_IDS_LABEL = "none";
 
 function isToolBlockType(type: TurnItem["type"] | undefined): boolean {
   return type !== undefined && TOOL_BLOCK_TYPES.includes(type);
@@ -47,6 +49,17 @@ function readTextContent(content: UserMessageLikeItem["content"]): string {
     .map((part) => (part.type === "text" ? part.text : ""))
     .filter((text) => text.length > 0)
     .join("\n");
+}
+
+function readReasoningSummary(summary: string[] | undefined): string[] {
+  return summary ?? [];
+}
+
+function formatReceiverThreadIds(receiverThreadIds: readonly string[]): string {
+  if (receiverThreadIds.length === 0) {
+    return EMPTY_RECEIVER_THREAD_IDS_LABEL;
+  }
+  return receiverThreadIds.join(", ");
 }
 
 function assertNever(value: never): never {
@@ -100,13 +113,11 @@ function ConversationItemComponent({
 
     /* ── Reasoning ──────────────────────────────────────── */
     case "reasoning": {
-      const summary = Array.isArray(item.summary)
-        ? item.summary.filter((s): s is string => typeof s === "string")
-        : [];
+      const summary = readReasoningSummary(item.summary);
       if (summary.length === 0 && !item.text) return null;
       return (
         <ReasoningBlock
-          summary={summary.length > 0 ? summary : ["Thinking…"]}
+          summary={summary.length > 0 ? summary : [REASONING_DEFAULT_SUMMARY_LINE]}
           text={item.text}
           isActive={isActive}
         />
@@ -236,7 +247,7 @@ function ConversationItemComponent({
             sender: {item.senderThreadId}
           </div>
           <div className="text-[11px] text-muted-foreground whitespace-pre-wrap break-all">
-            receivers: {item.receiverThreadIds.join(", ") || "none"}
+            receivers: {formatReceiverThreadIds(item.receiverThreadIds)}
           </div>
           {item.prompt && (
             <div className="mt-2 text-xs text-foreground/80 whitespace-pre-wrap break-words">

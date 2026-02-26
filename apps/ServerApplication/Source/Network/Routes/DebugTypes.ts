@@ -1,11 +1,29 @@
 import fs from "node:fs";
 import type { JsonValue } from "@farfield/protocol";
 
+export const HistoryEntrySourceByName = {
+  ipc: "ipc",
+  app: "app",
+  system: "system"
+} as const;
+
+export type HistoryEntrySource =
+  typeof HistoryEntrySourceByName[keyof typeof HistoryEntrySourceByName];
+
+export const HistoryEntryDirectionByName = {
+  in: "in",
+  out: "out",
+  system: "system"
+} as const;
+
+export type HistoryEntryDirection =
+  typeof HistoryEntryDirectionByName[keyof typeof HistoryEntryDirectionByName];
+
 export interface HistoryEntry {
   id: string;
   at: string;
-  source: "ipc" | "app" | "system";
-  direction: "in" | "out" | "system";
+  source: HistoryEntrySource;
+  direction: HistoryEntryDirection;
   payload: JsonValue;
   meta: Record<string, JsonValue>;
 }

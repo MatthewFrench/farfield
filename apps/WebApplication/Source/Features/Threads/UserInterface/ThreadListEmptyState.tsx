@@ -7,6 +7,10 @@ import {
   DropdownMenuTrigger
 } from "@/Components/UserInterface/DropdownMenu";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
+import {
+  DEFAULT_AGENT_LABEL,
+  DEFAULT_THREAD_PROJECT_DIRECTORY
+} from "@/Features/Threads/UserInterface/ThreadListUserInterfaceConstants";
 
 interface ThreadListEmptyStateProps {
   properties: ThreadListPaneProperties;
@@ -38,7 +42,8 @@ export function ThreadListEmptyState({
             className="rounded-full"
             disabled={properties.isBusy}
             onClick={() => {
-              const defaultProjectPath = properties.selectedAgentDescriptor?.projectDirectories[0] ?? ".";
+              const defaultProjectPath = properties.selectedAgentDescriptor?.projectDirectories[0]
+                ?? DEFAULT_THREAD_PROJECT_DIRECTORY;
               properties.onCreateThreadForSingleAgent(defaultProjectPath);
             }}
           >
@@ -64,14 +69,15 @@ export function ThreadListEmptyState({
                 <DropdownMenuItem
                   key={agentId}
                   onSelect={() => {
-                    const defaultProjectPath = properties.agentsById[agentId]?.projectDirectories[0] ?? ".";
+                    const defaultProjectPath = properties.agentsById[agentId]?.projectDirectories[0]
+                      ?? DEFAULT_THREAD_PROJECT_DIRECTORY;
                     properties.onCreateNewThread(defaultProjectPath, agentId);
                   }}
                 >
                   <span className="shrink-0 h-4 w-4 rounded-sm bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
                     {properties.renderAgentFavicon(
                       agentId,
-                      properties.agentsById[agentId]?.label ?? "Agent",
+                      properties.agentsById[agentId]?.label ?? DEFAULT_AGENT_LABEL,
                       "h-3.5 w-3.5"
                     )}
                   </span>

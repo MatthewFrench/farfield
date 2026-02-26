@@ -5,6 +5,31 @@ import { logger } from "../../Shared/Logging/Logger.js";
 import type { EventStreamClientRegistry } from "../../Network/EventStreamClientRegistry.js";
 import type { ActiveTrace, HistoryEntry, TraceSummary } from "../../Network/Routes/DebugTypes.js";
 
+const DEFAULT_HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES = 131_072;
+const RECENT_TRACE_LIMIT = 20;
+const TRACE_FILE_EXTENSION = ".ndjson";
+const TRACE_STREAM_OPEN_FLAGS = "a";
+const TRACE_MARKER_EVENT_TYPE = "trace-marker";
+const TRACE_HISTORY_EVENT_TYPE = "history";
+const HISTORY_PAYLOAD_PREVIEW_MAXIMUM_BYTES = 4_096;
+const TRACE_STREAM_WRITE_FAILED_LOG_EVENT = "trace-stream-write-failed";
+const ACTION_EVENT_LOG_EVENT = "action-event";
+const ACTION_ERROR_LOG_EVENT = "action-error";
+const SYSTEM_EVENT_LOG_EVENT = "system-event";
+const ACTION_DETAIL_SUMMARY_KEYS = [
+  "agentId",
+  "threadId",
+  "ownerClientId",
+  "requestId",
+  "textLength",
+  "cwd",
+  "model"
+] as const;
+
+/**
+ * Owns activity-history snapshots and trace stream lifecycle for debug endpoints.
+ * `history` may store summarized payloads while `historyById` preserves the full original payload.
+ */
 export class ActivityHistoryService {
   private readonly historyLimit: number;
   private readonly historyPayloadSummaryMaximumBytes: number;
@@ -18,7 +43,7 @@ export class ActivityHistoryService {
   public constructor(
     historyLimit: number,
     eventStreamClientRegistry: EventStreamClientRegistry,
-    historyPayloadSummaryMaximumBytes = 131_072
+    historyPayloadSummaryMaximumBytes = DEFAULT_HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES
   ) {
     if (!Number.isInteger(historyLimit) || historyLimit <= 0) {
       throw new Error("ActivityHistoryService requires positive integer historyLimit");
@@ -34,7 +59,7 @@ export class ActivityHistoryService {
 
     this.historyLimit = historyLimit;
     this.historyPayloadSummaryMaximumBytes = historyPayloadSummaryMaximumBytes;
-    this.recentTraceLimit = 20;
+    this.recentTraceLimit = RECENT_TRACE_LIMIT;
     this.eventStreamClientRegistry = eventStreamClientRegistry;
     this.history = [];
     this.historyById = new Map<string, HistoryEntry["payload"]>();
@@ -80,8 +105,8 @@ export class ActivityHistoryService {
 
     ensureTraceDirectory();
     const traceIdentifier = `${Date.now()}-${randomUUID()}`;
-    const tracePath = path.join(traceDirectoryPath, `${traceIdentifier}.ndjson`);
-    const stream = fs.createWriteStream(tracePath, { flags: "a" });
+    const tracePath = path.join(traceDirectoryPath, `${traceIdentifier}${TRACE_FILE_EXTENSION}`);
+    const stream = fs.createWriteStream(tracePath, { flags: TRACE_STREAM_OPEN_FLAGS });
     stream.on("error", (error) => {
       logger.error(
         {
@@ -89,7 +114,7 @@ export class ActivityHistoryService {
           tracePath,
           error: error.message
         },
-        "trace-stream-write-failed"
+        TRACE_STREAM_WRITE_FAILED_LOG_EVENT
       );
     });
 
@@ -116,7 +141,7 @@ export class ActivityHistoryService {
     }
 
     const marker = {
-      type: "trace-marker",
+      type: TRACE_MARKER_EVENT_TYPE,
       at: new Date().toISOString(),
       note
     };
@@ -180,7 +205,7 @@ export class ActivityHistoryService {
       }
     }
 
-    this.recordTraceEvent({ type: "history", ...entry });
+    this.recordTraceEvent({ type: TRACE_HISTORY_EVENT_TYPE, ...entry });
     this.eventStreamClientRegistry.broadcast({
       type: "activity-history-appended",
       entry
@@ -199,7 +224,7 @@ export class ActivityHistoryService {
         stage,
         ...this.summarizeActionDetails(details)
       },
-      "action-event"
+      ACTION_EVENT_LOG_EVENT
     );
 
     this.pushHistory("app", "out", {
@@ -221,7 +246,7 @@ export class ActivityHistoryService {
         error: errorMessage,
         ...this.summarizeActionDetails(details)
       },
-      "action-error"
+      ACTION_ERROR_LOG_EVENT
     );
 
     this.pushActionEvent(action, "error", { ...details, error: errorMessage });
@@ -230,7 +255,7 @@ export class ActivityHistoryService {
   }
 
   public pushSystem(message: string, details: HistoryEntry["meta"] = {}): void {
-    logger.debug({ message, ...details }, "system-event");
+    logger.debug({ message, ...details }, SYSTEM_EVENT_LOG_EVENT);
     this.pushHistory("system", "system", { message, details });
   }
 
@@ -246,9 +271,7 @@ export class ActivityHistoryService {
 
   private summarizeActionDetails(details: HistoryEntry["meta"]): HistoryEntry["meta"] {
     const summary: HistoryEntry["meta"] = {};
-    const keys = ["agentId", "threadId", "ownerClientId", "requestId", "textLength", "cwd", "model"];
-
-    for (const key of keys) {
+    for (const key of ACTION_DETAIL_SUMMARY_KEYS) {
       const value = details[key];
       if (value !== undefined) {
         summary[key] = value;
@@ -265,7 +288,10 @@ export class ActivityHistoryService {
       return payload;
     }
 
-    const previewMaximumBytes = Math.min(4_096, this.historyPayloadSummaryMaximumBytes);
+    const previewMaximumBytes = Math.min(
+      HISTORY_PAYLOAD_PREVIEW_MAXIMUM_BYTES,
+      this.historyPayloadSummaryMaximumBytes
+    );
     const preview = serializedPayload.slice(0, previewMaximumBytes);
     return {
       type: "history-payload-summary",

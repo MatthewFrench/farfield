@@ -4,10 +4,13 @@ import {
   type ThemePreference
 } from "@/Features/Theme/DataAccess/ThemePreferenceStore";
 
+const SYSTEM_DARK_MODE_MEDIA_QUERY = "(prefers-color-scheme: dark)";
+const DARK_THEME_CLASS_NAME = "dark";
+
 const themePreferenceStore = new ThemePreferenceStore();
 
 function readSystemThemePreference(): ThemePreference {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return window.matchMedia(SYSTEM_DARK_MODE_MEDIA_QUERY).matches ? "dark" : "light";
 }
 
 function getInitialTheme(): ThemePreference {
@@ -27,7 +30,7 @@ export function useTheme(): UseThemeResult {
   const [theme, setTheme] = useState<ThemePreference>(getInitialTheme);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.classList.toggle(DARK_THEME_CLASS_NAME, theme === "dark");
     themePreferenceStore.writeThemePreference(theme);
   }, [theme]);
 

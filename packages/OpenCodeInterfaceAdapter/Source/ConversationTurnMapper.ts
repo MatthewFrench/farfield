@@ -1,6 +1,12 @@
 import type { OpenCodeMessage, OpenCodePart } from "./Schemas.js";
-import type { MappedTurn, MappedTurnItem } from "./MapperContracts.js";
+import type {
+  MappedTurn,
+  MappedTurnItem,
+  MappedTurnStatus
+} from "./MapperContracts.js";
 import { isTextPart, partToTurnItem } from "./TurnItemMapper.js";
+
+const COMPLETED_ASSISTANT_FINISH_REASONS = new Set<string>(["stop", "length"]);
 
 /**
  * Reconstruct turns from OpenCode messages.
@@ -17,7 +23,10 @@ export function messagesToTurns(
 
   for (const msg of messages) {
     if (msg.role === "assistant") {
-      assistantByParent.set(msg.parentID, msg);
+      const existing = assistantByParent.get(msg.parentID);
+      if (existing === undefined || shouldPreferAssistantMessage(msg, existing)) {
+        assistantByParent.set(msg.parentID, msg);
+      }
     }
   }
 
@@ -51,13 +60,10 @@ export function messagesToTurns(
       }
     }
 
-    const isCompleted = assistantMsg?.finish === "stop" || assistantMsg?.finish === "length";
-    const hasError = assistantMsg?.error != null;
-
     turns.push({
       turnId: assistantMsg?.id ?? null,
       id: userMsg.id,
-      status: hasError ? "error" : isCompleted ? "completed" : assistantMsg ? "running" : "pending",
+      status: resolveTurnStatus(assistantMsg),
       turnStartedAtMs: userMsg.time.created,
       finalAssistantStartedAtMs: assistantMsg?.time.created ?? null,
       error: assistantMsg?.error ?? null,
@@ -67,4 +73,31 @@ export function messagesToTurns(
   }
 
   return turns;
+}
+
+/**
+ * Chooses a deterministic assistant candidate when OpenCode emits multiple
+ * assistant messages for the same user-parent relation.
+ */
+function shouldPreferAssistantMessage(
+  candidate: OpenCodeMessage,
+  existing: OpenCodeMessage
+): boolean {
+  if (candidate.time.created !== existing.time.created) {
+    return candidate.time.created > existing.time.created;
+  }
+  return candidate.id.localeCompare(existing.id) > 0;
+}
+
+function resolveTurnStatus(assistantMessage: OpenCodeMessage | null): MappedTurnStatus {
+  if (assistantMessage === null) {
+    return "pending";
+  }
+  if (assistantMessage.error !== undefined && assistantMessage.error !== null) {
+    return "error";
+  }
+  if (COMPLETED_ASSISTANT_FINISH_REASONS.has(assistantMessage.finish ?? "")) {
+    return "completed";
+  }
+  return "running";
 }

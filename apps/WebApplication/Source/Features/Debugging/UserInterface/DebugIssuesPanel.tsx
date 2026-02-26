@@ -1,11 +1,27 @@
 import { AlertTriangle } from "lucide-react";
 import {
+  DEBUG_ISSUE_SEVERITY_FILTER_ALL,
+  DEBUG_ISSUE_SEVERITY_FILTER_ERROR,
+  DEBUG_ISSUE_SEVERITY_FILTER_WARNING,
   type DebugIssueSeverityFilter
 } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { Badge } from "@/Components/UserInterface/Badge";
 import { Button } from "@/Components/UserInterface/Button";
 import { Input } from "@/Components/UserInterface/Input";
+
+const WARNING_BADGE_CLASS_NAME = "border-amber-300 bg-amber-50 text-amber-700";
+
+interface DebugIssueSeverityFilterOption {
+  value: DebugIssueSeverityFilter;
+  label: string;
+}
+
+const DEBUG_ISSUE_SEVERITY_FILTER_OPTIONS: readonly DebugIssueSeverityFilterOption[] = [
+  { value: DEBUG_ISSUE_SEVERITY_FILTER_ALL, label: "All" },
+  { value: DEBUG_ISSUE_SEVERITY_FILTER_ERROR, label: "Errors" },
+  { value: DEBUG_ISSUE_SEVERITY_FILTER_WARNING, label: "Warnings" }
+];
 
 interface DebugIssuesPanelProps {
   issues: readonly DebugIssue[];
@@ -66,33 +82,18 @@ export function DebugIssuesPanel({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <Button
-              type="button"
-              variant={severityFilter === "all" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={() => onSeverityFilterChange("all")}
-            >
-              All
-            </Button>
-            <Button
-              type="button"
-              variant={severityFilter === "error" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={() => onSeverityFilterChange("error")}
-            >
-              Errors
-            </Button>
-            <Button
-              type="button"
-              variant={severityFilter === "warning" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={() => onSeverityFilterChange("warning")}
-            >
-              Warnings
-            </Button>
+            {DEBUG_ISSUE_SEVERITY_FILTER_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                type="button"
+                variant={severityFilter === option.value ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => onSeverityFilterChange(option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
           </div>
           <Input
             value={filterQuery}
@@ -119,7 +120,7 @@ export function DebugIssuesPanel({
                 <div className="flex items-center justify-between gap-2">
                   <Badge
                     variant={issue.severity === "error" ? "danger" : "default"}
-                    className={issue.severity === "warning" ? "border-amber-300 bg-amber-50 text-amber-700" : ""}
+                    className={issue.severity === "warning" ? WARNING_BADGE_CLASS_NAME : ""}
                   >
                     {issue.severity}
                   </Badge>
@@ -161,7 +162,7 @@ export function DebugIssuesPanel({
               <div className="flex items-center gap-2">
                 <Badge
                   variant={selectedIssue.severity === "error" ? "danger" : "default"}
-                  className={selectedIssue.severity === "warning" ? "border-amber-300 bg-amber-50 text-amber-700" : ""}
+                  className={selectedIssue.severity === "warning" ? WARNING_BADGE_CLASS_NAME : ""}
                 >
                   {selectedIssue.severity}
                 </Badge>

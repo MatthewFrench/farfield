@@ -41,18 +41,21 @@ export interface ServerObservabilitySnapshotOwnerDependencies {
   threadAdapterResolver: ThreadAdapterResolver;
   requestObservabilityOwner: RequestObservabilityOwner;
   eventLoopLagObservabilityOwner: EventLoopLagObservabilityOwner;
+  readNowIsoString?: () => string;
 }
 
 export class ServerObservabilitySnapshotOwner {
   private readonly dependencies: ServerObservabilitySnapshotOwnerDependencies;
+  private readonly readNowIsoString: () => string;
 
   public constructor(dependencies: ServerObservabilitySnapshotOwnerDependencies) {
     this.dependencies = dependencies;
+    this.readNowIsoString = dependencies.readNowIsoString ?? (() => new Date().toISOString());
   }
 
   public readSnapshot(): ServerObservabilitySnapshot {
     return {
-      recordedAt: new Date().toISOString(),
+      recordedAt: this.readNowIsoString(),
       cache: {
         threadListAggregation: this.dependencies.threadListAggregationCache.readStatistics()
       },

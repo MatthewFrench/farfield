@@ -12,6 +12,12 @@ import {
   HttpRoutesIntegrationEnvironment
 } from "./HttpRoutesIntegrationEnvironment";
 
+const HealthRoutePath = "/api/health";
+const EventsSessionRoutePath = "/api/events/session";
+const JsonContentTypeHeaderName = "Content-Type";
+const JsonContentTypeHeaderValue = "application/json";
+const CookieHeaderName = "Cookie";
+
 describe("server route integration authentication", () => {
   const integrationEnvironment = new HttpRoutesIntegrationEnvironment();
 
@@ -24,17 +30,12 @@ describe("server route integration authentication", () => {
   });
 
   it("enforces API auth and exposes health shape", async () => {
-    const baseUrl = integrationEnvironment.readBaseUrl();
-    const apiToken = integrationEnvironment.readApiToken();
-
-    const unauthorizedResponse = await fetch(`${baseUrl}/api/health`);
+    const unauthorizedResponse = await fetch(integrationEnvironment.buildApiRouteUrl(HealthRoutePath));
     expect(unauthorizedResponse.status).toBe(401);
     ApiErrorEnvelopeSchema.parse(await unauthorizedResponse.json());
 
-    const authorizedResponse = await fetch(`${baseUrl}/api/health`, {
-      headers: {
-        "X-Farfield-Token": apiToken
-      }
+    const authorizedResponse = await fetch(integrationEnvironment.buildApiRouteUrl(HealthRoutePath), {
+      headers: integrationEnvironment.readAuthHeaders()
     });
     expect(authorizedResponse.status).toBe(200);
     const health = HealthEnvelopeSchema.parse(await authorizedResponse.json());
@@ -42,10 +43,9 @@ describe("server route integration authentication", () => {
   });
 
   it("supports events session bootstrap", async () => {
-    const baseUrl = integrationEnvironment.readBaseUrl();
     const apiToken = integrationEnvironment.readApiToken();
 
-    const firstResponse = await fetch(`${baseUrl}/api/events/session`, {
+    const firstResponse = await fetch(integrationEnvironment.buildApiRouteUrl(EventsSessionRoutePath), {
       method: "POST"
     });
 
@@ -55,10 +55,10 @@ describe("server route integration authentication", () => {
     expect(firstPayload.bootstrapped).toBe(false);
     expect(firstPayload.expiresAt).toBeNull();
 
-    const bootstrapResponse = await fetch(`${baseUrl}/api/events/session`, {
+    const bootstrapResponse = await fetch(integrationEnvironment.buildApiRouteUrl(EventsSessionRoutePath), {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        [JsonContentTypeHeaderName]: JsonContentTypeHeaderValue
       },
       body: JSON.stringify({
         apiToken
@@ -70,12 +70,11 @@ describe("server route integration authentication", () => {
     expect(bootstrapPayload.authRequired).toBe(true);
     expect(bootstrapPayload.bootstrapped).toBe(true);
     expect(bootstrapPayload.expiresAt).not.toBeNull();
-    const sessionCookie = bootstrapResponse.headers.get("set-cookie");
-    expect(sessionCookie).toContain("farfield_session=");
+    const sessionCookie = integrationEnvironment.readSessionCookieFromResponse(bootstrapResponse);
 
-    const healthViaCookieResponse = await fetch(`${baseUrl}/api/health`, {
+    const healthViaCookieResponse = await fetch(integrationEnvironment.buildApiRouteUrl(HealthRoutePath), {
       headers: {
-        ...(sessionCookie ? { Cookie: sessionCookie } : {})
+        [CookieHeaderName]: sessionCookie
       }
     });
     expect(healthViaCookieResponse.status).toBe(200);

@@ -247,4 +247,90 @@ describe("ThreadMutationActionCoordinator", () => {
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(busyStates).toEqual([true, false]);
   });
+
+  it("reports create-thread failures with trimmed project path details and resets busy state", async () => {
+    const coordinator = new ThreadMutationActionCoordinator();
+    const onSetBusy = vi.fn();
+    const onSetErrorMessage = vi.fn();
+    const onMarkThreadPendingMaterialization = vi.fn();
+    const onThreadSelected = vi.fn();
+    const onSetMobileSidebarOpen = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onRefreshCreatedThreadData = vi.fn(async (_threadId: string) => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const threadMutationClient = {
+      createThread: vi.fn(async () => {
+        throw new Error("create failed");
+      }),
+      archiveThread: vi.fn(async () => {}),
+      unarchiveThread: vi.fn(async () => {})
+    };
+
+    await coordinator.createThread({
+      projectPath: "  /tmp/project  ",
+      buildActionRequestOptions,
+      onSetBusy,
+      onSetErrorMessage,
+      onMarkThreadPendingMaterialization,
+      onThreadSelected,
+      onSetMobileSidebarOpen,
+      onInvalidateActiveThreadQuery,
+      threadMutationClient,
+      onRefreshCreatedThreadData,
+      reportTrackedUserInterfaceError
+    });
+
+    expect(onSetBusy.mock.calls).toEqual([[true], [false]]);
+    expect(onSetErrorMessage).not.toHaveBeenCalled();
+    expect(onMarkThreadPendingMaterialization).not.toHaveBeenCalled();
+    expect(onThreadSelected).not.toHaveBeenCalled();
+    expect(onSetMobileSidebarOpen).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
+    expect(onRefreshCreatedThreadData).not.toHaveBeenCalled();
+    expect(reportTrackedUserInterfaceError).toHaveBeenCalledWith({
+      operation: "create-thread",
+      actionId: "action-create-thread",
+      threadId: null,
+      error: "create failed",
+      details: {
+        projectPath: "/tmp/project"
+      }
+    });
+  });
+
+  it("keeps selection unchanged when archiving a non-selected thread", async () => {
+    const coordinator = new ThreadMutationActionCoordinator();
+    const selectedThreadIdentifiers: Array<string | null> = [];
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onInvalidateArchivedThreadQuery = vi.fn();
+    const loadCoreData = vi.fn(async () => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const threadMutationClient = {
+      createThread: vi.fn(async () => ({ threadId: "thread-1" })),
+      archiveThread: vi.fn(async () => {}),
+      unarchiveThread: vi.fn(async () => {})
+    };
+
+    await coordinator.archiveThread({
+      threadId: "thread-1",
+      selectedThreadId: "thread-4",
+      activeThreadIdentifiersInOrder: ["thread-1", "thread-4"],
+      buildActionRequestOptions,
+      onSetBusy: () => {},
+      onThreadSelected: (threadId) => {
+        selectedThreadIdentifiers.push(threadId);
+      },
+      onInvalidateActiveThreadQuery,
+      onInvalidateArchivedThreadQuery,
+      loadCoreData,
+      threadMutationClient,
+      reportTrackedUserInterfaceError
+    });
+
+    expect(selectedThreadIdentifiers).toEqual(["thread-4"]);
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onInvalidateArchivedThreadQuery).toHaveBeenCalledTimes(1);
+    expect(loadCoreData).toHaveBeenCalledTimes(1);
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+  });
 });

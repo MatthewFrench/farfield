@@ -1,5 +1,6 @@
 import {
   EventRefreshScheduler,
+  hasEventRefreshWork,
   type EventRefreshFlags
 } from "./EventRefreshScheduler";
 import { EventStreamRefreshDecisionEngine } from "./EventStreamRefreshDecisionEngine";
@@ -47,6 +48,21 @@ interface EventStreamConnectionCoordinatorDependencies {
 
 const DEFAULT_INITIAL_RECONNECT_DELAY_MS = 1_000;
 const DEFAULT_MAXIMUM_RECONNECT_DELAY_MS = 10_000;
+const DEFAULT_EVENTS_URL = "/events";
+
+function readValidatedReconnectDelayMilliseconds(
+  delayMilliseconds: number | undefined,
+  defaultDelayMilliseconds: number,
+  propertyName: string
+): number {
+  const nextDelayMilliseconds = delayMilliseconds ?? defaultDelayMilliseconds;
+  if (!Number.isInteger(nextDelayMilliseconds) || nextDelayMilliseconds < 0) {
+    throw new Error(
+      `EventStreamConnectionCoordinator requires a non-negative integer ${propertyName}`
+    );
+  }
+  return nextDelayMilliseconds;
+}
 
 /**
  * Owns EventSource lifecycle and reconnect backoff for runtime updates.
@@ -65,11 +81,28 @@ export class EventStreamConnectionCoordinator {
   private disposed: boolean;
 
   public constructor(dependencies?: EventStreamConnectionCoordinatorDependencies) {
+    const initialReconnectDelayMilliseconds = readValidatedReconnectDelayMilliseconds(
+      dependencies?.initialReconnectDelayMs,
+      DEFAULT_INITIAL_RECONNECT_DELAY_MS,
+      "initialReconnectDelayMs"
+    );
+    const maximumReconnectDelayMilliseconds = readValidatedReconnectDelayMilliseconds(
+      dependencies?.maximumReconnectDelayMs,
+      DEFAULT_MAXIMUM_RECONNECT_DELAY_MS,
+      "maximumReconnectDelayMs"
+    );
+    if (maximumReconnectDelayMilliseconds < initialReconnectDelayMilliseconds) {
+      throw new Error(
+        "EventStreamConnectionCoordinator requires maximumReconnectDelayMs to be greater than or equal to initialReconnectDelayMs"
+      );
+    }
+
     this.createEventSource = dependencies?.createEventSource ?? ((url) => new EventSource(url));
-    this.scheduleTimeout = dependencies?.scheduleTimeout ?? ((callback, delayMs) => window.setTimeout(callback, delayMs));
+    this.scheduleTimeout =
+      dependencies?.scheduleTimeout ?? ((callback, delayMs) => window.setTimeout(callback, delayMs));
     this.clearScheduledTimeout = dependencies?.clearScheduledTimeout ?? ((timerId) => window.clearTimeout(timerId));
-    this.initialReconnectDelayMs = dependencies?.initialReconnectDelayMs ?? DEFAULT_INITIAL_RECONNECT_DELAY_MS;
-    this.maximumReconnectDelayMs = dependencies?.maximumReconnectDelayMs ?? DEFAULT_MAXIMUM_RECONNECT_DELAY_MS;
+    this.initialReconnectDelayMs = initialReconnectDelayMilliseconds;
+    this.maximumReconnectDelayMs = maximumReconnectDelayMilliseconds;
     this.reconnectDelayMs = this.initialReconnectDelayMs;
     this.reconnectTimerId = null;
     this.source = null;
@@ -87,7 +120,7 @@ export class EventStreamConnectionCoordinator {
       executeScheduledRefresh: input.executeScheduledRefresh,
       applyThreadStreamDelta: input.applyThreadStreamDelta,
       onConnectionStatusChange: input.onConnectionStatusChange,
-      eventsUrl: input.eventsUrl ?? "/events"
+      eventsUrl: input.eventsUrl ?? DEFAULT_EVENTS_URL
     };
     this.reconnectDelayMs = this.initialReconnectDelayMs;
     this.disposed = false;
@@ -100,10 +133,7 @@ export class EventStreamConnectionCoordinator {
       this.clearScheduledTimeout(this.reconnectTimerId);
       this.reconnectTimerId = null;
     }
-    if (this.source) {
-      this.source.close();
-      this.source = null;
-    }
+    this.closeSource();
     if (this.context) {
       this.context.eventRefreshScheduler.dispose();
       this.context.onConnectionStatusChange(false);
@@ -155,10 +185,7 @@ export class EventStreamConnectionCoordinator {
         return;
       }
       this.context.onConnectionStatusChange(false);
-      if (this.source) {
-        this.source.close();
-        this.source = null;
-      }
+      this.closeSource();
       this.scheduleReconnect();
     };
   }
@@ -167,11 +194,7 @@ export class EventStreamConnectionCoordinator {
     if (!this.context) {
       return;
     }
-    if (
-      !refreshFlags.refreshCore &&
-      !refreshFlags.refreshHistory &&
-      !refreshFlags.refreshSelectedThread
-    ) {
+    if (!hasEventRefreshWork(refreshFlags)) {
       return;
     }
     this.context.eventRefreshScheduler.enqueueRefresh(refreshFlags, async (pendingRefreshFlags) => {
@@ -191,5 +214,13 @@ export class EventStreamConnectionCoordinator {
       this.connectEvents();
     }, this.reconnectDelayMs);
     this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, this.maximumReconnectDelayMs);
+  }
+
+  private closeSource(): void {
+    if (!this.source) {
+      return;
+    }
+    this.source.close();
+    this.source = null;
   }
 }

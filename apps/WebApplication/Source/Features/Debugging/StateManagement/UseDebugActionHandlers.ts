@@ -4,14 +4,20 @@ import {
   type SetStateAction
 } from "react";
 import type { ErrorBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
-import type {
-  DebugIssueSeverityFilter
+import type { DebugIssueSeverityFilter } from "../DomainModel/DebugIssueStateResolver";
+import {
+  DEBUG_ISSUE_SEVERITY_FILTER_ALL
 } from "../DomainModel/DebugIssueStateResolver";
+import { buildDebugErrorIssueIdentifier } from "../DomainModel/DebugIssueIdentifier";
 import { DebugWorkspaceActionCoordinator } from "./DebugWorkspaceActionCoordinator";
 import { type DebugServerClient } from "../DataAccess/DebugServerClient";
 import { type ReplayHistoryEntryRequestInput } from "../UserInterface/DebugHistoryDetailPanel";
 import { type DebugWorkspaceSection } from "../DomainModel/DebugWorkspaceSectionContracts";
 import { type DebugHistoryDetailResponse } from "../DataAccess/DebugServerClient";
+
+const DEBUG_APPLICATION_TAB = "debug";
+const DEBUG_ISSUES_WORKSPACE_SECTION: DebugWorkspaceSection = "issues";
+const EMPTY_DEBUG_ISSUE_FILTER_QUERY = "";
 
 export interface UseDebugActionHandlersInput {
   debugWorkspaceActionCoordinator: DebugWorkspaceActionCoordinator;
@@ -36,6 +42,19 @@ export interface DebugActionHandlers {
   markTraceFromDebugPanel: () => void;
   stopTraceFromDebugPanel: () => void;
   openDebugFromErrorBanner: () => void;
+}
+
+function readDebugIssueFilterQueryFromErrorBanner(errorBannerDetails: ErrorBannerDetails): string {
+  if (errorBannerDetails.requestId) {
+    return errorBannerDetails.requestId;
+  }
+  if (errorBannerDetails.actionId) {
+    return errorBannerDetails.actionId;
+  }
+  if (errorBannerDetails.operation) {
+    return errorBannerDetails.operation;
+  }
+  return EMPTY_DEBUG_ISSUE_FILTER_QUERY;
 }
 
 export function useDebugActionHandlers(input: UseDebugActionHandlersInput): DebugActionHandlers {
@@ -95,21 +114,21 @@ export function useDebugActionHandlers(input: UseDebugActionHandlersInput): Debu
   }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData]);
 
   const openDebugFromErrorBanner = useCallback(() => {
-    input.setActiveTab("debug");
-    input.setDebugWorkspaceSection("issues");
-    input.setDebugIssueSeverityFilter("all");
+    input.setActiveTab(DEBUG_APPLICATION_TAB);
+    input.setDebugWorkspaceSection(DEBUG_ISSUES_WORKSPACE_SECTION);
+    input.setDebugIssueSeverityFilter(DEBUG_ISSUE_SEVERITY_FILTER_ALL);
 
     if (input.errorBannerDetails.errorId) {
-      input.setSelectedDebugIssueId(`error:${input.errorBannerDetails.errorId}`);
+      input.setSelectedDebugIssueId(
+        buildDebugErrorIssueIdentifier(input.errorBannerDetails.errorId)
+      );
       input.setDebugIssueFilterQuery(input.errorBannerDetails.errorId);
       return;
     }
 
-    const nextFilterQuery = input.errorBannerDetails.requestId
-      ?? input.errorBannerDetails.actionId
-      ?? input.errorBannerDetails.operation
-      ?? "";
-    input.setDebugIssueFilterQuery(nextFilterQuery);
+    input.setDebugIssueFilterQuery(
+      readDebugIssueFilterQueryFromErrorBanner(input.errorBannerDetails)
+    );
   }, [
     input.errorBannerDetails.actionId,
     input.errorBannerDetails.errorId,

@@ -15,6 +15,10 @@ export interface ThreadListPresentationStateResult {
   archivedSectionThreadCount: number;
 }
 
+/**
+ * Owns presentational projections for active and archived thread list sections.
+ * Grouping and merged archived counts are computed once here so UI owners consume a strict shape.
+ */
 export class ThreadListPresentationStateResolver {
   public readState(input: ThreadListPresentationStateInput): ThreadListPresentationStateResult {
     const selectedThread = input.threads.find((thread) => thread.id === input.selectedThreadIdentifier) ?? null;
@@ -27,17 +31,8 @@ export class ThreadListPresentationStateResolver {
       removedProjectGroups
     );
 
-    const archivedThreadIdentifiers = new Set<string>();
-    for (const thread of input.archivedThreads) {
-      archivedThreadIdentifiers.add(thread.id);
-    }
-
-    const archivedSectionThreadIdentifiers = new Set<string>();
-    for (const group of archivedProjectGroups) {
-      for (const thread of group.threads) {
-        archivedSectionThreadIdentifiers.add(thread.id);
-      }
-    }
+    const archivedThreadIdentifiers = this.buildThreadIdentifierSet(input.archivedThreads);
+    const archivedSectionThreadIdentifiers = this.buildGroupThreadIdentifierSet(archivedProjectGroups);
 
     return {
       selectedThread,
@@ -46,5 +41,23 @@ export class ThreadListPresentationStateResolver {
       archivedThreadIdentifiers,
       archivedSectionThreadCount: archivedSectionThreadIdentifiers.size
     };
+  }
+
+  private buildThreadIdentifierSet(threads: ThreadListItem[]): Set<string> {
+    const threadIdentifiers = new Set<string>();
+    for (const thread of threads) {
+      threadIdentifiers.add(thread.id);
+    }
+    return threadIdentifiers;
+  }
+
+  private buildGroupThreadIdentifierSet(projectGroups: ThreadProjectGroup[]): Set<string> {
+    const threadIdentifiers = new Set<string>();
+    for (const projectGroup of projectGroups) {
+      for (const thread of projectGroup.threads) {
+        threadIdentifiers.add(thread.id);
+      }
+    }
+    return threadIdentifiers;
   }
 }

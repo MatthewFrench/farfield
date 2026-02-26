@@ -1,7 +1,8 @@
-import http from "node:http";
+import type { Server } from "node:http";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import type { AgentAdapter, AgentCapabilities, AgentId } from "../Source/Agents/Types.js";
@@ -21,6 +22,29 @@ function createTemporaryDirectory(): string {
   const temporaryDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-lifecycle-"));
   temporaryDirectoryPaths.push(temporaryDirectoryPath);
   return temporaryDirectoryPath;
+}
+
+class InMemoryLifecycleServer extends EventEmitter {
+  public listenCallCount: number;
+  public closeCallCount: number;
+
+  public constructor() {
+    super();
+    this.listenCallCount = 0;
+    this.closeCallCount = 0;
+  }
+
+  public listen(_port: number, _host: string, callback: () => void): this {
+    this.listenCallCount += 1;
+    callback();
+    return this;
+  }
+
+  public close(callback: () => void): this {
+    this.closeCallCount += 1;
+    callback();
+    return this;
+  }
 }
 
 const defaultCapabilities: AgentCapabilities = {
@@ -81,10 +105,8 @@ afterEach(() => {
 describe("ServerLifecycleCoordinator", () => {
   it("starts and stops server + adapters with owned lifecycle flow", async () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
-    const server = http.createServer((_req, res) => {
-      res.writeHead(200, { "Content-Type": "text/plain" });
-      res.end("ok");
-    });
+    const inMemoryServer = new InMemoryLifecycleServer();
+    const server = inMemoryServer as Server;
 
     const adapterCounters = { startCount: 0, stopCount: 0 };
     const registry = new AgentRegistry([createAdapter("codex", adapterCounters)]);
@@ -161,12 +183,14 @@ describe("ServerLifecycleCoordinator", () => {
 
     expect(coordinator.isShuttingDown()).toBe(false);
     await coordinator.start();
+    expect(inMemoryServer.listenCallCount).toBe(1);
     expect(adapterCounters.startCount).toBe(1);
     expect(lifecycleMessages).toContain("Starting Farfield monitor server");
     expect(lifecycleMessages).toContain("Monitor server ready");
 
     await coordinator.shutdown();
     expect(coordinator.isShuttingDown()).toBe(true);
+    expect(inMemoryServer.closeCallCount).toBe(1);
     expect(adapterCounters.stopCount).toBe(1);
   });
 });

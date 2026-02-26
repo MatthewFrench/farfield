@@ -43,12 +43,39 @@ export interface IpcConnectionState {
 export type IpcConnectionListener = (state: IpcConnectionState) => void;
 
 const MAX_FRAME_SIZE_BYTES = 256 * 1024 * 1024;
+const DEFAULT_IPC_REQUEST_TIMEOUT_MS = 20_000;
 const INITIALIZING_CLIENT_ID = "initializing-client";
+const IPC_FRAME_EVENT = "frame";
+const IPC_CONNECTION_STATE_EVENT = "connection-state";
+const IPC_INITIALIZE_METHOD = "initialize";
+const IPC_PROTOCOL_VERSION = 1;
+const FARFIELD_CLIENT_TYPE = "farfield";
+const NO_HANDLER_FOR_REQUEST_ERROR = "no-handler-for-request";
 const InitializeResultSchema = z
   .object({
     clientId: z.string().min(1)
   })
   .passthrough();
+
+function toErrorMessage<ValueType>(value: ValueType): string {
+  if (value instanceof Error) {
+    return value.message;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+
+  const parsedStructuredValue = JsonValueSchema.safeParse(value);
+  if (!parsedStructuredValue.success) {
+    return String(value);
+  }
+
+  if (typeof parsedStructuredValue.data === "string") {
+    return parsedStructuredValue.data;
+  }
+
+  return JSON.stringify(parsedStructuredValue.data);
+}
 
 /**
  * Owns raw desktop IPC socket lifecycle and framed request/response delivery.
@@ -65,17 +92,17 @@ export class DesktopIpcClient {
 
   public constructor(options: DesktopIpcClientOptions) {
     this.socketPath = options.socketPath;
-    this.requestTimeoutMs = options.requestTimeoutMs ?? 20_000;
+    this.requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_IPC_REQUEST_TIMEOUT_MS;
   }
 
   public onFrame(listener: IpcFrameListener): () => void {
-    this.events.on("frame", listener);
-    return () => this.events.off("frame", listener);
+    this.events.on(IPC_FRAME_EVENT, listener);
+    return () => this.events.off(IPC_FRAME_EVENT, listener);
   }
 
   public onConnectionState(listener: IpcConnectionListener): () => void {
-    this.events.on("connection-state", listener);
-    return () => this.events.off("connection-state", listener);
+    this.events.on(IPC_CONNECTION_STATE_EVENT, listener);
+    return () => this.events.off(IPC_CONNECTION_STATE_EVENT, listener);
   }
 
   public isConnected(): boolean {
@@ -148,11 +175,51 @@ export class DesktopIpcClient {
   }
 
   private emitFrame(frame: IpcFrame): void {
-    this.events.emit("frame", frame);
+    this.events.emit(IPC_FRAME_EVENT, frame);
   }
 
   private emitConnectionState(state: IpcConnectionState): void {
-    this.events.emit("connection-state", state);
+    this.events.emit(IPC_CONNECTION_STATE_EVENT, state);
+  }
+
+  private sourceClientId(): string {
+    return this.clientId ?? INITIALIZING_CLIENT_ID;
+  }
+
+  private createPendingRequestPromise(
+    requestId: string,
+    method: string,
+    timeoutMs: number,
+    timeoutErrorMessage: string
+  ): Promise<IpcResponseFrame> {
+    return new Promise<IpcResponseFrame>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(requestId);
+        reject(new DesktopIpcError(timeoutErrorMessage));
+      }, timeoutMs);
+
+      this.pending.set(requestId, {
+        method,
+        timer,
+        resolve,
+        reject
+      });
+    });
+  }
+
+  private writeRequestFrameOrReject(
+    requestId: string,
+    frame: IpcFrame,
+    writeFailureMessagePrefix: string
+  ): void {
+    try {
+      this.writeFrame(frame);
+    } catch (error) {
+      this.rejectPendingRequestById(
+        requestId,
+        new DesktopIpcError(`${writeFailureMessagePrefix}: ${toErrorMessage(error)}`)
+      );
+    }
   }
 
   private writeFrame(frame: IpcFrame): void {
@@ -191,7 +258,7 @@ export class DesktopIpcClient {
       type: "response",
       requestId,
       resultType: "error",
-      error: "no-handler-for-request"
+      error: NO_HANDLER_FOR_REQUEST_ERROR
     });
 
     this.writeFrame(response);
@@ -232,9 +299,7 @@ export class DesktopIpcClient {
       } catch (error) {
         this.rejectAll(
           new DesktopIpcError(
-            `IPC frame schema validation failed: ${
-              error instanceof Error ? error.message : String(error)
-            }`
+            `IPC frame schema validation failed: ${toErrorMessage(error)}`
           )
         );
         this.socket?.destroy();
@@ -267,15 +332,13 @@ export class DesktopIpcClient {
       if (frame.resultType === "error") {
         pending.reject(
           new DesktopIpcError(
-            `IPC ${pending.method} failed: ${
-              typeof frame.error === "string" ? frame.error : JSON.stringify(frame.error)
-            }`
+            `IPC ${pending.method} failed: ${toErrorMessage(frame.error)}`
           )
         );
         continue;
       }
 
-      if (frame.method === "initialize") {
+      if (frame.method === IPC_INITIALIZE_METHOD) {
         const parsedInitializeResult = InitializeResultSchema.safeParse(frame.result);
         if (parsedInitializeResult.success) {
           this.clientId = parsedInitializeResult.data.clientId;
@@ -295,7 +358,7 @@ export class DesktopIpcClient {
       type: "broadcast",
       method,
       params,
-      sourceClientId: this.clientId ?? INITIALIZING_CLIENT_ID,
+      sourceClientId: this.sourceClientId(),
       targetClientId: options.targetClientId,
       version: options.version
     });
@@ -315,39 +378,20 @@ export class DesktopIpcClient {
       requestId,
       method,
       params,
-      sourceClientId: this.clientId ?? INITIALIZING_CLIENT_ID,
+      sourceClientId: this.sourceClientId(),
       targetClientId: options.targetClientId,
       version: options.version
     });
 
     const timeout = options.timeoutMs ?? this.requestTimeoutMs;
+    const responsePromise = this.createPendingRequestPromise(
+      requestId,
+      method,
+      timeout,
+      `IPC request timed out: ${method}`
+    );
 
-    const responsePromise = new Promise<IpcResponseFrame>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(requestId);
-        reject(new DesktopIpcError(`IPC request timed out: ${method}`));
-      }, timeout);
-
-      this.pending.set(requestId, {
-        method,
-        timer,
-        resolve,
-        reject
-      });
-    });
-
-    try {
-      this.writeFrame(frame);
-    } catch (error) {
-      this.rejectPendingRequestById(
-        requestId,
-        new DesktopIpcError(
-          `IPC request write failed for ${method}: ${
-            error instanceof Error ? error.message : String(error)
-          }`
-        )
-      );
-    }
+    this.writeRequestFrameOrReject(requestId, frame, `IPC request write failed for ${method}`);
     return responsePromise;
   }
 
@@ -357,39 +401,21 @@ export class DesktopIpcClient {
       type: "request",
       requestId,
       sourceClientId: INITIALIZING_CLIENT_ID,
-      version: 1,
-      method: "initialize",
+      version: IPC_PROTOCOL_VERSION,
+      method: IPC_INITIALIZE_METHOD,
       params: {
-        clientType: "farfield"
+        clientType: FARFIELD_CLIENT_TYPE
       }
     });
 
-    const responsePromise = new Promise<IpcResponseFrame>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(requestId);
-        reject(new DesktopIpcError("IPC initialize request timed out"));
-      }, this.requestTimeoutMs);
+    const responsePromise = this.createPendingRequestPromise(
+      requestId,
+      IPC_INITIALIZE_METHOD,
+      this.requestTimeoutMs,
+      "IPC initialize request timed out"
+    );
 
-      this.pending.set(requestId, {
-        method: "initialize",
-        timer,
-        resolve,
-        reject
-      });
-    });
-
-    try {
-      this.writeFrame(frame);
-    } catch (error) {
-      this.rejectPendingRequestById(
-        requestId,
-        new DesktopIpcError(
-          `IPC initialize write failed: ${
-            error instanceof Error ? error.message : String(error)
-          }`
-        )
-      );
-    }
+    this.writeRequestFrameOrReject(requestId, frame, "IPC initialize write failed");
     return responsePromise;
   }
 }

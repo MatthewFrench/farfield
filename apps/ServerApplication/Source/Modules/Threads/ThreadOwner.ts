@@ -1,18 +1,29 @@
+const NO_THREAD_OWNER_CLIENT_ID_ERROR_MESSAGE =
+  "No owner client id is known for this thread yet. Wait for the desktop app to publish a thread event.";
+
+function normalizeOwnerClientId(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalizedValue = value.trim();
+  return normalizedValue.length > 0 ? normalizedValue : null;
+}
+
 export function resolveOwnerClientId(
-  threadOwnerById: Map<string, string>,
+  threadOwnerById: ReadonlyMap<string, string>,
   threadId: string,
   override?: string
 ): string {
-  const mapped = threadOwnerById.get(threadId);
-  if (mapped && mapped.trim()) {
-    return mapped.trim();
+  const mappedOwnerClientId = normalizeOwnerClientId(threadOwnerById.get(threadId));
+  if (mappedOwnerClientId !== null) {
+    return mappedOwnerClientId;
   }
 
-  if (override && override.trim()) {
-    return override.trim();
+  const overrideOwnerClientId = normalizeOwnerClientId(override);
+  if (overrideOwnerClientId !== null) {
+    return overrideOwnerClientId;
   }
 
-  throw new Error(
-    "No owner client id is known for this thread yet. Wait for the desktop app to publish a thread event."
-  );
+  throw new Error(NO_THREAD_OWNER_CLIENT_ID_ERROR_MESSAGE);
 }

@@ -13,6 +13,7 @@ import {
   getPushVapidPublicKey,
   savePushSubscription
 } from "../Source/Features/PushNotifications/DataAccess/PushApi";
+import { PushPreferenceStore } from "../Source/Features/PushNotifications/DataAccess/PushPreferenceStore";
 import { disablePushNotifications, recoverPushNotifications } from "../Source/Features/PushNotifications/DataAccess/PushClientApi";
 
 interface PushRecoveryHarness {
@@ -221,14 +222,12 @@ describe("recoverPushNotifications", () => {
     vi.resetAllMocks();
     installLocalStorageMock();
     vi.mocked(getPushStatus).mockResolvedValue({
-      ok: true,
       enabled: true,
       permissionRequired: true,
       subscriptionCount: 0,
       privateModeDefault: true
     });
     vi.mocked(getPushVapidPublicKey).mockResolvedValue({
-      ok: true,
       publicKey:
         "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U"
     });
@@ -313,23 +312,29 @@ describe("disablePushNotifications", () => {
 
   it("unsubscribes browser even when server deletion fails", async () => {
     const harness = installPushRecoveryHarness({ waitingWorker: false });
+    const pushPreferenceStore = new PushPreferenceStore();
+    pushPreferenceStore.writeAutoHealPreferenceEnabled(true);
     vi.mocked(deletePushSubscription).mockRejectedValue(new Error("server request failed"));
 
     const result = await disablePushNotifications();
 
     expect(result.unsubscribed).toBe(true);
+    expect(pushPreferenceStore.readAutoHealPreferenceEnabled()).toBe(false);
     expect(harness.existingSubscriptionUnsubscribeMock).toHaveBeenCalledTimes(1);
     expect(vi.mocked(deletePushSubscription)).toHaveBeenCalledTimes(1);
   });
 
-  it("fails when browser unsubscribe and server deletion both fail", async () => {
+  it("disables auto-heal preference even when browser unsubscribe and server deletion both fail", async () => {
     const harness = installPushRecoveryHarness({ waitingWorker: false });
+    const pushPreferenceStore = new PushPreferenceStore();
+    pushPreferenceStore.writeAutoHealPreferenceEnabled(true);
     harness.existingSubscriptionUnsubscribeMock.mockRejectedValue(new Error("unsubscribe failed"));
     vi.mocked(deletePushSubscription).mockRejectedValue(new Error("server request failed"));
 
     await expect(disablePushNotifications()).rejects.toThrowError(
       "Failed to disable push notifications"
     );
+    expect(pushPreferenceStore.readAutoHealPreferenceEnabled()).toBe(false);
     expect(harness.existingSubscriptionUnsubscribeMock).toHaveBeenCalledTimes(1);
     expect(vi.mocked(deletePushSubscription)).toHaveBeenCalledTimes(1);
   });

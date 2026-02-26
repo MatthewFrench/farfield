@@ -12,6 +12,24 @@ import { registerAppTestEnvironment } from "./AppTestEnvironment";
 
 const environment = registerAppTestEnvironment();
 
+function queryThreadListItemByIdentifier(threadId: string): HTMLElement | null {
+  const threadListItems = screen.queryAllByTestId("thread-list-item");
+  return threadListItems.find((element) => element.getAttribute("data-thread-id") === threadId) ?? null;
+}
+
+async function waitForThreadListItemByIdentifier(threadId: string): Promise<HTMLElement> {
+  await waitFor(() => {
+    expect(queryThreadListItemByIdentifier(threadId)).toBeTruthy();
+  });
+
+  const threadListItem = queryThreadListItemByIdentifier(threadId);
+  if (!threadListItem) {
+    throw new Error(`Expected thread list item for ${threadId}`);
+  }
+
+  return threadListItem;
+}
+
 describe("App", () => {
   it("updates the picker when remote model changes with same updatedAt and turns", async () => {
     const threadId = "thread-1";
@@ -151,11 +169,7 @@ describe("App", () => {
 
     environment.renderApp();
 
-    await waitFor(() => {
-      expect(
-        document.querySelector(`[data-testid="thread-list-item"][data-thread-id="${threadId}"]`)
-      ).toBeTruthy();
-    });
+    await waitForThreadListItemByIdentifier(threadId);
     expect(screen.queryByTestId("chat-empty-no-messages")).toBeNull();
 
     environment.emitHistoryEventForThread(threadId);
@@ -266,11 +280,7 @@ describe("App", () => {
 
     environment.renderApp();
 
-    await waitFor(() => {
-      expect(
-        document.querySelector(`[data-testid="thread-list-item"][data-thread-id="${selectedId}"]`)
-      ).toBeTruthy();
-    });
+    await waitForThreadListItemByIdentifier(selectedId);
     expect(screen.queryByTestId(`thread-unread-indicator-${updatedId}`)).toBeNull();
 
     environment.setThreadsFixture({
@@ -306,12 +316,7 @@ describe("App", () => {
       expect(screen.getByTestId(`thread-unread-indicator-${updatedId}`)).toBeTruthy();
     });
 
-    const updatedThreadButton = document.querySelector(
-      `[data-testid="thread-list-item"][data-thread-id="${updatedId}"]`
-    );
-    if (!updatedThreadButton) {
-      throw new Error("Expected updated thread button to exist");
-    }
+    const updatedThreadButton = await waitForThreadListItemByIdentifier(updatedId);
     fireEvent.click(updatedThreadButton);
 
     await waitFor(() => {

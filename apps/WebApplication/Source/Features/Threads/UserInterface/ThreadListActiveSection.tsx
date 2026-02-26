@@ -8,6 +8,11 @@ import {
   DropdownMenuTrigger
 } from "@/Components/UserInterface/DropdownMenu";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
+import {
+  DEFAULT_THREAD_PROJECT_DIRECTORY,
+  THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER,
+  THREAD_GROUP_NO_PROJECT_TOOLTIP
+} from "@/Features/Threads/UserInterface/ThreadListUserInterfaceConstants";
 
 interface ThreadListActiveSectionProps {
   properties: ThreadListPaneProperties;
@@ -27,7 +32,9 @@ export function ThreadListActiveSection({
           {properties.activeProjectGroups.map((group) => {
             const hasSelectedThread = group.threads.some((thread) => thread.id === properties.selectedThreadId);
             const isCollapsed = hasSelectedThread ? false : Boolean(properties.collapsedThreadProjectGroups[group.key]);
-            const groupProjectPath = group.projectPath ?? properties.selectedAgentDescriptor?.projectDirectories[0] ?? ".";
+            const groupProjectPath = group.projectPath
+              ?? properties.selectedAgentDescriptor?.projectDirectories[0]
+              ?? DEFAULT_THREAD_PROJECT_DIRECTORY;
             const groupPreferredAgentId = group.threads.find((thread) =>
               properties.availableAgentIds.includes(thread.agentId)
             )?.agentId ?? properties.availableAgentIds[0] ?? null;
@@ -47,7 +54,7 @@ export function ThreadListActiveSection({
                     ) : (
                       <ChevronDown size={13} className="shrink-0" />
                     )}
-                    <span className="flex-1 truncate" title={group.projectPath ?? "No project"}>
+                    <span className="flex-1 truncate" title={group.projectPath ?? THREAD_GROUP_NO_PROJECT_TOOLTIP}>
                       {group.label}
                     </span>
                     <span className="text-[10px] text-muted-foreground/60">{String(group.threads.length)}</span>
@@ -69,7 +76,7 @@ export function ThreadListActiveSection({
                     <DropdownMenuContent align="end" sideOffset={6}>
                       <DropdownMenuItem
                         onSelect={() => {
-                          if (groupPreferredAgentId) {
+                          if (groupPreferredAgentId !== null) {
                             properties.onCreateNewThread(groupProjectPath, groupPreferredAgentId);
                           }
                         }}
@@ -87,7 +94,8 @@ export function ThreadListActiveSection({
                       const isSelected = thread.id === properties.selectedThreadId;
                       const hasUnread = properties.unreadThreadIds[thread.id] === true && !isSelected;
                       const threadIsGenerating = isSelected && properties.isGenerating;
-                      const canArchive = thread.agentId === "codex";
+                      const canArchive =
+                        thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
                       return (
                         <div key={thread.id} className="flex items-stretch gap-1">
                           <Button

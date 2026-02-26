@@ -53,7 +53,7 @@ export interface UseApplicationOwnerDependenciesInput {
   setErrorMessage: (errorMessage: string) => void;
   modeSelectionStateResolver: ModeSelectionStateResolver;
   unsupportedPushClientState: PushClientState;
-  threadOnlyHistoryMethods: string[];
+  threadOnlyHistoryMethods: readonly string[];
   eventRefreshScheduleDelayMilliseconds: number;
   mobileVisualViewportKeyboardOpenDeltaPx: number;
   mobileLayoutMaximumWidthPx: number;
@@ -110,11 +110,90 @@ export interface ApplicationOwnerDependencies<
   pushNotificationToolbarActionCoordinator: PushNotificationToolbarActionCoordinator;
 }
 
+interface MobileSidebarSwipeConfiguration {
+  mobileLayoutMaximumWidthPx: number;
+  mobileSidebarSwipeEdgePx: number;
+  mobileSidebarSwipeTriggerPx: number;
+  mobileSidebarSwipeMaximumVerticalDriftPx: number;
+  mobileSidebarSwipeCancelNegativePx: number;
+}
+
+interface SelectedThreadRetryConfiguration {
+  readThreadRetryMaximumAttempts: number;
+  readThreadRetryBaseDelayMilliseconds: number;
+  readThreadRetryMaximumDelayMilliseconds: number;
+}
+
+interface ThreadListStateControllerConfiguration {
+  threadQueryCacheTimeToLiveMilliseconds: number;
+  threadQueryCacheMaximumEntries: number;
+}
+
+function createMobileSidebarSwipeCoordinator(
+  configuration: MobileSidebarSwipeConfiguration
+): MobileSidebarSwipeCoordinator {
+  return new MobileSidebarSwipeCoordinator({
+    mobileLayoutMaximumWidthPx: configuration.mobileLayoutMaximumWidthPx,
+    sidebarSwipeEdgePx: configuration.mobileSidebarSwipeEdgePx,
+    sidebarSwipeTriggerPx: configuration.mobileSidebarSwipeTriggerPx,
+    sidebarSwipeMaximumVerticalDriftPx: configuration.mobileSidebarSwipeMaximumVerticalDriftPx,
+    sidebarSwipeCancelNegativePx: configuration.mobileSidebarSwipeCancelNegativePx
+  });
+}
+
+function createSelectedThreadDataRefreshCoordinator(
+  configuration: SelectedThreadRetryConfiguration
+): SelectedThreadDataRefreshCoordinator {
+  return new SelectedThreadDataRefreshCoordinator({
+    retryConfiguration: {
+      maximumAttempts: configuration.readThreadRetryMaximumAttempts,
+      baseDelayMilliseconds: configuration.readThreadRetryBaseDelayMilliseconds,
+      maximumDelayMilliseconds: configuration.readThreadRetryMaximumDelayMilliseconds
+    }
+  });
+}
+
+function createThreadListStateController(
+  configuration: ThreadListStateControllerConfiguration
+): ThreadListStateController {
+  return new ThreadListStateController({
+    threadServerClient: new ThreadServerClient(),
+    threadQueryCache: new ThreadQueryCache(
+      configuration.threadQueryCacheTimeToLiveMilliseconds,
+      configuration.threadQueryCacheMaximumEntries
+    ),
+    threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
+    threadListStateStore: new ThreadListStateStore(),
+    threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+  });
+}
+
 export function useApplicationOwnerDependencies<
   CapabilitySnapshotType extends CapabilitySnapshotRecord
 >(
   input: UseApplicationOwnerDependenciesInput
 ): ApplicationOwnerDependencies<CapabilitySnapshotType> {
+  const {
+    setErrorMessage,
+    modeSelectionStateResolver,
+    unsupportedPushClientState,
+    threadOnlyHistoryMethods,
+    eventRefreshScheduleDelayMilliseconds,
+    mobileVisualViewportKeyboardOpenDeltaPx,
+    mobileLayoutMaximumWidthPx,
+    mobileSidebarSwipeEdgePx,
+    mobileSidebarSwipeTriggerPx,
+    mobileSidebarSwipeMaximumVerticalDriftPx,
+    mobileSidebarSwipeCancelNegativePx,
+    capabilitySnapshotRefreshIntervalMilliseconds,
+    chatScrollBottomThresholdPx,
+    readThreadRetryMaximumAttempts,
+    readThreadRetryBaseDelayMilliseconds,
+    readThreadRetryMaximumDelayMilliseconds,
+    threadQueryCacheTimeToLiveMilliseconds,
+    threadQueryCacheMaximumEntries
+  } = input;
+
   const apiAuthenticationErrorClassifier = useMemo(
     () => new ApiAuthenticationErrorClassifier(),
     []
@@ -133,20 +212,20 @@ export function useApplicationOwnerDependencies<
     []
   );
   const eventStreamRefreshDecisionEngine = useMemo(
-    () => new EventStreamRefreshDecisionEngine(Array.from(input.threadOnlyHistoryMethods)),
-    [input.threadOnlyHistoryMethods]
+    () => new EventStreamRefreshDecisionEngine(Array.from(threadOnlyHistoryMethods)),
+    [threadOnlyHistoryMethods]
   );
   const eventRefreshScheduler = useMemo(
-    () => new EventRefreshScheduler(input.eventRefreshScheduleDelayMilliseconds),
-    [input.eventRefreshScheduleDelayMilliseconds]
+    () => new EventRefreshScheduler(eventRefreshScheduleDelayMilliseconds),
+    [eventRefreshScheduleDelayMilliseconds]
   );
   const eventStreamConnectionCoordinator = useMemo(
     () => new EventStreamConnectionCoordinator(),
     []
   );
   const runtimeViewportSizingCoordinator = useMemo(
-    () => new RuntimeViewportSizingCoordinator(input.mobileVisualViewportKeyboardOpenDeltaPx),
-    [input.mobileVisualViewportKeyboardOpenDeltaPx]
+    () => new RuntimeViewportSizingCoordinator(mobileVisualViewportKeyboardOpenDeltaPx),
+    [mobileVisualViewportKeyboardOpenDeltaPx]
   );
   const pageTouchOverscrollGuardCoordinator = useMemo(
     () => new PageTouchOverscrollGuardCoordinator(),
@@ -154,26 +233,26 @@ export function useApplicationOwnerDependencies<
   );
   const mobileSidebarSwipeCoordinator = useMemo(
     () =>
-      new MobileSidebarSwipeCoordinator({
-        mobileLayoutMaximumWidthPx: input.mobileLayoutMaximumWidthPx,
-        sidebarSwipeEdgePx: input.mobileSidebarSwipeEdgePx,
-        sidebarSwipeTriggerPx: input.mobileSidebarSwipeTriggerPx,
-        sidebarSwipeMaximumVerticalDriftPx: input.mobileSidebarSwipeMaximumVerticalDriftPx,
-        sidebarSwipeCancelNegativePx: input.mobileSidebarSwipeCancelNegativePx
+      createMobileSidebarSwipeCoordinator({
+        mobileLayoutMaximumWidthPx,
+        mobileSidebarSwipeEdgePx,
+        mobileSidebarSwipeTriggerPx,
+        mobileSidebarSwipeMaximumVerticalDriftPx,
+        mobileSidebarSwipeCancelNegativePx
       }),
     [
-      input.mobileLayoutMaximumWidthPx,
-      input.mobileSidebarSwipeCancelNegativePx,
-      input.mobileSidebarSwipeEdgePx,
-      input.mobileSidebarSwipeMaximumVerticalDriftPx,
-      input.mobileSidebarSwipeTriggerPx
+      mobileLayoutMaximumWidthPx,
+      mobileSidebarSwipeCancelNegativePx,
+      mobileSidebarSwipeEdgePx,
+      mobileSidebarSwipeMaximumVerticalDriftPx,
+      mobileSidebarSwipeTriggerPx
     ]
   );
   const capabilitySnapshotCache = useMemo(
     () => new CapabilitySnapshotCache<CapabilitySnapshotType>(
-      input.capabilitySnapshotRefreshIntervalMilliseconds
+      capabilitySnapshotRefreshIntervalMilliseconds
     ),
-    [input.capabilitySnapshotRefreshIntervalMilliseconds]
+    [capabilitySnapshotRefreshIntervalMilliseconds]
   );
   const chatServerClient = useMemo(() => new ChatServerClient(), []);
   const selectedThreadRefreshConcurrencyCoordinator = useMemo(
@@ -189,8 +268,8 @@ export function useApplicationOwnerDependencies<
     []
   );
   const modeSelectionSyncCoordinator = useMemo(
-    () => new ModeSelectionSyncCoordinator(input.modeSelectionStateResolver),
-    [input.modeSelectionStateResolver]
+    () => new ModeSelectionSyncCoordinator(modeSelectionStateResolver),
+    [modeSelectionStateResolver]
   );
   const userInterfaceActionRequestBuilder = useMemo(
     () => new UserInterfaceActionRequestBuilder(),
@@ -198,38 +277,36 @@ export function useApplicationOwnerDependencies<
   );
   const trackedUserInterfaceErrorReporter = useMemo(
     () => new TrackedUserInterfaceErrorReporter({
-      setErrorMessage: input.setErrorMessage
+      setErrorMessage
     }),
-    [input.setErrorMessage]
+    [setErrorMessage]
   );
   const pendingUserInputAnswerBuilder = useMemo(
     () => new PendingUserInputAnswerBuilder(),
     []
   );
   const chatScrollStateCoordinator = useMemo(
-    () => new ChatScrollStateCoordinator(input.chatScrollBottomThresholdPx),
-    [input.chatScrollBottomThresholdPx]
+    () => new ChatScrollStateCoordinator(chatScrollBottomThresholdPx),
+    [chatScrollBottomThresholdPx]
   );
   const chatRequestActionCoordinator = useMemo(
     () => new ChatRequestActionCoordinator(),
     []
   );
   const collaborationModeActionCoordinator = useMemo(
-    () => new CollaborationModeActionCoordinator(input.modeSelectionStateResolver),
-    [input.modeSelectionStateResolver]
+    () => new CollaborationModeActionCoordinator(modeSelectionStateResolver),
+    [modeSelectionStateResolver]
   );
   const selectedThreadDataRefreshCoordinator = useMemo(
-    () => new SelectedThreadDataRefreshCoordinator({
-      retryConfiguration: {
-        maximumAttempts: input.readThreadRetryMaximumAttempts,
-        baseDelayMilliseconds: input.readThreadRetryBaseDelayMilliseconds,
-        maximumDelayMilliseconds: input.readThreadRetryMaximumDelayMilliseconds
-      }
+    () => createSelectedThreadDataRefreshCoordinator({
+      readThreadRetryMaximumAttempts,
+      readThreadRetryBaseDelayMilliseconds,
+      readThreadRetryMaximumDelayMilliseconds
     }),
     [
-      input.readThreadRetryBaseDelayMilliseconds,
-      input.readThreadRetryMaximumAttempts,
-      input.readThreadRetryMaximumDelayMilliseconds
+      readThreadRetryBaseDelayMilliseconds,
+      readThreadRetryMaximumAttempts,
+      readThreadRetryMaximumDelayMilliseconds
     ]
   );
   const conversationItemFlattener = useMemo(
@@ -260,19 +337,13 @@ export function useApplicationOwnerDependencies<
   );
   const threadListStateController = useMemo(
     () =>
-      new ThreadListStateController({
-        threadServerClient: new ThreadServerClient(),
-        threadQueryCache: new ThreadQueryCache(
-          input.threadQueryCacheTimeToLiveMilliseconds,
-          input.threadQueryCacheMaximumEntries
-        ),
-        threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
-        threadListStateStore: new ThreadListStateStore(),
-        threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+      createThreadListStateController({
+        threadQueryCacheTimeToLiveMilliseconds,
+        threadQueryCacheMaximumEntries
       }),
     [
-      input.threadQueryCacheMaximumEntries,
-      input.threadQueryCacheTimeToLiveMilliseconds
+      threadQueryCacheMaximumEntries,
+      threadQueryCacheTimeToLiveMilliseconds
     ]
   );
   const pushClientStateManager = useMemo(
@@ -283,10 +354,10 @@ export function useApplicationOwnerDependencies<
     () =>
       new PushNotificationToolbarActionCoordinator({
         pushClientStateManager,
-        unsupportedPushClientState: input.unsupportedPushClientState
+        unsupportedPushClientState
       }),
     [
-      input.unsupportedPushClientState,
+      unsupportedPushClientState,
       pushClientStateManager
     ]
   );

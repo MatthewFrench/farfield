@@ -30,6 +30,23 @@ function createReadThreadState(input: {
 }
 
 describe("ReadThreadStateMerger", () => {
+  it("returns incoming state when no previous state exists", () => {
+    const merger = new ReadThreadStateMerger();
+    const incoming = createReadThreadState({
+      threadId: "thread-1",
+      turnIds: [],
+      requestId: "incoming-request"
+    });
+
+    const merged = merger.merge({
+      previous: null,
+      incoming,
+      includeTurns: false
+    });
+
+    expect(merged).toBe(incoming);
+  });
+
   it("returns incoming state when turn payloads are explicitly included", () => {
     const merger = new ReadThreadStateMerger();
     const incoming = createReadThreadState({
@@ -87,6 +104,27 @@ describe("ReadThreadStateMerger", () => {
       previous: createReadThreadState({
         threadId: "thread-1",
         turnIds: ["previous-1"],
+        requestId: "previous-request"
+      }),
+      incoming,
+      includeTurns: false
+    });
+
+    expect(merged).toBe(incoming);
+  });
+
+  it("returns incoming state when both snapshots omit turn payloads", () => {
+    const merger = new ReadThreadStateMerger();
+    const incoming = createReadThreadState({
+      threadId: "thread-1",
+      turnIds: [],
+      requestId: "incoming-request"
+    });
+
+    const merged = merger.merge({
+      previous: createReadThreadState({
+        threadId: "thread-1",
+        turnIds: [],
         requestId: "previous-request"
       }),
       incoming,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { ServerTransportErrorClassifier } from "../Source/Network/ServerTransportErrorClassifier.js";
 
 describe("ServerTransportErrorClassifier", () => {
@@ -50,5 +51,23 @@ describe("ServerTransportErrorClassifier", () => {
     expect(classification.shouldRecordServerError).toBe(true);
     expect(classification.shouldPushSystemEvent).toBe(true);
     expect(classification.shouldBroadcastRuntimeState).toBe(true);
+  });
+
+  it("maps runtime zod errors to validation classification", () => {
+    const classifier = new ServerTransportErrorClassifier();
+    const zodError = z.object({ value: z.string() }).safeParse({ value: 7 });
+    if (zodError.success) {
+      throw new Error("Expected zod parse failure fixture");
+    }
+
+    const classification = classifier.classifyRuntimeError(
+      zodError.error,
+      () => false,
+      (value) => value.message
+    );
+
+    expect(classification.category).toBe("request_validation");
+    expect(classification.statusCode).toBe(400);
+    expect(classification.shouldRecordServerError).toBe(true);
   });
 });

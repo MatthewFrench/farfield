@@ -13,6 +13,10 @@ const ThreadListCursorSchema = z
   .strict();
 const ThreadListLimitMaximum = 200;
 const ThreadListMaxPagesMaximum = 40;
+const ThreadListLimitDefault = 80;
+const ThreadListMaxPagesDefault = 20;
+const ThreadListCursorIssuePath = "cursor";
+const ThreadListCursorEncodingIssueMessage = "Cursor must be URL-safe base64 encoded JSON";
 const RawThreadListQuerySchema = z
   .object({
     limit: z.string().nullable(),
@@ -52,6 +56,10 @@ export type ParseThreadCollectionListQueryResult =
   | { ok: true; query: ThreadCollectionListQuery }
   | { ok: false; issues: ThreadCollectionListQueryIssue[] };
 
+export type DecodeThreadCollectionListCursorResult =
+  | { ok: true; offset: number }
+  | { ok: false; issues: ThreadCollectionListQueryIssue[] };
+
 /**
  * Owns strict query/cursor/sort contracts for the thread list route.
  * Route owners consume typed query state from this owner to keep parsing concerns isolated.
@@ -80,14 +88,42 @@ export class ThreadCollectionListQueryOwner {
     return this.parseValidatedRawQuery(parsedRawThreadListQuery.data);
   }
 
-  public decodeCursor(cursor: string | null): number {
+  public decodeCursor(cursor: string | null): DecodeThreadCollectionListCursorResult {
     if (!cursor) {
-      return 0;
+      return {
+        ok: true,
+        offset: 0
+      };
     }
 
-    const decodedCursorPayload = Buffer.from(cursor, "base64url").toString("utf8");
-    const parsedCursor = ThreadListCursorSchema.parse(JSON.parse(decodedCursorPayload));
-    return parsedCursor.offset;
+    let decodedCursorPayload = "";
+    try {
+      decodedCursorPayload = Buffer.from(cursor, "base64url").toString("utf8");
+      const parsedCursor = ThreadListCursorSchema.safeParse(JSON.parse(decodedCursorPayload));
+      if (!parsedCursor.success) {
+        return {
+          ok: false,
+          issues: parsedCursor.error.issues.map((issue) => ({
+            path: this.buildCursorIssuePath(issue.path),
+            message: issue.message
+          }))
+        };
+      }
+      return {
+        ok: true,
+        offset: parsedCursor.data.offset
+      };
+    } catch {
+      return {
+        ok: false,
+        issues: [
+          {
+            path: ThreadListCursorIssuePath,
+            message: ThreadListCursorEncodingIssueMessage
+          }
+        ]
+      };
+    }
   }
 
   public encodeCursor(offset: number): string {
@@ -190,10 +226,15 @@ export class ThreadCollectionListQueryOwner {
     };
 
     const parsedQuery: ThreadCollectionListQuery = {
-      limit: parseBoundedInteger(rawQuery.limit, 80, "limit", ThreadListLimitQueryValueSchema),
+      limit: parseBoundedInteger(rawQuery.limit, ThreadListLimitDefault, "limit", ThreadListLimitQueryValueSchema),
       archived: parseBoolean(rawQuery.archived, false, "archived"),
       all: parseBoolean(rawQuery.all, false, "all"),
-      maxPages: parseBoundedInteger(rawQuery.maxPages, 20, "maxPages", ThreadListMaxPagesQueryValueSchema),
+      maxPages: parseBoundedInteger(
+        rawQuery.maxPages,
+        ThreadListMaxPagesDefault,
+        "maxPages",
+        ThreadListMaxPagesQueryValueSchema
+      ),
       cursor: rawQuery.cursor,
       sortKey: parseSortKey(rawQuery.sortKey),
       cwd: rawQuery.cwd
@@ -210,5 +251,13 @@ export class ThreadCollectionListQueryOwner {
       ok: true,
       query: parsedQuery
     };
+  }
+
+  private buildCursorIssuePath(path: ReadonlyArray<string | number>): string {
+    if (path.length === 0) {
+      return ThreadListCursorIssuePath;
+    }
+
+    return `${ThreadListCursorIssuePath}.${path.map((segment) => String(segment)).join(".")}`;
   }
 }

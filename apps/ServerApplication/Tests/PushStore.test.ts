@@ -77,4 +77,64 @@ describe("PushStore", () => {
     expect(removed).toBe(true);
     expect(store.getSubscriptionCount()).toBe(0);
   });
+
+  it("updates existing subscription by endpoint without duplicating state", async () => {
+    const { store } = createStoreWithTempPath();
+    store.load();
+
+    const createdSubscription = await store.upsertSubscription(
+      {
+        endpoint: "https://example.push.service/subscription-id",
+        keys: {
+          p256dh: "P256DhInitial",
+          auth: "AuthInitial"
+        }
+      },
+      {
+        privateMode: true
+      }
+    );
+    const updatedSubscription = await store.upsertSubscription(
+      {
+        endpoint: "https://example.push.service/subscription-id",
+        keys: {
+          p256dh: "P256DhUpdated",
+          auth: "AuthUpdated"
+        }
+      },
+      {
+        privateMode: false
+      }
+    );
+
+    expect(store.getSubscriptionCount()).toBe(1);
+    expect(updatedSubscription.id).toBe(createdSubscription.id);
+    expect(store.listSubscriptions()[0]).toEqual(
+      expect.objectContaining({
+        id: createdSubscription.id,
+        settings: {
+          privateMode: false
+        },
+        subscription: {
+          endpoint: "https://example.push.service/subscription-id",
+          keys: {
+            p256dh: "P256DhUpdated",
+            auth: "AuthUpdated"
+          }
+        }
+      })
+    );
+  });
+
+  it("returns false when removing unknown subscription endpoints", async () => {
+    const { store } = createStoreWithTempPath();
+    store.load();
+
+    const removed = await store.removeSubscriptionByEndpoint(
+      "https://example.push.service/unknown-subscription"
+    );
+
+    expect(removed).toBe(false);
+    expect(store.getSubscriptionCount()).toBe(0);
+  });
 });

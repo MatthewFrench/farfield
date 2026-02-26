@@ -110,4 +110,21 @@ describe("DebugWorkspacePane", () => {
     expect(screen.getByTestId("debug-trace-panel")).toBeDefined();
     expect(screen.queryByTestId("debug-issues-panel")).toBeNull();
   });
+
+  it("marks the active section tab from the workspace section prop", () => {
+    cleanup();
+    const { rerender } = render(<DebugWorkspacePane {...baseDebugWorkspacePaneProperties} />);
+
+    expect(screen.getByRole("tab", { name: "Issues" }).getAttribute("data-state")).toBe("active");
+
+    rerender(
+      <DebugWorkspacePane
+        {...baseDebugWorkspacePaneProperties}
+        debugWorkspaceSection="stream"
+      />
+    );
+
+    expect(screen.getByRole("tab", { name: "Stream" }).getAttribute("data-state")).toBe("active");
+    expect(screen.getByRole("tab", { name: "Issues" }).getAttribute("data-state")).toBe("inactive");
+  });
 });

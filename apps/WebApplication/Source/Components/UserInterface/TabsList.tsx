@@ -2,6 +2,8 @@ import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cn } from "@/Shared/Styling/ClassNameMerge";
 
+const TABS_LIST_COMPONENT_DISPLAY_NAME = "TabsList";
+
 export const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
@@ -14,4 +16,4 @@ export const TabsList = React.forwardRef<
     />
   );
 });
-TabsList.displayName = TabsPrimitive.List.displayName;
+TabsList.displayName = TABS_LIST_COMPONENT_DISPLAY_NAME;

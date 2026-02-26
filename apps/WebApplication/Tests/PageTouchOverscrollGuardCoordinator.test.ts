@@ -42,6 +42,7 @@ describe("PageTouchOverscrollGuardCoordinator", () => {
       writable: true,
       value: originalMatchMedia
     });
+    document.body.innerHTML = "";
   });
 
   it("does not install touch listeners when pointer is not coarse", () => {
@@ -60,9 +61,6 @@ describe("PageTouchOverscrollGuardCoordinator", () => {
     installCoarsePointerSupport(true);
     const coordinator = new PageTouchOverscrollGuardCoordinator();
     const applicationShellElement = document.createElement("div");
-    const innerElement = document.createElement("div");
-    applicationShellElement.appendChild(innerElement);
-    document.body.appendChild(applicationShellElement);
 
     const cleanup = coordinator.install(applicationShellElement);
 
@@ -70,18 +68,55 @@ describe("PageTouchOverscrollGuardCoordinator", () => {
       clientX: 12,
       clientY: 12
     });
-    innerElement.dispatchEvent(touchStartEvent);
+    applicationShellElement.dispatchEvent(touchStartEvent);
 
     const touchMoveEvent = createTouchEvent("touchmove", {
       clientX: 12,
       clientY: 44
     });
     const preventDefaultSpy = vi.spyOn(touchMoveEvent, "preventDefault");
-    innerElement.dispatchEvent(touchMoveEvent);
+    applicationShellElement.dispatchEvent(touchMoveEvent);
 
     expect(preventDefaultSpy).toHaveBeenCalledTimes(1);
 
     cleanup();
-    applicationShellElement.remove();
+  }, 15_000);
+
+  it("allows vertical touch movement inside a scrollable ancestor away from edges", () => {
+    installCoarsePointerSupport(true);
+    const coordinator = new PageTouchOverscrollGuardCoordinator();
+    const applicationShellElement = document.createElement("div");
+    const scrollableElement = document.createElement("div");
+    const innerElement = document.createElement("div");
+    scrollableElement.style.overflowY = "auto";
+    Object.defineProperty(scrollableElement, "clientHeight", {
+      configurable: true,
+      value: 100
+    });
+    Object.defineProperty(scrollableElement, "scrollHeight", {
+      configurable: true,
+      value: 300
+    });
+    Object.defineProperty(scrollableElement, "scrollTop", {
+      configurable: true,
+      writable: true,
+      value: 120
+    });
+    scrollableElement.appendChild(innerElement);
+    applicationShellElement.appendChild(scrollableElement);
+
+    const cleanup = coordinator.install(applicationShellElement);
+
+    innerElement.dispatchEvent(createTouchEvent("touchstart", { clientX: 16, clientY: 16 }));
+    const touchMoveEvent = createTouchEvent("touchmove", {
+      clientX: 16,
+      clientY: 36
+    });
+    const preventDefaultSpy = vi.spyOn(touchMoveEvent, "preventDefault");
+    innerElement.dispatchEvent(touchMoveEvent);
+
+    expect(preventDefaultSpy).not.toHaveBeenCalled();
+
+    cleanup();
   });
 });

@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { type DebugErrorSeverity } from "@farfield/protocol";
 
+const STATUS_CODE_BAD_REQUEST = 400;
+const STATUS_CODE_SERVICE_UNAVAILABLE = 503;
+const STATUS_CODE_INTERNAL_SERVER_ERROR = 500;
+const SHUTDOWN_RUNTIME_ERROR_MESSAGE = "Server is shutting down";
+
 export type ServerTransportErrorCategory =
   | "request_validation"
   | "shutdown_transport"
@@ -24,7 +29,7 @@ export class ServerTransportErrorClassifier {
   public classifyValidationError(validationErrorMessage: string): ServerTransportErrorClassification {
     return {
       category: "request_validation",
-      statusCode: 400,
+      statusCode: STATUS_CODE_BAD_REQUEST,
       severity: "warning",
       logLevel: "warn",
       logEventName: "request-validation-failed",
@@ -47,20 +52,20 @@ export class ServerTransportErrorClassifier {
     if (isExpectedShutdownTransportError(error)) {
       return {
         category: "shutdown_transport",
-        statusCode: 503,
+        statusCode: STATUS_CODE_SERVICE_UNAVAILABLE,
         severity: "warning",
         logLevel: "info",
         logEventName: "request-closed-during-shutdown",
         shouldRecordServerError: false,
         shouldPushSystemEvent: false,
         shouldBroadcastRuntimeState: false,
-        runtimeErrorMessage: "Server is shutting down"
+        runtimeErrorMessage: SHUTDOWN_RUNTIME_ERROR_MESSAGE
       };
     }
 
     return {
       category: "internal",
-      statusCode: 500,
+      statusCode: STATUS_CODE_INTERNAL_SERVER_ERROR,
       severity: "error",
       logLevel: "error",
       logEventName: "request-failed",

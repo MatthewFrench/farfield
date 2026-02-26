@@ -1,7 +1,22 @@
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
+const ACTION_IDENTIFIER_PREFIX = "action";
+const ACTION_IDENTIFIER_RANDOM_UPPER_BOUND = 1_000_000_000;
+const EMPTY_ACTION_NAME_ERROR_MESSAGE = "Action name is required";
+
 function createUserInterfaceActionId(): string {
-  return `action_${String(Date.now())}_${Math.floor(Math.random() * 1_000_000_000).toString(16)}`;
+  return (
+    `${ACTION_IDENTIFIER_PREFIX}_${String(Date.now())}_`
+    + `${Math.floor(Math.random() * ACTION_IDENTIFIER_RANDOM_UPPER_BOUND).toString(16)}`
+  );
+}
+
+function normalizeActionName(actionName: string): string {
+  const normalizedActionName = actionName.trim();
+  if (normalizedActionName.length === 0) {
+    throw new Error(EMPTY_ACTION_NAME_ERROR_MESSAGE);
+  }
+  return normalizedActionName;
 }
 
 export interface UserInterfaceActionRequest {
@@ -17,12 +32,13 @@ export class UserInterfaceActionRequestBuilder {
   }
 
   public create(actionName: string): UserInterfaceActionRequest {
+    const normalizedActionName = normalizeActionName(actionName);
     const actionId = this.readActionId();
     return {
       actionId,
       requestOptions: {
         actionId,
-        actionName
+        actionName: normalizedActionName
       }
     };
   }

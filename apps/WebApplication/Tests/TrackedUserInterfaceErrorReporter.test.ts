@@ -237,6 +237,51 @@ describe("TrackedUserInterfaceErrorReporter", () => {
     });
   });
 
+  it("keeps canonical action detail keys when caller details include overlapping fields", async () => {
+    const setErrorMessage = vi.fn();
+    const reportClientErrorFn = vi.fn(async () => ({
+      ok: true as const,
+      errorId: "error-556",
+      sessionId: "session-1",
+      recordedAt: "2026-01-01T00:00:00.000Z"
+    }));
+    const reporter = new TrackedUserInterfaceErrorReporter({
+      setErrorMessage,
+      reportClientErrorFn,
+      readPathnameAndSearch: () => "/"
+    });
+
+    await reporter.report({
+      operation: "set-collaboration-mode",
+      actionId: "action-56",
+      threadId: "thread-1",
+      error: new Error("Request failed"),
+      details: {
+        actionId: 999,
+        actionName: false,
+        category: "custom"
+      }
+    });
+
+    expect(reportClientErrorFn).toHaveBeenCalledTimes(1);
+    expect(reportClientErrorFn).toHaveBeenCalledWith({
+      source: "farfield-web",
+      operation: "set-collaboration-mode",
+      message: "Request failed",
+      severity: "error",
+      name: null,
+      stack: null,
+      requestId: null,
+      threadId: "thread-1",
+      url: "/",
+      details: {
+        actionId: "action-56",
+        actionName: "set-collaboration-mode",
+        category: "custom"
+      }
+    });
+  });
+
   it("does not parse requestId from generic request failed text", async () => {
     const setErrorMessage = vi.fn();
     const reportClientErrorFn = vi.fn(async () => ({

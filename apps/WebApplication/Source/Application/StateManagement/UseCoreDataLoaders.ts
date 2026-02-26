@@ -11,26 +11,18 @@ import {
   CapabilitySnapshotCache
 } from "@/Features/Capabilities/DataAccess/CapabilitySnapshotCache";
 import {
-  CapabilityServerClient,
-  type CapabilityAgentsResponse,
-  type CapabilityCollaborationModesResponse,
-  type CapabilityConfigDefaultsResponse,
-  type CapabilityHealthResponse,
-  type CapabilityModelsResponse
+  CapabilityServerClient
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import {
-  DebugServerClient,
-  type DebugErrorListResponse,
-  type DebugHistoryResponse,
-  type DebugTraceStatusResponse
+  DebugServerClient
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import {
   DebugWorkspaceDataReader,
   type DebugWorkspaceDataSnapshot
 } from "@/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
-import type { ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import {
+  type LoadActiveThreadStateInput,
   type LoadActiveThreadStateResult,
   ThreadListStateController
 } from "@/Features/Threads/StateManagement/ThreadListStateController";
@@ -40,6 +32,19 @@ import type {
 } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { applyCoreDataSnapshotState } from "./CoreDataSnapshotStateApplier";
+import type {
+  CoreDataAgentDescriptor,
+  CoreDataCapabilitySnapshot,
+  CoreDataConfigDefaultsResponse,
+  CoreDataDebugErrorsResponse,
+  CoreDataHealthResponse,
+  CoreDataHistoryResponse,
+  CoreDataModesResponse,
+  CoreDataModelsResponse,
+  CoreDataSnapshotStateDelta,
+  CoreDataThreadsResponse,
+  CoreDataTraceStatusResponse
+} from "./CoreDataSnapshotContracts";
 import {
   STARTUP_CRITICAL_THREADS_OPERATION,
   STARTUP_DEFERRED_AGENTS_OPERATION,
@@ -52,50 +57,265 @@ import {
   STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
   STARTUP_DEFERRED_TRACE_STATUS_OPERATION
 } from "./CoreDataStartupRequestProfile";
-
-export interface CoreDataCapabilitySnapshot {
-  modes: CapabilityCollaborationModesResponse;
-  models: CapabilityModelsResponse;
-  defaults: CapabilityConfigDefaultsResponse | null;
-  fetchedAt: number;
-}
+export type { CoreDataCapabilitySnapshot } from "./CoreDataSnapshotContracts";
 
 export interface SelectedThreadLoaderOptions {
   includeTurns?: boolean;
   includeReadThread?: boolean;
 }
 
-type Health = CapabilityHealthResponse;
-type ConfigDefaults = CapabilityConfigDefaultsResponse;
-type ThreadsResponse = ThreadListResponse;
-type ModesResponse = CapabilityCollaborationModesResponse;
-type ModelsResponse = CapabilityModelsResponse;
-type AgentsResponse = CapabilityAgentsResponse;
-type TraceStatus = DebugTraceStatusResponse;
-type HistoryResponse = DebugHistoryResponse;
-type DebugErrorsResponse = DebugErrorListResponse;
-type AgentDescriptor = AgentsResponse["agents"][number];
+type Health = CoreDataHealthResponse;
+type ConfigDefaults = CoreDataConfigDefaultsResponse;
+type ThreadsResponse = CoreDataThreadsResponse;
+type ModesResponse = CoreDataModesResponse;
+type ModelsResponse = CoreDataModelsResponse;
+type TraceStatus = CoreDataTraceStatusResponse;
+type HistoryResponse = CoreDataHistoryResponse;
+type DebugErrorsResponse = CoreDataDebugErrorsResponse;
+type AgentDescriptor = CoreDataAgentDescriptor;
 
 interface ActionRequestOptions {
   actionId: string;
   requestOptions: ApiRequestOptions;
 }
 
-interface CoreDataSnapshotPartial {
-  nextHealth?: Health;
-  nextActiveThreadState?: LoadActiveThreadStateResult;
-  nextTraceStatus?: TraceStatus;
-  nextAgents?: AgentsResponse | null;
-  nextCapabilities?: CoreDataCapabilitySnapshot;
-  debugWorkspaceData?: DebugWorkspaceDataSnapshot | null;
+type CoreDataSnapshotPartial = CoreDataSnapshotStateDelta;
+
+type SnapshotStateApplier = (snapshotPartial: CoreDataSnapshotPartial) => void;
+type DeferredStartupFailureReporter = <ErrorType,>(operation: string, error: ErrorType) => void;
+
+interface ThreadLoadActionMetadata {
+  actionId?: string;
+  actionName?: string;
 }
+
+interface BuildActiveThreadStateLoadRequestInput {
+  threadListLimit: number;
+  threadListMaxPages: number;
+  previousUnreadThreadIdentifiers: Record<string, true>;
+  selectedThreadIdentifier: string | null;
+  readFromCache: boolean;
+  requestOptions: ApiRequestOptions;
+}
+
+interface DeferredStartupResultApplicationInput<ResultValue> {
+  result: PromiseSettledResult<ResultValue>;
+  operation: string;
+  onFulfilled: (value: ResultValue) => void;
+  reportDeferredStartupFailure: DeferredStartupFailureReporter;
+}
+
+interface CapabilitySnapshotReadInput {
+  capabilityServerClient: CapabilityServerClient;
+  modesRequestOptions: ApiRequestOptions;
+  modelsRequestOptions: ApiRequestOptions;
+  defaultsRequestOptions: ApiRequestOptions;
+}
+
+interface DeferredStartupReadsInput {
+  activeTabRef: MutableRefObject<"chat" | "debug">;
+  debugHistoryLimit: number;
+  debugErrorListLimit: number;
+  capabilityServerClient: CapabilityServerClient;
+  capabilitySnapshotCache: CapabilitySnapshotCache<CoreDataCapabilitySnapshot>;
+  debugServerClient: DebugServerClient;
+  debugWorkspaceDataReader: DebugWorkspaceDataReader;
+  buildActionRequestOptions: (actionName: string) => ActionRequestOptions;
+  deferredStartupSequenceRef: MutableRefObject<number>;
+  deferredStartupSequence: number;
+  applySnapshotState: SnapshotStateApplier;
+  reportDeferredStartupFailure: DeferredStartupFailureReporter;
+}
+
+const STARTUP_TAGGED_ERROR_PATTERN = /^[a-z][a-z0-9._-]{1,64}:\s*(.+)$/i;
+const THREAD_LIST_UPDATED_AT_SORT_KEY = "updated_at" as const;
+const DEFERRED_STARTUP_DELAY_MILLISECONDS = 0;
+const CONFIG_DEFAULTS_AGENT_ID: AgentId = "codex";
 
 function createStartupTaggedError<ErrorType>(operation: string, error: ErrorType): Error {
   const message = toErrorMessage(error).trim();
-  if (/^[a-z][a-z0-9._-]{1,64}:\s*(.+)$/i.test(message)) {
+  if (STARTUP_TAGGED_ERROR_PATTERN.test(message)) {
     return new Error(message);
   }
   return new Error(`${operation}: ${message}`);
+}
+
+function readThreadLoadActionMetadata(requestOptions: ApiRequestOptions): ThreadLoadActionMetadata {
+  const metadata: ThreadLoadActionMetadata = {};
+  if (requestOptions.actionId) {
+    metadata.actionId = requestOptions.actionId;
+  }
+  if (requestOptions.actionName) {
+    metadata.actionName = requestOptions.actionName;
+  }
+  return metadata;
+}
+
+function createActiveThreadStateLoadRequest(
+  input: BuildActiveThreadStateLoadRequestInput
+): LoadActiveThreadStateInput {
+  return {
+    limit: input.threadListLimit,
+    maxPages: input.threadListMaxPages,
+    sortKey: THREAD_LIST_UPDATED_AT_SORT_KEY,
+    previousUnreadThreadIdentifiers: input.previousUnreadThreadIdentifiers,
+    selectedThreadIdentifier: input.selectedThreadIdentifier,
+    readFromCache: input.readFromCache,
+    ...readThreadLoadActionMetadata(input.requestOptions)
+  };
+}
+
+function applyDeferredStartupResult<ResultValue>(
+  input: DeferredStartupResultApplicationInput<ResultValue>
+): void {
+  if (input.result.status === "fulfilled") {
+    input.onFulfilled(input.result.value);
+    return;
+  }
+
+  input.reportDeferredStartupFailure(input.operation, input.result.reason);
+}
+
+async function readCapabilitySnapshot(input: CapabilitySnapshotReadInput): Promise<CoreDataCapabilitySnapshot> {
+  const [modesResponse, modelsResponse, defaultsResponse] = await Promise.all([
+    input.capabilityServerClient.listCollaborationModes(input.modesRequestOptions),
+    input.capabilityServerClient.listModels(input.modelsRequestOptions),
+    // Config defaults are optional at startup; preserve capability hydration even if this request fails.
+    input.capabilityServerClient.readConfigDefaults({
+      agentId: CONFIG_DEFAULTS_AGENT_ID,
+      ...input.defaultsRequestOptions
+    }).catch(() => null)
+  ]);
+
+  return {
+    modes: modesResponse,
+    models: modelsResponse,
+    defaults: defaultsResponse,
+    fetchedAt: Date.now()
+  };
+}
+
+async function runDeferredStartupReads(input: DeferredStartupReadsInput): Promise<void> {
+  if (input.deferredStartupSequenceRef.current !== input.deferredStartupSequence) {
+    return;
+  }
+
+  const shouldLoadDebugWorkspaceData = input.activeTabRef.current === "debug";
+  const now = Date.now();
+
+  const startupDeferredHealthRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_HEALTH_OPERATION);
+  const startupDeferredAgentsRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_AGENTS_OPERATION);
+  const startupDeferredTraceStatusRequest = input.buildActionRequestOptions(
+    STARTUP_DEFERRED_TRACE_STATUS_OPERATION
+  );
+  const startupDeferredModesRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_MODES_OPERATION);
+  const startupDeferredModelsRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_MODELS_OPERATION);
+  const startupDeferredDefaultsRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_DEFAULTS_OPERATION);
+
+  const capabilitiesPromise = input.capabilitySnapshotCache.readSnapshot(
+    () =>
+      readCapabilitySnapshot({
+        capabilityServerClient: input.capabilityServerClient,
+        modesRequestOptions: startupDeferredModesRequest.requestOptions,
+        modelsRequestOptions: startupDeferredModelsRequest.requestOptions,
+        defaultsRequestOptions: startupDeferredDefaultsRequest.requestOptions
+      }),
+    now
+  );
+
+  const debugWorkspaceDataPromise = shouldLoadDebugWorkspaceData
+    ? input.debugWorkspaceDataReader.readSnapshot(
+      input.debugHistoryLimit,
+      input.debugErrorListLimit,
+      {
+        historyRequestOptions: input.buildActionRequestOptions(
+          STARTUP_DEFERRED_DEBUG_HISTORY_OPERATION
+        ).requestOptions,
+        debugErrorsRequestOptions: input.buildActionRequestOptions(
+          STARTUP_DEFERRED_DEBUG_ERRORS_OPERATION
+        ).requestOptions
+      }
+    )
+    : Promise.resolve<DebugWorkspaceDataSnapshot | null>(null);
+
+  const [nextHealthResult, nextAgentsResult, nextCapabilitiesResult, nextTraceStatusResult, nextDebugWorkspaceDataResult] = await Promise.allSettled([
+    input.capabilityServerClient.readHealthStatus(startupDeferredHealthRequest.requestOptions),
+    input.capabilityServerClient.listAgents(startupDeferredAgentsRequest.requestOptions),
+    capabilitiesPromise,
+    shouldLoadDebugWorkspaceData
+      ? input.debugServerClient.readTraceStatus(startupDeferredTraceStatusRequest.requestOptions)
+      : Promise.resolve<TraceStatus | null>(null),
+    debugWorkspaceDataPromise
+  ]);
+
+  if (input.deferredStartupSequenceRef.current !== input.deferredStartupSequence) {
+    return;
+  }
+
+  applyDeferredStartupResult({
+    result: nextHealthResult,
+    operation: STARTUP_DEFERRED_HEALTH_OPERATION,
+    onFulfilled: (nextHealth) => {
+      input.applySnapshotState({
+        nextHealth
+      });
+    },
+    reportDeferredStartupFailure: input.reportDeferredStartupFailure
+  });
+
+  applyDeferredStartupResult({
+    result: nextAgentsResult,
+    operation: STARTUP_DEFERRED_AGENTS_OPERATION,
+    onFulfilled: (nextAgents) => {
+      input.applySnapshotState({
+        nextAgents
+      });
+    },
+    reportDeferredStartupFailure: input.reportDeferredStartupFailure
+  });
+
+  applyDeferredStartupResult({
+    result: nextCapabilitiesResult,
+    operation: STARTUP_DEFERRED_MODES_OPERATION,
+    onFulfilled: (nextCapabilities) => {
+      input.applySnapshotState({
+        nextCapabilities
+      });
+    },
+    reportDeferredStartupFailure: input.reportDeferredStartupFailure
+  });
+
+  applyDeferredStartupResult({
+    result: nextTraceStatusResult,
+    operation: STARTUP_DEFERRED_TRACE_STATUS_OPERATION,
+    onFulfilled: (nextTraceStatus) => {
+      if (nextTraceStatus) {
+        input.applySnapshotState({
+          nextTraceStatus
+        });
+      }
+    },
+    reportDeferredStartupFailure: input.reportDeferredStartupFailure
+  });
+
+  applyDeferredStartupResult({
+    result: nextDebugWorkspaceDataResult,
+    operation: STARTUP_DEFERRED_DEBUG_HISTORY_OPERATION,
+    onFulfilled: (debugWorkspaceData) => {
+      if (debugWorkspaceData) {
+        input.applySnapshotState({
+          debugWorkspaceData
+        });
+      }
+    },
+    reportDeferredStartupFailure: input.reportDeferredStartupFailure
+  });
+}
+
+function scheduleDeferredStartupReads(input: DeferredStartupReadsInput): void {
+  window.setTimeout(() => {
+    void runDeferredStartupReads(input);
+  }, DEFERRED_STARTUP_DELAY_MILLISECONDS);
 }
 
 export interface UseCoreDataLoadersInput {
@@ -152,6 +372,10 @@ export interface CoreDataLoaders {
   loadCoreDataTracked: () => Promise<void>;
 }
 
+/**
+ * Owns application-shell startup reads:
+ * critical thread state first, then deferred capability/debug hydration and optional cache revalidation.
+ */
 export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoaders {
   const deferredStartupSequenceRef = useRef(0);
 
@@ -198,22 +422,18 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
     const startupCriticalThreadsRequest = input.buildActionRequestOptions(STARTUP_CRITICAL_THREADS_OPERATION);
     let nextActiveThreadState: LoadActiveThreadStateResult;
     try {
-      nextActiveThreadState = await input.threadListStateController.loadActiveThreadState({
-        limit: input.threadListLimit,
-        maxPages: input.threadListMaxPages,
-        sortKey: "updated_at",
-        previousUnreadThreadIdentifiers: input.unreadThreadIdsRef.current,
-        selectedThreadIdentifier: input.selectedThreadIdRef.current,
-        // Prefer hot cache reads for event-driven refresh responsiveness.
-        // Mutation owners invalidate this cache key before invoking refresh.
-        readFromCache: true,
-        ...(startupCriticalThreadsRequest.requestOptions.actionId
-          ? { actionId: startupCriticalThreadsRequest.requestOptions.actionId }
-          : {}),
-        ...(startupCriticalThreadsRequest.requestOptions.actionName
-          ? { actionName: startupCriticalThreadsRequest.requestOptions.actionName }
-          : {})
-      });
+      nextActiveThreadState = await input.threadListStateController.loadActiveThreadState(
+        createActiveThreadStateLoadRequest({
+          threadListLimit: input.threadListLimit,
+          threadListMaxPages: input.threadListMaxPages,
+          previousUnreadThreadIdentifiers: input.unreadThreadIdsRef.current,
+          selectedThreadIdentifier: input.selectedThreadIdRef.current,
+          // Prefer hot cache reads for event-driven refresh responsiveness.
+          // Mutation owners invalidate this cache key before invoking refresh.
+          readFromCache: true,
+          requestOptions: startupCriticalThreadsRequest.requestOptions
+        })
+      );
     } catch (error) {
       throw createStartupTaggedError(STARTUP_CRITICAL_THREADS_OPERATION, error);
     }
@@ -225,122 +445,20 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
     const deferredStartupSequence = deferredStartupSequenceRef.current + 1;
     deferredStartupSequenceRef.current = deferredStartupSequence;
 
-    window.setTimeout(() => {
-      void (async () => {
-        if (deferredStartupSequenceRef.current !== deferredStartupSequence) {
-          return;
-        }
-
-        const now = Date.now();
-        const shouldLoadDebugWorkspaceData = input.activeTabRef.current === "debug";
-
-        const startupDeferredHealthRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_HEALTH_OPERATION);
-        const startupDeferredAgentsRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_AGENTS_OPERATION);
-        const startupDeferredTraceStatusRequest = input.buildActionRequestOptions(
-          STARTUP_DEFERRED_TRACE_STATUS_OPERATION
-        );
-        const startupDeferredModesRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_MODES_OPERATION);
-        const startupDeferredModelsRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_MODELS_OPERATION);
-        const startupDeferredDefaultsRequest = input.buildActionRequestOptions(STARTUP_DEFERRED_DEFAULTS_OPERATION);
-
-        const capabilitiesPromise = input.capabilitySnapshotCache.readSnapshot(
-          () =>
-            Promise.all([
-              input.capabilityServerClient.listCollaborationModes(startupDeferredModesRequest.requestOptions),
-              input.capabilityServerClient.listModels(startupDeferredModelsRequest.requestOptions),
-              input.capabilityServerClient.readConfigDefaults({
-                agentId: "codex",
-                ...startupDeferredDefaultsRequest.requestOptions
-              }).catch(() => null)
-            ]).then(([modesResponse, modelsResponse, defaultsResponse]) => ({
-              modes: modesResponse,
-              models: modelsResponse,
-              defaults: defaultsResponse,
-              fetchedAt: Date.now()
-            })),
-          now
-        );
-
-        const debugWorkspaceDataPromise = shouldLoadDebugWorkspaceData
-          ? input.debugWorkspaceDataReader.readSnapshot(
-            input.debugHistoryLimit,
-            input.debugErrorListLimit,
-            {
-              historyRequestOptions: input.buildActionRequestOptions(
-                STARTUP_DEFERRED_DEBUG_HISTORY_OPERATION
-              ).requestOptions,
-              debugErrorsRequestOptions: input.buildActionRequestOptions(
-                STARTUP_DEFERRED_DEBUG_ERRORS_OPERATION
-              ).requestOptions
-            }
-          )
-          : Promise.resolve<DebugWorkspaceDataSnapshot | null>(null);
-
-        const [
-          nextHealthResult,
-          nextAgentsResult,
-          nextCapabilitiesResult,
-          nextTraceStatusResult,
-          nextDebugWorkspaceDataResult
-        ] = await Promise.allSettled([
-          input.capabilityServerClient.readHealthStatus(startupDeferredHealthRequest.requestOptions),
-          input.capabilityServerClient.listAgents(startupDeferredAgentsRequest.requestOptions),
-          capabilitiesPromise,
-          shouldLoadDebugWorkspaceData
-            ? input.debugServerClient.readTraceStatus(startupDeferredTraceStatusRequest.requestOptions)
-            : Promise.resolve<TraceStatus | null>(null),
-          debugWorkspaceDataPromise
-        ]);
-
-        if (deferredStartupSequenceRef.current !== deferredStartupSequence) {
-          return;
-        }
-
-        if (nextHealthResult.status === "fulfilled") {
-          applySnapshotState({
-            nextHealth: nextHealthResult.value
-          });
-        } else {
-          reportDeferredStartupFailure(STARTUP_DEFERRED_HEALTH_OPERATION, nextHealthResult.reason);
-        }
-
-        if (nextAgentsResult.status === "fulfilled") {
-          applySnapshotState({
-            nextAgents: nextAgentsResult.value
-          });
-        } else {
-          reportDeferredStartupFailure(STARTUP_DEFERRED_AGENTS_OPERATION, nextAgentsResult.reason);
-        }
-
-        if (nextCapabilitiesResult.status === "fulfilled") {
-          applySnapshotState({
-            nextCapabilities: nextCapabilitiesResult.value
-          });
-        } else {
-          reportDeferredStartupFailure(STARTUP_DEFERRED_MODES_OPERATION, nextCapabilitiesResult.reason);
-        }
-
-        if (nextTraceStatusResult.status === "fulfilled") {
-          if (nextTraceStatusResult.value) {
-            applySnapshotState({
-              nextTraceStatus: nextTraceStatusResult.value
-            });
-          }
-        } else {
-          reportDeferredStartupFailure(STARTUP_DEFERRED_TRACE_STATUS_OPERATION, nextTraceStatusResult.reason);
-        }
-
-        if (nextDebugWorkspaceDataResult.status === "fulfilled") {
-          if (nextDebugWorkspaceDataResult.value) {
-            applySnapshotState({
-              debugWorkspaceData: nextDebugWorkspaceDataResult.value
-            });
-          }
-        } else {
-          reportDeferredStartupFailure(STARTUP_DEFERRED_DEBUG_HISTORY_OPERATION, nextDebugWorkspaceDataResult.reason);
-        }
-      })();
-    }, 0);
+    scheduleDeferredStartupReads({
+      activeTabRef: input.activeTabRef,
+      debugHistoryLimit: input.debugHistoryLimit,
+      debugErrorListLimit: input.debugErrorListLimit,
+      capabilityServerClient: input.capabilityServerClient,
+      capabilitySnapshotCache: input.capabilitySnapshotCache,
+      debugServerClient: input.debugServerClient,
+      debugWorkspaceDataReader: input.debugWorkspaceDataReader,
+      buildActionRequestOptions: input.buildActionRequestOptions,
+      deferredStartupSequenceRef,
+      deferredStartupSequence,
+      applySnapshotState,
+      reportDeferredStartupFailure
+    });
 
     if (nextActiveThreadState.loadedFromCache) {
       const startupDeferredThreadRevalidateRequest = input.buildActionRequestOptions(
@@ -348,20 +466,14 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
       );
       // Keep cache-first responsiveness but revalidate active threads in the background so
       // external updates (for example event-stream-driven updates) still converge quickly.
-      void input.threadListStateController.loadActiveThreadState({
-        limit: input.threadListLimit,
-        maxPages: input.threadListMaxPages,
-        sortKey: "updated_at",
+      void input.threadListStateController.loadActiveThreadState(createActiveThreadStateLoadRequest({
+        threadListLimit: input.threadListLimit,
+        threadListMaxPages: input.threadListMaxPages,
         previousUnreadThreadIdentifiers: nextActiveThreadState.nextUnreadThreadIdentifiers,
         selectedThreadIdentifier: input.selectedThreadIdRef.current,
         readFromCache: false,
-        ...(startupDeferredThreadRevalidateRequest.requestOptions.actionId
-          ? { actionId: startupDeferredThreadRevalidateRequest.requestOptions.actionId }
-          : {}),
-        ...(startupDeferredThreadRevalidateRequest.requestOptions.actionName
-          ? { actionName: startupDeferredThreadRevalidateRequest.requestOptions.actionName }
-          : {})
-      }).then((networkActiveThreadState) => {
+        requestOptions: startupDeferredThreadRevalidateRequest.requestOptions
+      })).then((networkActiveThreadState) => {
         applySnapshotState({
           nextActiveThreadState: networkActiveThreadState
         });
@@ -414,7 +526,7 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
       const archivedState = await input.threadListStateController.loadArchivedThreadState({
         limit: input.threadListLimit,
         maxPages: input.archivedThreadListMaxPages,
-        sortKey: "updated_at",
+        sortKey: THREAD_LIST_UPDATED_AT_SORT_KEY,
         readFromCache: true
       });
 

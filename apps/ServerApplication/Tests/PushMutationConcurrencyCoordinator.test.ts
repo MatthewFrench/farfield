@@ -55,4 +55,25 @@ describe("PushMutationConcurrencyCoordinator", () => {
       hasInFlightOperation: false
     });
   });
+
+  it("exposes in-flight status while an operation is waiting for completion", async () => {
+    const coordinator = new PushMutationConcurrencyCoordinator();
+    let releaseOperation: () => void = () => {};
+    const operationGate = new Promise<void>((resolve) => {
+      releaseOperation = resolve;
+    });
+
+    const inFlightOperation = coordinator.runExclusive(async () => {
+      await operationGate;
+      return "done";
+    });
+
+    await Promise.resolve();
+    expect(coordinator.readStatistics().hasInFlightOperation).toBe(true);
+
+    releaseOperation();
+    await inFlightOperation;
+
+    expect(coordinator.readStatistics().hasInFlightOperation).toBe(false);
+  });
 });

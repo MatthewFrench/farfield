@@ -2,7 +2,15 @@ import { PushSubscriptionSchema } from "@farfield/protocol";
 import { z } from "zod";
 import {
   type PushClientState,
+  type PushNotificationDisableResult,
+  type PushNotificationEnableResult,
+  type PushNotificationPreferenceInput,
+  PushNotificationPreferenceInputSchema,
+  type PushNotificationSettingsUpdateResult,
   type PushRecoveryResult,
+  PushSubscriptionReconcileInputSchema,
+  PushSubscriptionReconcileReasonSchema,
+  type PushSubscriptionReconcileInput,
   type PushSubscriptionReconcileResult
 } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { PushPreferenceStore } from "@/Features/PushNotifications/DataAccess/PushPreferenceStore";
@@ -16,6 +24,21 @@ interface PushClientStateManagerDependencies {
   pushPreferenceStore: PushPreferenceStore;
   pushServerClient: PushServerClient;
 }
+
+const PUSH_NOT_SUPPORTED_ERROR_MESSAGE = "Push notifications are not supported in this browser";
+const NOTIFICATION_PERMISSION_NOT_GRANTED_ERROR_MESSAGE = "Notification permission was not granted";
+const PUSH_DISABLED_ON_SERVER_ERROR_MESSAGE = "Push notifications are disabled on the server";
+const NO_ACTIVE_PUSH_SUBSCRIPTION_ERROR_MESSAGE = "No active push subscription to update";
+const PUSH_DISABLE_FAILED_ERROR_MESSAGE = "Failed to disable push notifications";
+const PUSH_SERVICE_WORKER_PATH = "/sw.js";
+// Keep service worker recovery from stalling indefinitely when browsers skip the controllerchange event.
+const CONTROLLER_CHANGE_WAIT_TIMEOUT_MILLISECONDS = 2_000;
+const SERVICE_WORKER_SKIP_WAITING_MESSAGE_TYPE = "SKIP_WAITING";
+const NOTIFICATION_PERMISSION_DEFAULT: NotificationPermission = "default";
+const NOTIFICATION_PERMISSION_GRANTED: NotificationPermission = "granted";
+const PUSH_SUBSCRIPTION_P256DH_KEY_NAME = "p256dh";
+const PUSH_SUBSCRIPTION_AUTH_KEY_NAME = "auth";
+const PushSubscriptionReconcileReasons = PushSubscriptionReconcileReasonSchema.enum;
 
 /**
  * Owns browser push-subscription lifecycle (permission, service worker registration, subscription reconcile/recovery).
@@ -44,7 +67,7 @@ export class PushClientStateManager {
     const subscription = registration ? await registration.pushManager.getSubscription() : null;
     return {
       supported: true,
-      serviceWorkerRegistered: registration !== undefined,
+      serviceWorkerRegistered: registration !== undefined && registration !== null,
       permission: Notification.permission,
       subscribed: subscription !== null
     };
@@ -56,24 +79,25 @@ export class PushClientStateManager {
     });
   }
 
-  public async enablePushNotifications(input: {
-    privateMode: boolean;
-  }): Promise<{ permission: NotificationPermission; subscribed: boolean; subscriptionId: string }> {
+  public async enablePushNotifications(
+    input: PushNotificationPreferenceInput
+  ): Promise<PushNotificationEnableResult> {
+    const parsedInput = PushNotificationPreferenceInputSchema.parse(input);
     if (!this.isPushSupported()) {
-      throw new Error("Push notifications are not supported in this browser");
+      throw new Error(PUSH_NOT_SUPPORTED_ERROR_MESSAGE);
     }
 
     let permission = Notification.permission;
-    if (permission === "default") {
+    if (permission === NOTIFICATION_PERMISSION_DEFAULT) {
       permission = await Notification.requestPermission();
     }
-    if (permission !== "granted") {
-      throw new Error("Notification permission was not granted");
+    if (permission !== NOTIFICATION_PERMISSION_GRANTED) {
+      throw new Error(NOTIFICATION_PERMISSION_NOT_GRANTED_ERROR_MESSAGE);
     }
 
     const status = await this.pushServerClient.readPushStatus();
     if (!status.enabled) {
-      throw new Error("Push notifications are disabled on the server");
+      throw new Error(PUSH_DISABLED_ON_SERVER_ERROR_MESSAGE);
     }
 
     const registration = await this.registerPushServiceWorker();
@@ -90,7 +114,7 @@ export class PushClientStateManager {
     const saved = await this.pushServerClient.savePushSubscription({
       subscription: payload,
       settings: {
-        privateMode: input.privateMode
+        privateMode: parsedInput.privateMode
       }
     });
     this.pushPreferenceStore.writeAutoHealPreferenceEnabled(true);
@@ -102,29 +126,32 @@ export class PushClientStateManager {
     };
   }
 
-  public async updatePushSettings(input: { privateMode: boolean }): Promise<{ updated: boolean }> {
+  public async updatePushSettings(
+    input: PushNotificationPreferenceInput
+  ): Promise<PushNotificationSettingsUpdateResult> {
+    const parsedInput = PushNotificationPreferenceInputSchema.parse(input);
     if (!this.isPushSupported()) {
-      throw new Error("Push notifications are not supported in this browser");
+      throw new Error(PUSH_NOT_SUPPORTED_ERROR_MESSAGE);
     }
 
     const registration = await this.registerPushServiceWorker();
     const browserSubscription = await registration.pushManager.getSubscription();
     if (!browserSubscription) {
-      throw new Error("No active push subscription to update");
+      throw new Error(NO_ACTIVE_PUSH_SUBSCRIPTION_ERROR_MESSAGE);
     }
 
     const payload = this.strictSubscriptionPayload(browserSubscription);
     await this.pushServerClient.savePushSubscription({
       subscription: payload,
       settings: {
-        privateMode: input.privateMode
+        privateMode: parsedInput.privateMode
       }
     });
 
     return { updated: true };
   }
 
-  public async disablePushNotifications(): Promise<{ unsubscribed: boolean }> {
+  public async disablePushNotifications(): Promise<PushNotificationDisableResult> {
     this.pushPreferenceStore.writeAutoHealPreferenceEnabled(false);
     if (!this.isPushSupported()) {
       return { unsubscribed: false };
@@ -158,21 +185,22 @@ export class PushClientStateManager {
     }
 
     if (!browserUnsubscribed && !serverDeleted) {
-      throw new Error("Failed to disable push notifications");
+      throw new Error(PUSH_DISABLE_FAILED_ERROR_MESSAGE);
     }
 
     return { unsubscribed: browserUnsubscribed || serverDeleted };
   }
 
-  public async reconcilePushSubscription(input?: {
-    privateMode?: boolean;
-  }): Promise<PushSubscriptionReconcileResult> {
+  public async reconcilePushSubscription(
+    input?: PushSubscriptionReconcileInput
+  ): Promise<PushSubscriptionReconcileResult> {
+    const parsedInput = PushSubscriptionReconcileInputSchema.parse(input ?? {});
     if (!this.isPushSupported()) {
       return {
         attempted: false,
         subscribed: false,
         repaired: false,
-        reason: "unsupported"
+        reason: PushSubscriptionReconcileReasons.unsupported
       };
     }
 
@@ -181,16 +209,16 @@ export class PushClientStateManager {
         attempted: false,
         subscribed: false,
         repaired: false,
-        reason: "not-enabled"
+        reason: PushSubscriptionReconcileReasons["not-enabled"]
       };
     }
 
-    if (Notification.permission !== "granted") {
+    if (Notification.permission !== NOTIFICATION_PERMISSION_GRANTED) {
       return {
         attempted: false,
         subscribed: false,
         repaired: false,
-        reason: "permission-not-granted"
+        reason: PushSubscriptionReconcileReasons["permission-not-granted"]
       };
     }
 
@@ -200,7 +228,7 @@ export class PushClientStateManager {
         attempted: false,
         subscribed: false,
         repaired: false,
-        reason: "server-disabled"
+        reason: PushSubscriptionReconcileReasons["server-disabled"]
       };
     }
 
@@ -218,7 +246,7 @@ export class PushClientStateManager {
     }
 
     const payload = this.strictSubscriptionPayload(browserSubscription);
-    const privateMode = input?.privateMode ?? status.privateModeDefault;
+    const privateMode = parsedInput.privateMode ?? status.privateModeDefault;
     await this.pushServerClient.savePushSubscription({
       subscription: payload,
       settings: {
@@ -230,15 +258,18 @@ export class PushClientStateManager {
       attempted: true,
       subscribed: true,
       repaired,
-      reason: repaired ? "subscription-restored" : "subscription-confirmed"
+      reason: repaired
+        ? PushSubscriptionReconcileReasons["subscription-restored"]
+        : PushSubscriptionReconcileReasons["subscription-confirmed"]
     };
   }
 
-  public async recoverPushNotifications(input: {
-    privateMode: boolean;
-  }): Promise<PushRecoveryResult> {
+  public async recoverPushNotifications(
+    input: PushNotificationPreferenceInput
+  ): Promise<PushRecoveryResult> {
+    const parsedInput = PushNotificationPreferenceInputSchema.parse(input);
     if (!this.isPushSupported()) {
-      throw new Error("Push notifications are not supported in this browser");
+      throw new Error(PUSH_NOT_SUPPORTED_ERROR_MESSAGE);
     }
 
     const registration = await this.registerPushServiceWorker();
@@ -257,7 +288,7 @@ export class PushClientStateManager {
       await this.clearServiceWorkerCaches();
       await this.registerPushServiceWorker();
       const enabled = await this.enablePushNotifications({
-        privateMode: input.privateMode
+        privateMode: parsedInput.privateMode
       });
       return {
         updatedServiceWorker,
@@ -285,7 +316,7 @@ export class PushClientStateManager {
   }
 
   private async registerPushServiceWorker(): Promise<ServiceWorkerRegistration> {
-    await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.register(PUSH_SERVICE_WORKER_PATH);
     return await navigator.serviceWorker.ready;
   }
 
@@ -296,8 +327,8 @@ export class PushClientStateManager {
     return PushSubscriptionSchema.parse({
       endpoint: raw.endpoint ?? subscription.endpoint,
       keys: {
-        p256dh: raw.keys?.["p256dh"] ?? "",
-        auth: raw.keys?.["auth"] ?? ""
+        p256dh: raw.keys?.[PUSH_SUBSCRIPTION_P256DH_KEY_NAME] ?? "",
+        auth: raw.keys?.[PUSH_SUBSCRIPTION_AUTH_KEY_NAME] ?? ""
       }
     });
   }
@@ -343,8 +374,10 @@ export class PushClientStateManager {
     if (!waitingWorker) {
       return false;
     }
-    const controllerChangePromise = this.waitForControllerChange(2_000);
-    waitingWorker.postMessage({ type: "SKIP_WAITING" });
+    const controllerChangePromise = this.waitForControllerChange(
+      CONTROLLER_CHANGE_WAIT_TIMEOUT_MILLISECONDS
+    );
+    waitingWorker.postMessage({ type: SERVICE_WORKER_SKIP_WAITING_MESSAGE_TYPE });
     await controllerChangePromise;
     return true;
   }

@@ -3,6 +3,7 @@ import { parseThreadStreamStateChangedBroadcast } from "@farfield/protocol";
 import {
   applyStrictPatchSequence,
   applyTrustedPatchSequence,
+  findLatestTurnParamsTemplate,
   reduceThreadStreamEvents,
   StrictPatchSequenceError,
   ThreadStreamReductionError
@@ -144,6 +145,7 @@ describe("live-state reducer", () => {
 
     expect(thread?.conversationState?.id).toBe("thread-2");
     expect(thread?.conversationState?.turns.length).toBe(0);
+    expect(thread?.ownerClientId).toBe("client-a");
   });
 
   it("throws reduction error with raw payload details when patch introduces invalid item type", () => {
@@ -314,6 +316,47 @@ describe("live-state reducer", () => {
     expect(capturedError.patchIndex).toBe(0);
   });
 
+  it("localizes final-state validation failures to the first invalid patch index", () => {
+    const sourceState = {
+      id: "thread-sequence-3",
+      turns: [
+        {
+          status: "completed",
+          items: []
+        }
+      ],
+      requests: []
+    };
+
+    let capturedError: StrictPatchSequenceError | null = null;
+    try {
+      applyStrictPatchSequence(sourceState, [
+        {
+          op: "replace",
+          path: ["turns", 0, "status"],
+          value: "completed"
+        },
+        {
+          op: "remove",
+          path: ["turns", 0, "items"]
+        }
+      ]);
+    } catch (error) {
+      if (error instanceof StrictPatchSequenceError) {
+        capturedError = error;
+      } else {
+        throw error;
+      }
+    }
+
+    expect(capturedError).toBeInstanceOf(StrictPatchSequenceError);
+    if (!capturedError) {
+      throw new Error("Expected StrictPatchSequenceError");
+    }
+    expect(capturedError.patchIndex).toBe(1);
+    expect(capturedError.message).toContain("produced invalid conversation state at index 1");
+  });
+
   it("applies trusted patch sequences for parsed stream patches", () => {
     const sourceState = {
       id: "thread-trusted-sequence-1",
@@ -366,6 +409,42 @@ describe("live-state reducer", () => {
     expect(patchedState.requests.length).toBe(1);
   });
 
+  it("supports append, remove, and index-shift patch application", () => {
+    const sourceState = {
+      id: "thread-trusted-sequence-3",
+      turns: [
+        {
+          status: "completed",
+          items: []
+        }
+      ],
+      requests: []
+    };
+
+    const patchedState = applyTrustedPatchSequence(sourceState, [
+      {
+        op: "add",
+        path: ["turns", "-"],
+        value: {
+          status: "completed",
+          items: []
+        }
+      },
+      {
+        op: "remove",
+        path: ["turns", 0]
+      },
+      {
+        op: "replace",
+        path: ["turns", 0, "status"],
+        value: "inProgress"
+      }
+    ]);
+
+    expect(patchedState.turns).toHaveLength(1);
+    expect(patchedState.turns[0]?.status).toBe("inProgress");
+  });
+
   it("reports trusted patch sequence errors when final state becomes invalid", () => {
     const sourceState = {
       id: "thread-trusted-sequence-2",
@@ -409,5 +488,45 @@ describe("live-state reducer", () => {
       throw new Error("Expected StrictPatchSequenceError");
     }
     expect(capturedError.patchIndex).toBe(0);
+  });
+
+  it("returns latest available turn params template", () => {
+    const template = findLatestTurnParamsTemplate({
+      id: "thread-template-1",
+      turns: [
+        {
+          status: "completed",
+          items: []
+        },
+        {
+          params: {
+            threadId: "thread-template-1",
+            input: [{ type: "text", text: "latest prompt" }],
+            attachments: []
+          },
+          status: "completed",
+          items: []
+        }
+      ],
+      requests: []
+    });
+
+    expect(template.threadId).toBe("thread-template-1");
+    expect(template.input[0]?.type).toBe("text");
+  });
+
+  it("throws when no turn contains params for template extraction", () => {
+    expect(() =>
+      findLatestTurnParamsTemplate({
+        id: "thread-template-2",
+        turns: [
+          {
+            status: "completed",
+            items: []
+          }
+        ],
+        requests: []
+      })
+    ).toThrowError("No turn params template found in conversation state");
   });
 });

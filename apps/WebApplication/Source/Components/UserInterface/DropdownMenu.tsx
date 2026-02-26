@@ -6,6 +6,26 @@ import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
 import { cn } from "@/Shared/Styling/ClassNameMerge"
 
+type DropdownMenuItemVariant = "default" | "destructive"
+
+const DROPDOWN_MENU_CONTENT_SIDE_OFFSET_PIXELS = 4
+const DROPDOWN_MENU_ITEM_DEFAULT_VARIANT: DropdownMenuItemVariant = "default"
+const DROPDOWN_MENU_COMPONENT_DISPLAY_NAME = "DropdownMenu"
+const DROPDOWN_MENU_PORTAL_COMPONENT_DISPLAY_NAME = "DropdownMenuPortal"
+const DROPDOWN_MENU_TRIGGER_COMPONENT_DISPLAY_NAME = "DropdownMenuTrigger"
+const DROPDOWN_MENU_CONTENT_COMPONENT_DISPLAY_NAME = "DropdownMenuContent"
+const DROPDOWN_MENU_GROUP_COMPONENT_DISPLAY_NAME = "DropdownMenuGroup"
+const DROPDOWN_MENU_LABEL_COMPONENT_DISPLAY_NAME = "DropdownMenuLabel"
+const DROPDOWN_MENU_ITEM_COMPONENT_DISPLAY_NAME = "DropdownMenuItem"
+const DROPDOWN_MENU_CHECKBOX_ITEM_COMPONENT_DISPLAY_NAME = "DropdownMenuCheckboxItem"
+const DROPDOWN_MENU_RADIO_GROUP_COMPONENT_DISPLAY_NAME = "DropdownMenuRadioGroup"
+const DROPDOWN_MENU_RADIO_ITEM_COMPONENT_DISPLAY_NAME = "DropdownMenuRadioItem"
+const DROPDOWN_MENU_SEPARATOR_COMPONENT_DISPLAY_NAME = "DropdownMenuSeparator"
+const DROPDOWN_MENU_SHORTCUT_COMPONENT_DISPLAY_NAME = "DropdownMenuShortcut"
+const DROPDOWN_MENU_SUB_COMPONENT_DISPLAY_NAME = "DropdownMenuSub"
+const DROPDOWN_MENU_SUB_TRIGGER_COMPONENT_DISPLAY_NAME = "DropdownMenuSubTrigger"
+const DROPDOWN_MENU_SUB_CONTENT_COMPONENT_DISPLAY_NAME = "DropdownMenuSubContent"
+
 function DropdownMenu({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
@@ -33,7 +53,7 @@ function DropdownMenuTrigger({
 
 function DropdownMenuContent({
   className,
-  sideOffset = 4,
+  sideOffset = DROPDOWN_MENU_CONTENT_SIDE_OFFSET_PIXELS,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   return (
@@ -62,11 +82,11 @@ function DropdownMenuGroup({
 function DropdownMenuItem({
   className,
   inset,
-  variant = "default",
+  variant = DROPDOWN_MENU_ITEM_DEFAULT_VARIANT,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Item> & {
   inset?: boolean
-  variant?: "default" | "destructive"
+  variant?: DropdownMenuItemVariant
 }) {
   return (
     <DropdownMenuPrimitive.Item
@@ -235,6 +255,22 @@ function DropdownMenuSubContent({
     />
   )
 }
+
+DropdownMenu.displayName = DROPDOWN_MENU_COMPONENT_DISPLAY_NAME
+DropdownMenuPortal.displayName = DROPDOWN_MENU_PORTAL_COMPONENT_DISPLAY_NAME
+DropdownMenuTrigger.displayName = DROPDOWN_MENU_TRIGGER_COMPONENT_DISPLAY_NAME
+DropdownMenuContent.displayName = DROPDOWN_MENU_CONTENT_COMPONENT_DISPLAY_NAME
+DropdownMenuGroup.displayName = DROPDOWN_MENU_GROUP_COMPONENT_DISPLAY_NAME
+DropdownMenuLabel.displayName = DROPDOWN_MENU_LABEL_COMPONENT_DISPLAY_NAME
+DropdownMenuItem.displayName = DROPDOWN_MENU_ITEM_COMPONENT_DISPLAY_NAME
+DropdownMenuCheckboxItem.displayName = DROPDOWN_MENU_CHECKBOX_ITEM_COMPONENT_DISPLAY_NAME
+DropdownMenuRadioGroup.displayName = DROPDOWN_MENU_RADIO_GROUP_COMPONENT_DISPLAY_NAME
+DropdownMenuRadioItem.displayName = DROPDOWN_MENU_RADIO_ITEM_COMPONENT_DISPLAY_NAME
+DropdownMenuSeparator.displayName = DROPDOWN_MENU_SEPARATOR_COMPONENT_DISPLAY_NAME
+DropdownMenuShortcut.displayName = DROPDOWN_MENU_SHORTCUT_COMPONENT_DISPLAY_NAME
+DropdownMenuSub.displayName = DROPDOWN_MENU_SUB_COMPONENT_DISPLAY_NAME
+DropdownMenuSubTrigger.displayName = DROPDOWN_MENU_SUB_TRIGGER_COMPONENT_DISPLAY_NAME
+DropdownMenuSubContent.displayName = DROPDOWN_MENU_SUB_CONTENT_COMPONENT_DISPLAY_NAME
 
 export {
   DropdownMenu,

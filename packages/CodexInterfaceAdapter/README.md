@@ -8,6 +8,12 @@ Typed client layer for the Codex app-server and desktop IPC.
 - Validate every untrusted payload with strict schemas.
 - Fail fast on protocol drift.
 
+## Contract Expectations
+
+- Parse transport payloads exactly once at ingress boundaries.
+- Reject contract mismatches immediately with explicit errors.
+- Keep internal code paths on strict, app-owned types after parse.
+
 ## Main Pieces
 
 - `AppServerClient`
@@ -27,10 +33,25 @@ Typed client layer for the Codex app-server and desktop IPC.
 
 ## Fail-Fast Rules
 
-- No fallback parsers.
+- No alternate parser paths.
 - No retry loops.
 - Unknown shapes throw immediately.
 - Invalid patch operations throw immediately.
+
+## Package Commands
+
+- `bun run build`
+  - Compile `Source` into `dist`.
+- `bun run typecheck`
+  - Type-check package sources.
+- `bun run lint`
+  - Lint `Source` and `Tests`.
+- `bun run test`
+  - Run test files under `Tests/**/*.test.ts` and `Tests/**/*.integration.test.ts`.
+- `bun run test:coverage`
+  - Emit coverage for `Source/**/*.ts`.
+- `bun run check`
+  - Run lint, typecheck, and tests in sequence.
 
 ## Example
 

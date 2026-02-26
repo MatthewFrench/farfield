@@ -62,6 +62,9 @@ export function useSelectedThreadLifecycleEffects(input: UseSelectedThreadLifecy
 
     void loadSelectedThreadFunction(input.selectedThreadId)
       .catch((error) => {
+        if (input.selectedThreadLoadTokenRef.current !== loadToken) {
+          return;
+        }
         if (error instanceof Error && isRequestCanceledError(error)) {
           return;
         }

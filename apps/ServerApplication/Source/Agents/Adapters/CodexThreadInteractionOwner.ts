@@ -23,6 +23,37 @@ import {
 } from "./CodexAgentAdapter.js";
 import type { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
 
+const MONITOR_PREVIEW_REQUEST_IDENTIFIER = "monitor-preview-request-id";
+
+function createPreviewRequestFrame(
+  method: string,
+  params: IpcRequestFrame["params"],
+  options: SendRequestOptions
+): IpcRequestFrame {
+  return {
+    type: "request",
+    requestId: MONITOR_PREVIEW_REQUEST_IDENTIFIER,
+    method,
+    params,
+    targetClientId: options.targetClientId,
+    version: options.version
+  };
+}
+
+function createPreviewBroadcastFrame(
+  method: string,
+  params: IpcRequestFrame["params"],
+  options: SendRequestOptions
+): IpcFrame {
+  return {
+    type: "broadcast",
+    method,
+    params,
+    targetClientId: options.targetClientId,
+    version: options.version
+  };
+}
+
 export interface CodexThreadInteractionOwnerOptions {
   service: CodexMonitorService;
   ipcClient: DesktopIpcClient;
@@ -127,14 +158,7 @@ export class CodexThreadInteractionOwner {
     options: SendRequestOptions = {}
   ): Promise<IpcResponseFrame["result"]> {
     this.ensureIpcReady();
-    const previewFrame: IpcFrame = {
-      type: "request",
-      requestId: "monitor-preview-request-id",
-      method,
-      params,
-      targetClientId: options.targetClientId,
-      version: options.version
-    };
+    const previewFrame = createPreviewRequestFrame(method, params, options);
     const previewFrameDescription = this.threadStreamStateOwner.describeFrame(previewFrame);
     this.emitIpcFrame({
       direction: "out",
@@ -153,21 +177,8 @@ export class CodexThreadInteractionOwner {
     options: SendRequestOptions = {}
   ): void {
     this.ensureIpcReady();
-    const previewFrame: IpcFrame = {
-      type: "broadcast",
-      method,
-      params,
-      targetClientId: options.targetClientId,
-      version: options.version
-    };
-    const previewRequestFrame: IpcFrame = {
-      type: "request",
-      requestId: "monitor-preview-request-id",
-      method,
-      params,
-      targetClientId: options.targetClientId,
-      version: options.version
-    };
+    const previewFrame = createPreviewBroadcastFrame(method, params, options);
+    const previewRequestFrame = createPreviewRequestFrame(method, params, options);
     const previewRequestDescription = this.threadStreamStateOwner.describeFrame(previewRequestFrame);
     this.emitIpcFrame({
       direction: "out",

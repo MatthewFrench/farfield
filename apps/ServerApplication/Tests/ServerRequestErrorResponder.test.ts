@@ -222,4 +222,25 @@ describe("ServerRequestErrorResponder", () => {
       }
     ]);
   });
+
+  it("does not write a second error payload when response headers were already sent", () => {
+    const harness = createHarness(() => false);
+    const { req, res } = createHttpPair("GET", "/api/threads");
+    res.writeHead(202);
+
+    harness.responder.respond({
+      req,
+      res,
+      error: new Error("request handler crashed"),
+      context: {
+        requestId: "request_4",
+        actionId: "action_4",
+        actionName: "stream-events"
+      }
+    });
+
+    expect(harness.jsonResponseCalls).toHaveLength(0);
+    expect(harness.runtimeLastErrors).toEqual(["request handler crashed"]);
+    expect(harness.broadcastCount).toBe(1);
+  });
 });

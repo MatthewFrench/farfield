@@ -17,13 +17,6 @@ const AGENT_FAVICON_BY_ID: Record<AgentId, string> = {
   opencode: buildAgentFaviconDataUrl("#F97316", "O")
 };
 
-function readAgentFaviconUrl(agentId: AgentId | null | undefined): string | null {
-  if (!agentId) {
-    return null;
-  }
-  return AGENT_FAVICON_BY_ID[agentId] ?? null;
-}
-
 export function AgentFavicon({
   agentId,
   label,
@@ -32,15 +25,10 @@ export function AgentFavicon({
   agentId: AgentId;
   label: string;
   className?: string;
-}): React.JSX.Element | null {
-  const faviconUrl = readAgentFaviconUrl(agentId);
-  if (!faviconUrl) {
-    return null;
-  }
-
+}): React.JSX.Element {
   return (
     <img
-      src={faviconUrl}
+      src={AGENT_FAVICON_BY_ID[agentId]}
       alt={label}
       title={label}
       className={className}

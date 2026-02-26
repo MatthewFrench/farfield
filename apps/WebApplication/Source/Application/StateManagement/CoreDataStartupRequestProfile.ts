@@ -6,6 +6,9 @@ export interface StartupRequestProfileEntry {
   description: string;
 }
 
+const STARTUP_REQUEST_PROFILE_DUPLICATE_ACTION_NAME_ERROR_PREFIX =
+  "Startup request profile contains duplicate action name: ";
+
 export const STARTUP_CRITICAL_EVENTS_SESSION_OPERATION = "startup-critical.events-session";
 export const STARTUP_CRITICAL_THREADS_OPERATION = "startup-critical.threads.active";
 export const STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION = "startup-deferred.threads.active.revalidate";
@@ -18,7 +21,11 @@ export const STARTUP_DEFERRED_DEFAULTS_OPERATION = "startup-deferred.capabilitie
 export const STARTUP_DEFERRED_DEBUG_HISTORY_OPERATION = "startup-deferred.debug.history";
 export const STARTUP_DEFERRED_DEBUG_ERRORS_OPERATION = "startup-deferred.debug.client-errors";
 
-export const STARTUP_REQUEST_PROFILE: StartupRequestProfileEntry[] = [
+/**
+ * Startup request ownership contract:
+ * each action name must be unique so metrics and observability labels remain deterministic.
+ */
+export const STARTUP_REQUEST_PROFILE: readonly StartupRequestProfileEntry[] = [
   {
     actionName: STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
     tier: "critical",
@@ -78,11 +85,26 @@ export const STARTUP_REQUEST_PROFILE: StartupRequestProfileEntry[] = [
 
 export const STARTUP_CRITICAL_REQUEST_BUDGET_MAXIMUM = 2;
 
+const STARTUP_ACTION_NAME_SET = new Set<string>();
+const STARTUP_REQUEST_DESCRIPTION_BY_ACTION_NAME = new Map<string, string>();
+
+for (const startupRequestProfileEntry of STARTUP_REQUEST_PROFILE) {
+  if (STARTUP_ACTION_NAME_SET.has(startupRequestProfileEntry.actionName)) {
+    throw new Error(
+      `${STARTUP_REQUEST_PROFILE_DUPLICATE_ACTION_NAME_ERROR_PREFIX}${startupRequestProfileEntry.actionName}`
+    );
+  }
+  STARTUP_ACTION_NAME_SET.add(startupRequestProfileEntry.actionName);
+  STARTUP_REQUEST_DESCRIPTION_BY_ACTION_NAME.set(
+    startupRequestProfileEntry.actionName,
+    startupRequestProfileEntry.description
+  );
+}
+
 export function isStartupActionName(actionName: string): boolean {
-  return STARTUP_REQUEST_PROFILE.some((entry) => entry.actionName === actionName);
+  return STARTUP_ACTION_NAME_SET.has(actionName);
 }
 
 export function readStartupRequestDescription(actionName: string): string {
-  const matchingProfileEntry = STARTUP_REQUEST_PROFILE.find((entry) => entry.actionName === actionName);
-  return matchingProfileEntry?.description ?? actionName;
+  return STARTUP_REQUEST_DESCRIPTION_BY_ACTION_NAME.get(actionName) ?? actionName;
 }

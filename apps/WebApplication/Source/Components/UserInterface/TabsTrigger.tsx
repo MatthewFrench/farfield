@@ -2,6 +2,8 @@ import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cn } from "@/Shared/Styling/ClassNameMerge";
 
+const TABS_TRIGGER_COMPONENT_DISPLAY_NAME = "TabsTrigger";
+
 export const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
@@ -17,4 +19,4 @@ export const TabsTrigger = React.forwardRef<
     />
   );
 });
-TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
+TabsTrigger.displayName = TABS_TRIGGER_COMPONENT_DISPLAY_NAME;

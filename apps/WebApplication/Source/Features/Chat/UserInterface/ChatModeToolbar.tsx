@@ -7,6 +7,19 @@ interface ModeOption {
   label: string;
 }
 
+const MODEL_PLACEHOLDER_TEXT = "Model";
+const EFFORT_PLACEHOLDER_TEXT = "Effort";
+const PLAN_LABEL_TEXT = "Plan";
+const EMPTY_MODE_KEY = "";
+
+function readSelectedOptionValue(value: string, appDefaultValue: string): string {
+  return value.length > 0 ? value : appDefaultValue;
+}
+
+function readModeSettingValue(nextValue: string, appDefaultValue: string): string {
+  return nextValue === appDefaultValue ? "" : nextValue;
+}
+
 export interface ChatModeToolbarProps {
   canSetCollaborationMode: boolean;
   canListCollaborationModes: boolean;
@@ -50,12 +63,19 @@ export function ChatModeToolbar({
   onModelChange,
   onReasoningEffortChange
 }: ChatModeToolbarProps): React.JSX.Element {
+  const shouldShowPlanModeControl = canSetCollaborationMode && canListCollaborationModes;
+  const shouldShowModelControl = canSetCollaborationMode && canListModels;
+  const shouldShowReasoningEffortControl = canSetCollaborationMode && canListCollaborationModes;
+  const isThreadSelected = selectedThreadId !== null;
+  const hasSelectedMode = selectedModeKey !== EMPTY_MODE_KEY;
+  const areModeSettingControlsDisabled = !isThreadSelected || !hasSelectedMode;
+
   return (
     <div
       data-testid="chat-mode-toolbar"
       className="flex items-center gap-1 min-w-0 overflow-x-auto overflow-y-hidden whitespace-nowrap"
     >
-      {canSetCollaborationMode && canListCollaborationModes && (
+      {shouldShowPlanModeControl && (
         <Button
           type="button"
           data-testid="chat-mode-toolbar-plan-button"
@@ -67,26 +87,26 @@ export function ChatModeToolbar({
               ? "bg-blue-500/15 text-blue-600 hover:bg-blue-500/20 dark:text-blue-300"
               : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
           }`}
-          disabled={!selectedThreadId || !hasPlanModeOption}
+          disabled={!isThreadSelected || !hasPlanModeOption}
         >
           {isPlanModeEnabled ? <CircleDot size={10} /> : <Circle size={10} />}
-          Plan
+          {PLAN_LABEL_TEXT}
         </Button>
       )}
-      {canSetCollaborationMode && canListModels && (
+      {shouldShowModelControl && (
         <Select
-          value={selectedModelId || appDefaultValue}
+          value={readSelectedOptionValue(selectedModelId, appDefaultValue)}
           onValueChange={(value) => {
-            const nextModelId = value === appDefaultValue ? "" : value;
+            const nextModelId = readModeSettingValue(value, appDefaultValue);
             onModelChange(nextModelId);
           }}
-          disabled={!selectedThreadId || !selectedModeKey}
+          disabled={areModeSettingControlsDisabled}
         >
           <SelectTrigger
             data-testid="chat-mode-toolbar-model-select"
             className="h-8 w-[132px] sm:w-[176px] shrink-0 rounded-full border-0 bg-transparent dark:bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:text-foreground focus-visible:ring-0"
           >
-            <SelectValue placeholder="Model" />
+            <SelectValue placeholder={MODEL_PLACEHOLDER_TEXT} />
           </SelectTrigger>
           <SelectContent position="popper">
             <SelectItem value={appDefaultValue}>{appDefaultModel}</SelectItem>
@@ -98,20 +118,20 @@ export function ChatModeToolbar({
           </SelectContent>
         </Select>
       )}
-      {canSetCollaborationMode && canListCollaborationModes && (
+      {shouldShowReasoningEffortControl && (
         <Select
-          value={selectedReasoningEffort || appDefaultValue}
+          value={readSelectedOptionValue(selectedReasoningEffort, appDefaultValue)}
           onValueChange={(value) => {
-            const nextReasoningEffort = value === appDefaultValue ? "" : value;
+            const nextReasoningEffort = readModeSettingValue(value, appDefaultValue);
             onReasoningEffortChange(nextReasoningEffort);
           }}
-          disabled={!selectedThreadId || !selectedModeKey}
+          disabled={areModeSettingControlsDisabled}
         >
           <SelectTrigger
             data-testid="chat-mode-toolbar-reasoning-effort-select"
             className="h-8 w-[104px] sm:w-[148px] shrink-0 rounded-full border-0 bg-transparent dark:bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:text-foreground focus-visible:ring-0"
           >
-            <SelectValue placeholder="Effort" />
+            <SelectValue placeholder={EFFORT_PLACEHOLDER_TEXT} />
           </SelectTrigger>
           <SelectContent position="popper">
             <SelectItem value={appDefaultValue}>{appDefaultReasoningEffort}</SelectItem>

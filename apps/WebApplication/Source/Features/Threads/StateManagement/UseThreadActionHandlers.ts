@@ -4,25 +4,24 @@ import {
   type MutableRefObject,
   type SetStateAction
 } from "react";
-import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
+import type { AgentId } from "@/Shared/Contracts/ApiContracts";
 import { type ThreadListItem } from "../DomainModel/ThreadGroupTypes";
 import { ThreadListStateController } from "./ThreadListStateController";
 import { PendingThreadMaterializationCoordinator } from "./PendingThreadMaterializationCoordinator";
 import {
   ThreadMutationActionCoordinator,
-  type ThreadMutationActionErrorReportInput
+  type ThreadMutationActionErrorReportInput,
+  type ThreadMutationActionRequestOptions,
+  type ThreadMutationOperationName
 } from "./ThreadMutationActionCoordinator";
 import { type ThreadMutationServerClient } from "../DataAccess/ThreadMutationServerClient";
-
-interface ActionRequestOptions {
-  actionId: string;
-  requestOptions: ApiRequestOptions;
-}
 
 export interface UseThreadActionHandlersInput {
   availableAgentIds: AgentId[];
   threads: ThreadListItem[];
-  buildActionRequestOptions: (actionName: string) => ActionRequestOptions;
+  buildActionRequestOptions: (
+    actionName: ThreadMutationOperationName
+  ) => ThreadMutationActionRequestOptions;
   setIsBusy: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string>>;
   setSelectedThreadId: Dispatch<SetStateAction<string | null>>;

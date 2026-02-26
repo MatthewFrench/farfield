@@ -113,7 +113,9 @@ const OpenCodeToolStateSchema = z
       .passthrough()
   ]);
 
-const OpenCodeTextPartSchema = z
+export type OpenCodeToolState = z.infer<typeof OpenCodeToolStateSchema>;
+
+export const OpenCodeTextPartSchema = z
   .object({
     id: z.string().min(1),
     type: z.literal("text"),
@@ -124,7 +126,7 @@ const OpenCodeTextPartSchema = z
   })
   .passthrough();
 
-const OpenCodeReasoningPartSchema = z
+export const OpenCodeReasoningPartSchema = z
   .object({
     id: z.string().min(1),
     type: z.literal("reasoning"),
@@ -133,7 +135,7 @@ const OpenCodeReasoningPartSchema = z
   })
   .passthrough();
 
-const OpenCodeToolPartSchema = z
+export const OpenCodeToolPartSchema = z
   .object({
     id: z.string().min(1),
     type: z.literal("tool"),
@@ -143,7 +145,7 @@ const OpenCodeToolPartSchema = z
   })
   .passthrough();
 
-const OpenCodeFilePartSchema = z
+export const OpenCodeFilePartSchema = z
   .object({
     id: z.string().min(1),
     type: z.literal("file"),
@@ -152,7 +154,7 @@ const OpenCodeFilePartSchema = z
   })
   .passthrough();
 
-const OpenCodeIgnoredPartSchema = z
+export const OpenCodeIgnoredPartSchema = z
   .object({
     id: z.string().min(1),
     type: z.enum([
@@ -177,6 +179,11 @@ export const OpenCodePartSchema = z.discriminatedUnion("type", [
   OpenCodeIgnoredPartSchema
 ]);
 
+export type OpenCodeTextPart = z.infer<typeof OpenCodeTextPartSchema>;
+export type OpenCodeReasoningPart = z.infer<typeof OpenCodeReasoningPartSchema>;
+export type OpenCodeToolPart = z.infer<typeof OpenCodeToolPartSchema>;
+export type OpenCodeFilePart = z.infer<typeof OpenCodeFilePartSchema>;
+export type OpenCodeIgnoredPart = z.infer<typeof OpenCodeIgnoredPartSchema>;
 export type OpenCodePart = z.infer<typeof OpenCodePartSchema>;
 
 const OpenCodeSessionMessageEntrySchema = z

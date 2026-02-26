@@ -66,6 +66,43 @@ describe("PushStatusButton", () => {
     expect(button.getAttribute("aria-label")).toBe("Notifications blocked by browser settings");
   });
 
+  it("treats denied permission as blocked even when a stale subscription exists", () => {
+    const onEnablePushNotifications = vi.fn();
+    renderPushStatusButton({
+      pushClientState: {
+        supported: true,
+        serviceWorkerRegistered: true,
+        permission: "denied",
+        subscribed: true
+      },
+      onEnablePushNotifications
+    });
+
+    const button = screen.getByTestId("enable-notifications-button");
+    fireEvent.click(button);
+
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("data-push-status")).toBe("blocked");
+    expect(onEnablePushNotifications).not.toHaveBeenCalled();
+  });
+
+  it("shows enabling state while push enable request is in progress", () => {
+    renderPushStatusButton({
+      pushClientState: {
+        supported: true,
+        serviceWorkerRegistered: true,
+        permission: "default",
+        subscribed: false
+      },
+      isEnablingPushNotifications: true
+    });
+
+    const button = screen.getByTestId("enable-notifications-button");
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("data-push-status")).toBe("enabling");
+    expect(button.getAttribute("aria-label")).toBe("Enabling notifications");
+  });
+
   it("invokes enable handler when button is enabled and clicked", () => {
     const onEnablePushNotifications = vi.fn();
     renderPushStatusButton({

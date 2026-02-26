@@ -1,10 +1,17 @@
 import { CreateDebugClientErrorBodySchema } from "@farfield/protocol";
 import { parseBody } from "../RequestSchemas/HttpSchemas.js";
 import {
+  DebugFileDownloadError,
+  DebugFileDownloadErrorCodeByName,
+  streamDebugFileDownload
+} from "./DebugFileDownload.js";
+import {
+  DebugRouteMethodByName,
+  DebugRoutePathnameByName,
+  DebugRouteSegmentByName,
   readFileNameFromPath,
   type DebugRouteDependencies
 } from "./DebugRouteContracts.js";
-import { streamDebugFileDownload } from "./DebugFileDownload.js";
 
 export class DebugClientErrorRouteOwner {
   private readonly dependencies: DebugRouteDependencies;
@@ -44,7 +51,7 @@ export class DebugClientErrorRouteOwner {
       res
     } = this.dependencies;
 
-    if (!(req.method === "POST" && pathname === "/api/debug/client-errors")) {
+    if (!(req.method === DebugRouteMethodByName.post && pathname === DebugRoutePathnameByName.clientErrors)) {
       return false;
     }
 
@@ -72,7 +79,7 @@ export class DebugClientErrorRouteOwner {
   private async handleClearClientErrorsRoute(): Promise<boolean> {
     const { req, pathname, clientErrorStore, jsonResponse, res } = this.dependencies;
 
-    if (!(req.method === "DELETE" && pathname === "/api/debug/client-errors")) {
+    if (!(req.method === DebugRouteMethodByName.delete && pathname === DebugRoutePathnameByName.clientErrors)) {
       return false;
     }
 
@@ -89,7 +96,7 @@ export class DebugClientErrorRouteOwner {
   private async handleListClientErrorsRoute(): Promise<boolean> {
     const { req, pathname, parseInteger, url, clientErrorStore, jsonResponse, res } = this.dependencies;
 
-    if (!(req.method === "GET" && pathname === "/api/debug/client-errors")) {
+    if (!(req.method === DebugRouteMethodByName.get && pathname === DebugRoutePathnameByName.clientErrors)) {
       return false;
     }
 
@@ -107,7 +114,7 @@ export class DebugClientErrorRouteOwner {
   private async handleSessionLogDownloadRoute(): Promise<boolean> {
     const { req, pathname, clientErrorStore, jsonResponse, res, toErrorMessage } = this.dependencies;
 
-    if (!(req.method === "GET" && pathname === "/api/debug/client-errors/session-log")) {
+    if (!(req.method === DebugRouteMethodByName.get && pathname === DebugRoutePathnameByName.clientErrorSessionLog)) {
       return false;
     }
 
@@ -117,13 +124,20 @@ export class DebugClientErrorRouteOwner {
       await streamDebugFileDownload(res, filePath, fileName);
       return true;
     } catch (error) {
-      if (toErrorMessage(error).includes("ENOENT")) {
+      if (
+        error instanceof DebugFileDownloadError
+        && (
+          error.code === DebugFileDownloadErrorCodeByName.notFound
+          || error.code === DebugFileDownloadErrorCodeByName.notFile
+        )
+      ) {
         jsonResponse(res, 404, {
           ok: false,
           error: "Client error session log not found"
         });
         return true;
       }
+
       jsonResponse(res, 500, {
         ok: false,
         error: toErrorMessage(error)
@@ -136,12 +150,12 @@ export class DebugClientErrorRouteOwner {
     const { req, segments, clientErrorStore, jsonResponse, res } = this.dependencies;
 
     const clientErrorIdSegment = segments[3];
-    if (
-      !(req.method === "GET"
-      && segments[2] === "client-errors"
+    const isReadClientErrorByIdentifierRequest =
+      req.method === DebugRouteMethodByName.get
+      && segments[2] === DebugRouteSegmentByName.clientErrors
       && segments.length === 4
-      && typeof clientErrorIdSegment === "string")
-    ) {
+      && typeof clientErrorIdSegment === "string";
+    if (!isReadClientErrorByIdentifierRequest) {
       return false;
     }
 

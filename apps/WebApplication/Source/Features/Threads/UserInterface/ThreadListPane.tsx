@@ -13,6 +13,11 @@ export type {
   ThreadListPaneProperties
 } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 
+const THREAD_SEARCH_CLEAR_BUTTON_LABEL = "Clear thread search";
+const THREAD_SEARCH_SUMMARY_EMPTY_MESSAGE = "No matching threads";
+const THREAD_SEARCH_SUMMARY_SINGLE_MATCH_SUFFIX = "matching thread";
+const THREAD_SEARCH_SUMMARY_MULTIPLE_MATCH_SUFFIX = "matching threads";
+
 export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.Element {
   const [threadSearchQuery, setThreadSearchQuery] = useState("");
 
@@ -21,16 +26,12 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
     [threadSearchQuery]
   );
 
-  const readAgentLabel = (agentId: ThreadListPaneProperties["availableAgentIds"][number]): string => {
-    return properties.agentsById[agentId]?.label ?? agentId;
-  };
-
   const filteredActiveProjectGroups = useMemo(
     () =>
       ThreadListSearchFilter.filterProjectGroups({
         projectGroups: properties.activeProjectGroups,
         query: normalizedSearchQuery,
-        readAgentLabel: (thread) => readAgentLabel(thread.agentId)
+        readAgentLabel: (thread) => properties.agentsById[thread.agentId]?.label ?? thread.agentId
       }),
     [normalizedSearchQuery, properties.activeProjectGroups, properties.agentsById]
   );
@@ -40,17 +41,13 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
       ThreadListSearchFilter.filterProjectGroups({
         projectGroups: properties.archivedProjectGroups,
         query: normalizedSearchQuery,
-        readAgentLabel: (thread) => readAgentLabel(thread.agentId)
+        readAgentLabel: (thread) => properties.agentsById[thread.agentId]?.label ?? thread.agentId
       }),
     [normalizedSearchQuery, properties.archivedProjectGroups, properties.agentsById]
   );
 
   const filteredActiveThreads = useMemo<ThreadListPaneProperties["threads"]>(() => {
-    const mappedThreads: ThreadListPaneProperties["threads"] = [];
-    for (const projectGroup of filteredActiveProjectGroups) {
-      mappedThreads.push(...projectGroup.threads);
-    }
-    return mappedThreads;
+    return flattenProjectGroupThreads(filteredActiveProjectGroups);
   }, [filteredActiveProjectGroups]);
 
   const filteredArchivedThreadCount = useMemo(
@@ -108,8 +105,8 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
                   setThreadSearchQuery("");
                 }}
                 data-testid="thread-list-search-clear"
-                aria-label="Clear thread search"
-                title="Clear thread search"
+                aria-label={THREAD_SEARCH_CLEAR_BUTTON_LABEL}
+                title={THREAD_SEARCH_CLEAR_BUTTON_LABEL}
               >
                 <X size={12} aria-hidden="true" />
               </Button>
@@ -122,9 +119,7 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
                 hasFilteredMatches ? "text-muted-foreground/80" : "text-muted-foreground/65"
               }`}
             >
-              {hasFilteredMatches
-                ? `${String(filteredMatchCount)} matching threads`
-                : "No matching threads"}
+              {buildSearchSummary(filteredMatchCount)}
             </div>
           )}
         </div>
@@ -135,4 +130,24 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
       </div>
     </div>
   );
+}
+
+function flattenProjectGroupThreads(
+  projectGroups: ThreadListPaneProperties["activeProjectGroups"]
+): ThreadListPaneProperties["threads"] {
+  const mappedThreads: ThreadListPaneProperties["threads"] = [];
+  for (const projectGroup of projectGroups) {
+    mappedThreads.push(...projectGroup.threads);
+  }
+  return mappedThreads;
+}
+
+function buildSearchSummary(matchCount: number): string {
+  if (matchCount === 0) {
+    return THREAD_SEARCH_SUMMARY_EMPTY_MESSAGE;
+  }
+  if (matchCount === 1) {
+    return `1 ${THREAD_SEARCH_SUMMARY_SINGLE_MATCH_SUFFIX}`;
+  }
+  return `${String(matchCount)} ${THREAD_SEARCH_SUMMARY_MULTIPLE_MATCH_SUFFIX}`;
 }

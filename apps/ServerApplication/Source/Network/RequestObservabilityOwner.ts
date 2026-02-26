@@ -1,3 +1,11 @@
+import {
+  REQUEST_PATH_SEGMENT_SEPARATOR,
+  RequestPathSegmentByName,
+  RequestPathnameByName,
+  normalizePathnameForRequestMetrics,
+  readPathSegmentsFromPathname
+} from "./RequestPathContracts.js";
+
 interface PercentileSample {
   values: number[];
   percentile: number;
@@ -18,7 +26,21 @@ function readPercentile(sample: PercentileSample): number {
   return sortedValues[percentileIndex] ?? 0;
 }
 
-const STARTUP_ACTION_DESCRIPTION_BY_NAME: Record<string, string> = {
+const STARTUP_ACTION_NAME_PREFIX = "startup-";
+const LONG_IDENTIFIER_SEGMENT_THRESHOLD = 28;
+const HEXADECIMAL_IDENTIFIER_SEGMENT_PATTERN = /^[0-9a-f]{16,}$/i;
+const ERROR_STATUS_CODE_MINIMUM = 400;
+const ROUTE_KEY_SEPARATOR = " ";
+
+const METRICS_ROUTE_PLACEHOLDER_BY_NAME = {
+  threadIdentifier: ":threadId",
+  historyEntryIdentifier: ":historyEntryId",
+  clientErrorIdentifier: ":clientErrorId",
+  traceIdentifier: ":traceId",
+  genericIdentifier: ":id"
+} as const;
+
+const STARTUP_ACTION_DESCRIPTION_BY_NAME: Readonly<Record<string, string>> = {
   "startup-critical.events-session": "Bootstrap API session/auth gate",
   "startup-critical.threads.active": "Load active thread list for sidebar",
   "startup-deferred.health": "Load runtime health snapshot",
@@ -31,6 +53,112 @@ const STARTUP_ACTION_DESCRIPTION_BY_NAME: Record<string, string> = {
   "startup-deferred.debug.client-errors": "Load debug client error list",
   "startup-deferred.threads.active.revalidate": "Revalidate active thread list from network"
 };
+
+/**
+ * Route classification mirrors dynamic segments owned by Network route owners so
+ * static paths (for example `session-log`) cannot collapse into identifier aggregates.
+ */
+interface MetricsRouteClassification {
+  replacementBySegmentIndex: Readonly<Record<number, string>>;
+}
+
+const THREAD_MEMBER_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
+  replacementBySegmentIndex: {
+    2: METRICS_ROUTE_PLACEHOLDER_BY_NAME.threadIdentifier
+  }
+};
+
+const DEBUG_HISTORY_ENTRY_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
+  replacementBySegmentIndex: {
+    3: METRICS_ROUTE_PLACEHOLDER_BY_NAME.historyEntryIdentifier
+  }
+};
+
+const DEBUG_CLIENT_ERROR_ENTRY_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
+  replacementBySegmentIndex: {
+    3: METRICS_ROUTE_PLACEHOLDER_BY_NAME.clientErrorIdentifier
+  }
+};
+
+const DEBUG_TRACE_DOWNLOAD_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
+  replacementBySegmentIndex: {
+    3: METRICS_ROUTE_PLACEHOLDER_BY_NAME.traceIdentifier
+  }
+};
+
+function classifyMetricsRoutePathname(pathSegments: readonly string[]): MetricsRouteClassification | null {
+  if (isThreadMemberRoutePath(pathSegments)) {
+    return THREAD_MEMBER_ROUTE_CLASSIFICATION;
+  }
+
+  if (isDebugHistoryEntryRoutePath(pathSegments)) {
+    return DEBUG_HISTORY_ENTRY_ROUTE_CLASSIFICATION;
+  }
+
+  if (isDebugClientErrorEntryRoutePath(pathSegments)) {
+    return DEBUG_CLIENT_ERROR_ENTRY_ROUTE_CLASSIFICATION;
+  }
+
+  if (isDebugTraceDownloadRoutePath(pathSegments)) {
+    return DEBUG_TRACE_DOWNLOAD_ROUTE_CLASSIFICATION;
+  }
+
+  return null;
+}
+
+function isThreadMemberRoutePath(pathSegments: readonly string[]): boolean {
+  return (
+    pathSegments.length >= 3
+    && pathSegments[0] === RequestPathSegmentByName.api
+    && pathSegments[1] === RequestPathSegmentByName.threads
+  );
+}
+
+function isDebugHistoryEntryRoutePath(pathSegments: readonly string[]): boolean {
+  return (
+    pathSegments.length === 4
+    && pathSegments[0] === RequestPathSegmentByName.api
+    && pathSegments[1] === RequestPathSegmentByName.debug
+    && pathSegments[2] === RequestPathSegmentByName.history
+  );
+}
+
+function isDebugClientErrorEntryRoutePath(pathSegments: readonly string[]): boolean {
+  return (
+    pathSegments.length === 4
+    && pathSegments[0] === RequestPathSegmentByName.api
+    && pathSegments[1] === RequestPathSegmentByName.debug
+    && pathSegments[2] === RequestPathSegmentByName.clientErrors
+    && pathSegments[3] !== RequestPathSegmentByName.sessionLog
+  );
+}
+
+function isDebugTraceDownloadRoutePath(pathSegments: readonly string[]): boolean {
+  return (
+    pathSegments.length === 5
+    && pathSegments[0] === RequestPathSegmentByName.api
+    && pathSegments[1] === RequestPathSegmentByName.debug
+    && pathSegments[2] === RequestPathSegmentByName.trace
+    && pathSegments[4] === RequestPathSegmentByName.download
+  );
+}
+
+function readClassifiedPathSegmentReplacement(
+  routeClassification: MetricsRouteClassification | null,
+  pathSegmentIndex: number
+): string | null {
+  if (routeClassification === null) {
+    return null;
+  }
+  return routeClassification.replacementBySegmentIndex[pathSegmentIndex] ?? null;
+}
+
+function isGenericIdentifierPathSegment(pathSegment: string): boolean {
+  if (HEXADECIMAL_IDENTIFIER_SEGMENT_PATTERN.test(pathSegment)) {
+    return true;
+  }
+  return pathSegment.length >= LONG_IDENTIFIER_SEGMENT_THRESHOLD;
+}
 
 export interface RouteTimingObservation {
   requestId: string;
@@ -135,6 +263,7 @@ export class RequestObservabilityOwner {
   private readonly maxSamplesPerRoute: number;
   private readonly maxStartupRequestEntries: number;
   private readonly maxRequestLifecycleEntries: number;
+  private readonly maxRouteTimingEntries: number;
   private readonly routeTimingAccumulatorsByKey: Map<string, RouteTimingAccumulator>;
   private readonly startupRequestObservations: StartupRequestTimingSummary[];
   private readonly requestLifecycleEvents: RequestLifecycleEvent[];
@@ -145,7 +274,8 @@ export class RequestObservabilityOwner {
   public constructor(
     maxSamplesPerRoute = 240,
     maxStartupRequestEntries = 200,
-    maxRequestLifecycleEntries = 2_000
+    maxRequestLifecycleEntries = 2_000,
+    maxRouteTimingEntries = 400
   ) {
     if (!Number.isInteger(maxSamplesPerRoute) || maxSamplesPerRoute <= 0) {
       throw new Error("RequestObservabilityOwner requires positive integer maxSamplesPerRoute");
@@ -156,10 +286,14 @@ export class RequestObservabilityOwner {
     if (!Number.isInteger(maxRequestLifecycleEntries) || maxRequestLifecycleEntries <= 0) {
       throw new Error("RequestObservabilityOwner requires positive integer maxRequestLifecycleEntries");
     }
+    if (!Number.isInteger(maxRouteTimingEntries) || maxRouteTimingEntries <= 0) {
+      throw new Error("RequestObservabilityOwner requires positive integer maxRouteTimingEntries");
+    }
 
     this.maxSamplesPerRoute = maxSamplesPerRoute;
     this.maxStartupRequestEntries = maxStartupRequestEntries;
     this.maxRequestLifecycleEntries = maxRequestLifecycleEntries;
+    this.maxRouteTimingEntries = maxRouteTimingEntries;
     this.routeTimingAccumulatorsByKey = new Map<string, RouteTimingAccumulator>();
     this.startupRequestObservations = [];
     this.requestLifecycleEvents = [];
@@ -171,13 +305,15 @@ export class RequestObservabilityOwner {
   public recordRequestStarted(observation: RequestStartedLifecycleObservation): void {
     this.totalRequestCount += 1;
     this.inFlightRequestCount += 1;
+    const normalizedMethod = observation.method.toUpperCase();
+    const normalizedPathname = normalizePathnameForRequestMetrics(observation.pathname);
     this.pushRequestLifecycleEvent({
       phase: "started",
       requestId: observation.requestId,
       actionId: observation.actionId,
       actionName: observation.actionName,
-      method: observation.method.toUpperCase(),
-      pathname: observation.pathname,
+      method: normalizedMethod,
+      pathname: normalizedPathname,
       startedAt: observation.startedAt,
       queueDelayMs: observation.queueDelayMs
     });
@@ -186,10 +322,12 @@ export class RequestObservabilityOwner {
   public recordRequestCompleted(observation: RouteTimingObservation): void {
     this.inFlightRequestCount = Math.max(0, this.inFlightRequestCount - 1);
 
-    const normalizedRoute = this.normalizeRoutePathname(observation.pathname);
-    const routeKey = `${observation.method.toUpperCase()} ${normalizedRoute}`;
+    const normalizedMethod = observation.method.toUpperCase();
+    const normalizedPathname = normalizePathnameForRequestMetrics(observation.pathname);
+    const normalizedRoute = this.normalizeRoutePathname(normalizedPathname);
+    const routeKey = `${normalizedMethod}${ROUTE_KEY_SEPARATOR}${normalizedRoute}`;
     const routeAccumulator = this.routeTimingAccumulatorsByKey.get(routeKey) ?? {
-      method: observation.method.toUpperCase(),
+      method: normalizedMethod,
       route: normalizedRoute,
       durationSamplesMs: [],
       queueDelaySamplesMs: [],
@@ -211,28 +349,28 @@ export class RequestObservabilityOwner {
       routeAccumulator.queueDelaySamplesMs.shift();
     }
 
-    if (observation.statusCode >= 400) {
+    if (observation.statusCode >= ERROR_STATUS_CODE_MINIMUM) {
       routeAccumulator.errorCount += 1;
       this.totalErrorCount += 1;
     }
 
-    this.routeTimingAccumulatorsByKey.set(routeKey, routeAccumulator);
+    this.writeRouteTimingAccumulator(routeKey, routeAccumulator);
     this.pushRequestLifecycleEvent({
       phase: "completed",
       requestId: observation.requestId,
       actionId: observation.actionId,
       actionName: observation.actionName,
-      method: observation.method.toUpperCase(),
-      pathname: observation.pathname,
+      method: normalizedMethod,
+      pathname: normalizedPathname,
       startedAt: observation.startedAt,
       statusCode: observation.statusCode,
       durationMs: observation.durationMs,
       queueDelayMs: observation.queueDelayMs,
       completedAt: observation.completedAt,
-      outcome: observation.statusCode >= 400 ? "error" : "success"
+      outcome: observation.statusCode >= ERROR_STATUS_CODE_MINIMUM ? "error" : "success"
     });
 
-    if (!observation.actionName || !observation.actionName.startsWith("startup-")) {
+    if (!observation.actionName || !observation.actionName.startsWith(STARTUP_ACTION_NAME_PREFIX)) {
       return;
     }
 
@@ -242,8 +380,8 @@ export class RequestObservabilityOwner {
       actionName: observation.actionName,
       description: STARTUP_ACTION_DESCRIPTION_BY_NAME[observation.actionName]
         ?? observation.actionName,
-      method: observation.method.toUpperCase(),
-      pathname: observation.pathname,
+      method: normalizedMethod,
+      pathname: normalizedPathname,
       statusCode: observation.statusCode,
       durationMs: observation.durationMs,
       queueDelayMs: observation.queueDelayMs,
@@ -297,33 +435,47 @@ export class RequestObservabilityOwner {
     }
   }
 
+  /**
+   * Treats the map as an insertion-ordered least-recently-used queue so route aggregates stay bounded
+   * even under high-cardinality traffic. Existing keys are refreshed to the end on every write.
+   */
+  private writeRouteTimingAccumulator(routeKey: string, routeAccumulator: RouteTimingAccumulator): void {
+    if (this.routeTimingAccumulatorsByKey.has(routeKey)) {
+      this.routeTimingAccumulatorsByKey.delete(routeKey);
+    }
+    this.routeTimingAccumulatorsByKey.set(routeKey, routeAccumulator);
+
+    while (this.routeTimingAccumulatorsByKey.size > this.maxRouteTimingEntries) {
+      const oldestRouteKey = this.routeTimingAccumulatorsByKey.keys().next().value;
+      if (oldestRouteKey === undefined) {
+        return;
+      }
+      this.routeTimingAccumulatorsByKey.delete(oldestRouteKey);
+    }
+  }
+
   private normalizeRoutePathname(pathname: string): string {
-    const trimmed = pathname.trim();
-    if (trimmed.length === 0 || trimmed === "/") {
-      return "/";
+    const pathSegments = readPathSegmentsFromPathname(pathname);
+    if (pathSegments.length === 0) {
+      return RequestPathnameByName.root;
     }
 
-    const segments = trimmed.split("/").filter((segment) => segment.length > 0);
-    const normalizedSegments = segments.map((segment, index) => {
-      const previousSegment = segments[index - 1] ?? "";
-      if (previousSegment === "threads") {
-        return ":threadId";
+    const routeClassification = classifyMetricsRoutePathname(pathSegments);
+    const normalizedSegments = pathSegments.map((pathSegment, pathSegmentIndex) => {
+      const classifiedReplacement = readClassifiedPathSegmentReplacement(
+        routeClassification,
+        pathSegmentIndex
+      );
+      if (classifiedReplacement !== null) {
+        return classifiedReplacement;
       }
-      if (previousSegment === "history") {
-        return ":historyEntryId";
+
+      if (isGenericIdentifierPathSegment(pathSegment)) {
+        return METRICS_ROUTE_PLACEHOLDER_BY_NAME.genericIdentifier;
       }
-      if (previousSegment === "client-errors") {
-        return ":clientErrorId";
-      }
-      if (/^[0-9a-f]{16,}$/i.test(segment)) {
-        return ":id";
-      }
-      if (segment.length >= 28) {
-        return ":id";
-      }
-      return segment;
+      return pathSegment;
     });
 
-    return `/${normalizedSegments.join("/")}`;
+    return `${RequestPathnameByName.root}${normalizedSegments.join(REQUEST_PATH_SEGMENT_SEPARATOR)}`;
   }
 }

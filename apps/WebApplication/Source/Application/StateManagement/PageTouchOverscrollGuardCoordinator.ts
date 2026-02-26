@@ -1,3 +1,8 @@
+const COARSE_POINTER_MEDIA_QUERY = "(pointer: coarse)";
+const SCROLLABLE_OVERFLOW_VALUES = new Set(["auto", "scroll", "overlay"]);
+// Treat sub-pixel layout differences as being at the edge to avoid accidental overscroll.
+const SCROLL_EDGE_EPSILON_PX = 1;
+
 export class PageTouchOverscrollGuardCoordinator {
   private touchStartX: number;
   private touchStartY: number;
@@ -10,7 +15,7 @@ export class PageTouchOverscrollGuardCoordinator {
   }
 
   public install(applicationShellElement: HTMLElement): () => void {
-    if (!window.matchMedia("(pointer: coarse)").matches) {
+    if (!window.matchMedia(COARSE_POINTER_MEDIA_QUERY).matches) {
       return () => {};
     }
 
@@ -44,7 +49,7 @@ export class PageTouchOverscrollGuardCoordinator {
       const atTop = this.scrollElement.scrollTop <= 0;
       const atBottom = (
         this.scrollElement.scrollTop + this.scrollElement.clientHeight
-        >= this.scrollElement.scrollHeight - 1
+        >= this.scrollElement.scrollHeight - SCROLL_EDGE_EPSILON_PX
       );
       const movingDown = deltaY > 0;
       const movingUp = deltaY < 0;
@@ -93,10 +98,10 @@ export class PageTouchOverscrollGuardCoordinator {
 
   private canElementScrollVertically(element: HTMLElement): boolean {
     const overflowY = window.getComputedStyle(element).overflowY;
-    if (overflowY !== "auto" && overflowY !== "scroll" && overflowY !== "overlay") {
+    if (!SCROLLABLE_OVERFLOW_VALUES.has(overflowY)) {
       return false;
     }
 
-    return element.scrollHeight > element.clientHeight + 1;
+    return element.scrollHeight > element.clientHeight + SCROLL_EDGE_EPSILON_PX;
   }
 }

@@ -1,50 +1,50 @@
 import { useState } from "react";
-import { type IpcFrame } from "@farfield/protocol";
+import { FileChangeEntrySchema, type IpcFrame } from "@farfield/protocol";
 import { ChevronRight } from "lucide-react";
 import { z } from "zod";
 import { DiffBlock } from "@/Components/DiffBlock";
 import { Button } from "@/Components/UserInterface/Button";
 
-const StreamEventChangeSchema = z
-  .object({
-    path: z.string().trim().min(1),
-    kind: z
-      .object({
-        type: z.string().trim().min(1),
-        move_path: z.string().nullable().optional()
-      })
-      .strict(),
-    diff: z.string().optional()
-  })
-  .strict();
+const REQUEST_EVENT_TYPE = "request";
+const BROADCAST_EVENT_TYPE = "broadcast";
+const RESPONSE_EVENT_TYPE = "response";
+const EVENT_BODY_JSON_INDENT_SPACES = 2;
 
 const StreamEventDiffParametersSchema = z
   .object({
-    changes: z.array(StreamEventChangeSchema)
+    changes: z.array(FileChangeEntrySchema)
   })
   .strict();
 
-type StreamEventChange = z.infer<typeof StreamEventChangeSchema>;
+type StreamEventChange = z.infer<typeof FileChangeEntrySchema>;
+
+export interface StreamEventCardProps {
+  event: IpcFrame;
+}
 
 function readEventLabel(event: IpcFrame): string {
-  if (event.type === "request" || event.type === "broadcast") {
+  if (event.type === REQUEST_EVENT_TYPE || event.type === BROADCAST_EVENT_TYPE) {
     return event.method;
   }
-  if (event.type === "response" && event.method) {
+  if (event.type === RESPONSE_EVENT_TYPE && event.method) {
     return event.method;
   }
   return event.type;
 }
 
 function readDiffChanges(event: IpcFrame): StreamEventChange[] | null {
-  if (event.type !== "request" && event.type !== "broadcast") {
+  if (event.type !== REQUEST_EVENT_TYPE && event.type !== BROADCAST_EVENT_TYPE) {
     return null;
   }
   const parsed = StreamEventDiffParametersSchema.safeParse(event.params);
   return parsed.success ? parsed.data.changes : null;
 }
 
-export function StreamEventCard({ event }: { event: IpcFrame }): React.JSX.Element {
+function readEventBodyText(event: IpcFrame): string {
+  return JSON.stringify(event, null, EVENT_BODY_JSON_INDENT_SPACES);
+}
+
+export function StreamEventCard({ event }: StreamEventCardProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const label = readEventLabel(event);
   const changes = readDiffChanges(event);
@@ -70,7 +70,7 @@ export function StreamEventCard({ event }: { event: IpcFrame }): React.JSX.Eleme
             <DiffBlock changes={changes} />
           ) : (
             <pre className="font-mono text-[11px] text-muted-foreground/80 whitespace-pre-wrap break-words">
-              {JSON.stringify(event, null, 2)}
+              {readEventBodyText(event)}
             </pre>
           )}
         </div>

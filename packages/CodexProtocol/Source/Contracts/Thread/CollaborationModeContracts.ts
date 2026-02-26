@@ -8,15 +8,16 @@ export const CollaborationModeSettingsSchema = z
   .object({
     model: NullableStringSchema.optional(),
     reasoning_effort: NullableStringSchema.optional(),
-    developer_instructions: z.union([z.string(), z.null()]).optional()
+    developer_instructions: NullableStringSchema.optional()
   })
-  .passthrough();
+  .strict();
 
 export const CollaborationModeSchema = z
   .object({
     mode: NonEmptyStringSchema,
     settings: CollaborationModeSettingsSchema
   })
-  .passthrough();
+  .strict();
 
+export type CollaborationModeSettings = z.infer<typeof CollaborationModeSettingsSchema>;
 export type CollaborationMode = z.infer<typeof CollaborationModeSchema>;

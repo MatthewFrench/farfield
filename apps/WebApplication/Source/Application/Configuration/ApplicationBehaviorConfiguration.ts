@@ -1,5 +1,7 @@
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 
+const DEFAULT_THREAD_LIST_MAXIMUM_PAGES = 20;
+
 export const DEFAULT_EFFORT_OPTIONS = ["minimal", "low", "medium", "high", "xhigh"] as const;
 export const INITIAL_VISIBLE_CHAT_ITEMS = 90;
 export const VISIBLE_CHAT_ITEMS_STEP = 80;
@@ -17,8 +19,8 @@ export const ASSUMED_APP_DEFAULT_REASONING_EFFORT = "medium";
 export const DEBUG_HISTORY_LIMIT = 120;
 export const DEBUG_ERROR_LIST_LIMIT = 240;
 export const THREAD_LIST_LIMIT = 80;
-export const THREAD_LIST_MAX_PAGES = 20;
-export const ARCHIVED_THREAD_LIST_MAX_PAGES = 20;
+export const THREAD_LIST_MAX_PAGES = DEFAULT_THREAD_LIST_MAXIMUM_PAGES;
+export const ARCHIVED_THREAD_LIST_MAX_PAGES = DEFAULT_THREAD_LIST_MAXIMUM_PAGES;
 export const THREAD_QUERY_CACHE_TIME_TO_LIVE_MS = 1_500;
 export const THREAD_QUERY_CACHE_MAXIMUM_ENTRIES = 16;
 export const EVENT_REFRESH_SCHEDULE_DELAY_MS = 200;

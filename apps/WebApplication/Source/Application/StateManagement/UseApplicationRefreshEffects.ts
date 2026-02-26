@@ -9,6 +9,17 @@ import { DebugIssueStateResolver } from "@/Features/Debugging/DomainModel/DebugI
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import type { DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 
+const DEBUG_APPLICATION_TAB = "debug";
+const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
+
+function readNextWatchdogDelayMilliseconds(
+  eventsConnected: boolean,
+  connectedMinimumIntervalMilliseconds: number,
+  disconnectedIntervalMilliseconds: number
+): number {
+  return eventsConnected ? connectedMinimumIntervalMilliseconds : disconnectedIntervalMilliseconds;
+}
+
 export interface UseApplicationRefreshEffectsInput {
   selectedThreadId: string | null;
   activeTab: "chat" | "debug";
@@ -70,7 +81,7 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   }, [input.activeTab, input.activeTabRef]);
 
   useEffect(() => {
-    if (input.activeTab !== "debug") {
+    if (input.activeTab !== DEBUG_APPLICATION_TAB) {
       return;
     }
 
@@ -134,19 +145,23 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   }, [input.handleRuntimeRequestError, input.refreshCoreDataAndSelectedThread]);
 
   useEffect(() => {
-    void input.refreshPushClientState();
-  }, [input.refreshPushClientState]);
+    void input.refreshPushClientState().catch((error) => {
+      input.handleRuntimeRequestError(error);
+    });
+  }, [input.handleRuntimeRequestError, input.refreshPushClientState]);
 
   useEffect(() => {
     if (!input.isArchivedThreadsOpen) {
       return;
     }
-    void input.loadArchivedThreads();
-  }, [input.isArchivedThreadsOpen, input.loadArchivedThreads]);
+    void input.loadArchivedThreads().catch((error) => {
+      input.handleRuntimeRequestError(error);
+    });
+  }, [input.handleRuntimeRequestError, input.isArchivedThreadsOpen, input.loadArchivedThreads]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
-      if (document.visibilityState !== "visible") {
+      if (document.visibilityState !== DOCUMENT_VISIBILITY_STATE_VISIBLE) {
         return;
       }
       void input.loadCoreDataTracked().catch((error) => input.handleRuntimeRequestError(error));
@@ -193,16 +208,20 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
         return;
       }
       scheduleNextWatchdog(
-        input.eventsConnectedRef.current
-          ? input.coreRefreshConnectedMinIntervalMs
-          : input.coreRefreshIntervalMs
+        readNextWatchdogDelayMilliseconds(
+          input.eventsConnectedRef.current,
+          input.coreRefreshConnectedMinIntervalMs,
+          input.coreRefreshIntervalMs
+        )
       );
     };
 
     scheduleNextWatchdog(
-      input.eventsConnectedRef.current
-        ? input.coreRefreshConnectedMinIntervalMs
-        : input.coreRefreshIntervalMs
+      readNextWatchdogDelayMilliseconds(
+        input.eventsConnectedRef.current,
+        input.coreRefreshConnectedMinIntervalMs,
+        input.coreRefreshIntervalMs
+      )
     );
 
     return () => {

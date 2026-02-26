@@ -3,6 +3,16 @@ import { logger } from "../../Shared/Logging/Logger.js";
 import type { AgentId } from "../../Agents/Types.js";
 import type { AgentRegistry } from "../../Agents/Registry.js";
 
+const CapabilityRouteMethodByName = {
+  get: "GET"
+} as const;
+
+const CapabilityRoutePathnameByName = {
+  defaults: "/api/config/defaults",
+  models: "/api/models",
+  collaborationModes: "/api/collaboration-modes"
+} as const;
+
 function toErrorMessage<ErrorType>(error: ErrorType): string {
   if (error instanceof Error) {
     return error.message;
@@ -40,7 +50,7 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     jsonResponse
   } = deps;
 
-  if (req.method === "GET" && pathname === "/api/config/defaults") {
+  if (req.method === CapabilityRouteMethodByName.get && pathname === CapabilityRoutePathnameByName.defaults) {
     const requestedAgentRaw = url.searchParams.get("agentId");
     const requestedAgentId = parseAgentId(requestedAgentRaw);
     if (requestedAgentRaw && !requestedAgentId) {
@@ -99,7 +109,7 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
 
-  if (req.method === "GET" && pathname === "/api/models") {
+  if (req.method === CapabilityRouteMethodByName.get && pathname === CapabilityRoutePathnameByName.models) {
     const adapter = registry.resolveFirstWithCapability("canListModels");
     if (!adapter || !adapter.listModels) {
       jsonResponse(res, 200, {
@@ -134,7 +144,7 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
 
-  if (req.method === "GET" && pathname === "/api/collaboration-modes") {
+  if (req.method === CapabilityRouteMethodByName.get && pathname === CapabilityRoutePathnameByName.collaborationModes) {
     const adapter = registry.resolveFirstWithCapability("canListCollaborationModes");
     if (!adapter || !adapter.listCollaborationModes) {
       jsonResponse(res, 200, {

@@ -72,6 +72,19 @@ describe("ChatWorkspacePane", () => {
     expect(screen.getByTestId("chat-empty-loading-threads")).toBeDefined();
   });
 
+  it("renders no-thread empty state from chatSurfaceState even when loading flags are true", () => {
+    renderChatWorkspacePane({
+      chatSurfaceState: "no-thread",
+      isCoreLoading: true,
+      isSelectedThreadLoading: true,
+      selectedThreadId: null,
+      turnCount: 0
+    });
+
+    expect(screen.getByTestId("chat-empty-no-thread").textContent).toBe("Start typing to create a new thread");
+    expect(screen.queryByTestId("chat-empty-loading-threads")).toBeNull();
+  });
+
   it("invokes show older messages callback when hidden messages are available", () => {
     const onShowOlderMessages = vi.fn();
 

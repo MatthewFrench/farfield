@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
   parseBody,
-  ReplayBodySchema,
-  SendMessageBodySchema,
-  StartThreadBodySchema,
-  SetModeBodySchema,
-  SubmitUserInputBodySchema
+  parseReplayBody,
+  parseSendMessageBody,
+  parseSetModeBody,
+  parseStartThreadBody,
+  parseTraceMarkBody,
+  parseTraceStartBody,
+  parseSubmitUserInputBody,
+  StartThreadBodySchema
 } from "../Source/Network/RequestSchemas/HttpSchemas.js";
 
 describe("server request schemas", () => {
   it("accepts valid send message body", () => {
-    const parsed = parseBody(SendMessageBodySchema, {
+    const parsed = parseSendMessageBody({
       text: "hello",
       isSteering: false
     });
@@ -20,7 +23,7 @@ describe("server request schemas", () => {
 
   it("rejects unknown fields", () => {
     expect(() =>
-      parseBody(SendMessageBodySchema, {
+      parseSendMessageBody({
         text: "hello",
         extra: true
       })
@@ -28,7 +31,7 @@ describe("server request schemas", () => {
   });
 
   it("validates set mode body", () => {
-    const parsed = parseBody(SetModeBodySchema, {
+    const parsed = parseSetModeBody({
       collaborationMode: {
         mode: "plan",
         settings: {
@@ -44,7 +47,7 @@ describe("server request schemas", () => {
 
   it("rejects invalid request id type", () => {
     expect(() =>
-      parseBody(SubmitUserInputBodySchema, {
+      parseSubmitUserInputBody({
         requestId: "bad",
         response: {}
       })
@@ -52,7 +55,7 @@ describe("server request schemas", () => {
   });
 
   it("validates replay body", () => {
-    const parsed = parseBody(ReplayBodySchema, {
+    const parsed = parseReplayBody({
       entryId: "abc",
       waitForResponse: true
     });
@@ -61,7 +64,7 @@ describe("server request schemas", () => {
   });
 
   it("validates start thread body with agentId", () => {
-    const parsed = parseBody(StartThreadBodySchema, {
+    const parsed = parseStartThreadBody({
       agentId: "opencode",
       cwd: "/tmp/workspace"
     });
@@ -71,9 +74,33 @@ describe("server request schemas", () => {
 
   it("rejects deprecated agentKind field", () => {
     expect(() =>
-      parseBody(StartThreadBodySchema, {
+      parseStartThreadBody({
         agentKind: "opencode"
       })
     ).toThrowError(/Unrecognized key/);
+  });
+
+  it("keeps generic schema parsing available for externally owned body schemas", () => {
+    const parsed = parseBody(StartThreadBodySchema, {
+      cwd: "/tmp/workspace"
+    });
+
+    expect(parsed.cwd).toBe("/tmp/workspace");
+  });
+
+  it("enforces trace label maximum length", () => {
+    expect(() =>
+      parseTraceStartBody({
+        label: "x".repeat(121)
+      })
+    ).toThrowError(/at most 120 character/);
+  });
+
+  it("enforces trace mark note maximum length", () => {
+    expect(() =>
+      parseTraceMarkBody({
+        note: "x".repeat(501)
+      })
+    ).toThrowError(/at most 500 character/);
   });
 });

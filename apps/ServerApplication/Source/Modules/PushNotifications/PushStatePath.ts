@@ -3,6 +3,11 @@ import { z } from "zod";
 
 const OptionalPathOverrideSchema = z.string().trim().min(1).optional();
 const NonEmptyPathSchema = z.string().trim().min(1);
+const STATE_DIRECTORY_NAME = "farfield";
+const PUSH_STATE_FILE_NAME = "push-state.json";
+const APPLE_SUPPORT_DIRECTORY_NAME = "Application Support";
+const WINDOWS_ROAMING_DIRECTORY_PATH_SEGMENTS = ["AppData", "Roaming"] as const;
+const LINUX_DEFAULT_STATE_DIRECTORY_PATH_SEGMENTS = [".local", "state"] as const;
 
 export interface PushStatePathResolution {
   filePath: string;
@@ -46,16 +51,20 @@ function resolveDefaultStateDirectory(
   xdgStateHome: string | undefined
 ): string {
   if (platform === "darwin") {
-    return path.join(homeDirectory, "Library", "Application Support", "farfield");
+    return path.join(homeDirectory, "Library", APPLE_SUPPORT_DIRECTORY_NAME, STATE_DIRECTORY_NAME);
   }
 
   if (platform === "win32") {
-    const appData = parseOptionalPathOverride("APPDATA", appDataPath) ?? path.join(homeDirectory, "AppData", "Roaming");
-    return path.join(appData, "farfield");
+    const appData =
+      parseOptionalPathOverride("APPDATA", appDataPath)
+      ?? path.join(homeDirectory, ...WINDOWS_ROAMING_DIRECTORY_PATH_SEGMENTS);
+    return path.join(appData, STATE_DIRECTORY_NAME);
   }
 
-  const xdgStatePath = parseOptionalPathOverride("XDG_STATE_HOME", xdgStateHome) ?? path.join(homeDirectory, ".local", "state");
-  return path.join(xdgStatePath, "farfield");
+  const xdgStatePath =
+    parseOptionalPathOverride("XDG_STATE_HOME", xdgStateHome)
+    ?? path.join(homeDirectory, ...LINUX_DEFAULT_STATE_DIRECTORY_PATH_SEGMENTS);
+  return path.join(xdgStatePath, STATE_DIRECTORY_NAME);
 }
 
 export function resolvePushStatePath(options: ResolvePushStatePathOptions): PushStatePathResolution {
@@ -68,7 +77,7 @@ export function resolvePushStatePath(options: ResolvePushStatePathOptions): Push
     options.appDataPath,
     options.xdgStateHome
   );
-  const defaultPath = path.join(defaultStateDirectory, "push-state.json");
+  const defaultPath = path.join(defaultStateDirectory, PUSH_STATE_FILE_NAME);
   const filePath = configuredPath ?? defaultPath;
 
   return {

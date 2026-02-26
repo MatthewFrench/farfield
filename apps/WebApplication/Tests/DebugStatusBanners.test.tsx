@@ -60,6 +60,14 @@ describe("DebugStatusBanners", () => {
     expect(onDismissErrorBanner).toHaveBeenCalledTimes(2);
   });
 
+  it("does not render an error banner when no error message is provided", () => {
+    renderDebugStatusBanners({
+      errorMessage: ""
+    });
+
+    expect(screen.queryByTestId("error-banner")).toBeNull();
+  });
+
   it("renders live-state reduction banner on chat tab", () => {
     renderDebugStatusBanners({
       activeTab: "chat",
@@ -72,6 +80,20 @@ describe("DebugStatusBanners", () => {
     expect(screen.getByText(/Live updates failed for this thread/i)).toBeTruthy();
     expect(screen.getByText(/event 3/i)).toBeTruthy();
     expect(screen.getByText(/patch 7/i)).toBeTruthy();
+  });
+
+  it("omits live-state event and patch details when indexes are unavailable", () => {
+    renderDebugStatusBanners({
+      activeTab: "chat",
+      liveStateReductionError: {
+        eventIndex: null,
+        patchIndex: null
+      }
+    });
+
+    expect(screen.getByText(/Live updates failed for this thread/i)).toBeTruthy();
+    expect(screen.queryByText(/event /i)).toBeNull();
+    expect(screen.queryByText(/patch /i)).toBeNull();
   });
 
   it("does not render live-state reduction banner on debug tab", () => {

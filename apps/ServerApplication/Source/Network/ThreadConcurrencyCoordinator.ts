@@ -1,3 +1,5 @@
+const EMPTY_THREAD_IDENTIFIER_ERROR_MESSAGE = "ThreadConcurrencyCoordinator requires non-empty threadId";
+
 export interface ThreadConcurrencyCoordinatorStatistics {
   queuedExecutionCount: number;
   completedExecutionCount: number;
@@ -22,10 +24,7 @@ export class ThreadConcurrencyCoordinator {
     threadId: string,
     operation: () => Promise<ResultType>
   ): Promise<ResultType> {
-    const normalizedThreadId = threadId.trim();
-    if (normalizedThreadId.length === 0) {
-      throw new Error("ThreadConcurrencyCoordinator requires non-empty threadId");
-    }
+    const normalizedThreadId = this.normalizeThreadId(threadId);
 
     this.queuedExecutionCount += 1;
 
@@ -62,5 +61,13 @@ export class ThreadConcurrencyCoordinator {
       failedExecutionCount: this.failedExecutionCount,
       activeThreadCount: this.tailByThreadId.size
     };
+  }
+
+  private normalizeThreadId(threadId: string): string {
+    const normalizedThreadId = threadId.trim();
+    if (normalizedThreadId.length === 0) {
+      throw new Error(EMPTY_THREAD_IDENTIFIER_ERROR_MESSAGE);
+    }
+    return normalizedThreadId;
   }
 }

@@ -14,3 +14,4 @@ export {
 export { messagesToTurns } from "./ConversationTurnMapper.js";
 export { partToTurnItem } from "./TurnItemMapper.js";
 export { mapOpenCodeEventToSsePayload } from "./EventPayloadMapper.js";
+export type { OpenCodeMappedSsePayload } from "./EventPayloadMapper.js";

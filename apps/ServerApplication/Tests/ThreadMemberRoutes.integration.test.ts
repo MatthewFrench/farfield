@@ -1,7 +1,11 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
-import { parseThreadConversationState } from "@farfield/protocol";
+import {
+  parseThreadConversationState,
+  ThreadConversationStateSchema
+} from "@farfield/protocol";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import { ThreadAdapterResolver } from "../Source/Agents/ThreadAdapterResolver.js";
 import { ThreadIndex } from "../Source/Agents/ThreadIndex.js";
@@ -18,8 +22,19 @@ import type {
   AgentSendMessageInput
 } from "../Source/Agents/Types.js";
 import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
-import type { ThreadMemberRouteDependencies } from "../Source/Network/Routes/ThreadMemberRouteContracts.js";
+import {
+  ThreadMemberRouteSegmentByName,
+  type ThreadMemberRouteDependencies
+} from "../Source/Network/Routes/ThreadMemberRouteContracts.js";
 import { handleThreadMemberRoutes } from "../Source/Network/Routes/ThreadMemberRoutes.js";
+import { ServerRequestUtilityOwner } from "../Source/Network/ServerRequestUtilityOwner.js";
+
+const LocalhostBaseUrl = "http://localhost";
+const AmbiguousThreadIdentifier = "thread_ambiguous";
+const SingleOwnerThreadIdentifier = "thread_single_owner";
+const NestedMessagesPathThreadIdentifier = "thread_nested_messages_path";
+const ActionErrorIdentifier = "action-error-id";
+const MessageBodyText = "hello";
 
 const defaultCapabilities: AgentCapabilities = {
   canListModels: false,
@@ -30,6 +45,38 @@ const defaultCapabilities: AgentCapabilities = {
   canReadStreamEvents: false
 };
 
+const AmbiguousThreadResolutionResponseSchema = z
+  .object({
+    ok: z.literal(false),
+    error: z.string().min(1),
+    threadId: z.string().min(1)
+  })
+  .strict();
+
+const ReadThreadRouteResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    agentId: z.enum(["codex", "opencode"]),
+    thread: ThreadConversationStateSchema
+  })
+  .strict();
+
+const requestUtilityOwner = new ServerRequestUtilityOwner();
+const parseIntegerRequestQuery = requestUtilityOwner.parseInteger.bind(requestUtilityOwner);
+const parseBooleanRequestQuery = requestUtilityOwner.parseBoolean.bind(requestUtilityOwner);
+
+interface CapturedJsonResponse {
+  statusCode: number | null;
+  body: object | null;
+}
+
+function createCapturedJsonResponse(): CapturedJsonResponse {
+  return {
+    statusCode: null,
+    body: null
+  };
+}
+
 function createMockRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
   const socket = new Socket();
   const request = new IncomingMessage(socket);
@@ -37,6 +84,75 @@ function createMockRequestResponsePair(): { request: IncomingMessage; response: 
   return {
     request,
     response
+  };
+}
+
+function createRouteSegments(threadIdentifier: string, ...tailSegments: string[]): string[] {
+  return [
+    ThreadMemberRouteSegmentByName.api,
+    ThreadMemberRouteSegmentByName.threads,
+    threadIdentifier,
+    ...tailSegments
+  ];
+}
+
+function createThreadRoutePath(threadIdentifier: string, ...tailSegments: string[]): string {
+  const encodedThreadIdentifier = encodeURIComponent(threadIdentifier);
+  const basePath = `/api/threads/${encodedThreadIdentifier}`;
+  if (tailSegments.length === 0) {
+    return basePath;
+  }
+  return `${basePath}/${tailSegments.join("/")}`;
+}
+
+function createThreadRouteUrl(threadIdentifier: string, ...tailSegments: string[]): URL {
+  const routePath = createThreadRoutePath(threadIdentifier, ...tailSegments);
+  return new URL(routePath, LocalhostBaseUrl);
+}
+
+function createJsonResponseWriter(
+  capturedResponse: CapturedJsonResponse
+): ThreadMemberRouteDependencies["jsonResponse"] {
+  return (_res, statusCode, body) => {
+    capturedResponse.statusCode = statusCode;
+    capturedResponse.body = body;
+  };
+}
+
+function createThreadReadResult(threadIdentifier: string): AgentReadThreadResult {
+  return {
+    thread: parseThreadConversationState({
+      id: threadIdentifier,
+      turns: [],
+      requests: []
+    })
+  };
+}
+
+function createThreadMemberRouteDependencies(
+  request: IncomingMessage,
+  response: ServerResponse,
+  segments: string[],
+  url: URL,
+  resolveAdapterForThread: ThreadMemberRouteDependencies["resolveAdapterForThread"],
+  readJsonBody: ThreadMemberRouteDependencies["readJsonBody"],
+  capturedResponse: CapturedJsonResponse
+): ThreadMemberRouteDependencies {
+  return {
+    req: request,
+    res: response,
+    segments,
+    url,
+    codexAdapter: null,
+    parseInteger: parseIntegerRequestQuery,
+    parseBoolean: parseBooleanRequestQuery,
+    threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
+    resolveAdapterForThread,
+    readJsonBody,
+    jsonResponse: createJsonResponseWriter(capturedResponse),
+    invalidateThreadListAggregationCache: () => {},
+    pushActionEventWithRequestContext: () => {},
+    pushActionErrorWithRequestContext: () => ActionErrorIdentifier
   };
 }
 
@@ -84,28 +200,16 @@ describe("ThreadMemberRoutes integration", () => {
     request.method = "GET";
 
     const codexAdapter = createAdapter("codex", async (input) => {
-      if (input.threadId !== "thread_ambiguous") {
+      if (input.threadId !== AmbiguousThreadIdentifier) {
         throw new Error("thread not found");
       }
-      return {
-        thread: parseThreadConversationState({
-          id: input.threadId,
-          turns: [],
-          requests: []
-        })
-      };
+      return createThreadReadResult(input.threadId);
     });
     const opencodeAdapter = createAdapter("opencode", async (input) => {
-      if (input.threadId !== "thread_ambiguous") {
+      if (input.threadId !== AmbiguousThreadIdentifier) {
         throw new Error("thread not found");
       }
-      return {
-        thread: parseThreadConversationState({
-          id: input.threadId,
-          turns: [],
-          requests: []
-        })
-      };
+      return createThreadReadResult(input.threadId);
     });
 
     const threadAdapterResolver = new ThreadAdapterResolver(
@@ -113,51 +217,27 @@ describe("ThreadMemberRoutes integration", () => {
       new ThreadIndex()
     );
 
-    let capturedStatusCode: number | null = null;
-    let capturedResponseBody: object | null = null;
-
-    const dependencies: ThreadMemberRouteDependencies = {
-      req: request,
-      res: response,
-      segments: ["api", "threads", "thread_ambiguous"],
-      url: new URL("http://localhost/api/threads/thread_ambiguous"),
-      codexAdapter: null,
-      parseInteger: (value, defaultValue) => {
-        if (!value) {
-          return defaultValue;
-        }
-        const parsed = Number(value);
-        return Number.isFinite(parsed) ? parsed : defaultValue;
-      },
-      parseBoolean: (value, defaultValue) => {
-        if (!value) {
-          return defaultValue;
-        }
-        return value === "true";
-      },
-      threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
-      resolveAdapterForThread: async (threadId) => threadAdapterResolver.resolveAdapterForThread(threadId),
-      readJsonBody: async () => ({}),
-      jsonResponse: (_res, statusCode, body) => {
-        capturedStatusCode = statusCode;
-        capturedResponseBody = body;
-      },
-      invalidateThreadListAggregationCache: () => {},
-      pushActionEventWithRequestContext: () => {},
-      pushActionErrorWithRequestContext: () => "action-error-id"
-    };
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(AmbiguousThreadIdentifier),
+      createThreadRouteUrl(AmbiguousThreadIdentifier),
+      async (threadId) => threadAdapterResolver.resolveAdapterForThread(threadId),
+      async () => ({}),
+      capturedResponse
+    );
 
     const handled = await handleThreadMemberRoutes(dependencies);
     expect(handled).toBe(true);
-    expect(capturedStatusCode).toBe(409);
-    expect(capturedResponseBody).toEqual({
-      ok: false,
-      error: (
-        "Thread thread_ambiguous matched multiple connected enabled agents "
-        + "(codex, opencode). Refresh thread list and retry."
-      ),
-      threadId: "thread_ambiguous"
-    });
+    expect(capturedResponse.statusCode).toBe(409);
+    const conflictResponse = AmbiguousThreadResolutionResponseSchema.parse(capturedResponse.body);
+    expect(conflictResponse.threadId).toBe(AmbiguousThreadIdentifier);
+    expect(conflictResponse.error).toContain(
+      `Thread ${AmbiguousThreadIdentifier} matched multiple connected enabled agents`
+    );
+    expect(conflictResponse.error).toContain("(codex, opencode)");
+    expect(conflictResponse.error).toContain("Refresh thread list and retry.");
   });
 
   it("returns 200 when unregistered thread discovery resolves to one adapter", async () => {
@@ -166,17 +246,11 @@ describe("ThreadMemberRoutes integration", () => {
 
     const readThreadIncludeTurnsValues: boolean[] = [];
     const codexAdapter = createAdapter("codex", async (input) => {
-      if (input.threadId !== "thread_single_owner") {
+      if (input.threadId !== SingleOwnerThreadIdentifier) {
         throw new Error("thread not found");
       }
       readThreadIncludeTurnsValues.push(input.includeTurns);
-      return {
-        thread: parseThreadConversationState({
-          id: input.threadId,
-          turns: [],
-          requests: []
-        })
-      };
+      return createThreadReadResult(input.threadId);
     });
     const opencodeAdapter = createAdapter("opencode", async () => {
       throw new Error("thread not found");
@@ -187,50 +261,23 @@ describe("ThreadMemberRoutes integration", () => {
       new ThreadIndex()
     );
 
-    let capturedStatusCode: number | null = null;
-    let capturedResponseBody: object | null = null;
-
-    const dependencies: ThreadMemberRouteDependencies = {
-      req: request,
-      res: response,
-      segments: ["api", "threads", "thread_single_owner"],
-      url: new URL("http://localhost/api/threads/thread_single_owner"),
-      codexAdapter: null,
-      parseInteger: (value, defaultValue) => {
-        if (!value) {
-          return defaultValue;
-        }
-        const parsed = Number(value);
-        return Number.isFinite(parsed) ? parsed : defaultValue;
-      },
-      parseBoolean: (value, defaultValue) => {
-        if (!value) {
-          return defaultValue;
-        }
-        return value === "true";
-      },
-      threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
-      resolveAdapterForThread: async (threadId) => threadAdapterResolver.resolveAdapterForThread(threadId),
-      readJsonBody: async () => ({}),
-      jsonResponse: (_res, statusCode, body) => {
-        capturedStatusCode = statusCode;
-        capturedResponseBody = body;
-      },
-      invalidateThreadListAggregationCache: () => {},
-      pushActionEventWithRequestContext: () => {},
-      pushActionErrorWithRequestContext: () => "action-error-id"
-    };
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(SingleOwnerThreadIdentifier),
+      createThreadRouteUrl(SingleOwnerThreadIdentifier),
+      async (threadId) => threadAdapterResolver.resolveAdapterForThread(threadId),
+      async () => ({}),
+      capturedResponse
+    );
 
     const handled = await handleThreadMemberRoutes(dependencies);
     expect(handled).toBe(true);
-    expect(capturedStatusCode).toBe(200);
-    expect(capturedResponseBody).toMatchObject({
-      ok: true,
-      agentId: "codex",
-      thread: {
-        id: "thread_single_owner"
-      }
-    });
+    expect(capturedResponse.statusCode).toBe(200);
+    const readThreadResponse = ReadThreadRouteResponseSchema.parse(capturedResponse.body);
+    expect(readThreadResponse.agentId).toBe("codex");
+    expect(readThreadResponse.thread.id).toBe(SingleOwnerThreadIdentifier);
     expect(readThreadIncludeTurnsValues).toEqual([false, true]);
   });
 
@@ -249,50 +296,35 @@ describe("ThreadMemberRoutes integration", () => {
       }
     );
 
-    let capturedStatusCode: number | null = null;
-    let capturedResponseBody: object | null = null;
-
-    const dependencies: ThreadMemberRouteDependencies = {
-      req: request,
-      res: response,
-      segments: ["api", "threads", "thread_nested_messages_path", "messages", "extra"],
-      url: new URL("http://localhost/api/threads/thread_nested_messages_path/messages/extra"),
-      codexAdapter: null,
-      parseInteger: (value, defaultValue) => {
-        if (!value) {
-          return defaultValue;
-        }
-        const parsed = Number(value);
-        return Number.isFinite(parsed) ? parsed : defaultValue;
-      },
-      parseBoolean: (value, defaultValue) => {
-        if (!value) {
-          return defaultValue;
-        }
-        return value === "true";
-      },
-      threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
-      resolveAdapterForThread: async () => ({
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(
+        NestedMessagesPathThreadIdentifier,
+        ThreadMemberRouteSegmentByName.messages,
+        "extra"
+      ),
+      createThreadRouteUrl(
+        NestedMessagesPathThreadIdentifier,
+        ThreadMemberRouteSegmentByName.messages,
+        "extra"
+      ),
+      async () => ({
         ok: true,
         adapter: codexAdapter,
         agentId: "codex"
       }),
-      readJsonBody: async () => ({
-        text: "hello"
+      async () => ({
+        text: MessageBodyText
       }),
-      jsonResponse: (_res, statusCode, body) => {
-        capturedStatusCode = statusCode;
-        capturedResponseBody = body;
-      },
-      invalidateThreadListAggregationCache: () => {},
-      pushActionEventWithRequestContext: () => {},
-      pushActionErrorWithRequestContext: () => "action-error-id"
-    };
+      capturedResponse
+    );
 
     const handled = await handleThreadMemberRoutes(dependencies);
     expect(handled).toBe(false);
     expect(sentMessages).toEqual([]);
-    expect(capturedStatusCode).toBeNull();
-    expect(capturedResponseBody).toBeNull();
+    expect(capturedResponse.statusCode).toBeNull();
+    expect(capturedResponse.body).toBeNull();
   });
 });

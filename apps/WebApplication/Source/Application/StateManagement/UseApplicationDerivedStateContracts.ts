@@ -60,8 +60,13 @@ type DebugErrorsResponse = DebugErrorListResponse;
 type PendingRequest = PendingUserInputRequest;
 type Thread = ThreadListItem;
 type AgentDescriptor = AgentsResponse["agents"][number];
+type AgentDescriptorById = Partial<Record<AgentId, AgentDescriptor>>;
 type ConversationState = NonNullable<LiveStateResponse["conversationState"]>;
 type ModeOption = ModesResponse["data"][number];
+type ModelOption = {
+  id: string;
+  label: string;
+};
 
 export interface UseApplicationDerivedStateInput {
   threads: Thread[];
@@ -104,7 +109,7 @@ export interface UseApplicationDerivedStateInput {
 export interface ApplicationDerivedState {
   threadListPresentationState: ReadThreadListPresentationStateResult;
   selectedThread: Thread | null;
-  agentsById: Partial<Record<AgentId, AgentDescriptor>>;
+  agentsById: AgentDescriptorById;
   availableAgentIds: AgentId[];
   selectedAgentDescriptor: AgentDescriptor | null;
   appDefaultModel: string;
@@ -136,8 +141,8 @@ export interface ApplicationDerivedState {
   isPlanModeEnabled: boolean;
   effortOptions: string[];
   effortOptionsWithoutAssumedDefault: string[];
-  modelOptions: { id: string; label: string }[];
-  modelOptionsWithoutAssumedDefault: { id: string; label: string }[];
+  modelOptions: ModelOption[];
+  modelOptionsWithoutAssumedDefault: ModelOption[];
   deferredConversationState: ConversationState | null;
   turns: ConversationState["turns"];
   lastTurn: ConversationState["turns"][number] | undefined;

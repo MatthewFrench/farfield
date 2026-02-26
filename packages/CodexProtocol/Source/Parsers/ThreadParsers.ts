@@ -1,5 +1,4 @@
 import { type JsonValue } from "../Common.js";
-import { ProtocolValidationError } from "../Errors.js";
 import {
   ThreadConversationStateSchema,
   type ThreadConversationState
@@ -12,29 +11,36 @@ import {
   UserInputResponsePayloadSchema,
   type UserInputResponsePayload
 } from "../Contracts/Thread/UserInputRequestContracts.js";
+import { parseSchemaOrThrow } from "../ProtocolSchemaParsers.js";
+
+const ParseContext = {
+  threadConversationState: "ThreadConversationState",
+  threadStreamStateChangedParams: "ThreadStreamStateChangedParams",
+  userInputResponsePayload: "UserInputResponsePayload"
+} as const;
 
 export function parseThreadConversationState(value: JsonValue): ThreadConversationState {
-  const result = ThreadConversationStateSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("ThreadConversationState", result.error);
-  }
-  return result.data;
+  return parseSchemaOrThrow(
+    ThreadConversationStateSchema,
+    value,
+    ParseContext.threadConversationState
+  );
 }
 
 export function parseThreadStreamStateChangedParams(
   value: JsonValue
 ): ThreadStreamStateChangedParams {
-  const result = ThreadStreamStateChangedParamsSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("ThreadStreamStateChangedParams", result.error);
-  }
-  return result.data;
+  return parseSchemaOrThrow(
+    ThreadStreamStateChangedParamsSchema,
+    value,
+    ParseContext.threadStreamStateChangedParams
+  );
 }
 
 export function parseUserInputResponsePayload(value: JsonValue): UserInputResponsePayload {
-  const result = UserInputResponsePayloadSchema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod("UserInputResponsePayload", result.error);
-  }
-  return result.data;
+  return parseSchemaOrThrow(
+    UserInputResponsePayloadSchema,
+    value,
+    ParseContext.userInputResponsePayload
+  );
 }

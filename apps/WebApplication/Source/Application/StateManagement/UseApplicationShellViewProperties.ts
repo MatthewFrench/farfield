@@ -117,259 +117,209 @@ export interface ApplicationShellViewProperties {
   apiSessionBootstrapOverlayProperties: ApiSessionBootstrapOverlayProperties;
 }
 
-export function useApplicationShellViewProperties(
+const CHAT_TAB: ApplicationHeaderBarProps["activeTab"] = "chat";
+const DEBUG_TAB: ApplicationHeaderBarProps["activeTab"] = "debug";
+const EMPTY_ERROR_MESSAGE = "";
+
+function buildThreadSidebarHealthState(
+  health: CapabilityHealthResponse | null
+): ThreadSidebarPanelHealthState | null {
+  if (!health) {
+    return null;
+  }
+
+  return {
+    appReady: health.state.appReady,
+    ipcConnected: health.state.ipcConnected,
+    ipcInitialized: health.state.ipcInitialized,
+    lastError: health.state.lastError
+  };
+}
+
+function clearErrorMessage(
+  setErrorMessage: (nextErrorMessage: string) => void
+): void {
+  setErrorMessage(EMPTY_ERROR_MESSAGE);
+}
+
+function buildApplicationHeaderBarProperties(
   input: UseApplicationShellViewPropertiesInput
-): ApplicationShellViewProperties {
-  const {
-    health,
-    activeTab,
-    desktopSidebarOpen,
-    selectedThreadLabel,
-    hasSelectedThread,
-    activeThreadAgentId,
-    activeAgentLabel,
-    isGenerating,
-    pushClientState,
-    isEnablingPushNotifications,
-    isBusy,
-    theme,
-    setMobileSidebarOpen,
-    setDesktopSidebarOpen,
-    enablePushNotificationsFromToolbar,
-    refreshCoreDataAndSelectedThread,
-    setActiveTab,
-    toggleTheme,
-    renderAgentFavicon,
-    errorMessage,
-    errorBannerDetails,
-    openDebugFromErrorBanner,
-    setErrorMessage,
-    liveStateReductionError,
-    chatSurfaceState,
-    selectedThreadId,
-    isCoreLoading,
-    isSelectedThreadLoading,
-    availableAgentIds,
-    turnCount,
-    scrollRef,
-    chatContentRef,
-    visibleConversationItems,
-    hasHiddenChatItems,
-    firstVisibleChatItemIndex,
-    setVisibleChatItemLimit,
-    conversationItemCount,
-    visibleChatItemsStep,
-    isChatAtBottom,
-    chatScrollStateCoordinator,
-    setIsChatAtBottom,
-    activeRequest,
-    canSubmitUserInputForActiveAgent,
-    answerDraft,
-    handleAnswerChange,
-    submitPendingRequest,
-    skipPendingRequest,
-    selectedAgentLabel,
-    runInterrupt,
-    submitMessage,
-    chatModeToolbarProperties,
-    debugWorkspaceSection,
-    setDebugWorkspaceSection,
-    debugErrorIssueCount,
-    debugWarningIssueCount,
-    filteredDebugIssues,
-    selectedDebugIssue,
-    selectedDebugIssueId,
-    debugIssueSeverityFilter,
-    debugIssueFilterQuery,
-    debugErrorSessionId,
-    debugErrorSessionLogPath,
-    setSelectedDebugIssueId,
-    setDebugIssueSeverityFilter,
-    setDebugIssueFilterQuery,
-    clearDebugIssuesFromDebugPanel,
-    debugHistoryEntryListItems,
-    selectedHistoryId,
-    selectedHistoryDetailId,
-    historyDetailPayloadText,
-    waitForReplayResponse,
-    setSelectedHistoryId,
-    setWaitForReplayResponse,
-    replayHistoryEntryFromDetail,
-    streamEventCount,
-    streamEventCards,
-    isTraceRecording,
-    traceLabel,
-    traceNote,
-    setTraceLabel,
-    setTraceNote,
-    startTraceFromDebugPanel,
-    markTraceFromDebugPanel,
-    stopTraceFromDebugPanel,
-    recentTraceSummaries,
-    apiSessionTokenDraft,
-    setApiSessionTokenDraft,
-    apiSessionBootstrapError,
-    setApiSessionBootstrapError,
-    submitApiSessionToken,
-    isApiSessionBootstrapPending
-  } = input;
-
-  const threadSidebarHealthState = useMemo<ThreadSidebarPanelHealthState | null>(
-    () => (
-      health
-        ? {
-          appReady: health.state.appReady,
-          ipcConnected: health.state.ipcConnected,
-          ipcInitialized: health.state.ipcInitialized,
-          lastError: health.state.lastError
-        }
-        : null
-    ),
-    [health]
-  );
-
-  const applicationHeaderBarProperties: ApplicationHeaderBarProps = {
-    activeTab,
-    desktopSidebarOpen,
-    selectedThreadLabel,
-    hasSelectedThread,
-    activeThreadAgentId,
-    activeAgentLabel,
-    isGenerating,
-    pushClientState,
-    isEnablingPushNotifications,
-    isBusy,
-    theme,
+): ApplicationHeaderBarProps {
+  return {
+    activeTab: input.activeTab,
+    desktopSidebarOpen: input.desktopSidebarOpen,
+    selectedThreadLabel: input.selectedThreadLabel,
+    hasSelectedThread: input.hasSelectedThread,
+    activeThreadAgentId: input.activeThreadAgentId,
+    activeAgentLabel: input.activeAgentLabel,
+    isGenerating: input.isGenerating,
+    pushClientState: input.pushClientState,
+    isEnablingPushNotifications: input.isEnablingPushNotifications,
+    isBusy: input.isBusy,
+    theme: input.theme,
     onOpenMobileSidebar: () => {
-      setActiveTab("chat");
-      setMobileSidebarOpen(true);
+      input.setActiveTab(CHAT_TAB);
+      input.setMobileSidebarOpen(true);
     },
     onOpenDesktopSidebar: () => {
-      setActiveTab("chat");
-      setDesktopSidebarOpen(true);
+      input.setActiveTab(CHAT_TAB);
+      input.setDesktopSidebarOpen(true);
     },
     onEnablePushNotifications: () => {
-      void enablePushNotificationsFromToolbar();
+      void input.enablePushNotificationsFromToolbar();
     },
     onRefresh: () => {
-      void refreshCoreDataAndSelectedThread();
+      void input.refreshCoreDataAndSelectedThread();
     },
     onToggleDebugTab: () => {
-      setActiveTab(activeTab === "debug" ? "chat" : "debug");
+      input.setActiveTab(input.activeTab === DEBUG_TAB ? CHAT_TAB : DEBUG_TAB);
     },
-    onToggleTheme: toggleTheme,
-    renderAgentFavicon
+    onToggleTheme: input.toggleTheme,
+    renderAgentFavicon: input.renderAgentFavicon
   };
+}
 
-  const debugStatusBannersProperties: DebugStatusBannersProps = {
-    activeTab,
-    errorMessage,
-    errorBannerDetails,
+function buildDebugStatusBannersProperties(
+  input: UseApplicationShellViewPropertiesInput
+): DebugStatusBannersProps {
+  return {
+    activeTab: input.activeTab,
+    errorMessage: input.errorMessage,
+    errorBannerDetails: input.errorBannerDetails,
     onOpenDebugFromErrorBanner: () => {
-      openDebugFromErrorBanner();
-      setErrorMessage("");
+      input.openDebugFromErrorBanner();
+      clearErrorMessage(input.setErrorMessage);
     },
     onDismissErrorBanner: () => {
-      setErrorMessage("");
+      clearErrorMessage(input.setErrorMessage);
     },
-    liveStateReductionError
+    liveStateReductionError: input.liveStateReductionError
   };
+}
 
-  const chatWorkspacePaneProperties: ChatWorkspacePaneProps = {
-    chatSurfaceState,
-    selectedThreadId,
-    isCoreLoading,
-    isSelectedThreadLoading,
-    availableAgentIds,
-    turnCount,
-    scrollRef,
-    chatContentRef,
-    visibleConversationItems,
-    hasHiddenChatItems,
-    firstVisibleChatItemIndex,
+function buildChatWorkspacePaneProperties(
+  input: UseApplicationShellViewPropertiesInput
+): ChatWorkspacePaneProps {
+  return {
+    chatSurfaceState: input.chatSurfaceState,
+    selectedThreadId: input.selectedThreadId,
+    isCoreLoading: input.isCoreLoading,
+    isSelectedThreadLoading: input.isSelectedThreadLoading,
+    availableAgentIds: input.availableAgentIds,
+    turnCount: input.turnCount,
+    scrollRef: input.scrollRef,
+    chatContentRef: input.chatContentRef,
+    visibleConversationItems: input.visibleConversationItems,
+    hasHiddenChatItems: input.hasHiddenChatItems,
+    firstVisibleChatItemIndex: input.firstVisibleChatItemIndex,
     onShowOlderMessages: () => {
-      setVisibleChatItemLimit((limit) =>
-        Math.min(conversationItemCount, limit + visibleChatItemsStep)
-      );
+      input.setVisibleChatItemLimit((limit) => (
+        Math.min(input.conversationItemCount, limit + input.visibleChatItemsStep)
+      ));
     },
-    isChatAtBottom,
+    isChatAtBottom: input.isChatAtBottom,
     onJumpToBottom: () => {
-      if (!scrollRef.current) {
+      const scrollElement = input.scrollRef.current;
+      if (!scrollElement) {
         return;
       }
-      chatScrollStateCoordinator.pinToBottom(scrollRef.current);
-      setIsChatAtBottom(true);
+
+      input.chatScrollStateCoordinator.pinToBottom(scrollElement);
+      input.setIsChatAtBottom(true);
     },
-    activeRequest,
-    canSubmitUserInputForActiveAgent,
-    answerDraft,
-    onAnswerDraftChange: handleAnswerChange,
+    activeRequest: input.activeRequest,
+    canSubmitUserInputForActiveAgent: input.canSubmitUserInputForActiveAgent,
+    answerDraft: input.answerDraft,
+    onAnswerDraftChange: input.handleAnswerChange,
     onSubmitPendingRequest: () => {
-      void submitPendingRequest();
+      void input.submitPendingRequest();
     },
     onSkipPendingRequest: () => {
-      void skipPendingRequest();
+      void input.skipPendingRequest();
     },
-    isBusy,
-    isGenerating,
-    activeAgentLabel,
-    selectedAgentLabel,
-    onInterrupt: runInterrupt,
-    onSendMessage: submitMessage,
-    chatModeToolbarProperties
+    isBusy: input.isBusy,
+    isGenerating: input.isGenerating,
+    activeAgentLabel: input.activeAgentLabel,
+    selectedAgentLabel: input.selectedAgentLabel,
+    onInterrupt: input.runInterrupt,
+    onSendMessage: input.submitMessage,
+    chatModeToolbarProperties: input.chatModeToolbarProperties
   };
+}
 
-  const debugWorkspacePaneProperties: DebugWorkspacePaneProps = {
-    debugWorkspaceSection,
-    onDebugWorkspaceSectionChange: setDebugWorkspaceSection,
-    debugErrorIssueCount,
-    debugWarningIssueCount,
-    filteredDebugIssues,
-    selectedDebugIssue,
-    selectedDebugIssueId,
-    debugIssueSeverityFilter,
-    debugIssueFilterQuery,
-    debugErrorSessionId,
-    debugErrorSessionLogPath,
-    onSelectDebugIssue: setSelectedDebugIssueId,
-    onDebugIssueSeverityFilterChange: setDebugIssueSeverityFilter,
-    onDebugIssueFilterQueryChange: setDebugIssueFilterQuery,
-    onClearDebugIssues: clearDebugIssuesFromDebugPanel,
-    debugHistoryEntryListItems,
-    selectedHistoryId,
-    selectedHistoryDetailId,
-    historyDetailPayloadText,
-    waitForReplayResponse,
-    onSelectHistoryEntry: setSelectedHistoryId,
-    onWaitForReplayResponseChange: setWaitForReplayResponse,
-    onReplayHistoryEntry: replayHistoryEntryFromDetail,
-    streamEventCount,
-    streamEventCards,
-    isTraceRecording,
-    traceLabel,
-    traceNote,
-    onTraceLabelChange: setTraceLabel,
-    onTraceNoteChange: setTraceNote,
-    onStartTrace: startTraceFromDebugPanel,
-    onMarkTrace: markTraceFromDebugPanel,
-    onStopTrace: stopTraceFromDebugPanel,
-    recentTraceSummaries
+function buildDebugWorkspacePaneProperties(
+  input: UseApplicationShellViewPropertiesInput
+): DebugWorkspacePaneProps {
+  return {
+    debugWorkspaceSection: input.debugWorkspaceSection,
+    onDebugWorkspaceSectionChange: input.setDebugWorkspaceSection,
+    debugErrorIssueCount: input.debugErrorIssueCount,
+    debugWarningIssueCount: input.debugWarningIssueCount,
+    filteredDebugIssues: input.filteredDebugIssues,
+    selectedDebugIssue: input.selectedDebugIssue,
+    selectedDebugIssueId: input.selectedDebugIssueId,
+    debugIssueSeverityFilter: input.debugIssueSeverityFilter,
+    debugIssueFilterQuery: input.debugIssueFilterQuery,
+    debugErrorSessionId: input.debugErrorSessionId,
+    debugErrorSessionLogPath: input.debugErrorSessionLogPath,
+    onSelectDebugIssue: input.setSelectedDebugIssueId,
+    onDebugIssueSeverityFilterChange: input.setDebugIssueSeverityFilter,
+    onDebugIssueFilterQueryChange: input.setDebugIssueFilterQuery,
+    onClearDebugIssues: input.clearDebugIssuesFromDebugPanel,
+    debugHistoryEntryListItems: input.debugHistoryEntryListItems,
+    selectedHistoryId: input.selectedHistoryId,
+    selectedHistoryDetailId: input.selectedHistoryDetailId,
+    historyDetailPayloadText: input.historyDetailPayloadText,
+    waitForReplayResponse: input.waitForReplayResponse,
+    onSelectHistoryEntry: input.setSelectedHistoryId,
+    onWaitForReplayResponseChange: input.setWaitForReplayResponse,
+    onReplayHistoryEntry: input.replayHistoryEntryFromDetail,
+    streamEventCount: input.streamEventCount,
+    streamEventCards: input.streamEventCards,
+    isTraceRecording: input.isTraceRecording,
+    traceLabel: input.traceLabel,
+    traceNote: input.traceNote,
+    onTraceLabelChange: input.setTraceLabel,
+    onTraceNoteChange: input.setTraceNote,
+    onStartTrace: input.startTraceFromDebugPanel,
+    onMarkTrace: input.markTraceFromDebugPanel,
+    onStopTrace: input.stopTraceFromDebugPanel,
+    recentTraceSummaries: input.recentTraceSummaries
   };
+}
 
-  const apiSessionBootstrapOverlayProperties: ApiSessionBootstrapOverlayProperties = {
-    apiTokenDraft: apiSessionTokenDraft,
-    onApiTokenDraftChange: (nextTokenValue) => {
-      setApiSessionTokenDraft(nextTokenValue);
-      if (apiSessionBootstrapError.length > 0) {
-        setApiSessionBootstrapError("");
+function buildApiSessionBootstrapOverlayProperties(
+  input: UseApplicationShellViewPropertiesInput
+): ApiSessionBootstrapOverlayProperties {
+  return {
+    apiTokenDraft: input.apiSessionTokenDraft,
+    onApiTokenDraftChange: (nextTokenValue: string) => {
+      input.setApiSessionTokenDraft(nextTokenValue);
+      if (input.apiSessionBootstrapError.length > 0) {
+        input.setApiSessionBootstrapError(EMPTY_ERROR_MESSAGE);
       }
     },
     onSubmitApiToken: () => {
-      void submitApiSessionToken();
+      void input.submitApiSessionToken();
     },
-    isSubmitting: isApiSessionBootstrapPending,
-    errorMessage: apiSessionBootstrapError
+    isSubmitting: input.isApiSessionBootstrapPending,
+    errorMessage: input.apiSessionBootstrapError
   };
+}
+
+export function useApplicationShellViewProperties(
+  input: UseApplicationShellViewPropertiesInput
+): ApplicationShellViewProperties {
+  const threadSidebarHealthState = useMemo<ThreadSidebarPanelHealthState | null>(
+    () => buildThreadSidebarHealthState(input.health),
+    [input.health]
+  );
+
+  const applicationHeaderBarProperties = buildApplicationHeaderBarProperties(input);
+  const debugStatusBannersProperties = buildDebugStatusBannersProperties(input);
+  const chatWorkspacePaneProperties = buildChatWorkspacePaneProperties(input);
+  const debugWorkspacePaneProperties = buildDebugWorkspacePaneProperties(input);
+  const apiSessionBootstrapOverlayProperties = buildApiSessionBootstrapOverlayProperties(input);
 
   return {
     threadSidebarHealthState,

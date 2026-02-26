@@ -4,7 +4,7 @@ import { type ThreadListItem, type ThreadProjectGroup } from "@/Features/Threads
 import {
   type ThreadListPaneAgentDescriptor,
   type ThreadListPaneProperties
-} from "@/Features/Threads/UserInterface/ThreadListPane";
+} from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 
 export interface UseThreadListPanePropertiesInput {
   threadListState: ThreadListPaneProperties["threadListState"];

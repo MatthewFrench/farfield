@@ -207,7 +207,7 @@ export class ThreadListAggregationCache {
 
   private cloneSnapshot(snapshot: ThreadListAggregationSnapshot): ThreadListAggregationSnapshot {
     return {
-      mergedData: [...snapshot.mergedData],
+      mergedData: snapshot.mergedData.map((threadListItem) => this.cloneThreadListItem(threadListItem)),
       combinedTruncated: snapshot.combinedTruncated
     };
   }
@@ -262,6 +262,12 @@ export class ThreadListAggregationCache {
       maxPages: query.maxPages,
       sortKey: query.sortKey,
       cwd: query.cwd
+    };
+  }
+
+  private cloneThreadListItem(threadListItem: ThreadListItemWithAgentId): ThreadListItemWithAgentId {
+    return {
+      ...threadListItem
     };
   }
 

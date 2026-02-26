@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, type RenderResult } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPane";
+import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 import { ThreadSidebarViewport } from "@/Features/Threads/UserInterface/ThreadSidebarViewport";
 import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 

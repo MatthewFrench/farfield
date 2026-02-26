@@ -19,6 +19,11 @@ export interface CodexConnectionLifecycleOwnerOptions {
   onStateChange?: (() => void) | null;
 }
 
+const CODEX_UNAVAILABLE_ERROR_PATTERNS = [
+  /\bENOENT\b/i,
+  /\bnot\s+found\b/i
+];
+
 export class CodexConnectionLifecycleOwner {
   private readonly appClient: AppServerClient;
   private readonly ipcClient: DesktopIpcClient;
@@ -132,12 +137,7 @@ export class CodexConnectionLifecycleOwner {
         );
       } catch (error) {
         const message = toErrorMessage(error);
-        const isSpawnError = message.includes("ENOENT") ||
-          message.includes("not found") ||
-          (error instanceof Error && "code" in error &&
-            (error as NodeJS.ErrnoException).code === "ENOENT");
-
-        if (isSpawnError) {
+        if (isCodexUnavailableBootstrapErrorMessage(message)) {
           this.patchRuntimeState({
             codexAvailable: false,
             lastError: message
@@ -226,4 +226,8 @@ function toErrorMessage<ErrorType>(error: ErrorType): string {
     return error;
   }
   return String(error);
+}
+
+export function isCodexUnavailableBootstrapErrorMessage(message: string): boolean {
+  return CODEX_UNAVAILABLE_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 }

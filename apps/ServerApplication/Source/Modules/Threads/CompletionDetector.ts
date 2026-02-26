@@ -1,6 +1,12 @@
 import type { ThreadConversationState } from "@farfield/protocol";
 
-type ThreadItem = ThreadConversationState["turns"][number]["items"][number];
+const COMPLETED_STATUS_VALUE = "completed";
+const COMPLETION_STATUS_UNDERSCORE_TOKEN = "_";
+const COMPLETION_STATUS_DASH_TOKEN = "-";
+const COMPLETION_MARKER_SEPARATOR = ":";
+
+type ThreadTurn = ThreadConversationState["turns"][number];
+type ThreadItem = ThreadTurn["items"][number];
 type AgentMessageTurnItem = Extract<ThreadItem, { type: "agentMessage" }>;
 
 export interface CompletionCandidate {
@@ -12,11 +18,49 @@ export interface CompletionCandidate {
 }
 
 function isCompletedStatus(status: string): boolean {
-  return status.toLowerCase().replaceAll("_", "-") === "completed";
+  return normalizeCompletionStatus(status) === COMPLETED_STATUS_VALUE;
+}
+
+function normalizeCompletionStatus(status: string): string {
+  return status.toLowerCase().replaceAll(
+    COMPLETION_STATUS_UNDERSCORE_TOKEN,
+    COMPLETION_STATUS_DASH_TOKEN
+  );
 }
 
 function isAgentMessageItem(item: ThreadItem): item is AgentMessageTurnItem {
   return item.type === "agentMessage";
+}
+
+function readLastTurn(conversationState: ThreadConversationState): ThreadTurn | null {
+  const turnCount = conversationState.turns.length;
+  if (turnCount === 0) {
+    return null;
+  }
+
+  const lastTurn = conversationState.turns[turnCount - 1];
+  return lastTurn ?? null;
+}
+
+function readCompletionTurnId(turn: ThreadTurn): string | null {
+  return turn.turnId ?? turn.id ?? null;
+}
+
+function readLastAgentMessage(turn: ThreadTurn): AgentMessageTurnItem | null {
+  for (let index = turn.items.length - 1; index >= 0; index -= 1) {
+    const candidate = turn.items[index];
+    if (!candidate) {
+      continue;
+    }
+    if (isAgentMessageItem(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function buildCompletionMarker(threadId: string, turnId: string, agentMessageId: string): string {
+  return [threadId, turnId, agentMessageId].join(COMPLETION_MARKER_SEPARATOR);
 }
 
 export class CompletionDetector {
@@ -31,7 +75,7 @@ export class CompletionDetector {
       return null;
     }
 
-    const lastTurn = conversationState.turns[conversationState.turns.length - 1];
+    const lastTurn = readLastTurn(conversationState);
     if (!lastTurn) {
       return null;
     }
@@ -40,17 +84,17 @@ export class CompletionDetector {
       return null;
     }
 
-    const turnId = lastTurn.turnId ?? lastTurn.id ?? null;
+    const turnId = readCompletionTurnId(lastTurn);
     if (!turnId) {
       return null;
     }
 
-    const lastAgentMessage = lastTurn.items.filter(isAgentMessageItem).slice(-1)[0];
+    const lastAgentMessage = readLastAgentMessage(lastTurn);
     if (!lastAgentMessage) {
       return null;
     }
 
-    const marker = `${threadId}:${turnId}:${lastAgentMessage.id}`;
+    const marker = buildCompletionMarker(threadId, turnId, lastAgentMessage.id);
     const previousMarker = this.watermarks.get(threadId);
     if (previousMarker === marker) {
       return null;
@@ -73,4 +117,3 @@ export class CompletionDetector {
     return this.watermarks.get(threadId) ?? null;
   }
 }
-

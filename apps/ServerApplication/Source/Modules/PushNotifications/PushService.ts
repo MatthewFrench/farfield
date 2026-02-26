@@ -37,6 +37,11 @@ const WebPushErrorSchema = z
 const MAX_PUSH_SEND_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 200;
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const PRUNED_SUBSCRIPTION_STATUS_CODES = new Set([404, 410]);
+const PUSH_SEND_FAILURE_MESSAGE = "Push send failed";
+const PUSH_REQUEST_TIME_TO_LIVE_SECONDS = 300;
+const PUSH_REQUEST_URGENCY: webPush.Urgency = "high";
+// Keep this bounded so one send cannot starve event-loop work under large subscription sets.
 const PUSH_SEND_CONCURRENCY_LIMIT = 8;
 
 interface DescribedPushError {
@@ -49,13 +54,13 @@ function describePushError<ErrorType>(error: ErrorType): DescribedPushError {
   if (!parsedError.success) {
     return {
       statusCode: null,
-      message: "Push send failed"
+      message: PUSH_SEND_FAILURE_MESSAGE
     };
   }
 
   return {
     statusCode: parsedError.data.statusCode ?? null,
-    message: parsedError.data.message ?? "Push send failed"
+    message: parsedError.data.message ?? PUSH_SEND_FAILURE_MESSAGE
   };
 }
 
@@ -150,7 +155,10 @@ async function sendSubscriptionsWithConcurrencyLimit(
           statusCode: described.statusCode,
           message: described.message
         });
-        if (described.statusCode === 404 || described.statusCode === 410) {
+        if (
+          described.statusCode !== null
+          && PRUNED_SUBSCRIPTION_STATUS_CODES.has(described.statusCode)
+        ) {
           prunedEndpoints.push(subscription.subscription.endpoint);
         }
       }
@@ -165,6 +173,18 @@ async function sendSubscriptionsWithConcurrencyLimit(
   };
 }
 
+function buildDisabledPushSendResult(): PushSendResult {
+  return {
+    attempted: 0,
+    delivered: 0,
+    failures: [],
+    prunedEndpoints: []
+  };
+}
+
+/**
+ * Owns web-push dispatch policy: payload validation, retry/backoff, and prune classification.
+ */
 export class PushService {
   private readonly enabled: boolean;
   private readonly vapidPublicKey: string;
@@ -194,19 +214,14 @@ export class PushService {
     payload: PushNotificationPayload
   ): Promise<PushSendResult> {
     if (!this.enabled) {
-      return {
-        attempted: 0,
-        delivered: 0,
-        failures: [],
-        prunedEndpoints: []
-      };
+      return buildDisabledPushSendResult();
     }
 
     const strictPayload = parsePushNotificationPayload(payload);
     const body = JSON.stringify(strictPayload);
     const requestOptions: webPush.RequestOptions = {
-      TTL: 300,
-      urgency: "high"
+      TTL: PUSH_REQUEST_TIME_TO_LIVE_SECONDS,
+      urgency: PUSH_REQUEST_URGENCY
     };
     const sendResult = await sendSubscriptionsWithConcurrencyLimit(
       subscriptions,

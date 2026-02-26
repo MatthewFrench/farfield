@@ -9,6 +9,10 @@ import {
 } from "@farfield/protocol";
 import { logger } from "../../Shared/Logging/Logger.js";
 
+const ERROR_IDENTIFIER_PREFIX = "error_";
+const MALFORMED_LINE_LOG_EVENT = "client-error-store-skip-malformed-line";
+const MALFORMED_LINE_NUMBER_SAMPLE_LIMIT = 5;
+
 interface RecordServerErrorInput {
   source: string;
   operation: string;
@@ -38,6 +42,15 @@ interface RecordErrorInput {
   occurredAt: string;
 }
 
+interface MalformedLineSummary {
+  malformedLineCount: number;
+  sampledLineNumbers: number[];
+}
+
+/**
+ * Owns the debug client-error session log lifecycle (read, append, trim, clear).
+ * Invalid existing NDJSON lines are skipped with one bounded summary warning per load.
+ */
 export class ClientErrorStore {
   private readonly filePath: string;
   private readonly sessionId: string;
@@ -74,10 +87,7 @@ export class ClientErrorStore {
 
   public list(limit: number): DebugErrorEvent[] {
     const boundedLimit = Number.isInteger(limit) && limit > 0 ? limit : this.maxEntries;
-    return this.events.slice(-boundedLimit).map((entry) => ({
-      ...entry,
-      details: { ...entry.details }
-    }));
+    return this.events.slice(-boundedLimit).map((entry) => this.cloneEvent(entry));
   }
 
   public getById(errorId: string): DebugErrorEvent | null {
@@ -86,10 +96,7 @@ export class ClientErrorStore {
       return null;
     }
 
-    return {
-      ...entry,
-      details: { ...entry.details }
-    };
+    return this.cloneEvent(entry);
   }
 
   public recordClientError(input: CreateDebugClientErrorBody): DebugErrorEvent {
@@ -129,7 +136,7 @@ export class ClientErrorStore {
 
   private record(input: RecordErrorInput): DebugErrorEvent {
     const event = parseDebugErrorEvent({
-      errorId: `error_${randomUUID()}`,
+      errorId: `${ERROR_IDENTIFIER_PREFIX}${randomUUID()}`,
       sessionId: this.sessionId,
       origin: input.origin,
       source: input.source,
@@ -162,10 +169,7 @@ export class ClientErrorStore {
     } else {
       this.appendEvent(event);
     }
-    return {
-      ...event,
-      details: { ...event.details }
-    };
+    return this.cloneEvent(event);
   }
 
   private ensureFile(): void {
@@ -183,21 +187,22 @@ export class ClientErrorStore {
     }
 
     const lines = raw.split("\n").filter((line) => line.trim().length > 0);
+    const malformedLineSummary: MalformedLineSummary = {
+      malformedLineCount: 0,
+      sampledLineNumbers: []
+    };
     for (const [lineIndex, line] of lines.entries()) {
       try {
         const parsed = parseDebugErrorEvent(JSON.parse(line));
         this.events.push(parsed);
         this.byId.set(parsed.errorId, parsed);
       } catch {
-        logger.warn(
-          {
-            sessionId: this.sessionId,
-            logPath: this.filePath,
-            lineNumber: lineIndex + 1
-          },
-          "client-error-store-skip-malformed-line"
-        );
+        this.recordMalformedLine(lineIndex + 1, malformedLineSummary);
       }
+    }
+
+    if (malformedLineSummary.malformedLineCount > 0) {
+      this.logMalformedLineSummary(malformedLineSummary);
     }
 
     if (this.events.length > this.maxEntries) {
@@ -217,6 +222,35 @@ export class ClientErrorStore {
     this.byId.clear();
     fs.writeFileSync(this.filePath, "", "utf8");
     return clearedCount;
+  }
+
+  private cloneEvent(event: DebugErrorEvent): DebugErrorEvent {
+    return {
+      ...event,
+      details: { ...event.details }
+    };
+  }
+
+  private recordMalformedLine(
+    lineNumber: number,
+    malformedLineSummary: MalformedLineSummary
+  ): void {
+    malformedLineSummary.malformedLineCount += 1;
+    if (malformedLineSummary.sampledLineNumbers.length < MALFORMED_LINE_NUMBER_SAMPLE_LIMIT) {
+      malformedLineSummary.sampledLineNumbers.push(lineNumber);
+    }
+  }
+
+  private logMalformedLineSummary(malformedLineSummary: MalformedLineSummary): void {
+    logger.warn(
+      {
+        sessionId: this.sessionId,
+        logPath: this.filePath,
+        malformedLineCount: malformedLineSummary.malformedLineCount,
+        sampledLineNumbers: malformedLineSummary.sampledLineNumbers
+      },
+      MALFORMED_LINE_LOG_EVENT
+    );
   }
 
   private appendEvent(event: DebugErrorEvent): void {

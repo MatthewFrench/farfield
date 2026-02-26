@@ -7,6 +7,8 @@ interface FilterProjectGroupsInput {
   readAgentLabel: (thread: ThreadListItem) => string;
 }
 
+const EMPTY_SEARCH_TEXT = "";
+
 export class ThreadListSearchFilter {
   public static normalizeQuery(rawQuery: string): string {
     return rawQuery.trim().toLowerCase();
@@ -51,12 +53,10 @@ export class ThreadListSearchFilter {
   }
 
   private static projectGroupMatchesQuery(projectGroup: ThreadProjectGroup, query: string): boolean {
-    const normalizedLabel = ThreadListSearchFilter.normalizeSearchText(projectGroup.label);
-    if (normalizedLabel.includes(query)) {
-      return true;
-    }
-    const normalizedProjectPath = ThreadListSearchFilter.normalizeSearchText(projectGroup.projectPath);
-    return normalizedProjectPath.includes(query);
+    return (
+      ThreadListSearchFilter.searchTextMatchesQuery(projectGroup.label, query)
+      || ThreadListSearchFilter.searchTextMatchesQuery(projectGroup.projectPath, query)
+    );
   }
 
   private static threadMatchesQuery(
@@ -64,33 +64,20 @@ export class ThreadListSearchFilter {
     query: string,
     agentLabel: string
   ): boolean {
-    const normalizedThreadLabel = ThreadListSearchFilter.normalizeSearchText(
-      ThreadGroupSelectors.threadLabel(thread)
+    return (
+      ThreadListSearchFilter.searchTextMatchesQuery(ThreadGroupSelectors.threadLabel(thread), query)
+      || ThreadListSearchFilter.searchTextMatchesQuery(thread.id, query)
+      || ThreadListSearchFilter.searchTextMatchesQuery(thread.cwd, query)
+      || ThreadListSearchFilter.searchTextMatchesQuery(thread.path, query)
+      || ThreadListSearchFilter.searchTextMatchesQuery(agentLabel, query)
     );
-    if (normalizedThreadLabel.includes(query)) {
-      return true;
-    }
-
-    const normalizedThreadIdentifier = ThreadListSearchFilter.normalizeSearchText(thread.id);
-    if (normalizedThreadIdentifier.includes(query)) {
-      return true;
-    }
-
-    const normalizedWorkingDirectory = ThreadListSearchFilter.normalizeSearchText(thread.cwd);
-    if (normalizedWorkingDirectory.includes(query)) {
-      return true;
-    }
-
-    const normalizedThreadPath = ThreadListSearchFilter.normalizeSearchText(thread.path);
-    if (normalizedThreadPath.includes(query)) {
-      return true;
-    }
-
-    const normalizedAgentLabel = ThreadListSearchFilter.normalizeSearchText(agentLabel);
-    return normalizedAgentLabel.includes(query);
   }
 
   private static normalizeSearchText(value: string | null | undefined): string {
-    return (value ?? "").trim().toLowerCase();
+    return (value ?? EMPTY_SEARCH_TEXT).trim().toLowerCase();
+  }
+
+  private static searchTextMatchesQuery(value: string | null | undefined, query: string): boolean {
+    return ThreadListSearchFilter.normalizeSearchText(value).includes(query);
   }
 }

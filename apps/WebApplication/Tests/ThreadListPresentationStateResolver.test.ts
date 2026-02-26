@@ -8,7 +8,7 @@ function buildThread(input: {
   cwd: string;
   createdAt: number;
   updatedAt: number;
-  removed?: boolean;
+  isProjectRemoved?: boolean;
 }): ThreadListItem {
   return {
     id: input.id,
@@ -18,7 +18,7 @@ function buildThread(input: {
     updatedAt: input.updatedAt,
     source: "opencode",
     agentId: "codex",
-    ...(input.removed ? { projectRemoved: true } : {})
+    isProjectRemoved: input.isProjectRemoved ?? false
   };
 }
 
@@ -39,7 +39,7 @@ describe("ThreadListPresentationStateResolver", () => {
         cwd: "/workspace/beta",
         createdAt: 11,
         updatedAt: 21,
-        removed: true
+        isProjectRemoved: true
       })
     ];
     const archivedThreads: ThreadListItem[] = [

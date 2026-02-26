@@ -31,6 +31,17 @@ export interface ModeSelectionSyncTransition {
   nextLastAppliedModeSignature: string;
 }
 
+interface ModeSelectionSyncTransitionOverrides {
+  nextSelectedModeKey?: string;
+  nextSelectedModelId?: string;
+  nextSelectedReasoningEffort?: string;
+  nextHasHydratedModeFromLiveState?: boolean;
+  nextIsModeSyncing?: boolean;
+  nextLastAppliedModeSignature?: string;
+}
+
+const EMPTY_MODE_KEY = "";
+
 export class ModeSelectionSyncCoordinator {
   private readonly modeSelectionStateResolver: ModeSelectionStateResolver;
 
@@ -40,15 +51,7 @@ export class ModeSelectionSyncCoordinator {
 
   public readTransition(input: ModeSelectionSyncInput): ModeSelectionSyncTransition {
     if (!input.conversationState) {
-      return {
-        kind: "noConversationState",
-        nextSelectedModeKey: input.selectedModeKey,
-        nextSelectedModelId: input.selectedModelId,
-        nextSelectedReasoningEffort: input.selectedReasoningEffort,
-        nextHasHydratedModeFromLiveState: input.hasHydratedModeFromLiveState,
-        nextIsModeSyncing: input.isModeSyncing,
-        nextLastAppliedModeSignature: input.lastAppliedModeSignature
-      };
+      return this.buildTransition(input, "noConversationState");
     }
 
     const remoteSelection = this.modeSelectionStateResolver.readModeSelectionFromConversationState(
@@ -56,7 +59,7 @@ export class ModeSelectionSyncCoordinator {
       input.appDefaultModel,
       input.appDefaultReasoningEffort
     );
-    const remoteModeKey = remoteSelection.modeKey || input.selectedModeKey || input.defaultModeKey || "";
+    const remoteModeKey = this.readRemoteModeKey(input, remoteSelection.modeKey);
     const remoteSignature = this.modeSelectionStateResolver.buildModeSignature(
       remoteModeKey,
       remoteSelection.modelId,
@@ -64,15 +67,13 @@ export class ModeSelectionSyncCoordinator {
     );
 
     if (!input.hasHydratedModeFromLiveState) {
-      return {
-        kind: "hydrateFromRemote",
-        nextSelectedModeKey: remoteModeKey || input.selectedModeKey,
+      return this.buildTransition(input, "hydrateFromRemote", {
+        nextSelectedModeKey: remoteModeKey,
         nextSelectedModelId: remoteSelection.modelId,
         nextSelectedReasoningEffort: remoteSelection.reasoningEffort,
         nextHasHydratedModeFromLiveState: true,
-        nextIsModeSyncing: input.isModeSyncing,
         nextLastAppliedModeSignature: remoteSignature
-      };
+      });
     }
 
     const localSignature = this.modeSelectionStateResolver.buildModeSignature(
@@ -81,15 +82,10 @@ export class ModeSelectionSyncCoordinator {
       input.selectedReasoningEffort
     );
     if (remoteSignature === localSignature) {
-      return {
-        kind: "confirmSynchronized",
-        nextSelectedModeKey: input.selectedModeKey,
-        nextSelectedModelId: input.selectedModelId,
-        nextSelectedReasoningEffort: input.selectedReasoningEffort,
-        nextHasHydratedModeFromLiveState: input.hasHydratedModeFromLiveState,
+      return this.buildTransition(input, "confirmSynchronized", {
         nextIsModeSyncing: false,
         nextLastAppliedModeSignature: remoteSignature
-      };
+      });
     }
 
     if (
@@ -97,29 +93,55 @@ export class ModeSelectionSyncCoordinator {
       && localSignature === input.lastAppliedModeSignature
       && remoteSignature !== input.lastAppliedModeSignature
     ) {
-      return {
-        kind: "holdLocalSyncingState",
-        nextSelectedModeKey: input.selectedModeKey,
-        nextSelectedModelId: input.selectedModelId,
-        nextSelectedReasoningEffort: input.selectedReasoningEffort,
-        nextHasHydratedModeFromLiveState: input.hasHydratedModeFromLiveState,
-        nextIsModeSyncing: input.isModeSyncing,
-        nextLastAppliedModeSignature: input.lastAppliedModeSignature
-      };
+      return this.buildTransition(input, "holdLocalSyncingState");
     }
 
-    const nextSelectedModeKey = remoteSelection.modeKey
-      ? remoteSelection.modeKey
-      : (!input.selectedModeKey && remoteModeKey ? remoteModeKey : input.selectedModeKey);
-
-    return {
-      kind: "applyRemote",
-      nextSelectedModeKey,
+    return this.buildTransition(input, "applyRemote", {
+      nextSelectedModeKey: this.readNextSelectedModeKeyForRemoteUpdate(
+        input,
+        remoteSelection.modeKey,
+        remoteModeKey
+      ),
       nextSelectedModelId: remoteSelection.modelId,
       nextSelectedReasoningEffort: remoteSelection.reasoningEffort,
-      nextHasHydratedModeFromLiveState: input.hasHydratedModeFromLiveState,
       nextIsModeSyncing: false,
       nextLastAppliedModeSignature: remoteSignature
+    });
+  }
+
+  private buildTransition(
+    input: ModeSelectionSyncInput,
+    kind: ModeSelectionSyncTransitionKind,
+    overrides?: ModeSelectionSyncTransitionOverrides
+  ): ModeSelectionSyncTransition {
+    return {
+      kind,
+      nextSelectedModeKey: overrides?.nextSelectedModeKey ?? input.selectedModeKey,
+      nextSelectedModelId: overrides?.nextSelectedModelId ?? input.selectedModelId,
+      nextSelectedReasoningEffort: overrides?.nextSelectedReasoningEffort ?? input.selectedReasoningEffort,
+      nextHasHydratedModeFromLiveState: (
+        overrides?.nextHasHydratedModeFromLiveState ?? input.hasHydratedModeFromLiveState
+      ),
+      nextIsModeSyncing: overrides?.nextIsModeSyncing ?? input.isModeSyncing,
+      nextLastAppliedModeSignature: overrides?.nextLastAppliedModeSignature ?? input.lastAppliedModeSignature
     };
+  }
+
+  private readRemoteModeKey(input: ModeSelectionSyncInput, remoteSelectionModeKey: string): string {
+    return remoteSelectionModeKey || input.selectedModeKey || input.defaultModeKey || EMPTY_MODE_KEY;
+  }
+
+  private readNextSelectedModeKeyForRemoteUpdate(
+    input: ModeSelectionSyncInput,
+    remoteSelectionModeKey: string,
+    remoteModeKey: string
+  ): string {
+    if (remoteSelectionModeKey) {
+      return remoteSelectionModeKey;
+    }
+    if (!input.selectedModeKey && remoteModeKey) {
+      return remoteModeKey;
+    }
+    return input.selectedModeKey;
   }
 }

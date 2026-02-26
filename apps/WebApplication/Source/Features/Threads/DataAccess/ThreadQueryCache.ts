@@ -5,20 +5,39 @@ interface ThreadQueryCacheEntry {
   expiresAtEpochMs: number;
 }
 
+interface ThreadQueryCacheDependencies {
+  readCurrentEpochMilliseconds?: () => number;
+}
+
+const INVALID_CACHE_TIME_TO_LIVE_MESSAGE = "ThreadQueryCache requires a positive timeToLiveMs value";
+const INVALID_CACHE_MAXIMUM_ENTRIES_MESSAGE =
+  "ThreadQueryCache requires a positive integer maximumEntries value";
+
+/**
+ * Owns in-memory thread-list query caching.
+ * Entries are bounded by TTL and least-recently-used eviction so thread-list refreshes can read
+ * immediately during short bursts without unbounded growth.
+ */
 export class ThreadQueryCache {
   private readonly timeToLiveMs: number;
   private readonly maximumEntries: number;
+  private readonly readCurrentEpochMilliseconds: () => number;
   private readonly entryByKey: Map<string, ThreadQueryCacheEntry>;
 
-  public constructor(timeToLiveMs: number, maximumEntries: number) {
+  public constructor(
+    timeToLiveMs: number,
+    maximumEntries: number,
+    dependencies?: ThreadQueryCacheDependencies
+  ) {
     if (!Number.isFinite(timeToLiveMs) || timeToLiveMs <= 0) {
-      throw new Error("ThreadQueryCache requires a positive timeToLiveMs value");
+      throw new Error(INVALID_CACHE_TIME_TO_LIVE_MESSAGE);
     }
     if (!Number.isInteger(maximumEntries) || maximumEntries <= 0) {
-      throw new Error("ThreadQueryCache requires a positive integer maximumEntries value");
+      throw new Error(INVALID_CACHE_MAXIMUM_ENTRIES_MESSAGE);
     }
     this.timeToLiveMs = timeToLiveMs;
     this.maximumEntries = maximumEntries;
+    this.readCurrentEpochMilliseconds = dependencies?.readCurrentEpochMilliseconds ?? Date.now;
     this.entryByKey = new Map<string, ThreadQueryCacheEntry>();
   }
 
@@ -27,7 +46,7 @@ export class ThreadQueryCache {
     if (!entry) {
       return null;
     }
-    if (Date.now() >= entry.expiresAtEpochMs) {
+    if (this.readCurrentEpochMilliseconds() >= entry.expiresAtEpochMs) {
       this.entryByKey.delete(cacheKey);
       return null;
     }
@@ -43,7 +62,7 @@ export class ThreadQueryCache {
     }
     this.entryByKey.set(cacheKey, {
       response,
-      expiresAtEpochMs: Date.now() + this.timeToLiveMs
+      expiresAtEpochMs: this.readCurrentEpochMilliseconds() + this.timeToLiveMs
     });
     this.evictUntilWithinBounds();
   }

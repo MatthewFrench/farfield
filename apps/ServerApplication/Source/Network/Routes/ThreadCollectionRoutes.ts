@@ -1,9 +1,13 @@
 import { logger } from "../../Shared/Logging/Logger.js";
-import { parseBody, StartThreadBodySchema } from "../RequestSchemas/HttpSchemas.js";
+import { parseStartThreadBody } from "../RequestSchemas/HttpSchemas.js";
 import type {
   ThreadListItemWithAgentId
 } from "../ThreadListAggregationCache.js";
-import type { ThreadCollectionRouteDependencies } from "./ThreadCollectionRouteContracts.js";
+import {
+  ThreadCollectionRouteMethodByName,
+  ThreadCollectionRoutePathnameByName,
+  type ThreadCollectionRouteDependencies
+} from "./ThreadCollectionRouteContracts.js";
 import { ThreadCollectionListQueryOwner } from "./ThreadCollectionListQueryOwner.js";
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {
@@ -43,8 +47,8 @@ export async function handleThreadCollectionRoutes(
     withTimeout
   } = deps;
 
-  if (req.method === "POST" && pathname === "/api/threads") {
-    const body = parseBody(StartThreadBodySchema, await readJsonBody(req));
+  if (req.method === ThreadCollectionRouteMethodByName.post && pathname === ThreadCollectionRoutePathnameByName.threads) {
+    const body = parseStartThreadBody(await readJsonBody(req));
     const adapter = resolveCreateThreadAdapter(body.agentId);
 
     if (!adapter) {
@@ -107,7 +111,7 @@ export async function handleThreadCollectionRoutes(
     return true;
   }
 
-  if (req.method === "GET" && pathname === "/api/threads") {
+  if (req.method === ThreadCollectionRouteMethodByName.get && pathname === ThreadCollectionRoutePathnameByName.threads) {
     const parsedThreadListQuery = threadCollectionListQueryOwner.parse(url);
     if (!parsedThreadListQuery.ok) {
       jsonResponse(res, 400, {
@@ -128,16 +132,16 @@ export async function handleThreadCollectionRoutes(
       cwd: rawCwd
     } = parsedThreadListQuery.query;
 
-    let cursorOffset = 0;
-    try {
-      cursorOffset = threadCollectionListQueryOwner.decodeCursor(cursor);
-    } catch {
+    const decodedCursor = threadCollectionListQueryOwner.decodeCursor(cursor);
+    if (!decodedCursor.ok) {
       jsonResponse(res, 400, {
         ok: false,
-        error: "Invalid cursor"
+        error: "Invalid cursor",
+        issues: decodedCursor.issues
       });
       return true;
     }
+    const cursorOffset = decodedCursor.offset;
     const sortKey = requestedSortKey ?? "updated_at";
     const cwd = normalizeOptionalString(rawCwd);
 

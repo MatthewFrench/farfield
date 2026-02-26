@@ -45,10 +45,15 @@ export function useMobileSidebarTouchHandlers(
 
   const handleAppShellTouchMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
     const touch = event.touches[0];
+    if (!touch) {
+      input.mobileSidebarSwipeCoordinator.endTracking();
+      return;
+    }
+
     const swipeOutput = input.mobileSidebarSwipeCoordinator.continueTracking({
       touchCount: event.touches.length,
-      touchClientX: touch?.clientX ?? 0,
-      touchClientY: touch?.clientY ?? 0
+      touchClientX: touch.clientX,
+      touchClientY: touch.clientY
     });
     if (swipeOutput.shouldOpenSidebar) {
       input.setMobileSidebarOpen(true);

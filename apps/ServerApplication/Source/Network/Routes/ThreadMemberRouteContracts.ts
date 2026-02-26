@@ -4,6 +4,33 @@ import type { CodexAgentAdapter } from "../../Agents/Adapters/CodexAgentAdapter.
 import type { AgentAdapter, AgentId } from "../../Agents/Types.js";
 import type { ThreadConcurrencyCoordinator } from "../ThreadConcurrencyCoordinator.js";
 
+export const ThreadMemberRouteMethodByName = {
+  get: "GET",
+  post: "POST"
+} as const;
+
+export const ThreadMemberRouteSegmentByName = {
+  api: "api",
+  threads: "threads",
+  liveState: "live-state",
+  streamEvents: "stream-events",
+  messages: "messages",
+  archive: "archive",
+  unarchive: "unarchive",
+  collaborationMode: "collaboration-mode",
+  userInput: "user-input",
+  interrupt: "interrupt"
+} as const;
+
+export const ThreadMemberMutationActionByName = {
+  messages: "messages",
+  threadArchive: "thread-archive",
+  threadUnarchive: "thread-unarchive",
+  collaborationMode: "collaboration-mode",
+  userInput: "user-input",
+  interrupt: "interrupt"
+} as const;
+
 export type ResolvedThreadAdapterResult =
   | { ok: true; adapter: AgentAdapter; agentId: AgentId }
   | { ok: false; status: number; error: string };

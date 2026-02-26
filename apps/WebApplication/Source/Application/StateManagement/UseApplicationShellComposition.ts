@@ -121,17 +121,11 @@ export function useApplicationShellComposition(
     setCollapsedThreadProjectGroups: applicationShellState.setCollapsedThreadProjectGroups,
     createThreadForSingleAgent,
     createNewThread,
-    setSelectedThreadId: (threadId) => {
-      applicationShellState.setSelectedThreadId(threadId);
-    },
-    setMobileSidebarOpen: (nextOpen) => {
-      applicationShellState.setMobileSidebarOpen(nextOpen);
-    },
+    setSelectedThreadId: applicationShellState.setSelectedThreadId,
+    setMobileSidebarOpen: applicationShellState.setMobileSidebarOpen,
     archiveThread: runArchiveThread,
     isArchivedThreadsOpen: applicationShellState.isArchivedThreadsOpen,
-    setIsArchivedThreadsOpen: (nextOpen) => {
-      applicationShellState.setIsArchivedThreadsOpen(nextOpen);
-    },
+    setIsArchivedThreadsOpen: applicationShellState.setIsArchivedThreadsOpen,
     isArchivedThreadsLoading: applicationShellState.isArchivedThreadsLoading,
     hasLoadedArchivedThreads: applicationShellState.hasLoadedArchivedThreads,
     archivedSectionThreadCount: applicationDerivedState.archivedSectionThreadCount,
@@ -158,25 +152,17 @@ export function useApplicationShellComposition(
     isEnablingPushNotifications: applicationShellState.isEnablingPushNotifications,
     isBusy: applicationShellState.isBusy,
     theme: input.theme,
-    setMobileSidebarOpen: (nextOpen) => {
-      applicationShellState.setMobileSidebarOpen(nextOpen);
-    },
-    setDesktopSidebarOpen: (nextOpen) => {
-      applicationShellState.setDesktopSidebarOpen(nextOpen);
-    },
+    setMobileSidebarOpen: applicationShellState.setMobileSidebarOpen,
+    setDesktopSidebarOpen: applicationShellState.setDesktopSidebarOpen,
     enablePushNotificationsFromToolbar: input.pushFeatureComposition.enablePushNotificationsFromToolbar,
     refreshCoreDataAndSelectedThread: input.refreshCoreDataAndSelectedThread,
-    setActiveTab: (nextTab) => {
-      applicationShellState.setActiveTab(nextTab);
-    },
+    setActiveTab: applicationShellState.setActiveTab,
     toggleTheme: input.toggleTheme,
     renderAgentFavicon: input.renderAgentFavicon,
     errorMessage: applicationShellState.error,
     errorBannerDetails: applicationDerivedState.errorBannerDetails,
     openDebugFromErrorBanner: input.debugFeatureComposition.openDebugFromErrorBanner,
-    setErrorMessage: (nextErrorMessage) => {
-      applicationShellState.setError(nextErrorMessage);
-    },
+    setErrorMessage: applicationShellState.setError,
     liveStateReductionError: applicationDerivedState.liveStateReductionError,
     chatSurfaceState: applicationDerivedState.chatSurfaceState,
     selectedThreadId: applicationShellState.selectedThreadId,
@@ -194,9 +180,7 @@ export function useApplicationShellComposition(
     visibleChatItemsStep: input.visibleChatItemsStep,
     isChatAtBottom: applicationShellState.isChatAtBottom,
     chatScrollStateCoordinator: input.chatScrollStateCoordinator,
-    setIsChatAtBottom: (nextIsAtBottom) => {
-      applicationShellState.setIsChatAtBottom(nextIsAtBottom);
-    },
+    setIsChatAtBottom: applicationShellState.setIsChatAtBottom,
     activeRequest: applicationDerivedState.activeRequest,
     canSubmitUserInputForActiveAgent: applicationDerivedState.canSubmitUserInputForActiveAgent,
     answerDraft: applicationShellState.answerDraft,
@@ -208,11 +192,9 @@ export function useApplicationShellComposition(
     submitMessage: input.chatFeatureComposition.submitMessage,
     chatModeToolbarProperties: input.chatFeatureComposition.chatModeToolbarProperties,
     debugWorkspaceSection: applicationShellState.debugWorkspaceSection,
-    setDebugWorkspaceSection: (nextSection) => {
-      applicationShellState.setDebugWorkspaceSection(nextSection);
-    },
-    debugErrorIssueCount: applicationDerivedState.debugIssues.filter((issue) => issue.severity === "error").length,
-    debugWarningIssueCount: applicationDerivedState.debugIssues.filter((issue) => issue.severity === "warning").length,
+    setDebugWorkspaceSection: applicationShellState.setDebugWorkspaceSection,
+    debugErrorIssueCount: applicationDerivedState.debugErrorIssues.length,
+    debugWarningIssueCount: applicationDerivedState.debugWarningIssues.length,
     filteredDebugIssues: applicationDerivedState.filteredDebugIssues,
     selectedDebugIssue: applicationDerivedState.selectedDebugIssue,
     selectedDebugIssueId: applicationShellState.selectedDebugIssueId,
@@ -220,51 +202,33 @@ export function useApplicationShellComposition(
     debugIssueFilterQuery: applicationShellState.debugIssueFilterQuery,
     debugErrorSessionId: applicationShellState.debugErrorSessionId,
     debugErrorSessionLogPath: applicationShellState.debugErrorSessionLogPath,
-    setSelectedDebugIssueId: (nextIssueId) => {
-      applicationShellState.setSelectedDebugIssueId(nextIssueId);
-    },
-    setDebugIssueSeverityFilter: (nextFilter) => {
-      applicationShellState.setDebugIssueSeverityFilter(nextFilter);
-    },
-    setDebugIssueFilterQuery: (nextQuery) => {
-      applicationShellState.setDebugIssueFilterQuery(nextQuery);
-    },
+    setSelectedDebugIssueId: applicationShellState.setSelectedDebugIssueId,
+    setDebugIssueSeverityFilter: applicationShellState.setDebugIssueSeverityFilter,
+    setDebugIssueFilterQuery: applicationShellState.setDebugIssueFilterQuery,
     clearDebugIssuesFromDebugPanel: input.debugFeatureComposition.clearDebugIssuesFromPanel,
     debugHistoryEntryListItems: applicationDerivedState.debugHistoryEntryListItems,
     selectedHistoryId: applicationShellState.selectedHistoryId,
     selectedHistoryDetailId: applicationShellState.historyDetail?.entry.id ?? null,
     historyDetailPayloadText: applicationDerivedState.historyDetailPayloadText,
     waitForReplayResponse: applicationShellState.waitForReplayResponse,
-    setSelectedHistoryId: (nextHistoryId) => {
-      applicationShellState.setSelectedHistoryId(nextHistoryId);
-    },
-    setWaitForReplayResponse: (nextWaitForReplayResponse) => {
-      applicationShellState.setWaitForReplayResponse(nextWaitForReplayResponse);
-    },
+    setSelectedHistoryId: applicationShellState.setSelectedHistoryId,
+    setWaitForReplayResponse: applicationShellState.setWaitForReplayResponse,
     replayHistoryEntryFromDetail: input.debugFeatureComposition.replayHistoryEntryFromDetail,
     streamEventCount: applicationShellState.streamEvents.length,
     streamEventCards: input.streamEventCards,
     isTraceRecording: applicationShellState.traceStatus?.active !== null,
     traceLabel: applicationShellState.traceLabel,
     traceNote: applicationShellState.traceNote,
-    setTraceLabel: (nextLabel) => {
-      applicationShellState.setTraceLabel(nextLabel);
-    },
-    setTraceNote: (nextNote) => {
-      applicationShellState.setTraceNote(nextNote);
-    },
+    setTraceLabel: applicationShellState.setTraceLabel,
+    setTraceNote: applicationShellState.setTraceNote,
     startTraceFromDebugPanel: input.debugFeatureComposition.startTraceFromDebugPanel,
     markTraceFromDebugPanel: input.debugFeatureComposition.markTraceFromDebugPanel,
     stopTraceFromDebugPanel: input.debugFeatureComposition.stopTraceFromDebugPanel,
     recentTraceSummaries: applicationDerivedState.recentTraceSummaries,
     apiSessionTokenDraft: applicationShellState.apiSessionTokenDraft,
-    setApiSessionTokenDraft: (nextTokenValue) => {
-      applicationShellState.setApiSessionTokenDraft(nextTokenValue);
-    },
+    setApiSessionTokenDraft: applicationShellState.setApiSessionTokenDraft,
     apiSessionBootstrapError: applicationShellState.apiSessionBootstrapError,
-    setApiSessionBootstrapError: (nextErrorMessage) => {
-      applicationShellState.setApiSessionBootstrapError(nextErrorMessage);
-    },
+    setApiSessionBootstrapError: applicationShellState.setApiSessionBootstrapError,
     submitApiSessionToken: input.pushFeatureComposition.submitApiSessionToken,
     isApiSessionBootstrapPending: applicationShellState.isApiSessionBootstrapPending
   });

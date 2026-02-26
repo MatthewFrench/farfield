@@ -3,6 +3,11 @@ export interface RuntimeRefreshMeasurement {
   startedAtHighResolutionMilliseconds: number;
 }
 
+export interface RuntimeRefreshObservabilityClock {
+  readEpochMilliseconds: () => number;
+  readHighResolutionMilliseconds: () => number;
+}
+
 export interface RuntimeRefreshObservabilitySnapshot {
   totalRefreshCount: number;
   succeededRefreshCount: number;
@@ -15,11 +20,17 @@ export interface RuntimeRefreshObservabilitySnapshot {
   lastCompletedAtEpochMilliseconds: number | null;
 }
 
+const RUNTIME_REFRESH_OBSERVABILITY_DEFAULT_CLOCK: RuntimeRefreshObservabilityClock = {
+  readEpochMilliseconds: () => Date.now(),
+  readHighResolutionMilliseconds: () => performance.now()
+};
+
 /**
  * Tracks runtime refresh counters and timing so startup/manual refresh behavior can be
  * inspected without coupling composition code to ad-hoc logging.
  */
 export class RuntimeRefreshObservabilityOwner {
+  private readonly clock: RuntimeRefreshObservabilityClock;
   private totalRefreshCount: number;
   private succeededRefreshCount: number;
   private failedRefreshCount: number;
@@ -30,7 +41,8 @@ export class RuntimeRefreshObservabilityOwner {
   private lastStartedAtEpochMilliseconds: number | null;
   private lastCompletedAtEpochMilliseconds: number | null;
 
-  public constructor() {
+  public constructor(clock: RuntimeRefreshObservabilityClock = RUNTIME_REFRESH_OBSERVABILITY_DEFAULT_CLOCK) {
+    this.clock = clock;
     this.totalRefreshCount = 0;
     this.succeededRefreshCount = 0;
     this.failedRefreshCount = 0;
@@ -43,8 +55,8 @@ export class RuntimeRefreshObservabilityOwner {
   }
 
   public beginRefresh(): RuntimeRefreshMeasurement {
-    const startedAtEpochMilliseconds = Date.now();
-    const startedAtHighResolutionMilliseconds = performance.now();
+    const startedAtEpochMilliseconds = this.clock.readEpochMilliseconds();
+    const startedAtHighResolutionMilliseconds = this.clock.readHighResolutionMilliseconds();
 
     this.totalRefreshCount += 1;
     this.inFlightRefreshCount += 1;
@@ -86,14 +98,17 @@ export class RuntimeRefreshObservabilityOwner {
   }
 
   private completeRefresh(measurement: RuntimeRefreshMeasurement): void {
-    const durationMilliseconds = Math.max(0, performance.now() - measurement.startedAtHighResolutionMilliseconds);
+    const durationMilliseconds = Math.max(
+      0,
+      this.clock.readHighResolutionMilliseconds() - measurement.startedAtHighResolutionMilliseconds
+    );
 
     this.lastDurationMilliseconds = durationMilliseconds;
     this.totalDurationMilliseconds += durationMilliseconds;
     this.longestDurationMilliseconds = this.longestDurationMilliseconds === null
       ? durationMilliseconds
       : Math.max(this.longestDurationMilliseconds, durationMilliseconds);
-    this.lastCompletedAtEpochMilliseconds = Date.now();
+    this.lastCompletedAtEpochMilliseconds = this.clock.readEpochMilliseconds();
     this.inFlightRefreshCount = Math.max(0, this.inFlightRefreshCount - 1);
   }
 }

@@ -24,6 +24,19 @@ import {
   type ReadThreadResolver,
   type ThreadListFixture
 } from "./AppTestFixtureContracts";
+import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
+
+/**
+ * Shared app-shell test runtime owner.
+ * Provides deterministic fixture routing and stream-event emission for shell tests.
+ */
+type StructuredDataObject = { [key: string]: StructuredDataValue };
+
+const HISTORY_EVENT_TIMESTAMP_BASE_MILLISECONDS = Date.parse("2026-02-26T00:00:00.000Z");
+
+function buildHistoryEventTimestampIso(sequence: number): string {
+  return new Date(HISTORY_EVENT_TIMESTAMP_BASE_MILLISECONDS + sequence * 1_000).toISOString();
+}
 
 class MockEventSource {
   private static instances: MockEventSource[] = [];
@@ -38,7 +51,7 @@ class MockEventSource {
     MockEventSource.instances = MockEventSource.instances.filter((instance) => instance !== this);
   }
 
-  public static emit(payload: Record<string, object | string | number | boolean | null | undefined>): void {
+  public static emit(payload: StructuredDataObject): void {
     const event = new MessageEvent<string>("message", {
       data: JSON.stringify(payload)
     });
@@ -286,7 +299,7 @@ function installGlobals(): void {
 
       if (pathname.startsWith("/api/threads/") && parsedUrl.searchParams.has("includeTurns")) {
         const includeTurns = parsedUrl.searchParams.get("includeTurns") === "true";
-        const readThread = readThreadResolver(threadId, includeTurns);
+        const readThread = await Promise.resolve(readThreadResolver(threadId, includeTurns));
         if (readThread) {
           if (readThreadDelayMilliseconds > 0) {
             await new Promise<void>((resolve) => {
@@ -427,7 +440,7 @@ export function registerAppTestEnvironment(): AppTestEnvironment {
           type: "activity-history-appended",
           entry: {
             id: `history-${String(eventStreamSequence)}`,
-            at: new Date().toISOString(),
+            at: buildHistoryEventTimestampIso(eventStreamSequence),
             source: "app",
             direction: "out",
             payload: {

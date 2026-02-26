@@ -1,9 +1,14 @@
 import * as React from "react";
 import { cn } from "@/Shared/Styling/ClassNameMerge";
 
-export const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+const CARD_CONTENT_COMPONENT_DISPLAY_NAME = "CardContent";
+const CARD_CONTENT_BASE_CLASS_NAME = "p-4 pt-0";
+
+export interface CardContentProps extends React.HTMLAttributes<HTMLDivElement> {}
+
+export const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(
   ({ className, ...props }, ref) => {
-    return <div ref={ref} className={cn("p-4 pt-0", className)} {...props} />;
+    return <div ref={ref} className={cn(CARD_CONTENT_BASE_CLASS_NAME, className)} {...props} />;
   }
 );
-CardContent.displayName = "CardContent";
+CardContent.displayName = CARD_CONTENT_COMPONENT_DISPLAY_NAME;

@@ -2,16 +2,26 @@ import type { ThreadMutationCreateThreadInput } from "../DataAccess/ThreadMutati
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 
+const CREATE_THREAD_OPERATION_NAME = "create-thread";
+const ARCHIVE_THREAD_OPERATION_NAME = "archive-thread";
+const UNARCHIVE_THREAD_OPERATION_NAME = "unarchive-thread";
+const MISSING_PROJECT_PATH_MESSAGE = "Cannot create thread: missing project path";
+
+export type ThreadMutationOperationName =
+  | typeof CREATE_THREAD_OPERATION_NAME
+  | typeof ARCHIVE_THREAD_OPERATION_NAME
+  | typeof UNARCHIVE_THREAD_OPERATION_NAME;
+
 export interface ThreadMutationActionRequestOptions {
   actionId: string;
   requestOptions: ApiRequestOptions;
 }
 
 export interface ThreadMutationActionErrorReportInput {
-  operation: string;
+  operation: ThreadMutationOperationName;
   actionId: string;
   threadId: string | null;
-  error: Error | string | number | boolean | bigint | symbol | null | undefined | object;
+  error: string;
   details?: Record<string, string | number | boolean | null>;
 }
 
@@ -27,7 +37,7 @@ export interface ThreadMutationActionClient {
 export interface CreateThreadActionInput {
   projectPath: string;
   agentId?: AgentId;
-  buildActionRequestOptions: (actionName: string) => ThreadMutationActionRequestOptions;
+  buildActionRequestOptions: (actionName: ThreadMutationOperationName) => ThreadMutationActionRequestOptions;
   onSetBusy: (isBusy: boolean) => void;
   onSetErrorMessage: (errorMessage: string) => void;
   onMarkThreadPendingMaterialization: (threadId: string) => void;
@@ -49,7 +59,7 @@ export interface ArchiveThreadActionInput {
   threadId: string;
   selectedThreadId: string | null;
   activeThreadIdentifiersInOrder: string[];
-  buildActionRequestOptions: (actionName: string) => ThreadMutationActionRequestOptions;
+  buildActionRequestOptions: (actionName: ThreadMutationOperationName) => ThreadMutationActionRequestOptions;
   onSetBusy: (isBusy: boolean) => void;
   onThreadSelected: (threadId: string | null) => void;
   onInvalidateActiveThreadQuery: () => void;
@@ -61,7 +71,7 @@ export interface ArchiveThreadActionInput {
 
 export interface UnarchiveThreadActionInput {
   threadId: string;
-  buildActionRequestOptions: (actionName: string) => ThreadMutationActionRequestOptions;
+  buildActionRequestOptions: (actionName: ThreadMutationOperationName) => ThreadMutationActionRequestOptions;
   onSetBusy: (isBusy: boolean) => void;
   onThreadSelected: (threadId: string) => void;
   onSetMobileSidebarOpen: (isOpen: boolean) => void;
@@ -76,17 +86,17 @@ export class ThreadMutationActionCoordinator {
   public async createThread(input: CreateThreadActionInput): Promise<void> {
     const trimmedProjectPath = input.projectPath.trim();
     if (!trimmedProjectPath) {
-      input.onSetErrorMessage("Cannot create thread: missing project path");
+      input.onSetErrorMessage(MISSING_PROJECT_PATH_MESSAGE);
       return;
     }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions("create-thread");
+    const { actionId, requestOptions } = input.buildActionRequestOptions(CREATE_THREAD_OPERATION_NAME);
     input.onSetBusy(true);
     try {
-      const created = await input.threadMutationClient.createThread({
-        cwd: trimmedProjectPath,
-        ...(input.agentId ? { agentId: input.agentId } : {})
-      }, requestOptions);
+      const created = await input.threadMutationClient.createThread(
+        this.buildCreateThreadMutationInput(trimmedProjectPath, input.agentId),
+        requestOptions
+      );
       input.onMarkThreadPendingMaterialization(created.threadId);
       input.onThreadSelected(created.threadId);
       input.onSetMobileSidebarOpen(false);
@@ -94,7 +104,7 @@ export class ThreadMutationActionCoordinator {
       await input.onRefreshCreatedThreadData(created.threadId);
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
-        operation: "create-thread",
+        operation: CREATE_THREAD_OPERATION_NAME,
         actionId,
         threadId: null,
         error: toErrorMessage(error),
@@ -108,7 +118,7 @@ export class ThreadMutationActionCoordinator {
   }
 
   public async archiveThread(input: ArchiveThreadActionInput): Promise<void> {
-    const { actionId, requestOptions } = input.buildActionRequestOptions("archive-thread");
+    const { actionId, requestOptions } = input.buildActionRequestOptions(ARCHIVE_THREAD_OPERATION_NAME);
     input.onSetBusy(true);
     try {
       const nextSelectedThreadIdentifier = this.computeNextSelectedThreadIdentifier({
@@ -123,7 +133,7 @@ export class ThreadMutationActionCoordinator {
       await input.loadCoreData();
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
-        operation: "archive-thread",
+        operation: ARCHIVE_THREAD_OPERATION_NAME,
         actionId,
         threadId: input.threadId,
         error: toErrorMessage(error)
@@ -134,7 +144,7 @@ export class ThreadMutationActionCoordinator {
   }
 
   public async unarchiveThread(input: UnarchiveThreadActionInput): Promise<void> {
-    const { actionId, requestOptions } = input.buildActionRequestOptions("unarchive-thread");
+    const { actionId, requestOptions } = input.buildActionRequestOptions(UNARCHIVE_THREAD_OPERATION_NAME);
     input.onSetBusy(true);
     try {
       await input.threadMutationClient.unarchiveThread(input.threadId, requestOptions);
@@ -145,7 +155,7 @@ export class ThreadMutationActionCoordinator {
       await input.loadCoreData();
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
-        operation: "unarchive-thread",
+        operation: UNARCHIVE_THREAD_OPERATION_NAME,
         actionId,
         threadId: input.threadId,
         error: toErrorMessage(error)
@@ -153,6 +163,19 @@ export class ThreadMutationActionCoordinator {
     } finally {
       input.onSetBusy(false);
     }
+  }
+
+  private buildCreateThreadMutationInput(
+    projectPath: string,
+    agentId?: AgentId
+  ): ThreadMutationCreateThreadInput {
+    const createThreadInput: ThreadMutationCreateThreadInput = {
+      cwd: projectPath
+    };
+    if (agentId) {
+      createThreadInput.agentId = agentId;
+    }
+    return createThreadInput;
   }
 
   private computeNextSelectedThreadIdentifier(

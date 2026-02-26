@@ -2,6 +2,8 @@ import * as React from "react";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { cn } from "@/Shared/Styling/ClassNameMerge";
 
+const SCROLL_AREA_COMPONENT_DISPLAY_NAME = "ScrollArea";
+
 export const ScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
@@ -18,4 +20,4 @@ export const ScrollArea = React.forwardRef<
     </ScrollAreaPrimitive.Root>
   );
 });
-ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName;
+ScrollArea.displayName = SCROLL_AREA_COMPONENT_DISPLAY_NAME;

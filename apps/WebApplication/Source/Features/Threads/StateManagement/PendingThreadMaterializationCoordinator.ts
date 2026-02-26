@@ -1,3 +1,7 @@
+/**
+ * Owns pending thread identifiers created by mutations before list refresh materializes them.
+ * This owner ensures selection/render logic can distinguish optimistic thread IDs from hydrated list data.
+ */
 export class PendingThreadMaterializationCoordinator {
   private readonly pendingThreadIdentifiers: Set<string>;
 

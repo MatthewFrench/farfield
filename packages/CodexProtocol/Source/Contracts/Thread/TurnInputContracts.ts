@@ -6,6 +6,12 @@ import {
 } from "../../Common.js";
 import { CollaborationModeSchema } from "./CollaborationModeContracts.js";
 
+const OptionalNullableJsonValueSchema = z.union([JsonValueSchema, z.null()]).optional();
+const OptionalNullableCollaborationModeSchema = z
+  .union([CollaborationModeSchema, z.null()])
+  .optional();
+const SandboxPolicySchema = z.object({ type: NonEmptyStringSchema }).passthrough();
+
 export const InputTextPartSchema = z
   .object({
     type: z.literal("text"),
@@ -31,12 +37,12 @@ export const TurnStartParamsSchema = z
     model: NullableStringSchema.optional(),
     effort: NullableStringSchema.optional(),
     approvalPolicy: NonEmptyStringSchema.optional(),
-    sandboxPolicy: z.object({ type: NonEmptyStringSchema }).passthrough().optional(),
+    sandboxPolicy: SandboxPolicySchema.optional(),
     summary: z.string().optional(),
     attachments: z.array(JsonValueSchema).optional(),
-    collaborationMode: z.union([CollaborationModeSchema, z.null()]).optional(),
-    personality: z.union([JsonValueSchema, z.null()]).optional(),
-    outputSchema: z.union([JsonValueSchema, z.null()]).optional()
+    collaborationMode: OptionalNullableCollaborationModeSchema,
+    personality: OptionalNullableJsonValueSchema,
+    outputSchema: OptionalNullableJsonValueSchema
   })
   .passthrough();
 

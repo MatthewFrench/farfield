@@ -1,6 +1,10 @@
 import { AgentRegistry } from "./Registry.js";
 import { CodexAgentAdapter, type CodexIpcFrameEvent } from "./Adapters/CodexAgentAdapter.js";
 import { OpenCodeAgentAdapter } from "./Adapters/OpenCodeAgentAdapter.js";
+import {
+  THREAD_STREAM_STATE_CHANGED_METHOD,
+  type ThreadStreamStateChangedMethod
+} from "./ThreadStreamStateChangedContract.js";
 import type { AgentAdapter, AgentId } from "./Types.js";
 
 export interface AgentRuntimeOwnerDependencies {
@@ -25,16 +29,16 @@ export function shouldScheduleThreadStreamStateChanged(
   event: CodexIpcFrameEvent
 ): event is CodexIpcFrameEvent & {
   direction: "in";
-  method: "thread-stream-state-changed";
+  method: ThreadStreamStateChangedMethod;
   threadId: string;
 } {
   if (event.direction !== "in") {
     return false;
   }
-  if (event.method !== "thread-stream-state-changed") {
+  if (event.method !== THREAD_STREAM_STATE_CHANGED_METHOD) {
     return false;
   }
-  if (typeof event.threadId !== "string") {
+  if (event.threadId === null) {
     return false;
   }
   return event.threadId.trim().length > 0;

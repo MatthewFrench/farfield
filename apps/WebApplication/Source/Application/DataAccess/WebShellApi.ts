@@ -6,6 +6,11 @@ import {
   request
 } from "@/Shared/Transport/FarfieldHttpTransport";
 
+const EVENTS_SESSION_ENDPOINT = "/api/events/session";
+const WEB_SHELL_HEALTH_ENDPOINT = "/healthz";
+const POST_METHOD = "POST";
+const JSON_CONTENT_TYPE_HEADER_VALUE = "application/json";
+
 const WebShellHealthResponseSchema = z
   .object({
     ok: z.literal(true),
@@ -27,26 +32,35 @@ const EventsSessionBootstrapRequestSchema = z
   .strict();
 export type ApiEventsSessionBootstrapRequest = z.infer<typeof EventsSessionBootstrapRequestSchema>;
 
+function buildEventsSessionBootstrapRequestInit(
+  input?: ApiEventsSessionBootstrapRequest
+): RequestInit {
+  if (!input) {
+    return {
+      method: POST_METHOD
+    };
+  }
+
+  const payload = EventsSessionBootstrapRequestSchema.parse(input);
+  return {
+    method: POST_METHOD,
+    headers: {
+      "Content-Type": JSON_CONTENT_TYPE_HEADER_VALUE
+    },
+    body: JSON.stringify(payload)
+  };
+}
+
 export async function bootstrapEventsSession(
   input?: ApiEventsSessionBootstrapRequest,
   options?: ApiRequestOptions
 ): Promise<ApiEventsSessionBootstrapResponse> {
-  const requestInit: RequestInit = {
-    method: "POST"
-  };
-  if (input) {
-    const payload = EventsSessionBootstrapRequestSchema.parse(input);
-    requestInit.headers = {
-      "Content-Type": "application/json"
-    };
-    requestInit.body = JSON.stringify(payload);
-  }
   return EventsSessionBootstrapResponseSchema.parse(await request(
-    "/api/events/session",
-    applyRequestOptions(requestInit, options)
+    EVENTS_SESSION_ENDPOINT,
+    applyRequestOptions(buildEventsSessionBootstrapRequestInit(input), options)
   ));
 }
 
 export async function getWebShellHealth(): Promise<ApiWebShellHealthResponse> {
-  return WebShellHealthResponseSchema.parse(await request("/healthz"));
+  return WebShellHealthResponseSchema.parse(await request(WEB_SHELL_HEALTH_ENDPOINT));
 }

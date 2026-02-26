@@ -3,8 +3,15 @@ import { Tooltip as TooltipPrimitive } from "radix-ui"
 
 import { cn } from "@/Shared/Styling/ClassNameMerge"
 
+const TOOLTIP_PROVIDER_DELAY_DURATION_MILLISECONDS = 0
+const TOOLTIP_CONTENT_SIDE_OFFSET_PIXELS = 0
+const TOOLTIP_COMPONENT_DISPLAY_NAME = "Tooltip"
+const TOOLTIP_CONTENT_COMPONENT_DISPLAY_NAME = "TooltipContent"
+const TOOLTIP_PROVIDER_COMPONENT_DISPLAY_NAME = "TooltipProvider"
+const TOOLTIP_TRIGGER_COMPONENT_DISPLAY_NAME = "TooltipTrigger"
+
 function TooltipProvider({
-  delayDuration = 0,
+  delayDuration = TOOLTIP_PROVIDER_DELAY_DURATION_MILLISECONDS,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
   return (
@@ -30,7 +37,7 @@ function TooltipTrigger({
 
 function TooltipContent({
   className,
-  sideOffset = 0,
+  sideOffset = TOOLTIP_CONTENT_SIDE_OFFSET_PIXELS,
   children,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
@@ -51,5 +58,10 @@ function TooltipContent({
     </TooltipPrimitive.Portal>
   )
 }
+
+Tooltip.displayName = TOOLTIP_COMPONENT_DISPLAY_NAME
+TooltipContent.displayName = TOOLTIP_CONTENT_COMPONENT_DISPLAY_NAME
+TooltipProvider.displayName = TOOLTIP_PROVIDER_COMPONENT_DISPLAY_NAME
+TooltipTrigger.displayName = TOOLTIP_TRIGGER_COMPONENT_DISPLAY_NAME
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }

@@ -14,6 +14,13 @@ import {
   requestInitWithOptions
 } from "@/Shared/Transport/FarfieldHttpTransport";
 
+const HEALTH_ENDPOINT = "/api/health";
+const AGENTS_ENDPOINT = "/api/agents";
+const CONFIG_DEFAULTS_ENDPOINT = "/api/config/defaults";
+const COLLABORATION_MODES_ENDPOINT = "/api/collaboration-modes";
+const MODELS_ENDPOINT = "/api/models";
+const MODELS_LIST_LIMIT = 200;
+
 const HealthResponseSchema = FarfieldHealthResponseSchema;
 export type ApiHealthResponse = z.infer<typeof HealthResponseSchema>;
 
@@ -64,6 +71,15 @@ export interface ApiConfigDefaultsOptions extends ApiRequestOptions {
   agentId?: AgentId;
 }
 
+function readConfigDefaultsPath(options?: ApiConfigDefaultsOptions): string {
+  const params = new URLSearchParams();
+  if (options?.agentId) {
+    params.set("agentId", options.agentId);
+  }
+  const suffix = params.toString();
+  return suffix.length > 0 ? `${CONFIG_DEFAULTS_ENDPOINT}?${suffix}` : CONFIG_DEFAULTS_ENDPOINT;
+}
+
 const CollaborationModeListEnvelopeSchema = z
   .object({
     ok: z.literal(true)
@@ -81,37 +97,32 @@ const ModelListEnvelopeSchema = z
 export type ApiModelsResponse = z.infer<typeof AppServerListModelsResponseSchema>;
 
 export async function getHealth(options?: ApiRequestOptions): Promise<ApiHealthResponse> {
-  return HealthResponseSchema.parse(await request("/api/health", requestInitWithOptions(options)));
+  return HealthResponseSchema.parse(await request(HEALTH_ENDPOINT, requestInitWithOptions(options)));
 }
 
 export async function listAgents(options?: ApiRequestOptions): Promise<ApiAgentsResponse> {
-  return AgentsResponseSchema.parse(await request("/api/agents", requestInitWithOptions(options)));
+  return AgentsResponseSchema.parse(await request(AGENTS_ENDPOINT, requestInitWithOptions(options)));
 }
 
 export async function getConfigDefaults(
   options?: ApiConfigDefaultsOptions
 ): Promise<ApiConfigDefaultsResponse> {
-  const params = new URLSearchParams();
-  if (options?.agentId) {
-    params.set("agentId", options.agentId);
-  }
-  const suffix = params.toString();
   return ConfigDefaultsResponseSchema.parse(
-    await request(
-      suffix.length > 0 ? `/api/config/defaults?${suffix}` : "/api/config/defaults",
-      requestInitWithOptions(options)
-    )
+    await request(readConfigDefaultsPath(options), requestInitWithOptions(options))
   );
 }
 
 export async function listCollaborationModes(
   options?: ApiRequestOptions
 ): Promise<ApiCollaborationModesResponse> {
-  const data = await request("/api/collaboration-modes", requestInitWithOptions(options));
+  const data = await request(COLLABORATION_MODES_ENDPOINT, requestInitWithOptions(options));
   return CollaborationModeListEnvelopeSchema.parse(data);
 }
 
 export async function listModels(options?: ApiRequestOptions): Promise<ApiModelsResponse> {
-  const data = await request("/api/models?limit=200", requestInitWithOptions(options));
+  const data = await request(
+    `${MODELS_ENDPOINT}?limit=${String(MODELS_LIST_LIMIT)}`,
+    requestInitWithOptions(options)
+  );
   return ModelListEnvelopeSchema.parse(data);
 }

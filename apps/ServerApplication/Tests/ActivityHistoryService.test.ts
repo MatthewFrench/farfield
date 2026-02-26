@@ -102,7 +102,7 @@ describe("ActivityHistoryService", () => {
     const latestTrace = service.readRecentTraces()[0];
     expect(latestTrace?.label).toBe("trace_21");
     expect(service.readTraceById(latestTrace?.id ?? "")?.id).toBe(latestTrace?.id);
-
+    // Allow trace stream close callbacks to flush before temporary directory cleanup.
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 25);
     });

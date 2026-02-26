@@ -1,10 +1,41 @@
 import { z } from "zod";
-import type { OpenCodePart } from "./Schemas.js";
-import type { MappedTurnItem } from "./MapperContracts.js";
+import type {
+  OpenCodePart,
+  OpenCodeTextPart,
+  OpenCodeToolPart
+} from "./Schemas.js";
+import type {
+  MappedFileChangeEntry,
+  MappedToolLifecycleStatus,
+  MappedTurnItem
+} from "./MapperContracts.js";
 
-type OpenCodeToolPart = Extract<OpenCodePart, { type: "tool" }>;
 type OpenCodeToolState = OpenCodeToolPart["state"];
-type OpenCodeTextPart = Extract<OpenCodePart, { type: "text" }>;
+
+const FILE_EDIT_TOOL_NAMES = new Set<string>(["write", "edit", "multiedit"]);
+const UNKNOWN_FILE_PATH = "(unknown)";
+
+/**
+ * OpenCode tool payloads allow arbitrary key/value input. This projection keeps
+ * mapper logic on strict, named fields while preserving strict parse failures
+ * for mismatched field types.
+ */
+const OpenCodeToolInputProjectionSchema = z
+  .object({
+    command: z.string().optional(),
+    cwd: z.string().optional(),
+    file_path: z.string().optional(),
+    path: z.string().optional()
+  })
+  .passthrough();
+
+type OpenCodeToolInputProjection = z.infer<typeof OpenCodeToolInputProjectionSchema>;
+
+const OpenCodeToolMetadataProjectionSchema = z
+  .object({
+    exit_code: z.number().int().optional()
+  })
+  .passthrough();
 
 export function isTextPart(part: OpenCodePart): part is OpenCodeTextPart {
   return part.type === "text";
@@ -60,9 +91,6 @@ export function partToTurnItem(part: OpenCodePart): MappedTurnItem | null {
     case "compaction":
     case "subtask":
       return null;
-
-    default:
-      return null;
   }
 }
 
@@ -70,27 +98,23 @@ function toolPartToTurnItem(toolPart: OpenCodeToolPart): MappedTurnItem {
   const state = toolPart.state;
   const toolName = toolPart.tool;
   const status = resolveToolStatus(state);
+  const input = parseToolInput(state.input);
 
   if (isFileEditTool(toolName)) {
     return {
       id: toolPart.id,
       type: "fileChange",
-      changes: extractFileChanges(toolName, state),
+      changes: extractFileChanges(toolName, input, state),
       status
     };
   }
 
-  const input = state.input;
-  const command = typeof input["command"] === "string"
-    ? input["command"]
-    : toolName;
-
   return {
     id: toolPart.id,
     type: "commandExecution",
-    command,
+    command: input.command ?? toolName,
     status,
-    ...(typeof input["cwd"] === "string" ? { cwd: input["cwd"] } : {}),
+    ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
     aggregatedOutput: extractToolOutput(state),
     exitCode: extractExitCode(state),
     durationMs: extractDurationMs(state)
@@ -98,19 +122,15 @@ function toolPartToTurnItem(toolPart: OpenCodeToolPart): MappedTurnItem {
 }
 
 function isFileEditTool(toolName: string): boolean {
-  return toolName === "write" || toolName === "edit" || toolName === "multiedit";
+  return FILE_EDIT_TOOL_NAMES.has(toolName);
 }
 
 function extractFileChanges(
   toolName: string,
+  input: OpenCodeToolInputProjection,
   state: OpenCodeToolState
-): Array<{ path: string; kind: { type: string }; diff?: string }> {
-  const input = state.input;
-  const filePath = typeof input["file_path"] === "string"
-    ? input["file_path"]
-    : typeof input["path"] === "string"
-      ? input["path"]
-      : "(unknown)";
+): MappedFileChangeEntry[] {
+  const filePath = input.file_path ?? input.path ?? UNKNOWN_FILE_PATH;
 
   const output = extractToolOutput(state);
   return [{
@@ -120,7 +140,7 @@ function extractFileChanges(
   }];
 }
 
-function resolveToolStatus(state: OpenCodeToolState): string {
+function resolveToolStatus(state: OpenCodeToolState): MappedToolLifecycleStatus {
   return state.status === "error" ? "error" : state.status;
 }
 
@@ -135,18 +155,14 @@ function extractToolOutput(state: OpenCodeToolState): string | null {
 }
 
 function extractExitCode(state: OpenCodeToolState): number | null {
-  if (state.status === "completed" || state.status === "error") {
-    const parsedMetadata = z
-      .object({
-        exit_code: z.number()
-      })
-      .passthrough()
-      .safeParse(state.metadata);
-    if (parsedMetadata.success) {
-      return parsedMetadata.data.exit_code;
-    }
+  if (state.status !== "completed" && state.status !== "error") {
+    return null;
   }
-  return null;
+  if (state.metadata === undefined) {
+    return null;
+  }
+  const metadata = OpenCodeToolMetadataProjectionSchema.parse(state.metadata);
+  return metadata.exit_code ?? null;
 }
 
 function extractDurationMs(state: OpenCodeToolState): number | null {
@@ -157,4 +173,8 @@ function extractDurationMs(state: OpenCodeToolState): number | null {
     return state.time.end - state.time.start;
   }
   return null;
+}
+
+function parseToolInput(input: OpenCodeToolState["input"]): OpenCodeToolInputProjection {
+  return OpenCodeToolInputProjectionSchema.parse(input);
 }

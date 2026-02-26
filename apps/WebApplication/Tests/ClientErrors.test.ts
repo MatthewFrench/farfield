@@ -91,6 +91,27 @@ describe("installGlobalClientCrashReporter", () => {
     handle.remove();
   });
 
+  it("stringifies numeric unhandled rejection reasons", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(buildCreateErrorSuccessResponse());
+    const handle = installGlobalClientCrashReporter({
+      source: "farfield-web"
+    });
+
+    window.dispatchEvent(buildUnhandledRejectionEvent(42));
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    const parsedBody = CreateDebugClientErrorBodySchema.parse(JSON.parse(String(requestInit?.body ?? "")));
+    expect(parsedBody.message).toBe("42");
+    expect(parsedBody.operation).toBe("window-unhandledrejection");
+    expect(parsedBody.details["eventType"]).toBe("window-unhandledrejection");
+
+    handle.remove();
+  });
+
   it("removes listeners when disposed", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(buildCreateErrorSuccessResponse());
     const handle = installGlobalClientCrashReporter({

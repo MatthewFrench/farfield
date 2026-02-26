@@ -1,4 +1,34 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { z } from "zod";
+
+const SESSION_TOKEN_PART_DELIMITER = ".";
+const COOKIE_SEGMENT_DELIMITER = ";";
+const SESSION_TOKEN_PART_COUNT = 4;
+const SESSION_NONCE_RANDOM_BYTE_LENGTH = 18;
+const MINIMUM_MAX_AGE_SECONDS = 1;
+
+const Base64UrlTokenSegmentSchema = z.string().trim().min(1).regex(/^[A-Za-z0-9_-]+$/);
+const SessionTimestampTokenSegmentSchema = z
+  .string()
+  .regex(/^[0-9]+$/)
+  .transform((value) => Number(value))
+  .pipe(z.number().int().positive());
+const SessionTokenPartsSchema = z
+  .tuple([
+    SessionTimestampTokenSegmentSchema,
+    SessionTimestampTokenSegmentSchema,
+    Base64UrlTokenSegmentSchema,
+    Base64UrlTokenSegmentSchema
+  ])
+  .superRefine(([issuedAtMs, expiresAtMs], context) => {
+    if (expiresAtMs <= issuedAtMs) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Session expiry must be greater than issue timestamp",
+        path: [1]
+      });
+    }
+  });
 
 export interface BrowserSessionAuthOwnerConfiguration {
   cookieName: string;
@@ -64,10 +94,10 @@ export class BrowserSessionAuthOwner {
   public issueSessionCookie(): BrowserSessionIssueResult {
     const issuedAtMs = this.now();
     const expiresAtMs = issuedAtMs + this.sessionTimeToLiveMs;
-    const nonce = this.randomBytesFactory(18).toString("base64url");
+    const nonce = this.randomBytesFactory(SESSION_NONCE_RANDOM_BYTE_LENGTH).toString("base64url");
     const payload = this.buildPayload(issuedAtMs, expiresAtMs, nonce);
     const signature = this.sign(payload);
-    const token = `${payload}.${signature}`;
+    const token = `${payload}${SESSION_TOKEN_PART_DELIMITER}${signature}`;
     const expiresAt = new Date(expiresAtMs).toISOString();
 
     return {
@@ -127,7 +157,8 @@ export class BrowserSessionAuthOwner {
   }
 
   private buildSetCookieHeaderValue(token: string, expiresAtMs: number): string {
-    const maxAgeSeconds = Math.floor(this.sessionTimeToLiveMs / 1_000);
+    // Browsers treat Max-Age=0 as immediate expiry, so keep a minimum one-second lifetime.
+    const maxAgeSeconds = Math.max(MINIMUM_MAX_AGE_SECONDS, Math.floor(this.sessionTimeToLiveMs / 1_000));
     const directives = [
       `${this.cookieName}=${token}`,
       "Path=/",
@@ -143,7 +174,7 @@ export class BrowserSessionAuthOwner {
   }
 
   private readCookieValue(cookieHeaderValue: string, cookieName: string): string | null {
-    const segments = cookieHeaderValue.split(";");
+    const segments = cookieHeaderValue.split(COOKIE_SEGMENT_DELIMITER);
     for (const segment of segments) {
       const equalsIndex = segment.indexOf("=");
       if (equalsIndex <= 0) {
@@ -163,29 +194,15 @@ export class BrowserSessionAuthOwner {
   }
 
   private parseSessionToken(token: string): ParsedSessionToken | null {
-    const parts = token.split(".");
-    if (parts.length !== 4) {
+    const parts = token.split(SESSION_TOKEN_PART_DELIMITER);
+    if (parts.length !== SESSION_TOKEN_PART_COUNT) {
       return null;
     }
-
-    const issuedAtRaw = parts[0];
-    const expiresAtRaw = parts[1];
-    const nonce = parts[2];
-    const signature = parts[3];
-    if (!issuedAtRaw || !expiresAtRaw || !nonce || !signature) {
+    const parsedSessionTokenParts = SessionTokenPartsSchema.safeParse(parts);
+    if (!parsedSessionTokenParts.success) {
       return null;
     }
-
-    const issuedAtMs = Number(issuedAtRaw);
-    const expiresAtMs = Number(expiresAtRaw);
-    if (
-      !Number.isInteger(issuedAtMs)
-      || !Number.isInteger(expiresAtMs)
-      || issuedAtMs <= 0
-      || expiresAtMs <= issuedAtMs
-    ) {
-      return null;
-    }
+    const [issuedAtMs, expiresAtMs, nonce, signature] = parsedSessionTokenParts.data;
 
     return {
       issuedAtMs,
@@ -196,7 +213,7 @@ export class BrowserSessionAuthOwner {
   }
 
   private buildPayload(issuedAtMs: number, expiresAtMs: number, nonce: string): string {
-    return `${String(issuedAtMs)}.${String(expiresAtMs)}.${nonce}`;
+    return `${String(issuedAtMs)}${SESSION_TOKEN_PART_DELIMITER}${String(expiresAtMs)}${SESSION_TOKEN_PART_DELIMITER}${nonce}`;
   }
 
   private sign(payload: string): string {

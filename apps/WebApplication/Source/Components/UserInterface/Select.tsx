@@ -4,6 +4,35 @@ import { Select as SelectPrimitive } from "radix-ui"
 
 import { cn } from "@/Shared/Styling/ClassNameMerge"
 
+type SelectTriggerSize = "default" | "sm"
+type SelectContentPosition = "item-aligned" | "popper"
+type SelectContentAlign = "start" | "center" | "end"
+
+type SelectTriggerProps = React.ComponentProps<typeof SelectPrimitive.Trigger> & {
+  size?: SelectTriggerSize
+}
+type SelectContentProps = Omit<
+  React.ComponentProps<typeof SelectPrimitive.Content>,
+  "position" | "align"
+> & {
+  position?: SelectContentPosition
+  align?: SelectContentAlign
+}
+
+const SELECT_TRIGGER_DEFAULT_SIZE: SelectTriggerSize = "default"
+const SELECT_CONTENT_DEFAULT_POSITION: SelectContentPosition = "item-aligned"
+const SELECT_CONTENT_DEFAULT_ALIGN: SelectContentAlign = "center"
+const SELECT_COMPONENT_DISPLAY_NAME = "Select"
+const SELECT_CONTENT_COMPONENT_DISPLAY_NAME = "SelectContent"
+const SELECT_GROUP_COMPONENT_DISPLAY_NAME = "SelectGroup"
+const SELECT_ITEM_COMPONENT_DISPLAY_NAME = "SelectItem"
+const SELECT_LABEL_COMPONENT_DISPLAY_NAME = "SelectLabel"
+const SELECT_SCROLL_DOWN_BUTTON_COMPONENT_DISPLAY_NAME = "SelectScrollDownButton"
+const SELECT_SCROLL_UP_BUTTON_COMPONENT_DISPLAY_NAME = "SelectScrollUpButton"
+const SELECT_SEPARATOR_COMPONENT_DISPLAY_NAME = "SelectSeparator"
+const SELECT_TRIGGER_COMPONENT_DISPLAY_NAME = "SelectTrigger"
+const SELECT_VALUE_COMPONENT_DISPLAY_NAME = "SelectValue"
+
 function Select({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
@@ -24,12 +53,10 @@ function SelectValue({
 
 function SelectTrigger({
   className,
-  size = "default",
+  size = SELECT_TRIGGER_DEFAULT_SIZE,
   children,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
-  size?: "sm" | "default"
-}) {
+}: SelectTriggerProps) {
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
@@ -51,10 +78,10 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  position = "item-aligned",
-  align = "center",
+  position = SELECT_CONTENT_DEFAULT_POSITION,
+  align = SELECT_CONTENT_DEFAULT_ALIGN,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
+}: SelectContentProps) {
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
@@ -173,6 +200,17 @@ function SelectScrollDownButton({
     </SelectPrimitive.ScrollDownButton>
   )
 }
+
+Select.displayName = SELECT_COMPONENT_DISPLAY_NAME
+SelectContent.displayName = SELECT_CONTENT_COMPONENT_DISPLAY_NAME
+SelectGroup.displayName = SELECT_GROUP_COMPONENT_DISPLAY_NAME
+SelectItem.displayName = SELECT_ITEM_COMPONENT_DISPLAY_NAME
+SelectLabel.displayName = SELECT_LABEL_COMPONENT_DISPLAY_NAME
+SelectScrollDownButton.displayName = SELECT_SCROLL_DOWN_BUTTON_COMPONENT_DISPLAY_NAME
+SelectScrollUpButton.displayName = SELECT_SCROLL_UP_BUTTON_COMPONENT_DISPLAY_NAME
+SelectSeparator.displayName = SELECT_SEPARATOR_COMPONENT_DISPLAY_NAME
+SelectTrigger.displayName = SELECT_TRIGGER_COMPONENT_DISPLAY_NAME
+SelectValue.displayName = SELECT_VALUE_COMPONENT_DISPLAY_NAME
 
 export {
   Select,

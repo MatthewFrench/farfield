@@ -1,48 +1,48 @@
 import { JsonValueSchema, type JsonValue } from "@farfield/protocol";
 import { z } from "zod";
-import { type ParsedReplayFrame } from "./DebugRouteContracts.js";
+import {
+  DebugReplayFrameTypeByName,
+  type ParsedReplayFrame
+} from "./DebugRouteContracts.js";
+
+const ReplayFrameMethodSchema = z.string().trim().min(1);
+const ReplayFrameTargetClientIdentifierSchema = z.string().trim().min(1);
+
+const ReplayRequestFrameSchema = z
+  .object({
+    type: z.literal(DebugReplayFrameTypeByName.request),
+    method: ReplayFrameMethodSchema,
+    params: JsonValueSchema.optional(),
+    targetClientId: ReplayFrameTargetClientIdentifierSchema.optional(),
+    version: z.number().int().optional()
+  })
+  .passthrough();
+
+const ReplayBroadcastFrameSchema = z
+  .object({
+    type: z.literal(DebugReplayFrameTypeByName.broadcast),
+    method: ReplayFrameMethodSchema,
+    params: JsonValueSchema.optional(),
+    targetClientId: ReplayFrameTargetClientIdentifierSchema.optional(),
+    version: z.number().int().optional()
+  })
+  .passthrough();
 
 const ReplayFrameSchema = z
-  .discriminatedUnion("type", [
-    z
-      .object({
-        type: z.literal("request"),
-        method: z.string().trim().min(1),
-        params: JsonValueSchema.optional(),
-        targetClientId: z.string().optional(),
-        version: z.number().int().optional()
-      })
-      .passthrough(),
-    z
-      .object({
-        type: z.literal("broadcast"),
-        method: z.string().trim().min(1),
-        params: JsonValueSchema.optional(),
-        targetClientId: z.string().optional(),
-        version: z.number().int().optional()
-      })
-      .passthrough()
-  ])
-  .superRefine((value, context) => {
-    if (value.method.length === 0) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Captured IPC frame has invalid method"
-      });
-    }
-  });
+  .discriminatedUnion("type", [ReplayRequestFrameSchema, ReplayBroadcastFrameSchema]);
 
 export function parseReplayFrame(payload: JsonValue): ParsedReplayFrame {
-  const parsed = ReplayFrameSchema.safeParse(payload);
-  if (!parsed.success) {
-    throw new Error(parsed.error.message);
-  }
+  const parsedReplayFrame = ReplayFrameSchema.parse(payload);
 
   return {
-    type: parsed.data.type,
-    method: parsed.data.method,
-    params: parsed.data.params,
-    ...(parsed.data.targetClientId ? { targetClientId: parsed.data.targetClientId } : {}),
-    ...(typeof parsed.data.version === "number" ? { version: parsed.data.version } : {})
+    type: parsedReplayFrame.type,
+    method: parsedReplayFrame.method,
+    params: parsedReplayFrame.params,
+    ...(parsedReplayFrame.targetClientId !== undefined
+      ? { targetClientId: parsedReplayFrame.targetClientId }
+      : {}),
+    ...(parsedReplayFrame.version !== undefined
+      ? { version: parsedReplayFrame.version }
+      : {})
   };
 }

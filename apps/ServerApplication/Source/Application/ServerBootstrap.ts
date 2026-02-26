@@ -40,6 +40,11 @@ import { ServerBootstrapUtilityOwner } from "./Bootstrap/ServerBootstrapUtilityO
 import { PushMutationConcurrencyCoordinator } from "../Network/PushMutationConcurrencyCoordinator.js";
 import { ThreadListCacheInvalidationOwner } from "./Bootstrap/ThreadListCacheInvalidationOwner.js";
 import { ThreadStreamDeltaEventPublisher } from "../Network/ThreadStreamDeltaEventPublisher.js";
+import {
+  THREAD_STREAM_STATE_CHANGED_BATCH_EVENT_TYPE,
+  THREAD_STREAM_STATE_CHANGED_METHOD,
+  ThreadStreamStateChangedHistoryBatchOwner
+} from "./ThreadStreamStateChangedHistoryBatchOwner.js";
 
 const PushTestBodySchema = FarfieldPushTestBodySchema;
 const runtimeConfiguration = readServerRuntimeConfigurationFromCurrentProcessEnvironment();
@@ -80,13 +85,17 @@ const pushLocalCaSourcePath = runtimeConfiguration.pushLocalCaSourcePath;
 const pushVapidPublicKey = runtimeConfiguration.pushVapidPublicKey;
 const pushVapidPrivateKey = runtimeConfiguration.pushVapidPrivateKey;
 const pushVapidSubject = runtimeConfiguration.pushVapidSubject;
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+const EVENT_STREAM_KEEPALIVE_INTERVAL_MS = 15_000;
+// Summarize bursty stream-state events once per second to preserve readable activity history.
+const THREAD_STREAM_HISTORY_SUMMARY_FLUSH_INTERVAL_MS = 1_000;
 
 const pushStore = new PushStore(pushStatePathResolution.filePath);
 pushStore.load();
 const pushReceiptStore = new PushReceiptStore(
   pushReceiptsPath,
   runtimeConfiguration.pushReceiptsMaxCount,
-  runtimeConfiguration.pushReceiptsMaxAgeDays * 24 * 60 * 60 * 1000
+  runtimeConfiguration.pushReceiptsMaxAgeDays * MILLISECONDS_PER_DAY
 );
 pushReceiptStore.load();
 const pushSendStore = new PushSendStore(pushSendsPath);
@@ -108,7 +117,6 @@ const clientErrorStore = new ClientErrorStore(
 const serverErrorEventRecorder = new ServerErrorEventRecorder(clientErrorStore);
 let agentRuntimeOwner: AgentRuntimeOwner | null = null;
 
-const EVENT_STREAM_KEEPALIVE_INTERVAL_MS = 15_000;
 const eventStreamClientRegistry = new EventStreamClientRegistry(
   EVENT_STREAM_KEEPALIVE_INTERVAL_MS
 );
@@ -123,6 +131,23 @@ const activityHistoryService = new ActivityHistoryService(
   eventStreamClientRegistry,
   runtimeConfiguration.historyPayloadSummaryMaximumBytes
 );
+const threadStreamStateChangedHistoryBatchOwner = new ThreadStreamStateChangedHistoryBatchOwner({
+  flushIntervalMs: THREAD_STREAM_HISTORY_SUMMARY_FLUSH_INTERVAL_MS,
+  emitSummary: (summary) => {
+    activityHistoryService.pushHistory("ipc", "in", {
+      type: THREAD_STREAM_STATE_CHANGED_BATCH_EVENT_TYPE,
+      count: summary.count,
+      spanMs: summary.spanMs,
+      latestThreadId: summary.latestThreadId
+    }, {
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
+      threadId: summary.latestThreadId,
+      summarized: true,
+      count: summary.count,
+      spanMs: summary.spanMs
+    });
+  }
+});
 const threadIndex = new ThreadIndex();
 const threadListAggregationCache = new ThreadListAggregationCache(
   runtimeConfiguration.threadListAggregationCacheTimeToLiveMs,
@@ -219,37 +244,6 @@ function invalidateThreadListAggregationCache(
   threadListCacheInvalidationOwner.invalidate(reason, details);
 }
 
-let bufferedThreadStreamHistoryEventCount = 0;
-let bufferedThreadStreamHistoryFirstAtMs: number | null = null;
-let bufferedThreadStreamHistoryLatestThreadId: string | null = null;
-
-function flushBufferedThreadStreamHistorySummary(nowMs: number): void {
-  if (
-    bufferedThreadStreamHistoryEventCount === 0
-    || bufferedThreadStreamHistoryFirstAtMs === null
-  ) {
-    return;
-  }
-
-  const spanMs = Math.max(0, nowMs - bufferedThreadStreamHistoryFirstAtMs);
-  activityHistoryService.pushHistory("ipc", "in", {
-    type: "thread-stream-state-changed-batch",
-    count: bufferedThreadStreamHistoryEventCount,
-    spanMs,
-    latestThreadId: bufferedThreadStreamHistoryLatestThreadId
-  }, {
-    method: "thread-stream-state-changed",
-    threadId: bufferedThreadStreamHistoryLatestThreadId,
-    summarized: true,
-    count: bufferedThreadStreamHistoryEventCount,
-    spanMs
-  });
-
-  bufferedThreadStreamHistoryEventCount = 0;
-  bufferedThreadStreamHistoryFirstAtMs = null;
-  bufferedThreadStreamHistoryLatestThreadId = null;
-}
-
 agentRuntimeOwner = new AgentRuntimeOwner({
   configuredAgentIds,
   codexExecutablePath: codexExecutable,
@@ -263,27 +257,19 @@ agentRuntimeOwner = new AgentRuntimeOwner({
     broadcastRuntimeState();
   },
   onCodexFrame: (event) => {
-    if (event.method === "thread-stream-state-changed") {
-      const nowMs = Date.now();
-      bufferedThreadStreamHistoryEventCount += 1;
-      if (bufferedThreadStreamHistoryFirstAtMs === null) {
-        bufferedThreadStreamHistoryFirstAtMs = nowMs;
-      }
-      bufferedThreadStreamHistoryLatestThreadId = event.threadId;
-      if (nowMs - bufferedThreadStreamHistoryFirstAtMs >= 1_000) {
-        flushBufferedThreadStreamHistorySummary(nowMs);
-      }
+    const nowMs = Date.now();
+    if (threadStreamStateChangedHistoryBatchOwner.handleFrame(event, nowMs)) {
       return;
     }
 
-    flushBufferedThreadStreamHistorySummary(Date.now());
+    threadStreamStateChangedHistoryBatchOwner.flushBufferedSummary(nowMs);
     activityHistoryService.pushHistory("ipc", event.direction, event.frame as JsonValue, {
       method: event.method,
       threadId: event.threadId
     });
   },
   onThreadStreamStateChanged: (threadId) => {
-    invalidateThreadListAggregationCache("thread-stream-state-changed", {
+    invalidateThreadListAggregationCache(THREAD_STREAM_STATE_CHANGED_METHOD, {
       threadId
     });
     pushDispatchConcurrencyCoordinator.schedule(threadId);

@@ -6,13 +6,23 @@ import {
   type PushReceiptStore as PushReceiptStoreState
 } from "@farfield/protocol";
 
+const PUSH_RECEIPT_STORE_VERSION = 2;
+const JSON_INDENT_SPACES = 2;
+const LINE_FEED = "\n";
+const TEMP_FILE_EXTENSION = "tmp";
+const OWNER_READ_WRITE_PERMISSIONS = 0o600;
+const WINDOWS_PLATFORM = "win32";
+
 function buildDefaultState(): PushReceiptStoreState {
   return parsePushReceiptStore({
-    version: 2,
+    version: PUSH_RECEIPT_STORE_VERSION,
     receipts: []
   });
 }
 
+/**
+ * Owns bounded retention of push delivery receipts for debug surfaces.
+ */
 export class PushReceiptStore {
   private readonly filePath: string;
   private readonly maxReceipts: number;
@@ -93,9 +103,9 @@ export class PushReceiptStore {
     const directory = path.dirname(this.filePath);
     fs.mkdirSync(directory, { recursive: true });
 
-    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
-    const encoded = `${JSON.stringify(this.state, null, 2)}\n`;
-    const fd = fs.openSync(tempPath, "w", 0o600);
+    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.${TEMP_FILE_EXTENSION}`;
+    const encoded = `${JSON.stringify(this.state, null, JSON_INDENT_SPACES)}${LINE_FEED}`;
+    const fd = fs.openSync(tempPath, "w", OWNER_READ_WRITE_PERMISSIONS);
     try {
       fs.writeFileSync(fd, encoded, "utf8");
       fs.fsyncSync(fd);
@@ -112,7 +122,7 @@ export class PushReceiptStore {
       throw error;
     }
 
-    if (process.platform !== "win32") {
+    if (process.platform !== WINDOWS_PLATFORM) {
       const dirFd = fs.openSync(directory, "r");
       try {
         fs.fsyncSync(dirFd);

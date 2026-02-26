@@ -27,6 +27,9 @@ interface ActionRequestOptions {
   requestOptions: ApiRequestOptions;
 }
 
+const RUNTIME_REQUEST_ERROR_OPERATION = "runtime-request-error";
+const RUNTIME_REQUEST_ERROR_HANDLER_NAME = "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError";
+
 export interface UseApplicationRuntimeRequestHandlersInput {
   trackedUserInterfaceErrorReporter: TrackedUserInterfaceErrorReporter;
   userInterfaceActionRequestBuilder: UserInterfaceActionRequestBuilder;
@@ -72,11 +75,10 @@ export function useApplicationRuntimeRequestHandlers(
       return;
     }
 
-    const runtimeErrorOperation = "runtime-request-error";
-    const actionId = input.userInterfaceActionRequestBuilder.create(runtimeErrorOperation).actionId;
+    const actionId = input.userInterfaceActionRequestBuilder.create(RUNTIME_REQUEST_ERROR_OPERATION).actionId;
     const runtimeErrorDescriptor = resolveRuntimeRequestErrorDescriptor({
       rawMessage: message,
-      defaultOperation: runtimeErrorOperation,
+      defaultOperation: RUNTIME_REQUEST_ERROR_OPERATION,
       actionId
     });
     void input.trackedUserInterfaceErrorReporter.report({
@@ -85,7 +87,7 @@ export function useApplicationRuntimeRequestHandlers(
       threadId: null,
       error: runtimeErrorDescriptor.trackingErrorMessage,
       details: {
-        handler: "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError"
+        handler: RUNTIME_REQUEST_ERROR_HANDLER_NAME
       }
     });
     input.setErrorMessage(runtimeErrorDescriptor.bannerErrorMessage);

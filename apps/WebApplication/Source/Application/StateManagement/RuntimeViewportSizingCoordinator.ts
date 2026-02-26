@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const MINIMUM_VIEWPORT_HEIGHT_PX = 1;
+
 export type ViewportOrientation = "portrait" | "landscape";
 
 export interface RuntimeViewportMetrics {
@@ -37,6 +39,7 @@ export class RuntimeViewportSizingCoordinator {
     const visualViewportHeight = this.readVisualViewportHeightPx();
     const orientation = this.readViewportOrientation();
 
+    // Keep a per-orientation baseline so keyboard detection remains stable across rotations.
     if (orientation === "landscape") {
       this.maxVisualHeightLandscape = Math.max(this.maxVisualHeightLandscape, visualViewportHeight);
     } else {
@@ -50,7 +53,7 @@ export class RuntimeViewportSizingCoordinator {
     const keyboardOpen = keyboardDelta >= this.keyboardOpenDeltaThresholdPx;
     const safeAreaInsetBottom = this.readCssPixelVariable("--safe-area-inset-bottom-clamped");
     const composerSafeBottomInset = keyboardOpen ? 0 : safeAreaInsetBottom;
-    const appHeight = Math.max(1, Math.round(visualViewportHeight));
+    const appHeight = Math.max(MINIMUM_VIEWPORT_HEIGHT_PX, Math.round(visualViewportHeight));
 
     root.style.setProperty("--app-height", `${String(appHeight)}px`);
     root.style.setProperty(
@@ -98,6 +101,6 @@ export class RuntimeViewportSizingCoordinator {
     if (innerHeightResult.success) {
       return innerHeightResult.data;
     }
-    return 1;
+    return MINIMUM_VIEWPORT_HEIGHT_PX;
   }
 }

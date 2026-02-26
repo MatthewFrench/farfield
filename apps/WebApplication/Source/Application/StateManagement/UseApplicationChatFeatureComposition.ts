@@ -12,6 +12,15 @@ import {
 } from "@/Features/Chat/StateManagement/UseChatModeToolbarProperties";
 import { type ChatModeToolbarProps } from "@/Features/Chat/UserInterface/ChatModeToolbar";
 
+interface PlanModeOption {
+  mode?: string | null | undefined;
+}
+
+interface ChatModelOption {
+  id: string;
+  label: string;
+}
+
 export interface UseApplicationChatFeatureCompositionInput {
   chatScrollEffectsInput: UseChatScrollEffectsInput;
   chatActionHandlersInput: UseChatActionHandlersInput;
@@ -22,7 +31,7 @@ export interface UseApplicationChatModeToolbarPropertiesInput {
   canSetCollaborationMode: boolean;
   canListCollaborationModes: boolean;
   canListModels: boolean;
-  planModeOption: { mode?: string | null | undefined } | null;
+  planModeOption: PlanModeOption | null;
   defaultModeKey: string | null;
   isPlanModeEnabled: boolean;
   selectedThreadId: string | null;
@@ -32,7 +41,7 @@ export interface UseApplicationChatModeToolbarPropertiesInput {
   selectedModelId: string;
   selectedReasoningEffort: string;
   selectedModeKey: string;
-  modelOptionsWithoutAssumedDefault: { id: string; label: string }[];
+  modelOptionsWithoutAssumedDefault: ChatModelOption[];
   effortOptionsWithoutAssumedDefault: string[];
   isModeSyncing: boolean;
   pendingRequestCount: number;
@@ -48,11 +57,36 @@ export interface ApplicationChatFeatureComposition extends ChatActionHandlers {
 export function useApplicationChatFeatureComposition(
   input: UseApplicationChatFeatureCompositionInput
 ): ApplicationChatFeatureComposition {
-  useChatScrollEffects(input.chatScrollEffectsInput);
+  const {
+    chatScrollEffectsInput,
+    chatActionHandlersInput,
+    chatModeToolbarPropertiesInput
+  } = input;
 
-  const chatActionHandlers = useChatActionHandlers(input.chatActionHandlersInput);
+  useChatScrollEffects(chatScrollEffectsInput);
+
+  const chatActionHandlers = useChatActionHandlers(chatActionHandlersInput);
   const chatModeToolbarProperties = useChatModeToolbarProperties({
-    ...input.chatModeToolbarPropertiesInput,
+    canSetCollaborationMode: chatModeToolbarPropertiesInput.canSetCollaborationMode,
+    canListCollaborationModes: chatModeToolbarPropertiesInput.canListCollaborationModes,
+    canListModels: chatModeToolbarPropertiesInput.canListModels,
+    planModeOption: chatModeToolbarPropertiesInput.planModeOption,
+    defaultModeKey: chatModeToolbarPropertiesInput.defaultModeKey,
+    isPlanModeEnabled: chatModeToolbarPropertiesInput.isPlanModeEnabled,
+    selectedThreadId: chatModeToolbarPropertiesInput.selectedThreadId,
+    appDefaultValue: chatModeToolbarPropertiesInput.appDefaultValue,
+    appDefaultModel: chatModeToolbarPropertiesInput.appDefaultModel,
+    appDefaultReasoningEffort: chatModeToolbarPropertiesInput.appDefaultReasoningEffort,
+    selectedModelId: chatModeToolbarPropertiesInput.selectedModelId,
+    selectedReasoningEffort: chatModeToolbarPropertiesInput.selectedReasoningEffort,
+    selectedModeKey: chatModeToolbarPropertiesInput.selectedModeKey,
+    modelOptionsWithoutAssumedDefault: chatModeToolbarPropertiesInput.modelOptionsWithoutAssumedDefault,
+    effortOptionsWithoutAssumedDefault: chatModeToolbarPropertiesInput.effortOptionsWithoutAssumedDefault,
+    isModeSyncing: chatModeToolbarPropertiesInput.isModeSyncing,
+    pendingRequestCount: chatModeToolbarPropertiesInput.pendingRequestCount,
+    setSelectedModeKey: chatModeToolbarPropertiesInput.setSelectedModeKey,
+    setSelectedModelId: chatModeToolbarPropertiesInput.setSelectedModelId,
+    setSelectedReasoningEffort: chatModeToolbarPropertiesInput.setSelectedReasoningEffort,
     applyModeDraft: chatActionHandlers.applyModeDraft
   });
 

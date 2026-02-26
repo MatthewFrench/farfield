@@ -4,7 +4,7 @@ import {
 } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import {
-  DebugWorkspaceSectionSchema,
+  parseDebugWorkspaceSection,
   type DebugWorkspaceSection
 } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import { Tabs } from "@/Components/UserInterface/Tabs";
@@ -108,10 +108,7 @@ export function DebugWorkspacePane({
       <Tabs
         value={debugWorkspaceSection}
         onValueChange={(value) => {
-          const parsedSection = DebugWorkspaceSectionSchema.safeParse(value);
-          if (parsedSection.success) {
-            onDebugWorkspaceSectionChange(parsedSection.data);
-          }
+          onDebugWorkspaceSectionChange(parseDebugWorkspaceSection(value));
         }}
         className="flex-1 min-h-0 flex flex-col overflow-hidden"
       >

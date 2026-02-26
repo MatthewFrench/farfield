@@ -7,6 +7,18 @@ import type {
 import type { EventStreamClientRegistry } from "./EventStreamClientRegistry.js";
 
 const STREAM_EVENT_LIMIT = 400;
+const THREAD_STREAM_DELTA_PUBLISH_FAILED_LOG_EVENT = "thread-stream-delta-publish-failed";
+
+export interface ThreadStreamDeltaEventPublisherStatistics {
+  scheduledPublishCount: number;
+  startedPublishCount: number;
+  completedPublishCount: number;
+  failedPublishCount: number;
+  broadcastCount: number;
+  suppressedBroadcastCount: number;
+  pendingThreadCount: number;
+  inFlightThreadCount: number;
+}
 
 export interface ThreadStreamDeltaEventPublisherDependencies {
   eventStreamClientRegistry: EventStreamClientRegistry;
@@ -34,6 +46,12 @@ export class ThreadStreamDeltaEventPublisher {
   private readonly inFlightThreadIdSet: Set<string>;
   private readonly pendingThreadIdSet: Set<string>;
   private readonly lastPublishedSequenceByThreadId: Map<string, number>;
+  private scheduledPublishCount: number;
+  private startedPublishCount: number;
+  private completedPublishCount: number;
+  private failedPublishCount: number;
+  private broadcastCount: number;
+  private suppressedBroadcastCount: number;
 
   public constructor(dependencies: ThreadStreamDeltaEventPublisherDependencies) {
     this.eventStreamClientRegistry = dependencies.eventStreamClientRegistry;
@@ -42,6 +60,12 @@ export class ThreadStreamDeltaEventPublisher {
     this.inFlightThreadIdSet = new Set<string>();
     this.pendingThreadIdSet = new Set<string>();
     this.lastPublishedSequenceByThreadId = new Map<string, number>();
+    this.scheduledPublishCount = 0;
+    this.startedPublishCount = 0;
+    this.completedPublishCount = 0;
+    this.failedPublishCount = 0;
+    this.broadcastCount = 0;
+    this.suppressedBroadcastCount = 0;
   }
 
   public schedulePublish(threadId: string): void {
@@ -49,6 +73,7 @@ export class ThreadStreamDeltaEventPublisher {
     if (normalizedThreadId.length === 0) {
       return;
     }
+    this.scheduledPublishCount += 1;
 
     this.pendingThreadIdSet.add(normalizedThreadId);
     if (this.inFlightThreadIdSet.has(normalizedThreadId)) {
@@ -61,18 +86,34 @@ export class ThreadStreamDeltaEventPublisher {
     });
   }
 
+  public readStatistics(): ThreadStreamDeltaEventPublisherStatistics {
+    return {
+      scheduledPublishCount: this.scheduledPublishCount,
+      startedPublishCount: this.startedPublishCount,
+      completedPublishCount: this.completedPublishCount,
+      failedPublishCount: this.failedPublishCount,
+      broadcastCount: this.broadcastCount,
+      suppressedBroadcastCount: this.suppressedBroadcastCount,
+      pendingThreadCount: this.pendingThreadIdSet.size,
+      inFlightThreadCount: this.inFlightThreadIdSet.size
+    };
+  }
+
   private async publishPendingThread(threadId: string): Promise<void> {
+    this.startedPublishCount += 1;
     try {
       while (this.pendingThreadIdSet.delete(threadId)) {
         await this.publishThreadDelta(threadId);
       }
+      this.completedPublishCount += 1;
     } catch (error) {
+      this.failedPublishCount += 1;
       logger.warn(
         {
           threadId,
           error: toErrorMessage(error)
         },
-        "thread-stream-delta-publish-failed"
+        THREAD_STREAM_DELTA_PUBLISH_FAILED_LOG_EVENT
       );
     } finally {
       this.inFlightThreadIdSet.delete(threadId);
@@ -91,6 +132,7 @@ export class ThreadStreamDeltaEventPublisher {
     this.lastPublishedSequenceByThreadId.set(threadId, streamEventsSnapshot.nextSequence);
 
     if (streamEventsSnapshot.events.length === 0 && !streamEventsSnapshot.resetRequired) {
+      this.suppressedBroadcastCount += 1;
       return;
     }
 
@@ -118,6 +160,7 @@ export class ThreadStreamDeltaEventPublisher {
       }
     };
     this.eventStreamClientRegistry.broadcast(event);
+    this.broadcastCount += 1;
   }
 }
 

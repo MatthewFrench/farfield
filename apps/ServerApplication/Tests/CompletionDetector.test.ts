@@ -107,4 +107,99 @@ describe("CompletionDetector", () => {
     const candidate = detector.detect("thread_1", state);
     expect(candidate).toBeNull();
   });
+
+  it("accepts completed status values regardless of case", () => {
+    const detector = new CompletionDetector(new Map());
+    const state = parseThreadConversationState({
+      id: "thread_1",
+      turns: [
+        {
+          turnId: "turn_1",
+          status: "COMPLETED",
+          items: [
+            {
+              id: "item_agent_1",
+              type: "agentMessage",
+              text: "done"
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    const candidate = detector.detect("thread_1", state);
+    expect(candidate).not.toBeNull();
+    expect(candidate?.turnId).toBe("turn_1");
+  });
+
+  it("uses legacy turn identifier when turnId is absent", () => {
+    const detector = new CompletionDetector(new Map());
+    const state = parseThreadConversationState({
+      id: "thread_1",
+      turns: [
+        {
+          id: "turn_legacy_id",
+          turnId: null,
+          status: "completed",
+          items: [
+            {
+              id: "item_agent_1",
+              type: "agentMessage",
+              text: "done"
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    const candidate = detector.detect("thread_1", state);
+    expect(candidate).not.toBeNull();
+    expect(candidate?.turnId).toBe("turn_legacy_id");
+  });
+
+  it("uses the last agent message item from the completed turn", () => {
+    const detector = new CompletionDetector(new Map());
+    const state = parseThreadConversationState({
+      id: "thread_1",
+      turns: [
+        {
+          turnId: "turn_1",
+          status: "completed",
+          items: [
+            {
+              id: "item_agent_1",
+              type: "agentMessage",
+              text: "older"
+            },
+            {
+              id: "item_error_1",
+              type: "error",
+              message: "transient"
+            },
+            {
+              id: "item_agent_2",
+              type: "agentMessage",
+              text: "newer"
+            }
+          ]
+        }
+      ],
+      requests: []
+    });
+
+    const candidate = detector.detect("thread_1", state);
+    expect(candidate).not.toBeNull();
+    expect(candidate?.agentMessageId).toBe("item_agent_2");
+    expect(candidate?.agentText).toBe("newer");
+  });
+
+  it("tracks watermark state through commit and read APIs", () => {
+    const detector = new CompletionDetector(new Map());
+    expect(detector.getWatermark("thread_1")).toBeNull();
+
+    detector.commit("thread_1", "thread_1:turn_1:item_agent_1");
+    expect(detector.getWatermark("thread_1")).toBe("thread_1:turn_1:item_agent_1");
+  });
 });

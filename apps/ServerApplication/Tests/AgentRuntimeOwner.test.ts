@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { IpcFrame } from "@farfield/protocol";
 import type { CodexIpcFrameEvent } from "../Source/Agents/Adapters/CodexAgentAdapter.js";
 import { shouldScheduleThreadStreamStateChanged } from "../Source/Agents/AgentRuntimeOwner.js";
+import { THREAD_STREAM_STATE_CHANGED_METHOD } from "../Source/Agents/ThreadStreamStateChangedContract.js";
 
 describe("AgentRuntimeOwner", () => {
   it("schedules completion checks only for inbound thread-stream updates", () => {
     const inboundStreamFrame: IpcFrame = {
       type: "broadcast",
-      method: "thread-stream-state-changed",
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
       params: {},
       sourceClientId: "client_a",
       version: 1
@@ -15,7 +16,7 @@ describe("AgentRuntimeOwner", () => {
     const inboundStreamEvent: CodexIpcFrameEvent = {
       direction: "in",
       frame: inboundStreamFrame,
-      method: "thread-stream-state-changed",
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
       threadId: "thread_1"
     };
 
@@ -26,7 +27,7 @@ describe("AgentRuntimeOwner", () => {
     const outboundPreviewFrame: IpcFrame = {
       type: "request",
       requestId: "request_preview",
-      method: "thread-stream-state-changed",
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
       params: {},
       targetClientId: "client_a",
       version: 1
@@ -34,7 +35,7 @@ describe("AgentRuntimeOwner", () => {
     const outboundPreviewEvent: CodexIpcFrameEvent = {
       direction: "out",
       frame: outboundPreviewFrame,
-      method: "thread-stream-state-changed",
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
       threadId: "thread_1"
     };
 
@@ -62,7 +63,7 @@ describe("AgentRuntimeOwner", () => {
   it("does not schedule completion checks when thread identifier is absent", () => {
     const inboundStreamFrame: IpcFrame = {
       type: "broadcast",
-      method: "thread-stream-state-changed",
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
       params: {},
       sourceClientId: "client_a",
       version: 1
@@ -70,10 +71,28 @@ describe("AgentRuntimeOwner", () => {
     const inboundStreamEventWithoutThreadIdentifier: CodexIpcFrameEvent = {
       direction: "in",
       frame: inboundStreamFrame,
-      method: "thread-stream-state-changed",
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
       threadId: null
     };
 
     expect(shouldScheduleThreadStreamStateChanged(inboundStreamEventWithoutThreadIdentifier)).toBe(false);
+  });
+
+  it("does not schedule completion checks when thread identifier is whitespace", () => {
+    const inboundStreamFrame: IpcFrame = {
+      type: "broadcast",
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
+      params: {},
+      sourceClientId: "client_a",
+      version: 1
+    };
+    const inboundStreamEventWithWhitespaceIdentifier: CodexIpcFrameEvent = {
+      direction: "in",
+      frame: inboundStreamFrame,
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
+      threadId: "   "
+    };
+
+    expect(shouldScheduleThreadStreamStateChanged(inboundStreamEventWithWhitespaceIdentifier)).toBe(false);
   });
 });

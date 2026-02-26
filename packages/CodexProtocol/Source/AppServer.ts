@@ -4,9 +4,9 @@ import {
   NonEmptyStringSchema,
   NullableStringSchema
 } from "./Common.js";
-import { ProtocolValidationError } from "./Errors.js";
 import { CollaborationModeSchema } from "./Contracts/Thread/CollaborationModeContracts.js";
 import { ThreadConversationStateSchema } from "./Contracts/Thread/ConversationStateContracts.js";
+import { parseSchemaOrThrow } from "./ProtocolSchemaParsers.js";
 import {
   CollaborationModeListResponseSchema as GeneratedCollaborationModeListResponseSchema,
   ModelListResponseSchema as GeneratedModelListResponseSchema,
@@ -221,38 +221,46 @@ export type DebugErrorCreateResponse = z.infer<typeof DebugErrorCreateResponseSc
 export type DebugErrorClearResponse = z.infer<typeof DebugErrorClearResponseSchema>;
 export type DebugErrorListResponse = z.infer<typeof DebugErrorListResponseSchema>;
 export type DebugErrorDetailResponse = z.infer<typeof DebugErrorDetailResponseSchema>;
-
-function parseWithSchema<Schema extends z.ZodTypeAny>(
-  schema: Schema,
-  value: z.input<Schema>,
-  context: string
-): z.output<Schema> {
-  const result = schema.safeParse(value);
-  if (!result.success) {
-    throw ProtocolValidationError.fromZod(context, result.error);
-  }
-  return result.data;
-}
+const ParseContext = {
+  listThreadsResponse: "AppServerListThreadsResponse",
+  readThreadGeneratedResponse: "GeneratedAppServerReadThreadResponse",
+  readThreadConversationState: "AppServerReadThreadResponse.thread",
+  listModelsResponse: "AppServerListModelsResponse",
+  collaborationModeListResponse: "AppServerCollaborationModeListResponse",
+  startThreadResponse: "AppServerStartThreadResponse",
+  configReadResponse: "AppServerConfigReadResponse",
+  createDebugClientErrorBody: "CreateDebugClientErrorBody",
+  debugErrorEvent: "DebugErrorEvent",
+  debugErrorCreateResponse: "DebugErrorCreateResponse",
+  debugErrorClearResponse: "DebugErrorClearResponse",
+  debugErrorListResponse: "DebugErrorListResponse",
+  debugErrorDetailResponse: "DebugErrorDetailResponse"
+} as const;
 
 export function parseAppServerListThreadsResponse(
   value: z.input<typeof AppServerListThreadsResponseSchema>
 ): AppServerListThreadsResponse {
-  return parseWithSchema(AppServerListThreadsResponseSchema, value, "AppServerListThreadsResponse");
+  return parseSchemaOrThrow(
+    AppServerListThreadsResponseSchema,
+    value,
+    ParseContext.listThreadsResponse
+  );
 }
 
 export function parseAppServerReadThreadResponse(
   value: z.input<typeof AppServerThreadReadResponseBaseSchema>
 ): AppServerReadThreadResponse {
-  const parsed = parseWithSchema(
+  const parsed = parseSchemaOrThrow(
     AppServerThreadReadResponseBaseSchema,
     value,
-    "GeneratedAppServerReadThreadResponse"
+    ParseContext.readThreadGeneratedResponse
   );
+
   return {
-    thread: parseWithSchema(
+    thread: parseSchemaOrThrow(
       ThreadConversationStateSchema,
       parsed.thread,
-      "AppServerReadThreadResponse.thread"
+      ParseContext.readThreadConversationState
     )
   };
 }
@@ -260,61 +268,93 @@ export function parseAppServerReadThreadResponse(
 export function parseAppServerListModelsResponse(
   value: z.input<typeof AppServerListModelsResponseSchema>
 ): AppServerListModelsResponse {
-  return parseWithSchema(AppServerListModelsResponseSchema, value, "AppServerListModelsResponse");
+  return parseSchemaOrThrow(
+    AppServerListModelsResponseSchema,
+    value,
+    ParseContext.listModelsResponse
+  );
 }
 
 export function parseAppServerCollaborationModeListResponse(
   value: z.input<typeof AppServerCollaborationModeListResponseSchema>
 ): AppServerCollaborationModeListResponse {
-  return parseWithSchema(
+  return parseSchemaOrThrow(
     AppServerCollaborationModeListResponseSchema,
     value,
-    "AppServerCollaborationModeListResponse"
+    ParseContext.collaborationModeListResponse
   );
 }
 
 export function parseAppServerStartThreadResponse(
   value: z.input<typeof AppServerStartThreadResponseSchema>
 ): AppServerStartThreadResponse {
-  return parseWithSchema(AppServerStartThreadResponseSchema, value, "AppServerStartThreadResponse");
+  return parseSchemaOrThrow(
+    AppServerStartThreadResponseSchema,
+    value,
+    ParseContext.startThreadResponse
+  );
 }
 
 export function parseAppServerConfigReadResponse(
   value: z.input<typeof AppServerConfigReadResponseSchema>
 ): AppServerConfigReadResponse {
-  return parseWithSchema(AppServerConfigReadResponseSchema, value, "AppServerConfigReadResponse");
+  return parseSchemaOrThrow(
+    AppServerConfigReadResponseSchema,
+    value,
+    ParseContext.configReadResponse
+  );
 }
 
 export function parseCreateDebugClientErrorBody(
   value: z.input<typeof CreateDebugClientErrorBodySchema>
 ): CreateDebugClientErrorBody {
-  return parseWithSchema(CreateDebugClientErrorBodySchema, value, "CreateDebugClientErrorBody");
+  return parseSchemaOrThrow(
+    CreateDebugClientErrorBodySchema,
+    value,
+    ParseContext.createDebugClientErrorBody
+  );
 }
 
 export function parseDebugErrorEvent(value: z.input<typeof DebugErrorEventSchema>): DebugErrorEvent {
-  return parseWithSchema(DebugErrorEventSchema, value, "DebugErrorEvent");
+  return parseSchemaOrThrow(DebugErrorEventSchema, value, ParseContext.debugErrorEvent);
 }
 
 export function parseDebugErrorCreateResponse(
   value: z.input<typeof DebugErrorCreateResponseSchema>
 ): DebugErrorCreateResponse {
-  return parseWithSchema(DebugErrorCreateResponseSchema, value, "DebugErrorCreateResponse");
+  return parseSchemaOrThrow(
+    DebugErrorCreateResponseSchema,
+    value,
+    ParseContext.debugErrorCreateResponse
+  );
 }
 
 export function parseDebugErrorClearResponse(
   value: z.input<typeof DebugErrorClearResponseSchema>
 ): DebugErrorClearResponse {
-  return parseWithSchema(DebugErrorClearResponseSchema, value, "DebugErrorClearResponse");
+  return parseSchemaOrThrow(
+    DebugErrorClearResponseSchema,
+    value,
+    ParseContext.debugErrorClearResponse
+  );
 }
 
 export function parseDebugErrorListResponse(
   value: z.input<typeof DebugErrorListResponseSchema>
 ): DebugErrorListResponse {
-  return parseWithSchema(DebugErrorListResponseSchema, value, "DebugErrorListResponse");
+  return parseSchemaOrThrow(
+    DebugErrorListResponseSchema,
+    value,
+    ParseContext.debugErrorListResponse
+  );
 }
 
 export function parseDebugErrorDetailResponse(
   value: z.input<typeof DebugErrorDetailResponseSchema>
 ): DebugErrorDetailResponse {
-  return parseWithSchema(DebugErrorDetailResponseSchema, value, "DebugErrorDetailResponse");
+  return parseSchemaOrThrow(
+    DebugErrorDetailResponseSchema,
+    value,
+    ParseContext.debugErrorDetailResponse
+  );
 }

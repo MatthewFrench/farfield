@@ -121,7 +121,7 @@ describe("ThreadListPane", () => {
     expect(screen.queryByText("Payment bug investigation")).toBeNull();
     expect(screen.queryByText("Landing page cleanup")).toBeNull();
     expect(screen.queryByText("Archived regression follow-up")).not.toBeNull();
-    expect(screen.getByTestId("thread-list-search-summary").textContent).toContain("1 matching threads");
+    expect(screen.getByTestId("thread-list-search-summary").textContent).toContain("1 matching thread");
   });
 
   it("restores complete list after clearing search input", () => {
@@ -139,5 +139,19 @@ describe("ThreadListPane", () => {
     expect(screen.queryByText("Payment bug investigation")).not.toBeNull();
     expect(screen.queryByText("Landing page cleanup")).not.toBeNull();
     expect(screen.queryByText("Archived regression follow-up")).not.toBeNull();
+  });
+
+  it("shows a no-match summary when search query returns no threads", () => {
+    cleanup();
+    render(<ThreadListPane {...createThreadListPaneProperties()} />);
+
+    fireEvent.change(screen.getByTestId("thread-list-search-input"), {
+      target: { value: "no-results-here" }
+    });
+
+    expect(screen.queryByText("Payment bug investigation")).toBeNull();
+    expect(screen.queryByText("Landing page cleanup")).toBeNull();
+    expect(screen.queryByText("Archived regression follow-up")).toBeNull();
+    expect(screen.getByTestId("thread-list-search-summary").textContent).toContain("No matching threads");
   });
 });

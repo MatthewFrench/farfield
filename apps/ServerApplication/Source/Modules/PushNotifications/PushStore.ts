@@ -9,14 +9,24 @@ import {
   type StoredPushSubscription
 } from "@farfield/protocol";
 
+const PUSH_STATE_STORE_VERSION = 1;
+const JSON_INDENT_SPACES = 2;
+const LINE_FEED = "\n";
+const TEMP_FILE_EXTENSION = "tmp";
+const OWNER_READ_WRITE_PERMISSIONS = 0o600;
+const WINDOWS_PLATFORM = "win32";
+
 function buildDefaultState(): PushStateStore {
   return parsePushStateStore({
-    version: 1,
+    version: PUSH_STATE_STORE_VERSION,
     subscriptions: [],
     completionWatermarks: []
   });
 }
 
+/**
+ * Owns canonical push state persistence and in-memory mutation policy.
+ */
 export class PushStore {
   private readonly filePath: string;
   private state: PushStateStore;
@@ -142,7 +152,7 @@ export class PushStore {
   }
 
   private persist(): Promise<void> {
-    const encodedState = `${JSON.stringify(this.state, null, 2)}\n`;
+    const encodedState = `${JSON.stringify(this.state, null, JSON_INDENT_SPACES)}${LINE_FEED}`;
     const runPersistWrite = async (): Promise<void> => {
       await this.persistEncodedState(encodedState);
     };
@@ -155,8 +165,8 @@ export class PushStore {
     const directory = path.dirname(this.filePath);
     await fs.promises.mkdir(directory, { recursive: true });
 
-    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
-    const fileHandle = await fs.promises.open(tempPath, "w", 0o600);
+    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.${TEMP_FILE_EXTENSION}`;
+    const fileHandle = await fs.promises.open(tempPath, "w", OWNER_READ_WRITE_PERMISSIONS);
     try {
       await fileHandle.writeFile(encodedState, "utf8");
       await fileHandle.sync();
@@ -175,7 +185,7 @@ export class PushStore {
       throw error;
     }
 
-    if (process.platform !== "win32") {
+    if (process.platform !== WINDOWS_PLATFORM) {
       const directoryHandle = await fs.promises.open(directory, "r");
       try {
         await directoryHandle.sync();

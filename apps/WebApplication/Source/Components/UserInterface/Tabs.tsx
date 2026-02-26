@@ -1,3 +1,13 @@
+import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 
-export const Tabs = TabsPrimitive.Root;
+const TABS_COMPONENT_DISPLAY_NAME = "Tabs";
+
+export const Tabs = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Root>
+>((props, ref) => {
+  return <TabsPrimitive.Root ref={ref} {...props} />;
+});
+
+Tabs.displayName = TABS_COMPONENT_DISPLAY_NAME;

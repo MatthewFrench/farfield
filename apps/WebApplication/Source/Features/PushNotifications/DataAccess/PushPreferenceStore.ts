@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-const PushAutoHealPreferenceSchema = z.enum(["true", "false"]);
+const PUSH_AUTO_HEAL_ENABLED_STORAGE_VALUE = "true";
+const PUSH_AUTO_HEAL_DISABLED_STORAGE_VALUE = "false";
+
+const PushAutoHealPreferenceSchema = z.enum([
+  PUSH_AUTO_HEAL_ENABLED_STORAGE_VALUE,
+  PUSH_AUTO_HEAL_DISABLED_STORAGE_VALUE
+]);
 const PushAutoHealEnabledSchema = z.boolean();
 
 export class PushPreferenceStore {
@@ -20,17 +26,19 @@ export class PushPreferenceStore {
     const parsedAutoHealPreference = PushAutoHealPreferenceSchema.safeParse(rawAutoHealPreference);
     if (!parsedAutoHealPreference.success) {
       throw new Error(
-        `Push auto-heal preference at key "${this.autoHealPreferenceStorageKey}" is invalid. Expected "true" or "false".`
+        `Push auto-heal preference at key "${this.autoHealPreferenceStorageKey}" is invalid. Expected "${PUSH_AUTO_HEAL_ENABLED_STORAGE_VALUE}" or "${PUSH_AUTO_HEAL_DISABLED_STORAGE_VALUE}".`
       );
     }
-    return parsedAutoHealPreference.data === "true";
+    return parsedAutoHealPreference.data === PUSH_AUTO_HEAL_ENABLED_STORAGE_VALUE;
   }
 
   public writeAutoHealPreferenceEnabled(enabled: boolean): void {
     const parsedEnabled = PushAutoHealEnabledSchema.parse(enabled);
     window.localStorage.setItem(
       this.autoHealPreferenceStorageKey,
-      parsedEnabled ? "true" : "false"
+      parsedEnabled
+        ? PUSH_AUTO_HEAL_ENABLED_STORAGE_VALUE
+        : PUSH_AUTO_HEAL_DISABLED_STORAGE_VALUE
     );
   }
 }

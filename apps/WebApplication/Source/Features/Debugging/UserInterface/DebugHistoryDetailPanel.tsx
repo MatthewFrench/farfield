@@ -2,6 +2,8 @@ import { Button } from "@/Components/UserInterface/Button";
 import { Checkbox } from "@/Components/UserInterface/Checkbox";
 import { Label } from "@/Components/UserInterface/Label";
 
+const WAIT_FOR_REPLAY_RESPONSE_FIELD_IDENTIFIER = "wait-for-replay-response";
+
 export interface ReplayHistoryEntryRequestInput {
   entryId: string;
   waitForResponse: boolean;
@@ -23,7 +25,7 @@ export function DebugHistoryDetailPanel({
   onReplayHistoryEntry
 }: DebugHistoryDetailPanelProps): React.JSX.Element {
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div data-testid="debug-history-detail-panel" className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="overflow-y-auto p-3 space-y-3">
         {historyEntryId === null ? (
           <div className="text-xs text-muted-foreground py-4">Select an entry</div>
@@ -31,11 +33,11 @@ export function DebugHistoryDetailPanel({
           <>
             <div className="flex items-center gap-2">
               <Label
-                htmlFor="wait-for-replay-response"
+                htmlFor={WAIT_FOR_REPLAY_RESPONSE_FIELD_IDENTIFIER}
                 className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground cursor-pointer"
               >
                 <Checkbox
-                  id="wait-for-replay-response"
+                  id={WAIT_FOR_REPLAY_RESPONSE_FIELD_IDENTIFIER}
                   checked={waitForReplayResponse}
                   onCheckedChange={(checked) => onWaitForReplayResponseChange(checked === true)}
                 />

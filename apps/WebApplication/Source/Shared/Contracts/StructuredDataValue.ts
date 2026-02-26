@@ -1,10 +1,15 @@
 import { z } from "zod";
 
+/**
+ * Shared structured-data contract for transport-boundary payload content.
+ * This shape intentionally mirrors JSON-compatible values only.
+ */
 export type StructuredDataPrimitive = string | number | boolean | null;
+export type StructuredDataObject = { [key: string]: StructuredDataValue };
 export type StructuredDataValue =
   | StructuredDataPrimitive
   | StructuredDataValue[]
-  | { [key: string]: StructuredDataValue };
+  | StructuredDataObject;
 
 export const StructuredDataPrimitiveSchema = z.union([
   z.string(),
@@ -13,10 +18,16 @@ export const StructuredDataPrimitiveSchema = z.union([
   z.null()
 ]);
 
-export const StructuredDataValueSchema: z.ZodType<StructuredDataValue> = z.lazy(() =>
+const StructuredDataValueSchemaOwner: z.ZodType<StructuredDataValue> = z.lazy(() =>
   z.union([
     StructuredDataPrimitiveSchema,
-    z.array(StructuredDataValueSchema),
-    z.record(StructuredDataValueSchema)
+    z.array(StructuredDataValueSchemaOwner),
+    z.record(z.string(), StructuredDataValueSchemaOwner)
   ])
+);
+
+export const StructuredDataValueSchema = StructuredDataValueSchemaOwner;
+export const StructuredDataObjectSchema: z.ZodType<StructuredDataObject> = z.record(
+  z.string(),
+  StructuredDataValueSchemaOwner
 );

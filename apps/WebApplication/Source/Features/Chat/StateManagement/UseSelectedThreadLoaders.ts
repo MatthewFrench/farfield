@@ -77,7 +77,9 @@ export interface SelectedThreadLoaders {
   applySelectedThreadStreamDelta: (input: ApplySelectedThreadStreamDeltaInput) => void;
 }
 
+// Bounds client-owned stream history to avoid unbounded growth during long-lived sessions.
 const STREAM_EVENT_RETENTION_LIMIT = 400;
+const DEFAULT_STREAM_READ_CAPABLE_AGENT_ID: AgentId = "codex";
 
 export function useSelectedThreadLoaders(
   input: UseSelectedThreadLoadersInput
@@ -92,9 +94,9 @@ export function useSelectedThreadLoaders(
     readThreadSnapshot: ReadThreadResponse | null;
     includeTurnsUsedForRead: boolean;
   }) => {
-    const containsAnyTurns = (
-      (snapshotInput.liveStateSnapshot.conversationState?.turns.length ?? 0) > 0
-      || (snapshotInput.readThreadSnapshot?.thread.turns.length ?? 0) > 0
+    const containsAnyTurns = hasTurnsInSelectedThreadSnapshots(
+      snapshotInput.liveStateSnapshot,
+      snapshotInput.readThreadSnapshot
     );
     if (containsAnyTurns) {
       input.pendingThreadMaterializationCoordinator.clearPending(snapshotInput.threadId);
@@ -194,14 +196,20 @@ export function useSelectedThreadLoaders(
     options?: LoadSelectedThreadOptions,
     signal?: AbortSignal
   ) => {
-    const includeTurns = options?.includeTurns
-      ?? !input.pendingThreadMaterializationCoordinator.isPending(threadId);
+    const includeTurns = resolveIncludeTurnsForThreadRead(
+      options?.includeTurns,
+      threadId,
+      input.pendingThreadMaterializationCoordinator
+    );
     const includeReadThread = options?.includeReadThread ?? true;
-    const thread = input.threads.find((entry) => entry.id === threadId) ?? null;
-    const threadAgentId = thread?.agentId ?? input.selectedAgentId;
-    const descriptor = input.agentsById[threadAgentId];
-    const canReadLiveState = descriptor?.capabilities.canReadLiveState ?? (threadAgentId === "codex");
-    const canReadStreamEvents = descriptor?.capabilities.canReadStreamEvents ?? (threadAgentId === "codex");
+    const readCapabilities = resolveReadCapabilitiesForThread({
+      threadId,
+      threads: input.threads,
+      selectedAgentId: input.selectedAgentId,
+      agentsById: input.agentsById
+    });
+    const canReadLiveState = readCapabilities.canReadLiveState;
+    const canReadStreamEvents = readCapabilities.canReadStreamEvents;
     const streamEventsSinceSequence = canReadStreamEvents
       ? (nextStreamSequenceByThreadReference.current.get(threadId) ?? null)
       : null;
@@ -243,7 +251,11 @@ export function useSelectedThreadLoaders(
   const loadSelectedThreadTracked = useCallback(async (threadId: string, options?: LoadSelectedThreadOptions) => {
     const request: SelectedThreadRefreshRequest = {
       threadId,
-      includeTurns: options?.includeTurns ?? !input.pendingThreadMaterializationCoordinator.isPending(threadId),
+      includeTurns: resolveIncludeTurnsForThreadRead(
+        options?.includeTurns,
+        threadId,
+        input.pendingThreadMaterializationCoordinator
+      ),
       includeReadThread: options?.includeReadThread ?? true
     };
 
@@ -298,4 +310,46 @@ function matchesStreamEventTail(previousEvents: StreamEventsResponse["events"], 
   const previousLastSignature = previousLastEvent ? JSON.stringify(previousLastEvent) : "";
   const nextLastSignature = nextLastEvent ? JSON.stringify(nextLastEvent) : "";
   return previousEvents.length === nextEvents.length && previousLastSignature === nextLastSignature;
+}
+
+function hasTurnsInSelectedThreadSnapshots(
+  liveStateSnapshot: LiveStateResponse,
+  readThreadSnapshot: ReadThreadResponse | null
+): boolean {
+  return (
+    (liveStateSnapshot.conversationState?.turns.length ?? 0) > 0
+    || (readThreadSnapshot?.thread.turns.length ?? 0) > 0
+  );
+}
+
+function resolveIncludeTurnsForThreadRead(
+  includeTurns: boolean | undefined,
+  threadId: string,
+  pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator
+): boolean {
+  return includeTurns ?? !pendingThreadMaterializationCoordinator.isPending(threadId);
+}
+
+interface ReadCapabilities {
+  canReadLiveState: boolean;
+  canReadStreamEvents: boolean;
+}
+
+interface ResolveReadCapabilitiesInput {
+  threadId: string;
+  threads: Thread[];
+  selectedAgentId: AgentId;
+  agentsById: Partial<Record<AgentId, AgentDescriptor>>;
+}
+
+function resolveReadCapabilitiesForThread(input: ResolveReadCapabilitiesInput): ReadCapabilities {
+  const thread = input.threads.find((entry) => entry.id === input.threadId) ?? null;
+  const threadAgentId = thread?.agentId ?? input.selectedAgentId;
+  const descriptor = input.agentsById[threadAgentId];
+  const defaultReadCapability = threadAgentId === DEFAULT_STREAM_READ_CAPABLE_AGENT_ID;
+
+  return {
+    canReadLiveState: descriptor?.capabilities.canReadLiveState ?? defaultReadCapability,
+    canReadStreamEvents: descriptor?.capabilities.canReadStreamEvents ?? defaultReadCapability
+  };
 }

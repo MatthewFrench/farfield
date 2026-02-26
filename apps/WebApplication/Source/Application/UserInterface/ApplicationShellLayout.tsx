@@ -80,6 +80,18 @@ export function ApplicationShellLayout({
   showApiSessionBootstrapOverlay,
   apiSessionBootstrapOverlayProperties
 }: ApplicationShellLayoutProps): React.JSX.Element {
+  const threadSidebarViewportSharedProperties = {
+    threadListPaneProperties,
+    onHideDesktopSidebar,
+    onCloseMobileSidebar,
+    allSystemsReady,
+    hasAnySystemFailure,
+    commitLabel,
+    agentDescriptors,
+    codexConfigured,
+    healthState: threadSidebarHealthState
+  };
+
   return (
     <div
       ref={applicationShellElementRef}
@@ -107,29 +119,13 @@ export function ApplicationShellLayout({
       <ThreadSidebarViewport
         viewport="desktop"
         isOpen={desktopSidebarOpen}
-        threadListPaneProperties={threadListPaneProperties}
-        onHideDesktopSidebar={onHideDesktopSidebar}
-        onCloseMobileSidebar={onCloseMobileSidebar}
-        allSystemsReady={allSystemsReady}
-        hasAnySystemFailure={hasAnySystemFailure}
-        commitLabel={commitLabel}
-        agentDescriptors={agentDescriptors}
-        codexConfigured={codexConfigured}
-        healthState={threadSidebarHealthState}
+        {...threadSidebarViewportSharedProperties}
       />
 
       <ThreadSidebarViewport
         viewport="mobile"
         isOpen={mobileSidebarOpen}
-        threadListPaneProperties={threadListPaneProperties}
-        onHideDesktopSidebar={onHideDesktopSidebar}
-        onCloseMobileSidebar={onCloseMobileSidebar}
-        allSystemsReady={allSystemsReady}
-        hasAnySystemFailure={hasAnySystemFailure}
-        commitLabel={commitLabel}
-        agentDescriptors={agentDescriptors}
-        codexConfigured={codexConfigured}
-        healthState={threadSidebarHealthState}
+        {...threadSidebarViewportSharedProperties}
       />
 
       <div

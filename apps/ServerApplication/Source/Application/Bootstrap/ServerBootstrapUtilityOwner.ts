@@ -1,17 +1,24 @@
 import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { JsonValue } from "@farfield/protocol";
+import { JsonValueSchema, type JsonValue } from "@farfield/protocol";
 import type { AgentAdapter, AgentDescriptor } from "../../Agents/Types.js";
+
+const JsonResponseHeaderValues = Object.freeze({
+  accessControlAllowHeaders: "content-type, x-farfield-token, x-farfield-request-id, x-farfield-action-id, x-farfield-action-name",
+  accessControlAllowMethods: "GET,POST,DELETE,OPTIONS",
+  accessControlAllowOrigin: "*",
+  contentType: "application/json; charset=utf-8"
+});
 
 export class ServerBootstrapUtilityOwner {
   public jsonResponse(res: ServerResponse, statusCode: number, body: object): void {
     const encoded = Buffer.from(JSON.stringify(body), "utf8");
     res.writeHead(statusCode, {
-      "Content-Type": "application/json; charset=utf-8",
+      "Content-Type": JsonResponseHeaderValues.contentType,
       "Content-Length": encoded.length,
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "content-type, x-farfield-token, x-farfield-request-id, x-farfield-action-id, x-farfield-action-name",
-      "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS"
+      "Access-Control-Allow-Origin": JsonResponseHeaderValues.accessControlAllowOrigin,
+      "Access-Control-Allow-Headers": JsonResponseHeaderValues.accessControlAllowHeaders,
+      "Access-Control-Allow-Methods": JsonResponseHeaderValues.accessControlAllowMethods
     });
     res.end(encoded);
   }
@@ -32,7 +39,7 @@ export class ServerBootstrapUtilityOwner {
       return {};
     }
 
-    return JSON.parse(raw);
+    return JsonValueSchema.parse(JSON.parse(raw));
   }
 
   public toErrorMessage<ErrorType>(error: ErrorType): string {
