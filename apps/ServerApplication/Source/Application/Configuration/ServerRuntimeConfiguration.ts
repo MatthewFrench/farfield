@@ -172,7 +172,7 @@ function parseOptionalPathEnvironmentValue(label: string, value: string | undefi
     throw new Error(`${label} must be a non-empty path when set`);
   }
 
-  if (!parsed.data) {
+  if (parsed.data === undefined) {
     return null;
   }
 
@@ -231,7 +231,7 @@ function resolveApiSessionSigningSecret(env: NodeJS.ProcessEnv, apiToken: string
 
 function resolveCodexExecutablePathFromEnvironment(env: NodeJS.ProcessEnv): string {
   const configuredPath = readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.codexCliPath);
-  if (configuredPath) {
+  if (configuredPath !== null && configuredPath.length > 0) {
     return configuredPath;
   }
 
@@ -245,7 +245,7 @@ function resolveCodexExecutablePathFromEnvironment(env: NodeJS.ProcessEnv): stri
 
 function resolveIpcSocketPathFromEnvironment(env: NodeJS.ProcessEnv): string {
   const configuredPath = readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.codexIpcSocketPath);
-  if (configuredPath) {
+  if (configuredPath !== null && configuredPath.length > 0) {
     return configuredPath;
   }
 
@@ -279,7 +279,7 @@ function resolveGitCommitHash(defaultWorkspacePath: string): string | null {
 
 function resolvePushLocalCaSourcePath(env: NodeJS.ProcessEnv): string {
   const configuredPath = readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushLocalCaPath);
-  if (configuredPath) {
+  if (configuredPath !== null) {
     return configuredPath;
   }
 
@@ -467,8 +467,13 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
   );
 
   const webHealthBuildId = resolveWebHealthBuildIdentifierFromEnvironment(env);
-  const webHealthServiceWorkerVersion =
-    readTrimmedEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.webServiceWorkerVersion) || null;
+  const webHealthServiceWorkerVersionValue = readTrimmedEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.webServiceWorkerVersion
+  );
+  const webHealthServiceWorkerVersion = webHealthServiceWorkerVersionValue.length > 0
+    ? webHealthServiceWorkerVersionValue
+    : null;
 
   const codexExecutablePath = resolveCodexExecutablePathFromEnvironment(env);
   const ipcSocketPath = resolveIpcSocketPathFromEnvironment(env);

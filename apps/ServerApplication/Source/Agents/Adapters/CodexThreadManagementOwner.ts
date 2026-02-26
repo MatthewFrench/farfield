@@ -33,8 +33,8 @@ function buildListThreadsOptions(input: AgentListThreadsInput): ListThreadsOptio
     limit: input.limit,
     archived: input.archived,
     sortKey: input.sortKey,
-    ...(input.cursor !== undefined && input.cursor !== null ? { cursor: input.cursor } : {}),
-    ...(input.cwd !== undefined && input.cwd !== null ? { cwd: input.cwd } : {})
+    ...(input.cursor !== null ? { cursor: input.cursor } : {}),
+    ...(input.cwd !== null ? { cwd: input.cwd } : {})
   };
 }
 
@@ -75,7 +75,7 @@ function mapListThreadsResult(result: AppServerListThreadsResponse): AgentListTh
 
 function readRequiredWorkingDirectory(input: AgentCreateThreadInput): string {
   const workingDirectory = input.cwd?.trim();
-  if (!workingDirectory) {
+  if (workingDirectory === undefined || workingDirectory.length === 0) {
     throw new Error(CREATE_THREAD_REQUIRES_WORKING_DIRECTORY_ERROR);
   }
 
@@ -113,7 +113,7 @@ function mapCreateThreadResult(result: AppServerStartThreadResponse): AgentCreat
 function readActiveConfigProfile(
   config: AppServerConfigReadResponse["config"]
 ): AppServerConfigReadResponse["config"]["profiles"][string] | null {
-  if (!config.profile) {
+  if (config.profile === null || config.profile.length === 0) {
     return null;
   }
 

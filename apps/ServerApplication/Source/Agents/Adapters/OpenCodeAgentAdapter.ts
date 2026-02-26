@@ -56,7 +56,7 @@ function encodeOpenCodeThreadCursor(offset: number): string {
 }
 
 function decodeOpenCodeThreadCursor(cursor: string | null): number {
-  if (!cursor) {
+  if (cursor === null || cursor.length === 0) {
     return 0;
   }
 
@@ -84,7 +84,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
 
   public constructor(options: OpenCodeAgentOptions = {}) {
     this.connection = new OpenCodeConnection({
-      ...(options.url ? { url: options.url } : {}),
+      ...(options.url !== undefined && options.url.length > 0 ? { url: options.url } : {}),
       ...(options.port !== undefined ? { port: options.port } : {})
     });
     this.service = new OpenCodeMonitorService(this.connection);
@@ -162,12 +162,12 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
     const directory = input.cwd !== undefined ? normalizeDirectoryInput(input.cwd) : undefined;
     const result = await this.service.createSession({
       ...(input.model !== undefined ? { title: input.model } : {}),
-      ...(directory ? { directory } : {})
+      ...(directory !== undefined && directory.length > 0 ? { directory } : {})
     });
 
     if (hasTrimmedText(result.mapped.cwd)) {
       this.cacheThreadDirectory(result.threadId, result.mapped.cwd);
-    } else if (directory) {
+    } else if (directory !== undefined && directory.length > 0) {
       this.threadDirectoryById.set(result.threadId, directory);
     }
 
@@ -203,7 +203,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
     await this.service.sendMessage({
       sessionId: input.threadId,
       text: input.text,
-      ...(directory ? { directory } : {})
+      ...(directory !== undefined && directory.length > 0 ? { directory } : {})
     });
   }
 
@@ -271,7 +271,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
 
   private resolveThreadDirectory(threadId: string): string | undefined {
     const directory = this.threadDirectoryById.get(threadId);
-    if (!directory) {
+    if (directory === undefined || directory.length === 0) {
       return undefined;
     }
     return path.resolve(directory);

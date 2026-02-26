@@ -396,7 +396,7 @@ export class DesktopIpcClient {
   private handleData(chunk: Buffer): void {
     this.frameBuffer.appendChunk(chunk);
 
-    while (true) {
+    for (;;) {
       const readResult = this.frameBuffer.readNextPayload(IPC_FRAME_BOUNDARY.maxFrameSizeBytes);
       if (readResult.type === "none") {
         break;

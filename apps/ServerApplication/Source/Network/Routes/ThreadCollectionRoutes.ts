@@ -193,7 +193,7 @@ async function handleThreadCollectionCreateRoute(
 }
 
 function buildUnavailableAgentMessage(requestedAgentId: AgentId | undefined): string {
-  if (requestedAgentId) {
+  if (requestedAgentId !== undefined) {
     return `Requested agent ${requestedAgentId} is not enabled.`;
   }
   return ThreadCollectionRouteErrorByName.noEnabledAgent;

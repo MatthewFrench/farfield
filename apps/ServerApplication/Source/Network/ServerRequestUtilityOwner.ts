@@ -77,23 +77,22 @@ export class ServerRequestUtilityOwner {
     // would make request time-limit behavior non-deterministic.
     const parsedTimeoutMs = PositiveIntegerParameterSchema.parse(timeoutMs);
     const parsedLabel = NonEmptyTrimmedStringSchema.parse(label);
-    let timeoutHandle: NodeJS.Timeout | null = null;
+    let rejectOnTimeout: (error: Error) => void = () => {};
     const timeoutPromise = new Promise<ValueType>((_resolve, reject) => {
-      timeoutHandle = setTimeout(() => {
-        reject(
-          new Error(
-            `${parsedLabel}${TimeoutErrorMessageConnector}${String(parsedTimeoutMs)}${TimeoutErrorMessageUnitMilliseconds}`
-          )
-        );
-      }, parsedTimeoutMs);
+      rejectOnTimeout = reject;
     });
+    const timeoutHandle = setTimeout(() => {
+      rejectOnTimeout(
+        new Error(
+          `${parsedLabel}${TimeoutErrorMessageConnector}${String(parsedTimeoutMs)}${TimeoutErrorMessageUnitMilliseconds}`
+        )
+      );
+    }, parsedTimeoutMs);
 
     try {
       return await Promise.race([promise, timeoutPromise]);
     } finally {
-      if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-      }
+      clearTimeout(timeoutHandle);
     }
   }
 }

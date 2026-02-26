@@ -244,7 +244,7 @@ export class ThreadListAggregationCache {
   private evictUntilWithinBounds(): void {
     while (this.entryByKey.size > this.maximumEntries) {
       const oldestEntryResult = this.entryByKey.keys().next();
-      if (oldestEntryResult.done) {
+      if (oldestEntryResult.done === true) {
         return;
       }
       this.entryByKey.delete(oldestEntryResult.value);

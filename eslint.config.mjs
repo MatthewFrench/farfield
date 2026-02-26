@@ -4,6 +4,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 const typescriptSourcePatterns = ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"];
+const typescriptProjectRootDirectory = new URL(".", import.meta.url).pathname;
 
 export default tseslint.config(
   {
@@ -60,6 +61,36 @@ export default tseslint.config(
         }
       ],
       "no-useless-escape": "off"
+    }
+  },
+  {
+    files: [
+      "apps/ServerApplication/Source/**/*.ts",
+      "packages/CodexInterfaceAdapter/Source/**/*.ts",
+      "packages/CodexProtocol/Source/**/*.ts",
+      "packages/OpenCodeInterfaceAdapter/Source/**/*.ts"
+    ],
+    ignores: ["packages/CodexProtocol/Source/Generated/**/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: typescriptProjectRootDirectory
+      }
+    },
+    rules: {
+      "@typescript-eslint/no-unnecessary-condition": "error",
+      "@typescript-eslint/strict-boolean-expressions": [
+        "error",
+        {
+          allowAny: false,
+          allowNullableBoolean: false,
+          allowNullableNumber: false,
+          allowNullableObject: true,
+          allowNullableString: false,
+          allowNumber: false,
+          allowString: false
+        }
+      ]
     }
   },
   {

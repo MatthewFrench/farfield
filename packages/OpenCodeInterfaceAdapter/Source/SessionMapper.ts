@@ -32,7 +32,13 @@ export function sessionToConversationState(
   const turns = messagesToTurns(messages, partsByMessage);
 
   const latestAssistant = resolveLatestAssistantMessage(messages);
-  const latestModel = latestAssistant?.providerID && latestAssistant?.modelID
+  const latestModel = (
+    latestAssistant !== null
+    && latestAssistant.providerID !== undefined
+    && latestAssistant.providerID.length > 0
+    && latestAssistant.modelID !== undefined
+    && latestAssistant.modelID.length > 0
+  )
     ? `${latestAssistant.providerID}/${latestAssistant.modelID}`
     : null;
   const sessionTitle = normalizeSessionTitle(session.title);

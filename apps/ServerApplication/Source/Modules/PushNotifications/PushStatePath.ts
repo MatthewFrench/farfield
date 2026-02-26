@@ -29,7 +29,7 @@ function parseOptionalPathOverride(label: string, value: string | undefined): st
   }
 
   const parsed = result.data;
-  if (!parsed) {
+  if (parsed === undefined) {
     return null;
   }
 
@@ -82,6 +82,6 @@ export function resolvePushStatePath(options: ResolvePushStatePathOptions): Push
 
   return {
     filePath,
-    source: configuredPath ? "env" : "default"
+    source: configuredPath !== null ? "env" : "default"
   };
 }

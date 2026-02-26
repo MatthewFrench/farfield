@@ -102,7 +102,7 @@ export class CodexConnectionLifecycleOwner {
       ipcConnected: state.connected,
       ipcInitialized: state.connected ? this.runtimeState.ipcInitialized : false
     };
-    if (state.reason) {
+    if (state.reason !== null && state.reason !== undefined && state.reason.length > 0) {
       statePatch.lastError = state.reason;
     }
     this.patchRuntimeState(statePatch);

@@ -79,7 +79,6 @@ const IPC_FRAME_TYPE_BROADCAST = "broadcast";
 const IPC_FRAME_TYPE_CLIENT_DISCOVERY_REQUEST = "client-discovery-request";
 const IPC_FRAME_TYPE_CLIENT_DISCOVERY_RESPONSE = "client-discovery-response";
 const THREAD_STREAM_CHANGE_TYPE_SNAPSHOT = "snapshot";
-const THREAD_STREAM_CHANGE_TYPE_PATCHES = "patches";
 const LIVE_STATE_ERROR_KIND_REDUCTION_FAILED = "reductionFailed";
 const RESPONSE_METHOD_DESCRIPTION = "response";
 const INVALID_THREAD_STREAM_EVENT_DETAIL_LOG_NAME = "codex-invalid-thread-stream-event-detail";
@@ -310,15 +309,13 @@ export class CodexThreadStreamStateOwner {
       );
       return;
     }
-    if (change.type === THREAD_STREAM_CHANGE_TYPE_PATCHES) {
-      const reducedProjection = this.projectPatchChange({
-        threadId,
-        ownerClientId: event.sourceClientId,
-        patches: change.patches,
-        eventIndex
-      });
-      this.liveStateProjectionByThreadId.set(threadId, reducedProjection);
-    }
+    const reducedProjection = this.projectPatchChange({
+      threadId,
+      ownerClientId: event.sourceClientId,
+      patches: change.patches,
+      eventIndex
+    });
+    this.liveStateProjectionByThreadId.set(threadId, reducedProjection);
   }
 
   private projectPatchChange(input: ThreadPatchReductionInput): ThreadLiveStateProjection {
@@ -556,7 +553,7 @@ function readPatchIndex<ErrorType>(error: ErrorType): number | null {
 }
 
 function normalizeNullableIdentifier(identifier: string | null | undefined): string | null {
-  if (!identifier) {
+  if (identifier === null || identifier === undefined || identifier.length === 0) {
     return null;
   }
 

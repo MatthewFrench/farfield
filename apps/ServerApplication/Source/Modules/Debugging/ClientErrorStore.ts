@@ -121,7 +121,7 @@ export class ClientErrorStore {
       requestId: input.requestId ?? null,
       threadId: input.threadId ?? null,
       url: input.url ?? null,
-      details: input.details ?? {},
+      details: input.details,
       occurredAt
     });
   }
@@ -138,7 +138,7 @@ export class ClientErrorStore {
       requestId: input.requestId ?? null,
       threadId: input.threadId ?? null,
       url: input.url ?? null,
-      details: input.details ?? {},
+      details: input.details,
       occurredAt: input.occurredAt
     });
   }

@@ -22,11 +22,9 @@ const PATCH_SEQUENCE_INVALID_STATE_MESSAGE_PREFIX =
 const NO_TURN_PARAMS_TEMPLATE_ERROR_MESSAGE = "No turn params template found in conversation state";
 const PATCH_TARGET_TYPE_MISMATCH_ERROR_MESSAGE = "Patch target type mismatch";
 const THREAD_STREAM_CHANGE_TYPE_SNAPSHOT = "snapshot";
-const THREAD_STREAM_CHANGE_TYPE_PATCHES = "patches";
 const STRICT_PATCH_SEQUENCE_ERROR_NAME = "StrictPatchSequenceError";
 const THREAD_STREAM_REDUCTION_ERROR_NAME = "ThreadStreamReductionError";
 const UNSUPPORTED_PATCH_OPERATION_ERROR_MESSAGE_PREFIX = "Unsupported patch operation";
-const UNSUPPORTED_THREAD_STREAM_CHANGE_TYPE_ERROR_MESSAGE = "Unsupported thread stream change type";
 
 function cloneState<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -155,13 +153,11 @@ function applyArrayPatch(
     return;
   }
 
-  if (operation === PATCH_OPERATION_REMOVE) {
-    if (arrayIndex < 0 || arrayIndex >= target.length) {
-      throw new Error(`Patch remove index out of range: ${String(lastSegment)}`);
-    }
-    target.splice(arrayIndex, 1);
-    return;
+  if (arrayIndex < 0 || arrayIndex >= target.length) {
+    throw new Error(`Patch remove index out of range: ${String(lastSegment)}`);
   }
+  target.splice(arrayIndex, 1);
+  return;
 
   throw new Error(`${UNSUPPORTED_PATCH_OPERATION_ERROR_MESSAGE_PREFIX}: ${String(operation)}`);
 }
@@ -181,12 +177,8 @@ function applyObjectPatch(
     return;
   }
 
-  if (operation === PATCH_OPERATION_ADD || operation === PATCH_OPERATION_REPLACE) {
-    target[key] = requirePatchValue(patch);
-    return;
-  }
-
-  throw new Error(`${UNSUPPORTED_PATCH_OPERATION_ERROR_MESSAGE_PREFIX}: ${String(operation)}`);
+  target[key] = requirePatchValue(patch);
+  return;
 }
 
 function applyPatchToState(state: JsonValue, patch: ThreadStreamPatch): void {
@@ -478,29 +470,21 @@ function reduceThreadStreamEvent(
     byThread.set(threadId, next);
     return;
   }
-
-  if (changeType === THREAD_STREAM_CHANGE_TYPE_PATCHES) {
-    if (next.conversationState) {
-      next.conversationState = applyEventPatchSequence(
-        threadId,
-        eventIndex,
-        event,
-        next.conversationState,
-        change.patches
-      );
-      byThread.set(threadId, next);
-      return;
-    }
-
-    // Event ownership still advances to the most recent producer even when
-    // patch events arrive before a thread has emitted its first snapshot.
+  if (next.conversationState !== null) {
+    next.conversationState = applyEventPatchSequence(
+      threadId,
+      eventIndex,
+      event,
+      next.conversationState,
+      change.patches
+    );
     byThread.set(threadId, next);
     return;
   }
 
-  throw new Error(
-    `${UNSUPPORTED_THREAD_STREAM_CHANGE_TYPE_ERROR_MESSAGE}: ${String(changeType)}`
-  );
+  // Event ownership still advances to the most recent producer even when
+  // patch events arrive before a thread has emitted its first snapshot.
+  byThread.set(threadId, next);
 }
 
 export function reduceThreadStreamEvents(

@@ -154,7 +154,7 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
         apiTokenHeaderName,
         parsedBody.body.apiToken
       );
-      if (providedToken && providedToken === apiToken) {
+      if (providedToken !== null && providedToken === apiToken) {
         const issuedSession = browserSessionAuthOwner.issueSessionCookie();
         res.setHeader(RuntimeRouteHeaderNameByName.setCookie, issuedSession.setCookieHeaderValue);
         bootstrapped = true;
@@ -227,7 +227,7 @@ function readHeaderValue(req: IncomingMessage, name: string): string | null {
   // Repeated headers may include blank artifacts; first non-empty value is authoritative.
   for (const rawHeaderValue of parsedHeaderValueList.data) {
     const normalizedHeaderValue = normalizeOptionalHeaderValue(rawHeaderValue);
-    if (normalizedHeaderValue) {
+    if (normalizedHeaderValue !== null) {
       return normalizedHeaderValue;
     }
   }
@@ -236,7 +236,7 @@ function readHeaderValue(req: IncomingMessage, name: string): string | null {
 }
 
 function normalizeOptionalHeaderValue(value: string | null): string | null {
-  if (!value) {
+  if (value === null || value.length === 0) {
     return null;
   }
   const normalized = value.trim();

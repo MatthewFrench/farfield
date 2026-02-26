@@ -101,7 +101,7 @@ export function parseServerCliOptions(argv: string[]): ServerCliOptions {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (!arg) {
+    if (arg === undefined || arg.length === 0) {
       continue;
     }
 
@@ -122,7 +122,7 @@ export function parseServerCliOptions(argv: string[]): ServerCliOptions {
 
     if (arg === AGENTS_LONG_OPTION) {
       const nextArg = argv[index + 1];
-      if (!nextArg || nextArg.startsWith("--")) {
+      if (nextArg === undefined || nextArg.startsWith("--")) {
         throw new Error(MISSING_AGENTS_VALUE_ERROR);
       }
       parsedAgents = parseAgentsArg(nextArg);

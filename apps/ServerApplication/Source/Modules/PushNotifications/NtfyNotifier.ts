@@ -53,7 +53,7 @@ const ParsedNtfyConfigSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.enabled && !value.topic) {
+    if (value.enabled && value.topic === null) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: "NTFY_TOPIC is required when NTFY_ENABLED is true"
@@ -84,7 +84,7 @@ export interface NtfyThreadCompletedPayload {
 type NtfyPriority = z.infer<typeof NtfyPrioritySchema>;
 
 function normalizeOptionalString(value: string | undefined): string | null {
-  if (!value) {
+  if (value === undefined || value.length === 0) {
     return null;
   }
   const normalized = value.trim();
@@ -162,7 +162,7 @@ function buildPublishHeaders(config: NtfyConfig, payload: NtfyThreadCompletedPay
   headers.set(NTFY_PRIORITY_HEADER_NAME, config.priority);
   headers.set(NTFY_TAGS_HEADER_NAME, NTFY_TAGS_HEADER_VALUE);
   headers.set(NTFY_CONTENT_TYPE_HEADER_NAME, NTFY_CONTENT_TYPE_HEADER_VALUE);
-  if (config.bearerToken) {
+  if (config.bearerToken !== null) {
     headers.set(
       NTFY_AUTHORIZATION_HEADER_NAME,
       `${NTFY_AUTHORIZATION_BEARER_PREFIX}${config.bearerToken}`
@@ -204,7 +204,7 @@ export class NtfyNotifier {
   public async publishThreadCompleted(
     payload: NtfyThreadCompletedPayload
   ): Promise<NtfyPublishResult> {
-    if (!this.config.enabled || !this.config.topic) {
+    if (!this.config.enabled || this.config.topic === null) {
       return {
         messageId: null
       };

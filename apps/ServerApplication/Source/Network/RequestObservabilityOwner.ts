@@ -486,7 +486,10 @@ export class RequestObservabilityOwner {
       outcome: observation.statusCode >= ERROR_STATUS_CODE_MINIMUM ? "error" : "success"
     });
 
-    if (!observation.actionName || !observation.actionName.startsWith(STARTUP_ACTION_NAME_PREFIX)) {
+    if (
+      observation.actionName === null
+      || !observation.actionName.startsWith(STARTUP_ACTION_NAME_PREFIX)
+    ) {
       return;
     }
 

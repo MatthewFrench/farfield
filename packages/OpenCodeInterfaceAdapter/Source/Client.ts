@@ -153,7 +153,7 @@ export class OpenCodeConnection implements OpenCodeConnectionClientProvider {
   }
 
   public async start(): Promise<void> {
-    if (this.options.url) {
+    if (this.options.url !== undefined) {
       this.createClientWithBaseUrl(this.options.url);
       return;
     }

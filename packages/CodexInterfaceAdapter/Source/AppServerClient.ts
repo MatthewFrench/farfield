@@ -208,7 +208,7 @@ export class AppServerClient {
 
       const nextCursor = page.nextCursor ?? null;
       // Empty page data with a cursor is treated as terminal to avoid looping on a non-advancing cursor.
-      if (!nextCursor || page.data.length === 0) {
+      if (nextCursor === null || nextCursor.length === 0 || page.data.length === 0) {
         return {
           data: listItems,
           nextCursor: null,

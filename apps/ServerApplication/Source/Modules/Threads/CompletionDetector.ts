@@ -85,7 +85,7 @@ export class CompletionDetector {
     }
 
     const turnId = readCompletionTurnId(lastTurn);
-    if (!turnId) {
+    if (turnId === null || turnId.length === 0) {
       return null;
     }
 

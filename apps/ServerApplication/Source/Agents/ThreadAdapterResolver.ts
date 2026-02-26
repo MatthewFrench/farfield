@@ -96,12 +96,12 @@ export class ThreadAdapterResolver {
   }
 
   public resolveCreateThreadAdapter(requestedAgentId: AgentId | undefined): AgentAdapter | null {
-    if (requestedAgentId) {
+    if (requestedAgentId !== undefined) {
       return this.resolveConnectedEnabledAdapter(requestedAgentId);
     }
 
     const defaultAgentId = this.registry.resolveDefaultAgentId();
-    if (defaultAgentId) {
+    if (defaultAgentId !== null) {
       const defaultAdapter = this.resolveConnectedEnabledAdapter(defaultAgentId);
       if (defaultAdapter) {
         return defaultAdapter;
@@ -114,7 +114,7 @@ export class ThreadAdapterResolver {
 
   public async resolveAdapterForThread(threadId: string): Promise<ResolvedThreadAdapterResult> {
     const registeredAgentId = this.threadIndex.resolve(threadId);
-    if (registeredAgentId) {
+    if (registeredAgentId !== null) {
       this.registeredLookupCount += 1;
       return this.resolveRegisteredAdapter(threadId, registeredAgentId);
     }

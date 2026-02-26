@@ -189,7 +189,7 @@ export class ServerRequestHandler {
     };
 
     try {
-      if (!req.url) {
+      if (req.url === undefined || req.url.length === 0) {
         this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.clientErrorBadRequest, {
           ok: false,
           error: MISSING_REQUEST_URL_ERROR_MESSAGE
@@ -435,13 +435,13 @@ export class ServerRequestHandler {
     requestLifecycleContext: RequestLifecycleContext
   ): void {
     res.setHeader(this.deps.clientRequestIdResponseHeader, requestLifecycleContext.requestId);
-    if (requestLifecycleContext.requestActionId) {
+    if (requestLifecycleContext.requestActionId !== null) {
       res.setHeader(
         this.deps.clientActionIdResponseHeader,
         requestLifecycleContext.requestActionId
       );
     }
-    if (requestLifecycleContext.requestActionName) {
+    if (requestLifecycleContext.requestActionName !== null) {
       res.setHeader(
         this.deps.clientActionNameResponseHeader,
         requestLifecycleContext.requestActionName
@@ -464,10 +464,10 @@ export class ServerRequestHandler {
   ): HistoryEntry["meta"] {
     return {
       requestId: requestLifecycleContext.requestId,
-      ...(requestLifecycleContext.requestActionId
+      ...(requestLifecycleContext.requestActionId !== null
         ? { actionId: requestLifecycleContext.requestActionId }
         : {}),
-      ...(requestLifecycleContext.requestActionName
+      ...(requestLifecycleContext.requestActionName !== null
         ? { actionName: requestLifecycleContext.requestActionName }
         : {})
     };
@@ -537,7 +537,7 @@ export class ServerRequestHandler {
       return true;
     }
     const providedToken = this.readHeader(req, this.deps.apiTokenHeaderName);
-    if (!providedToken) {
+    if (providedToken === null || providedToken.length === 0) {
       return false;
     }
     return providedToken === this.deps.apiToken;

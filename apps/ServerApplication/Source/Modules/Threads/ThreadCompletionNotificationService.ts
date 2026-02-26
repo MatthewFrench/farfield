@@ -212,7 +212,9 @@ export class ThreadCompletionNotificationService {
       this.pushSystem(THREAD_COMPLETION_PUSH_SYSTEM_OPERATION_NAME, {
         threadId,
         ntfyDelivered: ntfyDispatchResult.delivered,
-        ...(ntfyDispatchResult.messageId ? { ntfyMessageId: ntfyDispatchResult.messageId } : {}),
+        ...(ntfyDispatchResult.messageId !== null
+          ? { ntfyMessageId: ntfyDispatchResult.messageId }
+          : {}),
         webPushAttempted: webPushDispatchResult.attempted,
         webPushDelivered: webPushDispatchResult.delivered,
         webPushFailures: webPushDispatchResult.failures
@@ -489,10 +491,10 @@ export class ThreadCompletionNotificationService {
     cwd: string | null,
     pathValue: string | null
   ): string {
-    if (cwd) {
+    if (cwd !== null) {
       return this.projectLabelFromPath(cwd);
     }
-    if (pathValue) {
+    if (pathValue !== null) {
       return this.projectLabelFromPath(pathValue);
     }
     return DEFAULT_PROJECT_NAME;
@@ -529,7 +531,7 @@ export class ThreadCompletionNotificationService {
   }
 
   private normalizeOptionalString(value: string | null): string | null {
-    if (!value) {
+    if (value === null || value.length === 0) {
       return null;
     }
     const normalized = value.trim();

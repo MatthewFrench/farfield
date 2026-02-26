@@ -107,7 +107,7 @@ export class ThreadCollectionListQueryOwner {
   }
 
   public decodeCursor(cursor: string | null): DecodeThreadCollectionListCursorResult {
-    if (!cursor) {
+    if (cursor === null || cursor.length === 0) {
       return {
         ok: true,
         offset: 0

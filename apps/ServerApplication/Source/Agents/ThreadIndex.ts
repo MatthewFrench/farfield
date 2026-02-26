@@ -7,7 +7,7 @@ export class ThreadIndex {
 
   public register(threadId: string, agentId: AgentId): void {
     const registeredAgentId = this.agentIdByThreadId.get(threadId);
-    if (registeredAgentId && registeredAgentId !== agentId) {
+    if (registeredAgentId !== undefined && registeredAgentId !== agentId) {
       throw new Error(
         (
           `${THREAD_OWNER_CONFLICT_ERROR_PREFIX}: thread ${threadId} is already bound `

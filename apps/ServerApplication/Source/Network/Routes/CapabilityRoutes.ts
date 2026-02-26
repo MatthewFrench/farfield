@@ -181,7 +181,11 @@ async function handleConfigDefaultsRoute(deps: CapabilityRouteDependencies): Pro
 
   const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
   const requestedAgentId = parseAgentId(requestedAgentRaw);
-  if (requestedAgentRaw && !requestedAgentId) {
+  if (
+    requestedAgentRaw !== null
+    && requestedAgentRaw.length > 0
+    && requestedAgentId === null
+  ) {
     jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
       ok: false,
       error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`
@@ -190,7 +194,7 @@ async function handleConfigDefaultsRoute(deps: CapabilityRouteDependencies): Pro
   }
 
   const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
-  if (!resolvedAgentId) {
+  if (resolvedAgentId === null) {
     jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapDefaultsResponse(null, null));
     return true;
   }

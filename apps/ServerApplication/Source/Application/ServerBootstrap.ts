@@ -459,7 +459,7 @@ serverLifecycleCoordinator = new ServerLifecycleCoordinator({
   activityHistoryService,
   pushDispatchConcurrencyCoordinator,
   eventStreamClientRegistry,
-  readOpenCodeAdapter: () => agentRuntimeOwner?.readOpenCodeAdapter() ?? null,
+  readOpenCodeAdapter: () => agentRuntimeOwner.readOpenCodeAdapter(),
   ensureTraceDirectory,
   pushSystem: (message, details = {}) => {
     pushSystem(message, details);

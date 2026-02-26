@@ -43,7 +43,7 @@ export class CodexMessageDispatchOwner {
         input.ownerClientId
       );
 
-      if (ownerClientId) {
+      if (ownerClientId !== null) {
         const turnStartTemplate = await this.readTurnStartTemplate(input.threadId, ownerClientId);
         try {
           await this.service.sendMessage({

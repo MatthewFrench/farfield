@@ -108,7 +108,7 @@ export class DebugReplayRouteOwner {
     if (frame.type === DebugReplayFrameTypeByName.request) {
       const replayPromise = codexAdapter.replayRequest(frame.method, frame.params, options);
 
-      if (body.waitForResponse) {
+      if (body.waitForResponse === true) {
         const response = await replayPromise;
         jsonResponse(res, DebugReplayRouteStatusCodeByName.successOk, {
           ok: true,

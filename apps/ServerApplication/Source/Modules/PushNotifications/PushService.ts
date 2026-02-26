@@ -136,12 +136,12 @@ async function sendSubscriptionsWithConcurrencyLimit(
 
   const workerCount = Math.min(PUSH_SEND_CONCURRENCY_LIMIT, subscriptions.length);
   const workers = Array.from({ length: workerCount }, async () => {
-    while (true) {
+    for (;;) {
       // Claiming the index before awaiting guarantees each worker receives a unique slot.
       const subscriptionIndex = nextSubscriptionIndex;
       nextSubscriptionIndex += 1;
       const subscription = subscriptions[subscriptionIndex];
-      if (!subscription) {
+      if (subscription === undefined) {
         return;
       }
 

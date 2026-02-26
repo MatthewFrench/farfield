@@ -157,7 +157,7 @@ export class CodexMonitorService {
 
   public async sendMessage(input: SendMessageInput): Promise<void> {
     const trimmedText = input.text.trim();
-    if (!trimmedText) {
+    if (trimmedText.length === 0) {
       throw new Error(MESSAGE_TEXT_REQUIRED_ERROR_MESSAGE);
     }
 

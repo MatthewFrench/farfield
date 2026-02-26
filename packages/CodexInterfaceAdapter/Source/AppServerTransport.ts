@@ -214,7 +214,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     const lineReader = readline.createInterface({ input: child.stdout });
     lineReader.on("line", (line) => {
       const trimmed = line.trim();
-      if (!trimmed) {
+      if (trimmed.length === 0) {
         return;
       }
 
@@ -276,7 +276,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     const stderrReader = readline.createInterface({ input: child.stderr });
     stderrReader.on("line", (line) => {
       const trimmed = line.trim();
-      if (!trimmed) {
+      if (trimmed.length === 0) {
         return;
       }
 

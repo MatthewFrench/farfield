@@ -139,12 +139,12 @@ export class BrowserSessionAuthOwner {
   }
 
   public readSession(cookieHeaderValue: string | null): BrowserSessionReadResult {
-    if (!cookieHeaderValue) {
+    if (cookieHeaderValue === null || cookieHeaderValue.length === 0) {
       return this.buildUnauthenticatedReadResult();
     }
 
     const sessionToken = this.readCookieValue(cookieHeaderValue);
-    if (!sessionToken) {
+    if (sessionToken === null || sessionToken.length === 0) {
       return this.buildUnauthenticatedReadResult();
     }
 
