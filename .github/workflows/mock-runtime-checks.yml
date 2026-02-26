@@ -35,3 +35,6 @@ jobs:
 
       - name: Targeted touched-surface critical suites gate
         run: bun run ci:targeted:critical
+
+      - name: Targeted touched-surface performance invariants gate
+        run: bun run ci:targeted:performance

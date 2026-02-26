@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-26 23:11:41Z
+Last Updated (UTC): 2026-02-26 23:33:07Z
 
 ## Scope Model
 
@@ -42,13 +42,82 @@ Last Updated (UTC): 2026-02-26 23:11:41Z
    - debug contracts moved out of route layer to [`apps/ServerApplication/Source/Network/DebugContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/DebugContracts.ts).
    - runtime-route dependencies now consume explicit network-owned reader contracts instead of `Application` state-owner types.
    - debug-data mapping helpers were rewritten to immutable construction where mutable member writes were previously used.
-3. High-priority hotspots still queued by concern:
+3. High-priority hotspot closure in this iteration:
    - `apps/WebApplication/Source/Application/StateManagement`
-     - large orchestrator hooks still need decomposition into explicit owner classes/modules.
+     - startup and archived-thread orchestration moved to explicit owner classes:
+       - [`CoreDataStartupLoader.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/CoreDataStartupLoader.ts)
+       - [`ArchivedThreadLoader.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/ArchivedThreadLoader.ts)
+     - composition hook now acts as owner wiring only:
+       - [`UseCoreDataLoaders.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseCoreDataLoaders.ts)
    - `apps/ServerApplication/Source/Network/ServerRequestHandler.ts`
-     - central request orchestrator remains high fan-in and should be split by route concern owners.
+     - request handling split by concern owners:
+       - lifecycle owner: [`ServerRequestLifecycleOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ServerRequestLifecycleOwner.ts)
+       - authentication owner: [`ServerRequestAuthenticationOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ServerRequestAuthenticationOwner.ts)
+       - route-dispatch owner: [`ServerRequestRouteDispatchOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ServerRequestRouteDispatchOwner.ts)
    - `packages/CodexInterfaceAdapter/Source/LiveState.ts`
-     - live-state reduction and merge complexity remains high and should be segmented into smaller owner modules with focused invariants/tests.
+     - live-state responsibilities split into focused owner modules:
+       - error contracts: [`LiveStateErrorContracts.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/LiveStateErrorContracts.ts)
+       - patch application owner: [`LiveStatePatchApplicationOwner.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/LiveStatePatchApplicationOwner.ts)
+       - event-reduction owner: [`LiveStateEventReductionOwner.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/LiveStateEventReductionOwner.ts)
+4. Remaining queued by concern:
+   - `apps/ServerApplication/Source/Agents`
+     - continue reducing adapter fan-in and keep all adapter mutability behind explicit owner APIs.
+   - `apps/WebApplication/Source/Features`
+     - continue moving feature policy branching from composition and components into owner state modules.
+   - `apps/ServerApplication/Source/Modules`
+     - continue enforcing deterministic cache/concurrency owner boundaries and typed mutation-only APIs.
+
+## Group and Concern Separation Review (Current Iteration)
+
+1. `apps/ServerApplication/Source/Network`
+   - issue before this iteration:
+     - request ingress, auth policy, route dispatch, and lifecycle telemetry were concentrated in one owner surface.
+   - improvement applied:
+     - split into explicit owners for lifecycle context, auth policy, and route dispatch.
+     - route modules now consume network-owned runtime reader contracts and debug contracts rather than `Application` owner types.
+   - boundary API guidance:
+     - request composition owner should only parse ingress and delegate to owner APIs.
+     - route owner APIs should accept normalized path/method/context contracts, not raw application state owners.
+2. `packages/CodexInterfaceAdapter/Source`
+   - issue before this iteration:
+     - patch-path mechanics, strict patch application, and stream-event reduction were grouped in one file.
+   - improvement applied:
+     - split live-state behavior into dedicated modules:
+       - patch application owner
+       - stream event reduction owner
+       - error contract owner
+   - boundary API guidance:
+     - service consumers should call explicit reducer/apply APIs and avoid internal patch-path mechanics.
+     - error contracts should remain transport-agnostic and include event/patch localization metadata.
+3. `apps/WebApplication/Source/Application/StateManagement`
+   - issue before this iteration:
+     - startup critical-read orchestration and archived-thread load orchestration were mixed inside one hook.
+   - improvement applied:
+     - startup and archived-thread orchestration moved into explicit owners, with hook reduced to dependency wiring.
+   - boundary API guidance:
+     - hooks compose owners and pass typed refs/setters.
+     - owner APIs execute orchestration and return deterministic completion semantics.
+
+## Boundary API Usage Checks To Apply In Next Waves
+
+1. Ensure every group owner has one typed `Dependencies` contract and one typed public API surface.
+2. Ensure cross-group calls use owner APIs only, not direct state mutation or shared mutable object passing.
+3. Ensure ingress parsing and route-path normalization remain in network owners, not reused downstream through raw request objects.
+4. Ensure UI composition hooks do not embed policy branches that belong in state-management owners.
+5. Ensure package surfaces expose explicit error/value contracts so app owners do not inspect transport payload shapes directly.
+
+## Boundary API Misuse Signals (Quick Audit Checklist)
+
+1. Data-access module imported by a UI component:
+   - move request calls into feature/app owner APIs and let UI consume owner outputs only.
+2. Owner consumers constructing partial mutable payloads for owner internals:
+   - replace with named owner commands and strict input contracts.
+3. Shared mutable state object passed between multiple groups:
+   - replace with one owner API boundary and immutable read models for consumers.
+4. Repeated transport string discriminants in app logic:
+   - centralize discriminants in one boundary contract and map once at ingress.
+5. Cross-group helper mutating state without owner context:
+   - move mutation into the owning module/class and expose explicit mutation methods.
 
 ## Next Concern Focus: Ownership and Separation
 
