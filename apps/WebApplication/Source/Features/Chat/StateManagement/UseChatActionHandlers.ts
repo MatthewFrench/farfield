@@ -108,7 +108,8 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
   const handleThreadSelected = useCallback((threadId: string): void => {
     // Keep state and ref synchronized so async request callbacks observe the same thread selection.
     input.setSelectedThreadId(threadId);
-    input.selectedThreadIdRef.current = threadId;
+    const selectedThreadIdRef = input.selectedThreadIdRef;
+    selectedThreadIdRef.current = threadId;
   }, [input.selectedThreadIdRef, input.setSelectedThreadId]);
 
   const markThreadPendingMaterialization = useCallback((threadId: string): void => {

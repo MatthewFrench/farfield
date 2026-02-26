@@ -9,7 +9,7 @@ import {
 } from "@/Features/Debugging/DataAccess/ClientErrorReporter";
 import {
   type FarfieldHttpRequestFailureDetails
-} from "@/Shared/Transport/FarfieldHttpTransport";
+} from "@/Shared/Contracts/FarfieldHttpRequestFailureDetails";
 import { z } from "zod";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import {

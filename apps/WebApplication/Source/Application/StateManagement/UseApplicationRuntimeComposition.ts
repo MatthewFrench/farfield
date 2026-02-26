@@ -120,8 +120,10 @@ export function useApplicationRuntimeComposition(
   input: UseApplicationRuntimeCompositionInput
 ): ApplicationRuntimeComposition {
   // Effect owners retain stable subscriptions and always read the latest loader refs from this runtime owner.
-  input.applicationShellState.loadCoreDataTrackedRef.current = input.coreDataLoaders.loadCoreDataTracked;
-  input.applicationShellState.loadSelectedThreadRef.current = input.loadSelectedThreadTracked;
+  const loadCoreDataTrackedRef = input.applicationShellState.loadCoreDataTrackedRef;
+  const loadSelectedThreadRef = input.applicationShellState.loadSelectedThreadRef;
+  loadCoreDataTrackedRef.current = input.coreDataLoaders.loadCoreDataTracked;
+  loadSelectedThreadRef.current = input.loadSelectedThreadTracked;
 
   // Push bootstrap can complete at any time; resolve selected-thread refresh from the latest runtime selection ref.
   const loadSelectedThreadIfPresentFromRuntimeState = useCallback(async (): Promise<void> => {
@@ -301,7 +303,8 @@ export function useApplicationRuntimeComposition(
   }, [input.applicationShellState.lastAppliedModeSignatureRef]);
 
   const writeLastAppliedModeSignature = useCallback((nextModeSignature: string): void => {
-    input.applicationShellState.lastAppliedModeSignatureRef.current = nextModeSignature;
+    const lastAppliedModeSignatureRef = input.applicationShellState.lastAppliedModeSignatureRef;
+    lastAppliedModeSignatureRef.current = nextModeSignature;
   }, [input.applicationShellState.lastAppliedModeSignatureRef]);
 
   const invalidateActiveThreadQuery = useCallback((): void => {

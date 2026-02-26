@@ -129,34 +129,35 @@ function applyArrayPatch(
   lastSegment: PatchPathSegment,
   patch: ThreadStreamPatch
 ): void {
+  const mutableTarget = target;
   const operation = patch.op;
   if (operation === PATCH_OPERATION_ADD && lastSegment === PATCH_APPEND_PATH_SEGMENT) {
-    target.push(requirePatchValue(patch));
+    mutableTarget.push(requirePatchValue(patch));
     return;
   }
 
   const arrayIndex = parseArrayIndex(lastSegment);
 
   if (operation === PATCH_OPERATION_ADD) {
-    if (arrayIndex < 0 || arrayIndex > target.length) {
+    if (arrayIndex < 0 || arrayIndex > mutableTarget.length) {
       throw new Error(`Patch add index out of range: ${String(lastSegment)}`);
     }
-    target.splice(arrayIndex, 0, requirePatchValue(patch));
+    mutableTarget.splice(arrayIndex, 0, requirePatchValue(patch));
     return;
   }
 
   if (operation === PATCH_OPERATION_REPLACE) {
-    if (arrayIndex < 0 || arrayIndex >= target.length) {
+    if (arrayIndex < 0 || arrayIndex >= mutableTarget.length) {
       throw new Error(`Patch replace index out of range: ${String(lastSegment)}`);
     }
-    target[arrayIndex] = requirePatchValue(patch);
+    mutableTarget[arrayIndex] = requirePatchValue(patch);
     return;
   }
 
-  if (arrayIndex < 0 || arrayIndex >= target.length) {
+  if (arrayIndex < 0 || arrayIndex >= mutableTarget.length) {
     throw new Error(`Patch remove index out of range: ${String(lastSegment)}`);
   }
-  target.splice(arrayIndex, 1);
+  mutableTarget.splice(arrayIndex, 1);
   return;
 
   throw new Error(`${UNSUPPORTED_PATCH_OPERATION_ERROR_MESSAGE_PREFIX}: ${String(operation)}`);
@@ -167,17 +168,18 @@ function applyObjectPatch(
   lastSegment: PatchPathSegment,
   patch: ThreadStreamPatch
 ): void {
+  const mutableTarget = target;
   const operation = patch.op;
   const key = toObjectPathKey(lastSegment);
   if (operation === PATCH_OPERATION_REMOVE) {
-    if (!hasOwnJsonProperty(target, key)) {
+    if (!hasOwnJsonProperty(mutableTarget, key)) {
       throw new Error(`Patch remove key missing: ${key}`);
     }
-    delete target[key];
+    delete mutableTarget[key];
     return;
   }
 
-  target[key] = requirePatchValue(patch);
+  mutableTarget[key] = requirePatchValue(patch);
   return;
 }
 

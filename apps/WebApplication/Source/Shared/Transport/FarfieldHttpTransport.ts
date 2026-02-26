@@ -20,6 +20,9 @@ import {
   StructuredDataValueSchema,
   type StructuredDataValue
 } from "@/Shared/Contracts/StructuredDataValue";
+import {
+  type FarfieldHttpRequestFailureDetails
+} from "@/Shared/Contracts/FarfieldHttpRequestFailureDetails";
 import { RequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
 
 const ApiEnvelopeSchema = z
@@ -82,16 +85,6 @@ interface ApiEnvelopeDecodeFailure {
 }
 
 type ApiEnvelopeDecodeResult = ApiEnvelopeDecodeSuccess | ApiEnvelopeDecodeFailure;
-
-export interface FarfieldHttpRequestFailureDetails {
-  path: string;
-  status: number | null;
-  statusText: string | null;
-  requestId: string | null;
-  responseText: string | null;
-  responseTextLength: number | null;
-  responseTextTruncated: boolean;
-}
 
 export class FarfieldHttpRequestFailureError extends Error {
   public readonly requestFailureDetails: FarfieldHttpRequestFailureDetails;

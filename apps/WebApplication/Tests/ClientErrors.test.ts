@@ -56,7 +56,7 @@ describe("installGlobalClientCrashReporter", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    const requestInit = fetchMock.mock.calls[0]?.[1];
     const parsedBody = CreateDebugClientErrorBodySchema.parse(JSON.parse(String(requestInit?.body ?? "")));
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/debug/client-errors");
     expect(parsedBody.operation).toBe("window-error");
@@ -82,7 +82,7 @@ describe("installGlobalClientCrashReporter", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    const requestInit = fetchMock.mock.calls[0]?.[1];
     const parsedBody = CreateDebugClientErrorBodySchema.parse(JSON.parse(String(requestInit?.body ?? "")));
     expect(parsedBody.operation).toBe("window-unhandledrejection");
     expect(parsedBody.message).toBe("Task failed");
@@ -103,7 +103,7 @@ describe("installGlobalClientCrashReporter", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    const requestInit = fetchMock.mock.calls[0]?.[1];
     const parsedBody = CreateDebugClientErrorBodySchema.parse(JSON.parse(String(requestInit?.body ?? "")));
     expect(parsedBody.message).toBe("42");
     expect(parsedBody.operation).toBe("window-unhandledrejection");

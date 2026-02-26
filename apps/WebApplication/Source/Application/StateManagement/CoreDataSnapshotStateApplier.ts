@@ -249,11 +249,12 @@ function applySignedCollectionStateUpdate<InputCollection>(input: {
   nextCollection: InputCollection;
   setCollection: Dispatch<SetStateAction<InputCollection>>;
 }): void {
-  if (ThreadGroupSelectors.signaturesMatch(input.previousSignatureRef.current, input.nextSignature)) {
+  const previousSignatureRef = input.previousSignatureRef;
+  if (ThreadGroupSelectors.signaturesMatch(previousSignatureRef.current, input.nextSignature)) {
     return;
   }
 
-  input.previousSignatureRef.current = input.nextSignature;
+  previousSignatureRef.current = input.nextSignature;
   input.setCollection(input.nextCollection);
 }
 
@@ -276,7 +277,8 @@ function applyDebugWorkspaceSnapshot(input: {
       input.snapshot.debugErrorsSignature
     )
   ) {
-    input.debugErrorsSignatureRef.current = input.snapshot.debugErrorsSignature;
+    const debugErrorsSignatureRef = input.debugErrorsSignatureRef;
+    debugErrorsSignatureRef.current = input.snapshot.debugErrorsSignature;
     input.setDebugErrors(input.snapshot.debugErrors);
   }
 
@@ -382,8 +384,9 @@ function applyAgentSnapshot(input: {
   const enabledAgents = readEnabledAgentIdentifiers(input.nextAgents);
   const nextDefaultAgent = readNextDefaultAgentIdentifier(input.nextAgents, enabledAgents);
   input.setSelectedAgentId((currentAgentId) => {
-    if (!input.hasHydratedAgentSelectionRef.current) {
-      input.hasHydratedAgentSelectionRef.current = true;
+    const hasHydratedAgentSelectionRef = input.hasHydratedAgentSelectionRef;
+    if (!hasHydratedAgentSelectionRef.current) {
+      hasHydratedAgentSelectionRef.current = true;
       return nextDefaultAgent;
     }
     return enabledAgents.includes(currentAgentId) ? currentAgentId : nextDefaultAgent;

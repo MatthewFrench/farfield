@@ -62,7 +62,10 @@ export class ConversationItemFlattener {
     });
 
     if (flattened.length > 0) {
-      flattened[flattened.length - 1]!.isLast = true;
+      const lastFlattenedItem = flattened[flattened.length - 1];
+      if (lastFlattenedItem !== undefined) {
+        lastFlattenedItem.isLast = true;
+      }
     }
 
     return flattened;

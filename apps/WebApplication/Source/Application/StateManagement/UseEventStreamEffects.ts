@@ -118,7 +118,8 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
                   debugWorkspaceSnapshot.debugErrorsSignature
                 )
               ) {
-                input.debugErrorsSignatureRef.current = debugWorkspaceSnapshot.debugErrorsSignature;
+                const debugErrorsSignatureRef = input.debugErrorsSignatureRef;
+                debugErrorsSignatureRef.current = debugWorkspaceSnapshot.debugErrorsSignature;
                 input.setDebugErrors(debugWorkspaceSnapshot.debugErrors);
               }
 
@@ -160,7 +161,8 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
         });
       },
       onConnectionStatusChange: (connected) => {
-        input.eventsConnectedRef.current = connected;
+        const eventsConnectedRef = input.eventsConnectedRef;
+        eventsConnectedRef.current = connected;
       }
     });
 

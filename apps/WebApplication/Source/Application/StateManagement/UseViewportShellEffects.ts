@@ -27,21 +27,23 @@ export interface UseViewportShellEffectsInput {
 function cancelScheduledKeyboardOpenPin(
   keyboardOpenScrollRafReference: MutableRefObject<number | null>
 ): void {
-  if (keyboardOpenScrollRafReference.current === null) {
+  const keyboardOpenScrollRafRef = keyboardOpenScrollRafReference;
+  if (keyboardOpenScrollRafRef.current === null) {
     return;
   }
-  window.cancelAnimationFrame(keyboardOpenScrollRafReference.current);
-  keyboardOpenScrollRafReference.current = null;
+  window.cancelAnimationFrame(keyboardOpenScrollRafRef.current);
+  keyboardOpenScrollRafRef.current = null;
 }
 
 function scheduleKeyboardOpenPin(
   keyboardOpenScrollRafReference: MutableRefObject<number | null>,
   callback: () => void
 ): void {
-  keyboardOpenScrollRafReference.current = window.requestAnimationFrame(() => {
-    keyboardOpenScrollRafReference.current = window.requestAnimationFrame(() => {
+  const keyboardOpenScrollRafRef = keyboardOpenScrollRafReference;
+  keyboardOpenScrollRafRef.current = window.requestAnimationFrame(() => {
+    keyboardOpenScrollRafRef.current = window.requestAnimationFrame(() => {
       callback();
-      keyboardOpenScrollRafReference.current = null;
+      keyboardOpenScrollRafRef.current = null;
     });
   });
 }
@@ -57,8 +59,9 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
         window.scrollTo(0, 0);
       }
 
-      const previousKeyboardState = input.viewportKeyboardStateRef.current;
-      input.viewportKeyboardStateRef.current = metrics.keyboardOpen;
+      const viewportKeyboardStateRef = input.viewportKeyboardStateRef;
+      const previousKeyboardState = viewportKeyboardStateRef.current;
+      viewportKeyboardStateRef.current = metrics.keyboardOpen;
 
       if (
         metrics.keyboardOpen
@@ -73,7 +76,8 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
             return;
           }
           input.chatScrollStateCoordinator.pinToBottom(scroller);
-          input.isChatAtBottomRef.current = true;
+          const isChatAtBottomRef = input.isChatAtBottomRef;
+          isChatAtBottomRef.current = true;
           input.setIsChatAtBottom(true);
         });
       }

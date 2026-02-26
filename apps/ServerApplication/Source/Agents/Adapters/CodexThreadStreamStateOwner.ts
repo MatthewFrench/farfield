@@ -247,7 +247,8 @@ export class CodexThreadStreamStateOwner {
 
   private readThreadStreamSequenceWindow(entries: ThreadStreamEventEntry[]): ThreadStreamSequenceWindow {
     const nextSequence = this.readNextSequence(entries);
-    const firstAvailableSequence = entries.length > 0 ? entries[0]!.sequence : nextSequence;
+    const firstEntry = entries[0];
+    const firstAvailableSequence = firstEntry ? firstEntry.sequence : nextSequence;
     return {
       nextSequence,
       firstAvailableSequence

@@ -574,12 +574,13 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
   ]);
 
   const loadCoreDataTracked = useCallback(async () => {
+    const lastCoreRefreshAtRef = input.lastCoreRefreshAtRef;
     await input.coreDataRefreshConcurrencyCoordinator.run(async () => {
       await loadCoreData();
       if (input.isArchivedThreadsOpenRef.current || input.hasLoadedArchivedThreadsRef.current) {
         await loadArchivedThreads();
       }
-      input.lastCoreRefreshAtRef.current = Date.now();
+      lastCoreRefreshAtRef.current = Date.now();
     });
   }, [
     input.coreDataRefreshConcurrencyCoordinator,

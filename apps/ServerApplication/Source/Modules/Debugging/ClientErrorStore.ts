@@ -261,9 +261,10 @@ export class ClientErrorStore {
     lineNumber: number,
     malformedLineSummary: MalformedLineSummary
   ): void {
-    malformedLineSummary.malformedLineCount += 1;
-    if (malformedLineSummary.sampledLineNumbers.length < MALFORMED_LINE_NUMBER_SAMPLE_LIMIT) {
-      malformedLineSummary.sampledLineNumbers.push(lineNumber);
+    const mutableMalformedLineSummary = malformedLineSummary;
+    mutableMalformedLineSummary.malformedLineCount += 1;
+    if (mutableMalformedLineSummary.sampledLineNumbers.length < MALFORMED_LINE_NUMBER_SAMPLE_LIMIT) {
+      mutableMalformedLineSummary.sampledLineNumbers.push(lineNumber);
     }
   }
 

@@ -77,7 +77,8 @@ export interface UseApplicationRefreshEffectsInput {
 
 export function useApplicationRefreshEffects(input: UseApplicationRefreshEffectsInput): void {
   useEffect(() => {
-    input.selectedThreadIdRef.current = input.selectedThreadId;
+    const selectedThreadIdRef = input.selectedThreadIdRef;
+    selectedThreadIdRef.current = input.selectedThreadId;
     if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
       return;
     }
@@ -96,11 +97,13 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   ]);
 
   useEffect(() => {
-    input.unreadThreadIdsRef.current = input.unreadThreadIds;
+    const unreadThreadIdsRef = input.unreadThreadIdsRef;
+    unreadThreadIdsRef.current = input.unreadThreadIds;
   }, [input.unreadThreadIds, input.unreadThreadIdsRef]);
 
   useEffect(() => {
-    input.activeTabRef.current = input.activeTab;
+    const activeTabRef = input.activeTabRef;
+    activeTabRef.current = input.activeTab;
   }, [input.activeTab, input.activeTabRef]);
 
   useEffect(() => {
@@ -130,11 +133,13 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   ]);
 
   useEffect(() => {
-    input.isArchivedThreadsOpenRef.current = input.isArchivedThreadsOpen;
+    const isArchivedThreadsOpenRef = input.isArchivedThreadsOpenRef;
+    isArchivedThreadsOpenRef.current = input.isArchivedThreadsOpen;
   }, [input.isArchivedThreadsOpen, input.isArchivedThreadsOpenRef]);
 
   useEffect(() => {
-    input.hasLoadedArchivedThreadsRef.current = input.hasLoadedArchivedThreads;
+    const hasLoadedArchivedThreadsRef = input.hasLoadedArchivedThreadsRef;
+    hasLoadedArchivedThreadsRef.current = input.hasLoadedArchivedThreads;
   }, [input.hasLoadedArchivedThreads, input.hasLoadedArchivedThreadsRef]);
 
   useEffect(() => {
@@ -199,9 +204,10 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   useEffect(() => {
     let disposed = false;
     const isDisposed = (): boolean => disposed;
+    const coreRefreshIntervalRef = input.coreRefreshIntervalRef;
 
     const scheduleNextWatchdog = (delayMilliseconds: number): void => {
-      input.coreRefreshIntervalRef.current = window.setTimeout(() => {
+      coreRefreshIntervalRef.current = window.setTimeout(() => {
         void runWatchdogCycle();
       }, delayMilliseconds);
     };
@@ -248,9 +254,9 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
 
     return () => {
       disposed = true;
-      if (input.coreRefreshIntervalRef.current !== null) {
-        window.clearTimeout(input.coreRefreshIntervalRef.current);
-        input.coreRefreshIntervalRef.current = null;
+      if (coreRefreshIntervalRef.current !== null) {
+        window.clearTimeout(coreRefreshIntervalRef.current);
+        coreRefreshIntervalRef.current = null;
       }
     };
   }, [

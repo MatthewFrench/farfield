@@ -1,10 +1,29 @@
 import js from "@eslint/js";
+import functional from "eslint-plugin-functional";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 const typescriptSourcePatterns = ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"];
 const typescriptProjectRootDirectory = new URL(".", import.meta.url).pathname;
+const noInternalIndexBarrelImportPattern = {
+  group: ["**/Index", "**/Index.ts", "**/Index.tsx"],
+  message: "Import concrete internal modules directly instead of internal Index barrels."
+};
+const webTransportBoundaryImportPattern = {
+  group: ["@/Shared/Transport", "@/Shared/Transport/*"],
+  message: "Only data-access boundary modules may import shared transport request utilities."
+};
+const webDataAccessBoundaryImportPatterns = [
+  {
+    group: ["@/Features/*/DataAccess/*"],
+    message: "User-interface modules must consume owner/state APIs instead of feature data-access modules."
+  },
+  {
+    group: ["@/Application/DataAccess/*"],
+    message: "User-interface modules must consume owner/state APIs instead of application data-access modules."
+  }
+];
 
 export default tseslint.config(
   {
@@ -39,6 +58,7 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-empty-object-type": "off",
+      "@typescript-eslint/no-non-null-assertion": "error",
       "no-restricted-syntax": [
         "error",
         {
@@ -76,14 +96,33 @@ export default tseslint.config(
         "error",
         {
           patterns: [
-            {
-              group: ["**/Index", "**/Index.ts", "**/Index.tsx"],
-              message: "Import concrete internal modules directly instead of internal Index barrels."
-            }
+            noInternalIndexBarrelImportPattern
           ]
         }
       ],
       "no-useless-escape": "off"
+    }
+  },
+  {
+    files: [
+      "apps/ServerApplication/Source/**/*.ts",
+      "apps/WebApplication/Source/**/*.ts",
+      "apps/WebApplication/Source/**/*.tsx",
+      "packages/CodexInterfaceAdapter/Source/**/*.ts",
+      "packages/CodexProtocol/Source/**/*.ts",
+      "packages/OpenCodeInterfaceAdapter/Source/**/*.ts"
+    ],
+    ignores: [
+      "packages/CodexProtocol/Source/Generated/**/*.ts",
+      "packages/CodexProtocol/vendor/**/*.ts"
+    ],
+    rules: {
+      "no-param-reassign": [
+        "error",
+        {
+          props: true
+        }
+      ]
     }
   },
   {
@@ -106,6 +145,7 @@ export default tseslint.config(
     },
     rules: {
       "@typescript-eslint/no-unnecessary-condition": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
       "@typescript-eslint/strict-boolean-expressions": [
         "error",
         {
@@ -116,6 +156,82 @@ export default tseslint.config(
           allowNullableString: false,
           allowNumber: false,
           allowString: false
+        }
+      ]
+    }
+  },
+  {
+    files: [
+      "apps/WebApplication/Source/Application/**/*.ts",
+      "apps/WebApplication/Source/Application/**/*.tsx",
+      "apps/WebApplication/Source/Features/**/*.ts",
+      "apps/WebApplication/Source/Features/**/*.tsx",
+      "apps/WebApplication/Source/Components/**/*.ts",
+      "apps/WebApplication/Source/Components/**/*.tsx"
+    ],
+    ignores: [
+      "apps/WebApplication/Source/Application/DataAccess/**/*.ts",
+      "apps/WebApplication/Source/Application/DataAccess/**/*.tsx",
+      "apps/WebApplication/Source/Features/**/DataAccess/**/*.ts",
+      "apps/WebApplication/Source/Features/**/DataAccess/**/*.tsx",
+      "apps/WebApplication/Source/Shared/Transport/**/*.ts",
+      "apps/WebApplication/Source/Shared/Transport/**/*.tsx"
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            noInternalIndexBarrelImportPattern,
+            webTransportBoundaryImportPattern
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: [
+      "apps/WebApplication/Source/Application/UserInterface/**/*.ts",
+      "apps/WebApplication/Source/Application/UserInterface/**/*.tsx",
+      "apps/WebApplication/Source/Features/**/UserInterface/**/*.ts",
+      "apps/WebApplication/Source/Features/**/UserInterface/**/*.tsx",
+      "apps/WebApplication/Source/Components/**/*.ts",
+      "apps/WebApplication/Source/Components/**/*.tsx"
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            noInternalIndexBarrelImportPattern,
+            webTransportBoundaryImportPattern,
+            ...webDataAccessBoundaryImportPatterns
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: [
+      "apps/WebApplication/Source/Shared/Contracts/**/*.ts",
+      "apps/WebApplication/Source/Application/Configuration/**/*.ts",
+      "apps/ServerApplication/Source/Application/Configuration/**/*.ts",
+      "packages/CodexProtocol/Source/Contracts/**/*.ts"
+    ],
+    plugins: {
+      functional
+    },
+    rules: {
+      "functional/immutable-data": [
+        "error",
+        {
+          ignoreClasses: "fieldsOnly",
+          ignoreImmediateMutation: false,
+          ignoreMapsAndSets: false,
+          ignoreNonConstDeclarations: {
+            treatParametersAsConst: true
+          },
+          ignoreAccessorPattern: ["^this\\."]
         }
       ]
     }

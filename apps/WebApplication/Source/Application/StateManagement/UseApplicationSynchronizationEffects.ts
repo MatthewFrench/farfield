@@ -22,11 +22,13 @@ export function useApplicationSynchronizationEffects(
   input: UseApplicationSynchronizationEffectsInput
 ): void {
   useEffect(() => {
-    input.loadCoreDataTrackedRef.current = input.loadCoreDataTracked;
+    const loadCoreDataTrackedRef = input.loadCoreDataTrackedRef;
+    loadCoreDataTrackedRef.current = input.loadCoreDataTracked;
   }, [input.loadCoreDataTracked, input.loadCoreDataTrackedRef]);
 
   useEffect(() => {
-    input.loadSelectedThreadRef.current = input.loadSelectedThreadTracked;
+    const loadSelectedThreadRef = input.loadSelectedThreadRef;
+    loadSelectedThreadRef.current = input.loadSelectedThreadTracked;
   }, [input.loadSelectedThreadTracked, input.loadSelectedThreadRef]);
 
   useEffect(() => {

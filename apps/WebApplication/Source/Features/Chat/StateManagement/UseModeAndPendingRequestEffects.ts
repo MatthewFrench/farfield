@@ -57,6 +57,7 @@ export function useModeAndPendingRequestEffects(input: UseModeAndPendingRequestE
   }, [input.activeRequest, input.setAnswerDraft, input.setSelectedRequestId]);
 
   useEffect(() => {
+    const lastAppliedModeSignatureRef = input.lastAppliedModeSignatureRef;
     const transition = input.modeSelectionSyncCoordinator.readTransition({
       conversationState: input.conversationState,
       appDefaultModel: input.appDefaultModel,
@@ -67,7 +68,7 @@ export function useModeAndPendingRequestEffects(input: UseModeAndPendingRequestE
       selectedReasoningEffort: input.selectedReasoningEffort,
       hasHydratedModeFromLiveState: input.hasHydratedModeFromLiveState,
       isModeSyncing: input.isModeSyncing,
-      lastAppliedModeSignature: input.lastAppliedModeSignatureRef.current
+      lastAppliedModeSignature: lastAppliedModeSignatureRef.current
     });
 
     if (
@@ -86,8 +87,8 @@ export function useModeAndPendingRequestEffects(input: UseModeAndPendingRequestE
     if (transition.nextSelectedReasoningEffort !== input.selectedReasoningEffort) {
       input.setSelectedReasoningEffort(transition.nextSelectedReasoningEffort);
     }
-    if (transition.nextLastAppliedModeSignature !== input.lastAppliedModeSignatureRef.current) {
-      input.lastAppliedModeSignatureRef.current = transition.nextLastAppliedModeSignature;
+    if (transition.nextLastAppliedModeSignature !== lastAppliedModeSignatureRef.current) {
+      lastAppliedModeSignatureRef.current = transition.nextLastAppliedModeSignature;
     }
     if (transition.nextHasHydratedModeFromLiveState !== input.hasHydratedModeFromLiveState) {
       input.setHasHydratedModeFromLiveState(transition.nextHasHydratedModeFromLiveState);
@@ -115,7 +116,8 @@ export function useModeAndPendingRequestEffects(input: UseModeAndPendingRequestE
   ]);
 
   useEffect(() => {
-    input.lastAppliedModeSignatureRef.current = "";
+    const lastAppliedModeSignatureRef = input.lastAppliedModeSignatureRef;
+    lastAppliedModeSignatureRef.current = "";
     input.setHasHydratedModeFromLiveState(false);
     input.setIsModeSyncing(false);
   }, [

@@ -37,8 +37,10 @@ export function useSelectedThreadLifecycleEffects(input: UseSelectedThreadLifecy
   }, [input.selectedThreadRefreshConcurrencyCoordinator]);
 
   useEffect(() => {
-    input.selectedThreadLoadTokenRef.current += 1;
-    const loadToken = input.selectedThreadLoadTokenRef.current;
+    const selectedThreadLoadTokenRef = input.selectedThreadLoadTokenRef;
+    selectedThreadLoadTokenRef.current += 1;
+    const loadToken = selectedThreadLoadTokenRef.current;
+    const selectedThreadIdRef = input.selectedThreadIdRef;
 
     if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
       input.selectedThreadRefreshConcurrencyCoordinator.cancelActiveRefresh();
@@ -71,7 +73,7 @@ export function useSelectedThreadLifecycleEffects(input: UseSelectedThreadLifecy
         const message = toErrorMessage(error);
         if (isThreadNotLoadedReadError(message)) {
           input.setSelectedThreadId(null);
-          input.selectedThreadIdRef.current = null;
+          selectedThreadIdRef.current = null;
           return;
         }
         input.handleRuntimeRequestError(error);

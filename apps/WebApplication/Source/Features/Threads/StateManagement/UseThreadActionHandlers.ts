@@ -45,6 +45,8 @@ export interface ThreadActionHandlers {
 }
 
 export function useThreadActionHandlers(input: UseThreadActionHandlersInput): ThreadActionHandlers {
+  const selectedThreadIdRef = input.selectedThreadIdRef;
+
   const refreshCreatedThreadData = useCallback(async (threadId: string): Promise<void> => {
     await input.loadCoreDataTracked();
     await input.loadSelectedThreadTracked(threadId);
@@ -61,7 +63,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       },
       onThreadSelected: (threadId) => {
         input.setSelectedThreadId(threadId);
-        input.selectedThreadIdRef.current = threadId;
+        selectedThreadIdRef.current = threadId;
       },
       onSetMobileSidebarOpen: input.setMobileSidebarOpen,
       onInvalidateActiveThreadQuery: () => {
@@ -82,7 +84,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     input.pendingThreadMaterializationCoordinator,
     input.reportTrackedUserInterfaceError,
     refreshCreatedThreadData,
-    input.selectedThreadIdRef,
+    selectedThreadIdRef,
     input.setError,
     input.setIsBusy,
     input.setMobileSidebarOpen,
@@ -103,13 +105,13 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
   const runArchiveThread = useCallback(async (threadId: string) => {
     await input.threadMutationActionCoordinator.archiveThread({
       threadId,
-      selectedThreadId: input.selectedThreadIdRef.current,
+      selectedThreadId: selectedThreadIdRef.current,
       activeThreadIdentifiersInOrder: input.threads.map((thread) => thread.id),
       buildActionRequestOptions: input.buildActionRequestOptions,
       onSetBusy: input.setIsBusy,
       onThreadSelected: (nextThreadId) => {
         input.setSelectedThreadId(nextThreadId);
-        input.selectedThreadIdRef.current = nextThreadId;
+        selectedThreadIdRef.current = nextThreadId;
       },
       onInvalidateActiveThreadQuery: () => {
         input.threadListStateController.invalidateActiveThreadQuery();
@@ -125,7 +127,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     input.buildActionRequestOptions,
     input.loadCoreDataTracked,
     input.reportTrackedUserInterfaceError,
-    input.selectedThreadIdRef,
+    selectedThreadIdRef,
     input.setIsBusy,
     input.setSelectedThreadId,
     input.threadListStateController,
@@ -141,7 +143,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       onSetBusy: input.setIsBusy,
       onThreadSelected: (nextThreadId) => {
         input.setSelectedThreadId(nextThreadId);
-        input.selectedThreadIdRef.current = nextThreadId;
+        selectedThreadIdRef.current = nextThreadId;
       },
       onSetMobileSidebarOpen: input.setMobileSidebarOpen,
       onInvalidateActiveThreadQuery: () => {
@@ -158,7 +160,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     input.buildActionRequestOptions,
     input.loadCoreDataTracked,
     input.reportTrackedUserInterfaceError,
-    input.selectedThreadIdRef,
+    selectedThreadIdRef,
     input.setIsBusy,
     input.setMobileSidebarOpen,
     input.setSelectedThreadId,

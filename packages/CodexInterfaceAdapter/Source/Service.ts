@@ -121,27 +121,20 @@ function buildTurnStartParams(input: SendMessageInput, trimmedText: string): Tur
         attachments: []
       };
 
-  applyTurnStartOverrides(turnStartParams, input);
-
-  return turnStartParams;
+  return applyTurnStartOverrides(turnStartParams, input);
 }
 
 /**
  * Optional overrides are applied only when provided by the typed service API.
  * Omitted fields intentionally preserve template values.
  */
-function applyTurnStartOverrides(turnStartParams: TurnStartParams, input: SendMessageInput): void {
-  if (input.model !== undefined) {
-    turnStartParams.model = input.model;
-  }
-
-  if (input.effort !== undefined) {
-    turnStartParams.effort = input.effort;
-  }
-
-  if (input.collaborationMode !== undefined) {
-    turnStartParams.collaborationMode = input.collaborationMode;
-  }
+function applyTurnStartOverrides(turnStartParams: TurnStartParams, input: SendMessageInput): TurnStartParams {
+  return {
+    ...turnStartParams,
+    ...(input.model !== undefined ? { model: input.model } : {}),
+    ...(input.effort !== undefined ? { effort: input.effort } : {}),
+    ...(input.collaborationMode !== undefined ? { collaborationMode: input.collaborationMode } : {})
+  };
 }
 
 /**

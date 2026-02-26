@@ -57,7 +57,7 @@ describe("PendingRequestCard", () => {
   it("uses an explicit empty draft contract when no draft exists for a question", () => {
     renderPendingRequestCard();
 
-    const freeformInput = screen.getByPlaceholderText("Free-form answer…") as HTMLInputElement;
+    const freeformInput = screen.getByPlaceholderText<HTMLInputElement>("Free-form answer…");
 
     expect(freeformInput.value).toBe("");
   });

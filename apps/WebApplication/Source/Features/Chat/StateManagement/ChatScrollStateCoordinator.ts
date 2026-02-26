@@ -44,6 +44,7 @@ export class ChatScrollStateCoordinator {
   }
 
   public pinToBottom(scrollElement: ChatScrollElementLike): void {
-    scrollElement.scrollTop = scrollElement.scrollHeight;
+    const mutableScrollElement = scrollElement;
+    mutableScrollElement.scrollTop = mutableScrollElement.scrollHeight;
   }
 }
