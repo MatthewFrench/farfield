@@ -103,7 +103,7 @@ function normalizePushReceiptBody(body: CreatePushReceiptBody): CreatePushReceip
     url: body.url,
     threadId: body.threadId ?? null,
     turnId: body.turnId ?? null,
-    ...(body.message ? { message: body.message } : {}),
+    ...(body.message !== undefined ? { message: body.message } : {}),
     createdAt: body.createdAt
   };
 }

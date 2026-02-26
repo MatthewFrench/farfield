@@ -322,6 +322,92 @@ describe("handlePushRoutes", () => {
     }
   });
 
+  it("preserves explicitly empty receipt message values", async () => {
+    const temporaryDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "push-routes-receipts-empty-message-")
+    );
+    try {
+      const pushService = new PushService({
+        enabled: false,
+        vapidPublicKey: "",
+        vapidPrivateKey: "",
+        vapidSubject: "mailto:test@example.com"
+      });
+      const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
+      pushStore.load();
+      const pushReceiptStore = new PushReceiptStore(
+        path.join(temporaryDirectory, "push-receipts.json"),
+        100,
+        86_400_000
+      );
+      pushReceiptStore.load();
+      const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
+      pushSendStore.load();
+      const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
+      const createdAt = "2026-02-26T00:00:00.000Z";
+
+      const recordResult = await executePushRoute({
+        method: PushRouteMethodByName.post,
+        pathname: PushRoutePathnameByName.receipts,
+        pushService,
+        pushStore,
+        pushReceiptStore,
+        pushSendStore,
+        pushMutationConcurrencyCoordinator,
+        pushLocalCaSourcePath: path.join(temporaryDirectory, "rootCA.pem"),
+        readJsonBody: async () => ({
+          notificationId: "notification_empty_message",
+          event: "shown",
+          url: "/threads/thread_1",
+          threadId: "thread_1",
+          turnId: "turn_1",
+          message: "",
+          createdAt
+        })
+      });
+
+      expect(recordResult.handled).toBe(true);
+      expect(recordResult.statusCode).toBe(200);
+      const parsedReceiptCreateResponse = FarfieldPushReceiptCreateEnvelopeSchema.parse(
+        readRouteBody(recordResult)
+      );
+      expect(parsedReceiptCreateResponse).toEqual({ ok: true, recorded: true });
+
+      const storedLatestReceipt = pushReceiptStore.getLatest();
+      expect(storedLatestReceipt).not.toBeNull();
+      if (!storedLatestReceipt) {
+        throw new Error("Expected stored latest push receipt");
+      }
+      expect(storedLatestReceipt.message).toBe("");
+
+      const latestReceiptResult = await executePushRoute({
+        method: PushRouteMethodByName.get,
+        pathname: PushRoutePathnameByName.receiptsLatest,
+        pushService,
+        pushStore,
+        pushReceiptStore,
+        pushSendStore,
+        pushMutationConcurrencyCoordinator,
+        pushLocalCaSourcePath: path.join(temporaryDirectory, "rootCA.pem"),
+        readJsonBody: async () => ({})
+      });
+
+      expect(latestReceiptResult.handled).toBe(true);
+      expect(latestReceiptResult.statusCode).toBe(200);
+      const parsedLatestReceiptResponse = FarfieldPushReceiptLatestEnvelopeSchema.parse(
+        readRouteBody(latestReceiptResult)
+      );
+      expect(parsedLatestReceiptResponse.count).toBe(1);
+      expect(parsedLatestReceiptResponse.latest).not.toBeNull();
+      if (!parsedLatestReceiptResponse.latest) {
+        throw new Error("Expected latest receipt response payload");
+      }
+      expect(parsedLatestReceiptResponse.latest.message).toBe("");
+    } finally {
+      fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("supports local CA metadata and guarded download errors without exposing source path", async () => {
     const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "push-routes-local-ca-"));
     try {
