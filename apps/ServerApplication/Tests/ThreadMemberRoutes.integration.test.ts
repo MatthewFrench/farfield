@@ -12,6 +12,7 @@ import { ThreadAdapterResolver } from "../Source/Agents/ThreadAdapterResolver.js
 import { ThreadIndex } from "../Source/Agents/ThreadIndex.js";
 import type {
   AgentAdapter,
+  AgentArchiveThreadInput,
   AgentCapabilities,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
@@ -41,6 +42,9 @@ const SingleOwnerThreadIdentifier = "thread_single_owner";
 const LiveStateThreadIdentifier = "thread_live_state";
 const StreamEventsThreadIdentifier = "thread_stream_events";
 const NestedMessagesPathThreadIdentifier = "thread_nested_messages_path";
+const MessageMutationThreadIdentifier = "thread_message_mutation";
+const ArchiveMutationThreadIdentifier = "thread_archive_mutation";
+const InterruptMutationThreadIdentifier = "thread_interrupt_mutation";
 const InvalidThreadIdentifierSegment = "%E0%A4%A";
 const ActionErrorIdentifier = "action-error-id";
 const MessageBodyText = "hello";
@@ -85,6 +89,13 @@ const InvalidThreadIdentifierResponseSchema = z
   .object({
     ok: z.literal(false),
     error: z.literal("Invalid thread identifier")
+  })
+  .strict();
+
+const MutationRouteSuccessResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1)
   })
   .strict();
 
@@ -213,6 +224,8 @@ interface ThreadMemberRouteTestAdapterOptions {
   capabilities?: AgentCapabilities;
   readThread: (input: AgentReadThreadInput) => Promise<AgentReadThreadResult>;
   sendMessage?: (input: AgentSendMessageInput) => Promise<void>;
+  interrupt?: (input: AgentInterruptInput) => Promise<void>;
+  archiveThread?: (input: AgentArchiveThreadInput) => Promise<void>;
   readLiveState?: (threadId: string) => Promise<AgentThreadLiveState>;
   readStreamEvents?: (
     threadId: string,
@@ -248,9 +261,19 @@ function createAdapter(options: ThreadMemberRouteTestAdapterOptions): AgentAdapt
       }
       await options.sendMessage(input);
     },
-    async interrupt(_input: AgentInterruptInput): Promise<void> {
-      throw new Error("not used in this test");
+    async interrupt(input: AgentInterruptInput): Promise<void> {
+      if (!options.interrupt) {
+        throw new Error("not used in this test");
+      }
+      await options.interrupt(input);
     },
+    ...(options.archiveThread
+      ? {
+          async archiveThread(input: AgentArchiveThreadInput): Promise<void> {
+            await options.archiveThread(input);
+          }
+        }
+      : {}),
     readLiveState: options.readLiveState,
     readStreamEvents: options.readStreamEvents
   };
@@ -579,5 +602,175 @@ describe("ThreadMemberRoutes integration", () => {
     expect(sentMessages).toEqual([]);
     expect(capturedResponse.statusCode).toBeNull();
     expect(capturedResponse.body).toBeNull();
+  });
+
+  it("routes canonical messages mutations through message-owner dispatch", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = ThreadMemberRouteMethodByName.post;
+
+    const sendMessage = vi.fn<(input: AgentSendMessageInput) => Promise<void>>(async () => {});
+    const archiveThread = vi.fn<(input: AgentArchiveThreadInput) => Promise<void>>(async () => {});
+    const interrupt = vi.fn<(input: AgentInterruptInput) => Promise<void>>(async () => {});
+
+    const codexAdapter = createAdapter({
+      id: "codex",
+      readThread: async () => {
+        throw new Error("not used in this test");
+      },
+      sendMessage,
+      archiveThread,
+      interrupt
+    });
+    const resolveAdapterForThread = vi.fn<
+      ThreadMemberRouteDependencies["resolveAdapterForThread"]
+    >(async () => ({
+      ok: true,
+      adapter: codexAdapter,
+      agentId: "codex"
+    }));
+    const readJsonBody = vi.fn<ThreadMemberRouteDependencies["readJsonBody"]>(
+      async () => ({
+        text: MessageBodyText
+      })
+    );
+
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(MessageMutationThreadIdentifier, ThreadMemberRouteSegmentByName.messages),
+      createThreadRouteUrl(MessageMutationThreadIdentifier, ThreadMemberRouteSegmentByName.messages),
+      resolveAdapterForThread,
+      readJsonBody,
+      capturedResponse
+    );
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+    expect(handled).toBe(true);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      threadId: MessageMutationThreadIdentifier,
+      text: MessageBodyText
+    });
+    expect(archiveThread).not.toHaveBeenCalled();
+    expect(interrupt).not.toHaveBeenCalled();
+    expect(readJsonBody).toHaveBeenCalledTimes(1);
+    expect(capturedResponse.statusCode).toBe(200);
+    expect(MutationRouteSuccessResponseSchema.parse(capturedResponse.body)).toEqual({
+      ok: true,
+      threadId: MessageMutationThreadIdentifier
+    });
+  });
+
+  it("routes canonical archive mutations through archive-owner dispatch", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = ThreadMemberRouteMethodByName.post;
+
+    const sendMessage = vi.fn<(input: AgentSendMessageInput) => Promise<void>>(async () => {});
+    const archiveThread = vi.fn<(input: AgentArchiveThreadInput) => Promise<void>>(async () => {});
+    const interrupt = vi.fn<(input: AgentInterruptInput) => Promise<void>>(async () => {});
+    const readJsonBody = vi.fn<ThreadMemberRouteDependencies["readJsonBody"]>(async () => ({}));
+
+    const codexAdapter = createAdapter({
+      id: "codex",
+      readThread: async () => {
+        throw new Error("not used in this test");
+      },
+      sendMessage,
+      archiveThread,
+      interrupt
+    });
+    const resolveAdapterForThread = vi.fn<
+      ThreadMemberRouteDependencies["resolveAdapterForThread"]
+    >(async () => ({
+      ok: true,
+      adapter: codexAdapter,
+      agentId: "codex"
+    }));
+
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(ArchiveMutationThreadIdentifier, ThreadMemberRouteSegmentByName.archive),
+      createThreadRouteUrl(ArchiveMutationThreadIdentifier, ThreadMemberRouteSegmentByName.archive),
+      resolveAdapterForThread,
+      readJsonBody,
+      capturedResponse
+    );
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+    expect(handled).toBe(true);
+    expect(archiveThread).toHaveBeenCalledTimes(1);
+    expect(archiveThread).toHaveBeenCalledWith({
+      threadId: ArchiveMutationThreadIdentifier
+    });
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(interrupt).not.toHaveBeenCalled();
+    expect(readJsonBody).not.toHaveBeenCalled();
+    expect(capturedResponse.statusCode).toBe(200);
+    expect(MutationRouteSuccessResponseSchema.parse(capturedResponse.body)).toEqual({
+      ok: true,
+      threadId: ArchiveMutationThreadIdentifier
+    });
+  });
+
+  it("routes canonical interrupt mutations through interaction-owner dispatch", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = ThreadMemberRouteMethodByName.post;
+
+    const sendMessage = vi.fn<(input: AgentSendMessageInput) => Promise<void>>(async () => {});
+    const archiveThread = vi.fn<(input: AgentArchiveThreadInput) => Promise<void>>(async () => {});
+    const interrupt = vi.fn<(input: AgentInterruptInput) => Promise<void>>(async () => {});
+    const readJsonBody = vi.fn<ThreadMemberRouteDependencies["readJsonBody"]>(async () => ({}));
+
+    const codexAdapter = createAdapter({
+      id: "codex",
+      readThread: async () => {
+        throw new Error("not used in this test");
+      },
+      sendMessage,
+      archiveThread,
+      interrupt
+    });
+    const resolveAdapterForThread = vi.fn<
+      ThreadMemberRouteDependencies["resolveAdapterForThread"]
+    >(async () => ({
+      ok: true,
+      adapter: codexAdapter,
+      agentId: "codex"
+    }));
+
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(
+        InterruptMutationThreadIdentifier,
+        ThreadMemberRouteSegmentByName.interrupt
+      ),
+      createThreadRouteUrl(
+        InterruptMutationThreadIdentifier,
+        ThreadMemberRouteSegmentByName.interrupt
+      ),
+      resolveAdapterForThread,
+      readJsonBody,
+      capturedResponse
+    );
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+    expect(handled).toBe(true);
+    expect(interrupt).toHaveBeenCalledTimes(1);
+    expect(interrupt).toHaveBeenCalledWith({
+      threadId: InterruptMutationThreadIdentifier
+    });
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(archiveThread).not.toHaveBeenCalled();
+    expect(readJsonBody).toHaveBeenCalledTimes(1);
+    expect(capturedResponse.statusCode).toBe(200);
+    expect(MutationRouteSuccessResponseSchema.parse(capturedResponse.body)).toEqual({
+      ok: true,
+      threadId: InterruptMutationThreadIdentifier
+    });
   });
 });
