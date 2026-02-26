@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-26 19:29:33Z
+Last Updated (UTC): 2026-02-26 21:01:56Z
 
 ## Scope Model
 
@@ -92,6 +92,41 @@ Files touched in this continuation segment:
 11. `apps/ServerApplication/Source/Network/Routes/DebugTraceRouteOwner.ts`
 12. `apps/ServerApplication/Source/Network/Routes/DebugReplayRouteOwner.ts`
 13. `apps/ServerApplication/Source/Network/Routes/ThreadMemberRouteContracts.ts`
+
+## Latest Continuation Commit Wave (Current-2)
+
+The following isolated commits were added after the previous continuation section:
+
+1. `fc9d0cd` `refactor: harden debug route contract helpers`
+2. `224aacc` `refactor: preserve explicit optional values in thread member mutations`
+3. `90cd505` `refactor: preserve explicit optional values in codex adapter mapping`
+4. `bee77bb` `refactor: preserve explicit optional values in codex thread management`
+5. `2b325c1` `refactor: preserve explicit create-thread option values`
+6. `871b72c` `refactor: preserve explicit push receipt message values`
+7. `06eecc6` `refactor: validate explicit cwd values in opencode adapter`
+8. `913868d` `refactor: preserve explicit cwd in codex message dispatch`
+
+Files touched in this continuation segment:
+
+1. `apps/ServerApplication/Source/Network/Routes/DebugRouteContracts.ts`
+2. `apps/ServerApplication/Tests/DebugRouteContracts.test.ts`
+3. `apps/ServerApplication/Source/Network/Routes/ThreadMemberMessageMutationRouteOwner.ts`
+4. `apps/ServerApplication/Source/Network/Routes/ThreadMemberInteractionMutationRouteOwner.ts`
+5. `apps/ServerApplication/Tests/ThreadMemberMutationRouteOwner.test.ts`
+6. `packages/CodexInterfaceAdapter/Source/Service.ts`
+7. `packages/CodexInterfaceAdapter/Source/AppServerClient.ts`
+8. `packages/CodexInterfaceAdapter/Tests/Service.test.ts`
+9. `packages/CodexInterfaceAdapter/Tests/AppServerClient.test.ts`
+10. `apps/ServerApplication/Source/Agents/Adapters/CodexThreadManagementOwner.ts`
+11. `apps/ServerApplication/Tests/CodexThreadManagementOwner.test.ts`
+12. `apps/ServerApplication/Source/Network/Routes/ThreadCollectionRoutes.ts`
+13. `apps/ServerApplication/Tests/ThreadCollectionRoutes.test.ts`
+14. `apps/ServerApplication/Source/Network/Routes/PushRoutes.ts`
+15. `apps/ServerApplication/Tests/PushRoutes.test.ts`
+16. `apps/ServerApplication/Source/Agents/Adapters/OpenCodeAgentAdapter.ts`
+17. `apps/ServerApplication/Tests/OpenCodeAgentAdapter.test.ts`
+18. `apps/ServerApplication/Source/Agents/Adapters/CodexMessageDispatchOwner.ts`
+19. `apps/ServerApplication/Tests/CodexMessageDispatchOwner.test.ts`
 
 ## Repository Segment Coverage
 
