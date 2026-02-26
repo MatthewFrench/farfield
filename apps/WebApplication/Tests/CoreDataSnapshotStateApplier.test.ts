@@ -6,6 +6,7 @@ import type {
   CapabilityConfigDefaultsResponse,
   CapabilityModelsResponse
 } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
+import { buildDebugErrorSignature } from "../Source/Features/Debugging/DomainModel/DebugErrorSignature";
 import type { DebugWorkspaceDataSnapshot } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
 import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
@@ -163,6 +164,18 @@ function createDebugWorkspaceSnapshot(input: {
     debugErrorSessionLogPath: input.debugErrorSessionLogPath ?? "/tmp/session-1.ndjson",
     debugErrorsSignature: input.debugErrorsSignature ?? []
   };
+}
+
+function createDebugErrorSignature(error: {
+  errorId: string;
+  recordedAt: string;
+  message: string;
+}): string {
+  return buildDebugErrorSignature({
+    errorId: error.errorId,
+    recordedAt: error.recordedAt,
+    message: error.message
+  });
 }
 
 function createHarness() {
@@ -326,7 +339,13 @@ describe("CoreDataSnapshotStateApplier", () => {
       message: "first failure",
       recordedAt: "2026-02-26T00:00:01.000Z"
     });
-    const signature = ["error-1|2026-02-26T00:00:01.000Z|first failure"];
+    const signature = [
+      createDebugErrorSignature({
+        errorId: "error-1",
+        recordedAt: "2026-02-26T00:00:01.000Z",
+        message: "first failure"
+      })
+    ];
 
     harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
       history: [],
@@ -366,7 +385,13 @@ describe("CoreDataSnapshotStateApplier", () => {
     harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
       history: [],
       debugErrors: [firstDebugError],
-      debugErrorsSignature: ["error-1|2026-02-26T00:00:01.000Z|first failure"]
+      debugErrorsSignature: [
+        createDebugErrorSignature({
+          errorId: "error-1",
+          recordedAt: "2026-02-26T00:00:01.000Z",
+          message: "first failure"
+        })
+      ]
     });
     applyCoreDataSnapshotState(harness.input);
     harness.setDebugErrorsMock.mockClear();
@@ -376,7 +401,13 @@ describe("CoreDataSnapshotStateApplier", () => {
       message: "second failure",
       recordedAt: "2026-02-26T00:00:03.000Z"
     });
-    const nextSignature = ["error-2|2026-02-26T00:00:03.000Z|second failure"];
+    const nextSignature = [
+      createDebugErrorSignature({
+        errorId: "error-2",
+        recordedAt: "2026-02-26T00:00:03.000Z",
+        message: "second failure"
+      })
+    ];
     harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
       history: [],
       debugErrors: [secondDebugError],

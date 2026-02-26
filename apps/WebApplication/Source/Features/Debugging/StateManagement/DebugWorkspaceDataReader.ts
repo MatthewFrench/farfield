@@ -7,16 +7,11 @@ import type {
   DebugHistoryResponse,
   DebugServerClient
 } from "../DataAccess/DebugServerClient";
+import {
+  buildDebugErrorSignature,
+  type DebugErrorSignatureInput
+} from "../DomainModel/DebugErrorSignature";
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
-
-const DEBUG_ERROR_SIGNATURE_SCHEMA_VERSION = "v1";
-
-type DebugErrorSignatureTuple = readonly [
-  schemaVersion: string,
-  errorId: string,
-  recordedAt: string,
-  message: string
-];
 
 export interface DebugWorkspaceDataSnapshot {
   history: DebugHistoryResponse["history"];
@@ -31,16 +26,14 @@ export interface DebugWorkspaceDataReadOptions {
   debugErrorsRequestOptions?: ApiRequestOptions;
 }
 
-function buildDebugErrorSignature(
+function readDebugErrorSignatureInput(
   debugError: DebugErrorListResponse["data"][number]
-): string {
-  const signatureTuple: DebugErrorSignatureTuple = [
-    DEBUG_ERROR_SIGNATURE_SCHEMA_VERSION,
-    debugError.errorId,
-    debugError.recordedAt,
-    debugError.message
-  ];
-  return JSON.stringify(signatureTuple);
+): DebugErrorSignatureInput {
+  return {
+    errorId: debugError.errorId,
+    recordedAt: debugError.recordedAt,
+    message: debugError.message
+  };
 }
 
 export class DebugWorkspaceDataReader {
@@ -65,7 +58,9 @@ export class DebugWorkspaceDataReader {
       debugErrors: debugErrorsResponse.data,
       debugErrorSessionId: debugErrorsResponse.sessionId,
       debugErrorSessionLogPath: debugErrorsResponse.sessionLogPath,
-      debugErrorsSignature: debugErrorsResponse.data.map(buildDebugErrorSignature)
+      debugErrorsSignature: debugErrorsResponse.data.map((debugError) =>
+        buildDebugErrorSignature(readDebugErrorSignatureInput(debugError))
+      )
     };
   }
 }

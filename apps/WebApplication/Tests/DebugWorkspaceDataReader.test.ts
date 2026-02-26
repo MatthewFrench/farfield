@@ -4,6 +4,7 @@ import {
   type DebugErrorListResponse,
   type DebugHistoryResponse
 } from "../Source/Features/Debugging/DataAccess/DebugServerClient";
+import { buildDebugErrorSignature } from "../Source/Features/Debugging/DomainModel/DebugErrorSignature";
 import { DebugWorkspaceDataReader } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import type { ApiRequestOptions } from "../Source/Shared/Contracts/ApiContracts";
 type DebugErrorsResponse = DebugErrorListResponse;
@@ -124,7 +125,11 @@ describe("DebugWorkspaceDataReader", () => {
     expect(snapshot.debugErrorSessionId).toBe("session-1");
     expect(snapshot.debugErrorSessionLogPath).toBe("/tmp/session.ndjson");
     expect(snapshot.debugErrorsSignature).toEqual([
-      "error-1|2026-02-23T00:00:02.000Z|Failed to read history"
+      buildDebugErrorSignature({
+        errorId: "error-1",
+        recordedAt: "2026-02-23T00:00:02.000Z",
+        message: "Failed to read history"
+      })
     ]);
     expect(debugServerClient.readHistoryCalls()).toEqual([
       {

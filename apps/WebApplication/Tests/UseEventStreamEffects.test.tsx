@@ -19,6 +19,7 @@ import {
   type DebugHistoryResponse,
   DebugServerClient
 } from "../Source/Features/Debugging/DataAccess/DebugServerClient";
+import { buildDebugErrorSignature } from "../Source/Features/Debugging/DomainModel/DebugErrorSignature";
 import {
   DebugWorkspaceDataReader,
   type DebugWorkspaceDataSnapshot
@@ -158,7 +159,13 @@ function createDebugSnapshot(): DebugWorkspaceDataSnapshot {
     debugErrors,
     debugErrorSessionId: "session-1",
     debugErrorSessionLogPath: "/tmp/session-1.ndjson",
-    debugErrorsSignature: ["error-1|2026-02-26T00:00:02.000Z|debug-error"]
+    debugErrorsSignature: [
+      buildDebugErrorSignature({
+        errorId: "error-1",
+        recordedAt: "2026-02-26T00:00:02.000Z",
+        message: "debug-error"
+      })
+    ]
   };
 }
 
@@ -344,7 +351,11 @@ describe("useEventStreamEffects", () => {
     expect(input.setDebugErrorSessionId).toHaveBeenCalledWith("session-1");
     expect(input.setDebugErrorSessionLogPath).toHaveBeenCalledWith("/tmp/session-1.ndjson");
     expect(input.debugErrorsSignatureRef.current).toEqual([
-      "error-1|2026-02-26T00:00:02.000Z|debug-error"
+      buildDebugErrorSignature({
+        errorId: "error-1",
+        recordedAt: "2026-02-26T00:00:02.000Z",
+        message: "debug-error"
+      })
     ]);
   });
 
