@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OpenCodeAgentAdapter } from "../Source/Agents/Adapters/OpenCodeAgentAdapter.js";
 import type { AgentListThreadsInput } from "../Source/Agents/Types.js";
 
+const DIRECTORY_REQUIRED_ERROR_MESSAGE = "Directory is required";
+
 const openCodeApiMock = vi.hoisted(() => {
   interface ListSessionsCall {
     directory?: string;
@@ -239,5 +241,42 @@ describe("OpenCodeAgentAdapter", () => {
         directory: threadDirectory
       }
     ]);
+  });
+
+  it("rejects createThread when explicit cwd is an empty string", async () => {
+    const adapter = new OpenCodeAgentAdapter();
+
+    await expect(
+      adapter.createThread({
+        cwd: ""
+      })
+    ).rejects.toThrow(DIRECTORY_REQUIRED_ERROR_MESSAGE);
+  });
+
+  it("rejects sendMessage when explicit cwd is an empty string even when directory is cached", async () => {
+    const adapter = new OpenCodeAgentAdapter();
+    const state = openCodeApiMock.getState();
+
+    const projectDirectory = createTemporaryDirectory("farfield-opencode-project-");
+    const threadDirectory = path.join(projectDirectory, "thread-workspace");
+    fs.mkdirSync(threadDirectory, { recursive: true });
+
+    state.projectDirectories = [projectDirectory];
+    state.listSessionsByDirectory.set(projectDirectory, [
+      createThreadListItem({
+        id: "thread_cached_directory_explicit_empty_cwd",
+        cwd: `  ${threadDirectory}  `
+      })
+    ]);
+
+    await adapter.listThreads(createListThreadsInput());
+    await expect(
+      adapter.sendMessage({
+        threadId: "thread_cached_directory_explicit_empty_cwd",
+        text: "hello world",
+        cwd: ""
+      })
+    ).rejects.toThrow(DIRECTORY_REQUIRED_ERROR_MESSAGE);
+    expect(state.sendMessageCalls).toEqual([]);
   });
 });

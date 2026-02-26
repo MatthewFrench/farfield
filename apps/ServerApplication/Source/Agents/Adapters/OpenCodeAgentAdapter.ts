@@ -159,7 +159,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
   public async createThread(input: AgentCreateThreadInput): Promise<AgentCreateThreadResult> {
     this.ensureConnected();
 
-    const directory = input.cwd ? normalizeDirectoryInput(input.cwd) : undefined;
+    const directory = input.cwd !== undefined ? normalizeDirectoryInput(input.cwd) : undefined;
     const result = await this.service.createSession({
       ...(input.model ? { title: input.model } : {}),
       ...(directory ? { directory } : {})
@@ -196,7 +196,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
   public async sendMessage(input: AgentSendMessageInput): Promise<void> {
     this.ensureConnected();
 
-    const directory = input.cwd
+    const directory = input.cwd !== undefined
       ? normalizeDirectoryInput(input.cwd)
       : this.resolveThreadDirectory(input.threadId);
 
