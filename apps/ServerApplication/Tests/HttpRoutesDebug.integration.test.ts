@@ -18,13 +18,28 @@ import {
 
 const DebugClientErrorsRoutePath = "/api/debug/client-errors";
 const DebugClientErrorsSessionLogRoutePath = "/api/debug/client-errors/session-log";
+const DebugClientErrorsSessionLogExtraRoutePath = "/api/debug/client-errors/session-log/extra";
+const DebugRoutePathPrefix = "/api/debug";
 const DebugHistoryRoutePathPrefix = "/api/debug/history";
 const DebugTraceRoutePathPrefix = "/api/debug/trace";
 const DebugObservabilityRoutePath = "/api/debug/observability";
+const DebugTraceRouteWithoutDownloadPath = "/api/debug/trace/trace_missing";
+const DebugRouteNearMatchClientErrorsPath = "/api/debugging/client-errors";
 const DebugClientErrorsListLimit = 20;
 const JsonContentTypeHeaderName = "Content-Type";
 const JsonContentTypeHeaderValue = "application/json";
 const MalformedIdentifier = "%E0%A4%A";
+const NotFoundErrorMessage = "Not found";
+
+async function expectApiErrorResponse(
+  response: Response,
+  expectedStatusCode: number,
+  expectedError: string
+): Promise<void> {
+  expect(response.status).toBe(expectedStatusCode);
+  const errorEnvelope = ApiErrorEnvelopeSchema.parse(await response.json());
+  expect(errorEnvelope.error).toBe(expectedError);
+}
 
 function buildDebugClientErrorListRouteUrl(
   integrationEnvironment: HttpRoutesIntegrationEnvironment
@@ -164,5 +179,47 @@ describe("server route integration debug routes", () => {
     expect(payload.snapshot.streaming.eventStream.activeClientCount).toBeGreaterThanOrEqual(0);
     expect(payload.snapshot.routing.threadAdapterResolver.unregisteredDiscoveryAttemptCount).toBeGreaterThanOrEqual(0);
     expect(payload.snapshot.performance.requestRouting.requestLifecycleEvents.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("returns deterministic 404 contracts for unowned and near-match debug routes", async () => {
+    const authHeaders = integrationEnvironment.readAuthHeaders();
+
+    const debugPrefixResponse = await fetch(integrationEnvironment.buildApiRouteUrl(DebugRoutePathPrefix), {
+      headers: authHeaders
+    });
+    await expectApiErrorResponse(debugPrefixResponse, 404, NotFoundErrorMessage);
+
+    const unsupportedDebugHistoryMethodResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(DebugHistoryRoutePathPrefix),
+      {
+        method: "POST",
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(unsupportedDebugHistoryMethodResponse, 404, NotFoundErrorMessage);
+
+    const missingTraceDownloadSegmentResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(DebugTraceRouteWithoutDownloadPath),
+      {
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(missingTraceDownloadSegmentResponse, 404, NotFoundErrorMessage);
+
+    const extraClientErrorSegmentResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(DebugClientErrorsSessionLogExtraRoutePath),
+      {
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(extraClientErrorSegmentResponse, 404, NotFoundErrorMessage);
+
+    const nearMatchDebugPrefixResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(DebugRouteNearMatchClientErrorsPath),
+      {
+        headers: authHeaders
+      }
+    );
+    await expectApiErrorResponse(nearMatchDebugPrefixResponse, 404, NotFoundErrorMessage);
   });
 });
