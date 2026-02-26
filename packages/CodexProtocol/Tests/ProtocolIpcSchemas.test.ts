@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   IpcFrameType,
   IpcResponseResultType,
+  ProtocolValidationError,
   parseIpcFrame,
   parseThreadStreamStateChangedBroadcast,
   parseUserInputResponsePayload,
@@ -57,7 +58,7 @@ describe("codex-protocol ipc schemas", () => {
   });
 
   it("rejects success response frames that include an error payload", () => {
-    expect(() =>
+    const error = captureIpcFrameParseError(() =>
       parseIpcFrame({
         type: IpcFrameType.response,
         requestId: "request-7a",
@@ -69,17 +70,23 @@ describe("codex-protocol ipc schemas", () => {
           reason: "must-not-be-present"
         }
       })
-    ).toThrowError(/error/i);
+    );
+
+    expect(error.metadata.context).toBe("IpcFrame");
+    expect(error.metadata.issuePaths).toEqual(["<root>"]);
   });
 
   it("rejects error response frames that omit the error payload", () => {
-    expect(() =>
+    const error = captureIpcFrameParseError(() =>
       parseIpcFrame({
         type: IpcFrameType.response,
         requestId: "request-7b",
         resultType: IpcResponseResultType.error
       })
-    ).toThrowError(/error/i);
+    );
+
+    expect(error.metadata.context).toBe("IpcFrame");
+    expect(error.metadata.issuePaths).toEqual(["<root>"]);
   });
 
   it("rejects ipc frames with unsupported discriminant values", () => {
@@ -93,14 +100,17 @@ describe("codex-protocol ipc schemas", () => {
   });
 
   it("rejects response frames with unsupported resultType literals", () => {
-    expect(() =>
+    const error = captureIpcFrameParseError(() =>
       parseIpcFrame({
         type: IpcFrameType.response,
         requestId: "request-8",
         resultType: "partial",
         result: {}
       })
-    ).toThrowError(/resultType/);
+    );
+
+    expect(error.metadata.context).toBe("IpcFrame");
+    expect(error.metadata.issuePaths).toEqual(["<root>"]);
   });
 
   it("rejects thread stream state changed broadcasts missing source client ownership", () => {
@@ -154,3 +164,18 @@ describe("codex-protocol ipc schemas", () => {
     ).toThrowError(/Expected string, received number/);
   });
 });
+
+function captureIpcFrameParseError(
+  parseFrame: () => void
+): ProtocolValidationError {
+  try {
+    parseFrame();
+  } catch (error) {
+    if (error instanceof ProtocolValidationError) {
+      return error;
+    }
+    throw error;
+  }
+
+  throw new Error("Expected parseIpcFrame to throw ProtocolValidationError");
+}

@@ -25,6 +25,14 @@ describe("codex-protocol validation error formatting", () => {
 
     expect(error.issues[0]).toContain("<root>:");
     expect(error.message).toContain("<root>:");
+    expect(error.metadata.context).toBe("ThreadConversationState");
+    expect(error.metadata.issuePaths).toEqual(["<root>"]);
+    expect(error.metadata.issueDetails[0]).toEqual({
+      pathSegments: [],
+      path: "<root>",
+      message: "Expected object, received string",
+      summary: "<root>: Expected object, received string"
+    });
   });
 
   it("formats nested array paths without separator artifacts", () => {
@@ -59,5 +67,12 @@ describe("codex-protocol validation error formatting", () => {
     );
     expect(error.issues.every((issue) => !issue.includes(".["))).toBe(true);
     expect(error.message).toContain("requests[0].params.questions[0].id:");
+    expect(error.metadata.issuePaths).toContain("requests[0].params.questions[0].id");
+    expect(error.metadata.issueDetails[0]).toEqual({
+      pathSegments: ["requests", 0, "params", "questions", 0, "id"],
+      path: "requests[0].params.questions[0].id",
+      message: "String must contain at least 1 character(s)",
+      summary: "requests[0].params.questions[0].id: String must contain at least 1 character(s)"
+    });
   });
 });

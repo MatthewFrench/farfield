@@ -3,7 +3,8 @@ import { ProtocolValidationError } from "./Errors.js";
 import { type JsonValue } from "./Common.js";
 
 /**
- * Owns boundary schema parsing so protocol modules emit consistent validation diagnostics.
+ * Owns boundary schema parsing so protocol modules emit consistent validation diagnostics
+ * and deterministic ProtocolValidationError metadata.
  */
 export function parseSchemaOrThrow<Schema extends z.ZodTypeAny>(
   schema: Schema,
