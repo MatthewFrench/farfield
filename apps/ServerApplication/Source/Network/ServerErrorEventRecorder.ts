@@ -1,8 +1,16 @@
+import { JsonValueSchema, type DebugErrorEvent, type DebugErrorSeverity } from "@farfield/protocol";
 import { z } from "zod";
 import type { ClientErrorStore } from "../Modules/Debugging/ClientErrorStore.js";
 import { logger } from "../Shared/Logging/Logger.js";
 
 const CLIENT_ERROR_RECORDED_LOG_EVENT = "client-error-recorded";
+const ISO_TIMESTAMP_SCHEMA = z.string().datetime();
+
+// Owns the severity-to-log-level mapping for persisted server error events.
+const LOG_LEVEL_BY_SEVERITY: Record<DebugErrorSeverity, "warn" | "error"> = {
+  warning: "warn",
+  error: "error"
+};
 
 const ServerErrorEventRecordInputSchema = z
   .object({
@@ -15,11 +23,22 @@ const ServerErrorEventRecordInputSchema = z
     requestId: z.string().trim().min(1).nullable(),
     threadId: z.string().trim().min(1).nullable(),
     url: z.string().trim().min(1).nullable(),
-    details: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+    details: z.record(JsonValueSchema)
   })
   .strict();
 
 export type ServerErrorEventRecordInput = z.infer<typeof ServerErrorEventRecordInputSchema>;
+
+interface ServerErrorRecordedLogInput {
+  errorId: string;
+  origin: DebugErrorEvent["origin"];
+  severity: DebugErrorSeverity;
+  source: string;
+  operation: string;
+  requestId: string | null;
+  threadId: string | null;
+  message: string;
+}
 
 interface ServerErrorEventRecorderDependencies {
   readNowIsoString?: () => string;
@@ -36,8 +55,8 @@ export class ServerErrorEventRecorder {
 
   public record(input: ServerErrorEventRecordInput): void {
     const parsedInput = ServerErrorEventRecordInputSchema.parse(input);
-    const occurredAt = this.readNowIsoString();
-    const event = this.clientErrorStore.recordServerError({
+    const occurredAt = this.readOccurredAtIsoString();
+    const recordedEvent = this.clientErrorStore.recordServerError({
       source: parsedInput.source,
       operation: parsedInput.operation,
       message: parsedInput.message,
@@ -50,18 +69,30 @@ export class ServerErrorEventRecorder {
       details: parsedInput.details,
       occurredAt
     });
+    this.logRecordedEvent(recordedEvent);
+  }
 
-    const loggerInput = {
-      errorId: event.errorId,
-      origin: event.origin,
-      severity: event.severity,
-      source: event.source,
-      operation: event.operation,
-      requestId: event.requestId,
-      threadId: event.threadId,
-      message: event.message
+  private readOccurredAtIsoString(): string {
+    return ISO_TIMESTAMP_SCHEMA.parse(this.readNowIsoString());
+  }
+
+  private createRecordedLogInput(recordedEvent: DebugErrorEvent): ServerErrorRecordedLogInput {
+    return {
+      errorId: recordedEvent.errorId,
+      origin: recordedEvent.origin,
+      severity: recordedEvent.severity,
+      source: recordedEvent.source,
+      operation: recordedEvent.operation,
+      requestId: recordedEvent.requestId,
+      threadId: recordedEvent.threadId,
+      message: recordedEvent.message
     };
-    if (event.severity === "warning") {
+  }
+
+  private logRecordedEvent(recordedEvent: DebugErrorEvent): void {
+    const loggerInput = this.createRecordedLogInput(recordedEvent);
+    const logLevel = LOG_LEVEL_BY_SEVERITY[recordedEvent.severity];
+    if (logLevel === "warn") {
       logger.warn(loggerInput, CLIENT_ERROR_RECORDED_LOG_EVENT);
       return;
     }
