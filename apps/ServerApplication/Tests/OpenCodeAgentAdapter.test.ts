@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { MappedThreadListItem } from "@farfield/opencode-api";
+import type {
+  MappedThreadListItem,
+  OpenCodeCreateSessionInput
+} from "@farfield/opencode-api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OpenCodeAgentAdapter } from "../Source/Agents/Adapters/OpenCodeAgentAdapter.js";
 import type { AgentListThreadsInput } from "../Source/Agents/Types.js";
@@ -19,6 +22,11 @@ const openCodeApiMock = vi.hoisted(() => {
     directory?: string;
   }
 
+  interface OpenCodeCreateSessionResult {
+    threadId: string;
+    mapped: MappedThreadListItem;
+  }
+
   interface OpenCodeApiMockState {
     connected: boolean;
     url: string | null;
@@ -27,6 +35,21 @@ const openCodeApiMock = vi.hoisted(() => {
     unscopedSessions: MappedThreadListItem[];
     listSessionsCalls: ListSessionsCall[];
     sendMessageCalls: SendMessageCall[];
+    createSessionCalls: OpenCodeCreateSessionInput[];
+    createSessionResult: OpenCodeCreateSessionResult;
+  }
+
+  function createDefaultCreateSessionResult(): OpenCodeCreateSessionResult {
+    return {
+      threadId: "thread_create_session",
+      mapped: {
+        id: "thread_create_session",
+        preview: "thread_create_session preview",
+        createdAt: 1,
+        updatedAt: 2,
+        source: "opencode"
+      }
+    };
   }
 
   function createState(): OpenCodeApiMockState {
@@ -37,7 +60,9 @@ const openCodeApiMock = vi.hoisted(() => {
       listSessionsByDirectory: new Map<string, MappedThreadListItem[]>(),
       unscopedSessions: [],
       listSessionsCalls: [],
-      sendMessageCalls: []
+      sendMessageCalls: [],
+      createSessionCalls: [],
+      createSessionResult: createDefaultCreateSessionResult()
     };
   }
 
@@ -91,8 +116,11 @@ const openCodeApiMock = vi.hoisted(() => {
       state.sendMessageCalls.push(input);
     }
 
-    public async createSession(): Promise<never> {
-      throw new Error("not used in this test");
+    public async createSession(
+      input?: OpenCodeCreateSessionInput
+    ): Promise<OpenCodeCreateSessionResult> {
+      state.createSessionCalls.push(input ?? {});
+      return state.createSessionResult;
     }
 
     public async getSessionState(): Promise<never> {
@@ -251,6 +279,22 @@ describe("OpenCodeAgentAdapter", () => {
         cwd: ""
       })
     ).rejects.toThrow(DIRECTORY_REQUIRED_ERROR_MESSAGE);
+  });
+
+  it("preserves explicit empty model values when forwarding createThread input", async () => {
+    const adapter = new OpenCodeAgentAdapter();
+    const state = openCodeApiMock.getState();
+
+    const result = await adapter.createThread({
+      model: ""
+    });
+
+    expect(state.createSessionCalls).toEqual([
+      {
+        title: ""
+      }
+    ]);
+    expect(result.threadId).toBe("thread_create_session");
   });
 
   it("rejects sendMessage when explicit cwd is an empty string even when directory is cached", async () => {

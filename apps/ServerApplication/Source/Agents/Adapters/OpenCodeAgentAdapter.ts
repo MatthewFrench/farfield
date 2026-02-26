@@ -161,7 +161,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
 
     const directory = input.cwd !== undefined ? normalizeDirectoryInput(input.cwd) : undefined;
     const result = await this.service.createSession({
-      ...(input.model ? { title: input.model } : {}),
+      ...(input.model !== undefined ? { title: input.model } : {}),
       ...(directory ? { directory } : {})
     });
 
