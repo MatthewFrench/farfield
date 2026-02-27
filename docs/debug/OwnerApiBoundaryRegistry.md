@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 04:00:24Z
+Last Updated (UTC): 2026-02-27 04:07:30Z
 
 ## Purpose
 
@@ -75,6 +75,15 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 7. [`UseApplicationDebugIssueDerivedState.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationDebugIssueDerivedState.ts)
    - owns: debug issue derived-state memoization chain (error/warning merge, filtering, and selection).
    - query APIs: `useApplicationDebugIssueDerivedState`.
+8. [`CoreDataSnapshotCapabilitiesDerivation.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/CoreDataSnapshotCapabilitiesDerivation.ts)
+   - owns: capabilities snapshot normalization and mode/model signature derivation ownership.
+   - query APIs: `readCapabilitiesCollectionSnapshot`.
+9. [`CoreDataSnapshotReusePolicy.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/CoreDataSnapshotReusePolicy.ts)
+   - owns: deterministic state reuse comparators for health/config defaults/trace status/agent descriptors.
+   - query APIs: `shouldReusePreviousHealth`, `shouldReusePreviousConfigDefaults`, `shouldReusePreviousTraceStatus`, `shouldReusePreviousAgentDescriptors`.
+10. [`CoreDataSnapshotStateSectionAppliers.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/CoreDataSnapshotStateSectionAppliers.ts)
+   - owns: section-level state application commands for health/threads/capabilities/trace/debug/agents/selection surfaces.
+   - query APIs: `applyDebugWorkspaceSnapshot`, `applyHealthSnapshot`, `applyActiveThreadSnapshot`, `applyCapabilitiesSnapshot`, `applyTraceStatusSnapshot`, `applyAgentSnapshot`, `applySelectedThreadSnapshot`, `applySelectedModeKeySnapshot`.
 
 ## Web Application Data Access Group
 

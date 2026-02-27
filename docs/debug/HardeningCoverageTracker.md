@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 04:00:24Z
+Last Updated (UTC): 2026-02-27 04:07:30Z
 
 ## Scope Model
 
@@ -193,6 +193,22 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-21)
+
+The current in-progress wave applies web-application core-data snapshot owner separation:
+
+1. Split capability signature and defaults snapshot derivation ownership into `CoreDataSnapshotCapabilitiesDerivation`.
+2. Split state reuse comparator ownership into `CoreDataSnapshotReusePolicy`.
+3. Split section-level snapshot application ownership into `CoreDataSnapshotStateSectionAppliers`.
+4. Reduced `CoreDataSnapshotStateApplier` to top-level snapshot orchestration over these owner modules while preserving API and behavior.
+
+Files touched in this continuation segment:
+
+1. `apps/WebApplication/Source/Application/StateManagement/CoreDataSnapshotStateApplier.ts`
+2. `apps/WebApplication/Source/Application/StateManagement/CoreDataSnapshotCapabilitiesDerivation.ts`
+3. `apps/WebApplication/Source/Application/StateManagement/CoreDataSnapshotReusePolicy.ts`
+4. `apps/WebApplication/Source/Application/StateManagement/CoreDataSnapshotStateSectionAppliers.ts`
 
 ## Latest Continuation Commit Wave (Current-20)
 
