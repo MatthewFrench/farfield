@@ -68,6 +68,24 @@ describe("CodexThreadStreamEventHistoryOwner", () => {
     expect(incrementalSlice.events).toHaveLength(1);
   });
 
+  it("marks reset-required cursor reads when the cursor is ahead of retained history", () => {
+    const owner = new CodexThreadStreamEventHistoryOwner(3);
+
+    owner.appendStreamEvent("thread-1", createRequestFrame("request-1"));
+    owner.appendStreamEvent("thread-1", createRequestFrame("request-2"));
+    owner.appendStreamEvent("thread-1", createRequestFrame("request-3"));
+
+    const aheadCursorSlice = owner.readStreamEvents("thread-1", "client-a", {
+      limit: 2,
+      sinceSequence: 3,
+    });
+
+    expect(aheadCursorSlice.firstAvailableSequence).toBe(0);
+    expect(aheadCursorSlice.nextSequence).toBe(3);
+    expect(aheadCursorSlice.resetRequired).toBe(true);
+    expect(aheadCursorSlice.events).toHaveLength(2);
+  });
+
   it("tracks sequences independently per thread", () => {
     const owner = new CodexThreadStreamEventHistoryOwner(4);
 

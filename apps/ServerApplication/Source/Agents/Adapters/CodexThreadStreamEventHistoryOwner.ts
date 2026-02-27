@@ -60,6 +60,7 @@ export class CodexThreadStreamEventHistoryOwner {
     const resetRequired = this.isResetRequired(
       input.sinceSequence,
       sequenceWindow.firstAvailableSequence,
+      sequenceWindow.nextSequence,
     );
     const selectedEntries = this.selectStreamEntriesForRead(
       threadStreamEntries,
@@ -92,11 +93,19 @@ export class CodexThreadStreamEventHistoryOwner {
     };
   }
 
-  private isResetRequired(sinceSequence: number | null, firstAvailableSequence: number): boolean {
+  private isResetRequired(
+    sinceSequence: number | null,
+    firstAvailableSequence: number,
+    nextSequence: number,
+  ): boolean {
     // Cursor values represent the last seen event sequence, so subtract one to compare against retained floor.
+    if (sinceSequence === null) {
+      return false;
+    }
+
     return (
-      sinceSequence !== null &&
-      sinceSequence < firstAvailableSequence - RESET_CURSOR_SEQUENCE_OFFSET
+      sinceSequence < firstAvailableSequence - RESET_CURSOR_SEQUENCE_OFFSET ||
+      sinceSequence >= nextSequence
     );
   }
 

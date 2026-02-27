@@ -43,6 +43,7 @@ export class ThreadStreamStateChangedHistoryBatchOwner {
   private bufferedEventCount = 0;
   private bufferedFirstAtMs: number | null = null;
   private bufferedLatestThreadId: string | null = null;
+  private idleFlushTimeout: NodeJS.Timeout | null = null;
 
   public constructor(dependencies: ThreadStreamStateChangedHistoryBatchOwnerDependencies) {
     this.flushIntervalMs = ThreadStreamStateChangedFlushIntervalMillisecondsSchema.parse(
@@ -61,6 +62,7 @@ export class ThreadStreamStateChangedHistoryBatchOwner {
       this.bufferedFirstAtMs = nowMs;
     }
     this.bufferedLatestThreadId = event.threadId;
+    this.ensureIdleFlushScheduled();
 
     if (this.shouldFlushBufferedSummary(nowMs)) {
       this.flushBufferedSummary(nowMs);
@@ -70,6 +72,7 @@ export class ThreadStreamStateChangedHistoryBatchOwner {
   }
 
   public flushBufferedSummary(nowMs: number): void {
+    this.clearIdleFlushTimeout();
     if (this.bufferedEventCount === 0 && this.bufferedFirstAtMs === null) {
       return;
     }
@@ -100,5 +103,25 @@ export class ThreadStreamStateChangedHistoryBatchOwner {
     this.bufferedEventCount = 0;
     this.bufferedFirstAtMs = null;
     this.bufferedLatestThreadId = null;
+  }
+
+  private ensureIdleFlushScheduled(): void {
+    if (this.idleFlushTimeout !== null) {
+      return;
+    }
+
+    this.idleFlushTimeout = setTimeout(() => {
+      this.idleFlushTimeout = null;
+      this.flushBufferedSummary(Date.now());
+    }, this.flushIntervalMs);
+  }
+
+  private clearIdleFlushTimeout(): void {
+    if (this.idleFlushTimeout === null) {
+      return;
+    }
+
+    clearTimeout(this.idleFlushTimeout);
+    this.idleFlushTimeout = null;
   }
 }

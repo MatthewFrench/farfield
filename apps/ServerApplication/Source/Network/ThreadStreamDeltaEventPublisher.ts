@@ -53,7 +53,7 @@ export class ThreadStreamDeltaEventPublisher {
   ) => Promise<AgentThreadStreamEvents>;
   private readonly inFlightThreadIdSet: Set<string>;
   private readonly pendingThreadIdSet: Set<string>;
-  private readonly lastPublishedSequenceByThreadId: Map<string, number>;
+  private readonly lastDeliveredSequenceByThreadId: Map<string, number>;
   private scheduledPublishCount: number;
   private startedPublishCount: number;
   private completedPublishCount: number;
@@ -67,7 +67,7 @@ export class ThreadStreamDeltaEventPublisher {
     this.readThreadStreamEvents = dependencies.readThreadStreamEvents;
     this.inFlightThreadIdSet = new Set<string>();
     this.pendingThreadIdSet = new Set<string>();
-    this.lastPublishedSequenceByThreadId = new Map<string, number>();
+    this.lastDeliveredSequenceByThreadId = new Map<string, number>();
     this.scheduledPublishCount = 0;
     this.startedPublishCount = 0;
     this.completedPublishCount = 0;
@@ -133,13 +133,21 @@ export class ThreadStreamDeltaEventPublisher {
   }
 
   private async publishThreadDelta(threadId: string): Promise<void> {
-    const sinceSequence = this.lastPublishedSequenceByThreadId.get(threadId) ?? null;
+    const sinceSequence = this.lastDeliveredSequenceByThreadId.get(threadId) ?? null;
     const [liveStateSnapshot, streamEventsSnapshot] = await Promise.all([
       this.readThreadLiveState(threadId),
       this.readThreadStreamEvents(threadId, sinceSequence, THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT),
     ]);
-    // Cursor progression is persisted even when broadcast is suppressed.
-    this.lastPublishedSequenceByThreadId.set(threadId, streamEventsSnapshot.nextSequence);
+    // Persist cursor as the most recently delivered event sequence, never as nextSequence.
+    const nextSinceSequence = resolveNextStreamEventsSinceSequence(
+      sinceSequence,
+      streamEventsSnapshot,
+    );
+    if (nextSinceSequence === null) {
+      this.lastDeliveredSequenceByThreadId.delete(threadId);
+    } else {
+      this.lastDeliveredSequenceByThreadId.set(threadId, nextSinceSequence);
+    }
 
     if (shouldSuppressBroadcast(streamEventsSnapshot)) {
       this.suppressedBroadcastCount += 1;
@@ -188,6 +196,21 @@ export class ThreadStreamDeltaEventPublisher {
 
 function shouldSuppressBroadcast(streamEventsSnapshot: AgentThreadStreamEvents): boolean {
   return streamEventsSnapshot.events.length === 0 && !streamEventsSnapshot.resetRequired;
+}
+
+function resolveNextStreamEventsSinceSequence(
+  previousSinceSequence: number | null,
+  streamEventsSnapshot: AgentThreadStreamEvents,
+): number | null {
+  if (streamEventsSnapshot.nextSequence === 0) {
+    return null;
+  }
+
+  if (streamEventsSnapshot.resetRequired || streamEventsSnapshot.events.length > 0) {
+    return streamEventsSnapshot.nextSequence - 1;
+  }
+
+  return previousSinceSequence;
 }
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {

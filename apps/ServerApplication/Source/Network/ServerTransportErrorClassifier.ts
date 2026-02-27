@@ -1,5 +1,6 @@
 import { type DebugErrorSeverity } from "@farfield/protocol";
 import { z } from "zod";
+import { RequestValidationError } from "../Shared/Errors/RequestValidationError.js";
 
 const STATUS_CODE_BAD_REQUEST = 400;
 const STATUS_CODE_SERVICE_UNAVAILABLE = 503;
@@ -85,6 +86,10 @@ export class ServerTransportErrorClassifier {
     isExpectedShutdownTransportError: ShutdownTransportErrorPredicate,
     toErrorMessage: RuntimeErrorMessageMapper,
   ): ServerTransportErrorClassification {
+    if (error instanceof RequestValidationError) {
+      return this.classifyValidationError(error.message);
+    }
+
     if (error instanceof z.ZodError) {
       return this.classifyValidationError(error.message);
     }

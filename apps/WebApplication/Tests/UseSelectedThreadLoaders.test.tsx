@@ -226,7 +226,7 @@ describe("useSelectedThreadLoaders", () => {
           nextSequence: 12,
           resetRequired: false,
         }),
-        streamEventsSinceSequenceUsed: 11,
+        streamEventsSinceSequenceUsed: 10,
         readThreadSnapshot: null,
         includeTurnsUsedForRead: false,
         containsAnyTurns: true,
@@ -291,7 +291,7 @@ describe("useSelectedThreadLoaders", () => {
     });
     expect(
       selectedThreadDataRefreshCoordinator.readSnapshotCalls[1]?.streamEventsSinceSequence,
-    ).toBe(11);
+    ).toBe(10);
     expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls[1]?.includeReadThread).toBe(
       false,
     );
@@ -519,7 +519,7 @@ describe("useSelectedThreadLoaders", () => {
         nextSequence: 401,
         resetRequired: false,
       }),
-      streamEventsSinceSequenceUsed: 400,
+      streamEventsSinceSequenceUsed: 399,
     });
 
     await waitFor(() => {

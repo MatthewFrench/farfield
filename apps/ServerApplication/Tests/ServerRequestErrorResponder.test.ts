@@ -7,6 +7,7 @@ import {
   ServerRequestErrorResponder,
   type ServerRequestErrorResponderDependencies,
 } from "../Source/Network/ServerRequestErrorResponder.js";
+import { RequestValidationError } from "../Source/Shared/Errors/RequestValidationError.js";
 
 const JsonResponseBodySchema = z.object({
   ok: z.literal(false),
@@ -171,6 +172,32 @@ describe("ServerRequestErrorResponder", () => {
     expect(harness.recordedServerErrors).toHaveLength(1);
     expect(harness.recordedServerErrors[0]?.severity).toBe("warning");
     expect(harness.recordedServerErrors[0]?.details?.errorCategory).toBe("request_validation");
+    expect(harness.pushedSystemEvents).toEqual([]);
+    expect(harness.broadcastCount).toBe(0);
+  });
+
+  it("maps request-validation runtime errors to 400 responses", () => {
+    const harness = createHarness(() => false);
+    const { req, res } = createHttpPair({
+      method: "POST",
+      url: "/api/events/session",
+    });
+
+    harness.responder.respond({
+      req,
+      res,
+      error: new RequestValidationError("Request body must be valid JSON."),
+      context: {
+        requestId: "request_1b",
+        actionId: "action_1b",
+        actionName: "events-session-bootstrap",
+      },
+    });
+
+    expect(harness.jsonResponseCalls).toHaveLength(1);
+    expect(harness.jsonResponseCalls[0]?.statusCode).toBe(400);
+    expect(harness.jsonResponseCalls[0]?.body.error).toBe("Request body must be valid JSON.");
+    expect(harness.runtimeLastErrors).toEqual([]);
     expect(harness.pushedSystemEvents).toEqual([]);
     expect(harness.broadcastCount).toBe(0);
   });

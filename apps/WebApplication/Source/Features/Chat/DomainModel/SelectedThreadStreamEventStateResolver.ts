@@ -10,29 +10,40 @@ interface ResolveNextStreamEventsStateInput {
   previousStreamEvents: IpcFrame[];
   streamEventsSnapshot: StreamEventsSnapshotContract;
   streamEventsSinceSequenceUsed: number | null;
+  expectedSinceSequence: number | null;
 }
 
 // Bounds client-owned stream history to avoid unbounded growth during long-lived sessions.
 const STREAM_EVENT_RETENTION_LIMIT = 400;
 
-function matchesStreamEventTail(previousEvents: IpcFrame[], nextEvents: IpcFrame[]): boolean {
-  const previousLastEvent = previousEvents[previousEvents.length - 1];
-  const nextLastEvent = nextEvents[nextEvents.length - 1];
-  const previousLastSignature = previousLastEvent ? JSON.stringify(previousLastEvent) : "";
-  const nextLastSignature = nextLastEvent ? JSON.stringify(nextLastEvent) : "";
-  // Deliberately coarse guard: when lengths and trailing signatures match, treat snapshots as equivalent.
-  return previousEvents.length === nextEvents.length && previousLastSignature === nextLastSignature;
+function areStreamEventsEqual(previousEvents: IpcFrame[], nextEvents: IpcFrame[]): boolean {
+  if (previousEvents.length !== nextEvents.length) {
+    return false;
+  }
+
+  for (let index = 0; index < previousEvents.length; index += 1) {
+    const previousEvent = previousEvents[index];
+    const nextEvent = nextEvents[index];
+    if (JSON.stringify(previousEvent) !== JSON.stringify(nextEvent)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function resolveNextStreamEventsState(input: ResolveNextStreamEventsStateInput): IpcFrame[] {
   if (input.streamEventsSnapshot.resetRequired) {
-    if (matchesStreamEventTail(input.previousStreamEvents, input.streamEventsSnapshot.events)) {
+    if (areStreamEventsEqual(input.previousStreamEvents, input.streamEventsSnapshot.events)) {
       return input.previousStreamEvents;
     }
     return input.streamEventsSnapshot.events;
   }
 
   if (input.streamEventsSinceSequenceUsed !== null) {
+    if (input.streamEventsSinceSequenceUsed !== input.expectedSinceSequence) {
+      return input.previousStreamEvents;
+    }
+
     if (input.streamEventsSnapshot.events.length === 0) {
       return input.previousStreamEvents;
     }
@@ -44,7 +55,7 @@ export function resolveNextStreamEventsState(input: ResolveNextStreamEventsState
       : mergedEvents;
   }
 
-  if (matchesStreamEventTail(input.previousStreamEvents, input.streamEventsSnapshot.events)) {
+  if (areStreamEventsEqual(input.previousStreamEvents, input.streamEventsSnapshot.events)) {
     return input.previousStreamEvents;
   }
   return input.streamEventsSnapshot.events;

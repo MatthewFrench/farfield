@@ -105,6 +105,18 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.apiSessionSigningSecret).toBe("push_token");
   });
 
+  it("treats an empty API_SESSION_SECRET as unset and falls back to API token", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const configuration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      API_TOKEN: "primary_token",
+      API_SESSION_SECRET: "   ",
+    });
+
+    expect(configuration.apiToken).toBe("primary_token");
+    expect(configuration.apiSessionSigningSecret).toBe("primary_token");
+  });
+
   it("prefers API_TOKEN when set, even when PUSH_API_TOKEN is also set", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
     const configuration = readServerRuntimeConfiguration({
@@ -172,6 +184,17 @@ describe("readServerRuntimeConfiguration", () => {
     expect(invalidSecureCookieTokenConfiguration.apiSessionSecureCookie).toBe(false);
   });
 
+  it("defaults secure session cookies to true when API auth is required", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const configuration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      API_TOKEN: "required_token",
+    });
+
+    expect(configuration.apiAuthRequired).toBe(true);
+    expect(configuration.apiSessionSecureCookie).toBe(true);
+  });
+
   it("uses default client error maximum entries when configured value is not a positive integer", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
     const configuration = readServerRuntimeConfiguration({
@@ -180,6 +203,24 @@ describe("readServerRuntimeConfiguration", () => {
     });
 
     expect(configuration.clientErrorMaxEntries).toBe(2_000);
+  });
+
+  it("uses a session-scoped client error log path when DEBUG_CLIENT_ERROR_LOG_PATH is unset", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const environment = buildBaseEnvironment(temporaryDirectoryPath);
+    delete environment.DEBUG_CLIENT_ERROR_LOG_PATH;
+
+    const configuration = readServerRuntimeConfiguration(environment);
+
+    expect(configuration.clientErrorLogPath).toBe(
+      path.join(
+        process.cwd(),
+        ".runtime",
+        "logs",
+        "errors",
+        `${configuration.clientErrorSessionId}.ndjson`,
+      ),
+    );
   });
 
   it("fails for empty optional path environment values with a clear variable error", () => {

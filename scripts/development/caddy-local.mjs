@@ -1,7 +1,7 @@
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import { spawn, spawnSync } from "node:child_process";
 
 const cwd = process.cwd();
 const caddyConfigTemplatePath = path.join(cwd, "operations", "caddy", "Caddyfile.local.template");
@@ -9,6 +9,40 @@ const caddyConfigPath = path.join(cwd, "operations", "caddy", "Caddyfile.local")
 const caddyHttpPort = 80;
 const caddyHttpsPort = 443;
 const caddyReadyTimeoutMs = Number(process.env["IOS_LOCAL_CADDY_READY_TIMEOUT_MS"] ?? "180000");
+const caddyProcessEnvironmentAllowlist = Object.freeze([
+  "APPDATA",
+  "CADDYPATH",
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "LOCALAPPDATA",
+  "PATH",
+  "PROGRAMDATA",
+  "SHELL",
+  "SSL_CERT_DIR",
+  "SSL_CERT_FILE",
+  "SYSTEMROOT",
+  "TMPDIR",
+  "USER",
+  "XDG_CACHE_HOME",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_STATE_HOME",
+]);
+
+function buildCaddyProcessEnvironment(apiToken) {
+  const environment = {};
+  for (const key of caddyProcessEnvironmentAllowlist) {
+    const value = process.env[key];
+    if (typeof value === "string" && value.length > 0) {
+      environment[key] = value;
+    }
+  }
+  if (apiToken.length > 0) {
+    environment.API_TOKEN = apiToken;
+  }
+  return environment;
+}
 
 function parseHttpsOrigin(configText) {
   const siteLine = configText
@@ -42,7 +76,7 @@ function maskSecret(value) {
 function commandExists(command) {
   const whichCommand = process.platform === "win32" ? "where" : "which";
   const result = spawnSync(whichCommand, [command], {
-    stdio: "ignore"
+    stdio: "ignore",
   });
   return result.status === 0;
 }
@@ -68,7 +102,7 @@ function listListeningProcesses(port) {
   }
 
   const result = spawnSync("lsof", ["-nP", `-iTCP:${String(port)}`, "-sTCP:LISTEN"], {
-    encoding: "utf8"
+    encoding: "utf8",
   });
   if (result.status !== 0 || result.stdout.trim().length === 0) {
     return [];
@@ -87,7 +121,7 @@ async function probePortBinding(port) {
     server.once("error", (error) => {
       resolve({
         available: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     });
     server.listen(port, "0.0.0.0", () => {
@@ -95,13 +129,13 @@ async function probePortBinding(port) {
         if (closeError) {
           resolve({
             available: false,
-            error: closeError instanceof Error ? closeError.message : String(closeError)
+            error: closeError instanceof Error ? closeError.message : String(closeError),
           });
           return;
         }
         resolve({
           available: true,
-          error: ""
+          error: "",
         });
       });
     });
@@ -113,7 +147,7 @@ async function ensurePortIsAvailable(port, label) {
   if (listeners.length > 0) {
     printPrerequisiteError(`${label} port ${String(port)} is already in use.`, [
       "Stop existing listeners, then retry:",
-      ...listeners.map((line) => `  ${line}`)
+      ...listeners.map((line) => `  ${line}`),
     ]);
     process.exit(1);
   }
@@ -130,7 +164,7 @@ async function ensurePortIsAvailable(port, label) {
   printPrerequisiteError(`${label} port ${String(port)} appears unavailable.`, [
     "Port probe failed before startup:",
     `  ${probe.error}`,
-    "Stop existing listeners, then retry."
+    "Stop existing listeners, then retry.",
   ]);
   process.exit(1);
 }
@@ -166,7 +200,7 @@ async function waitForCaddyReady(port, timeoutMs) {
     await delay(250);
   }
   throw new Error(
-    `Caddy HTTPS listener was not ready on port ${String(port)} within ${String(timeoutMs)}ms`
+    `Caddy HTTPS listener was not ready on port ${String(port)} within ${String(timeoutMs)}ms`,
   );
 }
 
@@ -175,7 +209,7 @@ if (!fs.existsSync(caddyConfigPath)) {
     `Missing: ${caddyConfigPath}`,
     "Run:",
     "  bun run setup:ios-push",
-    `Template source: ${caddyConfigTemplatePath}`
+    `Template source: ${caddyConfigTemplatePath}`,
   ]);
   process.exit(1);
 }
@@ -187,10 +221,12 @@ const webToken = (process.env["VITE_API_TOKEN"] ?? process.env["VITE_PUSH_API_TO
 
 process.stdout.write(`[caddy:local] origin: ${origin}\n`);
 if (apiToken.length > 0) {
-  process.stdout.write(`[caddy:local] API token header: X-Farfield-Token: ${maskSecret(apiToken)}\n`);
+  process.stdout.write(
+    `[caddy:local] API token header: X-Farfield-Token: ${maskSecret(apiToken)}\n`,
+  );
 } else {
   process.stdout.write(
-    "[caddy:local] API token header: not set (loopback-only safe; set for remote hosts)\n"
+    "[caddy:local] API token header: not set (loopback-only safe; set for remote hosts)\n",
   );
 }
 if (webToken.length > 0) {
@@ -204,14 +240,14 @@ if (caddyExecutable === "caddy" && !commandExists("caddy")) {
   printPrerequisiteError("caddy is not available on PATH.", [
     "Install on macOS with Homebrew:",
     "  brew install caddy",
-    "Or set CADDY_BIN=/absolute/path/to/caddy"
+    "Or set CADDY_BIN=/absolute/path/to/caddy",
   ]);
   process.exit(1);
 }
 
 if (process.platform === "darwin" && !commandExists("certutil")) {
   process.stdout.write(
-    "[caddy:local] notice: certutil is not installed (brew install nss). This is optional for iOS Safari but removes NSS trust-store warnings.\n"
+    "[caddy:local] notice: certutil is not installed (brew install nss). This is optional for iOS Safari but removes NSS trust-store warnings.\n",
   );
 }
 
@@ -221,8 +257,8 @@ await ensurePortIsAvailable(caddyHttpsPort, "Caddy HTTPS");
 let shuttingDown = false;
 const caddyProcess = spawn(caddyExecutable, ["run", "--config", caddyConfigPath], {
   cwd,
-  env: process.env,
-  stdio: "inherit"
+  env: buildCaddyProcessEnvironment(apiToken),
+  stdio: "inherit",
 });
 
 function stopCaddy(signal) {
@@ -269,7 +305,7 @@ try {
       "If a password prompt is waiting, finish it or run:",
       "  bun run ios:trust-local-ca",
       "Then rerun:",
-      "  bun run caddy:local"
+      "  bun run caddy:local",
     ]);
   }
   stopCaddy("SIGTERM");
@@ -277,7 +313,9 @@ try {
 }
 
 process.stdout.write("[caddy:local] HTTPS proxy is ready.\n");
-process.stdout.write("[caddy:local] Keep this running, then start app dev server in another terminal: bun run dev\n");
+process.stdout.write(
+  "[caddy:local] Keep this running, then start app dev server in another terminal: bun run dev\n",
+);
 
 process.on("SIGINT", () => {
   terminate("SIGINT");

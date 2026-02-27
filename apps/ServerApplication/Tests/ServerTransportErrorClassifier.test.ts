@@ -8,6 +8,7 @@ import {
   type ServerTransportErrorLogEventName,
   type ServerTransportErrorLogLevel,
 } from "../Source/Network/ServerTransportErrorClassifier.js";
+import { RequestValidationError } from "../Source/Shared/Errors/RequestValidationError.js";
 
 const STATUS_CODE_BAD_REQUEST = 400;
 const STATUS_CODE_SERVICE_UNAVAILABLE = 503;
@@ -134,6 +135,19 @@ describe("ServerTransportErrorClassifier", () => {
 
     expect(classification).toEqual(
       createExpectedClassification("request_validation", zodError.error.message),
+    );
+  });
+
+  it("maps request-validation runtime errors to validation classification", () => {
+    const classifier = new ServerTransportErrorClassifier();
+    const classification = classifier.classifyRuntimeError(
+      new RequestValidationError("Request body must be valid JSON."),
+      () => false,
+      (value) => value.message,
+    );
+
+    expect(classification).toEqual(
+      createExpectedClassification("request_validation", "Request body must be valid JSON."),
     );
   });
 

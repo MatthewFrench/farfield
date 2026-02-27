@@ -108,10 +108,13 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
   const apiToken = resolveApiTokenFromEnvironment(env);
   const apiAuthRequired = apiToken.length > 0;
   const apiSessionSigningSecret = resolveApiSessionSigningSecret(env, apiToken);
+  const apiSessionSecureCookieDefault = apiAuthRequired
+    ? true
+    : ServerRuntimeDefaultValues.apiSessionSecureCookie;
   const apiSessionSecureCookie = readBooleanEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.apiSessionSecureCookie,
-    ServerRuntimeDefaultValues.apiSessionSecureCookie,
+    apiSessionSecureCookieDefault,
   );
 
   const pushEnabled = readBooleanEnvironmentValue(
@@ -216,7 +219,7 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
       ServerRuntimeStaticConfiguration.runtimeDirectoryName,
       ServerRuntimeStaticConfiguration.logsDirectoryName,
       ServerRuntimeStaticConfiguration.errorsLogDirectoryName,
-      ServerRuntimeStaticConfiguration.clientErrorLogFileName,
+      `${clientErrorSessionId}.ndjson`,
     );
   const clientErrorMaxEntries = readPositiveIntegerEnvironmentValue(
     env,

@@ -179,6 +179,18 @@ function applyObjectPatch(
     return;
   }
 
+  if (operation === PATCH_OPERATION_REPLACE) {
+    if (!hasOwnJsonProperty(mutableTarget, key)) {
+      throw new Error(`Patch replace key missing: ${key}`);
+    }
+    mutableTarget[key] = requirePatchValue(patch);
+    return;
+  }
+
+  if (operation !== PATCH_OPERATION_ADD) {
+    throw new Error(`${UNSUPPORTED_PATCH_OPERATION_ERROR_MESSAGE_PREFIX}: ${String(operation)}`);
+  }
+
   mutableTarget[key] = requirePatchValue(patch);
 }
 

@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { JsonObjectSchema, type JsonValue, JsonValueSchema } from "@farfield/protocol";
 import { z } from "zod";
 import type { AgentAdapter, AgentDescriptor } from "../../Agents/Types.js";
+import { RequestValidationError } from "../../Shared/Errors/RequestValidationError.js";
 
 const JsonResponseHeaderValues = Object.freeze({
   accessControlAllowHeaders:
@@ -55,12 +56,12 @@ export class ServerBootstrapUtilityOwner {
     try {
       parsedJsonValue = JsonValueSchema.parse(JSON.parse(rawBody));
     } catch {
-      throw new Error(BootstrapUtilityMessageByName.invalidJsonBody);
+      throw new RequestValidationError(BootstrapUtilityMessageByName.invalidJsonBody);
     }
 
     const parsedRequestBody = JsonRequestBodySchema.safeParse(parsedJsonValue);
     if (!parsedRequestBody.success) {
-      throw new Error(BootstrapUtilityMessageByName.invalidJsonBodyShape);
+      throw new RequestValidationError(BootstrapUtilityMessageByName.invalidJsonBodyShape);
     }
     return parsedRequestBody.data;
   }

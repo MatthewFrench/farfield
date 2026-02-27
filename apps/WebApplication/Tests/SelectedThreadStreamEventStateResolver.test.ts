@@ -40,6 +40,7 @@ describe("SelectedThreadStreamEventStateResolver", () => {
         resetRequired: true,
       }),
       streamEventsSinceSequenceUsed: null,
+      expectedSinceSequence: null,
     });
 
     expect(resolvedEvents).toBe(previousEvents);
@@ -59,6 +60,7 @@ describe("SelectedThreadStreamEventStateResolver", () => {
         resetRequired: false,
       }),
       streamEventsSinceSequenceUsed: 399,
+      expectedSinceSequence: 399,
     });
 
     expect(resolvedEvents).toHaveLength(400);
@@ -76,8 +78,41 @@ describe("SelectedThreadStreamEventStateResolver", () => {
         resetRequired: false,
       }),
       streamEventsSinceSequenceUsed: null,
+      expectedSinceSequence: null,
     });
 
     expect(resolvedEvents).toEqual([buildEvent("event-2")]);
+  });
+
+  it("does not append cursor-scoped deltas when the cursor does not match local state", () => {
+    const previousEvents = [buildEvent("event-1")];
+    const resolvedEvents = resolveNextStreamEventsState({
+      previousStreamEvents: previousEvents,
+      streamEventsSnapshot: buildStreamSnapshot({
+        events: [buildEvent("event-2")],
+        nextSequence: 3,
+        resetRequired: false,
+      }),
+      streamEventsSinceSequenceUsed: 99,
+      expectedSinceSequence: 1,
+    });
+
+    expect(resolvedEvents).toBe(previousEvents);
+  });
+
+  it("does not treat reset snapshots as equal when only the trailing event matches", () => {
+    const previousEvents = [buildEvent("event-1"), buildEvent("event-tail")];
+    const resolvedEvents = resolveNextStreamEventsState({
+      previousStreamEvents: previousEvents,
+      streamEventsSnapshot: buildStreamSnapshot({
+        events: [buildEvent("event-2"), buildEvent("event-tail")],
+        nextSequence: 3,
+        resetRequired: true,
+      }),
+      streamEventsSinceSequenceUsed: null,
+      expectedSinceSequence: null,
+    });
+
+    expect(resolvedEvents).toEqual([buildEvent("event-2"), buildEvent("event-tail")]);
   });
 });

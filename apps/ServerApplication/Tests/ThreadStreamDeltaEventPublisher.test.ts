@@ -120,7 +120,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
       2,
       "thread-1",
-      4,
+      3,
       THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT,
     );
     expect(broadcastSpy).toHaveBeenCalledTimes(2);
@@ -136,7 +136,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       broadcastSpy.mock.calls[1],
       "Expected second thread delta broadcast",
     );
-    expect(secondBroadcastEvent.delta.streamEventsSinceSequenceUsed).toBe(4);
+    expect(secondBroadcastEvent.delta.streamEventsSinceSequenceUsed).toBe(3);
     expect(secondBroadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(9);
     expect(publisher.readStatistics()).toMatchObject({
       scheduledPublishCount: 2,
@@ -148,7 +148,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     });
   });
 
-  it("suppresses broadcasts for empty non-reset snapshots while keeping cursor progression", async () => {
+  it("suppresses broadcasts for empty non-reset snapshots without advancing cursor", async () => {
     const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
     const broadcastSpy = vi.spyOn(eventStreamClientRegistry, "broadcast");
     const readThreadLiveState = vi.fn(async (_threadId: string) => createLiveStateSnapshot());
@@ -196,7 +196,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
       2,
       "thread-1",
-      5,
+      null,
       THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT,
     );
     expect(broadcastSpy).toHaveBeenCalledTimes(1);
@@ -205,7 +205,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       broadcastSpy.mock.calls[0],
       "Expected thread delta broadcast after reset-required snapshot",
     );
-    expect(broadcastEvent.delta.streamEventsSinceSequenceUsed).toBe(5);
+    expect(broadcastEvent.delta.streamEventsSinceSequenceUsed).toBeNull();
     expect(broadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(8);
     expect(publisher.readStatistics()).toMatchObject({
       scheduledPublishCount: 2,
@@ -308,7 +308,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
       2,
       "thread-1",
-      2,
+      1,
       THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT,
     );
     expect(broadcastSpy).toHaveBeenCalledTimes(2);
@@ -317,7 +317,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       broadcastSpy.mock.calls[1],
       "Expected drained in-flight second broadcast",
     );
-    expect(secondBroadcastEvent.delta.streamEventsSinceSequenceUsed).toBe(2);
+    expect(secondBroadcastEvent.delta.streamEventsSinceSequenceUsed).toBe(1);
     expect(secondBroadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(6);
     expect(publisher.readStatistics()).toMatchObject({
       scheduledPublishCount: 2,

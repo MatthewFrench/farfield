@@ -57,7 +57,8 @@ function hasTurnsInSelectedThreadSnapshots(
  */
 export class SelectedThreadSnapshotStateOwner {
   private deps: SelectedThreadSnapshotStateOwnerDependencies;
-  private readonly nextStreamSequenceByThreadId = new Map<string, number>();
+  private readonly streamEventsSinceSequenceByThreadId = new Map<string, number>();
+  private lastAppliedThreadId: string | null = null;
 
   public constructor(dependencies: SelectedThreadSnapshotStateOwnerDependencies) {
     this.deps = dependencies;
@@ -67,8 +68,8 @@ export class SelectedThreadSnapshotStateOwner {
     this.deps = dependencies;
   }
 
-  public readNextStreamSequence(threadId: string): number | null {
-    return this.nextStreamSequenceByThreadId.get(threadId) ?? null;
+  public readStreamEventsSinceSequence(threadId: string): number | null {
+    return this.readStreamEventsSinceSequenceForRead(threadId);
   }
 
   public shouldSkipSnapshotApply(threadId: string, signal?: AbortSignal): boolean {
@@ -76,6 +77,7 @@ export class SelectedThreadSnapshotStateOwner {
   }
 
   public applySnapshots(snapshotInput: ApplySnapshotsToStateInput): void {
+    const expectedSinceSequence = this.readStreamEventsSinceSequenceForRead(snapshotInput.threadId);
     const containsAnyTurns = hasTurnsInSelectedThreadSnapshots(
       snapshotInput.liveStateSnapshot,
       snapshotInput.readThreadSnapshot,
@@ -84,10 +86,13 @@ export class SelectedThreadSnapshotStateOwner {
       this.deps.pendingThreadMaterializationCoordinator.clearPending(snapshotInput.threadId);
     }
 
-    this.nextStreamSequenceByThreadId.set(
-      snapshotInput.threadId,
-      snapshotInput.streamEventsSnapshot.nextSequence,
-    );
+    const nextSinceSequence = this.resolveNextStreamEventsSinceSequence({
+      expectedSinceSequence,
+      streamEventsSnapshot: snapshotInput.streamEventsSnapshot,
+      streamEventsSinceSequenceUsed: snapshotInput.streamEventsSinceSequenceUsed,
+    });
+    this.writeStreamEventsSinceSequence(snapshotInput.threadId, nextSinceSequence);
+    this.lastAppliedThreadId = snapshotInput.threadId;
 
     startTransition(() => {
       this.deps.setLiveState((previousLiveState) => {
@@ -141,6 +146,7 @@ export class SelectedThreadSnapshotStateOwner {
           previousStreamEvents,
           streamEventsSnapshot: snapshotInput.streamEventsSnapshot,
           streamEventsSinceSequenceUsed: snapshotInput.streamEventsSinceSequenceUsed,
+          expectedSinceSequence,
         }),
       );
     });
@@ -161,5 +167,45 @@ export class SelectedThreadSnapshotStateOwner {
       readThreadSnapshot: null,
       includeTurnsUsedForRead: false,
     });
+  }
+
+  private readStreamEventsSinceSequenceForRead(threadId: string): number | null {
+    if (this.lastAppliedThreadId !== threadId) {
+      return null;
+    }
+    return this.streamEventsSinceSequenceByThreadId.get(threadId) ?? null;
+  }
+
+  private writeStreamEventsSinceSequence(threadId: string, sinceSequence: number | null): void {
+    if (sinceSequence === null) {
+      this.streamEventsSinceSequenceByThreadId.delete(threadId);
+      return;
+    }
+    this.streamEventsSinceSequenceByThreadId.set(threadId, sinceSequence);
+  }
+
+  private resolveNextStreamEventsSinceSequence(input: {
+    expectedSinceSequence: number | null;
+    streamEventsSnapshot: StreamEventsResponse;
+    streamEventsSinceSequenceUsed: number | null;
+  }): number | null {
+    const { expectedSinceSequence, streamEventsSnapshot, streamEventsSinceSequenceUsed } = input;
+    if (
+      streamEventsSinceSequenceUsed !== null &&
+      !streamEventsSnapshot.resetRequired &&
+      streamEventsSinceSequenceUsed !== expectedSinceSequence
+    ) {
+      return expectedSinceSequence;
+    }
+
+    if (streamEventsSnapshot.nextSequence === 0) {
+      return null;
+    }
+
+    if (streamEventsSnapshot.resetRequired || streamEventsSnapshot.events.length > 0) {
+      return streamEventsSnapshot.nextSequence - 1;
+    }
+
+    return expectedSinceSequence;
   }
 }

@@ -137,6 +137,7 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
     );
     let bootstrapped = !apiAuthRequired || currentSession.authenticated;
     let expiresAt = currentSession.expiresAt;
+    let issuedSessionCookieHeaderValue: string | null = null;
 
     if (!bootstrapped && apiAuthRequired) {
       const parsedBody = parseEventsSessionBootstrapBody(await readJsonBody(req));
@@ -159,10 +160,20 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
       );
       if (providedToken !== null && providedToken === apiToken) {
         const issuedSession = browserSessionAuthOwner.issueSessionCookie();
-        res.setHeader(RuntimeRouteHeaderNameByName.setCookie, issuedSession.setCookieHeaderValue);
+        issuedSessionCookieHeaderValue = issuedSession.setCookieHeaderValue;
         bootstrapped = true;
         expiresAt = issuedSession.expiresAt;
       }
+    }
+
+    if (apiAuthRequired && bootstrapped && issuedSessionCookieHeaderValue === null) {
+      const refreshedSession = browserSessionAuthOwner.issueSessionCookie();
+      issuedSessionCookieHeaderValue = refreshedSession.setCookieHeaderValue;
+      expiresAt = refreshedSession.expiresAt;
+    }
+
+    if (issuedSessionCookieHeaderValue !== null) {
+      res.setHeader(RuntimeRouteHeaderNameByName.setCookie, issuedSessionCookieHeaderValue);
     }
 
     const response = FarfieldEventsSessionResponseSchema.parse({

@@ -1,5 +1,5 @@
 import type { IpcFrame } from "@farfield/protocol";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CodexIpcFrameEvent } from "../Source/Agents/Adapters/CodexAgentAdapter.js";
 import {
   THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE,
@@ -112,6 +112,37 @@ describe("ThreadStreamStateChangedHistoryBatchOwner", () => {
 
     owner.flushBufferedSummary(120);
     expect(summaries).toHaveLength(1);
+  });
+
+  it("flushes buffered summaries after stream traffic goes idle", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const summaries: ThreadStreamStateChangedBatchSummary[] = [];
+      const owner = new ThreadStreamStateChangedHistoryBatchOwner({
+        flushIntervalMs: 1_000,
+        emitSummary: (summary) => {
+          summaries.push(summary);
+        },
+      });
+
+      expect(
+        owner.handleFrame(createIpcFrameEvent(THREAD_STREAM_STATE_CHANGED_METHOD, "thread-1"), 0),
+      ).toBe(true);
+      expect(summaries).toHaveLength(0);
+
+      vi.advanceTimersByTime(1_000);
+
+      expect(summaries).toEqual([
+        {
+          count: 1,
+          spanMs: 1_000,
+          latestThreadId: "thread-1",
+        },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("treats flush as a no-op when no events are buffered", () => {

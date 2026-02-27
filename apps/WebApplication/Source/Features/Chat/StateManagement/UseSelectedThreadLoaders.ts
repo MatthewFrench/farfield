@@ -138,7 +138,7 @@ export function useSelectedThreadLoaders(
         agentsById: input.agentsById,
       });
       const streamEventsSinceSequence = readCapabilities.canReadStreamEvents
-        ? snapshotStateOwner.readNextStreamSequence(threadId)
+        ? snapshotStateOwner.readStreamEventsSinceSequence(threadId)
         : null;
 
       const snapshot = await input.selectedThreadDataRefreshCoordinator.readSnapshot({

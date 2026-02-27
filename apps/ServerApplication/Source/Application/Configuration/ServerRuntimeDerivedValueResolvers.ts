@@ -44,12 +44,21 @@ export function resolveWebHealthBuildIdentifierFromEnvironment(env: NodeJS.Proce
 }
 
 export function resolveApiSessionSigningSecret(env: NodeJS.ProcessEnv, apiToken: string): string {
-  const sessionSecretCandidate =
-    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.apiSessionSecret) ?? apiToken;
-  const normalizedSessionSecret = sessionSecretCandidate.trim();
-  return normalizedSessionSecret.length > 0
-    ? normalizedSessionSecret
-    : ServerRuntimeDefaultValues.apiSessionSigningSecret;
+  const configuredSessionSecret = readEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.apiSessionSecret,
+  );
+  const normalizedConfiguredSessionSecret = configuredSessionSecret?.trim() ?? "";
+  if (normalizedConfiguredSessionSecret.length > 0) {
+    return normalizedConfiguredSessionSecret;
+  }
+
+  const normalizedApiToken = apiToken.trim();
+  if (normalizedApiToken.length > 0) {
+    return normalizedApiToken;
+  }
+
+  return ServerRuntimeDefaultValues.apiSessionSigningSecret;
 }
 
 export function resolveCodexExecutablePathFromEnvironment(env: NodeJS.ProcessEnv): string {

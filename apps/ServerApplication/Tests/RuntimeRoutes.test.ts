@@ -320,7 +320,7 @@ describe("RuntimeRoutes", () => {
     expect(harness.res.getHeader("Set-Cookie")).toBeUndefined();
   });
 
-  it("does not read request body when cookie session is already authenticated", async () => {
+  it("reissues session cookies when an authenticated events-session bootstrap is refreshed", async () => {
     const harness = createRuntimeRouteHarness({
       method: RequestMethodByName.post,
       pathname: RequestPathnameByName.apiEventsSession,
@@ -341,7 +341,10 @@ describe("RuntimeRoutes", () => {
     }
     const parsedResponse = FarfieldEventsSessionResponseSchema.parse(responseBody);
     expect(parsedResponse.bootstrapped).toBe(true);
-    expect(parsedResponse.expiresAt).toBe(issuedSession.expiresAt);
-    expect(harness.res.getHeader("Set-Cookie")).toBeUndefined();
+    expect(parsedResponse.expiresAt).not.toBeNull();
+    if (parsedResponse.expiresAt) {
+      expect(parsedResponse.expiresAt >= issuedSession.expiresAt).toBe(true);
+    }
+    expect(harness.res.getHeader("Set-Cookie")).toEqual(expect.any(String));
   });
 });
