@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 02:31:03Z
+Last Updated (UTC): 2026-02-27 02:40:41Z
 
 ## Scope Model
 
@@ -193,6 +193,25 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-13)
+
+The current in-progress wave applies package-layer transport owner separation for Codex app-server process transport:
+
+1. Split spawn-environment schema ownership into `AppServerSpawnEnvironmentContract`.
+2. Split child-process option parsing and classification ownership into `AppServerChildProcessTransportOptionsContract`.
+3. Split app-server stdout line parsing ownership into `AppServerIncomingLineParser`.
+4. Centralized transport literals into `AppServerTransportConstants`.
+5. Reduced `AppServerTransport` to lifecycle/request orchestration over these owner modules while preserving the public API surface.
+
+Files touched in this continuation segment:
+
+1. `packages/CodexInterfaceAdapter/Source/AppServerTransport.ts`
+2. `packages/CodexInterfaceAdapter/Source/AppServerSpawnEnvironmentContract.ts`
+3. `packages/CodexInterfaceAdapter/Source/AppServerChildProcessTransportOptionsContract.ts`
+4. `packages/CodexInterfaceAdapter/Source/AppServerIncomingLineParser.ts`
+5. `packages/CodexInterfaceAdapter/Source/AppServerTransportConstants.ts`
+6. `packages/CodexInterfaceAdapter/Tests/AppServerTransport.test.ts`
 
 ## Latest Continuation Commit Wave (Current-12)
 

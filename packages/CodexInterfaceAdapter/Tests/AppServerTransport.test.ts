@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseAppServerIncomingLine } from "../Source/AppServerIncomingLineParser.js";
 import {
   type AppServerTransport,
   buildAppServerSpawnEnvironment,
@@ -102,5 +103,49 @@ describe("isChildProcessAppServerTransportOptions", () => {
     };
 
     expect(isChildProcessAppServerTransportOptions(transport)).toBe(false);
+  });
+});
+
+describe("parseAppServerIncomingLine", () => {
+  it("returns ignore for empty lines", () => {
+    expect(parseAppServerIncomingLine("  ")).toEqual({ kind: "ignore" });
+  });
+
+  it("returns invalid-json errors for malformed payloads", () => {
+    expect(parseAppServerIncomingLine("{")).toEqual({
+      kind: "error",
+      errorKind: "invalid-json",
+    });
+  });
+
+  it("returns schema-mismatch errors for non-JSON-RPC envelopes", () => {
+    const parsed = parseAppServerIncomingLine('{"id":1}');
+    expect(parsed.kind).toBe("error");
+    if (parsed.kind !== "error") {
+      return;
+    }
+
+    expect(parsed.errorKind).toBe("schema-mismatch");
+    if (parsed.errorKind !== "schema-mismatch") {
+      return;
+    }
+
+    expect(parsed.errorMessage.length).toBeGreaterThan(0);
+  });
+
+  it("returns parsed response messages for valid JSON-RPC responses", () => {
+    const parsed = parseAppServerIncomingLine('{"jsonrpc":"2.0","id":1,"result":{}}');
+    expect(parsed.kind).toBe("message");
+    if (parsed.kind !== "message") {
+      return;
+    }
+
+    expect(parsed.message.kind).toBe("response");
+    if (parsed.message.kind !== "response") {
+      return;
+    }
+
+    expect(parsed.message.value.id).toBe(1);
+    expect(parsed.message.value.result).toEqual({});
   });
 });

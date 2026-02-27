@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 02:31:03Z
+Last Updated (UTC): 2026-02-27 02:40:41Z
 
 ## Purpose
 
@@ -115,6 +115,20 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 3. [`SessionMessageProjection.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/SessionMessageProjection.ts)
    - owns: session message projection for ordered message arrays plus part lookup map.
    - query APIs: `projectSessionMessages`.
+
+## Codex Interface Adapter Package Group
+
+1. [`AppServerSpawnEnvironmentContract.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerSpawnEnvironmentContract.ts)
+   - owns: app-server child-process environment allowlist contract and spawn environment shaping.
+   - query APIs: `buildAppServerSpawnEnvironment`.
+2. [`AppServerChildProcessTransportOptionsContract.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerChildProcessTransportOptionsContract.ts)
+   - owns: child-process transport option parsing and option-shape classification contracts.
+   - query APIs: `parseChildProcessAppServerTransportOptions`, `isChildProcessAppServerTransportOptionsValue`.
+3. [`AppServerIncomingLineParser.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerIncomingLineParser.ts)
+   - owns: app-server stdout line parsing and explicit parse outcome contracts.
+   - query APIs: `parseAppServerIncomingLine`.
+4. [`AppServerTransportConstants.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerTransportConstants.ts)
+   - owns: shared app-server transport literals consumed by transport owner modules.
 
 ## Boundary Rules to Enforce in Reviews
 
