@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 03:31:44Z
+Last Updated (UTC): 2026-02-27 03:51:28Z
 
 ## Purpose
 
@@ -60,6 +60,12 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 2. [`ArchivedThreadLoader.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/ArchivedThreadLoader.ts)
    - owns: archived thread list hydration orchestration.
    - query APIs: `loadArchivedThreads`.
+3. [`UseApplicationRuntimeRefreshOrchestration.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationRuntimeRefreshOrchestration.ts)
+   - owns: runtime refresh sequencing, runtime refresh observability completion semantics, and selected-thread refresh invariants.
+   - query APIs: `useApplicationRuntimeRefreshOrchestration`.
+4. [`ApplicationRuntimeCompositionDependencyBuilders.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/ApplicationRuntimeCompositionDependencyBuilders.ts)
+   - owns: runtime composition hook dependency-input assembly for feature/effect owners.
+   - query APIs: `createApplicationRuntimeCompositionContext`, `buildApplicationPushFeatureCompositionInput`, `buildViewportShellEffectsInput`, `buildApplicationRefreshEffectsInput`, `buildSelectedThreadLifecycleEffectsInput`, `buildEventStreamEffectsInput`, `buildModeAndPendingRequestEffectsInput`, `buildApplicationChatFeatureCompositionInput`, `buildApplicationDebugFeatureCompositionInput`, `buildApplicationSynchronizationEffectsInput`, `buildApplicationShellCompositionInput`.
 
 ## Web Application Data Access Group
 
