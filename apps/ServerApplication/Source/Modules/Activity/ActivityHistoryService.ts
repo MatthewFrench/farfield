@@ -14,9 +14,7 @@ const TRACE_HISTORY_EVENT_TYPE = "history";
 const HISTORY_PAYLOAD_SUMMARY_TYPE = "history-payload-summary";
 const HISTORY_PAYLOAD_PREVIEW_MAXIMUM_BYTES = 4_096;
 const TRACE_STREAM_WRITE_FAILED_LOG_EVENT = "trace-stream-write-failed";
-const ACTION_EVENT_LOG_EVENT = "action-event";
 const ACTION_ERROR_LOG_EVENT = "action-error";
-const SYSTEM_EVENT_LOG_EVENT = "system-event";
 const ACTIVITY_HISTORY_APPENDED_EVENT_TYPE = "activity-history-appended";
 const TRACE_RECORD_LINE_ENDING = "\n";
 const ACTION_DETAIL_SUMMARY_KEYS = [
@@ -205,14 +203,15 @@ export class ActivityHistoryService {
     stage: "attempt" | "success" | "error",
     details: HistoryEntry["meta"],
   ): void {
-    logger.debug(
-      {
-        action,
-        stage,
-        ...this.summarizeActionDetails(details),
-      },
-      ACTION_EVENT_LOG_EVENT,
-    );
+    // Commented out to reduce huge amounts of noise from high-frequency action lifecycle events.
+    // logger.debug(
+    //   {
+    //     action,
+    //     stage,
+    //     ...this.summarizeActionDetails(details),
+    //   },
+    //   "action-event",
+    // );
 
     this.pushHistory(
       "app",
@@ -251,7 +250,8 @@ export class ActivityHistoryService {
   }
 
   public pushSystem(message: string, details: HistoryEntry["meta"] = {}): void {
-    logger.debug({ message, ...details }, SYSTEM_EVENT_LOG_EVENT);
+    // Commented out to reduce huge amounts of noise from high-frequency system events.
+    // logger.debug({ message, ...details }, "system-event");
     this.pushHistory("system", "system", { message, details });
   }
 

@@ -4,7 +4,6 @@ import type {
   ThreadListAggregationCache,
   ThreadListAggregationQuery,
 } from "../../Network/ThreadListAggregationCache.js";
-import { logger } from "../../Shared/Logging/Logger.js";
 import { THREAD_STREAM_STATE_CHANGED_METHOD } from "../ThreadStreamStateChangedHistoryBatchOwner.js";
 
 type ThreadListInvalidationScope = "all" | "active";
@@ -73,13 +72,14 @@ export class ThreadListCacheInvalidationOwner {
       parsedReason === THREAD_STREAM_STATE_CHANGED_METHOD &&
       !this.shouldInvalidateForThreadStreamStateChange(parsedDetails)
     ) {
-      logger.debug(
-        {
-          reason: parsedReason,
-          ...parsedDetails,
-        },
-        "thread-list-aggregation-cache-invalidation-skipped",
-      );
+      // Commented out to reduce huge amounts of noise from bursty stream invalidation skips.
+      // logger.debug(
+      //   {
+      //     reason: parsedReason,
+      //     ...parsedDetails,
+      //   },
+      //   "thread-list-aggregation-cache-invalidation-skipped",
+      // );
       return;
     }
 
@@ -87,16 +87,16 @@ export class ThreadListCacheInvalidationOwner {
     this.threadListAggregationCache.invalidateWhere(
       this.buildThreadListInvalidationPredicate(invalidationScope),
     );
-    const statistics = this.threadListAggregationCache.readStatistics();
-    logger.debug(
-      {
-        reason: parsedReason,
-        invalidationScope,
-        ...parsedDetails,
-        statistics,
-      },
-      "thread-list-aggregation-cache-invalidated",
-    );
+    // Commented out to reduce huge amounts of noise from high-frequency invalidation summaries.
+    // logger.debug(
+    //   {
+    //     reason: parsedReason,
+    //     invalidationScope,
+    //     ...parsedDetails,
+    //     statistics,
+    //   },
+    //   "thread-list-aggregation-cache-invalidated",
+    // );
   }
 
   private readThreadListInvalidationScope(

@@ -6,7 +6,6 @@ const ANSI_ESCAPE_REGEX = /\u001B\[[0-?]*[ -/]*[@-~]/g;
 const APP_SERVER_STDERR_ERROR_PATTERN = /\b(error|fatal|panic)\b/i;
 const APP_SERVER_STDERR_WARN_PATTERN = /\bwarn(?:ing)?\b/i;
 const APP_SERVER_STDERR_LOG_EVENT = "codex-app-server-stderr";
-const APP_SERVER_STDERR_IGNORED_LOG_EVENT = "codex-app-server-stderr-ignored";
 
 const ROLLOUT_LIST_SCOPE_FRAGMENT = "codex_core::rollout::list";
 const ROLLOUT_PATH_MISSING_FRAGMENT = "state db missing rollout path for thread";
@@ -19,7 +18,8 @@ export class CodexAppServerStderrOwner {
   public handleStderrLine(line: string): void {
     const normalizedLine = this.normalizeLine(line);
     if (this.isKnownBenignLine(normalizedLine)) {
-      logger.debug({ line: normalizedLine }, APP_SERVER_STDERR_IGNORED_LOG_EVENT);
+      // Commented out to reduce huge amounts of noise from high-frequency ignored stderr lines.
+      // logger.debug({ line: normalizedLine }, "codex-app-server-stderr-ignored");
       return;
     }
 
@@ -34,7 +34,8 @@ export class CodexAppServerStderrOwner {
       return;
     }
 
-    logger.debug({ line: normalizedLine }, APP_SERVER_STDERR_LOG_EVENT);
+    // Commented out to reduce huge amounts of noise from non-error Codex stderr lines.
+    // logger.debug({ line: normalizedLine }, APP_SERVER_STDERR_LOG_EVENT);
   }
 
   private normalizeLine(line: string): string {
