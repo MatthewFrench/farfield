@@ -109,7 +109,7 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
     configuredAgentIds: [],
     registry: agentRegistry,
     threadAdapterResolver,
-    codexAdapter: null,
+    replayAdapter: null,
     threadListAggregationCache: new ThreadListAggregationCache(1_000, 8),
     threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
     eventStreamClientRegistry,

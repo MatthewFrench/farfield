@@ -363,7 +363,7 @@ const serverRequestHandler = new ServerRequestHandler({
   configuredAgentIds,
   registry,
   threadAdapterResolver,
-  codexAdapter: readCodexAdapter(),
+  replayAdapter: readCodexAdapter(),
   threadListAggregationCache,
   threadConcurrencyCoordinator,
   eventStreamClientRegistry,

@@ -1,7 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { FarfieldPushTestBodySchema, type PushNotificationPayload } from "@farfield/protocol";
 import { z } from "zod";
-import type { CodexAgentAdapter } from "../Agents/Adapters/CodexAgentAdapter.js";
 import type { AgentRegistry } from "../Agents/Registry.js";
 import type { ThreadAdapterResolver } from "../Agents/ThreadAdapterResolver.js";
 import type { AgentAdapter, AgentDescriptor, AgentId } from "../Agents/Types.js";
@@ -45,7 +44,7 @@ export interface ServerRequestRouteDispatchOwnerDependencies {
   configuredAgentIds: AgentId[];
   registry: AgentRegistry;
   threadAdapterResolver: ThreadAdapterResolver;
-  codexAdapter: CodexAgentAdapter | null;
+  replayAdapter: DebugRouteDependencies["replayAdapter"];
   threadListAggregationCache: ThreadListAggregationCache;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   eventStreamClientRegistry: EventStreamClientRegistry;
@@ -236,7 +235,7 @@ export class ServerRequestRouteDispatchOwner {
         url: input.url,
         traceDirectoryPath: this.deps.traceDirectoryPath,
         activityHistoryService: this.deps.activityHistoryService,
-        replayAdapter: this.deps.codexAdapter,
+        replayAdapter: this.deps.replayAdapter,
         clientErrorStore: this.deps.clientErrorStore,
         readObservabilitySnapshot: this.deps.readObservabilitySnapshot,
         parseInteger: this.deps.parseInteger,

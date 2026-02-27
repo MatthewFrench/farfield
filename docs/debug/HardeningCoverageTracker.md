@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 01:38:21Z
+Last Updated (UTC): 2026-02-27 01:43:55Z
 
 ## Scope Model
 
@@ -193,6 +193,21 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-9)
+
+The current in-progress wave applies network composition boundary cleanup for replay adapter wiring:
+
+1. Updated server request composition owners to use a generic replay-adapter dependency name and contract (`replayAdapter`) instead of codex-specific naming.
+2. Propagated replay-adapter dependency naming through bootstrap wiring and server request handler test fixtures.
+3. Preserved runtime behavior while tightening boundary ownership language and dependency contracts at the server network composition layer.
+
+Files touched in this continuation segment:
+
+1. `apps/ServerApplication/Source/Network/ServerRequestRouteDispatchOwner.ts`
+2. `apps/ServerApplication/Source/Network/ServerRequestHandler.ts`
+3. `apps/ServerApplication/Source/Application/ServerBootstrap.ts`
+4. `apps/ServerApplication/Tests/ServerRequestHandler.test.ts`
 
 ## Latest Continuation Commit Wave (Current-8)
 
