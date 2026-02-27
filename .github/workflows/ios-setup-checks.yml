@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Validate lockfile governance
+        run: bun run validate:lockfiles:governance
+
       - name: Run setup wizard non-interactive
         run: bun run setup:ios-push
 

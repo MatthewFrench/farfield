@@ -15,6 +15,22 @@ Required naming and structure conventions:
 4. Keep non-source roots lowercase (`docs`, `public`, `traces`, `scripts`, `operations`, `end-to-end`).
 5. Keep ownership explicit: user interface, state management, data access, and domain model must remain separated.
 
+## Tooling And Local Gates
+
+Repository development workflow requirements:
+
+1. Use Bun commands and `bun.lock` as the only lockfile policy.
+2. Use Biome for linting and formatting.
+3. Keep Husky hooks enabled (`prepare` installs hooks on dependency install).
+4. Keep `biome-ignore` directives justified with explicit rationale comments.
+
+Recommended local verification sequence:
+
+1. `bun run validate:lockfiles:governance`
+2. `bun run lint`
+3. `bun run typecheck`
+4. `bun run ci:targeted:gate` for end-to-end targeted checks before merge.
+
 ## Environment-Specific Config Policy
 
 Do not commit machine-specific runtime config files.

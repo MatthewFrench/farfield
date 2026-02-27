@@ -44,6 +44,24 @@ bun run dev:remote -- --agents=opencode      # network-accessible (opencode)
 > **Warning:** `dev:remote` is network-exposed. If `API_TOKEN` is unset, `/api/*` and `/events` are unauthenticated.
 > Set `API_TOKEN` in `.env.local` for remote use.
 
+## Development Tooling
+
+Farfield uses Bun, Biome, and Husky as the default local workflow.
+
+- Lockfile policy: `bun.lock` is the only allowed lockfile.
+- Formatter and lint: Biome (`bun run lint`, `bun run lint:fix`).
+- Pre-commit hook: staged Biome checks and `biome-ignore` rationale validation.
+- Pre-push hook: targeted lint and typecheck.
+
+Useful commands:
+
+```bash
+bun run lint
+bun run typecheck
+bun run ci:targeted:gate
+bun run validate:lockfiles:governance
+```
+
 ## Settings Parity
 
 Farfield reads Codex app defaults using `config/read` and uses those values for:
