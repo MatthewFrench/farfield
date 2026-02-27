@@ -248,7 +248,10 @@ describe("service worker notifications", () => {
     const focusMock = vi.fn(async () => undefined);
     harness.matchAllMock.mockResolvedValueOnce([
       { url: "https://example.test/threads/thread_1", focus: focusMock },
-      { url: "https://example.test/threads/thread_2", focus: vi.fn(async () => undefined) },
+      {
+        url: "https://example.test/threads/thread_2",
+        focus: vi.fn(async () => undefined),
+      },
     ]);
 
     const waitUntilPromises: Promise<void>[] = [];

@@ -50,7 +50,10 @@ class TestThreadServerClient extends ThreadServerClient {
   private listRequestCount: number;
   private readonly listRequestOptions: ThreadListLoadOptions[];
 
-  public constructor(input: { active: ThreadListResponse; archived: ThreadListResponse }) {
+  public constructor(input: {
+    active: ThreadListResponse;
+    archived: ThreadListResponse;
+  }) {
     super();
     this.responseByArchiveMode = {
       active: input.active,

@@ -5,8 +5,14 @@ describe("ApplicationRouteStateMapper", () => {
   it("parses chat root and debug root routes", () => {
     const mapper = new ApplicationRouteStateMapper();
 
-    expect(mapper.parseFromPathname("/")).toEqual({ threadId: null, tab: "chat" });
-    expect(mapper.parseFromPathname("/debug")).toEqual({ threadId: null, tab: "debug" });
+    expect(mapper.parseFromPathname("/")).toEqual({
+      threadId: null,
+      tab: "chat",
+    });
+    expect(mapper.parseFromPathname("/debug")).toEqual({
+      threadId: null,
+      tab: "debug",
+    });
   });
 
   it("parses thread routes with encoded identifiers", () => {

@@ -66,8 +66,16 @@ function createAdapter(input: {
 
 describe("ThreadAdapterResolver", () => {
   it("resolves create-thread adapter from requested id or default connected enabled agent", () => {
-    const codexAdapter = createAdapter({ id: "codex", enabled: true, connected: true });
-    const opencodeAdapter = createAdapter({ id: "opencode", enabled: false, connected: true });
+    const codexAdapter = createAdapter({
+      id: "codex",
+      enabled: true,
+      connected: true,
+    });
+    const opencodeAdapter = createAdapter({
+      id: "opencode",
+      enabled: false,
+      connected: true,
+    });
     const registry = new AgentRegistry([codexAdapter, opencodeAdapter]);
     const resolver = new ThreadAdapterResolver(registry, new ThreadIndex());
 
@@ -77,8 +85,16 @@ describe("ThreadAdapterResolver", () => {
   });
 
   it("selects another connected enabled adapter when default is disconnected", () => {
-    const codexAdapter = createAdapter({ id: "codex", enabled: true, connected: false });
-    const opencodeAdapter = createAdapter({ id: "opencode", enabled: true, connected: true });
+    const codexAdapter = createAdapter({
+      id: "codex",
+      enabled: true,
+      connected: false,
+    });
+    const opencodeAdapter = createAdapter({
+      id: "opencode",
+      enabled: true,
+      connected: true,
+    });
     const registry = new AgentRegistry([codexAdapter, opencodeAdapter]);
     const resolver = new ThreadAdapterResolver(registry, new ThreadIndex());
 
@@ -95,7 +111,11 @@ describe("ThreadAdapterResolver", () => {
         throw createThreadMissingError();
       },
     });
-    const opencodeAdapter = createAdapter({ id: "opencode", enabled: true, connected: false });
+    const opencodeAdapter = createAdapter({
+      id: "opencode",
+      enabled: true,
+      connected: false,
+    });
     const registry = new AgentRegistry([codexAdapter, opencodeAdapter]);
     const resolver = new ThreadAdapterResolver(registry, new ThreadIndex());
 

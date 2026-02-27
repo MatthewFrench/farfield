@@ -160,7 +160,9 @@ export class SelectedThreadDataRefreshCoordinator {
     if (!input.signal) {
       return input.chatClient.readLiveState(input.threadId);
     }
-    return input.chatClient.readLiveState(input.threadId, { signal: input.signal });
+    return input.chatClient.readLiveState(input.threadId, {
+      signal: input.signal,
+    });
   }
 
   private async readStreamEventsSnapshot(

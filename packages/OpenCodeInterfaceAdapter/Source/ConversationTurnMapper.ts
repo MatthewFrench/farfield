@@ -42,7 +42,10 @@ export function messagesToTurns(
       items.push({
         id: `${userMsg.id}-input`,
         type: "userMessage",
-        content: userTextParts.map((part) => ({ type: "text" as const, text: part.text })),
+        content: userTextParts.map((part) => ({
+          type: "text" as const,
+          text: part.text,
+        })),
       });
     }
 

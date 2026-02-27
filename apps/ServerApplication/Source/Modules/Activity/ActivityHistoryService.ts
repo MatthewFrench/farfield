@@ -111,7 +111,9 @@ export class ActivityHistoryService {
     ensureTraceDirectory();
     const traceIdentifier = `${Date.now()}-${randomUUID()}`;
     const tracePath = path.join(traceDirectoryPath, `${traceIdentifier}${TRACE_FILE_EXTENSION}`);
-    const stream = fs.createWriteStream(tracePath, { flags: TRACE_STREAM_OPEN_FLAGS });
+    const stream = fs.createWriteStream(tracePath, {
+      flags: TRACE_STREAM_OPEN_FLAGS,
+    });
     stream.on("error", (error) => {
       logger.error(
         {
@@ -187,7 +189,10 @@ export class ActivityHistoryService {
       meta: historyMeta,
     };
     this.appendHistoryEntry(entry, payload);
-    this.appendTraceRecordIfActive({ type: TRACE_HISTORY_EVENT_TYPE, ...entry });
+    this.appendTraceRecordIfActive({
+      type: TRACE_HISTORY_EVENT_TYPE,
+      ...entry,
+    });
     this.eventStreamClientRegistry.broadcast({
       type: ACTIVITY_HISTORY_APPENDED_EVENT_TYPE,
       entry,
@@ -237,7 +242,11 @@ export class ActivityHistoryService {
     );
 
     this.pushActionEvent(action, "error", { ...details, error: errorMessage });
-    this.pushSystem("Action failed", { action, ...details, error: errorMessage });
+    this.pushSystem("Action failed", {
+      action,
+      ...details,
+      error: errorMessage,
+    });
     return errorMessage;
   }
 

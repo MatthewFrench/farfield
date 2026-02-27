@@ -64,10 +64,18 @@ export class PageTouchOverscrollGuardCoordinator {
       this.scrollElement = null;
     };
 
-    applicationShellElement.addEventListener("touchstart", onTouchStart, { passive: true });
-    applicationShellElement.addEventListener("touchmove", onTouchMove, { passive: false });
-    applicationShellElement.addEventListener("touchend", clearTouchState, { passive: true });
-    applicationShellElement.addEventListener("touchcancel", clearTouchState, { passive: true });
+    applicationShellElement.addEventListener("touchstart", onTouchStart, {
+      passive: true,
+    });
+    applicationShellElement.addEventListener("touchmove", onTouchMove, {
+      passive: false,
+    });
+    applicationShellElement.addEventListener("touchend", clearTouchState, {
+      passive: true,
+    });
+    applicationShellElement.addEventListener("touchcancel", clearTouchState, {
+      passive: true,
+    });
 
     return () => {
       applicationShellElement.removeEventListener("touchstart", onTouchStart);

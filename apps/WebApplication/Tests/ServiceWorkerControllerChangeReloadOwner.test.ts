@@ -37,7 +37,9 @@ describe("ServiceWorkerControllerChangeReloadOwner", () => {
     expect(suppressedDecision.shouldReload).toBe(false);
     expect(suppressedDecision.reason).toBe("reload-suppressed");
 
-    const unsuppressedDecision = owner.readDecision({ reloadSuppressed: false });
+    const unsuppressedDecision = owner.readDecision({
+      reloadSuppressed: false,
+    });
     expect(unsuppressedDecision.shouldReload).toBe(true);
     expect(unsuppressedDecision.reason).toBe("reload-required");
   });
@@ -45,9 +47,15 @@ describe("ServiceWorkerControllerChangeReloadOwner", () => {
   it("does not consume the one reload while suppression remains active across rapid controller changes", () => {
     const owner = new ServiceWorkerControllerChangeReloadOwner(true);
 
-    const firstSuppressedDecision = owner.readDecision({ reloadSuppressed: true });
-    const secondSuppressedDecision = owner.readDecision({ reloadSuppressed: true });
-    const thirdSuppressedDecision = owner.readDecision({ reloadSuppressed: true });
+    const firstSuppressedDecision = owner.readDecision({
+      reloadSuppressed: true,
+    });
+    const secondSuppressedDecision = owner.readDecision({
+      reloadSuppressed: true,
+    });
+    const thirdSuppressedDecision = owner.readDecision({
+      reloadSuppressed: true,
+    });
     expect(firstSuppressedDecision.shouldReload).toBe(false);
     expect(firstSuppressedDecision.reason).toBe("reload-suppressed");
     expect(secondSuppressedDecision.shouldReload).toBe(false);
@@ -55,7 +63,9 @@ describe("ServiceWorkerControllerChangeReloadOwner", () => {
     expect(thirdSuppressedDecision.shouldReload).toBe(false);
     expect(thirdSuppressedDecision.reason).toBe("reload-suppressed");
 
-    const unsuppressedDecision = owner.readDecision({ reloadSuppressed: false });
+    const unsuppressedDecision = owner.readDecision({
+      reloadSuppressed: false,
+    });
     expect(unsuppressedDecision.shouldReload).toBe(true);
     expect(unsuppressedDecision.reason).toBe("reload-required");
   });
@@ -63,15 +73,21 @@ describe("ServiceWorkerControllerChangeReloadOwner", () => {
   it("keeps first-adoption skip deterministic even when suppression is active during adoption", () => {
     const owner = new ServiceWorkerControllerChangeReloadOwner(false);
 
-    const firstSuppressedDecision = owner.readDecision({ reloadSuppressed: true });
+    const firstSuppressedDecision = owner.readDecision({
+      reloadSuppressed: true,
+    });
     expect(firstSuppressedDecision.shouldReload).toBe(false);
     expect(firstSuppressedDecision.reason).toBe("first-controller-adoption");
 
-    const secondSuppressedDecision = owner.readDecision({ reloadSuppressed: true });
+    const secondSuppressedDecision = owner.readDecision({
+      reloadSuppressed: true,
+    });
     expect(secondSuppressedDecision.shouldReload).toBe(false);
     expect(secondSuppressedDecision.reason).toBe("reload-suppressed");
 
-    const unsuppressedDecision = owner.readDecision({ reloadSuppressed: false });
+    const unsuppressedDecision = owner.readDecision({
+      reloadSuppressed: false,
+    });
     expect(unsuppressedDecision.shouldReload).toBe(true);
     expect(unsuppressedDecision.reason).toBe("reload-required");
   });

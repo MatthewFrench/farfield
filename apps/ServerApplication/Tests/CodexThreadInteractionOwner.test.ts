@@ -183,7 +183,10 @@ class TestThreadStreamStateOwner extends CodexThreadStreamStateOwner {
     return this.resolvedOwnerClientId;
   }
 
-  public override describeFrame(frame: IpcFrame): { method: string; threadId: string | null } {
+  public override describeFrame(frame: IpcFrame): {
+    method: string;
+    threadId: string | null;
+  } {
     this.describedFrames.push(frame);
     switch (frame.type) {
       case "request":

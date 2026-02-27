@@ -139,7 +139,10 @@ export class DebugReplayRouteOwner {
     }
 
     codexAdapter.replayBroadcast(frame.method, frame.params, options);
-    jsonResponse(res, DebugReplayRouteStatusCodeByName.successOk, { ok: true, replayed: true });
+    jsonResponse(res, DebugReplayRouteStatusCodeByName.successOk, {
+      ok: true,
+      replayed: true,
+    });
     return true;
   }
 }

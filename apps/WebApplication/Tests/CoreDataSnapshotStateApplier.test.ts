@@ -420,7 +420,9 @@ describe("CoreDataSnapshotStateApplier", () => {
     const incomingHistory = createDebugHistoryCollection(2_000);
     incomingHistory[1_000] = createDebugHistoryEntry("history-middle-updated");
 
-    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({ history: incomingHistory });
+    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
+      history: incomingHistory,
+    });
     applyCoreDataSnapshotState(harness.input);
 
     expect(harness.setHistoryMock).toHaveBeenCalledTimes(1);
@@ -440,7 +442,9 @@ describe("CoreDataSnapshotStateApplier", () => {
     const incomingHistory = createDebugHistoryCollection(2_000);
     incomingHistory[1_999] = createDebugHistoryEntry("history-tail-updated");
 
-    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({ history: incomingHistory });
+    harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
+      history: incomingHistory,
+    });
     applyCoreDataSnapshotState(harness.input);
 
     expect(harness.setHistoryMock).toHaveBeenCalledTimes(1);

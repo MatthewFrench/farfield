@@ -53,7 +53,10 @@ interface HttpPairInput {
   url?: string;
 }
 
-function createHttpPair(input: HttpPairInput = {}): { req: IncomingMessage; res: ServerResponse } {
+function createHttpPair(input: HttpPairInput = {}): {
+  req: IncomingMessage;
+  res: ServerResponse;
+} {
   const request = new IncomingMessage(new Socket());
   if (input.method !== undefined) {
     request.method = input.method;
@@ -137,7 +140,10 @@ function createHarness(isExpectedShutdownTransportError: (error: Error) => boole
 describe("ServerRequestErrorResponder", () => {
   it("returns validation mapping with warning error recording", () => {
     const harness = createHarness(() => false);
-    const { req, res } = createHttpPair({ method: "POST", url: "/api/threads" });
+    const { req, res } = createHttpPair({
+      method: "POST",
+      url: "/api/threads",
+    });
 
     harness.responder.respond({
       req,
@@ -171,7 +177,10 @@ describe("ServerRequestErrorResponder", () => {
 
   it("records and reports internal runtime errors", () => {
     const harness = createHarness(() => false);
-    const { req, res } = createHttpPair({ method: "PATCH", url: "/api/threads/thread_123" });
+    const { req, res } = createHttpPair({
+      method: "PATCH",
+      url: "/api/threads/thread_123",
+    });
 
     harness.responder.respond({
       req,
@@ -273,7 +282,10 @@ describe("ServerRequestErrorResponder", () => {
 
   it("uses owned unknown literals when method and url are missing", () => {
     const harness = createHarness(() => false);
-    const { req, res } = createHttpPair({ method: "POST", url: "/api/threads" });
+    const { req, res } = createHttpPair({
+      method: "POST",
+      url: "/api/threads",
+    });
     req.method = undefined;
     req.url = undefined;
 

@@ -91,7 +91,9 @@ describe("UseDebugActionHandlers", () => {
       errorId: "error-1",
     });
 
-    const handlerState: { current: DebugActionHandlers | null } = { current: null };
+    const handlerState: { current: DebugActionHandlers | null } = {
+      current: null,
+    };
     render(
       <HandlerHarness
         input={input}
@@ -128,7 +130,9 @@ describe("UseDebugActionHandlers", () => {
       errorId: null,
     });
 
-    const handlerState: { current: DebugActionHandlers | null } = { current: null };
+    const handlerState: { current: DebugActionHandlers | null } = {
+      current: null,
+    };
     render(
       <HandlerHarness
         input={input}

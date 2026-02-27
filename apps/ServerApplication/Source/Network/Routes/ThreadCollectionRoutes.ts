@@ -336,7 +336,10 @@ async function loadThreadListSnapshot(input: {
   withTimeout: ThreadCollectionRouteWithTimeout;
   registerThreadAdapterOwnership: ThreadCollectionRouteThreadOwnershipRegistrar;
   sortKey: ThreadListSortKey;
-}): Promise<{ mergedData: ThreadListItemWithAgentId[]; combinedTruncated: boolean }> {
+}): Promise<{
+  mergedData: ThreadListItemWithAgentId[];
+  combinedTruncated: boolean;
+}> {
   const mergedData: ThreadListItemWithAgentId[] = [];
   let combinedTruncated = false;
 

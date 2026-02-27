@@ -70,7 +70,11 @@ export class ThreadMemberMessageMutationRouteOwner {
           threadId,
         },
       );
-      jsonResponse(this.dependencies.res, 500, { ok: false, error: message, threadId });
+      jsonResponse(this.dependencies.res, 500, {
+        ok: false,
+        error: message,
+        threadId,
+      });
       return true;
     }
 

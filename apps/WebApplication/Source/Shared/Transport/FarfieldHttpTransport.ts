@@ -321,7 +321,9 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
     if (inheritedSignal.aborted) {
       timeoutController.abort();
     } else {
-      inheritedSignal.addEventListener("abort", onAbortInheritedSignal, { once: true });
+      inheritedSignal.addEventListener("abort", onAbortInheritedSignal, {
+        once: true,
+      });
     }
   }
   try {

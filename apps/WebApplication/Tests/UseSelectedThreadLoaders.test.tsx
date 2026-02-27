@@ -239,7 +239,9 @@ describe("useSelectedThreadLoaders", () => {
     );
     const selectedThreadRefreshConcurrencyCoordinator =
       new SelectedThreadRefreshConcurrencyCoordinator();
-    const snapshotReference: { current: SelectedThreadLoadersHarnessSnapshot | null } = {
+    const snapshotReference: {
+      current: SelectedThreadLoadersHarnessSnapshot | null;
+    } = {
       current: null,
     };
 
@@ -318,7 +320,9 @@ describe("useSelectedThreadLoaders", () => {
     );
     const selectedThreadRefreshConcurrencyCoordinator =
       new SelectedThreadRefreshConcurrencyCoordinator();
-    const snapshotReference: { current: SelectedThreadLoadersHarnessSnapshot | null } = {
+    const snapshotReference: {
+      current: SelectedThreadLoadersHarnessSnapshot | null;
+    } = {
       current: null,
     };
 
@@ -363,7 +367,9 @@ describe("useSelectedThreadLoaders", () => {
     );
     const selectedThreadRefreshConcurrencyCoordinator =
       new SelectedThreadRefreshConcurrencyCoordinator();
-    const snapshotReference: { current: SelectedThreadLoadersHarnessSnapshot | null } = {
+    const snapshotReference: {
+      current: SelectedThreadLoadersHarnessSnapshot | null;
+    } = {
       current: null,
     };
 
@@ -453,7 +459,9 @@ describe("useSelectedThreadLoaders", () => {
     );
     const selectedThreadRefreshConcurrencyCoordinator =
       new SelectedThreadRefreshConcurrencyCoordinator();
-    const snapshotReference: { current: SelectedThreadLoadersHarnessSnapshot | null } = {
+    const snapshotReference: {
+      current: SelectedThreadLoadersHarnessSnapshot | null;
+    } = {
       current: null,
     };
 

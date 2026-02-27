@@ -222,7 +222,10 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
   };
 }
 
-function createRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
+function createRequestResponsePair(): {
+  request: IncomingMessage;
+  response: ServerResponse;
+} {
   const socket = new Socket();
   const request = new IncomingMessage(socket);
   const response = new ServerResponse(request);

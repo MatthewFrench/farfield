@@ -212,8 +212,14 @@ describe("useViewportShellEffects", () => {
 
     const applicationShellElement = document.createElement("div");
     const scrollElement = document.createElement("div");
-    Object.defineProperty(scrollElement, "scrollHeight", { configurable: true, value: 400 });
-    Object.defineProperty(scrollElement, "clientHeight", { configurable: true, value: 160 });
+    Object.defineProperty(scrollElement, "scrollHeight", {
+      configurable: true,
+      value: 400,
+    });
+    Object.defineProperty(scrollElement, "clientHeight", {
+      configurable: true,
+      value: 160,
+    });
     Object.defineProperty(scrollElement, "scrollTop", {
       configurable: true,
       value: 0,

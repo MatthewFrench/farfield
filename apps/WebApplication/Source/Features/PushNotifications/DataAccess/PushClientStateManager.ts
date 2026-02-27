@@ -415,7 +415,9 @@ export class PushClientStateManager {
     const controllerChangePromise = this.waitForControllerChange(
       CONTROLLER_CHANGE_WAIT_TIMEOUT_MILLISECONDS,
     );
-    waitingWorker.postMessage({ type: SERVICE_WORKER_SKIP_WAITING_MESSAGE_TYPE });
+    waitingWorker.postMessage({
+      type: SERVICE_WORKER_SKIP_WAITING_MESSAGE_TYPE,
+    });
     await controllerChangePromise;
     return true;
   }

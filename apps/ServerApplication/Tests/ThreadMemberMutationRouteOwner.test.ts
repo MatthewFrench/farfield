@@ -24,7 +24,10 @@ import {
 } from "../Source/Network/Routes/ThreadMemberRouteContracts.js";
 import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 
-function createMockRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
+function createMockRequestResponsePair(): {
+  request: IncomingMessage;
+  response: ServerResponse;
+} {
   const socket = new Socket();
   const request = new IncomingMessage(socket);
   const response = new ServerResponse(request);

@@ -179,7 +179,10 @@ export function ChatWorkspacePane({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: THREAD_FADE_TRANSITION_DURATION_SECONDS, ease: "easeOut" }}
+            transition={{
+              duration: THREAD_FADE_TRANSITION_DURATION_SECONDS,
+              ease: "easeOut",
+            }}
             className="w-full px-4 md:px-6 lg:px-8 pt-8 pb-6"
           >
             {shouldRenderEmptyState ? (
@@ -247,7 +250,9 @@ export function ChatWorkspacePane({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: JUMP_TO_BOTTOM_TRANSITION_DURATION_SECONDS }}
+            transition={{
+              duration: JUMP_TO_BOTTOM_TRANSITION_DURATION_SECONDS,
+            }}
             className="absolute left-1/2 -translate-x-1/2 bottom-[7.25rem] md:bottom-[7.75rem] z-20"
           >
             <Button
@@ -295,7 +300,9 @@ export function ChatWorkspacePane({
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 4 }}
-                transition={{ duration: THINKING_BANNER_TRANSITION_DURATION_SECONDS }}
+                transition={{
+                  duration: THINKING_BANNER_TRANSITION_DURATION_SECONDS,
+                }}
                 className="px-1 flex items-center gap-1.5 text-xs text-muted-foreground"
               >
                 <Loader2 size={11} className="animate-spin" />

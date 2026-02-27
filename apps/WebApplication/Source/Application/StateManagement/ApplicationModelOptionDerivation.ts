@@ -30,5 +30,8 @@ export function readModelOptions(input: ModelOptionsInput): ApplicationModelOpti
     modelLabelById.set(selectedModelId, selectedModelId);
   }
 
-  return Array.from(modelLabelById.entries()).map(([id, label]) => ({ id, label }));
+  return Array.from(modelLabelById.entries()).map(([id, label]) => ({
+    id,
+    label,
+  }));
 }

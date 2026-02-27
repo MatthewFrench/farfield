@@ -209,7 +209,12 @@ export class ThreadCompletionNotificationService {
 
       // Watermark commit is gated on at least one successful delivery so future
       // debounced checks can retry the same completion when every channel fails.
-      if (!this.hasCompletionDelivery({ ntfyDispatchResult, webPushDispatchResult })) {
+      if (
+        !this.hasCompletionDelivery({
+          ntfyDispatchResult,
+          webPushDispatchResult,
+        })
+      ) {
         return;
       }
 

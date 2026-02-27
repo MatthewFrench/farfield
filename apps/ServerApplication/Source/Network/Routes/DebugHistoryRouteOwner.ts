@@ -107,7 +107,10 @@ export class DebugHistoryRouteOwner {
       DebugHistoryRouteDefaultHistoryListLimit,
     );
     const data = activityHistoryService.readHistoryEntries().slice(-limit);
-    jsonResponse(res, DebugHistoryRouteStatusCodeByName.successOk, { ok: true, history: data });
+    jsonResponse(res, DebugHistoryRouteStatusCodeByName.successOk, {
+      ok: true,
+      history: data,
+    });
     return true;
   }
 

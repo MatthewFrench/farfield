@@ -472,7 +472,9 @@ serverLifecycleCoordinator.installSignalHandlers();
 void serverLifecycleCoordinator.start().catch((error) => {
   const runtimeErrorMessage = serverBootstrapUtilityOwner.toErrorMessage(error);
   runtimeStateOwner.setRuntimeLastError(runtimeErrorMessage);
-  pushSystem(BootstrapLifecycleMessages.monitorServerFailedToStart, { error: runtimeErrorMessage });
+  pushSystem(BootstrapLifecycleMessages.monitorServerFailedToStart, {
+    error: runtimeErrorMessage,
+  });
   logger.fatal({ error: runtimeErrorMessage }, "monitor-server-failed-to-start");
   process.exit(1);
 });

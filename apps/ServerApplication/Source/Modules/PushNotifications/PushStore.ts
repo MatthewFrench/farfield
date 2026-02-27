@@ -67,7 +67,9 @@ export class PushStore {
   }
 
   public listSubscriptions(): StoredPushSubscription[] {
-    return this.state.subscriptions.map((subscription) => ({ ...subscription }));
+    return this.state.subscriptions.map((subscription) => ({
+      ...subscription,
+    }));
   }
 
   public getSubscriptionCount(): number {
@@ -129,7 +131,10 @@ export class PushStore {
     return entry?.marker ?? null;
   }
 
-  public listCompletionWatermarks(): Array<{ threadId: string; marker: string }> {
+  public listCompletionWatermarks(): Array<{
+    threadId: string;
+    marker: string;
+  }> {
     return this.state.completionWatermarks.map((entry) => ({
       threadId: entry.threadId,
       marker: entry.marker,

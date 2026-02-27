@@ -254,7 +254,9 @@ export class AppServerClient {
   }
 
   public async listModels(limit = DEFAULT_LIST_MODELS_LIMIT): Promise<AppServerListModelsResponse> {
-    const result = await this.transport.request(AppServerMethod.listModels, { limit });
+    const result = await this.transport.request(AppServerMethod.listModels, {
+      limit,
+    });
     return parseWithSchema(
       AppServerListModelsResponseSchema,
       result,

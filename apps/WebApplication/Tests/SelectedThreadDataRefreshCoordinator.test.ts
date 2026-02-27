@@ -126,7 +126,9 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
 
     expect(chatClient.readLiveState).toHaveBeenCalledWith("thread-1");
     expect(chatClient.readStreamEvents).toHaveBeenCalledWith("thread-1", {});
-    expect(chatClient.readThread).toHaveBeenCalledWith("thread-1", { includeTurns: true });
+    expect(chatClient.readThread).toHaveBeenCalledWith("thread-1", {
+      includeTurns: true,
+    });
     expect(snapshot.readThreadSnapshot).not.toBeNull();
     expect(snapshot.includeTurnsUsedForRead).toBe(true);
     expect(snapshot.containsAnyTurns).toBe(true);

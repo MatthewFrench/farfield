@@ -566,7 +566,9 @@ export class RequestObservabilityOwner {
       inFlightRequestCount: this.inFlightRequestCount,
       routeTimings,
       startupRequestTimings: [...this.startupRequestObservations],
-      requestLifecycleEvents: this.requestLifecycleEvents.map((event) => ({ ...event })),
+      requestLifecycleEvents: this.requestLifecycleEvents.map((event) => ({
+        ...event,
+      })),
     };
   }
 

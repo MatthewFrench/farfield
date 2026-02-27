@@ -160,7 +160,12 @@ const GUTTER_STYLES: Record<LineType, string> = {
   header: "text-muted-foreground/30",
   context: "text-muted-foreground/25",
 };
-const GUTTER_CHAR: Record<LineType, string> = { add: "+", remove: "−", header: "", context: " " };
+const GUTTER_CHAR: Record<LineType, string> = {
+  add: "+",
+  remove: "−",
+  header: "",
+  context: " ",
+};
 
 function DiffBlockComponent({ changes }: DiffBlockProps) {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);

@@ -28,7 +28,9 @@ interface HarnessProperties {
 function Harness(properties: HarnessProperties): React.JSX.Element {
   const viewProperties = useApplicationShellViewProperties(properties.input);
   properties.onProperties(viewProperties);
-  return createElement("div", { "data-testid": "use-application-shell-view-properties-harness" });
+  return createElement("div", {
+    "data-testid": "use-application-shell-view-properties-harness",
+  });
 }
 
 interface ShowOlderMessagesHarnessProperties {

@@ -193,7 +193,11 @@ export class NtfyNotifier {
     return this.config.enabled;
   }
 
-  public getSummary(): { enabled: boolean; baseUrl: string; topic: string | null } {
+  public getSummary(): {
+    enabled: boolean;
+    baseUrl: string;
+    topic: string | null;
+  } {
     return {
       enabled: this.config.enabled,
       baseUrl: this.config.baseUrl,

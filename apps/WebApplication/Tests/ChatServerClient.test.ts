@@ -96,7 +96,9 @@ describe("ChatServerClient", () => {
 
     expect(readThread).toHaveBeenCalledWith("thread-1", { includeTurns: true });
     expect(getLiveState).toHaveBeenCalledWith("thread-1", undefined);
-    expect(getStreamEvents).toHaveBeenCalledWith("thread-1", { sinceSequence: 10 });
+    expect(getStreamEvents).toHaveBeenCalledWith("thread-1", {
+      sinceSequence: 10,
+    });
     expect(readThreadSnapshot["ok"]).toBe(true);
     expect(liveStateSnapshot["ok"]).toBe(true);
     expect(streamEventsSnapshot["ok"]).toBe(true);

@@ -134,7 +134,9 @@ export class ThreadListStateStore {
       return input.previousUnreadThreadIdentifiers;
     }
 
-    const nextUnreadThreadIdentifiers = { ...input.previousUnreadThreadIdentifiers };
+    const nextUnreadThreadIdentifiers = {
+      ...input.previousUnreadThreadIdentifiers,
+    };
     delete nextUnreadThreadIdentifiers[input.selectedThreadIdentifier];
     return nextUnreadThreadIdentifiers;
   }

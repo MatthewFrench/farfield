@@ -247,7 +247,9 @@ describe("UseChatActionHandlers", () => {
         nextInput.onClearThreadPendingMaterialization(CREATED_THREAD_IDENTIFIER);
       });
 
-    const handlerState: { current: ChatActionHandlers | null } = { current: null };
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
     render(
       <HandlerHarness
         input={input}
@@ -291,7 +293,9 @@ describe("UseChatActionHandlers", () => {
         void nextInput;
       });
 
-    const handlerState: { current: ChatActionHandlers | null } = { current: null };
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
     render(
       <HandlerHarness
         input={input}
@@ -349,7 +353,9 @@ describe("UseChatActionHandlers", () => {
         void nextInput;
       });
 
-    const handlerState: { current: ChatActionHandlers | null } = { current: null };
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
     render(
       <HandlerHarness
         input={input}
@@ -396,7 +402,9 @@ describe("UseChatActionHandlers", () => {
     );
     const skipPendingUserInputSpy = vi.spyOn(chatRequestActionCoordinator, "skipPendingUserInput");
 
-    const handlerState: { current: ChatActionHandlers | null } = { current: null };
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
     render(
       <HandlerHarness
         input={input}

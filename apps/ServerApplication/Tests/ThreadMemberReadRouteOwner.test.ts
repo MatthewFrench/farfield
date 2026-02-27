@@ -42,7 +42,10 @@ function readJsonResponseBody(responseBody: object | null): object {
   return responseBody;
 }
 
-function createMockRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
+function createMockRequestResponsePair(): {
+  request: IncomingMessage;
+  response: ServerResponse;
+} {
   const socket = new Socket();
   const request = new IncomingMessage(socket);
   const response = new ServerResponse(request);

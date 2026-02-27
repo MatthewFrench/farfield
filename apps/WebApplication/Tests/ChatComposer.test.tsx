@@ -26,7 +26,9 @@ describe("ChatComposer", () => {
     const onSend = vi.fn();
     renderChatComposer({ onSend });
 
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "  Ship this change  " } });
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "  Ship this change  " },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => {
@@ -54,8 +56,13 @@ describe("ChatComposer", () => {
     const onSend = vi.fn();
     renderChatComposer({ onSend });
 
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Shortcut send" } });
-    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter", ctrlKey: true });
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Shortcut send" },
+    });
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+      ctrlKey: true,
+    });
 
     await waitFor(() => {
       expect(onSend).toHaveBeenCalledTimes(1);

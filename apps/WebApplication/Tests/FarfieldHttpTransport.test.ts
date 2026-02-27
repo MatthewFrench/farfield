@@ -252,7 +252,9 @@ describe("FarfieldHttpTransport", () => {
     });
 
     const abortController = new AbortController();
-    const requestPromise = request("/api/threads", { signal: abortController.signal });
+    const requestPromise = request("/api/threads", {
+      signal: abortController.signal,
+    });
     abortController.abort();
 
     await expect(requestPromise).rejects.toBeInstanceOf(RequestCanceledError);

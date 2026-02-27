@@ -76,15 +76,21 @@ describe("ThreadListCacheInvalidationOwner", () => {
     const activeQuery = buildQuery({ archived: false });
 
     cache.write(activeQuery, buildSnapshot());
-    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, { threadId: "thread-1" });
+    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, {
+      threadId: "thread-1",
+    });
     expect(cache.readFresh(activeQuery)).toBeNull();
 
     cache.write(activeQuery, buildSnapshot());
-    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, { threadId: "thread-1" });
+    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, {
+      threadId: "thread-1",
+    });
     expect(cache.readFresh(activeQuery)).not.toBeNull();
 
     cache.write(activeQuery, buildSnapshot());
-    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, { threadId: "thread-2" });
+    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, {
+      threadId: "thread-2",
+    });
     expect(cache.readFresh(activeQuery)).toBeNull();
     expect(cache.readStatistics().invalidationCount).toBe(2);
   });
@@ -98,17 +104,23 @@ describe("ThreadListCacheInvalidationOwner", () => {
     const activeQuery = buildQuery({ archived: false });
 
     cache.write(activeQuery, buildSnapshot());
-    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, { threadId: "thread-1" });
+    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, {
+      threadId: "thread-1",
+    });
     expect(cache.readFresh(activeQuery)).toBeNull();
 
     cache.write(activeQuery, buildSnapshot());
     nowMilliseconds += STREAM_CACHE_INVALIDATION_DEBOUNCE_INTERVAL_MILLISECONDS - 1;
-    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, { threadId: "thread-1" });
+    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, {
+      threadId: "thread-1",
+    });
     expect(cache.readFresh(activeQuery)).not.toBeNull();
 
     cache.write(activeQuery, buildSnapshot());
     nowMilliseconds += 1;
-    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, { threadId: "thread-1" });
+    owner.invalidate(THREAD_STREAM_STATE_CHANGED_METHOD, {
+      threadId: "thread-1",
+    });
     expect(cache.readFresh(activeQuery)).toBeNull();
     expect(cache.readStatistics().invalidationCount).toBe(2);
   });

@@ -97,14 +97,20 @@ describe("useApplicationSynchronizationEffects", () => {
           loadSelectedThreadTracked: vi.fn(
             async (
               _threadId: string,
-              _options?: { includeReadThread?: boolean; includeTurns?: boolean },
+              _options?: {
+                includeReadThread?: boolean;
+                includeTurns?: boolean;
+              },
             ): Promise<void> => {},
           ),
           loadSelectedThreadRef:
             createLoaderReference<
               (
                 threadId: string,
-                options?: { includeReadThread?: boolean; includeTurns?: boolean },
+                options?: {
+                  includeReadThread?: boolean;
+                  includeTurns?: boolean;
+                },
               ) => Promise<void>
             >(),
           loadHistoryDetail,
@@ -132,14 +138,20 @@ describe("useApplicationSynchronizationEffects", () => {
           loadSelectedThreadTracked: vi.fn(
             async (
               _threadId: string,
-              _options?: { includeReadThread?: boolean; includeTurns?: boolean },
+              _options?: {
+                includeReadThread?: boolean;
+                includeTurns?: boolean;
+              },
             ): Promise<void> => {},
           ),
           loadSelectedThreadRef:
             createLoaderReference<
               (
                 threadId: string,
-                options?: { includeReadThread?: boolean; includeTurns?: boolean },
+                options?: {
+                  includeReadThread?: boolean;
+                  includeTurns?: boolean;
+                },
               ) => Promise<void>
             >(),
           loadHistoryDetail,

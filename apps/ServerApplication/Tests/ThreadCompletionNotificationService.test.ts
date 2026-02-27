@@ -61,7 +61,11 @@ class RecordingPushService extends PushService {
   ): Promise<{
     attempted: number;
     delivered: number;
-    failures: Array<{ endpoint: string; statusCode: number | null; message: string }>;
+    failures: Array<{
+      endpoint: string;
+      statusCode: number | null;
+      message: string;
+    }>;
     prunedEndpoints: string[];
   }> {
     this.calls.push({
@@ -97,7 +101,11 @@ class FailingPushService extends PushService {
   ): Promise<{
     attempted: number;
     delivered: number;
-    failures: Array<{ endpoint: string; statusCode: number | null; message: string }>;
+    failures: Array<{
+      endpoint: string;
+      statusCode: number | null;
+      message: string;
+    }>;
     prunedEndpoints: string[];
   }> {
     return {

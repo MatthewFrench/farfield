@@ -44,7 +44,10 @@ function readRouteBody(result: RouteExecutionResult): object {
   return result.body;
 }
 
-function createRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
+function createRequestResponsePair(): {
+  request: IncomingMessage;
+  response: ServerResponse;
+} {
   const socket = new Socket();
   const request = new IncomingMessage(socket);
   const response = new ServerResponse(request);
@@ -553,7 +556,10 @@ describe("handlePushRoutes", () => {
       const parsedDeleteSubscriptionResponse = FarfieldDeletePushSubscriptionEnvelopeSchema.parse(
         readRouteBody(deleteResult),
       );
-      expect(parsedDeleteSubscriptionResponse).toEqual({ ok: true, deleted: true });
+      expect(parsedDeleteSubscriptionResponse).toEqual({
+        ok: true,
+        deleted: true,
+      });
       expect(pushStore.getSubscriptionCount()).toBe(0);
     } finally {
       fs.rmSync(temporaryDirectory, { recursive: true, force: true });
