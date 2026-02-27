@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 02:22:52Z
+Last Updated (UTC): 2026-02-27 02:31:03Z
 
 ## Scope Model
 
@@ -193,6 +193,22 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-12)
+
+The current in-progress wave applies package-layer owner separation for OpenCode service orchestration:
+
+1. Split ingress parsing and structured envelope normalization into a dedicated boundary owner (`ServiceBoundaryContracts`).
+2. Split OpenCode SDK request construction into a dedicated request owner (`ServiceRequestBuilder`).
+3. Split session message projection behavior into a dedicated projection owner (`SessionMessageProjection`).
+4. Reduced `OpenCodeMonitorService` to orchestration-only behavior with strict typed boundary-owner dependencies.
+
+Files touched in this continuation segment:
+
+1. `packages/OpenCodeInterfaceAdapter/Source/Service.ts`
+2. `packages/OpenCodeInterfaceAdapter/Source/ServiceBoundaryContracts.ts`
+3. `packages/OpenCodeInterfaceAdapter/Source/ServiceRequestBuilder.ts`
+4. `packages/OpenCodeInterfaceAdapter/Source/SessionMessageProjection.ts`
 
 ## Latest Continuation Commit Wave (Current-11)
 

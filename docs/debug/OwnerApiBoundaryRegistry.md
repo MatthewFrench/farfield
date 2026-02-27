@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 02:22:52Z
+Last Updated (UTC): 2026-02-27 02:31:03Z
 
 ## Purpose
 
@@ -103,6 +103,18 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
    - owns: request metadata header normalization and request-init option shaping.
    - query APIs: `requestInitWithOptions`.
    - mutation APIs: `applyRequestOptions`.
+
+## OpenCode Interface Adapter Package Group
+
+1. [`ServiceBoundaryContracts.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/ServiceBoundaryContracts.ts)
+   - owns: monitor-service ingress parsing and structured envelope normalization contracts.
+   - query APIs: `parseListSessionsInput`, `parseCreateSessionInput`, `parseSessionLookupInput`, `parseSendMessageInput`, `parseStructuredDataValue`, `parseStructuredCollectionValue`, `parseProjectDirectory`.
+2. [`ServiceRequestBuilder.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/ServiceRequestBuilder.ts)
+   - owns: monitor-service request payload construction from parsed boundary contracts.
+   - query APIs: `buildSessionListRequest`, `buildSessionCreateRequest`, `buildSessionReadRequest`, `buildSessionPromptRequest`.
+3. [`SessionMessageProjection.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/SessionMessageProjection.ts)
+   - owns: session message projection for ordered message arrays plus part lookup map.
+   - query APIs: `projectSessionMessages`.
 
 ## Boundary Rules to Enforce in Reviews
 
