@@ -8,8 +8,9 @@ const SupportedCodeExtensions = Object.freeze([".js", ".jsx", ".ts", ".tsx", ".m
 
 const MinimumIgnoreReasonLengthCharacters = 12;
 const PlaceholderIgnoreReasonPattern = /^(todo|temporary|temp|fixme|ignore|n\/a)$/i;
-const IgnoreDirectiveCommentPattern = /(\/\/|\/\*)\s*biome-ignore(?:-all)?\b/;
-const IgnoreDirectiveReasonPattern = /biome-ignore(?:-all)?(?:\s+[^:]+)?\s*:\s*(.+?)\s*(?:\*\/)?$/;
+const IgnoreDirectiveCommentPattern = /^\s*(\/\/|\/\*)\s*biome-ignore(?:-all)?\b/;
+const IgnoreDirectiveReasonPattern =
+  /^\s*(\/\/|\/\*)\s*biome-ignore(?:-all)?(?:\s+[^:]+)?\s*:\s*(.+?)\s*(?:\*\/)?$/;
 
 function readTrackedRepositoryFilePaths() {
   const output = childProcess.execFileSync("git", ["ls-files"], {
@@ -48,7 +49,16 @@ function collectBiomeIgnoreViolations(filePath) {
       continue;
     }
 
-    const reason = reasonMatch[1].trim();
+    const reason = reasonMatch[2].trim();
+    if (PlaceholderIgnoreReasonPattern.test(reason)) {
+      violations.push({
+        lineNumber: lineIndex + 1,
+        reason: "Rationale must be specific and not placeholder text",
+        lineText: line.trim(),
+      });
+      continue;
+    }
+
     if (reason.length < MinimumIgnoreReasonLengthCharacters) {
       violations.push({
         lineNumber: lineIndex + 1,
@@ -56,14 +66,6 @@ function collectBiomeIgnoreViolations(filePath) {
         lineText: line.trim(),
       });
       continue;
-    }
-
-    if (PlaceholderIgnoreReasonPattern.test(reason)) {
-      violations.push({
-        lineNumber: lineIndex + 1,
-        reason: "Rationale must be specific and not placeholder text",
-        lineText: line.trim(),
-      });
     }
   }
 

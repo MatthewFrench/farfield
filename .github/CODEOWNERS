@@ -1,0 +1,4 @@
+# Governance-critical automation and tooling ownership.
+/.github/workflows/ @matthewfrench
+/.husky/ @matthewfrench
+/scripts/tooling/ @matthewfrench

@@ -62,6 +62,10 @@ bun run ci:targeted:gate
 bun run validate:lockfiles:governance
 ```
 
+Governance gate reference:
+
+- [`docs/development-governance-gates.md`](/Users/matthewfrench/GitHub/farfield/docs/development-governance-gates.md)
+
 ## Settings Parity
 
 Farfield reads Codex app defaults using `config/read` and uses those values for:

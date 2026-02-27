@@ -24,6 +24,10 @@ Repository development workflow requirements:
 3. Keep Husky hooks enabled (`prepare` installs hooks on dependency install).
 4. Keep `biome-ignore` directives justified with explicit rationale comments.
 
+Policy reference:
+
+1. `docs/development-governance-gates.md`
+
 Recommended local verification sequence:
 
 1. `bun run validate:lockfiles:governance`

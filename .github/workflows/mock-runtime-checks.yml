@@ -27,14 +27,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Validate lockfile governance
-        run: bun run validate:lockfiles:governance
-
       - name: Targeted touched-surface lint gate
         run: bun run ci:targeted:lint
 
       - name: Targeted touched-surface typecheck gate
         run: bun run ci:targeted:typecheck
+
+      - name: Targeted tooling governance tests gate
+        run: bun run ci:targeted:governance
 
       - name: Targeted touched-surface critical suites gate
         run: bun run ci:targeted:critical
