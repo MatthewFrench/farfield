@@ -1,9 +1,28 @@
 import { useDeferredValue, useMemo } from "react";
 import { toErrorBannerDetails } from "@/Features/Debugging/DomainModel/ErrorBannerDetailsParser";
 import {
+  readActiveAgentCapabilities,
+  readActiveAgentDescriptor,
+  readActiveAgentLabel,
+  readActiveThreadAgentId,
+  readAgentCapabilityFlags,
+  readAgentConnectivityState,
+  readAgentsById,
+  readAvailableAgentIds,
+  readSelectedAgentDescriptor,
+} from "./ApplicationAgentCapabilityDerivation";
+import {
   readActiveRequestSelection,
   readConversationStateSelection,
 } from "./ApplicationConversationStateDerivation";
+import {
+  readDefaultModeOption,
+  readEffortOptions,
+  readEffortOptionsWithoutAssumedDefault,
+  readIsPlanModeEnabled,
+  readModelOptionsWithoutAssumedDefault,
+  readPlanModeOption,
+} from "./ApplicationModeAndEffortOptionDerivation";
 import { readModelOptions } from "./ApplicationModelOptionDerivation";
 import { readSystemHealthStatus } from "./ApplicationSystemHealthDerivation";
 import {
@@ -11,6 +30,7 @@ import {
   readSelectedThreadLabel,
   readThreadListState,
 } from "./ApplicationThreadAndChatSurfaceDerivation";
+import { useApplicationDebugIssueDerivedState } from "./UseApplicationDebugIssueDerivedState";
 import {
   type ApplicationDerivedState,
   type UseApplicationDerivedStateInput,
@@ -19,110 +39,6 @@ import {
 const DEFAULT_SELECTED_AGENT_LABEL = "Agent";
 const UNKNOWN_COMMIT_LABEL = "unknown";
 const MINIMUM_VISIBLE_CHAT_ITEM_INDEX = 0;
-const CODEX_AGENT_IDENTIFIER = "codex";
-const OPENCODE_AGENT_IDENTIFIER = "opencode";
-
-interface UseDebugIssueDerivedStateInput {
-  debugErrors: UseApplicationDerivedStateInput["debugErrors"];
-  history: UseApplicationDerivedStateInput["history"];
-  debugIssueSeverityFilter: UseApplicationDerivedStateInput["debugIssueSeverityFilter"];
-  debugIssueFilterQuery: UseApplicationDerivedStateInput["debugIssueFilterQuery"];
-  selectedDebugIssueId: UseApplicationDerivedStateInput["selectedDebugIssueId"];
-  debugIssueStateResolver: UseApplicationDerivedStateInput["debugIssueStateResolver"];
-}
-
-interface DebugIssueDerivedState {
-  debugErrorIssues: ApplicationDerivedState["debugErrorIssues"];
-  debugWarningIssues: ApplicationDerivedState["debugWarningIssues"];
-  debugIssues: ApplicationDerivedState["debugIssues"];
-  filteredDebugIssues: ApplicationDerivedState["filteredDebugIssues"];
-  selectedDebugIssue: ApplicationDerivedState["selectedDebugIssue"];
-}
-
-function useDebugIssueDerivedState(input: UseDebugIssueDerivedStateInput): DebugIssueDerivedState {
-  const debugErrorIssues = useMemo(
-    () => input.debugIssueStateResolver.readDebugErrorIssues(input.debugErrors),
-    [input.debugErrors, input.debugIssueStateResolver],
-  );
-
-  const debugWarningIssues = useMemo(
-    () => input.debugIssueStateResolver.readDebugWarningIssues(input.history),
-    [input.debugIssueStateResolver, input.history],
-  );
-
-  const debugIssues = useMemo(
-    () =>
-      input.debugIssueStateResolver.readCombinedDebugIssues({
-        debugErrorIssues,
-        debugWarningIssues,
-      }),
-    [debugErrorIssues, input.debugIssueStateResolver, debugWarningIssues],
-  );
-
-  const filteredDebugIssues = useMemo(
-    () =>
-      input.debugIssueStateResolver.readFilteredDebugIssues({
-        debugIssues,
-        severityFilter: input.debugIssueSeverityFilter,
-        filterQuery: input.debugIssueFilterQuery,
-      }),
-    [
-      input.debugIssueFilterQuery,
-      input.debugIssueSeverityFilter,
-      input.debugIssueStateResolver,
-      debugIssues,
-    ],
-  );
-
-  const selectedDebugIssue = useMemo(
-    () =>
-      input.debugIssueStateResolver.readSelectedDebugIssue({
-        debugIssues: filteredDebugIssues,
-        selectedIssueIdentifier: input.selectedDebugIssueId,
-      }),
-    [input.debugIssueStateResolver, filteredDebugIssues, input.selectedDebugIssueId],
-  );
-
-  return {
-    debugErrorIssues,
-    debugWarningIssues,
-    debugIssues,
-    filteredDebugIssues,
-    selectedDebugIssue,
-  };
-}
-
-function readEffortOptions(
-  defaultEffortOptions: readonly string[],
-  modes: UseApplicationDerivedStateInput["modes"],
-  latestReasoningEffort: string | null | undefined,
-  selectedReasoningEffort: string,
-): string[] {
-  const values = new Set<string>(defaultEffortOptions);
-  for (const mode of modes) {
-    if (
-      mode.reasoning_effort !== null &&
-      mode.reasoning_effort !== undefined &&
-      mode.reasoning_effort.length > 0
-    ) {
-      values.add(mode.reasoning_effort);
-    }
-  }
-
-  if (
-    latestReasoningEffort !== null &&
-    latestReasoningEffort !== undefined &&
-    latestReasoningEffort.length > 0
-  ) {
-    values.add(latestReasoningEffort);
-  }
-
-  if (selectedReasoningEffort.length > 0) {
-    values.add(selectedReasoningEffort);
-  }
-
-  return Array.from(values);
-}
 
 export function useApplicationDerivedState(
   input: UseApplicationDerivedStateInput,
@@ -176,24 +92,15 @@ export function useApplicationDerivedState(
   );
 
   const selectedThread = threadListPresentationState.selectedThread;
-  const agentsById = useMemo(() => {
-    const map: ApplicationDerivedState["agentsById"] = {};
-    for (const descriptor of agentDescriptors) {
-      map[descriptor.id] = descriptor;
-    }
-    return map;
-  }, [agentDescriptors]);
+  const agentsById = useMemo(() => readAgentsById(agentDescriptors), [agentDescriptors]);
 
   const availableAgentIds = useMemo(
-    () =>
-      agentDescriptors
-        .filter((descriptor) => descriptor.enabled)
-        .map((descriptor) => descriptor.id),
+    () => readAvailableAgentIds(agentDescriptors),
     [agentDescriptors],
   );
 
   const selectedAgentDescriptor = useMemo(
-    () => agentsById[selectedAgentId] ?? null,
+    () => readSelectedAgentDescriptor({ agentsById, selectedAgentId }),
     [agentsById, selectedAgentId],
   );
 
@@ -242,12 +149,17 @@ export function useApplicationDerivedState(
   }, [pendingRequests, selectedRequestId]);
 
   const activeThreadAgentId = useMemo<ApplicationDerivedState["activeThreadAgentId"]>(
-    () => selectedThread?.agentId ?? selectedAgentId,
+    () => readActiveThreadAgentId({ selectedThread, selectedAgentId }),
     [selectedAgentId, selectedThread],
   );
 
   const activeAgentDescriptor = useMemo(
-    () => agentsById[activeThreadAgentId] ?? selectedAgentDescriptor,
+    () =>
+      readActiveAgentDescriptor({
+        activeThreadAgentId,
+        agentsById,
+        selectedAgentDescriptor,
+      }),
     [activeThreadAgentId, agentsById, selectedAgentDescriptor],
   );
 
@@ -287,34 +199,52 @@ export function useApplicationDerivedState(
     [history],
   );
 
-  const activeAgentLabel = activeAgentDescriptor?.label ?? selectedAgentLabel;
-  const activeAgentCapabilities = activeAgentDescriptor?.capabilities ?? selectedAgentCapabilities;
-  const canSetCollaborationMode = Boolean(activeAgentCapabilities?.canSetCollaborationMode);
-  const canListModels = Boolean(activeAgentCapabilities?.canListModels);
-  const canListCollaborationModes = Boolean(activeAgentCapabilities?.canListCollaborationModes);
-  const canSubmitUserInputForActiveAgent = Boolean(activeAgentCapabilities?.canSubmitUserInput);
+  const activeAgentLabel = readActiveAgentLabel({
+    activeAgentDescriptor,
+    selectedAgentLabel,
+  });
+  const activeAgentCapabilities = readActiveAgentCapabilities({
+    activeAgentDescriptor,
+    selectedAgentCapabilities,
+  });
+  const {
+    canSetCollaborationMode,
+    canListModels,
+    canListCollaborationModes,
+    canSubmitUserInputForActiveAgent,
+  } = readAgentCapabilityFlags(activeAgentCapabilities);
 
   const planModeOption = useMemo(
-    () => modes.find((mode) => modeSelectionStateResolver.isPlanModeOption(mode)) ?? null,
+    () =>
+      readPlanModeOption({
+        modes,
+        modeSelectionStateResolver,
+      }),
     [modeSelectionStateResolver, modes],
   );
 
   const defaultModeOption = useMemo(
     () =>
-      modes.find((mode) => !modeSelectionStateResolver.isPlanModeOption(mode)) ?? modes[0] ?? null,
+      readDefaultModeOption({
+        modes,
+        modeSelectionStateResolver,
+      }),
     [modeSelectionStateResolver, modes],
   );
 
-  const isPlanModeEnabled = planModeOption !== null && selectedModeKey === planModeOption.mode;
+  const isPlanModeEnabled = readIsPlanModeEnabled({
+    planModeOption,
+    selectedModeKey,
+  });
 
   const effortOptions = useMemo(
     () =>
-      readEffortOptions(
+      readEffortOptions({
         defaultEffortOptions,
         modes,
-        conversationState?.latestReasoningEffort,
+        latestReasoningEffort: conversationState?.latestReasoningEffort,
         selectedReasoningEffort,
-      ),
+      }),
     [
       conversationState?.latestReasoningEffort,
       defaultEffortOptions,
@@ -324,7 +254,11 @@ export function useApplicationDerivedState(
   );
 
   const effortOptionsWithoutAssumedDefault = useMemo(
-    () => effortOptions.filter((option) => option !== appDefaultReasoningEffort),
+    () =>
+      readEffortOptionsWithoutAssumedDefault({
+        appDefaultReasoningEffort,
+        effortOptions,
+      }),
     [appDefaultReasoningEffort, effortOptions],
   );
 
@@ -339,7 +273,11 @@ export function useApplicationDerivedState(
   );
 
   const modelOptionsWithoutAssumedDefault = useMemo(
-    () => modelOptions.filter((option) => option.id !== appDefaultModel),
+    () =>
+      readModelOptionsWithoutAssumedDefault({
+        appDefaultModel,
+        modelOptions,
+      }),
     [appDefaultModel, modelOptions],
   );
 
@@ -368,7 +306,7 @@ export function useApplicationDerivedState(
     debugIssues,
     filteredDebugIssues,
     selectedDebugIssue,
-  } = useDebugIssueDerivedState({
+  } = useApplicationDebugIssueDerivedState({
     debugErrors,
     history,
     debugIssueSeverityFilter,
@@ -396,8 +334,9 @@ export function useApplicationDerivedState(
   );
 
   const commitLabel = health?.state.gitCommit ?? UNKNOWN_COMMIT_LABEL;
-  const codexConfigured = agentsById[CODEX_AGENT_IDENTIFIER]?.enabled === true;
-  const openCodeConnected = agentsById[OPENCODE_AGENT_IDENTIFIER]?.connected === true;
+  const { codexConfigured, openCodeConnected } = readAgentConnectivityState({
+    agentsById,
+  });
   const { allSystemsReady, hasAnySystemFailure } = readSystemHealthStatus({
     codexConfigured,
     openCodeConnected,

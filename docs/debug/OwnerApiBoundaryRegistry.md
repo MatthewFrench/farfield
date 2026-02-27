@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 03:51:28Z
+Last Updated (UTC): 2026-02-27 04:00:24Z
 
 ## Purpose
 
@@ -66,6 +66,15 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 4. [`ApplicationRuntimeCompositionDependencyBuilders.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/ApplicationRuntimeCompositionDependencyBuilders.ts)
    - owns: runtime composition hook dependency-input assembly for feature/effect owners.
    - query APIs: `createApplicationRuntimeCompositionContext`, `buildApplicationPushFeatureCompositionInput`, `buildViewportShellEffectsInput`, `buildApplicationRefreshEffectsInput`, `buildSelectedThreadLifecycleEffectsInput`, `buildEventStreamEffectsInput`, `buildModeAndPendingRequestEffectsInput`, `buildApplicationChatFeatureCompositionInput`, `buildApplicationDebugFeatureCompositionInput`, `buildApplicationSynchronizationEffectsInput`, `buildApplicationShellCompositionInput`.
+5. [`ApplicationAgentCapabilityDerivation.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/ApplicationAgentCapabilityDerivation.ts)
+   - owns: agent map/selection derivation, active-agent capability flag derivation, and connectivity status derivation.
+   - query APIs: `readAgentsById`, `readAvailableAgentIds`, `readSelectedAgentDescriptor`, `readActiveThreadAgentId`, `readActiveAgentDescriptor`, `readActiveAgentLabel`, `readActiveAgentCapabilities`, `readAgentCapabilityFlags`, `readAgentConnectivityState`.
+6. [`ApplicationModeAndEffortOptionDerivation.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/ApplicationModeAndEffortOptionDerivation.ts)
+   - owns: mode-option, plan-mode, effort-option, and model-option filtering derivation contracts.
+   - query APIs: `readPlanModeOption`, `readDefaultModeOption`, `readIsPlanModeEnabled`, `readEffortOptions`, `readEffortOptionsWithoutAssumedDefault`, `readModelOptionsWithoutAssumedDefault`.
+7. [`UseApplicationDebugIssueDerivedState.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationDebugIssueDerivedState.ts)
+   - owns: debug issue derived-state memoization chain (error/warning merge, filtering, and selection).
+   - query APIs: `useApplicationDebugIssueDerivedState`.
 
 ## Web Application Data Access Group
 

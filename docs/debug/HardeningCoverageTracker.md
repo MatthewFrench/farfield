@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 03:51:28Z
+Last Updated (UTC): 2026-02-27 04:00:24Z
 
 ## Scope Model
 
@@ -193,6 +193,22 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-20)
+
+The current in-progress wave applies web-application derived-state owner separation:
+
+1. Split agent/capability derivation ownership into `ApplicationAgentCapabilityDerivation`.
+2. Split mode/effort/model-option derivation ownership into `ApplicationModeAndEffortOptionDerivation`.
+3. Split debug-issue derived-state chain ownership into `UseApplicationDebugIssueDerivedState`.
+4. Reduced `UseApplicationDerivedState` to top-level derived-state orchestration over these owner modules while preserving hook API and returned shape.
+
+Files touched in this continuation segment:
+
+1. `apps/WebApplication/Source/Application/StateManagement/UseApplicationDerivedState.ts`
+2. `apps/WebApplication/Source/Application/StateManagement/ApplicationAgentCapabilityDerivation.ts`
+3. `apps/WebApplication/Source/Application/StateManagement/ApplicationModeAndEffortOptionDerivation.ts`
+4. `apps/WebApplication/Source/Application/StateManagement/UseApplicationDebugIssueDerivedState.ts`
 
 ## Latest Continuation Commit Wave (Current-19)
 
