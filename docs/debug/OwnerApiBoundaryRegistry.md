@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 04:07:30Z
+Last Updated (UTC): 2026-02-27 04:22:20Z
 
 ## Purpose
 
@@ -30,6 +30,17 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 7. [`StartupRequestActionContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/StartupRequestActionContracts.ts)
    - owns: startup action identification and description mapping contracts for request timing summaries.
    - query APIs: `isStartupActionName`, `readStartupActionDescription`.
+
+## Server Application Configuration Group
+
+1. [`ServerRuntimeConfigurationConstants.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfigurationConstants.ts)
+   - owns: runtime configuration environment variable keys, defaults, static metadata constants, and shared configuration error message contracts.
+2. [`ServerRuntimeEnvironmentValueReaders.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Application/Configuration/ServerRuntimeEnvironmentValueReaders.ts)
+   - owns: strict environment value parsing and normalization contracts for path/boolean/positive integer values.
+   - query APIs: `readEnvironmentValue`, `readTrimmedEnvironmentValue`, `readPositiveIntegerEnvironmentValue`, `readBooleanEnvironmentValue`, `readOptionalPathEnvironmentValue`.
+3. [`ServerRuntimeDerivedValueResolvers.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Application/Configuration/ServerRuntimeDerivedValueResolvers.ts)
+   - owns: runtime derived value precedence and platform-sensitive path resolution contracts.
+   - query APIs: `resolveApiTokenFromEnvironment`, `resolveWebHealthBuildIdentifierFromEnvironment`, `resolveApiSessionSigningSecret`, `resolveCodexExecutablePathFromEnvironment`, `resolveIpcSocketPathFromEnvironment`, `resolveGitCommitHash`, `resolvePushLocalCaSourcePath`, `resolveClientErrorSessionMetadata`.
 
 ## Server Agents Group
 

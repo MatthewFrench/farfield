@@ -1,323 +1,35 @@
-import { execFileSync } from "node:child_process";
-import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { z } from "zod";
 import { parseNtfyConfigFromEnv } from "../../Modules/PushNotifications/NtfyNotifier.js";
 import { resolvePushStatePath } from "../../Modules/PushNotifications/PushStatePath.js";
 import { LoggerLevelSchema } from "../../Shared/Logging/Logger.js";
+import {
+  MissingPushVapidConfigurationErrorMessage,
+  ServerRuntimeDefaultValues,
+  ServerRuntimeEnvironmentVariableNames,
+  ServerRuntimeStaticConfiguration,
+} from "./ServerRuntimeConfigurationConstants.js";
 import type { ServerRuntimeConfiguration } from "./ServerRuntimeConfigurationContracts.js";
+import {
+  resolveApiSessionSigningSecret,
+  resolveApiTokenFromEnvironment,
+  resolveClientErrorSessionMetadata,
+  resolveCodexExecutablePathFromEnvironment,
+  resolveGitCommitHash,
+  resolveIpcSocketPathFromEnvironment,
+  resolvePushLocalCaSourcePath,
+  resolveWebHealthBuildIdentifierFromEnvironment,
+} from "./ServerRuntimeDerivedValueResolvers.js";
+import {
+  readBooleanEnvironmentValue,
+  readEnvironmentValue,
+  readOptionalPathEnvironmentValue,
+  readPositiveIntegerEnvironmentValue,
+  readTrimmedEnvironmentValue,
+} from "./ServerRuntimeEnvironmentValueReaders.js";
 
-// Owner note: this module is the single startup boundary for server environment
-// parsing, including key ownership, defaults, and precedence decisions.
-const OptionalPathEnvSchema = z.string().trim().min(1).optional();
-const ServerRuntimeEnvironmentVariableNames = Object.freeze({
-  appDataPath: "APPDATA",
-  apiSessionSecret: "API_SESSION_SECRET",
-  apiSessionSecureCookie: "API_SESSION_SECURE_COOKIE",
-  apiSessionTimeToLiveMilliseconds: "API_SESSION_TIME_TO_LIVE_MS",
-  apiToken: "API_TOKEN",
-  codexCliPath: "CODEX_CLI_PATH",
-  codexIpcSocketPath: "CODEX_IPC_SOCKET",
-  debugClientErrorLogPath: "DEBUG_CLIENT_ERROR_LOG_PATH",
-  debugClientErrorMaximumEntries: "DEBUG_CLIENT_ERROR_MAX_ENTRIES",
-  historyPayloadSummaryMaximumBytes: "HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES",
-  host: "HOST",
-  invalidThreadStreamEventsLogPath: "FARFIELD_INVALID_STREAM_LOG_PATH",
-  logLevel: "LOG_LEVEL",
-  port: "PORT",
-  pushApiToken: "PUSH_API_TOKEN",
-  pushEnabled: "PUSH_ENABLED",
-  pushLocalCaPath: "PUSH_LOCAL_CA_PATH",
-  pushPrivateModeDefault: "PUSH_PRIVATE_MODE_DEFAULT",
-  pushReceiptsMaxAgeDays: "PUSH_RECEIPTS_MAX_AGE_DAYS",
-  pushReceiptsMaxCount: "PUSH_RECEIPTS_MAX_COUNT",
-  pushReceiptsPath: "PUSH_RECEIPTS_PATH",
-  pushSendsPath: "PUSH_SENDS_PATH",
-  pushStatePath: "PUSH_STATE_PATH",
-  pushTestSendTimeoutMilliseconds: "PUSH_TEST_SEND_TIMEOUT_MS",
-  pushVapidPrivateKey: "PUSH_VAPID_PRIVATE_KEY",
-  pushVapidPublicKey: "PUSH_VAPID_PUBLIC_KEY",
-  pushVapidSubject: "PUSH_VAPID_SUBJECT",
-  runtimeStateSnapshotCacheTimeToLiveMilliseconds: "RUNTIME_STATE_SNAPSHOT_CACHE_TIME_TO_LIVE_MS",
-  threadListAdapterTimeoutMilliseconds: "THREAD_LIST_ADAPTER_TIMEOUT_MS",
-  threadListAggregationCacheMaximumEntries: "THREAD_LIST_AGGREGATION_CACHE_MAXIMUM_ENTRIES",
-  threadListAggregationCacheTimeToLiveMilliseconds: "THREAD_LIST_AGGREGATION_CACHE_TIME_TO_LIVE_MS",
-  webApplicationBuildId: "VITE_APP_BUILD_ID",
-  webBuildId: "WEB_BUILD_ID",
-  webServiceWorkerVersion: "WEB_SERVICE_WORKER_VERSION",
-  xdgDataHome: "XDG_DATA_HOME",
-  xdgStateHome: "XDG_STATE_HOME",
-});
-const ServerRuntimeDefaultValues = Object.freeze({
-  apiSessionSecureCookie: false,
-  apiSessionSigningSecret: "farfield_session_secret",
-  apiSessionTimeToLiveMilliseconds: 28_800_000,
-  capabilityListTimeoutMilliseconds: 8_000,
-  clientErrorMaximumEntries: 2_000,
-  historyLimit: 2_000,
-  // Keep payload summaries bounded at 128 KiB to cap log/memory overhead in debug flows.
-  historyPayloadSummaryMaximumBytes: 131_072,
-  host: "127.0.0.1",
-  ipcReconnectDelayMilliseconds: 1_000,
-  logLevel: "info",
-  // Debounce completion events to coalesce brief bursts into one push dispatch pass.
-  notificationCompletionDebounceMilliseconds: 250,
-  port: 4_311,
-  pushEnabled: false,
-  pushPrivateModeDefault: true,
-  pushReceiptsMaxAgeDays: 7,
-  pushReceiptsMaxCount: 100,
-  pushTestSendTimeoutMilliseconds: 7_500,
-  runtimeStateSnapshotCacheTimeToLiveMilliseconds: 250,
-  threadListAdapterTimeoutMilliseconds: 7_500,
-  // Bound thread-list aggregation cache cardinality to keep memory growth predictable.
-  threadListAggregationCacheMaximumEntries: 48,
-  threadListAggregationCacheTimeToLiveMilliseconds: 2_000,
-  webHealthBuildId: "dev",
-});
-const ServerRuntimeStaticConfiguration = Object.freeze({
-  apiSessionCookieName: "farfield_session",
-  apiTokenHeaderName: "x-farfield-token",
-  apiTokenResponseHeader: "X-Farfield-Token",
-  clientActionIdentifierHeaderName: "x-farfield-action-id",
-  clientActionIdentifierResponseHeader: "X-Farfield-Action-Id",
-  clientActionNameHeaderName: "x-farfield-action-name",
-  clientActionNameResponseHeader: "X-Farfield-Action-Name",
-  clientErrorLogFileName: "client-errors.ndjson",
-  clientRequestIdentifierHeaderName: "x-farfield-request-id",
-  clientRequestIdentifierResponseHeader: "X-Farfield-Request-Id",
-  codexDesktopExecutablePath: "/Applications/Codex.app/Contents/Resources/codex",
-  codexExecutablePath: "codex",
-  codexIpcDirectoryName: "codex-ipc",
-  errorsLogDirectoryName: "errors",
-  invalidThreadStreamEventsLogFileName: "invalid-thread-stream-events.ndjson",
-  logsDirectoryName: "logs",
-  pushReceiptsFileName: "push-receipts.json",
-  pushSendsFileName: "push-sends.json",
-  runtimeDirectoryName: ".runtime",
-  sessionIdentifierPrefix: "session-",
-  threadLogsDirectoryName: "threads",
-  traceDirectoryName: "traces",
-  userAgent: "farfield/0.2.0",
-  windowsCodexIpcSocketPath: "\\\\.\\pipe\\codex-ipc",
-});
-const ServerRuntimeParsingConstants = Object.freeze({
-  falseText: "false",
-  falseNumeric: "0",
-  minimumPositiveInteger: 1,
-  trueText: "true",
-  trueNumeric: "1",
-});
-const PositiveIntegerEnvironmentValueSchema = z.coerce
-  .number()
-  .int()
-  .min(ServerRuntimeParsingConstants.minimumPositiveInteger);
-const BooleanEnvironmentValueSchema = z.enum([
-  ServerRuntimeParsingConstants.trueNumeric,
-  ServerRuntimeParsingConstants.trueText,
-  ServerRuntimeParsingConstants.falseNumeric,
-  ServerRuntimeParsingConstants.falseText,
-]);
-const ServerRuntimeGitCommandConfiguration = Object.freeze({
-  command: "git",
-  outputEncoding: "utf8",
-  shortHeadArguments: Object.freeze(["rev-parse", "--short", "HEAD"]),
-});
-const ServerRuntimeFormattingConstants = Object.freeze({
-  clientErrorSessionTimestampUnsafeCharactersPattern: /[:.]/g,
-  clientErrorSessionTimestampSeparator: "-",
-});
-const MissingPushVapidConfigurationErrorMessage =
-  `${ServerRuntimeEnvironmentVariableNames.pushEnabled}=true requires ` +
-  `${ServerRuntimeEnvironmentVariableNames.pushVapidPublicKey}, ` +
-  `${ServerRuntimeEnvironmentVariableNames.pushVapidPrivateKey}, and ` +
-  ServerRuntimeEnvironmentVariableNames.pushVapidSubject;
-
-function readEnvironmentValue(env: NodeJS.ProcessEnv, variableName: string): string | null {
-  return env[variableName] ?? null;
-}
-
-function readTrimmedEnvironmentValue(env: NodeJS.ProcessEnv, variableName: string): string {
-  return (readEnvironmentValue(env, variableName) ?? "").trim();
-}
-
-function parsePositiveInteger(value: string | null, defaultValue: number): number {
-  const parsed = PositiveIntegerEnvironmentValueSchema.safeParse(value);
-  return parsed.success ? parsed.data : defaultValue;
-}
-
-function parseBooleanEnvironmentValue(value: string | null, defaultValue: boolean): boolean {
-  // Keep this strict and case-sensitive so only explicit opt-in tokens toggle behavior.
-  const parsed = BooleanEnvironmentValueSchema.safeParse(value);
-  if (!parsed.success) {
-    return defaultValue;
-  }
-
-  return (
-    parsed.data === ServerRuntimeParsingConstants.trueNumeric ||
-    parsed.data === ServerRuntimeParsingConstants.trueText
-  );
-}
-
-function parseOptionalPathEnvironmentValue(
-  label: string,
-  value: string | undefined,
-): string | null {
-  const parsed = OptionalPathEnvSchema.safeParse(value);
-  if (!parsed.success) {
-    throw new Error(`${label} must be a non-empty path when set`);
-  }
-
-  if (parsed.data === undefined) {
-    return null;
-  }
-
-  return path.resolve(parsed.data);
-}
-
-function readPositiveIntegerEnvironmentValue(
-  env: NodeJS.ProcessEnv,
-  variableName: string,
-  defaultValue: number,
-): number {
-  return parsePositiveInteger(readEnvironmentValue(env, variableName), defaultValue);
-}
-
-function readBooleanEnvironmentValue(
-  env: NodeJS.ProcessEnv,
-  variableName: string,
-  defaultValue: boolean,
-): boolean {
-  return parseBooleanEnvironmentValue(readEnvironmentValue(env, variableName), defaultValue);
-}
-
-function readOptionalPathEnvironmentValue(
-  env: NodeJS.ProcessEnv,
-  variableName: string,
-): string | null {
-  return parseOptionalPathEnvironmentValue(variableName, env[variableName]);
-}
-
-function resolveApiTokenFromEnvironment(env: NodeJS.ProcessEnv): string {
-  const apiTokenValue = readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.apiToken);
-  if (apiTokenValue !== null) {
-    return apiTokenValue.trim();
-  }
-
-  return readTrimmedEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushApiToken);
-}
-
-function resolveWebHealthBuildIdentifierFromEnvironment(env: NodeJS.ProcessEnv): string {
-  const buildIdentifierCandidate =
-    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.webBuildId) ??
-    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.webApplicationBuildId) ??
-    ServerRuntimeDefaultValues.webHealthBuildId;
-  const normalizedBuildIdentifier = buildIdentifierCandidate.trim();
-  return normalizedBuildIdentifier.length > 0
-    ? normalizedBuildIdentifier
-    : ServerRuntimeDefaultValues.webHealthBuildId;
-}
-
-function resolveApiSessionSigningSecret(env: NodeJS.ProcessEnv, apiToken: string): string {
-  const sessionSecretCandidate =
-    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.apiSessionSecret) ?? apiToken;
-  const normalizedSessionSecret = sessionSecretCandidate.trim();
-  return normalizedSessionSecret.length > 0
-    ? normalizedSessionSecret
-    : ServerRuntimeDefaultValues.apiSessionSigningSecret;
-}
-
-function resolveCodexExecutablePathFromEnvironment(env: NodeJS.ProcessEnv): string {
-  const configuredPath = readEnvironmentValue(
-    env,
-    ServerRuntimeEnvironmentVariableNames.codexCliPath,
-  );
-  if (configuredPath !== null && configuredPath.length > 0) {
-    return configuredPath;
-  }
-
-  const desktopPath = ServerRuntimeStaticConfiguration.codexDesktopExecutablePath;
-  if (fs.existsSync(desktopPath)) {
-    return desktopPath;
-  }
-
-  return ServerRuntimeStaticConfiguration.codexExecutablePath;
-}
-
-function resolveIpcSocketPathFromEnvironment(env: NodeJS.ProcessEnv): string {
-  const configuredPath = readEnvironmentValue(
-    env,
-    ServerRuntimeEnvironmentVariableNames.codexIpcSocketPath,
-  );
-  if (configuredPath !== null && configuredPath.length > 0) {
-    return configuredPath;
-  }
-
-  if (process.platform === "win32") {
-    return ServerRuntimeStaticConfiguration.windowsCodexIpcSocketPath;
-  }
-
-  const userIdentifier = process.getuid?.() ?? 0;
-  return path.join(
-    os.tmpdir(),
-    ServerRuntimeStaticConfiguration.codexIpcDirectoryName,
-    `ipc-${String(userIdentifier)}.sock`,
-  );
-}
-
-function resolveGitCommitHash(defaultWorkspacePath: string): string | null {
-  try {
-    const hash = execFileSync(
-      ServerRuntimeGitCommandConfiguration.command,
-      ServerRuntimeGitCommandConfiguration.shortHeadArguments,
-      {
-        cwd: defaultWorkspacePath,
-        encoding: ServerRuntimeGitCommandConfiguration.outputEncoding,
-      },
-    ).trim();
-    return hash.length > 0 ? hash : null;
-  } catch {
-    return null;
-  }
-}
-
-function resolvePushLocalCaSourcePath(env: NodeJS.ProcessEnv): string {
-  const configuredPath = readOptionalPathEnvironmentValue(
-    env,
-    ServerRuntimeEnvironmentVariableNames.pushLocalCaPath,
-  );
-  if (configuredPath !== null) {
-    return configuredPath;
-  }
-
-  const homeDirectory = os.homedir();
-  if (process.platform === "darwin") {
-    return path.join(
-      homeDirectory,
-      "Library",
-      "Application Support",
-      "Caddy",
-      "pki",
-      "authorities",
-      "local",
-      "root.crt",
-    );
-  }
-
-  if (process.platform === "win32") {
-    const appDataDirectory =
-      readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.appDataPath) ??
-      path.join(homeDirectory, "AppData", "Roaming");
-    return path.join(appDataDirectory, "Caddy", "pki", "authorities", "local", "root.crt");
-  }
-
-  const xdgDataHome =
-    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.xdgDataHome) ??
-    path.join(homeDirectory, ".local", "share");
-  return path.join(xdgDataHome, "caddy", "pki", "authorities", "local", "root.crt");
-}
-
+// Owner note: this module composes configuration owners to produce the single
+// startup runtime configuration contract for the server process.
 export type { ServerRuntimeConfiguration } from "./ServerRuntimeConfigurationContracts.js";
 
 export function readServerRuntimeConfigurationFromCurrentProcessEnvironment(): ServerRuntimeConfiguration {
@@ -492,12 +204,8 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
     throw new Error(MissingPushVapidConfigurationErrorMessage);
   }
 
-  const clientErrorSessionStartedAt = new Date().toISOString();
-  const clientErrorSessionTimestamp = clientErrorSessionStartedAt.replace(
-    ServerRuntimeFormattingConstants.clientErrorSessionTimestampUnsafeCharactersPattern,
-    ServerRuntimeFormattingConstants.clientErrorSessionTimestampSeparator,
-  );
-  const clientErrorSessionId = `${ServerRuntimeStaticConfiguration.sessionIdentifierPrefix}${clientErrorSessionTimestamp}-${String(process.pid)}`;
+  const { clientErrorSessionId, clientErrorSessionStartedAt, clientErrorSessionTimestamp } =
+    resolveClientErrorSessionMetadata();
   const clientErrorLogPath =
     readOptionalPathEnvironmentValue(
       env,

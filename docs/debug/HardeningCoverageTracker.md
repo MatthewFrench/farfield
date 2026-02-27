@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 04:07:30Z
+Last Updated (UTC): 2026-02-27 04:22:20Z
 
 ## Scope Model
 
@@ -193,6 +193,22 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-22)
+
+The current in-progress wave applies server runtime-configuration owner separation:
+
+1. Split environment-key/default/static/generic configuration constant ownership into `ServerRuntimeConfigurationConstants`.
+2. Split strict environment value parsing ownership into `ServerRuntimeEnvironmentValueReaders`.
+3. Split precedence/path/platform derived value ownership into `ServerRuntimeDerivedValueResolvers`.
+4. Reduced `ServerRuntimeConfiguration` to startup configuration composition over these owner modules while preserving exports, behavior, and error semantics.
+
+Files touched in this continuation segment:
+
+1. `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfiguration.ts`
+2. `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeConfigurationConstants.ts`
+3. `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeEnvironmentValueReaders.ts`
+4. `apps/ServerApplication/Source/Application/Configuration/ServerRuntimeDerivedValueResolvers.ts`
 
 ## Latest Continuation Commit Wave (Current-21)
 
