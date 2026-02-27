@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   NtfyNotifier,
+  type NtfyThreadCompletedPayload,
   parseNtfyConfigFromEnv,
-  type NtfyThreadCompletedPayload
 } from "../Source/Modules/PushNotifications/NtfyNotifier.js";
 
 interface NtfyThreadCompletedPayloadOverrides {
@@ -14,14 +14,14 @@ interface NtfyThreadCompletedPayloadOverrides {
 }
 
 function buildThreadCompletedPayload(
-  overrides: NtfyThreadCompletedPayloadOverrides = {}
+  overrides: NtfyThreadCompletedPayloadOverrides = {},
 ): NtfyThreadCompletedPayload {
   return {
     threadId: overrides.threadId ?? "thread-1",
     preview: overrides.preview ?? "Fix tests",
     projectName: overrides.projectName ?? "Farfield",
     threadName: overrides.threadName ?? "Fix tests",
-    agentText: overrides.agentText ?? "Completed"
+    agentText: overrides.agentText ?? "Completed",
   };
 }
 
@@ -43,8 +43,8 @@ describe("parseNtfyConfigFromEnv", () => {
   it("requires topic when enabled", () => {
     expect(() =>
       parseNtfyConfigFromEnv({
-        NTFY_ENABLED: "true"
-      })
+        NTFY_ENABLED: "true",
+      }),
     ).toThrowError(/NTFY_TOPIC is required/);
   });
 
@@ -54,7 +54,7 @@ describe("parseNtfyConfigFromEnv", () => {
       NTFY_TOPIC: "farfield",
       NTFY_BASE_URL: "https://ntfy.example.com",
       NTFY_BEARER_TOKEN: "secret",
-      NTFY_PRIORITY: "5"
+      NTFY_PRIORITY: "5",
     });
 
     expect(parsed.enabled).toBe(true);
@@ -67,8 +67,8 @@ describe("parseNtfyConfigFromEnv", () => {
   it("rejects invalid priority values", () => {
     expect(() =>
       parseNtfyConfigFromEnv({
-        NTFY_PRIORITY: "9"
-      })
+        NTFY_PRIORITY: "9",
+      }),
     ).toThrowError();
   });
 });
@@ -78,8 +78,8 @@ describe("NtfyNotifier.publishThreadCompleted", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     const notifier = new NtfyNotifier(
       parseNtfyConfigFromEnv({
-        NTFY_ENABLED: "false"
-      })
+        NTFY_ENABLED: "false",
+      }),
     );
 
     const result = await notifier.publishThreadCompleted(buildThreadCompletedPayload());
@@ -99,16 +99,16 @@ describe("NtfyNotifier.publishThreadCompleted", () => {
         NTFY_TOPIC: "farfield",
         NTFY_BASE_URL: "https://ntfy.example.com",
         NTFY_BEARER_TOKEN: "token-123",
-        NTFY_PRIORITY: "4"
-      })
+        NTFY_PRIORITY: "4",
+      }),
     );
 
     const result = await notifier.publishThreadCompleted(
       buildThreadCompletedPayload({
         preview: "Fix flaky tests",
         threadName: "Fix flaky tests",
-        agentText: "Done and green."
-      })
+        agentText: "Done and green.",
+      }),
     );
 
     expect(result.messageId).toBe("msg_123");
@@ -135,21 +135,21 @@ describe("NtfyNotifier.publishThreadCompleted", () => {
       parseNtfyConfigFromEnv({
         NTFY_ENABLED: "true",
         NTFY_TOPIC: "project updates/ios",
-        NTFY_BASE_URL: "https://ntfy.example.com/custom/path"
-      })
+        NTFY_BASE_URL: "https://ntfy.example.com/custom/path",
+      }),
     );
 
     await notifier.publishThreadCompleted(
       buildThreadCompletedPayload({
         projectName: "  ",
         threadName: "",
-        agentText: "   "
-      })
+        agentText: "   ",
+      }),
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "https://ntfy.example.com/custom/path/project%20updates%2Fios"
+      "https://ntfy.example.com/custom/path/project%20updates%2Fios",
     );
     const requestInit = fetchMock.mock.calls[0]?.[1];
     const requestHeaders = new Headers(requestInit?.headers);
@@ -165,14 +165,14 @@ describe("NtfyNotifier.publishThreadCompleted", () => {
     const notifier = new NtfyNotifier(
       parseNtfyConfigFromEnv({
         NTFY_ENABLED: "true",
-        NTFY_TOPIC: "farfield"
-      })
+        NTFY_TOPIC: "farfield",
+      }),
     );
 
     await notifier.publishThreadCompleted(
       buildThreadCompletedPayload({
-        agentText: "x".repeat(3_500)
-      })
+        agentText: "x".repeat(3_500),
+      }),
     );
 
     const requestInit = fetchMock.mock.calls[0]?.[1];
@@ -188,12 +188,12 @@ describe("NtfyNotifier.publishThreadCompleted", () => {
     const notifier = new NtfyNotifier(
       parseNtfyConfigFromEnv({
         NTFY_ENABLED: "true",
-        NTFY_TOPIC: "farfield"
-      })
+        NTFY_TOPIC: "farfield",
+      }),
     );
 
     await expect(
-      Reflect.apply(notifier.publishThreadCompleted, notifier, [{}])
+      Reflect.apply(notifier.publishThreadCompleted, notifier, [{}]),
     ).rejects.toThrowError();
     expect(fetchMock).not.toHaveBeenCalled();
   });

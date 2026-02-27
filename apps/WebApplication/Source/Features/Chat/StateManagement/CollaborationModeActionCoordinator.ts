@@ -41,7 +41,7 @@ export interface CollaborationModeActionChatClient {
         };
       };
     },
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<void>;
 }
 
@@ -56,7 +56,9 @@ export interface ApplyCollaborationModeDraftActionInput {
   onSetModeSyncing: (isModeSyncing: boolean) => void;
   chatClient: CollaborationModeActionChatClient;
   onReloadSelectedThread: (threadId: string) => Promise<void>;
-  reportTrackedUserInterfaceError: (input: CollaborationModeActionErrorReportInput) => Promise<void>;
+  reportTrackedUserInterfaceError: (
+    input: CollaborationModeActionErrorReportInput,
+  ) => Promise<void>;
 }
 
 export class CollaborationModeActionCoordinator {
@@ -79,30 +81,34 @@ export class CollaborationModeActionCoordinator {
     const modeSignature = this.modeSelectionStateResolver.buildModeSignature(
       input.draft.modeKey,
       input.draft.modelId,
-      input.draft.reasoningEffort
+      input.draft.reasoningEffort,
     );
     const lastAppliedModeSignature = input.readLastAppliedModeSignature();
     if (!input.isModeSyncing && lastAppliedModeSignature === modeSignature) {
       return;
     }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions(SET_COLLABORATION_MODE_ACTION_NAME);
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      SET_COLLABORATION_MODE_ACTION_NAME,
+    );
     input.writeLastAppliedModeSignature(modeSignature);
     input.onSetModeSyncing(true);
     try {
-      await input.chatClient.setCollaborationMode({
-        threadId: input.selectedThreadId,
+      await input.chatClient.setCollaborationMode(
+        {
+          threadId: input.selectedThreadId,
           collaborationMode: {
             mode: mode.mode,
             settings: {
               model: input.draft.modelId.length > 0 ? input.draft.modelId : null,
-              reasoning_effort: (
-                input.draft.reasoningEffort.length > 0 ? input.draft.reasoningEffort : null
-              ),
-              developer_instructions: mode.developer_instructions ?? null
-            }
-          }
-      }, requestOptions);
+              reasoning_effort:
+                input.draft.reasoningEffort.length > 0 ? input.draft.reasoningEffort : null,
+              developer_instructions: mode.developer_instructions ?? null,
+            },
+          },
+        },
+        requestOptions,
+      );
       await input.onReloadSelectedThread(input.selectedThreadId);
     } catch (error) {
       input.writeLastAppliedModeSignature(lastAppliedModeSignature);
@@ -112,8 +118,8 @@ export class CollaborationModeActionCoordinator {
         threadId: input.selectedThreadId,
         error: toErrorMessage(error),
         details: {
-          modeKey: input.draft.modeKey
-        }
+          modeKey: input.draft.modeKey,
+        },
       });
     } finally {
       input.onSetModeSyncing(false);

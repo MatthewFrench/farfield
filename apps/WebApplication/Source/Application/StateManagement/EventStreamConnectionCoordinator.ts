@@ -1,13 +1,13 @@
+import type { FarfieldThreadStreamDelta } from "@farfield/protocol";
 import {
+  type EventRefreshFlags,
   EventRefreshScheduler,
   hasEventRefreshWork,
-  type EventRefreshFlags
 } from "./EventRefreshScheduler";
 import {
+  type EventStreamRefreshDecision,
   EventStreamRefreshDecisionEngine,
-  type EventStreamRefreshDecision
 } from "./EventStreamRefreshDecisionEngine";
-import type { FarfieldThreadStreamDelta } from "@farfield/protocol";
 
 export interface EventSourceLike {
   onopen: ((event: Event) => void) | null;
@@ -69,7 +69,7 @@ function readInitialRefreshFlags(snapshot: EventStreamConnectionSnapshot): Event
   return {
     refreshCore: true,
     refreshHistory: snapshot.activeTab === DEBUG_ACTIVE_TAB,
-    refreshSelectedThread: Boolean(snapshot.selectedThreadId)
+    refreshSelectedThread: Boolean(snapshot.selectedThreadId),
   };
 }
 
@@ -77,14 +77,14 @@ function readRefreshFlagsFromDecision(decision: EventStreamRefreshDecision): Eve
   return {
     refreshCore: decision.refreshCore,
     refreshHistory: decision.refreshHistory,
-    refreshSelectedThread: decision.refreshSelectedThread
+    refreshSelectedThread: decision.refreshSelectedThread,
   };
 }
 
 function readValidatedReconnectDelayMilliseconds(
   delayMilliseconds: number | undefined,
   defaultDelayMilliseconds: number,
-  propertyName: string
+  propertyName: string,
 ): number {
   const nextDelayMilliseconds = delayMilliseconds ?? defaultDelayMilliseconds;
   if (!Number.isInteger(nextDelayMilliseconds) || nextDelayMilliseconds < 0) {
@@ -113,12 +113,12 @@ export class EventStreamConnectionCoordinator {
     const initialReconnectDelayMilliseconds = readValidatedReconnectDelayMilliseconds(
       dependencies?.initialReconnectDelayMs,
       DEFAULT_INITIAL_RECONNECT_DELAY_MS,
-      RECONNECT_DELAY_PROPERTY_NAME_INITIAL
+      RECONNECT_DELAY_PROPERTY_NAME_INITIAL,
     );
     const maximumReconnectDelayMilliseconds = readValidatedReconnectDelayMilliseconds(
       dependencies?.maximumReconnectDelayMs,
       DEFAULT_MAXIMUM_RECONNECT_DELAY_MS,
-      RECONNECT_DELAY_PROPERTY_NAME_MAXIMUM
+      RECONNECT_DELAY_PROPERTY_NAME_MAXIMUM,
     );
     if (maximumReconnectDelayMilliseconds < initialReconnectDelayMilliseconds) {
       throw new Error(RECONNECT_DELAY_RELATIONSHIP_ERROR_MESSAGE);
@@ -126,8 +126,10 @@ export class EventStreamConnectionCoordinator {
 
     this.createEventSource = dependencies?.createEventSource ?? ((url) => new EventSource(url));
     this.scheduleTimeout =
-      dependencies?.scheduleTimeout ?? ((callback, delayMs) => window.setTimeout(callback, delayMs));
-    this.clearScheduledTimeout = dependencies?.clearScheduledTimeout ?? ((timerId) => window.clearTimeout(timerId));
+      dependencies?.scheduleTimeout ??
+      ((callback, delayMs) => window.setTimeout(callback, delayMs));
+    this.clearScheduledTimeout =
+      dependencies?.clearScheduledTimeout ?? ((timerId) => window.clearTimeout(timerId));
     this.initialReconnectDelayMs = initialReconnectDelayMilliseconds;
     this.maximumReconnectDelayMs = maximumReconnectDelayMilliseconds;
     this.reconnectDelayMs = this.initialReconnectDelayMs;
@@ -147,7 +149,7 @@ export class EventStreamConnectionCoordinator {
       executeScheduledRefresh: input.executeScheduledRefresh,
       applyThreadStreamDelta: input.applyThreadStreamDelta,
       onConnectionStatusChange: input.onConnectionStatusChange,
-      eventsUrl: input.eventsUrl ?? DEFAULT_EVENTS_URL
+      eventsUrl: input.eventsUrl ?? DEFAULT_EVENTS_URL,
     };
     this.reconnectDelayMs = this.initialReconnectDelayMs;
     this.disposed = false;
@@ -206,7 +208,7 @@ export class EventStreamConnectionCoordinator {
     const refreshDecision = this.context.eventStreamRefreshDecisionEngine.readDecision({
       activeTab: snapshot.activeTab,
       selectedThreadId: snapshot.selectedThreadId,
-      eventData: event.data
+      eventData: event.data,
     });
     this.scheduleRefresh(readRefreshFlagsFromDecision(refreshDecision));
     if (refreshDecision.threadStreamDelta) {
@@ -249,7 +251,7 @@ export class EventStreamConnectionCoordinator {
     }, this.reconnectDelayMs);
     this.reconnectDelayMs = Math.min(
       this.reconnectDelayMs * RECONNECT_DELAY_BACKOFF_MULTIPLIER,
-      this.maximumReconnectDelayMs
+      this.maximumReconnectDelayMs,
     );
   }
 

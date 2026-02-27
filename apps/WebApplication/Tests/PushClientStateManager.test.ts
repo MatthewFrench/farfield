@@ -1,12 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { PushClientStateManager } from "@/Features/PushNotifications/DataAccess/PushClientStateManager";
 import { PushPreferenceStore } from "@/Features/PushNotifications/DataAccess/PushPreferenceStore";
 import {
   type PushCreateSubscriptionInput,
   type PushCreateSubscriptionResponse,
+  PushServerClient,
   type PushStatusResponse,
   type PushVapidPublicKeyResponse,
-  PushServerClient
 } from "@/Features/PushNotifications/DataAccess/PushServerClient";
 
 const PUSH_SERVICE_WORKER_PATH = "/sw.js";
@@ -18,10 +18,16 @@ const PUSH_VAPID_PUBLIC_KEY =
 
 const originalServiceWorkerPropertyDescriptor = Object.getOwnPropertyDescriptor(
   navigator,
-  "serviceWorker"
+  "serviceWorker",
 );
-const originalPushManagerPropertyDescriptor = Object.getOwnPropertyDescriptor(window, "PushManager");
-const originalNotificationPropertyDescriptor = Object.getOwnPropertyDescriptor(window, "Notification");
+const originalPushManagerPropertyDescriptor = Object.getOwnPropertyDescriptor(
+  window,
+  "PushManager",
+);
+const originalNotificationPropertyDescriptor = Object.getOwnPropertyDescriptor(
+  window,
+  "Notification",
+);
 
 interface BrowserPushEnvironmentInput {
   permission: NotificationPermission;
@@ -58,10 +64,10 @@ class TestPushServerClient extends PushServerClient {
     super();
     this.pushStatus = input.pushStatus;
     this.pushVapidPublicKey = {
-      publicKey: PUSH_VAPID_PUBLIC_KEY
+      publicKey: PUSH_VAPID_PUBLIC_KEY,
     };
     this.saveResponse = {
-      subscriptionId: "sub_test"
+      subscriptionId: "sub_test",
     };
   }
 
@@ -74,7 +80,7 @@ class TestPushServerClient extends PushServerClient {
   }
 
   public override async savePushSubscription(
-    input: PushCreateSubscriptionInput
+    input: PushCreateSubscriptionInput,
   ): Promise<PushCreateSubscriptionResponse> {
     this.saveRequests.push(input);
     return this.saveResponse;
@@ -84,7 +90,7 @@ class TestPushServerClient extends PushServerClient {
 function restoreGlobalProperty(
   target: Navigator | Window,
   propertyName: string,
-  descriptor: PropertyDescriptor | undefined
+  descriptor: PropertyDescriptor | undefined,
 ): void {
   if (descriptor) {
     Object.defineProperty(target, propertyName, descriptor);
@@ -97,7 +103,7 @@ function createMockCookieStoreManager(): CookieStoreManager {
   return {
     getSubscriptions: async () => [],
     subscribe: async () => undefined,
-    unsubscribe: async () => undefined
+    unsubscribe: async () => undefined,
   };
 }
 
@@ -107,9 +113,9 @@ function createMockNavigationPreloadManager(): NavigationPreloadManager {
     enable: async () => undefined,
     getState: async () => ({
       enabled: false,
-      headerValue: "true"
+      headerValue: "true",
     }),
-    setHeaderValue: async () => undefined
+    setHeaderValue: async () => undefined,
   };
 }
 
@@ -119,7 +125,7 @@ function createPushSubscription(endpoint: string): PushSubscription {
     expirationTime: null,
     options: {
       applicationServerKey: null,
-      userVisibleOnly: true
+      userVisibleOnly: true,
     },
     getKey: () => null,
     toJSON: () => ({
@@ -127,18 +133,20 @@ function createPushSubscription(endpoint: string): PushSubscription {
       expirationTime: null,
       keys: {
         p256dh: PUSH_SUBSCRIPTION_KEY_P256DH,
-        auth: PUSH_SUBSCRIPTION_KEY_AUTH
-      }
+        auth: PUSH_SUBSCRIPTION_KEY_AUTH,
+      },
     }),
-    unsubscribe: async () => true
+    unsubscribe: async () => true,
   } as PushSubscription;
 }
 
-function installBrowserPushEnvironment(input: BrowserPushEnvironmentInput): BrowserPushEnvironmentHarness {
+function installBrowserPushEnvironment(
+  input: BrowserPushEnvironmentInput,
+): BrowserPushEnvironmentHarness {
   const pushManager: PushManager = {
     getSubscription: async () => input.browserSubscription,
     subscribe: async () => createPushSubscription(PUSH_SUBSCRIPTION_ENDPOINT),
-    permissionState: async () => "granted"
+    permissionState: async () => "granted",
   };
   const serviceWorkerRegistrationEvents = new EventTarget();
   const registration: ServiceWorkerRegistration = {
@@ -156,12 +164,14 @@ function installBrowserPushEnvironment(input: BrowserPushEnvironmentInput): Brow
     unregister: async () => true,
     update: async () => registration,
     addEventListener: serviceWorkerRegistrationEvents.addEventListener.bind(
-      serviceWorkerRegistrationEvents
+      serviceWorkerRegistrationEvents,
     ),
     removeEventListener: serviceWorkerRegistrationEvents.removeEventListener.bind(
-      serviceWorkerRegistrationEvents
+      serviceWorkerRegistrationEvents,
     ),
-    dispatchEvent: serviceWorkerRegistrationEvents.dispatchEvent.bind(serviceWorkerRegistrationEvents)
+    dispatchEvent: serviceWorkerRegistrationEvents.dispatchEvent.bind(
+      serviceWorkerRegistrationEvents,
+    ),
   };
   const registerMock = vi.fn(async () => registration);
   const serviceWorkerContainerEvents = new EventTarget();
@@ -175,29 +185,31 @@ function installBrowserPushEnvironment(input: BrowserPushEnvironmentInput): Brow
     getRegistration: async () => registration,
     getRegistrations: async () => [registration],
     startMessages: () => undefined,
-    addEventListener: serviceWorkerContainerEvents.addEventListener.bind(serviceWorkerContainerEvents),
-    removeEventListener: serviceWorkerContainerEvents.removeEventListener.bind(
-      serviceWorkerContainerEvents
+    addEventListener: serviceWorkerContainerEvents.addEventListener.bind(
+      serviceWorkerContainerEvents,
     ),
-    dispatchEvent: serviceWorkerContainerEvents.dispatchEvent.bind(serviceWorkerContainerEvents)
+    removeEventListener: serviceWorkerContainerEvents.removeEventListener.bind(
+      serviceWorkerContainerEvents,
+    ),
+    dispatchEvent: serviceWorkerContainerEvents.dispatchEvent.bind(serviceWorkerContainerEvents),
   };
   Object.defineProperty(navigator, "serviceWorker", {
     configurable: true,
-    value: serviceWorkerContainer
+    value: serviceWorkerContainer,
   });
   Object.defineProperty(window, "PushManager", {
     configurable: true,
-    value: class {}
+    value: class {},
   });
   Object.defineProperty(window, "Notification", {
     configurable: true,
     value: {
       permission: input.permission,
-      requestPermission: async () => input.permission
-    }
+      requestPermission: async () => input.permission,
+    },
   });
   return {
-    registerMock
+    registerMock,
   };
 }
 
@@ -207,11 +219,7 @@ describe("PushClientStateManager", () => {
   });
 
   afterEach(() => {
-    restoreGlobalProperty(
-      navigator,
-      "serviceWorker",
-      originalServiceWorkerPropertyDescriptor
-    );
+    restoreGlobalProperty(navigator, "serviceWorker", originalServiceWorkerPropertyDescriptor);
     restoreGlobalProperty(window, "PushManager", originalPushManagerPropertyDescriptor);
     restoreGlobalProperty(window, "Notification", originalNotificationPropertyDescriptor);
   });
@@ -223,21 +231,21 @@ describe("PushClientStateManager", () => {
         enabled: true,
         permissionRequired: true,
         subscriptionCount: 0,
-        privateModeDefault: true
-      }
+        privateModeDefault: true,
+      },
     });
     const manager = new PushClientStateManager({
       pushPreferenceStore,
-      pushServerClient
+      pushServerClient,
     });
     const browserSubscription = createPushSubscription(PUSH_SUBSCRIPTION_ENDPOINT);
     const harness = installBrowserPushEnvironment({
       permission: "granted",
-      browserSubscription
+      browserSubscription,
     });
 
     const result = await manager.enablePushNotifications({
-      privateMode: false
+      privateMode: false,
     });
 
     expect(result.subscribed).toBe(true);
@@ -245,11 +253,15 @@ describe("PushClientStateManager", () => {
     expect(pushPreferenceStore.readAutoHealPreferenceEnabled()).toBe(true);
     expect(harness.registerMock).toHaveBeenCalledWith(PUSH_SERVICE_WORKER_PATH);
     expect(pushServerClient.saveRequests).toHaveLength(1);
-    expect(pushServerClient.saveRequests[0]?.subscription.endpoint).toBe(PUSH_SUBSCRIPTION_ENDPOINT);
-    expect(pushServerClient.saveRequests[0]?.subscription.keys.p256dh).toBe(
-      PUSH_SUBSCRIPTION_KEY_P256DH
+    expect(pushServerClient.saveRequests[0]?.subscription.endpoint).toBe(
+      PUSH_SUBSCRIPTION_ENDPOINT,
     );
-    expect(pushServerClient.saveRequests[0]?.subscription.keys.auth).toBe(PUSH_SUBSCRIPTION_KEY_AUTH);
+    expect(pushServerClient.saveRequests[0]?.subscription.keys.p256dh).toBe(
+      PUSH_SUBSCRIPTION_KEY_P256DH,
+    );
+    expect(pushServerClient.saveRequests[0]?.subscription.keys.auth).toBe(
+      PUSH_SUBSCRIPTION_KEY_AUTH,
+    );
     expect(pushServerClient.saveRequests[0]?.settings?.privateMode).toBe(false);
   });
 
@@ -261,16 +273,16 @@ describe("PushClientStateManager", () => {
         enabled: true,
         permissionRequired: true,
         subscriptionCount: 1,
-        privateModeDefault: true
-      }
+        privateModeDefault: true,
+      },
     });
     const manager = new PushClientStateManager({
       pushPreferenceStore,
-      pushServerClient
+      pushServerClient,
     });
     installBrowserPushEnvironment({
       permission: "granted",
-      browserSubscription: createPushSubscription(PUSH_SUBSCRIPTION_ENDPOINT)
+      browserSubscription: createPushSubscription(PUSH_SUBSCRIPTION_ENDPOINT),
     });
 
     const result = await manager.reconcilePushSubscription();
@@ -279,7 +291,7 @@ describe("PushClientStateManager", () => {
       attempted: true,
       subscribed: true,
       repaired: false,
-      reason: "subscription-confirmed"
+      reason: "subscription-confirmed",
     });
     expect(pushServerClient.saveRequests).toHaveLength(1);
     expect(pushServerClient.saveRequests[0]?.settings?.privateMode).toBe(true);
@@ -293,20 +305,20 @@ describe("PushClientStateManager", () => {
         enabled: true,
         permissionRequired: true,
         subscriptionCount: 1,
-        privateModeDefault: false
-      }
+        privateModeDefault: false,
+      },
     });
     const manager = new PushClientStateManager({
       pushPreferenceStore,
-      pushServerClient
+      pushServerClient,
     });
     installBrowserPushEnvironment({
       permission: "granted",
-      browserSubscription: createPushSubscription(PUSH_SUBSCRIPTION_ENDPOINT)
+      browserSubscription: createPushSubscription(PUSH_SUBSCRIPTION_ENDPOINT),
     });
 
     const result = await manager.reconcilePushSubscription({
-      privateMode: true
+      privateMode: true,
     });
 
     expect(result.reason).toBe("subscription-confirmed");
@@ -321,16 +333,16 @@ describe("PushClientStateManager", () => {
         enabled: true,
         permissionRequired: true,
         subscriptionCount: 1,
-        privateModeDefault: true
-      }
+        privateModeDefault: true,
+      },
     });
     const manager = new PushClientStateManager({
       pushPreferenceStore,
-      pushServerClient
+      pushServerClient,
     });
     installBrowserPushEnvironment({
       permission: "granted",
-      browserSubscription: createPushSubscription(PUSH_SUBSCRIPTION_ENDPOINT)
+      browserSubscription: createPushSubscription(PUSH_SUBSCRIPTION_ENDPOINT),
     });
 
     const result = await manager.reconcilePushSubscription();
@@ -339,7 +351,7 @@ describe("PushClientStateManager", () => {
       attempted: false,
       subscribed: false,
       repaired: false,
-      reason: "not-enabled"
+      reason: "not-enabled",
     });
     expect(pushServerClient.saveRequests).toHaveLength(0);
   });

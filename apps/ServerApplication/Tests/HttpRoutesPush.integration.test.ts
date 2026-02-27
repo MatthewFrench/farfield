@@ -1,14 +1,5 @@
-import {
-  CreatePushReceiptBodySchema,
-  CreatePushSubscriptionBodySchema
-} from "@farfield/protocol";
-import {
-  afterAll,
-  beforeAll,
-  describe,
-  expect,
-  it
-} from "vitest";
+import { CreatePushReceiptBodySchema, CreatePushSubscriptionBodySchema } from "@farfield/protocol";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   CreatePushSubscriptionEnvelopeSchema,
   HttpRoutesIntegrationEnvironment,
@@ -17,7 +8,7 @@ import {
   PushReceiptLatestEnvelopeSchema,
   PushStatusEnvelopeSchema,
   PushTestEnvelopeSchema,
-  VapidPublicKeyEnvelopeSchema
+  VapidPublicKeyEnvelopeSchema,
 } from "./HttpRoutesIntegrationEnvironment";
 
 const PushStatusRoutePath = "/api/push/status";
@@ -46,16 +37,22 @@ describe("server route integration push routes", () => {
   it("supports push route contracts", async () => {
     const authHeaders = integrationEnvironment.readAuthHeaders();
 
-    const statusResponse = await fetch(integrationEnvironment.buildApiRouteUrl(PushStatusRoutePath), {
-      headers: authHeaders
-    });
+    const statusResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(PushStatusRoutePath),
+      {
+        headers: authHeaders,
+      },
+    );
     expect(statusResponse.status).toBe(200);
     const status = PushStatusEnvelopeSchema.parse(await statusResponse.json());
     expect(status.subscriptionCount).toBe(0);
 
-    const vapidResponse = await fetch(integrationEnvironment.buildApiRouteUrl(PushVapidPublicKeyRoutePath), {
-      headers: authHeaders
-    });
+    const vapidResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(PushVapidPublicKeyRoutePath),
+      {
+        headers: authHeaders,
+      },
+    );
     expect(vapidResponse.status).toBe(200);
     const vapid = VapidPublicKeyEnvelopeSchema.parse(await vapidResponse.json());
     expect(vapid.publicKey).toBe(integrationEnvironment.readVapidPublicKey());
@@ -65,12 +62,12 @@ describe("server route integration push routes", () => {
         endpoint: "https://push.example.test/subscriptions/sub_1",
         keys: {
           p256dh: "BElidedKeyMaterial_123",
-          auth: "CAuthValue_456"
-        }
+          auth: "CAuthValue_456",
+        },
       },
       settings: {
-        privateMode: true
-      }
+        privateMode: true,
+      },
     });
 
     const createSubscriptionResponse = await fetch(
@@ -79,10 +76,10 @@ describe("server route integration push routes", () => {
         method: "POST",
         headers: {
           ...authHeaders,
-          [JsonContentTypeHeaderName]: JsonContentTypeHeaderValue
+          [JsonContentTypeHeaderName]: JsonContentTypeHeaderValue,
         },
-        body: JSON.stringify(subscriptionBody)
-      }
+        body: JSON.stringify(subscriptionBody),
+      },
     );
     expect(createSubscriptionResponse.status).toBe(200);
     CreatePushSubscriptionEnvelopeSchema.parse(await createSubscriptionResponse.json());
@@ -90,26 +87,29 @@ describe("server route integration push routes", () => {
     const statusAfterSubscriptionResponse = await fetch(
       integrationEnvironment.buildApiRouteUrl(PushStatusRoutePath),
       {
-        headers: authHeaders
-      }
+        headers: authHeaders,
+      },
     );
     const statusAfterSubscription = PushStatusEnvelopeSchema.parse(
-      await statusAfterSubscriptionResponse.json()
+      await statusAfterSubscriptionResponse.json(),
     );
     expect(statusAfterSubscription.subscriptionCount).toBe(1);
 
-    const pushTestResponse = await fetch(integrationEnvironment.buildApiRouteUrl(PushTestRoutePath), {
-      method: "POST",
-      headers: {
-        ...authHeaders,
-        [JsonContentTypeHeaderName]: JsonContentTypeHeaderValue
+    const pushTestResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(PushTestRoutePath),
+      {
+        method: "POST",
+        headers: {
+          ...authHeaders,
+          [JsonContentTypeHeaderName]: JsonContentTypeHeaderValue,
+        },
+        body: JSON.stringify({
+          threadId: "thread_integration",
+          turnId: "turn_integration",
+          dryRun: true,
+        }),
       },
-      body: JSON.stringify({
-        threadId: "thread_integration",
-        turnId: "turn_integration",
-        dryRun: true
-      })
-    });
+    );
     expect(pushTestResponse.status).toBe(200);
     const pushTestPayload = PushTestEnvelopeSchema.parse(await pushTestResponse.json());
     expect(pushTestPayload.ready).toBe(true);
@@ -122,31 +122,40 @@ describe("server route integration push routes", () => {
       threadId: "thread_integration",
       turnId: "turn_integration",
       message: "shown",
-      createdAt: ReceiptCreatedAtTimestamp
+      createdAt: ReceiptCreatedAtTimestamp,
     });
 
-    const receiptResponse = await fetch(integrationEnvironment.buildApiRouteUrl(PushReceiptsRoutePath), {
-      method: "POST",
-      headers: {
-        ...authHeaders,
-        [JsonContentTypeHeaderName]: JsonContentTypeHeaderValue
+    const receiptResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(PushReceiptsRoutePath),
+      {
+        method: "POST",
+        headers: {
+          ...authHeaders,
+          [JsonContentTypeHeaderName]: JsonContentTypeHeaderValue,
+        },
+        body: JSON.stringify(receiptBody),
       },
-      body: JSON.stringify(receiptBody)
-    });
+    );
     expect(receiptResponse.status).toBe(200);
     PushReceiptCreateEnvelopeSchema.parse(await receiptResponse.json());
 
-    const latestReceiptResponse = await fetch(integrationEnvironment.buildApiRouteUrl(PushLatestReceiptRoutePath), {
-      headers: authHeaders
-    });
+    const latestReceiptResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(PushLatestReceiptRoutePath),
+      {
+        headers: authHeaders,
+      },
+    );
     expect(latestReceiptResponse.status).toBe(200);
     const latestReceipt = PushReceiptLatestEnvelopeSchema.parse(await latestReceiptResponse.json());
     expect(latestReceipt.count).toBeGreaterThanOrEqual(1);
     expect(latestReceipt.latest?.notificationId).toBe("notif_integration");
 
-    const localCaStatusResponse = await fetch(integrationEnvironment.buildApiRouteUrl(PushLocalCaStatusRoutePath), {
-      headers: authHeaders
-    });
+    const localCaStatusResponse = await fetch(
+      integrationEnvironment.buildApiRouteUrl(PushLocalCaStatusRoutePath),
+      {
+        headers: authHeaders,
+      },
+    );
     expect(localCaStatusResponse.status).toBe(200);
     const localCaStatus = PushLocalCaStatusEnvelopeSchema.parse(await localCaStatusResponse.json());
     expect(localCaStatus.available).toBe(true);
@@ -155,8 +164,8 @@ describe("server route integration push routes", () => {
     const localCaDownloadResponse = await fetch(
       integrationEnvironment.buildApiRouteUrl(PushLocalCaDownloadRoutePath),
       {
-        headers: authHeaders
-      }
+        headers: authHeaders,
+      },
     );
     expect(localCaDownloadResponse.status).toBe(200);
     const localCaBody = await localCaDownloadResponse.text();

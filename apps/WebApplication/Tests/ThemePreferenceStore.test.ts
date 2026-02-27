@@ -9,11 +9,11 @@ const THEME_PREFERENCE_FIXTURES: ReadonlyArray<{
   themePreference: "light" | "dark";
 }> = [
   {
-    themePreference: LIGHT_THEME_PREFERENCE
+    themePreference: LIGHT_THEME_PREFERENCE,
   },
   {
-    themePreference: DARK_THEME_PREFERENCE
-  }
+    themePreference: DARK_THEME_PREFERENCE,
+  },
 ];
 const originalLocalStorage = window.localStorage;
 
@@ -39,7 +39,7 @@ function createStorageMock(): Storage {
     },
     setItem(key: string, value: string): void {
       storageValues.set(key, value);
-    }
+    },
   };
 }
 
@@ -51,14 +51,14 @@ describe("ThemePreferenceStore", () => {
   beforeEach(() => {
     Object.defineProperty(window, "localStorage", {
       configurable: true,
-      value: createStorageMock()
+      value: createStorageMock(),
     });
   });
 
   afterEach(() => {
     Object.defineProperty(window, "localStorage", {
       configurable: true,
-      value: originalLocalStorage
+      value: originalLocalStorage,
     });
   });
 
@@ -70,27 +70,25 @@ describe("ThemePreferenceStore", () => {
     expect(themePreference).toBeNull();
   });
 
-  it.each(THEME_PREFERENCE_FIXTURES)(
-    "reads stored theme preference $themePreference",
-    ({ themePreference }) => {
-      const store = createStore();
-      window.localStorage.setItem(THEME_STORAGE_KEY, themePreference);
+  it.each(THEME_PREFERENCE_FIXTURES)("reads stored theme preference $themePreference", ({
+    themePreference,
+  }) => {
+    const store = createStore();
+    window.localStorage.setItem(THEME_STORAGE_KEY, themePreference);
 
-      const actualThemePreference = store.readThemePreference();
+    const actualThemePreference = store.readThemePreference();
 
-      expect(actualThemePreference).toBe(themePreference);
-    }
-  );
+    expect(actualThemePreference).toBe(themePreference);
+  });
 
-  it.each(THEME_PREFERENCE_FIXTURES)(
-    "writes theme preference $themePreference",
-    ({ themePreference }) => {
-      const store = createStore();
-      store.writeThemePreference(themePreference);
+  it.each(THEME_PREFERENCE_FIXTURES)("writes theme preference $themePreference", ({
+    themePreference,
+  }) => {
+    const store = createStore();
+    store.writeThemePreference(themePreference);
 
-      expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe(themePreference);
-    }
-  );
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe(themePreference);
+  });
 
   it("overwrites previously stored theme preference", () => {
     const store = createStore();
@@ -106,7 +104,7 @@ describe("ThemePreferenceStore", () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, INVALID_THEME_PREFERENCE);
 
     expect(() => store.readThemePreference()).toThrowError(
-      `Theme preference at key "${THEME_STORAGE_KEY}" is invalid. Expected "${LIGHT_THEME_PREFERENCE}" or "${DARK_THEME_PREFERENCE}".`
+      `Theme preference at key "${THEME_STORAGE_KEY}" is invalid. Expected "${LIGHT_THEME_PREFERENCE}" or "${DARK_THEME_PREFERENCE}".`,
     );
   });
 });

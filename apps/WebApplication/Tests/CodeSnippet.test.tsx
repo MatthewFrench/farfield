@@ -11,9 +11,9 @@ vi.mock("@/Features/Theme/StateManagement/UseTheme", () => ({
   useTheme() {
     return {
       theme: "light",
-      toggle: () => {}
+      toggle: () => {},
     };
-  }
+  },
 }));
 
 vi.mock("react-syntax-highlighter", () => ({
@@ -27,12 +27,12 @@ vi.mock("react-syntax-highlighter", () => ({
         {input.children}
       </pre>
     );
-  }
+  },
 }));
 
 vi.mock("react-syntax-highlighter/dist/esm/styles/prism", () => ({
   oneDark: {},
-  oneLight: {}
+  oneLight: {},
 }));
 
 import { CodeSnippet } from "@/Components/CodeSnippet";
@@ -45,23 +45,21 @@ function renderCodeSnippet(input?: {
   cleanup();
 
   const wrapLongLinesProperties =
-    input?.wrapLongLines === undefined
-      ? {}
-      : { wrapLongLines: input.wrapLongLines };
+    input?.wrapLongLines === undefined ? {} : { wrapLongLines: input.wrapLongLines };
 
   render(
     <CodeSnippet
       code={input?.code ?? "const value = 1;"}
       language={input?.language ?? "ts"}
       {...wrapLongLinesProperties}
-    />
+    />,
   );
 }
 
 describe("CodeSnippet", () => {
   it("normalizes empty language input to the text language contract", () => {
     renderCodeSnippet({
-      language: "   "
+      language: "   ",
     });
 
     const snippet = screen.getByTestId("code-snippet");
@@ -76,7 +74,7 @@ describe("CodeSnippet", () => {
     expect(defaultSnippet.getAttribute("data-wrap-long-lines")).toBe("true");
 
     renderCodeSnippet({
-      wrapLongLines: false
+      wrapLongLines: false,
     });
 
     const noWrapSnippet = screen.getByTestId("code-snippet");

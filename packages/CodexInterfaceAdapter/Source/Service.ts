@@ -1,11 +1,11 @@
 import {
-  JsonValueSchema,
-  type JsonValue,
-  type IpcResponseFrame,
-  type TurnStartParams,
   type CollaborationMode,
+  type IpcResponseFrame,
+  type JsonValue,
+  JsonValueSchema,
   parseUserInputResponsePayload,
-  type UserInputResponsePayload
+  type TurnStartParams,
+  type UserInputResponsePayload,
 } from "@farfield/protocol";
 
 const THREAD_FOLLOWER_START_TURN_METHOD = "thread-follower-start-turn";
@@ -35,14 +35,14 @@ export interface CodexMonitorIpcClient {
   sendRequestAndWait(
     method: string,
     params: JsonValue,
-    options: ThreadFollowerRequestOptions
+    options: ThreadFollowerRequestOptions,
   ): Promise<IpcResponseFrame>;
 }
 
 function buildThreadFollowerRequestOptions(ownerClientId: string): ThreadFollowerRequestOptions {
   return {
     targetClientId: ownerClientId,
-    version: THREAD_FOLLOWER_PROTOCOL_VERSION
+    version: THREAD_FOLLOWER_PROTOCOL_VERSION,
   };
 }
 
@@ -112,13 +112,13 @@ function buildTurnStartParams(input: SendMessageInput, trimmedText: string): Tur
         threadId: input.threadId,
         input: textInput,
         cwd: input.cwd ?? template.cwd,
-        attachments: template.attachments ?? []
+        attachments: template.attachments ?? [],
       }
     : {
         threadId: input.threadId,
         input: textInput,
         ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
-        attachments: []
+        attachments: [],
       };
 
   return applyTurnStartOverrides(turnStartParams, input);
@@ -128,12 +128,17 @@ function buildTurnStartParams(input: SendMessageInput, trimmedText: string): Tur
  * Optional overrides are applied only when provided by the typed service API.
  * Omitted fields intentionally preserve template values.
  */
-function applyTurnStartOverrides(turnStartParams: TurnStartParams, input: SendMessageInput): TurnStartParams {
+function applyTurnStartOverrides(
+  turnStartParams: TurnStartParams,
+  input: SendMessageInput,
+): TurnStartParams {
   return {
     ...turnStartParams,
     ...(input.model !== undefined ? { model: input.model } : {}),
     ...(input.effort !== undefined ? { effort: input.effort } : {}),
-    ...(input.collaborationMode !== undefined ? { collaborationMode: input.collaborationMode } : {})
+    ...(input.collaborationMode !== undefined
+      ? { collaborationMode: input.collaborationMode }
+      : {}),
   };
 }
 
@@ -157,69 +162,69 @@ export class CodexMonitorService {
     const requestParameters: ThreadFollowerStartTurnRequestParameters = {
       conversationId: input.threadId,
       turnStartParams: buildTurnStartParams(input, trimmedText),
-      isSteering: Boolean(input.isSteering)
+      isSteering: Boolean(input.isSteering),
     };
 
     await this.sendThreadFollowerRequest(
       THREAD_FOLLOWER_START_TURN_METHOD,
       requestParameters,
-      input.ownerClientId
+      input.ownerClientId,
     );
   }
 
   public async setCollaborationMode(input: SetModeInput): Promise<void> {
     const requestParameters: ThreadFollowerSetCollaborationModeRequestParameters = {
       conversationId: input.threadId,
-      collaborationMode: input.collaborationMode
+      collaborationMode: input.collaborationMode,
     };
 
     await this.sendThreadFollowerRequest(
       THREAD_FOLLOWER_SET_COLLABORATION_MODE_METHOD,
       requestParameters,
-      input.ownerClientId
+      input.ownerClientId,
     );
   }
 
   public async submitUserInput(input: SubmitUserInputInput): Promise<void> {
     const responsePayload = parseUserInputResponsePayload(
-      normalizeStructuredDataValue(input.response)
+      normalizeStructuredDataValue(input.response),
     );
 
     const requestParameters: ThreadFollowerSubmitUserInputRequestParameters = {
       conversationId: input.threadId,
       requestId: input.requestId,
-      response: responsePayload
+      response: responsePayload,
     };
 
     await this.sendThreadFollowerRequest(
       THREAD_FOLLOWER_SUBMIT_USER_INPUT_METHOD,
       requestParameters,
-      input.ownerClientId
+      input.ownerClientId,
     );
   }
 
   public async interrupt(input: InterruptInput): Promise<void> {
     const requestParameters: ThreadFollowerInterruptRequestParameters = {
-      conversationId: input.threadId
+      conversationId: input.threadId,
     };
 
     await this.sendThreadFollowerRequest(
       THREAD_FOLLOWER_INTERRUPT_TURN_METHOD,
       requestParameters,
-      input.ownerClientId
+      input.ownerClientId,
     );
   }
 
   private async sendThreadFollowerRequest(
     method: string,
     requestParameters: ThreadFollowerRequestParameters,
-    ownerClientId: string
+    ownerClientId: string,
   ): Promise<void> {
     const requestParams = normalizeStructuredDataValue(requestParameters);
     await this.ipcClient.sendRequestAndWait(
       method,
       requestParams,
-      buildThreadFollowerRequestOptions(ownerClientId)
+      buildThreadFollowerRequestOptions(ownerClientId),
     );
   }
 }

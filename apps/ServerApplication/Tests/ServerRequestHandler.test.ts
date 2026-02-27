@@ -1,10 +1,10 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { IncomingMessage, ServerResponse } from "node:http";
+import { Socket } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { Socket } from "node:net";
-import { describe, expect, it } from "vitest";
 import { FarfieldPushTestBodySchema, type PushNotificationPayload } from "@farfield/protocol";
+import { describe, expect, it } from "vitest";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import { ThreadAdapterResolver } from "../Source/Agents/ThreadAdapterResolver.js";
 import { ThreadIndex } from "../Source/Agents/ThreadIndex.js";
@@ -23,7 +23,7 @@ import { RequestObservabilityOwner } from "../Source/Network/RequestObservabilit
 import { RequestPathnameByName } from "../Source/Network/RequestPathContracts.js";
 import {
   ServerRequestHandler,
-  type ServerRequestHandlerDependencies
+  type ServerRequestHandlerDependencies,
 } from "../Source/Network/ServerRequestHandler.js";
 import { ServerRequestUtilityOwner } from "../Source/Network/ServerRequestUtilityOwner.js";
 import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
@@ -64,7 +64,7 @@ function createRuntimeStateOwner(): RuntimeStateOwner {
     readPushSubscriptionCount: () => 0,
     readPushReceiptCount: () => 0,
     readClientErrorCount: () => 0,
-    readActiveTraceSummary: () => null
+    readActiveTraceSummary: () => null,
   });
 }
 
@@ -88,7 +88,7 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
       cookieName: "farfield-session",
       sessionTimeToLiveMs: 60_000,
       signingSecret: "test-secret",
-      secureCookie: false
+      secureCookie: false,
     }),
     clientRequestIdHeaderName: options.clientRequestIdHeaderName ?? BASE_TEST_REQUEST_HEADER_NAME,
     clientRequestIdResponseHeader: BASE_TEST_RESPONSE_HEADER_NAME,
@@ -118,26 +118,28 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
     clientErrorStore: new ClientErrorStore(
       path.join(tempDirectoryPath, "client-errors.ndjson"),
       "session_test",
-      64
+      64,
     ),
     pushService: new PushService({
       enabled: false,
       vapidPublicKey: "",
       vapidPrivateKey: "",
-      vapidSubject: "mailto:test@example.com"
+      vapidSubject: "mailto:test@example.com",
     }),
     pushStore: new PushStore(path.join(tempDirectoryPath, "push-state.json")),
     pushReceiptStore: new PushReceiptStore(
       path.join(tempDirectoryPath, "push-receipts.json"),
       64,
-      60_000
+      60_000,
     ),
     pushSendStore: new PushSendStore(path.join(tempDirectoryPath, "push-send.json")),
     pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
     requestObservabilityOwner,
     readCurrentEventLoopLagMs: options.readCurrentEventLoopLagMs ?? (() => 0),
     readObservabilitySnapshot: () => {
-      throw new Error("readObservabilitySnapshot should not run in ServerRequestHandler unit tests");
+      throw new Error(
+        "readObservabilitySnapshot should not run in ServerRequestHandler unit tests",
+      );
     },
     pushTestBodySchema: FarfieldPushTestBodySchema,
     buildPushTestPayload: () => {
@@ -156,9 +158,9 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
             navigate: "/threads/thread_1",
             icon: "/icons/icon-192.png",
             badge: "/icons/icon-192.png",
-            tag: "thread:thread_1"
-          }
-        }
+            tag: "thread:thread_1",
+          },
+        },
       };
       return payload;
     },
@@ -172,10 +174,10 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
       response.statusCode = statusCode;
       jsonResponseCalls.push({
         statusCode,
-        body
+        body,
       });
     },
-    toErrorMessage: <ValueType,>(value: ValueType): string => {
+    toErrorMessage: <ValueType>(value: ValueType): string => {
       if (value instanceof Error) {
         return value.message;
       }
@@ -184,7 +186,10 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
     ensureTraceDirectory: () => {},
     pushSystem: () => {},
     invalidateThreadListAggregationCache: () => {},
-    buildAgentDescriptor: (_adapter: AgentAdapter, projectDirectories: string[]): AgentDescriptor => ({
+    buildAgentDescriptor: (
+      _adapter: AgentAdapter,
+      projectDirectories: string[],
+    ): AgentDescriptor => ({
       id: "codex",
       label: "Codex",
       enabled: true,
@@ -195,15 +200,15 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
         canSetCollaborationMode: false,
         canSubmitUserInput: false,
         canReadLiveState: false,
-        canReadStreamEvents: false
+        canReadStreamEvents: false,
       },
-      projectDirectories
+      projectDirectories,
     }),
     setRuntimeLastError: () => {},
     broadcastRuntimeState: () => {},
     isShuttingDown: () => false,
     isExpectedShutdownTransportError: () => false,
-    recordServerErrorEvent: () => {}
+    recordServerErrorEvent: () => {},
   };
 
   return {
@@ -213,7 +218,7 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
     cleanup: () => {
       eventStreamClientRegistry.stopKeepalive();
       rmSync(tempDirectoryPath, { recursive: true, force: true });
-    }
+    },
   };
 }
 
@@ -223,7 +228,7 @@ function createRequestResponsePair(): { request: IncomingMessage; response: Serv
   const response = new ServerResponse(request);
   return {
     request,
-    response
+    response,
   };
 }
 
@@ -242,9 +247,9 @@ describe("ServerRequestHandler", () => {
           statusCode: 400,
           body: {
             ok: false,
-            error: "Malformed request URL"
-          }
-        }
+            error: "Malformed request URL",
+          },
+        },
       ]);
 
       const snapshot = harness.requestObservabilityOwner.readSnapshot();
@@ -258,7 +263,7 @@ describe("ServerRequestHandler", () => {
 
   it("reads configured request-id headers through lowercase normalization", async () => {
     const harness = createHandlerTestHarness({
-      clientRequestIdHeaderName: "X-Farfield-Request-Id"
+      clientRequestIdHeaderName: "X-Farfield-Request-Id",
     });
     const { request, response } = createRequestResponsePair();
     request.method = "GET";
@@ -323,7 +328,7 @@ describe("ServerRequestHandler", () => {
       readCurrentEventLoopLagMs: () => {
         readCurrentEventLoopLagInvocationCount += 1;
         return readCurrentEventLoopLagInvocationCount === 1 ? 17 : 91;
-      }
+      },
     });
     const { request, response } = createRequestResponsePair();
     request.method = "GET";

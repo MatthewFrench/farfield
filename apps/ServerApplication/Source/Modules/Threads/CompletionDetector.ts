@@ -22,10 +22,9 @@ function isCompletedStatus(status: string): boolean {
 }
 
 function normalizeCompletionStatus(status: string): string {
-  return status.toLowerCase().replaceAll(
-    COMPLETION_STATUS_UNDERSCORE_TOKEN,
-    COMPLETION_STATUS_DASH_TOKEN
-  );
+  return status
+    .toLowerCase()
+    .replaceAll(COMPLETION_STATUS_UNDERSCORE_TOKEN, COMPLETION_STATUS_DASH_TOKEN);
 }
 
 function isAgentMessageItem(item: ThreadItem): item is AgentMessageTurnItem {
@@ -70,7 +69,10 @@ export class CompletionDetector {
     this.watermarks = new Map(initialWatermarks);
   }
 
-  public detect(threadId: string, conversationState: ThreadConversationState | null): CompletionCandidate | null {
+  public detect(
+    threadId: string,
+    conversationState: ThreadConversationState | null,
+  ): CompletionCandidate | null {
     if (!conversationState) {
       return null;
     }
@@ -105,7 +107,7 @@ export class CompletionDetector {
       turnId,
       marker,
       agentMessageId: lastAgentMessage.id,
-      agentText: lastAgentMessage.text
+      agentText: lastAgentMessage.text,
     };
   }
 

@@ -1,6 +1,5 @@
+import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import {
-  DEFAULT_DEBUG_LIST_LIMIT,
-  clearDebugClientErrors,
   type ApiDebugErrorClearResponse,
   type ApiDebugErrorDetailResponse,
   type ApiDebugErrorListResponse,
@@ -9,6 +8,8 @@ import {
   type ApiReplayHistoryEntryInput,
   type ApiReplayHistoryEntryResponse,
   type ApiTraceStatusResponse,
+  clearDebugClientErrors,
+  DEFAULT_DEBUG_LIST_LIMIT,
   getDebugClientError,
   getHistoryEntry,
   getTraceStatus,
@@ -17,9 +18,8 @@ import {
   markTrace,
   replayHistoryEntry,
   startTrace,
-  stopTrace
+  stopTrace,
 } from "./DebugApi";
-import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
 export type DebugTraceStatusResponse = ApiTraceStatusResponse;
 export type DebugHistoryResponse = ApiDebugHistoryResponse;
@@ -53,28 +53,28 @@ export class DebugServerClient {
 
   public async listHistory(
     limit = DEFAULT_DEBUG_LIST_LIMIT,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<ApiDebugHistoryResponse> {
     return listDebugHistory(limit, options);
   }
 
   public async readHistoryEntry(
     entryId: string,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<ApiDebugHistoryDetailResponse> {
     return getHistoryEntry(entryId, options);
   }
 
   public async listClientErrors(
     limit = DEFAULT_DEBUG_LIST_LIMIT,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<ApiDebugErrorListResponse> {
     return listDebugClientErrors(limit, options);
   }
 
   public async readClientError(
     errorId: string,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<ApiDebugErrorDetailResponse> {
     return getDebugClientError(errorId, options);
   }
@@ -85,7 +85,7 @@ export class DebugServerClient {
 
   public async replayHistoryEntry(
     input: ApiReplayHistoryEntryInput,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<ApiReplayHistoryEntryResponse> {
     return replayHistoryEntry(input, options);
   }

@@ -4,10 +4,10 @@ import { EventLoopLagObservabilityOwner } from "../Source/Network/EventLoopLagOb
 describe("EventLoopLagObservabilityOwner", () => {
   it("rejects invalid constructor bounds", () => {
     expect(() => new EventLoopLagObservabilityOwner(0, 10)).toThrow(
-      "EventLoopLagObservabilityOwner requires a positive integer sampleIntervalMs"
+      "EventLoopLagObservabilityOwner requires a positive integer sampleIntervalMs",
     );
     expect(() => new EventLoopLagObservabilityOwner(10, 0)).toThrow(
-      "EventLoopLagObservabilityOwner requires a positive integer maxSamples"
+      "EventLoopLagObservabilityOwner requires a positive integer maxSamples",
     );
   });
 
@@ -22,7 +22,7 @@ describe("EventLoopLagObservabilityOwner", () => {
       },
       clearScheduledInterval: (timerHandle) => {
         clearInterval(timerHandle);
-      }
+      },
     });
 
     owner.start();
@@ -54,7 +54,7 @@ describe("EventLoopLagObservabilityOwner", () => {
       },
       clearScheduledInterval: (timerHandle) => {
         clearInterval(timerHandle);
-      }
+      },
     });
 
     owner.start();
@@ -92,7 +92,7 @@ describe("EventLoopLagObservabilityOwner", () => {
       },
       clearScheduledInterval: (timerHandle) => {
         clearInterval(timerHandle);
-      }
+      },
     });
 
     owner.start();

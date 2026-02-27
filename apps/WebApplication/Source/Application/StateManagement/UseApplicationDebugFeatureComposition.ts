@@ -1,7 +1,7 @@
 import {
   type DebugActionHandlers,
   type UseDebugActionHandlersInput,
-  useDebugActionHandlers
+  useDebugActionHandlers,
 } from "@/Features/Debugging/StateManagement/UseDebugActionHandlers";
 
 // Application-level composition intentionally delegates debug action ownership to the
@@ -9,7 +9,7 @@ import {
 export type UseApplicationDebugFeatureCompositionInput = UseDebugActionHandlersInput;
 
 export function useApplicationDebugFeatureComposition(
-  input: UseApplicationDebugFeatureCompositionInput
+  input: UseApplicationDebugFeatureCompositionInput,
 ): DebugActionHandlers {
   return useDebugActionHandlers(input);
 }

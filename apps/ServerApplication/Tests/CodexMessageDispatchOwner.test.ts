@@ -1,5 +1,15 @@
-import { AppServerClient, CodexMonitorService, type AppServerTransport, type CodexMonitorIpcClient, type SendMessageInput } from "@farfield/api";
-import { parseThreadStreamStateChangedBroadcast, type IpcResponseFrame, type JsonValue } from "@farfield/protocol";
+import {
+  AppServerClient,
+  type AppServerTransport,
+  type CodexMonitorIpcClient,
+  CodexMonitorService,
+  type SendMessageInput,
+} from "@farfield/api";
+import {
+  type IpcResponseFrame,
+  type JsonValue,
+  parseThreadStreamStateChangedBroadcast,
+} from "@farfield/protocol";
 import { describe, expect, it } from "vitest";
 import { CodexMessageDispatchOwner } from "../Source/Agents/Adapters/CodexMessageDispatchOwner.js";
 import { CodexThreadStreamStateOwner } from "../Source/Agents/Adapters/CodexThreadStreamStateOwner.js";
@@ -10,14 +20,14 @@ const DEFAULT_IPC_RESPONSE_FRAME: IpcResponseFrame = {
   requestId: "response-1",
   resultType: "success",
   result: {
-    status: "ok"
-  }
+    status: "ok",
+  },
 };
 
 const NOOP_MONITOR_IPC_CLIENT: CodexMonitorIpcClient = {
   async sendRequestAndWait(): Promise<IpcResponseFrame> {
     return DEFAULT_IPC_RESPONSE_FRAME;
-  }
+  },
 };
 
 interface AppServerRequestCall {
@@ -52,51 +62,56 @@ class TestAppServerTransport implements AppServerTransport {
     this.requestCalls.push({
       method,
       params,
-      timeoutMs
+      timeoutMs,
     });
     return {
       thread: {
         id: "unused-thread-id",
         turns: [],
-        requests: []
-      }
+        requests: [],
+      },
     };
   }
 
   public async close(): Promise<void> {}
 }
 
-function createThreadStreamStateOwner(threadId: string, ownerClientId: string): CodexThreadStreamStateOwner {
+function createThreadStreamStateOwner(
+  threadId: string,
+  ownerClientId: string,
+): CodexThreadStreamStateOwner {
   const threadStreamStateOwner = new CodexThreadStreamStateOwner();
-  threadStreamStateOwner.ingestInboundFrame(parseThreadStreamStateChangedBroadcast({
-    type: "broadcast",
-    method: THREAD_STREAM_STATE_CHANGED_METHOD,
-    sourceClientId: ownerClientId,
-    version: 4,
-    params: {
-      conversationId: threadId,
-      type: THREAD_STREAM_STATE_CHANGED_METHOD,
+  threadStreamStateOwner.ingestInboundFrame(
+    parseThreadStreamStateChangedBroadcast({
+      type: "broadcast",
+      method: THREAD_STREAM_STATE_CHANGED_METHOD,
+      sourceClientId: ownerClientId,
       version: 4,
-      change: {
-        type: "snapshot",
-        conversationState: {
-          id: threadId,
-          turns: [
-            {
-              params: {
-                threadId,
-                input: [{ type: "text", text: "existing input" }],
-                attachments: []
+      params: {
+        conversationId: threadId,
+        type: THREAD_STREAM_STATE_CHANGED_METHOD,
+        version: 4,
+        change: {
+          type: "snapshot",
+          conversationState: {
+            id: threadId,
+            turns: [
+              {
+                params: {
+                  threadId,
+                  input: [{ type: "text", text: "existing input" }],
+                  attachments: [],
+                },
+                status: "completed",
+                items: [],
               },
-              status: "completed",
-              items: []
-            }
-          ],
-          requests: []
-        }
-      }
-    }
-  }));
+            ],
+            requests: [],
+          },
+        },
+      },
+    }),
+  );
   return threadStreamStateOwner;
 }
 
@@ -111,18 +126,20 @@ function createOwnerTestContext(threadId: string, ownerClientId: string): OwnerT
     appClient,
     service,
     threadStreamStateOwner,
-    runAppServerCall: async <ValueType,>(operation: () => Promise<ValueType>): Promise<ValueType> => {
+    runAppServerCall: async <ValueType>(
+      operation: () => Promise<ValueType>,
+    ): Promise<ValueType> => {
       runAppServerCallCount += 1;
       return operation();
     },
-    isConversationNotFoundError: <ErrorType,>(_error: ErrorType): boolean => false
+    isConversationNotFoundError: <ErrorType>(_error: ErrorType): boolean => false,
   });
 
   return {
     owner,
     service,
     appServerTransport,
-    readRunAppServerCallCount: () => runAppServerCallCount
+    readRunAppServerCallCount: () => runAppServerCallCount,
   };
 }
 
@@ -136,9 +153,9 @@ describe("CodexMessageDispatchOwner", () => {
       {
         threadId,
         text: "hello",
-        cwd: ""
+        cwd: "",
       },
-      true
+      true,
     );
 
     expect(context.service.sendMessageCalls).toHaveLength(1);
@@ -162,9 +179,9 @@ describe("CodexMessageDispatchOwner", () => {
     await context.owner.sendMessage(
       {
         threadId,
-        text: "hello"
+        text: "hello",
       },
-      true
+      true,
     );
 
     expect(context.service.sendMessageCalls).toHaveLength(1);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  FarfieldEventStreamEnvelopeSchema,
   FarfieldDebugObservabilityEnvelopeSchema,
+  FarfieldEventStreamEnvelopeSchema,
   FarfieldHealthResponseSchema,
   FarfieldPushStatusEnvelopeSchema,
   parseAppServerCollaborationModeListResponse,
@@ -11,7 +11,7 @@ import {
   parseAppServerReadThreadResponse,
   parseAppServerStartThreadResponse,
   parseCreateDebugClientErrorBody,
-  parseDebugErrorEvent
+  parseDebugErrorEvent,
 } from "../Source/Index.js";
 
 describe("codex-protocol app-server schemas", () => {
@@ -23,9 +23,9 @@ describe("codex-protocol app-server schemas", () => {
           mode: "plan",
           model: null,
           reasoning_effort: "medium",
-          developer_instructions: "Instructions"
-        }
-      ]
+          developer_instructions: "Instructions",
+        },
+      ],
     });
 
     expect(parsed.data[0]?.mode).toBe("plan");
@@ -43,21 +43,21 @@ describe("codex-protocol app-server schemas", () => {
           supportedReasoningEfforts: [
             {
               reasoningEffort: "medium",
-              description: "Balanced"
+              description: "Balanced",
             },
             {
               reasoningEffort: "xhigh",
-              description: "Deep reasoning"
-            }
+              description: "Deep reasoning",
+            },
           ],
           defaultReasoningEffort: "xhigh",
           inputModalities: ["text", "image"],
           supportsPersonality: true,
           isDefault: true,
-          hidden: true
-        }
+          hidden: true,
+        },
       ],
-      nextCursor: null
+      nextCursor: null,
     });
 
     expect(parsed.data[0]?.id).toBe("gpt-5.3-codex");
@@ -76,18 +76,18 @@ describe("codex-protocol app-server schemas", () => {
           supportedReasoningEfforts: [
             {
               reasoningEffort: "medium",
-              description: "Balanced"
-            }
+              description: "Balanced",
+            },
           ],
           defaultReasoningEffort: "medium",
           inputModalities: ["text"],
           supportsPersonality: true,
           isDefault: true,
-          hidden: false
-        }
+          hidden: false,
+        },
       ],
       nextCursor: null,
-      hidden: true
+      hidden: true,
     });
 
     expect(parsed["hidden"]).toBe(true);
@@ -102,10 +102,10 @@ describe("codex-protocol app-server schemas", () => {
           createdAt: 1700000000,
           updatedAt: 1700000100,
           cwd: "/tmp/project",
-          source: "opencode"
-        }
+          source: "opencode",
+        },
       ],
-      nextCursor: null
+      nextCursor: null,
     });
 
     expect(parsed.data[0]?.id).toBe("sess-1");
@@ -131,12 +131,12 @@ describe("codex-protocol app-server schemas", () => {
               {
                 id: "item-1",
                 type: "agentMessage",
-                text: "hello"
-              }
-            ]
-          }
-        ]
-      }
+                text: "hello",
+              },
+            ],
+          },
+        ],
+      },
     });
 
     expect(parsed.thread.id).toBe("thread-123");
@@ -158,12 +158,12 @@ describe("codex-protocol app-server schemas", () => {
         cliVersion: "0.1.0",
         turns: [],
         threadRuntimeMetadata: {
-          sourceRequestId: "request-1"
-        }
+          sourceRequestId: "request-1",
+        },
       },
       responseEnvelopeMetadata: {
-        nextCursor: null
-      }
+        nextCursor: null,
+      },
     });
 
     expect(Object.keys(parsed)).toEqual(["thread"]);
@@ -183,11 +183,11 @@ describe("codex-protocol app-server schemas", () => {
           path: "/tmp/thread.jsonl",
           cliVersion: "0.1.0",
           source: {
-            subAgent: "review"
+            subAgent: "review",
           },
-          turns: []
-        }
-      })
+          turns: [],
+        },
+      }),
     ).toThrowError(/AppServerReadThreadResponse\.thread did not match expected schema/);
   });
 
@@ -204,16 +204,16 @@ describe("codex-protocol app-server schemas", () => {
         cliVersion: "0.1.0",
         source: "vscode",
         gitInfo: null,
-        turns: []
+        turns: [],
       },
       model: "gpt-5.3-codex",
       modelProvider: "openai",
       cwd: "/tmp/workspace",
       approvalPolicy: "never",
       sandbox: {
-        type: "dangerFullAccess"
+        type: "dangerFullAccess",
       },
-      reasoningEffort: "medium"
+      reasoningEffort: "medium",
     });
 
     expect(parsed.thread.id).toBe("thread-456");
@@ -228,9 +228,9 @@ describe("codex-protocol app-server schemas", () => {
         createdAt: 1700000000,
         updatedAt: 1700000000,
         cwd: "/tmp/project",
-        source: "opencode"
+        source: "opencode",
       },
-      cwd: "/tmp/project"
+      cwd: "/tmp/project",
     });
 
     expect(parsed.thread.id).toBe("sess-2");
@@ -245,12 +245,12 @@ describe("codex-protocol app-server schemas", () => {
         profiles: {
           personal: {
             model: "gpt-5.3-codex",
-            model_reasoning_effort: "xhigh"
-          }
-        }
+            model_reasoning_effort: "xhigh",
+          },
+        },
       },
       origins: {},
-      layers: null
+      layers: null,
     });
 
     expect(parsed.config.profile).toBe("personal");
@@ -260,7 +260,7 @@ describe("codex-protocol app-server schemas", () => {
 
   it("normalizes app-server config/read response defaults when optional fields are absent", () => {
     const parsed = parseAppServerConfigReadResponse({
-      config: {}
+      config: {},
     });
 
     expect(parsed.config.profile).toBeNull();
@@ -273,9 +273,9 @@ describe("codex-protocol app-server schemas", () => {
     expect(() =>
       parseAppServerConfigReadResponse({
         config: {
-          model_reasoning_effort: "ultra"
-        }
-      })
+          model_reasoning_effort: "ultra",
+        },
+      }),
     ).toThrowError(/model_reasoning_effort/);
   });
 
@@ -283,7 +283,7 @@ describe("codex-protocol app-server schemas", () => {
     const parsed = parseCreateDebugClientErrorBody({
       source: "farfield-web",
       operation: "capture-error",
-      message: "Network request failed"
+      message: "Network request failed",
     });
 
     expect(parsed.severity).toBe("error");
@@ -297,8 +297,8 @@ describe("codex-protocol app-server schemas", () => {
         source: "farfield-web",
         operation: "capture-error",
         message: "Network request failed",
-        extraField: "unexpected"
-      })
+        extraField: "unexpected",
+      }),
     ).toThrowError(/Unrecognized key\(s\) in object: 'extraField'/);
   });
 
@@ -315,15 +315,15 @@ describe("codex-protocol app-server schemas", () => {
             evictionCount: 4,
             invalidationCount: 5,
             entryCount: 6,
-            inFlightCount: 7
-          }
+            inFlightCount: 7,
+          },
         },
         concurrency: {
           thread: {
             queuedExecutionCount: 1,
             completedExecutionCount: 2,
             failedExecutionCount: 3,
-            activeThreadCount: 4
+            activeThreadCount: 4,
           },
           pushDispatch: {
             scheduledCheckCount: 1,
@@ -331,14 +331,14 @@ describe("codex-protocol app-server schemas", () => {
             completedCheckCount: 3,
             skippedWhileInFlightCount: 4,
             activeTimerCount: 5,
-            inFlightThreadCount: 6
+            inFlightThreadCount: 6,
           },
           pushMutation: {
             queuedExecutionCount: 1,
             completedExecutionCount: 2,
             failedExecutionCount: 3,
-            hasInFlightOperation: false
-          }
+            hasInFlightOperation: false,
+          },
         },
         streaming: {
           eventStream: {
@@ -349,8 +349,8 @@ describe("codex-protocol app-server schemas", () => {
             broadcastEventCount: 4,
             broadcastDeliveryAttemptCount: 5,
             eventWriteFailureCount: 6,
-            keepaliveWriteFailureCount: 7
-          }
+            keepaliveWriteFailureCount: 7,
+          },
         },
         routing: {
           threadAdapterResolver: {
@@ -360,8 +360,8 @@ describe("codex-protocol app-server schemas", () => {
             unregisteredDiscoveryMissCount: 4,
             unregisteredDiscoveryMissCacheHitCount: 5,
             unregisteredDiscoveryAmbiguousCount: 6,
-            unregisteredDiscoveryAlertCount: 7
-          }
+            unregisteredDiscoveryAlertCount: 7,
+          },
         },
         performance: {
           requestRouting: {
@@ -380,8 +380,8 @@ describe("codex-protocol app-server schemas", () => {
                 p99DurationMs: 95,
                 lastQueueDelayMs: 2,
                 p95QueueDelayMs: 5,
-                maxQueueDelayMs: 9
-              }
+                maxQueueDelayMs: 9,
+              },
             ],
             startupRequestTimings: [
               {
@@ -394,8 +394,8 @@ describe("codex-protocol app-server schemas", () => {
                 statusCode: 200,
                 durationMs: 42,
                 queueDelayMs: 3,
-                completedAt: "2026-02-26T00:00:02.000Z"
-              }
+                completedAt: "2026-02-26T00:00:02.000Z",
+              },
             ],
             requestLifecycleEvents: [
               {
@@ -406,7 +406,7 @@ describe("codex-protocol app-server schemas", () => {
                 method: "GET",
                 pathname: "/api/threads",
                 startedAt: "2026-02-26T00:00:00.500Z",
-                queueDelayMs: 2
+                queueDelayMs: 2,
               },
               {
                 phase: "completed",
@@ -420,9 +420,9 @@ describe("codex-protocol app-server schemas", () => {
                 durationMs: 42,
                 queueDelayMs: 3,
                 completedAt: "2026-02-26T00:00:02.000Z",
-                outcome: "success"
-              }
-            ]
+                outcome: "success",
+              },
+            ],
           },
           eventLoop: {
             sampleIntervalMs: 1000,
@@ -431,13 +431,15 @@ describe("codex-protocol app-server schemas", () => {
             p50LagMs: 0,
             p95LagMs: 4,
             p99LagMs: 7,
-            maxLagMs: 9
-          }
-        }
-      }
+            maxLagMs: 9,
+          },
+        },
+      },
     });
 
-    expect(parsed.snapshot.routing.threadAdapterResolver.unregisteredDiscoveryMissCacheHitCount).toBe(5);
+    expect(
+      parsed.snapshot.routing.threadAdapterResolver.unregisteredDiscoveryMissCacheHitCount,
+    ).toBe(5);
   });
 
   it("parses farfield health response with additive diagnostics keys", () => {
@@ -453,21 +455,23 @@ describe("codex-protocol app-server schemas", () => {
         historyCount: 12,
         threadOwnerCount: 2,
         pushSubscriptionCount: 1,
-        diagnosticsBuild: "2026-02-26"
-      }
+        diagnosticsBuild: "2026-02-26",
+      },
     });
 
     expect(Object.keys(parsed.state)).toContain("diagnosticsBuild");
   });
 
   it("rejects farfield push status envelope when ok is false", () => {
-    expect(() => FarfieldPushStatusEnvelopeSchema.parse({
-      ok: false,
-      enabled: true,
-      permissionRequired: false,
-      subscriptionCount: 0,
-      privateModeDefault: false
-    })).toThrowError(/Invalid literal value, expected true/);
+    expect(() =>
+      FarfieldPushStatusEnvelopeSchema.parse({
+        ok: false,
+        enabled: true,
+        permissionRequired: false,
+        subscriptionCount: 0,
+        privateModeDefault: false,
+      }),
+    ).toThrowError(/Invalid literal value, expected true/);
   });
 
   it("parses farfield event-stream envelope for thread stream delta payloads", () => {
@@ -482,7 +486,7 @@ describe("codex-protocol app-server schemas", () => {
             threadId: "thread-1",
             ownerClientId: "client-a",
             conversationState: null,
-            liveStateError: null
+            liveStateError: null,
           },
           streamEventsSnapshot: {
             ok: true,
@@ -494,17 +498,17 @@ describe("codex-protocol app-server schemas", () => {
                 requestId: "request-1",
                 method: "thread/read",
                 params: {
-                  threadId: "thread-1"
-                }
-              }
+                  threadId: "thread-1",
+                },
+              },
             ],
             nextSequence: 4,
             firstAvailableSequence: 2,
-            resetRequired: false
+            resetRequired: false,
           },
-          streamEventsSinceSequenceUsed: 3
-        }
-      }
+          streamEventsSinceSequenceUsed: 3,
+        },
+      },
     });
 
     expect(parsed.event.type).toBe("thread-stream-delta");
@@ -515,103 +519,107 @@ describe("codex-protocol app-server schemas", () => {
   });
 
   it("rejects farfield event-stream envelopes when required event metadata is missing", () => {
-    expect(() => FarfieldEventStreamEnvelopeSchema.parse({
-      sequence: 1,
-      event: {
-        type: "thread-stream-delta",
-        delta: {
-          threadId: "thread-1",
-          liveStateSnapshot: {
-            ok: true,
+    expect(() =>
+      FarfieldEventStreamEnvelopeSchema.parse({
+        sequence: 1,
+        event: {
+          type: "thread-stream-delta",
+          delta: {
             threadId: "thread-1",
-            ownerClientId: null,
-            conversationState: null,
-            liveStateError: null
+            liveStateSnapshot: {
+              ok: true,
+              threadId: "thread-1",
+              ownerClientId: null,
+              conversationState: null,
+              liveStateError: null,
+            },
+            streamEventsSnapshot: {
+              ok: true,
+              threadId: "thread-1",
+              ownerClientId: null,
+              events: [],
+              firstAvailableSequence: 0,
+              resetRequired: false,
+            },
+            streamEventsSinceSequenceUsed: null,
           },
-          streamEventsSnapshot: {
-            ok: true,
-            threadId: "thread-1",
-            ownerClientId: null,
-            events: [],
-            firstAvailableSequence: 0,
-            resetRequired: false
-          },
-          streamEventsSinceSequenceUsed: null
-        }
-      }
-    })).toThrowError(/nextSequence/);
+        },
+      }),
+    ).toThrowError(/nextSequence/);
   });
 
   it("rejects farfield debug observability envelope when routing stats are missing", () => {
-    expect(() => FarfieldDebugObservabilityEnvelopeSchema.parse({
-      ok: true,
-      snapshot: {
-        recordedAt: "2026-02-26T00:00:00.000Z",
-        cache: {
-          threadListAggregation: {
-            hitCount: 1,
-            missCount: 2,
-            coalescedCount: 3,
-            evictionCount: 4,
-            invalidationCount: 5,
-            entryCount: 6,
-            inFlightCount: 7
-          }
-        },
-        concurrency: {
-          thread: {
-            queuedExecutionCount: 1,
-            completedExecutionCount: 2,
-            failedExecutionCount: 3,
-            activeThreadCount: 4
+    expect(() =>
+      FarfieldDebugObservabilityEnvelopeSchema.parse({
+        ok: true,
+        snapshot: {
+          recordedAt: "2026-02-26T00:00:00.000Z",
+          cache: {
+            threadListAggregation: {
+              hitCount: 1,
+              missCount: 2,
+              coalescedCount: 3,
+              evictionCount: 4,
+              invalidationCount: 5,
+              entryCount: 6,
+              inFlightCount: 7,
+            },
           },
-          pushDispatch: {
-            scheduledCheckCount: 1,
-            startedCheckCount: 2,
-            completedCheckCount: 3,
-            skippedWhileInFlightCount: 4,
-            activeTimerCount: 5,
-            inFlightThreadCount: 6
+          concurrency: {
+            thread: {
+              queuedExecutionCount: 1,
+              completedExecutionCount: 2,
+              failedExecutionCount: 3,
+              activeThreadCount: 4,
+            },
+            pushDispatch: {
+              scheduledCheckCount: 1,
+              startedCheckCount: 2,
+              completedCheckCount: 3,
+              skippedWhileInFlightCount: 4,
+              activeTimerCount: 5,
+              inFlightThreadCount: 6,
+            },
+            pushMutation: {
+              queuedExecutionCount: 1,
+              completedExecutionCount: 2,
+              failedExecutionCount: 3,
+              hasInFlightOperation: false,
+            },
           },
-          pushMutation: {
-            queuedExecutionCount: 1,
-            completedExecutionCount: 2,
-            failedExecutionCount: 3,
-            hasInFlightOperation: false
-          }
-        },
-        streaming: {
-          eventStream: {
-            activeClientCount: 1,
-            keepaliveEnabled: true,
-            addedClientCount: 2,
-            removedClientCount: 3,
-            broadcastEventCount: 4,
-            broadcastDeliveryAttemptCount: 5,
-            eventWriteFailureCount: 6,
-            keepaliveWriteFailureCount: 7
-          }
-        },
-        performance: {
-          requestRouting: {
-            totalRequestCount: 1,
-            totalErrorCount: 0,
-            inFlightRequestCount: 0,
-            routeTimings: [],
-            startupRequestTimings: []
+          streaming: {
+            eventStream: {
+              activeClientCount: 1,
+              keepaliveEnabled: true,
+              addedClientCount: 2,
+              removedClientCount: 3,
+              broadcastEventCount: 4,
+              broadcastDeliveryAttemptCount: 5,
+              eventWriteFailureCount: 6,
+              keepaliveWriteFailureCount: 7,
+            },
           },
-          eventLoop: {
-            sampleIntervalMs: 1000,
-            sampleCount: 1,
-            lastLagMs: 0,
-            p50LagMs: 0,
-            p95LagMs: 0,
-            p99LagMs: 0,
-            maxLagMs: 0
-          }
-        }
-      }
-    })).toThrowError(/routing/);
+          performance: {
+            requestRouting: {
+              totalRequestCount: 1,
+              totalErrorCount: 0,
+              inFlightRequestCount: 0,
+              routeTimings: [],
+              startupRequestTimings: [],
+            },
+            eventLoop: {
+              sampleIntervalMs: 1000,
+              sampleCount: 1,
+              lastLagMs: 0,
+              p50LagMs: 0,
+              p95LagMs: 0,
+              p99LagMs: 0,
+              maxLagMs: 0,
+            },
+          },
+        },
+      }),
+    ).toThrowError(/routing/);
   });
 
   it("defaults debug error severity to error for legacy records", () => {
@@ -629,7 +637,7 @@ describe("codex-protocol app-server schemas", () => {
       url: null,
       occurredAt: "2026-02-26T00:00:00.000Z",
       recordedAt: "2026-02-26T00:00:01.000Z",
-      details: {}
+      details: {},
     });
 
     expect(parsed.severity).toBe("error");

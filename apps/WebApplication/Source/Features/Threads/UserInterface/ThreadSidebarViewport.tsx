@@ -1,9 +1,6 @@
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import {
-  ThreadSidebarPanel,
-  type ThreadSidebarPanelProps
-} from "./ThreadSidebarPanel";
+import { useEffect, useState } from "react";
+import { ThreadSidebarPanel, type ThreadSidebarPanelProps } from "./ThreadSidebarPanel";
 
 interface ThreadSidebarViewportProps extends Omit<ThreadSidebarPanelProps, "viewport"> {
   viewport: "desktop" | "mobile";
@@ -18,7 +15,7 @@ const SIDEBAR_SPRING_TRANSITION = {
   type: "spring",
   stiffness: 380,
   damping: 36,
-  mass: 0.7
+  mass: 0.7,
 } as const;
 
 export function ThreadSidebarViewport({
@@ -32,7 +29,7 @@ export function ThreadSidebarViewport({
   commitLabel,
   agentDescriptors,
   codexConfigured,
-  healthState
+  healthState,
 }: ThreadSidebarViewportProps): React.JSX.Element {
   // Keep the sidebar mounted after first open so thread-list scroll position and
   // panel-local state survive open/close transitions.
@@ -54,7 +51,7 @@ export function ThreadSidebarViewport({
         initial={false}
         animate={{
           x: isOpen ? 0 : SIDEBAR_CLOSED_TRANSLATE_X_PIXELS,
-          opacity: isOpen ? 1 : SIDEBAR_CLOSED_OPACITY
+          opacity: isOpen ? 1 : SIDEBAR_CLOSED_OPACITY,
         }}
         transition={SIDEBAR_SPRING_TRANSITION}
         data-testid="sidebar-desktop"

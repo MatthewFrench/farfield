@@ -9,12 +9,12 @@ describe("resolvePushStatePath", () => {
       appDataPath: undefined,
       xdgStateHome: undefined,
       homeDirectory: "/Users/test-user",
-      platform: "darwin"
+      platform: "darwin",
     });
 
     expect(resolved.source).toBe("default");
     expect(resolved.filePath).toBe(
-      path.resolve("/Users/test-user/Library/Application Support/farfield/push-state.json")
+      path.resolve("/Users/test-user/Library/Application Support/farfield/push-state.json"),
     );
   });
 
@@ -24,7 +24,7 @@ describe("resolvePushStatePath", () => {
       appDataPath: undefined,
       xdgStateHome: undefined,
       homeDirectory: "/Users/test-user",
-      platform: "linux"
+      platform: "linux",
     });
 
     expect(resolved.source).toBe("env");
@@ -38,8 +38,8 @@ describe("resolvePushStatePath", () => {
         appDataPath: undefined,
         xdgStateHome: undefined,
         homeDirectory: "/Users/test-user",
-        platform: "linux"
-      })
+        platform: "linux",
+      }),
     ).toThrowError(/PUSH_STATE_PATH/);
   });
 
@@ -49,12 +49,12 @@ describe("resolvePushStatePath", () => {
       appDataPath: "C:/Users/test-user/AppData/Roaming",
       xdgStateHome: undefined,
       homeDirectory: "C:/Users/test-user",
-      platform: "win32"
+      platform: "win32",
     });
 
     expect(resolved.source).toBe("default");
     expect(resolved.filePath).toBe(
-      path.resolve("C:/Users/test-user/AppData/Roaming/farfield/push-state.json")
+      path.resolve("C:/Users/test-user/AppData/Roaming/farfield/push-state.json"),
     );
   });
 
@@ -64,12 +64,12 @@ describe("resolvePushStatePath", () => {
       appDataPath: undefined,
       xdgStateHome: "/home/test-user/.cache/state",
       homeDirectory: "/home/test-user",
-      platform: "linux"
+      platform: "linux",
     });
 
     expect(resolved.source).toBe("default");
     expect(resolved.filePath).toBe(
-      path.resolve("/home/test-user/.cache/state/farfield/push-state.json")
+      path.resolve("/home/test-user/.cache/state/farfield/push-state.json"),
     );
   });
 });

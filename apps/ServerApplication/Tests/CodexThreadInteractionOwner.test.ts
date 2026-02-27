@@ -1,30 +1,33 @@
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
 import {
+  type CodexMonitorIpcClient,
   CodexMonitorService,
   DesktopIpcClient,
-  type CodexMonitorIpcClient,
   type InterruptInput,
   type SendRequestOptions,
   type SetModeInput,
-  type SubmitUserInputInput
+  type SubmitUserInputInput,
 } from "@farfield/api";
 import type { IpcFrame, IpcRequestFrame, IpcResponseFrame } from "@farfield/protocol";
-import type {
-  AgentReadStreamEventsInput,
-  AgentThreadLiveState,
-  AgentThreadStreamEvents
-} from "../Source/Agents/Types.js";
+import { describe, expect, it } from "vitest";
 import type { CodexIpcFrameEvent } from "../Source/Agents/Adapters/CodexAgentAdapter.js";
 import { CodexThreadInteractionOwner } from "../Source/Agents/Adapters/CodexThreadInteractionOwner.js";
 import { CodexThreadStreamStateOwner } from "../Source/Agents/Adapters/CodexThreadStreamStateOwner.js";
+import type {
+  AgentReadStreamEventsInput,
+  AgentThreadLiveState,
+  AgentThreadStreamEvents,
+} from "../Source/Agents/Types.js";
 
 const PREVIEW_REQUEST_IDENTIFIER = "monitor-preview-request-id";
-const TEST_SOCKET_PATH = path.join(os.tmpdir(), `farfield-codex-thread-interaction-owner-${String(process.pid)}.sock`);
+const TEST_SOCKET_PATH = path.join(
+  os.tmpdir(),
+  `farfield-codex-thread-interaction-owner-${String(process.pid)}.sock`,
+);
 const STREAM_STATE_TEST_LOG_PATH = path.join(
   os.tmpdir(),
-  `farfield-codex-thread-interaction-owner-stream-state-${String(process.pid)}.ndjson`
+  `farfield-codex-thread-interaction-owner-stream-state-${String(process.pid)}.ndjson`,
 );
 
 const DEFAULT_IPC_RESPONSE_FRAME: IpcResponseFrame = {
@@ -32,14 +35,14 @@ const DEFAULT_IPC_RESPONSE_FRAME: IpcResponseFrame = {
   requestId: "response-1",
   resultType: "success",
   result: {
-    status: "ok"
-  }
+    status: "ok",
+  },
 };
 
 const DEFAULT_LIVE_STATE: AgentThreadLiveState = {
   ownerClientId: "owner-client-1",
   conversationState: null,
-  liveStateError: null
+  liveStateError: null,
 };
 
 const DEFAULT_STREAM_EVENTS: AgentThreadStreamEvents = {
@@ -47,7 +50,7 @@ const DEFAULT_STREAM_EVENTS: AgentThreadStreamEvents = {
   events: [],
   nextSequence: 0,
   firstAvailableSequence: 0,
-  resetRequired: false
+  resetRequired: false,
 };
 
 interface OwnerClientIdResolutionCall {
@@ -81,7 +84,7 @@ interface OwnerTestContext {
 const NOOP_MONITOR_IPC_CLIENT: CodexMonitorIpcClient = {
   async sendRequestAndWait(): Promise<IpcResponseFrame> {
     return DEFAULT_IPC_RESPONSE_FRAME;
-  }
+  },
 };
 
 class TestCodexMonitorService extends CodexMonitorService {
@@ -113,7 +116,7 @@ class TestDesktopIpcClient extends DesktopIpcClient {
 
   public constructor(responseFrame: IpcResponseFrame = DEFAULT_IPC_RESPONSE_FRAME) {
     super({
-      socketPath: TEST_SOCKET_PATH
+      socketPath: TEST_SOCKET_PATH,
     });
     this.responseFrame = responseFrame;
   }
@@ -121,12 +124,12 @@ class TestDesktopIpcClient extends DesktopIpcClient {
   public override async sendRequestAndWait(
     method: string,
     params: IpcRequestFrame["params"],
-    options: SendRequestOptions = {}
+    options: SendRequestOptions = {},
   ): Promise<IpcResponseFrame> {
     this.requestCalls.push({
       method,
       params,
-      options
+      options,
     });
     return this.responseFrame;
   }
@@ -134,12 +137,12 @@ class TestDesktopIpcClient extends DesktopIpcClient {
   public override sendBroadcast(
     method: string,
     params: IpcRequestFrame["params"],
-    options: SendRequestOptions = {}
+    options: SendRequestOptions = {},
   ): void {
     this.broadcastCalls.push({
       method,
       params,
-      options
+      options,
     });
   }
 }
@@ -161,7 +164,7 @@ class TestThreadStreamStateOwner extends CodexThreadStreamStateOwner {
     streamEvents?: AgentThreadStreamEvents;
   }) {
     super({
-      invalidStreamEventsLogPath: STREAM_STATE_TEST_LOG_PATH
+      invalidStreamEventsLogPath: STREAM_STATE_TEST_LOG_PATH,
     });
     this.resolvedOwnerClientId = input?.resolvedOwnerClientId ?? "resolved-owner-client";
     this.describedThreadId = input?.describedThreadId ?? "described-thread-id";
@@ -171,11 +174,11 @@ class TestThreadStreamStateOwner extends CodexThreadStreamStateOwner {
 
   public override resolveRequiredOwnerClientId(
     threadId: string,
-    overrideOwnerClientId: string | null | undefined
+    overrideOwnerClientId: string | null | undefined,
   ): string {
     this.ownerClientIdResolutionCalls.push({
       threadId,
-      overrideOwnerClientId
+      overrideOwnerClientId,
     });
     return this.resolvedOwnerClientId;
   }
@@ -187,14 +190,14 @@ class TestThreadStreamStateOwner extends CodexThreadStreamStateOwner {
       case "broadcast":
         return {
           method: frame.method,
-          threadId: this.describedThreadId
+          threadId: this.describedThreadId,
         };
       case "response":
       case "client-discovery-request":
       case "client-discovery-response":
         return {
           method: frame.type,
-          threadId: this.describedThreadId
+          threadId: this.describedThreadId,
         };
     }
   }
@@ -206,11 +209,11 @@ class TestThreadStreamStateOwner extends CodexThreadStreamStateOwner {
 
   public override readStreamEvents(
     threadId: string,
-    input: AgentReadStreamEventsInput
+    input: AgentReadStreamEventsInput,
   ): AgentThreadStreamEvents {
     this.readStreamEventsCalls.push({
       threadId,
-      input
+      input,
     });
     return this.streamEvents;
   }
@@ -229,7 +232,7 @@ function createOwnerTestContext(input?: {
     describedThreadId: input?.describedThreadId,
     resolvedOwnerClientId: input?.resolvedOwnerClientId,
     liveState: input?.liveState,
-    streamEvents: input?.streamEvents
+    streamEvents: input?.streamEvents,
   });
   const emittedFrames: CodexIpcFrameEvent[] = [];
   let codexAvailabilityChecks = 0;
@@ -247,7 +250,7 @@ function createOwnerTestContext(input?: {
     },
     emitIpcFrame: (event) => {
       emittedFrames.push(event);
-    }
+    },
   });
 
   return {
@@ -258,43 +261,43 @@ function createOwnerTestContext(input?: {
     emittedFrames,
     readReadinessCounters: () => ({
       codexAvailabilityChecks,
-      ipcReadinessChecks
-    })
+      ipcReadinessChecks,
+    }),
   };
 }
 
 describe("CodexThreadInteractionOwner", () => {
   it("delegates interrupt using the resolved owner client id after readiness checks", async () => {
     const context = createOwnerTestContext({
-      resolvedOwnerClientId: "resolved-client-1"
+      resolvedOwnerClientId: "resolved-client-1",
     });
 
     await context.owner.interrupt({
       threadId: "thread-1",
-      ownerClientId: "override-client"
+      ownerClientId: "override-client",
     });
 
     expect(context.threadStreamStateOwner.ownerClientIdResolutionCalls).toEqual([
       {
         threadId: "thread-1",
-        overrideOwnerClientId: "override-client"
-      }
+        overrideOwnerClientId: "override-client",
+      },
     ]);
     expect(context.service.interruptCalls).toEqual([
       {
         threadId: "thread-1",
-        ownerClientId: "resolved-client-1"
-      }
+        ownerClientId: "resolved-client-1",
+      },
     ]);
     expect(context.readReadinessCounters()).toEqual({
       codexAvailabilityChecks: 1,
-      ipcReadinessChecks: 1
+      ipcReadinessChecks: 1,
     });
   });
 
   it("delegates collaboration-mode updates and returns resolved owner identity", async () => {
     const context = createOwnerTestContext({
-      resolvedOwnerClientId: "resolved-client-2"
+      resolvedOwnerClientId: "resolved-client-2",
     });
 
     const result = await context.owner.setCollaborationMode({
@@ -305,13 +308,13 @@ describe("CodexThreadInteractionOwner", () => {
         settings: {
           model: "gpt-5",
           reasoning_effort: null,
-          developer_instructions: null
-        }
-      }
+          developer_instructions: null,
+        },
+      },
     });
 
     expect(result).toEqual({
-      ownerClientId: "resolved-client-2"
+      ownerClientId: "resolved-client-2",
     });
     expect(context.service.setCollaborationModeCalls).toEqual([
       {
@@ -322,20 +325,20 @@ describe("CodexThreadInteractionOwner", () => {
           settings: {
             model: "gpt-5",
             reasoning_effort: null,
-            developer_instructions: null
-          }
-        }
-      }
+            developer_instructions: null,
+          },
+        },
+      },
     ]);
     expect(context.readReadinessCounters()).toEqual({
       codexAvailabilityChecks: 1,
-      ipcReadinessChecks: 1
+      ipcReadinessChecks: 1,
     });
   });
 
   it("delegates user-input submission and returns the submitted request identity", async () => {
     const context = createOwnerTestContext({
-      resolvedOwnerClientId: "resolved-client-3"
+      resolvedOwnerClientId: "resolved-client-3",
     });
 
     const result = await context.owner.submitUserInput({
@@ -345,15 +348,15 @@ describe("CodexThreadInteractionOwner", () => {
       response: {
         answers: {
           questionOne: {
-            answers: ["A"]
-          }
-        }
-      }
+            answers: ["A"],
+          },
+        },
+      },
     });
 
     expect(result).toEqual({
       ownerClientId: "resolved-client-3",
-      requestId: 42
+      requestId: 42,
     });
     expect(context.service.submitUserInputCalls).toEqual([
       {
@@ -363,15 +366,15 @@ describe("CodexThreadInteractionOwner", () => {
         response: {
           answers: {
             questionOne: {
-              answers: ["A"]
-            }
-          }
-        }
-      }
+              answers: ["A"],
+            },
+          },
+        },
+      },
     ]);
     expect(context.readReadinessCounters()).toEqual({
       codexAvailabilityChecks: 1,
-      ipcReadinessChecks: 1
+      ipcReadinessChecks: 1,
     });
   });
 
@@ -379,24 +382,24 @@ describe("CodexThreadInteractionOwner", () => {
     const liveState: AgentThreadLiveState = {
       ownerClientId: "owner-live",
       conversationState: null,
-      liveStateError: null
+      liveStateError: null,
     };
     const streamEvents: AgentThreadStreamEvents = {
       ownerClientId: "owner-live",
       events: [],
       nextSequence: 5,
       firstAvailableSequence: 1,
-      resetRequired: false
+      resetRequired: false,
     };
     const context = createOwnerTestContext({
       liveState,
-      streamEvents
+      streamEvents,
     });
 
     const resolvedLiveState = await context.owner.readLiveState("thread-live");
     const resolvedStreamEvents = await context.owner.readStreamEvents("thread-live", {
       limit: 50,
-      sinceSequence: 2
+      sinceSequence: 2,
     });
 
     expect(resolvedLiveState).toBe(liveState);
@@ -407,13 +410,13 @@ describe("CodexThreadInteractionOwner", () => {
         threadId: "thread-live",
         input: {
           limit: 50,
-          sinceSequence: 2
-        }
-      }
+          sinceSequence: 2,
+        },
+      },
     ]);
     expect(context.readReadinessCounters()).toEqual({
       codexAvailabilityChecks: 0,
-      ipcReadinessChecks: 0
+      ipcReadinessChecks: 0,
     });
   });
 
@@ -423,29 +426,29 @@ describe("CodexThreadInteractionOwner", () => {
       requestId: "response-2",
       resultType: "success",
       result: {
-        replay: "ok"
-      }
+        replay: "ok",
+      },
     };
     const context = createOwnerTestContext({
       describedThreadId: "thread-from-preview",
-      responseFrame
+      responseFrame,
     });
     const replayParameters: IpcRequestFrame["params"] = {
-      conversationId: "thread-from-request-params"
+      conversationId: "thread-from-request-params",
     };
     const requestOptions: SendRequestOptions = {
       targetClientId: "client-1",
-      version: 9
+      version: 9,
     };
 
     const replayResult = await context.owner.replayRequest(
       "thread-read",
       replayParameters,
-      requestOptions
+      requestOptions,
     );
 
     expect(replayResult).toEqual({
-      replay: "ok"
+      replay: "ok",
     });
     expect(context.threadStreamStateOwner.describedFrames).toEqual([
       {
@@ -454,8 +457,8 @@ describe("CodexThreadInteractionOwner", () => {
         method: "thread-read",
         params: replayParameters,
         targetClientId: "client-1",
-        version: 9
-      }
+        version: 9,
+      },
     ]);
     expect(context.emittedFrames).toEqual([
       {
@@ -466,42 +469,38 @@ describe("CodexThreadInteractionOwner", () => {
           method: "thread-read",
           params: replayParameters,
           targetClientId: "client-1",
-          version: 9
+          version: 9,
         },
         method: "thread-read",
-        threadId: "thread-from-preview"
-      }
+        threadId: "thread-from-preview",
+      },
     ]);
     expect(context.ipcClient.requestCalls).toEqual([
       {
         method: "thread-read",
         params: replayParameters,
-        options: requestOptions
-      }
+        options: requestOptions,
+      },
     ]);
     expect(context.readReadinessCounters()).toEqual({
       codexAvailabilityChecks: 0,
-      ipcReadinessChecks: 1
+      ipcReadinessChecks: 1,
     });
   });
 
   it("uses request-shape preview metadata when emitting replay broadcast frames", () => {
     const context = createOwnerTestContext({
-      describedThreadId: "thread-from-broadcast-preview"
+      describedThreadId: "thread-from-broadcast-preview",
     });
     const replayParameters: IpcRequestFrame["params"] = {
-      threadId: "thread-from-request-params"
+      threadId: "thread-from-request-params",
     };
     const requestOptions: SendRequestOptions = {
       targetClientId: "client-2",
-      version: 7
+      version: 7,
     };
 
-    context.owner.replayBroadcast(
-      "thread-archive",
-      replayParameters,
-      requestOptions
-    );
+    context.owner.replayBroadcast("thread-archive", replayParameters, requestOptions);
 
     expect(context.threadStreamStateOwner.describedFrames).toEqual([
       {
@@ -510,8 +509,8 @@ describe("CodexThreadInteractionOwner", () => {
         method: "thread-archive",
         params: replayParameters,
         targetClientId: "client-2",
-        version: 7
-      }
+        version: 7,
+      },
     ]);
     expect(context.emittedFrames).toEqual([
       {
@@ -521,22 +520,22 @@ describe("CodexThreadInteractionOwner", () => {
           method: "thread-archive",
           params: replayParameters,
           targetClientId: "client-2",
-          version: 7
+          version: 7,
         },
         method: "thread-archive",
-        threadId: "thread-from-broadcast-preview"
-      }
+        threadId: "thread-from-broadcast-preview",
+      },
     ]);
     expect(context.ipcClient.broadcastCalls).toEqual([
       {
         method: "thread-archive",
         params: replayParameters,
-        options: requestOptions
-      }
+        options: requestOptions,
+      },
     ]);
     expect(context.readReadinessCounters()).toEqual({
       codexAvailabilityChecks: 0,
-      ipcReadinessChecks: 1
+      ipcReadinessChecks: 1,
     });
   });
 });

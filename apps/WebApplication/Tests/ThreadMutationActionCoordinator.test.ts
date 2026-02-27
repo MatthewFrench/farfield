@@ -5,8 +5,8 @@ const buildActionRequestOptions = (actionName: string) => ({
   actionId: `action-${actionName}`,
   requestOptions: {
     actionId: `action-${actionName}`,
-    actionName
-  }
+    actionName,
+  },
 });
 
 describe("ThreadMutationActionCoordinator", () => {
@@ -23,7 +23,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const threadMutationClient = {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
       archiveThread: vi.fn(async () => {}),
-      unarchiveThread: vi.fn(async () => {})
+      unarchiveThread: vi.fn(async () => {}),
     };
 
     await coordinator.createThread({
@@ -37,7 +37,7 @@ describe("ThreadMutationActionCoordinator", () => {
       onInvalidateActiveThreadQuery,
       threadMutationClient,
       onRefreshCreatedThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(onSetErrorMessage).toHaveBeenCalledWith("Cannot create thread: missing project path");
@@ -61,7 +61,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const threadMutationClient = {
       createThread: vi.fn(async () => ({ threadId: "thread-55" })),
       archiveThread: vi.fn(async () => {}),
-      unarchiveThread: vi.fn(async () => {})
+      unarchiveThread: vi.fn(async () => {}),
     };
 
     await coordinator.createThread({
@@ -84,18 +84,18 @@ describe("ThreadMutationActionCoordinator", () => {
       onInvalidateActiveThreadQuery,
       threadMutationClient,
       onRefreshCreatedThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(threadMutationClient.createThread).toHaveBeenCalledWith(
       {
         cwd: "/tmp/project",
-        agentId: "codex"
+        agentId: "codex",
       },
       {
         actionId: "action-create-thread",
-        actionName: "create-thread"
-      }
+        actionName: "create-thread",
+      },
     );
     expect(onSetErrorMessage).not.toHaveBeenCalled();
     expect(markedThreadIdentifiers).toEqual(["thread-55"]);
@@ -119,7 +119,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const threadMutationClient = {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
       archiveThread: vi.fn(async () => {}),
-      unarchiveThread: vi.fn(async () => {})
+      unarchiveThread: vi.fn(async () => {}),
     };
 
     await coordinator.archiveThread({
@@ -137,16 +137,13 @@ describe("ThreadMutationActionCoordinator", () => {
       onInvalidateArchivedThreadQuery,
       loadCoreData,
       threadMutationClient,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
-    expect(threadMutationClient.archiveThread).toHaveBeenCalledWith(
-      "thread-1",
-      {
-        actionId: "action-archive-thread",
-        actionName: "archive-thread"
-      }
-    );
+    expect(threadMutationClient.archiveThread).toHaveBeenCalledWith("thread-1", {
+      actionId: "action-archive-thread",
+      actionName: "archive-thread",
+    });
     expect(selectedThreadIdentifiers).toEqual(["thread-2"]);
     expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
     expect(onInvalidateArchivedThreadQuery).toHaveBeenCalledTimes(1);
@@ -168,7 +165,7 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {
         throw new Error("archive failed");
       }),
-      unarchiveThread: vi.fn(async () => {})
+      unarchiveThread: vi.fn(async () => {}),
     };
 
     await coordinator.archiveThread({
@@ -182,7 +179,7 @@ describe("ThreadMutationActionCoordinator", () => {
       onInvalidateArchivedThreadQuery,
       loadCoreData,
       threadMutationClient,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(onSetBusy.mock.calls).toEqual([[true], [false]]);
@@ -194,7 +191,7 @@ describe("ThreadMutationActionCoordinator", () => {
       operation: "archive-thread",
       actionId: "action-archive-thread",
       threadId: "thread-1",
-      error: "archive failed"
+      error: "archive failed",
     });
   });
 
@@ -210,7 +207,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const threadMutationClient = {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
       archiveThread: vi.fn(async () => {}),
-      unarchiveThread: vi.fn(async () => {})
+      unarchiveThread: vi.fn(async () => {}),
     };
 
     await coordinator.unarchiveThread({
@@ -229,16 +226,13 @@ describe("ThreadMutationActionCoordinator", () => {
       onInvalidateArchivedThreadQuery,
       loadCoreData,
       threadMutationClient,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
-    expect(threadMutationClient.unarchiveThread).toHaveBeenCalledWith(
-      "thread-7",
-      {
-        actionId: "action-unarchive-thread",
-        actionName: "unarchive-thread"
-      }
-    );
+    expect(threadMutationClient.unarchiveThread).toHaveBeenCalledWith("thread-7", {
+      actionId: "action-unarchive-thread",
+      actionName: "unarchive-thread",
+    });
     expect(selectedThreadIdentifiers).toEqual(["thread-7"]);
     expect(mobileSidebarOpenStates).toEqual([false]);
     expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
@@ -263,7 +257,7 @@ describe("ThreadMutationActionCoordinator", () => {
         throw new Error("create failed");
       }),
       archiveThread: vi.fn(async () => {}),
-      unarchiveThread: vi.fn(async () => {})
+      unarchiveThread: vi.fn(async () => {}),
     };
 
     await coordinator.createThread({
@@ -277,7 +271,7 @@ describe("ThreadMutationActionCoordinator", () => {
       onInvalidateActiveThreadQuery,
       threadMutationClient,
       onRefreshCreatedThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(onSetBusy.mock.calls).toEqual([[true], [false]]);
@@ -293,8 +287,8 @@ describe("ThreadMutationActionCoordinator", () => {
       threadId: null,
       error: "create failed",
       details: {
-        projectPath: "/tmp/project"
-      }
+        projectPath: "/tmp/project",
+      },
     });
   });
 
@@ -308,7 +302,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const threadMutationClient = {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
       archiveThread: vi.fn(async () => {}),
-      unarchiveThread: vi.fn(async () => {})
+      unarchiveThread: vi.fn(async () => {}),
     };
 
     await coordinator.archiveThread({
@@ -324,7 +318,7 @@ describe("ThreadMutationActionCoordinator", () => {
       onInvalidateArchivedThreadQuery,
       loadCoreData,
       threadMutationClient,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(selectedThreadIdentifiers).toEqual(["thread-4"]);

@@ -1,6 +1,6 @@
-import type { ThreadMutationCreateThreadInput } from "../DataAccess/ThreadMutationServerClient";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
+import type { ThreadMutationCreateThreadInput } from "../DataAccess/ThreadMutationServerClient";
 
 const CREATE_THREAD_OPERATION_NAME = "create-thread";
 const ARCHIVE_THREAD_OPERATION_NAME = "archive-thread";
@@ -28,7 +28,7 @@ export interface ThreadMutationActionErrorReportInput {
 export interface ThreadMutationActionClient {
   createThread(
     input?: ThreadMutationCreateThreadInput,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<{ threadId: string }>;
   archiveThread(threadId: string, options?: ApiRequestOptions): Promise<void>;
   unarchiveThread(threadId: string, options?: ApiRequestOptions): Promise<void>;
@@ -37,7 +37,9 @@ export interface ThreadMutationActionClient {
 export interface CreateThreadActionInput {
   projectPath: string;
   agentId?: AgentId;
-  buildActionRequestOptions: (actionName: ThreadMutationOperationName) => ThreadMutationActionRequestOptions;
+  buildActionRequestOptions: (
+    actionName: ThreadMutationOperationName,
+  ) => ThreadMutationActionRequestOptions;
   onSetBusy: (isBusy: boolean) => void;
   onSetErrorMessage: (errorMessage: string) => void;
   onMarkThreadPendingMaterialization: (threadId: string) => void;
@@ -59,7 +61,9 @@ export interface ArchiveThreadActionInput {
   threadId: string;
   selectedThreadId: string | null;
   activeThreadIdentifiersInOrder: string[];
-  buildActionRequestOptions: (actionName: ThreadMutationOperationName) => ThreadMutationActionRequestOptions;
+  buildActionRequestOptions: (
+    actionName: ThreadMutationOperationName,
+  ) => ThreadMutationActionRequestOptions;
   onSetBusy: (isBusy: boolean) => void;
   onThreadSelected: (threadId: string | null) => void;
   onInvalidateActiveThreadQuery: () => void;
@@ -71,7 +75,9 @@ export interface ArchiveThreadActionInput {
 
 export interface UnarchiveThreadActionInput {
   threadId: string;
-  buildActionRequestOptions: (actionName: ThreadMutationOperationName) => ThreadMutationActionRequestOptions;
+  buildActionRequestOptions: (
+    actionName: ThreadMutationOperationName,
+  ) => ThreadMutationActionRequestOptions;
   onSetBusy: (isBusy: boolean) => void;
   onThreadSelected: (threadId: string) => void;
   onSetMobileSidebarOpen: (isOpen: boolean) => void;
@@ -90,12 +96,14 @@ export class ThreadMutationActionCoordinator {
       return;
     }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions(CREATE_THREAD_OPERATION_NAME);
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      CREATE_THREAD_OPERATION_NAME,
+    );
     input.onSetBusy(true);
     try {
       const created = await input.threadMutationClient.createThread(
         this.buildCreateThreadMutationInput(trimmedProjectPath, input.agentId),
-        requestOptions
+        requestOptions,
       );
       input.onMarkThreadPendingMaterialization(created.threadId);
       input.onThreadSelected(created.threadId);
@@ -109,8 +117,8 @@ export class ThreadMutationActionCoordinator {
         threadId: null,
         error: toErrorMessage(error),
         details: {
-          projectPath: trimmedProjectPath
-        }
+          projectPath: trimmedProjectPath,
+        },
       });
     } finally {
       input.onSetBusy(false);
@@ -118,13 +126,15 @@ export class ThreadMutationActionCoordinator {
   }
 
   public async archiveThread(input: ArchiveThreadActionInput): Promise<void> {
-    const { actionId, requestOptions } = input.buildActionRequestOptions(ARCHIVE_THREAD_OPERATION_NAME);
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      ARCHIVE_THREAD_OPERATION_NAME,
+    );
     input.onSetBusy(true);
     try {
       const nextSelectedThreadIdentifier = this.computeNextSelectedThreadIdentifier({
         selectedThreadId: input.selectedThreadId,
         archivedThreadId: input.threadId,
-        activeThreadIdentifiersInOrder: input.activeThreadIdentifiersInOrder
+        activeThreadIdentifiersInOrder: input.activeThreadIdentifiersInOrder,
       });
       await input.threadMutationClient.archiveThread(input.threadId, requestOptions);
       input.onThreadSelected(nextSelectedThreadIdentifier);
@@ -136,7 +146,7 @@ export class ThreadMutationActionCoordinator {
         operation: ARCHIVE_THREAD_OPERATION_NAME,
         actionId,
         threadId: input.threadId,
-        error: toErrorMessage(error)
+        error: toErrorMessage(error),
       });
     } finally {
       input.onSetBusy(false);
@@ -144,7 +154,9 @@ export class ThreadMutationActionCoordinator {
   }
 
   public async unarchiveThread(input: UnarchiveThreadActionInput): Promise<void> {
-    const { actionId, requestOptions } = input.buildActionRequestOptions(UNARCHIVE_THREAD_OPERATION_NAME);
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      UNARCHIVE_THREAD_OPERATION_NAME,
+    );
     input.onSetBusy(true);
     try {
       await input.threadMutationClient.unarchiveThread(input.threadId, requestOptions);
@@ -158,7 +170,7 @@ export class ThreadMutationActionCoordinator {
         operation: UNARCHIVE_THREAD_OPERATION_NAME,
         actionId,
         threadId: input.threadId,
-        error: toErrorMessage(error)
+        error: toErrorMessage(error),
       });
     } finally {
       input.onSetBusy(false);
@@ -167,10 +179,10 @@ export class ThreadMutationActionCoordinator {
 
   private buildCreateThreadMutationInput(
     projectPath: string,
-    agentId?: AgentId
+    agentId?: AgentId,
   ): ThreadMutationCreateThreadInput {
     const createThreadInput: ThreadMutationCreateThreadInput = {
-      cwd: projectPath
+      cwd: projectPath,
     };
     if (agentId !== undefined) {
       createThreadInput.agentId = agentId;
@@ -179,13 +191,15 @@ export class ThreadMutationActionCoordinator {
   }
 
   private computeNextSelectedThreadIdentifier(
-    input: ComputeNextSelectedThreadIdentifierInput
+    input: ComputeNextSelectedThreadIdentifierInput,
   ): string | null {
     if (input.selectedThreadId !== input.archivedThreadId) {
       return input.selectedThreadId;
     }
-    return input.activeThreadIdentifiersInOrder.find(
-      (threadIdentifier) => threadIdentifier !== input.archivedThreadId
-    ) ?? null;
+    return (
+      input.activeThreadIdentifiersInOrder.find(
+        (threadIdentifier) => threadIdentifier !== input.archivedThreadId,
+      ) ?? null
+    );
   }
 }

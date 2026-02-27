@@ -1,5 +1,5 @@
-import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
+import * as React from "react";
 import { cn } from "@/Shared/Styling/ClassNameMerge";
 
 const TABS_LIST_COMPONENT_DISPLAY_NAME = "TabsList";

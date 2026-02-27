@@ -1,10 +1,10 @@
 import { parseSendMessageBody } from "../RequestSchemas/HttpSchemas.js";
 import {
   ThreadMemberMutationActionByName,
+  type ThreadMemberResolvedRouteContext,
+  type ThreadMemberRouteDependencies,
   ThreadMemberRouteMethodByName,
   ThreadMemberRouteSegmentByName,
-  type ThreadMemberRouteDependencies,
-  type ThreadMemberResolvedRouteContext
 } from "./ThreadMemberRouteContracts.js";
 
 export interface ThreadMemberMessageMutationRouteOwnerOptions {
@@ -29,15 +29,17 @@ export class ThreadMemberMessageMutationRouteOwner {
       pushActionEventWithRequestContext,
       pushActionErrorWithRequestContext,
       invalidateThreadListAggregationCache,
-      jsonResponse
+      jsonResponse,
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
-    if (!(
-      req.method === ThreadMemberRouteMethodByName.post
-      && this.dependencies.segments.length === 4
-      && this.dependencies.segments[3] === ThreadMemberRouteSegmentByName.messages
-    )) {
+    if (
+      !(
+        req.method === ThreadMemberRouteMethodByName.post &&
+        this.dependencies.segments.length === 4 &&
+        this.dependencies.segments[3] === ThreadMemberRouteSegmentByName.messages
+      )
+    ) {
       return false;
     }
 
@@ -46,7 +48,7 @@ export class ThreadMemberMessageMutationRouteOwner {
     pushActionEventWithRequestContext(ThreadMemberMutationActionByName.messages, "attempt", {
       agentId,
       threadId,
-      textLength: body.text.length
+      textLength: body.text.length,
     });
 
     try {
@@ -56,30 +58,34 @@ export class ThreadMemberMessageMutationRouteOwner {
           text: body.text,
           ...(body.ownerClientId !== undefined ? { ownerClientId: body.ownerClientId } : {}),
           ...(body.cwd !== undefined ? { cwd: body.cwd } : {}),
-          ...(typeof body.isSteering === "boolean" ? { isSteering: body.isSteering } : {})
+          ...(typeof body.isSteering === "boolean" ? { isSteering: body.isSteering } : {}),
         });
       });
     } catch (error) {
-      const message = pushActionErrorWithRequestContext(ThreadMemberMutationActionByName.messages, error, {
-        agentId,
-        threadId
-      });
+      const message = pushActionErrorWithRequestContext(
+        ThreadMemberMutationActionByName.messages,
+        error,
+        {
+          agentId,
+          threadId,
+        },
+      );
       jsonResponse(this.dependencies.res, 500, { ok: false, error: message, threadId });
       return true;
     }
 
     pushActionEventWithRequestContext(ThreadMemberMutationActionByName.messages, "success", {
       agentId,
-      threadId
+      threadId,
     });
     invalidateThreadListAggregationCache("thread-message-sent", {
       threadId,
-      agentId
+      agentId,
     });
 
     jsonResponse(this.dependencies.res, 200, {
       ok: true,
-      threadId
+      threadId,
     });
     return true;
   }

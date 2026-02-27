@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
-import { type ErrorBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { Button } from "@/Components/UserInterface/Button";
+import { type ErrorBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 
 interface LiveStateReductionErrorSummary {
   eventIndex: number | null;
@@ -9,7 +9,8 @@ interface LiveStateReductionErrorSummary {
 }
 
 const ERROR_BANNER_OPEN_DEBUG_BUTTON_LABEL = "Open in Debug";
-const LIVE_STATE_REDUCTION_WARNING_MESSAGE = "Live updates failed for this thread. Showing saved messages only.";
+const LIVE_STATE_REDUCTION_WARNING_MESSAGE =
+  "Live updates failed for this thread. Showing saved messages only.";
 
 export interface DebugStatusBannersProps {
   activeTab: "chat" | "debug";
@@ -26,7 +27,7 @@ export function DebugStatusBanners({
   errorBannerDetails,
   onOpenDebugFromErrorBanner,
   onDismissErrorBanner,
-  liveStateReductionError
+  liveStateReductionError,
 }: DebugStatusBannersProps): React.JSX.Element {
   return (
     <>
@@ -57,14 +58,15 @@ export function DebugStatusBanners({
                     action {errorBannerDetails.actionId}
                   </span>
                 )}
-                {errorBannerDetails.requestId !== null && errorBannerDetails.requestId.length > 0 && (
-                  <span
-                    data-testid="error-banner-request-id"
-                    className="hidden sm:inline-flex font-mono text-[11px] px-1 py-0.5 rounded bg-black/15"
-                  >
-                    request {errorBannerDetails.requestId}
-                  </span>
-                )}
+                {errorBannerDetails.requestId !== null &&
+                  errorBannerDetails.requestId.length > 0 && (
+                    <span
+                      data-testid="error-banner-request-id"
+                      className="hidden sm:inline-flex font-mono text-[11px] px-1 py-0.5 rounded bg-black/15"
+                    >
+                      request {errorBannerDetails.requestId}
+                    </span>
+                  )}
                 {errorBannerDetails.errorId !== null && errorBannerDetails.errorId.length > 0 && (
                   <span
                     data-testid="error-banner-error-id"

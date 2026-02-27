@@ -11,7 +11,7 @@ import type {
   AgentListThreadsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
-  AgentSendMessageInput
+  AgentSendMessageInput,
 } from "../Source/Agents/Types.js";
 
 const DEFAULT_CAPABILITIES: AgentCapabilities = {
@@ -20,7 +20,7 @@ const DEFAULT_CAPABILITIES: AgentCapabilities = {
   canSetCollaborationMode: false,
   canSubmitUserInput: false,
   canReadLiveState: false,
-  canReadStreamEvents: false
+  canReadStreamEvents: false,
 };
 
 interface AgentAdapterFactoryInput {
@@ -35,7 +35,7 @@ interface AgentAdapterFactoryInput {
 function createAgentAdapter(input: AgentAdapterFactoryInput): AgentAdapter {
   const capabilities: AgentCapabilities = {
     ...DEFAULT_CAPABILITIES,
-    ...input.capabilities
+    ...input.capabilities,
   };
 
   return {
@@ -68,7 +68,7 @@ function createAgentAdapter(input: AgentAdapterFactoryInput): AgentAdapter {
     },
     async interrupt(_input: AgentInterruptInput): Promise<void> {
       throw new Error("not used in this test");
-    }
+    },
   };
 }
 
@@ -77,16 +77,16 @@ describe("AgentRegistry", () => {
     const firstAdapter = createAgentAdapter({
       id: "codex",
       enabled: true,
-      connected: true
+      connected: true,
     });
     const secondAdapter = createAgentAdapter({
       id: "codex",
       enabled: true,
-      connected: true
+      connected: true,
     });
 
     expect(() => new AgentRegistry([firstAdapter, secondAdapter])).toThrowError(
-      /Duplicate agent adapter id/
+      /Duplicate agent adapter id/,
     );
   });
 
@@ -94,12 +94,12 @@ describe("AgentRegistry", () => {
     const codexAdapter = createAgentAdapter({
       id: "codex",
       enabled: false,
-      connected: true
+      connected: true,
     });
     const opencodeAdapter = createAgentAdapter({
       id: "opencode",
       enabled: true,
-      connected: false
+      connected: false,
     });
     const registry = new AgentRegistry([codexAdapter, opencodeAdapter]);
 
@@ -111,13 +111,13 @@ describe("AgentRegistry", () => {
       id: "codex",
       enabled: true,
       connected: false,
-      capabilities: { canReadStreamEvents: true }
+      capabilities: { canReadStreamEvents: true },
     });
     const opencodeAdapter = createAgentAdapter({
       id: "opencode",
       enabled: true,
       connected: true,
-      capabilities: { canReadStreamEvents: true }
+      capabilities: { canReadStreamEvents: true },
     });
     const registry = new AgentRegistry([codexAdapter, opencodeAdapter]);
 
@@ -131,14 +131,14 @@ describe("AgentRegistry", () => {
       enabled: true,
       connected: true,
       onStart: () => lifecycleEvents.push("start-codex"),
-      onStop: () => lifecycleEvents.push("stop-codex")
+      onStop: () => lifecycleEvents.push("stop-codex"),
     });
     const opencodeAdapter = createAgentAdapter({
       id: "opencode",
       enabled: true,
       connected: true,
       onStart: () => lifecycleEvents.push("start-opencode"),
-      onStop: () => lifecycleEvents.push("stop-opencode")
+      onStop: () => lifecycleEvents.push("stop-opencode"),
     });
     const registry = new AgentRegistry([codexAdapter, opencodeAdapter]);
 
@@ -149,7 +149,7 @@ describe("AgentRegistry", () => {
       "start-codex",
       "start-opencode",
       "stop-opencode",
-      "stop-codex"
+      "stop-codex",
     ]);
   });
 });

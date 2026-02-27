@@ -1,7 +1,7 @@
+import type { FileChangeEntrySchema } from "@farfield/protocol";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
-import type { FileChangeEntrySchema } from "@farfield/protocol";
 import { DiffBlock } from "@/Components/DiffBlock";
 
 type FileChangeEntry = z.infer<typeof FileChangeEntrySchema>;
@@ -17,8 +17,8 @@ describe("DiffBlock", () => {
       {
         path: "README.md",
         kind: { type: "create" },
-        diff: "+new line"
-      }
+        diff: "+new line",
+      },
     ]);
 
     expect(screen.getByText("README.md")).toBeDefined();
@@ -30,8 +30,8 @@ describe("DiffBlock", () => {
       {
         path: "Source/Features/Chat/ChatWorkspacePane.tsx",
         kind: { type: "create" },
-        diff: "@@ -1 +1 @@\n-old line\n+new line"
-      }
+        diff: "@@ -1 +1 @@\n-old line\n+new line",
+      },
     ]);
 
     expect(screen.getByText("+1")).toBeDefined();
@@ -49,8 +49,8 @@ describe("DiffBlock", () => {
     renderDiffBlock([
       {
         path: "Source/Features/Chat/ChatWorkspacePane.tsx",
-        kind: { type: "rename" }
-      }
+        kind: { type: "rename" },
+      },
     ]);
 
     fireEvent.click(screen.getByRole("button", { name: /ChatWorkspacePane\.tsx/i }));

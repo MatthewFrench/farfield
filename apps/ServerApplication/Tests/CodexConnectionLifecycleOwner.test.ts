@@ -1,19 +1,15 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AppServerClient,
+  type AppServerTransport,
   AppServerTransportError,
   DesktopIpcClient,
-  type AppServerTransport,
-  type ListThreadsOptions
+  type ListThreadsOptions,
 } from "@farfield/api";
-import type {
-  AppServerListThreadsResponse,
-  IpcResponseFrame,
-  JsonValue
-} from "@farfield/protocol";
+import type { AppServerListThreadsResponse, IpcResponseFrame, JsonValue } from "@farfield/protocol";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CodexConnectionLifecycleOwner,
-  isCodexUnavailableBootstrapErrorMessage
+  isCodexUnavailableBootstrapErrorMessage,
 } from "../Source/Agents/Adapters/CodexConnectionLifecycleOwner.js";
 
 const TEST_LABEL = "Codex";
@@ -21,7 +17,7 @@ const TEST_RECONNECT_DELAY_MILLISECONDS = 25;
 const TEST_SOCKET_PATH = "/tmp/codex-connection-lifecycle-owner.sock";
 const EMPTY_LIST_THREADS_RESPONSE: AppServerListThreadsResponse = {
   data: [],
-  nextCursor: null
+  nextCursor: null,
 };
 const IPC_INITIALIZE_SUCCESS_RESPONSE: IpcResponseFrame = {
   type: "response",
@@ -29,15 +25,15 @@ const IPC_INITIALIZE_SUCCESS_RESPONSE: IpcResponseFrame = {
   method: "initialize",
   resultType: "success",
   result: {
-    clientId: "client-1"
-  }
+    clientId: "client-1",
+  },
 };
 
 const NOOP_TRANSPORT: AppServerTransport = {
   async request(_method: string, _params: object, _timeoutMs?: number): Promise<JsonValue> {
     throw new Error("transport should not be used in this test");
   },
-  async close(): Promise<void> {}
+  async close(): Promise<void> {},
 };
 
 interface TestAppServerClientOptions {
@@ -54,7 +50,9 @@ class TestAppServerClient extends AppServerClient {
       options.listThreadsImplementation ?? (async () => EMPTY_LIST_THREADS_RESPONSE);
   }
 
-  public override async listThreads(options: ListThreadsOptions): Promise<AppServerListThreadsResponse> {
+  public override async listThreads(
+    options: ListThreadsOptions,
+  ): Promise<AppServerListThreadsResponse> {
     this.listThreadsCalls.push(options);
     return this.listThreadsImplementation();
   }
@@ -77,11 +75,13 @@ class TestDesktopIpcClient extends DesktopIpcClient {
 
   public constructor(options: TestDesktopIpcClientOptions = {}) {
     super({
-      socketPath: TEST_SOCKET_PATH
+      socketPath: TEST_SOCKET_PATH,
     });
     this.connected = options.connected ?? false;
     this.connectError = options.connectError ?? null;
-    this.initializeOutcomes = [...(options.initializeOutcomes ?? [IPC_INITIALIZE_SUCCESS_RESPONSE])];
+    this.initializeOutcomes = [
+      ...(options.initializeOutcomes ?? [IPC_INITIALIZE_SUCCESS_RESPONSE]),
+    ];
   }
 
   public override isConnected(): boolean {
@@ -121,7 +121,7 @@ function createOwner(fixture: Partial<OwnerFixture> = {}): CodexConnectionLifecy
     ipcClient: fixture.ipcClient ?? new TestDesktopIpcClient(),
     label: TEST_LABEL,
     reconnectDelayMs: fixture.reconnectDelayMs ?? TEST_RECONNECT_DELAY_MILLISECONDS,
-    onStateChange: fixture.onStateChange ?? null
+    onStateChange: fixture.onStateChange ?? null,
   });
 }
 
@@ -135,7 +135,7 @@ describe("CodexConnectionLifecycleOwner", () => {
     const ipcClient = new TestDesktopIpcClient();
     const owner = createOwner({
       appClient,
-      ipcClient
+      ipcClient,
     });
 
     await owner.bootstrapConnections();
@@ -144,8 +144,8 @@ describe("CodexConnectionLifecycleOwner", () => {
       {
         limit: 1,
         archived: false,
-        sortKey: "updated_at"
-      }
+        sortKey: "updated_at",
+      },
     ]);
     expect(ipcClient.connectCalls).toBe(1);
     expect(ipcClient.initializeLabels).toEqual([TEST_LABEL]);
@@ -154,7 +154,7 @@ describe("CodexConnectionLifecycleOwner", () => {
       ipcConnected: true,
       ipcInitialized: true,
       codexAvailable: true,
-      lastError: null
+      lastError: null,
     });
     expect(owner.isConnected()).toBe(true);
     expect(owner.isIpcReady()).toBe(true);
@@ -163,20 +163,24 @@ describe("CodexConnectionLifecycleOwner", () => {
   it("treats transport errors as app-not-ready and non-transport errors as still app-ready", async () => {
     const owner = createOwner();
 
-    await expect(owner.runAppServerCall(async () => {
-      throw new AppServerTransportError("app-server transport closed");
-    })).rejects.toThrowError("app-server transport closed");
+    await expect(
+      owner.runAppServerCall(async () => {
+        throw new AppServerTransportError("app-server transport closed");
+      }),
+    ).rejects.toThrowError("app-server transport closed");
     expect(owner.getRuntimeState()).toMatchObject({
       appReady: false,
-      lastError: "app-server transport closed"
+      lastError: "app-server transport closed",
     });
 
-    await expect(owner.runAppServerCall(async () => {
-      throw new Error("app-server rpc failed");
-    })).rejects.toThrowError("app-server rpc failed");
+    await expect(
+      owner.runAppServerCall(async () => {
+        throw new Error("app-server rpc failed");
+      }),
+    ).rejects.toThrowError("app-server rpc failed");
     expect(owner.getRuntimeState()).toMatchObject({
       appReady: true,
-      lastError: "app-server rpc failed"
+      lastError: "app-server rpc failed",
     });
   });
 
@@ -185,12 +189,12 @@ describe("CodexConnectionLifecycleOwner", () => {
     const appClient = new TestAppServerClient({
       listThreadsImplementation: async () => {
         throw new AppServerTransportError(codexUnavailableMessage);
-      }
+      },
     });
     const ipcClient = new TestDesktopIpcClient();
     const owner = createOwner({
       appClient,
-      ipcClient
+      ipcClient,
     });
 
     await owner.bootstrapConnections();
@@ -200,7 +204,7 @@ describe("CodexConnectionLifecycleOwner", () => {
     expect(owner.getRuntimeState()).toMatchObject({
       codexAvailable: false,
       appReady: false,
-      lastError: codexUnavailableMessage
+      lastError: codexUnavailableMessage,
     });
     expect(() => owner.ensureCodexAvailable()).toThrowError("Codex backend is not available");
   });
@@ -214,10 +218,10 @@ describe("CodexConnectionLifecycleOwner", () => {
       listThreadsImplementation: async () => {
         await listThreadsGate;
         return EMPTY_LIST_THREADS_RESPONSE;
-      }
+      },
     });
     const owner = createOwner({
-      appClient
+      appClient,
     });
 
     const firstBootstrap = owner.bootstrapConnections();
@@ -235,17 +239,17 @@ describe("CodexConnectionLifecycleOwner", () => {
     const ipcClient = new TestDesktopIpcClient();
     const owner = createOwner({
       appClient,
-      ipcClient
+      ipcClient,
     });
     owner.markStarted();
 
     owner.handleIpcConnectionState({
       connected: false,
-      reason: "IPC socket closed"
+      reason: "IPC socket closed",
     });
     owner.handleIpcConnectionState({
       connected: false,
-      reason: "IPC socket closed"
+      reason: "IPC socket closed",
     });
     await vi.advanceTimersByTimeAsync(TEST_RECONNECT_DELAY_MILLISECONDS);
 
@@ -258,13 +262,13 @@ describe("CodexConnectionLifecycleOwner", () => {
     vi.useFakeTimers();
     const appClient = new TestAppServerClient();
     const owner = createOwner({
-      appClient
+      appClient,
     });
     owner.markStarted();
 
     owner.handleIpcConnectionState({
       connected: false,
-      reason: "IPC socket closed"
+      reason: "IPC socket closed",
     });
     owner.markStopped();
     await vi.advanceTimersByTimeAsync(TEST_RECONNECT_DELAY_MILLISECONDS);
@@ -276,16 +280,16 @@ describe("CodexConnectionLifecycleOwner", () => {
     vi.useFakeTimers();
     const appClient = new TestAppServerClient();
     const owner = createOwner({
-      appClient
+      appClient,
     });
     owner.markStarted();
 
     owner.handleIpcConnectionState({
       connected: false,
-      reason: "IPC socket closed"
+      reason: "IPC socket closed",
     });
     owner.handleIpcConnectionState({
-      connected: true
+      connected: true,
     });
     await vi.advanceTimersByTimeAsync(TEST_RECONNECT_DELAY_MILLISECONDS);
 
@@ -293,11 +297,15 @@ describe("CodexConnectionLifecycleOwner", () => {
   });
 
   it("classifies ENOENT process errors as codex unavailable", () => {
-    expect(isCodexUnavailableBootstrapErrorMessage("app-server process error: spawn codex ENOENT")).toBe(true);
+    expect(
+      isCodexUnavailableBootstrapErrorMessage("app-server process error: spawn codex ENOENT"),
+    ).toBe(true);
   });
 
   it("classifies not-found process errors as codex unavailable", () => {
-    expect(isCodexUnavailableBootstrapErrorMessage("app-server process error: executable not found")).toBe(true);
+    expect(
+      isCodexUnavailableBootstrapErrorMessage("app-server process error: executable not found"),
+    ).toBe(true);
   });
 
   it("does not classify unrelated transport errors as codex unavailable", () => {

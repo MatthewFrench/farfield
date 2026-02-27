@@ -16,7 +16,7 @@ afterEach(() => {
 
 function createStoreWithTempPath(
   maxReceipts = 10,
-  maxReceiptAgeMs = 7 * 24 * 60 * 60 * 1_000
+  maxReceiptAgeMs = 7 * 24 * 60 * 60 * 1_000,
 ): { store: PushReceiptStore; filePath: string } {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-push-receipts-"));
   tempDirectories.push(directory);
@@ -44,7 +44,7 @@ describe("PushReceiptStore", () => {
       threadId: "thread_1",
       turnId: "turn_1",
       message: null,
-      createdAt
+      createdAt,
     });
 
     const reloaded = new PushReceiptStore(filePath, 10, 7 * 24 * 60 * 60 * 1_000);
@@ -58,7 +58,7 @@ describe("PushReceiptStore", () => {
       threadId: "thread_1",
       turnId: "turn_1",
       message: null,
-      createdAt
+      createdAt,
     });
   });
 
@@ -73,7 +73,7 @@ describe("PushReceiptStore", () => {
       threadId: "thread_1",
       turnId: "turn_1",
       message: null,
-      createdAt: new Date(baseTimestampMs - 2_000).toISOString()
+      createdAt: new Date(baseTimestampMs - 2_000).toISOString(),
     });
     store.add({
       notificationId: "notif_2",
@@ -82,7 +82,7 @@ describe("PushReceiptStore", () => {
       threadId: "thread_1",
       turnId: "turn_1",
       message: null,
-      createdAt: new Date(baseTimestampMs - 1_000).toISOString()
+      createdAt: new Date(baseTimestampMs - 1_000).toISOString(),
     });
     store.add({
       notificationId: "notif_3",
@@ -91,7 +91,7 @@ describe("PushReceiptStore", () => {
       threadId: "thread_2",
       turnId: "turn_2",
       message: null,
-      createdAt: new Date(baseTimestampMs).toISOString()
+      createdAt: new Date(baseTimestampMs).toISOString(),
     });
 
     expect(store.getCount()).toBe(2);
@@ -112,7 +112,7 @@ describe("PushReceiptStore", () => {
       threadId: "thread_stale",
       turnId: "turn_stale",
       message: null,
-      createdAt: staleCreatedAt
+      createdAt: staleCreatedAt,
     });
     store.add({
       notificationId: "notif_fresh",
@@ -121,7 +121,7 @@ describe("PushReceiptStore", () => {
       threadId: "thread_fresh",
       turnId: "turn_fresh",
       message: null,
-      createdAt: freshCreatedAt
+      createdAt: freshCreatedAt,
     });
 
     expect(store.getCount()).toBe(1);

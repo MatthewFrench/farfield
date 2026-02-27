@@ -4,14 +4,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   ChatLiveStateResponse,
   ChatReadThreadResponse,
-  ChatStreamEventsResponse
+  ChatStreamEventsResponse,
 } from "@/Features/Chat/DataAccess/ChatServerClient";
 import { SelectedThreadRefreshConcurrencyCoordinator } from "@/Features/Chat/StateManagement/SelectedThreadRefreshConcurrencyCoordinator";
-import type { LoadSelectedThreadOptions } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import {
   type UseSelectedThreadLifecycleEffectsInput,
-  useSelectedThreadLifecycleEffects
+  useSelectedThreadLifecycleEffects,
 } from "@/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects";
+import type { LoadSelectedThreadOptions } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 
 interface LifecycleHarnessProperties {
   input: UseSelectedThreadLifecycleEffectsInput;
@@ -40,27 +40,32 @@ function createDeferredVoidPromise(): {
   return {
     promise,
     resolve: resolvePromise,
-    reject: rejectPromise
+    reject: rejectPromise,
   };
 }
 
 function createLifecycleInput(selectedThreadId: string | null) {
   const selectedThreadIdRef: MutableRefObject<string | null> = {
-    current: selectedThreadId
+    current: selectedThreadId,
   };
   const selectedThreadLoadTokenRef: MutableRefObject<number> = {
-    current: 0
+    current: 0,
   };
-  const loadSelectedThreadRef: MutableRefObject<((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null> = {
-    current: null
+  const loadSelectedThreadRef: MutableRefObject<
+    ((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null
+  > = {
+    current: null,
   };
-  const selectedThreadRefreshConcurrencyCoordinator = new SelectedThreadRefreshConcurrencyCoordinator();
+  const selectedThreadRefreshConcurrencyCoordinator =
+    new SelectedThreadRefreshConcurrencyCoordinator();
   const setLiveState = vi.fn<(value: SetStateAction<ChatLiveStateResponse | null>) => void>();
-  const setReadThreadState = vi.fn<(value: SetStateAction<ChatReadThreadResponse | null>) => void>();
-  const setStreamEvents = vi.fn<(value: SetStateAction<ChatStreamEventsResponse["events"]>) => void>();
+  const setReadThreadState =
+    vi.fn<(value: SetStateAction<ChatReadThreadResponse | null>) => void>();
+  const setStreamEvents =
+    vi.fn<(value: SetStateAction<ChatStreamEventsResponse["events"]>) => void>();
   const setIsSelectedThreadLoading = vi.fn<(value: SetStateAction<boolean>) => void>();
   const setSelectedThreadId = vi.fn<(value: SetStateAction<string | null>) => void>();
-  const handleRuntimeRequestError = vi.fn<<ErrorType,>(error: ErrorType) => void>();
+  const handleRuntimeRequestError = vi.fn<<ErrorType>(error: ErrorType) => void>();
 
   return {
     input: {
@@ -74,7 +79,7 @@ function createLifecycleInput(selectedThreadId: string | null) {
       setStreamEvents,
       setIsSelectedThreadLoading,
       setSelectedThreadId,
-      handleRuntimeRequestError
+      handleRuntimeRequestError,
     },
     selectedThreadIdRef,
     selectedThreadLoadTokenRef,
@@ -85,7 +90,7 @@ function createLifecycleInput(selectedThreadId: string | null) {
     setStreamEvents,
     setIsSelectedThreadLoading,
     setSelectedThreadId,
-    handleRuntimeRequestError
+    handleRuntimeRequestError,
   };
 }
 
@@ -98,7 +103,7 @@ describe("useSelectedThreadLifecycleEffects", () => {
     const lifecycle = createLifecycleInput(null);
     const cancelActiveRefreshSpy = vi.spyOn(
       lifecycle.selectedThreadRefreshConcurrencyCoordinator,
-      "cancelActiveRefresh"
+      "cancelActiveRefresh",
     );
 
     render(<LifecycleHarness input={lifecycle.input} />);
@@ -149,9 +154,9 @@ describe("useSelectedThreadLifecycleEffects", () => {
       <LifecycleHarness
         input={{
           ...lifecycle.input,
-          selectedThreadId: "thread-2"
+          selectedThreadId: "thread-2",
         }}
-      />
+      />,
     );
 
     await waitFor(() => {

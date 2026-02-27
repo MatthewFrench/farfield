@@ -1,12 +1,9 @@
-import {
-  useCallback,
-  useMemo
-} from "react";
+import { useCallback, useMemo } from "react";
 import { DateValueFormatter } from "@/Application/DomainModel/DateValueFormatter";
 import { AgentFavicon } from "@/Application/UserInterface/AgentFavicon";
-import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import { StreamEventCard } from "@/Components/StreamEventCard";
 import { type ChatStreamEventsResponse } from "@/Features/Chat/DataAccess/ChatServerClient";
+import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 
 export interface UseStreamEventCardsInput {
   streamEvents: ChatStreamEventsResponse["events"];
@@ -23,18 +20,14 @@ function buildStreamEventCardKey(stableIndex: number): string {
   return `${STREAM_EVENT_CARD_KEY_PREFIX}${String(stableIndex)}`;
 }
 
-function indexStreamEvents(
-  streamEvents: ChatStreamEventsResponse["events"]
-): IndexedStreamEvent[] {
+function indexStreamEvents(streamEvents: ChatStreamEventsResponse["events"]): IndexedStreamEvent[] {
   return streamEvents.map<IndexedStreamEvent>((streamEvent, stableIndex) => ({
     streamEvent,
-    stableIndex
+    stableIndex,
   }));
 }
 
-function buildStreamEventCard(
-  indexedStreamEvent: IndexedStreamEvent
-): React.JSX.Element {
+function buildStreamEventCard(indexedStreamEvent: IndexedStreamEvent): React.JSX.Element {
   return (
     <StreamEventCard
       key={buildStreamEventCardKey(indexedStreamEvent.stableIndex)}
@@ -44,13 +37,15 @@ function buildStreamEventCard(
 }
 
 export function useStreamEventCards(input: UseStreamEventCardsInput): React.JSX.Element[] {
-  return useMemo<React.JSX.Element[]>(() => (
-    indexStreamEvents(input.streamEvents)
-      // Preserve each event's original index as a stable key seed so appends do not
-      // remount every existing card (which would reset local expand/collapse state).
-      .reverse()
-      .map(buildStreamEventCard)
-  ), [input.streamEvents]);
+  return useMemo<React.JSX.Element[]>(
+    () =>
+      indexStreamEvents(input.streamEvents)
+        // Preserve each event's original index as a stable key seed so appends do not
+        // remount every existing card (which would reset local expand/collapse state).
+        .reverse()
+        .map(buildStreamEventCard),
+    [input.streamEvents],
+  );
 }
 
 export interface UseApplicationFormattingHelpersInput {
@@ -63,22 +58,22 @@ export interface ApplicationFormattingHelpers {
 }
 
 export function useApplicationFormattingHelpers(
-  input: UseApplicationFormattingHelpersInput
+  input: UseApplicationFormattingHelpersInput,
 ): ApplicationFormattingHelpers {
   const renderAgentFavicon = useCallback(
     (agentId: AgentId, label: string, className: string): React.JSX.Element => (
       <AgentFavicon agentId={agentId} label={label} className={className} />
     ),
-    []
+    [],
   );
 
   const formatDateValue = useCallback(
     (value: number | string | null | undefined): string => input.dateValueFormatter.format(value),
-    [input.dateValueFormatter]
+    [input.dateValueFormatter],
   );
 
   return {
     renderAgentFavicon,
-    formatDateValue
+    formatDateValue,
   };
 }

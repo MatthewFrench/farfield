@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import {
   FarfieldPushTestBodySchema,
+  type PushNotificationPayload,
   parsePushNotificationPayload,
-  type PushNotificationPayload
 } from "@farfield/protocol";
 import { z } from "zod";
 
@@ -28,13 +28,11 @@ export class PushTestPayloadOwner {
 
   public constructor(dependencies?: PushTestPayloadOwnerDependencies) {
     this.readNowIsoString = dependencies?.readNowIsoString ?? (() => new Date().toISOString());
-    this.createNotificationIdSuffix = dependencies?.createNotificationIdSuffix ?? (() => randomUUID());
+    this.createNotificationIdSuffix =
+      dependencies?.createNotificationIdSuffix ?? (() => randomUUID());
   }
 
-  public buildPayload(
-    input: PushTestPayloadInput,
-    privateMode: boolean
-  ): PushNotificationPayload {
+  public buildPayload(input: PushTestPayloadInput, privateMode: boolean): PushNotificationPayload {
     const now = this.readNowIsoString();
     const notificationId = `${NOTIFICATION_ID_PREFIX}${this.createNotificationIdSuffix()}`;
     const url = `/threads/${encodeURIComponent(input.threadId)}`;
@@ -58,9 +56,9 @@ export class PushTestPayloadOwner {
           navigate: url,
           icon: DEFAULT_NOTIFICATION_ICON_PATH,
           badge: DEFAULT_NOTIFICATION_ICON_PATH,
-          tag: `thread:${input.threadId}`
-        }
-      }
+          tag: `thread:${input.threadId}`,
+        },
+      },
     });
   }
 }

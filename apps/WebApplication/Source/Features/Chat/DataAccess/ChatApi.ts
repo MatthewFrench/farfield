@@ -4,22 +4,26 @@
  */
 import {
   CollaborationModeSchema,
-  FarfieldThreadLiveStateSnapshotSchema,
-  FarfieldThreadStreamEventsSnapshotSchema,
   type FarfieldThreadLiveStateSnapshot,
+  FarfieldThreadLiveStateSnapshotSchema,
   type FarfieldThreadStreamEventsSnapshot,
-  UserInputResponsePayloadSchema
+  FarfieldThreadStreamEventsSnapshotSchema,
+  UserInputResponsePayloadSchema,
 } from "@farfield/protocol";
 import { z } from "zod";
-import { readThread, type ApiReadThreadOptions, type ApiReadThreadResponse } from "@/Features/Threads/DataAccess/ThreadApi";
+import {
+  type ApiReadThreadOptions,
+  type ApiReadThreadResponse,
+  readThread,
+} from "@/Features/Threads/DataAccess/ThreadApi";
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
+import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 import {
   applyRequestOptions,
   request,
   requestInitWithOptions,
-  requestNoContent
+  requestNoContent,
 } from "@/Shared/Transport/FarfieldHttpTransport";
-import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 
 const THREADS_ROUTE_PATH = "/api/threads";
 const LIVE_STATE_ROUTE_SEGMENT = "live-state";
@@ -47,7 +51,7 @@ const StreamEventsResponseWireSchema = FarfieldThreadStreamEventsSnapshotSchema.
 const StreamEventsQueryOptionsSchema = z
   .object({
     // Query cursor must be an absolute sequence index for deterministic stream replay.
-    sinceSequence: z.number().int().nonnegative().nullable().optional()
+    sinceSequence: z.number().int().nonnegative().nullable().optional(),
   })
   .strict();
 
@@ -56,12 +60,12 @@ const SendMessageInputSchema = z
     threadId: ThreadIdentifierSchema,
     ownerClientId: z.string().optional(),
     text: z.string().min(1),
-    cwd: z.string().optional()
+    cwd: z.string().optional(),
   })
   .strict();
 export type ApiSendMessageInput = z.infer<typeof SendMessageInputSchema>;
 const SendMessageRequestBodySchema = SendMessageInputSchema.omit({
-  threadId: true
+  threadId: true,
 }).strict();
 type ApiSendMessageRequestBody = z.infer<typeof SendMessageRequestBodySchema>;
 
@@ -69,12 +73,12 @@ const SetCollaborationModeInputSchema = z
   .object({
     threadId: ThreadIdentifierSchema,
     ownerClientId: z.string().optional(),
-    collaborationMode: CollaborationModeSchema
+    collaborationMode: CollaborationModeSchema,
   })
   .strict();
 export type ApiSetCollaborationModeInput = z.infer<typeof SetCollaborationModeInputSchema>;
 const SetCollaborationModeRequestBodySchema = SetCollaborationModeInputSchema.omit({
-  threadId: true
+  threadId: true,
 }).strict();
 type ApiSetCollaborationModeRequestBody = z.infer<typeof SetCollaborationModeRequestBodySchema>;
 
@@ -83,24 +87,24 @@ const SubmitUserInputInputSchema = z
     threadId: ThreadIdentifierSchema,
     ownerClientId: z.string().optional(),
     requestId: z.number().int().nonnegative(),
-    response: UserInputResponsePayloadSchema
+    response: UserInputResponsePayloadSchema,
   })
   .strict();
 export type ApiSubmitUserInputInput = z.infer<typeof SubmitUserInputInputSchema>;
 const SubmitUserInputRequestBodySchema = SubmitUserInputInputSchema.omit({
-  threadId: true
+  threadId: true,
 }).strict();
 type ApiSubmitUserInputRequestBody = z.infer<typeof SubmitUserInputRequestBodySchema>;
 
 const InterruptThreadInputSchema = z
   .object({
     threadId: ThreadIdentifierSchema,
-    ownerClientId: z.string().optional()
+    ownerClientId: z.string().optional(),
   })
   .strict();
 export type ApiInterruptThreadInput = z.infer<typeof InterruptThreadInputSchema>;
 const InterruptThreadRequestBodySchema = InterruptThreadInputSchema.omit({
-  threadId: true
+  threadId: true,
 }).strict();
 type ApiInterruptThreadRequestBody = z.infer<typeof InterruptThreadRequestBodySchema>;
 
@@ -129,7 +133,7 @@ function parseLiveStateResponse(data: StructuredDataValue): ApiLiveStateResponse
     threadId: snapshot.threadId,
     ownerClientId: snapshot.ownerClientId,
     conversationState: snapshot.conversationState,
-    liveStateError: snapshot.liveStateError
+    liveStateError: snapshot.liveStateError,
   };
 }
 
@@ -142,7 +146,7 @@ function parseStreamEventsResponse(data: StructuredDataValue): ApiStreamEventsRe
     events: snapshot.events,
     nextSequence: snapshot.nextSequence,
     firstAvailableSequence: snapshot.firstAvailableSequence,
-    resetRequired: snapshot.resetRequired
+    resetRequired: snapshot.resetRequired,
   };
 }
 
@@ -153,14 +157,17 @@ function buildThreadMemberRoutePath(threadId: string, routeSegment: string): str
 
 function buildStreamEventsSearchParameters(options?: ApiReadStreamEventsOptions): URLSearchParams {
   const parsedQueryOptions = StreamEventsQueryOptionsSchema.parse({
-    sinceSequence: options?.sinceSequence
+    sinceSequence: options?.sinceSequence,
   });
   const queryParameters = new URLSearchParams({
-    [STREAM_EVENTS_LIMIT_QUERY_KEY]: STREAM_EVENTS_LIMIT_QUERY_VALUE
+    [STREAM_EVENTS_LIMIT_QUERY_KEY]: STREAM_EVENTS_LIMIT_QUERY_VALUE,
   });
 
   if (parsedQueryOptions.sinceSequence !== undefined && parsedQueryOptions.sinceSequence !== null) {
-    queryParameters.set(STREAM_EVENTS_SINCE_SEQUENCE_QUERY_KEY, String(parsedQueryOptions.sinceSequence));
+    queryParameters.set(
+      STREAM_EVENTS_SINCE_SEQUENCE_QUERY_KEY,
+      String(parsedQueryOptions.sinceSequence),
+    );
   }
 
   return queryParameters;
@@ -171,11 +178,11 @@ function createJsonPostRequestInit(bodyText: string, options?: ApiRequestOptions
     {
       method: REQUEST_METHOD_POST,
       headers: {
-        [REQUEST_CONTENT_TYPE_HEADER_NAME]: REQUEST_CONTENT_TYPE_HEADER_VALUE
+        [REQUEST_CONTENT_TYPE_HEADER_NAME]: REQUEST_CONTENT_TYPE_HEADER_VALUE,
       },
-      body: bodyText
+      body: bodyText,
     },
-    options
+    options,
   );
 }
 
@@ -183,88 +190,106 @@ function postThreadMutation(
   threadId: string,
   routeSegment: ChatMutationRouteSegment,
   requestBody: ChatMutationRequestBody,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<void> {
   return requestNoContent(
     buildThreadMemberRoutePath(threadId, routeSegment),
-    createJsonPostRequestInit(JSON.stringify(requestBody), options)
+    createJsonPostRequestInit(JSON.stringify(requestBody), options),
   );
 }
 
 export async function getLiveState(
   threadId: string,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiLiveStateResponse> {
   const data = await request(
     buildThreadMemberRoutePath(threadId, LIVE_STATE_ROUTE_SEGMENT),
-    requestInitWithOptions(options)
+    requestInitWithOptions(options),
   );
   return parseLiveStateResponse(data);
 }
 
 export async function getStreamEvents(
   threadId: string,
-  options?: ApiReadStreamEventsOptions
+  options?: ApiReadStreamEventsOptions,
 ): Promise<ApiStreamEventsResponse> {
   const queryParameters = buildStreamEventsSearchParameters(options);
   const data = await request(
     `${buildThreadMemberRoutePath(threadId, STREAM_EVENTS_ROUTE_SEGMENT)}?${queryParameters.toString()}`,
-    requestInitWithOptions(options)
+    requestInitWithOptions(options),
   );
   return parseStreamEventsResponse(data);
 }
 
-export async function sendMessage(input: ApiSendMessageInput, options?: ApiRequestOptions): Promise<void> {
+export async function sendMessage(
+  input: ApiSendMessageInput,
+  options?: ApiRequestOptions,
+): Promise<void> {
   const parsedInput = SendMessageInputSchema.parse(input);
   const parsedRequestBody = SendMessageRequestBodySchema.parse({
     ownerClientId: parsedInput.ownerClientId,
     text: parsedInput.text,
-    cwd: parsedInput.cwd
+    cwd: parsedInput.cwd,
   });
 
-  await postThreadMutation(parsedInput.threadId, MESSAGES_ROUTE_SEGMENT, parsedRequestBody, options);
+  await postThreadMutation(
+    parsedInput.threadId,
+    MESSAGES_ROUTE_SEGMENT,
+    parsedRequestBody,
+    options,
+  );
 }
 
 export async function setCollaborationMode(
   input: ApiSetCollaborationModeInput,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<void> {
   const parsedInput = SetCollaborationModeInputSchema.parse(input);
   const parsedRequestBody = SetCollaborationModeRequestBodySchema.parse({
     ownerClientId: parsedInput.ownerClientId,
-    collaborationMode: parsedInput.collaborationMode
+    collaborationMode: parsedInput.collaborationMode,
   });
 
   await postThreadMutation(
     parsedInput.threadId,
     COLLABORATION_MODE_ROUTE_SEGMENT,
     parsedRequestBody,
-    options
+    options,
   );
 }
 
 export async function submitUserInput(
   input: ApiSubmitUserInputInput,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<void> {
   const parsedInput = SubmitUserInputInputSchema.parse(input);
   const parsedRequestBody = SubmitUserInputRequestBodySchema.parse({
     ownerClientId: parsedInput.ownerClientId,
     requestId: parsedInput.requestId,
-    response: parsedInput.response
+    response: parsedInput.response,
   });
 
-  await postThreadMutation(parsedInput.threadId, USER_INPUT_ROUTE_SEGMENT, parsedRequestBody, options);
+  await postThreadMutation(
+    parsedInput.threadId,
+    USER_INPUT_ROUTE_SEGMENT,
+    parsedRequestBody,
+    options,
+  );
 }
 
 export async function interruptThread(
   input: ApiInterruptThreadInput,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<void> {
   const parsedInput = InterruptThreadInputSchema.parse(input);
   const parsedRequestBody = InterruptThreadRequestBodySchema.parse({
-    ownerClientId: parsedInput.ownerClientId
+    ownerClientId: parsedInput.ownerClientId,
   });
 
-  await postThreadMutation(parsedInput.threadId, INTERRUPT_ROUTE_SEGMENT, parsedRequestBody, options);
+  await postThreadMutation(
+    parsedInput.threadId,
+    INTERRUPT_ROUTE_SEGMENT,
+    parsedRequestBody,
+    options,
+  );
 }

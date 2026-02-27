@@ -1,9 +1,9 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
-import { logger } from "../../Shared/Logging/Logger.js";
-import type { EventStreamClientRegistry } from "../../Network/EventStreamClientRegistry.js";
 import type { ActiveTrace, HistoryEntry, TraceSummary } from "../../Network/DebugContracts.js";
+import type { EventStreamClientRegistry } from "../../Network/EventStreamClientRegistry.js";
+import { logger } from "../../Shared/Logging/Logger.js";
 
 const DEFAULT_HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES = 131_072;
 const RECENT_TRACE_LIMIT = 20;
@@ -26,7 +26,7 @@ const ACTION_DETAIL_SUMMARY_KEYS = [
   "requestId",
   "textLength",
   "cwd",
-  "model"
+  "model",
 ] as const;
 
 /**
@@ -46,17 +46,17 @@ export class ActivityHistoryService {
   public constructor(
     historyLimit: number,
     eventStreamClientRegistry: EventStreamClientRegistry,
-    historyPayloadSummaryMaximumBytes = DEFAULT_HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES
+    historyPayloadSummaryMaximumBytes = DEFAULT_HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES,
   ) {
     if (!Number.isInteger(historyLimit) || historyLimit <= 0) {
       throw new Error("ActivityHistoryService requires positive integer historyLimit");
     }
     if (
-      !Number.isInteger(historyPayloadSummaryMaximumBytes)
-      || historyPayloadSummaryMaximumBytes <= 0
+      !Number.isInteger(historyPayloadSummaryMaximumBytes) ||
+      historyPayloadSummaryMaximumBytes <= 0
     ) {
       throw new Error(
-        "ActivityHistoryService requires positive integer historyPayloadSummaryMaximumBytes"
+        "ActivityHistoryService requires positive integer historyPayloadSummaryMaximumBytes",
       );
     }
 
@@ -73,7 +73,7 @@ export class ActivityHistoryService {
   public readHistoryEntries(): HistoryEntry[] {
     return this.history.map((historyEntry) => ({
       ...historyEntry,
-      meta: { ...historyEntry.meta }
+      meta: { ...historyEntry.meta },
     }));
   }
 
@@ -102,7 +102,7 @@ export class ActivityHistoryService {
   public startTrace(
     traceDirectoryPath: string,
     label: string,
-    ensureTraceDirectory: () => void
+    ensureTraceDirectory: () => void,
   ): TraceSummary | null {
     if (this.activeTraceRef.current) {
       return null;
@@ -117,9 +117,9 @@ export class ActivityHistoryService {
         {
           traceId: traceIdentifier,
           tracePath,
-          error: error.message
+          error: error.message,
         },
-        TRACE_STREAM_WRITE_FAILED_LOG_EVENT
+        TRACE_STREAM_WRITE_FAILED_LOG_EVENT,
       );
     });
 
@@ -129,12 +129,12 @@ export class ActivityHistoryService {
       startedAt: this.readCurrentTimestampIsoString(),
       stoppedAt: null,
       eventCount: 0,
-      path: tracePath
+      path: tracePath,
     };
 
     this.activeTraceRef.current = {
       summary,
-      stream
+      stream,
     };
 
     return summary;
@@ -144,7 +144,7 @@ export class ActivityHistoryService {
     const marker: HistoryEntry["payload"] = {
       type: TRACE_MARKER_EVENT_TYPE,
       at: this.readCurrentTimestampIsoString(),
-      note
+      note,
     };
 
     return this.appendTraceRecordIfActive(marker);
@@ -174,7 +174,7 @@ export class ActivityHistoryService {
     source: HistoryEntry["source"],
     direction: HistoryEntry["direction"],
     payload: HistoryEntry["payload"],
-    meta: HistoryEntry["meta"] = {}
+    meta: HistoryEntry["meta"] = {},
   ): HistoryEntry {
     const historyPayload = this.summarizePayloadForHistory(payload);
     const historyMeta = { ...meta };
@@ -184,13 +184,13 @@ export class ActivityHistoryService {
       source,
       direction,
       payload: historyPayload,
-      meta: historyMeta
+      meta: historyMeta,
     };
     this.appendHistoryEntry(entry, payload);
     this.appendTraceRecordIfActive({ type: TRACE_HISTORY_EVENT_TYPE, ...entry });
     this.eventStreamClientRegistry.broadcast({
       type: ACTIVITY_HISTORY_APPENDED_EVENT_TYPE,
-      entry
+      entry,
     });
     return entry;
   }
@@ -198,37 +198,42 @@ export class ActivityHistoryService {
   public pushActionEvent(
     action: string,
     stage: "attempt" | "success" | "error",
-    details: HistoryEntry["meta"]
+    details: HistoryEntry["meta"],
   ): void {
     logger.debug(
       {
         action,
         stage,
-        ...this.summarizeActionDetails(details)
+        ...this.summarizeActionDetails(details),
       },
-      ACTION_EVENT_LOG_EVENT
+      ACTION_EVENT_LOG_EVENT,
     );
 
-    this.pushHistory("app", "out", {
-      type: "action",
-      action,
-      stage,
-      ...details
-    }, details);
+    this.pushHistory(
+      "app",
+      "out",
+      {
+        type: "action",
+        action,
+        stage,
+        ...details,
+      },
+      details,
+    );
   }
 
   public pushActionFailure(
     action: string,
     errorMessage: string,
-    details: HistoryEntry["meta"]
+    details: HistoryEntry["meta"],
   ): string {
     logger.error(
       {
         action,
         error: errorMessage,
-        ...this.summarizeActionDetails(details)
+        ...this.summarizeActionDetails(details),
       },
-      ACTION_ERROR_LOG_EVENT
+      ACTION_ERROR_LOG_EVENT,
     );
 
     this.pushActionEvent(action, "error", { ...details, error: errorMessage });
@@ -266,10 +271,7 @@ export class ActivityHistoryService {
     return `${JSON.stringify(event)}${TRACE_RECORD_LINE_ENDING}`;
   }
 
-  private appendHistoryEntry(
-    entry: HistoryEntry,
-    originalPayload: HistoryEntry["payload"]
-  ): void {
+  private appendHistoryEntry(entry: HistoryEntry, originalPayload: HistoryEntry["payload"]): void {
     this.history.push(entry);
     this.historyById.set(entry.id, originalPayload);
 
@@ -314,14 +316,14 @@ export class ActivityHistoryService {
     // Keep preview size bounded so activity history remains responsive under very large payloads.
     const previewMaximumBytes = Math.min(
       HISTORY_PAYLOAD_PREVIEW_MAXIMUM_BYTES,
-      this.historyPayloadSummaryMaximumBytes
+      this.historyPayloadSummaryMaximumBytes,
     );
     const preview = serializedPayload.slice(0, previewMaximumBytes);
     return {
       type: HISTORY_PAYLOAD_SUMMARY_TYPE,
       truncated: true,
       originalSizeBytes: serializedPayloadBytes,
-      preview
+      preview,
     };
   }
 }

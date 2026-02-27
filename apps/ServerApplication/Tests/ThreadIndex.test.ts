@@ -19,7 +19,7 @@ describe("ThreadIndex", () => {
     expect(threadIndex.resolve("thread-b")).toBe("opencode");
     expect(threadIndex.list()).toEqual([
       { threadId: "thread-a", agentId: "codex" },
-      { threadId: "thread-b", agentId: "opencode" }
+      { threadId: "thread-b", agentId: "opencode" },
     ]);
   });
 
@@ -38,7 +38,7 @@ describe("ThreadIndex", () => {
     threadIndex.register("thread-a", "codex");
 
     expect(() => threadIndex.register("thread-a", "opencode")).toThrowError(
-      /already bound to codex/
+      /already bound to codex/,
     );
   });
 });

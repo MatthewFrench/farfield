@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  parseThreadConversationState
-} from "../Source/Index.js";
+import { parseThreadConversationState } from "../Source/Index.js";
 
 describe("codex-protocol thread extended schemas", () => {
   it("parses thread conversation state with fileChange item", () => {
@@ -20,16 +18,16 @@ describe("codex-protocol thread extended schemas", () => {
                   path: "/tmp/file.txt",
                   kind: {
                     type: "update",
-                    move_path: null
+                    move_path: null,
                   },
-                  diff: "@@ -1 +1 @@\n-old\n+new\n"
-                }
-              ]
-            }
-          ]
-        }
+                  diff: "@@ -1 +1 @@\n-old\n+new\n",
+                },
+              ],
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("fileChange");
@@ -45,7 +43,7 @@ describe("codex-protocol thread extended schemas", () => {
             {
               id: "item-compact",
               type: "contextCompaction",
-              completed: true
+              completed: true,
             },
             {
               id: "item-web",
@@ -54,13 +52,13 @@ describe("codex-protocol thread extended schemas", () => {
               action: {
                 type: "search",
                 query: "example query",
-                queries: ["example query"]
-              }
-            }
-          ]
-        }
+                queries: ["example query"],
+              },
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("contextCompaction");
@@ -83,10 +81,10 @@ describe("codex-protocol thread extended schemas", () => {
               arguments: { path: "README.md" },
               result: {
                 content: ["ok"],
-                structuredContent: null
+                structuredContent: null,
               },
               error: null,
-              durationMs: 18
+              durationMs: 18,
             },
             {
               id: "item-collab",
@@ -99,29 +97,29 @@ describe("codex-protocol thread extended schemas", () => {
               agentsStates: {
                 "thread-124": {
                   status: "running",
-                  message: null
-                }
-              }
+                  message: null,
+                },
+              },
             },
             {
               id: "item-image-view",
               type: "imageView",
-              path: "/tmp/example.png"
+              path: "/tmp/example.png",
             },
             {
               id: "item-review-enter",
               type: "enteredReviewMode",
-              review: "review-1"
+              review: "review-1",
             },
             {
               id: "item-review-exit",
               type: "exitedReviewMode",
-              review: "review-1"
-            }
-          ]
-        }
+              review: "review-1",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("mcpToolCall");
@@ -149,14 +147,14 @@ describe("codex-protocol thread extended schemas", () => {
               agentsStates: {
                 "thread-124": {
                   status: "running",
-                  message: null
-                }
-              }
-            }
-          ]
-        }
+                  message: null,
+                },
+              },
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("collabToolCall");
@@ -171,12 +169,12 @@ describe("codex-protocol thread extended schemas", () => {
           items: [
             {
               id: "item-compact",
-              type: "contextCompaction"
-            }
-          ]
-        }
+              type: "contextCompaction",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("contextCompaction");
@@ -191,15 +189,15 @@ describe("codex-protocol thread extended schemas", () => {
         settings: {
           model: "gpt-5.3-codex",
           reasoning_effort: null,
-          developer_instructions: "Keep responses concise."
-        }
-      }
+          developer_instructions: "Keep responses concise.",
+        },
+      },
     });
 
     expect(parsed.latestCollaborationMode?.settings.model).toBe("gpt-5.3-codex");
     expect(parsed.latestCollaborationMode?.settings.reasoning_effort).toBeNull();
     expect(parsed.latestCollaborationMode?.settings.developer_instructions).toBe(
-      "Keep responses concise."
+      "Keep responses concise.",
     );
   });
 
@@ -214,11 +212,11 @@ describe("codex-protocol thread extended schemas", () => {
             model: null,
             reasoning_effort: null,
             developer_instructions: null,
-            extraSetting: "not-allowed"
+            extraSetting: "not-allowed",
           },
-          extraModeField: "not-allowed"
-        }
-      })
+          extraModeField: "not-allowed",
+        },
+      }),
     ).toThrowError(/ThreadConversationState did not match expected schema/);
   });
 
@@ -233,12 +231,12 @@ describe("codex-protocol thread extended schemas", () => {
               id: "item-model",
               type: "modelChanged",
               fromModel: "gpt-5.3-codex-spark",
-              toModel: "gpt-5.3-codex"
-            }
-          ]
-        }
+              toModel: "gpt-5.3-codex",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("modelChanged");

@@ -15,7 +15,7 @@ const DEBUG_ROUTE_PATH_SUFFIX = "/debug";
 function buildRouteState(threadId: string | null, tab: "chat" | "debug"): ApplicationRouteState {
   return {
     threadId,
-    tab
+    tab,
   };
 }
 

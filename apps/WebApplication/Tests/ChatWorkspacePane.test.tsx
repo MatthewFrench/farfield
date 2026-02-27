@@ -1,9 +1,9 @@
-import { createRef } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
   ChatWorkspacePane,
-  type ChatWorkspacePaneProps
+  type ChatWorkspacePaneProps,
 } from "@/Features/Chat/UserInterface/ChatWorkspacePane";
 
 const baseChatWorkspacePaneProperties: ChatWorkspacePaneProps = {
@@ -50,18 +50,13 @@ const baseChatWorkspacePaneProperties: ChatWorkspacePaneProps = {
     pendingRequestCount: 0,
     onTogglePlanMode: () => {},
     onModelChange: () => {},
-    onReasoningEffortChange: () => {}
-  }
+    onReasoningEffortChange: () => {},
+  },
 };
 
 function renderChatWorkspacePane(properties?: Partial<ChatWorkspacePaneProps>): void {
   cleanup();
-  render(
-    <ChatWorkspacePane
-      {...baseChatWorkspacePaneProperties}
-      {...properties}
-    />
-  );
+  render(<ChatWorkspacePane {...baseChatWorkspacePaneProperties} {...properties} />);
 }
 
 describe("ChatWorkspacePane", () => {
@@ -74,10 +69,12 @@ describe("ChatWorkspacePane", () => {
     renderChatWorkspacePane({
       chatSurfaceState: "no-thread",
       selectedThreadId: null,
-      turnCount: 0
+      turnCount: 0,
     });
 
-    expect(screen.getByTestId("chat-empty-no-thread").textContent).toBe("Start typing to create a new thread");
+    expect(screen.getByTestId("chat-empty-no-thread").textContent).toBe(
+      "Start typing to create a new thread",
+    );
     expect(screen.queryByTestId("chat-empty-loading-threads")).toBeNull();
   });
 
@@ -86,10 +83,12 @@ describe("ChatWorkspacePane", () => {
       chatSurfaceState: "no-thread",
       selectedThreadId: null,
       availableAgentIds: [],
-      turnCount: 0
+      turnCount: 0,
     });
 
-    expect(screen.getByTestId("chat-empty-no-thread").textContent).toBe("Select a thread from the sidebar");
+    expect(screen.getByTestId("chat-empty-no-thread").textContent).toBe(
+      "Select a thread from the sidebar",
+    );
   });
 
   it("fails fast when an empty-state render is requested while the surface state is ready", () => {
@@ -97,9 +96,11 @@ describe("ChatWorkspacePane", () => {
       renderChatWorkspacePane({
         chatSurfaceState: "ready",
         selectedThreadId: null,
-        turnCount: 0
+        turnCount: 0,
       });
-    }).toThrowError("ChatWorkspacePane received an empty-state render with chatSurfaceState set to 'ready'.");
+    }).toThrowError(
+      "ChatWorkspacePane received an empty-state render with chatSurfaceState set to 'ready'.",
+    );
   });
 
   it("invokes show older messages callback when hidden messages are available", () => {
@@ -110,7 +111,7 @@ describe("ChatWorkspacePane", () => {
       hasHiddenChatItems: true,
       firstVisibleChatItemIndex: 3,
       onShowOlderMessages,
-      chatSurfaceState: "ready"
+      chatSurfaceState: "ready",
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Show older messages (3)" }));
@@ -124,7 +125,7 @@ describe("ChatWorkspacePane", () => {
       turnCount: 2,
       isChatAtBottom: false,
       onJumpToBottom,
-      chatSurfaceState: "ready"
+      chatSurfaceState: "ready",
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Jump to latest message" }));
@@ -135,7 +136,7 @@ describe("ChatWorkspacePane", () => {
     renderChatWorkspacePane({
       turnCount: 1,
       chatSurfaceState: "ready",
-      visibleConversationItems: []
+      visibleConversationItems: [],
     });
 
     expect(screen.getByRole("log", { name: "Conversation updates" })).toBeDefined();
@@ -144,7 +145,7 @@ describe("ChatWorkspacePane", () => {
   it("uses the selected-agent placeholder when no thread is selected", () => {
     renderChatWorkspacePane({
       selectedThreadId: null,
-      selectedAgentLabel: "OpenCode"
+      selectedAgentLabel: "OpenCode",
     });
 
     expect(screen.getByPlaceholderText("Message OpenCode…")).toBeDefined();
@@ -153,7 +154,7 @@ describe("ChatWorkspacePane", () => {
   it("uses the active-agent placeholder when a thread is selected", () => {
     renderChatWorkspacePane({
       selectedThreadId: "thread-001",
-      activeAgentLabel: "OpenCode"
+      activeAgentLabel: "OpenCode",
     });
 
     expect(screen.getByPlaceholderText("Message OpenCode…")).toBeDefined();

@@ -8,7 +8,7 @@ vi.mock("../Source/Features/PushNotifications/DataAccess/PushApi", () => ({
   getPushStatus: vi.fn(),
   getPushVapidPublicKey: vi.fn(),
   savePushSubscription: vi.fn(),
-  sendPushTestNotification: vi.fn()
+  sendPushTestNotification: vi.fn(),
 }));
 
 import {
@@ -19,7 +19,7 @@ import {
   getPushStatus,
   getPushVapidPublicKey,
   savePushSubscription,
-  sendPushTestNotification
+  sendPushTestNotification,
 } from "../Source/Features/PushNotifications/DataAccess/PushApi";
 import { PushServerClient } from "../Source/Features/PushNotifications/DataAccess/PushServerClient";
 
@@ -27,33 +27,34 @@ const PUSH_STATUS_RESPONSE = {
   enabled: true,
   permissionRequired: true,
   subscriptionCount: 2,
-  privateModeDefault: false
+  privateModeDefault: false,
 };
 
 const PUSH_VAPID_PUBLIC_KEY_RESPONSE = {
-  publicKey: "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U"
+  publicKey:
+    "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U",
 };
 
 const PUSH_RECEIPT_LATEST_RESPONSE = {
   latest: null,
-  count: 0
+  count: 0,
 };
 
 const PUSH_SEND_LATEST_RESPONSE = {
-  latest: null
+  latest: null,
 };
 
 const PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_RESPONSE = {
   available: true,
-  downloadPath: null
+  downloadPath: null,
 };
 
 const PUSH_CREATE_SUBSCRIPTION_RESPONSE = {
-  subscriptionId: "subscription-1"
+  subscriptionId: "subscription-1",
 };
 
 const PUSH_DELETE_SUBSCRIPTION_RESPONSE = {
-  deleted: true
+  deleted: true,
 };
 
 const PUSH_TEST_RESPONSE = {
@@ -63,7 +64,7 @@ const PUSH_TEST_RESPONSE = {
   reason: "push test accepted",
   attempted: 1,
   delivered: 0,
-  failures: 0
+  failures: 0,
 };
 
 describe("PushServerClient", () => {
@@ -74,7 +75,7 @@ describe("PushServerClient", () => {
     vi.mocked(getLatestPushReceipt).mockResolvedValue(PUSH_RECEIPT_LATEST_RESPONSE);
     vi.mocked(getLatestPushSend).mockResolvedValue(PUSH_SEND_LATEST_RESPONSE);
     vi.mocked(getPushLocalCaStatus).mockResolvedValue(
-      PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_RESPONSE
+      PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_RESPONSE,
     );
     vi.mocked(savePushSubscription).mockResolvedValue(PUSH_CREATE_SUBSCRIPTION_RESPONSE);
     vi.mocked(deletePushSubscription).mockResolvedValue(PUSH_DELETE_SUBSCRIPTION_RESPONSE);
@@ -85,39 +86,39 @@ describe("PushServerClient", () => {
     const pushServerClient = new PushServerClient();
     const readOptions = {
       actionId: "action-push-read",
-      actionName: "push-read"
+      actionName: "push-read",
     };
     const saveOptions = {
       actionId: "action-push-save",
-      actionName: "push-save"
+      actionName: "push-save",
     };
     const deleteOptions = {
       actionId: "action-push-delete",
-      actionName: "push-delete"
+      actionName: "push-delete",
     };
     const testOptions = {
       actionId: "action-push-test",
-      actionName: "push-test"
+      actionName: "push-test",
     };
     const createPushSubscriptionInput = {
       subscription: {
         endpoint: "https://example.com/push/subscription",
         keys: {
           p256dh: "abc123",
-          auth: "def456"
-        }
+          auth: "def456",
+        },
       },
       settings: {
-        privateMode: true
-      }
+        privateMode: true,
+      },
     };
     const deletePushSubscriptionInput = {
-      endpoint: "https://example.com/push/subscription"
+      endpoint: "https://example.com/push/subscription",
     };
     const pushTestNotificationInput = {
       threadId: "thread-1",
       turnId: "turn-1",
-      dryRun: true
+      dryRun: true,
     };
 
     const pushStatusResponse = await pushServerClient.readPushStatus(readOptions);
@@ -128,15 +129,15 @@ describe("PushServerClient", () => {
       await pushServerClient.readPushLocalCertificateAuthorityStatus(readOptions);
     const createPushSubscriptionResponse = await pushServerClient.savePushSubscription(
       createPushSubscriptionInput,
-      saveOptions
+      saveOptions,
     );
     const deletePushSubscriptionResponse = await pushServerClient.deletePushSubscription(
       deletePushSubscriptionInput,
-      deleteOptions
+      deleteOptions,
     );
     const pushTestResponse = await pushServerClient.sendPushTestNotification(
       pushTestNotificationInput,
-      testOptions
+      testOptions,
     );
 
     expect(getPushStatus).toHaveBeenCalledWith(readOptions);
@@ -152,7 +153,7 @@ describe("PushServerClient", () => {
     expect(latestPushReceiptResponse).toEqual(PUSH_RECEIPT_LATEST_RESPONSE);
     expect(latestPushSendResponse).toEqual(PUSH_SEND_LATEST_RESPONSE);
     expect(pushLocalCertificateAuthorityStatusResponse).toEqual(
-      PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_RESPONSE
+      PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_RESPONSE,
     );
     expect(createPushSubscriptionResponse).toEqual(PUSH_CREATE_SUBSCRIPTION_RESPONSE);
     expect(deletePushSubscriptionResponse).toEqual(PUSH_DELETE_SUBSCRIPTION_RESPONSE);

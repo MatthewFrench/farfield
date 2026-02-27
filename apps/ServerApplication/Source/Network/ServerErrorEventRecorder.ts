@@ -1,4 +1,4 @@
-import { JsonValueSchema, type DebugErrorEvent, type DebugErrorSeverity } from "@farfield/protocol";
+import { type DebugErrorEvent, type DebugErrorSeverity, JsonValueSchema } from "@farfield/protocol";
 import { z } from "zod";
 import type { ClientErrorStore } from "../Modules/Debugging/ClientErrorStore.js";
 import { logger } from "../Shared/Logging/Logger.js";
@@ -9,7 +9,7 @@ const ISO_TIMESTAMP_SCHEMA = z.string().datetime();
 // Owns the severity-to-log-level mapping for persisted server error events.
 const LOG_LEVEL_BY_SEVERITY: Record<DebugErrorSeverity, "warn" | "error"> = {
   warning: "warn",
-  error: "error"
+  error: "error",
 };
 
 const ServerErrorEventRecordInputSchema = z
@@ -23,7 +23,7 @@ const ServerErrorEventRecordInputSchema = z
     requestId: z.string().trim().min(1).nullable(),
     threadId: z.string().trim().min(1).nullable(),
     url: z.string().trim().min(1).nullable(),
-    details: z.record(JsonValueSchema)
+    details: z.record(JsonValueSchema),
   })
   .strict();
 
@@ -48,7 +48,10 @@ export class ServerErrorEventRecorder {
   private readonly clientErrorStore: ClientErrorStore;
   private readonly readNowIsoString: () => string;
 
-  public constructor(clientErrorStore: ClientErrorStore, dependencies?: ServerErrorEventRecorderDependencies) {
+  public constructor(
+    clientErrorStore: ClientErrorStore,
+    dependencies?: ServerErrorEventRecorderDependencies,
+  ) {
     this.clientErrorStore = clientErrorStore;
     this.readNowIsoString = dependencies?.readNowIsoString ?? (() => new Date().toISOString());
   }
@@ -67,7 +70,7 @@ export class ServerErrorEventRecorder {
       threadId: parsedInput.threadId,
       url: parsedInput.url,
       details: parsedInput.details,
-      occurredAt
+      occurredAt,
     });
     this.logRecordedEvent(recordedEvent);
   }
@@ -85,7 +88,7 @@ export class ServerErrorEventRecorder {
       operation: recordedEvent.operation,
       requestId: recordedEvent.requestId,
       threadId: recordedEvent.threadId,
-      message: recordedEvent.message
+      message: recordedEvent.message,
     };
   }
 

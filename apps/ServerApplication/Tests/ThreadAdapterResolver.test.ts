@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { parseThreadConversationState } from "@farfield/protocol";
 import { AppServerRpcError } from "@farfield/api";
+import { parseThreadConversationState } from "@farfield/protocol";
+import { describe, expect, it } from "vitest";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import { ThreadAdapterResolver } from "../Source/Agents/ThreadAdapterResolver.js";
 import { ThreadIndex } from "../Source/Agents/ThreadIndex.js";
@@ -9,7 +9,7 @@ import type {
   AgentCapabilities,
   AgentId,
   AgentReadThreadInput,
-  AgentReadThreadResult
+  AgentReadThreadResult,
 } from "../Source/Agents/Types.js";
 
 const defaultCapabilities: AgentCapabilities = {
@@ -18,7 +18,7 @@ const defaultCapabilities: AgentCapabilities = {
   canSetCollaborationMode: false,
   canSubmitUserInput: false,
   canReadLiveState: false,
-  canReadStreamEvents: false
+  canReadStreamEvents: false,
 };
 
 function createThreadMissingError(): AppServerRpcError {
@@ -60,7 +60,7 @@ function createAdapter(input: {
     },
     async interrupt(): Promise<void> {
       throw new Error("not used in this test");
-    }
+    },
   };
 }
 
@@ -93,7 +93,7 @@ describe("ThreadAdapterResolver", () => {
       connected: true,
       readThread: async () => {
         throw createThreadMissingError();
-      }
+      },
     });
     const opencodeAdapter = createAdapter({ id: "opencode", enabled: true, connected: false });
     const registry = new AgentRegistry([codexAdapter, opencodeAdapter]);
@@ -137,10 +137,10 @@ describe("ThreadAdapterResolver", () => {
           thread: parseThreadConversationState({
             id: input.threadId,
             turns: [],
-            requests: []
-          })
+            requests: [],
+          }),
         };
-      }
+      },
     });
     const opencodeAdapter = createAdapter({
       id: "opencode",
@@ -148,7 +148,7 @@ describe("ThreadAdapterResolver", () => {
       connected: true,
       readThread: async () => {
         throw createThreadMissingError();
-      }
+      },
     });
     const threadIndex = new ThreadIndex();
     const registry = new AgentRegistry([codexAdapter, opencodeAdapter]);
@@ -172,7 +172,7 @@ describe("ThreadAdapterResolver", () => {
       readThread: async () => {
         probeOrder.push("codex");
         throw createThreadMissingError();
-      }
+      },
     });
     const opencodeAdapter = createAdapter({
       id: "opencode",
@@ -187,15 +187,15 @@ describe("ThreadAdapterResolver", () => {
           thread: parseThreadConversationState({
             id: input.threadId,
             turns: [],
-            requests: []
-          })
+            requests: [],
+          }),
         };
-      }
+      },
     });
     const threadIndex = new ThreadIndex();
     const resolver = new ThreadAdapterResolver(
       new AgentRegistry([codexAdapter, opencodeAdapter]),
-      threadIndex
+      threadIndex,
     );
 
     const discovered = await resolver.resolveAdapterForThread("thread_ordered_discovery");
@@ -215,7 +215,7 @@ describe("ThreadAdapterResolver", () => {
       connected: true,
       readThread: async () => {
         throw createThreadMissingError();
-      }
+      },
     });
     let nowEpochMs = 100;
     const resolver = new ThreadAdapterResolver(
@@ -223,8 +223,8 @@ describe("ThreadAdapterResolver", () => {
       new ThreadIndex(),
       {
         now: () => nowEpochMs,
-        unregisteredThreadMissTimeToLiveMs: 10
-      }
+        unregisteredThreadMissTimeToLiveMs: 10,
+      },
     );
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -253,15 +253,15 @@ describe("ThreadAdapterResolver", () => {
       readThread: async () => {
         readThreadCount += 1;
         throw createThreadMissingError();
-      }
+      },
     });
     const resolver = new ThreadAdapterResolver(
       new AgentRegistry([codexAdapter]),
       new ThreadIndex(),
       {
         now: () => nowEpochMs,
-        unregisteredThreadMissTimeToLiveMs: 50
-      }
+        unregisteredThreadMissTimeToLiveMs: 50,
+      },
     );
 
     const firstMissing = await resolver.resolveAdapterForThread("thread_miss_cached");
@@ -309,10 +309,10 @@ describe("ThreadAdapterResolver", () => {
           thread: parseThreadConversationState({
             id: input.threadId,
             turns: [],
-            requests: []
-          })
+            requests: [],
+          }),
         };
-      }
+      },
     });
     const opencodeAdapter = createAdapter({
       id: "opencode",
@@ -326,14 +326,14 @@ describe("ThreadAdapterResolver", () => {
           thread: parseThreadConversationState({
             id: input.threadId,
             turns: [],
-            requests: []
-          })
+            requests: [],
+          }),
         };
-      }
+      },
     });
     const resolver = new ThreadAdapterResolver(
       new AgentRegistry([codexAdapter, opencodeAdapter]),
-      new ThreadIndex()
+      new ThreadIndex(),
     );
 
     const ambiguous = await resolver.resolveAdapterForThread("thread_ambiguous");
@@ -355,11 +355,11 @@ describe("ThreadAdapterResolver", () => {
       connected: true,
       readThread: async () => {
         throw new Error("app-server request timed out");
-      }
+      },
     });
     const resolver = new ThreadAdapterResolver(
       new AgentRegistry([codexAdapter]),
-      new ThreadIndex()
+      new ThreadIndex(),
     );
 
     const unavailable = await resolver.resolveAdapterForThread("thread_probe_failure");
@@ -382,14 +382,18 @@ describe("ThreadAdapterResolver", () => {
 
     expect(() => {
       new ThreadAdapterResolver(registry, threadIndex, {
-        unregisteredThreadMissTimeToLiveMs: 0
+        unregisteredThreadMissTimeToLiveMs: 0,
       });
-    }).toThrowError("ThreadAdapterResolver requires positive integer unregisteredThreadMissTimeToLiveMs");
+    }).toThrowError(
+      "ThreadAdapterResolver requires positive integer unregisteredThreadMissTimeToLiveMs",
+    );
 
     expect(() => {
       new ThreadAdapterResolver(registry, threadIndex, {
-        unregisteredThreadMissTimeToLiveMs: 1.5
+        unregisteredThreadMissTimeToLiveMs: 1.5,
       });
-    }).toThrowError("ThreadAdapterResolver requires positive integer unregisteredThreadMissTimeToLiveMs");
+    }).toThrowError(
+      "ThreadAdapterResolver requires positive integer unregisteredThreadMissTimeToLiveMs",
+    );
   });
 });

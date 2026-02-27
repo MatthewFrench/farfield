@@ -1,6 +1,12 @@
 import { Circle, CircleDot, Loader2 } from "lucide-react";
 import { Button } from "@/Components/UserInterface/Button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/UserInterface/Select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/Components/UserInterface/Select";
 
 interface ModeOption {
   id: string;
@@ -61,7 +67,7 @@ export function ChatModeToolbar({
   pendingRequestCount,
   onTogglePlanMode,
   onModelChange,
-  onReasoningEffortChange
+  onReasoningEffortChange,
 }: ChatModeToolbarProps): React.JSX.Element {
   const shouldShowPlanModeControl = canSetCollaborationMode && canListCollaborationModes;
   const shouldShowModelControl = canSetCollaborationMode && canListModels;

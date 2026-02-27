@@ -1,8 +1,8 @@
 import {
-  useCallback,
   type Dispatch,
+  type TouchEvent as ReactTouchEvent,
   type SetStateAction,
-  type TouchEvent as ReactTouchEvent
+  useCallback,
 } from "react";
 import { MobileSidebarSwipeCoordinator } from "./MobileSidebarSwipeCoordinator";
 import { RuntimeViewportSizingCoordinator } from "./RuntimeViewportSizingCoordinator";
@@ -21,48 +21,58 @@ export interface UseMobileSidebarTouchHandlersInput {
 }
 
 export function useMobileSidebarTouchHandlers(
-  input: UseMobileSidebarTouchHandlersInput
+  input: UseMobileSidebarTouchHandlersInput,
 ): MobileSidebarTouchHandlers {
   const endSidebarSwipeTracking = useCallback(() => {
     input.mobileSidebarSwipeCoordinator.endTracking();
   }, [input.mobileSidebarSwipeCoordinator]);
 
-  const handleAppShellTouchStart = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
-    const touch = event.touches[0];
-    if (!touch) {
-      input.mobileSidebarSwipeCoordinator.endTracking();
-      return;
-    }
-    input.mobileSidebarSwipeCoordinator.beginTracking({
-      mobileSidebarOpen: input.mobileSidebarOpen,
-      viewportWidthPx: window.innerWidth,
-      touchCount: event.touches.length,
-      touchClientX: touch.clientX,
-      touchClientY: touch.clientY,
-      safeAreaInsetLeftPx: input.runtimeViewportSizingCoordinator.readSafeAreaInsetLeftPx()
-    });
-  }, [input.mobileSidebarOpen, input.mobileSidebarSwipeCoordinator, input.runtimeViewportSizingCoordinator]);
+  const handleAppShellTouchStart = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      const touch = event.touches[0];
+      if (!touch) {
+        input.mobileSidebarSwipeCoordinator.endTracking();
+        return;
+      }
+      input.mobileSidebarSwipeCoordinator.beginTracking({
+        mobileSidebarOpen: input.mobileSidebarOpen,
+        viewportWidthPx: window.innerWidth,
+        touchCount: event.touches.length,
+        touchClientX: touch.clientX,
+        touchClientY: touch.clientY,
+        safeAreaInsetLeftPx: input.runtimeViewportSizingCoordinator.readSafeAreaInsetLeftPx(),
+      });
+    },
+    [
+      input.mobileSidebarOpen,
+      input.mobileSidebarSwipeCoordinator,
+      input.runtimeViewportSizingCoordinator,
+    ],
+  );
 
-  const handleAppShellTouchMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
-    const touch = event.touches[0];
-    if (!touch) {
-      input.mobileSidebarSwipeCoordinator.endTracking();
-      return;
-    }
+  const handleAppShellTouchMove = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      const touch = event.touches[0];
+      if (!touch) {
+        input.mobileSidebarSwipeCoordinator.endTracking();
+        return;
+      }
 
-    const swipeOutput = input.mobileSidebarSwipeCoordinator.continueTracking({
-      touchCount: event.touches.length,
-      touchClientX: touch.clientX,
-      touchClientY: touch.clientY
-    });
-    if (swipeOutput.shouldOpenSidebar) {
-      input.setMobileSidebarOpen(true);
-    }
-  }, [input.mobileSidebarSwipeCoordinator, input.setMobileSidebarOpen]);
+      const swipeOutput = input.mobileSidebarSwipeCoordinator.continueTracking({
+        touchCount: event.touches.length,
+        touchClientX: touch.clientX,
+        touchClientY: touch.clientY,
+      });
+      if (swipeOutput.shouldOpenSidebar) {
+        input.setMobileSidebarOpen(true);
+      }
+    },
+    [input.mobileSidebarSwipeCoordinator, input.setMobileSidebarOpen],
+  );
 
   return {
     endSidebarSwipeTracking,
     handleAppShellTouchStart,
-    handleAppShellTouchMove
+    handleAppShellTouchMove,
   };
 }

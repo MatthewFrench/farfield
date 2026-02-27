@@ -7,27 +7,27 @@ import {
   FarfieldDebugErrorClearEnvelopeSchema,
   FarfieldDebugErrorCreateEnvelopeSchema,
   FarfieldDebugErrorDetailEnvelopeSchema,
-  FarfieldDebugErrorListEnvelopeSchema
+  FarfieldDebugErrorListEnvelopeSchema,
 } from "@farfield/protocol";
 import { z } from "zod";
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import {
+  type StructuredDataValue,
+  StructuredDataValueSchema,
+} from "@/Shared/Contracts/StructuredDataValue";
+import {
   applyRequestOptions,
   request,
   requestInitWithOptions,
-  requestNoContent
+  requestNoContent,
 } from "@/Shared/Transport/FarfieldHttpTransport";
-import {
-  StructuredDataValueSchema,
-  type StructuredDataValue
-} from "@/Shared/Contracts/StructuredDataValue";
 
 const REQUEST_METHOD_POST = "POST";
 const REQUEST_METHOD_DELETE = "DELETE";
 const APPLICATION_JSON_CONTENT_TYPE_HEADER_NAME = "Content-Type";
 const APPLICATION_JSON_CONTENT_TYPE_HEADER_VALUE = "application/json";
 const JSON_CONTENT_TYPE_HEADERS = {
-  [APPLICATION_JSON_CONTENT_TYPE_HEADER_NAME]: APPLICATION_JSON_CONTENT_TYPE_HEADER_VALUE
+  [APPLICATION_JSON_CONTENT_TYPE_HEADER_NAME]: APPLICATION_JSON_CONTENT_TYPE_HEADER_VALUE,
 };
 const TRACE_STATUS_ENDPOINT = "/api/debug/trace/status";
 const TRACE_START_ENDPOINT = "/api/debug/trace/start";
@@ -57,14 +57,14 @@ const TraceSummarySchema = z
     startedAt: z.string(),
     stoppedAt: z.string().nullable(),
     eventCount: z.number().int().nonnegative(),
-    path: z.string().trim().min(1)
+    path: z.string().trim().min(1),
   })
   .strip();
 const TraceStatusSchema = z
   .object({
     ok: z.literal(true),
     active: TraceSummarySchema.nullable(),
-    recent: z.array(TraceSummarySchema)
+    recent: z.array(TraceSummarySchema),
   })
   .strip();
 export type ApiTraceStatusResponse = z.infer<typeof TraceStatusSchema>;
@@ -76,13 +76,13 @@ const HistoryEntrySchema = z
     source: z.enum(["ipc", "app", "system"]),
     direction: z.enum(["in", "out", "system"]),
     payload: StructuredDataValueSchema.optional(),
-    meta: z.record(StructuredDataValueSchema)
+    meta: z.record(StructuredDataValueSchema),
   })
   .strip();
 const HistoryListSchema = z
   .object({
     ok: z.literal(true),
-    history: z.array(HistoryEntrySchema)
+    history: z.array(HistoryEntrySchema),
   })
   .strip();
 export type ApiDebugHistoryResponse = z.infer<typeof HistoryListSchema>;
@@ -91,7 +91,7 @@ const HistoryDetailSchema = z
   .object({
     ok: z.literal(true),
     entry: HistoryEntrySchema,
-    fullPayload: StructuredDataValueSchema
+    fullPayload: StructuredDataValueSchema,
   })
   .strip();
 export type ApiDebugHistoryDetailResponse = z.infer<typeof HistoryDetailSchema>;
@@ -107,7 +107,7 @@ const DebugErrorActionNameSchema = z.string().trim().min(1);
 const DebugErrorDetailsSchema = z
   .object({
     [DEBUG_ERROR_DETAIL_ACTION_IDENTIFIER_KEY]: DebugErrorActionIdentifierSchema.optional(),
-    [DEBUG_ERROR_DETAIL_ACTION_NAME_KEY]: DebugErrorActionNameSchema.optional()
+    [DEBUG_ERROR_DETAIL_ACTION_NAME_KEY]: DebugErrorActionNameSchema.optional(),
   })
   .catchall(StructuredDataValueSchema);
 export type ApiDebugErrorDetails = z.infer<typeof DebugErrorDetailsSchema>;
@@ -128,7 +128,7 @@ const DebugErrorEventContractSchema = z
     url: z.string().nullable(),
     occurredAt: z.string().datetime(),
     recordedAt: z.string().datetime(),
-    details: DebugErrorDetailsSchema
+    details: DebugErrorDetailsSchema,
   })
   .strict();
 
@@ -136,35 +136,38 @@ type DebugErrorEventContract = z.infer<typeof DebugErrorEventContractSchema>;
 type DebugErrorEventWire = z.infer<typeof FarfieldDebugErrorListEnvelopeSchema.shape.data.element>;
 
 function mapDebugErrorDetailsWireToContract(
-  value: z.infer<typeof FarfieldDebugErrorListEnvelopeSchema.shape.data.element.shape.details>
+  value: z.infer<typeof FarfieldDebugErrorListEnvelopeSchema.shape.data.element.shape.details>,
 ): ApiDebugErrorDetails {
   const details = z.record(StructuredDataValueSchema).parse(value);
   const actionIdentifierValue = details[DEBUG_ERROR_DETAIL_ACTION_IDENTIFIER_KEY];
   const actionNameValue = details[DEBUG_ERROR_DETAIL_ACTION_NAME_KEY];
-  const mappedDetailEntries = Object.entries(details).filter(([detailKey]) =>
-    detailKey !== DEBUG_ERROR_DETAIL_ACTION_IDENTIFIER_KEY
-    && detailKey !== DEBUG_ERROR_DETAIL_ACTION_NAME_KEY
+  const mappedDetailEntries = Object.entries(details).filter(
+    ([detailKey]) =>
+      detailKey !== DEBUG_ERROR_DETAIL_ACTION_IDENTIFIER_KEY &&
+      detailKey !== DEBUG_ERROR_DETAIL_ACTION_NAME_KEY,
   );
   const mappedDetails = mappedDetailEntries.reduce<Record<string, StructuredDataValue>>(
     (accumulatedDetails, [detailKey, detailValue]) => ({
       ...accumulatedDetails,
-      [detailKey]: detailValue
+      [detailKey]: detailValue,
     }),
-    {}
+    {},
   );
-  const mappedDetailsWithActionIdentifier = actionIdentifierValue === undefined
-    ? mappedDetails
-    : {
-        ...mappedDetails,
-        [DEBUG_ERROR_DETAIL_ACTION_IDENTIFIER_KEY]:
-          DebugErrorActionIdentifierSchema.parse(actionIdentifierValue)
-      };
-  const mappedDetailsWithActionIdentifierAndName = actionNameValue === undefined
-    ? mappedDetailsWithActionIdentifier
-    : {
-        ...mappedDetailsWithActionIdentifier,
-        [DEBUG_ERROR_DETAIL_ACTION_NAME_KEY]: DebugErrorActionNameSchema.parse(actionNameValue)
-      };
+  const mappedDetailsWithActionIdentifier =
+    actionIdentifierValue === undefined
+      ? mappedDetails
+      : {
+          ...mappedDetails,
+          [DEBUG_ERROR_DETAIL_ACTION_IDENTIFIER_KEY]:
+            DebugErrorActionIdentifierSchema.parse(actionIdentifierValue),
+        };
+  const mappedDetailsWithActionIdentifierAndName =
+    actionNameValue === undefined
+      ? mappedDetailsWithActionIdentifier
+      : {
+          ...mappedDetailsWithActionIdentifier,
+          [DEBUG_ERROR_DETAIL_ACTION_NAME_KEY]: DebugErrorActionNameSchema.parse(actionNameValue),
+        };
 
   return DebugErrorDetailsSchema.parse(mappedDetailsWithActionIdentifierAndName);
 }
@@ -185,7 +188,7 @@ function mapDebugErrorEventWireToContract(value: DebugErrorEventWire): DebugErro
     url: value.url,
     occurredAt: value.occurredAt,
     recordedAt: value.recordedAt,
-    details: mapDebugErrorDetailsWireToContract(value.details)
+    details: mapDebugErrorDetailsWireToContract(value.details),
   };
 }
 
@@ -198,57 +201,57 @@ const DebugErrorListEnvelopeContractSchema = z
     ok: z.literal(true),
     data: z.array(DebugErrorEventSchema),
     sessionId: z.string().trim().min(1),
-    sessionLogPath: z.string().trim().min(1)
+    sessionLogPath: z.string().trim().min(1),
   })
   .strict();
 type DebugErrorListEnvelopeContract = z.infer<typeof DebugErrorListEnvelopeContractSchema>;
 export type ApiDebugErrorListResponse = DebugErrorListEnvelopeContract;
 
 function mapDebugErrorListEnvelopeWireToContract(
-  value: z.infer<typeof FarfieldDebugErrorListEnvelopeSchema>
+  value: z.infer<typeof FarfieldDebugErrorListEnvelopeSchema>,
 ): DebugErrorListEnvelopeContract {
   return {
     ok: value.ok,
     data: value.data.map((debugErrorEvent) => DebugErrorEventSchema.parse(debugErrorEvent)),
     sessionId: value.sessionId,
-    sessionLogPath: value.sessionLogPath
+    sessionLogPath: value.sessionLogPath,
   };
 }
 
-const DebugErrorListEnvelopeSchema = FarfieldDebugErrorListEnvelopeSchema
-  .transform(mapDebugErrorListEnvelopeWireToContract)
-  .pipe(DebugErrorListEnvelopeContractSchema);
+const DebugErrorListEnvelopeSchema = FarfieldDebugErrorListEnvelopeSchema.transform(
+  mapDebugErrorListEnvelopeWireToContract,
+).pipe(DebugErrorListEnvelopeContractSchema);
 
 const DebugErrorDetailEnvelopeContractSchema = z
   .object({
     ok: z.literal(true),
     error: DebugErrorEventSchema,
     sessionId: z.string().trim().min(1),
-    sessionLogPath: z.string().trim().min(1)
+    sessionLogPath: z.string().trim().min(1),
   })
   .strict();
 type DebugErrorDetailEnvelopeContract = z.infer<typeof DebugErrorDetailEnvelopeContractSchema>;
 export type ApiDebugErrorDetailResponse = DebugErrorDetailEnvelopeContract;
 
 function mapDebugErrorDetailEnvelopeWireToContract(
-  value: z.infer<typeof FarfieldDebugErrorDetailEnvelopeSchema>
+  value: z.infer<typeof FarfieldDebugErrorDetailEnvelopeSchema>,
 ): DebugErrorDetailEnvelopeContract {
   return {
     ok: value.ok,
     error: DebugErrorEventSchema.parse(value.error),
     sessionId: value.sessionId,
-    sessionLogPath: value.sessionLogPath
+    sessionLogPath: value.sessionLogPath,
   };
 }
 
-const DebugErrorDetailEnvelopeSchema = FarfieldDebugErrorDetailEnvelopeSchema
-  .transform(mapDebugErrorDetailEnvelopeWireToContract)
-  .pipe(DebugErrorDetailEnvelopeContractSchema);
+const DebugErrorDetailEnvelopeSchema = FarfieldDebugErrorDetailEnvelopeSchema.transform(
+  mapDebugErrorDetailEnvelopeWireToContract,
+).pipe(DebugErrorDetailEnvelopeContractSchema);
 
 const ReplayHistoryEntryInputSchema = z
   .object({
     entryId: z.string().trim().min(1),
-    waitForResponse: z.boolean()
+    waitForResponse: z.boolean(),
   })
   .strict();
 
@@ -257,7 +260,7 @@ const ReplayHistoryEntryResponseSchema = z
     ok: z.literal(true),
     replayed: z.literal(true),
     queued: z.boolean().optional(),
-    response: z.record(StructuredDataValueSchema).optional()
+    response: z.record(StructuredDataValueSchema).optional(),
   })
   .strict();
 export type ApiReplayHistoryEntryResponse = z.infer<typeof ReplayHistoryEntryResponseSchema>;
@@ -281,18 +284,18 @@ function buildJsonPostRequestInit(bodyText: string, options?: ApiRequestOptions)
     {
       method: REQUEST_METHOD_POST,
       headers: JSON_CONTENT_TYPE_HEADERS,
-      body: bodyText
+      body: bodyText,
     },
-    options
+    options,
   );
 }
 
 function buildDeleteRequestInit(options?: ApiRequestOptions): RequestInit {
   return applyRequestOptions(
     {
-      method: REQUEST_METHOD_DELETE
+      method: REQUEST_METHOD_DELETE,
     },
-    options
+    options,
   );
 }
 
@@ -305,7 +308,7 @@ export async function startTrace(label: string, options?: ApiRequestOptions): Pr
   const parsedLabel = TraceStartLabelSchema.parse(label);
   await requestNoContent(
     TRACE_START_ENDPOINT,
-    buildJsonPostRequestInit(JSON.stringify({ label: parsedLabel }), options)
+    buildJsonPostRequestInit(JSON.stringify({ label: parsedLabel }), options),
   );
 }
 
@@ -313,66 +316,72 @@ export async function markTrace(note: string, options?: ApiRequestOptions): Prom
   const parsedNote = TraceMarkNoteSchema.parse(note);
   await requestNoContent(
     TRACE_MARK_ENDPOINT,
-    buildJsonPostRequestInit(JSON.stringify({ note: parsedNote }), options)
+    buildJsonPostRequestInit(JSON.stringify({ note: parsedNote }), options),
   );
 }
 
 export async function stopTrace(options?: ApiRequestOptions): Promise<void> {
-  await requestNoContent(
-    TRACE_STOP_ENDPOINT,
-    buildJsonPostRequestInit("{}", options)
-  );
+  await requestNoContent(TRACE_STOP_ENDPOINT, buildJsonPostRequestInit("{}", options));
 }
 
 export async function listDebugHistory(
   limit = DEFAULT_DEBUG_LIST_LIMIT,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiDebugHistoryResponse> {
-  const data = await request(buildListRequestPath(HISTORY_LIST_ENDPOINT, limit), requestInitWithOptions(options));
+  const data = await request(
+    buildListRequestPath(HISTORY_LIST_ENDPOINT, limit),
+    requestInitWithOptions(options),
+  );
   return HistoryListSchema.parse(data);
 }
 
 export async function getHistoryEntry(
   entryId: string,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiDebugHistoryDetailResponse> {
-  const data = await request(buildMemberRequestPath(HISTORY_LIST_ENDPOINT, entryId), requestInitWithOptions(options));
+  const data = await request(
+    buildMemberRequestPath(HISTORY_LIST_ENDPOINT, entryId),
+    requestInitWithOptions(options),
+  );
   return HistoryDetailSchema.parse(data);
 }
 
 export async function createDebugClientError(
   input: ApiCreateDebugClientErrorInput,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiDebugErrorCreateResponse> {
   const body = CreateDebugClientErrorBodySchema.parse(input);
   const data = await request(
     CLIENT_ERRORS_ENDPOINT,
-    buildJsonPostRequestInit(JSON.stringify(body), options)
+    buildJsonPostRequestInit(JSON.stringify(body), options),
   );
   return DebugErrorCreateEnvelopeSchema.parse(data);
 }
 
 export async function listDebugClientErrors(
   limit = DEFAULT_DEBUG_LIST_LIMIT,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiDebugErrorListResponse> {
   const data = await request(
     buildListRequestPath(CLIENT_ERRORS_ENDPOINT, limit),
-    requestInitWithOptions(options)
+    requestInitWithOptions(options),
   );
   return DebugErrorListEnvelopeSchema.parse(data);
 }
 
 export async function getDebugClientError(
   errorId: string,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiDebugErrorDetailResponse> {
-  const data = await request(buildMemberRequestPath(CLIENT_ERRORS_ENDPOINT, errorId), requestInitWithOptions(options));
+  const data = await request(
+    buildMemberRequestPath(CLIENT_ERRORS_ENDPOINT, errorId),
+    requestInitWithOptions(options),
+  );
   return DebugErrorDetailEnvelopeSchema.parse(data);
 }
 
 export async function clearDebugClientErrors(
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiDebugErrorClearResponse> {
   const data = await request(CLIENT_ERRORS_ENDPOINT, buildDeleteRequestInit(options));
   return DebugErrorClearEnvelopeSchema.parse(data);
@@ -380,9 +389,12 @@ export async function clearDebugClientErrors(
 
 export async function replayHistoryEntry(
   input: ApiReplayHistoryEntryInput,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiReplayHistoryEntryResponse> {
   const body = ReplayHistoryEntryInputSchema.parse(input);
-  const data = await request(REPLAY_ENDPOINT, buildJsonPostRequestInit(JSON.stringify(body), options));
+  const data = await request(
+    REPLAY_ENDPOINT,
+    buildJsonPostRequestInit(JSON.stringify(body), options),
+  );
   return ReplayHistoryEntryResponseSchema.parse(data);
 }

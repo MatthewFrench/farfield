@@ -14,7 +14,7 @@ describe("CapabilitySnapshotCache", () => {
       loadCount += 1;
       return {
         fetchedAt: 1_000,
-        revision: loadCount
+        revision: loadCount,
       };
     };
 
@@ -34,7 +34,7 @@ describe("CapabilitySnapshotCache", () => {
       nextRevision += 1;
       return {
         fetchedAt: revision === 1 ? 1_000 : 2_500,
-        revision
+        revision,
       };
     };
 
@@ -65,7 +65,7 @@ describe("CapabilitySnapshotCache", () => {
     expect(loadCount).toBe(1);
     resolveLoader({
       fetchedAt: 100,
-      revision: 1
+      revision: 1,
     });
 
     const [first, second] = await Promise.all([firstPromise, secondPromise]);
@@ -87,7 +87,7 @@ describe("CapabilitySnapshotCache", () => {
     cache.clearSnapshot();
     resolveLoader({
       fetchedAt: 1_000,
-      revision: 1
+      revision: 1,
     });
     await firstPromise;
 
@@ -98,10 +98,10 @@ describe("CapabilitySnapshotCache", () => {
     const cache = new CapabilitySnapshotCache<TestCapabilitySnapshot>(1_000);
 
     expect(() => cache.readSnapshotIfFresh(Number.NaN)).toThrowError(
-      "CapabilitySnapshotCache requires nowEpochMs to be a finite non-negative epoch timestamp"
+      "CapabilitySnapshotCache requires nowEpochMs to be a finite non-negative epoch timestamp",
     );
     expect(() => cache.overwriteSnapshot({ fetchedAt: Number.NaN, revision: 1 })).toThrowError(
-      "CapabilitySnapshotCache requires snapshot.fetchedAt to be a finite non-negative epoch timestamp"
+      "CapabilitySnapshotCache requires snapshot.fetchedAt to be a finite non-negative epoch timestamp",
     );
   });
 });

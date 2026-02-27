@@ -58,16 +58,21 @@ export class ThreadListStateStore {
   }
 
   public computeActiveThreadState(
-    input: ActiveThreadStateComputationInput
+    input: ActiveThreadStateComputationInput,
   ): ActiveThreadStateComputationResult {
     const nextThreadSignature = this.buildThreadSignature(input.nextThreads);
-    const didChangeThreads = !ThreadGroupSelectors.signaturesMatch(this.activeThreadSignature, nextThreadSignature);
-    const nextThreadUpdatedAtByIdentifier = ThreadGroupSelectors.mapThreadUpdatedAtByIdentifier(input.nextThreads);
+    const didChangeThreads = !ThreadGroupSelectors.signaturesMatch(
+      this.activeThreadSignature,
+      nextThreadSignature,
+    );
+    const nextThreadUpdatedAtByIdentifier = ThreadGroupSelectors.mapThreadUpdatedAtByIdentifier(
+      input.nextThreads,
+    );
     const nextUnreadThreadIdentifiers = ThreadGroupSelectors.computeUnreadThreadIdentifiers({
       previousUnreadThreadIdentifiers: input.previousUnreadThreadIdentifiers,
       previousThreadUpdatedAtByIdentifier: this.threadUpdatedAtByIdentifier,
       nextThreads: input.nextThreads,
-      selectedThreadIdentifier: input.selectedThreadIdentifier
+      selectedThreadIdentifier: input.selectedThreadIdentifier,
     });
 
     this.activeThreadSignature = nextThreadSignature;
@@ -76,23 +81,23 @@ export class ThreadListStateStore {
     return {
       didChangeThreads,
       nextThreads: input.nextThreads,
-      nextUnreadThreadIdentifiers
+      nextUnreadThreadIdentifiers,
     };
   }
 
   public computeArchivedThreadState(
-    input: ArchivedThreadStateComputationInput
+    input: ArchivedThreadStateComputationInput,
   ): ArchivedThreadStateComputationResult {
     const nextArchivedThreadSignature = this.buildThreadSignature(input.nextArchivedThreads);
     const didChangeArchivedThreads = !ThreadGroupSelectors.signaturesMatch(
       this.archivedThreadSignature,
-      nextArchivedThreadSignature
+      nextArchivedThreadSignature,
     );
     this.archivedThreadSignature = nextArchivedThreadSignature;
 
     return {
       didChangeArchivedThreads,
-      nextArchivedThreads: input.nextArchivedThreads
+      nextArchivedThreads: input.nextArchivedThreads,
     };
   }
 
@@ -100,7 +105,9 @@ export class ThreadListStateStore {
     this.resetTrackedState();
   }
 
-  public computeInitialSelectedThreadIdentifier(input: InitialThreadSelectionComputationInput): string | null {
+  public computeInitialSelectedThreadIdentifier(
+    input: InitialThreadSelectionComputationInput,
+  ): string | null {
     const currentSelectedThreadIdentifier = input.currentSelectedThreadIdentifier;
     if (currentSelectedThreadIdentifier !== null && currentSelectedThreadIdentifier.length > 0) {
       this.markInitialSelectionHydrated();
@@ -118,7 +125,7 @@ export class ThreadListStateStore {
   }
 
   public computeUnreadThreadIdentifiersAfterSelectionChange(
-    input: UnreadThreadSelectionUpdateInput
+    input: UnreadThreadSelectionUpdateInput,
   ): UnreadThreadIdentifierMap {
     if (input.selectedThreadIdentifier === null || input.selectedThreadIdentifier.length === 0) {
       return input.previousUnreadThreadIdentifiers;
@@ -143,10 +150,12 @@ export class ThreadListStateStore {
     this.hasHydratedInitialThreadSelection = true;
   }
 
-  private readInitialSelectedThreadIdentifier(input: InitialThreadSelectionComputationInput): string | null {
+  private readInitialSelectedThreadIdentifier(
+    input: InitialThreadSelectionComputationInput,
+  ): string | null {
     if (input.preferredAgentIdentifier !== null && input.preferredAgentIdentifier.length > 0) {
       const preferredThread = input.nextThreads.find(
-        (thread) => thread.agentId === input.preferredAgentIdentifier
+        (thread) => thread.agentId === input.preferredAgentIdentifier,
       );
       if (preferredThread) {
         return preferredThread.id;
@@ -167,7 +176,7 @@ export class ThreadListStateStore {
       thread.preview,
       thread.agentId,
       thread.cwd ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
-      thread.path ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT
+      thread.path ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
     ].join(THREAD_SIGNATURE_SEGMENT_DELIMITER);
   }
 }

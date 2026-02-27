@@ -1,12 +1,9 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import readline from "node:readline";
+import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import readline from "node:readline";
+import { type JsonValue, JsonValueSchema } from "@farfield/protocol";
 import { z } from "zod";
-import { JsonValueSchema, type JsonValue } from "@farfield/protocol";
-import {
-  AppServerRpcError,
-  AppServerTransportError
-} from "./Errors.js";
+import { AppServerRpcError, AppServerTransportError } from "./Errors.js";
 import { JsonRpcRequestSchema, parseJsonRpcIncomingMessage } from "./JsonRpc.js";
 
 export interface AppServerTransport {
@@ -63,7 +60,7 @@ const AppServerSpawnEnvironmentShape = {
   LOCALAPPDATA: SpawnEnvironmentVariableSchema,
   USERPROFILE: SpawnEnvironmentVariableSchema,
   SystemRoot: SpawnEnvironmentVariableSchema,
-  ComSpec: SpawnEnvironmentVariableSchema
+  ComSpec: SpawnEnvironmentVariableSchema,
 } as const;
 const AppServerSpawnInheritedEnvironmentSchema = z.object(AppServerSpawnEnvironmentShape).strip();
 const AppServerSpawnOverrideEnvironmentSchema = z.object(AppServerSpawnEnvironmentShape).strict();
@@ -72,7 +69,7 @@ const BuildAppServerSpawnEnvironmentInputSchema = z
     baseEnvironment: ProcessEnvironmentSchema,
     overrideEnvironment: ProcessEnvironmentSchema.optional(),
     userAgent: z.string().min(1),
-    clientId: z.string().min(1)
+    clientId: z.string().min(1),
   })
   .strict();
 
@@ -87,16 +84,22 @@ export interface BuildAppServerSpawnEnvironmentInput {
  * Owns the exact environment contract used to spawn `codex app-server`.
  * Only allowlisted keys may cross the process boundary so configuration remains explicit and reviewable.
  */
-export function buildAppServerSpawnEnvironment(input: BuildAppServerSpawnEnvironmentInput): NodeJS.ProcessEnv {
+export function buildAppServerSpawnEnvironment(
+  input: BuildAppServerSpawnEnvironmentInput,
+): NodeJS.ProcessEnv {
   const parsedInput = BuildAppServerSpawnEnvironmentInputSchema.parse(input);
-  const inheritedEnvironment = AppServerSpawnInheritedEnvironmentSchema.parse(parsedInput.baseEnvironment);
-  const overrideEnvironment = AppServerSpawnOverrideEnvironmentSchema.parse(parsedInput.overrideEnvironment ?? {});
+  const inheritedEnvironment = AppServerSpawnInheritedEnvironmentSchema.parse(
+    parsedInput.baseEnvironment,
+  );
+  const overrideEnvironment = AppServerSpawnOverrideEnvironmentSchema.parse(
+    parsedInput.overrideEnvironment ?? {},
+  );
 
   return {
     ...inheritedEnvironment,
     ...overrideEnvironment,
     [APP_SERVER_CODEX_USER_AGENT_ENVIRONMENT_KEY]: parsedInput.userAgent,
-    [APP_SERVER_CODEX_CLIENT_IDENTIFIER_ENVIRONMENT_KEY]: parsedInput.clientId
+    [APP_SERVER_CODEX_CLIENT_IDENTIFIER_ENVIRONMENT_KEY]: parsedInput.clientId,
   };
 }
 
@@ -118,7 +121,7 @@ const ChildProcessAppServerTransportOptionsSchema = z
     cwd: z.string().min(1).optional(),
     env: ProcessEnvironmentSchema.optional(),
     requestTimeoutMs: z.number().int().positive().optional(),
-    onStderr: z.function().args(z.string()).returns(z.void()).optional()
+    onStderr: z.function().args(z.string()).returns(z.void()).optional(),
   })
   .strict();
 
@@ -131,7 +134,7 @@ function toErrorMessage<ValueType>(value: ValueType): string {
 }
 
 export function isChildProcessAppServerTransportOptions(
-  value: AppServerTransport | ChildProcessAppServerTransportOptions
+  value: AppServerTransport | ChildProcessAppServerTransportOptions,
 ): value is ChildProcessAppServerTransportOptions {
   return ChildProcessAppServerTransportOptionsSchema.safeParse(value).success;
 }
@@ -182,7 +185,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       const spawnEnvironmentInput: BuildAppServerSpawnEnvironmentInput = {
         baseEnvironment: this.baseEnvironment,
         userAgent: this.userAgent,
-        clientId: clientIdentifier
+        clientId: clientIdentifier,
       };
       if (this.env) {
         spawnEnvironmentInput.overrideEnvironment = this.env;
@@ -190,14 +193,14 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       spawnEnvironment = buildAppServerSpawnEnvironment(spawnEnvironmentInput);
     } catch (error) {
       throw new AppServerTransportError(
-        `${APP_SERVER_PROCESS_NAME} environment configuration invalid: ${toErrorMessage(error)}`
+        `${APP_SERVER_PROCESS_NAME} environment configuration invalid: ${toErrorMessage(error)}`,
       );
     }
 
     const child = spawn(this.executablePath, [APP_SERVER_COMMAND], {
       cwd: this.cwd,
       env: spawnEnvironment,
-      stdio: ["pipe", "pipe", "pipe"]
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     child.on("exit", (code, signal) => {
@@ -207,7 +210,9 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     });
 
     child.on("error", (error) => {
-      this.rejectAll(new AppServerTransportError(`${APP_SERVER_PROCESS_NAME} process error: ${error.message}`));
+      this.rejectAll(
+        new AppServerTransportError(`${APP_SERVER_PROCESS_NAME} process error: ${error.message}`),
+      );
       this.resetProcessState();
     });
 
@@ -222,7 +227,9 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       try {
         raw = JsonValueSchema.parse(JSON.parse(trimmed));
       } catch {
-        this.rejectAll(new AppServerTransportError(`${APP_SERVER_PROCESS_NAME} returned invalid JSON`));
+        this.rejectAll(
+          new AppServerTransportError(`${APP_SERVER_PROCESS_NAME} returned invalid JSON`),
+        );
         return;
       }
 
@@ -232,8 +239,8 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       } catch (error) {
         this.rejectAll(
           new AppServerTransportError(
-            `${APP_SERVER_PROCESS_NAME} response schema mismatch: ${toErrorMessage(error)}`
-          )
+            `${APP_SERVER_PROCESS_NAME} response schema mismatch: ${toErrorMessage(error)}`,
+          ),
         );
         return;
       }
@@ -255,8 +262,8 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
           new AppServerRpcError(
             message.value.error.code,
             message.value.error.message,
-            message.value.error.data
-          )
+            message.value.error.data,
+          ),
         );
         return;
       }
@@ -264,8 +271,8 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       if (message.value.result === undefined) {
         pending.reject(
           new AppServerTransportError(
-            `${APP_SERVER_PROCESS_NAME} response missing result for request id ${String(message.value.id)}`
-          )
+            `${APP_SERVER_PROCESS_NAME} response missing result for request id ${String(message.value.id)}`,
+          ),
         );
         return;
       }
@@ -301,7 +308,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
   private async sendRequest(
     method: string,
     params: object,
-    timeoutMs?: number
+    timeoutMs?: number,
   ): Promise<JsonValue> {
     const processHandle = this.process;
     if (!processHandle) {
@@ -314,7 +321,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       jsonrpc: APP_SERVER_JSON_RPC_VERSION,
       id,
       method,
-      params: JsonValueSchema.parse(params)
+      params: JsonValueSchema.parse(params),
     });
     const encoded = JSON.stringify(requestPayload) + APP_SERVER_STANDARD_INPUT_LINE_TERMINATOR;
 
@@ -322,7 +329,9 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
       // Timeout completion and write callbacks can race during shutdown. `pending` ownership ensures one settle path.
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new AppServerTransportError(`${APP_SERVER_PROCESS_NAME} request timed out: ${method}`));
+        reject(
+          new AppServerTransportError(`${APP_SERVER_PROCESS_NAME} request timed out: ${method}`),
+        );
       }, timeout);
 
       this.pending.set(id, { timer, resolve, reject });
@@ -339,7 +348,11 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
 
         clearTimeout(pending.timer);
         this.pending.delete(id);
-        pending.reject(new AppServerTransportError(`failed to write ${APP_SERVER_PROCESS_NAME} request: ${error.message}`));
+        pending.reject(
+          new AppServerTransportError(
+            `failed to write ${APP_SERVER_PROCESS_NAME} request: ${error.message}`,
+          ),
+        );
       });
     });
   }
@@ -360,13 +373,13 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
         {
           clientInfo: {
             name: APP_SERVER_CLIENT_NAME,
-            version: APP_SERVER_CLIENT_VERSION
+            version: APP_SERVER_CLIENT_VERSION,
           },
           capabilities: {
-            experimentalApi: true
-          }
+            experimentalApi: true,
+          },
         },
-        this.requestTimeoutMs
+        this.requestTimeoutMs,
       );
 
       InitializeResultSchema.parse(result);
@@ -379,11 +392,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     return this.initializeInFlight;
   }
 
-  public async request(
-    method: string,
-    params: object,
-    timeoutMs?: number
-  ): Promise<JsonValue> {
+  public async request(method: string, params: object, timeoutMs?: number): Promise<JsonValue> {
     this.ensureStarted();
 
     // The initialize RPC must not recursively trigger initialize orchestration.

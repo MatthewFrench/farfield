@@ -9,10 +9,8 @@ export class ThreadIndex {
     const registeredAgentId = this.agentIdByThreadId.get(threadId);
     if (registeredAgentId !== undefined && registeredAgentId !== agentId) {
       throw new Error(
-        (
-          `${THREAD_OWNER_CONFLICT_ERROR_PREFIX}: thread ${threadId} is already bound `
-          + `to ${registeredAgentId} and cannot be reassigned to ${agentId}`
-        )
+        `${THREAD_OWNER_CONFLICT_ERROR_PREFIX}: thread ${threadId} is already bound ` +
+          `to ${registeredAgentId} and cannot be reassigned to ${agentId}`,
       );
     }
 
@@ -26,7 +24,7 @@ export class ThreadIndex {
   public list(): Array<{ threadId: string; agentId: AgentId }> {
     return Array.from(this.agentIdByThreadId.entries()).map(([threadId, agentId]) => ({
       threadId,
-      agentId
+      agentId,
     }));
   }
 }

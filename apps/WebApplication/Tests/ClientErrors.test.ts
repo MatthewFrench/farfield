@@ -8,23 +8,25 @@ function buildCreateErrorSuccessResponse(): Response {
       ok: true,
       errorId: "error_1",
       sessionId: "session_1",
-      recordedAt: "2026-02-21T00:00:01.000Z"
+      recordedAt: "2026-02-21T00:00:01.000Z",
     }),
     {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "X-Farfield-Request-Id": "req_server_1"
-      }
-    }
+        "X-Farfield-Request-Id": "req_server_1",
+      },
+    },
   );
 }
 
-function buildUnhandledRejectionEvent(reason: PromiseRejectionEvent["reason"]): PromiseRejectionEvent {
+function buildUnhandledRejectionEvent(
+  reason: PromiseRejectionEvent["reason"],
+): PromiseRejectionEvent {
   const event = new Event("unhandledrejection");
   Object.defineProperty(event, "reason", {
     value: reason,
-    enumerable: true
+    enumerable: true,
   });
   return event as PromiseRejectionEvent;
 }
@@ -35,11 +37,13 @@ afterEach(() => {
 
 describe("installGlobalClientCrashReporter", () => {
   it("reports uncaught window errors to the debug client-error endpoint", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(buildCreateErrorSuccessResponse());
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(buildCreateErrorSuccessResponse());
     const handle = installGlobalClientCrashReporter({
       source: "farfield-web",
       readThreadId: () => "thread-abc",
-      readUrl: () => "/threads/thread-abc?view=chat"
+      readUrl: () => "/threads/thread-abc?view=chat",
     });
 
     window.dispatchEvent(
@@ -48,8 +52,8 @@ describe("installGlobalClientCrashReporter", () => {
         error: new Error("Boom happened"),
         filename: "/Source/Main.tsx",
         lineno: 42,
-        colno: 7
-      })
+        colno: 7,
+      }),
     );
 
     await vi.waitFor(() => {
@@ -57,7 +61,9 @@ describe("installGlobalClientCrashReporter", () => {
     });
 
     const requestInit = fetchMock.mock.calls[0]?.[1];
-    const parsedBody = CreateDebugClientErrorBodySchema.parse(JSON.parse(String(requestInit?.body ?? "")));
+    const parsedBody = CreateDebugClientErrorBodySchema.parse(
+      JSON.parse(String(requestInit?.body ?? "")),
+    );
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/debug/client-errors");
     expect(parsedBody.operation).toBe("window-error");
     expect(parsedBody.message).toBe("Boom happened");
@@ -71,9 +77,11 @@ describe("installGlobalClientCrashReporter", () => {
   });
 
   it("reports unhandled promise rejections", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(buildCreateErrorSuccessResponse());
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(buildCreateErrorSuccessResponse());
     const handle = installGlobalClientCrashReporter({
-      source: "farfield-web"
+      source: "farfield-web",
     });
 
     window.dispatchEvent(buildUnhandledRejectionEvent("Task failed"));
@@ -83,7 +91,9 @@ describe("installGlobalClientCrashReporter", () => {
     });
 
     const requestInit = fetchMock.mock.calls[0]?.[1];
-    const parsedBody = CreateDebugClientErrorBodySchema.parse(JSON.parse(String(requestInit?.body ?? "")));
+    const parsedBody = CreateDebugClientErrorBodySchema.parse(
+      JSON.parse(String(requestInit?.body ?? "")),
+    );
     expect(parsedBody.operation).toBe("window-unhandledrejection");
     expect(parsedBody.message).toBe("Task failed");
     expect(parsedBody.details["eventType"]).toBe("window-unhandledrejection");
@@ -92,9 +102,11 @@ describe("installGlobalClientCrashReporter", () => {
   });
 
   it("stringifies numeric unhandled rejection reasons", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(buildCreateErrorSuccessResponse());
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(buildCreateErrorSuccessResponse());
     const handle = installGlobalClientCrashReporter({
-      source: "farfield-web"
+      source: "farfield-web",
     });
 
     window.dispatchEvent(buildUnhandledRejectionEvent(42));
@@ -104,7 +116,9 @@ describe("installGlobalClientCrashReporter", () => {
     });
 
     const requestInit = fetchMock.mock.calls[0]?.[1];
-    const parsedBody = CreateDebugClientErrorBodySchema.parse(JSON.parse(String(requestInit?.body ?? "")));
+    const parsedBody = CreateDebugClientErrorBodySchema.parse(
+      JSON.parse(String(requestInit?.body ?? "")),
+    );
     expect(parsedBody.message).toBe("42");
     expect(parsedBody.operation).toBe("window-unhandledrejection");
     expect(parsedBody.details["eventType"]).toBe("window-unhandledrejection");
@@ -113,9 +127,11 @@ describe("installGlobalClientCrashReporter", () => {
   });
 
   it("removes listeners when disposed", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(buildCreateErrorSuccessResponse());
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(buildCreateErrorSuccessResponse());
     const handle = installGlobalClientCrashReporter({
-      source: "farfield-web"
+      source: "farfield-web",
     });
 
     handle.remove();

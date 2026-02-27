@@ -1,20 +1,14 @@
-import {
-  fireEvent,
-  screen,
-  waitFor
-} from "@testing-library/react";
-import {
-  describe,
-  expect,
-  it
-} from "vitest";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import { registerAppTestEnvironment } from "./AppTestEnvironment";
 
 const environment = registerAppTestEnvironment();
 
 function queryThreadListItemByIdentifier(threadId: string): HTMLElement | null {
   const threadListItems = screen.queryAllByTestId("thread-list-item");
-  return threadListItems.find((element) => element.getAttribute("data-thread-id") === threadId) ?? null;
+  return (
+    threadListItems.find((element) => element.getAttribute("data-thread-id") === threadId) ?? null
+  );
 }
 
 async function waitForThreadListItemByIdentifier(threadId: string): Promise<HTMLElement> {
@@ -45,12 +39,12 @@ describe("App", () => {
           updatedAt: 1700000000,
           cwd: "/tmp/project",
           source: "opencode",
-          agentId: "codex"
-        }
+          agentId: "codex",
+        },
       ],
       nextCursor: null,
       pages: 1,
-      truncated: false
+      truncated: false,
     });
 
     environment.setModelsFixture({
@@ -65,14 +59,14 @@ describe("App", () => {
           supportedReasoningEfforts: [
             {
               reasoningEffort: "medium",
-              description: "Balanced"
-            }
+              description: "Balanced",
+            },
           ],
           defaultReasoningEffort: "medium",
           inputModalities: ["text"],
           supportsPersonality: true,
           isDefault: false,
-          hidden: false
+          hidden: false,
         },
         {
           id: "gpt-new-codex",
@@ -83,23 +77,23 @@ describe("App", () => {
           supportedReasoningEfforts: [
             {
               reasoningEffort: "medium",
-              description: "Balanced"
-            }
+              description: "Balanced",
+            },
           ],
           defaultReasoningEffort: "medium",
           inputModalities: ["text"],
           supportsPersonality: true,
           isDefault: true,
-          hidden: false
-        }
+          hidden: false,
+        },
       ],
-      nextCursor: null
+      nextCursor: null,
     });
 
     environment.setReadThreadResolver((targetThreadId: string, _includeTurns: boolean) => ({
       ok: true,
       thread: environment.buildConversationStateFixture(targetThreadId, modelId),
-      agentId: "codex"
+      agentId: "codex",
     }));
 
     environment.setLiveStateResolver((targetThreadId: string) => ({
@@ -107,7 +101,7 @@ describe("App", () => {
       threadId: targetThreadId,
       ownerClientId: "client-1",
       conversationState: environment.buildConversationStateFixture(targetThreadId, modelId),
-      liveStateError: null
+      liveStateError: null,
     }));
 
     environment.renderApp();
@@ -138,12 +132,12 @@ describe("App", () => {
           updatedAt: 1700000000,
           cwd: "/tmp/project",
           source: "opencode",
-          agentId: "codex"
-        }
+          agentId: "codex",
+        },
       ],
       nextCursor: null,
       pages: 1,
-      truncated: false
+      truncated: false,
     });
 
     environment.setReadThreadResolver((targetThreadId: string, includeTurns: boolean) => {
@@ -155,15 +149,15 @@ describe("App", () => {
           thread: {
             ...fullState,
             updatedAt: fullState.updatedAt + 1,
-            turns: []
+            turns: [],
           },
-          agentId: "codex"
+          agentId: "codex",
         };
       }
       return {
         ok: true,
         thread: fullState,
-        agentId: "codex"
+        agentId: "codex",
       };
     });
 
@@ -195,7 +189,7 @@ describe("App", () => {
           updatedAt: 1700000000,
           cwd: "/tmp/project",
           source: "opencode",
-          agentId: "codex"
+          agentId: "codex",
         },
         {
           id: otherThreadId,
@@ -204,18 +198,18 @@ describe("App", () => {
           updatedAt: 1700000001,
           cwd: "/tmp/project",
           source: "opencode",
-          agentId: "codex"
-        }
+          agentId: "codex",
+        },
       ],
       nextCursor: null,
       pages: 1,
-      truncated: false
+      truncated: false,
     });
 
     environment.setReadThreadResolver((threadId: string, _includeTurns: boolean) => ({
       ok: true,
       thread: environment.buildConversationStateFixture(threadId, "gpt-5.3-codex"),
-      agentId: "codex"
+      agentId: "codex",
     }));
 
     environment.renderApp();
@@ -255,7 +249,7 @@ describe("App", () => {
           updatedAt: 1700000000,
           cwd: "/tmp/project",
           source: "opencode",
-          agentId: "codex"
+          agentId: "codex",
         },
         {
           id: updatedId,
@@ -264,18 +258,18 @@ describe("App", () => {
           updatedAt: 1700000000,
           cwd: "/tmp/project",
           source: "opencode",
-          agentId: "codex"
-        }
+          agentId: "codex",
+        },
       ],
       nextCursor: null,
       pages: 1,
-      truncated: false
+      truncated: false,
     });
 
     environment.setReadThreadResolver((threadId: string, _includeTurns: boolean) => ({
       ok: true,
       thread: environment.buildConversationStateFixture(threadId, "gpt-5.3-codex"),
-      agentId: "codex"
+      agentId: "codex",
     }));
 
     environment.renderApp();
@@ -293,7 +287,7 @@ describe("App", () => {
           updatedAt: 1700000000,
           cwd: "/tmp/project",
           source: "opencode",
-          agentId: "codex"
+          agentId: "codex",
         },
         {
           id: updatedId,
@@ -302,12 +296,12 @@ describe("App", () => {
           updatedAt: 1700000050,
           cwd: "/tmp/project",
           source: "opencode",
-          agentId: "codex"
-        }
+          agentId: "codex",
+        },
       ],
       nextCursor: null,
       pages: 1,
-      truncated: false
+      truncated: false,
     });
 
     environment.emitHistoryEventForThread(updatedId);

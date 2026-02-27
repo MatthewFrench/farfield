@@ -21,25 +21,29 @@ export interface ThreadListPresentationStateResult {
  */
 export class ThreadListPresentationStateResolver {
   public readState(input: ThreadListPresentationStateInput): ThreadListPresentationStateResult {
-    const selectedThread = input.threads.find((thread) => thread.id === input.selectedThreadIdentifier) ?? null;
+    const selectedThread =
+      input.threads.find((thread) => thread.id === input.selectedThreadIdentifier) ?? null;
     const groupedThreadsByProject = ThreadGroupSelectors.groupThreadsByProject(input.threads);
-    const groupedArchivedThreadsByProject = ThreadGroupSelectors.groupThreadsByProject(input.archivedThreads);
+    const groupedArchivedThreadsByProject = ThreadGroupSelectors.groupThreadsByProject(
+      input.archivedThreads,
+    );
     const activeProjectGroups = groupedThreadsByProject.filter((group) => !group.isRemoved);
     const removedProjectGroups = groupedThreadsByProject.filter((group) => group.isRemoved);
     const archivedProjectGroups = ThreadGroupSelectors.mergeProjectGroups(
       groupedArchivedThreadsByProject,
-      removedProjectGroups
+      removedProjectGroups,
     );
 
     const archivedThreadIdentifiers = this.buildThreadIdentifierSet(input.archivedThreads);
-    const archivedSectionThreadIdentifiers = this.buildGroupThreadIdentifierSet(archivedProjectGroups);
+    const archivedSectionThreadIdentifiers =
+      this.buildGroupThreadIdentifierSet(archivedProjectGroups);
 
     return {
       selectedThread,
       activeProjectGroups,
       archivedProjectGroups,
       archivedThreadIdentifiers,
-      archivedSectionThreadCount: archivedSectionThreadIdentifiers.size
+      archivedSectionThreadCount: archivedSectionThreadIdentifiers.size,
     };
   }
 

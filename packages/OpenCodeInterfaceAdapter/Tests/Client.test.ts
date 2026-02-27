@@ -1,10 +1,10 @@
-import { describe, expect, it, vi, type Mock } from "vitest";
+import { describe, expect, it, type Mock, vi } from "vitest";
 import {
-  OpenCodeConnection,
   type OpenCodeClientConfiguration,
+  OpenCodeConnection,
   type OpenCodeConnectionDependencies,
   type OpenCodeServerHandle,
-  type OpenCodeServerStartOptions
+  type OpenCodeServerStartOptions,
 } from "../Source/Client.js";
 import type {
   OpenCodeApiResponseEnvelope,
@@ -12,15 +12,11 @@ import type {
   OpenCodeSessionCreateRequest,
   OpenCodeSessionListRequest,
   OpenCodeSessionPromptRequest,
-  OpenCodeSessionReadRequest
+  OpenCodeSessionReadRequest,
 } from "../Source/ClientContracts.js";
 
-type CreateServerFunction = (
-  options: OpenCodeServerStartOptions
-) => Promise<OpenCodeServerHandle>;
-type CreateClientFunction = (
-  configuration: OpenCodeClientConfiguration
-) => OpenCodeMonitorClient;
+type CreateServerFunction = (options: OpenCodeServerStartOptions) => Promise<OpenCodeServerHandle>;
+type CreateClientFunction = (configuration: OpenCodeClientConfiguration) => OpenCodeMonitorClient;
 
 interface OpenCodeConnectionDependenciesDouble {
   dependencies: OpenCodeConnectionDependencies;
@@ -30,13 +26,15 @@ interface OpenCodeConnectionDependenciesDouble {
   client: OpenCodeMonitorClient;
 }
 
-function createResponseEnvelope(data?: OpenCodeApiResponseEnvelope["data"]): OpenCodeApiResponseEnvelope {
+function createResponseEnvelope(
+  data?: OpenCodeApiResponseEnvelope["data"],
+): OpenCodeApiResponseEnvelope {
   if (data === undefined) {
     return {};
   }
 
   return {
-    data
+    data,
   };
 }
 
@@ -49,11 +47,11 @@ function createMonitorClientDouble(): OpenCodeMonitorClient {
       messages: async (_input: OpenCodeSessionReadRequest) => createResponseEnvelope([]),
       prompt: async (_input: OpenCodeSessionPromptRequest) => createResponseEnvelope(),
       abort: async (_input: OpenCodeSessionReadRequest) => createResponseEnvelope(),
-      delete: async (_input: OpenCodeSessionReadRequest) => createResponseEnvelope()
+      delete: async (_input: OpenCodeSessionReadRequest) => createResponseEnvelope(),
     },
     project: {
-      list: async () => createResponseEnvelope([])
-    }
+      list: async () => createResponseEnvelope([]),
+    },
   };
 }
 
@@ -63,7 +61,7 @@ function createConnectionDependenciesDouble(): OpenCodeConnectionDependenciesDou
   const createServer = vi.fn<CreateServerFunction>();
   createServer.mockResolvedValue({
     url: "http://127.0.0.1:6142",
-    close: closeServer
+    close: closeServer,
   });
   const createClient = vi.fn<CreateClientFunction>();
   createClient.mockReturnValue(client);
@@ -71,12 +69,12 @@ function createConnectionDependenciesDouble(): OpenCodeConnectionDependenciesDou
   return {
     dependencies: {
       createServer,
-      createClient
+      createClient,
     },
     createServer,
     createClient,
     closeServer,
-    client
+    client,
   };
 }
 
@@ -90,16 +88,16 @@ describe("OpenCodeConnection", () => {
     const dependenciesDouble = createConnectionDependenciesDouble();
     const connection = new OpenCodeConnection(
       {
-        url: "  http://localhost:7777  "
+        url: "  http://localhost:7777  ",
       },
-      dependenciesDouble.dependencies
+      dependenciesDouble.dependencies,
     );
 
     await connection.start();
 
     expect(dependenciesDouble.createServer).not.toHaveBeenCalled();
     expect(dependenciesDouble.createClient).toHaveBeenCalledWith({
-      baseUrl: "http://localhost:7777"
+      baseUrl: "http://localhost:7777",
     });
     expect(connection.isConnected()).toBe(true);
     expect(connection.getUrl()).toBe("http://localhost:7777");
@@ -115,10 +113,10 @@ describe("OpenCodeConnection", () => {
     expect(dependenciesDouble.createServer).toHaveBeenCalledWith({
       hostname: "127.0.0.1",
       port: 0,
-      timeoutMilliseconds: 30_000
+      timeoutMilliseconds: 30_000,
     });
     expect(dependenciesDouble.createClient).toHaveBeenCalledWith({
-      baseUrl: "http://127.0.0.1:6142"
+      baseUrl: "http://127.0.0.1:6142",
     });
     expect(connection.getUrl()).toBe("http://127.0.0.1:6142");
   });
@@ -128,9 +126,9 @@ describe("OpenCodeConnection", () => {
     const connection = new OpenCodeConnection(
       {
         hostname: "  localhost  ",
-        port: 6143
+        port: 6143,
       },
-      dependenciesDouble.dependencies
+      dependenciesDouble.dependencies,
     );
 
     await connection.start();
@@ -138,7 +136,7 @@ describe("OpenCodeConnection", () => {
     expect(dependenciesDouble.createServer).toHaveBeenCalledWith({
       hostname: "localhost",
       port: 6143,
-      timeoutMilliseconds: 30_000
+      timeoutMilliseconds: 30_000,
     });
   });
 
@@ -157,7 +155,7 @@ describe("OpenCodeConnection", () => {
 
   it("keeps configured URL available before start", () => {
     const connection = new OpenCodeConnection({
-      url: "http://localhost:8888"
+      url: "http://localhost:8888",
     });
 
     expect(connection.getUrl()).toBe("http://localhost:8888");
@@ -167,9 +165,9 @@ describe("OpenCodeConnection", () => {
     const dependenciesDouble = createConnectionDependenciesDouble();
     const connection = new OpenCodeConnection(
       {
-        url: "http://localhost:8888"
+        url: "http://localhost:8888",
       },
-      dependenciesDouble.dependencies
+      dependenciesDouble.dependencies,
     );
 
     await connection.start();

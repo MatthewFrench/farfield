@@ -1,17 +1,12 @@
 import { cleanup, render } from "@testing-library/react";
-import {
-  afterEach,
-  describe,
-  expect,
-  it
-} from "vitest";
-import { type ApplicationRouteState } from "../Source/Application/DomainModel/ApplicationRouteStateMapper";
+import { afterEach, describe, expect, it } from "vitest";
 import { UNSUPPORTED_PUSH_CLIENT_STATE } from "../Source/Application/Configuration/ApplicationBehaviorConfiguration";
-import { PendingThreadMaterializationCoordinator } from "../Source/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
+import { type ApplicationRouteState } from "../Source/Application/DomainModel/ApplicationRouteStateMapper";
 import {
+  type ApplicationShellState,
   useApplicationShellState,
-  type ApplicationShellState
 } from "../Source/Application/StateManagement/UseApplicationShellState";
+import { PendingThreadMaterializationCoordinator } from "../Source/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 
 interface HarnessProperties {
   initialUiState: ApplicationRouteState;
@@ -23,7 +18,7 @@ function Harness(properties: HarnessProperties): React.JSX.Element {
   const state = useApplicationShellState({
     initialUiState: properties.initialUiState,
     unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
-    initialVisibleChatItems: properties.initialVisibleChatItems
+    initialVisibleChatItems: properties.initialVisibleChatItems,
   });
   properties.onState(state);
   return <div data-testid="application-shell-state-harness" />;
@@ -34,9 +29,9 @@ interface HarnessInput {
   initialVisibleChatItems: number;
 }
 
-function readCapturedApplicationShellState(
-  capturedState: { current: ApplicationShellState | null }
-): ApplicationShellState {
+function readCapturedApplicationShellState(capturedState: {
+  current: ApplicationShellState | null;
+}): ApplicationShellState {
   if (!capturedState.current) {
     throw new Error("Expected application shell state to be captured");
   }
@@ -46,7 +41,7 @@ function readCapturedApplicationShellState(
 
 function renderApplicationShellStateHarness(input: HarnessInput): ApplicationShellState {
   const capturedState: { current: ApplicationShellState | null } = {
-    current: null
+    current: null,
   };
 
   render(
@@ -56,7 +51,7 @@ function renderApplicationShellStateHarness(input: HarnessInput): ApplicationShe
       onState={(state) => {
         capturedState.current = state;
       }}
-    />
+    />,
   );
 
   return readCapturedApplicationShellState(capturedState);
@@ -71,9 +66,9 @@ describe("useApplicationShellState", () => {
     const applicationShellState = renderApplicationShellStateHarness({
       initialUiState: {
         threadId: "thread-123",
-        tab: "debug"
+        tab: "debug",
       },
-      initialVisibleChatItems: 50
+      initialVisibleChatItems: 50,
     });
 
     expect(applicationShellState.selectedThreadId).toBe("thread-123");
@@ -87,9 +82,9 @@ describe("useApplicationShellState", () => {
     const applicationShellState = renderApplicationShellStateHarness({
       initialUiState: {
         threadId: null,
-        tab: "chat"
+        tab: "chat",
       },
-      initialVisibleChatItems: 50
+      initialVisibleChatItems: 50,
     });
 
     expect(applicationShellState.selectedThreadId).toBeNull();
@@ -104,9 +99,9 @@ describe("useApplicationShellState", () => {
     const applicationShellState = renderApplicationShellStateHarness({
       initialUiState: {
         threadId: null,
-        tab: "chat"
+        tab: "chat",
       },
-      initialVisibleChatItems
+      initialVisibleChatItems,
     });
 
     expect(applicationShellState.error).toBe("");
@@ -135,21 +130,21 @@ describe("useApplicationShellState", () => {
     expect(applicationShellState.loadSelectedThreadRef.current).toBeNull();
     expect(applicationShellState.keyboardOpenScrollRafRef.current).toBeNull();
     expect(applicationShellState.pendingThreadMaterializationCoordinator).toBeInstanceOf(
-      PendingThreadMaterializationCoordinator
+      PendingThreadMaterializationCoordinator,
     );
   });
 
   it("retains ref owners and coordinator instance across rerenders", () => {
     const capturedState: { current: ApplicationShellState | null } = {
-      current: null
+      current: null,
     };
 
     const initialRenderInput: HarnessInput = {
       initialUiState: {
         threadId: "thread-123",
-        tab: "debug"
+        tab: "debug",
       },
-      initialVisibleChatItems: 50
+      initialVisibleChatItems: 50,
     };
 
     const { rerender } = render(
@@ -159,7 +154,7 @@ describe("useApplicationShellState", () => {
         onState={(state) => {
           capturedState.current = state;
         }}
-      />
+      />,
     );
 
     const firstState = readCapturedApplicationShellState(capturedState);
@@ -170,14 +165,14 @@ describe("useApplicationShellState", () => {
         onState={(state) => {
           capturedState.current = state;
         }}
-      />
+      />,
     );
     const secondState = readCapturedApplicationShellState(capturedState);
 
     expect(secondState.selectedThreadIdRef).toBe(firstState.selectedThreadIdRef);
     expect(secondState.activeTabRef).toBe(firstState.activeTabRef);
     expect(secondState.pendingThreadMaterializationCoordinator).toBe(
-      firstState.pendingThreadMaterializationCoordinator
+      firstState.pendingThreadMaterializationCoordinator,
     );
   });
 });

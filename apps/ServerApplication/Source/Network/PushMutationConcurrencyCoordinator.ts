@@ -31,9 +31,7 @@ export class PushMutationConcurrencyCoordinator {
     this.failedExecutionCount = 0;
   }
 
-  public async runExclusive<ResultType>(
-    operation: () => Promise<ResultType>
-  ): Promise<ResultType> {
+  public async runExclusive<ResultType>(operation: () => Promise<ResultType>): Promise<ResultType> {
     this.recordQueuedExecution();
     const queuedExecution = this.enqueueExecution();
     try {
@@ -54,7 +52,7 @@ export class PushMutationConcurrencyCoordinator {
       queuedExecutionCount: this.queuedExecutionCount,
       completedExecutionCount: this.completedExecutionCount,
       failedExecutionCount: this.failedExecutionCount,
-      hasInFlightOperation: this.pendingExecutionCount > 0
+      hasInFlightOperation: this.pendingExecutionCount > 0,
     };
   }
 
@@ -65,26 +63,26 @@ export class PushMutationConcurrencyCoordinator {
 
   private enqueueExecution(): QueuedExecution {
     const previousTail = this.executionTail;
-    let releaseCurrentTail: () => void = () => {};
+    let releaseCurrentTail: () => void = () => void 0;
     const currentTail = new Promise<void>((resolve) => {
       releaseCurrentTail = resolve;
     });
     // Keep the queue moving even if a prior tail unexpectedly rejects.
     this.executionTail = previousTail.then(
       () => currentTail,
-      () => currentTail
+      () => currentTail,
     );
 
     return {
       previousTail,
-      releaseCurrentTail
+      releaseCurrentTail,
     };
   }
 
   private finishQueuedExecution(queuedExecution: QueuedExecution): void {
     this.pendingExecutionCount = Math.max(
       MINIMUM_PENDING_EXECUTION_COUNT,
-      this.pendingExecutionCount - 1
+      this.pendingExecutionCount - 1,
     );
     queuedExecution.releaseCurrentTail();
   }

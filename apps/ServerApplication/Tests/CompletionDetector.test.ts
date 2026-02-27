@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { parseThreadConversationState } from "@farfield/protocol";
+import { describe, expect, it } from "vitest";
 import { CompletionDetector } from "../Source/Modules/Threads/CompletionDetector.js";
 
 describe("CompletionDetector", () => {
@@ -15,12 +15,12 @@ describe("CompletionDetector", () => {
             {
               id: "item_agent_1",
               type: "agentMessage",
-              text: "done"
-            }
-          ]
-        }
+              text: "done",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const candidate = detector.detect("thread_1", state);
@@ -41,12 +41,12 @@ describe("CompletionDetector", () => {
             {
               id: "item_agent_1",
               type: "agentMessage",
-              text: "done"
-            }
-          ]
-        }
+              text: "done",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const first = detector.detect("thread_1", state);
@@ -72,12 +72,12 @@ describe("CompletionDetector", () => {
             {
               id: "item_agent_1",
               type: "agentMessage",
-              text: "done"
-            }
-          ]
-        }
+              text: "done",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const candidate = detector.detect("thread_1", state);
@@ -96,12 +96,12 @@ describe("CompletionDetector", () => {
             {
               id: "item_agent_1",
               type: "agentMessage",
-              text: "working"
-            }
-          ]
-        }
+              text: "working",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const candidate = detector.detect("thread_1", state);
@@ -120,12 +120,12 @@ describe("CompletionDetector", () => {
             {
               id: "item_agent_1",
               type: "agentMessage",
-              text: "done"
-            }
-          ]
-        }
+              text: "done",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const candidate = detector.detect("thread_1", state);
@@ -146,12 +146,12 @@ describe("CompletionDetector", () => {
             {
               id: "item_agent_1",
               type: "agentMessage",
-              text: "done"
-            }
-          ]
-        }
+              text: "done",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const candidate = detector.detect("thread_1", state);
@@ -171,22 +171,22 @@ describe("CompletionDetector", () => {
             {
               id: "item_agent_1",
               type: "agentMessage",
-              text: "older"
+              text: "older",
             },
             {
               id: "item_error_1",
               type: "error",
-              message: "transient"
+              message: "transient",
             },
             {
               id: "item_agent_2",
               type: "agentMessage",
-              text: "newer"
-            }
-          ]
-        }
+              text: "newer",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const candidate = detector.detect("thread_1", state);

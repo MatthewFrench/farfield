@@ -1,5 +1,5 @@
-import { type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ReasoningBlock } from "@/Components/ReasoningBlock";
 
@@ -20,15 +20,11 @@ vi.mock("framer-motion", () => ({
     },
     span({ children, ...props }: MotionSpanProps) {
       return <span {...props}>{children}</span>;
-    }
-  }
+    },
+  },
 }));
 
-function renderReasoningBlock(input?: {
-  summary?: string[];
-  text?: string;
-  isActive?: boolean;
-}) {
+function renderReasoningBlock(input?: { summary?: string[]; text?: string; isActive?: boolean }) {
   cleanup();
 
   return render(
@@ -36,14 +32,14 @@ function renderReasoningBlock(input?: {
       summary={input?.summary ?? ["Step one"]}
       text={input?.text}
       isActive={input?.isActive ?? false}
-    />
+    />,
   );
 }
 
 describe("ReasoningBlock", () => {
   it("uses the explicit default summary line when no summary entries exist", () => {
     renderReasoningBlock({
-      summary: []
+      summary: [],
     });
 
     expect(screen.getByText("Thinking…")).toBeDefined();
@@ -52,7 +48,7 @@ describe("ReasoningBlock", () => {
   it("sanitizes summary lines and expands deterministic detail content", () => {
     renderReasoningBlock({
       summary: ["  **First step**  ", "**Second step**"],
-      text: "Detailed reasoning"
+      text: "Detailed reasoning",
     });
 
     expect(screen.getByText("Second step")).toBeDefined();
@@ -66,7 +62,7 @@ describe("ReasoningBlock", () => {
   it("does not render an expanded text block for blank reasoning text", () => {
     const renderResult = renderReasoningBlock({
       summary: ["Step A", "Step B"],
-      text: "   "
+      text: "   ",
     });
 
     fireEvent.click(screen.getByRole("button"));

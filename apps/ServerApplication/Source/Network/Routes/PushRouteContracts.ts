@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   FarfieldPushTestBodySchema,
   type JsonValue,
-  type PushNotificationPayload
+  type PushNotificationPayload,
 } from "@farfield/protocol";
 import { z } from "zod";
 import type { PushReceiptStore } from "../../Modules/PushNotifications/PushReceiptStore.js";
@@ -14,7 +14,7 @@ import type { PushMutationConcurrencyCoordinator } from "../PushMutationConcurre
 export const PushRouteMethodByName = {
   get: "GET",
   post: "POST",
-  delete: "DELETE"
+  delete: "DELETE",
 } as const;
 
 export const PushRoutePathnameByName = {
@@ -26,12 +26,12 @@ export const PushRoutePathnameByName = {
   localCa: "/api/push/local-ca",
   localCaDownload: "/api/push/local-ca/download",
   subscriptions: "/api/push/subscriptions",
-  test: "/api/push/test"
+  test: "/api/push/test",
 } as const;
 
 export const PushRouteSegmentByName = {
   api: "api",
-  push: "push"
+  push: "push",
 } as const;
 
 export interface PushRouteDependencies {
@@ -52,11 +52,11 @@ export interface PushRouteDependencies {
   jsonResponse: (res: ServerResponse, statusCode: number, body: object) => void;
   buildPushTestPayload: (
     input: z.infer<typeof FarfieldPushTestBodySchema>,
-    privateMode: boolean
+    privateMode: boolean,
   ) => PushNotificationPayload;
   withTimeout: <ValueType>(
     promise: Promise<ValueType>,
     timeoutMs: number,
-    label: string
+    label: string,
   ) => Promise<ValueType>;
 }

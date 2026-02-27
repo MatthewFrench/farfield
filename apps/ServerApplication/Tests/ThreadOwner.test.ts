@@ -40,9 +40,7 @@ describe("resolveOwnerClientId", () => {
   });
 
   it("throws when owner is unavailable", () => {
-    expect(() => resolveOwnerClientId(new Map(), "thread-1")).toThrowError(
-      /No owner client id/
-    );
+    expect(() => resolveOwnerClientId(new Map(), "thread-1")).toThrowError(/No owner client id/);
   });
 
   it("throws when owner sources are blank", () => {
@@ -50,7 +48,7 @@ describe("resolveOwnerClientId", () => {
     owners.set("thread-1", "   ");
 
     expect(() => resolveOwnerClientId(owners, "thread-1", "   ")).toThrowError(
-      /No owner client id/
+      /No owner client id/,
     );
   });
 });

@@ -57,13 +57,13 @@ export class ModeSelectionSyncCoordinator {
     const remoteSelection = this.modeSelectionStateResolver.readModeSelectionFromConversationState(
       input.conversationState,
       input.appDefaultModel,
-      input.appDefaultReasoningEffort
+      input.appDefaultReasoningEffort,
     );
     const remoteModeKey = this.readRemoteModeKey(input, remoteSelection.modeKey);
     const remoteSignature = this.modeSelectionStateResolver.buildModeSignature(
       remoteModeKey,
       remoteSelection.modelId,
-      remoteSelection.reasoningEffort
+      remoteSelection.reasoningEffort,
     );
 
     if (!input.hasHydratedModeFromLiveState) {
@@ -72,26 +72,26 @@ export class ModeSelectionSyncCoordinator {
         nextSelectedModelId: remoteSelection.modelId,
         nextSelectedReasoningEffort: remoteSelection.reasoningEffort,
         nextHasHydratedModeFromLiveState: true,
-        nextLastAppliedModeSignature: remoteSignature
+        nextLastAppliedModeSignature: remoteSignature,
       });
     }
 
     const localSignature = this.modeSelectionStateResolver.buildModeSignature(
       input.selectedModeKey,
       input.selectedModelId,
-      input.selectedReasoningEffort
+      input.selectedReasoningEffort,
     );
     if (remoteSignature === localSignature) {
       return this.buildTransition(input, "confirmSynchronized", {
         nextIsModeSyncing: false,
-        nextLastAppliedModeSignature: remoteSignature
+        nextLastAppliedModeSignature: remoteSignature,
       });
     }
 
     if (
-      input.isModeSyncing
-      && localSignature === input.lastAppliedModeSignature
-      && remoteSignature !== input.lastAppliedModeSignature
+      input.isModeSyncing &&
+      localSignature === input.lastAppliedModeSignature &&
+      remoteSignature !== input.lastAppliedModeSignature
     ) {
       return this.buildTransition(input, "holdLocalSyncingState");
     }
@@ -100,30 +100,31 @@ export class ModeSelectionSyncCoordinator {
       nextSelectedModeKey: this.readNextSelectedModeKeyForRemoteUpdate(
         input,
         remoteSelection.modeKey,
-        remoteModeKey
+        remoteModeKey,
       ),
       nextSelectedModelId: remoteSelection.modelId,
       nextSelectedReasoningEffort: remoteSelection.reasoningEffort,
       nextIsModeSyncing: false,
-      nextLastAppliedModeSignature: remoteSignature
+      nextLastAppliedModeSignature: remoteSignature,
     });
   }
 
   private buildTransition(
     input: ModeSelectionSyncInput,
     kind: ModeSelectionSyncTransitionKind,
-    overrides?: ModeSelectionSyncTransitionOverrides
+    overrides?: ModeSelectionSyncTransitionOverrides,
   ): ModeSelectionSyncTransition {
     return {
       kind,
       nextSelectedModeKey: overrides?.nextSelectedModeKey ?? input.selectedModeKey,
       nextSelectedModelId: overrides?.nextSelectedModelId ?? input.selectedModelId,
-      nextSelectedReasoningEffort: overrides?.nextSelectedReasoningEffort ?? input.selectedReasoningEffort,
-      nextHasHydratedModeFromLiveState: (
-        overrides?.nextHasHydratedModeFromLiveState ?? input.hasHydratedModeFromLiveState
-      ),
+      nextSelectedReasoningEffort:
+        overrides?.nextSelectedReasoningEffort ?? input.selectedReasoningEffort,
+      nextHasHydratedModeFromLiveState:
+        overrides?.nextHasHydratedModeFromLiveState ?? input.hasHydratedModeFromLiveState,
       nextIsModeSyncing: overrides?.nextIsModeSyncing ?? input.isModeSyncing,
-      nextLastAppliedModeSignature: overrides?.nextLastAppliedModeSignature ?? input.lastAppliedModeSignature
+      nextLastAppliedModeSignature:
+        overrides?.nextLastAppliedModeSignature ?? input.lastAppliedModeSignature,
     };
   }
 
@@ -143,7 +144,7 @@ export class ModeSelectionSyncCoordinator {
   private readNextSelectedModeKeyForRemoteUpdate(
     input: ModeSelectionSyncInput,
     remoteSelectionModeKey: string,
-    remoteModeKey: string
+    remoteModeKey: string,
   ): string {
     if (remoteSelectionModeKey.length > 0) {
       return remoteSelectionModeKey;

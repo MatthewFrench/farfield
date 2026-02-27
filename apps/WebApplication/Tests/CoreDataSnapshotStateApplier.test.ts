@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
 import type { SetStateAction } from "react";
-import { applyCoreDataSnapshotState, type ApplyCoreDataSnapshotStateInput } from "../Source/Application/StateManagement/CoreDataSnapshotStateApplier";
+import { describe, expect, it, vi } from "vitest";
+import {
+  type ApplyCoreDataSnapshotStateInput,
+  applyCoreDataSnapshotState,
+} from "../Source/Application/StateManagement/CoreDataSnapshotStateApplier";
 import type {
   CapabilityCollaborationModesResponse,
   CapabilityConfigDefaultsResponse,
-  CapabilityModelsResponse
+  CapabilityModelsResponse,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { buildDebugErrorSignature } from "../Source/Features/Debugging/DomainModel/DebugErrorSignature";
 import type { DebugWorkspaceDataSnapshot } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
@@ -32,17 +35,17 @@ function createThreadListStateController(): ThreadListStateController {
     threadServerClient: new ThreadServerClient(),
     threadQueryCache: new ThreadQueryCache(
       THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS,
-      THREAD_QUERY_CACHE_MAXIMUM_ENTRIES
+      THREAD_QUERY_CACHE_MAXIMUM_ENTRIES,
     ),
     threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
     threadListStateStore: new ThreadListStateStore(),
-    threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+    threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
   });
 }
 
 function createModelDescriptor(
   displayName: string,
-  modelIdentifier = DEFAULT_MODEL_ID
+  modelIdentifier = DEFAULT_MODEL_ID,
 ): CapabilityModelsResponse["data"][number] {
   return {
     id: modelIdentifier,
@@ -56,21 +59,21 @@ function createModelDescriptor(
     supportedReasoningEfforts: [
       {
         reasoningEffort: "low",
-        description: "low effort"
+        description: "low effort",
       },
       {
         reasoningEffort: "medium",
-        description: "medium effort"
-      }
+        description: "medium effort",
+      },
     ],
-    supportsPersonality: false
+    supportsPersonality: false,
   };
 }
 
 function createCapabilitiesSnapshot(
   modeReasoningEffort: ReasoningEffort,
   modelDisplayName: string,
-  modelIdentifier = DEFAULT_MODEL_ID
+  modelIdentifier = DEFAULT_MODEL_ID,
 ): {
   modes: CapabilityCollaborationModesResponse;
   models: CapabilityModelsResponse;
@@ -81,7 +84,7 @@ function createCapabilitiesSnapshot(
     name: DEFAULT_MODE_NAME,
     mode: DEFAULT_MODE_KEY,
     model: DEFAULT_MODEL_ID,
-    reasoning_effort: modeReasoningEffort
+    reasoning_effort: modeReasoningEffort,
   };
   return createCapabilitiesSnapshotFromMode(modeDescriptor, modelDisplayName, modelIdentifier);
 }
@@ -89,7 +92,7 @@ function createCapabilitiesSnapshot(
 function createCapabilitiesSnapshotFromMode(
   modeDescriptor: CapabilityModeDescriptor,
   modelDisplayName: string,
-  modelIdentifier = DEFAULT_MODEL_ID
+  modelIdentifier = DEFAULT_MODEL_ID,
 ): {
   modes: CapabilityCollaborationModesResponse;
   models: CapabilityModelsResponse;
@@ -98,14 +101,14 @@ function createCapabilitiesSnapshotFromMode(
 } {
   return {
     modes: {
-      data: [modeDescriptor]
+      data: [modeDescriptor],
     },
     models: {
       data: [createModelDescriptor(modelDisplayName, modelIdentifier)],
-      nextCursor: null
+      nextCursor: null,
     },
     defaults: null,
-    fetchedAt: Date.now()
+    fetchedAt: Date.now(),
   };
 }
 
@@ -116,13 +119,13 @@ function createDebugHistoryEntry(entryId: string): DebugHistory[number] {
     source: "app",
     direction: "in",
     payload: {},
-    meta: {}
+    meta: {},
   };
 }
 
 function createDebugHistoryCollection(entryCount: number): DebugHistory {
   return Array.from({ length: entryCount }, (_value, index) =>
-    createDebugHistoryEntry(`history-${String(index)}`)
+    createDebugHistoryEntry(`history-${String(index)}`),
   );
 }
 
@@ -146,7 +149,7 @@ function createDebugErrorEntry(input: {
     url: null,
     occurredAt: input.recordedAt,
     recordedAt: input.recordedAt,
-    details: {}
+    details: {},
   };
 }
 
@@ -162,7 +165,7 @@ function createDebugWorkspaceSnapshot(input: {
     debugErrors: input.debugErrors ?? [],
     debugErrorSessionId: input.debugErrorSessionId ?? "session-1",
     debugErrorSessionLogPath: input.debugErrorSessionLogPath ?? "/tmp/session-1.ndjson",
-    debugErrorsSignature: input.debugErrorsSignature ?? []
+    debugErrorsSignature: input.debugErrorsSignature ?? [],
   };
 }
 
@@ -174,7 +177,7 @@ function createDebugErrorSignature(error: {
   return buildDebugErrorSignature({
     errorId: error.errorId,
     recordedAt: error.recordedAt,
-    message: error.message
+    message: error.message,
   });
 }
 
@@ -205,7 +208,7 @@ function createHarness() {
     setSelectedAgentId: vi.fn(),
     setSelectedThreadId: vi.fn(),
     setSelectedModeKey: vi.fn(),
-    readInitialModeKey: () => DEFAULT_MODE_KEY
+    readInitialModeKey: () => DEFAULT_MODE_KEY,
   };
 
   return {
@@ -213,7 +216,7 @@ function createHarness() {
     setModesMock,
     setModelsMock,
     setHistoryMock,
-    setDebugErrorsMock
+    setDebugErrorsMock,
   };
 }
 
@@ -234,9 +237,7 @@ describe("CoreDataSnapshotStateApplier", () => {
     expect(harness.setModesMock).toHaveBeenCalledTimes(1);
     expect(harness.setModesMock).toHaveBeenCalledWith(changedSnapshot.modes.data);
     expect(harness.setModelsMock).not.toHaveBeenCalled();
-    expect(harness.input.modesSignatureRef.current).toEqual([
-      "default|Balanced|high"
-    ]);
+    expect(harness.input.modesSignatureRef.current).toEqual(["default|Balanced|high"]);
   });
 
   it("does not update modes or models when signatures are unchanged", () => {
@@ -253,12 +254,8 @@ describe("CoreDataSnapshotStateApplier", () => {
 
     expect(harness.setModesMock).not.toHaveBeenCalled();
     expect(harness.setModelsMock).not.toHaveBeenCalled();
-    expect(harness.input.modesSignatureRef.current).toEqual([
-      "default|Balanced|medium"
-    ]);
-    expect(harness.input.modelsSignatureRef.current).toEqual([
-      "gpt-5|GPT-5"
-    ]);
+    expect(harness.input.modesSignatureRef.current).toEqual(["default|Balanced|medium"]);
+    expect(harness.input.modelsSignatureRef.current).toEqual(["gpt-5|GPT-5"]);
   });
 
   it("updates models when model display name changes", () => {
@@ -277,9 +274,7 @@ describe("CoreDataSnapshotStateApplier", () => {
     expect(harness.setModelsMock).toHaveBeenCalledTimes(1);
     expect(harness.setModelsMock).toHaveBeenCalledWith(changedSnapshot.models.data);
     expect(harness.setModesMock).not.toHaveBeenCalled();
-    expect(harness.input.modelsSignatureRef.current).toEqual([
-      "gpt-5|GPT-5 Turbo"
-    ]);
+    expect(harness.input.modelsSignatureRef.current).toEqual(["gpt-5|GPT-5 Turbo"]);
   });
 
   it("updates models when model identifier changes", () => {
@@ -298,9 +293,7 @@ describe("CoreDataSnapshotStateApplier", () => {
     expect(harness.setModelsMock).toHaveBeenCalledTimes(1);
     expect(harness.setModelsMock).toHaveBeenCalledWith(changedSnapshot.models.data);
     expect(harness.setModesMock).not.toHaveBeenCalled();
-    expect(harness.input.modelsSignatureRef.current).toEqual([
-      "gpt-5-pro|GPT-5"
-    ]);
+    expect(harness.input.modelsSignatureRef.current).toEqual(["gpt-5-pro|GPT-5"]);
   });
 
   it("normalizes null and omitted mode signature segments to the same signature", () => {
@@ -309,7 +302,7 @@ describe("CoreDataSnapshotStateApplier", () => {
       name: DEFAULT_MODE_NAME,
       mode: null,
       model: DEFAULT_MODEL_ID,
-      reasoning_effort: null
+      reasoning_effort: null,
     };
 
     harness.input.nextCapabilities = createCapabilitiesSnapshotFromMode(nullSegmentMode, "GPT-5");
@@ -320,16 +313,17 @@ describe("CoreDataSnapshotStateApplier", () => {
 
     const omittedSegmentMode: CapabilityModeDescriptor = {
       name: DEFAULT_MODE_NAME,
-      model: DEFAULT_MODEL_ID
+      model: DEFAULT_MODEL_ID,
     };
-    harness.input.nextCapabilities = createCapabilitiesSnapshotFromMode(omittedSegmentMode, "GPT-5");
+    harness.input.nextCapabilities = createCapabilitiesSnapshotFromMode(
+      omittedSegmentMode,
+      "GPT-5",
+    );
     applyCoreDataSnapshotState(harness.input);
 
     expect(harness.setModesMock).not.toHaveBeenCalled();
     expect(harness.setModelsMock).not.toHaveBeenCalled();
-    expect(harness.input.modesSignatureRef.current).toEqual([
-      "|Balanced|"
-    ]);
+    expect(harness.input.modesSignatureRef.current).toEqual(["|Balanced|"]);
   });
 
   it("does not apply debug errors when debug-error signature is unchanged", () => {
@@ -337,20 +331,20 @@ describe("CoreDataSnapshotStateApplier", () => {
     const firstDebugError = createDebugErrorEntry({
       errorId: "error-1",
       message: "first failure",
-      recordedAt: "2026-02-26T00:00:01.000Z"
+      recordedAt: "2026-02-26T00:00:01.000Z",
     });
     const signature = [
       createDebugErrorSignature({
         errorId: "error-1",
         recordedAt: "2026-02-26T00:00:01.000Z",
-        message: "first failure"
-      })
+        message: "first failure",
+      }),
     ];
 
     harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
       history: [],
       debugErrors: [firstDebugError],
-      debugErrorsSignature: signature
+      debugErrorsSignature: signature,
     });
     applyCoreDataSnapshotState(harness.input);
 
@@ -361,12 +355,12 @@ describe("CoreDataSnapshotStateApplier", () => {
     const replacedDebugError = createDebugErrorEntry({
       errorId: "error-1",
       message: "second failure with reused signature",
-      recordedAt: "2026-02-26T00:00:02.000Z"
+      recordedAt: "2026-02-26T00:00:02.000Z",
     });
     harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
       history: [],
       debugErrors: [replacedDebugError],
-      debugErrorsSignature: signature
+      debugErrorsSignature: signature,
     });
     applyCoreDataSnapshotState(harness.input);
 
@@ -379,7 +373,7 @@ describe("CoreDataSnapshotStateApplier", () => {
     const firstDebugError = createDebugErrorEntry({
       errorId: "error-1",
       message: "first failure",
-      recordedAt: "2026-02-26T00:00:01.000Z"
+      recordedAt: "2026-02-26T00:00:01.000Z",
     });
 
     harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
@@ -389,9 +383,9 @@ describe("CoreDataSnapshotStateApplier", () => {
         createDebugErrorSignature({
           errorId: "error-1",
           recordedAt: "2026-02-26T00:00:01.000Z",
-          message: "first failure"
-        })
-      ]
+          message: "first failure",
+        }),
+      ],
     });
     applyCoreDataSnapshotState(harness.input);
     harness.setDebugErrorsMock.mockClear();
@@ -399,19 +393,19 @@ describe("CoreDataSnapshotStateApplier", () => {
     const secondDebugError = createDebugErrorEntry({
       errorId: "error-2",
       message: "second failure",
-      recordedAt: "2026-02-26T00:00:03.000Z"
+      recordedAt: "2026-02-26T00:00:03.000Z",
     });
     const nextSignature = [
       createDebugErrorSignature({
         errorId: "error-2",
         recordedAt: "2026-02-26T00:00:03.000Z",
-        message: "second failure"
-      })
+        message: "second failure",
+      }),
     ];
     harness.input.debugWorkspaceData = createDebugWorkspaceSnapshot({
       history: [],
       debugErrors: [secondDebugError],
-      debugErrorsSignature: nextSignature
+      debugErrorsSignature: nextSignature,
     });
     applyCoreDataSnapshotState(harness.input);
 

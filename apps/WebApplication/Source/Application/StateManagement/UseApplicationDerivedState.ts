@@ -1,19 +1,19 @@
 import { useDeferredValue, useMemo } from "react";
+import { toErrorBannerDetails } from "@/Features/Debugging/DomainModel/ErrorBannerDetailsParser";
 import {
   readActiveRequestSelection,
-  readConversationStateSelection
+  readConversationStateSelection,
 } from "./ApplicationConversationStateDerivation";
 import { readModelOptions } from "./ApplicationModelOptionDerivation";
 import { readSystemHealthStatus } from "./ApplicationSystemHealthDerivation";
 import {
   readChatSurfaceState,
   readSelectedThreadLabel,
-  readThreadListState
+  readThreadListState,
 } from "./ApplicationThreadAndChatSurfaceDerivation";
-import { toErrorBannerDetails } from "@/Features/Debugging/DomainModel/ErrorBannerDetailsParser";
 import {
   type ApplicationDerivedState,
-  type UseApplicationDerivedStateInput
+  type UseApplicationDerivedStateInput,
 } from "./UseApplicationDerivedStateContracts";
 
 const DEFAULT_SELECTED_AGENT_LABEL = "Agent";
@@ -42,21 +42,21 @@ interface DebugIssueDerivedState {
 function useDebugIssueDerivedState(input: UseDebugIssueDerivedStateInput): DebugIssueDerivedState {
   const debugErrorIssues = useMemo(
     () => input.debugIssueStateResolver.readDebugErrorIssues(input.debugErrors),
-    [input.debugErrors, input.debugIssueStateResolver]
+    [input.debugErrors, input.debugIssueStateResolver],
   );
 
   const debugWarningIssues = useMemo(
     () => input.debugIssueStateResolver.readDebugWarningIssues(input.history),
-    [input.debugIssueStateResolver, input.history]
+    [input.debugIssueStateResolver, input.history],
   );
 
   const debugIssues = useMemo(
     () =>
       input.debugIssueStateResolver.readCombinedDebugIssues({
         debugErrorIssues,
-        debugWarningIssues
+        debugWarningIssues,
       }),
-    [debugErrorIssues, input.debugIssueStateResolver, debugWarningIssues]
+    [debugErrorIssues, input.debugIssueStateResolver, debugWarningIssues],
   );
 
   const filteredDebugIssues = useMemo(
@@ -64,18 +64,23 @@ function useDebugIssueDerivedState(input: UseDebugIssueDerivedStateInput): Debug
       input.debugIssueStateResolver.readFilteredDebugIssues({
         debugIssues,
         severityFilter: input.debugIssueSeverityFilter,
-        filterQuery: input.debugIssueFilterQuery
+        filterQuery: input.debugIssueFilterQuery,
       }),
-    [input.debugIssueFilterQuery, input.debugIssueSeverityFilter, input.debugIssueStateResolver, debugIssues]
+    [
+      input.debugIssueFilterQuery,
+      input.debugIssueSeverityFilter,
+      input.debugIssueStateResolver,
+      debugIssues,
+    ],
   );
 
   const selectedDebugIssue = useMemo(
     () =>
       input.debugIssueStateResolver.readSelectedDebugIssue({
         debugIssues: filteredDebugIssues,
-        selectedIssueIdentifier: input.selectedDebugIssueId
+        selectedIssueIdentifier: input.selectedDebugIssueId,
       }),
-    [input.debugIssueStateResolver, filteredDebugIssues, input.selectedDebugIssueId]
+    [input.debugIssueStateResolver, filteredDebugIssues, input.selectedDebugIssueId],
   );
 
   return {
@@ -83,7 +88,7 @@ function useDebugIssueDerivedState(input: UseDebugIssueDerivedStateInput): Debug
     debugWarningIssues,
     debugIssues,
     filteredDebugIssues,
-    selectedDebugIssue
+    selectedDebugIssue,
   };
 }
 
@@ -91,23 +96,23 @@ function readEffortOptions(
   defaultEffortOptions: readonly string[],
   modes: UseApplicationDerivedStateInput["modes"],
   latestReasoningEffort: string | null | undefined,
-  selectedReasoningEffort: string
+  selectedReasoningEffort: string,
 ): string[] {
   const values = new Set<string>(defaultEffortOptions);
   for (const mode of modes) {
     if (
-      mode.reasoning_effort !== null
-      && mode.reasoning_effort !== undefined
-      && mode.reasoning_effort.length > 0
+      mode.reasoning_effort !== null &&
+      mode.reasoning_effort !== undefined &&
+      mode.reasoning_effort.length > 0
     ) {
       values.add(mode.reasoning_effort);
     }
   }
 
   if (
-    latestReasoningEffort !== null
-    && latestReasoningEffort !== undefined
-    && latestReasoningEffort.length > 0
+    latestReasoningEffort !== null &&
+    latestReasoningEffort !== undefined &&
+    latestReasoningEffort.length > 0
   ) {
     values.add(latestReasoningEffort);
   }
@@ -120,7 +125,7 @@ function readEffortOptions(
 }
 
 export function useApplicationDerivedState(
-  input: UseApplicationDerivedStateInput
+  input: UseApplicationDerivedStateInput,
 ): ApplicationDerivedState {
   const {
     threads,
@@ -157,7 +162,7 @@ export function useApplicationDerivedState(
     pendingUserInputRequestSelector,
     conversationItemFlattener,
     debugIssueStateResolver,
-    threadListStateController
+    threadListStateController,
   } = input;
 
   const threadListPresentationState = useMemo(
@@ -165,9 +170,9 @@ export function useApplicationDerivedState(
       threadListStateController.readThreadListPresentationState({
         threads,
         archivedThreads,
-        selectedThreadIdentifier: selectedThreadId
+        selectedThreadIdentifier: selectedThreadId,
       }),
-    [archivedThreads, selectedThreadId, threadListStateController, threads]
+    [archivedThreads, selectedThreadId, threadListStateController, threads],
   );
 
   const selectedThread = threadListPresentationState.selectedThread;
@@ -180,17 +185,21 @@ export function useApplicationDerivedState(
   }, [agentDescriptors]);
 
   const availableAgentIds = useMemo(
-    () => agentDescriptors.filter((descriptor) => descriptor.enabled).map((descriptor) => descriptor.id),
-    [agentDescriptors]
+    () =>
+      agentDescriptors
+        .filter((descriptor) => descriptor.enabled)
+        .map((descriptor) => descriptor.id),
+    [agentDescriptors],
   );
 
   const selectedAgentDescriptor = useMemo(
     () => agentsById[selectedAgentId] ?? null,
-    [agentsById, selectedAgentId]
+    [agentsById, selectedAgentId],
   );
 
   const appDefaultModel = configDefaults?.model ?? assumedAppDefaultModelIdentifier;
-  const appDefaultReasoningEffort = configDefaults?.reasoningEffort ?? assumedAppDefaultReasoningEffort;
+  const appDefaultReasoningEffort =
+    configDefaults?.reasoningEffort ?? assumedAppDefaultReasoningEffort;
   const selectedAgentLabel = selectedAgentDescriptor?.label ?? DEFAULT_SELECTED_AGENT_LABEL;
   const selectedAgentCapabilities = selectedAgentDescriptor?.capabilities ?? null;
   const activeProjectGroups = threadListPresentationState.activeProjectGroups;
@@ -204,7 +213,7 @@ export function useApplicationDerivedState(
     return readConversationStateSelection({
       liveConversationState,
       readConversationState,
-      conversationSyncSignatureBuilder
+      conversationSyncSignatureBuilder,
     });
   }, [conversationSyncSignatureBuilder, liveState?.conversationState, readThreadState?.thread]);
 
@@ -215,7 +224,9 @@ export function useApplicationDerivedState(
     return pendingUserInputRequestSelector.readPendingUserInputRequests(conversationState);
   }, [conversationState, pendingUserInputRequestSelector]);
 
-  const liveStateReductionError = useMemo<ApplicationDerivedState["liveStateReductionError"]>(() => {
+  const liveStateReductionError = useMemo<
+    ApplicationDerivedState["liveStateReductionError"]
+  >(() => {
     const errorState = liveState?.liveStateError;
     if (errorState === null || errorState === undefined) {
       return null;
@@ -226,24 +237,24 @@ export function useApplicationDerivedState(
   const activeRequest = useMemo<ApplicationDerivedState["activeRequest"]>(() => {
     return readActiveRequestSelection({
       pendingRequests,
-      selectedRequestId
+      selectedRequestId,
     });
   }, [pendingRequests, selectedRequestId]);
 
   const activeThreadAgentId = useMemo<ApplicationDerivedState["activeThreadAgentId"]>(
     () => selectedThread?.agentId ?? selectedAgentId,
-    [selectedAgentId, selectedThread]
+    [selectedAgentId, selectedThread],
   );
 
   const activeAgentDescriptor = useMemo(
     () => agentsById[activeThreadAgentId] ?? selectedAgentDescriptor,
-    [activeThreadAgentId, agentsById, selectedAgentDescriptor]
+    [activeThreadAgentId, agentsById, selectedAgentDescriptor],
   );
 
   const selectedThreadLabel = readSelectedThreadLabel({
     selectedThread,
     selectedThreadId,
-    isSelectedThreadLoading
+    isSelectedThreadLoading,
   });
 
   const historyDetailPayloadText = useMemo(() => {
@@ -261,7 +272,7 @@ export function useApplicationDerivedState(
       id: trace.id,
       label: trace.label,
       eventCount: trace.eventCount,
-      path: trace.path
+      path: trace.path,
     }));
   }, [traceStatus]);
 
@@ -271,9 +282,9 @@ export function useApplicationDerivedState(
         id: historyEntry.id,
         at: historyEntry.at,
         source: historyEntry.source,
-        direction: historyEntry.direction
+        direction: historyEntry.direction,
       })),
-    [history]
+    [history],
   );
 
   const activeAgentLabel = activeAgentDescriptor?.label ?? selectedAgentLabel;
@@ -285,12 +296,13 @@ export function useApplicationDerivedState(
 
   const planModeOption = useMemo(
     () => modes.find((mode) => modeSelectionStateResolver.isPlanModeOption(mode)) ?? null,
-    [modeSelectionStateResolver, modes]
+    [modeSelectionStateResolver, modes],
   );
 
   const defaultModeOption = useMemo(
-    () => modes.find((mode) => !modeSelectionStateResolver.isPlanModeOption(mode)) ?? modes[0] ?? null,
-    [modeSelectionStateResolver, modes]
+    () =>
+      modes.find((mode) => !modeSelectionStateResolver.isPlanModeOption(mode)) ?? modes[0] ?? null,
+    [modeSelectionStateResolver, modes],
   );
 
   const isPlanModeEnabled = planModeOption !== null && selectedModeKey === planModeOption.mode;
@@ -301,14 +313,19 @@ export function useApplicationDerivedState(
         defaultEffortOptions,
         modes,
         conversationState?.latestReasoningEffort,
-        selectedReasoningEffort
+        selectedReasoningEffort,
       ),
-    [conversationState?.latestReasoningEffort, defaultEffortOptions, modes, selectedReasoningEffort]
+    [
+      conversationState?.latestReasoningEffort,
+      defaultEffortOptions,
+      modes,
+      selectedReasoningEffort,
+    ],
   );
 
   const effortOptionsWithoutAssumedDefault = useMemo(
     () => effortOptions.filter((option) => option !== appDefaultReasoningEffort),
-    [appDefaultReasoningEffort, effortOptions]
+    [appDefaultReasoningEffort, effortOptions],
   );
 
   const modelOptions = useMemo(
@@ -316,14 +333,14 @@ export function useApplicationDerivedState(
       readModelOptions({
         models,
         latestModel: conversationState?.latestModel,
-        selectedModelId
+        selectedModelId,
       }),
-    [conversationState?.latestModel, models, selectedModelId]
+    [conversationState?.latestModel, models, selectedModelId],
   );
 
   const modelOptionsWithoutAssumedDefault = useMemo(
     () => modelOptions.filter((option) => option.id !== appDefaultModel),
-    [appDefaultModel, modelOptions]
+    [appDefaultModel, modelOptions],
   );
 
   const deferredConversationState = useDeferredValue(conversationState);
@@ -333,14 +350,14 @@ export function useApplicationDerivedState(
 
   const threadListState = readThreadListState({
     isCoreLoading,
-    threadCount: threads.length
+    threadCount: threads.length,
   });
 
   const chatSurfaceState = readChatSurfaceState({
     selectedThreadId,
     isCoreLoading,
     isSelectedThreadLoading,
-    turnCount: turns.length
+    turnCount: turns.length,
   });
 
   const errorBannerDetails = useMemo(() => toErrorBannerDetails(errorMessage), [errorMessage]);
@@ -350,32 +367,32 @@ export function useApplicationDerivedState(
     debugWarningIssues,
     debugIssues,
     filteredDebugIssues,
-    selectedDebugIssue
+    selectedDebugIssue,
   } = useDebugIssueDerivedState({
     debugErrors,
     history,
     debugIssueSeverityFilter,
     debugIssueFilterQuery,
     selectedDebugIssueId,
-    debugIssueStateResolver
+    debugIssueStateResolver,
   });
 
   const flatConversationItems = useMemo<ApplicationDerivedState["flatConversationItems"]>(
     () => conversationItemFlattener.flattenConversationItems(turns, isGenerating),
-    [conversationItemFlattener, isGenerating, turns]
+    [conversationItemFlattener, isGenerating, turns],
   );
 
   const conversationItemCount = flatConversationItems.length;
   // Clamp to zero so slicing never underflows when the visible limit is larger than the list.
   const firstVisibleChatItemIndex = Math.max(
     MINIMUM_VISIBLE_CHAT_ITEM_INDEX,
-    conversationItemCount - visibleChatItemLimit
+    conversationItemCount - visibleChatItemLimit,
   );
   const hasHiddenChatItems = firstVisibleChatItemIndex > MINIMUM_VISIBLE_CHAT_ITEM_INDEX;
 
   const visibleConversationItems = useMemo(
     () => flatConversationItems.slice(firstVisibleChatItemIndex),
-    [firstVisibleChatItemIndex, flatConversationItems]
+    [firstVisibleChatItemIndex, flatConversationItems],
   );
 
   const commitLabel = health?.state.gitCommit ?? UNKNOWN_COMMIT_LABEL;
@@ -384,7 +401,7 @@ export function useApplicationDerivedState(
   const { allSystemsReady, hasAnySystemFailure } = readSystemHealthStatus({
     codexConfigured,
     openCodeConnected,
-    health
+    health,
   });
 
   return {
@@ -445,6 +462,6 @@ export function useApplicationDerivedState(
     codexConfigured,
     openCodeConnected,
     allSystemsReady,
-    hasAnySystemFailure
+    hasAnySystemFailure,
   };
 }

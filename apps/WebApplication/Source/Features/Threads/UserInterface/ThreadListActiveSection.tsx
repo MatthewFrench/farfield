@@ -1,17 +1,17 @@
 import { Archive, ChevronDown, ChevronRight, Loader2, MoreHorizontal, Plus } from "lucide-react";
-import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
 import { Button } from "@/Components/UserInterface/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "@/Components/UserInterface/DropdownMenu";
+import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 import {
   DEFAULT_THREAD_PROJECT_DIRECTORY,
   THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER,
-  THREAD_GROUP_NO_PROJECT_TOOLTIP
+  THREAD_GROUP_NO_PROJECT_TOOLTIP,
 } from "@/Features/Threads/UserInterface/ThreadListUserInterfaceConstants";
 
 interface ThreadListActiveSectionProps {
@@ -19,7 +19,7 @@ interface ThreadListActiveSectionProps {
 }
 
 export function ThreadListActiveSection({
-  properties
+  properties,
 }: ThreadListActiveSectionProps): React.JSX.Element {
   return (
     <div className="space-y-1">
@@ -30,14 +30,21 @@ export function ThreadListActiveSection({
       {properties.activeProjectGroups.length > 0 && (
         <div className="space-y-2">
           {properties.activeProjectGroups.map((group) => {
-            const hasSelectedThread = group.threads.some((thread) => thread.id === properties.selectedThreadId);
-            const isCollapsed = hasSelectedThread ? false : Boolean(properties.collapsedThreadProjectGroups[group.key]);
-            const groupProjectPath = group.projectPath
-              ?? properties.selectedAgentDescriptor?.projectDirectories[0]
-              ?? DEFAULT_THREAD_PROJECT_DIRECTORY;
-            const groupPreferredAgentId = group.threads.find((thread) =>
-              properties.availableAgentIds.includes(thread.agentId)
-            )?.agentId ?? properties.availableAgentIds[0] ?? null;
+            const hasSelectedThread = group.threads.some(
+              (thread) => thread.id === properties.selectedThreadId,
+            );
+            const isCollapsed = hasSelectedThread
+              ? false
+              : Boolean(properties.collapsedThreadProjectGroups[group.key]);
+            const groupProjectPath =
+              group.projectPath ??
+              properties.selectedAgentDescriptor?.projectDirectories[0] ??
+              DEFAULT_THREAD_PROJECT_DIRECTORY;
+            const groupPreferredAgentId =
+              group.threads.find((thread) => properties.availableAgentIds.includes(thread.agentId))
+                ?.agentId ??
+              properties.availableAgentIds[0] ??
+              null;
             return (
               <div key={group.key} className="space-y-1">
                 <div className="flex items-center gap-1">
@@ -54,10 +61,15 @@ export function ThreadListActiveSection({
                     ) : (
                       <ChevronDown size={13} className="shrink-0" />
                     )}
-                    <span className="flex-1 truncate" title={group.projectPath ?? THREAD_GROUP_NO_PROJECT_TOOLTIP}>
+                    <span
+                      className="flex-1 truncate"
+                      title={group.projectPath ?? THREAD_GROUP_NO_PROJECT_TOOLTIP}
+                    >
                       {group.label}
                     </span>
-                    <span className="text-[10px] text-muted-foreground/60">{String(group.threads.length)}</span>
+                    <span className="text-[10px] text-muted-foreground/60">
+                      {String(group.threads.length)}
+                    </span>
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -92,7 +104,8 @@ export function ThreadListActiveSection({
                   <div className="space-y-1 pl-4">
                     {group.threads.map((thread) => {
                       const isSelected = thread.id === properties.selectedThreadId;
-                      const hasUnread = properties.unreadThreadIds[thread.id] === true && !isSelected;
+                      const hasUnread =
+                        properties.unreadThreadIds[thread.id] === true && !isSelected;
                       const threadIsGenerating = isSelected && properties.isGenerating;
                       const canArchive =
                         thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
@@ -123,7 +136,10 @@ export function ThreadListActiveSection({
                                 />
                               )}
                               {threadIsGenerating && (
-                                <Loader2 size={11} className="animate-spin text-muted-foreground/70" />
+                                <Loader2
+                                  size={11}
+                                  className="animate-spin text-muted-foreground/70"
+                                />
                               )}
                               {thread.updatedAt !== 0 && !Number.isNaN(thread.updatedAt) && (
                                 <span className="text-[10px] text-muted-foreground/50">

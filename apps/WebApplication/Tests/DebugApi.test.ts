@@ -6,7 +6,7 @@ import {
   getTraceStatus,
   listDebugClientErrors,
   listDebugHistory,
-  replayHistoryEntry
+  replayHistoryEntry,
 } from "@/Features/Debugging/DataAccess/DebugApi";
 import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 
@@ -14,8 +14,8 @@ function createJsonResponse(body: StructuredDataValue): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: {
-      "Content-Type": "application/json"
-    }
+      "Content-Type": "application/json",
+    },
   });
 }
 
@@ -35,7 +35,7 @@ describe("DebugApi", () => {
           stoppedAt: null,
           eventCount: 4,
           path: "/tmp/trace-active.ndjson",
-          extraKey: "ignored"
+          extraKey: "ignored",
         },
         recent: [
           {
@@ -45,11 +45,11 @@ describe("DebugApi", () => {
             stoppedAt: "2026-02-26T00:02:00.000Z",
             eventCount: 2,
             path: "/tmp/trace-recent.ndjson",
-            extraKey: "ignored"
-          }
+            extraKey: "ignored",
+          },
         ],
-        topLevelExtra: "ignored"
-      })
+        topLevelExtra: "ignored",
+      }),
     );
 
     const result = await getTraceStatus();
@@ -62,7 +62,7 @@ describe("DebugApi", () => {
         startedAt: "2026-02-26T00:00:00.000Z",
         stoppedAt: null,
         eventCount: 4,
-        path: "/tmp/trace-active.ndjson"
+        path: "/tmp/trace-active.ndjson",
       },
       recent: [
         {
@@ -71,9 +71,9 @@ describe("DebugApi", () => {
           startedAt: "2026-02-26T00:01:00.000Z",
           stoppedAt: "2026-02-26T00:02:00.000Z",
           eventCount: 2,
-          path: "/tmp/trace-recent.ndjson"
-        }
-      ]
+          path: "/tmp/trace-recent.ndjson",
+        },
+      ],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -89,16 +89,16 @@ describe("DebugApi", () => {
             source: "app",
             direction: "in",
             payload: {
-              kind: "message"
+              kind: "message",
             },
             meta: {
-              requestId: "request-1"
+              requestId: "request-1",
             },
-            extraKey: "ignored"
-          }
+            extraKey: "ignored",
+          },
         ],
-        topLevelExtra: "ignored"
-      })
+        topLevelExtra: "ignored",
+      }),
     );
 
     const result = await listDebugHistory(1);
@@ -112,13 +112,13 @@ describe("DebugApi", () => {
           source: "app",
           direction: "in",
           payload: {
-            kind: "message"
+            kind: "message",
           },
           meta: {
-            requestId: "request-1"
-          }
-        }
-      ]
+            requestId: "request-1",
+          },
+        },
+      ],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -127,14 +127,16 @@ describe("DebugApi", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
         ok: true,
-        history: []
-      })
+        history: [],
+      }),
     );
 
     await listDebugHistory();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/debug/history?limit=${String(DEFAULT_DEBUG_LIST_LIMIT)}`);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `/api/debug/history?limit=${String(DEFAULT_DEBUG_LIST_LIMIT)}`,
+    );
   });
 
   it("rejects invalid debug-history limits before issuing a request", async () => {
@@ -159,8 +161,8 @@ describe("DebugApi", () => {
     await expect(
       replayHistoryEntry({
         entryId: "   ",
-        waitForResponse: true
-      })
+        waitForResponse: true,
+      }),
     ).rejects.toThrowError();
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -203,13 +205,13 @@ describe("DebugApi", () => {
             occurredAt: "2026-02-26T00:00:00.000Z",
             recordedAt: "2026-02-26T00:00:00.000Z",
             details: {
-              actionId: 42
-            }
-          }
+              actionId: 42,
+            },
+          },
         ],
         sessionId: "session-1",
-        sessionLogPath: "/tmp/session.ndjson"
-      })
+        sessionLogPath: "/tmp/session.ndjson",
+      }),
     );
 
     await expect(listDebugClientErrors()).rejects.toThrowError();

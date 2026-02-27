@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import {
   DebugWorkspacePane,
-  type DebugWorkspacePaneProps
+  type DebugWorkspacePaneProps,
 } from "@/Features/Debugging/UserInterface/DebugWorkspacePane";
 
 const exampleDebugIssue: DebugIssue = {
@@ -24,7 +24,7 @@ const exampleDebugIssue: DebugIssue = {
   operation: "send-message",
   name: "ExampleError",
   stack: null,
-  detailsText: "{}"
+  detailsText: "{}",
 };
 
 const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
@@ -48,8 +48,8 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
       id: "history-1",
       at: "2025-01-01T00:00:01.000Z",
       source: "ipc",
-      direction: "in"
-    }
+      direction: "in",
+    },
   ],
   selectedHistoryId: "history-1",
   selectedHistoryDetailId: "history-1",
@@ -73,9 +73,9 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
       id: "trace-1",
       label: "capture",
       eventCount: 3,
-      path: "/tmp/trace-1.ndjson"
-    }
-  ]
+      path: "/tmp/trace-1.ndjson",
+    },
+  ],
 };
 
 function renderDebugWorkspacePane(properties: DebugWorkspacePaneProps): void {
@@ -94,7 +94,7 @@ describe("DebugWorkspacePane", () => {
   it("renders history panel when history section is active", () => {
     renderDebugWorkspacePane({
       ...baseDebugWorkspacePaneProperties,
-      debugWorkspaceSection: "history"
+      debugWorkspaceSection: "history",
     });
 
     expect(screen.getByTestId("debug-history-panel")).toBeDefined();
@@ -104,7 +104,7 @@ describe("DebugWorkspacePane", () => {
   it("renders the active workspace section panel", () => {
     renderDebugWorkspacePane({
       ...baseDebugWorkspacePaneProperties,
-      debugWorkspaceSection: "trace"
+      debugWorkspaceSection: "trace",
     });
 
     expect(screen.getByTestId("debug-trace-panel")).toBeDefined();
@@ -118,10 +118,7 @@ describe("DebugWorkspacePane", () => {
     expect(screen.getByRole("tab", { name: "Issues" }).getAttribute("data-state")).toBe("active");
 
     rerender(
-      <DebugWorkspacePane
-        {...baseDebugWorkspacePaneProperties}
-        debugWorkspaceSection="stream"
-      />
+      <DebugWorkspacePane {...baseDebugWorkspacePaneProperties} debugWorkspaceSection="stream" />,
     );
 
     expect(screen.getByRole("tab", { name: "Stream" }).getAttribute("data-state")).toBe("active");

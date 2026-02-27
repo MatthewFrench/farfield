@@ -9,30 +9,29 @@ import {
   type DebugErrorLike,
   type DebugHistoryEntryLike,
   type DebugIssue,
-  type DebugWarningIssue
+  type DebugWarningIssue,
 } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { buildDebugErrorIssueIdentifier } from "@/Features/Debugging/DomainModel/DebugIssueIdentifier";
 import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 
 const NORMALIZED_NON_EMPTY_STRING_SCHEMA = z.preprocess(
   (value) => (typeof value === "string" && value.trim().length > 0 ? value : null),
-  z.string().trim().min(1).nullable()
+  z.string().trim().min(1).nullable(),
 );
 
-const SystemHistoryPayloadSchema = z
-  .preprocess(
-    (value) => {
-      if (value === null || typeof value !== "object" || Array.isArray(value)) {
-        return {};
-      }
-      return value;
-    },
-    z
-      .object({
-        message: NORMALIZED_NON_EMPTY_STRING_SCHEMA
-      })
-      .passthrough()
-  );
+const SystemHistoryPayloadSchema = z.preprocess(
+  (value) => {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+      return {};
+    }
+    return value;
+  },
+  z
+    .object({
+      message: NORMALIZED_NON_EMPTY_STRING_SCHEMA,
+    })
+    .passthrough(),
+);
 
 const HistoryWarningMetaSchema = z
   .object({
@@ -40,7 +39,7 @@ const HistoryWarningMetaSchema = z
     threadId: NORMALIZED_NON_EMPTY_STRING_SCHEMA,
     requestId: NORMALIZED_NON_EMPTY_STRING_SCHEMA,
     actionId: NORMALIZED_NON_EMPTY_STRING_SCHEMA,
-    actionName: NORMALIZED_NON_EMPTY_STRING_SCHEMA
+    actionName: NORMALIZED_NON_EMPTY_STRING_SCHEMA,
   })
   .passthrough();
 type HistoryWarningMeta = z.infer<typeof HistoryWarningMetaSchema>;
@@ -91,9 +90,8 @@ export function sortDebugIssuesByTimeDesc(left: DebugIssue, right: DebugIssue): 
 export function buildDebugErrorIssue(event: DebugErrorLike): DebugErrorIssue {
   const actionId = event.details.actionId ?? null;
   const actionName = event.details.actionName ?? null;
-  const sourceLabel = event.origin === "server"
-    ? `Server (${event.operation})`
-    : `Client (${event.operation})`;
+  const sourceLabel =
+    event.origin === "server" ? `Server (${event.operation})` : `Client (${event.operation})`;
   const searchText = buildIssueSearchText([
     event.errorId,
     event.origin,
@@ -103,7 +101,7 @@ export function buildDebugErrorIssue(event: DebugErrorLike): DebugErrorIssue {
     event.requestId ?? "",
     event.threadId ?? "",
     actionId ?? "",
-    actionName ?? ""
+    actionName ?? "",
   ]);
 
   return {
@@ -124,12 +122,12 @@ export function buildDebugErrorIssue(event: DebugErrorLike): DebugErrorIssue {
     operation: event.operation,
     name: event.name,
     stack: event.stack,
-    detailsText: serializeDebugErrorDetails(event.details)
+    detailsText: serializeDebugErrorDetails(event.details),
   };
 }
 
 export function buildDebugWarningIssuesFromHistory(
-  history: DebugHistoryEntryLike[]
+  history: DebugHistoryEntryLike[],
 ): DebugWarningIssue[] {
   const warningIssues: DebugWarningIssue[] = [];
 
@@ -143,7 +141,7 @@ export function buildDebugWarningIssuesFromHistory(
         method,
         warningMeta.threadId ?? "",
         warningMeta.requestId ?? "",
-        warningMeta.actionId ?? ""
+        warningMeta.actionId ?? "",
       ]);
       warningIssues.push({
         id: `${HISTORY_METHOD_WARNING_IDENTIFIER_PREFIX}${entry.id}`,
@@ -159,7 +157,7 @@ export function buildDebugWarningIssuesFromHistory(
         actionId: warningMeta.actionId,
         actionName: warningMeta.actionName,
         payloadText: serializeStructuredData(entry.payload),
-        searchText
+        searchText,
       });
       continue;
     }
@@ -179,7 +177,7 @@ export function buildDebugWarningIssuesFromHistory(
       systemMessage,
       warningMeta.threadId ?? "",
       warningMeta.requestId ?? "",
-      warningMeta.actionId ?? ""
+      warningMeta.actionId ?? "",
     ]);
     warningIssues.push({
       id: `${SYSTEM_WARNING_IDENTIFIER_PREFIX}${entry.id}`,
@@ -195,7 +193,7 @@ export function buildDebugWarningIssuesFromHistory(
       actionId: warningMeta.actionId,
       actionName: warningMeta.actionName,
       payloadText: serializeStructuredData(entry.payload),
-      searchText
+      searchText,
     });
   }
 

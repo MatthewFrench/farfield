@@ -1,13 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
 import type { FarfieldEventStreamEvent, FarfieldThreadStreamDeltaEvent } from "@farfield/protocol";
-import type {
-  AgentThreadLiveState,
-  AgentThreadStreamEvents
-} from "../Source/Agents/Types.js";
+import { describe, expect, it, vi } from "vitest";
+import type { AgentThreadLiveState, AgentThreadStreamEvents } from "../Source/Agents/Types.js";
 import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
 import { ThreadStreamDeltaEventPublisher } from "../Source/Network/ThreadStreamDeltaEventPublisher.js";
 
-const THREAD_STREAM_DELTA_EVENT_TYPE: FarfieldThreadStreamDeltaEvent["type"] = "thread-stream-delta";
+const THREAD_STREAM_DELTA_EVENT_TYPE: FarfieldThreadStreamDeltaEvent["type"] =
+  "thread-stream-delta";
 const THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT = 400;
 
 interface StreamEventsSnapshotInput {
@@ -25,7 +23,7 @@ function createLiveStateSnapshot(): AgentThreadLiveState {
   return {
     ownerClientId: null,
     conversationState: null,
-    liveStateError: null
+    liveStateError: null,
   };
 }
 
@@ -35,7 +33,7 @@ function createStreamEventsSnapshot(input: StreamEventsSnapshotInput): AgentThre
     events: [],
     nextSequence: input.nextSequence,
     firstAvailableSequence: input.firstAvailableSequence,
-    resetRequired: input.resetRequired
+    resetRequired: input.resetRequired,
   };
 }
 
@@ -55,13 +53,13 @@ function createDeferredPromise<ValueType>(): DeferredPromise<ValueType> {
   }
   return {
     promise,
-    resolve: resolvePromise
+    resolve: resolvePromise,
   };
 }
 
 function readThreadStreamDeltaEvent(
   broadcastCall: [FarfieldEventStreamEvent] | undefined,
-  missingEventErrorMessage: string
+  missingEventErrorMessage: string,
 ): FarfieldThreadStreamDeltaEvent {
   if (!broadcastCall) {
     throw new Error(missingEventErrorMessage);
@@ -83,13 +81,13 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       createStreamEventsSnapshot({
         nextSequence: 4,
         firstAvailableSequence: 0,
-        resetRequired: true
+        resetRequired: true,
       }),
       createStreamEventsSnapshot({
         nextSequence: 9,
         firstAvailableSequence: 0,
-        resetRequired: true
-      })
+        resetRequired: true,
+      }),
     ];
     const readThreadStreamEvents = vi.fn(
       async (_threadId: string, _sinceSequence: number | null, _limit: number) => {
@@ -98,12 +96,12 @@ describe("ThreadStreamDeltaEventPublisher", () => {
           throw new Error("Expected stream-events snapshot fixture");
         }
         return nextSnapshot;
-      }
+      },
     );
     const publisher = new ThreadStreamDeltaEventPublisher({
       eventStreamClientRegistry,
       readThreadLiveState,
-      readThreadStreamEvents
+      readThreadStreamEvents,
     });
 
     publisher.schedulePublish("thread-1");
@@ -117,26 +115,26 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       1,
       "thread-1",
       null,
-      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT,
     );
     expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
       2,
       "thread-1",
       4,
-      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT,
     );
     expect(broadcastSpy).toHaveBeenCalledTimes(2);
 
     const firstBroadcastEvent = readThreadStreamDeltaEvent(
       broadcastSpy.mock.calls[0],
-      "Expected first thread delta broadcast"
+      "Expected first thread delta broadcast",
     );
     expect(firstBroadcastEvent.delta.streamEventsSinceSequenceUsed).toBeNull();
     expect(firstBroadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(4);
 
     const secondBroadcastEvent = readThreadStreamDeltaEvent(
       broadcastSpy.mock.calls[1],
-      "Expected second thread delta broadcast"
+      "Expected second thread delta broadcast",
     );
     expect(secondBroadcastEvent.delta.streamEventsSinceSequenceUsed).toBe(4);
     expect(secondBroadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(9);
@@ -146,7 +144,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       completedPublishCount: 2,
       failedPublishCount: 0,
       broadcastCount: 2,
-      suppressedBroadcastCount: 0
+      suppressedBroadcastCount: 0,
     });
   });
 
@@ -158,13 +156,13 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       createStreamEventsSnapshot({
         nextSequence: 5,
         firstAvailableSequence: 0,
-        resetRequired: false
+        resetRequired: false,
       }),
       createStreamEventsSnapshot({
         nextSequence: 8,
         firstAvailableSequence: 0,
-        resetRequired: true
-      })
+        resetRequired: true,
+      }),
     ];
     const readThreadStreamEvents = vi.fn(
       async (_threadId: string, _sinceSequence: number | null, _limit: number) => {
@@ -173,12 +171,12 @@ describe("ThreadStreamDeltaEventPublisher", () => {
           throw new Error("Expected stream-events snapshot fixture");
         }
         return nextSnapshot;
-      }
+      },
     );
     const publisher = new ThreadStreamDeltaEventPublisher({
       eventStreamClientRegistry,
       readThreadLiveState,
-      readThreadStreamEvents
+      readThreadStreamEvents,
     });
 
     publisher.schedulePublish("thread-1");
@@ -193,26 +191,26 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       1,
       "thread-1",
       null,
-      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT,
     );
     expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
       2,
       "thread-1",
       5,
-      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT,
     );
     expect(broadcastSpy).toHaveBeenCalledTimes(1);
 
     const broadcastEvent = readThreadStreamDeltaEvent(
       broadcastSpy.mock.calls[0],
-      "Expected thread delta broadcast after reset-required snapshot"
+      "Expected thread delta broadcast after reset-required snapshot",
     );
     expect(broadcastEvent.delta.streamEventsSinceSequenceUsed).toBe(5);
     expect(broadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(8);
     expect(publisher.readStatistics()).toMatchObject({
       scheduledPublishCount: 2,
       broadcastCount: 1,
-      suppressedBroadcastCount: 1
+      suppressedBroadcastCount: 1,
     });
   });
 
@@ -231,13 +229,13 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       return createStreamEventsSnapshot({
         nextSequence: 3,
         firstAvailableSequence: 0,
-        resetRequired: true
+        resetRequired: true,
       });
     });
     const publisher = new ThreadStreamDeltaEventPublisher({
       eventStreamClientRegistry,
       readThreadLiveState,
-      readThreadStreamEvents
+      readThreadStreamEvents,
     });
 
     publisher.schedulePublish("thread-1");
@@ -249,7 +247,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     expect(publisher.readStatistics()).toMatchObject({
       scheduledPublishCount: 2,
       failedPublishCount: 1,
-      broadcastCount: 1
+      broadcastCount: 1,
     });
   });
 
@@ -269,13 +267,13 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       createStreamEventsSnapshot({
         nextSequence: 2,
         firstAvailableSequence: 0,
-        resetRequired: true
+        resetRequired: true,
       }),
       createStreamEventsSnapshot({
         nextSequence: 6,
         firstAvailableSequence: 0,
-        resetRequired: true
-      })
+        resetRequired: true,
+      }),
     ];
     const readThreadStreamEvents = vi.fn(
       async (_threadId: string, _sinceSequence: number | null, _limit: number) => {
@@ -284,12 +282,12 @@ describe("ThreadStreamDeltaEventPublisher", () => {
           throw new Error("Expected stream-events snapshot fixture");
         }
         return nextSnapshot;
-      }
+      },
     );
     const publisher = new ThreadStreamDeltaEventPublisher({
       eventStreamClientRegistry,
       readThreadLiveState,
-      readThreadStreamEvents
+      readThreadStreamEvents,
     });
 
     publisher.schedulePublish("thread-1");
@@ -305,19 +303,19 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       1,
       "thread-1",
       null,
-      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT,
     );
     expect(readThreadStreamEvents).toHaveBeenNthCalledWith(
       2,
       "thread-1",
       2,
-      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT
+      THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT,
     );
     expect(broadcastSpy).toHaveBeenCalledTimes(2);
 
     const secondBroadcastEvent = readThreadStreamDeltaEvent(
       broadcastSpy.mock.calls[1],
-      "Expected drained in-flight second broadcast"
+      "Expected drained in-flight second broadcast",
     );
     expect(secondBroadcastEvent.delta.streamEventsSinceSequenceUsed).toBe(2);
     expect(secondBroadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(6);
@@ -327,7 +325,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
       completedPublishCount: 1,
       failedPublishCount: 0,
       broadcastCount: 2,
-      suppressedBroadcastCount: 0
+      suppressedBroadcastCount: 0,
     });
   });
 
@@ -335,11 +333,12 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     const publisher = new ThreadStreamDeltaEventPublisher({
       eventStreamClientRegistry: new EventStreamClientRegistry(1_000),
       readThreadLiveState: async () => createLiveStateSnapshot(),
-      readThreadStreamEvents: async () => createStreamEventsSnapshot({
-        nextSequence: 0,
-        firstAvailableSequence: 0,
-        resetRequired: false
-      })
+      readThreadStreamEvents: async () =>
+        createStreamEventsSnapshot({
+          nextSequence: 0,
+          firstAvailableSequence: 0,
+          resetRequired: false,
+        }),
     });
 
     publisher.schedulePublish("   ");

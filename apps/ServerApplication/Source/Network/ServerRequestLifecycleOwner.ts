@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { performance } from "node:perf_hooks";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { performance } from "node:perf_hooks";
 import type { HistoryEntry } from "./DebugContracts.js";
 import type { RequestObservabilityOwner } from "./RequestObservabilityOwner.js";
 import { normalizeRequestMethodForRequestMetrics } from "./RequestPathContracts.js";
@@ -47,14 +47,15 @@ export class ServerRequestLifecycleOwner {
     // Record queue delay exactly once so started/completed telemetry stays directly comparable.
     const requestQueueDelayMilliseconds = this.deps.readCurrentEventLoopLagMs();
     const requestMethod = normalizeRequestMethodForRequestMetrics(req.method);
-    const requestId = this.deps.normalizeOptionalString(
-      this.readHeader(req, this.deps.clientRequestIdHeaderName)
-    ) ?? `${REQUEST_IDENTIFIER_PREFIX}${randomUUID()}`;
+    const requestId =
+      this.deps.normalizeOptionalString(
+        this.readHeader(req, this.deps.clientRequestIdHeaderName),
+      ) ?? `${REQUEST_IDENTIFIER_PREFIX}${randomUUID()}`;
     const requestActionId = this.deps.normalizeOptionalString(
-      this.readHeader(req, this.deps.clientActionIdHeaderName)
+      this.readHeader(req, this.deps.clientActionIdHeaderName),
     );
     const requestActionName = this.deps.normalizeOptionalString(
-      this.readHeader(req, this.deps.clientActionNameHeaderName)
+      this.readHeader(req, this.deps.clientActionNameHeaderName),
     );
 
     return {
@@ -64,41 +65,41 @@ export class ServerRequestLifecycleOwner {
       requestMethod,
       requestId,
       requestActionId,
-      requestActionName
+      requestActionName,
     };
   }
 
   public writeRequestContextResponseHeaders(
     res: ServerResponse,
-    requestLifecycleContext: RequestLifecycleContext
+    requestLifecycleContext: RequestLifecycleContext,
   ): void {
     res.setHeader(this.deps.clientRequestIdResponseHeader, requestLifecycleContext.requestId);
     if (requestLifecycleContext.requestActionId !== null) {
       res.setHeader(
         this.deps.clientActionIdResponseHeader,
-        requestLifecycleContext.requestActionId
+        requestLifecycleContext.requestActionId,
       );
     }
     if (requestLifecycleContext.requestActionName !== null) {
       res.setHeader(
         this.deps.clientActionNameResponseHeader,
-        requestLifecycleContext.requestActionName
+        requestLifecycleContext.requestActionName,
       );
     }
   }
 
   public createRequestErrorContext(
-    requestLifecycleContext: RequestLifecycleContext
+    requestLifecycleContext: RequestLifecycleContext,
   ): ServerRequestErrorContext {
     return {
       requestId: requestLifecycleContext.requestId,
       actionId: requestLifecycleContext.requestActionId,
-      actionName: requestLifecycleContext.requestActionName
+      actionName: requestLifecycleContext.requestActionName,
     };
   }
 
   public createRequestContextDetails(
-    requestLifecycleContext: RequestLifecycleContext
+    requestLifecycleContext: RequestLifecycleContext,
   ): HistoryEntry["meta"] {
     return {
       requestId: requestLifecycleContext.requestId,
@@ -107,13 +108,13 @@ export class ServerRequestLifecycleOwner {
         : {}),
       ...(requestLifecycleContext.requestActionName !== null
         ? { actionName: requestLifecycleContext.requestActionName }
-        : {})
+        : {}),
     };
   }
 
   public recordRequestStartedForObservability(
     requestLifecycleContext: RequestLifecycleContext,
-    pathnameForMetrics: string
+    pathnameForMetrics: string,
   ): void {
     this.deps.requestObservabilityOwner.recordRequestStarted({
       requestId: requestLifecycleContext.requestId,
@@ -122,7 +123,7 @@ export class ServerRequestLifecycleOwner {
       method: requestLifecycleContext.requestMethod,
       pathname: pathnameForMetrics,
       startedAt: requestLifecycleContext.requestStartedAt,
-      queueDelayMs: requestLifecycleContext.requestQueueDelayMilliseconds
+      queueDelayMs: requestLifecycleContext.requestQueueDelayMilliseconds,
     });
   }
 
@@ -133,7 +134,7 @@ export class ServerRequestLifecycleOwner {
   }): void {
     const durationMilliseconds = Math.max(
       0,
-      performance.now() - input.requestLifecycleContext.requestStartedAtHighResolutionMilliseconds
+      performance.now() - input.requestLifecycleContext.requestStartedAtHighResolutionMilliseconds,
     );
     // Keep identity and timing fields aligned with `recordRequestStarted` for deterministic pairing.
     this.deps.requestObservabilityOwner.recordRequestCompleted({
@@ -146,7 +147,7 @@ export class ServerRequestLifecycleOwner {
       statusCode: input.statusCode,
       durationMs: durationMilliseconds,
       queueDelayMs: input.requestLifecycleContext.requestQueueDelayMilliseconds,
-      completedAt: new Date().toISOString()
+      completedAt: new Date().toISOString(),
     });
   }
 

@@ -1,27 +1,27 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { bootstrapEventsSession } from "../Source/Application/DataAccess/WebShellApi";
 import {
   getConfigDefaults,
-  listCollaborationModes
+  listCollaborationModes,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
+import { sendMessage } from "../Source/Features/Chat/DataAccess/ChatApi";
 import {
   clearDebugClientErrors,
-  getDebugClientError
+  getDebugClientError,
 } from "../Source/Features/Debugging/DataAccess/DebugApi";
-import { sendMessage } from "../Source/Features/Chat/DataAccess/ChatApi";
 import {
   createThread,
   listThreads,
-  unarchiveThread
+  unarchiveThread,
 } from "../Source/Features/Threads/DataAccess/ThreadApi";
-import { bootstrapEventsSession } from "../Source/Application/DataAccess/WebShellApi";
 import { type StructuredDataValue } from "../Source/Shared/Contracts/StructuredDataValue";
 
 function createJsonResponse(body: StructuredDataValue, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      "Content-Type": "application/json"
-    }
+      "Content-Type": "application/json",
+    },
   });
 }
 
@@ -49,11 +49,11 @@ describe("API envelope parsing", () => {
           url: null,
           occurredAt: "2026-02-18T00:00:00.000Z",
           recordedAt: "2026-02-18T00:00:01.000Z",
-          details: {}
+          details: {},
         },
         sessionId: "session_1",
-        sessionLogPath: ".runtime/logs/errors/session-test.ndjson"
-      })
+        sessionLogPath: ".runtime/logs/errors/session-test.ndjson",
+      }),
     );
 
     const result = await getDebugClientError("error_1");
@@ -63,10 +63,13 @@ describe("API envelope parsing", () => {
 
   it("throws server error message for non-ok envelopes", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      createJsonResponse({
-        ok: false,
-        error: "Nope"
-      }, 500)
+      createJsonResponse(
+        {
+          ok: false,
+          error: "Nope",
+        },
+        500,
+      ),
     );
 
     await expect(getDebugClientError("error_1")).rejects.toThrow("Nope");
@@ -74,11 +77,11 @@ describe("API envelope parsing", () => {
 
   it("includes endpoint context when fetch throws before response", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(
-      new Error("The string did not match the expected pattern.")
+      new Error("The string did not match the expected pattern."),
     );
 
     await expect(getDebugClientError("error_1")).rejects.toThrow(
-      /Request failed for \/api\/debug\/client-errors\/error_1: The string did not match the expected pattern\. status=n\/a/
+      /Request failed for \/api\/debug\/client-errors\/error_1: The string did not match the expected pattern\. status=n\/a/,
     );
   });
 
@@ -88,8 +91,8 @@ describe("API envelope parsing", () => {
         ok: true,
         authRequired: true,
         bootstrapped: true,
-        expiresAt: "2026-02-19T00:00:00.000Z"
-      })
+        expiresAt: "2026-02-19T00:00:00.000Z",
+      }),
     );
 
     const result = await bootstrapEventsSession();
@@ -104,12 +107,12 @@ describe("API envelope parsing", () => {
         ok: true,
         authRequired: true,
         bootstrapped: true,
-        expiresAt: "2026-02-19T00:00:00.000Z"
-      })
+        expiresAt: "2026-02-19T00:00:00.000Z",
+      }),
     );
 
     await bootstrapEventsSession({
-      apiToken: "token_123"
+      apiToken: "token_123",
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -125,12 +128,12 @@ describe("API envelope parsing", () => {
         ok: true,
         authRequired: true,
         bootstrapped: true,
-        expiresAt: "2026-02-19T00:00:00.000Z"
-      })
+        expiresAt: "2026-02-19T00:00:00.000Z",
+      }),
     );
 
     await bootstrapEventsSession({
-      apiToken: "  token_123  "
+      apiToken: "  token_123  ",
     });
 
     const requestInit = fetchMock.mock.calls[0]?.[1];
@@ -143,14 +146,14 @@ describe("API envelope parsing", () => {
         ok: true,
         authRequired: true,
         bootstrapped: true,
-        expiresAt: "2026-02-19T00:00:00.000Z"
-      })
+        expiresAt: "2026-02-19T00:00:00.000Z",
+      }),
     );
 
     await expect(
       bootstrapEventsSession({
-        apiToken: "    "
-      })
+        apiToken: "    ",
+      }),
     ).rejects.toThrow("String must contain at least 1 character(s)");
     expect(fetchMock).toHaveBeenCalledTimes(0);
   });
@@ -161,8 +164,8 @@ describe("API envelope parsing", () => {
         ok: true,
         clearedCount: 2,
         sessionId: "session_1",
-        sessionLogPath: ".runtime/logs/errors/client-errors.ndjson"
-      })
+        sessionLogPath: ".runtime/logs/errors/client-errors.ndjson",
+      }),
     );
 
     const result = await clearDebugClientErrors();
@@ -176,8 +179,8 @@ describe("API envelope parsing", () => {
       createJsonResponse({
         ok: true,
         data: [],
-        nextCursor: null
-      })
+        nextCursor: null,
+      }),
     );
 
     await listThreads({
@@ -186,7 +189,7 @@ describe("API envelope parsing", () => {
       all: true,
       maxPages: 20,
       sortKey: "updated_at",
-      cwd: "/tmp/workspace"
+      cwd: "/tmp/workspace",
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -206,15 +209,15 @@ describe("API envelope parsing", () => {
         data: [],
         nextCursor: "cursor_2",
         pages: 3,
-        truncated: true
-      })
+        truncated: true,
+      }),
     );
 
     const result = await listThreads({
       limit: 80,
       archived: true,
       all: true,
-      maxPages: 20
+      maxPages: 20,
     });
 
     expect(result.nextCursor).toBe("cursor_2");
@@ -233,10 +236,10 @@ describe("API envelope parsing", () => {
             mode: "plan",
             model: null,
             reasoning_effort: "medium",
-            developer_instructions: longDeveloperInstructions
-          }
-        ]
-      })
+            developer_instructions: longDeveloperInstructions,
+          },
+        ],
+      }),
     );
 
     const result = await listCollaborationModes();
@@ -254,11 +257,11 @@ describe("API envelope parsing", () => {
             preview: "hello",
             createdAt: 123,
             updatedAt: "not-a-number",
-            agentId: "codex"
-          }
+            agentId: "codex",
+          },
         ],
-        nextCursor: null
-      })
+        nextCursor: null,
+      }),
     );
 
     await expect(
@@ -266,8 +269,8 @@ describe("API envelope parsing", () => {
         limit: 80,
         archived: false,
         all: true,
-        maxPages: 20
-      })
+        maxPages: 20,
+      }),
     ).rejects.toThrow(/updatedAt/);
   });
 
@@ -277,8 +280,8 @@ describe("API envelope parsing", () => {
         ok: true,
         agentId: "codex",
         model: "gpt-5.3-codex",
-        reasoningEffort: "xhigh"
-      })
+        reasoningEffort: "xhigh",
+      }),
     );
 
     const result = await getConfigDefaults({ agentId: "codex" });
@@ -290,8 +293,8 @@ describe("API envelope parsing", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
         ok: true,
-        threadId: "thread_123"
-      })
+        threadId: "thread_123",
+      }),
     );
 
     await unarchiveThread("thread_123");
@@ -316,26 +319,28 @@ describe("API envelope parsing", () => {
           cliVersion: "1.0.0",
           modelProvider: "openai",
           source: "cli",
-          turns: []
-        }
-      })
+          turns: [],
+        },
+      }),
     );
 
     const created = await createThread();
     expect(created).toEqual({
       threadId: "thread_123",
-      agentId: "codex"
+      agentId: "codex",
     });
   });
 
   it("succeeds for sendMessage when response has no JSON body", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, {
-      status: 200
-    }));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 200,
+      }),
+    );
 
     await sendMessage({
       threadId: "thread_123",
-      text: "hello"
+      text: "hello",
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);

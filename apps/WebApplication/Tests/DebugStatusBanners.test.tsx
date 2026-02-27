@@ -8,7 +8,7 @@ const BASE_ERROR_BANNER_DETAILS: ErrorBannerDetails = {
   message: "failed to load",
   actionId: "action-1",
   requestId: "request-1",
-  errorId: "error-1"
+  errorId: "error-1",
 };
 
 function renderDebugStatusBanners(input: {
@@ -31,7 +31,7 @@ function renderDebugStatusBanners(input: {
       onOpenDebugFromErrorBanner={input.onOpenDebugFromErrorBanner ?? (() => {})}
       onDismissErrorBanner={input.onDismissErrorBanner ?? (() => {})}
       liveStateReductionError={input.liveStateReductionError ?? null}
-    />
+    />,
   );
 }
 
@@ -43,7 +43,7 @@ describe("DebugStatusBanners", () => {
     renderDebugStatusBanners({
       errorMessage: "thread.read: failed to load",
       onOpenDebugFromErrorBanner,
-      onDismissErrorBanner
+      onDismissErrorBanner,
     });
 
     expect(screen.getByTestId("error-banner")).toBeTruthy();
@@ -62,7 +62,7 @@ describe("DebugStatusBanners", () => {
 
   it("does not render an error banner when no error message is provided", () => {
     renderDebugStatusBanners({
-      errorMessage: ""
+      errorMessage: "",
     });
 
     expect(screen.queryByTestId("error-banner")).toBeNull();
@@ -73,8 +73,8 @@ describe("DebugStatusBanners", () => {
       activeTab: "chat",
       liveStateReductionError: {
         eventIndex: 3,
-        patchIndex: 7
-      }
+        patchIndex: 7,
+      },
     });
 
     expect(screen.getByText(/Live updates failed for this thread/i)).toBeTruthy();
@@ -87,8 +87,8 @@ describe("DebugStatusBanners", () => {
       activeTab: "chat",
       liveStateReductionError: {
         eventIndex: null,
-        patchIndex: null
-      }
+        patchIndex: null,
+      },
     });
 
     expect(screen.getByText(/Live updates failed for this thread/i)).toBeTruthy();
@@ -101,8 +101,8 @@ describe("DebugStatusBanners", () => {
       activeTab: "debug",
       liveStateReductionError: {
         eventIndex: 3,
-        patchIndex: 7
-      }
+        patchIndex: 7,
+      },
     });
 
     expect(screen.queryByText(/Live updates failed for this thread/i)).toBeNull();

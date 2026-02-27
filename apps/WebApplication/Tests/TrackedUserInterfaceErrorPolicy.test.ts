@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractRequestIdFromErrorMessage,
   formatTrackedUiErrorMessage,
-  shouldIgnoreUiErrorMessage
+  shouldIgnoreUiErrorMessage,
 } from "../Source/Features/Debugging/StateManagement/TrackedUserInterfaceErrorPolicy";
 
 describe("TrackedUserInterfaceErrorPolicy", () => {
@@ -16,7 +16,9 @@ describe("TrackedUserInterfaceErrorPolicy", () => {
   });
 
   it("returns null when request identifier patterns are not valid", () => {
-    expect(extractRequestIdFromErrorMessage("Request failed for /api/threads status=500")).toBeNull();
+    expect(
+      extractRequestIdFromErrorMessage("Request failed for /api/threads status=500"),
+    ).toBeNull();
     expect(extractRequestIdFromErrorMessage("request id: ")).toBeNull();
     expect(extractRequestIdFromErrorMessage("request identifier: req-200")).toBeNull();
     expect(extractRequestIdFromErrorMessage("request-id=req-300")).toBeNull();
@@ -29,20 +31,24 @@ describe("TrackedUserInterfaceErrorPolicy", () => {
   });
 
   it("formats tracked error text with optional tags", () => {
-    expect(formatTrackedUiErrorMessage({
-      operation: "send-message",
-      errorMessage: "Failed to send",
-      actionId: "action-1",
-      requestId: "req-1",
-      errorId: "error-1"
-    })).toBe("send-message: Failed to send actionId=action-1 requestId=req-1 errorId=error-1");
+    expect(
+      formatTrackedUiErrorMessage({
+        operation: "send-message",
+        errorMessage: "Failed to send",
+        actionId: "action-1",
+        requestId: "req-1",
+        errorId: "error-1",
+      }),
+    ).toBe("send-message: Failed to send actionId=action-1 requestId=req-1 errorId=error-1");
 
-    expect(formatTrackedUiErrorMessage({
-      operation: "send-message",
-      errorMessage: "Failed to send",
-      actionId: "action-2",
-      requestId: null,
-      errorId: null
-    })).toBe("send-message: Failed to send actionId=action-2");
+    expect(
+      formatTrackedUiErrorMessage({
+        operation: "send-message",
+        errorMessage: "Failed to send",
+        actionId: "action-2",
+        requestId: null,
+        errorId: null,
+      }),
+    ).toBe("send-message: Failed to send actionId=action-2");
   });
 });

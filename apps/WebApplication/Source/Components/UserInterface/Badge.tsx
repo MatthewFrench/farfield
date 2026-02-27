@@ -1,5 +1,5 @@
-import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import * as React from "react";
 import { cn } from "@/Shared/Styling/ClassNameMerge";
 
 const badgeVariants = cva(
@@ -9,13 +9,13 @@ const badgeVariants = cva(
       variant: {
         default: "border-border bg-card text-foreground",
         success: "border-emerald-300 bg-emerald-50 text-emerald-700",
-        danger: "border-rose-300 bg-rose-50 text-rose-700"
-      }
+        danger: "border-rose-300 bg-rose-50 text-rose-700",
+      },
     },
     defaultVariants: {
-      variant: "default"
-    }
-  }
+      variant: "default",
+    },
+  },
 );
 
 const BADGE_COMPONENT_DISPLAY_NAME = "Badge";

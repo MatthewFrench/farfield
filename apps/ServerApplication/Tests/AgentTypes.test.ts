@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  type AgentDescriptor,
+  type AgentId,
   AgentIdentifierByName,
   AgentIdentifierValues,
+  type AgentListThreadsInput,
+  type AgentThreadListSortKey,
   AgentThreadListSortKeyByName,
   AgentThreadListSortKeyValues,
   AgentThreadLiveStateErrorKindByName,
-  type AgentDescriptor,
-  type AgentId,
-  type AgentListThreadsInput,
-  type AgentThreadListSortKey
 } from "../Source/Agents/Types.js";
 
 function createDescriptor(id: AgentId): AgentDescriptor {
@@ -23,9 +23,9 @@ function createDescriptor(id: AgentId): AgentDescriptor {
       canSetCollaborationMode: false,
       canSubmitUserInput: false,
       canReadLiveState: false,
-      canReadStreamEvents: false
+      canReadStreamEvents: false,
     },
-    projectDirectories: []
+    projectDirectories: [],
   };
 }
 
@@ -37,7 +37,7 @@ function createListThreadsInput(sortKey: AgentThreadListSortKey): AgentListThrea
     maxPages: 1,
     cursor: null,
     sortKey,
-    cwd: null
+    cwd: null,
   };
 }
 
@@ -45,7 +45,7 @@ describe("Agent type literal owners", () => {
   it("keeps canonical agent identifiers in one exported owner", () => {
     expect(AgentIdentifierByName).toEqual({
       codex: "codex",
-      opencode: "opencode"
+      opencode: "opencode",
     });
     expect(AgentIdentifierValues).toEqual(["codex", "opencode"]);
 
@@ -56,7 +56,7 @@ describe("Agent type literal owners", () => {
   it("keeps canonical thread list sort keys in one exported owner", () => {
     expect(AgentThreadListSortKeyByName).toEqual({
       createdAt: "created_at",
-      updatedAt: "updated_at"
+      updatedAt: "updated_at",
     });
     expect(AgentThreadListSortKeyValues).toEqual(["created_at", "updated_at"]);
 
@@ -68,7 +68,7 @@ describe("Agent type literal owners", () => {
 
   it("keeps live-state error kind literal under the agent contracts owner", () => {
     expect(AgentThreadLiveStateErrorKindByName).toEqual({
-      reductionFailed: "reductionFailed"
+      reductionFailed: "reductionFailed",
     });
   });
 });

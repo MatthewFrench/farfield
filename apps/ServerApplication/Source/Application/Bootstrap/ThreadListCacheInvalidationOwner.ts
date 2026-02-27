@@ -1,10 +1,10 @@
-import { JsonValueSchema, type JsonValue } from "@farfield/protocol";
+import { type JsonValue, JsonValueSchema } from "@farfield/protocol";
 import { z } from "zod";
-import { logger } from "../../Shared/Logging/Logger.js";
 import type {
   ThreadListAggregationCache,
-  ThreadListAggregationQuery
+  ThreadListAggregationQuery,
 } from "../../Network/ThreadListAggregationCache.js";
+import { logger } from "../../Shared/Logging/Logger.js";
 import { THREAD_STREAM_STATE_CHANGED_METHOD } from "../ThreadStreamStateChangedHistoryBatchOwner.js";
 
 type ThreadListInvalidationScope = "all" | "active";
@@ -19,28 +19,30 @@ const ThreadListInvalidationReasonValues = [
   "thread-user-input-submitted",
   "thread-interrupted",
   "thread-archived",
-  "thread-unarchived"
+  "thread-unarchived",
 ] as const;
 const ThreadListInvalidationReasonSchema = z.enum(ThreadListInvalidationReasonValues);
 type ThreadListInvalidationReason = z.infer<typeof ThreadListInvalidationReasonSchema>;
-const ThreadListInvalidationScopeByReason: Readonly<Record<ThreadListInvalidationReason, ThreadListInvalidationScope>> = {
+const ThreadListInvalidationScopeByReason: Readonly<
+  Record<ThreadListInvalidationReason, ThreadListInvalidationScope>
+> = {
   [THREAD_STREAM_STATE_CHANGED_METHOD]: "active",
   "thread-created": "active",
   "thread-message-sent": "active",
   "thread-user-input-submitted": "active",
   "thread-interrupted": "active",
   "thread-archived": "all",
-  "thread-unarchived": "all"
+  "thread-unarchived": "all",
 };
 const ThreadListInvalidationPredicateByScope: Readonly<
   Record<ThreadListInvalidationScope, (query: ThreadListAggregationQuery) => boolean>
 > = {
   all: () => true,
-  active: (query) => !query.archived
+  active: (query) => !query.archived,
 };
 const ThreadListInvalidationDetailsSchema = z
   .object({
-    threadId: z.string().trim().min(1).optional()
+    threadId: z.string().trim().min(1).optional(),
   })
   .catchall(JsonValueSchema);
 type ThreadListInvalidationDetails = z.infer<typeof ThreadListInvalidationDetailsSchema>;
@@ -58,7 +60,7 @@ export class ThreadListCacheInvalidationOwner {
 
   public constructor(
     threadListAggregationCache: ThreadListAggregationCache,
-    dependencies?: ThreadListCacheInvalidationOwnerDependencies
+    dependencies?: ThreadListCacheInvalidationOwnerDependencies,
   ) {
     this.threadListAggregationCache = threadListAggregationCache;
     this.now = dependencies?.now ?? (() => Date.now());
@@ -68,38 +70,44 @@ export class ThreadListCacheInvalidationOwner {
     const parsedReason = ThreadListInvalidationReasonSchema.parse(reason);
     const parsedDetails = ThreadListInvalidationDetailsSchema.parse(details);
     if (
-      parsedReason === THREAD_STREAM_STATE_CHANGED_METHOD
-      && !this.shouldInvalidateForThreadStreamStateChange(parsedDetails)
+      parsedReason === THREAD_STREAM_STATE_CHANGED_METHOD &&
+      !this.shouldInvalidateForThreadStreamStateChange(parsedDetails)
     ) {
       logger.debug(
         {
           reason: parsedReason,
-          ...parsedDetails
+          ...parsedDetails,
         },
-        "thread-list-aggregation-cache-invalidation-skipped"
+        "thread-list-aggregation-cache-invalidation-skipped",
       );
       return;
     }
 
     const invalidationScope = this.readThreadListInvalidationScope(parsedReason);
-    this.threadListAggregationCache.invalidateWhere(this.buildThreadListInvalidationPredicate(invalidationScope));
+    this.threadListAggregationCache.invalidateWhere(
+      this.buildThreadListInvalidationPredicate(invalidationScope),
+    );
     const statistics = this.threadListAggregationCache.readStatistics();
     logger.debug(
       {
         reason: parsedReason,
         invalidationScope,
         ...parsedDetails,
-        statistics
+        statistics,
       },
-      "thread-list-aggregation-cache-invalidated"
+      "thread-list-aggregation-cache-invalidated",
     );
   }
 
-  private readThreadListInvalidationScope(reason: ThreadListInvalidationReason): ThreadListInvalidationScope {
+  private readThreadListInvalidationScope(
+    reason: ThreadListInvalidationReason,
+  ): ThreadListInvalidationScope {
     return ThreadListInvalidationScopeByReason[reason];
   }
 
-  private shouldInvalidateForThreadStreamStateChange(details: ThreadListInvalidationDetails): boolean {
+  private shouldInvalidateForThreadStreamStateChange(
+    details: ThreadListInvalidationDetails,
+  ): boolean {
     const threadId = details.threadId;
     if (threadId === undefined) {
       return true;
@@ -110,8 +118,8 @@ export class ThreadListCacheInvalidationOwner {
     // Stream state events can arrive in tight bursts; debounce invalidation per
     // thread to avoid repeatedly blowing hot cache entries during active generation.
     if (
-      lastInvalidationAt !== undefined
-      && now - lastInvalidationAt < ThreadStreamCacheInvalidationMinimumIntervalMilliseconds
+      lastInvalidationAt !== undefined &&
+      now - lastInvalidationAt < ThreadStreamCacheInvalidationMinimumIntervalMilliseconds
     ) {
       return false;
     }
@@ -121,7 +129,7 @@ export class ThreadListCacheInvalidationOwner {
   }
 
   private buildThreadListInvalidationPredicate(
-    scope: ThreadListInvalidationScope
+    scope: ThreadListInvalidationScope,
   ): (query: ThreadListAggregationQuery) => boolean {
     return ThreadListInvalidationPredicateByScope[scope];
   }

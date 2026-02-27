@@ -1,15 +1,30 @@
 import { FarfieldDebugObservabilitySnapshotSchema } from "@farfield/protocol";
-import type { EventStreamClientRegistry, EventStreamClientRegistryStatistics } from "./EventStreamClientRegistry.js";
-import type { EventLoopLagObservabilityOwner, EventLoopLagStatistics } from "./EventLoopLagObservabilityOwner.js";
+import type {
+  ThreadAdapterResolver,
+  ThreadAdapterResolverStatistics,
+} from "../Agents/ThreadAdapterResolver.js";
+import type {
+  EventLoopLagObservabilityOwner,
+  EventLoopLagStatistics,
+} from "./EventLoopLagObservabilityOwner.js";
+import type {
+  EventStreamClientRegistry,
+  EventStreamClientRegistryStatistics,
+} from "./EventStreamClientRegistry.js";
 import type { PushDispatchConcurrencyCoordinator } from "./PushDispatchConcurrencyCoordinator.js";
 import type {
   PushMutationConcurrencyCoordinator,
-  PushMutationConcurrencyCoordinatorStatistics
+  PushMutationConcurrencyCoordinatorStatistics,
 } from "./PushMutationConcurrencyCoordinator.js";
-import type { RequestObservabilityOwner, RequestObservabilitySnapshot } from "./RequestObservabilityOwner.js";
+import type {
+  RequestObservabilityOwner,
+  RequestObservabilitySnapshot,
+} from "./RequestObservabilityOwner.js";
 import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinator.js";
-import type { ThreadListAggregationCache, ThreadListAggregationCacheStatistics } from "./ThreadListAggregationCache.js";
-import type { ThreadAdapterResolver, ThreadAdapterResolverStatistics } from "../Agents/ThreadAdapterResolver.js";
+import type {
+  ThreadListAggregationCache,
+  ThreadListAggregationCacheStatistics,
+} from "./ThreadListAggregationCache.js";
 
 const DEFAULT_READ_NOW_ISO_STRING = (): string => new Date().toISOString();
 
@@ -77,21 +92,23 @@ export class ServerObservabilitySnapshotOwner {
   }
 
   public readSnapshot(): ServerObservabilitySnapshot {
-    const threadConcurrencyStatistics = this.dependencies.threadConcurrencyCoordinator.readStatistics();
-    const pushDispatchConcurrencyStatistics = this.dependencies.pushDispatchConcurrencyCoordinator.readStatistics();
+    const threadConcurrencyStatistics =
+      this.dependencies.threadConcurrencyCoordinator.readStatistics();
+    const pushDispatchConcurrencyStatistics =
+      this.dependencies.pushDispatchConcurrencyCoordinator.readStatistics();
 
     // Keep the emitted snapshot aligned to the protocol schema instead of leaking owner-internal counters.
     const snapshot: ServerObservabilitySnapshot = {
       recordedAt: this.readNowIsoString(),
       cache: {
-        threadListAggregation: this.dependencies.threadListAggregationCache.readStatistics()
+        threadListAggregation: this.dependencies.threadListAggregationCache.readStatistics(),
       },
       concurrency: {
         thread: {
           queuedExecutionCount: threadConcurrencyStatistics.queuedExecutionCount,
           completedExecutionCount: threadConcurrencyStatistics.completedExecutionCount,
           failedExecutionCount: threadConcurrencyStatistics.failedExecutionCount,
-          activeThreadCount: threadConcurrencyStatistics.activeThreadCount
+          activeThreadCount: threadConcurrencyStatistics.activeThreadCount,
         },
         pushDispatch: {
           scheduledCheckCount: pushDispatchConcurrencyStatistics.scheduledCheckCount,
@@ -99,20 +116,20 @@ export class ServerObservabilitySnapshotOwner {
           completedCheckCount: pushDispatchConcurrencyStatistics.completedCheckCount,
           skippedWhileInFlightCount: pushDispatchConcurrencyStatistics.skippedWhileInFlightCount,
           activeTimerCount: pushDispatchConcurrencyStatistics.activeTimerCount,
-          inFlightThreadCount: pushDispatchConcurrencyStatistics.inFlightThreadCount
+          inFlightThreadCount: pushDispatchConcurrencyStatistics.inFlightThreadCount,
         },
-        pushMutation: this.dependencies.pushMutationConcurrencyCoordinator.readStatistics()
+        pushMutation: this.dependencies.pushMutationConcurrencyCoordinator.readStatistics(),
       },
       streaming: {
-        eventStream: this.dependencies.eventStreamClientRegistry.readStatistics()
+        eventStream: this.dependencies.eventStreamClientRegistry.readStatistics(),
       },
       routing: {
-        threadAdapterResolver: this.dependencies.threadAdapterResolver.readStatistics()
+        threadAdapterResolver: this.dependencies.threadAdapterResolver.readStatistics(),
       },
       performance: {
         requestRouting: this.dependencies.requestObservabilityOwner.readSnapshot(),
-        eventLoop: this.dependencies.eventLoopLagObservabilityOwner.readStatistics()
-      }
+        eventLoop: this.dependencies.eventLoopLagObservabilityOwner.readStatistics(),
+      },
     };
 
     return FarfieldDebugObservabilitySnapshotSchema.parse(snapshot);

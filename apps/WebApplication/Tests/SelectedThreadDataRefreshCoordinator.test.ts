@@ -4,19 +4,19 @@ import {
   SelectedThreadDataRefreshCoordinator,
   type SelectedThreadLiveStateSnapshot,
   type SelectedThreadReadThreadSnapshot,
-  type SelectedThreadStreamEventsSnapshot
+  type SelectedThreadStreamEventsSnapshot,
 } from "../Source/Features/Chat/StateManagement/SelectedThreadDataRefreshCoordinator";
 
 function buildLiveStateSnapshot(
   threadId: string,
-  conversationState: SelectedThreadLiveStateSnapshot["conversationState"]
+  conversationState: SelectedThreadLiveStateSnapshot["conversationState"],
 ): SelectedThreadLiveStateSnapshot {
   return {
     ok: true,
     threadId,
     ownerClientId: null,
     conversationState,
-    liveStateError: null
+    liveStateError: null,
   };
 }
 
@@ -28,13 +28,13 @@ function buildStreamEventsSnapshot(threadId: string): SelectedThreadStreamEvents
     events: [],
     nextSequence: 0,
     firstAvailableSequence: 0,
-    resetRequired: false
+    resetRequired: false,
   };
 }
 
 function buildReadThreadSnapshot(
   threadId: string,
-  turns: SelectedThreadReadThreadSnapshot["thread"]["turns"]
+  turns: SelectedThreadReadThreadSnapshot["thread"]["turns"],
 ): SelectedThreadReadThreadSnapshot {
   return {
     ok: true,
@@ -50,27 +50,27 @@ function buildReadThreadSnapshot(
         settings: {
           model: "gpt-5.3-codex",
           reasoning_effort: "medium",
-          developer_instructions: null
-        }
-      }
+          developer_instructions: null,
+        },
+      },
     },
-    agentId: "codex"
+    agentId: "codex",
   };
 }
 
 function createChatClient(
-  overrides?: Partial<SelectedThreadDataRefreshChatClient>
+  overrides?: Partial<SelectedThreadDataRefreshChatClient>,
 ): SelectedThreadDataRefreshChatClient {
   return {
-    readThread: overrides?.readThread ?? vi.fn(async (threadId: string) => (
-      buildReadThreadSnapshot(threadId, [])
-    )),
-    readLiveState: overrides?.readLiveState ?? vi.fn(async (threadId: string) => (
-      buildLiveStateSnapshot(threadId, null)
-    )),
-    readStreamEvents: overrides?.readStreamEvents ?? vi.fn(async (threadId: string) => (
-      buildStreamEventsSnapshot(threadId)
-    ))
+    readThread:
+      overrides?.readThread ??
+      vi.fn(async (threadId: string) => buildReadThreadSnapshot(threadId, [])),
+    readLiveState:
+      overrides?.readLiveState ??
+      vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
+    readStreamEvents:
+      overrides?.readStreamEvents ??
+      vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId)),
   };
 }
 
@@ -78,15 +78,15 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
   it("reads live state, stream events, and read-thread snapshot when capabilities allow", async () => {
     const coordinator = new SelectedThreadDataRefreshCoordinator();
     const chatClient = createChatClient({
-      readLiveState: vi.fn(async (threadId: string) => (
+      readLiveState: vi.fn(async (threadId: string) =>
         buildLiveStateSnapshot(threadId, {
           id: threadId,
           turns: [
             {
               id: "turn-live-1",
               status: "completed",
-              items: []
-            }
+              items: [],
+            },
           ],
           requests: [],
           updatedAt: 1_700_000_000,
@@ -97,21 +97,21 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
             settings: {
               model: "gpt-5.3-codex",
               reasoning_effort: "medium",
-              developer_instructions: null
-            }
-          }
-        })
-      )),
-      readThread: vi.fn(async (threadId: string) => (
+              developer_instructions: null,
+            },
+          },
+        }),
+      ),
+      readThread: vi.fn(async (threadId: string) =>
         buildReadThreadSnapshot(threadId, [
           {
             id: "turn-read-1",
             status: "completed",
-            items: []
-          }
-        ])
-      )),
-      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId))
+            items: [],
+          },
+        ]),
+      ),
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId)),
     });
 
     const snapshot = await coordinator.readSnapshot({
@@ -121,7 +121,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       canReadLiveState: true,
       canReadStreamEvents: true,
       streamEventsSinceSequence: null,
-      chatClient
+      chatClient,
     });
 
     expect(chatClient.readLiveState).toHaveBeenCalledWith("thread-1");
@@ -138,11 +138,11 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       retryConfiguration: {
         maximumAttempts: 3,
         baseDelayMilliseconds: 10,
-        maximumDelayMilliseconds: 40
+        maximumDelayMilliseconds: 40,
       },
       waitForMilliseconds: async (durationMilliseconds) => {
         waitDurations.push(durationMilliseconds);
-      }
+      },
     });
     const readThreadCalls: boolean[] = [];
     const chatClient = createChatClient({
@@ -155,12 +155,12 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
           {
             id: "turn-read-2",
             status: "completed",
-            items: []
-          }
+            items: [],
+          },
         ]);
       }),
       readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
-      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId))
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId)),
     });
 
     const snapshot = await coordinator.readSnapshot({
@@ -170,7 +170,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       canReadLiveState: false,
       canReadStreamEvents: false,
       streamEventsSinceSequence: null,
-      chatClient
+      chatClient,
     });
 
     expect(readThreadCalls).toEqual([false, true]);
@@ -185,11 +185,11 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       retryConfiguration: {
         maximumAttempts: 4,
         baseDelayMilliseconds: 10,
-        maximumDelayMilliseconds: 25
+        maximumDelayMilliseconds: 25,
       },
       waitForMilliseconds: async (durationMilliseconds) => {
         waitDurations.push(durationMilliseconds);
-      }
+      },
     });
     const readThreadCalls: boolean[] = [];
     const chatClient = createChatClient({
@@ -199,7 +199,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
           throw new Error("thread not loaded in app-server");
         }
         return buildReadThreadSnapshot(threadId, []);
-      })
+      }),
     });
 
     const snapshot = await coordinator.readSnapshot({
@@ -209,7 +209,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       canReadLiveState: false,
       canReadStreamEvents: false,
       streamEventsSinceSequence: null,
-      chatClient
+      chatClient,
     });
 
     expect(waitDurations).toEqual([10, 20, 25]);
@@ -228,7 +228,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       canReadLiveState: false,
       canReadStreamEvents: false,
       streamEventsSinceSequence: null,
-      chatClient
+      chatClient,
     });
 
     expect(chatClient.readLiveState).not.toHaveBeenCalled();
@@ -239,7 +239,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       threadId: "thread-3",
       ownerClientId: null,
       conversationState: null,
-      liveStateError: null
+      liveStateError: null,
     });
     expect(snapshot.streamEventsSnapshot).toEqual({
       ok: true,
@@ -248,7 +248,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       events: [],
       nextSequence: 0,
       firstAvailableSequence: 0,
-      resetRequired: false
+      resetRequired: false,
     });
     expect(snapshot.readThreadSnapshot).toBeNull();
     expect(snapshot.includeTurnsUsedForRead).toBe(false);
@@ -266,7 +266,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       canReadLiveState: false,
       canReadStreamEvents: false,
       streamEventsSinceSequence: null,
-      chatClient
+      chatClient,
     });
 
     expect(snapshot.readThreadSnapshot).toBeNull();
@@ -277,7 +277,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     const coordinator = new SelectedThreadDataRefreshCoordinator();
     const chatClient = createChatClient({
       readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
-      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId))
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId)),
     });
 
     await coordinator.readSnapshot({
@@ -287,11 +287,11 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       canReadLiveState: true,
       canReadStreamEvents: true,
       streamEventsSinceSequence: 44,
-      chatClient
+      chatClient,
     });
 
     expect(chatClient.readStreamEvents).toHaveBeenCalledWith("thread-5", {
-      sinceSequence: 44
+      sinceSequence: 44,
     });
   });
 
@@ -301,7 +301,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     const chatClient = createChatClient({
       readThread: vi.fn(async (threadId: string) => buildReadThreadSnapshot(threadId, [])),
       readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
-      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId))
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId)),
     });
 
     await coordinator.readSnapshot({
@@ -312,18 +312,18 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       canReadStreamEvents: true,
       streamEventsSinceSequence: null,
       chatClient,
-      signal: abortController.signal
+      signal: abortController.signal,
     });
 
     expect(chatClient.readLiveState).toHaveBeenCalledWith("thread-6", {
-      signal: abortController.signal
+      signal: abortController.signal,
     });
     expect(chatClient.readStreamEvents).toHaveBeenCalledWith("thread-6", {
-      signal: abortController.signal
+      signal: abortController.signal,
     });
     expect(chatClient.readThread).toHaveBeenCalledWith("thread-6", {
       includeTurns: false,
-      signal: abortController.signal
+      signal: abortController.signal,
     });
   });
 
@@ -332,7 +332,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     const abortController = new AbortController();
     const chatClient = createChatClient({
       readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
-      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId))
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId)),
     });
 
     await coordinator.readSnapshot({
@@ -343,12 +343,12 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
       canReadStreamEvents: true,
       streamEventsSinceSequence: 9,
       chatClient,
-      signal: abortController.signal
+      signal: abortController.signal,
     });
 
     expect(chatClient.readStreamEvents).toHaveBeenCalledWith("thread-7", {
       sinceSequence: 9,
-      signal: abortController.signal
+      signal: abortController.signal,
     });
   });
 
@@ -357,12 +357,12 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     const coordinator = new SelectedThreadDataRefreshCoordinator({
       waitForMilliseconds: async (durationMilliseconds) => {
         waitDurations.push(durationMilliseconds);
-      }
+      },
     });
     const chatClient = createChatClient({
       readThread: vi.fn(async () => {
         throw new Error("permission denied");
-      })
+      }),
     });
 
     await expect(
@@ -373,8 +373,8 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
         canReadLiveState: false,
         canReadStreamEvents: false,
         streamEventsSinceSequence: null,
-        chatClient
-      })
+        chatClient,
+      }),
     ).rejects.toThrow("permission denied");
 
     expect(chatClient.readThread).toHaveBeenCalledTimes(1);

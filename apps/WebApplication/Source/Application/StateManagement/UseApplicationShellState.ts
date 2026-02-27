@@ -1,30 +1,27 @@
-import {
-  useRef,
-  useState
-} from "react";
-import { type AgentId } from "@/Shared/Contracts/ApiContracts";
+import { useRef, useState } from "react";
 import {
   type CapabilityAgentsResponse,
   type CapabilityCollaborationModesResponse,
   type CapabilityConfigDefaultsResponse,
   type CapabilityHealthResponse,
-  type CapabilityModelsResponse
+  type CapabilityModelsResponse,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import {
   type ChatLiveStateResponse,
   type ChatReadThreadResponse,
-  type ChatStreamEventsResponse
+  type ChatStreamEventsResponse,
 } from "@/Features/Chat/DataAccess/ChatServerClient";
 import {
   type DebugErrorListResponse,
   type DebugHistoryDetailResponse,
   type DebugHistoryResponse,
-  type DebugTraceStatusResponse
+  type DebugTraceStatusResponse,
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { type DebugIssueSeverityFilter } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
-import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
+import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import { useApplicationArchivedThreadState } from "./UseApplicationArchivedThreadState";
 import { useApplicationPushState } from "./UseApplicationPushState";
 import {
@@ -36,7 +33,7 @@ import {
   type SelectedThreadLoadFunction,
   type SignatureTokens,
   type UnreadThreadIdentifierMap,
-  type UseApplicationShellStateInput
+  type UseApplicationShellStateInput,
 } from "./UseApplicationShellStateContracts";
 
 type AgentDescriptor = CapabilityAgentsResponse["agents"][number];
@@ -76,7 +73,7 @@ const INITIAL_SHELL_FLAGS: ShellInitialFlags = {
   hasHydratedModeFromLiveState: false,
   isModeSyncing: false,
   eventsConnected: false,
-  hasHydratedAgentSelection: false
+  hasHydratedAgentSelection: false,
 };
 
 function readRouteSeededShellState(input: UseApplicationShellStateInput): RouteSeededShellState {
@@ -84,7 +81,7 @@ function readRouteSeededShellState(input: UseApplicationShellStateInput): RouteS
   return {
     selectedThreadIdentifier,
     activeTab: input.initialUiState.tab,
-    isSelectedThreadLoading: selectedThreadIdentifier !== null
+    isSelectedThreadLoading: selectedThreadIdentifier !== null,
   };
 }
 
@@ -136,26 +133,39 @@ function createPendingThreadMaterializationCoordinator(): PendingThreadMateriali
   return new PendingThreadMaterializationCoordinator();
 }
 
-export type { ApplicationShellState, UseApplicationShellStateInput } from "./UseApplicationShellStateContracts";
+export type {
+  ApplicationShellState,
+  UseApplicationShellStateInput,
+} from "./UseApplicationShellStateContracts";
 
-export function useApplicationShellState(input: UseApplicationShellStateInput): ApplicationShellState {
+export function useApplicationShellState(
+  input: UseApplicationShellStateInput,
+): ApplicationShellState {
   // Invariant: route-seeded state and refs must initialize from one snapshot to avoid first-render divergence.
   const routeSeededShellState = readRouteSeededShellState(input);
 
   const [error, setError] = useState(INITIAL_TEXT_VALUE);
   const [health, setHealth] = useState<CapabilityHealthResponse | null>(null);
-  const [configDefaults, setConfigDefaults] = useState<CapabilityConfigDefaultsResponse | null>(null);
+  const [configDefaults, setConfigDefaults] = useState<CapabilityConfigDefaultsResponse | null>(
+    null,
+  );
   const [threads, setThreads] = useState<ThreadListResponse["data"]>(createInitialThreadCollection);
   const [unreadThreadIds, setUnreadThreadIds] = useState<UnreadThreadIdentifierMap>(
-    createInitialUnreadThreadIdentifierMap
+    createInitialUnreadThreadIdentifierMap,
   );
   const applicationArchivedThreadState = useApplicationArchivedThreadState();
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(routeSeededShellState.selectedThreadIdentifier);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(
+    routeSeededShellState.selectedThreadIdentifier,
+  );
   const [liveState, setLiveState] = useState<ChatLiveStateResponse | null>(null);
   const [readThreadState, setReadThreadState] = useState<ChatReadThreadResponse | null>(null);
-  const [isSelectedThreadLoading, setIsSelectedThreadLoading] = useState(routeSeededShellState.isSelectedThreadLoading);
-  const [streamEvents, setStreamEvents] = useState<ChatStreamEventsResponse["events"]>(createInitialStreamEvents);
-  const [modes, setModes] = useState<CapabilityCollaborationModesResponse["data"]>(createInitialModes);
+  const [isSelectedThreadLoading, setIsSelectedThreadLoading] = useState(
+    routeSeededShellState.isSelectedThreadLoading,
+  );
+  const [streamEvents, setStreamEvents] =
+    useState<ChatStreamEventsResponse["events"]>(createInitialStreamEvents);
+  const [modes, setModes] =
+    useState<CapabilityCollaborationModesResponse["data"]>(createInitialModes);
   const [models, setModels] = useState<CapabilityModelsResponse["data"]>(createInitialModels);
   const [selectedModeKey, setSelectedModeKey] = useState(INITIAL_TEXT_VALUE);
   const [selectedModelId, setSelectedModelId] = useState(INITIAL_TEXT_VALUE);
@@ -164,40 +174,51 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
   const [traceStatus, setTraceStatus] = useState<DebugTraceStatusResponse | null>(null);
   const [traceLabel, setTraceLabel] = useState(INITIAL_TRACE_LABEL);
   const [traceNote, setTraceNote] = useState(INITIAL_TEXT_VALUE);
-  const [history, setHistory] = useState<DebugHistoryResponse["history"]>(createInitialHistoryEntries);
-  const [debugErrors, setDebugErrors] = useState<DebugErrorListResponse["data"]>(createInitialDebugErrors);
+  const [history, setHistory] = useState<DebugHistoryResponse["history"]>(
+    createInitialHistoryEntries,
+  );
+  const [debugErrors, setDebugErrors] =
+    useState<DebugErrorListResponse["data"]>(createInitialDebugErrors);
   const [debugErrorSessionId, setDebugErrorSessionId] = useState(INITIAL_TEXT_VALUE);
   const [debugErrorSessionLogPath, setDebugErrorSessionLogPath] = useState(INITIAL_TEXT_VALUE);
   const [selectedHistoryId, setSelectedHistoryId] = useState(INITIAL_TEXT_VALUE);
   const [historyDetail, setHistoryDetail] = useState<DebugHistoryDetailResponse | null>(null);
   const [isCoreLoading, setIsCoreLoading] = useState(INITIAL_SHELL_FLAGS.isCoreLoading);
-  const [waitForReplayResponse, setWaitForReplayResponse] = useState(INITIAL_SHELL_FLAGS.waitForReplayResponse);
-  const [selectedRequestId, setSelectedRequestId] = useState<number | null>(INITIAL_NULLABLE_NUMBER_VALUE);
+  const [waitForReplayResponse, setWaitForReplayResponse] = useState(
+    INITIAL_SHELL_FLAGS.waitForReplayResponse,
+  );
+  const [selectedRequestId, setSelectedRequestId] = useState<number | null>(
+    INITIAL_NULLABLE_NUMBER_VALUE,
+  );
   const [answerDraft, setAnswerDraft] = useState<AnswerDraftState>(createInitialAnswerDraftState);
-  const [agentDescriptors, setAgentDescriptors] = useState<AgentDescriptor[]>(createInitialAgentDescriptors);
-  const [selectedAgentId, setSelectedAgentId] = useState<AgentId>(DEFAULT_SELECTED_AGENT_IDENTIFIER);
+  const [agentDescriptors, setAgentDescriptors] = useState<AgentDescriptor[]>(
+    createInitialAgentDescriptors,
+  );
+  const [selectedAgentId, setSelectedAgentId] = useState<AgentId>(
+    DEFAULT_SELECTED_AGENT_IDENTIFIER,
+  );
   const applicationPushState = useApplicationPushState({
-    unsupportedPushClientState: input.unsupportedPushClientState
+    unsupportedPushClientState: input.unsupportedPushClientState,
   });
   const [activeTab, setActiveTab] = useState<ApplicationShellTab>(routeSeededShellState.activeTab);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(INITIAL_SHELL_FLAGS.mobileSidebarOpen);
-  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(INITIAL_SHELL_FLAGS.desktopSidebarOpen);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(
+    INITIAL_SHELL_FLAGS.desktopSidebarOpen,
+  );
   const [isChatAtBottom, setIsChatAtBottom] = useState(INITIAL_SHELL_FLAGS.isChatAtBottom);
   const [visibleChatItemLimit, setVisibleChatItemLimit] = useState(input.initialVisibleChatItems);
   const [hasHydratedModeFromLiveState, setHasHydratedModeFromLiveState] = useState(
-    INITIAL_SHELL_FLAGS.hasHydratedModeFromLiveState
+    INITIAL_SHELL_FLAGS.hasHydratedModeFromLiveState,
   );
   const [isModeSyncing, setIsModeSyncing] = useState(INITIAL_SHELL_FLAGS.isModeSyncing);
-  const [collapsedThreadProjectGroups, setCollapsedThreadProjectGroups] = useState<CollapsedProjectGroupMap>(
-    createInitialCollapsedProjectGroupMap
-  );
+  const [collapsedThreadProjectGroups, setCollapsedThreadProjectGroups] =
+    useState<CollapsedProjectGroupMap>(createInitialCollapsedProjectGroupMap);
   const [debugWorkspaceSection, setDebugWorkspaceSection] = useState<DebugWorkspaceSection>(
-    INITIAL_DEBUG_WORKSPACE_SECTION
+    INITIAL_DEBUG_WORKSPACE_SECTION,
   );
   const [selectedDebugIssueId, setSelectedDebugIssueId] = useState(INITIAL_TEXT_VALUE);
-  const [debugIssueSeverityFilter, setDebugIssueSeverityFilter] = useState<DebugIssueSeverityFilter>(
-    INITIAL_DEBUG_ISSUE_SEVERITY_FILTER
-  );
+  const [debugIssueSeverityFilter, setDebugIssueSeverityFilter] =
+    useState<DebugIssueSeverityFilter>(INITIAL_DEBUG_ISSUE_SEVERITY_FILTER);
   const [debugIssueFilterQuery, setDebugIssueFilterQuery] = useState(INITIAL_TEXT_VALUE);
   const selectedThreadIdRef = useRef<string | null>(routeSeededShellState.selectedThreadIdentifier);
   const activeTabRef = useRef<ApplicationShellTab>(routeSeededShellState.activeTab);
@@ -209,12 +230,15 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
   const chatContentRef = useRef<HTMLDivElement>(null);
   const isChatAtBottomRef = useRef(INITIAL_SHELL_FLAGS.isChatAtBottom);
   const lastAppliedModeSignatureRef = useRef(INITIAL_TEXT_VALUE);
-  const unreadThreadIdsRef = useRef<UnreadThreadIdentifierMap>(createInitialUnreadThreadIdentifierMap());
+  const unreadThreadIdsRef = useRef<UnreadThreadIdentifierMap>(
+    createInitialUnreadThreadIdentifierMap(),
+  );
   const hasHydratedAgentSelectionRef = useRef(INITIAL_SHELL_FLAGS.hasHydratedAgentSelection);
   const pendingThreadMaterializationCoordinatorRef = useRef(
-    createPendingThreadMaterializationCoordinator()
+    createPendingThreadMaterializationCoordinator(),
   );
-  const pendingThreadMaterializationCoordinator = pendingThreadMaterializationCoordinatorRef.current;
+  const pendingThreadMaterializationCoordinator =
+    pendingThreadMaterializationCoordinatorRef.current;
   const debugErrorsSignatureRef = useRef<SignatureTokens>(createInitialSignatureTokens());
   const modesSignatureRef = useRef<SignatureTokens>(createInitialSignatureTokens());
   const modelsSignatureRef = useRef<SignatureTokens>(createInitialSignatureTokens());
@@ -335,6 +359,6 @@ export function useApplicationShellState(input: UseApplicationShellStateInput): 
     loadSelectedThreadRef,
     viewportKeyboardStateRef,
     viewportTelemetryLastReportedAtRef,
-    keyboardOpenScrollRafRef
+    keyboardOpenScrollRafRef,
   };
 }

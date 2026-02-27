@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  PushReceiptEventSchema,
   parsePushReceiptStore,
   parsePushSendStore,
   parsePushStateStore,
-  PushReceiptEventSchema,
-  parseVapidPublicKeyResponse
+  parseVapidPublicKeyResponse,
 } from "../Source/Index.js";
 
 describe("codex-protocol push schemas", () => {
@@ -18,9 +18,9 @@ describe("codex-protocol push schemas", () => {
           threadId: "thread-1",
           turnId: "turn-1",
           message: null,
-          createdAt: "2026-02-26T00:00:00.000Z"
-        }
-      ]
+          createdAt: "2026-02-26T00:00:00.000Z",
+        },
+      ],
     });
 
     expect(parsed.version).toBe(2);
@@ -31,8 +31,8 @@ describe("codex-protocol push schemas", () => {
     expect(() =>
       parsePushReceiptStore({
         version: 3,
-        receipts: []
-      })
+        receipts: [],
+      }),
     ).toThrowError(/PushReceiptStore did not match expected schema/);
   });
 
@@ -41,8 +41,8 @@ describe("codex-protocol push schemas", () => {
       parsePushStateStore({
         version: 2,
         subscriptions: [],
-        completionWatermarks: []
-      })
+        completionWatermarks: [],
+      }),
     ).toThrowError(/Unsupported push state version: 2/);
   });
 
@@ -50,8 +50,8 @@ describe("codex-protocol push schemas", () => {
     expect(() =>
       parsePushSendStore({
         version: 2,
-        latest: null
-      })
+        latest: null,
+      }),
     ).toThrowError(/Unsupported push send store version: 2/);
   });
 
@@ -65,7 +65,7 @@ describe("codex-protocol push schemas", () => {
           threadId: "thread-1",
           turnId: "turn-1",
           message: null,
-          createdAt: "2026-02-26T00:00:00.000Z"
+          createdAt: "2026-02-26T00:00:00.000Z",
         },
         {
           event: "clicked",
@@ -73,9 +73,9 @@ describe("codex-protocol push schemas", () => {
           threadId: "thread-2",
           turnId: "turn-2",
           message: "opened",
-          createdAt: "2026-02-26T00:01:00.000Z"
-        }
-      ]
+          createdAt: "2026-02-26T00:01:00.000Z",
+        },
+      ],
     } as const;
 
     const firstParse = parsePushReceiptStore(legacyStore);
@@ -83,11 +83,11 @@ describe("codex-protocol push schemas", () => {
 
     expect(firstParse.receipts.map((receipt) => receipt.notificationId)).toEqual([
       "legacy-1-2026-02-26T00:00:00.000Z",
-      "legacy-2-2026-02-26T00:01:00.000Z"
+      "legacy-2-2026-02-26T00:01:00.000Z",
     ]);
     expect(secondParse.receipts.map((receipt) => receipt.notificationId)).toEqual([
       "legacy-1-2026-02-26T00:00:00.000Z",
-      "legacy-2-2026-02-26T00:01:00.000Z"
+      "legacy-2-2026-02-26T00:01:00.000Z",
     ]);
   });
 
@@ -98,14 +98,14 @@ describe("codex-protocol push schemas", () => {
 
   it("parses and validates vapid public key contracts", () => {
     const parsed = parseVapidPublicKeyResponse({
-      publicKey: "AbCdEf0123_-"
+      publicKey: "AbCdEf0123_-",
     });
 
     expect(parsed.publicKey).toBe("AbCdEf0123_-");
     expect(() =>
       parseVapidPublicKeyResponse({
-        publicKey: "AbCdEf+/="
-      })
+        publicKey: "AbCdEf+/=",
+      }),
     ).toThrowError(/Expected base64url value/);
   });
 });

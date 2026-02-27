@@ -4,7 +4,7 @@ import { type PushClientState } from "@/Features/PushNotifications/DomainModel/P
 const INITIAL_PUSH_STATE_FLAGS = {
   isEnablingPushNotifications: false,
   requiresApiSessionToken: false,
-  isApiSessionBootstrapPending: false
+  isApiSessionBootstrapPending: false,
 };
 
 const INITIAL_API_SESSION_TOKEN_DRAFT = "";
@@ -29,25 +29,25 @@ export interface ApplicationPushStateSlice {
   setIsApiSessionBootstrapPending: Dispatch<SetStateAction<boolean>>;
 }
 
-export function useApplicationPushState(input: UseApplicationPushStateInput): ApplicationPushStateSlice {
+export function useApplicationPushState(
+  input: UseApplicationPushStateInput,
+): ApplicationPushStateSlice {
   const { unsupportedPushClientState } = input;
   const [pushClientState, setPushClientState] = useState<PushClientState>(
-    unsupportedPushClientState
+    unsupportedPushClientState,
   );
   const [isEnablingPushNotifications, setIsEnablingPushNotifications] = useState(
-    INITIAL_PUSH_STATE_FLAGS.isEnablingPushNotifications
+    INITIAL_PUSH_STATE_FLAGS.isEnablingPushNotifications,
   );
   const [requiresApiSessionToken, setRequiresApiSessionToken] = useState(
-    INITIAL_PUSH_STATE_FLAGS.requiresApiSessionToken
+    INITIAL_PUSH_STATE_FLAGS.requiresApiSessionToken,
   );
-  const [apiSessionTokenDraft, setApiSessionTokenDraft] = useState(
-    INITIAL_API_SESSION_TOKEN_DRAFT
-  );
+  const [apiSessionTokenDraft, setApiSessionTokenDraft] = useState(INITIAL_API_SESSION_TOKEN_DRAFT);
   const [apiSessionBootstrapError, setApiSessionBootstrapError] = useState(
-    INITIAL_API_SESSION_BOOTSTRAP_ERROR_MESSAGE
+    INITIAL_API_SESSION_BOOTSTRAP_ERROR_MESSAGE,
   );
   const [isApiSessionBootstrapPending, setIsApiSessionBootstrapPending] = useState(
-    INITIAL_PUSH_STATE_FLAGS.isApiSessionBootstrapPending
+    INITIAL_PUSH_STATE_FLAGS.isApiSessionBootstrapPending,
   );
 
   return {
@@ -62,6 +62,6 @@ export function useApplicationPushState(input: UseApplicationPushStateInput): Ap
     apiSessionBootstrapError,
     setApiSessionBootstrapError,
     isApiSessionBootstrapPending,
-    setIsApiSessionBootstrapPending
+    setIsApiSessionBootstrapPending,
   };
 }

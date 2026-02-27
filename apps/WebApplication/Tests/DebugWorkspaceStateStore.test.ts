@@ -17,27 +17,21 @@ function createHistoryEntry(entryId: string): DebugHistoryEntry {
     source: "app",
     direction: "in",
     payload: {},
-    meta: {}
+    meta: {},
   };
 }
 
 function createHistoryCollection(entryCount: number): DebugHistoryEntry[] {
   return Array.from({ length: entryCount }, (_value, index) =>
-    createHistoryEntry(`history-${String(index)}`)
+    createHistoryEntry(`history-${String(index)}`),
   );
 }
 
 describe("DebugWorkspaceStateStore", () => {
   it("reuses existing history state when length and tail identifier are unchanged", () => {
     const store = new DebugWorkspaceStateStore();
-    const previousHistory = [
-      createHistoryEntry("history-1"),
-      createHistoryEntry("history-2")
-    ];
-    const nextHistory = [
-      createHistoryEntry("history-1"),
-      createHistoryEntry("history-2")
-    ];
+    const previousHistory = [createHistoryEntry("history-1"), createHistoryEntry("history-2")];
+    const nextHistory = [createHistoryEntry("history-1"), createHistoryEntry("history-2")];
 
     const result = store.readNextHistory(previousHistory, nextHistory);
 
@@ -46,13 +40,8 @@ describe("DebugWorkspaceStateStore", () => {
 
   it("uses incoming history when shape changed", () => {
     const store = new DebugWorkspaceStateStore();
-    const previousHistory = [
-      createHistoryEntry("history-1")
-    ];
-    const nextHistory = [
-      createHistoryEntry("history-1"),
-      createHistoryEntry("history-2")
-    ];
+    const previousHistory = [createHistoryEntry("history-1")];
+    const nextHistory = [createHistoryEntry("history-1"), createHistoryEntry("history-2")];
 
     const result = store.readNextHistory(previousHistory, nextHistory);
 
@@ -61,14 +50,8 @@ describe("DebugWorkspaceStateStore", () => {
 
   it("uses incoming history when first identifier changes even if tail matches", () => {
     const store = new DebugWorkspaceStateStore();
-    const previousHistory = [
-      createHistoryEntry("history-1"),
-      createHistoryEntry("history-2")
-    ];
-    const nextHistory = [
-      createHistoryEntry("history-9"),
-      createHistoryEntry("history-2")
-    ];
+    const previousHistory = [createHistoryEntry("history-1"), createHistoryEntry("history-2")];
+    const nextHistory = [createHistoryEntry("history-9"), createHistoryEntry("history-2")];
 
     const result = store.readNextHistory(previousHistory, nextHistory);
 
@@ -107,7 +90,9 @@ describe("DebugWorkspaceStateStore", () => {
   it("detects changed debug error signatures", () => {
     const store = new DebugWorkspaceStateStore();
 
-    expect(store.shouldApplyDebugErrors(["error-1", "error-2"], ["error-1", "error-2"])).toBe(false);
+    expect(store.shouldApplyDebugErrors(["error-1", "error-2"], ["error-1", "error-2"])).toBe(
+      false,
+    );
     expect(store.shouldApplyDebugErrors(["error-1", "error-2"], ["error-1", "error-3"])).toBe(true);
   });
 });

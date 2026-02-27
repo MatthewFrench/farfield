@@ -1,3 +1,4 @@
+import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import {
   type ApiAgentsResponse,
   type ApiCollaborationModesResponse,
@@ -9,9 +10,8 @@ import {
   getHealth,
   listAgents,
   listCollaborationModes,
-  listModels
+  listModels,
 } from "./CapabilityApi";
-import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
 export type CapabilityRequestOptions = ApiRequestOptions;
 export type CapabilityHealthResponse = ApiHealthResponse;
@@ -26,7 +26,9 @@ export type CapabilityConfigDefaultsResponse = ApiConfigDefaultsResponse;
  * Snapshot reuse policy is centralized in `CapabilitySnapshotCache`.
  */
 export class CapabilityServerClient {
-  public async readHealthStatus(options?: CapabilityRequestOptions): Promise<CapabilityHealthResponse> {
+  public async readHealthStatus(
+    options?: CapabilityRequestOptions,
+  ): Promise<CapabilityHealthResponse> {
     return getHealth(options);
   }
 
@@ -35,7 +37,7 @@ export class CapabilityServerClient {
   }
 
   public async listCollaborationModes(
-    options?: CapabilityRequestOptions
+    options?: CapabilityRequestOptions,
   ): Promise<CapabilityCollaborationModesResponse> {
     return listCollaborationModes(options);
   }
@@ -45,7 +47,7 @@ export class CapabilityServerClient {
   }
 
   public async readConfigDefaults(
-    input?: CapabilityConfigDefaultsOptions
+    input?: CapabilityConfigDefaultsOptions,
   ): Promise<CapabilityConfigDefaultsResponse> {
     return getConfigDefaults(input);
   }

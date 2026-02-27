@@ -1,12 +1,12 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
 import {
-  parsePushStateStore,
   type PushSettings,
   type PushStateStore,
   type PushSubscription,
-  type StoredPushSubscription
+  parsePushStateStore,
+  type StoredPushSubscription,
 } from "@farfield/protocol";
 
 const PUSH_STATE_STORE_VERSION = 1;
@@ -28,7 +28,7 @@ function buildDefaultState(): PushStateStore {
   return parsePushStateStore({
     version: PUSH_STATE_STORE_VERSION,
     subscriptions: [],
-    completionWatermarks: []
+    completionWatermarks: [],
   });
 }
 
@@ -76,11 +76,11 @@ export class PushStore {
 
   public upsertSubscription(
     subscription: PushSubscription,
-    settings: PushSettings
+    settings: PushSettings,
   ): Promise<StoredPushSubscription> {
     const now = new Date().toISOString();
     const existingIndex = this.state.subscriptions.findIndex(
-      (candidate) => candidate.subscription.endpoint === subscription.endpoint
+      (candidate) => candidate.subscription.endpoint === subscription.endpoint,
     );
 
     let nextSubscription: StoredPushSubscription;
@@ -93,7 +93,7 @@ export class PushStore {
         ...existing,
         subscription,
         settings,
-        updatedAt: now
+        updatedAt: now,
       };
       this.state.subscriptions[existingIndex] = nextSubscription;
     } else {
@@ -102,7 +102,7 @@ export class PushStore {
         subscription,
         settings,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
       };
       this.state.subscriptions.push(nextSubscription);
     }
@@ -113,7 +113,7 @@ export class PushStore {
   public async removeSubscriptionByEndpoint(endpoint: string): Promise<boolean> {
     const originalLength = this.state.subscriptions.length;
     this.state.subscriptions = this.state.subscriptions.filter(
-      (entry) => entry.subscription.endpoint !== endpoint
+      (entry) => entry.subscription.endpoint !== endpoint,
     );
     const changed = this.state.subscriptions.length !== originalLength;
     if (changed) {
@@ -123,20 +123,22 @@ export class PushStore {
   }
 
   public getCompletionWatermark(threadId: string): string | null {
-    const entry = this.state.completionWatermarks.find((candidate) => candidate.threadId === threadId);
+    const entry = this.state.completionWatermarks.find(
+      (candidate) => candidate.threadId === threadId,
+    );
     return entry?.marker ?? null;
   }
 
   public listCompletionWatermarks(): Array<{ threadId: string; marker: string }> {
     return this.state.completionWatermarks.map((entry) => ({
       threadId: entry.threadId,
-      marker: entry.marker
+      marker: entry.marker,
     }));
   }
 
   public async setCompletionWatermark(threadId: string, marker: string): Promise<boolean> {
     const existingIndex = this.state.completionWatermarks.findIndex(
-      (candidate) => candidate.threadId === threadId
+      (candidate) => candidate.threadId === threadId,
     );
 
     if (existingIndex >= 0) {
@@ -149,7 +151,7 @@ export class PushStore {
       }
       this.state.completionWatermarks[existingIndex] = {
         threadId,
-        marker
+        marker,
       };
       await this.persist();
       return true;
@@ -157,7 +159,7 @@ export class PushStore {
 
     this.state.completionWatermarks.push({
       threadId,
-      marker
+      marker,
     });
     await this.persist();
     return true;
@@ -183,7 +185,7 @@ export class PushStore {
     const fileHandle = await fs.promises.open(
       tempPath,
       WRITE_FILE_OPEN_FLAG,
-      OWNER_READ_WRITE_PERMISSIONS
+      OWNER_READ_WRITE_PERMISSIONS,
     );
     try {
       await fileHandle.writeFile(encodedState, UTF8_FILE_ENCODING);
@@ -214,11 +216,8 @@ export class PushStore {
   }
 
   private buildTemporaryStatePath(): string {
-    return [
-      this.filePath,
-      String(process.pid),
-      String(Date.now()),
-      TEMP_FILE_EXTENSION
-    ].join(TEMP_FILE_NAME_SEGMENT_DELIMITER);
+    return [this.filePath, String(process.pid), String(Date.now()), TEMP_FILE_EXTENSION].join(
+      TEMP_FILE_NAME_SEGMENT_DELIMITER,
+    );
   }
 }

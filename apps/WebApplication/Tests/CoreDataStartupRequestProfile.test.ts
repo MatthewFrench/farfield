@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  isStartupActionName,
+  readStartupRequestDescription,
   STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
   STARTUP_CRITICAL_REQUEST_BUDGET_MAXIMUM,
   STARTUP_REQUEST_ALLOWED_TIERS,
   STARTUP_REQUEST_PROFILE,
-  isStartupActionName,
-  readStartupRequestDescription
 } from "../Source/Application/StateManagement/CoreDataStartupRequestProfile";
 
 describe("CoreDataStartupRequestProfile", () => {
   it("keeps startup critical request count within budget", () => {
-    const criticalRequestCount = STARTUP_REQUEST_PROFILE.filter((entry) => entry.tier === "critical").length;
+    const criticalRequestCount = STARTUP_REQUEST_PROFILE.filter(
+      (entry) => entry.tier === "critical",
+    ).length;
     expect(criticalRequestCount).toBeLessThanOrEqual(STARTUP_CRITICAL_REQUEST_BUDGET_MAXIMUM);
   });
 
@@ -44,13 +46,15 @@ describe("CoreDataStartupRequestProfile", () => {
   it("resolves startup request descriptions from owner index and preserves unknown action names", () => {
     for (const startupRequestProfileEntry of STARTUP_REQUEST_PROFILE) {
       expect(readStartupRequestDescription(startupRequestProfileEntry.actionName)).toBe(
-        startupRequestProfileEntry.description
+        startupRequestProfileEntry.description,
       );
     }
     expect(readStartupRequestDescription(STARTUP_CRITICAL_EVENTS_SESSION_OPERATION)).toBe(
-      "Bootstrap API session/auth gate"
+      "Bootstrap API session/auth gate",
     );
-    expect(readStartupRequestDescription("startup-unknown.operation")).toBe("startup-unknown.operation");
+    expect(readStartupRequestDescription("startup-unknown.operation")).toBe(
+      "startup-unknown.operation",
+    );
   });
 
   it("keeps membership and description lookup deterministic across repeated reads", () => {
@@ -63,10 +67,10 @@ describe("CoreDataStartupRequestProfile", () => {
     expect(isStartupActionName(firstStartupProfileEntry.actionName)).toBe(true);
     expect(isStartupActionName(firstStartupProfileEntry.actionName)).toBe(true);
     expect(readStartupRequestDescription(firstStartupProfileEntry.actionName)).toBe(
-      firstStartupProfileEntry.description
+      firstStartupProfileEntry.description,
     );
     expect(readStartupRequestDescription(firstStartupProfileEntry.actionName)).toBe(
-      firstStartupProfileEntry.description
+      firstStartupProfileEntry.description,
     );
     expect(readStartupRequestDescription(unknownActionName)).toBe(unknownActionName);
     expect(readStartupRequestDescription(unknownActionName)).toBe(unknownActionName);

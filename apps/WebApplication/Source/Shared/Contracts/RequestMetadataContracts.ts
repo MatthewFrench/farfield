@@ -18,11 +18,11 @@ export const RequestMetadataTokenSchema = z
   .min(1, "Request metadata values must not be blank.")
   .max(
     REQUEST_METADATA_TOKEN_MAXIMUM_LENGTH,
-    `Request metadata values must not exceed ${String(REQUEST_METADATA_TOKEN_MAXIMUM_LENGTH)} characters.`
+    `Request metadata values must not exceed ${String(REQUEST_METADATA_TOKEN_MAXIMUM_LENGTH)} characters.`,
   )
   .regex(
     REQUEST_METADATA_TOKEN_PATTERN,
-    "Request metadata values may contain only letters, numbers, periods, underscores, and hyphens."
+    "Request metadata values may contain only letters, numbers, periods, underscores, and hyphens.",
   );
 
 export const RequestIdentifierInMessagePattern = /\brequest(?:Id)?[ =:]+[a-z0-9._-]+\b/i;

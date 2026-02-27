@@ -1,7 +1,7 @@
+import type { UserInputRequestSchema } from "@farfield/protocol";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { z } from "zod";
-import type { UserInputRequestSchema } from "@farfield/protocol";
 import { PendingRequestCard, type PendingRequestCardProps } from "@/Components/PendingRequestCard";
 
 type PendingUserInputRequest = z.infer<typeof UserInputRequestSchema>;
@@ -24,16 +24,16 @@ function createPendingUserInputRequest(): PendingUserInputRequest {
           options: [
             {
               label: "Use workspace token",
-              description: ""
+              description: "",
             },
             {
               label: "Use local token",
-              description: "Read from local keychain"
-            }
-          ]
-        }
-      ]
-    }
+              description: "Read from local keychain",
+            },
+          ],
+        },
+      ],
+    },
   };
 }
 
@@ -49,7 +49,7 @@ function renderPendingRequestCard(overrides?: Partial<PendingRequestCardProps>):
       onSkip={() => {}}
       isBusy={false}
       {...overrides}
-    />
+    />,
   );
 }
 
@@ -66,13 +66,12 @@ describe("PendingRequestCard", () => {
     const onDraftChange = vi.fn();
 
     renderPendingRequestCard({
-      onDraftChange
+      onDraftChange,
     });
 
-    fireEvent.change(
-      screen.getByPlaceholderText("Free-form answer…"),
-      { target: { value: "token-value" } }
-    );
+    fireEvent.change(screen.getByPlaceholderText("Free-form answer…"), {
+      target: { value: "token-value" },
+    });
 
     expect(onDraftChange).toHaveBeenCalledWith("question-1", "freeform", "token-value");
   });
@@ -84,7 +83,7 @@ describe("PendingRequestCard", () => {
     renderPendingRequestCard({
       isBusy: true,
       onSubmit,
-      onSkip
+      onSkip,
     });
 
     const skipButton = screen.getByRole("button", { name: "Skip" });

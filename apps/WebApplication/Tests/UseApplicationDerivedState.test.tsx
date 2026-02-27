@@ -3,29 +3,33 @@ import { afterEach, describe, expect, it } from "vitest";
 import { useApplicationDerivedState } from "../Source/Application/StateManagement/UseApplicationDerivedState";
 import {
   type ApplicationDerivedState,
-  type UseApplicationDerivedStateInput
+  type UseApplicationDerivedStateInput,
 } from "../Source/Application/StateManagement/UseApplicationDerivedStateContracts";
 import {
   type CapabilityAgentsResponse,
   type CapabilityCollaborationModesResponse,
   type CapabilityConfigDefaultsResponse,
-  type CapabilityModelsResponse
+  type CapabilityModelsResponse,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
-import { type ChatLiveStateResponse, type ChatReadThreadResponse } from "../Source/Features/Chat/DataAccess/ChatServerClient";
-import { ConversationItemFlattener, type ConversationTurn } from "../Source/Features/Chat/DomainModel/ConversationItemFlattener";
+import {
+  type ChatLiveStateResponse,
+  type ChatReadThreadResponse,
+} from "../Source/Features/Chat/DataAccess/ChatServerClient";
+import {
+  ConversationItemFlattener,
+  type ConversationTurn,
+} from "../Source/Features/Chat/DomainModel/ConversationItemFlattener";
 import { ConversationSyncSignatureBuilder } from "../Source/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
 import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import { PendingUserInputRequestSelector } from "../Source/Features/Chat/DomainModel/PendingUserInputRequestSelector";
-import { type ThreadListItem } from "../Source/Features/Threads/DomainModel/ThreadGroupTypes";
-import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
-import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
-import {
-  ThreadListStateController
-} from "../Source/Features/Threads/StateManagement/ThreadListStateController";
-import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
-import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement/ThreadListStateStore";
-import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import { DebugIssueStateResolver } from "../Source/Features/Debugging/DomainModel/DebugIssueStateResolver";
+import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
+import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
+import { type ThreadListItem } from "../Source/Features/Threads/DomainModel/ThreadGroupTypes";
+import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
+import { ThreadListStateController } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
+import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement/ThreadListStateStore";
+import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
 
 const THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS = 60_000;
 const THREAD_QUERY_CACHE_MAXIMUM_ENTRIES = 10;
@@ -57,24 +61,24 @@ function createThreadListStateController(): ThreadListStateController {
     threadServerClient: new ThreadServerClient(),
     threadQueryCache: new ThreadQueryCache(
       THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS,
-      THREAD_QUERY_CACHE_MAXIMUM_ENTRIES
+      THREAD_QUERY_CACHE_MAXIMUM_ENTRIES,
     ),
     threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
     threadListStateStore: new ThreadListStateStore(),
-    threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+    threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
   });
 }
 
 function buildThreadListItem(
   threadIdentifier: string,
-  agentIdentifier: ThreadListItem["agentId"] = "codex"
+  agentIdentifier: ThreadListItem["agentId"] = "codex",
 ): ThreadListItem {
   return {
     id: threadIdentifier,
     preview: "",
     createdAt: 1_700_000_000,
     updatedAt: 1_700_000_000,
-    agentId: agentIdentifier
+    agentId: agentIdentifier,
   };
 }
 
@@ -86,13 +90,15 @@ function buildAgentMessageTurn(turnIdentifier: string, text: string): Conversati
       {
         id: `item-${turnIdentifier}`,
         type: "agentMessage",
-        text
-      }
-    ]
+        text,
+      },
+    ],
   };
 }
 
-function buildConversationState(input: ConversationStateInput): NonNullable<ChatLiveStateResponse["conversationState"]> {
+function buildConversationState(
+  input: ConversationStateInput,
+): NonNullable<ChatLiveStateResponse["conversationState"]> {
   return {
     id: input.threadIdentifier,
     turns: input.turns,
@@ -105,9 +111,9 @@ function buildConversationState(input: ConversationStateInput): NonNullable<Chat
       settings: {
         model: input.latestModel,
         reasoning_effort: input.latestReasoningEffort,
-        developer_instructions: null
-      }
-    }
+        developer_instructions: null,
+      },
+    },
   };
 }
 
@@ -115,7 +121,7 @@ function buildReadThreadSnapshot(input: ConversationStateInput): ChatReadThreadR
   return {
     ok: true,
     thread: buildConversationState(input),
-    agentId: "codex"
+    agentId: "codex",
   };
 }
 
@@ -132,9 +138,9 @@ function buildAgentDescriptorsFixture(): CapabilityAgentsResponse["agents"] {
         canSetCollaborationMode: true,
         canSubmitUserInput: true,
         canReadLiveState: true,
-        canReadStreamEvents: true
+        canReadStreamEvents: true,
       },
-      projectDirectories: []
+      projectDirectories: [],
     },
     {
       id: "opencode",
@@ -147,10 +153,10 @@ function buildAgentDescriptorsFixture(): CapabilityAgentsResponse["agents"] {
         canSetCollaborationMode: false,
         canSubmitUserInput: false,
         canReadLiveState: false,
-        canReadStreamEvents: false
+        canReadStreamEvents: false,
       },
-      projectDirectories: []
-    }
+      projectDirectories: [],
+    },
   ];
 }
 
@@ -163,15 +169,15 @@ function createBaseInput(): UseApplicationDerivedStateInput {
       mode: "default",
       model: null,
       reasoning_effort: "medium",
-      developer_instructions: null
+      developer_instructions: null,
     },
     {
       name: "Plan",
       mode: "plan",
       model: null,
       reasoning_effort: "medium",
-      developer_instructions: null
-    }
+      developer_instructions: null,
+    },
   ];
 
   const models: CapabilityModelsResponse["data"] = [
@@ -186,19 +192,19 @@ function createBaseInput(): UseApplicationDerivedStateInput {
       supportedReasoningEfforts: [
         {
           reasoningEffort: "medium",
-          description: "Balanced reasoning"
-        }
+          description: "Balanced reasoning",
+        },
       ],
       inputModalities: ["text"],
-      supportsPersonality: false
-    }
+      supportsPersonality: false,
+    },
   ];
 
   const configDefaults: CapabilityConfigDefaultsResponse = {
     ok: true,
     agentId: "codex",
     model: "gpt-5",
-    reasoningEffort: "medium"
+    reasoningEffort: "medium",
   };
 
   return {
@@ -232,17 +238,19 @@ function createBaseInput(): UseApplicationDerivedStateInput {
     assumedAppDefaultModelIdentifier: "gpt-5",
     assumedAppDefaultReasoningEffort: "medium",
     modeSelectionStateResolver,
-    conversationSyncSignatureBuilder: new ConversationSyncSignatureBuilder(modeSelectionStateResolver),
+    conversationSyncSignatureBuilder: new ConversationSyncSignatureBuilder(
+      modeSelectionStateResolver,
+    ),
     pendingUserInputRequestSelector: new PendingUserInputRequestSelector(),
     conversationItemFlattener: new ConversationItemFlattener(),
     debugIssueStateResolver: new DebugIssueStateResolver(),
-    threadListStateController: createThreadListStateController()
+    threadListStateController: createThreadListStateController(),
   };
 }
 
 function renderDerivedState(input: UseApplicationDerivedStateInput): ApplicationDerivedState {
   const snapshotReference: { current: ApplicationDerivedState | null } = {
-    current: null
+    current: null,
   };
 
   render(
@@ -251,7 +259,7 @@ function renderDerivedState(input: UseApplicationDerivedStateInput): Application
       onDerivedState={(derivedState) => {
         snapshotReference.current = derivedState;
       }}
-    />
+    />,
   );
 
   const snapshot = snapshotReference.current;
@@ -277,22 +285,22 @@ describe("useApplicationDerivedState", () => {
           mode: "default",
           model: null,
           reasoning_effort: "high",
-          developer_instructions: null
+          developer_instructions: null,
         },
         {
           name: "Plan",
           mode: "plan",
           model: null,
           reasoning_effort: "minimal",
-          developer_instructions: null
-        }
+          developer_instructions: null,
+        },
       ],
       readThreadState: buildReadThreadSnapshot({
         threadIdentifier: "thread-1",
         turns: [buildAgentMessageTurn("turn-1", "hello")],
         latestModel: "gpt-5",
-        latestReasoningEffort: "xhigh"
-      })
+        latestReasoningEffort: "xhigh",
+      }),
     };
 
     const derivedState = renderDerivedState(input);
@@ -306,14 +314,14 @@ describe("useApplicationDerivedState", () => {
       "high",
       "minimal",
       "xhigh",
-      "none"
+      "none",
     ]);
     expect(derivedState.effortOptionsWithoutAssumedDefault).toEqual([
       "low",
       "high",
       "minimal",
       "xhigh",
-      "none"
+      "none",
     ]);
   });
 
@@ -322,7 +330,7 @@ describe("useApplicationDerivedState", () => {
       ...createBaseInput(),
       selectedAgentId: "opencode",
       selectedThreadId: "thread-codex",
-      threads: [buildThreadListItem("thread-codex", "codex")]
+      threads: [buildThreadListItem("thread-codex", "codex")],
     };
 
     const derivedState = renderDerivedState(input);
@@ -345,11 +353,11 @@ describe("useApplicationDerivedState", () => {
         turns: [
           buildAgentMessageTurn("turn-1", "one"),
           buildAgentMessageTurn("turn-2", "two"),
-          buildAgentMessageTurn("turn-3", "three")
+          buildAgentMessageTurn("turn-3", "three"),
         ],
         latestModel: "gpt-5",
-        latestReasoningEffort: "medium"
-      })
+        latestReasoningEffort: "medium",
+      }),
     };
 
     const derivedState = renderDerivedState(input);
@@ -359,7 +367,7 @@ describe("useApplicationDerivedState", () => {
     expect(derivedState.hasHiddenChatItems).toBe(true);
     expect(derivedState.visibleConversationItems.map((item) => item.key)).toEqual([
       "item-turn-2",
-      "item-turn-3"
+      "item-turn-3",
     ]);
   });
 
@@ -369,13 +377,10 @@ describe("useApplicationDerivedState", () => {
       visibleChatItemLimit: 20,
       readThreadState: buildReadThreadSnapshot({
         threadIdentifier: "thread-1",
-        turns: [
-          buildAgentMessageTurn("turn-1", "one"),
-          buildAgentMessageTurn("turn-2", "two")
-        ],
+        turns: [buildAgentMessageTurn("turn-1", "one"), buildAgentMessageTurn("turn-2", "two")],
         latestModel: "gpt-5",
-        latestReasoningEffort: "medium"
-      })
+        latestReasoningEffort: "medium",
+      }),
     };
 
     const derivedState = renderDerivedState(input);
@@ -385,7 +390,7 @@ describe("useApplicationDerivedState", () => {
     expect(derivedState.hasHiddenChatItems).toBe(false);
     expect(derivedState.visibleConversationItems.map((item) => item.key)).toEqual([
       "item-turn-1",
-      "item-turn-2"
+      "item-turn-2",
     ]);
   });
 });

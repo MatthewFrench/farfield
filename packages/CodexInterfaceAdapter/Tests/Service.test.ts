@@ -1,21 +1,21 @@
-import { describe, expect, it, vi, type Mock } from "vitest";
 import {
-  IpcResponseFrameSchema,
   type IpcResponseFrame,
+  IpcResponseFrameSchema,
   type JsonValue,
   type ThreadConversationState,
-  type TurnStartParams
+  type TurnStartParams,
 } from "@farfield/protocol";
+import { describe, expect, it, type Mock, vi } from "vitest";
 import {
-  CodexMonitorService,
   type CodexMonitorIpcClient,
-  type ThreadFollowerRequestOptions
+  CodexMonitorService,
+  type ThreadFollowerRequestOptions,
 } from "../Source/Service.js";
 
 type SendRequestAndWaitFunction = (
   method: string,
   params: JsonValue,
-  options: ThreadFollowerRequestOptions
+  options: ThreadFollowerRequestOptions,
 ) => Promise<IpcResponseFrame>;
 
 type SendRequestAndWaitMock = Mock<SendRequestAndWaitFunction>;
@@ -44,13 +44,13 @@ function createThread(templateOverrides?: ThreadTemplateOverrides): ThreadConver
           ...(templateOverrides?.effort !== undefined ? { effort: templateOverrides.effort } : {}),
           ...(templateOverrides?.collaborationMode !== undefined
             ? { collaborationMode: templateOverrides.collaborationMode }
-            : {})
+            : {}),
         },
         status: "completed",
-        items: []
-      }
+        items: [],
+      },
     ],
-    requests: []
+    requests: [],
   };
 }
 
@@ -59,7 +59,7 @@ function createIpcSuccessResponse(): IpcResponseFrame {
     type: "response",
     requestId: "request-1",
     resultType: "success",
-    result: {}
+    result: {},
   });
 }
 
@@ -68,18 +68,16 @@ function createServiceIpcClientDouble(): ServiceIpcClientDouble {
   sendRequestAndWait.mockResolvedValue(createIpcSuccessResponse());
 
   const ipcClient: CodexMonitorIpcClient = {
-    sendRequestAndWait
+    sendRequestAndWait,
   };
 
   return {
     ipcClient,
-    sendRequestAndWait
+    sendRequestAndWait,
   };
 }
 
-function requireTurnStartTemplate(
-  thread: ThreadConversationState
-): TurnStartParams {
+function requireTurnStartTemplate(thread: ThreadConversationState): TurnStartParams {
   const template = thread.turns[0]?.params;
   if (!template) {
     throw new Error("Expected turn start template");
@@ -96,18 +94,18 @@ describe("CodexMonitorService", () => {
       threadId: "thread-1",
       ownerClientId: "client-1",
       text: "new message",
-      turnStartTemplate: requireTurnStartTemplate(createThread())
+      turnStartTemplate: requireTurnStartTemplate(createThread()),
     });
 
     expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
       "thread-follower-start-turn",
       expect.objectContaining({
-        conversationId: "thread-1"
+        conversationId: "thread-1",
       }),
       {
         targetClientId: "client-1",
-        version: 1
-      }
+        version: 1,
+      },
     );
   });
 
@@ -127,9 +125,9 @@ describe("CodexMonitorService", () => {
         settings: {
           model: "gpt-5.3-codex",
           reasoning_effort: "high",
-          developer_instructions: "plan"
-        }
-      }
+          developer_instructions: "plan",
+        },
+      },
     });
 
     expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
@@ -139,11 +137,11 @@ describe("CodexMonitorService", () => {
           model: "gpt-5.3-codex",
           effort: "high",
           collaborationMode: expect.objectContaining({
-            mode: "plan"
-          })
-        })
+            mode: "plan",
+          }),
+        }),
       }),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -160,10 +158,10 @@ describe("CodexMonitorService", () => {
           model: "template-model",
           effort: "medium",
           collaborationMode: {
-            mode: "plan"
-          }
-        })
-      )
+            mode: "plan",
+          },
+        }),
+      ),
     });
 
     expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
@@ -173,11 +171,11 @@ describe("CodexMonitorService", () => {
           model: "template-model",
           effort: "medium",
           collaborationMode: expect.objectContaining({
-            mode: "plan"
-          })
-        })
+            mode: "plan",
+          }),
+        }),
       }),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -194,13 +192,13 @@ describe("CodexMonitorService", () => {
           model: "template-model",
           effort: "medium",
           collaborationMode: {
-            mode: "plan"
-          }
-        })
+            mode: "plan",
+          },
+        }),
       ),
       model: null,
       effort: null,
-      collaborationMode: null
+      collaborationMode: null,
     });
 
     expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
@@ -209,10 +207,10 @@ describe("CodexMonitorService", () => {
         turnStartParams: expect.objectContaining({
           model: null,
           effort: null,
-          collaborationMode: null
-        })
+          collaborationMode: null,
+        }),
       }),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -224,7 +222,7 @@ describe("CodexMonitorService", () => {
       threadId: "thread-1",
       ownerClientId: "client-1",
       text: "new message without template",
-      cwd: "/tmp/project"
+      cwd: "/tmp/project",
     });
 
     expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
@@ -237,12 +235,12 @@ describe("CodexMonitorService", () => {
           input: [
             {
               type: "text",
-              text: "new message without template"
-            }
-          ]
-        })
+              text: "new message without template",
+            },
+          ],
+        }),
       }),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -254,7 +252,7 @@ describe("CodexMonitorService", () => {
       threadId: "thread-1",
       ownerClientId: "client-1",
       text: "message with explicit empty cwd",
-      cwd: ""
+      cwd: "",
     });
 
     expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
@@ -263,10 +261,10 @@ describe("CodexMonitorService", () => {
         conversationId: "thread-1",
         turnStartParams: expect.objectContaining({
           threadId: "thread-1",
-          cwd: ""
-        })
+          cwd: "",
+        }),
       }),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -278,8 +276,8 @@ describe("CodexMonitorService", () => {
       service.sendMessage({
         threadId: "thread-1",
         ownerClientId: "client-1",
-        text: "   "
-      })
+        text: "   ",
+      }),
     ).rejects.toThrowError("Message text is required");
 
     expect(serviceIpcClientDouble.sendRequestAndWait).not.toHaveBeenCalled();
@@ -293,8 +291,8 @@ describe("CodexMonitorService", () => {
       threadId: "thread-1",
       ownerClientId: "client-1",
       collaborationMode: {
-        mode: "plan"
-      }
+        mode: "plan",
+      },
     });
 
     expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
@@ -302,13 +300,13 @@ describe("CodexMonitorService", () => {
       expect.objectContaining({
         conversationId: "thread-1",
         collaborationMode: expect.objectContaining({
-          mode: "plan"
-        })
+          mode: "plan",
+        }),
       }),
       {
         targetClientId: "client-1",
-        version: 1
-      }
+        version: 1,
+      },
     );
   });
 
@@ -323,10 +321,10 @@ describe("CodexMonitorService", () => {
       response: {
         answers: {
           q1: {
-            answers: ["Option A"]
-          }
-        }
-      }
+            answers: ["Option A"],
+          },
+        },
+      },
     });
 
     expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
@@ -337,15 +335,15 @@ describe("CodexMonitorService", () => {
         response: {
           answers: {
             q1: {
-              answers: ["Option A"]
-            }
-          }
-        }
+              answers: ["Option A"],
+            },
+          },
+        },
       }),
       {
         targetClientId: "client-1",
-        version: 1
-      }
+        version: 1,
+      },
     );
   });
 
@@ -355,18 +353,18 @@ describe("CodexMonitorService", () => {
 
     await service.interrupt({
       threadId: "thread-1",
-      ownerClientId: "client-1"
+      ownerClientId: "client-1",
     });
 
     expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
       "thread-follower-interrupt-turn",
       expect.objectContaining({
-        conversationId: "thread-1"
+        conversationId: "thread-1",
       }),
       {
         targetClientId: "client-1",
-        version: 1
-      }
+        version: 1,
+      },
     );
   });
 
@@ -382,11 +380,11 @@ describe("CodexMonitorService", () => {
         response: {
           answers: {
             q1: {
-              freeResponse: ""
-            }
-          }
-        }
-      })
+              freeResponse: "",
+            },
+          },
+        },
+      }),
     ).rejects.toThrowError(/did not match expected schema/i);
   });
 });

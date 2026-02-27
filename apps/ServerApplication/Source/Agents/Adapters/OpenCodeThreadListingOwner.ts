@@ -2,13 +2,11 @@ import type { MappedThreadListItem } from "@farfield/opencode-api";
 import type { AgentListThreadsInput, AgentListThreadsResult } from "../Types.js";
 import {
   decodeOpenCodeThreadCursor,
-  encodeOpenCodeThreadCursor
+  encodeOpenCodeThreadCursor,
 } from "./OpenCodeThreadCursorContracts.js";
 
 export interface OpenCodeThreadListingOwnerDependencies {
-  parseThreadListItem: (
-    session: MappedThreadListItem
-  ) => AgentListThreadsResult["data"][number];
+  parseThreadListItem: (session: MappedThreadListItem) => AgentListThreadsResult["data"][number];
   listSessions: (input?: { directory?: string }) => Promise<{ data: MappedThreadListItem[] }>;
   resolveSessionDirectories: (inputDirectory: string | null) => Promise<string[]>;
   cacheThreadDirectory: (threadId: string, directory: string | undefined) => void;
@@ -19,14 +17,14 @@ function createEmptyThreadListResult(): AgentListThreadsResult {
     data: [],
     nextCursor: null,
     pages: 0,
-    truncated: false
+    truncated: false,
   };
 }
 
 function compareThreadsBySortKey(
   left: AgentListThreadsResult["data"][number],
   right: AgentListThreadsResult["data"][number],
-  sortKey: "created_at" | "updated_at"
+  sortKey: "created_at" | "updated_at",
 ): number {
   const leftValue = sortKey === "created_at" ? left.createdAt : left.updatedAt;
   const rightValue = sortKey === "created_at" ? right.createdAt : right.updatedAt;
@@ -64,33 +62,33 @@ export class OpenCodeThreadListingOwner {
     if (!input.all) {
       const pageData = mappedData.slice(cursorOffset, cursorOffset + input.limit);
       const nextOffset = cursorOffset + pageData.length;
-      const nextCursor = nextOffset < mappedData.length
-        ? encodeOpenCodeThreadCursor(nextOffset)
-        : null;
+      const nextCursor =
+        nextOffset < mappedData.length ? encodeOpenCodeThreadCursor(nextOffset) : null;
       return {
         data: pageData,
         nextCursor,
         pages: pageData.length > 0 ? 1 : 0,
-        truncated: nextCursor !== null
+        truncated: nextCursor !== null,
       };
     }
 
     const maxItems = input.limit * input.maxPages;
     const pageData = mappedData.slice(cursorOffset, cursorOffset + maxItems);
     const nextOffset = cursorOffset + pageData.length;
-    const nextCursor = nextOffset < mappedData.length
-      ? encodeOpenCodeThreadCursor(nextOffset)
-      : null;
+    const nextCursor =
+      nextOffset < mappedData.length ? encodeOpenCodeThreadCursor(nextOffset) : null;
 
     return {
       data: pageData,
       nextCursor,
       pages: pageData.length === 0 ? 0 : Math.ceil(pageData.length / input.limit),
-      truncated: nextCursor !== null
+      truncated: nextCursor !== null,
     };
   }
 
-  private async readSessions(inputDirectory: string | null): Promise<Map<string, MappedThreadListItem>> {
+  private async readSessions(
+    inputDirectory: string | null,
+  ): Promise<Map<string, MappedThreadListItem>> {
     const directories = await this.deps.resolveSessionDirectories(inputDirectory);
     const sessionMap = new Map<string, MappedThreadListItem>();
 
@@ -104,7 +102,7 @@ export class OpenCodeThreadListingOwner {
       directories.map(async (directory) => {
         const result = await this.deps.listSessions({ directory });
         this.mergeSessions(sessionMap, result.data);
-      })
+      }),
     );
 
     return sessionMap;
@@ -112,7 +110,7 @@ export class OpenCodeThreadListingOwner {
 
   private mergeSessions(
     targetSessionMap: Map<string, MappedThreadListItem>,
-    sessions: ReadonlyArray<MappedThreadListItem>
+    sessions: ReadonlyArray<MappedThreadListItem>,
   ): void {
     for (const session of sessions) {
       targetSessionMap.set(session.id, session);

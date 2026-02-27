@@ -28,13 +28,13 @@ describe("ClientErrorStore", () => {
     const logPath = path.join(directory, "session.ndjson");
 
     expect(() => new ClientErrorStore("", "session_1", 20)).toThrow(
-      "filePath must be a non-empty string"
+      "filePath must be a non-empty string",
     );
     expect(() => new ClientErrorStore(logPath, "", 20)).toThrow(
-      "sessionId must be a non-empty string"
+      "sessionId must be a non-empty string",
     );
     expect(() => new ClientErrorStore(logPath, "session_1", 0)).toThrow(
-      "maxEntries must be a positive integer"
+      "maxEntries must be a positive integer",
     );
   });
 
@@ -54,8 +54,8 @@ describe("ClientErrorStore", () => {
       url: "/threads/thread_1",
       occurredAt: "2026-02-18T00:00:00.000Z",
       details: {
-        tab: "chat"
-      }
+        tab: "chat",
+      },
     });
 
     const serverEvent = store.recordServerError({
@@ -69,9 +69,9 @@ describe("ClientErrorStore", () => {
       threadId: "thread_2",
       url: "/api/threads/thread_2/live-state",
       details: {
-        method: "GET"
+        method: "GET",
       },
-      occurredAt: "2026-02-18T00:00:01.000Z"
+      occurredAt: "2026-02-18T00:00:01.000Z",
     });
 
     expect(store.getCount()).toBe(2);
@@ -81,8 +81,8 @@ describe("ClientErrorStore", () => {
     const raw = fs.readFileSync(logPath, "utf8").trim();
     const lines = raw.split("\n");
     expect(lines.length).toBe(2);
-    expect(lines[0]).toContain("\"origin\":\"client\"");
-    expect(lines[1]).toContain("\"origin\":\"server\"");
+    expect(lines[0]).toContain('"origin":"client"');
+    expect(lines[1]).toContain('"origin":"server"');
 
     const reloadedStore = new ClientErrorStore(logPath, "session_1", 20);
     expect(reloadedStore.getCount()).toBe(2);
@@ -99,19 +99,19 @@ describe("ClientErrorStore", () => {
       source: "web-app",
       operation: "op-1",
       message: "one",
-      details: {}
+      details: {},
     });
     store.recordClientError({
       source: "web-app",
       operation: "op-2",
       message: "two",
-      details: {}
+      details: {},
     });
     store.recordClientError({
       source: "web-app",
       operation: "op-3",
       message: "three",
-      details: {}
+      details: {},
     });
 
     expect(store.getCount()).toBe(2);
@@ -132,19 +132,19 @@ describe("ClientErrorStore", () => {
       source: "web-app",
       operation: "op-1",
       message: "one",
-      details: {}
+      details: {},
     });
     store.recordClientError({
       source: "web-app",
       operation: "op-2",
       message: "two",
-      details: {}
+      details: {},
     });
     store.recordClientError({
       source: "web-app",
       operation: "op-3",
       message: "three",
-      details: {}
+      details: {},
     });
 
     expect(store.list(0).map((entry) => entry.operation)).toEqual(["op-1", "op-2", "op-3"]);
@@ -161,7 +161,7 @@ describe("ClientErrorStore", () => {
       source: "web-app",
       operation: "op-1",
       message: "one",
-      details: {}
+      details: {},
     });
     const clearedCount = store.clear();
 
@@ -190,7 +190,7 @@ describe("ClientErrorStore", () => {
       url: null,
       details: {},
       occurredAt: "2026-02-18T00:00:00.000Z",
-      recordedAt: "2026-02-18T00:00:01.000Z"
+      recordedAt: "2026-02-18T00:00:01.000Z",
     };
     const invalidSchemaEvent = {
       errorId: "error_invalid_schema",
@@ -201,12 +201,12 @@ describe("ClientErrorStore", () => {
       message: "invalid",
       details: {},
       occurredAt: "2026-02-18T00:00:00.000Z",
-      recordedAt: "2026-02-18T00:00:01.000Z"
+      recordedAt: "2026-02-18T00:00:01.000Z",
     };
     const lines = [
       JSON.stringify(validEvent),
-      "{\"errorId\":\"error_truncated\"",
-      JSON.stringify(invalidSchemaEvent)
+      '{"errorId":"error_truncated"',
+      JSON.stringify(invalidSchemaEvent),
     ];
     fs.writeFileSync(logPath, `${lines.join("\n")}\n`, "utf8");
 
@@ -219,7 +219,7 @@ describe("ClientErrorStore", () => {
       sessionId: "session_3",
       logPath,
       malformedLineCount: 2,
-      sampledLineNumbers: [2, 3]
+      sampledLineNumbers: [2, 3],
     });
     expect(warnSpy.mock.calls[0]?.[1]).toBe("client-error-store-skip-malformed-line");
   });
@@ -235,9 +235,9 @@ describe("ClientErrorStore", () => {
       message: "created",
       details: {
         nested: {
-          key: "value"
-        }
-      }
+          key: "value",
+        },
+      },
     });
 
     const listed = store.list(1)[0];
@@ -247,16 +247,16 @@ describe("ClientErrorStore", () => {
     }
 
     listed.details.nested = {
-      key: "changed-from-list"
+      key: "changed-from-list",
     };
     byId.details.nested = {
-      key: "changed-from-getById"
+      key: "changed-from-getById",
     };
 
     const stored = store.getById(created.errorId);
     expect(stored).not.toBeNull();
     expect(stored?.details.nested).toEqual({
-      key: "value"
+      key: "value",
     });
   });
 });

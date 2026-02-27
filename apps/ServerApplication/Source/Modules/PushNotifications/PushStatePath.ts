@@ -48,7 +48,7 @@ function resolveDefaultStateDirectory(
   platform: NodeJS.Platform,
   homeDirectory: string,
   appDataPath: string | undefined,
-  xdgStateHome: string | undefined
+  xdgStateHome: string | undefined,
 ): string {
   if (platform === "darwin") {
     return path.join(homeDirectory, "Library", APPLE_SUPPORT_DIRECTORY_NAME, STATE_DIRECTORY_NAME);
@@ -56,18 +56,20 @@ function resolveDefaultStateDirectory(
 
   if (platform === "win32") {
     const appData =
-      parseOptionalPathOverride("APPDATA", appDataPath)
-      ?? path.join(homeDirectory, ...WINDOWS_ROAMING_DIRECTORY_PATH_SEGMENTS);
+      parseOptionalPathOverride("APPDATA", appDataPath) ??
+      path.join(homeDirectory, ...WINDOWS_ROAMING_DIRECTORY_PATH_SEGMENTS);
     return path.join(appData, STATE_DIRECTORY_NAME);
   }
 
   const xdgStatePath =
-    parseOptionalPathOverride("XDG_STATE_HOME", xdgStateHome)
-    ?? path.join(homeDirectory, ...LINUX_DEFAULT_STATE_DIRECTORY_PATH_SEGMENTS);
+    parseOptionalPathOverride("XDG_STATE_HOME", xdgStateHome) ??
+    path.join(homeDirectory, ...LINUX_DEFAULT_STATE_DIRECTORY_PATH_SEGMENTS);
   return path.join(xdgStatePath, STATE_DIRECTORY_NAME);
 }
 
-export function resolvePushStatePath(options: ResolvePushStatePathOptions): PushStatePathResolution {
+export function resolvePushStatePath(
+  options: ResolvePushStatePathOptions,
+): PushStatePathResolution {
   const configuredPath = parseOptionalPathOverride("PUSH_STATE_PATH", options.envPath);
   const homeDirectory = requirePath("homeDirectory", options.homeDirectory);
 
@@ -75,13 +77,13 @@ export function resolvePushStatePath(options: ResolvePushStatePathOptions): Push
     options.platform,
     homeDirectory,
     options.appDataPath,
-    options.xdgStateHome
+    options.xdgStateHome,
   );
   const defaultPath = path.join(defaultStateDirectory, PUSH_STATE_FILE_NAME);
   const filePath = configuredPath ?? defaultPath;
 
   return {
     filePath,
-    source: configuredPath !== null ? "env" : "default"
+    source: configuredPath !== null ? "env" : "default",
   };
 }

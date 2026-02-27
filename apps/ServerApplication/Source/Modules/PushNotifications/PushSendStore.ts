@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  parsePushSendStore,
   type PushSendStore as PushSendStoreState,
-  type PushSendSummary
+  type PushSendSummary,
+  parsePushSendStore,
 } from "@farfield/protocol";
 
 const PUSH_SEND_STORE_VERSION = 1;
@@ -16,7 +16,7 @@ const WINDOWS_PLATFORM = "win32";
 function buildDefaultState(): PushSendStoreState {
   return parsePushSendStore({
     version: PUSH_SEND_STORE_VERSION,
-    latest: null
+    latest: null,
   });
 }
 

@@ -13,7 +13,7 @@ export class ThreadRefreshConcurrencyCoordinator {
 
   public async runSingleFlight(
     requestKey: string,
-    task: () => Promise<ThreadListResponse>
+    task: () => Promise<ThreadListResponse>,
   ): Promise<ThreadListResponse> {
     const existingInFlightRequest = this.inFlightRequestByKey.get(requestKey);
     if (existingInFlightRequest) {
@@ -27,7 +27,7 @@ export class ThreadRefreshConcurrencyCoordinator {
 
   private trackInFlightRequest(
     requestKey: string,
-    task: () => Promise<ThreadListResponse>
+    task: () => Promise<ThreadListResponse>,
   ): Promise<ThreadListResponse> {
     return task().finally(() => {
       this.inFlightRequestByKey.delete(requestKey);

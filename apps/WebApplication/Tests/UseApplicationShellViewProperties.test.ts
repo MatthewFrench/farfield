@@ -1,22 +1,16 @@
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
   createElement,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
-  useState
+  useState,
 } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  afterEach,
-  describe,
-  expect,
-  it,
-  vi
-} from "vitest";
-import {
-  useApplicationShellViewProperties,
   type ApplicationShellViewProperties,
-  type UseApplicationShellViewPropertiesInput
+  type UseApplicationShellViewPropertiesInput,
+  useApplicationShellViewProperties,
 } from "../Source/Application/StateManagement/UseApplicationShellViewProperties";
 import { ChatScrollStateCoordinator } from "../Source/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { type ChatModeToolbarProps } from "../Source/Features/Chat/UserInterface/ChatModeToolbar";
@@ -44,14 +38,14 @@ interface ShowOlderMessagesHarnessProperties {
 }
 
 function ShowOlderMessagesHarness(
-  properties: ShowOlderMessagesHarnessProperties
+  properties: ShowOlderMessagesHarnessProperties,
 ): React.JSX.Element {
   const [visibleChatItemLimit, setVisibleChatItemLimit] = useState<number>(
-    properties.initialVisibleChatItemLimit
+    properties.initialVisibleChatItemLimit,
   );
   const viewProperties = useApplicationShellViewProperties({
     ...properties.input,
-    setVisibleChatItemLimit
+    setVisibleChatItemLimit,
   });
 
   properties.onVisibleChatItemLimitChange(visibleChatItemLimit);
@@ -59,7 +53,7 @@ function ShowOlderMessagesHarness(
   return createElement("button", {
     type: "button",
     "data-testid": "show-older-messages-button",
-    onClick: viewProperties.chatWorkspacePaneProperties.onShowOlderMessages
+    onClick: viewProperties.chatWorkspacePaneProperties.onShowOlderMessages,
   });
 }
 
@@ -91,23 +85,23 @@ function createChatModeToolbarPropertiesFixture(): ChatModeToolbarProps {
     pendingRequestCount: 0,
     onTogglePlanMode: (): void => {},
     onModelChange: (): void => {},
-    onReasoningEffortChange: (): void => {}
+    onReasoningEffortChange: (): void => {},
   };
 }
 
 function createScrollableElementFixture(
   scrollHeight: number,
   scrollTop: number,
-  clientHeight: number
+  clientHeight: number,
 ): HTMLDivElement {
   const scrollElement = document.createElement("div");
   Object.defineProperty(scrollElement, "scrollHeight", {
     configurable: true,
-    value: scrollHeight
+    value: scrollHeight,
   });
   Object.defineProperty(scrollElement, "clientHeight", {
     configurable: true,
-    value: clientHeight
+    value: clientHeight,
   });
   scrollElement.scrollTop = scrollTop;
   return scrollElement;
@@ -160,7 +154,7 @@ function createUseApplicationShellViewPropertiesFixture() {
       supported: true,
       serviceWorkerRegistered: true,
       permission: "granted",
-      subscribed: true
+      subscribed: true,
     },
     isEnablingPushNotifications: false,
     isBusy: false,
@@ -178,7 +172,7 @@ function createUseApplicationShellViewPropertiesFixture() {
       message: "request failed",
       actionId: "action-123",
       requestId: "request-123",
-      errorId: "error-123"
+      errorId: "error-123",
     },
     openDebugFromErrorBanner: openDebugFromErrorBannerSpy,
     setErrorMessage: setErrorMessageSpy,
@@ -249,7 +243,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     apiSessionBootstrapError: "invalid-token",
     setApiSessionBootstrapError: setApiSessionBootstrapErrorSpy,
     submitApiSessionToken: submitApiSessionTokenSpy,
-    isApiSessionBootstrapPending: false
+    isApiSessionBootstrapPending: false,
   };
 
   return {
@@ -265,23 +259,25 @@ function createUseApplicationShellViewPropertiesFixture() {
     setErrorMessageSpy,
     setIsChatAtBottomSpy,
     setApiSessionTokenDraftSpy,
-    setApiSessionBootstrapErrorSpy
+    setApiSessionBootstrapErrorSpy,
   };
 }
 
 function renderViewProperties(
-  input: UseApplicationShellViewPropertiesInput
+  input: UseApplicationShellViewPropertiesInput,
 ): ApplicationShellViewProperties {
   const capturedProperties: { current: ApplicationShellViewProperties | null } = {
-    current: null
+    current: null,
   };
 
-  render(createElement(Harness, {
-    input,
-    onProperties: (properties) => {
-      capturedProperties.current = properties;
-    }
-  }));
+  render(
+    createElement(Harness, {
+      input,
+      onProperties: (properties) => {
+        capturedProperties.current = properties;
+      },
+    }),
+  );
 
   if (!capturedProperties.current) {
     throw new Error("Expected application shell view properties to be captured.");
@@ -292,20 +288,22 @@ function renderViewProperties(
 
 function renderShowOlderMessagesHarness(
   input: UseApplicationShellViewPropertiesInput,
-  initialVisibleChatItemLimit: number
+  initialVisibleChatItemLimit: number,
 ): {
   clickShowOlderMessages: () => void;
   getLatestVisibleChatItemLimit: () => number;
 } {
   const visibleChatItemLimitValues: number[] = [];
 
-  render(createElement(ShowOlderMessagesHarness, {
-    input,
-    initialVisibleChatItemLimit,
-    onVisibleChatItemLimitChange: (nextVisibleChatItemLimit) => {
-      visibleChatItemLimitValues.push(nextVisibleChatItemLimit);
-    }
-  }));
+  render(
+    createElement(ShowOlderMessagesHarness, {
+      input,
+      initialVisibleChatItemLimit,
+      onVisibleChatItemLimitChange: (nextVisibleChatItemLimit) => {
+        visibleChatItemLimitValues.push(nextVisibleChatItemLimit);
+      },
+    }),
+  );
 
   return {
     clickShowOlderMessages: () => {
@@ -318,7 +316,7 @@ function renderShowOlderMessagesHarness(
       }
 
       return latestVisibleChatItemLimit;
-    }
+    },
   };
 }
 

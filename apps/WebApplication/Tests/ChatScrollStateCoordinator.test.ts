@@ -13,7 +13,7 @@ function createScrollElement(input: {
   return {
     scrollHeight: input.scrollHeight,
     scrollTop: input.scrollTop,
-    clientHeight: input.clientHeight
+    clientHeight: input.clientHeight,
   };
 }
 
@@ -23,12 +23,12 @@ describe("ChatScrollStateCoordinator", () => {
     const nearBottomElement = createScrollElement({
       scrollHeight: 1000,
       scrollTop: 455,
-      clientHeight: 500
+      clientHeight: 500,
     });
     const farFromBottomElement = createScrollElement({
       scrollHeight: 1000,
       scrollTop: 400,
-      clientHeight: 500
+      clientHeight: 500,
     });
 
     expect(coordinator.readDistanceFromBottom(nearBottomElement)).toBe(45);
@@ -42,30 +42,30 @@ describe("ChatScrollStateCoordinator", () => {
     const notBottomElement = createScrollElement({
       scrollHeight: 1000,
       scrollTop: 300,
-      clientHeight: 500
+      clientHeight: 500,
     });
     const bottomElement = createScrollElement({
       scrollHeight: 1000,
       scrollTop: 460,
-      clientHeight: 500
+      clientHeight: 500,
     });
 
     const firstResult = coordinator.synchronizeBottomState({
       scrollElement: notBottomElement,
-      previousIsAtBottom: true
+      previousIsAtBottom: true,
     });
     const secondResult = coordinator.synchronizeBottomState({
       scrollElement: bottomElement,
-      previousIsAtBottom: false
+      previousIsAtBottom: false,
     });
 
     expect(firstResult).toEqual({
       nextIsAtBottom: false,
-      changed: true
+      changed: true,
     });
     expect(secondResult).toEqual({
       nextIsAtBottom: true,
-      changed: true
+      changed: true,
     });
   });
 
@@ -74,7 +74,7 @@ describe("ChatScrollStateCoordinator", () => {
     const scrollElement = createScrollElement({
       scrollHeight: 1250,
       scrollTop: 200,
-      clientHeight: 500
+      clientHeight: 500,
     });
 
     coordinator.pinToBottom(scrollElement);
@@ -87,7 +87,7 @@ describe("ChatScrollStateCoordinator", () => {
     const overscrolledElement = createScrollElement({
       scrollHeight: 1000,
       scrollTop: 700,
-      clientHeight: 400
+      clientHeight: 400,
     });
 
     expect(coordinator.readDistanceFromBottom(overscrolledElement)).toBe(0);

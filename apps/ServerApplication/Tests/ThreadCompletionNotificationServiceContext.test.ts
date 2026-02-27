@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { CodexAgentAdapter } from "../Source/Agents/Adapters/CodexAgentAdapter.js";
 import {
   NtfyNotifier,
-  type NtfyThreadCompletedPayload
+  type NtfyThreadCompletedPayload,
 } from "../Source/Modules/PushNotifications/NtfyNotifier.js";
 import { PushSendStore } from "../Source/Modules/PushNotifications/PushSendStore.js";
 import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
@@ -18,7 +18,9 @@ import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrenc
 const temporaryDirectoryPaths: string[] = [];
 
 function createTemporaryDirectory(): string {
-  const temporaryDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-completion-context-"));
+  const temporaryDirectoryPath = fs.mkdtempSync(
+    path.join(os.tmpdir(), "farfield-completion-context-"),
+  );
   temporaryDirectoryPaths.push(temporaryDirectoryPath);
   return temporaryDirectoryPath;
 }
@@ -40,7 +42,7 @@ class RecordingNtfyNotifier extends NtfyNotifier {
       topic: "farfield-tests",
       baseUrl: "https://ntfy.sh",
       bearerToken: null,
-      priority: "3"
+      priority: "3",
     });
   }
 
@@ -49,11 +51,11 @@ class RecordingNtfyNotifier extends NtfyNotifier {
   }
 
   public override async publishThreadCompleted(
-    payload: NtfyThreadCompletedPayload
+    payload: NtfyThreadCompletedPayload,
   ): Promise<{ messageId: string | null }> {
     this.calls.push(payload);
     return {
-      messageId: "message_recorded"
+      messageId: "message_recorded",
     };
   }
 }
@@ -77,20 +79,20 @@ describe("ThreadCompletionNotificationServiceContext", () => {
             {
               id: "item_agent_no_targets",
               type: "agentMessage",
-              text: "No channel is enabled"
-            }
-          ]
-        }
+              text: "No channel is enabled",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const codexAdapter = {
       readLiveState: async (_threadId: string) => ({
         ownerClientId: null,
         conversationState,
-        liveStateError: null
-      })
+        liveStateError: null,
+      }),
     } as CodexAgentAdapter;
 
     const pushSystemEvents: string[] = [];
@@ -103,19 +105,19 @@ describe("ThreadCompletionNotificationServiceContext", () => {
         topic: null,
         baseUrl: "https://ntfy.sh",
         bearerToken: null,
-        priority: "3"
+        priority: "3",
       }),
       pushService: new PushService({
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: ""
+        vapidSubject: "",
       }),
       pushStore,
       pushSendStore,
       pushSystem: (message) => {
         pushSystemEvents.push(message);
-      }
+      },
     });
 
     await service.checkAndNotifyThreadCompletion("thread_no_targets");
@@ -145,20 +147,20 @@ describe("ThreadCompletionNotificationServiceContext", () => {
             {
               id: "item_agent_context_preview_cwd",
               type: "agentMessage",
-              text: "Delivered over ntfy"
-            }
-          ]
-        }
+              text: "Delivered over ntfy",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const codexAdapter = {
       readLiveState: async (_threadId: string) => ({
         ownerClientId: null,
         conversationState,
-        liveStateError: null
-      })
+        liveStateError: null,
+      }),
     } as CodexAgentAdapter;
 
     const recordingNtfyNotifier = new RecordingNtfyNotifier();
@@ -171,11 +173,11 @@ describe("ThreadCompletionNotificationServiceContext", () => {
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: ""
+        vapidSubject: "",
       }),
       pushStore,
       pushSendStore,
-      pushSystem: () => {}
+      pushSystem: () => {},
     });
 
     await service.checkAndNotifyThreadCompletion("thread_context_preview_cwd");
@@ -185,7 +187,7 @@ describe("ThreadCompletionNotificationServiceContext", () => {
       threadId: "thread_context_preview_cwd",
       preview: "Build finished",
       threadName: "Build finished",
-      projectName: "RocketProject"
+      projectName: "RocketProject",
     });
     expect(pushStore.getCompletionWatermark("thread_context_preview_cwd")).not.toBeNull();
   });
@@ -210,20 +212,20 @@ describe("ThreadCompletionNotificationServiceContext", () => {
             {
               id: "item_agent_context_title_path",
               type: "agentMessage",
-              text: "Delivered over ntfy"
-            }
-          ]
-        }
+              text: "Delivered over ntfy",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const codexAdapter = {
       readLiveState: async (_threadId: string) => ({
         ownerClientId: null,
         conversationState,
-        liveStateError: null
-      })
+        liveStateError: null,
+      }),
     } as CodexAgentAdapter;
 
     const recordingNtfyNotifier = new RecordingNtfyNotifier();
@@ -236,11 +238,11 @@ describe("ThreadCompletionNotificationServiceContext", () => {
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: ""
+        vapidSubject: "",
       }),
       pushStore,
       pushSendStore,
-      pushSystem: () => {}
+      pushSystem: () => {},
     });
 
     await service.checkAndNotifyThreadCompletion("thread_context_title_path");
@@ -250,7 +252,7 @@ describe("ThreadCompletionNotificationServiceContext", () => {
       threadId: "thread_context_title_path",
       preview: "",
       threadName: "Secondary title",
-      projectName: "AtlasProject"
+      projectName: "AtlasProject",
     });
     expect(pushStore.getCompletionWatermark("thread_context_title_path")).not.toBeNull();
   });

@@ -5,7 +5,7 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityApi", () => ({
   getHealth: vi.fn(),
   listAgents: vi.fn(),
   listCollaborationModes: vi.fn(),
-  listModels: vi.fn()
+  listModels: vi.fn(),
 }));
 
 import {
@@ -13,15 +13,15 @@ import {
   getHealth,
   listAgents,
   listCollaborationModes,
-  listModels
+  listModels,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
 import {
-  CapabilityServerClient,
   type CapabilityAgentsResponse,
   type CapabilityCollaborationModesResponse,
   type CapabilityConfigDefaultsResponse,
   type CapabilityHealthResponse,
-  type CapabilityModelsResponse
+  type CapabilityModelsResponse,
+  CapabilityServerClient,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
 
 const HEALTH_RESPONSE: CapabilityHealthResponse = {
@@ -32,8 +32,8 @@ const HEALTH_RESPONSE: CapabilityHealthResponse = {
     ipcInitialized: true,
     lastError: null,
     historyCount: 0,
-    threadOwnerCount: 0
-  }
+    threadOwnerCount: 0,
+  },
 };
 
 const AGENTS_RESPONSE: CapabilityAgentsResponse = {
@@ -50,12 +50,12 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canSetCollaborationMode: true,
         canSubmitUserInput: true,
         canReadLiveState: true,
-        canReadStreamEvents: true
+        canReadStreamEvents: true,
       },
-      projectDirectories: ["/tmp/project"]
-    }
+      projectDirectories: ["/tmp/project"],
+    },
   ],
-  defaultAgentId: "codex"
+  defaultAgentId: "codex",
 };
 
 const COLLABORATION_MODES_RESPONSE: CapabilityCollaborationModesResponse = {
@@ -64,9 +64,9 @@ const COLLABORATION_MODES_RESPONSE: CapabilityCollaborationModesResponse = {
       name: "Balanced",
       mode: "default",
       model: "gpt-5",
-      reasoning_effort: "medium"
-    }
-  ]
+      reasoning_effort: "medium",
+    },
+  ],
 };
 
 const MODELS_RESPONSE: CapabilityModelsResponse = {
@@ -82,21 +82,21 @@ const MODELS_RESPONSE: CapabilityModelsResponse = {
       supportedReasoningEfforts: [
         {
           reasoningEffort: "medium",
-          description: "Balanced reasoning"
-        }
+          description: "Balanced reasoning",
+        },
       ],
       inputModalities: ["text", "image"],
-      supportsPersonality: false
-    }
+      supportsPersonality: false,
+    },
   ],
-  nextCursor: null
+  nextCursor: null,
 };
 
 const CONFIG_DEFAULTS_RESPONSE: CapabilityConfigDefaultsResponse = {
   ok: true,
   agentId: "codex",
   model: "gpt-5",
-  reasoningEffort: "medium"
+  reasoningEffort: "medium",
 };
 
 describe("CapabilityServerClient", () => {
@@ -113,33 +113,33 @@ describe("CapabilityServerClient", () => {
     const capabilityServerClient = new CapabilityServerClient();
     const healthOptions = {
       actionId: "action-health",
-      actionName: "read-health"
+      actionName: "read-health",
     };
     const agentOptions = {
       actionId: "action-agents",
-      actionName: "list-agents"
+      actionName: "list-agents",
     };
     const collaborationModeOptions = {
       actionId: "action-collaboration-modes",
-      actionName: "list-collaboration-modes"
+      actionName: "list-collaboration-modes",
     };
     const modelOptions = {
       actionId: "action-models",
-      actionName: "list-models"
+      actionName: "list-models",
     };
     const configDefaultsOptions = {
       agentId: "codex" as const,
       actionId: "action-config-defaults",
-      actionName: "read-config-defaults"
+      actionName: "read-config-defaults",
     };
 
     const healthResponse = await capabilityServerClient.readHealthStatus(healthOptions);
     const agentsResponse = await capabilityServerClient.listAgents(agentOptions);
-    const collaborationModesResponse = await capabilityServerClient.listCollaborationModes(
-      collaborationModeOptions
-    );
+    const collaborationModesResponse =
+      await capabilityServerClient.listCollaborationModes(collaborationModeOptions);
     const modelsResponse = await capabilityServerClient.listModels(modelOptions);
-    const configDefaultsResponse = await capabilityServerClient.readConfigDefaults(configDefaultsOptions);
+    const configDefaultsResponse =
+      await capabilityServerClient.readConfigDefaults(configDefaultsOptions);
 
     expect(getHealth).toHaveBeenCalledWith(healthOptions);
     expect(listAgents).toHaveBeenCalledWith(agentOptions);

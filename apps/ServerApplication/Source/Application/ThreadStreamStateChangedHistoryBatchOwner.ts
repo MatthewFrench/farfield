@@ -10,13 +10,13 @@ export const THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE =
 const ThreadStreamStateChangedFlushIntervalMillisecondsSchema = z
   .number({
     invalid_type_error: THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE,
-    required_error: THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE
+    required_error: THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE,
   })
   .finite(THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE)
   .int(THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE)
   .min(
     THREAD_STREAM_STATE_CHANGED_MINIMUM_FLUSH_INTERVAL_MILLISECONDS,
-    THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE
+    THREAD_STREAM_STATE_CHANGED_INVALID_FLUSH_INTERVAL_MESSAGE,
   );
 
 const THREAD_STREAM_STATE_CHANGED_BUFFER_INVARIANT_VIOLATION_MESSAGE =
@@ -45,7 +45,9 @@ export class ThreadStreamStateChangedHistoryBatchOwner {
   private bufferedLatestThreadId: string | null = null;
 
   public constructor(dependencies: ThreadStreamStateChangedHistoryBatchOwnerDependencies) {
-    this.flushIntervalMs = ThreadStreamStateChangedFlushIntervalMillisecondsSchema.parse(dependencies.flushIntervalMs);
+    this.flushIntervalMs = ThreadStreamStateChangedFlushIntervalMillisecondsSchema.parse(
+      dependencies.flushIntervalMs,
+    );
     this.emitSummary = dependencies.emitSummary;
   }
 
@@ -80,7 +82,7 @@ export class ThreadStreamStateChangedHistoryBatchOwner {
     this.emitSummary({
       count: this.bufferedEventCount,
       spanMs,
-      latestThreadId: this.bufferedLatestThreadId
+      latestThreadId: this.bufferedLatestThreadId,
     });
 
     this.resetBufferedSummaryState();

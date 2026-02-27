@@ -1,8 +1,8 @@
 import { Github, PanelLeft, X } from "lucide-react";
-import { type AgentId } from "@/Shared/Contracts/ApiContracts";
-import { ThreadListPane, type ThreadListPaneProperties } from "./ThreadListPane";
 import { Button } from "@/Components/UserInterface/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/UserInterface/Tooltip";
+import { type AgentId } from "@/Shared/Contracts/ApiContracts";
+import { ThreadListPane, type ThreadListPaneProperties } from "./ThreadListPane";
 
 const SIDEBAR_HEALTH_STATE_READY = "ready";
 const SIDEBAR_HEALTH_STATE_FAILURE = "failure";
@@ -57,7 +57,7 @@ export function ThreadSidebarPanel({
   commitLabel,
   agentDescriptors,
   codexConfigured,
-  healthState
+  healthState,
 }: ThreadSidebarPanelProps): React.JSX.Element {
   return (
     <>
@@ -122,7 +122,7 @@ export function ThreadSidebarPanel({
                   data-state={readSidebarHealthState(allSystemsReady, hasAnySystemFailure)}
                   className={`h-2 w-2 rounded-full shrink-0 ${readSidebarHealthClassName(
                     allSystemsReady,
-                    hasAnySystemFailure
+                    hasAnySystemFailure,
                   )}`}
                 />
                 <span className="font-mono truncate">commit {commitLabel}</span>
@@ -134,23 +134,28 @@ export function ThreadSidebarPanel({
                 .filter((descriptor) => descriptor.enabled)
                 .map((descriptor) => (
                   <div key={descriptor.id}>
-                    {descriptor.label}: {descriptor.connected ? CONNECTED_LABEL : DISCONNECTED_LABEL}
+                    {descriptor.label}:{" "}
+                    {descriptor.connected ? CONNECTED_LABEL : DISCONNECTED_LABEL}
                   </div>
                 ))}
               {codexConfigured ? (
                 <>
                   <div>App: {healthState?.appReady === true ? OK_LABEL : NOT_READY_LABEL}</div>
-                  <div>IPC: {healthState?.ipcConnected === true ? CONNECTED_LABEL : DISCONNECTED_LABEL}</div>
-                  <div>Init: {healthState?.ipcInitialized === true ? READY_LABEL : NOT_READY_LABEL}</div>
+                  <div>
+                    IPC: {healthState?.ipcConnected === true ? CONNECTED_LABEL : DISCONNECTED_LABEL}
+                  </div>
+                  <div>
+                    Init: {healthState?.ipcInitialized === true ? READY_LABEL : NOT_READY_LABEL}
+                  </div>
                 </>
               ) : null}
-              {healthState?.lastError !== undefined
-                && healthState.lastError !== null
-                && healthState.lastError.length > 0 && (
-                <div className="max-w-64 break-words text-destructive">
-                  Error: {healthState.lastError}
-                </div>
-              )}
+              {healthState?.lastError !== undefined &&
+                healthState.lastError !== null &&
+                healthState.lastError.length > 0 && (
+                  <div className="max-w-64 break-words text-destructive">
+                    Error: {healthState.lastError}
+                  </div>
+                )}
             </TooltipContent>
           </Tooltip>
           <Tooltip>
@@ -166,7 +171,9 @@ export function ThreadSidebarPanel({
                 <Github size={14} aria-hidden="true" />
               </a>
             </TooltipTrigger>
-            <TooltipContent side="top" align="end">GitHub</TooltipContent>
+            <TooltipContent side="top" align="end">
+              GitHub
+            </TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -174,7 +181,10 @@ export function ThreadSidebarPanel({
   );
 }
 
-function readSidebarHealthClassName(allSystemsReady: boolean, hasAnySystemFailure: boolean): string {
+function readSidebarHealthClassName(
+  allSystemsReady: boolean,
+  hasAnySystemFailure: boolean,
+): string {
   if (allSystemsReady) {
     return SIDEBAR_HEALTH_CLASS_READY;
   }
@@ -186,7 +196,7 @@ function readSidebarHealthClassName(allSystemsReady: boolean, hasAnySystemFailur
 
 function readSidebarHealthState(
   allSystemsReady: boolean,
-  hasAnySystemFailure: boolean
+  hasAnySystemFailure: boolean,
 ): SidebarHealthState {
   if (allSystemsReady) {
     return SIDEBAR_HEALTH_STATE_READY;

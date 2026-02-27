@@ -2,17 +2,13 @@ import {
   type ActiveRequestSelectionInput,
   type ApplicationConversationState,
   type ApplicationPendingRequest,
-  type ConversationStateSelectionInput
+  type ConversationStateSelectionInput,
 } from "./UseApplicationDerivedStateContracts";
 
 export function readConversationStateSelection(
-  input: ConversationStateSelectionInput
+  input: ConversationStateSelectionInput,
 ): ApplicationConversationState | null {
-  const {
-    liveConversationState,
-    readConversationState,
-    conversationSyncSignatureBuilder
-  } = input;
+  const { liveConversationState, readConversationState, conversationSyncSignatureBuilder } = input;
   if (!liveConversationState) {
     return readConversationState;
   }
@@ -21,17 +17,15 @@ export function readConversationStateSelection(
   }
 
   // Choose the newest snapshot so stream updates and read-thread fetches stay aligned.
-  const liveUpdatedAt = conversationSyncSignatureBuilder.readConversationStateUpdatedAt(
-    liveConversationState
-  );
-  const readUpdatedAt = conversationSyncSignatureBuilder.readConversationStateUpdatedAt(
-    readConversationState
-  );
+  const liveUpdatedAt =
+    conversationSyncSignatureBuilder.readConversationStateUpdatedAt(liveConversationState);
+  const readUpdatedAt =
+    conversationSyncSignatureBuilder.readConversationStateUpdatedAt(readConversationState);
   return liveUpdatedAt > readUpdatedAt ? liveConversationState : readConversationState;
 }
 
 export function readActiveRequestSelection(
-  input: ActiveRequestSelectionInput
+  input: ActiveRequestSelectionInput,
 ): ApplicationPendingRequest | null {
   const { pendingRequests, selectedRequestId } = input;
   const firstPendingRequest = pendingRequests[0] ?? null;

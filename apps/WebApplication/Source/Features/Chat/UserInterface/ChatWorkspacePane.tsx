@@ -1,20 +1,21 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, Loader2 } from "lucide-react";
-import { type AgentId } from "@/Shared/Contracts/ApiContracts";
-import {
-  type FlattenedConversationItem
-} from "@/Features/Chat/DomainModel/ConversationItemFlattener";
-import {
-  type PendingUserInputAnswerDraftByQuestionId
-} from "@/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
-import { type PendingUserInputRequest } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
-import { ConversationItem } from "@/Components/ConversationItem";
 import { ChatComposer } from "@/Components/ChatComposer";
+import { ConversationItem } from "@/Components/ConversationItem";
 import { PendingRequestCard } from "@/Components/PendingRequestCard";
 import { Button } from "@/Components/UserInterface/Button";
+import { type FlattenedConversationItem } from "@/Features/Chat/DomainModel/ConversationItemFlattener";
+import { type PendingUserInputAnswerDraftByQuestionId } from "@/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
+import { type PendingUserInputRequest } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
+import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import { ChatModeToolbar, type ChatModeToolbarProps } from "./ChatModeToolbar";
 
-export type ChatSurfaceState = "loading-threads" | "loading-thread" | "no-messages" | "no-thread" | "ready";
+export type ChatSurfaceState =
+  | "loading-threads"
+  | "loading-thread"
+  | "no-messages"
+  | "no-thread"
+  | "ready";
 type PendingRequestDraftField = "option" | "freeform";
 
 const NO_THREAD_MOTION_KEY = "__no_thread__";
@@ -31,36 +32,40 @@ interface ChatEmptyStateDescriptor {
 
 function readChatEmptyStateDescriptor(
   chatSurfaceState: ChatSurfaceState,
-  canCreateNewThread: boolean
+  canCreateNewThread: boolean,
 ): ChatEmptyStateDescriptor {
   switch (chatSurfaceState) {
     case "loading-threads":
       return {
         testId: "chat-empty-loading-threads",
         message: "Loading threads...",
-        showLoadingIndicator: true
+        showLoadingIndicator: true,
       };
     case "loading-thread":
       return {
         testId: "chat-empty-loading-thread",
         message: "Loading thread...",
-        showLoadingIndicator: true
+        showLoadingIndicator: true,
       };
     case "no-messages":
       return {
         testId: "chat-empty-no-messages",
         message: "No messages yet",
-        showLoadingIndicator: false
+        showLoadingIndicator: false,
       };
     case "no-thread":
       return {
         testId: "chat-empty-no-thread",
-        message: canCreateNewThread ? "Start typing to create a new thread" : "Select a thread from the sidebar",
-        showLoadingIndicator: false
+        message: canCreateNewThread
+          ? "Start typing to create a new thread"
+          : "Select a thread from the sidebar",
+        showLoadingIndicator: false,
       };
     case "ready":
       // Empty-state rendering should never happen once the surface is marked ready.
-      throw new Error("ChatWorkspacePane received an empty-state render with chatSurfaceState set to 'ready'.");
+      throw new Error(
+        "ChatWorkspacePane received an empty-state render with chatSurfaceState set to 'ready'.",
+      );
   }
 }
 
@@ -75,13 +80,11 @@ function readCanSendMessage(selectedThreadId: string | null, canCreateNewThread:
 function readComposerPlaceholder(
   selectedThreadId: string | null,
   activeAgentLabel: string,
-  selectedAgentLabel: string
+  selectedAgentLabel: string,
 ): string {
-  return (
-    selectedThreadId !== null && selectedThreadId.length > 0
-      ? `Message ${activeAgentLabel}…`
-      : `Message ${selectedAgentLabel}…`
-  );
+  return selectedThreadId !== null && selectedThreadId.length > 0
+    ? `Message ${activeAgentLabel}…`
+    : `Message ${selectedAgentLabel}…`;
 }
 
 export interface ChatWorkspacePaneProps {
@@ -137,19 +140,21 @@ export function ChatWorkspacePane({
   selectedAgentLabel,
   onInterrupt,
   onSendMessage,
-  chatModeToolbarProperties
+  chatModeToolbarProperties,
 }: ChatWorkspacePaneProps): React.JSX.Element {
   const shouldRenderEmptyState = turnCount === 0;
   const canCreateNewThread = readCanCreateNewThread(availableAgentIds);
   const canSendMessage = readCanSendMessage(selectedThreadId, canCreateNewThread);
-  const composerPlaceholder = readComposerPlaceholder(selectedThreadId, activeAgentLabel, selectedAgentLabel);
+  const composerPlaceholder = readComposerPlaceholder(
+    selectedThreadId,
+    activeAgentLabel,
+    selectedAgentLabel,
+  );
   const emptyStateDescriptor = shouldRenderEmptyState
     ? readChatEmptyStateDescriptor(chatSurfaceState, canCreateNewThread)
     : null;
-  const shouldShowEmptyStateLoadingIndicator = (
-    emptyStateDescriptor !== null
-    && emptyStateDescriptor.showLoadingIndicator === true
-  );
+  const shouldShowEmptyStateLoadingIndicator =
+    emptyStateDescriptor !== null && emptyStateDescriptor.showLoadingIndicator === true;
   const loadingEmptyStateDescriptor = shouldShowEmptyStateLoadingIndicator
     ? emptyStateDescriptor
     : null;
@@ -178,15 +183,23 @@ export function ChatWorkspacePane({
             className="w-full px-4 md:px-6 lg:px-8 pt-8 pb-6"
           >
             {shouldRenderEmptyState ? (
-              <div data-testid="chat-empty-state" className="text-center py-20 text-sm text-muted-foreground">
-                {loadingEmptyStateDescriptor !== null
-                  ? (
-                    <span data-testid={loadingEmptyStateDescriptor.testId} className="inline-flex items-center gap-2">
-                      <Loader2 size={14} className="animate-spin" />
-                      {loadingEmptyStateDescriptor.message}
-                    </span>
-                  )
-                  : <span data-testid={emptyStateDescriptor?.testId}>{emptyStateDescriptor?.message}</span>}
+              <div
+                data-testid="chat-empty-state"
+                className="text-center py-20 text-sm text-muted-foreground"
+              >
+                {loadingEmptyStateDescriptor !== null ? (
+                  <span
+                    data-testid={loadingEmptyStateDescriptor.testId}
+                    className="inline-flex items-center gap-2"
+                  >
+                    <Loader2 size={14} className="animate-spin" />
+                    {loadingEmptyStateDescriptor.message}
+                  </span>
+                ) : (
+                  <span data-testid={emptyStateDescriptor?.testId}>
+                    {emptyStateDescriptor?.message}
+                  </span>
+                )}
               </div>
             ) : (
               <div
@@ -254,7 +267,9 @@ export function ChatWorkspacePane({
 
       <div
         className="relative z-10 -mt-6 px-4 pt-6 shrink-0"
-        style={{ paddingBottom: "calc(var(--composer-bottom-spacing) + var(--composer-safe-bottom-inset))" }}
+        style={{
+          paddingBottom: "calc(var(--composer-bottom-spacing) + var(--composer-safe-bottom-inset))",
+        }}
       >
         <div
           aria-hidden="true"

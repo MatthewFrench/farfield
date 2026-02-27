@@ -4,10 +4,10 @@ import { ThreadServerClient } from "@/Features/Threads/DataAccess/ThreadServerCl
 import type {
   ThreadListItem,
   ThreadListLoadOptions,
-  ThreadListResponse
+  ThreadListResponse,
 } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
-import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import { ThreadListPresentationStateResolver } from "@/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
+import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import { ThreadListStateStore } from "@/Features/Threads/StateManagement/ThreadListStateStore";
 import { ThreadRefreshConcurrencyCoordinator } from "@/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
 
@@ -24,7 +24,7 @@ function buildThreadListResponse(input: {
         updatedAt: input.threadOneUpdatedAt,
         cwd: "/tmp/project",
         source: "opencode",
-        agentId: "codex"
+        agentId: "codex",
       },
       {
         id: "thread-2",
@@ -33,12 +33,12 @@ function buildThreadListResponse(input: {
         updatedAt: input.threadTwoUpdatedAt,
         cwd: "/tmp/project",
         source: "opencode",
-        agentId: "codex"
-      }
+        agentId: "codex",
+      },
     ],
     nextCursor: null,
     pages: 1,
-    truncated: false
+    truncated: false,
   };
 }
 
@@ -54,7 +54,7 @@ class TestThreadServerClient extends ThreadServerClient {
     super();
     this.responseByArchiveMode = {
       active: input.active,
-      archived: input.archived
+      archived: input.archived,
     };
     this.listRequestCount = 0;
     this.listRequestOptions = [];
@@ -71,7 +71,9 @@ class TestThreadServerClient extends ThreadServerClient {
   public override async listThreads(options: ThreadListLoadOptions): Promise<ThreadListResponse> {
     this.listRequestCount += 1;
     this.listRequestOptions.push({ ...options });
-    return options.archived ? this.responseByArchiveMode.archived : this.responseByArchiveMode.active;
+    return options.archived
+      ? this.responseByArchiveMode.archived
+      : this.responseByArchiveMode.active;
   }
 }
 
@@ -80,7 +82,7 @@ describe("Thread ownership modules", () => {
     const cache = new ThreadQueryCache(1_000, 4);
     const response = buildThreadListResponse({
       threadOneUpdatedAt: 1_700_000_000,
-      threadTwoUpdatedAt: 1_700_000_001
+      threadTwoUpdatedAt: 1_700_000_001,
     });
 
     expect(cache.readFresh("threads:active")).toBeNull();
@@ -94,7 +96,7 @@ describe("Thread ownership modules", () => {
     const cache = new ThreadQueryCache(10_000, 2);
     const response = buildThreadListResponse({
       threadOneUpdatedAt: 1_700_000_000,
-      threadTwoUpdatedAt: 1_700_000_001
+      threadTwoUpdatedAt: 1_700_000_001,
     });
 
     cache.write("threads:active", response);
@@ -112,7 +114,7 @@ describe("Thread ownership modules", () => {
     const coordinator = new ThreadRefreshConcurrencyCoordinator();
     const response = buildThreadListResponse({
       threadOneUpdatedAt: 1_700_000_000,
-      threadTwoUpdatedAt: 1_700_000_001
+      threadTwoUpdatedAt: 1_700_000_001,
     });
     let callCount = 0;
     const task = async (): Promise<ThreadListResponse> => {
@@ -125,7 +127,7 @@ describe("Thread ownership modules", () => {
 
     const [first, second] = await Promise.all([
       coordinator.runSingleFlight("threads:active", task),
-      coordinator.runSingleFlight("threads:active", task)
+      coordinator.runSingleFlight("threads:active", task),
     ]);
 
     expect(callCount).toBe(1);
@@ -139,20 +141,20 @@ describe("Thread ownership modules", () => {
     const first = store.computeActiveThreadState({
       nextThreads: buildThreadListResponse({
         threadOneUpdatedAt: 1_700_000_000,
-        threadTwoUpdatedAt: 1_700_000_001
+        threadTwoUpdatedAt: 1_700_000_001,
       }).data,
       previousUnreadThreadIdentifiers: {},
-      selectedThreadIdentifier: "thread-1"
+      selectedThreadIdentifier: "thread-1",
     });
     expect(first.nextUnreadThreadIdentifiers).toEqual({});
 
     const second = store.computeActiveThreadState({
       nextThreads: buildThreadListResponse({
         threadOneUpdatedAt: 1_700_000_000,
-        threadTwoUpdatedAt: 1_700_000_010
+        threadTwoUpdatedAt: 1_700_000_010,
       }).data,
       previousUnreadThreadIdentifiers: first.nextUnreadThreadIdentifiers,
-      selectedThreadIdentifier: "thread-1"
+      selectedThreadIdentifier: "thread-1",
     });
 
     expect(second.nextUnreadThreadIdentifiers).toEqual({ "thread-2": true });
@@ -171,7 +173,7 @@ describe("Thread ownership modules", () => {
           cwd: "/tmp/project",
           source: "opencode",
           agentId: "codex",
-          hasUnreadTurn: true
+          hasUnreadTurn: true,
         },
         {
           id: "thread-explicit-read",
@@ -181,7 +183,7 @@ describe("Thread ownership modules", () => {
           cwd: "/tmp/project",
           source: "opencode",
           agentId: "codex",
-          hasUnreadTurn: false
+          hasUnreadTurn: false,
         },
         {
           id: "thread-selected",
@@ -191,18 +193,18 @@ describe("Thread ownership modules", () => {
           cwd: "/tmp/project",
           source: "opencode",
           agentId: "codex",
-          hasUnreadTurn: true
-        }
+          hasUnreadTurn: true,
+        },
       ],
       previousUnreadThreadIdentifiers: {
         "thread-explicit-read": true,
-        "thread-selected": true
+        "thread-selected": true,
       },
-      selectedThreadIdentifier: "thread-selected"
+      selectedThreadIdentifier: "thread-selected",
     });
 
     expect(state.nextUnreadThreadIdentifiers).toEqual({
-      "thread-explicit-unread": true
+      "thread-explicit-unread": true,
     });
   });
 
@@ -219,11 +221,11 @@ describe("Thread ownership modules", () => {
           cwd: "/tmp/project",
           source: "opencode",
           agentId: "codex",
-          hasUnreadTurn: null
-        }
+          hasUnreadTurn: null,
+        },
       ],
       previousUnreadThreadIdentifiers: {},
-      selectedThreadIdentifier: null
+      selectedThreadIdentifier: null,
     });
     expect(first.nextUnreadThreadIdentifiers).toEqual({});
 
@@ -237,15 +239,15 @@ describe("Thread ownership modules", () => {
           cwd: "/tmp/project",
           source: "opencode",
           agentId: "codex",
-          hasUnreadTurn: null
-        }
+          hasUnreadTurn: null,
+        },
       ],
       previousUnreadThreadIdentifiers: first.nextUnreadThreadIdentifiers,
-      selectedThreadIdentifier: null
+      selectedThreadIdentifier: null,
     });
 
     expect(second.nextUnreadThreadIdentifiers).toEqual({
-      "thread-heuristic": true
+      "thread-heuristic": true,
     });
   });
 
@@ -259,7 +261,7 @@ describe("Thread ownership modules", () => {
         updatedAt: 1_700_000_001,
         cwd: "/tmp/project",
         source: "opencode",
-        agentId: "opencode"
+        agentId: "opencode",
       },
       {
         id: "thread-codex",
@@ -268,21 +270,21 @@ describe("Thread ownership modules", () => {
         updatedAt: 1_700_000_003,
         cwd: "/tmp/project",
         source: "opencode",
-        agentId: "codex"
-      }
+        agentId: "codex",
+      },
     ];
 
     const first = store.computeInitialSelectedThreadIdentifier({
       currentSelectedThreadIdentifier: null,
       preferredAgentIdentifier: "codex",
-      nextThreads
+      nextThreads,
     });
     expect(first).toBe("thread-codex");
 
     const second = store.computeInitialSelectedThreadIdentifier({
       currentSelectedThreadIdentifier: null,
       preferredAgentIdentifier: "opencode",
-      nextThreads
+      nextThreads,
     });
     expect(second).toBeNull();
   });
@@ -291,30 +293,31 @@ describe("Thread ownership modules", () => {
     const store = new ThreadListStateStore();
     const previousUnreadThreadIdentifiers: Record<string, true> = {
       "thread-1": true,
-      "thread-2": true
+      "thread-2": true,
     };
 
     const nextUnreadThreadIdentifiers = store.computeUnreadThreadIdentifiersAfterSelectionChange({
       previousUnreadThreadIdentifiers,
-      selectedThreadIdentifier: "thread-1"
+      selectedThreadIdentifier: "thread-1",
     });
     expect(nextUnreadThreadIdentifiers).toEqual({ "thread-2": true });
 
-    const unchangedUnreadThreadIdentifiers = store.computeUnreadThreadIdentifiersAfterSelectionChange({
-      previousUnreadThreadIdentifiers: nextUnreadThreadIdentifiers,
-      selectedThreadIdentifier: null
-    });
+    const unchangedUnreadThreadIdentifiers =
+      store.computeUnreadThreadIdentifiersAfterSelectionChange({
+        previousUnreadThreadIdentifiers: nextUnreadThreadIdentifiers,
+        selectedThreadIdentifier: null,
+      });
     expect(unchangedUnreadThreadIdentifiers).toBe(nextUnreadThreadIdentifiers);
   });
 
   it("ThreadListStateController reads from cache when allowed", async () => {
     const active = buildThreadListResponse({
       threadOneUpdatedAt: 1_700_000_000,
-      threadTwoUpdatedAt: 1_700_000_001
+      threadTwoUpdatedAt: 1_700_000_001,
     });
     const archived = buildThreadListResponse({
       threadOneUpdatedAt: 1_600_000_000,
-      threadTwoUpdatedAt: 1_600_000_001
+      threadTwoUpdatedAt: 1_600_000_001,
     });
     const serverClient = new TestThreadServerClient({ active, archived });
     const controller = new ThreadListStateController({
@@ -322,7 +325,7 @@ describe("Thread ownership modules", () => {
       threadQueryCache: new ThreadQueryCache(10_000, 8),
       threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
       threadListStateStore: new ThreadListStateStore(),
-      threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
     });
 
     const firstRead = await controller.loadActiveThreadState({
@@ -331,7 +334,7 @@ describe("Thread ownership modules", () => {
       sortKey: "updated_at",
       previousUnreadThreadIdentifiers: {},
       selectedThreadIdentifier: "thread-1",
-      readFromCache: true
+      readFromCache: true,
     });
 
     const secondRead = await controller.loadActiveThreadState({
@@ -340,7 +343,7 @@ describe("Thread ownership modules", () => {
       sortKey: "updated_at",
       previousUnreadThreadIdentifiers: {},
       selectedThreadIdentifier: "thread-1",
-      readFromCache: true
+      readFromCache: true,
     });
 
     expect(firstRead.loadedFromCache).toBe(false);
@@ -351,11 +354,11 @@ describe("Thread ownership modules", () => {
   it("ThreadListStateController isolates active and archived cache reads", async () => {
     const active = buildThreadListResponse({
       threadOneUpdatedAt: 1_700_000_000,
-      threadTwoUpdatedAt: 1_700_000_001
+      threadTwoUpdatedAt: 1_700_000_001,
     });
     const archived = buildThreadListResponse({
       threadOneUpdatedAt: 1_600_000_000,
-      threadTwoUpdatedAt: 1_600_000_001
+      threadTwoUpdatedAt: 1_600_000_001,
     });
     const serverClient = new TestThreadServerClient({ active, archived });
     const controller = new ThreadListStateController({
@@ -363,7 +366,7 @@ describe("Thread ownership modules", () => {
       threadQueryCache: new ThreadQueryCache(10_000, 8),
       threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
       threadListStateStore: new ThreadListStateStore(),
-      threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
     });
 
     const firstActiveRead = await controller.loadActiveThreadState({
@@ -372,14 +375,14 @@ describe("Thread ownership modules", () => {
       sortKey: "updated_at",
       previousUnreadThreadIdentifiers: {},
       selectedThreadIdentifier: "thread-1",
-      readFromCache: true
+      readFromCache: true,
     });
 
     const firstArchivedRead = await controller.loadArchivedThreadState({
       limit: 80,
       maxPages: 20,
       sortKey: "updated_at",
-      readFromCache: true
+      readFromCache: true,
     });
 
     const secondActiveRead = await controller.loadActiveThreadState({
@@ -388,14 +391,14 @@ describe("Thread ownership modules", () => {
       sortKey: "updated_at",
       previousUnreadThreadIdentifiers: {},
       selectedThreadIdentifier: "thread-1",
-      readFromCache: true
+      readFromCache: true,
     });
 
     const secondArchivedRead = await controller.loadArchivedThreadState({
       limit: 80,
       maxPages: 20,
       sortKey: "updated_at",
-      readFromCache: true
+      readFromCache: true,
     });
 
     expect(firstActiveRead.loadedFromCache).toBe(false);
@@ -408,11 +411,11 @@ describe("Thread ownership modules", () => {
   it("ThreadListStateController forwards action metadata to thread list requests", async () => {
     const active = buildThreadListResponse({
       threadOneUpdatedAt: 1_700_000_000,
-      threadTwoUpdatedAt: 1_700_000_001
+      threadTwoUpdatedAt: 1_700_000_001,
     });
     const archived = buildThreadListResponse({
       threadOneUpdatedAt: 1_600_000_000,
-      threadTwoUpdatedAt: 1_600_000_001
+      threadTwoUpdatedAt: 1_600_000_001,
     });
     const serverClient = new TestThreadServerClient({ active, archived });
     const controller = new ThreadListStateController({
@@ -420,7 +423,7 @@ describe("Thread ownership modules", () => {
       threadQueryCache: new ThreadQueryCache(10_000, 8),
       threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
       threadListStateStore: new ThreadListStateStore(),
-      threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
     });
 
     await controller.loadActiveThreadState({
@@ -431,7 +434,7 @@ describe("Thread ownership modules", () => {
       selectedThreadIdentifier: null,
       readFromCache: false,
       actionId: "action-active",
-      actionName: "thread-list.refresh-active"
+      actionName: "thread-list.refresh-active",
     });
 
     await controller.loadArchivedThreadState({
@@ -440,7 +443,7 @@ describe("Thread ownership modules", () => {
       sortKey: "created_at",
       readFromCache: false,
       actionId: "action-archived",
-      actionName: "thread-list.refresh-archived"
+      actionName: "thread-list.refresh-archived",
     });
 
     expect(serverClient.readListRequestOptions()).toEqual([
@@ -450,7 +453,7 @@ describe("Thread ownership modules", () => {
         maxPages: 5,
         sortKey: "updated_at",
         actionId: "action-active",
-        actionName: "thread-list.refresh-active"
+        actionName: "thread-list.refresh-active",
       },
       {
         archived: true,
@@ -458,37 +461,37 @@ describe("Thread ownership modules", () => {
         maxPages: 2,
         sortKey: "created_at",
         actionId: "action-archived",
-        actionName: "thread-list.refresh-archived"
-      }
+        actionName: "thread-list.refresh-archived",
+      },
     ]);
   });
 
   it("ThreadListStateController marks archived list truncated when pagination cursor exists", async () => {
     const active = buildThreadListResponse({
       threadOneUpdatedAt: 1_700_000_000,
-      threadTwoUpdatedAt: 1_700_000_001
+      threadTwoUpdatedAt: 1_700_000_001,
     });
     const archived: ThreadListResponse = {
       ...buildThreadListResponse({
         threadOneUpdatedAt: 1_600_000_000,
-        threadTwoUpdatedAt: 1_600_000_001
+        threadTwoUpdatedAt: 1_600_000_001,
       }),
       nextCursor: "cursor-2",
-      truncated: false
+      truncated: false,
     };
     const controller = new ThreadListStateController({
       threadServerClient: new TestThreadServerClient({ active, archived }),
       threadQueryCache: new ThreadQueryCache(10_000, 8),
       threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
       threadListStateStore: new ThreadListStateStore(),
-      threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
     });
 
     const archivedState = await controller.loadArchivedThreadState({
       limit: 80,
       maxPages: 20,
       sortKey: "updated_at",
-      readFromCache: false
+      readFromCache: false,
     });
 
     expect(archivedState.isTruncated).toBe(true);
@@ -497,29 +500,29 @@ describe("Thread ownership modules", () => {
   it("ThreadListStateController leaves archived list untruncated when cursor and flag are absent", async () => {
     const active = buildThreadListResponse({
       threadOneUpdatedAt: 1_700_000_000,
-      threadTwoUpdatedAt: 1_700_000_001
+      threadTwoUpdatedAt: 1_700_000_001,
     });
     const archived: ThreadListResponse = {
       ...buildThreadListResponse({
         threadOneUpdatedAt: 1_600_000_000,
-        threadTwoUpdatedAt: 1_600_000_001
+        threadTwoUpdatedAt: 1_600_000_001,
       }),
       nextCursor: null,
-      truncated: false
+      truncated: false,
     };
     const controller = new ThreadListStateController({
       threadServerClient: new TestThreadServerClient({ active, archived }),
       threadQueryCache: new ThreadQueryCache(10_000, 8),
       threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
       threadListStateStore: new ThreadListStateStore(),
-      threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
     });
 
     const archivedState = await controller.loadArchivedThreadState({
       limit: 80,
       maxPages: 20,
       sortKey: "updated_at",
-      readFromCache: false
+      readFromCache: false,
     });
 
     expect(archivedState.isTruncated).toBe(false);

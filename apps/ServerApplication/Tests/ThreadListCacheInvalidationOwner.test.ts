@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { ThreadListCacheInvalidationOwner } from "../Source/Application/Bootstrap/ThreadListCacheInvalidationOwner.js";
+import { THREAD_STREAM_STATE_CHANGED_METHOD } from "../Source/Application/ThreadStreamStateChangedHistoryBatchOwner.js";
 import {
   ThreadListAggregationCache,
   type ThreadListAggregationQuery,
-  type ThreadListAggregationSnapshot
+  type ThreadListAggregationSnapshot,
 } from "../Source/Network/ThreadListAggregationCache.js";
-import { ThreadListCacheInvalidationOwner } from "../Source/Application/Bootstrap/ThreadListCacheInvalidationOwner.js";
-import { THREAD_STREAM_STATE_CHANGED_METHOD } from "../Source/Application/ThreadStreamStateChangedHistoryBatchOwner.js";
 
 const STREAM_CACHE_INVALIDATION_DEBOUNCE_INTERVAL_MILLISECONDS = 2_000;
 
-function buildQuery(overrides: Partial<ThreadListAggregationQuery> = {}): ThreadListAggregationQuery {
+function buildQuery(
+  overrides: Partial<ThreadListAggregationQuery> = {},
+): ThreadListAggregationQuery {
   return {
     enabledAgentIds: ["codex"],
     limit: 20,
@@ -18,17 +20,17 @@ function buildQuery(overrides: Partial<ThreadListAggregationQuery> = {}): Thread
     maxPages: 10,
     sortKey: "updated_at",
     cwd: null,
-    ...overrides
+    ...overrides,
   };
 }
 
 function buildSnapshot(
-  overrides: Partial<ThreadListAggregationSnapshot> = {}
+  overrides: Partial<ThreadListAggregationSnapshot> = {},
 ): ThreadListAggregationSnapshot {
   return {
     mergedData: [],
     combinedTruncated: false,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -69,7 +71,7 @@ describe("ThreadListCacheInvalidationOwner", () => {
     const cache = new ThreadListAggregationCache(1_000, 8);
     const nowMilliseconds = 10_000;
     const owner = new ThreadListCacheInvalidationOwner(cache, {
-      now: () => nowMilliseconds
+      now: () => nowMilliseconds,
     });
     const activeQuery = buildQuery({ archived: false });
 
@@ -91,7 +93,7 @@ describe("ThreadListCacheInvalidationOwner", () => {
     const cache = new ThreadListAggregationCache(1_000, 8);
     let nowMilliseconds = 5_000;
     const owner = new ThreadListCacheInvalidationOwner(cache, {
-      now: () => nowMilliseconds
+      now: () => nowMilliseconds,
     });
     const activeQuery = buildQuery({ archived: false });
 

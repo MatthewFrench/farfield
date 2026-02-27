@@ -3,7 +3,7 @@ import {
   JsonValueSchema,
   NonEmptyStringSchema,
   NonNegativeIntSchema,
-  NullableStringSchema
+  NullableStringSchema,
 } from "../../Common.js";
 
 const OptionalNullableStringSchema = NullableStringSchema.optional();
@@ -13,7 +13,7 @@ const OptionalNullableNonNegativeIntSchema = z.union([NonNegativeIntSchema, z.nu
 
 const UserMessagePartTypeValues = {
   text: "text",
-  image: "image"
+  image: "image",
 } as const;
 
 const TurnItemTypeValues = {
@@ -36,7 +36,7 @@ const TurnItemTypeValues = {
   collabToolCall: "collabToolCall",
   imageView: "imageView",
   enteredReviewMode: "enteredReviewMode",
-  exitedReviewMode: "exitedReviewMode"
+  exitedReviewMode: "exitedReviewMode",
 } as const;
 
 const TurnPlanStepStatusValues = ["pending", "inProgress", "completed"] as const;
@@ -46,7 +46,7 @@ const CollabAgentToolValues = [
   "sendInput",
   "resumeAgent",
   "wait",
-  "closeAgent"
+  "closeAgent",
 ] as const;
 const CollabAgentStatusValues = [
   "pendingInit",
@@ -54,34 +54,34 @@ const CollabAgentStatusValues = [
   "completed",
   "errored",
   "shutdown",
-  "notFound"
+  "notFound",
 ] as const;
 
 export const UserMessageContentPartSchema = z
   .object({
     type: z.literal(UserMessagePartTypeValues.text),
     text: z.string(),
-    text_elements: z.array(JsonValueSchema).optional()
+    text_elements: z.array(JsonValueSchema).optional(),
   })
   .passthrough();
 
 export const UserMessageImageContentPartSchema = z
   .object({
     type: z.literal(UserMessagePartTypeValues.image),
-    url: z.string()
+    url: z.string(),
   })
   .passthrough();
 
 export const UserMessagePartSchema = z.union([
   UserMessageContentPartSchema,
-  UserMessageImageContentPartSchema
+  UserMessageImageContentPartSchema,
 ]);
 
 export const UserMessageItemSchema = z
   .object({
     id: NonEmptyStringSchema,
     type: z.literal(TurnItemTypeValues.userMessage),
-    content: z.array(UserMessagePartSchema)
+    content: z.array(UserMessagePartSchema),
   })
   .passthrough();
 
@@ -90,7 +90,7 @@ export const SteeringUserMessageItemSchema = z
     id: NonEmptyStringSchema,
     type: z.literal(TurnItemTypeValues.steeringUserMessage),
     content: z.array(UserMessagePartSchema),
-    attachments: z.array(JsonValueSchema).optional()
+    attachments: z.array(JsonValueSchema).optional(),
   })
   .passthrough();
 
@@ -98,7 +98,7 @@ export const AgentMessageItemSchema = z
   .object({
     id: NonEmptyStringSchema,
     type: z.literal(TurnItemTypeValues.agentMessage),
-    text: z.string()
+    text: z.string(),
   })
   .passthrough();
 
@@ -109,7 +109,7 @@ export const ErrorItemSchema = z
     message: z.string(),
     willRetry: z.boolean().optional(),
     errorInfo: OptionalNullableStringSchema,
-    additionalDetails: OptionalNullableJsonValueSchema
+    additionalDetails: OptionalNullableJsonValueSchema,
   })
   .passthrough();
 
@@ -119,7 +119,7 @@ export const ReasoningItemSchema = z
     type: z.literal(TurnItemTypeValues.reasoning),
     summary: z.array(z.string()).optional(),
     content: z.array(JsonValueSchema).optional(),
-    text: z.string().optional()
+    text: z.string().optional(),
   })
   .passthrough();
 
@@ -127,7 +127,7 @@ export const PlanItemSchema = z
   .object({
     id: NonEmptyStringSchema,
     type: z.literal(TurnItemTypeValues.plan),
-    text: z.string()
+    text: z.string(),
   })
   .passthrough();
 
@@ -137,7 +137,7 @@ export const PlanImplementationItemSchema = z
     type: z.literal(TurnItemTypeValues.planImplementation),
     turnId: NonEmptyStringSchema,
     planContent: z.string(),
-    isCompleted: z.boolean().optional()
+    isCompleted: z.boolean().optional(),
   })
   .passthrough();
 
@@ -146,7 +146,7 @@ export const TurnPlanStepStatusSchema = z.enum(TurnPlanStepStatusValues);
 export const TodoListPlanStepSchema = z
   .object({
     step: z.string(),
-    status: TurnPlanStepStatusSchema
+    status: TurnPlanStepStatusSchema,
   })
   .passthrough();
 
@@ -155,7 +155,7 @@ export const TodoListItemSchema = z
     id: NonEmptyStringSchema,
     type: z.literal(TurnItemTypeValues.todoList),
     explanation: OptionalNullableStringSchema,
-    plan: z.array(TodoListPlanStepSchema)
+    plan: z.array(TodoListPlanStepSchema),
   })
   .passthrough();
 
@@ -163,7 +163,7 @@ export const UserInputAnsweredQuestionSchema = z
   .object({
     id: NonEmptyStringSchema,
     header: z.string().optional(),
-    question: z.string().optional()
+    question: z.string().optional(),
   })
   .passthrough();
 
@@ -175,7 +175,7 @@ export const UserInputResponseItemSchema = z
     turnId: NonEmptyStringSchema,
     questions: z.array(UserInputAnsweredQuestionSchema),
     answers: z.record(z.array(z.string())),
-    completed: z.boolean().optional()
+    completed: z.boolean().optional(),
   })
   .passthrough();
 
@@ -185,7 +185,7 @@ export const CommandActionSchema = z
     command: z.string().optional(),
     name: z.string().optional(),
     path: OptionalNullableStringSchema,
-    query: z.string().optional()
+    query: z.string().optional(),
   })
   .passthrough();
 
@@ -200,14 +200,14 @@ export const CommandExecutionItemSchema = z
     commandActions: z.array(CommandActionSchema).optional(),
     aggregatedOutput: OptionalNullableStringSchema,
     exitCode: OptionalNullableIntegerSchema,
-    durationMs: OptionalNullableNonNegativeIntSchema
+    durationMs: OptionalNullableNonNegativeIntSchema,
   })
   .passthrough();
 
 export const FileChangeKindSchema = z
   .object({
     type: NonEmptyStringSchema,
-    move_path: OptionalNullableStringSchema
+    move_path: OptionalNullableStringSchema,
   })
   .passthrough();
 
@@ -215,7 +215,7 @@ export const FileChangeEntrySchema = z
   .object({
     path: z.string(),
     kind: FileChangeKindSchema,
-    diff: z.string().optional()
+    diff: z.string().optional(),
   })
   .passthrough();
 
@@ -224,7 +224,7 @@ export const FileChangeItemSchema = z
     type: z.literal(TurnItemTypeValues.fileChange),
     id: NonEmptyStringSchema,
     changes: z.array(FileChangeEntrySchema),
-    status: NonEmptyStringSchema
+    status: NonEmptyStringSchema,
   })
   .passthrough();
 
@@ -232,7 +232,7 @@ export const ContextCompactionItemSchema = z
   .object({
     type: z.literal(TurnItemTypeValues.contextCompaction),
     id: NonEmptyStringSchema,
-    completed: z.boolean().optional()
+    completed: z.boolean().optional(),
   })
   .passthrough();
 
@@ -240,7 +240,7 @@ export const WebSearchActionSchema = z
   .object({
     type: NonEmptyStringSchema,
     query: z.string().optional(),
-    queries: z.array(z.string()).optional()
+    queries: z.array(z.string()).optional(),
   })
   .passthrough();
 
@@ -249,7 +249,7 @@ export const WebSearchItemSchema = z
     type: z.literal(TurnItemTypeValues.webSearch),
     id: NonEmptyStringSchema,
     query: z.string(),
-    action: WebSearchActionSchema
+    action: WebSearchActionSchema,
   })
   .passthrough();
 
@@ -258,7 +258,7 @@ export const ModelChangedItemSchema = z
     type: z.literal(TurnItemTypeValues.modelChanged),
     id: NonEmptyStringSchema,
     fromModel: NullableStringSchema.optional(),
-    toModel: NullableStringSchema.optional()
+    toModel: NullableStringSchema.optional(),
   })
   .passthrough();
 
@@ -267,13 +267,13 @@ export const McpToolCallStatusSchema = z.enum(ToolCallLifecycleStatusValues);
 export const McpToolCallResultSchema = z
   .object({
     content: z.array(JsonValueSchema),
-    structuredContent: OptionalNullableJsonValueSchema
+    structuredContent: OptionalNullableJsonValueSchema,
   })
   .passthrough();
 
 export const McpToolCallErrorSchema = z
   .object({
-    message: z.string()
+    message: z.string(),
   })
   .passthrough();
 
@@ -287,7 +287,7 @@ export const McpToolCallItemSchema = z
     arguments: JsonValueSchema,
     result: z.union([McpToolCallResultSchema, z.null()]).optional(),
     error: z.union([McpToolCallErrorSchema, z.null()]).optional(),
-    durationMs: OptionalNullableNonNegativeIntSchema
+    durationMs: OptionalNullableNonNegativeIntSchema,
   })
   .passthrough();
 
@@ -298,7 +298,7 @@ export const CollabAgentStatusSchema = z.enum(CollabAgentStatusValues);
 export const CollabAgentStateSchema = z
   .object({
     status: CollabAgentStatusSchema,
-    message: OptionalNullableStringSchema
+    message: OptionalNullableStringSchema,
   })
   .passthrough();
 
@@ -312,23 +312,23 @@ const CollaborationToolCallItemSharedSchema = z
     senderThreadId: z.string(),
     receiverThreadIds: z.array(z.string()),
     prompt: OptionalNullableStringSchema,
-    agentsStates: z.record(CollabAgentStateSchema)
+    agentsStates: z.record(CollabAgentStateSchema),
   })
   .passthrough();
 
 export const CollabAgentToolCallItemSchema = CollaborationToolCallItemSharedSchema.extend({
-  type: z.literal(TurnItemTypeValues.collabAgentToolCall)
+  type: z.literal(TurnItemTypeValues.collabAgentToolCall),
 }).passthrough();
 
 export const CollabToolCallItemSchema = CollaborationToolCallItemSharedSchema.extend({
-  type: z.literal(TurnItemTypeValues.collabToolCall)
+  type: z.literal(TurnItemTypeValues.collabToolCall),
 }).passthrough();
 
 export const ImageViewItemSchema = z
   .object({
     type: z.literal(TurnItemTypeValues.imageView),
     id: NonEmptyStringSchema,
-    path: z.string()
+    path: z.string(),
   })
   .passthrough();
 
@@ -336,7 +336,7 @@ export const EnteredReviewModeItemSchema = z
   .object({
     type: z.literal(TurnItemTypeValues.enteredReviewMode),
     id: NonEmptyStringSchema,
-    review: z.string()
+    review: z.string(),
   })
   .passthrough();
 
@@ -344,7 +344,7 @@ export const ExitedReviewModeItemSchema = z
   .object({
     type: z.literal(TurnItemTypeValues.exitedReviewMode),
     id: NonEmptyStringSchema,
-    review: z.string()
+    review: z.string(),
   })
   .passthrough();
 
@@ -368,7 +368,7 @@ type TurnItemVariantSchemaTuple = [
   typeof ImageViewItemSchema,
   typeof EnteredReviewModeItemSchema,
   typeof ExitedReviewModeItemSchema,
-  typeof ModelChangedItemSchema
+  typeof ModelChangedItemSchema,
 ];
 
 const TurnItemVariantSchemas: TurnItemVariantSchemaTuple = [
@@ -391,7 +391,7 @@ const TurnItemVariantSchemas: TurnItemVariantSchemaTuple = [
   ImageViewItemSchema,
   EnteredReviewModeItemSchema,
   ExitedReviewModeItemSchema,
-  ModelChangedItemSchema
+  ModelChangedItemSchema,
 ];
 
 export const TurnItemSchema: z.ZodDiscriminatedUnion<"type", TurnItemVariantSchemaTuple> =

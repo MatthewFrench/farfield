@@ -80,7 +80,7 @@ export class ChatModeToolbarPropertiesBuilder {
       onReasoningEffortChange: (nextReasoningEffort) => {
         input.onSetSelectedReasoningEffort(nextReasoningEffort);
         applyModeDraft({ reasoningEffort: nextReasoningEffort });
-      }
+      },
     };
   }
 
@@ -93,12 +93,12 @@ export class ChatModeToolbarPropertiesBuilder {
 
   private buildModeDraft(
     input: BuildChatModeToolbarPropertiesInput,
-    modeDraftOverrides: ModeDraftOverrides
+    modeDraftOverrides: ModeDraftOverrides,
   ): ModeDraftInput {
     return {
       modeKey: modeDraftOverrides.modeKey ?? input.selectedModeKey,
       modelId: modeDraftOverrides.modelId ?? input.selectedModelId,
-      reasoningEffort: modeDraftOverrides.reasoningEffort ?? input.selectedReasoningEffort
+      reasoningEffort: modeDraftOverrides.reasoningEffort ?? input.selectedReasoningEffort,
     };
   }
 }

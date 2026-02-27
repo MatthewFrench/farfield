@@ -1,18 +1,18 @@
-import { memo, useState } from "react";
+import type { CommandExecutionItemSchema } from "@farfield/protocol";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ChevronRight,
   CheckCircle2,
-  XCircle,
-  Loader2,
-  Terminal,
-  Search,
-  FolderOpen,
+  ChevronRight,
+  FileSearch,
   FileText,
-  FileSearch
+  FolderOpen,
+  Loader2,
+  Search,
+  Terminal,
+  XCircle,
 } from "lucide-react";
+import { memo, useState } from "react";
 import type { z } from "zod";
-import type { CommandExecutionItemSchema } from "@farfield/protocol";
 import { Button } from "@/Components/UserInterface/Button";
 import { CodeSnippet } from "./CodeSnippet";
 
@@ -27,7 +27,7 @@ const ACTION_ICONS: Record<string, React.ElementType> = {
   write: FileText,
   read: FileSearch,
   readFile: FileSearch,
-  writeFile: FileText
+  writeFile: FileText,
 };
 
 function simplifyCommand(cmd: string): string {
@@ -136,7 +136,9 @@ function CommandBlockComponent({ item, isActive }: CommandBlockProps) {
               )}
 
               {!hasActions && !hasOutput && (
-                <div className="px-3 py-2 text-xs text-muted-foreground">{COMMAND_EMPTY_OUTPUT_LABEL}</div>
+                <div className="px-3 py-2 text-xs text-muted-foreground">
+                  {COMMAND_EMPTY_OUTPUT_LABEL}
+                </div>
               )}
             </div>
           </motion.div>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   decodeOpenCodeThreadCursor,
-  encodeOpenCodeThreadCursor
+  encodeOpenCodeThreadCursor,
 } from "../Source/Agents/Adapters/OpenCodeThreadCursorContracts.js";
 
 describe("OpenCodeThreadCursorContracts", () => {
@@ -16,7 +16,9 @@ describe("OpenCodeThreadCursorContracts", () => {
   });
 
   it("fails hard for malformed cursor payloads", () => {
-    const malformedCursor = Buffer.from(JSON.stringify({ offset: 42 }), "utf8").toString("base64url");
+    const malformedCursor = Buffer.from(JSON.stringify({ offset: 42 }), "utf8").toString(
+      "base64url",
+    );
     expect(() => decodeOpenCodeThreadCursor(malformedCursor)).toThrow();
   });
 });

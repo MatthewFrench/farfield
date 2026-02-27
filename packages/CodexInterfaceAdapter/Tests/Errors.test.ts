@@ -4,7 +4,7 @@ import {
   AppServerError,
   AppServerRpcError,
   AppServerTransportError,
-  DesktopIpcError
+  DesktopIpcError,
 } from "../Source/Errors.js";
 
 describe("Errors", () => {
@@ -21,7 +21,7 @@ describe("Errors", () => {
 
   it("keeps rpc error metadata and category as strict fields", () => {
     const payload: JsonValue = {
-      requestId: "request-1"
+      requestId: "request-1",
     };
     const error = new AppServerRpcError(-32_600, "conversation not found", payload);
 
@@ -54,25 +54,25 @@ describe("Errors", () => {
 
   it("rejects empty app-server error messages", () => {
     expect(() => new AppServerError("")).toThrowError(
-      "AppServerError constructor argument mismatch: Error message must be a non-empty string"
+      "AppServerError constructor argument mismatch: Error message must be a non-empty string",
     );
   });
 
   it("rejects rpc constructor code that is not an integer", () => {
     expect(() => new AppServerRpcError(-32_600.5, "invalid request")).toThrowError(
-      "AppServerRpcError constructor argument mismatch: RPC error code must be an integer"
+      "AppServerRpcError constructor argument mismatch: RPC error code must be an integer",
     );
   });
 
   it("rejects rpc constructor messages that are empty", () => {
     expect(() => new AppServerRpcError(-32_600, "")).toThrowError(
-      "AppServerRpcError constructor argument mismatch: Error message must be a non-empty string"
+      "AppServerRpcError constructor argument mismatch: Error message must be a non-empty string",
     );
   });
 
   it("rejects empty desktop ipc messages", () => {
     expect(() => new DesktopIpcError("")).toThrowError(
-      "DesktopIpcError constructor argument mismatch: Error message must be a non-empty string"
+      "DesktopIpcError constructor argument mismatch: Error message must be a non-empty string",
     );
   });
 });

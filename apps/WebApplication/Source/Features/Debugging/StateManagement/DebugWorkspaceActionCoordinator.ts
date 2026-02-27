@@ -1,21 +1,21 @@
+import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import type {
   DebugErrorClearResponse,
   DebugHistoryDetailResponse,
-  DebugReplayHistoryEntryInput
+  DebugReplayHistoryEntryInput,
 } from "../DataAccess/DebugServerClient";
-import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
 const EMPTY_HISTORY_ENTRY_IDENTIFIER = "";
 
 export interface DebugWorkspaceActionClient {
   readHistoryEntry(
     entryId: string,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<DebugHistoryDetailResponse>;
   clearClientErrors(options?: ApiRequestOptions): Promise<DebugErrorClearResponse>;
   replayHistoryEntry(
     input: DebugReplayHistoryEntryInput,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<object>;
   startTrace(label: string, options?: ApiRequestOptions): Promise<void>;
   markTrace(note: string, options?: ApiRequestOptions): Promise<void>;
@@ -25,9 +25,7 @@ export interface DebugWorkspaceActionClient {
 export interface LoadDebugHistoryDetailActionInput {
   historyEntryId: string;
   debugClient: DebugWorkspaceActionClient;
-  onHistoryDetailLoaded: (
-    historyDetail: DebugHistoryDetailResponse | null
-  ) => void;
+  onHistoryDetailLoaded: (historyDetail: DebugHistoryDetailResponse | null) => void;
 }
 
 export interface ReplayDebugHistoryEntryActionInput {

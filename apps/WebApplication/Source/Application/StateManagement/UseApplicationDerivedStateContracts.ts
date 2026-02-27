@@ -1,50 +1,48 @@
-import { type AgentId } from "@/Shared/Contracts/ApiContracts";
-import {
-  type DebugIssue,
-  type ErrorBannerDetails
-} from "@/Features/Debugging/DomainModel/DebugIssueContracts";
-import {
-  type ThreadListPaneProperties
-} from "@/Features/Threads/UserInterface/ThreadListPane";
 import {
   type CapabilityAgentsResponse,
   type CapabilityCollaborationModesResponse,
   type CapabilityConfigDefaultsResponse,
   type CapabilityHealthResponse,
-  type CapabilityModelsResponse
+  type CapabilityModelsResponse,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import {
   type ChatLiveStateResponse,
-  type ChatReadThreadResponse
+  type ChatReadThreadResponse,
 } from "@/Features/Chat/DataAccess/ChatServerClient";
 import {
+  type ConversationItemFlattener,
   type FlattenedConversationItem,
-  type ConversationItemFlattener
 } from "@/Features/Chat/DomainModel/ConversationItemFlattener";
+import { ConversationSyncSignatureBuilder } from "@/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
 import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import {
   type PendingUserInputRequest,
-  type PendingUserInputRequestSelector
+  type PendingUserInputRequestSelector,
 } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
-import { ConversationSyncSignatureBuilder } from "@/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
 import { type ChatWorkspacePaneProps } from "@/Features/Chat/UserInterface/ChatWorkspacePane";
 import {
   type DebugErrorListResponse,
   type DebugHistoryDetailResponse,
   type DebugHistoryResponse,
-  type DebugTraceStatusResponse
+  type DebugTraceStatusResponse,
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import {
+  type DebugIssue,
+  type ErrorBannerDetails,
+} from "@/Features/Debugging/DomainModel/DebugIssueContracts";
+import {
+  type DebugIssueSeverityFilter,
   DebugIssueStateResolver,
-  type DebugIssueSeverityFilter
 } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugHistoryEntryListItem } from "@/Features/Debugging/UserInterface/DebugHistoryPanel";
 import { type DebugTraceSummary } from "@/Features/Debugging/UserInterface/DebugTracePanel";
 import type { ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import {
   type ReadThreadListPresentationStateResult,
-  type ThreadListStateController
+  type ThreadListStateController,
 } from "@/Features/Threads/StateManagement/ThreadListStateController";
+import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPane";
+import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 
 type Health = CapabilityHealthResponse;
 type ConfigDefaults = CapabilityConfigDefaultsResponse;

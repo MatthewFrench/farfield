@@ -17,8 +17,8 @@ function installOrientation(landscape: boolean): void {
       removeListener: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
+      dispatchEvent: vi.fn(),
+    })),
   });
 }
 
@@ -27,8 +27,8 @@ function installVisualViewportHeight(height: number): void {
     configurable: true,
     writable: true,
     value: {
-      height
-    }
+      height,
+    },
   });
 }
 
@@ -36,7 +36,7 @@ function installInnerHeight(height: number): void {
   Object.defineProperty(window, "innerHeight", {
     configurable: true,
     writable: true,
-    value: height
+    value: height,
   });
 }
 
@@ -45,17 +45,17 @@ describe("RuntimeViewportSizingCoordinator", () => {
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       writable: true,
-      value: originalMatchMedia
+      value: originalMatchMedia,
     });
     Object.defineProperty(window, "visualViewport", {
       configurable: true,
       writable: true,
-      value: originalVisualViewport
+      value: originalVisualViewport,
     });
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
       writable: true,
-      value: originalInnerHeight
+      value: originalInnerHeight,
     });
     document.documentElement.style.removeProperty("--app-height");
     document.documentElement.style.removeProperty("--composer-safe-bottom-inset");
@@ -77,7 +77,9 @@ describe("RuntimeViewportSizingCoordinator", () => {
     expect(metrics.visualViewportHeight).toBe(900);
     expect(metrics.keyboardOpen).toBe(false);
     expect(document.documentElement.style.getPropertyValue("--app-height")).toBe("900px");
-    expect(document.documentElement.style.getPropertyValue("--composer-safe-bottom-inset")).toBe("16px");
+    expect(document.documentElement.style.getPropertyValue("--composer-safe-bottom-inset")).toBe(
+      "16px",
+    );
   });
 
   it("uses baseline height to classify keyboard-open transitions", () => {
@@ -94,7 +96,9 @@ describe("RuntimeViewportSizingCoordinator", () => {
     expect(initialMetrics.keyboardOpen).toBe(false);
     expect(nextMetrics.keyboardOpen).toBe(true);
     expect(nextMetrics.keyboardDelta).toBe(170);
-    expect(document.documentElement.style.getPropertyValue("--composer-safe-bottom-inset")).toBe("0px");
+    expect(document.documentElement.style.getPropertyValue("--composer-safe-bottom-inset")).toBe(
+      "0px",
+    );
   });
 
   it("reads safe area inset left and clears runtime css variables", () => {
@@ -109,7 +113,9 @@ describe("RuntimeViewportSizingCoordinator", () => {
 
     coordinator.clearViewportSizingVariables();
     expect(document.documentElement.style.getPropertyValue("--app-height")).toBe("");
-    expect(document.documentElement.style.getPropertyValue("--composer-safe-bottom-inset")).toBe("");
+    expect(document.documentElement.style.getPropertyValue("--composer-safe-bottom-inset")).toBe(
+      "",
+    );
   });
 
   it("uses layout viewport height when visual viewport metrics are not finite", () => {

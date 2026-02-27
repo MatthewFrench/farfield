@@ -494,7 +494,7 @@ end-to-end/real/scenarios/mobile-sidebar.spec.ts	end-to-end	end-to-end/real	no	0
 end-to-end/real/scenarios/startup-and-header-refresh.spec.ts	end-to-end	end-to-end/real	no	0	0	0	not-started
 end-to-end/real/scenarios/startup-under-load.spec.ts	end-to-end	end-to-end/real	no	0	0	0	not-started
 end-to-end/real/scenarios/thread-open.spec.ts	end-to-end	end-to-end/real	no	0	0	0	not-started
-eslint.config.mjs	(root)	(direct-files)	no	0	0	0	not-started
+biome.json	(root)	(direct-files)	no	0	0	0	not-started
 LICENSE	(root)	(direct-files)	no	0	0	0	not-started
 operations/caddy/Caddyfile.domain.template	operations	operations/caddy	no	0	0	0	not-started
 operations/caddy/Caddyfile.local.template	operations	operations/caddy	no	0	0	0	not-started

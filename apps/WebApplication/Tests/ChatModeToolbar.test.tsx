@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   ChatModeToolbar,
-  type ChatModeToolbarProps
+  type ChatModeToolbarProps,
 } from "@/Features/Chat/UserInterface/ChatModeToolbar";
 
 const APP_DEFAULT_VALUE = "__app_default__";
@@ -22,15 +22,13 @@ const baseChatModeToolbarProperties: ChatModeToolbarProps = {
   selectedModelId: "",
   selectedReasoningEffort: "",
   selectedModeKey: "default",
-  modelOptionsWithoutAssumedDefault: [
-    { id: "gpt-4.1-mini", label: "GPT-4.1 mini" }
-  ],
+  modelOptionsWithoutAssumedDefault: [{ id: "gpt-4.1-mini", label: "GPT-4.1 mini" }],
   effortOptionsWithoutAssumedDefault: ["low", "high"],
   isModeSyncing: false,
   pendingRequestCount: 0,
   onTogglePlanMode: () => {},
   onModelChange: () => {},
-  onReasoningEffortChange: () => {}
+  onReasoningEffortChange: () => {},
 };
 
 function renderChatModeToolbar(properties: ChatModeToolbarProps): void {
@@ -61,19 +59,21 @@ interface ChatModeToolbarPropertyOverrides {
 }
 
 function buildChatModeToolbarProperties(
-  overrides?: ChatModeToolbarPropertyOverrides
+  overrides?: ChatModeToolbarPropertyOverrides,
 ): ChatModeToolbarProps {
   return {
     ...baseChatModeToolbarProperties,
-    ...overrides
+    ...overrides,
   };
 }
 
 describe("ChatModeToolbar", () => {
   it("hides mode controls when collaboration mode changes are unavailable", () => {
-    renderChatModeToolbar(buildChatModeToolbarProperties({
-      canSetCollaborationMode: false
-    }));
+    renderChatModeToolbar(
+      buildChatModeToolbarProperties({
+        canSetCollaborationMode: false,
+      }),
+    );
 
     expect(screen.queryByTestId("chat-mode-toolbar-plan-button")).toBeNull();
     expect(screen.queryByTestId("chat-mode-toolbar-model-select")).toBeNull();
@@ -84,52 +84,74 @@ describe("ChatModeToolbar", () => {
   it("runs plan toggle action when plan control is clicked", () => {
     const onTogglePlanMode = vi.fn();
 
-    renderChatModeToolbar(buildChatModeToolbarProperties({
-      onTogglePlanMode
-    }));
+    renderChatModeToolbar(
+      buildChatModeToolbarProperties({
+        onTogglePlanMode,
+      }),
+    );
 
     fireEvent.click(screen.getByTestId("chat-mode-toolbar-plan-button"));
     expect(onTogglePlanMode).toHaveBeenCalledTimes(1);
   });
 
   it("shows pending request count when pending items exist", () => {
-    renderChatModeToolbar(buildChatModeToolbarProperties({
-      pendingRequestCount: 3
-    }));
+    renderChatModeToolbar(
+      buildChatModeToolbarProperties({
+        pendingRequestCount: 3,
+      }),
+    );
 
-    expect(screen.getByTestId("chat-mode-toolbar-pending-count").textContent).toBe(EXPECTED_PENDING_LABEL);
+    expect(screen.getByTestId("chat-mode-toolbar-pending-count").textContent).toBe(
+      EXPECTED_PENDING_LABEL,
+    );
   });
 
   it("does not show pending request count when no items are pending", () => {
-    renderChatModeToolbar(buildChatModeToolbarProperties({
-      pendingRequestCount: 0
-    }));
+    renderChatModeToolbar(
+      buildChatModeToolbarProperties({
+        pendingRequestCount: 0,
+      }),
+    );
 
     expect(screen.queryByTestId("chat-mode-toolbar-pending-count")).toBeNull();
   });
 
   it("disables model and reasoning controls when no thread is selected", () => {
-    renderChatModeToolbar(buildChatModeToolbarProperties({
-      selectedThreadId: null
-    }));
+    renderChatModeToolbar(
+      buildChatModeToolbarProperties({
+        selectedThreadId: null,
+      }),
+    );
 
-    expect(screen.getByTestId("chat-mode-toolbar-model-select").hasAttribute("disabled")).toBe(true);
-    expect(screen.getByTestId("chat-mode-toolbar-reasoning-effort-select").hasAttribute("disabled")).toBe(true);
+    expect(screen.getByTestId("chat-mode-toolbar-model-select").hasAttribute("disabled")).toBe(
+      true,
+    );
+    expect(
+      screen.getByTestId("chat-mode-toolbar-reasoning-effort-select").hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("disables mode setting controls when selected mode key is empty", () => {
-    renderChatModeToolbar(buildChatModeToolbarProperties({
-      selectedModeKey: ""
-    }));
+    renderChatModeToolbar(
+      buildChatModeToolbarProperties({
+        selectedModeKey: "",
+      }),
+    );
 
-    expect(screen.getByTestId("chat-mode-toolbar-model-select").hasAttribute("disabled")).toBe(true);
-    expect(screen.getByTestId("chat-mode-toolbar-reasoning-effort-select").hasAttribute("disabled")).toBe(true);
+    expect(screen.getByTestId("chat-mode-toolbar-model-select").hasAttribute("disabled")).toBe(
+      true,
+    );
+    expect(
+      screen.getByTestId("chat-mode-toolbar-reasoning-effort-select").hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("disables plan button when plan mode option is unavailable", () => {
-    renderChatModeToolbar(buildChatModeToolbarProperties({
-      hasPlanModeOption: false
-    }));
+    renderChatModeToolbar(
+      buildChatModeToolbarProperties({
+        hasPlanModeOption: false,
+      }),
+    );
 
     expect(screen.getByTestId("chat-mode-toolbar-plan-button").hasAttribute("disabled")).toBe(true);
   });

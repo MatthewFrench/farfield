@@ -1,9 +1,9 @@
 import { Bug, Loader2, Menu, Moon, PanelLeft, RefreshCcw, Sun } from "lucide-react";
-import { type AgentId } from "@/Shared/Contracts/ApiContracts";
-import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
-import { PushStatusButton } from "@/Features/PushNotifications/UserInterface/PushStatusButton";
 import { Button } from "@/Components/UserInterface/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/UserInterface/Tooltip";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
+import { PushStatusButton } from "@/Features/PushNotifications/UserInterface/PushStatusButton";
+import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 
 const DEBUG_TAB = "debug";
 const CHAT_TAB = "chat";
@@ -30,7 +30,7 @@ function HeaderIconButton({
   title,
   active,
   testId,
-  children
+  children,
 }: HeaderIconButtonProps): React.JSX.Element {
   const buttonNode = (
     <Button
@@ -86,7 +86,7 @@ export interface ApplicationHeaderBarProps {
 function buildSidebarOpenHandler(
   onOpenSidebar: () => void,
   activeTab: ApplicationHeaderBarTab,
-  onToggleDebugTab: () => void
+  onToggleDebugTab: () => void,
 ): () => void {
   return () => {
     onOpenSidebar();
@@ -122,17 +122,17 @@ export function ApplicationHeaderBar({
   onRefresh,
   onToggleDebugTab,
   onToggleTheme,
-  renderAgentFavicon
+  renderAgentFavicon,
 }: ApplicationHeaderBarProps): React.JSX.Element {
   const handleOpenMobileSidebar = buildSidebarOpenHandler(
     onOpenMobileSidebar,
     activeTab,
-    onToggleDebugTab
+    onToggleDebugTab,
   );
   const handleOpenDesktopSidebar = buildSidebarOpenHandler(
     onOpenDesktopSidebar,
     activeTab,
-    onToggleDebugTab
+    onToggleDebugTab,
   );
 
   return (
@@ -159,7 +159,10 @@ export function ApplicationHeaderBar({
           </div>
         )}
         <div className="min-w-0">
-          <div data-testid="selected-thread-label" className="text-sm font-medium truncate leading-5 flex items-center gap-1.5">
+          <div
+            data-testid="selected-thread-label"
+            className="text-sm font-medium truncate leading-5 flex items-center gap-1.5"
+          >
             {selectedThreadLabel}
             {hasSelectedThread && activeAgentLabel.length > 0 && (
               <span className="shrink-0 h-5 w-5 rounded-md bg-muted/30 ring-1 ring-border/60 flex items-center justify-center overflow-hidden">
@@ -199,7 +202,11 @@ export function ApplicationHeaderBar({
           <Bug size={14} aria-hidden="true" />
         </HeaderIconButton>
         <HeaderIconButton onClick={onToggleTheme} title="Toggle theme">
-          {theme === "dark" ? <Sun size={14} aria-hidden="true" /> : <Moon size={14} aria-hidden="true" />}
+          {theme === "dark" ? (
+            <Sun size={14} aria-hidden="true" />
+          ) : (
+            <Moon size={14} aria-hidden="true" />
+          )}
         </HeaderIconButton>
       </div>
     </header>

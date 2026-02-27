@@ -1,5 +1,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { Badge } from "@/Components/UserInterface/Badge";
+import { Button } from "@/Components/UserInterface/Button";
+import { Card } from "@/Components/UserInterface/Card";
+import { Checkbox } from "@/Components/UserInterface/Checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -15,8 +19,12 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "@/Components/UserInterface/DropdownMenu";
+import { Input } from "@/Components/UserInterface/Input";
+import { Label } from "@/Components/UserInterface/Label";
+import { RadioGroup, RadioGroupItem } from "@/Components/UserInterface/RadioGroup";
+import { ScrollArea } from "@/Components/UserInterface/ScrollArea";
 import {
   Select,
   SelectContent,
@@ -27,69 +35,47 @@ import {
   SelectScrollUpButton,
   SelectSeparator,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from "@/Components/UserInterface/Select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from "@/Components/UserInterface/Tooltip";
-import { Badge } from "@/Components/UserInterface/Badge";
-import { Button } from "@/Components/UserInterface/Button";
-import { Card } from "@/Components/UserInterface/Card";
-import { Checkbox } from "@/Components/UserInterface/Checkbox";
-import { Input } from "@/Components/UserInterface/Input";
-import { Label } from "@/Components/UserInterface/Label";
-import {
-  RadioGroup,
-  RadioGroupItem
-} from "@/Components/UserInterface/RadioGroup";
-import { ScrollArea } from "@/Components/UserInterface/ScrollArea";
 import { Tabs } from "@/Components/UserInterface/Tabs";
 import { TabsContent } from "@/Components/UserInterface/TabsContent";
 import { TabsList } from "@/Components/UserInterface/TabsList";
 import { TabsTrigger } from "@/Components/UserInterface/TabsTrigger";
 import { Textarea } from "@/Components/UserInterface/Textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/Components/UserInterface/Tooltip";
 
 function renderSelectTrigger(input?: { size?: "default" | "sm" }): void {
-  const selectTriggerSizeProperties =
-    input?.size === undefined
-      ? {}
-      : { size: input.size };
+  const selectTriggerSizeProperties = input?.size === undefined ? {} : { size: input.size };
 
   cleanup();
   render(
     <Select>
-      <SelectTrigger
-        data-testid="select-trigger"
-        {...selectTriggerSizeProperties}
-      >
+      <SelectTrigger data-testid="select-trigger" {...selectTriggerSizeProperties}>
         <SelectValue placeholder="Select value" />
       </SelectTrigger>
-    </Select>
+    </Select>,
   );
 }
 
 function renderDropdownMenuItem(input?: { variant?: "default" | "destructive" }): void {
   const dropdownMenuVariantProperties =
-    input?.variant === undefined
-      ? {}
-      : { variant: input.variant };
+    input?.variant === undefined ? {} : { variant: input.variant };
 
   cleanup();
   render(
     <DropdownMenu open>
       <DropdownMenuTrigger>Open</DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuItem
-          data-testid="dropdown-menu-item"
-          {...dropdownMenuVariantProperties}
-        >
+        <DropdownMenuItem data-testid="dropdown-menu-item" {...dropdownMenuVariantProperties}>
           Item label
         </DropdownMenuItem>
       </DropdownMenuContent>
-    </DropdownMenu>
+    </DropdownMenu>,
   );
 }
 
@@ -111,7 +97,9 @@ describe("UserInterfacePrimitiveContracts", () => {
 
   it("applies the provided dropdown item variant token", () => {
     renderDropdownMenuItem({ variant: "destructive" });
-    expect(screen.getByTestId("dropdown-menu-item").getAttribute("data-variant")).toBe("destructive");
+    expect(screen.getByTestId("dropdown-menu-item").getAttribute("data-variant")).toBe(
+      "destructive",
+    );
   });
 
   it("uses explicit owner display names for primitive wrappers", () => {
@@ -171,7 +159,7 @@ describe("UserInterfacePrimitiveContracts", () => {
       <div>
         <Button>Run</Button>
         <Input data-testid="primitive-default-input" />
-      </div>
+      </div>,
     );
 
     expect(screen.getByRole("button", { name: "Run" }).getAttribute("type")).toBe("button");
@@ -182,10 +170,12 @@ describe("UserInterfacePrimitiveContracts", () => {
     cleanup();
     render(
       <div>
-        <Badge data-testid="primitive-badge" variant="success">Ready</Badge>
+        <Badge data-testid="primitive-badge" variant="success">
+          Ready
+        </Badge>
         <Card data-testid="primitive-card">Card body</Card>
         <Textarea data-testid="primitive-textarea" />
-      </div>
+      </div>,
     );
 
     expect(screen.getByTestId("primitive-badge").className.includes("bg-emerald-50")).toBe(true);

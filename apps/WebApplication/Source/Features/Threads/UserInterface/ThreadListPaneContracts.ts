@@ -1,6 +1,9 @@
 import React from "react";
+import type {
+  ThreadListItem,
+  ThreadProjectGroup,
+} from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
-import type { ThreadListItem, ThreadProjectGroup } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 
 export interface ThreadListPaneAgentDescriptor {
   label: string;
@@ -20,7 +23,7 @@ export type ThreadListPaneDateFormatter = (value: number | string | null | undef
 export type ThreadListPaneAgentFaviconRenderer = (
   agentId: AgentId,
   label: string,
-  className: string
+  className: string,
 ) => React.ReactNode;
 
 export interface ThreadListPaneProperties {

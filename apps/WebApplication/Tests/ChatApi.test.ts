@@ -5,7 +5,7 @@ import {
   interruptThread,
   sendMessage,
   setCollaborationMode,
-  submitUserInput
+  submitUserInput,
 } from "@/Features/Chat/DataAccess/ChatApi";
 import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 
@@ -13,8 +13,8 @@ function createJsonResponse(body: StructuredDataValue, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      "Content-Type": "application/json"
-    }
+      "Content-Type": "application/json",
+    },
   });
 }
 
@@ -32,14 +32,14 @@ describe("ChatApi", () => {
         events: [],
         nextSequence: 0,
         firstAvailableSequence: 0,
-        resetRequired: false
-      })
+        resetRequired: false,
+      }),
     );
 
     await expect(
       getStreamEvents("thread_1", {
-        sinceSequence: -1
-      })
+        sinceSequence: -1,
+      }),
     ).rejects.toThrow(/greater than or equal to 0/);
     expect(fetchMock).toHaveBeenCalledTimes(0);
   });
@@ -53,12 +53,12 @@ describe("ChatApi", () => {
         events: [],
         nextSequence: 12,
         firstAvailableSequence: 0,
-        resetRequired: false
-      })
+        resetRequired: false,
+      }),
     );
 
     await getStreamEvents("thread_1", {
-      sinceSequence: 11
+      sinceSequence: 11,
     });
 
     const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
@@ -79,9 +79,9 @@ describe("ChatApi", () => {
           kind: "reductionFailed",
           message: "",
           eventIndex: null,
-          patchIndex: null
-        }
-      })
+          patchIndex: null,
+        },
+      }),
     );
 
     await expect(getLiveState("thread_1")).rejects.toThrow(/at least 1 character/);
@@ -95,8 +95,8 @@ describe("ChatApi", () => {
         ownerClientId: null,
         conversationState: null,
         liveStateError: null,
-        extraKey: "ignored"
-      })
+        extraKey: "ignored",
+      }),
     );
 
     const result = await getLiveState("thread_1");
@@ -114,37 +114,41 @@ describe("ChatApi", () => {
         events: [],
         nextSequence: 12,
         firstAvailableSequence: 0,
-        resetRequired: "false"
-      })
+        resetRequired: "false",
+      }),
     );
 
     await expect(getStreamEvents("thread_1")).rejects.toThrow(/resetRequired/);
   });
 
   it("rejects send-message requests before dispatch when message text is empty", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, {
-      status: 200
-    }));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 200,
+      }),
+    );
 
     await expect(
       sendMessage({
         threadId: "thread_1",
-        text: ""
-      })
+        text: "",
+      }),
     ).rejects.toThrow(/at least 1 character/);
     expect(fetchMock).toHaveBeenCalledTimes(0);
   });
 
   it("posts send-message payload through the messages route with JSON headers", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, {
-      status: 200
-    }));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 200,
+      }),
+    );
 
     await sendMessage({
       threadId: "thread_1",
       ownerClientId: "owner_1",
       text: "hello",
-      cwd: "/tmp/workspace"
+      cwd: "/tmp/workspace",
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -153,17 +157,21 @@ describe("ChatApi", () => {
     expect(requestUrl).toContain("/api/threads/thread_1/messages");
     expect(requestInit?.method).toBe("POST");
     expect(new Headers(requestInit?.headers).get("Content-Type")).toBe("application/json");
-    expect(String(requestInit?.body)).toBe(JSON.stringify({
-      ownerClientId: "owner_1",
-      text: "hello",
-      cwd: "/tmp/workspace"
-    }));
+    expect(String(requestInit?.body)).toBe(
+      JSON.stringify({
+        ownerClientId: "owner_1",
+        text: "hello",
+        cwd: "/tmp/workspace",
+      }),
+    );
   });
 
   it("posts collaboration-mode requests through the collaboration-mode route", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, {
-      status: 200
-    }));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 200,
+      }),
+    );
 
     await setCollaborationMode({
       threadId: "thread_1",
@@ -172,9 +180,9 @@ describe("ChatApi", () => {
         settings: {
           model: null,
           reasoning_effort: "high",
-          developer_instructions: "Use explicit reasoning."
-        }
-      }
+          developer_instructions: "Use explicit reasoning.",
+        },
+      },
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -183,22 +191,26 @@ describe("ChatApi", () => {
     expect(requestUrl).toContain("/api/threads/thread_1/collaboration-mode");
     expect(requestInit?.method).toBe("POST");
     expect(new Headers(requestInit?.headers).get("Content-Type")).toBe("application/json");
-    expect(String(requestInit?.body)).toBe(JSON.stringify({
-      collaborationMode: {
-        mode: "plan",
-        settings: {
-          model: null,
-          reasoning_effort: "high",
-          developer_instructions: "Use explicit reasoning."
-        }
-      }
-    }));
+    expect(String(requestInit?.body)).toBe(
+      JSON.stringify({
+        collaborationMode: {
+          mode: "plan",
+          settings: {
+            model: null,
+            reasoning_effort: "high",
+            developer_instructions: "Use explicit reasoning.",
+          },
+        },
+      }),
+    );
   });
 
   it("rejects collaboration-mode requests before dispatch when threadId is blank", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, {
-      status: 200
-    }));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 200,
+      }),
+    );
 
     await expect(
       setCollaborationMode({
@@ -208,21 +220,23 @@ describe("ChatApi", () => {
           settings: {
             model: null,
             reasoning_effort: null,
-            developer_instructions: null
-          }
-        }
-      })
+            developer_instructions: null,
+          },
+        },
+      }),
     ).rejects.toThrow(/at least 1 character/);
     expect(fetchMock).toHaveBeenCalledTimes(0);
   });
 
   it("posts interrupt requests through the interrupt route with an empty body by default", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, {
-      status: 200
-    }));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 200,
+      }),
+    );
 
     await interruptThread({
-      threadId: "thread_1"
+      threadId: "thread_1",
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -235,9 +249,11 @@ describe("ChatApi", () => {
   });
 
   it("rejects user-input submission when requestId is negative", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, {
-      status: 200
-    }));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 200,
+      }),
+    );
 
     await expect(
       submitUserInput({
@@ -246,11 +262,11 @@ describe("ChatApi", () => {
         response: {
           answers: {
             question_1: {
-              answers: ["answer"]
-            }
-          }
-        }
-      })
+              answers: ["answer"],
+            },
+          },
+        },
+      }),
     ).rejects.toThrow(/greater than or equal to 0/);
     expect(fetchMock).toHaveBeenCalledTimes(0);
   });

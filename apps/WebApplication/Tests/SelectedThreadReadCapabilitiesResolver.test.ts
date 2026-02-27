@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { AgentId } from "@/Shared/Contracts/ApiContracts";
-import type { ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import { resolveReadCapabilitiesForThread } from "@/Features/Chat/DomainModel/SelectedThreadReadCapabilitiesResolver";
+import type { ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import type { AgentId } from "@/Shared/Contracts/ApiContracts";
 
 function buildThread(threadId: string, agentId: AgentId): ThreadListItem {
   return {
@@ -9,7 +9,7 @@ function buildThread(threadId: string, agentId: AgentId): ThreadListItem {
     preview: `${threadId}-preview`,
     createdAt: 1,
     updatedAt: 2,
-    agentId
+    agentId,
   };
 }
 
@@ -23,15 +23,15 @@ describe("SelectedThreadReadCapabilitiesResolver", () => {
         opencode: {
           capabilities: {
             canReadLiveState: true,
-            canReadStreamEvents: false
-          }
-        }
-      }
+            canReadStreamEvents: false,
+          },
+        },
+      },
     });
 
     expect(capabilities).toEqual({
       canReadLiveState: true,
-      canReadStreamEvents: false
+      canReadStreamEvents: false,
     });
   });
 
@@ -40,12 +40,12 @@ describe("SelectedThreadReadCapabilitiesResolver", () => {
       threadId: "thread-1",
       threads: [buildThread("thread-1", "codex")],
       selectedAgentId: "codex",
-      agentsById: {}
+      agentsById: {},
     });
 
     expect(capabilities).toEqual({
       canReadLiveState: true,
-      canReadStreamEvents: true
+      canReadStreamEvents: true,
     });
   });
 
@@ -54,12 +54,12 @@ describe("SelectedThreadReadCapabilitiesResolver", () => {
       threadId: "thread-1",
       threads: [buildThread("thread-1", "opencode")],
       selectedAgentId: "codex",
-      agentsById: {}
+      agentsById: {},
     });
 
     expect(capabilities).toEqual({
       canReadLiveState: false,
-      canReadStreamEvents: false
+      canReadStreamEvents: false,
     });
   });
 });

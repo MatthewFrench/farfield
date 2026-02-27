@@ -4,7 +4,7 @@ const REQUEST_IDENTIFIER_VALUE_CAPTURE_PATTERN = String.raw`([a-z0-9._-]+)`;
 // Accepts "requestId=req-1", "request id: req-1", and equivalent casing/spacing variants.
 const REQUEST_IDENTIFIER_CAPTURE_PATTERN = new RegExp(
   `${REQUEST_IDENTIFIER_PREFIX_PATTERN}${REQUEST_IDENTIFIER_SEPARATOR_PATTERN}${REQUEST_IDENTIFIER_VALUE_CAPTURE_PATTERN}`,
-  "i"
+  "i",
 );
 const REQUEST_CANCELED_ERROR_MESSAGE_PATTERN = /^Request canceled for /i;
 const SERVER_SHUTTING_DOWN_ERROR_MESSAGE_PATTERN = /Server is shutting down/i;
@@ -18,8 +18,8 @@ export function extractRequestIdFromErrorMessage(errorMessage: string): string |
 
 export function shouldIgnoreUiErrorMessage(errorMessage: string): boolean {
   return (
-    REQUEST_CANCELED_ERROR_MESSAGE_PATTERN.test(errorMessage.trim())
-    || SERVER_SHUTTING_DOWN_ERROR_MESSAGE_PATTERN.test(errorMessage)
+    REQUEST_CANCELED_ERROR_MESSAGE_PATTERN.test(errorMessage.trim()) ||
+    SERVER_SHUTTING_DOWN_ERROR_MESSAGE_PATTERN.test(errorMessage)
   );
 }
 
@@ -33,7 +33,7 @@ export function formatTrackedUiErrorMessage(input: {
   const tags = [
     `actionId=${input.actionId}`,
     input.requestId !== null && input.requestId.length > 0 ? `requestId=${input.requestId}` : "",
-    input.errorId !== null && input.errorId.length > 0 ? `errorId=${input.errorId}` : ""
+    input.errorId !== null && input.errorId.length > 0 ? `errorId=${input.errorId}` : "",
   ].filter((value) => value.length > 0);
 
   if (tags.length === 0) {

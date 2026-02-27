@@ -1,24 +1,18 @@
 import { cleanup, render } from "@testing-library/react";
-import {
-  afterEach,
-  describe,
-  expect,
-  it,
-  vi
-} from "vitest";
 import type { Dispatch, SetStateAction } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApplicationRouteStateMapper } from "../Source/Application/DomainModel/ApplicationRouteStateMapper";
 import {
+  type UseApplicationRefreshEffectsInput,
   useApplicationRefreshEffects,
-  type UseApplicationRefreshEffectsInput
 } from "../Source/Application/StateManagement/UseApplicationRefreshEffects";
 import { DebugIssueStateResolver } from "../Source/Features/Debugging/DomainModel/DebugIssueStateResolver";
-import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
 import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
-import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
-import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement/ThreadListStateStore";
+import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
 import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import { ThreadListStateController } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
+import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement/ThreadListStateStore";
+import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
 
 const THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS = 30_000;
 const THREAD_QUERY_CACHE_MAXIMUM_ENTRY_COUNT = 100;
@@ -40,11 +34,11 @@ function createThreadListStateController(): ThreadListStateController {
     threadServerClient: new ThreadServerClient(),
     threadQueryCache: new ThreadQueryCache(
       THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS,
-      THREAD_QUERY_CACHE_MAXIMUM_ENTRY_COUNT
+      THREAD_QUERY_CACHE_MAXIMUM_ENTRY_COUNT,
     ),
     threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
     threadListStateStore: new ThreadListStateStore(),
-    threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+    threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
   });
 }
 
@@ -82,7 +76,7 @@ function createBaseInput(): UseApplicationRefreshEffectsInput {
     refreshPushClientState: vi.fn(async (): Promise<void> => {}),
     handleRuntimeRequestError: vi.fn(),
     coreRefreshIntervalMs: DISCONNECTED_CORE_REFRESH_INTERVAL_MILLISECONDS,
-    coreRefreshConnectedMinIntervalMs: CONNECTED_CORE_REFRESH_MINIMUM_INTERVAL_MILLISECONDS
+    coreRefreshConnectedMinIntervalMs: CONNECTED_CORE_REFRESH_MINIMUM_INTERVAL_MILLISECONDS,
   };
 }
 

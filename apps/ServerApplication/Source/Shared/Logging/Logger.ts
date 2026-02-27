@@ -8,7 +8,7 @@ export const LoggerLevelSchema = z.enum([
   "info",
   "debug",
   "trace",
-  "silent"
+  "silent",
 ]);
 export type LoggerLevel = z.infer<typeof LoggerLevelSchema>;
 
@@ -18,7 +18,7 @@ export const DEFAULT_SERVER_LOGGER_LEVEL: LoggerLevel = "info";
 function buildLoggerOptions(): LoggerOptions {
   return {
     name: SERVER_LOGGER_NAME,
-    level: DEFAULT_SERVER_LOGGER_LEVEL
+    level: DEFAULT_SERVER_LOGGER_LEVEL,
   };
 }
 

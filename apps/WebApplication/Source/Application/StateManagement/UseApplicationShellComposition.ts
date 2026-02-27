@@ -1,38 +1,36 @@
-import { type ThreadMutationServerClient } from "@/Features/Threads/DataAccess/ThreadMutationServerClient";
-import { type ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
-import {
-  type ThreadMutationActionCoordinator,
-  type ThreadMutationActionErrorReportInput
-} from "@/Features/Threads/StateManagement/ThreadMutationActionCoordinator";
-import { type ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
-import {
-  type UseThreadListPanePropertiesInput,
-  useThreadListPaneProperties
-} from "@/Features/Threads/StateManagement/UseThreadListPaneProperties";
-import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPane";
-import {
-  type ThreadActionHandlers,
-  type UseThreadActionHandlersInput,
-  useThreadActionHandlers
-} from "@/Features/Threads/StateManagement/UseThreadActionHandlers";
-import { type DebugActionHandlers } from "@/Features/Debugging/StateManagement/UseDebugActionHandlers";
-import { type ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { type MobileSidebarSwipeCoordinator } from "@/Application/StateManagement/MobileSidebarSwipeCoordinator";
 import { type RuntimeViewportSizingCoordinator } from "@/Application/StateManagement/RuntimeViewportSizingCoordinator";
-import {
-  type ApplicationDerivedState
-} from "@/Application/StateManagement/UseApplicationDerivedStateContracts";
+import { type ApplicationDerivedState } from "@/Application/StateManagement/UseApplicationDerivedStateContracts";
 import { type ApplicationShellState } from "@/Application/StateManagement/UseApplicationShellState";
 import {
   type ApplicationShellViewProperties,
   type UseApplicationShellViewPropertiesInput,
-  useApplicationShellViewProperties
+  useApplicationShellViewProperties,
 } from "@/Application/StateManagement/UseApplicationShellViewProperties";
 import {
-  type UseMobileSidebarTouchHandlersInput,
   type MobileSidebarTouchHandlers,
-  useMobileSidebarTouchHandlers
+  type UseMobileSidebarTouchHandlersInput,
+  useMobileSidebarTouchHandlers,
 } from "@/Application/StateManagement/UseMobileSidebarTouchHandlers";
+import { type ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
+import { type DebugActionHandlers } from "@/Features/Debugging/StateManagement/UseDebugActionHandlers";
+import { type ThreadMutationServerClient } from "@/Features/Threads/DataAccess/ThreadMutationServerClient";
+import { type ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
+import {
+  type ThreadMutationActionCoordinator,
+  type ThreadMutationActionErrorReportInput,
+} from "@/Features/Threads/StateManagement/ThreadMutationActionCoordinator";
+import {
+  type ThreadActionHandlers,
+  type UseThreadActionHandlersInput,
+  useThreadActionHandlers,
+} from "@/Features/Threads/StateManagement/UseThreadActionHandlers";
+import {
+  type UseThreadListPanePropertiesInput,
+  useThreadListPaneProperties,
+} from "@/Features/Threads/StateManagement/UseThreadListPaneProperties";
+import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPane";
+import { type ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { type ApplicationChatFeatureComposition } from "./UseApplicationChatFeatureComposition";
 import { type ApplicationPushFeatureComposition } from "./UseApplicationPushFeatureComposition";
 
@@ -64,7 +62,9 @@ export interface UseApplicationShellCompositionInput {
   pushFeatureComposition: ApplicationPushFeatureComposition;
 }
 
-export interface ApplicationShellComposition extends ApplicationShellViewProperties, MobileSidebarTouchHandlers {
+export interface ApplicationShellComposition
+  extends ApplicationShellViewProperties,
+    MobileSidebarTouchHandlers {
   threadListPaneProperties: ThreadListPaneProperties;
 }
 
@@ -76,17 +76,17 @@ interface ApplicationShellCompositionContext {
 }
 
 function createApplicationShellCompositionContext(
-  input: UseApplicationShellCompositionInput
+  input: UseApplicationShellCompositionInput,
 ): ApplicationShellCompositionContext {
   return {
     input,
     applicationShellState: input.applicationShellState,
-    applicationDerivedState: input.applicationDerivedState
+    applicationDerivedState: input.applicationDerivedState,
   };
 }
 
 function buildThreadActionHandlersInput(
-  context: ApplicationShellCompositionContext
+  context: ApplicationShellCompositionContext,
 ): UseThreadActionHandlersInput {
   const { input, applicationShellState, applicationDerivedState } = context;
   return {
@@ -98,31 +98,32 @@ function buildThreadActionHandlersInput(
     setSelectedThreadId: applicationShellState.setSelectedThreadId,
     setMobileSidebarOpen: applicationShellState.setMobileSidebarOpen,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
-    pendingThreadMaterializationCoordinator: applicationShellState.pendingThreadMaterializationCoordinator,
+    pendingThreadMaterializationCoordinator:
+      applicationShellState.pendingThreadMaterializationCoordinator,
     threadMutationActionCoordinator: input.threadMutationActionCoordinator,
     threadMutationServerClient: input.threadMutationServerClient,
     threadListStateController: input.threadListStateController,
     loadCoreDataTracked: input.loadCoreDataTracked,
     loadSelectedThreadTracked: input.loadSelectedThreadTracked,
-    reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError
+    reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
   };
 }
 
 function buildMobileSidebarTouchHandlersInput(
-  context: ApplicationShellCompositionContext
+  context: ApplicationShellCompositionContext,
 ): UseMobileSidebarTouchHandlersInput {
   const { input, applicationShellState } = context;
   return {
     mobileSidebarOpen: applicationShellState.mobileSidebarOpen,
     setMobileSidebarOpen: applicationShellState.setMobileSidebarOpen,
     mobileSidebarSwipeCoordinator: input.mobileSidebarSwipeCoordinator,
-    runtimeViewportSizingCoordinator: input.runtimeViewportSizingCoordinator
+    runtimeViewportSizingCoordinator: input.runtimeViewportSizingCoordinator,
   };
 }
 
 function buildThreadListPanePropertiesInput(
   context: ApplicationShellCompositionContext,
-  threadActionHandlers: ThreadActionHandlers
+  threadActionHandlers: ThreadActionHandlers,
 ): UseThreadListPanePropertiesInput {
   const { input, applicationShellState, applicationDerivedState } = context;
   return {
@@ -157,12 +158,12 @@ function buildThreadListPanePropertiesInput(
     setCollapsedArchivedProjectGroups: applicationShellState.setCollapsedArchivedProjectGroups,
     unarchiveThread: threadActionHandlers.runUnarchiveThread,
     formatDate: input.formatDateValue,
-    renderAgentFavicon: input.renderAgentFavicon
+    renderAgentFavicon: input.renderAgentFavicon,
   };
 }
 
 function buildApplicationShellViewPropertiesInput(
-  context: ApplicationShellCompositionContext
+  context: ApplicationShellCompositionContext,
 ): UseApplicationShellViewPropertiesInput {
   const { input, applicationShellState, applicationDerivedState } = context;
   return {
@@ -180,7 +181,8 @@ function buildApplicationShellViewPropertiesInput(
     theme: input.theme,
     setMobileSidebarOpen: applicationShellState.setMobileSidebarOpen,
     setDesktopSidebarOpen: applicationShellState.setDesktopSidebarOpen,
-    enablePushNotificationsFromToolbar: input.pushFeatureComposition.enablePushNotificationsFromToolbar,
+    enablePushNotificationsFromToolbar:
+      input.pushFeatureComposition.enablePushNotificationsFromToolbar,
     refreshCoreDataAndSelectedThread: input.refreshCoreDataAndSelectedThread,
     setActiveTab: applicationShellState.setActiveTab,
     toggleTheme: input.toggleTheme,
@@ -256,34 +258,32 @@ function buildApplicationShellViewPropertiesInput(
     apiSessionBootstrapError: applicationShellState.apiSessionBootstrapError,
     setApiSessionBootstrapError: applicationShellState.setApiSessionBootstrapError,
     submitApiSessionToken: input.pushFeatureComposition.submitApiSessionToken,
-    isApiSessionBootstrapPending: applicationShellState.isApiSessionBootstrapPending
+    isApiSessionBootstrapPending: applicationShellState.isApiSessionBootstrapPending,
   };
 }
 
 export function useApplicationShellComposition(
-  input: UseApplicationShellCompositionInput
+  input: UseApplicationShellCompositionInput,
 ): ApplicationShellComposition {
   const context = createApplicationShellCompositionContext(input);
 
-  const threadActionHandlers = useThreadActionHandlers(
-    buildThreadActionHandlersInput(context)
-  );
+  const threadActionHandlers = useThreadActionHandlers(buildThreadActionHandlersInput(context));
 
   const mobileSidebarTouchHandlers = useMobileSidebarTouchHandlers(
-    buildMobileSidebarTouchHandlersInput(context)
+    buildMobileSidebarTouchHandlersInput(context),
   );
 
   const threadListPaneProperties = useThreadListPaneProperties(
-    buildThreadListPanePropertiesInput(context, threadActionHandlers)
+    buildThreadListPanePropertiesInput(context, threadActionHandlers),
   );
 
   const shellViewProperties = useApplicationShellViewProperties(
-    buildApplicationShellViewPropertiesInput(context)
+    buildApplicationShellViewPropertiesInput(context),
   );
 
   return {
     ...mobileSidebarTouchHandlers,
     threadListPaneProperties,
-    ...shellViewProperties
+    ...shellViewProperties,
   };
 }

@@ -1,9 +1,9 @@
-import path from "node:path";
 import type { IncomingMessage } from "node:http";
-import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react";
+import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
 import type { ProxyOptions } from "vite";
+import { defineConfig } from "vitest/config";
 
 process.env["VITE_APP_BUILD_ID"] ??= "dev";
 process.env["VITE_GIT_COMMIT"] ??= "dev";
@@ -27,11 +27,7 @@ function normalizeOriginHeader(origin: string): string | null {
 }
 
 function parseTrustedDevProxyOrigins(rawOrigins: string | undefined): Set<string> {
-  const builtIn = [
-    "http://localhost:4312",
-    "http://127.0.0.1:4312",
-    "http://[::1]:4312"
-  ];
+  const builtIn = ["http://localhost:4312", "http://127.0.0.1:4312", "http://[::1]:4312"];
   if (!rawOrigins || rawOrigins.trim().length === 0) {
     return new Set(builtIn.map((origin) => normalizeOrigin(origin)));
   }
@@ -49,18 +45,14 @@ function parseTrustedDevProxyOrigins(rawOrigins: string | undefined): Set<string
 }
 
 const trustedDevProxyOrigins = parseTrustedDevProxyOrigins(
-  process.env["VITE_DEV_PROXY_TRUSTED_ORIGINS"]
+  process.env["VITE_DEV_PROXY_TRUSTED_ORIGINS"],
 );
 
 function isLoopbackAddress(address: string | undefined): boolean {
   if (!address) {
     return false;
   }
-  return (
-    address === "127.0.0.1" ||
-    address === "::1" ||
-    address === "::ffff:127.0.0.1"
-  );
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
 }
 
 function shouldInjectApiToken(req: IncomingMessage): boolean {
@@ -98,7 +90,7 @@ function createTokenAwareProxyTarget(): string | ProxyOptions {
         }
         proxyReq.setHeader("X-Farfield-Token", apiToken);
       });
-    }
+    },
   };
 }
 
@@ -106,8 +98,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./Source")
-    }
+      "@": path.resolve(__dirname, "./Source"),
+    },
   },
   server: {
     host: true,
@@ -117,8 +109,8 @@ export default defineConfig({
     proxy: {
       "/api": createTokenAwareProxyTarget(),
       "/events": createTokenAwareProxyTarget(),
-      "/healthz": "http://127.0.0.1:4311"
-    }
+      "/healthz": "http://127.0.0.1:4311",
+    },
   },
   test: {
     environment: "jsdom",
@@ -133,14 +125,14 @@ export default defineConfig({
         "**/*.test.ts",
         "**/*.test.tsx",
         "Source/Main.tsx",
-        "vite.config.ts"
+        "vite.config.ts",
       ],
       thresholds: {
         branches: 75,
         functions: 65,
         lines: 70,
-        statements: 70
-      }
-    }
-  }
+        statements: 70,
+      },
+    },
+  },
 });

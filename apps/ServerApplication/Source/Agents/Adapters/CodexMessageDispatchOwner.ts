@@ -2,7 +2,7 @@ import {
   AppServerClient,
   CodexMonitorService,
   DesktopIpcError,
-  findLatestTurnParamsTemplate
+  findLatestTurnParamsTemplate,
 } from "@farfield/api";
 import type { TurnStartParams } from "@farfield/protocol";
 import { logger } from "../../Shared/Logging/Logger.js";
@@ -25,7 +25,9 @@ export class CodexMessageDispatchOwner {
   private readonly appClient: AppServerClient;
   private readonly service: CodexMonitorService;
   private readonly threadStreamStateOwner: CodexThreadStreamStateOwner;
-  private readonly runAppServerCall: <ValueType>(operation: () => Promise<ValueType>) => Promise<ValueType>;
+  private readonly runAppServerCall: <ValueType>(
+    operation: () => Promise<ValueType>,
+  ) => Promise<ValueType>;
   private readonly isConversationNotFoundError: <ErrorType>(error: ErrorType) => boolean;
 
   public constructor(options: CodexMessageDispatchOwnerOptions) {
@@ -40,7 +42,7 @@ export class CodexMessageDispatchOwner {
     if (isIpcReady) {
       const ownerClientId = this.threadStreamStateOwner.resolveKnownOwnerClientId(
         input.threadId,
-        input.ownerClientId
+        input.ownerClientId,
       );
 
       if (ownerClientId !== null) {
@@ -52,7 +54,7 @@ export class CodexMessageDispatchOwner {
             text: input.text,
             ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
             ...(typeof input.isSteering === "boolean" ? { isSteering: input.isSteering } : {}),
-            turnStartTemplate
+            turnStartTemplate,
           });
           return;
         } catch (error) {
@@ -63,9 +65,9 @@ export class CodexMessageDispatchOwner {
             {
               threadId: input.threadId,
               ownerClientId,
-              error: toErrorMessage(error)
+              error: toErrorMessage(error),
             },
-            IPC_SEND_MESSAGE_FAILURE_LOG_EVENT
+            IPC_SEND_MESSAGE_FAILURE_LOG_EVENT,
           );
           this.threadStreamStateOwner.clearThreadOwner(input.threadId);
         }
@@ -73,9 +75,7 @@ export class CodexMessageDispatchOwner {
     }
 
     try {
-      await this.runAppServerCall(() =>
-        this.appClient.sendUserMessage(input.threadId, input.text)
-      );
+      await this.runAppServerCall(() => this.appClient.sendUserMessage(input.threadId, input.text));
       return;
     } catch (error) {
       if (!this.isConversationNotFoundError(error)) {
@@ -84,21 +84,20 @@ export class CodexMessageDispatchOwner {
     }
 
     await this.runAppServerCall(() =>
-      this.appClient.resumeThread(input.threadId, { persistExtendedHistory: RESUME_WITH_EXTENDED_HISTORY })
+      this.appClient.resumeThread(input.threadId, {
+        persistExtendedHistory: RESUME_WITH_EXTENDED_HISTORY,
+      }),
     );
-    await this.runAppServerCall(() =>
-      this.appClient.sendUserMessage(input.threadId, input.text)
-    );
+    await this.runAppServerCall(() => this.appClient.sendUserMessage(input.threadId, input.text));
   }
 
   private async readTurnStartTemplate(
     threadId: string,
-    ownerClientId: string
+    ownerClientId: string,
   ): Promise<TurnStartParams | null> {
     let turnStartTemplate: TurnStartParams | null = null;
-    const projectedConversationState = this.threadStreamStateOwner.getProjectedConversationState(
-      threadId
-    );
+    const projectedConversationState =
+      this.threadStreamStateOwner.getProjectedConversationState(threadId);
 
     try {
       if (projectedConversationState) {
@@ -114,7 +113,7 @@ export class CodexMessageDispatchOwner {
 
     try {
       const readResult = await this.runAppServerCall(() =>
-        this.appClient.readThread(threadId, true)
+        this.appClient.readThread(threadId, true),
       );
       return findLatestTurnParamsTemplate(readResult.thread);
     } catch (error) {
@@ -122,9 +121,9 @@ export class CodexMessageDispatchOwner {
         {
           threadId,
           ownerClientId,
-          error: toErrorMessage(error)
+          error: toErrorMessage(error),
         },
-        TURN_START_TEMPLATE_UNAVAILABLE_LOG_EVENT
+        TURN_START_TEMPLATE_UNAVAILABLE_LOG_EVENT,
       );
       return null;
     }

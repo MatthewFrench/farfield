@@ -12,10 +12,10 @@ function buildThreadListResponse(threadIdentifier: string): ThreadListResponse {
         updatedAt: 1_735_000_000_100,
         cwd: "/tmp/thread-query-cache",
         path: "/tmp/thread-query-cache",
-        agentId: "codex"
-      }
+        agentId: "codex",
+      },
     ],
-    nextCursor: null
+    nextCursor: null,
   };
 }
 
@@ -23,7 +23,7 @@ describe("ThreadQueryCache", () => {
   it("expires entries when the injected cache clock reaches the time-to-live boundary", () => {
     let currentEpochMilliseconds = 1_000;
     const cache = new ThreadQueryCache(50, 4, {
-      readCurrentEpochMilliseconds: () => currentEpochMilliseconds
+      readCurrentEpochMilliseconds: () => currentEpochMilliseconds,
     });
 
     cache.write("threads:active", buildThreadListResponse("thread-active"));
@@ -37,7 +37,7 @@ describe("ThreadQueryCache", () => {
 
   it("evicts least-recently-used keys while preserving recently read entries", () => {
     const cache = new ThreadQueryCache(1_000, 2, {
-      readCurrentEpochMilliseconds: () => 100
+      readCurrentEpochMilliseconds: () => 100,
     });
 
     const activeResponse = buildThreadListResponse("thread-active");

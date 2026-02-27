@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type {
   ThreadListItemWithAgentId,
-  ThreadListSortKey
+  ThreadListSortKey,
 } from "../ThreadListAggregationCache.js";
 
 interface RawThreadCollectionListQuery {
@@ -22,7 +22,7 @@ const ThreadListQueryParameterByName = {
   maxPages: "maxPages",
   cursor: "cursor",
   sortKey: "sortKey",
-  cwd: "cwd"
+  cwd: "cwd",
 } as const;
 const ThreadListCursorVersion = 1;
 const ThreadListCursorEncoding = "base64url";
@@ -30,7 +30,7 @@ const ThreadListCursorPayloadEncoding = "utf8";
 const ThreadListCursorSchema = z
   .object({
     version: z.literal(ThreadListCursorVersion),
-    offset: z.number().int().nonnegative()
+    offset: z.number().int().nonnegative(),
   })
   .strict();
 const ThreadListLimitMaximum = 200;
@@ -49,12 +49,15 @@ const RawThreadListQuerySchema = z
     [ThreadListQueryParameterByName.maxPages]: z.string().nullable(),
     [ThreadListQueryParameterByName.cursor]: z.string().nullable(),
     [ThreadListQueryParameterByName.sortKey]: z.string().nullable(),
-    [ThreadListQueryParameterByName.cwd]: z.string().nullable()
+    [ThreadListQueryParameterByName.cwd]: z.string().nullable(),
   })
   .strict();
-const ThreadListLimitQueryValueSchema = z.coerce.number().int().positive().max(ThreadListLimitMaximum);
-const ThreadListMaxPagesQueryValueSchema = z
-  .coerce
+const ThreadListLimitQueryValueSchema = z.coerce
+  .number()
+  .int()
+  .positive()
+  .max(ThreadListLimitMaximum);
+const ThreadListMaxPagesQueryValueSchema = z.coerce
   .number()
   .int()
   .positive()
@@ -91,15 +94,15 @@ export type DecodeThreadCollectionListCursorResult =
 export class ThreadCollectionListQueryOwner {
   public parse(url: URL): ParseThreadCollectionListQueryResult {
     const parsedRawThreadListQuery = RawThreadListQuerySchema.safeParse(
-      this.readRawThreadListQuery(url)
+      this.readRawThreadListQuery(url),
     );
     if (!parsedRawThreadListQuery.success) {
       return {
         ok: false,
         issues: parsedRawThreadListQuery.error.issues.map((issue) => ({
           path: issue.path.join("."),
-          message: issue.message
-        }))
+          message: issue.message,
+        })),
       };
     }
 
@@ -110,14 +113,14 @@ export class ThreadCollectionListQueryOwner {
     if (cursor === null || cursor.length === 0) {
       return {
         ok: true,
-        offset: 0
+        offset: 0,
       };
     }
 
     let decodedCursorPayload = "";
     try {
       decodedCursorPayload = Buffer.from(cursor, ThreadListCursorEncoding).toString(
-        ThreadListCursorPayloadEncoding
+        ThreadListCursorPayloadEncoding,
       );
       const parsedCursor = ThreadListCursorSchema.safeParse(JSON.parse(decodedCursorPayload));
       if (!parsedCursor.success) {
@@ -125,13 +128,13 @@ export class ThreadCollectionListQueryOwner {
           ok: false,
           issues: parsedCursor.error.issues.map((issue) => ({
             path: this.buildCursorIssuePath(issue.path),
-            message: issue.message
-          }))
+            message: issue.message,
+          })),
         };
       }
       return {
         ok: true,
-        offset: parsedCursor.data.offset
+        offset: parsedCursor.data.offset,
       };
     } catch {
       return {
@@ -139,9 +142,9 @@ export class ThreadCollectionListQueryOwner {
         issues: [
           {
             path: ThreadListCursorIssuePath,
-            message: ThreadListCursorEncodingIssueMessage
-          }
-        ]
+            message: ThreadListCursorEncodingIssueMessage,
+          },
+        ],
       };
     }
   }
@@ -150,16 +153,16 @@ export class ThreadCollectionListQueryOwner {
     return Buffer.from(
       JSON.stringify({
         version: ThreadListCursorVersion,
-        offset
+        offset,
       }),
-      ThreadListCursorPayloadEncoding
+      ThreadListCursorPayloadEncoding,
     ).toString(ThreadListCursorEncoding);
   }
 
   public compareThreadListItems(
     left: ThreadListItemWithAgentId,
     right: ThreadListItemWithAgentId,
-    sortKey: ThreadListSortKey
+    sortKey: ThreadListSortKey,
   ): number {
     const leftSortValue = sortKey === "created_at" ? left.createdAt : left.updatedAt;
     const rightSortValue = sortKey === "created_at" ? right.createdAt : right.updatedAt;
@@ -192,12 +195,12 @@ export class ThreadCollectionListQueryOwner {
       maxPages: url.searchParams.get(ThreadListQueryParameterByName.maxPages),
       cursor: url.searchParams.get(ThreadListQueryParameterByName.cursor),
       sortKey: url.searchParams.get(ThreadListQueryParameterByName.sortKey),
-      cwd: url.searchParams.get(ThreadListQueryParameterByName.cwd)
+      cwd: url.searchParams.get(ThreadListQueryParameterByName.cwd),
     };
   }
 
   private parseValidatedRawQuery(
-    rawQuery: RawThreadCollectionListQuery
+    rawQuery: RawThreadCollectionListQuery,
   ): ParseThreadCollectionListQueryResult {
     // Parse each field independently to preserve specific issue paths/messages
     // instead of collapsing query failures into one generic parse error.
@@ -209,37 +212,34 @@ export class ThreadCollectionListQueryOwner {
         rawQuery.archived,
         ThreadListArchivedDefault,
         ThreadListQueryParameterByName.archived,
-        issues
+        issues,
       ),
       all: this.parseBoolean(
         rawQuery.all,
         ThreadListAllDefault,
         ThreadListQueryParameterByName.all,
-        issues
+        issues,
       ),
       maxPages: this.parseMaxPages(rawQuery.maxPages, issues),
       cursor: rawQuery.cursor,
       sortKey: this.parseSortKey(rawQuery.sortKey, issues),
-      cwd: rawQuery.cwd
+      cwd: rawQuery.cwd,
     };
 
     if (issues.length > 0) {
       return {
         ok: false,
-        issues
+        issues,
       };
     }
 
     return {
       ok: true,
-      query: parsedQuery
+      query: parsedQuery,
     };
   }
 
-  private parseLimit(
-    value: string | null,
-    issues: ThreadCollectionListQueryIssue[]
-  ): number {
+  private parseLimit(value: string | null, issues: ThreadCollectionListQueryIssue[]): number {
     if (value === null || value.length === 0) {
       return ThreadListLimitDefault;
     }
@@ -251,15 +251,12 @@ export class ThreadCollectionListQueryOwner {
     this.appendIssuesForPath(
       ThreadListQueryParameterByName.limit,
       parsedValue.error.issues,
-      issues
+      issues,
     );
     return ThreadListLimitDefault;
   }
 
-  private parseMaxPages(
-    value: string | null,
-    issues: ThreadCollectionListQueryIssue[]
-  ): number {
+  private parseMaxPages(value: string | null, issues: ThreadCollectionListQueryIssue[]): number {
     if (value === null || value.length === 0) {
       return ThreadListMaxPagesDefault;
     }
@@ -271,7 +268,7 @@ export class ThreadCollectionListQueryOwner {
     this.appendIssuesForPath(
       ThreadListQueryParameterByName.maxPages,
       parsedValue.error.issues,
-      issues
+      issues,
     );
     return ThreadListMaxPagesDefault;
   }
@@ -280,7 +277,7 @@ export class ThreadCollectionListQueryOwner {
     value: string | null,
     defaultValue: boolean,
     path: string,
-    issues: ThreadCollectionListQueryIssue[]
+    issues: ThreadCollectionListQueryIssue[],
   ): boolean {
     if (value === null || value.length === 0) {
       return defaultValue;
@@ -296,7 +293,7 @@ export class ThreadCollectionListQueryOwner {
 
   private parseSortKey(
     value: string | null,
-    issues: ThreadCollectionListQueryIssue[]
+    issues: ThreadCollectionListQueryIssue[],
   ): ThreadListSortKey | null {
     if (value === null || value.length === 0) {
       return null;
@@ -309,7 +306,7 @@ export class ThreadCollectionListQueryOwner {
     this.appendIssuesForPath(
       ThreadListQueryParameterByName.sortKey,
       parsedValue.error.issues,
-      issues
+      issues,
     );
     return null;
   }
@@ -317,12 +314,12 @@ export class ThreadCollectionListQueryOwner {
   private appendIssuesForPath(
     path: string,
     zodIssues: ReadonlyArray<z.ZodIssue>,
-    issues: ThreadCollectionListQueryIssue[]
+    issues: ThreadCollectionListQueryIssue[],
   ): void {
     for (const issue of zodIssues) {
       issues.push({
         path,
-        message: issue.message
+        message: issue.message,
       });
     }
   }

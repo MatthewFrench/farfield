@@ -1,18 +1,18 @@
-import { describe, expect, it } from "vitest";
 import {
   parseThreadStreamStateChangedBroadcast,
-  ThreadStreamStateChangedEventType,
   type ThreadConversationState,
+  type ThreadStreamPatch,
   type ThreadStreamStateChangedBroadcast,
-  type ThreadStreamPatch
+  ThreadStreamStateChangedEventType,
 } from "@farfield/protocol";
+import { describe, expect, it } from "vitest";
 import {
   applyStrictPatchSequence,
   applyTrustedPatchSequence,
   findLatestTurnParamsTemplate,
   reduceThreadStreamEvents,
   StrictPatchSequenceError,
-  ThreadStreamReductionError
+  ThreadStreamReductionError,
 } from "../Source/LiveState.js";
 
 type ConversationTurn = ThreadConversationState["turns"][number];
@@ -26,9 +26,9 @@ function createUserMessageTurn(itemIdentifier: string): ConversationTurn {
       {
         id: itemIdentifier,
         type: "userMessage",
-        content: [{ type: "text", text: itemIdentifier }]
-      }
-    ]
+        content: [{ type: "text", text: itemIdentifier }],
+      },
+    ],
   };
 }
 
@@ -51,10 +51,10 @@ function createSnapshotStreamEvent(input: {
         conversationState: {
           id: input.threadId,
           turns: input.turns,
-          requests: []
-        }
-      }
-    }
+          requests: [],
+        },
+      },
+    },
   });
 }
 
@@ -74,9 +74,9 @@ function createPatchStreamEvent(input: {
       version: STREAM_EVENT_VERSION,
       change: {
         type: "patches",
-        patches: input.patches
-      }
-    }
+        patches: input.patches,
+      },
+    },
   });
 }
 
@@ -84,7 +84,7 @@ function createAppendTurnPatch(itemIdentifier: string): ThreadStreamPatch {
   return {
     op: "add",
     path: ["turns", "-"],
-    value: createUserMessageTurn(itemIdentifier)
+    value: createUserMessageTurn(itemIdentifier),
   };
 }
 
@@ -98,12 +98,12 @@ describe("live-state reducer", () => {
           params: {
             threadId: "thread-1",
             input: [{ type: "text", text: "hello" }],
-            attachments: []
+            attachments: [],
           },
           status: "completed",
-          items: []
-        }
-      ]
+          items: [],
+        },
+      ],
     });
 
     const patchEvent = createPatchStreamEvent({
@@ -131,16 +131,16 @@ describe("live-state reducer", () => {
                     options: [
                       {
                         label: "A",
-                        description: "A desc"
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ]
+                        description: "A desc",
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
     });
 
     const state = reduceThreadStreamEvents([snapshotEvent, patchEvent]);
@@ -159,16 +159,16 @@ describe("live-state reducer", () => {
           path: ["turns", 0],
           value: {
             status: "inProgress",
-            items: []
-          }
-        }
-      ]
+            items: [],
+          },
+        },
+      ],
     });
 
     const snapshotEvent = createSnapshotStreamEvent({
       threadId: "thread-2",
       sourceClientId: "client-a",
-      turns: []
+      turns: [],
     });
 
     const state = reduceThreadStreamEvents([patchEvent, snapshotEvent]);
@@ -185,32 +185,32 @@ describe("live-state reducer", () => {
       createSnapshotStreamEvent({
         threadId,
         sourceClientId: "client-a",
-        turns: [createUserMessageTurn("seed-turn")]
+        turns: [createUserMessageTurn("seed-turn")],
       }),
       createPatchStreamEvent({
         threadId,
         sourceClientId: "client-a",
         patches: [
           createAppendTurnPatch("appended-turn-1"),
-          createAppendTurnPatch("appended-turn-2")
-        ]
+          createAppendTurnPatch("appended-turn-2"),
+        ],
       }),
       createSnapshotStreamEvent({
         threadId,
         sourceClientId: "client-b",
-        turns: [createUserMessageTurn("reset-base-turn")]
+        turns: [createUserMessageTurn("reset-base-turn")],
       }),
       createPatchStreamEvent({
         threadId,
         sourceClientId: "client-b",
-        patches: [createAppendTurnPatch("post-reset-turn")]
-      })
+        patches: [createAppendTurnPatch("post-reset-turn")],
+      }),
     ]);
     const thread = state.get(threadId);
 
     expect(thread?.conversationState?.turns.map((turn) => turn.items[0]?.id)).toEqual([
       "reset-base-turn",
-      "post-reset-turn"
+      "post-reset-turn",
     ]);
     expect(thread?.ownerClientId).toBe("client-b");
   });
@@ -222,23 +222,23 @@ describe("live-state reducer", () => {
       createSnapshotStreamEvent({
         threadId: firstThreadId,
         sourceClientId: "client-a1",
-        turns: [createUserMessageTurn("a-seed")]
+        turns: [createUserMessageTurn("a-seed")],
       }),
       createSnapshotStreamEvent({
         threadId: secondThreadId,
         sourceClientId: "client-b1",
-        turns: [createUserMessageTurn("b-seed")]
+        turns: [createUserMessageTurn("b-seed")],
       }),
       createPatchStreamEvent({
         threadId: firstThreadId,
         sourceClientId: "client-a2",
-        patches: [createAppendTurnPatch("a-next")]
+        patches: [createAppendTurnPatch("a-next")],
       }),
       createPatchStreamEvent({
         threadId: secondThreadId,
         sourceClientId: "client-b2",
-        patches: [createAppendTurnPatch("b-next")]
-      })
+        patches: [createAppendTurnPatch("b-next")],
+      }),
     ]);
 
     const firstThread = state.get(firstThreadId);
@@ -247,12 +247,12 @@ describe("live-state reducer", () => {
     expect(firstThread?.ownerClientId).toBe("client-a2");
     expect(firstThread?.conversationState?.turns.map((turn) => turn.items[0]?.id)).toEqual([
       "a-seed",
-      "a-next"
+      "a-next",
     ]);
     expect(secondThread?.ownerClientId).toBe("client-b2");
     expect(secondThread?.conversationState?.turns.map((turn) => turn.items[0]?.id)).toEqual([
       "b-seed",
-      "b-next"
+      "b-next",
     ]);
   });
 
@@ -262,13 +262,13 @@ describe("live-state reducer", () => {
       createSnapshotStreamEvent({
         threadId,
         sourceClientId: "client-a",
-        turns: [createUserMessageTurn("seed")]
+        turns: [createUserMessageTurn("seed")],
       }),
       createPatchStreamEvent({
         threadId,
         sourceClientId: "client-b",
-        patches: []
-      })
+        patches: [],
+      }),
     ]);
 
     const thread = state.get(threadId);
@@ -288,11 +288,11 @@ describe("live-state reducer", () => {
             {
               id: "item-1",
               type: "userMessage",
-              content: [{ type: "text", text: "hello" }]
-            }
-          ]
-        }
-      ]
+              content: [{ type: "text", text: "hello" }],
+            },
+          ],
+        },
+      ],
     });
 
     const patchEvent = createPatchStreamEvent({
@@ -304,10 +304,10 @@ describe("live-state reducer", () => {
           path: ["turns", 0, "items", 0],
           value: {
             id: "item-2",
-            type: "newUnknownItemType"
-          }
-        }
-      ]
+            type: "newUnknownItemType",
+          },
+        },
+      ],
     });
 
     let captured: ThreadStreamReductionError | null = null;
@@ -339,10 +339,10 @@ describe("live-state reducer", () => {
       turns: [
         {
           status: "completed",
-          items: []
-        }
+          items: [],
+        },
       ],
-      requests: []
+      requests: [],
     };
 
     const patchedState = applyStrictPatchSequence(sourceState, [
@@ -366,19 +366,19 @@ describe("live-state reducer", () => {
                 options: [
                   {
                     label: "A",
-                    description: "A desc"
-                  }
-                ]
-              }
-            ]
-          }
-        }
+                    description: "A desc",
+                  },
+                ],
+              },
+            ],
+          },
+        },
       },
       {
         op: "replace",
         path: ["turns", 0, "status"],
-        value: "inProgress"
-      }
+        value: "inProgress",
+      },
     ]);
 
     expect(patchedState.requests.length).toBe(1);
@@ -391,10 +391,10 @@ describe("live-state reducer", () => {
       turns: [
         {
           status: "completed",
-          items: []
-        }
+          items: [],
+        },
       ],
-      requests: []
+      requests: [],
     };
 
     let capturedError: StrictPatchSequenceError | null = null;
@@ -403,8 +403,8 @@ describe("live-state reducer", () => {
         {
           op: "replace",
           path: ["turns", 9, "status"],
-          value: "inProgress"
-        }
+          value: "inProgress",
+        },
       ]);
     } catch (error) {
       if (error instanceof StrictPatchSequenceError) {
@@ -427,10 +427,10 @@ describe("live-state reducer", () => {
       turns: [
         {
           status: "completed",
-          items: []
-        }
+          items: [],
+        },
       ],
-      requests: []
+      requests: [],
     };
 
     let capturedError: StrictPatchSequenceError | null = null;
@@ -439,12 +439,12 @@ describe("live-state reducer", () => {
         {
           op: "replace",
           path: ["turns", 0, "status"],
-          value: "completed"
+          value: "completed",
         },
         {
           op: "remove",
-          path: ["turns", 0, "items"]
-        }
+          path: ["turns", 0, "items"],
+        },
       ]);
     } catch (error) {
       if (error instanceof StrictPatchSequenceError) {
@@ -467,10 +467,10 @@ describe("live-state reducer", () => {
     const sourceState = {
       id: "thread-large-strict",
       turns: [createUserMessageTurn("seed-turn")],
-      requests: []
+      requests: [],
     };
     const patches = Array.from({ length: appendPatchCount }, (_value, index) =>
-      createAppendTurnPatch(`strict-append-${String(index)}`)
+      createAppendTurnPatch(`strict-append-${String(index)}`),
     );
 
     const patchedState = applyStrictPatchSequence(sourceState, patches);
@@ -479,7 +479,7 @@ describe("live-state reducer", () => {
     expect(patchedState.turns).toHaveLength(appendPatchCount + 1);
     expect(patchedState.turns[1]?.items[0]?.id).toBe("strict-append-0");
     expect(patchedState.turns[appendPatchCount]?.items[0]?.id).toBe(
-      `strict-append-${String(appendPatchCount - 1)}`
+      `strict-append-${String(appendPatchCount - 1)}`,
     );
   });
 
@@ -489,17 +489,17 @@ describe("live-state reducer", () => {
       turns: [
         {
           status: "completed",
-          items: []
-        }
+          items: [],
+        },
       ],
-      requests: []
+      requests: [],
     };
 
     const patchedState = applyTrustedPatchSequence(sourceState, [
       {
         op: "replace",
         path: ["turns", 0, "status"],
-        value: "inProgress"
+        value: "inProgress",
       },
       {
         op: "add",
@@ -521,14 +521,14 @@ describe("live-state reducer", () => {
                 options: [
                   {
                     label: "Option",
-                    description: "Description"
-                  }
-                ]
-              }
-            ]
-          }
-        }
-      }
+                    description: "Description",
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
     ]);
 
     expect(patchedState.turns[0]?.status).toBe("inProgress");
@@ -540,10 +540,10 @@ describe("live-state reducer", () => {
     const sourceState = {
       id: "thread-large-trusted",
       turns: [createUserMessageTurn("seed-turn")],
-      requests: []
+      requests: [],
     };
     const patches = Array.from({ length: appendPatchCount }, (_value, index) =>
-      createAppendTurnPatch(`trusted-append-${String(index)}`)
+      createAppendTurnPatch(`trusted-append-${String(index)}`),
     );
 
     const patchedState = applyTrustedPatchSequence(sourceState, patches);
@@ -552,7 +552,7 @@ describe("live-state reducer", () => {
     expect(patchedState.turns).toHaveLength(appendPatchCount + 1);
     expect(sourceState.turns[1]?.items[0]?.id).toBe("trusted-append-0");
     expect(patchedState.turns[appendPatchCount]?.items[0]?.id).toBe(
-      `trusted-append-${String(appendPatchCount - 1)}`
+      `trusted-append-${String(appendPatchCount - 1)}`,
     );
   });
 
@@ -562,10 +562,10 @@ describe("live-state reducer", () => {
       turns: [
         {
           status: "completed",
-          items: []
-        }
+          items: [],
+        },
       ],
-      requests: []
+      requests: [],
     };
 
     const patchedState = applyTrustedPatchSequence(sourceState, [
@@ -574,18 +574,18 @@ describe("live-state reducer", () => {
         path: ["turns", "-"],
         value: {
           status: "completed",
-          items: []
-        }
+          items: [],
+        },
       },
       {
         op: "remove",
-        path: ["turns", 0]
+        path: ["turns", 0],
       },
       {
         op: "replace",
         path: ["turns", 0, "status"],
-        value: "inProgress"
-      }
+        value: "inProgress",
+      },
     ]);
 
     expect(patchedState.turns).toHaveLength(1);
@@ -602,12 +602,12 @@ describe("live-state reducer", () => {
             {
               id: "item-1",
               type: "userMessage",
-              content: [{ type: "text", text: "hello" }]
-            }
-          ]
-        }
+              content: [{ type: "text", text: "hello" }],
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     };
 
     let capturedError: StrictPatchSequenceError | null = null;
@@ -618,9 +618,9 @@ describe("live-state reducer", () => {
           path: ["turns", 0, "items", 0],
           value: {
             id: "item-2",
-            type: "newUnknownItemType"
-          }
-        }
+            type: "newUnknownItemType",
+          },
+        },
       ]);
     } catch (error) {
       if (error instanceof StrictPatchSequenceError) {
@@ -643,10 +643,10 @@ describe("live-state reducer", () => {
       turns: [
         {
           status: "completed",
-          items: []
-        }
+          items: [],
+        },
       ],
-      requests: []
+      requests: [],
     };
 
     let capturedError: StrictPatchSequenceError | null = null;
@@ -655,12 +655,12 @@ describe("live-state reducer", () => {
         {
           op: "replace",
           path: ["turns", 0, "status"],
-          value: "inProgress"
+          value: "inProgress",
         },
         {
           op: "remove",
-          path: ["turns", 0, "items"]
-        }
+          path: ["turns", 0, "items"],
+        },
       ]);
     } catch (error) {
       if (error instanceof StrictPatchSequenceError) {
@@ -684,19 +684,19 @@ describe("live-state reducer", () => {
       turns: [
         {
           status: "completed",
-          items: []
+          items: [],
         },
         {
           params: {
             threadId: "thread-template-1",
             input: [{ type: "text", text: "latest prompt" }],
-            attachments: []
+            attachments: [],
           },
           status: "completed",
-          items: []
-        }
+          items: [],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(template.threadId).toBe("thread-template-1");
@@ -710,11 +710,11 @@ describe("live-state reducer", () => {
         turns: [
           {
             status: "completed",
-            items: []
-          }
+            items: [],
+          },
         ],
-        requests: []
-      })
+        requests: [],
+      }),
     ).toThrowError("No turn params template found in conversation state");
   });
 });

@@ -2,23 +2,20 @@ import type {
   AgentAdapter,
   AgentCreateThreadInput,
   AgentId,
-  AgentListThreadsInput
+  AgentListThreadsInput,
 } from "../../Agents/Types.js";
 import { logger } from "../../Shared/Logging/Logger.js";
-import {
-  parseStartThreadBody,
-  type StartThreadBody
-} from "../RequestSchemas/HttpSchemas.js";
+import { parseStartThreadBody, type StartThreadBody } from "../RequestSchemas/HttpSchemas.js";
 import type {
   ThreadListItemWithAgentId,
-  ThreadListSortKey
+  ThreadListSortKey,
 } from "../ThreadListAggregationCache.js";
+import { ThreadCollectionListQueryOwner } from "./ThreadCollectionListQueryOwner.js";
 import {
+  type ThreadCollectionRouteDependencies,
   ThreadCollectionRouteMethodByName,
   ThreadCollectionRoutePathnameByName,
-  type ThreadCollectionRouteDependencies
 } from "./ThreadCollectionRouteContracts.js";
-import { ThreadCollectionListQueryOwner } from "./ThreadCollectionListQueryOwner.js";
 
 /**
  * Owns list/create route orchestration for `/api/threads`, including adapter fan-out,
@@ -28,26 +25,26 @@ const ThreadCollectionRouteStatusCodeByName = {
   ok: 200,
   badRequest: 400,
   serverError: 500,
-  serviceUnavailable: 503
+  serviceUnavailable: 503,
 } as const;
 
 const ThreadCollectionRouteActionByName = {
-  threadCreate: "thread-create"
+  threadCreate: "thread-create",
 } as const;
 
 const ThreadCollectionRouteErrorByName = {
   invalidThreadListQuery: "Invalid thread list query parameters",
   invalidCursor: "Invalid cursor",
-  noEnabledAgent: "No enabled agent is available."
+  noEnabledAgent: "No enabled agent is available.",
 } as const;
 
 const ThreadCollectionRouteCacheInvalidationReasonByName = {
-  threadCreated: "thread-created"
+  threadCreated: "thread-created",
 } as const;
 
 const ThreadCollectionRouteLogEventByName = {
   agentListThreadsFailed: "agent-list-threads-failed",
-  threadListAggregationCacheRead: "thread-list-aggregation-cache-read"
+  threadListAggregationCacheRead: "thread-list-aggregation-cache-read",
 } as const;
 
 const ThreadCollectionRouteDefaultSortKey: ThreadListSortKey = "updated_at";
@@ -58,24 +55,21 @@ const threadCollectionListQueryOwner = new ThreadCollectionListQueryOwner();
 type ThreadCollectionRouteWithTimeout = <ValueType>(
   promise: Promise<ValueType>,
   timeoutMs: number,
-  label: string
+  label: string,
 ) => Promise<ValueType>;
 
-type ThreadCollectionRouteThreadOwnershipRegistrar = (
-  threadId: string,
-  agentId: AgentId
-) => void;
+type ThreadCollectionRouteThreadOwnershipRegistrar = (threadId: string, agentId: AgentId) => void;
 
 export type { ThreadCollectionRouteDependencies } from "./ThreadCollectionRouteContracts.js";
 
 export async function handleThreadCollectionRoutes(
-  deps: ThreadCollectionRouteDependencies
+  deps: ThreadCollectionRouteDependencies,
 ): Promise<boolean> {
   if (
     isThreadCollectionRouteRequest(
       deps.req.method,
       deps.pathname,
-      ThreadCollectionRouteMethodByName.post
+      ThreadCollectionRouteMethodByName.post,
     )
   ) {
     await handleThreadCollectionCreateRoute(deps);
@@ -86,7 +80,7 @@ export async function handleThreadCollectionRoutes(
     isThreadCollectionRouteRequest(
       deps.req.method,
       deps.pathname,
-      ThreadCollectionRouteMethodByName.get
+      ThreadCollectionRouteMethodByName.get,
     )
   ) {
     await handleThreadCollectionListRoute(deps);
@@ -99,16 +93,13 @@ export async function handleThreadCollectionRoutes(
 function isThreadCollectionRouteRequest(
   method: string | undefined,
   pathname: string,
-  expectedMethod: string
+  expectedMethod: string,
 ): boolean {
-  return (
-    method === expectedMethod &&
-    pathname === ThreadCollectionRoutePathnameByName.threads
-  );
+  return method === expectedMethod && pathname === ThreadCollectionRoutePathnameByName.threads;
 }
 
 async function handleThreadCollectionCreateRoute(
-  deps: ThreadCollectionRouteDependencies
+  deps: ThreadCollectionRouteDependencies,
 ): Promise<void> {
   const {
     req,
@@ -120,7 +111,7 @@ async function handleThreadCollectionCreateRoute(
     registerThreadAdapterOwnership,
     invalidateThreadListAggregationCache,
     pushActionEventWithRequestContext,
-    pushActionErrorWithRequestContext
+    pushActionErrorWithRequestContext,
   } = deps;
 
   const body = parseStartThreadBody(await readJsonBody(req));
@@ -128,27 +119,19 @@ async function handleThreadCollectionCreateRoute(
   if (!adapter) {
     jsonResponse(res, ThreadCollectionRouteStatusCodeByName.serviceUnavailable, {
       ok: false,
-      error: buildUnavailableAgentMessage(body.agentId)
+      error: buildUnavailableAgentMessage(body.agentId),
     });
     return;
   }
 
-  pushActionEventWithRequestContext(
-    ThreadCollectionRouteActionByName.threadCreate,
-    "attempt",
-    {
-      agentId: adapter.id,
-      cwd: body.cwd ?? null,
-      model: body.model ?? null
-    }
-  );
+  pushActionEventWithRequestContext(ThreadCollectionRouteActionByName.threadCreate, "attempt", {
+    agentId: adapter.id,
+    cwd: body.cwd ?? null,
+    model: body.model ?? null,
+  });
 
   try {
-    const createThreadInput = buildCreateThreadInput(
-      body,
-      adapter.id,
-      defaultWorkspace
-    );
+    const createThreadInput = buildCreateThreadInput(body, adapter.id, defaultWorkspace);
     const result = await adapter.createThread(createThreadInput);
     registerThreadAdapterOwnership(result.threadId, adapter.id);
 
@@ -156,25 +139,21 @@ async function handleThreadCollectionCreateRoute(
       ThreadCollectionRouteCacheInvalidationReasonByName.threadCreated,
       {
         threadId: result.threadId,
-        agentId: adapter.id
-      }
+        agentId: adapter.id,
+      },
     );
 
-    pushActionEventWithRequestContext(
-      ThreadCollectionRouteActionByName.threadCreate,
-      "success",
-      {
-        agentId: adapter.id,
-        threadId: result.threadId,
-        cwd: result.cwd ?? result.thread.cwd ?? null
-      }
-    );
+    pushActionEventWithRequestContext(ThreadCollectionRouteActionByName.threadCreate, "success", {
+      agentId: adapter.id,
+      threadId: result.threadId,
+      cwd: result.cwd ?? result.thread.cwd ?? null,
+    });
 
     jsonResponse(res, ThreadCollectionRouteStatusCodeByName.ok, {
       ok: true,
       ...result,
       threadId: result.threadId,
-      agentId: adapter.id
+      agentId: adapter.id,
     });
   } catch (error) {
     const message = pushActionErrorWithRequestContext(
@@ -182,12 +161,12 @@ async function handleThreadCollectionCreateRoute(
       error,
       {
         agentId: adapter.id,
-        cwd: body.cwd ?? null
-      }
+        cwd: body.cwd ?? null,
+      },
     );
     jsonResponse(res, ThreadCollectionRouteStatusCodeByName.serverError, {
       ok: false,
-      error: message
+      error: message,
     });
   }
 }
@@ -202,7 +181,7 @@ function buildUnavailableAgentMessage(requestedAgentId: AgentId | undefined): st
 function buildCreateThreadInput(
   body: StartThreadBody,
   adapterId: AgentId,
-  defaultWorkspace: string
+  defaultWorkspace: string,
 ): AgentCreateThreadInput {
   // Codex thread creation requires a working directory; when callers omit cwd,
   // the route injects the default workspace so adapter ownership stays deterministic.
@@ -218,12 +197,12 @@ function buildCreateThreadInput(
     ...(body.personality !== undefined ? { personality: body.personality } : {}),
     ...(body.sandbox !== undefined ? { sandbox: body.sandbox } : {}),
     ...(body.approvalPolicy !== undefined ? { approvalPolicy: body.approvalPolicy } : {}),
-    ...(typeof body.ephemeral === "boolean" ? { ephemeral: body.ephemeral } : {})
+    ...(typeof body.ephemeral === "boolean" ? { ephemeral: body.ephemeral } : {}),
   };
 }
 
 async function handleThreadCollectionListRoute(
-  deps: ThreadCollectionRouteDependencies
+  deps: ThreadCollectionRouteDependencies,
 ): Promise<void> {
   const {
     res,
@@ -234,7 +213,7 @@ async function handleThreadCollectionListRoute(
     listThreadsTimeoutMs,
     registerThreadAdapterOwnership,
     jsonResponse,
-    withTimeout
+    withTimeout,
   } = deps;
 
   const parsedThreadListQuery = threadCollectionListQueryOwner.parse(url);
@@ -242,7 +221,7 @@ async function handleThreadCollectionListRoute(
     jsonResponse(res, ThreadCollectionRouteStatusCodeByName.badRequest, {
       ok: false,
       error: ThreadCollectionRouteErrorByName.invalidThreadListQuery,
-      issues: parsedThreadListQuery.issues
+      issues: parsedThreadListQuery.issues,
     });
     return;
   }
@@ -254,7 +233,7 @@ async function handleThreadCollectionListRoute(
     maxPages,
     cursor,
     sortKey: requestedSortKey,
-    cwd: rawCwd
+    cwd: rawCwd,
   } = parsedThreadListQuery.query;
 
   const decodedCursor = threadCollectionListQueryOwner.decodeCursor(cursor);
@@ -262,7 +241,7 @@ async function handleThreadCollectionListRoute(
     jsonResponse(res, ThreadCollectionRouteStatusCodeByName.badRequest, {
       ok: false,
       error: ThreadCollectionRouteErrorByName.invalidCursor,
-      issues: decodedCursor.issues
+      issues: decodedCursor.issues,
     });
     return;
   }
@@ -275,7 +254,7 @@ async function handleThreadCollectionListRoute(
     archived,
     maxPages,
     sortKey,
-    cwd
+    cwd,
   });
 
   const cacheReadResult = await threadListAggregationCache.readFreshOrLoad(
@@ -286,7 +265,7 @@ async function handleThreadCollectionListRoute(
       all,
       maxPages,
       sortKey,
-      cwd
+      cwd,
     },
     async () =>
       await loadThreadListSnapshot({
@@ -295,8 +274,8 @@ async function handleThreadCollectionListRoute(
         listThreadsTimeoutMs,
         withTimeout,
         registerThreadAdapterOwnership,
-        sortKey
-      })
+        sortKey,
+      }),
   );
 
   for (const thread of cacheReadResult.snapshot.mergedData) {
@@ -308,9 +287,9 @@ async function handleThreadCollectionListRoute(
     {
       readState: cacheReadResult.readState,
       entryCount: cacheStatistics.entryCount,
-      inFlightCount: cacheStatistics.inFlightCount
+      inFlightCount: cacheStatistics.inFlightCount,
     },
-    ThreadCollectionRouteLogEventByName.threadListAggregationCacheRead
+    ThreadCollectionRouteLogEventByName.threadListAggregationCacheRead,
   );
 
   const threadListPage = buildThreadListPage({
@@ -318,7 +297,7 @@ async function handleThreadCollectionListRoute(
     cursorOffset: decodedCursor.offset,
     limit,
     maxPages,
-    all
+    all,
   });
 
   jsonResponse(res, ThreadCollectionRouteStatusCodeByName.ok, {
@@ -326,7 +305,7 @@ async function handleThreadCollectionListRoute(
     data: threadListPage.pageData,
     nextCursor: threadListPage.nextCursor,
     pages: threadListPage.pages,
-    truncated: cacheReadResult.snapshot.combinedTruncated || threadListPage.hasMoreData
+    truncated: cacheReadResult.snapshot.combinedTruncated || threadListPage.hasMoreData,
   });
 }
 
@@ -346,7 +325,7 @@ function buildAdapterListThreadsInput(input: {
     maxPages: input.maxPages,
     cursor: null,
     sortKey: input.sortKey,
-    cwd: input.cwd
+    cwd: input.cwd,
   };
 }
 
@@ -367,29 +346,29 @@ async function loadThreadListSnapshot(input: {
         const boundedResult = await input.withTimeout(
           adapter.listThreads(input.adapterListThreadsInput),
           input.listThreadsTimeoutMs,
-          buildListThreadsTimeoutLabel(adapter.id)
+          buildListThreadsTimeoutLabel(adapter.id),
         );
 
         return {
           ok: true as const,
           adapter,
-          result: boundedResult
+          result: boundedResult,
         };
       } catch (error) {
         logger.warn(
           {
             agentId: adapter.id,
-            error: toErrorMessage(error)
+            error: toErrorMessage(error),
           },
-          ThreadCollectionRouteLogEventByName.agentListThreadsFailed
+          ThreadCollectionRouteLogEventByName.agentListThreadsFailed,
         );
 
         return {
           ok: false as const,
-          adapter
+          adapter,
         };
       }
-    })
+    }),
   );
 
   for (const adapterResult of adapterResults) {
@@ -402,18 +381,18 @@ async function loadThreadListSnapshot(input: {
       input.registerThreadAdapterOwnership(thread.id, adapterResult.adapter.id);
       mergedData.push({
         ...thread,
-        agentId: adapterResult.adapter.id
+        agentId: adapterResult.adapter.id,
       });
     }
   }
 
   mergedData.sort((left, right) =>
-    threadCollectionListQueryOwner.compareThreadListItems(left, right, input.sortKey)
+    threadCollectionListQueryOwner.compareThreadListItems(left, right, input.sortKey),
   );
 
   return {
     mergedData,
-    combinedTruncated
+    combinedTruncated,
   };
 }
 
@@ -437,16 +416,14 @@ function buildThreadListPage(input: {
   const pageData = input.mergedData.slice(input.cursorOffset, input.cursorOffset + pageSize);
   const nextOffset = input.cursorOffset + pageData.length;
   const hasMoreData = nextOffset < input.mergedData.length;
-  const nextCursor = hasMoreData
-    ? threadCollectionListQueryOwner.encodeCursor(nextOffset)
-    : null;
+  const nextCursor = hasMoreData ? threadCollectionListQueryOwner.encodeCursor(nextOffset) : null;
   const pages = pageData.length === 0 ? 0 : Math.ceil(pageData.length / input.limit);
 
   return {
     pageData,
     nextCursor,
     pages,
-    hasMoreData
+    hasMoreData,
   };
 }
 

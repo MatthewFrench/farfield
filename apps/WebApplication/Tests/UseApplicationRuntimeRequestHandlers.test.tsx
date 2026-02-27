@@ -1,29 +1,24 @@
 import { act, cleanup, render } from "@testing-library/react";
-import { useEffect, type SetStateAction } from "react";
+import { type SetStateAction, useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  type ApiEventsSessionBootstrapResponse,
+  bootstrapEventsSession,
+} from "@/Application/DataAccess/WebShellApi";
 import { ApiAuthenticationErrorClassifier } from "../Source/Application/DomainModel/ApiAuthenticationErrorClassifier";
-import {
-  ApiSessionBootstrapCoordinator
-} from "../Source/Application/StateManagement/ApiSessionBootstrapCoordinator";
-import {
-  STARTUP_CRITICAL_EVENTS_SESSION_OPERATION
-} from "../Source/Application/StateManagement/CoreDataStartupRequestProfile";
+import { ApiSessionBootstrapCoordinator } from "../Source/Application/StateManagement/ApiSessionBootstrapCoordinator";
+import { STARTUP_CRITICAL_EVENTS_SESSION_OPERATION } from "../Source/Application/StateManagement/CoreDataStartupRequestProfile";
 import {
   type ApplicationRuntimeRequestHandlers,
   type UseApplicationRuntimeRequestHandlersInput,
-  useApplicationRuntimeRequestHandlers
+  useApplicationRuntimeRequestHandlers,
 } from "../Source/Application/StateManagement/UseApplicationRuntimeRequestHandlers";
 import { UserInterfaceActionRequestBuilder } from "../Source/Application/StateManagement/UserInterfaceActionRequestBuilder";
-import {
-  TrackedUserInterfaceErrorReporter
-} from "../Source/Features/Debugging/StateManagement/TrackedUserInterfaceErrorReporter";
-import {
-  resolveRuntimeRequestErrorDescriptor
-} from "../Source/Shared/Errors/RuntimeRequestErrorDescriptor";
-import { bootstrapEventsSession, type ApiEventsSessionBootstrapResponse } from "@/Application/DataAccess/WebShellApi";
+import { TrackedUserInterfaceErrorReporter } from "../Source/Features/Debugging/StateManagement/TrackedUserInterfaceErrorReporter";
+import { resolveRuntimeRequestErrorDescriptor } from "../Source/Shared/Errors/RuntimeRequestErrorDescriptor";
 
 vi.mock("@/Application/DataAccess/WebShellApi", () => ({
-  bootstrapEventsSession: vi.fn()
+  bootstrapEventsSession: vi.fn(),
 }));
 
 interface RuntimeRequestHandlersHarnessProperties {
@@ -32,13 +27,14 @@ interface RuntimeRequestHandlersHarnessProperties {
 }
 
 const RUNTIME_REQUEST_ERROR_OPERATION = "runtime-request-error";
-const RUNTIME_REQUEST_ERROR_HANDLER_NAME = "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError";
+const RUNTIME_REQUEST_ERROR_HANDLER_NAME =
+  "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError";
 const API_TOKEN_AUTHENTICATION_ERROR_MESSAGE = "Unauthorized: missing or invalid X-Farfield-Token";
 const FUTURE_BOOTSTRAP_EXPIRY_ISO8601 = "2099-01-01T00:00:00.000Z";
 const bootstrapEventsSessionMock = vi.mocked(bootstrapEventsSession);
 
 function RuntimeRequestHandlersHarness(
-  properties: RuntimeRequestHandlersHarnessProperties
+  properties: RuntimeRequestHandlersHarnessProperties,
 ): React.JSX.Element {
   const { input, onSnapshot } = properties;
   const runtimeRequestHandlers = useApplicationRuntimeRequestHandlers(input);
@@ -59,16 +55,11 @@ function createActionIdentifierReader(): () => string {
 }
 
 function mountRuntimeRequestHandlers(
-  input: UseApplicationRuntimeRequestHandlersInput
+  input: UseApplicationRuntimeRequestHandlersInput,
 ): ApplicationRuntimeRequestHandlers {
   const onSnapshot = vi.fn<(snapshot: ApplicationRuntimeRequestHandlers) => void>();
 
-  render(
-    <RuntimeRequestHandlersHarness
-      input={input}
-      onSnapshot={onSnapshot}
-    />
-  );
+  render(<RuntimeRequestHandlersHarness input={input} onSnapshot={onSnapshot} />);
 
   const firstSnapshotCall = onSnapshot.mock.calls[0];
   if (firstSnapshotCall === undefined) {
@@ -87,7 +78,7 @@ function createBootstrapResponse(input: {
     ok: true,
     authRequired: input.authRequired,
     bootstrapped: input.bootstrapped,
-    expiresAt: input.expiresAt
+    expiresAt: input.expiresAt,
   };
 }
 
@@ -108,13 +99,15 @@ function createRuntimeRequestHandlersHarness(overrides?: {
   const setErrorMessage = vi.fn<(value: SetStateAction<string>) => void>();
 
   const trackedUserInterfaceErrorReporter = new TrackedUserInterfaceErrorReporter({
-    setErrorMessage: (_errorMessage: string): void => {}
+    setErrorMessage: (_errorMessage: string): void => {},
   });
   const reportTrackedUserInterfaceErrorSpy = vi
     .spyOn(trackedUserInterfaceErrorReporter, "report")
     .mockResolvedValue(undefined);
 
-  const userInterfaceActionRequestBuilder = new UserInterfaceActionRequestBuilder(createActionIdentifierReader());
+  const userInterfaceActionRequestBuilder = new UserInterfaceActionRequestBuilder(
+    createActionIdentifierReader(),
+  );
   const buildActionRequestSpy = vi.spyOn(userInterfaceActionRequestBuilder, "create");
 
   const apiSessionBootstrapCoordinator = new ApiSessionBootstrapCoordinator();
@@ -129,7 +122,7 @@ function createRuntimeRequestHandlersHarness(overrides?: {
     apiSessionBootstrapErrorMessage: overrides?.apiSessionBootstrapErrorMessage ?? "",
     setRequiresApiSessionToken,
     setApiSessionBootstrapErrorMessage,
-    setErrorMessage
+    setErrorMessage,
   };
 
   return {
@@ -139,7 +132,7 @@ function createRuntimeRequestHandlersHarness(overrides?: {
     reportTrackedUserInterfaceErrorSpy,
     setRequiresApiSessionToken,
     setApiSessionBootstrapErrorMessage,
-    setErrorMessage
+    setErrorMessage,
   };
 }
 
@@ -162,7 +155,7 @@ describe("useApplicationRuntimeRequestHandlers", () => {
     const expectedDescriptor = resolveRuntimeRequestErrorDescriptor({
       rawMessage: runtimeError.message,
       defaultOperation: RUNTIME_REQUEST_ERROR_OPERATION,
-      actionId: "action-1"
+      actionId: "action-1",
     });
 
     expect(harness.markApiTokenRequiredSpy).not.toHaveBeenCalled();
@@ -173,8 +166,8 @@ describe("useApplicationRuntimeRequestHandlers", () => {
       threadId: null,
       error: expectedDescriptor.trackingErrorMessage,
       details: {
-        handler: RUNTIME_REQUEST_ERROR_HANDLER_NAME
-      }
+        handler: RUNTIME_REQUEST_ERROR_HANDLER_NAME,
+      },
     });
     expect(harness.setErrorMessage).toHaveBeenCalledWith(expectedDescriptor.bannerErrorMessage);
   });
@@ -184,7 +177,9 @@ describe("useApplicationRuntimeRequestHandlers", () => {
     const runtimeRequestHandlers = mountRuntimeRequestHandlers(harness.input);
 
     act(() => {
-      runtimeRequestHandlers.handleRuntimeRequestError(new Error(API_TOKEN_AUTHENTICATION_ERROR_MESSAGE));
+      runtimeRequestHandlers.handleRuntimeRequestError(
+        new Error(API_TOKEN_AUTHENTICATION_ERROR_MESSAGE),
+      );
     });
 
     expect(harness.markApiTokenRequiredSpy).toHaveBeenCalledTimes(1);
@@ -193,32 +188,42 @@ describe("useApplicationRuntimeRequestHandlers", () => {
     expect(harness.setRequiresApiSessionToken).toHaveBeenCalledWith(true);
     expect(harness.setApiSessionBootstrapErrorMessage).toHaveBeenCalledWith("");
 
-    expect(readFirstInvocationCallOrder(
-      harness.markApiTokenRequiredSpy.mock.invocationCallOrder,
-      "markApiTokenRequired"
-    )).toBeLessThan(readFirstInvocationCallOrder(
-      harness.setRequiresApiSessionToken.mock.invocationCallOrder,
-      "setRequiresApiSessionToken"
-    ));
-    expect(readFirstInvocationCallOrder(
-      harness.setRequiresApiSessionToken.mock.invocationCallOrder,
-      "setRequiresApiSessionToken"
-    )).toBeLessThan(readFirstInvocationCallOrder(
-      harness.setApiSessionBootstrapErrorMessage.mock.invocationCallOrder,
-      "setApiSessionBootstrapErrorMessage"
-    ));
+    expect(
+      readFirstInvocationCallOrder(
+        harness.markApiTokenRequiredSpy.mock.invocationCallOrder,
+        "markApiTokenRequired",
+      ),
+    ).toBeLessThan(
+      readFirstInvocationCallOrder(
+        harness.setRequiresApiSessionToken.mock.invocationCallOrder,
+        "setRequiresApiSessionToken",
+      ),
+    );
+    expect(
+      readFirstInvocationCallOrder(
+        harness.setRequiresApiSessionToken.mock.invocationCallOrder,
+        "setRequiresApiSessionToken",
+      ),
+    ).toBeLessThan(
+      readFirstInvocationCallOrder(
+        harness.setApiSessionBootstrapErrorMessage.mock.invocationCallOrder,
+        "setApiSessionBootstrapErrorMessage",
+      ),
+    );
   });
 
   it("clears token-required and bootstrap-error state after a ready bootstrap decision", async () => {
-    bootstrapEventsSessionMock.mockResolvedValue(createBootstrapResponse({
-      authRequired: true,
-      bootstrapped: true,
-      expiresAt: FUTURE_BOOTSTRAP_EXPIRY_ISO8601
-    }));
+    bootstrapEventsSessionMock.mockResolvedValue(
+      createBootstrapResponse({
+        authRequired: true,
+        bootstrapped: true,
+        expiresAt: FUTURE_BOOTSTRAP_EXPIRY_ISO8601,
+      }),
+    );
 
     const harness = createRuntimeRequestHandlersHarness({
       requiresApiSessionToken: true,
-      apiSessionBootstrapErrorMessage: "invalid API token"
+      apiSessionBootstrapErrorMessage: "invalid API token",
     });
     const runtimeRequestHandlers = mountRuntimeRequestHandlers(harness.input);
 
@@ -230,28 +235,34 @@ describe("useApplicationRuntimeRequestHandlers", () => {
     expect(bootstrapReady).toBe(true);
     expect(bootstrapEventsSessionMock).toHaveBeenCalledWith(undefined, {
       actionId: "action-1",
-      actionName: STARTUP_CRITICAL_EVENTS_SESSION_OPERATION
+      actionName: STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
     });
     expect(harness.setRequiresApiSessionToken).toHaveBeenCalledWith(false);
     expect(harness.setApiSessionBootstrapErrorMessage).toHaveBeenCalledWith("");
-    expect(readFirstInvocationCallOrder(
-      harness.setRequiresApiSessionToken.mock.invocationCallOrder,
-      "setRequiresApiSessionToken"
-    )).toBeLessThan(readFirstInvocationCallOrder(
-      harness.setApiSessionBootstrapErrorMessage.mock.invocationCallOrder,
-      "setApiSessionBootstrapErrorMessage"
-    ));
+    expect(
+      readFirstInvocationCallOrder(
+        harness.setRequiresApiSessionToken.mock.invocationCallOrder,
+        "setRequiresApiSessionToken",
+      ),
+    ).toBeLessThan(
+      readFirstInvocationCallOrder(
+        harness.setApiSessionBootstrapErrorMessage.mock.invocationCallOrder,
+        "setApiSessionBootstrapErrorMessage",
+      ),
+    );
   });
 
   it("activates token-required bootstrap state when the bootstrap decision still requires a token", async () => {
-    bootstrapEventsSessionMock.mockResolvedValue(createBootstrapResponse({
-      authRequired: true,
-      bootstrapped: false,
-      expiresAt: null
-    }));
+    bootstrapEventsSessionMock.mockResolvedValue(
+      createBootstrapResponse({
+        authRequired: true,
+        bootstrapped: false,
+        expiresAt: null,
+      }),
+    );
 
     const harness = createRuntimeRequestHandlersHarness({
-      apiSessionBootstrapErrorMessage: "stale bootstrap error"
+      apiSessionBootstrapErrorMessage: "stale bootstrap error",
     });
     const runtimeRequestHandlers = mountRuntimeRequestHandlers(harness.input);
 
@@ -263,17 +274,21 @@ describe("useApplicationRuntimeRequestHandlers", () => {
     expect(bootstrapReady).toBe(false);
     expect(bootstrapEventsSessionMock).toHaveBeenCalledWith(undefined, {
       actionId: "action-1",
-      actionName: STARTUP_CRITICAL_EVENTS_SESSION_OPERATION
+      actionName: STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
     });
     expect(harness.markApiTokenRequiredSpy).not.toHaveBeenCalled();
     expect(harness.setRequiresApiSessionToken).toHaveBeenCalledWith(true);
     expect(harness.setApiSessionBootstrapErrorMessage).toHaveBeenCalledWith("");
-    expect(readFirstInvocationCallOrder(
-      harness.setRequiresApiSessionToken.mock.invocationCallOrder,
-      "setRequiresApiSessionToken"
-    )).toBeLessThan(readFirstInvocationCallOrder(
-      harness.setApiSessionBootstrapErrorMessage.mock.invocationCallOrder,
-      "setApiSessionBootstrapErrorMessage"
-    ));
+    expect(
+      readFirstInvocationCallOrder(
+        harness.setRequiresApiSessionToken.mock.invocationCallOrder,
+        "setRequiresApiSessionToken",
+      ),
+    ).toBeLessThan(
+      readFirstInvocationCallOrder(
+        harness.setApiSessionBootstrapErrorMessage.mock.invocationCallOrder,
+        "setApiSessionBootstrapErrorMessage",
+      ),
+    );
   });
 });

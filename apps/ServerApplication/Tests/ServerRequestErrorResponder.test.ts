@@ -2,18 +2,18 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import type { ServerErrorEventRecordInput } from "../Source/Network/ServerErrorEventRecorder.js";
 import {
   ServerRequestErrorResponder,
-  type ServerRequestErrorResponderDependencies
+  type ServerRequestErrorResponderDependencies,
 } from "../Source/Network/ServerRequestErrorResponder.js";
-import type { ServerErrorEventRecordInput } from "../Source/Network/ServerErrorEventRecorder.js";
 
 const JsonResponseBodySchema = z.object({
   ok: z.literal(false),
   error: z.string(),
   requestId: z.string(),
   actionId: z.string().nullable(),
-  actionName: z.string().nullable()
+  actionName: z.string().nullable(),
 });
 
 const PushedSystemEventDetailsSchema = z.object({
@@ -23,7 +23,7 @@ const PushedSystemEventDetailsSchema = z.object({
   errorCategory: z.enum(["request_validation", "shutdown_transport", "internal"]),
   error: z.string(),
   method: z.string(),
-  url: z.string()
+  url: z.string(),
 });
 
 type JsonResponseBody = z.infer<typeof JsonResponseBodySchema>;
@@ -78,9 +78,7 @@ function createValidationError(): z.ZodError {
   throw new Error("Expected validation error");
 }
 
-function createHarness(
-  isExpectedShutdownTransportError: (error: Error) => boolean
-): TestHarness {
+function createHarness(isExpectedShutdownTransportError: (error: Error) => boolean): TestHarness {
   const jsonResponseCalls: JsonResponseCall[] = [];
   const runtimeLastErrors: string[] = [];
   const pushedSystemEvents: PushedSystemEvent[] = [];
@@ -93,10 +91,10 @@ function createHarness(
       const parsedBody = JsonResponseBodySchema.parse(body);
       jsonResponseCalls.push({
         statusCode,
-        body: parsedBody
+        body: parsedBody,
       });
     },
-    toErrorMessage: <ValueType,>(value: ValueType): string => {
+    toErrorMessage: <ValueType>(value: ValueType): string => {
       if (value instanceof Error) {
         return value.message;
       }
@@ -116,12 +114,12 @@ function createHarness(
       const parsedDetails = PushedSystemEventDetailsSchema.parse(details);
       pushedSystemEvents.push({
         message,
-        details: parsedDetails
+        details: parsedDetails,
       });
     },
     broadcastRuntimeState: () => {
       broadcastCount += 1;
-    }
+    },
   };
 
   return {
@@ -132,7 +130,7 @@ function createHarness(
     recordedServerErrors,
     get broadcastCount() {
       return broadcastCount;
-    }
+    },
   };
 }
 
@@ -148,8 +146,8 @@ describe("ServerRequestErrorResponder", () => {
       context: {
         requestId: "request_1",
         actionId: "action_1",
-        actionName: "load-threads"
-      }
+        actionName: "load-threads",
+      },
     });
 
     expect(harness.jsonResponseCalls).toHaveLength(1);
@@ -158,9 +156,11 @@ describe("ServerRequestErrorResponder", () => {
       ok: false,
       requestId: "request_1",
       actionId: "action_1",
-      actionName: "load-threads"
+      actionName: "load-threads",
     });
-    expect(harness.jsonResponseCalls[0]?.body.error.includes("Expected string, received number")).toBe(true);
+    expect(
+      harness.jsonResponseCalls[0]?.body.error.includes("Expected string, received number"),
+    ).toBe(true);
     expect(harness.runtimeLastErrors).toEqual([]);
     expect(harness.recordedServerErrors).toHaveLength(1);
     expect(harness.recordedServerErrors[0]?.severity).toBe("warning");
@@ -180,8 +180,8 @@ describe("ServerRequestErrorResponder", () => {
       context: {
         requestId: "request_2",
         actionId: "action_2",
-        actionName: "archive-thread"
-      }
+        actionName: "archive-thread",
+      },
     });
 
     expect(harness.runtimeLastErrors).toEqual(["request handler crashed"]);
@@ -198,9 +198,9 @@ describe("ServerRequestErrorResponder", () => {
           errorCategory: "internal",
           error: "request handler crashed",
           method: "PATCH",
-          url: "/api/threads/thread_123"
-        }
-      }
+          url: "/api/threads/thread_123",
+        },
+      },
     ]);
     expect(harness.broadcastCount).toBe(1);
     expect(harness.jsonResponseCalls).toEqual([
@@ -211,9 +211,9 @@ describe("ServerRequestErrorResponder", () => {
           error: "request handler crashed",
           requestId: "request_2",
           actionId: "action_2",
-          actionName: "archive-thread"
-        }
-      }
+          actionName: "archive-thread",
+        },
+      },
     ]);
   });
 
@@ -228,8 +228,8 @@ describe("ServerRequestErrorResponder", () => {
       context: {
         requestId: "request_3",
         actionId: null,
-        actionName: null
-      }
+        actionName: null,
+      },
     });
 
     expect(harness.runtimeLastErrors).toEqual(["Server is shutting down"]);
@@ -244,9 +244,9 @@ describe("ServerRequestErrorResponder", () => {
           error: "Server is shutting down",
           requestId: "request_3",
           actionId: null,
-          actionName: null
-        }
-      }
+          actionName: null,
+        },
+      },
     ]);
   });
 
@@ -262,8 +262,8 @@ describe("ServerRequestErrorResponder", () => {
       context: {
         requestId: "request_4",
         actionId: "action_4",
-        actionName: "stream-events"
-      }
+        actionName: "stream-events",
+      },
     });
 
     expect(harness.jsonResponseCalls).toHaveLength(0);
@@ -284,8 +284,8 @@ describe("ServerRequestErrorResponder", () => {
       context: {
         requestId: "request_5",
         actionId: "action_5",
-        actionName: "send-message"
-      }
+        actionName: "send-message",
+      },
     });
 
     expect(harness.pushedSystemEvents).toEqual([
@@ -298,9 +298,9 @@ describe("ServerRequestErrorResponder", () => {
           errorCategory: "internal",
           error: "request handler crashed",
           method: "unknown",
-          url: "unknown"
-        }
-      }
+          url: "unknown",
+        },
+      },
     ]);
     expect(harness.recordedServerErrors).toHaveLength(1);
     expect(harness.recordedServerErrors[0]?.url).toBeNull();

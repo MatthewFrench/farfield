@@ -1,5 +1,14 @@
 import { z } from "zod";
 import {
+  DebugErrorClearResponseSchema,
+  DebugErrorCreateResponseSchema,
+  DebugErrorDetailResponseSchema,
+  DebugErrorListResponseSchema,
+} from "./AppServer.js";
+import { JsonValueSchema } from "./Common.js";
+import { ThreadConversationStateSchema } from "./Contracts/Thread/ConversationStateContracts.js";
+import { IpcFrameSchema } from "./Ipc.js";
+import {
   CreatePushSubscriptionResponseSchema,
   DeletePushSubscriptionResponseSchema,
   PushLocalCaStatusResponseSchema,
@@ -7,44 +16,35 @@ import {
   PushReceiptLatestResponseSchema,
   PushSendLatestResponseSchema,
   PushStatusResponseSchema,
-  VapidPublicKeyResponseSchema
+  VapidPublicKeyResponseSchema,
 } from "./Push.js";
-import {
-  DebugErrorClearResponseSchema,
-  DebugErrorCreateResponseSchema,
-  DebugErrorDetailResponseSchema,
-  DebugErrorListResponseSchema
-} from "./AppServer.js";
-import { IpcFrameSchema } from "./Ipc.js";
-import { JsonValueSchema } from "./Common.js";
-import { ThreadConversationStateSchema } from "./Contracts/Thread/ConversationStateContracts.js";
 
 const FarfieldProtocolStatusValue = {
   Success: true,
-  Error: false
+  Error: false,
 } as const;
 
 const FarfieldEventStreamEventType = {
   RuntimeStateChanged: "runtime-state-changed",
   ActivityHistoryAppended: "activity-history-appended",
-  ThreadStreamDelta: "thread-stream-delta"
+  ThreadStreamDelta: "thread-stream-delta",
 } as const;
 
 const FarfieldRequestLifecyclePhaseValue = {
   Started: "started",
-  Completed: "completed"
+  Completed: "completed",
 } as const;
 
 const FarfieldRequestLifecycleOutcomeValues = ["success", "error"] as const;
 
 const FarfieldSuccessResponseEnvelopeSchema = z.object({
-  ok: z.literal(FarfieldProtocolStatusValue.Success)
+  ok: z.literal(FarfieldProtocolStatusValue.Success),
 });
 
 export const FarfieldApiErrorResponseSchema = z
   .object({
     ok: z.literal(FarfieldProtocolStatusValue.Error),
-    error: z.string().min(1)
+    error: z.string().min(1),
   })
   .strict();
 
@@ -58,7 +58,7 @@ export const FarfieldHealthStateSchema = z
     lastError: z.string().nullable(),
     historyCount: z.number().int().nonnegative(),
     threadOwnerCount: z.number().int().nonnegative(),
-    pushSubscriptionCount: z.number().int().nonnegative().optional()
+    pushSubscriptionCount: z.number().int().nonnegative().optional(),
   })
   // Health diagnostics may add keys over time; known fields stay typed while unknown keys pass through.
   .passthrough();
@@ -66,7 +66,7 @@ export const FarfieldHealthStateSchema = z
 export const FarfieldHealthResponseSchema = z
   .object({
     ok: z.literal(FarfieldProtocolStatusValue.Success),
-    state: FarfieldHealthStateSchema
+    state: FarfieldHealthStateSchema,
   })
   .strict();
 
@@ -75,7 +75,7 @@ export const FarfieldEventsSessionResponseSchema = z
     ok: z.literal(FarfieldProtocolStatusValue.Success),
     authRequired: z.boolean(),
     bootstrapped: z.boolean(),
-    expiresAt: z.string().datetime().nullable()
+    expiresAt: z.string().datetime().nullable(),
   })
   .strict();
 
@@ -86,7 +86,7 @@ export const FarfieldHistoryEntrySchema = z
     source: z.enum(["ipc", "app", "system"]),
     direction: z.enum(["in", "out", "system"]),
     payload: JsonValueSchema,
-    meta: z.record(JsonValueSchema)
+    meta: z.record(JsonValueSchema),
   })
   .strict();
 
@@ -103,9 +103,9 @@ export const FarfieldThreadLiveStateSnapshotSchema = z
         kind: z.literal("reductionFailed"),
         message: z.string().min(1),
         eventIndex: z.number().int().nonnegative().nullable(),
-        patchIndex: z.number().int().nonnegative().nullable()
+        patchIndex: z.number().int().nonnegative().nullable(),
       })
-      .nullable()
+      .nullable(),
   })
   .strict();
 
@@ -120,11 +120,13 @@ export const FarfieldThreadStreamEventsSnapshotSchema = z
     // Clients consume these fields as an append-or-reset cursor contract.
     nextSequence: z.number().int().nonnegative(),
     firstAvailableSequence: z.number().int().nonnegative(),
-    resetRequired: z.boolean()
+    resetRequired: z.boolean(),
   })
   .strict();
 
-export type FarfieldThreadStreamEventsSnapshot = z.infer<typeof FarfieldThreadStreamEventsSnapshotSchema>;
+export type FarfieldThreadStreamEventsSnapshot = z.infer<
+  typeof FarfieldThreadStreamEventsSnapshotSchema
+>;
 export type FarfieldHealthState = z.infer<typeof FarfieldHealthStateSchema>;
 
 export const FarfieldThreadStreamDeltaSchema: z.ZodObject<
@@ -141,7 +143,7 @@ export const FarfieldThreadStreamDeltaSchema: z.ZodObject<
     threadId: z.string().min(1),
     liveStateSnapshot: FarfieldThreadLiveStateSnapshotSchema,
     streamEventsSnapshot: FarfieldThreadStreamEventsSnapshotSchema,
-    streamEventsSinceSequenceUsed: z.number().int().nonnegative().nullable()
+    streamEventsSinceSequenceUsed: z.number().int().nonnegative().nullable(),
   })
   .strict();
 
@@ -175,14 +177,14 @@ export type FarfieldEventStreamEnvelope = {
 export const FarfieldRuntimeStateChangedEventSchema = z
   .object({
     type: z.literal(FarfieldEventStreamEventType.RuntimeStateChanged),
-    state: FarfieldHealthStateSchema
+    state: FarfieldHealthStateSchema,
   })
   .strict();
 
 export const FarfieldActivityHistoryAppendedEventSchema = z
   .object({
     type: z.literal(FarfieldEventStreamEventType.ActivityHistoryAppended),
-    entry: FarfieldHistoryEntrySchema
+    entry: FarfieldHistoryEntrySchema,
   })
   .strict();
 
@@ -195,7 +197,7 @@ export const FarfieldThreadStreamDeltaEventSchema: z.ZodObject<
 > = z
   .object({
     type: z.literal(FarfieldEventStreamEventType.ThreadStreamDelta),
-    delta: FarfieldThreadStreamDeltaSchema
+    delta: FarfieldThreadStreamDeltaSchema,
   })
   .strict();
 
@@ -204,12 +206,12 @@ export const FarfieldEventStreamEventSchema: z.ZodDiscriminatedUnion<
   [
     typeof FarfieldRuntimeStateChangedEventSchema,
     typeof FarfieldActivityHistoryAppendedEventSchema,
-    typeof FarfieldThreadStreamDeltaEventSchema
+    typeof FarfieldThreadStreamDeltaEventSchema,
   ]
 > = z.discriminatedUnion("type", [
   FarfieldRuntimeStateChangedEventSchema,
   FarfieldActivityHistoryAppendedEventSchema,
-  FarfieldThreadStreamDeltaEventSchema
+  FarfieldThreadStreamDeltaEventSchema,
 ]);
 
 export const FarfieldEventStreamEnvelopeSchema: z.ZodObject<
@@ -221,41 +223,38 @@ export const FarfieldEventStreamEnvelopeSchema: z.ZodObject<
 > = z
   .object({
     sequence: z.number().int().nonnegative(),
-    event: FarfieldEventStreamEventSchema
+    event: FarfieldEventStreamEventSchema,
   })
   .strict();
 
-export const FarfieldPushStatusEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(PushStatusResponseSchema)
-  .strict();
+export const FarfieldPushStatusEnvelopeSchema =
+  FarfieldSuccessResponseEnvelopeSchema.merge(PushStatusResponseSchema).strict();
 
-export const FarfieldPushVapidPublicKeyEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(VapidPublicKeyResponseSchema)
-  .strict();
+export const FarfieldPushVapidPublicKeyEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema.merge(
+  VapidPublicKeyResponseSchema,
+).strict();
 
-export const FarfieldCreatePushSubscriptionEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(CreatePushSubscriptionResponseSchema)
-  .strict();
+export const FarfieldCreatePushSubscriptionEnvelopeSchema =
+  FarfieldSuccessResponseEnvelopeSchema.merge(CreatePushSubscriptionResponseSchema).strict();
 
-export const FarfieldDeletePushSubscriptionEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(DeletePushSubscriptionResponseSchema)
-  .strict();
+export const FarfieldDeletePushSubscriptionEnvelopeSchema =
+  FarfieldSuccessResponseEnvelopeSchema.merge(DeletePushSubscriptionResponseSchema).strict();
 
-export const FarfieldPushReceiptCreateEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(PushReceiptCreateResponseSchema)
-  .strict();
+export const FarfieldPushReceiptCreateEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema.merge(
+  PushReceiptCreateResponseSchema,
+).strict();
 
-export const FarfieldPushReceiptLatestEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(PushReceiptLatestResponseSchema)
-  .strict();
+export const FarfieldPushReceiptLatestEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema.merge(
+  PushReceiptLatestResponseSchema,
+).strict();
 
-export const FarfieldPushSendLatestEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(PushSendLatestResponseSchema)
-  .strict();
+export const FarfieldPushSendLatestEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema.merge(
+  PushSendLatestResponseSchema,
+).strict();
 
-export const FarfieldPushLocalCaStatusEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(PushLocalCaStatusResponseSchema)
-  .strict();
+export const FarfieldPushLocalCaStatusEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema.merge(
+  PushLocalCaStatusResponseSchema,
+).strict();
 
 export const FarfieldPushTestBodySchema = z
   .object({
@@ -263,7 +262,7 @@ export const FarfieldPushTestBodySchema = z
     turnId: z.string().min(1),
     title: z.string().min(1).optional(),
     body: z.string().optional(),
-    dryRun: z.boolean().optional()
+    dryRun: z.boolean().optional(),
   })
   .strict();
 
@@ -276,25 +275,25 @@ export const FarfieldPushTestEnvelopeSchema = z
     reason: z.string().min(1),
     attempted: z.number().int().nonnegative(),
     delivered: z.number().int().nonnegative(),
-    failures: z.number().int().nonnegative()
+    failures: z.number().int().nonnegative(),
   })
   .strict();
 
-export const FarfieldDebugErrorCreateEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(DebugErrorCreateResponseSchema)
-  .strict();
+export const FarfieldDebugErrorCreateEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema.merge(
+  DebugErrorCreateResponseSchema,
+).strict();
 
-export const FarfieldDebugErrorClearEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(DebugErrorClearResponseSchema)
-  .strict();
+export const FarfieldDebugErrorClearEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema.merge(
+  DebugErrorClearResponseSchema,
+).strict();
 
-export const FarfieldDebugErrorListEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(DebugErrorListResponseSchema)
-  .strict();
+export const FarfieldDebugErrorListEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema.merge(
+  DebugErrorListResponseSchema,
+).strict();
 
-export const FarfieldDebugErrorDetailEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema
-  .merge(DebugErrorDetailResponseSchema)
-  .strict();
+export const FarfieldDebugErrorDetailEnvelopeSchema = FarfieldSuccessResponseEnvelopeSchema.merge(
+  DebugErrorDetailResponseSchema,
+).strict();
 
 export const FarfieldThreadListAggregationCacheStatisticsSchema = z
   .object({
@@ -304,7 +303,7 @@ export const FarfieldThreadListAggregationCacheStatisticsSchema = z
     evictionCount: z.number().int().nonnegative(),
     invalidationCount: z.number().int().nonnegative(),
     entryCount: z.number().int().nonnegative(),
-    inFlightCount: z.number().int().nonnegative()
+    inFlightCount: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -313,7 +312,7 @@ export const FarfieldThreadConcurrencyStatisticsSchema = z
     queuedExecutionCount: z.number().int().nonnegative(),
     completedExecutionCount: z.number().int().nonnegative(),
     failedExecutionCount: z.number().int().nonnegative(),
-    activeThreadCount: z.number().int().nonnegative()
+    activeThreadCount: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -324,7 +323,7 @@ export const FarfieldPushDispatchConcurrencyStatisticsSchema = z
     completedCheckCount: z.number().int().nonnegative(),
     skippedWhileInFlightCount: z.number().int().nonnegative(),
     activeTimerCount: z.number().int().nonnegative(),
-    inFlightThreadCount: z.number().int().nonnegative()
+    inFlightThreadCount: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -333,7 +332,7 @@ export const FarfieldPushMutationConcurrencyStatisticsSchema = z
     queuedExecutionCount: z.number().int().nonnegative(),
     completedExecutionCount: z.number().int().nonnegative(),
     failedExecutionCount: z.number().int().nonnegative(),
-    hasInFlightOperation: z.boolean()
+    hasInFlightOperation: z.boolean(),
   })
   .strict();
 
@@ -346,7 +345,7 @@ export const FarfieldEventStreamClientRegistryStatisticsSchema = z
     broadcastEventCount: z.number().int().nonnegative(),
     broadcastDeliveryAttemptCount: z.number().int().nonnegative(),
     eventWriteFailureCount: z.number().int().nonnegative(),
-    keepaliveWriteFailureCount: z.number().int().nonnegative()
+    keepaliveWriteFailureCount: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -359,7 +358,7 @@ export const FarfieldThreadAdapterResolverStatisticsSchema = z
     unregisteredDiscoveryMissCacheHitCount: z.number().int().nonnegative(),
     unregisteredDiscoveryProbeFailureCount: z.number().int().nonnegative().optional().default(0),
     unregisteredDiscoveryAmbiguousCount: z.number().int().nonnegative(),
-    unregisteredDiscoveryAlertCount: z.number().int().nonnegative()
+    unregisteredDiscoveryAlertCount: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -375,7 +374,7 @@ export const FarfieldRouteTimingSummarySchema = z
     p99DurationMs: z.number().nonnegative(),
     lastQueueDelayMs: z.number().nonnegative(),
     p95QueueDelayMs: z.number().nonnegative(),
-    maxQueueDelayMs: z.number().nonnegative()
+    maxQueueDelayMs: z.number().nonnegative(),
   })
   .strict();
 
@@ -390,7 +389,7 @@ export const FarfieldStartupRequestTimingSummarySchema = z
     statusCode: z.number().int().min(100).max(599),
     durationMs: z.number().nonnegative(),
     queueDelayMs: z.number().nonnegative(),
-    completedAt: z.string().datetime()
+    completedAt: z.string().datetime(),
   })
   .strict();
 
@@ -403,7 +402,7 @@ export const FarfieldRequestLifecycleStartedEventSchema = z
     method: z.string().trim().min(1),
     pathname: z.string().trim().min(1),
     startedAt: z.string().datetime(),
-    queueDelayMs: z.number().nonnegative()
+    queueDelayMs: z.number().nonnegative(),
   })
   .strict();
 
@@ -422,7 +421,7 @@ export const FarfieldRequestLifecycleCompletedEventSchema = z
     durationMs: z.number().nonnegative(),
     queueDelayMs: z.number().nonnegative(),
     completedAt: z.string().datetime(),
-    outcome: FarfieldRequestLifecycleOutcomeSchema
+    outcome: FarfieldRequestLifecycleOutcomeSchema,
   })
   .strict();
 
@@ -430,11 +429,11 @@ export const FarfieldRequestLifecycleEventSchema: z.ZodDiscriminatedUnion<
   "phase",
   [
     typeof FarfieldRequestLifecycleStartedEventSchema,
-    typeof FarfieldRequestLifecycleCompletedEventSchema
+    typeof FarfieldRequestLifecycleCompletedEventSchema,
   ]
 > = z.discriminatedUnion("phase", [
   FarfieldRequestLifecycleStartedEventSchema,
-  FarfieldRequestLifecycleCompletedEventSchema
+  FarfieldRequestLifecycleCompletedEventSchema,
 ]);
 
 export const FarfieldRequestObservabilitySnapshotSchema = z
@@ -444,7 +443,7 @@ export const FarfieldRequestObservabilitySnapshotSchema = z
     inFlightRequestCount: z.number().int().nonnegative(),
     routeTimings: z.array(FarfieldRouteTimingSummarySchema),
     startupRequestTimings: z.array(FarfieldStartupRequestTimingSummarySchema),
-    requestLifecycleEvents: z.array(FarfieldRequestLifecycleEventSchema)
+    requestLifecycleEvents: z.array(FarfieldRequestLifecycleEventSchema),
   })
   .strict();
 
@@ -456,37 +455,47 @@ export const FarfieldEventLoopLagStatisticsSchema = z
     p50LagMs: z.number().nonnegative(),
     p95LagMs: z.number().nonnegative(),
     p99LagMs: z.number().nonnegative(),
-    maxLagMs: z.number().nonnegative()
+    maxLagMs: z.number().nonnegative(),
   })
   .strict();
 
 export const FarfieldDebugObservabilitySnapshotSchema = z
   .object({
     recordedAt: z.string().datetime(),
-    cache: z.object({
-      threadListAggregation: FarfieldThreadListAggregationCacheStatisticsSchema
-    }).strict(),
-    concurrency: z.object({
-      thread: FarfieldThreadConcurrencyStatisticsSchema,
-      pushDispatch: FarfieldPushDispatchConcurrencyStatisticsSchema,
-      pushMutation: FarfieldPushMutationConcurrencyStatisticsSchema
-    }).strict(),
-    streaming: z.object({
-      eventStream: FarfieldEventStreamClientRegistryStatisticsSchema
-    }).strict(),
-    routing: z.object({
-      threadAdapterResolver: FarfieldThreadAdapterResolverStatisticsSchema
-    }).strict(),
-    performance: z.object({
-      requestRouting: FarfieldRequestObservabilitySnapshotSchema,
-      eventLoop: FarfieldEventLoopLagStatisticsSchema
-    }).strict()
+    cache: z
+      .object({
+        threadListAggregation: FarfieldThreadListAggregationCacheStatisticsSchema,
+      })
+      .strict(),
+    concurrency: z
+      .object({
+        thread: FarfieldThreadConcurrencyStatisticsSchema,
+        pushDispatch: FarfieldPushDispatchConcurrencyStatisticsSchema,
+        pushMutation: FarfieldPushMutationConcurrencyStatisticsSchema,
+      })
+      .strict(),
+    streaming: z
+      .object({
+        eventStream: FarfieldEventStreamClientRegistryStatisticsSchema,
+      })
+      .strict(),
+    routing: z
+      .object({
+        threadAdapterResolver: FarfieldThreadAdapterResolverStatisticsSchema,
+      })
+      .strict(),
+    performance: z
+      .object({
+        requestRouting: FarfieldRequestObservabilitySnapshotSchema,
+        eventLoop: FarfieldEventLoopLagStatisticsSchema,
+      })
+      .strict(),
   })
   .strict();
 
 export const FarfieldDebugObservabilityEnvelopeSchema = z
   .object({
     ok: z.literal(FarfieldProtocolStatusValue.Success),
-    snapshot: FarfieldDebugObservabilitySnapshotSchema
+    snapshot: FarfieldDebugObservabilitySnapshotSchema,
   })
   .strict();

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   archiveThread,
   listThreads,
-  unarchiveThread
+  unarchiveThread,
 } from "@/Features/Threads/DataAccess/ThreadApi";
 import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 
@@ -10,15 +10,15 @@ const DEFAULT_LIST_THREADS_OPTIONS = {
   limit: 80,
   archived: false,
   all: true,
-  maxPages: 20
+  maxPages: 20,
 } as const;
 
 function createJsonResponse(body: StructuredDataValue): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: {
-      "Content-Type": "application/json"
-    }
+      "Content-Type": "application/json",
+    },
   });
 }
 
@@ -41,11 +41,11 @@ describe("ThreadApi", () => {
             source: "opencode",
             agentId: "codex",
             hasUnreadTurn: true,
-            projectState: "removed"
-          }
+            projectState: "removed",
+          },
         ],
-        nextCursor: null
-      })
+        nextCursor: null,
+      }),
     );
 
     const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
@@ -67,16 +67,14 @@ describe("ThreadApi", () => {
             cwd: "/tmp/workspace",
             source: "opencode",
             agentId: "codex",
-            hasUnreadTurn: "yes"
-          }
+            hasUnreadTurn: "yes",
+          },
         ],
-        nextCursor: null
-      })
+        nextCursor: null,
+      }),
     );
 
-    await expect(
-      listThreads(DEFAULT_LIST_THREADS_OPTIONS)
-    ).rejects.toThrow(/hasUnreadTurn/);
+    await expect(listThreads(DEFAULT_LIST_THREADS_OPTIONS)).rejects.toThrow(/hasUnreadTurn/);
   });
 
   it("rejects thread list payloads when projectState is invalid", async () => {
@@ -92,16 +90,14 @@ describe("ThreadApi", () => {
             cwd: "/tmp/workspace",
             source: "opencode",
             agentId: "codex",
-            projectState: "deleted"
-          }
+            projectState: "deleted",
+          },
         ],
-        nextCursor: null
-      })
+        nextCursor: null,
+      }),
     );
 
-    await expect(
-      listThreads(DEFAULT_LIST_THREADS_OPTIONS)
-    ).rejects.toThrow(/projectState/);
+    await expect(listThreads(DEFAULT_LIST_THREADS_OPTIONS)).rejects.toThrow(/projectState/);
   });
 
   it("normalizes missing hasUnreadTurn to null and project-removal to false", async () => {
@@ -116,11 +112,11 @@ describe("ThreadApi", () => {
             updatedAt: 124,
             cwd: "/tmp/workspace",
             source: "opencode",
-            agentId: "codex"
-          }
+            agentId: "codex",
+          },
         ],
-        nextCursor: null
-      })
+        nextCursor: null,
+      }),
     );
 
     const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
@@ -133,8 +129,8 @@ describe("ThreadApi", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
         ok: true,
-        data: []
-      })
+        data: [],
+      }),
     );
 
     const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
@@ -155,7 +151,7 @@ describe("ThreadApi", () => {
             cwd: "/tmp/workspace",
             agentId: "codex",
             source: "opencode",
-            removed: true
+            removed: true,
           },
           {
             id: "thread_project_removed",
@@ -165,7 +161,7 @@ describe("ThreadApi", () => {
             cwd: "/tmp/workspace",
             agentId: "codex",
             source: "opencode",
-            projectRemoved: true
+            projectRemoved: true,
           },
           {
             id: "thread_active",
@@ -175,11 +171,11 @@ describe("ThreadApi", () => {
             cwd: "/tmp/workspace",
             agentId: "codex",
             source: "opencode",
-            projectState: "active"
-          }
+            projectState: "active",
+          },
         ],
-        nextCursor: null
-      })
+        nextCursor: null,
+      }),
     );
 
     const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
@@ -190,15 +186,20 @@ describe("ThreadApi", () => {
   });
 
   it("posts archive and unarchive mutations through encoded thread member routes", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(createJsonResponse({
-        ok: true,
-        threadId: "thread_123"
-      }))
-      .mockResolvedValueOnce(createJsonResponse({
-        ok: true,
-        threadId: "thread_123"
-      }));
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          ok: true,
+          threadId: "thread_123",
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          ok: true,
+          threadId: "thread_123",
+        }),
+      );
 
     await archiveThread("thread 123/with slash");
     await unarchiveThread("thread 123/with slash");

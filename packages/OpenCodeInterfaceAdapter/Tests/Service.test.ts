@@ -1,5 +1,4 @@
-import { describe, expect, it, vi, type Mock } from "vitest";
-import { OpenCodeMonitorService } from "../Source/Service.js";
+import { describe, expect, it, type Mock, vi } from "vitest";
 import type {
   OpenCodeApiResponseEnvelope,
   OpenCodeConnectionClientProvider,
@@ -7,21 +6,22 @@ import type {
   OpenCodeSessionCreateRequest,
   OpenCodeSessionListRequest,
   OpenCodeSessionPromptRequest,
-  OpenCodeSessionReadRequest
+  OpenCodeSessionReadRequest,
 } from "../Source/ClientContracts.js";
 import type { OpenCodeStructuredDataValue } from "../Source/Schemas.js";
+import { OpenCodeMonitorService } from "../Source/Service.js";
 
 type SessionListFunction = (
-  input?: OpenCodeSessionListRequest
+  input?: OpenCodeSessionListRequest,
 ) => Promise<OpenCodeApiResponseEnvelope>;
 type SessionCreateFunction = (
-  input: OpenCodeSessionCreateRequest
+  input: OpenCodeSessionCreateRequest,
 ) => Promise<OpenCodeApiResponseEnvelope>;
 type SessionReadFunction = (
-  input: OpenCodeSessionReadRequest
+  input: OpenCodeSessionReadRequest,
 ) => Promise<OpenCodeApiResponseEnvelope>;
 type SessionPromptFunction = (
-  input: OpenCodeSessionPromptRequest
+  input: OpenCodeSessionPromptRequest,
 ) => Promise<OpenCodeApiResponseEnvelope>;
 type ProjectListFunction = () => Promise<OpenCodeApiResponseEnvelope>;
 
@@ -43,7 +43,7 @@ function createResponseEnvelope(data?: OpenCodeStructuredDataValue): OpenCodeApi
   }
 
   return {
-    data
+    data,
   };
 }
 
@@ -52,7 +52,7 @@ function createSessionRecord(
   title: string,
   directory: string,
   createdAtSeconds: number,
-  updatedAtSeconds: number
+  updatedAtSeconds: number,
 ): OpenCodeStructuredDataValue {
   return {
     id,
@@ -60,8 +60,8 @@ function createSessionRecord(
     directory,
     time: {
       created: createdAtSeconds,
-      updated: updatedAtSeconds
-    }
+      updated: updatedAtSeconds,
+    },
   };
 }
 
@@ -73,14 +73,16 @@ function createMessageRecords(): OpenCodeStructuredDataValue {
         role: "user",
         parentID: "root",
         time: {
-          created: 1_700_000_100
-        }
+          created: 1_700_000_100,
+        },
       },
-      parts: [{
-        id: "part-user-1",
-        type: "text",
-        text: "hello"
-      }]
+      parts: [
+        {
+          id: "part-user-1",
+          type: "text",
+          text: "hello",
+        },
+      ],
     },
     {
       info: {
@@ -91,15 +93,17 @@ function createMessageRecords(): OpenCodeStructuredDataValue {
         modelID: "gpt-4.1",
         finish: "stop",
         time: {
-          created: 1_700_000_200
-        }
+          created: 1_700_000_200,
+        },
       },
-      parts: [{
-        id: "part-assistant-1",
-        type: "text",
-        text: "hi"
-      }]
-    }
+      parts: [
+        {
+          id: "part-assistant-1",
+          type: "text",
+          text: "hi",
+        },
+      ],
+    },
   ];
 }
 
@@ -107,22 +111,40 @@ function createServiceClientDouble(): OpenCodeServiceClientDouble {
   const sessionList = vi.fn<SessionListFunction>();
   sessionList.mockResolvedValue(
     createResponseEnvelope([
-      createSessionRecord("session-1", "Test Session", "/tmp/project", 1_700_000_000, 1_700_000_900)
-    ])
+      createSessionRecord(
+        "session-1",
+        "Test Session",
+        "/tmp/project",
+        1_700_000_000,
+        1_700_000_900,
+      ),
+    ]),
   );
 
   const sessionCreate = vi.fn<SessionCreateFunction>();
   sessionCreate.mockResolvedValue(
     createResponseEnvelope(
-      createSessionRecord("session-created", "Created Session", "/tmp/project", 1_700_001_000, 1_700_001_001)
-    )
+      createSessionRecord(
+        "session-created",
+        "Created Session",
+        "/tmp/project",
+        1_700_001_000,
+        1_700_001_001,
+      ),
+    ),
   );
 
   const sessionGet = vi.fn<SessionReadFunction>();
   sessionGet.mockResolvedValue(
     createResponseEnvelope(
-      createSessionRecord("session-1", "State Session", "/tmp/project", 1_700_000_000, 1_700_000_900)
-    )
+      createSessionRecord(
+        "session-1",
+        "State Session",
+        "/tmp/project",
+        1_700_000_000,
+        1_700_000_900,
+      ),
+    ),
   );
 
   const sessionMessages = vi.fn<SessionReadFunction>();
@@ -139,10 +161,7 @@ function createServiceClientDouble(): OpenCodeServiceClientDouble {
 
   const projectList = vi.fn<ProjectListFunction>();
   projectList.mockResolvedValue(
-    createResponseEnvelope([
-      { worktree: "  /tmp/project-a  " },
-      { worktree: "/tmp/project-b" }
-    ])
+    createResponseEnvelope([{ worktree: "  /tmp/project-a  " }, { worktree: "/tmp/project-b" }]),
   );
 
   const client: OpenCodeMonitorClient = {
@@ -153,16 +172,16 @@ function createServiceClientDouble(): OpenCodeServiceClientDouble {
       messages: sessionMessages,
       prompt: sessionPrompt,
       abort: sessionAbort,
-      delete: sessionDelete
+      delete: sessionDelete,
     },
     project: {
-      list: projectList
-    }
+      list: projectList,
+    },
   };
 
   return {
     provider: {
-      getClient: () => client
+      getClient: () => client,
     },
     sessionList,
     sessionCreate,
@@ -171,7 +190,7 @@ function createServiceClientDouble(): OpenCodeServiceClientDouble {
     sessionPrompt,
     sessionAbort,
     sessionDelete,
-    projectList
+    projectList,
   };
 }
 
@@ -181,13 +200,13 @@ describe("OpenCodeMonitorService", () => {
     const service = new OpenCodeMonitorService(clientDouble.provider);
 
     const result = await service.listSessions({
-      directory: "  /tmp/project  "
+      directory: "  /tmp/project  ",
     });
 
     expect(clientDouble.sessionList).toHaveBeenCalledWith({
       query: {
-        directory: "/tmp/project"
-      }
+        directory: "/tmp/project",
+      },
     });
     expect(result.data).toEqual([
       {
@@ -196,8 +215,8 @@ describe("OpenCodeMonitorService", () => {
         createdAt: 1_700_000_000,
         updatedAt: 1_700_000_900,
         cwd: "/tmp/project",
-        source: "opencode"
-      }
+        source: "opencode",
+      },
     ]);
   });
 
@@ -207,8 +226,8 @@ describe("OpenCodeMonitorService", () => {
 
     await expect(
       service.listSessions({
-        directory: "    "
-      })
+        directory: "    ",
+      }),
     ).rejects.toThrow();
 
     expect(clientDouble.sessionList).not.toHaveBeenCalled();
@@ -225,11 +244,7 @@ describe("OpenCodeMonitorService", () => {
 
   it("rejects whitespace-only project worktree values", async () => {
     const clientDouble = createServiceClientDouble();
-    clientDouble.projectList.mockResolvedValue(
-      createResponseEnvelope([
-        { worktree: "   " }
-      ])
-    );
+    clientDouble.projectList.mockResolvedValue(createResponseEnvelope([{ worktree: "   " }]));
     const service = new OpenCodeMonitorService(clientDouble.provider);
 
     await expect(service.listProjectDirectories()).rejects.toThrow();
@@ -241,16 +256,16 @@ describe("OpenCodeMonitorService", () => {
 
     const result = await service.createSession({
       title: "  Created Session  ",
-      directory: "  /tmp/project  "
+      directory: "  /tmp/project  ",
     });
 
     expect(clientDouble.sessionCreate).toHaveBeenCalledWith({
       body: {
-        title: "Created Session"
+        title: "Created Session",
       },
       query: {
-        directory: "/tmp/project"
-      }
+        directory: "/tmp/project",
+      },
     });
     expect(result.threadId).toBe("session-created");
     expect(result.mapped.preview).toBe("Created Session");
@@ -262,8 +277,8 @@ describe("OpenCodeMonitorService", () => {
 
     await expect(
       service.createSession({
-        title: "   "
-      })
+        title: "   ",
+      }),
     ).rejects.toThrow();
 
     expect(clientDouble.sessionCreate).not.toHaveBeenCalled();
@@ -277,28 +292,25 @@ describe("OpenCodeMonitorService", () => {
 
     expect(clientDouble.sessionGet).toHaveBeenCalledWith({
       path: {
-        id: "session-1"
+        id: "session-1",
       },
       query: {
-        directory: "/tmp/project"
-      }
+        directory: "/tmp/project",
+      },
     });
     expect(clientDouble.sessionMessages).toHaveBeenCalledWith({
       path: {
-        id: "session-1"
+        id: "session-1",
       },
       query: {
-        directory: "/tmp/project"
-      }
+        directory: "/tmp/project",
+      },
     });
     expect(state.id).toBe("session-1");
     expect(state.latestModel).toBe("openai/gpt-4.1");
     expect(state.turns).toHaveLength(1);
     expect(state.turns[0].status).toBe("completed");
-    expect(state.turns[0].items.map((item) => item.type)).toEqual([
-      "userMessage",
-      "agentMessage"
-    ]);
+    expect(state.turns[0].items.map((item) => item.type)).toEqual(["userMessage", "agentMessage"]);
   });
 
   it("maps getSession request using parsed identifiers", async () => {
@@ -309,11 +321,11 @@ describe("OpenCodeMonitorService", () => {
 
     expect(clientDouble.sessionGet).toHaveBeenCalledWith({
       path: {
-        id: "session-1"
+        id: "session-1",
       },
       query: {
-        directory: "/tmp/project"
-      }
+        directory: "/tmp/project",
+      },
     });
     expect(session.id).toBe("session-1");
     expect(session.directory).toBe("/tmp/project");
@@ -335,22 +347,24 @@ describe("OpenCodeMonitorService", () => {
     await service.sendMessage({
       sessionId: "  session-1  ",
       text: "  hello world  ",
-      directory: "  /tmp/project  "
+      directory: "  /tmp/project  ",
     });
 
     expect(clientDouble.sessionPrompt).toHaveBeenCalledWith({
       path: {
-        id: "session-1"
+        id: "session-1",
       },
       query: {
-        directory: "/tmp/project"
+        directory: "/tmp/project",
       },
       body: {
-        parts: [{
-          type: "text",
-          text: "hello world"
-        }]
-      }
+        parts: [
+          {
+            type: "text",
+            text: "hello world",
+          },
+        ],
+      },
     });
   });
 
@@ -361,8 +375,8 @@ describe("OpenCodeMonitorService", () => {
     await expect(
       service.sendMessage({
         sessionId: "session-1",
-        text: "    "
-      })
+        text: "    ",
+      }),
     ).rejects.toThrow("Message text is required");
 
     expect(clientDouble.sessionPrompt).not.toHaveBeenCalled();
@@ -377,19 +391,19 @@ describe("OpenCodeMonitorService", () => {
 
     expect(clientDouble.sessionAbort).toHaveBeenCalledWith({
       path: {
-        id: "session-1"
+        id: "session-1",
       },
       query: {
-        directory: "/tmp/project"
-      }
+        directory: "/tmp/project",
+      },
     });
     expect(clientDouble.sessionDelete).toHaveBeenCalledWith({
       path: {
-        id: "session-1"
+        id: "session-1",
       },
       query: {
-        directory: "/tmp/project"
-      }
+        directory: "/tmp/project",
+      },
     });
   });
 

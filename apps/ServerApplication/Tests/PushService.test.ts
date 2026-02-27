@@ -1,14 +1,14 @@
+import { type PushNotificationPayload, type StoredPushSubscription } from "@farfield/protocol";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import webPush from "web-push";
-import { type PushNotificationPayload, type StoredPushSubscription } from "@farfield/protocol";
 import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
 
 vi.mock("web-push", () => {
   return {
     default: {
       setVapidDetails: vi.fn(),
-      sendNotification: vi.fn()
-    }
+      sendNotification: vi.fn(),
+    },
   };
 });
 
@@ -19,14 +19,14 @@ function buildStoredSubscription(endpoint: string): StoredPushSubscription {
       endpoint,
       keys: {
         p256dh: "BElidedKeyMaterial_123",
-        auth: "CAuthValue_456"
-      }
+        auth: "CAuthValue_456",
+      },
     },
     settings: {
-      privateMode: false
+      privateMode: false,
     },
     createdAt: "2026-02-18T00:00:00.000Z",
-    updatedAt: "2026-02-18T00:00:00.000Z"
+    updatedAt: "2026-02-18T00:00:00.000Z",
   };
 }
 
@@ -35,7 +35,7 @@ const ENABLED_PUSH_SERVICE_CONFIG = {
   vapidPublicKey:
     "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U",
   vapidPrivateKey: "tfyAO9n9LMLXTy7ZaZwfDafDifFhnKz0MLC8nOxDmds",
-  vapidSubject: "mailto:test@example.com"
+  vapidSubject: "mailto:test@example.com",
 };
 
 function buildEnabledPushService(): PushService {
@@ -50,7 +50,7 @@ function buildNotificationPayload(notificationId: string): PushNotificationPaylo
     threadId: "thread_1",
     turnId: "turn_1",
     url: "/threads/thread_1",
-    createdAt: "2026-02-18T00:00:00.000Z"
+    createdAt: "2026-02-18T00:00:00.000Z",
   };
 }
 
@@ -65,7 +65,7 @@ describe("PushService", () => {
     vi.mocked(webPush.sendNotification).mockResolvedValue({
       statusCode: 201,
       body: "",
-      headers: {}
+      headers: {},
     });
 
     const service = buildEnabledPushService();
@@ -81,10 +81,10 @@ describe("PushService", () => {
             navigate: "/threads/thread_1",
             icon: "/icons/icon-192.png",
             badge: "/icons/icon-192.png",
-            tag: "thread:thread_1"
-          }
-        }
-      }
+            tag: "thread:thread_1",
+          },
+        },
+      },
     );
 
     expect(result.attempted).toBe(1);
@@ -92,12 +92,12 @@ describe("PushService", () => {
     expect(vi.mocked(webPush.sendNotification)).toHaveBeenCalledTimes(1);
 
     const firstCall = vi.mocked(webPush.sendNotification).mock.calls[0];
-    expect(firstCall?.[1]).toContain("\"web_push\"");
-    expect(firstCall?.[1]).toContain("\"notificationId\":\"notif_1\"");
-    expect(firstCall?.[1]).toContain("\"navigate\":\"/threads/thread_1\"");
+    expect(firstCall?.[1]).toContain('"web_push"');
+    expect(firstCall?.[1]).toContain('"notificationId":"notif_1"');
+    expect(firstCall?.[1]).toContain('"navigate":"/threads/thread_1"');
     expect(firstCall?.[2]).toEqual({
       TTL: 300,
-      urgency: "high"
+      urgency: "high",
     });
   });
 
@@ -105,18 +105,18 @@ describe("PushService", () => {
     vi.mocked(webPush.sendNotification).mockResolvedValue({
       statusCode: 201,
       body: "",
-      headers: {}
+      headers: {},
     });
 
     const service = buildEnabledPushService();
     const subscriptionCount = 12;
     const subscriptions = Array.from({ length: subscriptionCount }, (_, index) =>
-      buildStoredSubscription(`https://push.example.test/subscriptions/sub_${index}`)
+      buildStoredSubscription(`https://push.example.test/subscriptions/sub_${index}`),
     );
 
     const result = await service.sendToSubscriptions(
       subscriptions,
-      buildNotificationPayload("notif_dispatch_saturation")
+      buildNotificationPayload("notif_dispatch_saturation"),
     );
 
     expect(result.attempted).toBe(subscriptionCount);
@@ -127,15 +127,14 @@ describe("PushService", () => {
 
     const dispatchedEndpoints = vi
       .mocked(webPush.sendNotification)
-      .mock.calls
-      .map(([subscription]) => subscription.endpoint);
+      .mock.calls.map(([subscription]) => subscription.endpoint);
     expect(new Set(dispatchedEndpoints).size).toBe(subscriptionCount);
   });
 
   it("marks gone subscriptions for pruning", async () => {
     vi.mocked(webPush.sendNotification).mockRejectedValue({
       statusCode: 410,
-      message: "Gone"
+      message: "Gone",
     });
 
     const endpoint = "https://push.example.test/subscriptions/sub_410";
@@ -143,7 +142,7 @@ describe("PushService", () => {
 
     const result = await service.sendToSubscriptions(
       [buildStoredSubscription(endpoint)],
-      buildNotificationPayload("notif_2")
+      buildNotificationPayload("notif_2"),
     );
 
     expect(result.attempted).toBe(1);
@@ -158,23 +157,23 @@ describe("PushService", () => {
     vi.mocked(webPush.sendNotification)
       .mockRejectedValueOnce({
         statusCode: 503,
-        message: "Service unavailable"
+        message: "Service unavailable",
       })
       .mockRejectedValueOnce({
         statusCode: 503,
-        message: "Service unavailable"
+        message: "Service unavailable",
       })
       .mockResolvedValueOnce({
         statusCode: 201,
         body: "",
-        headers: {}
+        headers: {},
       });
 
     const service = buildEnabledPushService();
 
     const resultPromise = service.sendToSubscriptions(
       [buildStoredSubscription("https://push.example.test/subscriptions/sub_retry")],
-      buildNotificationPayload("notif_3")
+      buildNotificationPayload("notif_3"),
     );
 
     await vi.runAllTimersAsync();
@@ -191,15 +190,15 @@ describe("PushService", () => {
     vi.mocked(webPush.sendNotification)
       .mockRejectedValueOnce({
         statusCode: 503,
-        message: "Service unavailable"
+        message: "Service unavailable",
       })
       .mockRejectedValueOnce({
         statusCode: 503,
-        message: "Service unavailable"
+        message: "Service unavailable",
       })
       .mockRejectedValueOnce({
         statusCode: 503,
-        message: "Service unavailable"
+        message: "Service unavailable",
       });
 
     const endpoint = "https://push.example.test/subscriptions/sub_retry_fail";
@@ -207,7 +206,7 @@ describe("PushService", () => {
 
     const resultPromise = service.sendToSubscriptions(
       [buildStoredSubscription(endpoint)],
-      buildNotificationPayload("notif_4")
+      buildNotificationPayload("notif_4"),
     );
 
     await vi.runAllTimersAsync();
@@ -233,7 +232,7 @@ describe("PushService", () => {
 
     const resultPromise = service.sendToSubscriptions(
       [buildStoredSubscription(endpoint)],
-      buildNotificationPayload("notif_non_object_error")
+      buildNotificationPayload("notif_non_object_error"),
     );
 
     await vi.runAllTimersAsync();
@@ -245,8 +244,8 @@ describe("PushService", () => {
       {
         endpoint,
         statusCode: null,
-        message: "Push send failed"
-      }
+        message: "Push send failed",
+      },
     ]);
     expect(result.prunedEndpoints).toEqual([]);
     expect(vi.mocked(webPush.sendNotification)).toHaveBeenCalledTimes(3);
@@ -257,7 +256,7 @@ describe("PushService", () => {
       enabled: false,
       vapidPublicKey: "public_key_unused_when_disabled",
       vapidPrivateKey: "private_key_unused_when_disabled",
-      vapidSubject: "mailto:test@example.com"
+      vapidSubject: "mailto:test@example.com",
     });
 
     const result = await service.sendToSubscriptions(
@@ -265,15 +264,15 @@ describe("PushService", () => {
       {
         ...buildNotificationPayload("notif_disabled"),
         title: "Disabled",
-        body: "Should not send"
-      }
+        body: "Should not send",
+      },
     );
 
     expect(result).toEqual({
       attempted: 0,
       delivered: 0,
       failures: [],
-      prunedEndpoints: []
+      prunedEndpoints: [],
     });
     expect(vi.mocked(webPush.sendNotification)).not.toHaveBeenCalled();
   });

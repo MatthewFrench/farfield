@@ -10,27 +10,24 @@ vi.mock("@/Features/Theme/StateManagement/UseTheme", () => ({
   useTheme() {
     return {
       theme: "light",
-      toggle: () => {}
+      toggle: () => {},
     };
-  }
+  },
 }));
 
 vi.mock("react-syntax-highlighter", () => ({
   Prism(input: SyntaxHighlighterProps) {
     return (
-      <pre
-        data-testid="markdown-syntax-highlighter"
-        data-language={input.language}
-      >
+      <pre data-testid="markdown-syntax-highlighter" data-language={input.language}>
         {input.children}
       </pre>
     );
-  }
+  },
 }));
 
 vi.mock("react-syntax-highlighter/dist/esm/styles/prism", () => ({
   oneDark: {},
-  oneLight: {}
+  oneLight: {},
 }));
 
 import { MarkdownText } from "@/Components/MarkdownText";
@@ -48,11 +45,7 @@ describe("MarkdownText", () => {
   });
 
   it("renders fenced code blocks with parsed language labels", () => {
-    render(
-      <MarkdownText
-        text={"```ts\nconst value = 1;\n```"}
-      />
-    );
+    render(<MarkdownText text={"```ts\nconst value = 1;\n```"} />);
 
     const block = screen.getByTestId("markdown-syntax-highlighter");
 
@@ -61,11 +54,7 @@ describe("MarkdownText", () => {
   });
 
   it("uses the text language contract when fenced code language is omitted", () => {
-    render(
-      <MarkdownText
-        text={"```\nplain block\n```"}
-      />
-    );
+    render(<MarkdownText text={"```\nplain block\n```"} />);
 
     const block = screen.getByTestId("markdown-syntax-highlighter");
 

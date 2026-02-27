@@ -1,14 +1,11 @@
 import { describe, expect, it } from "vitest";
-import {
-  parseThreadConversationState,
-  UserInputRequestMethod
-} from "../Source/Index.js";
+import { parseThreadConversationState, UserInputRequestMethod } from "../Source/Index.js";
 
 describe("codex-protocol thread contract hardening", () => {
   it("defaults requests to an empty list when omitted", () => {
     const parsed = parseThreadConversationState({
       id: "thread-123",
-      turns: []
+      turns: [],
     });
 
     expect(parsed.requests).toEqual([]);
@@ -25,23 +22,23 @@ describe("codex-protocol thread contract hardening", () => {
             input: [
               {
                 type: "text",
-                text: "hello"
-              }
+                text: "hello",
+              },
             ],
             collaborationMode: {
               mode: "delegate",
               settings: {
                 model: null,
                 reasoning_effort: null,
-                developer_instructions: null
-              }
+                developer_instructions: null,
+              },
             },
             personality: null,
-            outputSchema: null
+            outputSchema: null,
           },
-          items: []
-        }
-      ]
+          items: [],
+        },
+      ],
     });
 
     const turn = parsed.turns[0];
@@ -64,14 +61,14 @@ describe("codex-protocol thread contract hardening", () => {
                 plan: [
                   {
                     step: "do work",
-                    status: "done"
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      })
+                    status: "done",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
     ).toThrowError(/ThreadConversationState did not match expected schema/);
   });
 
@@ -92,14 +89,14 @@ describe("codex-protocol thread contract hardening", () => {
                 receiverThreadIds: ["thread-124"],
                 agentsStates: {
                   "thread-124": {
-                    status: "paused"
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      })
+                    status: "paused",
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }),
     ).toThrowError(/ThreadConversationState did not match expected schema/);
   });
 
@@ -116,7 +113,7 @@ describe("codex-protocol thread contract hardening", () => {
               server: "filesystem",
               tool: "read_file",
               status: "failed",
-              arguments: { path: "README.md" }
+              arguments: { path: "README.md" },
             },
             {
               id: "item-collab",
@@ -127,13 +124,13 @@ describe("codex-protocol thread contract hardening", () => {
               receiverThreadIds: ["thread-124"],
               agentsStates: {
                 "thread-124": {
-                  status: "running"
-                }
-              }
-            }
-          ]
-        }
-      ]
+                  status: "running",
+                },
+              },
+            },
+          ],
+        },
+      ],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("mcpToolCall");
@@ -154,12 +151,12 @@ describe("codex-protocol thread contract hardening", () => {
                 server: "filesystem",
                 tool: "read_file",
                 status: "paused",
-                arguments: { path: "README.md" }
-              }
-            ]
-          }
-        ]
-      })
+                arguments: { path: "README.md" },
+              },
+            ],
+          },
+        ],
+      }),
     ).toThrowError(/ThreadConversationState did not match expected schema/);
   });
 
@@ -180,14 +177,14 @@ describe("codex-protocol thread contract hardening", () => {
                 receiverThreadIds: ["thread-124"],
                 agentsStates: {
                   "thread-124": {
-                    status: "running"
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      })
+                    status: "running",
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }),
     ).toThrowError(/ThreadConversationState did not match expected schema/);
   });
 
@@ -204,11 +201,11 @@ describe("codex-protocol thread contract hardening", () => {
               threadId: "thread-123",
               turnId: "turn-123",
               itemId: "item-123",
-              questions: []
-            }
-          }
-        ]
-      })
+              questions: [],
+            },
+          },
+        ],
+      }),
     ).toThrowError(/ThreadConversationState did not match expected schema/);
   });
 
@@ -224,10 +221,10 @@ describe("codex-protocol thread contract hardening", () => {
             threadId: "thread-123",
             turnId: "turn-123",
             itemId: "item-123",
-            questions: []
-          }
-        }
-      ]
+            questions: [],
+          },
+        },
+      ],
     });
 
     expect(parsed.requests[0]?.method).toBe(UserInputRequestMethod);

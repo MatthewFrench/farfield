@@ -14,7 +14,7 @@ type DebugErrorSignatureTuple = readonly [
   schemaVersion: string,
   errorId: string,
   recordedAt: string,
-  message: string
+  message: string,
 ];
 
 export function buildDebugErrorSignature(input: DebugErrorSignatureInput): string {
@@ -22,7 +22,7 @@ export function buildDebugErrorSignature(input: DebugErrorSignatureInput): strin
     DEBUG_ERROR_SIGNATURE_SCHEMA_VERSION,
     input.errorId,
     input.recordedAt,
-    input.message
+    input.message,
   ];
   return JSON.stringify(signatureTuple);
 }

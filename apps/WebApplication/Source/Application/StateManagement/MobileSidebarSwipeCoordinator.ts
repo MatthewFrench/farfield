@@ -48,34 +48,36 @@ interface MobileSidebarSwipeTrackingState {
 }
 
 const MOBILE_SIDEBAR_SWIPE_SINGLE_TOUCH_COUNT = 1;
-const MOBILE_SIDEBAR_SWIPE_TRACKING_STATUS_NOT_TRACKING: MobileSidebarSwipeTrackingStatus = "not-tracking";
+const MOBILE_SIDEBAR_SWIPE_TRACKING_STATUS_NOT_TRACKING: MobileSidebarSwipeTrackingStatus =
+  "not-tracking";
 const MOBILE_SIDEBAR_SWIPE_TRACKING_STATUS_TRACKING: MobileSidebarSwipeTrackingStatus = "tracking";
 const MOBILE_SIDEBAR_SWIPE_COORDINATE_RESET_PX = 0;
 
 const MOBILE_SIDEBAR_SWIPE_OUTPUT_NOT_TRACKING: ContinueMobileSidebarSwipeTrackingOutput = {
   shouldOpenSidebar: false,
-  reason: "not-tracking"
+  reason: "not-tracking",
 };
 const MOBILE_SIDEBAR_SWIPE_OUTPUT_TOUCH_COUNT_MISMATCH: ContinueMobileSidebarSwipeTrackingOutput = {
   shouldOpenSidebar: false,
-  reason: "touch-count-mismatch"
+  reason: "touch-count-mismatch",
 };
-const MOBILE_SIDEBAR_SWIPE_OUTPUT_VERTICAL_DRIFT_CANCELLED: ContinueMobileSidebarSwipeTrackingOutput = {
-  shouldOpenSidebar: false,
-  reason: "vertical-drift-cancelled"
-};
-const MOBILE_SIDEBAR_SWIPE_OUTPUT_NEGATIVE_HORIZONTAL_CANCELLED:
-  ContinueMobileSidebarSwipeTrackingOutput = {
+const MOBILE_SIDEBAR_SWIPE_OUTPUT_VERTICAL_DRIFT_CANCELLED: ContinueMobileSidebarSwipeTrackingOutput =
+  {
     shouldOpenSidebar: false,
-    reason: "negative-horizontal-cancelled"
+    reason: "vertical-drift-cancelled",
+  };
+const MOBILE_SIDEBAR_SWIPE_OUTPUT_NEGATIVE_HORIZONTAL_CANCELLED: ContinueMobileSidebarSwipeTrackingOutput =
+  {
+    shouldOpenSidebar: false,
+    reason: "negative-horizontal-cancelled",
   };
 const MOBILE_SIDEBAR_SWIPE_OUTPUT_TRIGGER_REACHED: ContinueMobileSidebarSwipeTrackingOutput = {
   shouldOpenSidebar: true,
-  reason: "trigger-reached"
+  reason: "trigger-reached",
 };
 const MOBILE_SIDEBAR_SWIPE_OUTPUT_TRACKING_IN_PROGRESS: ContinueMobileSidebarSwipeTrackingOutput = {
   shouldOpenSidebar: false,
-  reason: "tracking-in-progress"
+  reason: "tracking-in-progress",
 };
 
 export class MobileSidebarSwipeCoordinator {
@@ -87,7 +89,7 @@ export class MobileSidebarSwipeCoordinator {
     this.trackingState = {
       trackingStatus: MOBILE_SIDEBAR_SWIPE_TRACKING_STATUS_NOT_TRACKING,
       startX: MOBILE_SIDEBAR_SWIPE_COORDINATE_RESET_PX,
-      startY: MOBILE_SIDEBAR_SWIPE_COORDINATE_RESET_PX
+      startY: MOBILE_SIDEBAR_SWIPE_COORDINATE_RESET_PX,
     };
   }
 
@@ -109,12 +111,9 @@ export class MobileSidebarSwipeCoordinator {
   }
 
   public continueTracking(
-    input: ContinueMobileSidebarSwipeTrackingInput
+    input: ContinueMobileSidebarSwipeTrackingInput,
   ): ContinueMobileSidebarSwipeTrackingOutput {
-    if (
-      this.trackingState.trackingStatus
-      !== MOBILE_SIDEBAR_SWIPE_TRACKING_STATUS_TRACKING
-    ) {
+    if (this.trackingState.trackingStatus !== MOBILE_SIDEBAR_SWIPE_TRACKING_STATUS_TRACKING) {
       return MOBILE_SIDEBAR_SWIPE_OUTPUT_NOT_TRACKING;
     }
     if (input.touchCount !== MOBILE_SIDEBAR_SWIPE_SINGLE_TOUCH_COUNT) {
@@ -163,8 +162,8 @@ export class MobileSidebarSwipeCoordinator {
 
   private shouldCancelForVerticalDrift(absoluteDeltaX: number, absoluteDeltaY: number): boolean {
     return (
-      absoluteDeltaY > this.configuration.sidebarSwipeMaximumVerticalDriftPx
-      && absoluteDeltaY > absoluteDeltaX
+      absoluteDeltaY > this.configuration.sidebarSwipeMaximumVerticalDriftPx &&
+      absoluteDeltaY > absoluteDeltaX
     );
   }
 
@@ -174,8 +173,8 @@ export class MobileSidebarSwipeCoordinator {
 
   private shouldOpenSidebar(deltaX: number, absoluteDeltaY: number): boolean {
     return (
-      deltaX >= this.configuration.sidebarSwipeTriggerPx
-      && absoluteDeltaY <= this.configuration.sidebarSwipeMaximumVerticalDriftPx
+      deltaX >= this.configuration.sidebarSwipeTriggerPx &&
+      absoluteDeltaY <= this.configuration.sidebarSwipeMaximumVerticalDriftPx
     );
   }
 }

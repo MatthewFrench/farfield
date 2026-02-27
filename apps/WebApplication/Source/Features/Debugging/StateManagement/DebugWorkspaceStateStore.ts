@@ -6,7 +6,7 @@ const FIRST_COLLECTION_INDEX = 0;
 export class DebugWorkspaceStateStore {
   public readNextHistory(
     previousHistory: DebugHistoryEntries,
-    nextHistory: DebugHistoryEntries
+    nextHistory: DebugHistoryEntries,
   ): DebugHistoryEntries {
     if (this.readHistoryCollectionIdentifiersMatch(previousHistory, nextHistory)) {
       return previousHistory;
@@ -16,14 +16,14 @@ export class DebugWorkspaceStateStore {
 
   public shouldApplyDebugErrors(
     previousSignature: readonly string[],
-    nextSignature: readonly string[]
+    nextSignature: readonly string[],
   ): boolean {
     return !this.readSignaturesMatch(previousSignature, nextSignature);
   }
 
   private readHistoryCollectionIdentifiersMatch(
     previousHistory: DebugHistoryEntries,
-    nextHistory: DebugHistoryEntries
+    nextHistory: DebugHistoryEntries,
   ): boolean {
     if (previousHistory.length !== nextHistory.length) {
       return false;
@@ -35,26 +35,27 @@ export class DebugWorkspaceStateStore {
 
     const previousFirstHistoryEntryIdentifier = previousHistory[FIRST_COLLECTION_INDEX]?.id ?? null;
     const nextFirstHistoryEntryIdentifier = nextHistory[FIRST_COLLECTION_INDEX]?.id ?? null;
-    const previousLastHistoryEntryIdentifier = previousHistory[previousHistory.length - 1]?.id ?? null;
+    const previousLastHistoryEntryIdentifier =
+      previousHistory[previousHistory.length - 1]?.id ?? null;
     const nextLastHistoryEntryIdentifier = nextHistory[nextHistory.length - 1]?.id ?? null;
     if (
-      previousFirstHistoryEntryIdentifier === null
-      || nextFirstHistoryEntryIdentifier === null
-      || previousLastHistoryEntryIdentifier === null
-      || nextLastHistoryEntryIdentifier === null
+      previousFirstHistoryEntryIdentifier === null ||
+      nextFirstHistoryEntryIdentifier === null ||
+      previousLastHistoryEntryIdentifier === null ||
+      nextLastHistoryEntryIdentifier === null
     ) {
       return false;
     }
 
     return (
-      previousFirstHistoryEntryIdentifier === nextFirstHistoryEntryIdentifier
-      && previousLastHistoryEntryIdentifier === nextLastHistoryEntryIdentifier
+      previousFirstHistoryEntryIdentifier === nextFirstHistoryEntryIdentifier &&
+      previousLastHistoryEntryIdentifier === nextLastHistoryEntryIdentifier
     );
   }
 
   private readSignaturesMatch(
     firstSignature: readonly string[],
-    secondSignature: readonly string[]
+    secondSignature: readonly string[],
   ): boolean {
     if (firstSignature.length !== secondSignature.length) {
       return false;

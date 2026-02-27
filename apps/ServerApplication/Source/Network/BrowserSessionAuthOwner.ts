@@ -13,14 +13,15 @@ const SetCookieDirectiveByName = {
   path: "Path=/",
   httpOnly: "HttpOnly",
   sameSiteLax: "SameSite=Lax",
-  secure: "Secure"
+  secure: "Secure",
 } as const;
 
 const BrowserSessionAuthOwnerConfigurationErrorMessageByName = {
   missingCookieName: "BrowserSessionAuthOwner requires a non-empty cookieName",
-  invalidSessionTimeToLiveMs: "BrowserSessionAuthOwner requires a positive integer sessionTimeToLiveMs",
+  invalidSessionTimeToLiveMs:
+    "BrowserSessionAuthOwner requires a positive integer sessionTimeToLiveMs",
   missingSigningSecret: "BrowserSessionAuthOwner requires a non-empty signingSecret",
-  invalidSecureCookie: "BrowserSessionAuthOwner requires secureCookie to be a boolean"
+  invalidSecureCookie: "BrowserSessionAuthOwner requires secureCookie to be a boolean",
 } as const;
 
 const CookieNameConfigurationSchema = z.string().trim().min(1);
@@ -28,7 +29,11 @@ const SessionTimeToLiveMillisecondsConfigurationSchema = z.number().int().positi
 const SigningSecretConfigurationSchema = z.string().trim().min(1);
 const SecureCookieConfigurationSchema = z.boolean();
 
-const Base64UrlTokenSegmentSchema = z.string().trim().min(1).regex(/^[A-Za-z0-9_-]+$/);
+const Base64UrlTokenSegmentSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(/^[A-Za-z0-9_-]+$/);
 const SessionTimestampTokenSegmentSchema = z
   .string()
   .regex(/^[0-9]+$/)
@@ -39,14 +44,14 @@ const SessionTokenPartsSchema = z
     SessionTimestampTokenSegmentSchema,
     SessionTimestampTokenSegmentSchema,
     Base64UrlTokenSegmentSchema,
-    Base64UrlTokenSegmentSchema
+    Base64UrlTokenSegmentSchema,
   ])
   .superRefine(([issuedAtMs, expiresAtMs], context) => {
     if (expiresAtMs <= issuedAtMs) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Session expiry must be greater than issue timestamp",
-        path: [1]
+        path: [1],
       });
     }
   });
@@ -94,23 +99,28 @@ export class BrowserSessionAuthOwner {
 
   public constructor(
     configuration: BrowserSessionAuthOwnerConfiguration,
-    dependencies?: BrowserSessionAuthOwnerDependencies
+    dependencies?: BrowserSessionAuthOwnerDependencies,
   ) {
     const parsedCookieName = CookieNameConfigurationSchema.safeParse(configuration.cookieName);
     if (!parsedCookieName.success) {
       throw new Error(BrowserSessionAuthOwnerConfigurationErrorMessageByName.missingCookieName);
     }
-    const parsedSessionTimeToLiveMilliseconds = SessionTimeToLiveMillisecondsConfigurationSchema.safeParse(
-      configuration.sessionTimeToLiveMs
-    );
+    const parsedSessionTimeToLiveMilliseconds =
+      SessionTimeToLiveMillisecondsConfigurationSchema.safeParse(configuration.sessionTimeToLiveMs);
     if (!parsedSessionTimeToLiveMilliseconds.success) {
-      throw new Error(BrowserSessionAuthOwnerConfigurationErrorMessageByName.invalidSessionTimeToLiveMs);
+      throw new Error(
+        BrowserSessionAuthOwnerConfigurationErrorMessageByName.invalidSessionTimeToLiveMs,
+      );
     }
-    const parsedSigningSecret = SigningSecretConfigurationSchema.safeParse(configuration.signingSecret);
+    const parsedSigningSecret = SigningSecretConfigurationSchema.safeParse(
+      configuration.signingSecret,
+    );
     if (!parsedSigningSecret.success) {
       throw new Error(BrowserSessionAuthOwnerConfigurationErrorMessageByName.missingSigningSecret);
     }
-    const parsedSecureCookie = SecureCookieConfigurationSchema.safeParse(configuration.secureCookie);
+    const parsedSecureCookie = SecureCookieConfigurationSchema.safeParse(
+      configuration.secureCookie,
+    );
     if (!parsedSecureCookie.success) {
       throw new Error(BrowserSessionAuthOwnerConfigurationErrorMessageByName.invalidSecureCookie);
     }
@@ -134,7 +144,7 @@ export class BrowserSessionAuthOwner {
 
     return {
       setCookieHeaderValue: this.buildSetCookieHeaderValue(token, expiresAtMs),
-      expiresAt
+      expiresAt,
     };
   }
 
@@ -156,7 +166,7 @@ export class BrowserSessionAuthOwner {
     const payload = this.buildPayload(
       parsedSessionToken.issuedAtMs,
       parsedSessionToken.expiresAtMs,
-      parsedSessionToken.nonce
+      parsedSessionToken.nonce,
     );
     const expectedSignature = this.sign(payload);
     if (!this.signaturesMatch(parsedSessionToken.signature, expectedSignature)) {
@@ -174,7 +184,7 @@ export class BrowserSessionAuthOwner {
     // Browsers treat Max-Age=0 as immediate expiry, so keep a minimum one-second lifetime.
     const maxAgeSeconds = Math.max(
       MINIMUM_MAX_AGE_SECONDS,
-      Math.floor(this.sessionTimeToLiveMs / MILLISECONDS_PER_SECOND)
+      Math.floor(this.sessionTimeToLiveMs / MILLISECONDS_PER_SECOND),
     );
     const directives = [
       `${this.cookieName}=${token}`,
@@ -182,7 +192,7 @@ export class BrowserSessionAuthOwner {
       SetCookieDirectiveByName.httpOnly,
       SetCookieDirectiveByName.sameSiteLax,
       `Max-Age=${String(maxAgeSeconds)}`,
-      `Expires=${this.buildUtcTimestamp(expiresAtMs)}`
+      `Expires=${this.buildUtcTimestamp(expiresAtMs)}`,
     ];
     if (this.secureCookie) {
       directives.push(SetCookieDirectiveByName.secure);
@@ -225,7 +235,7 @@ export class BrowserSessionAuthOwner {
       issuedAtMs,
       expiresAtMs,
       nonce,
-      signature
+      signature,
     };
   }
 
@@ -236,14 +246,14 @@ export class BrowserSessionAuthOwner {
   private buildAuthenticatedReadResult(expiresAtMs: number): BrowserSessionReadResult {
     return {
       authenticated: true,
-      expiresAt: this.buildIsoTimestamp(expiresAtMs)
+      expiresAt: this.buildIsoTimestamp(expiresAtMs),
     };
   }
 
   private buildUnauthenticatedReadResult(): BrowserSessionReadResult {
     return {
       authenticated: false,
-      expiresAt: null
+      expiresAt: null,
     };
   }
 
@@ -256,9 +266,7 @@ export class BrowserSessionAuthOwner {
   }
 
   private sign(payload: string): string {
-    return createHmac("sha256", this.signingSecret)
-      .update(payload)
-      .digest("base64url");
+    return createHmac("sha256", this.signingSecret).update(payload).digest("base64url");
   }
 
   private signaturesMatch(receivedSignature: string, expectedSignature: string): boolean {

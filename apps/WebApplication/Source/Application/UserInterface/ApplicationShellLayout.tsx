@@ -1,33 +1,31 @@
-import { type TouchEvent as ReactTouchEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { type TouchEvent as ReactTouchEvent } from "react";
 import {
   ApiSessionBootstrapOverlay,
-  type ApiSessionBootstrapOverlayProperties
+  type ApiSessionBootstrapOverlayProperties,
 } from "@/Application/UserInterface/ApiSessionBootstrapOverlay";
 import {
   ApplicationHeaderBar,
-  type ApplicationHeaderBarProps
+  type ApplicationHeaderBarProps,
 } from "@/Application/UserInterface/ApplicationHeaderBar";
 import {
   ChatWorkspacePane,
-  type ChatWorkspacePaneProps
+  type ChatWorkspacePaneProps,
 } from "@/Features/Chat/UserInterface/ChatWorkspacePane";
 import {
   DebugStatusBanners,
-  type DebugStatusBannersProps
+  type DebugStatusBannersProps,
 } from "@/Features/Debugging/UserInterface/DebugStatusBanners";
 import {
   DebugWorkspacePane,
-  type DebugWorkspacePaneProps
+  type DebugWorkspacePaneProps,
 } from "@/Features/Debugging/UserInterface/DebugWorkspacePane";
-import {
-  type ThreadListPaneProperties
-} from "@/Features/Threads/UserInterface/ThreadListPane";
-import { ThreadSidebarViewport } from "@/Features/Threads/UserInterface/ThreadSidebarViewport";
+import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPane";
 import {
   type ThreadSidebarAgentDescriptor,
-  type ThreadSidebarPanelHealthState
+  type ThreadSidebarPanelHealthState,
 } from "@/Features/Threads/UserInterface/ThreadSidebarPanel";
+import { ThreadSidebarViewport } from "@/Features/Threads/UserInterface/ThreadSidebarViewport";
 
 export type ApplicationShellActiveTab = "chat" | "debug";
 
@@ -78,7 +76,7 @@ export function ApplicationShellLayout({
   chatWorkspacePaneProperties,
   debugWorkspacePaneProperties,
   showApiSessionBootstrapOverlay,
-  apiSessionBootstrapOverlayProperties
+  apiSessionBootstrapOverlayProperties,
 }: ApplicationShellLayoutProps): React.JSX.Element {
   const threadSidebarViewportSharedProperties = {
     threadListPaneProperties,
@@ -89,7 +87,7 @@ export function ApplicationShellLayout({
     commitLabel,
     agentDescriptors,
     codexConfigured,
-    healthState: threadSidebarHealthState
+    healthState: threadSidebarHealthState,
   };
 
   return (

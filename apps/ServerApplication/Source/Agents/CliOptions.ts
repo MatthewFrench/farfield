@@ -49,9 +49,7 @@ function parseAgentsArg(raw: string): AgentId[] {
     throw new Error(MISSING_AGENTS_VALUE_ERROR);
   }
 
-  const tokens = trimmed
-    .split(",")
-    .map((token) => token.trim());
+  const tokens = trimmed.split(",").map((token) => token.trim());
 
   if (tokens.length === 0 || tokens.some((token) => token.length === 0)) {
     throw new Error(MISSING_AGENTS_VALUE_ERROR);
@@ -76,7 +74,7 @@ function parseAgentsArg(raw: string): AgentId[] {
 
   if (deduped.length === 0) {
     throw new Error(
-      `No valid agent ids were provided. Allowed values: ${formatAllowedAgentIds()}, ${ALL_AGENTS_TOKEN}`
+      `No valid agent ids were provided. Allowed values: ${formatAllowedAgentIds()}, ${ALL_AGENTS_TOKEN}`,
     );
   }
 
@@ -91,7 +89,7 @@ export function formatServerHelpText(): string {
     "",
     "Flags:",
     `  ${AGENTS_LONG_OPTION}=<ids>   Comma-separated agent ids. Allowed: ${formatAllowedAgentIds()}, ${ALL_AGENTS_TOKEN}`,
-    `  ${HELP_LONG_OPTION}           Show this help message`
+    `  ${HELP_LONG_OPTION}           Show this help message`,
   ].join("\n");
 }
 
@@ -135,6 +133,6 @@ export function parseServerCliOptions(argv: string[]): ServerCliOptions {
 
   return {
     agentIds: parsedAgents ?? [...DEFAULT_AGENT_IDS],
-    showHelp
+    showHelp,
   };
 }

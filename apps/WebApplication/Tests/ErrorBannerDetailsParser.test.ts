@@ -8,13 +8,13 @@ describe("ErrorBannerDetailsParser", () => {
       message: "",
       actionId: null,
       requestId: null,
-      errorId: null
+      errorId: null,
     });
   });
 
   it("extracts operation, message, and identifiers", () => {
     const details = toErrorBannerDetails(
-      "send-message: failed to send actionId=action-7 requestId=req-7 errorId=error-7"
+      "send-message: failed to send actionId=action-7 requestId=req-7 errorId=error-7",
     );
 
     expect(details).toEqual({
@@ -22,13 +22,13 @@ describe("ErrorBannerDetailsParser", () => {
       message: "failed to send actionId=action-7 requestId=req-7 errorId=error-7",
       actionId: "action-7",
       requestId: "req-7",
-      errorId: "error-7"
+      errorId: "error-7",
     });
   });
 
   it("strips repeated operation prefixes from the banner message", () => {
     const details = toErrorBannerDetails(
-      "thread.read: thread.read: thread.read - Request failed requestId=req-9"
+      "thread.read: thread.read: thread.read - Request failed requestId=req-9",
     );
 
     expect(details.operation).toBe("thread.read");

@@ -5,11 +5,9 @@ import { PlanPanel, type PlanPanelProps } from "@/Components/PlanPanel";
 const basePlanPanelProperties: PlanPanelProps = {
   modes: [
     { mode: "default", name: "Default" },
-    { mode: "plan", name: "Plan" }
+    { mode: "plan", name: "Plan" },
   ],
-  modelOptions: [
-    { id: "gpt-5.3-codex", label: "GPT-5.3 Codex" }
-  ],
+  modelOptions: [{ id: "gpt-5.3-codex", label: "GPT-5.3 Codex" }],
   effortOptions: ["low", "high"],
   selectedModeKey: "default",
   selectedModelId: "",
@@ -20,25 +18,20 @@ const basePlanPanelProperties: PlanPanelProps = {
   onApply: () => {},
   isBusy: false,
   hasThread: true,
-  hasMode: true
+  hasMode: true,
 };
 
 function renderPlanPanel(properties?: Partial<PlanPanelProps>): void {
   cleanup();
 
-  render(
-    <PlanPanel
-      {...basePlanPanelProperties}
-      {...properties}
-    />
-  );
+  render(<PlanPanel {...basePlanPanelProperties} {...properties} />);
 }
 
 describe("PlanPanel", () => {
   it("shows explicit app-default labels for empty model and effort selections", () => {
     renderPlanPanel({
       selectedModelId: "",
-      selectedReasoningEffort: ""
+      selectedReasoningEffort: "",
     });
 
     const appDefaultLabels = screen.getAllByText("App default");
@@ -49,7 +42,7 @@ describe("PlanPanel", () => {
   it("disables apply when thread or mode context is unavailable", () => {
     renderPlanPanel({
       hasThread: false,
-      hasMode: false
+      hasMode: false,
     });
 
     expect(screen.getByRole("button", { name: "Apply" }).hasAttribute("disabled")).toBe(true);
@@ -62,7 +55,7 @@ describe("PlanPanel", () => {
       onApply,
       hasThread: true,
       hasMode: true,
-      isBusy: false
+      isBusy: false,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));

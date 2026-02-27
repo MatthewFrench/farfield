@@ -1,7 +1,7 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -25,17 +25,22 @@ interface BootstrapExecutionResult {
 }
 
 const temporaryDirectoryPaths: string[] = [];
-const ServerApplicationDirectoryPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ServerApplicationDirectoryPath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 const ServerBootstrapEntryPath = path.join(
   ServerApplicationDirectoryPath,
   "Source",
   "Application",
-  "ServerBootstrap.ts"
+  "ServerBootstrap.ts",
 );
 const ServerBootstrapExecutionTimeoutMilliseconds = 10_000;
 
 function createTemporaryDirectory(): string {
-  const temporaryDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-server-bootstrap-"));
+  const temporaryDirectoryPath = fs.mkdtempSync(
+    path.join(os.tmpdir(), "farfield-server-bootstrap-"),
+  );
   temporaryDirectoryPaths.push(temporaryDirectoryPath);
   return temporaryDirectoryPath;
 }
@@ -43,14 +48,18 @@ function createTemporaryDirectory(): string {
 function createBootstrapEnvironmentSetup(): BootstrapEnvironmentSetup {
   const temporaryDirectoryPath = createTemporaryDirectory();
   const pushLocalCaPath = path.join(temporaryDirectoryPath, "local-root.crt");
-  fs.writeFileSync(pushLocalCaPath, "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n", "utf8");
+  fs.writeFileSync(
+    pushLocalCaPath,
+    "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n",
+    "utf8",
+  );
 
   const paths: BootstrapPersistencePaths = {
     pushStatePath: path.join(temporaryDirectoryPath, "push-state.json"),
     pushReceiptsPath: path.join(temporaryDirectoryPath, "push-receipts.json"),
     pushSendsPath: path.join(temporaryDirectoryPath, "push-sends.json"),
     clientErrorLogPath: path.join(temporaryDirectoryPath, "client-errors.ndjson"),
-    pushLocalCaPath
+    pushLocalCaPath,
   };
 
   return {
@@ -62,13 +71,16 @@ function createBootstrapEnvironmentSetup(): BootstrapEnvironmentSetup {
       PUSH_RECEIPTS_PATH: paths.pushReceiptsPath,
       PUSH_SENDS_PATH: paths.pushSendsPath,
       DEBUG_CLIENT_ERROR_LOG_PATH: paths.clientErrorLogPath,
-      PUSH_LOCAL_CA_PATH: paths.pushLocalCaPath
+      PUSH_LOCAL_CA_PATH: paths.pushLocalCaPath,
     },
-    paths
+    paths,
   };
 }
 
-function runBootstrapProcess(argumentsList: string[], environment: NodeJS.ProcessEnv): BootstrapExecutionResult {
+function runBootstrapProcess(
+  argumentsList: string[],
+  environment: NodeJS.ProcessEnv,
+): BootstrapExecutionResult {
   const result = spawnSync(
     process.execPath,
     ["--import", "tsx", ServerBootstrapEntryPath, ...argumentsList],
@@ -76,8 +88,8 @@ function runBootstrapProcess(argumentsList: string[], environment: NodeJS.Proces
       cwd: ServerApplicationDirectoryPath,
       env: environment,
       encoding: "utf8",
-      timeout: ServerBootstrapExecutionTimeoutMilliseconds
-    }
+      timeout: ServerBootstrapExecutionTimeoutMilliseconds,
+    },
   );
 
   if (result.error) {
@@ -87,7 +99,7 @@ function runBootstrapProcess(argumentsList: string[], environment: NodeJS.Proces
   return {
     statusCode: result.status,
     standardOutput: result.stdout,
-    standardError: result.stderr
+    standardError: result.stderr,
   };
 }
 
@@ -114,14 +126,19 @@ describe("ServerBootstrap", () => {
 
     expect(result.statusCode).toBe(0);
     expect(result.standardOutput).toContain("Farfield server");
-    expect(result.standardOutput).toContain("Usage: tsx watch Source/Application/ServerBootstrap.ts");
+    expect(result.standardOutput).toContain(
+      "Usage: tsx watch Source/Application/ServerBootstrap.ts",
+    );
     expectNoPersistenceFilesCreated(environmentSetup.paths);
   });
 
   it("fails invalid arguments before persistence owners initialize", () => {
     const environmentSetup = createBootstrapEnvironmentSetup();
 
-    const result = runBootstrapProcess(["--definitely-invalid-option"], environmentSetup.environment);
+    const result = runBootstrapProcess(
+      ["--definitely-invalid-option"],
+      environmentSetup.environment,
+    );
 
     expect(result.statusCode).toBe(1);
     expect(result.standardError).toContain("Unknown argument: --definitely-invalid-option");

@@ -29,7 +29,7 @@ export class CapabilitySnapshotCache<Snapshot extends CapabilitySnapshotRecord> 
     }
     const snapshotFetchedAtEpochMilliseconds = readEpochTimestampMilliseconds(
       this.snapshot.fetchedAt,
-      "snapshot.fetchedAt"
+      "snapshot.fetchedAt",
     );
     if (nowEpochMilliseconds - snapshotFetchedAtEpochMilliseconds >= this.refreshIntervalMs) {
       return null;
@@ -50,7 +50,7 @@ export class CapabilitySnapshotCache<Snapshot extends CapabilitySnapshotRecord> 
 
   public async readSnapshot(
     loadSnapshot: () => Promise<Snapshot>,
-    nowEpochMs: number = Date.now()
+    nowEpochMs: number = Date.now(),
   ): Promise<Snapshot> {
     const freshSnapshot = this.readSnapshotIfFresh(nowEpochMs);
     if (freshSnapshot) {
@@ -89,7 +89,7 @@ function readEpochTimestampMilliseconds(value: number, valueName: string): numbe
   const parsedValue = EPOCH_TIMESTAMP_MILLISECONDS_SCHEMA.safeParse(value);
   if (!parsedValue.success) {
     throw new Error(
-      `CapabilitySnapshotCache requires ${valueName} to be a finite non-negative epoch timestamp`
+      `CapabilitySnapshotCache requires ${valueName} to be a finite non-negative epoch timestamp`,
     );
   }
   return parsedValue.data;

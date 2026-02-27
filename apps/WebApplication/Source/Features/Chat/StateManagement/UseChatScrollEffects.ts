@@ -1,9 +1,9 @@
 import {
-  useEffect,
   type Dispatch,
   type MutableRefObject,
   type RefObject,
-  type SetStateAction
+  type SetStateAction,
+  useEffect,
 } from "react";
 import { ChatScrollStateCoordinator } from "./ChatScrollStateCoordinator";
 
@@ -35,7 +35,7 @@ export function useChatScrollEffects(input: UseChatScrollEffectsInput): void {
     isChatAtBottomRef,
     setIsChatAtBottom,
     setVisibleChatItemLimit,
-    chatScrollStateCoordinator
+    chatScrollStateCoordinator,
   } = input;
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export function useChatScrollEffects(input: UseChatScrollEffectsInput): void {
     const syncBottomState = () => {
       const synchronizationResult = chatScrollStateCoordinator.synchronizeBottomState({
         scrollElement: scroller,
-        previousIsAtBottom: isChatAtBottomRef.current
+        previousIsAtBottom: isChatAtBottomRef.current,
       });
       if (synchronizationResult.changed) {
         isChatAtBottomRef.current = synchronizationResult.nextIsAtBottom;
@@ -83,20 +83,14 @@ export function useChatScrollEffects(input: UseChatScrollEffectsInput): void {
     isChatAtBottomRef,
     scrollRef,
     selectedThreadId,
-    setIsChatAtBottom
+    setIsChatAtBottom,
   ]);
 
   useEffect(() => {
     if (activeTab === CHAT_TAB_IDENTIFIER && isChatAtBottomRef.current && scrollRef.current) {
       chatScrollStateCoordinator.pinToBottom(scrollRef.current);
     }
-  }, [
-    activeTab,
-    chatScrollStateCoordinator,
-    conversationItemCount,
-    isChatAtBottomRef,
-    scrollRef
-  ]);
+  }, [activeTab, chatScrollStateCoordinator, conversationItemCount, isChatAtBottomRef, scrollRef]);
 
   useEffect(() => {
     if (activeTab !== CHAT_TAB_IDENTIFIER || !scrollRef.current || !chatContentRef.current) {
@@ -132,7 +126,7 @@ export function useChatScrollEffects(input: UseChatScrollEffectsInput): void {
     chatScrollStateCoordinator,
     isChatAtBottomRef,
     scrollRef,
-    selectedThreadId
+    selectedThreadId,
   ]);
 
   useEffect(() => {
@@ -151,6 +145,6 @@ export function useChatScrollEffects(input: UseChatScrollEffectsInput): void {
     scrollRef,
     selectedThreadId,
     setIsChatAtBottom,
-    setVisibleChatItemLimit
+    setVisibleChatItemLimit,
   ]);
 }

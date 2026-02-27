@@ -1,5 +1,5 @@
+import { type JsonValue, JsonValueSchema } from "@farfield/protocol";
 import { z } from "zod";
-import { JsonValueSchema, type JsonValue } from "@farfield/protocol";
 
 /**
  * Owns exported error contracts for the Codex adapter package.
@@ -23,7 +23,7 @@ const AppServerRpcErrorConstructorSchema = z
   .object({
     code: z.number().int(APP_SERVER_RPC_CODE_VALIDATION_ERROR),
     message: ErrorMessageSchema,
-    data: JsonValueSchema.optional()
+    data: JsonValueSchema.optional(),
   })
   .strict();
 
@@ -50,12 +50,12 @@ function parseErrorMessageOrThrow(message: string, errorName: string): string {
 function parseAppServerRpcErrorConstructorArgumentsOrThrow(
   code: number,
   message: string,
-  data: JsonValue | undefined
+  data: JsonValue | undefined,
 ): AppServerRpcErrorConstructorArguments {
   const parsed = AppServerRpcErrorConstructorSchema.safeParse({
     code,
     message,
-    data
+    data,
   });
   if (!parsed.success) {
     throw buildConstructorContractError(APP_SERVER_RPC_ERROR_NAME, parsed.error.issues);
@@ -64,7 +64,7 @@ function parseAppServerRpcErrorConstructorArgumentsOrThrow(
   return {
     code: parsed.data.code,
     message: parsed.data.message,
-    data: parsed.data.data
+    data: parsed.data.data,
   };
 }
 

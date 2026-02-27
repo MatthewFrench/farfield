@@ -1,12 +1,12 @@
-import { ProtocolValidationError, type JsonValue } from "@farfield/protocol";
-import { describe, expect, it, vi, type Mock } from "vitest";
+import { type JsonValue, ProtocolValidationError } from "@farfield/protocol";
+import { describe, expect, it, type Mock, vi } from "vitest";
 import { AppServerClient } from "../Source/AppServerClient.js";
 import type { AppServerTransport } from "../Source/AppServerTransport.js";
 
 type AppServerRequestFunction = (
   method: string,
   params: object,
-  timeoutMs?: number
+  timeoutMs?: number,
 ) => Promise<JsonValue>;
 type AppServerCloseFunction = () => Promise<void>;
 type AppServerRequestMock = Mock<AppServerRequestFunction>;
@@ -27,13 +27,13 @@ function createTransportDouble(): AppServerTransportDouble {
 
   const transport: AppServerTransport = {
     request,
-    close
+    close,
   };
 
   return {
     transport,
     request,
-    close
+    close,
   };
 }
 
@@ -42,8 +42,8 @@ function createThreadConversationResponse(threadId: string): JsonValue {
     thread: {
       id: threadId,
       turns: [],
-      requests: []
-    }
+      requests: [],
+    },
   };
 }
 
@@ -54,7 +54,7 @@ function createThreadListItem(threadId: string): JsonValue {
     createdAt: 1,
     updatedAt: 2,
     source: "opencode",
-    cwd: "/tmp/workspace"
+    cwd: "/tmp/workspace",
   };
 }
 
@@ -70,17 +70,17 @@ describe("AppServerClient.sendUserMessage", () => {
         {
           type: "text",
           data: {
-            text: "hello"
-          }
-        }
-      ]
+            text: "hello",
+          },
+        },
+      ],
     });
   });
 
   it("accepts response when server adds extra keys", async () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
-      ok: true
+      ok: true,
     });
 
     const client = new AppServerClient(transportDouble.transport);
@@ -98,7 +98,7 @@ describe("AppServerClient.resumeThread", () => {
 
     expect(transportDouble.request).toHaveBeenCalledWith("thread/resume", {
       threadId: "thread-1",
-      persistExtendedHistory: true
+      persistExtendedHistory: true,
     });
   });
 
@@ -108,12 +108,12 @@ describe("AppServerClient.resumeThread", () => {
 
     const client = new AppServerClient(transportDouble.transport);
     await client.resumeThread("thread-1", {
-      persistExtendedHistory: false
+      persistExtendedHistory: false,
     });
 
     expect(transportDouble.request).toHaveBeenCalledWith("thread/resume", {
       threadId: "thread-1",
-      persistExtendedHistory: false
+      persistExtendedHistory: false,
     });
   });
 });
@@ -123,7 +123,7 @@ describe("AppServerClient.listThreads", () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
       data: [],
-      nextCursor: null
+      nextCursor: null,
     });
 
     const client = new AppServerClient(transportDouble.transport);
@@ -131,7 +131,7 @@ describe("AppServerClient.listThreads", () => {
       limit: 50,
       archived: false,
       sortKey: "updated_at",
-      cwd: "/tmp/workspace"
+      cwd: "/tmp/workspace",
     });
 
     expect(transportDouble.request).toHaveBeenCalledWith("thread/list", {
@@ -139,7 +139,7 @@ describe("AppServerClient.listThreads", () => {
       archived: false,
       cursor: null,
       sortKey: "updated_at",
-      cwd: "/tmp/workspace"
+      cwd: "/tmp/workspace",
     });
   });
 
@@ -147,7 +147,7 @@ describe("AppServerClient.listThreads", () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
       data: [],
-      nextCursor: null
+      nextCursor: null,
     });
 
     const client = new AppServerClient(transportDouble.transport);
@@ -155,29 +155,29 @@ describe("AppServerClient.listThreads", () => {
       limit: 50,
       archived: false,
       cursor: "",
-      cwd: ""
+      cwd: "",
     });
 
     expect(transportDouble.request).toHaveBeenCalledWith("thread/list", {
       limit: 50,
       archived: false,
       cursor: "",
-      cwd: ""
+      cwd: "",
     });
   });
 
   it("throws protocol validation errors when list response shape is invalid", async () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
-      invalid: true
+      invalid: true,
     });
 
     const client = new AppServerClient(transportDouble.transport);
     await expect(
       client.listThreads({
         limit: 10,
-        archived: false
-      })
+        archived: false,
+      }),
     ).rejects.toBeInstanceOf(ProtocolValidationError);
   });
 });
@@ -187,7 +187,7 @@ describe("AppServerClient.listThreadsAll", () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
       data: [createThreadListItem("thread-1")],
-      nextCursor: null
+      nextCursor: null,
     });
 
     const client = new AppServerClient(transportDouble.transport);
@@ -195,19 +195,19 @@ describe("AppServerClient.listThreadsAll", () => {
       limit: 1,
       archived: false,
       cursor: "cursor-start",
-      maxPages: 5
+      maxPages: 5,
     });
 
     expect(transportDouble.request).toHaveBeenCalledWith("thread/list", {
       limit: 1,
       archived: false,
-      cursor: "cursor-start"
+      cursor: "cursor-start",
     });
     expect(response).toEqual({
       data: [createThreadListItem("thread-1")],
       nextCursor: null,
       pages: 1,
-      truncated: false
+      truncated: false,
     });
   });
 
@@ -215,7 +215,7 @@ describe("AppServerClient.listThreadsAll", () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
       data: [createThreadListItem("thread-1")],
-      nextCursor: null
+      nextCursor: null,
     });
 
     const client = new AppServerClient(transportDouble.transport);
@@ -224,14 +224,14 @@ describe("AppServerClient.listThreadsAll", () => {
       archived: false,
       cursor: "",
       cwd: "",
-      maxPages: 1
+      maxPages: 1,
     });
 
     expect(transportDouble.request).toHaveBeenCalledWith("thread/list", {
       limit: 1,
       archived: false,
       cursor: "",
-      cwd: ""
+      cwd: "",
     });
   });
 
@@ -240,11 +240,11 @@ describe("AppServerClient.listThreadsAll", () => {
     transportDouble.request
       .mockResolvedValueOnce({
         data: [createThreadListItem("thread-1")],
-        nextCursor: "cursor-1"
+        nextCursor: "cursor-1",
       })
       .mockResolvedValueOnce({
         data: [createThreadListItem("thread-2")],
-        nextCursor: null
+        nextCursor: null,
       });
 
     const client = new AppServerClient(transportDouble.transport);
@@ -253,28 +253,28 @@ describe("AppServerClient.listThreadsAll", () => {
       archived: false,
       maxPages: 5,
       sortKey: "updated_at",
-      cwd: "/tmp/workspace"
+      cwd: "/tmp/workspace",
     });
 
     expect(response).toEqual({
       data: [createThreadListItem("thread-1"), createThreadListItem("thread-2")],
       nextCursor: null,
       pages: 2,
-      truncated: false
+      truncated: false,
     });
     expect(transportDouble.request).toHaveBeenNthCalledWith(1, "thread/list", {
       limit: 1,
       archived: false,
       cursor: null,
       sortKey: "updated_at",
-      cwd: "/tmp/workspace"
+      cwd: "/tmp/workspace",
     });
     expect(transportDouble.request).toHaveBeenNthCalledWith(2, "thread/list", {
       limit: 1,
       archived: false,
       cursor: "cursor-1",
       sortKey: "updated_at",
-      cwd: "/tmp/workspace"
+      cwd: "/tmp/workspace",
     });
   });
 
@@ -283,25 +283,25 @@ describe("AppServerClient.listThreadsAll", () => {
     transportDouble.request
       .mockResolvedValueOnce({
         data: [createThreadListItem("thread-1")],
-        nextCursor: "cursor-1"
+        nextCursor: "cursor-1",
       })
       .mockResolvedValueOnce({
         data: [createThreadListItem("thread-2")],
-        nextCursor: "cursor-2"
+        nextCursor: "cursor-2",
       });
 
     const client = new AppServerClient(transportDouble.transport);
     const response = await client.listThreadsAll({
       limit: 1,
       archived: true,
-      maxPages: 2
+      maxPages: 2,
     });
 
     expect(response).toEqual({
       data: [createThreadListItem("thread-1"), createThreadListItem("thread-2")],
       nextCursor: "cursor-2",
       pages: 2,
-      truncated: true
+      truncated: true,
     });
   });
 
@@ -309,21 +309,21 @@ describe("AppServerClient.listThreadsAll", () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
       data: [],
-      nextCursor: "cursor-ignored"
+      nextCursor: "cursor-ignored",
     });
 
     const client = new AppServerClient(transportDouble.transport);
     const response = await client.listThreadsAll({
       limit: 5,
       archived: false,
-      maxPages: 3
+      maxPages: 3,
     });
 
     expect(response).toEqual({
       data: [],
       nextCursor: null,
       pages: 1,
-      truncated: false
+      truncated: false,
     });
   });
 });
@@ -336,10 +336,14 @@ describe("AppServerClient.readThread", () => {
     const client = new AppServerClient(transportDouble.transport);
     await client.readThread("thread-1");
 
-    expect(transportDouble.request).toHaveBeenCalledWith("thread/read", {
-      threadId: "thread-1",
-      includeTurns: true
-    }, 90_000);
+    expect(transportDouble.request).toHaveBeenCalledWith(
+      "thread/read",
+      {
+        threadId: "thread-1",
+        includeTurns: true,
+      },
+      90_000,
+    );
   });
 
   it("uses default timeout when includeTurns is false", async () => {
@@ -349,10 +353,14 @@ describe("AppServerClient.readThread", () => {
     const client = new AppServerClient(transportDouble.transport);
     await client.readThread("thread-1", false);
 
-    expect(transportDouble.request).toHaveBeenCalledWith("thread/read", {
-      threadId: "thread-1",
-      includeTurns: false
-    }, undefined);
+    expect(transportDouble.request).toHaveBeenCalledWith(
+      "thread/read",
+      {
+        threadId: "thread-1",
+        includeTurns: false,
+      },
+      undefined,
+    );
   });
 });
 
@@ -360,14 +368,14 @@ describe("AppServerClient.readConfig", () => {
   it("requests config/read with includeLayers=false by default", async () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
-      config: {}
+      config: {},
     });
 
     const client = new AppServerClient(transportDouble.transport);
     await client.readConfig();
 
     expect(transportDouble.request).toHaveBeenCalledWith("config/read", {
-      includeLayers: false
+      includeLayers: false,
     });
   });
 
@@ -378,15 +386,15 @@ describe("AppServerClient.readConfig", () => {
         model: "gpt-5.3-codex",
         model_reasoning_effort: "medium",
         profile: "default",
-        profiles: {}
-      }
+        profiles: {},
+      },
     });
 
     const client = new AppServerClient(transportDouble.transport);
     await client.readConfig({ includeLayers: true });
 
     expect(transportDouble.request).toHaveBeenCalledWith("config/read", {
-      includeLayers: true
+      includeLayers: true,
     });
   });
 });
@@ -395,14 +403,14 @@ describe("AppServerClient.unarchiveThread", () => {
   it("sends thread/unarchive and parses response", async () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
-      thread: createThreadListItem("thread-1")
+      thread: createThreadListItem("thread-1"),
     });
 
     const client = new AppServerClient(transportDouble.transport);
     const thread = await client.unarchiveThread("thread-1");
 
     expect(transportDouble.request).toHaveBeenCalledWith("thread/unarchive", {
-      threadId: "thread-1"
+      threadId: "thread-1",
     });
     expect(thread.id).toBe("thread-1");
     expect(thread.preview).toBe("Thread thread-1");
@@ -416,7 +424,7 @@ describe("AppServerClient.request and validation behavior", () => {
       thread: createThreadListItem("thread-started"),
       model: "gpt-5.3-codex",
       modelProvider: "openai",
-      cwd: "/tmp/workspace"
+      cwd: "/tmp/workspace",
     });
 
     const client = new AppServerClient(transportDouble.transport);
@@ -424,13 +432,13 @@ describe("AppServerClient.request and validation behavior", () => {
     const response = await client.startThread({
       cwd: "/tmp/workspace",
       model: "gpt-5.3-codex",
-      approvalPolicy: "never"
+      approvalPolicy: "never",
     });
 
     expect(transportDouble.request).toHaveBeenCalledWith("thread/start", {
       cwd: "/tmp/workspace",
       model: "gpt-5.3-codex",
-      approvalPolicy: "never"
+      approvalPolicy: "never",
     });
     expect(response.thread.id).toBe("thread-started");
     expect(response.model).toBe("gpt-5.3-codex");
@@ -447,13 +455,13 @@ describe("AppServerClient.request and validation behavior", () => {
   it("throws protocol validation errors for invalid model/list responses", async () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
-      invalid: true
+      invalid: true,
     });
 
     const client = new AppServerClient(transportDouble.transport);
     await expect(client.listModels()).rejects.toBeInstanceOf(ProtocolValidationError);
     expect(transportDouble.request).toHaveBeenCalledWith("model/list", {
-      limit: 100
+      limit: 100,
     });
   });
 

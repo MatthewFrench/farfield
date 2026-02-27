@@ -3,41 +3,40 @@ import { parseBody } from "../RequestSchemas/HttpSchemas.js";
 import {
   DebugFileDownloadError,
   DebugFileDownloadErrorCodeByName,
-  streamDebugFileDownload
+  streamDebugFileDownload,
 } from "./DebugFileDownload.js";
 import {
+  type DebugRouteDependencies,
   DebugRouteMethodByName,
   DebugRoutePathnameByName,
   DebugRouteSegmentByName,
   readFileNameFromPath,
-  type DebugRouteDependencies
 } from "./DebugRouteContracts.js";
 
 const DebugClientErrorRouteStatusCodeByName = {
   successOk: 200,
   clientErrorBadRequest: 400,
   clientErrorNotFound: 404,
-  serverErrorInternal: 500
+  serverErrorInternal: 500,
 } as const;
 
 const DebugClientErrorRouteErrorMessageByName = {
   invalidClientErrorIdentifier: "Invalid client error identifier",
   clientErrorNotFound: "Client error not found",
-  clientErrorSessionLogNotFound: "Client error session log not found"
+  clientErrorSessionLogNotFound: "Client error session log not found",
 } as const;
 
 const DebugClientErrorRouteSegmentIndexByName = {
   clientErrorCollection: 2,
-  clientErrorIdentifier: 3
+  clientErrorIdentifier: 3,
 } as const;
 
 const DebugClientErrorRouteSegmentCountByName = {
-  readByIdentifier: 4
+  readByIdentifier: 4,
 } as const;
 
 const RoutePathSegmentSeparator = "/";
-const ClientErrorIdentifierRoutePathPrefix =
-  `${DebugRoutePathnameByName.clientErrors}${RoutePathSegmentSeparator}`;
+const ClientErrorIdentifierRoutePathPrefix = `${DebugRoutePathnameByName.clientErrors}${RoutePathSegmentSeparator}`;
 
 export class DebugClientErrorRouteOwner {
   private readonly dependencies: DebugRouteDependencies;
@@ -74,10 +73,15 @@ export class DebugClientErrorRouteOwner {
       clientErrorStore,
       onClientErrorRecorded,
       jsonResponse,
-      res
+      res,
     } = this.dependencies;
 
-    if (!(req.method === DebugRouteMethodByName.post && pathname === DebugRoutePathnameByName.clientErrors)) {
+    if (
+      !(
+        req.method === DebugRouteMethodByName.post &&
+        pathname === DebugRoutePathnameByName.clientErrors
+      )
+    ) {
       return false;
     }
 
@@ -91,13 +95,13 @@ export class DebugClientErrorRouteOwner {
       operation: event.operation,
       requestId: event.requestId,
       threadId: event.threadId,
-      message: event.message
+      message: event.message,
     });
     jsonResponse(res, DebugClientErrorRouteStatusCodeByName.successOk, {
       ok: true,
       errorId: event.errorId,
       sessionId: event.sessionId,
-      recordedAt: event.recordedAt
+      recordedAt: event.recordedAt,
     });
     return true;
   }
@@ -105,7 +109,12 @@ export class DebugClientErrorRouteOwner {
   private async handleClearClientErrorsRoute(): Promise<boolean> {
     const { req, pathname, clientErrorStore, jsonResponse, res } = this.dependencies;
 
-    if (!(req.method === DebugRouteMethodByName.delete && pathname === DebugRoutePathnameByName.clientErrors)) {
+    if (
+      !(
+        req.method === DebugRouteMethodByName.delete &&
+        pathname === DebugRoutePathnameByName.clientErrors
+      )
+    ) {
       return false;
     }
 
@@ -114,15 +123,21 @@ export class DebugClientErrorRouteOwner {
       ok: true,
       clearedCount,
       sessionId: clientErrorStore.getSessionId(),
-      sessionLogPath: clientErrorStore.getSessionLogPath()
+      sessionLogPath: clientErrorStore.getSessionLogPath(),
     });
     return true;
   }
 
   private async handleListClientErrorsRoute(): Promise<boolean> {
-    const { req, pathname, parseInteger, url, clientErrorStore, jsonResponse, res } = this.dependencies;
+    const { req, pathname, parseInteger, url, clientErrorStore, jsonResponse, res } =
+      this.dependencies;
 
-    if (!(req.method === DebugRouteMethodByName.get && pathname === DebugRoutePathnameByName.clientErrors)) {
+    if (
+      !(
+        req.method === DebugRouteMethodByName.get &&
+        pathname === DebugRoutePathnameByName.clientErrors
+      )
+    ) {
       return false;
     }
 
@@ -132,15 +147,21 @@ export class DebugClientErrorRouteOwner {
       ok: true,
       data,
       sessionId: clientErrorStore.getSessionId(),
-      sessionLogPath: clientErrorStore.getSessionLogPath()
+      sessionLogPath: clientErrorStore.getSessionLogPath(),
     });
     return true;
   }
 
   private async handleSessionLogDownloadRoute(): Promise<boolean> {
-    const { req, pathname, clientErrorStore, jsonResponse, res, toErrorMessage } = this.dependencies;
+    const { req, pathname, clientErrorStore, jsonResponse, res, toErrorMessage } =
+      this.dependencies;
 
-    if (!(req.method === DebugRouteMethodByName.get && pathname === DebugRoutePathnameByName.clientErrorSessionLog)) {
+    if (
+      !(
+        req.method === DebugRouteMethodByName.get &&
+        pathname === DebugRoutePathnameByName.clientErrorSessionLog
+      )
+    ) {
       return false;
     }
 
@@ -151,22 +172,20 @@ export class DebugClientErrorRouteOwner {
       return true;
     } catch (error) {
       if (
-        error instanceof DebugFileDownloadError
-        && (
-          error.code === DebugFileDownloadErrorCodeByName.notFound
-          || error.code === DebugFileDownloadErrorCodeByName.notFile
-        )
+        error instanceof DebugFileDownloadError &&
+        (error.code === DebugFileDownloadErrorCodeByName.notFound ||
+          error.code === DebugFileDownloadErrorCodeByName.notFile)
       ) {
         jsonResponse(res, DebugClientErrorRouteStatusCodeByName.clientErrorNotFound, {
           ok: false,
-          error: DebugClientErrorRouteErrorMessageByName.clientErrorSessionLogNotFound
+          error: DebugClientErrorRouteErrorMessageByName.clientErrorSessionLogNotFound,
         });
         return true;
       }
 
       jsonResponse(res, DebugClientErrorRouteStatusCodeByName.serverErrorInternal, {
         ok: false,
-        error: toErrorMessage(error)
+        error: toErrorMessage(error),
       });
       return true;
     }
@@ -178,8 +197,8 @@ export class DebugClientErrorRouteOwner {
     const clientErrorIdentifierSegment =
       segments[DebugClientErrorRouteSegmentIndexByName.clientErrorIdentifier];
     if (
-      typeof clientErrorIdentifierSegment !== "string"
-      || !this.isReadClientErrorByIdentifierRequest(clientErrorIdentifierSegment)
+      typeof clientErrorIdentifierSegment !== "string" ||
+      !this.isReadClientErrorByIdentifierRequest(clientErrorIdentifierSegment)
     ) {
       return false;
     }
@@ -188,7 +207,7 @@ export class DebugClientErrorRouteOwner {
     if (errorId === null) {
       jsonResponse(res, DebugClientErrorRouteStatusCodeByName.clientErrorBadRequest, {
         ok: false,
-        error: DebugClientErrorRouteErrorMessageByName.invalidClientErrorIdentifier
+        error: DebugClientErrorRouteErrorMessageByName.invalidClientErrorIdentifier,
       });
       return true;
     }
@@ -197,7 +216,7 @@ export class DebugClientErrorRouteOwner {
     if (!errorEvent) {
       jsonResponse(res, DebugClientErrorRouteStatusCodeByName.clientErrorNotFound, {
         ok: false,
-        error: DebugClientErrorRouteErrorMessageByName.clientErrorNotFound
+        error: DebugClientErrorRouteErrorMessageByName.clientErrorNotFound,
       });
       return true;
     }
@@ -206,7 +225,7 @@ export class DebugClientErrorRouteOwner {
       ok: true,
       error: errorEvent,
       sessionId: clientErrorStore.getSessionId(),
-      sessionLogPath: clientErrorStore.getSessionLogPath()
+      sessionLogPath: clientErrorStore.getSessionLogPath(),
     });
     return true;
   }
@@ -218,10 +237,11 @@ export class DebugClientErrorRouteOwner {
     const { req, pathname, segments } = this.dependencies;
 
     if (
-      req.method !== DebugRouteMethodByName.get
-      || segments.length !== DebugClientErrorRouteSegmentCountByName.readByIdentifier
-      || segments[DebugClientErrorRouteSegmentIndexByName.clientErrorCollection] !== DebugRouteSegmentByName.clientErrors
-      || pathname.endsWith(RoutePathSegmentSeparator)
+      req.method !== DebugRouteMethodByName.get ||
+      segments.length !== DebugClientErrorRouteSegmentCountByName.readByIdentifier ||
+      segments[DebugClientErrorRouteSegmentIndexByName.clientErrorCollection] !==
+        DebugRouteSegmentByName.clientErrors ||
+      pathname.endsWith(RoutePathSegmentSeparator)
     ) {
       return false;
     }

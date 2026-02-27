@@ -1,19 +1,13 @@
+import { ThreadMemberArchiveMutationRouteOwner } from "./ThreadMemberArchiveMutationRouteOwner.js";
+import { ThreadMemberInteractionMutationRouteOwner } from "./ThreadMemberInteractionMutationRouteOwner.js";
+import { ThreadMemberMessageMutationRouteOwner } from "./ThreadMemberMessageMutationRouteOwner.js";
 import {
   isThreadMemberSubresourceRoute,
+  type ThreadMemberResolvedRouteContext,
+  type ThreadMemberRouteDependencies,
   ThreadMemberRouteMethodByName,
   ThreadMemberRouteSegmentByName,
-  type ThreadMemberRouteDependencies,
-  type ThreadMemberResolvedRouteContext
 } from "./ThreadMemberRouteContracts.js";
-import {
-  ThreadMemberArchiveMutationRouteOwner
-} from "./ThreadMemberArchiveMutationRouteOwner.js";
-import {
-  ThreadMemberInteractionMutationRouteOwner
-} from "./ThreadMemberInteractionMutationRouteOwner.js";
-import {
-  ThreadMemberMessageMutationRouteOwner
-} from "./ThreadMemberMessageMutationRouteOwner.js";
 
 export interface ThreadMemberMutationRouteOwnerOptions {
   dependencies: ThreadMemberRouteDependencies;
@@ -23,11 +17,11 @@ export interface ThreadMemberMutationRouteOwnerOptions {
 const ThreadMemberMutationRouteOwnerNameByName = {
   message: "message",
   archive: "archive",
-  interaction: "interaction"
+  interaction: "interaction",
 } as const;
 
 type ThreadMemberMutationRouteOwnerName =
-  typeof ThreadMemberMutationRouteOwnerNameByName[keyof typeof ThreadMemberMutationRouteOwnerNameByName];
+  (typeof ThreadMemberMutationRouteOwnerNameByName)[keyof typeof ThreadMemberMutationRouteOwnerNameByName];
 
 type ThreadMemberMutationSubresource =
   | typeof ThreadMemberRouteSegmentByName.messages
@@ -42,45 +36,48 @@ interface ThreadMemberMutationDispatchDescriptor {
   ownerName: ThreadMemberMutationRouteOwnerName;
 }
 
-type ThreadMemberMutationHandlerFactory = (
-  options: ThreadMemberMutationRouteOwnerOptions
-) => { handle: () => Promise<boolean> };
+type ThreadMemberMutationHandlerFactory = (options: ThreadMemberMutationRouteOwnerOptions) => {
+  handle: () => Promise<boolean>;
+};
 
 // Canonical subresource dispatch ownership is centralized so mutation routing remains deterministic.
 const ThreadMemberMutationDispatchDescriptors: readonly ThreadMemberMutationDispatchDescriptor[] = [
   {
     subresource: ThreadMemberRouteSegmentByName.messages,
-    ownerName: ThreadMemberMutationRouteOwnerNameByName.message
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.message,
   },
   {
     subresource: ThreadMemberRouteSegmentByName.archive,
-    ownerName: ThreadMemberMutationRouteOwnerNameByName.archive
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.archive,
   },
   {
     subresource: ThreadMemberRouteSegmentByName.unarchive,
-    ownerName: ThreadMemberMutationRouteOwnerNameByName.archive
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.archive,
   },
   {
     subresource: ThreadMemberRouteSegmentByName.collaborationMode,
-    ownerName: ThreadMemberMutationRouteOwnerNameByName.interaction
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.interaction,
   },
   {
     subresource: ThreadMemberRouteSegmentByName.userInput,
-    ownerName: ThreadMemberMutationRouteOwnerNameByName.interaction
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.interaction,
   },
   {
     subresource: ThreadMemberRouteSegmentByName.interrupt,
-    ownerName: ThreadMemberMutationRouteOwnerNameByName.interaction
-  }
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.interaction,
+  },
 ];
 
 const ThreadMemberMutationHandlerFactoryByOwnerName: Record<
   ThreadMemberMutationRouteOwnerName,
   ThreadMemberMutationHandlerFactory
 > = {
-  [ThreadMemberMutationRouteOwnerNameByName.message]: (options) => new ThreadMemberMessageMutationRouteOwner(options),
-  [ThreadMemberMutationRouteOwnerNameByName.archive]: (options) => new ThreadMemberArchiveMutationRouteOwner(options),
-  [ThreadMemberMutationRouteOwnerNameByName.interaction]: (options) => new ThreadMemberInteractionMutationRouteOwner(options)
+  [ThreadMemberMutationRouteOwnerNameByName.message]: (options) =>
+    new ThreadMemberMessageMutationRouteOwner(options),
+  [ThreadMemberMutationRouteOwnerNameByName.archive]: (options) =>
+    new ThreadMemberArchiveMutationRouteOwner(options),
+  [ThreadMemberMutationRouteOwnerNameByName.interaction]: (options) =>
+    new ThreadMemberInteractionMutationRouteOwner(options),
 };
 
 export class ThreadMemberMutationRouteOwner {
@@ -100,7 +97,7 @@ export class ThreadMemberMutationRouteOwner {
 
     const ownerOptions: ThreadMemberMutationRouteOwnerOptions = {
       dependencies: this.dependencies,
-      context: this.context
+      context: this.context,
     };
     const createRouteOwner = ThreadMemberMutationHandlerFactoryByOwnerName[matchedOwnerName];
     const routeOwner = createRouteOwner(ownerOptions);

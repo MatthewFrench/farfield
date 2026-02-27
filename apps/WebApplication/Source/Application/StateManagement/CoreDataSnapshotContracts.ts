@@ -3,12 +3,12 @@ import type {
   CapabilityCollaborationModesResponse,
   CapabilityConfigDefaultsResponse,
   CapabilityHealthResponse,
-  CapabilityModelsResponse
+  CapabilityModelsResponse,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import type {
   DebugErrorListResponse,
   DebugHistoryResponse,
-  DebugTraceStatusResponse
+  DebugTraceStatusResponse,
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import type { DebugWorkspaceDataSnapshot } from "@/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import type { ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";

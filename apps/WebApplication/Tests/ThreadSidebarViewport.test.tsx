@@ -1,8 +1,8 @@
-import { cleanup, fireEvent, render, screen, type RenderResult } from "@testing-library/react";
+import { cleanup, fireEvent, type RenderResult, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 import { ThreadSidebarViewport } from "@/Features/Threads/UserInterface/ThreadSidebarViewport";
-import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 
 const BASE_THREAD_LIST_PANE_PROPERTIES: ThreadListPaneProperties = {
   threadListState: "empty",
@@ -35,7 +35,7 @@ const BASE_THREAD_LIST_PANE_PROPERTIES: ThreadListPaneProperties = {
   onToggleArchivedProjectGroup: () => {},
   onUnarchiveThread: () => {},
   formatDate: () => "",
-  renderAgentFavicon: () => null
+  renderAgentFavicon: () => null,
 };
 
 function renderThreadSidebarViewport(input: {
@@ -60,18 +60,18 @@ function renderThreadSidebarViewport(input: {
             id: "codex",
             label: "Codex",
             enabled: true,
-            connected: true
-          }
+            connected: true,
+          },
         ]}
         codexConfigured={true}
         healthState={{
           appReady: true,
           ipcConnected: true,
           ipcInitialized: true,
-          lastError: null
+          lastError: null,
         }}
       />
-    </TooltipProvider>
+    </TooltipProvider>,
   );
 }
 
@@ -79,7 +79,7 @@ describe("ThreadSidebarViewport", () => {
   it("renders desktop sidebar when open", () => {
     renderThreadSidebarViewport({
       viewport: "desktop",
-      isOpen: true
+      isOpen: true,
     });
 
     expect(screen.getByTestId("sidebar-desktop")).toBeDefined();
@@ -88,7 +88,7 @@ describe("ThreadSidebarViewport", () => {
   it("does not render desktop sidebar when closed", () => {
     renderThreadSidebarViewport({
       viewport: "desktop",
-      isOpen: false
+      isOpen: false,
     });
 
     expect(screen.queryByTestId("sidebar-desktop")).toBeNull();
@@ -99,7 +99,7 @@ describe("ThreadSidebarViewport", () => {
     renderThreadSidebarViewport({
       viewport: "mobile",
       isOpen: true,
-      onCloseMobileSidebar
+      onCloseMobileSidebar,
     });
 
     fireEvent.click(screen.getByTestId("sidebar-toggle-close"));
@@ -109,7 +109,7 @@ describe("ThreadSidebarViewport", () => {
   it("keeps desktop sidebar mounted after it has been opened once", () => {
     const renderResult = renderThreadSidebarViewport({
       viewport: "desktop",
-      isOpen: true
+      isOpen: true,
     });
     expect(screen.getByTestId("sidebar-desktop")).toBeDefined();
 
@@ -129,18 +129,18 @@ describe("ThreadSidebarViewport", () => {
               id: "codex",
               label: "Codex",
               enabled: true,
-              connected: true
-            }
+              connected: true,
+            },
           ]}
           codexConfigured={true}
           healthState={{
             appReady: true,
             ipcConnected: true,
             ipcInitialized: true,
-            lastError: null
+            lastError: null,
           }}
         />
-      </TooltipProvider>
+      </TooltipProvider>,
     );
 
     expect(screen.getByTestId("sidebar-desktop")).toBeDefined();

@@ -14,7 +14,7 @@ export type PendingUserInputAnswersByQuestionId = Record<string, { answers: stri
 export function createEmptyPendingUserInputAnswerDraft(): PendingUserInputAnswerDraft {
   return {
     option: "",
-    freeform: ""
+    freeform: "",
   };
 }
 
@@ -25,15 +25,19 @@ export class PendingUserInputAnswerBuilder {
   }): PendingUserInputAnswersByQuestionId {
     const answerEntries: Array<readonly [string, { answers: string[] }]> = [];
     for (const question of input.questions) {
-      const draft = input.answerDraftByQuestionId[question.id] ?? createEmptyPendingUserInputAnswerDraft();
+      const draft =
+        input.answerDraftByQuestionId[question.id] ?? createEmptyPendingUserInputAnswerDraft();
       const normalizedFreeform = draft.freeform.trim();
       const answerText = draft.option.length > 0 ? draft.option : normalizedFreeform;
       if (answerText.length === 0) {
         continue;
       }
-      answerEntries.push([question.id, {
-        answers: [answerText]
-      }]);
+      answerEntries.push([
+        question.id,
+        {
+          answers: [answerText],
+        },
+      ]);
     }
     return Object.fromEntries(answerEntries);
   }

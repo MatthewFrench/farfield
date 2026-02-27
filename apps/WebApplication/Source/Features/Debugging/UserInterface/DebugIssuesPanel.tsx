@@ -1,14 +1,14 @@
 import { AlertTriangle } from "lucide-react";
+import { Badge } from "@/Components/UserInterface/Badge";
+import { Button } from "@/Components/UserInterface/Button";
+import { Input } from "@/Components/UserInterface/Input";
+import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import {
   DEBUG_ISSUE_SEVERITY_FILTER_ALL,
   DEBUG_ISSUE_SEVERITY_FILTER_ERROR,
   DEBUG_ISSUE_SEVERITY_FILTER_WARNING,
-  type DebugIssueSeverityFilter
+  type DebugIssueSeverityFilter,
 } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
-import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
-import { Badge } from "@/Components/UserInterface/Badge";
-import { Button } from "@/Components/UserInterface/Button";
-import { Input } from "@/Components/UserInterface/Input";
 
 const WARNING_BADGE_CLASS_NAME = "border-amber-300 bg-amber-50 text-amber-700";
 
@@ -20,7 +20,7 @@ interface DebugIssueSeverityFilterOption {
 const DEBUG_ISSUE_SEVERITY_FILTER_OPTIONS: readonly DebugIssueSeverityFilterOption[] = [
   { value: DEBUG_ISSUE_SEVERITY_FILTER_ALL, label: "All" },
   { value: DEBUG_ISSUE_SEVERITY_FILTER_ERROR, label: "Errors" },
-  { value: DEBUG_ISSUE_SEVERITY_FILTER_WARNING, label: "Warnings" }
+  { value: DEBUG_ISSUE_SEVERITY_FILTER_WARNING, label: "Warnings" },
 ];
 
 interface DebugIssuesPanelProps {
@@ -48,10 +48,13 @@ export function DebugIssuesPanel({
   onIssueSelect,
   onSeverityFilterChange,
   onFilterQueryChange,
-  onClearIssues
+  onClearIssues,
 }: DebugIssuesPanelProps): React.JSX.Element {
   return (
-    <div data-testid="debug-issues-panel" className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[330px_minmax(0,1fr)] divide-y md:divide-y-0 md:divide-x divide-border overflow-hidden">
+    <div
+      data-testid="debug-issues-panel"
+      className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[330px_minmax(0,1fr)] divide-y md:divide-y-0 md:divide-x divide-border overflow-hidden"
+    >
       <div className="flex flex-col min-h-0 overflow-hidden">
         <div className="shrink-0 p-3 border-b border-border space-y-2">
           <div className="flex items-center justify-between gap-2">
@@ -138,9 +141,7 @@ export function DebugIssuesPanel({
             </Button>
           ))}
           {issues.length === 0 && (
-            <div className="px-3 py-6 text-xs text-muted-foreground">
-              No matching issues.
-            </div>
+            <div className="px-3 py-6 text-xs text-muted-foreground">No matching issues.</div>
           )}
         </div>
       </div>
@@ -172,21 +173,48 @@ export function DebugIssuesPanel({
               </div>
               <div className="text-sm leading-5">{selectedIssue.message}</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-                <div><span className="text-muted-foreground">source:</span> {selectedIssue.sourceLabel}</div>
-                <div><span className="text-muted-foreground">thread:</span> {selectedIssue.threadId ?? "n/a"}</div>
-                <div><span className="text-muted-foreground">request:</span> {selectedIssue.requestId ?? "n/a"}</div>
-                <div><span className="text-muted-foreground">action:</span> {selectedIssue.actionId ?? "n/a"}</div>
-                <div className="sm:col-span-2"><span className="text-muted-foreground">actionName:</span> {selectedIssue.actionName ?? "n/a"}</div>
+                <div>
+                  <span className="text-muted-foreground">source:</span> {selectedIssue.sourceLabel}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">thread:</span>{" "}
+                  {selectedIssue.threadId ?? "n/a"}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">request:</span>{" "}
+                  {selectedIssue.requestId ?? "n/a"}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">action:</span>{" "}
+                  {selectedIssue.actionId ?? "n/a"}
+                </div>
+                <div className="sm:col-span-2">
+                  <span className="text-muted-foreground">actionName:</span>{" "}
+                  {selectedIssue.actionName ?? "n/a"}
+                </div>
               </div>
 
               {selectedIssue.kind === "debug-error" && (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-                    <div><span className="text-muted-foreground">errorId:</span> {selectedIssue.errorId}</div>
-                    <div><span className="text-muted-foreground">origin:</span> {selectedIssue.origin}</div>
-                    <div><span className="text-muted-foreground">operation:</span> {selectedIssue.operation}</div>
-                    <div><span className="text-muted-foreground">source:</span> {selectedIssue.source}</div>
-                    <div className="sm:col-span-2"><span className="text-muted-foreground">name:</span> {selectedIssue.name ?? "n/a"}</div>
+                    <div>
+                      <span className="text-muted-foreground">errorId:</span>{" "}
+                      {selectedIssue.errorId}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">origin:</span> {selectedIssue.origin}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">operation:</span>{" "}
+                      {selectedIssue.operation}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">source:</span> {selectedIssue.source}
+                    </div>
+                    <div className="sm:col-span-2">
+                      <span className="text-muted-foreground">name:</span>{" "}
+                      {selectedIssue.name ?? "n/a"}
+                    </div>
                   </div>
                   {selectedIssue.stack !== null && selectedIssue.stack.length > 0 && (
                     <div className="space-y-1">

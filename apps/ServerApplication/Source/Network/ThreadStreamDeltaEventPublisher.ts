@@ -1,14 +1,12 @@
 import type { FarfieldThreadStreamDeltaEvent } from "@farfield/protocol";
+import type { AgentThreadLiveState, AgentThreadStreamEvents } from "../Agents/Types.js";
 import { logger } from "../Shared/Logging/Logger.js";
-import type {
-  AgentThreadLiveState,
-  AgentThreadStreamEvents
-} from "../Agents/Types.js";
 import type { EventStreamClientRegistry } from "./EventStreamClientRegistry.js";
 
 // Stream deltas stay bounded to keep per-publish work predictable under bursty traffic.
 const THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT = 400;
-const THREAD_STREAM_DELTA_EVENT_TYPE: FarfieldThreadStreamDeltaEvent["type"] = "thread-stream-delta";
+const THREAD_STREAM_DELTA_EVENT_TYPE: FarfieldThreadStreamDeltaEvent["type"] =
+  "thread-stream-delta";
 const FARFIELD_DELTA_SNAPSHOT_OK = true as const;
 const THREAD_STREAM_DELTA_PUBLISH_FAILED_LOG_EVENT = "thread-stream-delta-publish-failed";
 
@@ -29,7 +27,7 @@ export interface ThreadStreamDeltaEventPublisherDependencies {
   readThreadStreamEvents: (
     threadId: string,
     sinceSequence: number | null,
-    limit: number
+    limit: number,
   ) => Promise<AgentThreadStreamEvents>;
 }
 
@@ -51,7 +49,7 @@ export class ThreadStreamDeltaEventPublisher {
   private readonly readThreadStreamEvents: (
     threadId: string,
     sinceSequence: number | null,
-    limit: number
+    limit: number,
   ) => Promise<AgentThreadStreamEvents>;
   private readonly inFlightThreadIdSet: Set<string>;
   private readonly pendingThreadIdSet: Set<string>;
@@ -105,7 +103,7 @@ export class ThreadStreamDeltaEventPublisher {
       broadcastCount: this.broadcastCount,
       suppressedBroadcastCount: this.suppressedBroadcastCount,
       pendingThreadCount: this.pendingThreadIdSet.size,
-      inFlightThreadCount: this.inFlightThreadIdSet.size
+      inFlightThreadCount: this.inFlightThreadIdSet.size,
     };
   }
 
@@ -122,9 +120,9 @@ export class ThreadStreamDeltaEventPublisher {
       logger.warn(
         {
           threadId,
-          error: toErrorMessage(error)
+          error: toErrorMessage(error),
         },
-        THREAD_STREAM_DELTA_PUBLISH_FAILED_LOG_EVENT
+        THREAD_STREAM_DELTA_PUBLISH_FAILED_LOG_EVENT,
       );
     } finally {
       this.inFlightThreadIdSet.delete(threadId);
@@ -138,7 +136,7 @@ export class ThreadStreamDeltaEventPublisher {
     const sinceSequence = this.lastPublishedSequenceByThreadId.get(threadId) ?? null;
     const [liveStateSnapshot, streamEventsSnapshot] = await Promise.all([
       this.readThreadLiveState(threadId),
-      this.readThreadStreamEvents(threadId, sinceSequence, THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT)
+      this.readThreadStreamEvents(threadId, sinceSequence, THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT),
     ]);
     // Cursor progression is persisted even when broadcast is suppressed.
     this.lastPublishedSequenceByThreadId.set(threadId, streamEventsSnapshot.nextSequence);
@@ -153,14 +151,14 @@ export class ThreadStreamDeltaEventPublisher {
         threadId,
         sinceSequence,
         liveStateSnapshot,
-        streamEventsSnapshot
-      })
+        streamEventsSnapshot,
+      }),
     );
     this.broadcastCount += 1;
   }
 
   private buildThreadStreamDeltaEvent(
-    input: ThreadStreamDeltaEventBuildInput
+    input: ThreadStreamDeltaEventBuildInput,
   ): FarfieldThreadStreamDeltaEvent {
     return {
       type: THREAD_STREAM_DELTA_EVENT_TYPE,
@@ -171,7 +169,7 @@ export class ThreadStreamDeltaEventPublisher {
           threadId: input.threadId,
           ownerClientId: input.liveStateSnapshot.ownerClientId,
           conversationState: input.liveStateSnapshot.conversationState,
-          liveStateError: input.liveStateSnapshot.liveStateError
+          liveStateError: input.liveStateSnapshot.liveStateError,
         },
         streamEventsSnapshot: {
           ok: FARFIELD_DELTA_SNAPSHOT_OK,
@@ -180,10 +178,10 @@ export class ThreadStreamDeltaEventPublisher {
           events: input.streamEventsSnapshot.events,
           nextSequence: input.streamEventsSnapshot.nextSequence,
           firstAvailableSequence: input.streamEventsSnapshot.firstAvailableSequence,
-          resetRequired: input.streamEventsSnapshot.resetRequired
+          resetRequired: input.streamEventsSnapshot.resetRequired,
         },
-        streamEventsSinceSequenceUsed: input.sinceSequence
-      }
+        streamEventsSinceSequenceUsed: input.sinceSequence,
+      },
     };
   }
 }

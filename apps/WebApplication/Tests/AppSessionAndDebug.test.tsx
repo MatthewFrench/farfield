@@ -1,19 +1,11 @@
-import {
-  fireEvent,
-  screen,
-  waitFor
-} from "@testing-library/react";
-import {
-  describe,
-  expect,
-  it
-} from "vitest";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import { registerAppTestEnvironment } from "./AppTestEnvironment";
 import {
   type DebugErrorFixture,
   type DebugErrorsFixture,
   type EventsSessionFixture,
-  type ThreadListFixture
+  type ThreadListFixture,
 } from "./AppTestFixtureContracts";
 
 const environment = registerAppTestEnvironment();
@@ -32,12 +24,12 @@ function createThreadListFixture(): ThreadListFixture {
         createdAt: 1700000000,
         updatedAt: 1700000001,
         source: "opencode",
-        agentId: "codex"
-      }
+        agentId: "codex",
+      },
     ],
     nextCursor: null,
     pages: 1,
-    truncated: false
+    truncated: false,
   };
 }
 
@@ -46,7 +38,7 @@ function createDebugErrorsFixture(error: DebugErrorFixture): DebugErrorsFixture 
     ok: true,
     data: [error],
     sessionId: SESSION_ID,
-    sessionLogPath: SESSION_LOG_PATH
+    sessionLogPath: SESSION_LOG_PATH,
   };
 }
 
@@ -55,7 +47,7 @@ function createEventsSessionFixture(acceptedApiToken: string): EventsSessionFixt
     authRequired: true,
     bootstrapped: false,
     expiresAt: null,
-    acceptedApiToken
+    acceptedApiToken,
   };
 }
 
@@ -71,7 +63,7 @@ describe("App", () => {
       return {
         ok: true,
         thread: environment.buildConversationStateFixture(threadId, "gpt-5.3-codex"),
-        agentId: "codex"
+        agentId: "codex",
       };
     });
     environment.setPathname(`/threads/${THREAD_ID}`);
@@ -103,26 +95,28 @@ describe("App", () => {
   });
 
   it("shows client errors in the debug issues panel", async () => {
-    environment.setDebugErrorsFixture(createDebugErrorsFixture({
-      errorId: "error_1",
-      sessionId: SESSION_ID,
-      origin: "client",
-      source: "farfield-web",
-      operation: "send-message",
-      message: DEBUG_ERROR_MESSAGE,
-      severity: "error",
-      name: "Error",
-      stack: null,
-      requestId: "req_123",
-      threadId: THREAD_ID,
-      url: `/threads/${THREAD_ID}`,
-      occurredAt: "2026-02-21T00:00:00.000Z",
-      recordedAt: "2026-02-21T00:00:01.000Z",
-      details: {
-        actionId: "action_abc",
-        actionName: "send-message"
-      }
-    }));
+    environment.setDebugErrorsFixture(
+      createDebugErrorsFixture({
+        errorId: "error_1",
+        sessionId: SESSION_ID,
+        origin: "client",
+        source: "farfield-web",
+        operation: "send-message",
+        message: DEBUG_ERROR_MESSAGE,
+        severity: "error",
+        name: "Error",
+        stack: null,
+        requestId: "req_123",
+        threadId: THREAD_ID,
+        url: `/threads/${THREAD_ID}`,
+        occurredAt: "2026-02-21T00:00:00.000Z",
+        recordedAt: "2026-02-21T00:00:01.000Z",
+        details: {
+          actionId: "action_abc",
+          actionName: "send-message",
+        },
+      }),
+    );
 
     environment.renderApp();
     fireEvent.click(await screen.findByTestId("tab-debug"));
@@ -135,23 +129,25 @@ describe("App", () => {
   });
 
   it("clears debug issues from the debug panel", async () => {
-    environment.setDebugErrorsFixture(createDebugErrorsFixture({
-      errorId: "error_2",
-      sessionId: SESSION_ID,
-      origin: "server",
-      source: "farfield-server",
-      operation: "http:request",
-      message: "Request failed",
-      severity: "warning",
-      name: "Error",
-      stack: null,
-      requestId: "req_456",
-      threadId: null,
-      url: "/api/threads",
-      occurredAt: "2026-02-21T00:00:00.000Z",
-      recordedAt: "2026-02-21T00:00:01.000Z",
-      details: {}
-    }));
+    environment.setDebugErrorsFixture(
+      createDebugErrorsFixture({
+        errorId: "error_2",
+        sessionId: SESSION_ID,
+        origin: "server",
+        source: "farfield-server",
+        operation: "http:request",
+        message: "Request failed",
+        severity: "warning",
+        name: "Error",
+        stack: null,
+        requestId: "req_456",
+        threadId: null,
+        url: "/api/threads",
+        occurredAt: "2026-02-21T00:00:00.000Z",
+        recordedAt: "2026-02-21T00:00:01.000Z",
+        details: {},
+      }),
+    );
 
     environment.renderApp();
     fireEvent.click(await screen.findByTestId("tab-debug"));
@@ -172,7 +168,7 @@ describe("App", () => {
     expect(screen.getByPlaceholderText("API token")).toBeTruthy();
 
     fireEvent.change(screen.getByPlaceholderText("API token"), {
-      target: { value: "token-123" }
+      target: { value: "token-123" },
     });
     fireEvent.click(screen.getByText("Authenticate"));
 
@@ -191,7 +187,7 @@ describe("App", () => {
     expect(await screen.findByText("Authenticate Session")).toBeTruthy();
 
     fireEvent.change(screen.getByPlaceholderText("API token"), {
-      target: { value: "token-wrong" }
+      target: { value: "token-wrong" },
     });
     fireEvent.click(screen.getByText("Authenticate"));
 

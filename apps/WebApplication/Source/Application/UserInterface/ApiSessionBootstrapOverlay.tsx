@@ -17,7 +17,7 @@ export function ApiSessionBootstrapOverlay({
   onApiTokenDraftChange,
   onSubmitApiToken,
   isSubmitting,
-  errorMessage
+  errorMessage,
 }: ApiSessionBootstrapOverlayProperties): React.JSX.Element {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
@@ -49,11 +49,7 @@ export function ApiSessionBootstrapOverlay({
           </p>
         )}
         <div className="flex justify-end">
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            size="sm"
-          >
+          <Button type="submit" disabled={isSubmitting} size="sm">
             {isSubmitting ? "Authenticating..." : "Authenticate"}
           </Button>
         </div>

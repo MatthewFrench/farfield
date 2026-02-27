@@ -4,20 +4,20 @@ import type { JsonValue } from "@farfield/protocol";
 export const HistoryEntrySourceByName = {
   ipc: "ipc",
   app: "app",
-  system: "system"
+  system: "system",
 } as const;
 
 export type HistoryEntrySource =
-  typeof HistoryEntrySourceByName[keyof typeof HistoryEntrySourceByName];
+  (typeof HistoryEntrySourceByName)[keyof typeof HistoryEntrySourceByName];
 
 export const HistoryEntryDirectionByName = {
   in: "in",
   out: "out",
-  system: "system"
+  system: "system",
 } as const;
 
 export type HistoryEntryDirection =
-  typeof HistoryEntryDirectionByName[keyof typeof HistoryEntryDirectionByName];
+  (typeof HistoryEntryDirectionByName)[keyof typeof HistoryEntryDirectionByName];
 
 export interface HistoryEntry {
   id: string;

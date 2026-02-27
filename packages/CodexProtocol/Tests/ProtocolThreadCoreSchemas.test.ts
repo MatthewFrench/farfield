@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseThreadConversationState,
-  parseThreadStreamStateChangedBroadcast
+  parseThreadStreamStateChangedBroadcast,
 } from "../Source/Index.js";
 
 describe("codex-protocol thread core schemas", () => {
@@ -38,17 +38,17 @@ describe("codex-protocol thread core schemas", () => {
                       options: [
                         {
                           label: "Option A",
-                          description: "Description A"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      }
+                          description: "Description A",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      },
     });
 
     expect(parsed.params.change.type).toBe("patches");
@@ -81,8 +81,8 @@ describe("codex-protocol thread core schemas", () => {
               settings: {
                 model: "",
                 reasoning_effort: null,
-                developer_instructions: null
-              }
+                developer_instructions: null,
+              },
             },
             hasUnreadTurn: false,
             rolloutPath: "/tmp/rollout.jsonl",
@@ -90,10 +90,10 @@ describe("codex-protocol thread core schemas", () => {
             resumeState: "resumed",
             latestTokenUsageInfo: null,
             cwd: "/tmp/workspace",
-            source: "vscode"
-          }
-        }
-      }
+            source: "vscode",
+          },
+        },
+      },
     });
 
     expect(parsed.params.change.type).toBe("snapshot");
@@ -123,15 +123,15 @@ describe("codex-protocol thread core schemas", () => {
                     message: "contextWindowExceeded",
                     willRetry: false,
                     errorInfo: "contextWindowExceeded",
-                    additionalDetails: null
-                  }
-                ]
-              }
+                    additionalDetails: null,
+                  },
+                ],
+              },
             ],
-            requests: []
-          }
-        }
-      }
+            requests: [],
+          },
+        },
+      },
     });
 
     expect(parsed.params.change.type).toBe("snapshot");
@@ -154,12 +154,12 @@ describe("codex-protocol thread core schemas", () => {
               {
                 op: "remove",
                 path: ["requests", 0],
-                value: true
-              }
-            ]
-          }
-        }
-      })
+                value: true,
+              },
+            ],
+          },
+        },
+      }),
     ).toThrowError(/patches\[0\]\.value/);
   });
 
@@ -179,12 +179,12 @@ describe("codex-protocol thread core schemas", () => {
             patches: [
               {
                 op: "add",
-                path: ["requests", 0]
-              }
-            ]
-          }
-        }
-      })
+                path: ["requests", 0],
+              },
+            ],
+          },
+        },
+      }),
     ).toThrowError(/patches\[0\]\.value/);
   });
 
@@ -196,7 +196,7 @@ describe("codex-protocol thread core schemas", () => {
           params: {
             threadId: "thread-123",
             input: [{ type: "text", text: "hello" }],
-            attachments: []
+            attachments: [],
           },
           status: "completed",
           items: [
@@ -207,12 +207,12 @@ describe("codex-protocol thread core schemas", () => {
               turnId: "turn-1",
               questions: [{ id: "q", header: "H", question: "Q" }],
               answers: { q: ["A"] },
-              completed: true
-            }
-          ]
-        }
+              completed: true,
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("userInputResponse");
@@ -231,12 +231,12 @@ describe("codex-protocol thread core schemas", () => {
               requestId: 12,
               turnId: "turn-1",
               questions: [{ id: "q", header: "H", question: "Q" }],
-              answers: { q: ["A"] }
-            }
-          ]
-        }
+              answers: { q: ["A"] },
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("userInputResponse");
@@ -255,18 +255,18 @@ describe("codex-protocol thread core schemas", () => {
               content: [
                 {
                   type: "text",
-                  text: "describe this image"
+                  text: "describe this image",
                 },
                 {
                   type: "image",
-                  url: "data:image/png;base64,AAAA"
-                }
-              ]
-            }
-          ]
-        }
+                  url: "data:image/png;base64,AAAA",
+                },
+              ],
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("userMessage");
@@ -285,15 +285,15 @@ describe("codex-protocol thread core schemas", () => {
               content: [
                 {
                   type: "text",
-                  text: "please keep this concise"
-                }
+                  text: "please keep this concise",
+                },
               ],
-              attachments: []
-            }
-          ]
-        }
+              attachments: [],
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("steeringUserMessage");
@@ -311,12 +311,12 @@ describe("codex-protocol thread core schemas", () => {
               type: "planImplementation",
               turnId: "turn-1",
               planContent: "# Plan\n\nDo the thing",
-              isCompleted: true
-            }
-          ]
-        }
+              isCompleted: true,
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("planImplementation");
@@ -336,22 +336,22 @@ describe("codex-protocol thread core schemas", () => {
               plan: [
                 {
                   step: "Collect context",
-                  status: "completed"
+                  status: "completed",
                 },
                 {
                   step: "Apply patch",
-                  status: "inProgress"
+                  status: "inProgress",
                 },
                 {
                   step: "Run tests",
-                  status: "pending"
-                }
-              ]
-            }
-          ]
-        }
+                  status: "pending",
+                },
+              ],
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("todo-list");
@@ -369,14 +369,14 @@ describe("codex-protocol thread core schemas", () => {
                 id: "item-unknown",
                 type: "toolCall",
                 payload: {
-                  hello: "world"
-                }
-              }
-            ]
-          }
+                  hello: "world",
+                },
+              },
+            ],
+          },
         ],
-        requests: []
-      })
+        requests: [],
+      }),
     ).toThrowError(/ThreadConversationState did not match expected schema/);
   });
 
@@ -399,17 +399,17 @@ describe("codex-protocol thread core schemas", () => {
                   type: "read",
                   command: "cat file.txt",
                   name: "file.txt",
-                  path: "file.txt"
-                }
+                  path: "file.txt",
+                },
               ],
               aggregatedOutput: "hello",
               exitCode: 0,
-              durationMs: 5
-            }
-          ]
-        }
+              durationMs: 5,
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("commandExecution");
@@ -432,17 +432,16 @@ describe("codex-protocol thread core schemas", () => {
                   type: "search",
                   command: "rg -n hello -S",
                   query: "hello",
-                  path: null
-                }
-              ]
-            }
-          ]
-        }
+                  path: null,
+                },
+              ],
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("commandExecution");
   });
-
 });

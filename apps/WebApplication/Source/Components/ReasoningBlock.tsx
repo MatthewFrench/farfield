@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronRight, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/Components/UserInterface/Button";
 
 const BOLD_MARKER_TOKEN = "**";
@@ -23,7 +23,11 @@ function hasExpandedReasoningText(text: string | undefined): boolean {
   return text !== undefined && text.trim().length > 0;
 }
 
-export function ReasoningBlock({ summary, text, isActive }: ReasoningBlockProps): React.JSX.Element {
+export function ReasoningBlock({
+  summary,
+  text,
+  isActive,
+}: ReasoningBlockProps): React.JSX.Element {
   const [expanded, setExpanded] = useState(false);
   const sanitizedSummary = sanitizeSummaryLines(summary);
   const currentLine = sanitizedSummary[sanitizedSummary.length - 1] ?? DEFAULT_REASONING_LINE;

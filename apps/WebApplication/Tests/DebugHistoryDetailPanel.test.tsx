@@ -16,7 +16,7 @@ function renderDebugHistoryDetailPanel(input?: {
       waitForReplayResponse={input?.waitForReplayResponse ?? false}
       onWaitForReplayResponseChange={input?.onWaitForReplayResponseChange ?? (() => {})}
       onReplayHistoryEntry={input?.onReplayHistoryEntry ?? (() => {})}
-    />
+    />,
   );
 }
 
@@ -35,7 +35,7 @@ describe("DebugHistoryDetailPanel", () => {
       historyEntryId: "history-7",
       waitForReplayResponse: false,
       onWaitForReplayResponseChange,
-      onReplayHistoryEntry
+      onReplayHistoryEntry,
     });
 
     fireEvent.click(screen.getByRole("checkbox"));
@@ -44,7 +44,7 @@ describe("DebugHistoryDetailPanel", () => {
     expect(onWaitForReplayResponseChange).toHaveBeenCalledWith(true);
     expect(onReplayHistoryEntry).toHaveBeenCalledWith({
       entryId: "history-7",
-      waitForResponse: false
+      waitForResponse: false,
     });
   });
 });

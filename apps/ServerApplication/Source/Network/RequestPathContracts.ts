@@ -16,11 +16,13 @@ const RequestUrlForRequestMetricsSchema = z.string();
  * Owns request-path parse input validation for Node request-url and runtime host/port values so malformed
  * boundary inputs collapse into one deterministic malformed-path classification.
  */
-const RequestUrlPathnameParseInputSchema = z.object({
-  requestUrl: z.string(),
-  host: z.string().min(1),
-  port: z.number().int().min(REQUEST_PORT_MINIMUM).max(REQUEST_PORT_MAXIMUM)
-}).strict();
+const RequestUrlPathnameParseInputSchema = z
+  .object({
+    requestUrl: z.string(),
+    host: z.string().min(1),
+    port: z.number().int().min(REQUEST_PORT_MINIMUM).max(REQUEST_PORT_MAXIMUM),
+  })
+  .strict();
 
 /**
  * Owns request method/path literals and path normalization used by request-routing and
@@ -32,7 +34,7 @@ export const RequestMethodByName = {
   get: "GET",
   post: "POST",
   options: "OPTIONS",
-  unknown: "UNKNOWN"
+  unknown: "UNKNOWN",
 } as const;
 
 export const RequestPathnameByName = {
@@ -43,7 +45,7 @@ export const RequestPathnameByName = {
   events: "/events",
   apiPrefix: "/api/",
   apiHealth: "/api/health",
-  apiEventsSession: "/api/events/session"
+  apiEventsSession: "/api/events/session",
 } as const;
 
 export const RequestPathSegmentByName = {
@@ -54,12 +56,12 @@ export const RequestPathSegmentByName = {
   clientErrors: "client-errors",
   sessionLog: "session-log",
   trace: "trace",
-  download: "download"
+  download: "download",
 } as const;
 
 export const RequestUrlPathnameParseStatusByName = {
   resolved: "resolved",
-  malformedRequestUrl: "malformed-request-url"
+  malformedRequestUrl: "malformed-request-url",
 } as const;
 
 export interface RequestUrlPathnameParseInput {
@@ -107,18 +109,16 @@ export function normalizePathnameForRequestMetrics(pathnameOrRequestUrl: string)
 
   const absoluteUrlPathnameResolution = readPathnameFromAbsoluteUrl(trimmedValue);
   if (
-    absoluteUrlPathnameResolution.isAbsoluteUrl
-    && absoluteUrlPathnameResolution.pathname === null
+    absoluteUrlPathnameResolution.isAbsoluteUrl &&
+    absoluteUrlPathnameResolution.pathname === null
   ) {
     return RequestPathnameByName.malformedRequestUrl;
   }
-  return normalizePathnameCandidate(
-    absoluteUrlPathnameResolution.pathname ?? trimmedValue
-  );
+  return normalizePathnameCandidate(absoluteUrlPathnameResolution.pathname ?? trimmedValue);
 }
 
 export function readPathnameForRequestMetricsFromRequestUrl(
-  requestUrl: string | undefined
+  requestUrl: string | undefined,
 ): string {
   const requestUrlParseResult = RequestUrlForRequestMetricsSchema.safeParse(requestUrl);
   if (!requestUrlParseResult.success) {
@@ -134,19 +134,19 @@ export function readPathSegmentsFromPathname(pathname: string): string[] {
 }
 
 export function parseRequestUrlPathname(
-  input: RequestUrlPathnameParseInput
+  input: RequestUrlPathnameParseInput,
 ): RequestUrlPathnameParseResult {
   const inputParseResult = RequestUrlPathnameParseInputSchema.safeParse(input);
   if (!inputParseResult.success) {
     return {
-      status: RequestUrlPathnameParseStatusByName.malformedRequestUrl
+      status: RequestUrlPathnameParseStatusByName.malformedRequestUrl,
     };
   }
 
   const url = readUrlFromRequestPathnameParseInput(inputParseResult.data);
   if (url === null) {
     return {
-      status: RequestUrlPathnameParseStatusByName.malformedRequestUrl
+      status: RequestUrlPathnameParseStatusByName.malformedRequestUrl,
     };
   }
 
@@ -155,7 +155,7 @@ export function parseRequestUrlPathname(
     status: RequestUrlPathnameParseStatusByName.resolved,
     url,
     pathname,
-    pathSegments: readPathSegmentsFromNormalizedPathname(pathname)
+    pathSegments: readPathSegmentsFromNormalizedPathname(pathname),
   };
 }
 
@@ -177,8 +177,8 @@ function stripPathnameSuffix(pathname: string): string {
 function normalizePathnameCandidate(pathnameCandidate: string): string {
   const pathnameWithoutSuffix = stripPathnameSuffix(pathnameCandidate);
   if (
-    pathnameWithoutSuffix.length === 0
-    || ROOT_ONLY_PATHNAME_PATTERN.test(pathnameWithoutSuffix)
+    pathnameWithoutSuffix.length === 0 ||
+    ROOT_ONLY_PATHNAME_PATTERN.test(pathnameWithoutSuffix)
   ) {
     return RequestPathnameByName.root;
   }
@@ -209,19 +209,19 @@ function readPathnameFromAbsoluteUrl(urlValue: string): AbsoluteUrlPathnameResol
   if (!isAbsoluteUrlValue(urlValue)) {
     return {
       isAbsoluteUrl: false,
-      pathname: null
+      pathname: null,
     };
   }
 
   try {
     return {
       isAbsoluteUrl: true,
-      pathname: new URL(urlValue).pathname
+      pathname: new URL(urlValue).pathname,
     };
   } catch {
     return {
       isAbsoluteUrl: true,
-      pathname: null
+      pathname: null,
     };
   }
 }
@@ -230,9 +230,7 @@ function isAbsoluteUrlValue(urlValue: string): boolean {
   return ABSOLUTE_URL_PREFIX_PATTERN.test(urlValue);
 }
 
-function readUrlFromRequestPathnameParseInput(
-  input: RequestUrlPathnameParseInput
-): URL | null {
+function readUrlFromRequestPathnameParseInput(input: RequestUrlPathnameParseInput): URL | null {
   try {
     return new URL(input.requestUrl, readRequestBaseUrl(input.host, input.port));
   } catch {

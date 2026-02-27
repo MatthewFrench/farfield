@@ -6,7 +6,7 @@ import type {
   AppServerStartThreadResponse,
   CollaborationMode,
   IpcFrame,
-  UserInputResponsePayload
+  UserInputResponsePayload,
 } from "@farfield/protocol";
 
 /**
@@ -22,12 +22,12 @@ export const AgentIdentifierByName: {
   opencode: AgentId;
 } = {
   codex: "codex",
-  opencode: "opencode"
+  opencode: "opencode",
 };
 
 export const AgentIdentifierValues: ReadonlyArray<AgentId> = [
   AgentIdentifierByName.codex,
-  AgentIdentifierByName.opencode
+  AgentIdentifierByName.opencode,
 ];
 
 export type AgentThreadListSortKey = "created_at" | "updated_at";
@@ -37,12 +37,12 @@ export const AgentThreadListSortKeyByName: {
   updatedAt: AgentThreadListSortKey;
 } = {
   createdAt: "created_at",
-  updatedAt: "updated_at"
+  updatedAt: "updated_at",
 };
 
 export const AgentThreadListSortKeyValues: ReadonlyArray<AgentThreadListSortKey> = [
   AgentThreadListSortKeyByName.createdAt,
-  AgentThreadListSortKeyByName.updatedAt
+  AgentThreadListSortKeyByName.updatedAt,
 ];
 
 export interface AgentCapabilities {
@@ -150,7 +150,7 @@ export type AgentThreadLiveStateErrorKind = "reductionFailed";
 export const AgentThreadLiveStateErrorKindByName: {
   reductionFailed: AgentThreadLiveStateErrorKind;
 } = {
-  reductionFailed: "reductionFailed"
+  reductionFailed: "reductionFailed",
 };
 
 export interface AgentThreadLiveStateError {
@@ -222,10 +222,15 @@ export interface AgentAdapter {
 
   listModels?(limit: number): Promise<AppServerListModelsResponse>;
   listCollaborationModes?(): Promise<AppServerCollaborationModeListResponse>;
-  setCollaborationMode?(input: AgentSetCollaborationModeInput): Promise<AgentSetCollaborationModeResult>;
+  setCollaborationMode?(
+    input: AgentSetCollaborationModeInput,
+  ): Promise<AgentSetCollaborationModeResult>;
   submitUserInput?(input: AgentSubmitUserInputInput): Promise<AgentSubmitUserInputResult>;
   readLiveState?(threadId: string): Promise<AgentThreadLiveState>;
-  readStreamEvents?(threadId: string, input: AgentReadStreamEventsInput): Promise<AgentThreadStreamEvents>;
+  readStreamEvents?(
+    threadId: string,
+    input: AgentReadStreamEventsInput,
+  ): Promise<AgentThreadStreamEvents>;
   listProjectDirectories?(): Promise<string[]>;
   readConfigDefaults?(): Promise<AgentConfigDefaults>;
 }

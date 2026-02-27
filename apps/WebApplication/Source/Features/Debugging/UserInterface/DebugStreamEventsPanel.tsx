@@ -9,10 +9,13 @@ interface DebugStreamEventsPanelProps {
 
 export function DebugStreamEventsPanel({
   streamEventCount,
-  streamEventCards
+  streamEventCards,
 }: DebugStreamEventsPanelProps): React.JSX.Element {
   return (
-    <div data-testid="debug-stream-events-panel" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div
+      data-testid="debug-stream-events-panel"
+      className="flex-1 flex flex-col min-h-0 overflow-hidden"
+    >
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border shrink-0">
         <Activity size={13} className="text-muted-foreground" />
         <span className="text-xs font-medium">{DEBUG_STREAM_EVENTS_SECTION_TITLE}</span>

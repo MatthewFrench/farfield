@@ -8,7 +8,7 @@ const NtfyThreadCompletedPayloadSchema = z
     preview: z.string(),
     projectName: z.string(),
     threadName: z.string(),
-    agentText: z.string()
+    agentText: z.string(),
   })
   .strict();
 const DEFAULT_NTFY_ENABLED = "false";
@@ -39,7 +39,7 @@ const RawNtfyEnvSchema = z
     NTFY_TOPIC: z.string().optional(),
     NTFY_BASE_URL: z.string().optional(),
     NTFY_BEARER_TOKEN: z.string().optional(),
-    NTFY_PRIORITY: z.string().optional()
+    NTFY_PRIORITY: z.string().optional(),
   })
   .strict();
 
@@ -49,14 +49,14 @@ const ParsedNtfyConfigSchema = z
     topic: z.union([z.string(), z.null()]),
     baseUrl: z.string().url(),
     bearerToken: z.union([z.string(), z.null()]),
-    priority: NtfyPrioritySchema
+    priority: NtfyPrioritySchema,
   })
   .strict()
   .superRefine((value, context) => {
     if (value.enabled && value.topic === null) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "NTFY_TOPIC is required when NTFY_ENABLED is true"
+        message: "NTFY_TOPIC is required when NTFY_ENABLED is true",
       });
     }
   });
@@ -131,7 +131,7 @@ export function parseNtfyConfigFromEnv(env: NodeJS.ProcessEnv): NtfyConfig {
     NTFY_TOPIC: env["NTFY_TOPIC"],
     NTFY_BASE_URL: env["NTFY_BASE_URL"],
     NTFY_BEARER_TOKEN: env["NTFY_BEARER_TOKEN"],
-    NTFY_PRIORITY: env["NTFY_PRIORITY"]
+    NTFY_PRIORITY: env["NTFY_PRIORITY"],
   });
 
   return ParsedNtfyConfigSchema.parse({
@@ -139,7 +139,7 @@ export function parseNtfyConfigFromEnv(env: NodeJS.ProcessEnv): NtfyConfig {
     topic: normalizeOptionalString(raw.NTFY_TOPIC),
     baseUrl: normalizeBaseUrl(raw.NTFY_BASE_URL),
     bearerToken: normalizeOptionalString(raw.NTFY_BEARER_TOKEN),
-    priority: normalizePriorityValue(raw.NTFY_PRIORITY)
+    priority: normalizePriorityValue(raw.NTFY_PRIORITY),
   });
 }
 
@@ -151,7 +151,7 @@ function buildPublishUrl(baseUrl: string, topic: string): string {
 }
 
 function parseThreadCompletedPayload(
-  payload: NtfyThreadCompletedPayload
+  payload: NtfyThreadCompletedPayload,
 ): NtfyThreadCompletedPayload {
   return NtfyThreadCompletedPayloadSchema.parse(payload);
 }
@@ -165,7 +165,7 @@ function buildPublishHeaders(config: NtfyConfig, payload: NtfyThreadCompletedPay
   if (config.bearerToken !== null) {
     headers.set(
       NTFY_AUTHORIZATION_HEADER_NAME,
-      `${NTFY_AUTHORIZATION_BEARER_PREFIX}${config.bearerToken}`
+      `${NTFY_AUTHORIZATION_BEARER_PREFIX}${config.bearerToken}`,
     );
   }
   return headers;
@@ -197,16 +197,16 @@ export class NtfyNotifier {
     return {
       enabled: this.config.enabled,
       baseUrl: this.config.baseUrl,
-      topic: this.config.topic
+      topic: this.config.topic,
     };
   }
 
   public async publishThreadCompleted(
-    payload: NtfyThreadCompletedPayload
+    payload: NtfyThreadCompletedPayload,
   ): Promise<NtfyPublishResult> {
     if (!this.config.enabled || this.config.topic === null) {
       return {
-        messageId: null
+        messageId: null,
       };
     }
 
@@ -214,7 +214,7 @@ export class NtfyNotifier {
     const response = await fetch(buildPublishUrl(this.config.baseUrl, this.config.topic), {
       method: NTFY_PUBLISH_HTTP_METHOD,
       headers: buildPublishHeaders(this.config, parsedPayload),
-      body: buildNotificationBody(parsedPayload)
+      body: buildNotificationBody(parsedPayload),
     });
 
     if (!response.ok) {
@@ -224,7 +224,7 @@ export class NtfyNotifier {
 
     const messageId = (await response.text()).trim();
     return {
-      messageId: messageId.length > 0 ? messageId : null
+      messageId: messageId.length > 0 ? messageId : null,
     };
   }
 }

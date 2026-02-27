@@ -1,18 +1,21 @@
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
+import os from "node:os";
+import path from "node:path";
 import {
   FarfieldPushTestBodySchema,
   FarfieldPushTestEnvelopeSchema,
   type JsonValue,
-  type PushNotificationPayload
+  type PushNotificationPayload,
 } from "@farfield/protocol";
 import { describe, expect, it, vi } from "vitest";
-import { PushService, type PushSendResult } from "../Source/Modules/PushNotifications/PushService.js";
-import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
 import { PushSendStore } from "../Source/Modules/PushNotifications/PushSendStore.js";
+import {
+  type PushSendResult,
+  PushService,
+} from "../Source/Modules/PushNotifications/PushService.js";
+import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
 import { PushMutationConcurrencyCoordinator } from "../Source/Network/PushMutationConcurrencyCoordinator.js";
 import { PushTestRouteOwner } from "../Source/Network/Routes/PushTestRouteOwner.js";
 
@@ -37,7 +40,7 @@ function createDeferred<ValueType>(): Deferred<ValueType> {
   return {
     promise,
     resolve: resolvePromise,
-    reject: rejectPromise
+    reject: rejectPromise,
   };
 }
 
@@ -50,11 +53,15 @@ function createRequestResponsePair(): {
   const response = new ServerResponse(request);
   return {
     request,
-    response
+    response,
   };
 }
 
-function createPushPayload(threadId: string, turnId: string, privateMode: boolean): PushNotificationPayload {
+function createPushPayload(
+  threadId: string,
+  turnId: string,
+  privateMode: boolean,
+): PushNotificationPayload {
   const createdAt = new Date().toISOString();
   return {
     notificationId: `notif_${privateMode ? "private" : "detailed"}`,
@@ -63,7 +70,7 @@ function createPushPayload(threadId: string, turnId: string, privateMode: boolea
     threadId,
     turnId,
     url: `/threads/${threadId}`,
-    createdAt
+    createdAt,
   };
 }
 
@@ -78,34 +85,36 @@ describe("PushTestRouteOwner", () => {
           endpoint: "https://push.example.test/private",
           keys: {
             p256dh: "PrivateP256DhKey",
-            auth: "PrivateAuthKey"
-          }
+            auth: "PrivateAuthKey",
+          },
         },
         {
-          privateMode: true
-        }
+          privateMode: true,
+        },
       );
       await pushStore.upsertSubscription(
         {
           endpoint: "https://push.example.test/detailed",
           keys: {
             p256dh: "DetailedP256DhKey",
-            auth: "DetailedAuthKey"
-          }
+            auth: "DetailedAuthKey",
+          },
         },
         {
-          privateMode: false
-        }
+          privateMode: false,
+        },
       );
 
-      const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send-state.json"));
+      const pushSendStore = new PushSendStore(
+        path.join(temporaryDirectory, "push-send-state.json"),
+      );
       pushSendStore.load();
       const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
       const pushService = new PushService({
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: "mailto:test@example.com"
+        vapidSubject: "mailto:test@example.com",
       });
       vi.spyOn(pushService, "isEnabled").mockReturnValue(true);
 
@@ -115,8 +124,9 @@ describe("PushTestRouteOwner", () => {
       const detailedDispatchStarted = createDeferred<void>();
       let privateDispatchObserved = false;
       let detailedDispatchObserved = false;
-      const sendToSubscriptionsSpy = vi.spyOn(pushService, "sendToSubscriptions").mockImplementation(
-        async (subscriptions): Promise<PushSendResult> => {
+      const sendToSubscriptionsSpy = vi
+        .spyOn(pushService, "sendToSubscriptions")
+        .mockImplementation(async (subscriptions): Promise<PushSendResult> => {
           const firstSubscription = subscriptions[0];
           if (!firstSubscription) {
             throw new Error("Expected at least one subscription for push send");
@@ -133,12 +143,10 @@ describe("PushTestRouteOwner", () => {
             detailedDispatchStarted.resolve();
           }
           return detailedDeferred.promise;
-        }
-      );
+        });
 
-      const jsonResponse = vi.fn<
-        (response: ServerResponse, statusCode: number, body: object) => void
-      >();
+      const jsonResponse =
+        vi.fn<(response: ServerResponse, statusCode: number, body: object) => void>();
       const timeoutLabels: string[] = [];
 
       const owner = new PushTestRouteOwner({
@@ -150,7 +158,7 @@ describe("PushTestRouteOwner", () => {
         readJsonBody: async (): Promise<JsonValue> => ({
           threadId: "thread_parallel",
           turnId: "turn_parallel",
-          dryRun: false
+          dryRun: false,
         }),
         jsonResponse,
         buildPushTestPayload: (input, privateMode) => {
@@ -160,7 +168,7 @@ describe("PushTestRouteOwner", () => {
         withTimeout: async (promise, _timeoutMs, label) => {
           timeoutLabels.push(label);
           return promise;
-        }
+        },
       });
 
       const { request, response } = createRequestResponsePair();
@@ -168,14 +176,11 @@ describe("PushTestRouteOwner", () => {
       const handlePromise = owner.handle({
         req: request,
         res: response,
-        pathname: "/api/push/test"
+        pathname: "/api/push/test",
       });
 
       await Promise.all([privateDispatchStarted.promise, detailedDispatchStarted.promise]);
-      expect(timeoutLabels).toEqual([
-        "push-test-send:private",
-        "push-test-send:detailed"
-      ]);
+      expect(timeoutLabels).toEqual(["push-test-send:private", "push-test-send:detailed"]);
 
       const privateDispatchPayload = sendToSubscriptionsSpy.mock.calls[0]?.[1];
       const detailedDispatchPayload = sendToSubscriptionsSpy.mock.calls[1]?.[1];
@@ -189,13 +194,13 @@ describe("PushTestRouteOwner", () => {
         attempted: 1,
         delivered: 1,
         failures: [],
-        prunedEndpoints: []
+        prunedEndpoints: [],
       });
       detailedDeferred.resolve({
         attempted: 1,
         delivered: 1,
         failures: [],
-        prunedEndpoints: []
+        prunedEndpoints: [],
       });
 
       await expect(handlePromise).resolves.toBe(true);
@@ -215,33 +220,36 @@ describe("PushTestRouteOwner", () => {
         reason: "Push notification attempted",
         attempted: 2,
         delivered: 2,
-        failures: 0
+        failures: 0,
       });
     } finally {
       fs.rmSync(temporaryDirectory, {
         recursive: true,
-        force: true
+        force: true,
       });
     }
   });
 
   it("returns a strict readiness response when push notifications are disabled", async () => {
-    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "push-test-route-owner-disabled-"));
+    const temporaryDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "push-test-route-owner-disabled-"),
+    );
     try {
       const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
       pushStore.load();
-      const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send-state.json"));
+      const pushSendStore = new PushSendStore(
+        path.join(temporaryDirectory, "push-send-state.json"),
+      );
       pushSendStore.load();
       const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
       const pushService = new PushService({
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: "mailto:test@example.com"
+        vapidSubject: "mailto:test@example.com",
       });
-      const jsonResponse = vi.fn<
-        (response: ServerResponse, statusCode: number, body: object) => void
-      >();
+      const jsonResponse =
+        vi.fn<(response: ServerResponse, statusCode: number, body: object) => void>();
 
       const owner = new PushTestRouteOwner({
         pushService,
@@ -252,7 +260,7 @@ describe("PushTestRouteOwner", () => {
         readJsonBody: async (): Promise<JsonValue> => ({
           threadId: "thread_disabled",
           turnId: "turn_disabled",
-          dryRun: true
+          dryRun: true,
         }),
         jsonResponse,
         buildPushTestPayload: (input, privateMode) => {
@@ -262,19 +270,21 @@ describe("PushTestRouteOwner", () => {
         withTimeout: async <ValueType>(
           _promise: Promise<ValueType>,
           _timeoutMs: number,
-          _label: string
+          _label: string,
         ): Promise<ValueType> => {
           throw new Error("withTimeout should not be called for disabled push responses");
-        }
+        },
       });
 
       const { request, response } = createRequestResponsePair();
       request.method = "POST";
-      await expect(owner.handle({
-        req: request,
-        res: response,
-        pathname: "/api/push/test"
-      })).resolves.toBe(true);
+      await expect(
+        owner.handle({
+          req: request,
+          res: response,
+          pathname: "/api/push/test",
+        }),
+      ).resolves.toBe(true);
 
       expect(jsonResponse).toHaveBeenCalledTimes(1);
       const responseCall = jsonResponse.mock.calls[0];
@@ -292,18 +302,20 @@ describe("PushTestRouteOwner", () => {
         reason: "Push notifications are disabled",
         attempted: 0,
         delivered: 0,
-        failures: 0
+        failures: 0,
       });
     } finally {
       fs.rmSync(temporaryDirectory, {
         recursive: true,
-        force: true
+        force: true,
       });
     }
   });
 
   it("returns a strict dry-run readiness response when subscriptions exist", async () => {
-    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "push-test-route-owner-dry-run-"));
+    const temporaryDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "push-test-route-owner-dry-run-"),
+    );
     try {
       const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
       pushStore.load();
@@ -312,27 +324,28 @@ describe("PushTestRouteOwner", () => {
           endpoint: "https://push.example.test/dry-run",
           keys: {
             p256dh: "DryRunP256DhKey",
-            auth: "DryRunAuthKey"
-          }
+            auth: "DryRunAuthKey",
+          },
         },
         {
-          privateMode: true
-        }
+          privateMode: true,
+        },
       );
-      const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send-state.json"));
+      const pushSendStore = new PushSendStore(
+        path.join(temporaryDirectory, "push-send-state.json"),
+      );
       pushSendStore.load();
       const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
       const pushService = new PushService({
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: "mailto:test@example.com"
+        vapidSubject: "mailto:test@example.com",
       });
       vi.spyOn(pushService, "isEnabled").mockReturnValue(true);
       const sendToSubscriptionsSpy = vi.spyOn(pushService, "sendToSubscriptions");
-      const jsonResponse = vi.fn<
-        (response: ServerResponse, statusCode: number, body: object) => void
-      >();
+      const jsonResponse =
+        vi.fn<(response: ServerResponse, statusCode: number, body: object) => void>();
 
       const owner = new PushTestRouteOwner({
         pushService,
@@ -343,7 +356,7 @@ describe("PushTestRouteOwner", () => {
         readJsonBody: async (): Promise<JsonValue> => ({
           threadId: "thread_dry_run",
           turnId: "turn_dry_run",
-          dryRun: true
+          dryRun: true,
         }),
         jsonResponse,
         buildPushTestPayload: (input, privateMode) => {
@@ -353,19 +366,21 @@ describe("PushTestRouteOwner", () => {
         withTimeout: async <ValueType>(
           _promise: Promise<ValueType>,
           _timeoutMs: number,
-          _label: string
+          _label: string,
         ): Promise<ValueType> => {
           throw new Error("withTimeout should not be called for dry-run push responses");
-        }
+        },
       });
 
       const { request, response } = createRequestResponsePair();
       request.method = "POST";
-      await expect(owner.handle({
-        req: request,
-        res: response,
-        pathname: "/api/push/test"
-      })).resolves.toBe(true);
+      await expect(
+        owner.handle({
+          req: request,
+          res: response,
+          pathname: "/api/push/test",
+        }),
+      ).resolves.toBe(true);
 
       expect(sendToSubscriptionsSpy).not.toHaveBeenCalled();
       expect(jsonResponse).toHaveBeenCalledTimes(1);
@@ -384,18 +399,20 @@ describe("PushTestRouteOwner", () => {
         reason: "Push notifications are configured and subscriptions are present",
         attempted: 1,
         delivered: 0,
-        failures: 0
+        failures: 0,
       });
     } finally {
       fs.rmSync(temporaryDirectory, {
         recursive: true,
-        force: true
+        force: true,
       });
     }
   });
 
   it("propagates timeout errors from timed push dispatches", async () => {
-    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "push-test-route-owner-timeout-"));
+    const temporaryDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "push-test-route-owner-timeout-"),
+    );
     try {
       const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
       pushStore.load();
@@ -404,28 +421,32 @@ describe("PushTestRouteOwner", () => {
           endpoint: "https://push.example.test/private-only",
           keys: {
             p256dh: "PrivateOnlyP256DhKey",
-            auth: "PrivateOnlyAuthKey"
-          }
+            auth: "PrivateOnlyAuthKey",
+          },
         },
         {
-          privateMode: true
-        }
+          privateMode: true,
+        },
       );
-      const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send-state.json"));
+      const pushSendStore = new PushSendStore(
+        path.join(temporaryDirectory, "push-send-state.json"),
+      );
       pushSendStore.load();
       const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
       const pushService = new PushService({
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: "mailto:test@example.com"
+        vapidSubject: "mailto:test@example.com",
       });
       vi.spyOn(pushService, "isEnabled").mockReturnValue(true);
-      vi.spyOn(pushService, "sendToSubscriptions").mockImplementation(async (): Promise<PushSendResult> => {
-        return new Promise<PushSendResult>(() => {
-          // Intentionally unresolved to verify timeout propagation.
-        });
-      });
+      vi.spyOn(pushService, "sendToSubscriptions").mockImplementation(
+        async (): Promise<PushSendResult> => {
+          return new Promise<PushSendResult>(() => {
+            // Intentionally unresolved to verify timeout propagation.
+          });
+        },
+      );
 
       const owner = new PushTestRouteOwner({
         pushService,
@@ -436,7 +457,7 @@ describe("PushTestRouteOwner", () => {
         readJsonBody: async (): Promise<JsonValue> => ({
           threadId: "thread_timeout",
           turnId: "turn_timeout",
-          dryRun: false
+          dryRun: false,
         }),
         jsonResponse: () => {},
         buildPushTestPayload: (input, privateMode) => {
@@ -445,20 +466,22 @@ describe("PushTestRouteOwner", () => {
         pushTestSendTimeoutMs: 250,
         withTimeout: async (_promise, timeoutMs, label) => {
           throw new Error(`${label} timed out after ${String(timeoutMs)}ms`);
-        }
+        },
       });
 
       const { request, response } = createRequestResponsePair();
       request.method = "POST";
-      await expect(owner.handle({
-        req: request,
-        res: response,
-        pathname: "/api/push/test"
-      })).rejects.toThrow("push-test-send:private timed out");
+      await expect(
+        owner.handle({
+          req: request,
+          res: response,
+          pathname: "/api/push/test",
+        }),
+      ).rejects.toThrow("push-test-send:private timed out");
     } finally {
       fs.rmSync(temporaryDirectory, {
         recursive: true,
-        force: true
+        force: true,
       });
     }
   });

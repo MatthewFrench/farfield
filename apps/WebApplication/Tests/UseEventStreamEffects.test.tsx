@@ -1,43 +1,31 @@
 import { cleanup, render } from "@testing-library/react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  afterEach,
-  describe,
-  expect,
-  it,
-  vi
-} from "vitest";
-import type {
-  Dispatch,
-  MutableRefObject,
-  SetStateAction
-} from "react";
+  type EventRefreshFlags,
+  EventRefreshScheduler,
+} from "../Source/Application/StateManagement/EventRefreshScheduler";
 import {
-  RequestCanceledError
-} from "../Source/Shared/Errors/RequestCanceledError";
+  EventStreamConnectionCoordinator,
+  type EventStreamConnectionCoordinatorStartInput,
+} from "../Source/Application/StateManagement/EventStreamConnectionCoordinator";
+import { EventStreamRefreshDecisionEngine } from "../Source/Application/StateManagement/EventStreamRefreshDecisionEngine";
+import {
+  type UseEventStreamEffectsInput,
+  useEventStreamEffects,
+} from "../Source/Application/StateManagement/UseEventStreamEffects";
 import {
   type DebugErrorListResponse,
   type DebugHistoryResponse,
-  DebugServerClient
+  DebugServerClient,
 } from "../Source/Features/Debugging/DataAccess/DebugServerClient";
 import { buildDebugErrorSignature } from "../Source/Features/Debugging/DomainModel/DebugErrorSignature";
 import {
   DebugWorkspaceDataReader,
-  type DebugWorkspaceDataSnapshot
+  type DebugWorkspaceDataSnapshot,
 } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
-import {
-  EventRefreshScheduler,
-  type EventRefreshFlags
-} from "../Source/Application/StateManagement/EventRefreshScheduler";
-import {
-  EventStreamConnectionCoordinator,
-  type EventStreamConnectionCoordinatorStartInput
-} from "../Source/Application/StateManagement/EventStreamConnectionCoordinator";
-import { EventStreamRefreshDecisionEngine } from "../Source/Application/StateManagement/EventStreamRefreshDecisionEngine";
-import {
-  useEventStreamEffects,
-  type UseEventStreamEffectsInput
-} from "../Source/Application/StateManagement/UseEventStreamEffects";
+import { RequestCanceledError } from "../Source/Shared/Errors/RequestCanceledError";
 
 type DebugErrors = DebugErrorListResponse["data"];
 type DebugHistory = DebugHistoryResponse["history"];
@@ -49,27 +37,27 @@ const IMMEDIATE_EVENT_REFRESH_DELAY_MILLISECONDS = 0;
 const CORE_AND_SELECTED_THREAD_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: true,
   refreshHistory: false,
-  refreshSelectedThread: true
+  refreshSelectedThread: true,
 };
 const SELECTED_THREAD_ONLY_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: false,
   refreshHistory: false,
-  refreshSelectedThread: true
+  refreshSelectedThread: true,
 };
 const DEBUG_HISTORY_ONLY_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: false,
   refreshHistory: true,
-  refreshSelectedThread: false
+  refreshSelectedThread: false,
 };
 const CORE_ONLY_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: true,
   refreshHistory: false,
-  refreshSelectedThread: false
+  refreshSelectedThread: false,
 };
 const CORE_AND_HISTORY_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: true,
   refreshHistory: true,
-  refreshSelectedThread: false
+  refreshSelectedThread: false,
 };
 
 interface HarnessProperties {
@@ -86,8 +74,8 @@ class TestEventStreamConnectionCoordinator extends EventStreamConnectionCoordina
         onopen: null,
         onmessage: null,
         onerror: null,
-        close: () => {}
-      })
+        close: () => {},
+      }),
     });
   }
 
@@ -111,7 +99,7 @@ class TestDebugWorkspaceDataReader extends DebugWorkspaceDataReader {
 
   public override async readSnapshot(
     _historyLimit: number,
-    _errorListLimit: number
+    _errorListLimit: number,
   ): Promise<DebugWorkspaceDataSnapshot> {
     this.readSnapshotCallCount += 1;
     return this.snapshot;
@@ -128,31 +116,35 @@ function createDispatchSpy<ValueType>(): Dispatch<SetStateAction<ValueType>> {
 }
 
 function createDebugSnapshot(): DebugWorkspaceDataSnapshot {
-  const history: DebugHistory = [{
-    id: "history-1",
-    at: "2026-02-26T00:00:00.000Z",
-    source: "app",
-    direction: "in",
-    payload: { type: "history" },
-    meta: {}
-  }];
-  const debugErrors: DebugErrors = [{
-    errorId: "error-1",
-    sessionId: "session-1",
-    origin: "client",
-    source: "farfield-web",
-    operation: "refresh-history",
-    message: "debug-error",
-    severity: "error",
-    name: null,
-    stack: null,
-    requestId: null,
-    threadId: null,
-    url: null,
-    occurredAt: "2026-02-26T00:00:01.000Z",
-    recordedAt: "2026-02-26T00:00:02.000Z",
-    details: {}
-  }];
+  const history: DebugHistory = [
+    {
+      id: "history-1",
+      at: "2026-02-26T00:00:00.000Z",
+      source: "app",
+      direction: "in",
+      payload: { type: "history" },
+      meta: {},
+    },
+  ];
+  const debugErrors: DebugErrors = [
+    {
+      errorId: "error-1",
+      sessionId: "session-1",
+      origin: "client",
+      source: "farfield-web",
+      operation: "refresh-history",
+      message: "debug-error",
+      severity: "error",
+      name: null,
+      stack: null,
+      requestId: null,
+      threadId: null,
+      url: null,
+      occurredAt: "2026-02-26T00:00:01.000Z",
+      recordedAt: "2026-02-26T00:00:02.000Z",
+      details: {},
+    },
+  ];
 
   return {
     history,
@@ -163,15 +155,15 @@ function createDebugSnapshot(): DebugWorkspaceDataSnapshot {
       buildDebugErrorSignature({
         errorId: "error-1",
         recordedAt: "2026-02-26T00:00:02.000Z",
-        message: "debug-error"
-      })
-    ]
+        message: "debug-error",
+      }),
+    ],
   };
 }
 
 function createBaseInput(
   eventStreamConnectionCoordinator: TestEventStreamConnectionCoordinator,
-  debugWorkspaceDataReader: TestDebugWorkspaceDataReader
+  debugWorkspaceDataReader: TestDebugWorkspaceDataReader,
 ): UseEventStreamEffectsInput {
   const loadCoreDataTracked = vi.fn(async (): Promise<void> => {});
   const loadSelectedThread = vi.fn(async (_threadId: string): Promise<void> => {});
@@ -186,7 +178,7 @@ function createBaseInput(
     selectedThreadIdRef: { current: "thread-1" },
     loadCoreDataTrackedRef: { current: loadCoreDataTracked },
     loadSelectedThreadRef: {
-      current: loadSelectedThread
+      current: loadSelectedThread,
     },
     debugWorkspaceDataReader,
     debugWorkspaceStateStore: new DebugWorkspaceStateStore(),
@@ -197,12 +189,12 @@ function createBaseInput(
     setDebugErrorSessionId: createDispatchSpy<string>(),
     setDebugErrorSessionLogPath: createDispatchSpy<string>(),
     applySelectedThreadStreamDelta: vi.fn(),
-    handleRuntimeRequestError: vi.fn()
+    handleRuntimeRequestError: vi.fn(),
   };
 }
 
 function readStartInputOrThrow(
-  eventStreamConnectionCoordinator: TestEventStreamConnectionCoordinator
+  eventStreamConnectionCoordinator: TestEventStreamConnectionCoordinator,
 ): EventStreamConnectionCoordinatorStartInput {
   if (!eventStreamConnectionCoordinator.startInput) {
     throw new Error("Expected event-stream start input");
@@ -217,7 +209,7 @@ interface SelectedThreadReadCountRefResult {
 
 function createSelectedThreadReadCountRef(
   initialSelectedThreadId: string,
-  nextSelectedThreadId: string
+  nextSelectedThreadId: string,
 ): SelectedThreadReadCountRefResult {
   let selectedThreadIdValue: string | null = initialSelectedThreadId;
   const selectedThreadIdReadCountRef: MutableRefObject<number> = { current: 0 };
@@ -231,21 +223,24 @@ function createSelectedThreadReadCountRef(
     },
     set current(nextSelectedThreadIdValue: string | null) {
       selectedThreadIdValue = nextSelectedThreadIdValue;
-    }
+    },
   };
 
   return {
     selectedThreadIdRef,
-    selectedThreadIdReadCountRef
+    selectedThreadIdReadCountRef,
   };
 }
 
-const originalVisibilityStateDescriptor = Object.getOwnPropertyDescriptor(document, "visibilityState");
+const originalVisibilityStateDescriptor = Object.getOwnPropertyDescriptor(
+  document,
+  "visibilityState",
+);
 
 function setDocumentVisibilityState(nextVisibilityState: "visible" | "hidden"): void {
   Object.defineProperty(document, "visibilityState", {
     configurable: true,
-    get: () => nextVisibilityState
+    get: () => nextVisibilityState,
   });
 }
 
@@ -261,7 +256,7 @@ describe("useEventStreamEffects", () => {
     const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
     const input = createBaseInput(
       eventStreamConnectionCoordinator,
-      new TestDebugWorkspaceDataReader(createDebugSnapshot())
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
     );
 
     const { unmount } = render(<Harness input={input} />);
@@ -277,7 +272,7 @@ describe("useEventStreamEffects", () => {
     const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
     const input = createBaseInput(
       eventStreamConnectionCoordinator,
-      new TestDebugWorkspaceDataReader(createDebugSnapshot())
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
     );
     render(<Harness input={input} />);
 
@@ -294,7 +289,7 @@ describe("useEventStreamEffects", () => {
     const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
     const input = createBaseInput(
       eventStreamConnectionCoordinator,
-      new TestDebugWorkspaceDataReader(createDebugSnapshot())
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
     );
     render(<Harness input={input} />);
 
@@ -304,7 +299,7 @@ describe("useEventStreamEffects", () => {
     expect(input.loadSelectedThreadRef.current).toHaveBeenCalledTimes(1);
     expect(input.loadSelectedThreadRef.current).toHaveBeenCalledWith("thread-1", {
       includeReadThread: true,
-      includeTurns: false
+      includeTurns: false,
     });
   });
 
@@ -314,11 +309,11 @@ describe("useEventStreamEffects", () => {
     const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
     const input = createBaseInput(
       eventStreamConnectionCoordinator,
-      new TestDebugWorkspaceDataReader(createDebugSnapshot())
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
     );
     const selectedThreadReadCountRefResult = createSelectedThreadReadCountRef(
       "thread-1",
-      "thread-2"
+      "thread-2",
     );
     input.selectedThreadIdRef = selectedThreadReadCountRefResult.selectedThreadIdRef;
     render(<Harness input={input} />);
@@ -329,7 +324,7 @@ describe("useEventStreamEffects", () => {
     expect(selectedThreadReadCountRefResult.selectedThreadIdReadCountRef.current).toBe(1);
     expect(input.loadSelectedThreadRef.current).toHaveBeenCalledWith("thread-1", {
       includeReadThread: true,
-      includeTurns: false
+      includeTurns: false,
     });
   });
 
@@ -354,8 +349,8 @@ describe("useEventStreamEffects", () => {
       buildDebugErrorSignature({
         errorId: "error-1",
         recordedAt: "2026-02-26T00:00:02.000Z",
-        message: "debug-error"
-      })
+        message: "debug-error",
+      }),
     ]);
   });
 
@@ -381,7 +376,7 @@ describe("useEventStreamEffects", () => {
     const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
     const input = createBaseInput(
       eventStreamConnectionCoordinator,
-      new TestDebugWorkspaceDataReader(createDebugSnapshot())
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
     );
     input.loadCoreDataTrackedRef.current = vi.fn(async (): Promise<void> => {
       throw new RequestCanceledError("/api/threads");

@@ -4,7 +4,7 @@ import {
   NonEmptyStringSchema,
   NonNegativeIntSchema,
   NullableNonEmptyStringSchema,
-  NullableStringSchema
+  NullableStringSchema,
 } from "../../Common.js";
 import { CollaborationModeSchema } from "./CollaborationModeContracts.js";
 import { TurnStartParamsSchema } from "./TurnInputContracts.js";
@@ -27,7 +27,7 @@ export const ThreadTurnSchema = z
     finalAssistantStartedAtMs: z.union([NonNegativeIntSchema, z.null()]).optional(),
     error: OptionalNullableJsonValueSchema,
     diff: OptionalNullableJsonValueSchema,
-    items: z.array(TurnItemSchema)
+    items: z.array(TurnItemSchema),
   })
   .passthrough();
 
@@ -49,7 +49,7 @@ export const ThreadConversationStateSchema = z
     gitInfo: OptionalNullableJsonValueSchema,
     resumeState: z.string().optional(),
     latestTokenUsageInfo: JsonValueSchema.optional(),
-    source: z.string().optional()
+    source: z.string().optional(),
   })
   .passthrough();
 

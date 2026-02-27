@@ -1,12 +1,12 @@
-import { JsonValueSchema, type JsonValue } from "@farfield/protocol";
+import { type JsonValue, JsonValueSchema } from "@farfield/protocol";
 import { z } from "zod";
 import {
   DebugReplayFrameParseError,
   DebugReplayFrameParseErrorTypeByName,
-  DebugReplayFrameTypeByName,
   type DebugReplayFrameParseIssue,
   type DebugReplayFrameType,
-  type ParsedReplayFrame
+  DebugReplayFrameTypeByName,
+  type ParsedReplayFrame,
 } from "./DebugRouteContracts.js";
 
 const ReplayFrameMethodSchema = z.string().trim().min(1);
@@ -22,16 +22,15 @@ function createReplayFrameSchema(frameType: DebugReplayFrameType) {
       method: ReplayFrameMethodSchema,
       params: JsonValueSchema.optional(),
       targetClientId: ReplayFrameTargetClientIdentifierSchema.optional(),
-      version: ReplayFrameVersionSchema.optional()
+      version: ReplayFrameVersionSchema.optional(),
     })
     .passthrough();
 }
 
-const ReplayFrameSchema = z
-  .discriminatedUnion("type", [
-    createReplayFrameSchema(DebugReplayFrameTypeByName.request),
-    createReplayFrameSchema(DebugReplayFrameTypeByName.broadcast)
-  ]);
+const ReplayFrameSchema = z.discriminatedUnion("type", [
+  createReplayFrameSchema(DebugReplayFrameTypeByName.request),
+  createReplayFrameSchema(DebugReplayFrameTypeByName.broadcast),
+]);
 
 /**
  * Owns debug replay frame boundary parsing so route handlers consume a strict, route-owned contract.
@@ -42,7 +41,7 @@ export function parseReplayFrame(payload: JsonValue): ParsedReplayFrame {
   if (!parsedReplayFrameResult.success) {
     throw new DebugReplayFrameParseError({
       errorType: DebugReplayFrameParseErrorTypeByName.invalidReplayFramePayload,
-      issues: mapReplayFrameIssues(parsedReplayFrameResult.error.issues)
+      issues: mapReplayFrameIssues(parsedReplayFrameResult.error.issues),
     });
   }
 
@@ -55,9 +54,7 @@ export function parseReplayFrame(payload: JsonValue): ParsedReplayFrame {
     ...(parsedReplayFrame.targetClientId !== undefined
       ? { targetClientId: parsedReplayFrame.targetClientId }
       : {}),
-    ...(parsedReplayFrame.version !== undefined
-      ? { version: parsedReplayFrame.version }
-      : {})
+    ...(parsedReplayFrame.version !== undefined ? { version: parsedReplayFrame.version } : {}),
   };
 }
 
@@ -66,14 +63,14 @@ function mapReplayFrameIssues(issues: ReadonlyArray<z.ZodIssue>): DebugReplayFra
     .map((issue) => ({
       path: buildReplayFrameIssuePath(issue.path),
       issueCode: issue.code,
-      message: issue.message
+      message: issue.message,
     }))
     .sort(compareReplayFrameIssues);
 }
 
 function compareReplayFrameIssues(
   leftIssue: DebugReplayFrameParseIssue,
-  rightIssue: DebugReplayFrameParseIssue
+  rightIssue: DebugReplayFrameParseIssue,
 ): number {
   const pathOrder = leftIssue.path.localeCompare(rightIssue.path);
   if (pathOrder !== 0) {

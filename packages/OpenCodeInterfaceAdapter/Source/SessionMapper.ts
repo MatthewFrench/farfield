@@ -1,13 +1,9 @@
-import type {
-  OpenCodeMessage,
-  OpenCodePart,
-  OpenCodeSession
-} from "./Schemas.js";
+import { messagesToTurns } from "./ConversationTurnMapper.js";
 import {
   type MappedThreadConversationState,
-  type MappedThreadListItem
+  type MappedThreadListItem,
 } from "./MapperContracts.js";
-import { messagesToTurns } from "./ConversationTurnMapper.js";
+import type { OpenCodeMessage, OpenCodePart, OpenCodeSession } from "./Schemas.js";
 
 const UNTITLED_SESSION_PREVIEW = "(untitled)";
 
@@ -20,27 +16,26 @@ export function sessionToThreadListItem(session: OpenCodeSession): MappedThreadL
     createdAt: session.time.created,
     updatedAt: session.time.updated,
     cwd: session.directory,
-    source: "opencode"
+    source: "opencode",
   };
 }
 
 export function sessionToConversationState(
   session: OpenCodeSession,
   messages: OpenCodeMessage[],
-  partsByMessage: Map<string, OpenCodePart[]>
+  partsByMessage: Map<string, OpenCodePart[]>,
 ): MappedThreadConversationState {
   const turns = messagesToTurns(messages, partsByMessage);
 
   const latestAssistant = resolveLatestAssistantMessage(messages);
-  const latestModel = (
-    latestAssistant !== null
-    && latestAssistant.providerID !== undefined
-    && latestAssistant.providerID.length > 0
-    && latestAssistant.modelID !== undefined
-    && latestAssistant.modelID.length > 0
-  )
-    ? `${latestAssistant.providerID}/${latestAssistant.modelID}`
-    : null;
+  const latestModel =
+    latestAssistant !== null &&
+    latestAssistant.providerID !== undefined &&
+    latestAssistant.providerID.length > 0 &&
+    latestAssistant.modelID !== undefined &&
+    latestAssistant.modelID.length > 0
+      ? `${latestAssistant.providerID}/${latestAssistant.modelID}`
+      : null;
   const sessionTitle = normalizeSessionTitle(session.title);
 
   return {
@@ -52,7 +47,7 @@ export function sessionToConversationState(
     title: sessionTitle,
     latestModel,
     cwd: session.directory,
-    source: "opencode"
+    source: "opencode",
   };
 }
 

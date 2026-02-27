@@ -18,14 +18,12 @@ describe("server cli options", () => {
   });
 
   it("rejects unknown agent ids", () => {
-    expect(() => parseServerCliOptions(["--agents=foo"])).toThrowError(
-      /Unknown agent id/
-    );
+    expect(() => parseServerCliOptions(["--agents=foo"])).toThrowError(/Unknown agent id/);
   });
 
   it("rejects empty comma-delimited agent tokens", () => {
     expect(() => parseServerCliOptions(["--agents=codex,,opencode"])).toThrowError(
-      /Missing value for --agents/
+      /Missing value for --agents/,
     );
   });
 
@@ -36,7 +34,7 @@ describe("server cli options", () => {
 
   it("rejects --agents when the next token is another flag", () => {
     expect(() => parseServerCliOptions(["--agents", "--help"])).toThrowError(
-      /Missing value for --agents/
+      /Missing value for --agents/,
     );
   });
 });

@@ -1,14 +1,9 @@
-import {
-  useEffect,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction
-} from "react";
+import { type Dispatch, type MutableRefObject, type SetStateAction, useEffect } from "react";
+import type { ModeSelectionConversationState } from "../DomainModel/ModeSelectionStateResolver";
 import {
   createEmptyPendingUserInputAnswerDraft,
-  type PendingUserInputAnswerDraftByQuestionId
+  type PendingUserInputAnswerDraftByQuestionId,
 } from "../DomainModel/PendingUserInputAnswerBuilder";
-import type { ModeSelectionConversationState } from "../DomainModel/ModeSelectionStateResolver";
 import { type PendingUserInputRequest } from "../DomainModel/PendingUserInputRequestSelector";
 import { ModeSelectionSyncCoordinator } from "./ModeSelectionSyncCoordinator";
 
@@ -48,9 +43,8 @@ export function useModeAndPendingRequestEffects(input: UseModeAndPendingRequestE
     input.setAnswerDraft((previousAnswerDraft) => {
       const nextAnswerDraft: PendingUserInputAnswerDraftByQuestionId = {};
       for (const question of activeRequest.params.questions) {
-        nextAnswerDraft[question.id] = (
-          previousAnswerDraft[question.id] ?? createEmptyPendingUserInputAnswerDraft()
-        );
+        nextAnswerDraft[question.id] =
+          previousAnswerDraft[question.id] ?? createEmptyPendingUserInputAnswerDraft();
       }
       return nextAnswerDraft;
     });
@@ -68,13 +62,10 @@ export function useModeAndPendingRequestEffects(input: UseModeAndPendingRequestE
       selectedReasoningEffort: input.selectedReasoningEffort,
       hasHydratedModeFromLiveState: input.hasHydratedModeFromLiveState,
       isModeSyncing: input.isModeSyncing,
-      lastAppliedModeSignature: lastAppliedModeSignatureRef.current
+      lastAppliedModeSignature: lastAppliedModeSignatureRef.current,
     });
 
-    if (
-      transition.kind === "noConversationState"
-      || transition.kind === "holdLocalSyncingState"
-    ) {
+    if (transition.kind === "noConversationState" || transition.kind === "holdLocalSyncingState") {
       return;
     }
 
@@ -112,7 +103,7 @@ export function useModeAndPendingRequestEffects(input: UseModeAndPendingRequestE
     input.setIsModeSyncing,
     input.setSelectedModeKey,
     input.setSelectedModelId,
-    input.setSelectedReasoningEffort
+    input.setSelectedReasoningEffort,
   ]);
 
   useEffect(() => {
@@ -124,6 +115,6 @@ export function useModeAndPendingRequestEffects(input: UseModeAndPendingRequestE
     input.lastAppliedModeSignatureRef,
     input.selectedThreadId,
     input.setHasHydratedModeFromLiveState,
-    input.setIsModeSyncing
+    input.setIsModeSyncing,
   ]);
 }

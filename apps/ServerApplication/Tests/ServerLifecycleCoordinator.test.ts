@@ -1,20 +1,20 @@
-import type { Server } from "node:http";
+import { EventEmitter } from "node:events";
 import fs from "node:fs";
+import type { Server } from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import type { AgentAdapter, AgentCapabilities, AgentId } from "../Source/Agents/Types.js";
+import { ServerLifecycleCoordinator } from "../Source/Application/Bootstrap/ServerLifecycleCoordinator.js";
 import { ActivityHistoryService } from "../Source/Modules/Activity/ActivityHistoryService.js";
 import { ClientErrorStore } from "../Source/Modules/Debugging/ClientErrorStore.js";
-import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
 import { NtfyNotifier } from "../Source/Modules/PushNotifications/NtfyNotifier.js";
-import { PushDispatchConcurrencyCoordinator } from "../Source/Network/PushDispatchConcurrencyCoordinator.js";
 import { PushReceiptStore } from "../Source/Modules/PushNotifications/PushReceiptStore.js";
 import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
 import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
-import { ServerLifecycleCoordinator } from "../Source/Application/Bootstrap/ServerLifecycleCoordinator.js";
+import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
+import { PushDispatchConcurrencyCoordinator } from "../Source/Network/PushDispatchConcurrencyCoordinator.js";
 
 const temporaryDirectoryPaths: string[] = [];
 
@@ -53,12 +53,12 @@ const defaultCapabilities: AgentCapabilities = {
   canSetCollaborationMode: false,
   canSubmitUserInput: false,
   canReadLiveState: false,
-  canReadStreamEvents: false
+  canReadStreamEvents: false,
 };
 
 function createAdapter(
   id: AgentId,
-  counters: { startCount: number; stopCount: number }
+  counters: { startCount: number; stopCount: number },
 ): AgentAdapter {
   return {
     id,
@@ -90,7 +90,7 @@ function createAdapter(
     },
     async interrupt(): Promise<void> {
       throw new Error("not used");
-    }
+    },
   };
 }
 
@@ -116,30 +116,34 @@ describe("ServerLifecycleCoordinator", () => {
     const pushDispatchConcurrencyCoordinator = new PushDispatchConcurrencyCoordinator(
       50,
       () => false,
-      async () => {}
+      async () => {},
     );
 
     const pushStore = new PushStore(path.join(temporaryDirectoryPath, "push-state.json"));
     pushStore.load();
-    const pushReceiptStore = new PushReceiptStore(path.join(temporaryDirectoryPath, "push-receipts.json"), 50, 86_400_000);
+    const pushReceiptStore = new PushReceiptStore(
+      path.join(temporaryDirectoryPath, "push-receipts.json"),
+      50,
+      86_400_000,
+    );
     pushReceiptStore.load();
     const pushService = new PushService({
       enabled: false,
       vapidPublicKey: "",
       vapidPrivateKey: "",
-      vapidSubject: ""
+      vapidSubject: "",
     });
     const clientErrorStore = new ClientErrorStore(
       path.join(temporaryDirectoryPath, "client-errors.ndjson"),
       "session-test",
-      100
+      100,
     );
     const ntfyNotifier = new NtfyNotifier({
       enabled: false,
       topic: null,
       baseUrl: "https://ntfy.sh",
       bearerToken: null,
-      priority: "3"
+      priority: "3",
     });
 
     const lifecycleMessages: string[] = [];
@@ -178,7 +182,7 @@ describe("ServerLifecycleCoordinator", () => {
       pushSystem: (message) => {
         lifecycleMessages.push(message);
       },
-      broadcastRuntimeState: () => {}
+      broadcastRuntimeState: () => {},
     });
 
     expect(coordinator.isShuttingDown()).toBe(false);

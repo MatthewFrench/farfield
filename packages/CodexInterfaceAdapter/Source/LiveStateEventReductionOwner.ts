@@ -1,13 +1,13 @@
 import {
   type ThreadConversationState,
   type ThreadStreamPatch,
-  type ThreadStreamStateChangedBroadcast
+  type ThreadStreamStateChangedBroadcast,
 } from "@farfield/protocol";
-import { applyStrictPatch } from "./LiveStatePatchApplicationOwner.js";
 import {
   createThreadStreamReductionError,
-  normalizeErrorCause
+  normalizeErrorCause,
 } from "./LiveStateErrorContracts.js";
+import { applyStrictPatch } from "./LiveStatePatchApplicationOwner.js";
 
 const NO_TURN_PARAMS_TEMPLATE_ERROR_MESSAGE = "No turn params template found in conversation state";
 const THREAD_STREAM_CHANGE_TYPE_SNAPSHOT = "snapshot";
@@ -22,7 +22,7 @@ function applyEventPatchSequence(
   eventIndex: number,
   event: ThreadStreamStateChangedBroadcast,
   sourceConversationState: ThreadConversationState,
-  patches: ThreadStreamPatch[]
+  patches: ThreadStreamPatch[],
 ): ThreadConversationState {
   // Stream reduction keeps strict per-patch validation so failures retain
   // deterministic event/patch localization metadata for diagnostics.
@@ -42,7 +42,7 @@ function applyEventPatchSequence(
         patchIndex,
         event,
         patch,
-        normalizedCause
+        normalizedCause,
       );
     }
   }
@@ -52,24 +52,24 @@ function applyEventPatchSequence(
 function createEmptyThreadStreamDerivedState(): ThreadStreamDerivedState {
   return {
     ownerClientId: null,
-    conversationState: null
+    conversationState: null,
   };
 }
 
 function createNextThreadStreamDerivedState(
   previous: ThreadStreamDerivedState,
-  sourceClientId: string
+  sourceClientId: string,
 ): ThreadStreamDerivedState {
   return {
     ownerClientId: sourceClientId,
-    conversationState: previous.conversationState
+    conversationState: previous.conversationState,
   };
 }
 
 function reduceThreadStreamEvent(
   byThread: Map<string, ThreadStreamDerivedState>,
   event: ThreadStreamStateChangedBroadcast,
-  eventIndex: number
+  eventIndex: number,
 ): void {
   const threadId = event.params.conversationId;
   const previous = byThread.get(threadId) ?? createEmptyThreadStreamDerivedState();
@@ -88,7 +88,7 @@ function reduceThreadStreamEvent(
       eventIndex,
       event,
       next.conversationState,
-      change.patches
+      change.patches,
     );
     byThread.set(threadId, next);
     return;
@@ -100,7 +100,7 @@ function reduceThreadStreamEvent(
 }
 
 export function reduceThreadStreamEvents(
-  events: ThreadStreamStateChangedBroadcast[]
+  events: ThreadStreamStateChangedBroadcast[],
 ): Map<string, ThreadStreamDerivedState> {
   const byThread = new Map<string, ThreadStreamDerivedState>();
 
@@ -117,7 +117,7 @@ export function reduceThreadStreamEvents(
 }
 
 export function findLatestTurnParamsTemplate(
-  conversationState: ThreadConversationState
+  conversationState: ThreadConversationState,
 ): NonNullable<ThreadConversationState["turns"][number]["params"]> {
   for (let i = conversationState.turns.length - 1; i >= 0; i -= 1) {
     const turn = conversationState.turns[i];

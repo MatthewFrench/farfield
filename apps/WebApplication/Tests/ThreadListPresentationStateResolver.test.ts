@@ -18,7 +18,7 @@ function buildThread(input: {
     updatedAt: input.updatedAt,
     source: "opencode",
     agentId: "codex",
-    isProjectRemoved: input.isProjectRemoved ?? false
+    isProjectRemoved: input.isProjectRemoved ?? false,
   };
 }
 
@@ -31,7 +31,7 @@ describe("ThreadListPresentationStateResolver", () => {
         preview: "alpha",
         cwd: "/workspace/alpha",
         createdAt: 10,
-        updatedAt: 20
+        updatedAt: 20,
       }),
       buildThread({
         id: "thread-2",
@@ -39,8 +39,8 @@ describe("ThreadListPresentationStateResolver", () => {
         cwd: "/workspace/beta",
         createdAt: 11,
         updatedAt: 21,
-        isProjectRemoved: true
-      })
+        isProjectRemoved: true,
+      }),
     ];
     const archivedThreads: ThreadListItem[] = [
       buildThread({
@@ -48,19 +48,22 @@ describe("ThreadListPresentationStateResolver", () => {
         preview: "gamma",
         cwd: "/workspace/gamma",
         createdAt: 12,
-        updatedAt: 22
-      })
+        updatedAt: 22,
+      }),
     ];
 
     const result = resolver.readState({
       threads: activeThreads,
       archivedThreads,
-      selectedThreadIdentifier: "thread-1"
+      selectedThreadIdentifier: "thread-1",
     });
 
     expect(result.selectedThread?.id).toBe("thread-1");
     expect(result.activeProjectGroups.map((group) => group.label)).toEqual(["alpha"]);
-    expect(result.archivedProjectGroups.map((group) => group.label).sort()).toEqual(["beta", "gamma"]);
+    expect(result.archivedProjectGroups.map((group) => group.label).sort()).toEqual([
+      "beta",
+      "gamma",
+    ]);
     expect(result.archivedThreadIdentifiers.has("thread-3")).toBe(true);
     expect(result.archivedThreadIdentifiers.has("thread-2")).toBe(false);
     expect(result.archivedSectionThreadCount).toBe(2);
@@ -71,7 +74,7 @@ describe("ThreadListPresentationStateResolver", () => {
     const result = resolver.readState({
       threads: [],
       archivedThreads: [],
-      selectedThreadIdentifier: "thread-missing"
+      selectedThreadIdentifier: "thread-missing",
     });
 
     expect(result.selectedThread).toBeNull();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type DebugErrorLike,
-  type DebugHistoryEntryLike
+  type DebugHistoryEntryLike,
 } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { DebugIssueStateResolver } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 
@@ -23,7 +23,7 @@ function buildDebugError(input: {
     requestId: null,
     threadId: null,
     occurredAt: input.occurredAt,
-    details: {}
+    details: {},
   };
 }
 
@@ -38,8 +38,8 @@ function buildHistoryWarningEntry(input: {
     source: "ipc",
     payload: {},
     meta: {
-      method: input.method
-    }
+      method: input.method,
+    },
   };
 }
 
@@ -51,32 +51,32 @@ describe("DebugIssueStateResolver", () => {
         errorId: "error-early",
         operation: "thread.read",
         message: "early error",
-        occurredAt: "2025-01-01T10:00:00.000Z"
+        occurredAt: "2025-01-01T10:00:00.000Z",
       }),
       buildDebugError({
         errorId: "error-late",
         operation: "thread.read",
         message: "late error",
-        occurredAt: "2025-01-01T11:00:00.000Z"
-      })
+        occurredAt: "2025-01-01T11:00:00.000Z",
+      }),
     ]);
     const debugWarningIssues = resolver.readDebugWarningIssues([
       buildHistoryWarningEntry({
         id: "warning-1",
         at: "2025-01-01T10:30:00.000Z",
-        method: "warning.deprecated.method"
-      })
+        method: "warning.deprecated.method",
+      }),
     ]);
 
     const debugIssues = resolver.readCombinedDebugIssues({
       debugErrorIssues,
-      debugWarningIssues
+      debugWarningIssues,
     });
 
     expect(debugIssues.map((issue) => issue.id)).toEqual([
       "error:error-late",
       "warning:history-method:warning-1",
-      "error:error-early"
+      "error:error-early",
     ]);
   });
 
@@ -88,27 +88,27 @@ describe("DebugIssueStateResolver", () => {
           errorId: "error-alpha",
           operation: "alpha.operation",
           message: "alpha failure",
-          occurredAt: "2025-01-01T10:00:00.000Z"
-        })
+          occurredAt: "2025-01-01T10:00:00.000Z",
+        }),
       ]),
       debugWarningIssues: resolver.readDebugWarningIssues([
         buildHistoryWarningEntry({
           id: "warning-beta",
           at: "2025-01-01T10:30:00.000Z",
-          method: "warning.beta"
-        })
-      ])
+          method: "warning.beta",
+        }),
+      ]),
     });
 
     const filteredErrorIssues = resolver.readFilteredDebugIssues({
       debugIssues,
       severityFilter: "error",
-      filterQuery: ""
+      filterQuery: "",
     });
     const filteredWarningIssuesByQuery = resolver.readFilteredDebugIssues({
       debugIssues,
       severityFilter: "all",
-      filterQuery: "warning.beta"
+      filterQuery: "warning.beta",
     });
 
     expect(filteredErrorIssues.length).toBe(1);
@@ -125,22 +125,22 @@ describe("DebugIssueStateResolver", () => {
           errorId: "error-alpha",
           operation: "alpha.operation",
           message: "alpha failure",
-          occurredAt: "2025-01-01T10:00:00.000Z"
-        })
+          occurredAt: "2025-01-01T10:00:00.000Z",
+        }),
       ]),
       debugWarningIssues: resolver.readDebugWarningIssues([
         buildHistoryWarningEntry({
           id: "warning-beta",
           at: "2025-01-01T10:30:00.000Z",
-          method: "warning.beta"
-        })
-      ])
+          method: "warning.beta",
+        }),
+      ]),
     });
 
     const filteredIssues = resolver.readFilteredDebugIssues({
       debugIssues,
       severityFilter: "all",
-      filterQuery: "   ALPHA FAILURE   "
+      filterQuery: "   ALPHA FAILURE   ",
     });
 
     expect(filteredIssues.map((issue) => issue.id)).toEqual(["error:error-alpha"]);
@@ -154,24 +154,27 @@ describe("DebugIssueStateResolver", () => {
           errorId: "error-first",
           operation: "alpha.operation",
           message: "alpha failure",
-          occurredAt: "2025-01-01T10:00:00.000Z"
-        })
+          occurredAt: "2025-01-01T10:00:00.000Z",
+        }),
       ]),
-      debugWarningIssues: []
+      debugWarningIssues: [],
     });
 
     const selectedDebugIssue = resolver.readSelectedDebugIssue({
       debugIssues,
-      selectedIssueIdentifier: "error:error-first"
+      selectedIssueIdentifier: "error:error-first",
     });
-    const nextSelectedDebugIssueIdentifierWhenMissing = resolver.readNextSelectedDebugIssueIdentifier({
-      debugIssues,
-      selectedIssueIdentifier: "missing"
-    });
-    const nextSelectedDebugIssueIdentifierWhenEmpty = resolver.readNextSelectedDebugIssueIdentifier({
-      debugIssues: [],
-      selectedIssueIdentifier: "missing"
-    });
+    const nextSelectedDebugIssueIdentifierWhenMissing =
+      resolver.readNextSelectedDebugIssueIdentifier({
+        debugIssues,
+        selectedIssueIdentifier: "missing",
+      });
+    const nextSelectedDebugIssueIdentifierWhenEmpty = resolver.readNextSelectedDebugIssueIdentifier(
+      {
+        debugIssues: [],
+        selectedIssueIdentifier: "missing",
+      },
+    );
 
     expect(selectedDebugIssue?.id).toBe("error:error-first");
     expect(nextSelectedDebugIssueIdentifierWhenMissing).toBe("error:error-first");

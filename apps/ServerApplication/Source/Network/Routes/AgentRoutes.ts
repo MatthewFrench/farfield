@@ -1,28 +1,28 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
-import { logger } from "../../Shared/Logging/Logger.js";
 import type { AgentRegistry } from "../../Agents/Registry.js";
 import type { AgentAdapter, AgentDescriptor, AgentId } from "../../Agents/Types.js";
+import { logger } from "../../Shared/Logging/Logger.js";
 
 const AgentRouteMethodByName = {
-  get: "GET"
+  get: "GET",
 } as const;
 
 const AgentRoutePathnameByName = {
-  listAgents: "/api/agents"
+  listAgents: "/api/agents",
 } as const;
 
 const AgentRouteStatusCodeByName = {
-  successOk: 200
+  successOk: 200,
 } as const;
 
 const AgentRouteLogEventByName = {
-  projectDirectoryListFailed: "agent-project-directory-list-failed"
+  projectDirectoryListFailed: "agent-project-directory-list-failed",
 } as const;
 
 const AgentRouteErrorMessageByName = {
   missingDefaultAgentIdentifier:
-    "Agent route cannot resolve a default agent identifier from enabled, configured, or listed agents."
+    "Agent route cannot resolve a default agent identifier from enabled, configured, or listed agents.",
 } as const;
 
 const AgentRouteMaximumLoggedErrorLength = 240;
@@ -31,7 +31,7 @@ const AgentRouteProjectDirectoryListSchema = z.array(z.string());
 
 type AgentRouteBuildDescriptor = (
   adapter: AgentAdapter,
-  projectDirectories: string[]
+  projectDirectories: string[],
 ) => AgentDescriptor;
 
 interface AgentRouteListResponseBody {
@@ -56,15 +56,8 @@ export interface AgentRouteDependencies {
  * project-directory read failures to bounded warning logs.
  */
 export async function handleAgentRoutes(deps: AgentRouteDependencies): Promise<boolean> {
-  const {
-    req,
-    res,
-    pathname,
-    registry,
-    configuredAgentIds,
-    buildAgentDescriptor,
-    jsonResponse
-  } = deps;
+  const { req, res, pathname, registry, configuredAgentIds, buildAgentDescriptor, jsonResponse } =
+    deps;
 
   if (!isListAgentsRouteRequest(req.method, pathname)) {
     return false;
@@ -73,13 +66,13 @@ export async function handleAgentRoutes(deps: AgentRouteDependencies): Promise<b
   const descriptors = await Promise.all(
     registry
       .listAdapters()
-      .map((adapter) => buildAgentDescriptorWithProjectDirectories(adapter, buildAgentDescriptor))
+      .map((adapter) => buildAgentDescriptorWithProjectDirectories(adapter, buildAgentDescriptor)),
   );
 
   const responseBody: AgentRouteListResponseBody = {
     ok: true,
     agents: descriptors,
-    defaultAgentId: resolveDefaultAgentIdentifier(registry, configuredAgentIds, descriptors)
+    defaultAgentId: resolveDefaultAgentIdentifier(registry, configuredAgentIds, descriptors),
   };
 
   jsonResponse(res, AgentRouteStatusCodeByName.successOk, responseBody);
@@ -92,7 +85,7 @@ function isListAgentsRouteRequest(method: string | undefined, pathname: string):
 
 async function buildAgentDescriptorWithProjectDirectories(
   adapter: AgentAdapter,
-  buildAgentDescriptor: AgentRouteBuildDescriptor
+  buildAgentDescriptor: AgentRouteBuildDescriptor,
 ): Promise<AgentDescriptor> {
   if (!adapter.listProjectDirectories || !adapter.isConnected()) {
     return buildAgentDescriptor(adapter, createEmptyProjectDirectoryList());
@@ -100,7 +93,7 @@ async function buildAgentDescriptorWithProjectDirectories(
 
   try {
     const projectDirectories = AgentRouteProjectDirectoryListSchema.parse(
-      await adapter.listProjectDirectories()
+      await adapter.listProjectDirectories(),
     );
     return buildAgentDescriptor(adapter, projectDirectories);
   } catch (error) {
@@ -116,7 +109,7 @@ function createEmptyProjectDirectoryList(): string[] {
 function resolveDefaultAgentIdentifier(
   registry: AgentRegistry,
   configuredAgentIds: AgentId[],
-  descriptors: AgentDescriptor[]
+  descriptors: AgentDescriptor[],
 ): AgentId {
   const enabledAgentIdentifier = registry.resolveDefaultAgentId();
   if (enabledAgentIdentifier !== null) {
@@ -125,7 +118,7 @@ function resolveDefaultAgentIdentifier(
 
   const configuredAgentIdentifier = resolveConfiguredDefaultAgentIdentifier(
     configuredAgentIds,
-    descriptors
+    descriptors,
   );
   if (configuredAgentIdentifier !== null) {
     return configuredAgentIdentifier;
@@ -145,7 +138,7 @@ function resolveDefaultAgentIdentifier(
  */
 function resolveConfiguredDefaultAgentIdentifier(
   configuredAgentIds: AgentId[],
-  descriptors: AgentDescriptor[]
+  descriptors: AgentDescriptor[],
 ): AgentId | null {
   if (descriptors.length === 0) {
     return configuredAgentIds[0] ?? null;
@@ -165,9 +158,9 @@ function logProjectDirectoryListFailure(agentId: AgentId, errorMessage: string):
   logger.warn(
     {
       agentId,
-      error: truncateRouteErrorMessage(errorMessage)
+      error: truncateRouteErrorMessage(errorMessage),
     },
-    AgentRouteLogEventByName.projectDirectoryListFailed
+    AgentRouteLogEventByName.projectDirectoryListFailed,
   );
 }
 

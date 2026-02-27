@@ -1,34 +1,31 @@
-import { describe, expect, it } from "vitest";
 import {
   AppServerClient,
   type AppServerTransport,
   type ListThreadsAllOptions,
   type ListThreadsOptions,
   type ReadConfigOptions,
-  type StartThreadOptions
+  type StartThreadOptions,
 } from "@farfield/api";
 import type {
   AppServerConfigReadResponse,
   AppServerListThreadsResponse,
   AppServerStartThreadResponse,
-  JsonValue
+  JsonValue,
 } from "@farfield/protocol";
+import { describe, expect, it } from "vitest";
 import { CodexThreadManagementOwner } from "../Source/Agents/Adapters/CodexThreadManagementOwner.js";
-import type {
-  AgentCreateThreadInput,
-  AgentListThreadsInput
-} from "../Source/Agents/Types.js";
+import type { AgentCreateThreadInput, AgentListThreadsInput } from "../Source/Agents/Types.js";
 
 const NOOP_TRANSPORT: AppServerTransport = {
   async request(_method: string, _params: object, _timeoutMs?: number): Promise<JsonValue> {
     throw new Error("transport should not be used in this test");
   },
-  async close(): Promise<void> {}
+  async close(): Promise<void> {},
 };
 
 const EMPTY_LIST_THREADS_RESPONSE: AppServerListThreadsResponse = {
   data: [],
-  nextCursor: null
+  nextCursor: null,
 };
 
 const EMPTY_READ_CONFIG_RESPONSE: AppServerConfigReadResponse = {
@@ -36,8 +33,8 @@ const EMPTY_READ_CONFIG_RESPONSE: AppServerConfigReadResponse = {
     profile: null,
     model: null,
     model_reasoning_effort: null,
-    profiles: {}
-  }
+    profiles: {},
+  },
 };
 
 const START_THREAD_RESPONSE: AppServerStartThreadResponse = {
@@ -46,11 +43,11 @@ const START_THREAD_RESPONSE: AppServerStartThreadResponse = {
     preview: "Thread preview",
     createdAt: 1,
     updatedAt: 1,
-    source: "opencode"
+    source: "opencode",
   },
   model: "gpt-5",
   modelProvider: "openai",
-  cwd: "/tmp/workspace"
+  cwd: "/tmp/workspace",
 };
 
 class TestAppServerClient extends AppServerClient {
@@ -77,23 +74,29 @@ class TestAppServerClient extends AppServerClient {
     this.readConfigResult = input?.readConfigResult ?? EMPTY_READ_CONFIG_RESPONSE;
   }
 
-  public override async listThreads(options: ListThreadsOptions): Promise<AppServerListThreadsResponse> {
+  public override async listThreads(
+    options: ListThreadsOptions,
+  ): Promise<AppServerListThreadsResponse> {
     this.listThreadsCalls.push(options);
     return this.listThreadsResult;
   }
 
-  public override async listThreadsAll(options: ListThreadsAllOptions): Promise<AppServerListThreadsResponse> {
+  public override async listThreadsAll(
+    options: ListThreadsAllOptions,
+  ): Promise<AppServerListThreadsResponse> {
     this.listThreadsAllCalls.push(options);
     return this.listThreadsAllResult;
   }
 
-  public override async startThread(options: StartThreadOptions): Promise<AppServerStartThreadResponse> {
+  public override async startThread(
+    options: StartThreadOptions,
+  ): Promise<AppServerStartThreadResponse> {
     this.startThreadCalls.push(options);
     return this.startThreadResult;
   }
 
   public override async readConfig(
-    options?: ReadConfigOptions
+    options?: ReadConfigOptions,
   ): Promise<AppServerConfigReadResponse> {
     this.readConfigCalls.push(options);
     return this.readConfigResult;
@@ -103,8 +106,9 @@ class TestAppServerClient extends AppServerClient {
 function createOwner(appClient: AppServerClient): CodexThreadManagementOwner {
   return new CodexThreadManagementOwner({
     appClient,
-    runAppServerCall: async <ValueType>(operation: () => Promise<ValueType>): Promise<ValueType> => operation(),
-    ensureCodexAvailable: () => {}
+    runAppServerCall: async <ValueType>(operation: () => Promise<ValueType>): Promise<ValueType> =>
+      operation(),
+    ensureCodexAvailable: () => {},
   });
 }
 
@@ -118,7 +122,9 @@ interface AgentListThreadsInputOverrides {
   cwd?: AgentListThreadsInput["cwd"];
 }
 
-function createListThreadsInput(overrides: AgentListThreadsInputOverrides = {}): AgentListThreadsInput {
+function createListThreadsInput(
+  overrides: AgentListThreadsInputOverrides = {},
+): AgentListThreadsInput {
   return {
     limit: 20,
     archived: false,
@@ -127,7 +133,7 @@ function createListThreadsInput(overrides: AgentListThreadsInputOverrides = {}):
     cursor: null,
     sortKey: "updated_at",
     cwd: null,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -136,8 +142,8 @@ describe("CodexThreadManagementOwner", () => {
     const appClient = new TestAppServerClient({
       listThreadsResult: {
         data: [],
-        nextCursor: "next-cursor"
-      }
+        nextCursor: "next-cursor",
+      },
     });
     const owner = createOwner(appClient);
 
@@ -146,20 +152,20 @@ describe("CodexThreadManagementOwner", () => {
         all: false,
         limit: 10,
         archived: true,
-        sortKey: "created_at"
-      })
+        sortKey: "created_at",
+      }),
     );
 
     expect(appClient.listThreadsCalls).toEqual([
       {
         limit: 10,
         archived: true,
-        sortKey: "created_at"
-      }
+        sortKey: "created_at",
+      },
     ]);
     expect(result).toEqual({
       data: [],
-      nextCursor: "next-cursor"
+      nextCursor: "next-cursor",
     });
     expect(result).not.toHaveProperty("pages");
     expect(result).not.toHaveProperty("truncated");
@@ -172,8 +178,8 @@ describe("CodexThreadManagementOwner", () => {
     await owner.listThreads(
       createListThreadsInput({
         cursor: "",
-        cwd: ""
-      })
+        cwd: "",
+      }),
     );
 
     expect(appClient.listThreadsCalls).toEqual([
@@ -182,8 +188,8 @@ describe("CodexThreadManagementOwner", () => {
         archived: false,
         cursor: "",
         sortKey: "updated_at",
-        cwd: ""
-      }
+        cwd: "",
+      },
     ]);
   });
 
@@ -193,8 +199,8 @@ describe("CodexThreadManagementOwner", () => {
         data: [],
         nextCursor: null,
         pages: 2,
-        truncated: true
-      }
+        truncated: true,
+      },
     });
     const owner = createOwner(appClient);
 
@@ -203,8 +209,8 @@ describe("CodexThreadManagementOwner", () => {
         all: true,
         cursor: "cursor-1",
         cwd: "/tmp/workspace",
-        maxPages: 3
-      })
+        maxPages: 3,
+      }),
     );
 
     expect(appClient.listThreadsAllCalls).toEqual([
@@ -214,22 +220,22 @@ describe("CodexThreadManagementOwner", () => {
         cursor: "cursor-1",
         sortKey: "updated_at",
         cwd: "/tmp/workspace",
-        maxPages: 3
-      }
+        maxPages: 3,
+      },
     ]);
     expect(result).toEqual({
       data: [],
       nextCursor: null,
       pages: 2,
-      truncated: true
+      truncated: true,
     });
   });
 
   it("normalizes undefined nextCursor to null for list results", async () => {
     const appClient = new TestAppServerClient({
       listThreadsResult: {
-        data: []
-      }
+        data: [],
+      },
     });
     const owner = createOwner(appClient);
 
@@ -237,7 +243,7 @@ describe("CodexThreadManagementOwner", () => {
 
     expect(result).toEqual({
       data: [],
-      nextCursor: null
+      nextCursor: null,
     });
   });
 
@@ -257,7 +263,7 @@ describe("CodexThreadManagementOwner", () => {
       modelProvider: "openai",
       approvalPolicy: "on-request",
       sandbox: "workspace-write",
-      ephemeral: true
+      ephemeral: true,
     };
 
     const result = await owner.createThread(createThreadInput);
@@ -269,8 +275,8 @@ describe("CodexThreadManagementOwner", () => {
         modelProvider: "openai",
         approvalPolicy: "on-request",
         sandbox: "workspace-write",
-        ephemeral: true
-      }
+        ephemeral: true,
+      },
     ]);
     expect(result.threadId).toBe("thread-1");
     expect(result.cwd).toBe("/tmp/workspace");
@@ -287,7 +293,7 @@ describe("CodexThreadManagementOwner", () => {
       personality: "",
       sandbox: "",
       approvalPolicy: "",
-      ephemeral: false
+      ephemeral: false,
     });
 
     expect(appClient.startThreadCalls).toEqual([
@@ -298,8 +304,8 @@ describe("CodexThreadManagementOwner", () => {
         personality: "",
         sandbox: "",
         approvalPolicy: "",
-        ephemeral: false
-      }
+        ephemeral: false,
+      },
     ]);
   });
 
@@ -312,8 +318,8 @@ describe("CodexThreadManagementOwner", () => {
         cwd: "/tmp/workspace",
         approvalPolicy: "never",
         sandbox: "workspace-write",
-        reasoningEffort: "medium"
-      }
+        reasoningEffort: "medium",
+      },
     });
     const owner = createOwner(appClient);
 
@@ -327,7 +333,7 @@ describe("CodexThreadManagementOwner", () => {
       cwd: "/tmp/workspace",
       approvalPolicy: "never",
       sandbox: "workspace-write",
-      reasoningEffort: "medium"
+      reasoningEffort: "medium",
     });
   });
 
@@ -341,11 +347,11 @@ describe("CodexThreadManagementOwner", () => {
           profiles: {
             work: {
               model: "profile-model",
-              model_reasoning_effort: "high"
-            }
-          }
-        }
-      }
+              model_reasoning_effort: "high",
+            },
+          },
+        },
+      },
     });
     const owner = createOwner(appClient);
 
@@ -353,12 +359,12 @@ describe("CodexThreadManagementOwner", () => {
 
     expect(appClient.readConfigCalls).toEqual([
       {
-        includeLayers: false
-      }
+        includeLayers: false,
+      },
     ]);
     expect(result).toEqual({
       model: "profile-model",
-      reasoningEffort: "high"
+      reasoningEffort: "high",
     });
   });
 
@@ -369,9 +375,9 @@ describe("CodexThreadManagementOwner", () => {
           profile: "missing",
           model: "global-model",
           model_reasoning_effort: "medium",
-          profiles: {}
-        }
-      }
+          profiles: {},
+        },
+      },
     });
     const owner = createOwner(appClient);
 
@@ -379,7 +385,7 @@ describe("CodexThreadManagementOwner", () => {
 
     expect(result).toEqual({
       model: "global-model",
-      reasoningEffort: "medium"
+      reasoningEffort: "medium",
     });
   });
 });

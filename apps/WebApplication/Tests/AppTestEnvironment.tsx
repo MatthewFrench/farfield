@@ -1,30 +1,23 @@
-import {
-  cleanup,
-  render
-} from "@testing-library/react";
-import {
-  afterEach,
-  beforeEach,
-  vi
-} from "vitest";
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, beforeEach, vi } from "vitest";
 import { z } from "zod";
+import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 import { App } from "../Source/App";
 import {
-  buildConversationStateFixture,
-  CODEX_CAPABILITIES,
-  OPENCODE_CAPABILITIES,
   type AgentsFixture,
   type AppTestEnvironment,
+  buildConversationStateFixture,
+  CODEX_CAPABILITIES,
   type CollaborationModesFixture,
   type ConfigDefaultsFixture,
   type DebugErrorsFixture,
   type EventsSessionFixture,
   type LiveStateResolver,
   type ModelsFixture,
+  OPENCODE_CAPABILITIES,
   type ReadThreadResolver,
-  type ThreadListFixture
+  type ThreadListFixture,
 } from "./AppTestFixtureContracts";
-import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 
 /**
  * Shared app-shell test runtime owner.
@@ -53,7 +46,7 @@ class MockEventSource {
 
   public static emit(payload: StructuredDataObject): void {
     const event = new MessageEvent<string>("message", {
-      data: JSON.stringify(payload)
+      data: JSON.stringify(payload),
     });
     for (const instance of MockEventSource.instances) {
       instance.onmessage?.(event);
@@ -67,7 +60,7 @@ class MockEventSource {
 
 const EventsSessionBootstrapRequestSchema = z
   .object({
-    apiToken: z.string().trim().min(1)
+    apiToken: z.string().trim().min(1),
   })
   .strict();
 
@@ -91,8 +84,8 @@ function createJsonResponse<TResponseBody>(responseBody: TResponseBody): Respons
   return new Response(JSON.stringify(responseBody), {
     status: 200,
     headers: {
-      "Content-Type": "application/json"
-    }
+      "Content-Type": "application/json",
+    },
   });
 }
 
@@ -111,10 +104,10 @@ function resetFixtures(): void {
         enabled: true,
         connected: true,
         capabilities: CODEX_CAPABILITIES,
-        projectDirectories: []
-      }
+        projectDirectories: [],
+      },
     ],
-    defaultAgentId: "codex"
+    defaultAgentId: "codex",
   };
 
   threadsFixture = {
@@ -122,7 +115,7 @@ function resetFixtures(): void {
     data: [],
     nextCursor: null,
     pages: 0,
-    truncated: false
+    truncated: false,
   };
 
   collaborationModesFixture = {
@@ -133,16 +126,16 @@ function resetFixtures(): void {
         mode: "default",
         model: null,
         reasoning_effort: "medium",
-        developer_instructions: null
+        developer_instructions: null,
       },
       {
         name: "Plan",
         mode: "plan",
         model: null,
         reasoning_effort: "medium",
-        developer_instructions: "x"
-      }
-    ]
+        developer_instructions: "x",
+      },
+    ],
   };
 
   modelsFixture = {
@@ -157,31 +150,31 @@ function resetFixtures(): void {
         supportedReasoningEfforts: [
           {
             reasoningEffort: "medium",
-            description: "Balanced"
-          }
+            description: "Balanced",
+          },
         ],
         defaultReasoningEffort: "medium",
         inputModalities: ["text"],
         supportsPersonality: true,
         isDefault: true,
-        hidden: false
-      }
+        hidden: false,
+      },
     ],
-    nextCursor: null
+    nextCursor: null,
   };
 
   debugErrorsFixture = {
     ok: true,
     data: [],
     sessionId: "session-test",
-    sessionLogPath: "/tmp/session-test.ndjson"
+    sessionLogPath: "/tmp/session-test.ndjson",
   };
 
   configDefaultsFixture = {
     ok: true,
     agentId: "codex",
     model: "gpt-5.3-codex",
-    reasoningEffort: "medium"
+    reasoningEffort: "medium",
   };
 
   readThreadResolver = (_threadId: string, _includeTurns: boolean) => null;
@@ -190,14 +183,14 @@ function resetFixtures(): void {
     threadId,
     ownerClientId: null,
     conversationState: null,
-    liveStateError: null
+    liveStateError: null,
   });
   readThreadDelayMilliseconds = 0;
   eventsSessionFixture = {
     authRequired: false,
     bootstrapped: true,
     expiresAt: "2099-01-01T00:00:00.000Z",
-    acceptedApiToken: "test-api-token"
+    acceptedApiToken: "test-api-token",
   };
 }
 
@@ -211,22 +204,28 @@ function installGlobals(): void {
   Element.prototype.scrollTo = vi.fn();
   window.scrollTo = vi.fn();
 
-  vi.stubGlobal("ResizeObserver", class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  });
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
 
-  vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
-    matches: query === "(prefers-color-scheme: dark)",
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn()
-  })));
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => ({
+      matches: query === "(prefers-color-scheme: dark)",
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  );
 
   vi.stubGlobal("localStorage", {
     getItem: vi.fn((key: string) => localStorageState.get(key) ?? null),
@@ -238,7 +237,7 @@ function installGlobals(): void {
     }),
     clear: vi.fn(() => {
       localStorageState.clear();
-    })
+    }),
   });
 
   vi.stubGlobal(
@@ -263,7 +262,7 @@ function installGlobals(): void {
           ok: true,
           authRequired: eventsSessionFixture.authRequired,
           bootstrapped: eventsSessionFixture.bootstrapped,
-          expiresAt: eventsSessionFixture.bootstrapped ? eventsSessionFixture.expiresAt : null
+          expiresAt: eventsSessionFixture.bootstrapped ? eventsSessionFixture.expiresAt : null,
         });
       }
 
@@ -276,8 +275,8 @@ function installGlobals(): void {
             ipcInitialized: true,
             lastError: null,
             historyCount: 0,
-            threadOwnerCount: 0
-          }
+            threadOwnerCount: 0,
+          },
         });
       }
 
@@ -293,7 +292,7 @@ function installGlobals(): void {
           events: [],
           nextSequence: 0,
           firstAvailableSequence: 0,
-          resetRequired: false
+          resetRequired: false,
         });
       }
 
@@ -330,14 +329,14 @@ function installGlobals(): void {
         return createJsonResponse({
           ok: true,
           active: null,
-          recent: []
+          recent: [],
         });
       }
 
       if (pathname === "/api/debug/history") {
         return createJsonResponse({
           ok: true,
-          history: []
+          history: [],
         });
       }
 
@@ -347,20 +346,20 @@ function installGlobals(): void {
             ok: true,
             errorId: "error_test_created",
             sessionId: debugErrorsFixture.sessionId,
-            recordedAt: "2026-02-26T00:00:00.000Z"
+            recordedAt: "2026-02-26T00:00:00.000Z",
           });
         }
         if (init?.method === "DELETE") {
           const clearedCount = debugErrorsFixture.data.length;
           debugErrorsFixture = {
             ...debugErrorsFixture,
-            data: []
+            data: [],
           };
           return createJsonResponse({
             ok: true,
             clearedCount,
             sessionId: debugErrorsFixture.sessionId,
-            sessionLogPath: debugErrorsFixture.sessionLogPath
+            sessionLogPath: debugErrorsFixture.sessionLogPath,
           });
         }
         return createJsonResponse(debugErrorsFixture);
@@ -376,9 +375,9 @@ function installGlobals(): void {
         ownerClientId: null,
         conversationState: null,
         liveStateError: null,
-        events: []
+        events: [],
       });
-    })
+    }),
   );
 
   globalsInstalled = true;
@@ -444,17 +443,17 @@ export function registerAppTestEnvironment(): AppTestEnvironment {
             source: "app",
             direction: "out",
             payload: {
-              ok: true
+              ok: true,
             },
             meta: {
               threadId,
-              method: "messages.send"
-            }
-          }
-        }
+              method: "messages.send",
+            },
+          },
+        },
       });
     },
-    buildConversationStateFixture
+    buildConversationStateFixture,
   };
 }
 

@@ -7,7 +7,7 @@ const BASE64_URL_ENCODING = "base64url";
 const OpenCodeThreadCursorSchema = z
   .object({
     version: z.literal(OPEN_CODE_THREAD_CURSOR_VERSION),
-    offset: z.number().int().nonnegative()
+    offset: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -15,9 +15,9 @@ export function encodeOpenCodeThreadCursor(offset: number): string {
   return Buffer.from(
     JSON.stringify({
       version: OPEN_CODE_THREAD_CURSOR_VERSION,
-      offset
+      offset,
     }),
-    UTF8_ENCODING
+    UTF8_ENCODING,
   ).toString(BASE64_URL_ENCODING);
 }
 

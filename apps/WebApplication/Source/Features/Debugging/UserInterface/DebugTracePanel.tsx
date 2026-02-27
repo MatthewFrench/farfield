@@ -32,7 +32,7 @@ export function DebugTracePanel({
   onStartTrace,
   onMarkTrace,
   onStopTrace,
-  recentTraces
+  recentTraces,
 }: DebugTracePanelProps): React.JSX.Element {
   return (
     <div data-testid="debug-trace-panel" className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -40,9 +40,7 @@ export function DebugTracePanel({
         <span className="text-sm font-medium">Trace</span>
         <span
           className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-            isRecording
-              ? "bg-success/15 text-success"
-              : "bg-muted text-muted-foreground"
+            isRecording ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
           }`}
         >
           {isRecording ? TRACE_STATE_RECORDING_LABEL : TRACE_STATE_IDLE_LABEL}

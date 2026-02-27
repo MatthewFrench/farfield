@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { PushClientStateManager } from "@/Features/PushNotifications/DataAccess/PushClientStateManager";
-import {
-  PushNotificationToolbarActionCoordinator
-} from "@/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
+import { PushNotificationToolbarActionCoordinator } from "@/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";
 
 const READ_FAILURE_MESSAGE = "push client state read failed";
 const ENABLE_FAILURE_MESSAGE = "push enable failed";
@@ -57,29 +55,29 @@ const ENABLED_PUSH_CLIENT_STATE: PushClientState = {
   supported: true,
   serviceWorkerRegistered: true,
   permission: "granted",
-  subscribed: true
+  subscribed: true,
 };
 
 const UNSUPPORTED_PUSH_CLIENT_STATE: PushClientState = {
   supported: false,
   serviceWorkerRegistered: false,
   permission: "unsupported",
-  subscribed: false
+  subscribed: false,
 };
 
 function createCoordinator(
-  pushClientStateManager: TestPushClientStateManager
+  pushClientStateManager: TestPushClientStateManager,
 ): PushNotificationToolbarActionCoordinator {
   return new PushNotificationToolbarActionCoordinator({
     pushClientStateManager,
-    unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE
+    unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
   });
 }
 
 describe("PushNotificationToolbarActionCoordinator", () => {
   it("refreshes push client state from push client manager", async () => {
     const pushClientStateManager = new TestPushClientStateManager({
-      pushClientState: ENABLED_PUSH_CLIENT_STATE
+      pushClientState: ENABLED_PUSH_CLIENT_STATE,
     });
     const coordinator = createCoordinator(pushClientStateManager);
     const observedPushClientStates: PushClientState[] = [];
@@ -87,7 +85,7 @@ describe("PushNotificationToolbarActionCoordinator", () => {
     await coordinator.refreshPushClientState({
       onPushClientStateRead: (state) => {
         observedPushClientStates.push(state);
-      }
+      },
     });
 
     expect(pushClientStateManager.getReadCallCount()).toBe(1);
@@ -97,7 +95,7 @@ describe("PushNotificationToolbarActionCoordinator", () => {
   it("uses unsupported push client state when refresh read fails", async () => {
     const pushClientStateManager = new TestPushClientStateManager({
       pushClientState: ENABLED_PUSH_CLIENT_STATE,
-      shouldFailRead: true
+      shouldFailRead: true,
     });
     const coordinator = createCoordinator(pushClientStateManager);
     const observedPushClientStates: PushClientState[] = [];
@@ -105,7 +103,7 @@ describe("PushNotificationToolbarActionCoordinator", () => {
     await coordinator.refreshPushClientState({
       onPushClientStateRead: (state) => {
         observedPushClientStates.push(state);
-      }
+      },
     });
 
     expect(pushClientStateManager.getReadCallCount()).toBe(1);
@@ -114,7 +112,7 @@ describe("PushNotificationToolbarActionCoordinator", () => {
 
   it("enables push notifications and refreshes push client state", async () => {
     const pushClientStateManager = new TestPushClientStateManager({
-      pushClientState: ENABLED_PUSH_CLIENT_STATE
+      pushClientState: ENABLED_PUSH_CLIENT_STATE,
     });
     const coordinator = createCoordinator(pushClientStateManager);
     const enablingStates: boolean[] = [];
@@ -134,7 +132,7 @@ describe("PushNotificationToolbarActionCoordinator", () => {
       onSetErrorMessage: (errorMessage) => {
         observedErrorMessages.push(errorMessage);
         callbackEvents.push(`error:${errorMessage}`);
-      }
+      },
     });
 
     expect(pushClientStateManager.getEnableCallCount()).toBe(1);
@@ -148,7 +146,7 @@ describe("PushNotificationToolbarActionCoordinator", () => {
   it("uses unsupported state when enable succeeds but refresh read fails", async () => {
     const pushClientStateManager = new TestPushClientStateManager({
       pushClientState: ENABLED_PUSH_CLIENT_STATE,
-      shouldFailRead: true
+      shouldFailRead: true,
     });
     const coordinator = createCoordinator(pushClientStateManager);
     const enablingStates: boolean[] = [];
@@ -164,7 +162,7 @@ describe("PushNotificationToolbarActionCoordinator", () => {
       },
       onSetErrorMessage: (errorMessage) => {
         observedErrorMessages.push(errorMessage);
-      }
+      },
     });
 
     expect(pushClientStateManager.getEnableCallCount()).toBe(1);
@@ -177,7 +175,7 @@ describe("PushNotificationToolbarActionCoordinator", () => {
   it("reports error when enable push notifications fails", async () => {
     const pushClientStateManager = new TestPushClientStateManager({
       pushClientState: ENABLED_PUSH_CLIENT_STATE,
-      enableFailureValue: ENABLE_FAILURE_MESSAGE
+      enableFailureValue: ENABLE_FAILURE_MESSAGE,
     });
     const coordinator = createCoordinator(pushClientStateManager);
     const enablingStates: boolean[] = [];
@@ -193,14 +191,14 @@ describe("PushNotificationToolbarActionCoordinator", () => {
       },
       onSetErrorMessage: (errorMessage) => {
         observedErrorMessages.push(errorMessage);
-      }
+      },
     });
 
     expect(pushClientStateManager.getEnableCallCount()).toBe(1);
     expect(pushClientStateManager.getReadCallCount()).toBe(0);
     expect(observedPushClientStates).toEqual([]);
     expect(observedErrorMessages).toEqual([
-      `${PUSH_ENABLE_OPERATION_NAME}: ${ENABLE_FAILURE_MESSAGE}`
+      `${PUSH_ENABLE_OPERATION_NAME}: ${ENABLE_FAILURE_MESSAGE}`,
     ]);
     expect(enablingStates).toEqual([true, false]);
   });

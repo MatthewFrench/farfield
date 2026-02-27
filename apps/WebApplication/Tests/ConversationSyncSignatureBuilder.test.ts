@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  type ConversationStateLike,
   ConversationSyncSignatureBuilder,
-  type ConversationStateLike
 } from "../Source/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
 import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
 
@@ -18,7 +18,7 @@ function createConversationState(input?: {
 }): ConversationStateLike {
   const state: ConversationStateLike = {
     id: "conversation-1",
-    turns: input?.turns ?? []
+    turns: input?.turns ?? [],
   };
   if (input?.updatedAt !== undefined) {
     state.updatedAt = input.updatedAt;
@@ -32,9 +32,11 @@ describe("ConversationSyncSignatureBuilder", () => {
 
     expect(builder.readConversationStateUpdatedAt(null)).toBe(Number.NEGATIVE_INFINITY);
     expect(builder.readConversationStateUpdatedAt(createConversationState())).toBe(
-      Number.NEGATIVE_INFINITY
+      Number.NEGATIVE_INFINITY,
     );
-    expect(builder.readConversationStateUpdatedAt(createConversationState({ updatedAt: 25 }))).toBe(25);
+    expect(builder.readConversationStateUpdatedAt(createConversationState({ updatedAt: 25 }))).toBe(
+      25,
+    );
   });
 
   it("includes missing turn identifiers in read-thread progress signatures", () => {
@@ -48,25 +50,25 @@ describe("ConversationSyncSignatureBuilder", () => {
             {
               id: "item-1",
               type: "agentMessage",
-              text: "hello"
-            }
-          ]
-        }
-      ]
+              text: "hello",
+            },
+          ],
+        },
+      ],
     });
     const signature = builder.buildReadThreadSyncSignature(
       {
-        thread
+        thread,
       },
       DEFAULT_MODEL,
-      DEFAULT_REASONING_EFFORT
+      DEFAULT_REASONING_EFFORT,
     );
     const repeatedSignature = builder.buildReadThreadSyncSignature(
       {
-        thread
+        thread,
       },
       DEFAULT_MODEL,
-      DEFAULT_REASONING_EFFORT
+      DEFAULT_REASONING_EFFORT,
     );
 
     expect(signature).toBe(repeatedSignature);
@@ -84,13 +86,13 @@ describe("ConversationSyncSignatureBuilder", () => {
             {
               id: "turn-1",
               status: "completed",
-              items: []
-            }
-          ]
-        })
+              items: [],
+            },
+          ],
+        }),
       },
       DEFAULT_MODEL,
-      DEFAULT_REASONING_EFFORT
+      DEFAULT_REASONING_EFFORT,
     );
 
     expect(signature).toContain("conversation-1|60|1|");
@@ -104,11 +106,11 @@ describe("ConversationSyncSignatureBuilder", () => {
         threadId: "thread-1",
         ownerClientId: null,
         conversationState: createConversationState({
-          updatedAt: 8
-        })
+          updatedAt: 8,
+        }),
       },
       DEFAULT_MODEL,
-      DEFAULT_REASONING_EFFORT
+      DEFAULT_REASONING_EFFORT,
     );
 
     expect(signature).toContain("thread-1||8|0|");
@@ -121,10 +123,10 @@ describe("ConversationSyncSignatureBuilder", () => {
       {
         threadId: "thread-1",
         ownerClientId: null,
-        conversationState: null
+        conversationState: null,
       },
       DEFAULT_MODEL,
-      DEFAULT_REASONING_EFFORT
+      DEFAULT_REASONING_EFFORT,
     );
 
     expect(signature).toBe(`thread-1||${String(Number.NEGATIVE_INFINITY)}|-1||||`);
@@ -144,15 +146,15 @@ describe("ConversationSyncSignatureBuilder", () => {
                 {
                   id: "item-7",
                   type: "agentMessage",
-                  text: "deterministic"
-                }
-              ]
-            }
-          ]
-        })
+                  text: "deterministic",
+                },
+              ],
+            },
+          ],
+        }),
       },
       DEFAULT_MODEL,
-      DEFAULT_REASONING_EFFORT
+      DEFAULT_REASONING_EFFORT,
     );
     const secondSignature = builder.buildReadThreadSyncSignature(
       {
@@ -166,15 +168,15 @@ describe("ConversationSyncSignatureBuilder", () => {
                 {
                   id: "item-7",
                   type: "agentMessage",
-                  text: "deterministic"
-                }
-              ]
-            }
-          ]
-        })
+                  text: "deterministic",
+                },
+              ],
+            },
+          ],
+        }),
       },
       DEFAULT_MODEL,
-      DEFAULT_REASONING_EFFORT
+      DEFAULT_REASONING_EFFORT,
     );
 
     expect(firstSignature).toBe(secondSignature);

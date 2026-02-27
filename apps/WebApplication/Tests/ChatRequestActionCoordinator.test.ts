@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  ChatRequestActionCoordinator,
   type ChatRequestActionChatClient,
-  type ChatRequestActionThreadMutationClient
+  ChatRequestActionCoordinator,
+  type ChatRequestActionThreadMutationClient,
 } from "../Source/Features/Chat/StateManagement/ChatRequestActionCoordinator";
 
 const DEFAULT_AGENT_ID = "codex";
@@ -14,8 +14,8 @@ const buildActionRequestOptions = (actionName: string) => ({
   actionId: `action-${actionName}`,
   requestOptions: {
     actionId: `action-${actionName}`,
-    actionName
-  }
+    actionName,
+  },
 });
 
 function createChatClient(overrides?: {
@@ -26,15 +26,15 @@ function createChatClient(overrides?: {
   return {
     sendMessage: vi.fn(overrides?.sendMessage ?? (async () => {})),
     submitUserInput: vi.fn(overrides?.submitUserInput ?? (async () => {})),
-    interruptThread: vi.fn(overrides?.interruptThread ?? (async () => {}))
+    interruptThread: vi.fn(overrides?.interruptThread ?? (async () => {})),
   };
 }
 
 function createThreadMutationClient(
-  threadId: string = DEFAULT_THREAD_ID
+  threadId: string = DEFAULT_THREAD_ID,
 ): ChatRequestActionThreadMutationClient {
   return {
-    createThread: vi.fn(async () => ({ threadId }))
+    createThread: vi.fn(async () => ({ threadId })),
   };
 }
 
@@ -47,7 +47,7 @@ function createActionCallbacks() {
     },
     onInvalidateActiveThreadQuery: vi.fn(),
     onRefreshThreadData: vi.fn(async (_threadId: string) => {}),
-    reportTrackedUserInterfaceError: vi.fn(async () => {})
+    reportTrackedUserInterfaceError: vi.fn(async () => {}),
   };
 }
 
@@ -59,7 +59,7 @@ describe("ChatRequestActionCoordinator", () => {
       onSetBusy,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     } = createActionCallbacks();
     const markedThreads: string[] = [];
     const clearedThreads: string[] = [];
@@ -86,16 +86,16 @@ describe("ChatRequestActionCoordinator", () => {
       threadMutationClient,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(threadMutationClient.createThread).toHaveBeenCalledWith(
       { agentId: DEFAULT_AGENT_ID },
-      { actionId: "action-send-message", actionName: "send-message" }
+      { actionId: "action-send-message", actionName: "send-message" },
     );
     expect(chatClient.sendMessage).toHaveBeenCalledWith(
       { threadId: DEFAULT_THREAD_ID, text: "hello world" },
-      { actionId: "action-send-message", actionName: "send-message" }
+      { actionId: "action-send-message", actionName: "send-message" },
     );
     expect(markedThreads).toEqual([DEFAULT_THREAD_ID]);
     expect(selectedThreads).toEqual([DEFAULT_THREAD_ID]);
@@ -113,7 +113,7 @@ describe("ChatRequestActionCoordinator", () => {
       onSetBusy,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     } = createActionCallbacks();
     const onThreadSelected = vi.fn();
     const onMarkThreadPendingMaterialization = vi.fn();
@@ -134,7 +134,7 @@ describe("ChatRequestActionCoordinator", () => {
       threadMutationClient,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(onThreadSelected).not.toHaveBeenCalled();
@@ -164,7 +164,7 @@ describe("ChatRequestActionCoordinator", () => {
       chatClient,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(onSetBusy).not.toHaveBeenCalled();
@@ -181,13 +181,13 @@ describe("ChatRequestActionCoordinator", () => {
       onSetBusy,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     } = createActionCallbacks();
     const chatClient = createChatClient();
     const answers = {
       question_1: {
-        answers: ["alpha"]
-      }
+        answers: ["alpha"],
+      },
     };
 
     await coordinator.submitPendingUserInput({
@@ -199,7 +199,7 @@ describe("ChatRequestActionCoordinator", () => {
       chatClient,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(chatClient.submitUserInput).toHaveBeenCalledWith(
@@ -207,13 +207,13 @@ describe("ChatRequestActionCoordinator", () => {
         threadId: DEFAULT_THREAD_ID,
         requestId: 12,
         response: {
-          answers
-        }
+          answers,
+        },
       },
       {
         actionId: "action-submit-user-input",
-        actionName: "submit-user-input"
-      }
+        actionName: "submit-user-input",
+      },
     );
     expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
     expect(onRefreshThreadData).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
@@ -229,12 +229,12 @@ describe("ChatRequestActionCoordinator", () => {
       onSetBusy,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     } = createActionCallbacks();
     const chatClient = createChatClient({
       submitUserInput: async () => {
         throw new Error("skip failed");
-      }
+      },
     });
 
     await coordinator.skipPendingUserInput({
@@ -245,19 +245,19 @@ describe("ChatRequestActionCoordinator", () => {
       chatClient,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(chatClient.submitUserInput).toHaveBeenCalledWith(
       {
         threadId: "thread-2",
         requestId: SKIP_REQUEST_ID,
-        response: { answers: {} }
+        response: { answers: {} },
       },
       {
         actionId: "action-skip-user-input",
-        actionName: "skip-user-input"
-      }
+        actionName: "skip-user-input",
+      },
     );
     expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
     expect(onRefreshThreadData).not.toHaveBeenCalled();
@@ -267,8 +267,8 @@ describe("ChatRequestActionCoordinator", () => {
       threadId: "thread-2",
       error: "skip failed",
       details: {
-        requestId: SKIP_REQUEST_ID
-      }
+        requestId: SKIP_REQUEST_ID,
+      },
     });
     expect(busyStates).toEqual([true, false]);
   });
@@ -280,7 +280,7 @@ describe("ChatRequestActionCoordinator", () => {
       onSetBusy,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     } = createActionCallbacks();
     const chatClient = createChatClient();
 
@@ -291,12 +291,12 @@ describe("ChatRequestActionCoordinator", () => {
       chatClient,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(chatClient.interruptThread).toHaveBeenCalledWith(
       { threadId: EXISTING_THREAD_ID },
-      { actionId: "action-interrupt-thread", actionName: "interrupt-thread" }
+      { actionId: "action-interrupt-thread", actionName: "interrupt-thread" },
     );
     expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
     expect(onRefreshThreadData).toHaveBeenCalledWith(EXISTING_THREAD_ID);
@@ -320,7 +320,7 @@ describe("ChatRequestActionCoordinator", () => {
       chatClient,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(onSetBusy).not.toHaveBeenCalled();

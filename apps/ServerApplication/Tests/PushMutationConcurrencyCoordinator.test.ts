@@ -13,7 +13,7 @@ const createDeferredGate = (): DeferredGate => {
   });
   return {
     promise,
-    release
+    release,
   };
 };
 
@@ -39,17 +39,12 @@ describe("PushMutationConcurrencyCoordinator", () => {
 
     expect(firstResult).toBe("first-result");
     expect(secondResult).toBe("second-result");
-    expect(callOrder).toEqual([
-      "first:start",
-      "first:end",
-      "second:start",
-      "second:end"
-    ]);
+    expect(callOrder).toEqual(["first:start", "first:end", "second:start", "second:end"]);
     expect(coordinator.readStatistics()).toMatchObject({
       queuedExecutionCount: 2,
       completedExecutionCount: 2,
       failedExecutionCount: 0,
-      hasInFlightOperation: false
+      hasInFlightOperation: false,
     });
   });
 
@@ -59,7 +54,7 @@ describe("PushMutationConcurrencyCoordinator", () => {
     await expect(
       coordinator.runExclusive(async () => {
         throw new Error("operation failed");
-      })
+      }),
     ).rejects.toThrow("operation failed");
 
     const value = await coordinator.runExclusive(async () => "next");
@@ -68,7 +63,7 @@ describe("PushMutationConcurrencyCoordinator", () => {
       queuedExecutionCount: 2,
       completedExecutionCount: 1,
       failedExecutionCount: 1,
-      hasInFlightOperation: false
+      hasInFlightOperation: false,
     });
   });
 
@@ -115,17 +110,12 @@ describe("PushMutationConcurrencyCoordinator", () => {
     await expect(firstOperation).rejects.toThrow("first failed");
     await expect(secondOperation).resolves.toBe("second-result");
 
-    expect(callOrder).toEqual([
-      "first:start",
-      "first:fail",
-      "second:start",
-      "second:end"
-    ]);
+    expect(callOrder).toEqual(["first:start", "first:fail", "second:start", "second:end"]);
     expect(coordinator.readStatistics()).toMatchObject({
       queuedExecutionCount: 2,
       completedExecutionCount: 1,
       failedExecutionCount: 1,
-      hasInFlightOperation: false
+      hasInFlightOperation: false,
     });
   });
 
@@ -143,7 +133,7 @@ describe("PushMutationConcurrencyCoordinator", () => {
       queuedExecutionCount: 2,
       completedExecutionCount: 1,
       failedExecutionCount: 1,
-      hasInFlightOperation: false
+      hasInFlightOperation: false,
     });
   });
 });

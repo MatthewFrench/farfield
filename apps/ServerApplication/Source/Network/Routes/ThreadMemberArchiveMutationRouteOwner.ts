@@ -1,10 +1,10 @@
 import {
   isThreadMemberSubresourceRoute,
   ThreadMemberMutationActionByName,
+  type ThreadMemberResolvedRouteContext,
+  type ThreadMemberRouteDependencies,
   ThreadMemberRouteMethodByName,
   ThreadMemberRouteSegmentByName,
-  type ThreadMemberRouteDependencies,
-  type ThreadMemberResolvedRouteContext
 } from "./ThreadMemberRouteContracts.js";
 
 export interface ThreadMemberArchiveMutationRouteOwnerOptions {
@@ -36,17 +36,19 @@ export class ThreadMemberArchiveMutationRouteOwner {
       pushActionEventWithRequestContext,
       pushActionErrorWithRequestContext,
       invalidateThreadListAggregationCache,
-      jsonResponse
+      jsonResponse,
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
-    if (!(
-      req.method === ThreadMemberRouteMethodByName.post
-      && isThreadMemberSubresourceRoute(
-        this.dependencies.segments,
-        ThreadMemberRouteSegmentByName.archive
+    if (
+      !(
+        req.method === ThreadMemberRouteMethodByName.post &&
+        isThreadMemberSubresourceRoute(
+          this.dependencies.segments,
+          ThreadMemberRouteSegmentByName.archive,
+        )
       )
-    )) {
+    ) {
       return false;
     }
 
@@ -55,14 +57,14 @@ export class ThreadMemberArchiveMutationRouteOwner {
       jsonResponse(this.dependencies.res, 400, {
         ok: false,
         error: `Agent ${agentId} does not support thread archive`,
-        threadId
+        threadId,
       });
       return true;
     }
 
     pushActionEventWithRequestContext(ThreadMemberMutationActionByName.threadArchive, "attempt", {
       agentId,
-      threadId
+      threadId,
     });
 
     try {
@@ -71,25 +73,29 @@ export class ThreadMemberArchiveMutationRouteOwner {
       });
       pushActionEventWithRequestContext(ThreadMemberMutationActionByName.threadArchive, "success", {
         agentId,
-        threadId
+        threadId,
       });
       invalidateThreadListAggregationCache("thread-archived", {
         threadId,
-        agentId
+        agentId,
       });
       jsonResponse(this.dependencies.res, 200, {
         ok: true,
-        threadId
+        threadId,
       });
     } catch (error) {
-      const message = pushActionErrorWithRequestContext(ThreadMemberMutationActionByName.threadArchive, error, {
-        agentId,
-        threadId
-      });
+      const message = pushActionErrorWithRequestContext(
+        ThreadMemberMutationActionByName.threadArchive,
+        error,
+        {
+          agentId,
+          threadId,
+        },
+      );
       jsonResponse(this.dependencies.res, 500, {
         ok: false,
         error: message,
-        threadId
+        threadId,
       });
     }
     return true;
@@ -102,17 +108,19 @@ export class ThreadMemberArchiveMutationRouteOwner {
       pushActionEventWithRequestContext,
       pushActionErrorWithRequestContext,
       invalidateThreadListAggregationCache,
-      jsonResponse
+      jsonResponse,
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
-    if (!(
-      req.method === ThreadMemberRouteMethodByName.post
-      && isThreadMemberSubresourceRoute(
-        this.dependencies.segments,
-        ThreadMemberRouteSegmentByName.unarchive
+    if (
+      !(
+        req.method === ThreadMemberRouteMethodByName.post &&
+        isThreadMemberSubresourceRoute(
+          this.dependencies.segments,
+          ThreadMemberRouteSegmentByName.unarchive,
+        )
       )
-    )) {
+    ) {
       return false;
     }
 
@@ -121,41 +129,49 @@ export class ThreadMemberArchiveMutationRouteOwner {
       jsonResponse(this.dependencies.res, 400, {
         ok: false,
         error: `Agent ${agentId} does not support thread unarchive`,
-        threadId
+        threadId,
       });
       return true;
     }
 
     pushActionEventWithRequestContext(ThreadMemberMutationActionByName.threadUnarchive, "attempt", {
       agentId,
-      threadId
+      threadId,
     });
 
     try {
       await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
         await unarchiveThread({ threadId });
       });
-      pushActionEventWithRequestContext(ThreadMemberMutationActionByName.threadUnarchive, "success", {
-        agentId,
-        threadId
-      });
+      pushActionEventWithRequestContext(
+        ThreadMemberMutationActionByName.threadUnarchive,
+        "success",
+        {
+          agentId,
+          threadId,
+        },
+      );
       invalidateThreadListAggregationCache("thread-unarchived", {
         threadId,
-        agentId
+        agentId,
       });
       jsonResponse(this.dependencies.res, 200, {
         ok: true,
-        threadId
+        threadId,
       });
     } catch (error) {
-      const message = pushActionErrorWithRequestContext(ThreadMemberMutationActionByName.threadUnarchive, error, {
-        agentId,
-        threadId
-      });
+      const message = pushActionErrorWithRequestContext(
+        ThreadMemberMutationActionByName.threadUnarchive,
+        error,
+        {
+          agentId,
+          threadId,
+        },
+      );
       jsonResponse(this.dependencies.res, 500, {
         ok: false,
         error: message,
-        threadId
+        threadId,
       });
     }
     return true;

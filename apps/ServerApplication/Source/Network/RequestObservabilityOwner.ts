@@ -1,9 +1,9 @@
 import {
-  REQUEST_PATH_SEGMENT_SEPARATOR,
-  RequestPathSegmentByName,
-  RequestPathnameByName,
   normalizePathnameForRequestMetrics,
-  readPathSegmentsFromPathname
+  REQUEST_PATH_SEGMENT_SEPARATOR,
+  RequestPathnameByName,
+  RequestPathSegmentByName,
+  readPathSegmentsFromPathname,
 } from "./RequestPathContracts.js";
 
 interface PercentileSample {
@@ -21,8 +21,8 @@ function readPercentile(sample: PercentileSample): number {
     0,
     Math.min(
       sortedValues.length - 1,
-      Math.ceil((sample.percentile / 100) * sortedValues.length) - 1
-    )
+      Math.ceil((sample.percentile / 100) * sortedValues.length) - 1,
+    ),
   );
   return sortedValues[percentileIndex] ?? 0;
 }
@@ -35,13 +35,13 @@ const ROUTE_KEY_SEPARATOR = " ";
 const PATH_SEGMENT_INDEX_BY_NAME = {
   third: 2,
   fourth: 3,
-  fifth: 4
+  fifth: 4,
 } as const;
 const PATH_SEGMENT_COUNT_BY_NAME = {
   threadMemberMinimum: 3,
   debugHistoryEntry: 4,
   debugClientErrorEntry: 4,
-  debugTraceDownload: 5
+  debugTraceDownload: 5,
 } as const;
 
 const METRICS_ROUTE_PLACEHOLDER_BY_NAME = {
@@ -49,7 +49,7 @@ const METRICS_ROUTE_PLACEHOLDER_BY_NAME = {
   historyEntryIdentifier: ":historyEntryId",
   clientErrorIdentifier: ":clientErrorId",
   traceIdentifier: ":traceId",
-  genericIdentifier: ":id"
+  genericIdentifier: ":id",
 } as const;
 
 const STARTUP_ACTION_DESCRIPTION_BY_NAME: Readonly<Record<string, string>> = {
@@ -63,30 +63,30 @@ const STARTUP_ACTION_DESCRIPTION_BY_NAME: Readonly<Record<string, string>> = {
   "startup-deferred.capabilities.defaults": "Load default model/reasoning values",
   "startup-deferred.debug.history": "Load debug history list",
   "startup-deferred.debug.client-errors": "Load debug client error list",
-  "startup-deferred.threads.active.revalidate": "Revalidate active thread list from network"
+  "startup-deferred.threads.active.revalidate": "Revalidate active thread list from network",
 };
 
 const THREAD_MEMBER_ROUTE_PREFIX_SEGMENTS = [
   RequestPathSegmentByName.api,
-  RequestPathSegmentByName.threads
+  RequestPathSegmentByName.threads,
 ] as const;
 
 const DEBUG_HISTORY_ENTRY_ROUTE_PREFIX_SEGMENTS = [
   RequestPathSegmentByName.api,
   RequestPathSegmentByName.debug,
-  RequestPathSegmentByName.history
+  RequestPathSegmentByName.history,
 ] as const;
 
 const DEBUG_CLIENT_ERROR_ENTRY_ROUTE_PREFIX_SEGMENTS = [
   RequestPathSegmentByName.api,
   RequestPathSegmentByName.debug,
-  RequestPathSegmentByName.clientErrors
+  RequestPathSegmentByName.clientErrors,
 ] as const;
 
 const DEBUG_TRACE_DOWNLOAD_ROUTE_PREFIX_SEGMENTS = [
   RequestPathSegmentByName.api,
   RequestPathSegmentByName.debug,
-  RequestPathSegmentByName.trace
+  RequestPathSegmentByName.trace,
 ] as const;
 
 interface MetricsRouteClassification {
@@ -111,36 +111,36 @@ const NO_PATH_SEGMENT_MATCH_CONSTRAINTS: readonly PathSegmentMatchConstraint[] =
 
 const THREAD_MEMBER_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
   replacementBySegmentIndex: {
-    [PATH_SEGMENT_INDEX_BY_NAME.third]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.threadIdentifier
-  }
+    [PATH_SEGMENT_INDEX_BY_NAME.third]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.threadIdentifier,
+  },
 };
 
 const DEBUG_HISTORY_ENTRY_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
   replacementBySegmentIndex: {
-    [PATH_SEGMENT_INDEX_BY_NAME.fourth]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.historyEntryIdentifier
-  }
+    [PATH_SEGMENT_INDEX_BY_NAME.fourth]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.historyEntryIdentifier,
+  },
 };
 
 const DEBUG_CLIENT_ERROR_ENTRY_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
   replacementBySegmentIndex: {
-    [PATH_SEGMENT_INDEX_BY_NAME.fourth]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.clientErrorIdentifier
-  }
+    [PATH_SEGMENT_INDEX_BY_NAME.fourth]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.clientErrorIdentifier,
+  },
 };
 
 const DEBUG_TRACE_DOWNLOAD_ROUTE_CLASSIFICATION: MetricsRouteClassification = {
   replacementBySegmentIndex: {
-    [PATH_SEGMENT_INDEX_BY_NAME.fourth]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.traceIdentifier
-  }
+    [PATH_SEGMENT_INDEX_BY_NAME.fourth]: METRICS_ROUTE_PLACEHOLDER_BY_NAME.traceIdentifier,
+  },
 };
 
 const DEBUG_TRACE_DOWNLOAD_REQUIRED_PATH_SEGMENT_MATCH: PathSegmentMatchConstraint = {
   pathSegmentIndex: PATH_SEGMENT_INDEX_BY_NAME.fifth,
-  expectedPathSegment: RequestPathSegmentByName.download
+  expectedPathSegment: RequestPathSegmentByName.download,
 };
 
 const DEBUG_CLIENT_ERROR_SESSION_LOG_EXCLUDED_PATH_SEGMENT_MATCH: PathSegmentMatchConstraint = {
   pathSegmentIndex: PATH_SEGMENT_INDEX_BY_NAME.fourth,
-  expectedPathSegment: RequestPathSegmentByName.sessionLog
+  expectedPathSegment: RequestPathSegmentByName.sessionLog,
 };
 
 /**
@@ -154,7 +154,7 @@ const METRICS_ROUTE_PATH_DEFINITIONS: readonly MetricsRoutePathDefinition[] = [
     exactSegmentCount: null,
     requiredPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
     excludedPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
-    classification: THREAD_MEMBER_ROUTE_CLASSIFICATION
+    classification: THREAD_MEMBER_ROUTE_CLASSIFICATION,
   },
   {
     leadingPathSegments: DEBUG_HISTORY_ENTRY_ROUTE_PREFIX_SEGMENTS,
@@ -162,7 +162,7 @@ const METRICS_ROUTE_PATH_DEFINITIONS: readonly MetricsRoutePathDefinition[] = [
     exactSegmentCount: PATH_SEGMENT_COUNT_BY_NAME.debugHistoryEntry,
     requiredPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
     excludedPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
-    classification: DEBUG_HISTORY_ENTRY_ROUTE_CLASSIFICATION
+    classification: DEBUG_HISTORY_ENTRY_ROUTE_CLASSIFICATION,
   },
   {
     leadingPathSegments: DEBUG_CLIENT_ERROR_ENTRY_ROUTE_PREFIX_SEGMENTS,
@@ -170,7 +170,7 @@ const METRICS_ROUTE_PATH_DEFINITIONS: readonly MetricsRoutePathDefinition[] = [
     exactSegmentCount: PATH_SEGMENT_COUNT_BY_NAME.debugClientErrorEntry,
     requiredPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
     excludedPathSegmentMatches: [DEBUG_CLIENT_ERROR_SESSION_LOG_EXCLUDED_PATH_SEGMENT_MATCH],
-    classification: DEBUG_CLIENT_ERROR_ENTRY_ROUTE_CLASSIFICATION
+    classification: DEBUG_CLIENT_ERROR_ENTRY_ROUTE_CLASSIFICATION,
   },
   {
     leadingPathSegments: DEBUG_TRACE_DOWNLOAD_ROUTE_PREFIX_SEGMENTS,
@@ -178,11 +178,13 @@ const METRICS_ROUTE_PATH_DEFINITIONS: readonly MetricsRoutePathDefinition[] = [
     exactSegmentCount: PATH_SEGMENT_COUNT_BY_NAME.debugTraceDownload,
     requiredPathSegmentMatches: [DEBUG_TRACE_DOWNLOAD_REQUIRED_PATH_SEGMENT_MATCH],
     excludedPathSegmentMatches: NO_PATH_SEGMENT_MATCH_CONSTRAINTS,
-    classification: DEBUG_TRACE_DOWNLOAD_ROUTE_CLASSIFICATION
-  }
+    classification: DEBUG_TRACE_DOWNLOAD_ROUTE_CLASSIFICATION,
+  },
 ] as const;
 
-function classifyMetricsRoutePathname(pathSegments: readonly string[]): MetricsRouteClassification | null {
+function classifyMetricsRoutePathname(
+  pathSegments: readonly string[],
+): MetricsRouteClassification | null {
   for (const metricsRoutePathDefinition of METRICS_ROUTE_PATH_DEFINITIONS) {
     if (isMetricsRoutePathMatch(pathSegments, metricsRoutePathDefinition)) {
       return metricsRoutePathDefinition.classification;
@@ -194,18 +196,18 @@ function classifyMetricsRoutePathname(pathSegments: readonly string[]): MetricsR
 
 function isMetricsRoutePathMatch(
   pathSegments: readonly string[],
-  metricsRoutePathDefinition: MetricsRoutePathDefinition
+  metricsRoutePathDefinition: MetricsRoutePathDefinition,
 ): boolean {
   if (
-    metricsRoutePathDefinition.minimumSegmentCount !== null
-    && pathSegments.length < metricsRoutePathDefinition.minimumSegmentCount
+    metricsRoutePathDefinition.minimumSegmentCount !== null &&
+    pathSegments.length < metricsRoutePathDefinition.minimumSegmentCount
   ) {
     return false;
   }
 
   if (
-    metricsRoutePathDefinition.exactSegmentCount !== null
-    && pathSegments.length !== metricsRoutePathDefinition.exactSegmentCount
+    metricsRoutePathDefinition.exactSegmentCount !== null &&
+    pathSegments.length !== metricsRoutePathDefinition.exactSegmentCount
   ) {
     return false;
   }
@@ -214,13 +216,15 @@ function isMetricsRoutePathMatch(
     return false;
   }
 
-  if (!hasMatchingPathSegments(pathSegments, metricsRoutePathDefinition.requiredPathSegmentMatches)) {
+  if (
+    !hasMatchingPathSegments(pathSegments, metricsRoutePathDefinition.requiredPathSegmentMatches)
+  ) {
     return false;
   }
 
   if (
-    metricsRoutePathDefinition.excludedPathSegmentMatches.length > 0
-    && hasMatchingPathSegments(pathSegments, metricsRoutePathDefinition.excludedPathSegmentMatches)
+    metricsRoutePathDefinition.excludedPathSegmentMatches.length > 0 &&
+    hasMatchingPathSegments(pathSegments, metricsRoutePathDefinition.excludedPathSegmentMatches)
   ) {
     return false;
   }
@@ -230,7 +234,7 @@ function isMetricsRoutePathMatch(
 
 function hasLeadingPathSegments(
   pathSegments: readonly string[],
-  leadingPathSegments: readonly string[]
+  leadingPathSegments: readonly string[],
 ): boolean {
   if (pathSegments.length < leadingPathSegments.length) {
     return false;
@@ -247,7 +251,7 @@ function hasLeadingPathSegments(
 
 function hasMatchingPathSegments(
   pathSegments: readonly string[],
-  pathSegmentMatches: readonly PathSegmentMatchConstraint[]
+  pathSegmentMatches: readonly PathSegmentMatchConstraint[],
 ): boolean {
   for (const pathSegmentMatch of pathSegmentMatches) {
     if (pathSegments[pathSegmentMatch.pathSegmentIndex] !== pathSegmentMatch.expectedPathSegment) {
@@ -260,7 +264,7 @@ function hasMatchingPathSegments(
 
 function readClassifiedPathSegmentReplacement(
   routeClassification: MetricsRouteClassification | null,
-  pathSegmentIndex: number
+  pathSegmentIndex: number,
 ): string | null {
   if (routeClassification === null) {
     return null;
@@ -390,16 +394,20 @@ export class RequestObservabilityOwner {
     maxSamplesPerRoute = 240,
     maxStartupRequestEntries = 200,
     maxRequestLifecycleEntries = 2_000,
-    maxRouteTimingEntries = 400
+    maxRouteTimingEntries = 400,
   ) {
     if (!Number.isInteger(maxSamplesPerRoute) || maxSamplesPerRoute <= 0) {
       throw new Error("RequestObservabilityOwner requires positive integer maxSamplesPerRoute");
     }
     if (!Number.isInteger(maxStartupRequestEntries) || maxStartupRequestEntries <= 0) {
-      throw new Error("RequestObservabilityOwner requires positive integer maxStartupRequestEntries");
+      throw new Error(
+        "RequestObservabilityOwner requires positive integer maxStartupRequestEntries",
+      );
     }
     if (!Number.isInteger(maxRequestLifecycleEntries) || maxRequestLifecycleEntries <= 0) {
-      throw new Error("RequestObservabilityOwner requires positive integer maxRequestLifecycleEntries");
+      throw new Error(
+        "RequestObservabilityOwner requires positive integer maxRequestLifecycleEntries",
+      );
     }
     if (!Number.isInteger(maxRouteTimingEntries) || maxRouteTimingEntries <= 0) {
       throw new Error("RequestObservabilityOwner requires positive integer maxRouteTimingEntries");
@@ -430,7 +438,7 @@ export class RequestObservabilityOwner {
       method: normalizedMethod,
       pathname: normalizedPathname,
       startedAt: observation.startedAt,
-      queueDelayMs: observation.queueDelayMs
+      queueDelayMs: observation.queueDelayMs,
     });
   }
 
@@ -449,7 +457,7 @@ export class RequestObservabilityOwner {
       requestCount: 0,
       errorCount: 0,
       lastDurationMs: 0,
-      lastQueueDelayMs: 0
+      lastQueueDelayMs: 0,
     };
 
     routeAccumulator.requestCount += 1;
@@ -483,12 +491,12 @@ export class RequestObservabilityOwner {
       durationMs: observation.durationMs,
       queueDelayMs: observation.queueDelayMs,
       completedAt: observation.completedAt,
-      outcome: observation.statusCode >= ERROR_STATUS_CODE_MINIMUM ? "error" : "success"
+      outcome: observation.statusCode >= ERROR_STATUS_CODE_MINIMUM ? "error" : "success",
     });
 
     if (
-      observation.actionName === null
-      || !observation.actionName.startsWith(STARTUP_ACTION_NAME_PREFIX)
+      observation.actionName === null ||
+      !observation.actionName.startsWith(STARTUP_ACTION_NAME_PREFIX)
     ) {
       return;
     }
@@ -497,14 +505,14 @@ export class RequestObservabilityOwner {
       requestId: observation.requestId,
       actionId: observation.actionId,
       actionName: observation.actionName,
-      description: STARTUP_ACTION_DESCRIPTION_BY_NAME[observation.actionName]
-        ?? observation.actionName,
+      description:
+        STARTUP_ACTION_DESCRIPTION_BY_NAME[observation.actionName] ?? observation.actionName,
       method: normalizedMethod,
       pathname: normalizedPathname,
       statusCode: observation.statusCode,
       durationMs: observation.durationMs,
       queueDelayMs: observation.queueDelayMs,
-      completedAt: observation.completedAt
+      completedAt: observation.completedAt,
     };
 
     this.startupRequestObservations.push(startupRequestObservation);
@@ -521,15 +529,28 @@ export class RequestObservabilityOwner {
         requestCount: routeAccumulator.requestCount,
         errorCount: routeAccumulator.errorCount,
         lastDurationMs: routeAccumulator.lastDurationMs,
-        p50DurationMs: readPercentile({ values: routeAccumulator.durationSamplesMs, percentile: 50 }),
-        p95DurationMs: readPercentile({ values: routeAccumulator.durationSamplesMs, percentile: 95 }),
-        p99DurationMs: readPercentile({ values: routeAccumulator.durationSamplesMs, percentile: 99 }),
+        p50DurationMs: readPercentile({
+          values: routeAccumulator.durationSamplesMs,
+          percentile: 50,
+        }),
+        p95DurationMs: readPercentile({
+          values: routeAccumulator.durationSamplesMs,
+          percentile: 95,
+        }),
+        p99DurationMs: readPercentile({
+          values: routeAccumulator.durationSamplesMs,
+          percentile: 99,
+        }),
         lastQueueDelayMs: routeAccumulator.lastQueueDelayMs,
-        p95QueueDelayMs: readPercentile({ values: routeAccumulator.queueDelaySamplesMs, percentile: 95 }),
+        p95QueueDelayMs: readPercentile({
+          values: routeAccumulator.queueDelaySamplesMs,
+          percentile: 95,
+        }),
         // Preserve one worst-case queueing signal alongside percentile smoothing.
-        maxQueueDelayMs: routeAccumulator.queueDelaySamplesMs.length > 0
-          ? Math.max(...routeAccumulator.queueDelaySamplesMs)
-          : 0
+        maxQueueDelayMs:
+          routeAccumulator.queueDelaySamplesMs.length > 0
+            ? Math.max(...routeAccumulator.queueDelaySamplesMs)
+            : 0,
       }))
       .sort((left, right) => {
         // Surface slower routes first; request volume breaks p95 ties deterministically.
@@ -545,7 +566,7 @@ export class RequestObservabilityOwner {
       inFlightRequestCount: this.inFlightRequestCount,
       routeTimings,
       startupRequestTimings: [...this.startupRequestObservations],
-      requestLifecycleEvents: this.requestLifecycleEvents.map((event) => ({ ...event }))
+      requestLifecycleEvents: this.requestLifecycleEvents.map((event) => ({ ...event })),
     };
   }
 
@@ -560,7 +581,10 @@ export class RequestObservabilityOwner {
    * Treats the map as an insertion-ordered least-recently-used queue so route aggregates stay bounded
    * even under high-cardinality traffic. Existing keys are refreshed to the end on every write.
    */
-  private writeRouteTimingAccumulator(routeKey: string, routeAccumulator: RouteTimingAccumulator): void {
+  private writeRouteTimingAccumulator(
+    routeKey: string,
+    routeAccumulator: RouteTimingAccumulator,
+  ): void {
     if (this.routeTimingAccumulatorsByKey.has(routeKey)) {
       this.routeTimingAccumulatorsByKey.delete(routeKey);
     }
@@ -585,7 +609,7 @@ export class RequestObservabilityOwner {
     const normalizedSegments = pathSegments.map((pathSegment, pathSegmentIndex) => {
       const classifiedReplacement = readClassifiedPathSegmentReplacement(
         routeClassification,
-        pathSegmentIndex
+        pathSegmentIndex,
       );
       if (classifiedReplacement !== null) {
         return classifiedReplacement;

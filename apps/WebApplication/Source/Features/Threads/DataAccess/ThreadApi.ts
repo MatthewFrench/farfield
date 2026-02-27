@@ -1,18 +1,18 @@
 import {
   AppServerListThreadsResponseSchema,
   AppServerReadThreadResponseSchema,
-  AppServerStartThreadResponseSchema
+  AppServerStartThreadResponseSchema,
 } from "@farfield/protocol";
 import { z } from "zod";
 import {
-  AgentIdSchema,
   type AgentId,
-  type ApiRequestOptions
+  AgentIdSchema,
+  type ApiRequestOptions,
 } from "@/Shared/Contracts/ApiContracts";
 import {
   applyRequestOptions,
   request,
-  requestInitWithOptions
+  requestInitWithOptions,
 } from "@/Shared/Transport/FarfieldHttpTransport";
 
 /**
@@ -40,7 +40,7 @@ const NO_UNREAD_TURN_SIGNAL = null;
 
 const ThreadProjectStateSchema = z.enum([
   THREAD_PROJECT_STATE_ACTIVE,
-  THREAD_PROJECT_STATE_REMOVED
+  THREAD_PROJECT_STATE_REMOVED,
 ]);
 const OptionalThreadListCursorSchema = z
   .union([z.string(), z.null(), z.undefined()])
@@ -50,14 +50,16 @@ const OptionalThreadListItemPathSchema = z.union([z.string(), z.null(), z.undefi
 // Thread-list responses come from heterogeneous adapters; parse permissive wire payloads once,
 // then immediately normalize to a strict app-owned contract used by thread state owners.
 const ThreadListItemWireSchema = AppServerListThreadsResponseSchema.shape.data.element.and(
-  z.object({
-    agentId: AgentIdSchema,
-    source: z.string().optional(),
-    removed: z.boolean().optional(),
-    projectRemoved: z.boolean().optional(),
-    projectState: ThreadProjectStateSchema.optional(),
-    hasUnreadTurn: z.boolean().optional()
-  }).passthrough()
+  z
+    .object({
+      agentId: AgentIdSchema,
+      source: z.string().optional(),
+      removed: z.boolean().optional(),
+      projectRemoved: z.boolean().optional(),
+      projectState: ThreadProjectStateSchema.optional(),
+      hasUnreadTurn: z.boolean().optional(),
+    })
+    .passthrough(),
 );
 
 const ThreadListItemContractSchema = z
@@ -71,7 +73,7 @@ const ThreadListItemContractSchema = z
     agentId: AgentIdSchema,
     source: z.string().optional(),
     hasUnreadTurn: z.union([z.boolean(), z.null()]),
-    isProjectRemoved: z.boolean()
+    isProjectRemoved: z.boolean(),
   })
   .strict();
 type ThreadListItemWire = z.infer<typeof ThreadListItemWireSchema>;
@@ -84,9 +86,9 @@ function readThreadHasUnreadTurnSignal(value: boolean | undefined): boolean | nu
 // Legacy adapters expose project removal with multiple fields; treat any explicit removal signal as removed.
 function readThreadProjectRemovedState(value: ThreadListItemWire): boolean {
   return (
-    value.projectRemoved === true
-    || value.removed === true
-    || value.projectState === THREAD_PROJECT_STATE_REMOVED
+    value.projectRemoved === true ||
+    value.removed === true ||
+    value.projectState === THREAD_PROJECT_STATE_REMOVED
   );
 }
 
@@ -101,20 +103,20 @@ function mapThreadListItemWireToContract(value: ThreadListItemWire): ThreadListI
     agentId: value.agentId,
     source: value.source,
     hasUnreadTurn: readThreadHasUnreadTurnSignal(value.hasUnreadTurn),
-    isProjectRemoved: readThreadProjectRemovedState(value)
+    isProjectRemoved: readThreadProjectRemovedState(value),
   };
 }
 
-const ThreadListItemSchema = ThreadListItemWireSchema
-  .transform(mapThreadListItemWireToContract)
-  .pipe(ThreadListItemContractSchema);
+const ThreadListItemSchema = ThreadListItemWireSchema.transform(
+  mapThreadListItemWireToContract,
+).pipe(ThreadListItemContractSchema);
 
 const ThreadListResponseSchema = z
   .object({
     data: z.array(ThreadListItemSchema),
     nextCursor: OptionalThreadListCursorSchema,
     pages: z.number().int().nonnegative().optional(),
-    truncated: z.boolean().optional()
+    truncated: z.boolean().optional(),
   })
   .strict();
 export type ApiThreadListResponse = z.infer<typeof ThreadListResponseSchema>;
@@ -132,14 +134,14 @@ export type ApiThreadListItem = ApiThreadListResponse["data"][number];
 
 const ThreadListEnvelopeSchema = z
   .object({
-    ok: z.literal(true)
+    ok: z.literal(true),
   })
   .merge(ThreadListResponseSchema)
   .strict()
   .transform(({ ok: _ok, ...threadListResponse }) => threadListResponse);
 
 const ReadThreadResponseWithAgentSchema = AppServerReadThreadResponseSchema.extend({
-  agentId: AgentIdSchema
+  agentId: AgentIdSchema,
 });
 export type ApiReadThreadResponse = z.infer<typeof ReadThreadResponseWithAgentSchema>;
 
@@ -149,7 +151,7 @@ export interface ApiReadThreadOptions extends ApiRequestOptions {
 
 const ReadThreadResponseEnvelopeSchema = z
   .object({
-    ok: z.literal(true)
+    ok: z.literal(true),
   })
   .merge(ReadThreadResponseWithAgentSchema)
   .strict()
@@ -159,7 +161,7 @@ const CreateThreadResponseWireSchema = z
   .object({
     ok: z.literal(true),
     threadId: z.string().min(1),
-    agentId: AgentIdSchema
+    agentId: AgentIdSchema,
   })
   .merge(AppServerStartThreadResponseSchema)
   .passthrough();
@@ -168,7 +170,7 @@ type CreateThreadResponseWire = z.infer<typeof CreateThreadResponseWireSchema>;
 const CreateThreadResponseSchema = z
   .object({
     threadId: z.string().min(1),
-    agentId: AgentIdSchema
+    agentId: AgentIdSchema,
   })
   .strict();
 export type ApiCreateThreadResponse = z.infer<typeof CreateThreadResponseSchema>;
@@ -176,7 +178,7 @@ export type ApiCreateThreadResponse = z.infer<typeof CreateThreadResponseSchema>
 const ThreadMutationResponseSchema = z
   .object({
     ok: z.literal(true),
-    threadId: z.string().min(1)
+    threadId: z.string().min(1),
   })
   .strict();
 
@@ -205,7 +207,7 @@ function buildThreadMemberRequestPath(threadId: string): string {
 
 function buildThreadMutationRequestPath(
   threadId: string,
-  mutationRouteSegment: ThreadMutationRouteSegment
+  mutationRouteSegment: ThreadMutationRouteSegment,
 ): string {
   return `${buildThreadMemberRequestPath(threadId)}/${mutationRouteSegment}`;
 }
@@ -236,43 +238,45 @@ function buildReadThreadRequestPath(threadId: string, includeTurns: boolean): st
 function buildThreadMutationRequestInit(options?: ApiRequestOptions): RequestInit {
   return applyRequestOptions(
     {
-      method: HTTP_POST_METHOD
+      method: HTTP_POST_METHOD,
     },
-    options
+    options,
   );
 }
 
 function buildCreateThreadRequestInit(
   input?: ApiCreateThreadInput,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): RequestInit {
   return applyRequestOptions(
     {
       method: HTTP_POST_METHOD,
       headers: {
-        [APPLICATION_JSON_CONTENT_TYPE_HEADER_NAME]: APPLICATION_JSON_CONTENT_TYPE
+        [APPLICATION_JSON_CONTENT_TYPE_HEADER_NAME]: APPLICATION_JSON_CONTENT_TYPE,
       },
-      body: JSON.stringify(input ?? {})
+      body: JSON.stringify(input ?? {}),
     },
-    options
+    options,
   );
 }
 
-function mapCreateThreadWireToContract(response: CreateThreadResponseWire): ApiCreateThreadResponse {
+function mapCreateThreadWireToContract(
+  response: CreateThreadResponseWire,
+): ApiCreateThreadResponse {
   return {
     threadId: response.threadId,
-    agentId: response.agentId
+    agentId: response.agentId,
   };
 }
 
 async function runThreadMutation(
   threadId: string,
   mutationRouteSegment: ThreadMutationRouteSegment,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<void> {
   const data = await request(
     buildThreadMutationRequestPath(threadId, mutationRouteSegment),
-    buildThreadMutationRequestInit(options)
+    buildThreadMutationRequestInit(options),
   );
   ThreadMutationResponseSchema.parse(data);
 }
@@ -281,31 +285,28 @@ export async function listThreads(options: ApiListThreadsOptions): Promise<ApiTh
   const queryParameters = buildThreadListSearchParameters(options);
   const data = await request(
     `${THREADS_ROUTE_PATH}?${queryParameters.toString()}`,
-    requestInitWithOptions(options)
+    requestInitWithOptions(options),
   );
   return ThreadListEnvelopeSchema.parse(data);
 }
 
 export async function readThread(
   threadId: string,
-  options?: ApiReadThreadOptions
+  options?: ApiReadThreadOptions,
 ): Promise<ApiReadThreadResponse> {
   const includeTurns = options?.includeTurns ?? true;
   const data = await request(
     buildReadThreadRequestPath(threadId, includeTurns),
-    requestInitWithOptions(options)
+    requestInitWithOptions(options),
   );
   return ReadThreadResponseEnvelopeSchema.parse(data);
 }
 
 export async function createThread(
   input?: ApiCreateThreadInput,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiCreateThreadResponse> {
-  const data = await request(
-    THREADS_ROUTE_PATH,
-    buildCreateThreadRequestInit(input, options)
-  );
+  const data = await request(THREADS_ROUTE_PATH, buildCreateThreadRequestInit(input, options));
   const parsedWireResponse = CreateThreadResponseWireSchema.parse(data);
   return CreateThreadResponseSchema.parse(mapCreateThreadWireToContract(parsedWireResponse));
 }
@@ -314,6 +315,9 @@ export async function archiveThread(threadId: string, options?: ApiRequestOption
   await runThreadMutation(threadId, THREAD_ARCHIVE_ROUTE_SEGMENT, options);
 }
 
-export async function unarchiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {
+export async function unarchiveThread(
+  threadId: string,
+  options?: ApiRequestOptions,
+): Promise<void> {
   await runThreadMutation(threadId, THREAD_UNARCHIVE_ROUTE_SEGMENT, options);
 }

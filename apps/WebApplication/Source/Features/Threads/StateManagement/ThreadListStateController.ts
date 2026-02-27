@@ -1,17 +1,17 @@
-import { ThreadServerClient } from "../DataAccess/ThreadServerClient";
 import { ThreadQueryCache } from "../DataAccess/ThreadQueryCache";
+import { ThreadServerClient } from "../DataAccess/ThreadServerClient";
 import type { ThreadListLoadOptions, ThreadListResponse } from "../DomainModel/ThreadGroupTypes";
-import { ThreadRefreshConcurrencyCoordinator } from "./ThreadRefreshConcurrencyCoordinator";
 import {
-  ThreadListPresentationStateResolver,
   type ThreadListPresentationStateInput,
-  type ThreadListPresentationStateResult
+  ThreadListPresentationStateResolver,
+  type ThreadListPresentationStateResult,
 } from "./ThreadListPresentationStateResolver";
 import {
-  ThreadListStateStore,
   type InitialThreadSelectionComputationInput,
-  type UnreadThreadSelectionUpdateInput
+  ThreadListStateStore,
+  type UnreadThreadSelectionUpdateInput,
 } from "./ThreadListStateStore";
+import { ThreadRefreshConcurrencyCoordinator } from "./ThreadRefreshConcurrencyCoordinator";
 
 const ACTIVE_THREADS_CACHE_KEY = "threads:active";
 const ARCHIVED_THREADS_CACHE_KEY = "threads:archived";
@@ -118,49 +118,53 @@ export class ThreadListStateController {
     this.threadListPresentationStateResolver = dependencies.threadListPresentationStateResolver;
   }
 
-  public async loadActiveThreadState(input: LoadActiveThreadStateInput): Promise<LoadActiveThreadStateResult> {
+  public async loadActiveThreadState(
+    input: LoadActiveThreadStateInput,
+  ): Promise<LoadActiveThreadStateResult> {
     const threadListResult = await this.loadThreadListForArchiveMode({
       archived: false,
       limit: input.limit,
       maxPages: input.maxPages,
       sortKey: input.sortKey,
       readFromCache: input.readFromCache,
-      ...this.buildThreadListActionMetadata(input.actionId, input.actionName)
+      ...this.buildThreadListActionMetadata(input.actionId, input.actionName),
     });
 
     const stateResult = this.threadListStateStore.computeActiveThreadState({
       nextThreads: threadListResult.response.data,
       previousUnreadThreadIdentifiers: input.previousUnreadThreadIdentifiers,
-      selectedThreadIdentifier: input.selectedThreadIdentifier
+      selectedThreadIdentifier: input.selectedThreadIdentifier,
     });
 
     return {
       didChangeThreads: stateResult.didChangeThreads,
       nextThreads: stateResult.nextThreads,
       nextUnreadThreadIdentifiers: stateResult.nextUnreadThreadIdentifiers,
-      loadedFromCache: threadListResult.loadedFromCache
+      loadedFromCache: threadListResult.loadedFromCache,
     };
   }
 
-  public async loadArchivedThreadState(input: LoadArchivedThreadStateInput): Promise<LoadArchivedThreadStateResult> {
+  public async loadArchivedThreadState(
+    input: LoadArchivedThreadStateInput,
+  ): Promise<LoadArchivedThreadStateResult> {
     const threadListResult = await this.loadThreadListForArchiveMode({
       archived: true,
       limit: input.limit,
       maxPages: input.maxPages,
       sortKey: input.sortKey,
       readFromCache: input.readFromCache,
-      ...this.buildThreadListActionMetadata(input.actionId, input.actionName)
+      ...this.buildThreadListActionMetadata(input.actionId, input.actionName),
     });
 
     const stateResult = this.threadListStateStore.computeArchivedThreadState({
-      nextArchivedThreads: threadListResult.response.data
+      nextArchivedThreads: threadListResult.response.data,
     });
 
     return {
       didChangeArchivedThreads: stateResult.didChangeArchivedThreads,
       nextArchivedThreads: stateResult.nextArchivedThreads,
       isTruncated: this.readThreadListIsTruncated(threadListResult.response),
-      loadedFromCache: threadListResult.loadedFromCache
+      loadedFromCache: threadListResult.loadedFromCache,
     };
   }
 
@@ -178,19 +182,19 @@ export class ThreadListStateController {
   }
 
   public computeInitialSelectedThreadIdentifier(
-    input: ComputeInitialSelectedThreadIdentifierInput
+    input: ComputeInitialSelectedThreadIdentifierInput,
   ): string | null {
     return this.threadListStateStore.computeInitialSelectedThreadIdentifier(input);
   }
 
   public computeUnreadThreadIdentifiersAfterSelectionChange(
-    input: ComputeUnreadThreadIdentifiersAfterSelectionChangeInput
+    input: ComputeUnreadThreadIdentifiersAfterSelectionChangeInput,
   ): Record<string, true> {
     return this.threadListStateStore.computeUnreadThreadIdentifiersAfterSelectionChange(input);
   }
 
   public readThreadListPresentationState(
-    input: ReadThreadListPresentationStateInput
+    input: ReadThreadListPresentationStateInput,
   ): ReadThreadListPresentationStateResult {
     return this.threadListPresentationStateResolver.readState(input);
   }
@@ -199,12 +203,14 @@ export class ThreadListStateController {
     this.threadListStateStore.resetState();
   }
 
-  private buildThreadListLoadOptions(input: BuildThreadListLoadOptionsInput): ThreadListLoadOptions {
+  private buildThreadListLoadOptions(
+    input: BuildThreadListLoadOptionsInput,
+  ): ThreadListLoadOptions {
     const loadOptions: ThreadListLoadOptions = {
       archived: input.archived,
       limit: input.limit,
       maxPages: input.maxPages,
-      sortKey: input.sortKey
+      sortKey: input.sortKey,
     };
     if (input.actionId !== undefined && input.actionId.length > 0) {
       loadOptions.actionId = input.actionId;
@@ -216,23 +222,25 @@ export class ThreadListStateController {
   }
 
   private readThreadListIsTruncated(response: ThreadListResponse): boolean {
-    return (response.truncated ?? THREAD_LIST_RESPONSE_NOT_TRUNCATED) || response.nextCursor !== null;
+    return (
+      (response.truncated ?? THREAD_LIST_RESPONSE_NOT_TRUNCATED) || response.nextCursor !== null
+    );
   }
 
   private async loadThreadListForArchiveMode(
-    input: LoadThreadListForArchiveModeInput
+    input: LoadThreadListForArchiveModeInput,
   ): Promise<LoadThreadListResult> {
     const loadOptions = this.buildThreadListLoadOptions({
       archived: input.archived,
       limit: input.limit,
       maxPages: input.maxPages,
       sortKey: input.sortKey,
-      ...this.buildThreadListActionMetadata(input.actionId, input.actionName)
+      ...this.buildThreadListActionMetadata(input.actionId, input.actionName),
     });
     return this.loadThreadList(
       this.readThreadListCacheKey(input.archived),
       loadOptions,
-      input.readFromCache
+      input.readFromCache,
     );
   }
 
@@ -243,7 +251,7 @@ export class ThreadListStateController {
 
   private buildThreadListActionMetadata(
     actionId: string | undefined,
-    actionName: string | undefined
+    actionName: string | undefined,
   ): ThreadListActionMetadata {
     const actionMetadata: ThreadListActionMetadata = {};
     if (actionId !== undefined && actionId.length > 0) {
@@ -258,27 +266,30 @@ export class ThreadListStateController {
   private async loadThreadList(
     cacheKey: string,
     loadOptions: ThreadListLoadOptions,
-    readFromCache: boolean
+    readFromCache: boolean,
   ): Promise<LoadThreadListResult> {
     if (readFromCache) {
       const cachedResponse = this.threadQueryCache.readFresh(cacheKey);
       if (cachedResponse) {
         return {
           response: cachedResponse,
-          loadedFromCache: true
+          loadedFromCache: true,
         };
       }
     }
 
-    const response = await this.threadRefreshConcurrencyCoordinator.runSingleFlight(cacheKey, async () => {
-      const nextResponse = await this.threadServerClient.listThreads(loadOptions);
-      this.threadQueryCache.write(cacheKey, nextResponse);
-      return nextResponse;
-    });
+    const response = await this.threadRefreshConcurrencyCoordinator.runSingleFlight(
+      cacheKey,
+      async () => {
+        const nextResponse = await this.threadServerClient.listThreads(loadOptions);
+        this.threadQueryCache.write(cacheKey, nextResponse);
+        return nextResponse;
+      },
+    );
 
     return {
       response,
-      loadedFromCache: false
+      loadedFromCache: false,
     };
   }
 }

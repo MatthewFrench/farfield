@@ -8,7 +8,7 @@ const DEBUG_DOWNLOAD_ACCESS_CONTROL_ALLOW_ORIGIN = "*";
 const DEBUG_DOWNLOAD_FILE_SYSTEM_ERROR_CODE_BY_NAME = {
   missingPath: "ENOENT",
   missingPathSegment: "ENOTDIR",
-  pathIsDirectory: "EISDIR"
+  pathIsDirectory: "EISDIR",
 } as const;
 const DebugFileDownloadMessageByName = {
   invalidDownloadInput: "Debug download input contract is invalid",
@@ -21,7 +21,7 @@ const DebugFileDownloadMessageByName = {
   fileNotFound: "Requested download file was not found",
   notFile: "Requested download path is not a file",
   statFailed: "Failed to read debug download file metadata",
-  streamFailed: "Failed to stream debug download file"
+  streamFailed: "Failed to stream debug download file",
 } as const;
 const HEADER_UNSAFE_FILENAME_CHARACTER_PATTERN = /[\u0000-\u001F\u007F"\\]/u;
 const DebugFileDownloadInputSchema = z
@@ -29,35 +29,35 @@ const DebugFileDownloadInputSchema = z
     filePath: z
       .string()
       .min(1, {
-        message: DebugFileDownloadMessageByName.invalidFilePath
+        message: DebugFileDownloadMessageByName.invalidFilePath,
       })
       .refine((value) => value.trim().length > 0, {
-        message: DebugFileDownloadMessageByName.invalidFilePath
+        message: DebugFileDownloadMessageByName.invalidFilePath,
       })
       .refine((value) => !value.includes("\0"), {
-        message: DebugFileDownloadMessageByName.invalidFilePathNulCharacter
+        message: DebugFileDownloadMessageByName.invalidFilePathNulCharacter,
       }),
     downloadFileName: z
       .string()
       .min(1, {
-        message: DebugFileDownloadMessageByName.invalidFileName
+        message: DebugFileDownloadMessageByName.invalidFileName,
       })
       .max(255, {
-        message: DebugFileDownloadMessageByName.invalidFileName
+        message: DebugFileDownloadMessageByName.invalidFileName,
       })
       .refine((value) => value.trim().length > 0, {
-        message: DebugFileDownloadMessageByName.invalidFileName
+        message: DebugFileDownloadMessageByName.invalidFileName,
       })
       .refine((value) => !(value.includes("/") || value.includes("\\")), {
-        message: DebugFileDownloadMessageByName.invalidFileNamePathSeparator
+        message: DebugFileDownloadMessageByName.invalidFileNamePathSeparator,
       })
       .refine((value) => !HEADER_UNSAFE_FILENAME_CHARACTER_PATTERN.test(value), {
-        message: DebugFileDownloadMessageByName.invalidFileNameHeaderUnsafeCharacter
-      })
+        message: DebugFileDownloadMessageByName.invalidFileNameHeaderUnsafeCharacter,
+      }),
   })
   .strict();
 const DebugFileSystemErrorSchema = z.object({
-  code: z.string().optional()
+  code: z.string().optional(),
 });
 
 interface DebugFileDownloadInput {
@@ -69,11 +69,11 @@ export const DebugFileDownloadErrorCodeByName = {
   invalidRequest: "invalid-request",
   notFound: "not-found",
   notFile: "not-file",
-  streamFailed: "stream-failed"
+  streamFailed: "stream-failed",
 } as const;
 
 export type DebugFileDownloadErrorCode =
-  typeof DebugFileDownloadErrorCodeByName[keyof typeof DebugFileDownloadErrorCodeByName];
+  (typeof DebugFileDownloadErrorCodeByName)[keyof typeof DebugFileDownloadErrorCodeByName];
 
 /**
  * Download errors are normalized here so route owners can map response status deterministically
@@ -91,11 +91,11 @@ export class DebugFileDownloadError extends Error {
 
 function parseDebugFileDownloadInput(
   filePath: string,
-  downloadFileName: string
+  downloadFileName: string,
 ): DebugFileDownloadInput {
   const parsedInput = DebugFileDownloadInputSchema.safeParse({
     filePath,
-    downloadFileName
+    downloadFileName,
   });
   if (parsedInput.success) {
     return parsedInput.data;
@@ -110,35 +110,32 @@ function parseDebugFileDownloadInput(
 
 function mapFileSystemErrorToDownloadError(
   fileSystemErrorCode: string | null,
-  defaultMessage: string
+  defaultMessage: string,
 ): DebugFileDownloadError {
   if (
-    fileSystemErrorCode === DEBUG_DOWNLOAD_FILE_SYSTEM_ERROR_CODE_BY_NAME.missingPath
-    || fileSystemErrorCode === DEBUG_DOWNLOAD_FILE_SYSTEM_ERROR_CODE_BY_NAME.missingPathSegment
+    fileSystemErrorCode === DEBUG_DOWNLOAD_FILE_SYSTEM_ERROR_CODE_BY_NAME.missingPath ||
+    fileSystemErrorCode === DEBUG_DOWNLOAD_FILE_SYSTEM_ERROR_CODE_BY_NAME.missingPathSegment
   ) {
     return new DebugFileDownloadError(
       DebugFileDownloadErrorCodeByName.notFound,
-      DebugFileDownloadMessageByName.fileNotFound
+      DebugFileDownloadMessageByName.fileNotFound,
     );
   }
 
   if (fileSystemErrorCode === DEBUG_DOWNLOAD_FILE_SYSTEM_ERROR_CODE_BY_NAME.pathIsDirectory) {
     return new DebugFileDownloadError(
       DebugFileDownloadErrorCodeByName.notFile,
-      DebugFileDownloadMessageByName.notFile
+      DebugFileDownloadMessageByName.notFile,
     );
   }
 
-  return new DebugFileDownloadError(
-    DebugFileDownloadErrorCodeByName.streamFailed,
-    defaultMessage
-  );
+  return new DebugFileDownloadError(DebugFileDownloadErrorCodeByName.streamFailed, defaultMessage);
 }
 
 export async function streamDebugFileDownload(
   res: ServerResponse,
   filePath: string,
-  downloadFileName: string
+  downloadFileName: string,
 ): Promise<void> {
   const parsedInput = parseDebugFileDownloadInput(filePath, downloadFileName);
 
@@ -148,18 +145,18 @@ export async function streamDebugFileDownload(
   } catch (error) {
     const parsedFileSystemError = DebugFileSystemErrorSchema.safeParse(error);
     const fileSystemErrorCode = parsedFileSystemError.success
-      ? parsedFileSystemError.data.code ?? null
+      ? (parsedFileSystemError.data.code ?? null)
       : null;
     throw mapFileSystemErrorToDownloadError(
       fileSystemErrorCode,
-      DebugFileDownloadMessageByName.statFailed
+      DebugFileDownloadMessageByName.statFailed,
     );
   }
 
   if (!fileStats.isFile()) {
     throw new DebugFileDownloadError(
       DebugFileDownloadErrorCodeByName.notFile,
-      DebugFileDownloadMessageByName.notFile
+      DebugFileDownloadMessageByName.notFile,
     );
   }
 
@@ -167,7 +164,7 @@ export async function streamDebugFileDownload(
     "Content-Type": DEBUG_DOWNLOAD_CONTENT_TYPE,
     "Content-Length": fileStats.size,
     "Content-Disposition": `attachment; filename=\"${parsedInput.downloadFileName}\"`,
-    "Access-Control-Allow-Origin": DEBUG_DOWNLOAD_ACCESS_CONTROL_ALLOW_ORIGIN
+    "Access-Control-Allow-Origin": DEBUG_DOWNLOAD_ACCESS_CONTROL_ALLOW_ORIGIN,
   });
 
   try {
@@ -177,11 +174,11 @@ export async function streamDebugFileDownload(
   } catch (error) {
     const parsedFileSystemError = DebugFileSystemErrorSchema.safeParse(error);
     const fileSystemErrorCode = parsedFileSystemError.success
-      ? parsedFileSystemError.data.code ?? null
+      ? (parsedFileSystemError.data.code ?? null)
       : null;
     throw mapFileSystemErrorToDownloadError(
       fileSystemErrorCode,
-      DebugFileDownloadMessageByName.streamFailed
+      DebugFileDownloadMessageByName.streamFailed,
     );
   }
 }

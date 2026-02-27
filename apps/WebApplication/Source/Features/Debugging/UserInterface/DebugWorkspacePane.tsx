@@ -1,20 +1,15 @@
 import { Bug } from "lucide-react";
-import {
-  type DebugIssueSeverityFilter
-} from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
-import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
-import {
-  parseDebugWorkspaceSection,
-  type DebugWorkspaceSection
-} from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import { Tabs } from "@/Components/UserInterface/Tabs";
 import { TabsList } from "@/Components/UserInterface/TabsList";
 import { TabsTrigger } from "@/Components/UserInterface/TabsTrigger";
+import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
+import { type DebugIssueSeverityFilter } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import {
-  DebugHistoryPanel,
-  type DebugHistoryEntryListItem
-} from "./DebugHistoryPanel";
+  type DebugWorkspaceSection,
+  parseDebugWorkspaceSection,
+} from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import { type ReplayHistoryEntryRequestInput } from "./DebugHistoryDetailPanel";
+import { type DebugHistoryEntryListItem, DebugHistoryPanel } from "./DebugHistoryPanel";
 import { DebugIssuesPanel } from "./DebugIssuesPanel";
 import { DebugStreamEventsPanel } from "./DebugStreamEventsPanel";
 import { DebugTracePanel, type DebugTraceSummary } from "./DebugTracePanel";
@@ -90,7 +85,7 @@ export function DebugWorkspacePane({
   onStartTrace,
   onMarkTrace,
   onStopTrace,
-  recentTraceSummaries
+  recentTraceSummaries,
 }: DebugWorkspacePaneProps): React.JSX.Element {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -114,10 +109,18 @@ export function DebugWorkspacePane({
       >
         <div className="shrink-0 px-4 py-2 border-b border-border">
           <TabsList className="h-8">
-            <TabsTrigger value="issues" className="text-xs h-7 px-2.5">Issues</TabsTrigger>
-            <TabsTrigger value="history" className="text-xs h-7 px-2.5">History</TabsTrigger>
-            <TabsTrigger value="stream" className="text-xs h-7 px-2.5">Stream</TabsTrigger>
-            <TabsTrigger value="trace" className="text-xs h-7 px-2.5">Trace</TabsTrigger>
+            <TabsTrigger value="issues" className="text-xs h-7 px-2.5">
+              Issues
+            </TabsTrigger>
+            <TabsTrigger value="history" className="text-xs h-7 px-2.5">
+              History
+            </TabsTrigger>
+            <TabsTrigger value="stream" className="text-xs h-7 px-2.5">
+              Stream
+            </TabsTrigger>
+            <TabsTrigger value="trace" className="text-xs h-7 px-2.5">
+              Trace
+            </TabsTrigger>
           </TabsList>
         </div>
 

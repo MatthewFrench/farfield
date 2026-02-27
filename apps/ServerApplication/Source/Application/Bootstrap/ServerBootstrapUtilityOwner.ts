@@ -1,19 +1,20 @@
 import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { JsonObjectSchema, JsonValueSchema, type JsonValue } from "@farfield/protocol";
+import { JsonObjectSchema, type JsonValue, JsonValueSchema } from "@farfield/protocol";
 import { z } from "zod";
 import type { AgentAdapter, AgentDescriptor } from "../../Agents/Types.js";
 
 const JsonResponseHeaderValues = Object.freeze({
-  accessControlAllowHeaders: "content-type, x-farfield-token, x-farfield-request-id, x-farfield-action-id, x-farfield-action-name",
+  accessControlAllowHeaders:
+    "content-type, x-farfield-token, x-farfield-request-id, x-farfield-action-id, x-farfield-action-name",
   accessControlAllowMethods: "GET,POST,DELETE,OPTIONS",
   accessControlAllowOrigin: "*",
-  contentType: "application/json; charset=utf-8"
+  contentType: "application/json; charset=utf-8",
 });
 const BootstrapUtilityMessageByName = Object.freeze({
   invalidJsonBody: "Request body must be valid JSON.",
   invalidJsonBodyShape: "Request body must be a JSON object.",
-  directoryPathBlank: "Directory path must contain at least one non-whitespace character."
+  directoryPathBlank: "Directory path must contain at least one non-whitespace character.",
 });
 const HttpStatusCodeSchema = z.number().int().min(100).max(599);
 const JsonRequestBodySchema = JsonObjectSchema;
@@ -21,11 +22,11 @@ const NonBlankDirectoryPathSchema = z
   .string()
   .min(1)
   .refine((value) => value.trim().length > 0, {
-    message: BootstrapUtilityMessageByName.directoryPathBlank
+    message: BootstrapUtilityMessageByName.directoryPathBlank,
   });
 const ErrorInstanceSchema = z.instanceof(Error);
 const ErrorMessageObjectSchema = z.object({
-  message: z.string()
+  message: z.string(),
 });
 const ErrorStringSchema = z.string();
 
@@ -39,7 +40,7 @@ export class ServerBootstrapUtilityOwner {
       "Content-Length": encoded.length,
       "Access-Control-Allow-Origin": JsonResponseHeaderValues.accessControlAllowOrigin,
       "Access-Control-Allow-Headers": JsonResponseHeaderValues.accessControlAllowHeaders,
-      "Access-Control-Allow-Methods": JsonResponseHeaderValues.accessControlAllowMethods
+      "Access-Control-Allow-Methods": JsonResponseHeaderValues.accessControlAllowMethods,
     });
     res.end(encoded);
   }
@@ -87,14 +88,17 @@ export class ServerBootstrapUtilityOwner {
     fs.mkdirSync(parsedPath, { recursive: true });
   }
 
-  public buildAgentDescriptor(adapter: AgentAdapter, projectDirectories: string[]): AgentDescriptor {
+  public buildAgentDescriptor(
+    adapter: AgentAdapter,
+    projectDirectories: string[],
+  ): AgentDescriptor {
     return {
       id: adapter.id,
       label: adapter.label,
       enabled: adapter.isEnabled(),
       connected: adapter.isConnected(),
       capabilities: adapter.capabilities,
-      projectDirectories
+      projectDirectories,
     };
   }
 

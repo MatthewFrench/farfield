@@ -7,12 +7,12 @@ const PushStoreVersion = {
   state: 1,
   send: 1,
   receipt: 2,
-  legacyReceipt: 1
+  legacyReceipt: 1,
 } as const;
 const PushStoreVersionLabel = {
   state: "push state",
   send: "push send store",
-  receipt: "push receipt store"
+  receipt: "push receipt store",
 } as const;
 const LegacyPushReceiptNotificationIdentifierPrefix = "legacy";
 const Base64UrlPattern = /^[A-Za-z0-9_-]+$/;
@@ -28,14 +28,14 @@ type VersionedPushStore = {
 
 function createUnsupportedPushStoreVersionMessage(
   storeLabel: string,
-  actualVersion: number
+  actualVersion: number,
 ): string {
   return `Unsupported ${storeLabel} version: ${String(actualVersion)}`;
 }
 
 function createPushStoreVersionRefinement(
   expectedVersion: number,
-  storeLabel: string
+  storeLabel: string,
 ): (state: VersionedPushStore, ctx: z.RefinementCtx) => void {
   // Keep the version field numeric before refinement so diagnostics can include
   // the received version number and remain stable across all push store contracts.
@@ -43,7 +43,7 @@ function createPushStoreVersionRefinement(
     if (state.version !== expectedVersion) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: createUnsupportedPushStoreVersionMessage(storeLabel, state.version)
+        message: createUnsupportedPushStoreVersionMessage(storeLabel, state.version),
       });
     }
   };
@@ -51,48 +51,45 @@ function createPushStoreVersionRefinement(
 
 function buildLegacyPushReceiptNotificationIdentifier(
   receiptIndex: number,
-  createdAt: string
+  createdAt: string,
 ): string {
   // Legacy receipt records do not include notification identifiers; synthesize a deterministic value
   // from persisted order and timestamp so migration stays stable for repeated parses.
   return `${LegacyPushReceiptNotificationIdentifierPrefix}-${receiptIndex + 1}-${createdAt}`;
 }
 
-const Base64UrlValueSchema = z
-  .string()
-  .min(1)
-  .regex(Base64UrlPattern, Base64UrlValidationMessage);
+const Base64UrlValueSchema = z.string().min(1).regex(Base64UrlPattern, Base64UrlValidationMessage);
 
 export const PushSubscriptionKeysSchema = z
   .object({
     p256dh: Base64UrlValueSchema,
-    auth: Base64UrlValueSchema
+    auth: Base64UrlValueSchema,
   })
   .strict();
 
 export const PushSubscriptionSchema = z
   .object({
     endpoint: z.string().url(),
-    keys: PushSubscriptionKeysSchema
+    keys: PushSubscriptionKeysSchema,
   })
   .strict();
 
 export const PushSettingsSchema = z
   .object({
-    privateMode: z.boolean()
+    privateMode: z.boolean(),
   })
   .strict();
 
 export const CreatePushSubscriptionBodySchema = z
   .object({
     subscription: PushSubscriptionSchema,
-    settings: PushSettingsSchema.optional()
+    settings: PushSettingsSchema.optional(),
   })
   .strict();
 
 export const DeletePushSubscriptionBodySchema = z
   .object({
-    endpoint: z.string().url()
+    endpoint: z.string().url(),
   })
   .strict();
 
@@ -102,14 +99,14 @@ export const StoredPushSubscriptionSchema = z
     subscription: PushSubscriptionSchema,
     settings: PushSettingsSchema,
     createdAt: IsoDateTimeStringSchema,
-    updatedAt: IsoDateTimeStringSchema
+    updatedAt: IsoDateTimeStringSchema,
   })
   .strict();
 
 export const CompletionWatermarkSchema = z
   .object({
     threadId: NonEmptyStringSchema,
-    marker: NonEmptyStringSchema
+    marker: NonEmptyStringSchema,
   })
   .strict();
 
@@ -117,11 +114,11 @@ export const PushStateStoreSchema = z
   .object({
     version: NonNegativeIntSchema,
     subscriptions: z.array(StoredPushSubscriptionSchema),
-    completionWatermarks: z.array(CompletionWatermarkSchema)
+    completionWatermarks: z.array(CompletionWatermarkSchema),
   })
   .strict()
   .superRefine(
-    createPushStoreVersionRefinement(PushStoreVersion.state, PushStoreVersionLabel.state)
+    createPushStoreVersionRefinement(PushStoreVersion.state, PushStoreVersionLabel.state),
   );
 
 export const DeclarativePushNotificationSchema = z
@@ -131,13 +128,13 @@ export const DeclarativePushNotificationSchema = z
     navigate: NonEmptyStringSchema.optional(),
     icon: NonEmptyStringSchema.optional(),
     badge: NonEmptyStringSchema.optional(),
-    tag: NonEmptyStringSchema.optional()
+    tag: NonEmptyStringSchema.optional(),
   })
   .strict();
 
 export const DeclarativeWebPushSchema = z
   .object({
-    notification: DeclarativePushNotificationSchema
+    notification: DeclarativePushNotificationSchema,
   })
   .strict();
 
@@ -150,7 +147,7 @@ export const PushNotificationPayloadSchema = z
     turnId: NonEmptyStringSchema,
     url: NonEmptyStringSchema,
     createdAt: IsoDateTimeStringSchema,
-    web_push: DeclarativeWebPushSchema.optional()
+    web_push: DeclarativeWebPushSchema.optional(),
   })
   .strict();
 
@@ -164,7 +161,7 @@ export const CreatePushReceiptBodySchema = z
     threadId: OptionalNullableNonEmptyStringSchema,
     turnId: OptionalNullableNonEmptyStringSchema,
     message: z.string().max(500).optional(),
-    createdAt: IsoDateTimeStringSchema
+    createdAt: IsoDateTimeStringSchema,
   })
   .strict();
 
@@ -176,7 +173,7 @@ export const PushReceiptSchema = z
     threadId: NullableNonEmptyStringSchema,
     turnId: NullableNonEmptyStringSchema,
     message: z.string().nullable(),
-    createdAt: IsoDateTimeStringSchema
+    createdAt: IsoDateTimeStringSchema,
   })
   .strict();
 
@@ -187,20 +184,20 @@ const LegacyPushReceiptSchema = z
     threadId: NullableNonEmptyStringSchema,
     turnId: NullableNonEmptyStringSchema,
     message: z.string().nullable(),
-    createdAt: IsoDateTimeStringSchema
+    createdAt: IsoDateTimeStringSchema,
   })
   .strict();
 
 export const PushReceiptCreateResponseSchema = z
   .object({
-    recorded: z.literal(true)
+    recorded: z.literal(true),
   })
   .strict();
 
 export const PushReceiptLatestResponseSchema = z
   .object({
     latest: PushReceiptSchema.nullable(),
-    count: NonNegativeIntSchema
+    count: NonNegativeIntSchema,
   })
   .strict();
 
@@ -212,20 +209,20 @@ export const PushSendSummarySchema = z
     sentAt: IsoDateTimeStringSchema,
     attempted: NonNegativeIntSchema,
     delivered: NonNegativeIntSchema,
-    failures: NonNegativeIntSchema
+    failures: NonNegativeIntSchema,
   })
   .strict();
 
 export const PushSendLatestResponseSchema = z
   .object({
-    latest: PushSendSummarySchema.nullable()
+    latest: PushSendSummarySchema.nullable(),
   })
   .strict();
 
 export const PushSendStoreSchema = z
   .object({
     version: NonNegativeIntSchema,
-    latest: PushSendSummarySchema.nullable()
+    latest: PushSendSummarySchema.nullable(),
   })
   .strict()
   .superRefine(createPushStoreVersionRefinement(PushStoreVersion.send, PushStoreVersionLabel.send));
@@ -233,30 +230,30 @@ export const PushSendStoreSchema = z
 export const PushReceiptStoreSchema = z
   .object({
     version: NonNegativeIntSchema,
-    receipts: z.array(PushReceiptSchema)
+    receipts: z.array(PushReceiptSchema),
   })
   .strict()
   .superRefine(
-    createPushStoreVersionRefinement(PushStoreVersion.receipt, PushStoreVersionLabel.receipt)
+    createPushStoreVersionRefinement(PushStoreVersion.receipt, PushStoreVersionLabel.receipt),
   );
 
 const LegacyPushReceiptStoreSchema = z
   .object({
     version: z.literal(PushStoreVersion.legacyReceipt),
-    receipts: z.array(LegacyPushReceiptSchema)
+    receipts: z.array(LegacyPushReceiptSchema),
   })
   .strict();
 
 export const PushLocalCaStatusResponseSchema = z
   .object({
     available: z.boolean(),
-    downloadPath: NullableNonEmptyStringSchema
+    downloadPath: NullableNonEmptyStringSchema,
   })
   .strict();
 
 export const VapidPublicKeyResponseSchema = z
   .object({
-    publicKey: Base64UrlValueSchema
+    publicKey: Base64UrlValueSchema,
   })
   .strict();
 
@@ -265,19 +262,19 @@ export const PushStatusResponseSchema = z
     enabled: z.boolean(),
     permissionRequired: z.boolean(),
     subscriptionCount: NonNegativeIntSchema,
-    privateModeDefault: z.boolean()
+    privateModeDefault: z.boolean(),
   })
   .strict();
 
 export const CreatePushSubscriptionResponseSchema = z
   .object({
-    subscriptionId: NonEmptyStringSchema
+    subscriptionId: NonEmptyStringSchema,
   })
   .strict();
 
 export const DeletePushSubscriptionResponseSchema = z
   .object({
-    deleted: z.boolean()
+    deleted: z.boolean(),
   })
   .strict();
 
@@ -316,26 +313,26 @@ const ParseContext = {
   pushSendStore: "PushSendStore",
   pushReceiptStore: "PushReceiptStore",
   pushLocalCaStatusResponse: "PushLocalCaStatusResponse",
-  vapidPublicKeyResponse: "VapidPublicKeyResponse"
+  vapidPublicKeyResponse: "VapidPublicKeyResponse",
 } as const;
 
 export function parseCreatePushSubscriptionBody(
-  value: z.input<typeof CreatePushSubscriptionBodySchema>
+  value: z.input<typeof CreatePushSubscriptionBodySchema>,
 ): CreatePushSubscriptionBody {
   return parseSchemaOrThrow(
     CreatePushSubscriptionBodySchema,
     value,
-    ParseContext.createPushSubscriptionBody
+    ParseContext.createPushSubscriptionBody,
   );
 }
 
 export function parseDeletePushSubscriptionBody(
-  value: z.input<typeof DeletePushSubscriptionBodySchema>
+  value: z.input<typeof DeletePushSubscriptionBodySchema>,
 ): DeletePushSubscriptionBody {
   return parseSchemaOrThrow(
     DeletePushSubscriptionBodySchema,
     value,
-    ParseContext.deletePushSubscriptionBody
+    ParseContext.deletePushSubscriptionBody,
   );
 }
 
@@ -344,32 +341,28 @@ export function parsePushStateStore(value: z.input<typeof PushStateStoreSchema>)
 }
 
 export function parsePushNotificationPayload(
-  value: z.input<typeof PushNotificationPayloadSchema>
+  value: z.input<typeof PushNotificationPayloadSchema>,
 ): PushNotificationPayload {
   return parseSchemaOrThrow(
     PushNotificationPayloadSchema,
     value,
-    ParseContext.pushNotificationPayload
+    ParseContext.pushNotificationPayload,
   );
 }
 
 export function parseCreatePushReceiptBody(
-  value: z.input<typeof CreatePushReceiptBodySchema>
+  value: z.input<typeof CreatePushReceiptBodySchema>,
 ): CreatePushReceiptBody {
-  return parseSchemaOrThrow(
-    CreatePushReceiptBodySchema,
-    value,
-    ParseContext.createPushReceiptBody
-  );
+  return parseSchemaOrThrow(CreatePushReceiptBodySchema, value, ParseContext.createPushReceiptBody);
 }
 
 export function parsePushSendLatestResponse(
-  value: z.input<typeof PushSendLatestResponseSchema>
+  value: z.input<typeof PushSendLatestResponseSchema>,
 ): PushSendLatestResponse {
   return parseSchemaOrThrow(
     PushSendLatestResponseSchema,
     value,
-    ParseContext.pushSendLatestResponse
+    ParseContext.pushSendLatestResponse,
   );
 }
 
@@ -378,7 +371,7 @@ export function parsePushSendStore(value: z.input<typeof PushSendStoreSchema>): 
 }
 
 export function parsePushReceiptStore(
-  value: z.input<typeof PushReceiptStoreSchema>
+  value: z.input<typeof PushReceiptStoreSchema>,
 ): PushReceiptStore {
   const currentResult = PushReceiptStoreSchema.safeParse(value);
   if (currentResult.success) {
@@ -396,8 +389,8 @@ export function parsePushReceiptStore(
         threadId: receipt.threadId,
         turnId: receipt.turnId,
         message: receipt.message,
-        createdAt: receipt.createdAt
-      }))
+        createdAt: receipt.createdAt,
+      })),
     };
   }
 
@@ -405,21 +398,21 @@ export function parsePushReceiptStore(
 }
 
 export function parsePushLocalCaStatusResponse(
-  value: z.input<typeof PushLocalCaStatusResponseSchema>
+  value: z.input<typeof PushLocalCaStatusResponseSchema>,
 ): PushLocalCaStatusResponse {
   return parseSchemaOrThrow(
     PushLocalCaStatusResponseSchema,
     value,
-    ParseContext.pushLocalCaStatusResponse
+    ParseContext.pushLocalCaStatusResponse,
   );
 }
 
 export function parseVapidPublicKeyResponse(
-  value: z.input<typeof VapidPublicKeyResponseSchema>
+  value: z.input<typeof VapidPublicKeyResponseSchema>,
 ): VapidPublicKeyResponse {
   return parseSchemaOrThrow(
     VapidPublicKeyResponseSchema,
     value,
-    ParseContext.vapidPublicKeyResponse
+    ParseContext.vapidPublicKeyResponse,
   );
 }

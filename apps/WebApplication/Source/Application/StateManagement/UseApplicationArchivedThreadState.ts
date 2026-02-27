@@ -8,7 +8,7 @@ const INITIAL_ARCHIVED_THREAD_FLAGS = {
   hasLoadedArchivedThreads: false,
   archivedThreadsTruncated: false,
   isArchivedThreadsOpen: false,
-  isArchivedThreadsLoading: false
+  isArchivedThreadsLoading: false,
 };
 
 function createInitialArchivedThreadCollection(): ArchivedThreadCollection {
@@ -37,24 +37,27 @@ export interface ApplicationArchivedThreadStateSlice {
 }
 
 export function useApplicationArchivedThreadState(): ApplicationArchivedThreadStateSlice {
-  const [archivedThreads, setArchivedThreads] = useState<ArchivedThreadCollection>(createInitialArchivedThreadCollection);
+  const [archivedThreads, setArchivedThreads] = useState<ArchivedThreadCollection>(
+    createInitialArchivedThreadCollection,
+  );
   const [hasLoadedArchivedThreads, setHasLoadedArchivedThreads] = useState(
-    INITIAL_ARCHIVED_THREAD_FLAGS.hasLoadedArchivedThreads
+    INITIAL_ARCHIVED_THREAD_FLAGS.hasLoadedArchivedThreads,
   );
   const [archivedThreadsTruncated, setArchivedThreadsTruncated] = useState(
-    INITIAL_ARCHIVED_THREAD_FLAGS.archivedThreadsTruncated
+    INITIAL_ARCHIVED_THREAD_FLAGS.archivedThreadsTruncated,
   );
   const [isArchivedThreadsOpen, setIsArchivedThreadsOpen] = useState(
-    INITIAL_ARCHIVED_THREAD_FLAGS.isArchivedThreadsOpen
+    INITIAL_ARCHIVED_THREAD_FLAGS.isArchivedThreadsOpen,
   );
   const [isArchivedThreadsLoading, setIsArchivedThreadsLoading] = useState(
-    INITIAL_ARCHIVED_THREAD_FLAGS.isArchivedThreadsLoading
+    INITIAL_ARCHIVED_THREAD_FLAGS.isArchivedThreadsLoading,
   );
-  const [collapsedArchivedProjectGroups, setCollapsedArchivedProjectGroups] = useState<CollapsedArchivedProjectGroups>(
-    createInitialCollapsedArchivedProjectGroups
-  );
+  const [collapsedArchivedProjectGroups, setCollapsedArchivedProjectGroups] =
+    useState<CollapsedArchivedProjectGroups>(createInitialCollapsedArchivedProjectGroups);
   const isArchivedThreadsOpenRef = useRef(INITIAL_ARCHIVED_THREAD_FLAGS.isArchivedThreadsOpen);
-  const hasLoadedArchivedThreadsRef = useRef(INITIAL_ARCHIVED_THREAD_FLAGS.hasLoadedArchivedThreads);
+  const hasLoadedArchivedThreadsRef = useRef(
+    INITIAL_ARCHIVED_THREAD_FLAGS.hasLoadedArchivedThreads,
+  );
 
   return {
     archivedThreads,
@@ -70,6 +73,6 @@ export function useApplicationArchivedThreadState(): ApplicationArchivedThreadSt
     collapsedArchivedProjectGroups,
     setCollapsedArchivedProjectGroups,
     isArchivedThreadsOpenRef,
-    hasLoadedArchivedThreadsRef
+    hasLoadedArchivedThreadsRef,
   };
 }

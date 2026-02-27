@@ -1,27 +1,22 @@
 import {
-  useCallback,
-  useRef,
   type Dispatch,
   type MutableRefObject,
-  type SetStateAction
+  type SetStateAction,
+  useCallback,
+  useRef,
 } from "react";
-import { CoreDataRefreshConcurrencyCoordinator } from "./CoreDataRefreshConcurrencyCoordinator";
-import {
-  CapabilitySnapshotCache
-} from "@/Features/Capabilities/DataAccess/CapabilitySnapshotCache";
-import {
-  CapabilityServerClient
-} from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
-import {
-  DebugServerClient
-} from "@/Features/Debugging/DataAccess/DebugServerClient";
+import { CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
+import { CapabilitySnapshotCache } from "@/Features/Capabilities/DataAccess/CapabilitySnapshotCache";
+import { DebugServerClient } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { DebugWorkspaceDataReader } from "@/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
-import type {
-  AgentId,
-  ApiRequestOptions
-} from "@/Shared/Contracts/ApiContracts";
+import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
+import {
+  ArchivedThreadLoader,
+  type ArchivedThreadLoaderDependencies,
+} from "./ArchivedThreadLoader";
+import { CoreDataRefreshConcurrencyCoordinator } from "./CoreDataRefreshConcurrencyCoordinator";
 import type {
   CoreDataAgentDescriptor,
   CoreDataCapabilitySnapshot,
@@ -29,18 +24,14 @@ import type {
   CoreDataDebugErrorsResponse,
   CoreDataHealthResponse,
   CoreDataHistoryResponse,
-  CoreDataModesResponse,
   CoreDataModelsResponse,
+  CoreDataModesResponse,
   CoreDataThreadsResponse,
-  CoreDataTraceStatusResponse
+  CoreDataTraceStatusResponse,
 } from "./CoreDataSnapshotContracts";
 import {
-  ArchivedThreadLoader,
-  type ArchivedThreadLoaderDependencies
-} from "./ArchivedThreadLoader";
-import {
   CoreDataStartupLoader,
-  type CoreDataStartupLoaderDependencies
+  type CoreDataStartupLoaderDependencies,
 } from "./CoreDataStartupLoader";
 
 export type { CoreDataCapabilitySnapshot } from "./CoreDataSnapshotContracts";
@@ -66,7 +57,7 @@ interface ActionRequestOptions {
 }
 
 function createStartupLoaderDependencies(
-  input: UseCoreDataLoadersInput
+  input: UseCoreDataLoadersInput,
 ): CoreDataStartupLoaderDependencies {
   return {
     debugHistoryLimit: input.debugHistoryLimit,
@@ -104,12 +95,12 @@ function createStartupLoaderDependencies(
     ensureApiSessionBootstrapped: input.ensureApiSessionBootstrapped,
     buildActionRequestOptions: input.buildActionRequestOptions,
     readInitialModeKey: input.readInitialModeKey,
-    handleRuntimeRequestError: input.handleRuntimeRequestError
+    handleRuntimeRequestError: input.handleRuntimeRequestError,
   };
 }
 
 function createArchivedThreadLoaderDependencies(
-  input: UseCoreDataLoadersInput
+  input: UseCoreDataLoadersInput,
 ): ArchivedThreadLoaderDependencies {
   return {
     threadListStateController: input.threadListStateController,
@@ -119,7 +110,7 @@ function createArchivedThreadLoaderDependencies(
     setArchivedThreads: input.setArchivedThreads,
     setArchivedThreadsTruncated: input.setArchivedThreadsTruncated,
     setHasLoadedArchivedThreads: input.setHasLoadedArchivedThreads,
-    handleRuntimeRequestError: input.handleRuntimeRequestError
+    handleRuntimeRequestError: input.handleRuntimeRequestError,
   };
 }
 
@@ -168,7 +159,7 @@ export interface UseCoreDataLoadersInput {
   ensureApiSessionBootstrapped: () => Promise<boolean>;
   buildActionRequestOptions: (actionName: string) => ActionRequestOptions;
   readInitialModeKey: (modes: ModesResponse["data"]) => string;
-  handleRuntimeRequestError: <ErrorType,>(error: ErrorType) => void;
+  handleRuntimeRequestError: <ErrorType>(error: ErrorType) => void;
 }
 
 export interface CoreDataLoaders {
@@ -183,7 +174,9 @@ export interface CoreDataLoaders {
 export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoaders {
   const startupLoaderReference = useRef<CoreDataStartupLoader | null>(null);
   if (startupLoaderReference.current === null) {
-    startupLoaderReference.current = new CoreDataStartupLoader(createStartupLoaderDependencies(input));
+    startupLoaderReference.current = new CoreDataStartupLoader(
+      createStartupLoaderDependencies(input),
+    );
   } else {
     startupLoaderReference.current.updateDependencies(createStartupLoaderDependencies(input));
   }
@@ -192,11 +185,11 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
   const archivedThreadLoaderReference = useRef<ArchivedThreadLoader | null>(null);
   if (archivedThreadLoaderReference.current === null) {
     archivedThreadLoaderReference.current = new ArchivedThreadLoader(
-      createArchivedThreadLoaderDependencies(input)
+      createArchivedThreadLoaderDependencies(input),
     );
   } else {
     archivedThreadLoaderReference.current.updateDependencies(
-      createArchivedThreadLoaderDependencies(input)
+      createArchivedThreadLoaderDependencies(input),
     );
   }
   const archivedThreadLoader = archivedThreadLoaderReference.current;
@@ -224,12 +217,12 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
     input.isArchivedThreadsOpenRef,
     input.lastCoreRefreshAtRef,
     loadArchivedThreads,
-    loadCoreData
+    loadCoreData,
   ]);
 
   return {
     loadCoreData,
     loadArchivedThreads,
-    loadCoreDataTracked
+    loadCoreDataTracked,
   };
 }

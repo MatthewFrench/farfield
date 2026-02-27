@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Button } from "@/Components/UserInterface/Button";
 import { Input } from "@/Components/UserInterface/Input";
 import { ThreadListSearchFilter } from "@/Features/Threads/DomainModel/ThreadListSearchFilter";
@@ -10,7 +10,7 @@ import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/
 
 export type {
   ThreadListPaneAgentDescriptor,
-  ThreadListPaneProperties
+  ThreadListPaneProperties,
 } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 
 const THREAD_SEARCH_CLEAR_BUTTON_LABEL = "Clear thread search";
@@ -23,7 +23,7 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
 
   const normalizedSearchQuery = useMemo(
     () => ThreadListSearchFilter.normalizeQuery(threadSearchQuery),
-    [threadSearchQuery]
+    [threadSearchQuery],
   );
 
   const filteredActiveProjectGroups = useMemo(
@@ -31,9 +31,9 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
       ThreadListSearchFilter.filterProjectGroups({
         projectGroups: properties.activeProjectGroups,
         query: normalizedSearchQuery,
-        readAgentLabel: (thread) => properties.agentsById[thread.agentId]?.label ?? thread.agentId
+        readAgentLabel: (thread) => properties.agentsById[thread.agentId]?.label ?? thread.agentId,
       }),
-    [normalizedSearchQuery, properties.activeProjectGroups, properties.agentsById]
+    [normalizedSearchQuery, properties.activeProjectGroups, properties.agentsById],
   );
 
   const filteredArchivedProjectGroups = useMemo(
@@ -41,9 +41,9 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
       ThreadListSearchFilter.filterProjectGroups({
         projectGroups: properties.archivedProjectGroups,
         query: normalizedSearchQuery,
-        readAgentLabel: (thread) => properties.agentsById[thread.agentId]?.label ?? thread.agentId
+        readAgentLabel: (thread) => properties.agentsById[thread.agentId]?.label ?? thread.agentId,
       }),
-    [normalizedSearchQuery, properties.archivedProjectGroups, properties.agentsById]
+    [normalizedSearchQuery, properties.archivedProjectGroups, properties.agentsById],
   );
 
   const filteredActiveThreads = useMemo<ThreadListPaneProperties["threads"]>(() => {
@@ -52,7 +52,7 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
 
   const filteredArchivedThreadCount = useMemo(
     () => ThreadListSearchFilter.countThreads(filteredArchivedProjectGroups),
-    [filteredArchivedProjectGroups]
+    [filteredArchivedProjectGroups],
   );
 
   const hasSearchQuery = normalizedSearchQuery.length > 0;
@@ -61,12 +61,12 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
 
   const sectionProperties = hasSearchQuery
     ? {
-      ...properties,
-      threads: filteredActiveThreads,
-      activeProjectGroups: filteredActiveProjectGroups,
-      archivedProjectGroups: filteredArchivedProjectGroups,
-      archivedSectionThreadCount: filteredArchivedThreadCount
-    }
+        ...properties,
+        threads: filteredActiveThreads,
+        activeProjectGroups: filteredActiveProjectGroups,
+        archivedProjectGroups: filteredArchivedProjectGroups,
+        archivedSectionThreadCount: filteredArchivedThreadCount,
+      }
     : properties;
 
   return (
@@ -133,7 +133,7 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
 }
 
 function flattenProjectGroupThreads(
-  projectGroups: ThreadListPaneProperties["activeProjectGroups"]
+  projectGroups: ThreadListPaneProperties["activeProjectGroups"],
 ): ThreadListPaneProperties["threads"] {
   const mappedThreads: ThreadListPaneProperties["threads"] = [];
   for (const projectGroup of projectGroups) {

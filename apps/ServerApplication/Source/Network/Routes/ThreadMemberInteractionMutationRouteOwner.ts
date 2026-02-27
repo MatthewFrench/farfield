@@ -2,15 +2,15 @@ import { JsonValueSchema } from "@farfield/protocol";
 import {
   parseInterruptBody,
   parseSetModeBody,
-  parseSubmitUserInputBody
+  parseSubmitUserInputBody,
 } from "../RequestSchemas/HttpSchemas.js";
 import {
   isThreadMemberSubresourceRoute,
   ThreadMemberMutationActionByName,
+  type ThreadMemberResolvedRouteContext,
+  type ThreadMemberRouteDependencies,
   ThreadMemberRouteMethodByName,
   ThreadMemberRouteSegmentByName,
-  type ThreadMemberRouteDependencies,
-  type ThreadMemberResolvedRouteContext
 } from "./ThreadMemberRouteContracts.js";
 
 export interface ThreadMemberInteractionMutationRouteOwnerOptions {
@@ -46,16 +46,18 @@ export class ThreadMemberInteractionMutationRouteOwner {
       threadConcurrencyCoordinator,
       pushActionEventWithRequestContext,
       pushActionErrorWithRequestContext,
-      jsonResponse
+      jsonResponse,
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
     if (
-      !(req.method === ThreadMemberRouteMethodByName.post
-      && isThreadMemberSubresourceRoute(
-        this.dependencies.segments,
-        ThreadMemberRouteSegmentByName.collaborationMode
-      ))
+      !(
+        req.method === ThreadMemberRouteMethodByName.post &&
+        isThreadMemberSubresourceRoute(
+          this.dependencies.segments,
+          ThreadMemberRouteSegmentByName.collaborationMode,
+        )
+      )
     ) {
       return false;
     }
@@ -65,48 +67,60 @@ export class ThreadMemberInteractionMutationRouteOwner {
       jsonResponse(this.dependencies.res, 400, {
         ok: false,
         error: `Agent ${agentId} does not support collaboration modes`,
-        threadId
+        threadId,
       });
       return true;
     }
 
     const body = parseSetModeBody(await readJsonBody(req));
 
-    pushActionEventWithRequestContext(ThreadMemberMutationActionByName.collaborationMode, "attempt", {
-      agentId,
-      threadId,
-      collaborationMode: JsonValueSchema.parse(body.collaborationMode)
-    });
+    pushActionEventWithRequestContext(
+      ThreadMemberMutationActionByName.collaborationMode,
+      "attempt",
+      {
+        agentId,
+        threadId,
+        collaborationMode: JsonValueSchema.parse(body.collaborationMode),
+      },
+    );
 
     try {
       const result = await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
         return setCollaborationMode({
           threadId,
           ...(body.ownerClientId !== undefined ? { ownerClientId: body.ownerClientId } : {}),
-          collaborationMode: body.collaborationMode
+          collaborationMode: body.collaborationMode,
         });
       });
 
-      pushActionEventWithRequestContext(ThreadMemberMutationActionByName.collaborationMode, "success", {
-        agentId,
-        threadId,
-        ownerClientId: result.ownerClientId
-      });
+      pushActionEventWithRequestContext(
+        ThreadMemberMutationActionByName.collaborationMode,
+        "success",
+        {
+          agentId,
+          threadId,
+          ownerClientId: result.ownerClientId,
+        },
+      );
 
       jsonResponse(this.dependencies.res, 200, {
         ok: true,
         threadId,
-        ownerClientId: result.ownerClientId
+        ownerClientId: result.ownerClientId,
       });
     } catch (error) {
-      const message = pushActionErrorWithRequestContext(ThreadMemberMutationActionByName.collaborationMode, error, {
-        agentId,
-        threadId
-      });
+      const message = pushActionErrorWithRequestContext(
+        ThreadMemberMutationActionByName.collaborationMode,
+        error,
+        {
+          agentId,
+          threadId,
+        },
+      );
       jsonResponse(this.dependencies.res, 500, {
         ok: false,
         error: message,
-        threadId
+        threadId,
       });
     }
     return true;
@@ -120,16 +134,18 @@ export class ThreadMemberInteractionMutationRouteOwner {
       pushActionEventWithRequestContext,
       pushActionErrorWithRequestContext,
       invalidateThreadListAggregationCache,
-      jsonResponse
+      jsonResponse,
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
     if (
-      !(req.method === ThreadMemberRouteMethodByName.post
-      && isThreadMemberSubresourceRoute(
-        this.dependencies.segments,
-        ThreadMemberRouteSegmentByName.userInput
-      ))
+      !(
+        req.method === ThreadMemberRouteMethodByName.post &&
+        isThreadMemberSubresourceRoute(
+          this.dependencies.segments,
+          ThreadMemberRouteSegmentByName.userInput,
+        )
+      )
     ) {
       return false;
     }
@@ -139,7 +155,7 @@ export class ThreadMemberInteractionMutationRouteOwner {
       jsonResponse(this.dependencies.res, 400, {
         ok: false,
         error: `Agent ${agentId} does not support user input submission`,
-        threadId
+        threadId,
       });
       return true;
     }
@@ -149,7 +165,7 @@ export class ThreadMemberInteractionMutationRouteOwner {
     pushActionEventWithRequestContext(ThreadMemberMutationActionByName.userInput, "attempt", {
       agentId,
       threadId,
-      requestId: body.requestId
+      requestId: body.requestId,
     });
 
     try {
@@ -158,7 +174,7 @@ export class ThreadMemberInteractionMutationRouteOwner {
           threadId,
           ...(body.ownerClientId !== undefined ? { ownerClientId: body.ownerClientId } : {}),
           requestId: body.requestId,
-          response: body.response
+          response: body.response,
         });
       });
 
@@ -166,31 +182,35 @@ export class ThreadMemberInteractionMutationRouteOwner {
         agentId,
         threadId,
         ownerClientId: result.ownerClientId,
-        requestId: result.requestId
+        requestId: result.requestId,
       });
       invalidateThreadListAggregationCache("thread-user-input-submitted", {
         threadId,
         agentId,
-        requestId: result.requestId
+        requestId: result.requestId,
       });
 
       jsonResponse(this.dependencies.res, 200, {
         ok: true,
         threadId,
         ownerClientId: result.ownerClientId,
-        requestId: result.requestId
+        requestId: result.requestId,
       });
     } catch (error) {
-      const message = pushActionErrorWithRequestContext(ThreadMemberMutationActionByName.userInput, error, {
-        agentId,
-        threadId,
-        requestId: body.requestId
-      });
+      const message = pushActionErrorWithRequestContext(
+        ThreadMemberMutationActionByName.userInput,
+        error,
+        {
+          agentId,
+          threadId,
+          requestId: body.requestId,
+        },
+      );
       jsonResponse(this.dependencies.res, 500, {
         ok: false,
         error: message,
         threadId,
-        requestId: body.requestId
+        requestId: body.requestId,
       });
     }
     return true;
@@ -204,16 +224,18 @@ export class ThreadMemberInteractionMutationRouteOwner {
       pushActionEventWithRequestContext,
       pushActionErrorWithRequestContext,
       invalidateThreadListAggregationCache,
-      jsonResponse
+      jsonResponse,
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
 
     if (
-      !(req.method === ThreadMemberRouteMethodByName.post
-      && isThreadMemberSubresourceRoute(
-        this.dependencies.segments,
-        ThreadMemberRouteSegmentByName.interrupt
-      ))
+      !(
+        req.method === ThreadMemberRouteMethodByName.post &&
+        isThreadMemberSubresourceRoute(
+          this.dependencies.segments,
+          ThreadMemberRouteSegmentByName.interrupt,
+        )
+      )
     ) {
       return false;
     }
@@ -222,37 +244,41 @@ export class ThreadMemberInteractionMutationRouteOwner {
 
     pushActionEventWithRequestContext(ThreadMemberMutationActionByName.interrupt, "attempt", {
       agentId,
-      threadId
+      threadId,
     });
 
     try {
       await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
         await adapter.interrupt({
           threadId,
-          ...(body.ownerClientId !== undefined ? { ownerClientId: body.ownerClientId } : {})
+          ...(body.ownerClientId !== undefined ? { ownerClientId: body.ownerClientId } : {}),
         });
       });
     } catch (error) {
-      const message = pushActionErrorWithRequestContext(ThreadMemberMutationActionByName.interrupt, error, {
-        agentId,
-        threadId
-      });
+      const message = pushActionErrorWithRequestContext(
+        ThreadMemberMutationActionByName.interrupt,
+        error,
+        {
+          agentId,
+          threadId,
+        },
+      );
       jsonResponse(this.dependencies.res, 500, { ok: false, error: message, threadId });
       return true;
     }
 
     pushActionEventWithRequestContext(ThreadMemberMutationActionByName.interrupt, "success", {
       agentId,
-      threadId
+      threadId,
     });
     invalidateThreadListAggregationCache("thread-interrupted", {
       threadId,
-      agentId
+      agentId,
     });
 
     jsonResponse(this.dependencies.res, 200, {
       ok: true,
-      threadId
+      threadId,
     });
     return true;
   }

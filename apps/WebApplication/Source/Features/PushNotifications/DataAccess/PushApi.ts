@@ -8,14 +8,14 @@ import {
   FarfieldPushSendLatestEnvelopeSchema,
   FarfieldPushStatusEnvelopeSchema,
   FarfieldPushTestEnvelopeSchema,
-  FarfieldPushVapidPublicKeyEnvelopeSchema
+  FarfieldPushVapidPublicKeyEnvelopeSchema,
 } from "@farfield/protocol";
 import { z } from "zod";
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import {
   applyRequestOptions,
   request,
-  requestInitWithOptions
+  requestInitWithOptions,
 } from "@/Shared/Transport/FarfieldHttpTransport";
 
 /**
@@ -47,61 +47,65 @@ type PushRouteSegment =
 type PushMutationRequestMethod = typeof REQUEST_METHOD_POST | typeof REQUEST_METHOD_DELETE;
 
 const APPLICATION_JSON_REQUEST_HEADERS = {
-  [REQUEST_CONTENT_TYPE_HEADER_NAME]: REQUEST_CONTENT_TYPE_HEADER_VALUE
+  [REQUEST_CONTENT_TYPE_HEADER_NAME]: REQUEST_CONTENT_TYPE_HEADER_VALUE,
 };
 const PUSH_STATUS_ENDPOINT = buildPushRoutePath(PUSH_STATUS_ROUTE_SEGMENT);
 const PUSH_VAPID_PUBLIC_KEY_ENDPOINT = buildPushRoutePath(PUSH_VAPID_PUBLIC_KEY_ROUTE_SEGMENT);
 const PUSH_RECEIPT_LATEST_ENDPOINT = buildPushRoutePath(PUSH_RECEIPT_LATEST_ROUTE_SEGMENT);
 const PUSH_SEND_LATEST_ENDPOINT = buildPushRoutePath(PUSH_SEND_LATEST_ROUTE_SEGMENT);
 const PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_ENDPOINT = buildPushRoutePath(
-  PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_ROUTE_SEGMENT
+  PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_ROUTE_SEGMENT,
 );
 const PUSH_SUBSCRIPTIONS_ENDPOINT = buildPushRoutePath(PUSH_SUBSCRIPTIONS_ROUTE_SEGMENT);
 const PUSH_TEST_ENDPOINT = buildPushRoutePath(PUSH_TEST_ROUTE_SEGMENT);
 
 const PushStatusResponseSchema = FarfieldPushStatusEnvelopeSchema.transform(
-  ({ ok: _ok, ...pushStatusResponse }) => pushStatusResponse
+  ({ ok: _ok, ...pushStatusResponse }) => pushStatusResponse,
 );
 export type ApiPushStatusResponse = z.infer<typeof PushStatusResponseSchema>;
 
 const PushVapidPublicKeyResponseSchema = FarfieldPushVapidPublicKeyEnvelopeSchema.transform(
-  ({ ok: _ok, ...pushVapidPublicKeyResponse }) => pushVapidPublicKeyResponse
+  ({ ok: _ok, ...pushVapidPublicKeyResponse }) => pushVapidPublicKeyResponse,
 );
 export type ApiPushVapidPublicKeyResponse = z.infer<typeof PushVapidPublicKeyResponseSchema>;
 
 const PushReceiptLatestResponseSchema = FarfieldPushReceiptLatestEnvelopeSchema.transform(
-  ({ ok: _ok, ...pushReceiptLatestResponse }) => pushReceiptLatestResponse
+  ({ ok: _ok, ...pushReceiptLatestResponse }) => pushReceiptLatestResponse,
 );
 export type ApiPushReceiptLatestResponse = z.infer<typeof PushReceiptLatestResponseSchema>;
 
 const PushSendLatestResponseSchema = FarfieldPushSendLatestEnvelopeSchema.transform(
-  ({ ok: _ok, ...pushSendLatestResponse }) => pushSendLatestResponse
+  ({ ok: _ok, ...pushSendLatestResponse }) => pushSendLatestResponse,
 );
 export type ApiPushSendLatestResponse = z.infer<typeof PushSendLatestResponseSchema>;
 
 const PushLocalCertificateAuthorityStatusResponseSchema =
   FarfieldPushLocalCaStatusEnvelopeSchema.transform(
     ({ ok: _ok, ...pushLocalCertificateAuthorityStatusResponse }) =>
-      pushLocalCertificateAuthorityStatusResponse
+      pushLocalCertificateAuthorityStatusResponse,
   );
 export type ApiPushLocalCaStatusResponse = z.infer<
   typeof PushLocalCertificateAuthorityStatusResponseSchema
 >;
 
 const CreatePushSubscriptionResponseSchema = FarfieldCreatePushSubscriptionEnvelopeSchema.transform(
-  ({ ok: _ok, ...createPushSubscriptionResponse }) => createPushSubscriptionResponse
+  ({ ok: _ok, ...createPushSubscriptionResponse }) => createPushSubscriptionResponse,
 );
 const DeletePushSubscriptionResponseSchema = FarfieldDeletePushSubscriptionEnvelopeSchema.transform(
-  ({ ok: _ok, ...deletePushSubscriptionResponse }) => deletePushSubscriptionResponse
+  ({ ok: _ok, ...deletePushSubscriptionResponse }) => deletePushSubscriptionResponse,
 );
 const PushTestNotificationResponseSchema = FarfieldPushTestEnvelopeSchema.transform(
-  ({ ok: _ok, ...pushTestNotificationResponse }) => pushTestNotificationResponse
+  ({ ok: _ok, ...pushTestNotificationResponse }) => pushTestNotificationResponse,
 );
 
 export type ApiCreatePushSubscriptionInput = z.infer<typeof CreatePushSubscriptionBodySchema>;
-export type ApiCreatePushSubscriptionResponse = z.infer<typeof CreatePushSubscriptionResponseSchema>;
+export type ApiCreatePushSubscriptionResponse = z.infer<
+  typeof CreatePushSubscriptionResponseSchema
+>;
 export type ApiDeletePushSubscriptionInput = z.infer<typeof DeletePushSubscriptionBodySchema>;
-export type ApiDeletePushSubscriptionResponse = z.infer<typeof DeletePushSubscriptionResponseSchema>;
+export type ApiDeletePushSubscriptionResponse = z.infer<
+  typeof DeletePushSubscriptionResponseSchema
+>;
 export type ApiPushTestResponse = z.infer<typeof PushTestNotificationResponseSchema>;
 
 export interface ApiPushTestNotificationInput {
@@ -118,7 +122,7 @@ const PushTestNotificationInputSchema = z
     turnId: z.string().trim().min(NON_EMPTY_TRIMMED_TEXT_MIN_LENGTH),
     title: z.string().optional(),
     body: z.string().optional(),
-    dryRun: z.boolean().optional()
+    dryRun: z.boolean().optional(),
   })
   .strict();
 
@@ -129,15 +133,15 @@ function buildPushRoutePath(routeSegment: PushRouteSegment): string {
 function buildPushJsonMutationRequestInit(
   method: PushMutationRequestMethod,
   body: string,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): RequestInit {
   return applyRequestOptions(
     {
       method,
       headers: APPLICATION_JSON_REQUEST_HEADERS,
-      body
+      body,
     },
-    options
+    options,
   );
 }
 
@@ -147,66 +151,68 @@ export async function getPushStatus(options?: ApiRequestOptions): Promise<ApiPus
 }
 
 export async function getPushVapidPublicKey(
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiPushVapidPublicKeyResponse> {
   const data = await request(PUSH_VAPID_PUBLIC_KEY_ENDPOINT, requestInitWithOptions(options));
   return PushVapidPublicKeyResponseSchema.parse(data);
 }
 
 export async function getLatestPushReceipt(
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiPushReceiptLatestResponse> {
   const data = await request(PUSH_RECEIPT_LATEST_ENDPOINT, requestInitWithOptions(options));
   return PushReceiptLatestResponseSchema.parse(data);
 }
 
-export async function getLatestPushSend(options?: ApiRequestOptions): Promise<ApiPushSendLatestResponse> {
+export async function getLatestPushSend(
+  options?: ApiRequestOptions,
+): Promise<ApiPushSendLatestResponse> {
   const data = await request(PUSH_SEND_LATEST_ENDPOINT, requestInitWithOptions(options));
   return PushSendLatestResponseSchema.parse(data);
 }
 
 export async function getPushLocalCaStatus(
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiPushLocalCaStatusResponse> {
   const data = await request(
     PUSH_LOCAL_CERTIFICATE_AUTHORITY_STATUS_ENDPOINT,
-    requestInitWithOptions(options)
+    requestInitWithOptions(options),
   );
   return PushLocalCertificateAuthorityStatusResponseSchema.parse(data);
 }
 
 export async function savePushSubscription(
   input: ApiCreatePushSubscriptionInput,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiCreatePushSubscriptionResponse> {
   const body = CreatePushSubscriptionBodySchema.parse(input);
   const data = await request(
     PUSH_SUBSCRIPTIONS_ENDPOINT,
-    buildPushJsonMutationRequestInit(REQUEST_METHOD_POST, JSON.stringify(body), options)
+    buildPushJsonMutationRequestInit(REQUEST_METHOD_POST, JSON.stringify(body), options),
   );
   return CreatePushSubscriptionResponseSchema.parse(data);
 }
 
 export async function deletePushSubscription(
   input: ApiDeletePushSubscriptionInput,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiDeletePushSubscriptionResponse> {
   const body = DeletePushSubscriptionBodySchema.parse(input);
   const data = await request(
     PUSH_SUBSCRIPTIONS_ENDPOINT,
-    buildPushJsonMutationRequestInit(REQUEST_METHOD_DELETE, JSON.stringify(body), options)
+    buildPushJsonMutationRequestInit(REQUEST_METHOD_DELETE, JSON.stringify(body), options),
   );
   return DeletePushSubscriptionResponseSchema.parse(data);
 }
 
 export async function sendPushTestNotification(
   input: ApiPushTestNotificationInput,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiPushTestResponse> {
   const body = PushTestNotificationInputSchema.parse(input);
   const data = await request(
     PUSH_TEST_ENDPOINT,
-    buildPushJsonMutationRequestInit(REQUEST_METHOD_POST, JSON.stringify(body), options)
+    buildPushJsonMutationRequestInit(REQUEST_METHOD_POST, JSON.stringify(body), options),
   );
   return PushTestNotificationResponseSchema.parse(data);
 }

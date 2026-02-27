@@ -25,7 +25,7 @@ export interface ChatRequestActionChatClient {
       threadId: string;
       text: string;
     },
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<void>;
   submitUserInput(
     input: {
@@ -35,13 +35,13 @@ export interface ChatRequestActionChatClient {
         answers: Record<string, { answers: string[] }>;
       };
     },
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<void>;
   interruptThread(
     input: {
       threadId: string;
     },
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<void>;
 }
 
@@ -50,7 +50,7 @@ export interface ChatRequestActionThreadMutationClient {
     input?: {
       agentId?: AgentId | undefined;
     },
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<{
     threadId: string;
   }>;
@@ -117,9 +117,12 @@ export class ChatRequestActionCoordinator {
     input.onSetBusy(true);
     try {
       if (threadId === null || threadId.length === 0) {
-        const created = await input.threadMutationClient.createThread({
-          agentId: input.selectedAgentId
-        }, requestOptions);
+        const created = await input.threadMutationClient.createThread(
+          {
+            agentId: input.selectedAgentId,
+          },
+          requestOptions,
+        );
         threadId = created.threadId;
         input.onMarkThreadPendingMaterialization(threadId);
         input.onThreadSelected(threadId);
@@ -136,8 +139,8 @@ export class ChatRequestActionCoordinator {
         threadId,
         error: toErrorMessage(error),
         details: {
-          draftLength: trimmedDraft.length
-        }
+          draftLength: trimmedDraft.length,
+        },
       });
     } finally {
       input.onSetBusy(false);
@@ -149,16 +152,21 @@ export class ChatRequestActionCoordinator {
       return;
     }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions(SUBMIT_USER_INPUT_ACTION_NAME);
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      SUBMIT_USER_INPUT_ACTION_NAME,
+    );
     input.onSetBusy(true);
     try {
-      await input.chatClient.submitUserInput({
-        threadId: input.selectedThreadId,
-        requestId: input.requestId,
-        response: {
-          answers: input.answers
-        }
-      }, requestOptions);
+      await input.chatClient.submitUserInput(
+        {
+          threadId: input.selectedThreadId,
+          requestId: input.requestId,
+          response: {
+            answers: input.answers,
+          },
+        },
+        requestOptions,
+      );
       input.onInvalidateActiveThreadQuery();
       await input.onRefreshThreadData(input.selectedThreadId);
     } catch (error) {
@@ -168,8 +176,8 @@ export class ChatRequestActionCoordinator {
         threadId: input.selectedThreadId,
         error: toErrorMessage(error),
         details: {
-          requestId: input.requestId
-        }
+          requestId: input.requestId,
+        },
       });
     } finally {
       input.onSetBusy(false);
@@ -181,16 +189,21 @@ export class ChatRequestActionCoordinator {
       return;
     }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions(SKIP_USER_INPUT_ACTION_NAME);
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      SKIP_USER_INPUT_ACTION_NAME,
+    );
     input.onSetBusy(true);
     try {
-      await input.chatClient.submitUserInput({
-        threadId: input.selectedThreadId,
-        requestId: input.requestId,
-        response: {
-          answers: {}
-        }
-      }, requestOptions);
+      await input.chatClient.submitUserInput(
+        {
+          threadId: input.selectedThreadId,
+          requestId: input.requestId,
+          response: {
+            answers: {},
+          },
+        },
+        requestOptions,
+      );
       input.onInvalidateActiveThreadQuery();
       await input.onRefreshThreadData(input.selectedThreadId);
     } catch (error) {
@@ -200,8 +213,8 @@ export class ChatRequestActionCoordinator {
         threadId: input.selectedThreadId,
         error: toErrorMessage(error),
         details: {
-          requestId: input.requestId
-        }
+          requestId: input.requestId,
+        },
       });
     } finally {
       input.onSetBusy(false);
@@ -213,12 +226,17 @@ export class ChatRequestActionCoordinator {
       return;
     }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions(INTERRUPT_THREAD_ACTION_NAME);
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      INTERRUPT_THREAD_ACTION_NAME,
+    );
     input.onSetBusy(true);
     try {
-      await input.chatClient.interruptThread({
-        threadId: input.selectedThreadId
-      }, requestOptions);
+      await input.chatClient.interruptThread(
+        {
+          threadId: input.selectedThreadId,
+        },
+        requestOptions,
+      );
       input.onInvalidateActiveThreadQuery();
       await input.onRefreshThreadData(input.selectedThreadId);
     } catch (error) {
@@ -226,7 +244,7 @@ export class ChatRequestActionCoordinator {
         operation: INTERRUPT_THREAD_ACTION_NAME,
         actionId,
         threadId: input.selectedThreadId,
-        error: toErrorMessage(error)
+        error: toErrorMessage(error),
       });
     } finally {
       input.onSetBusy(false);

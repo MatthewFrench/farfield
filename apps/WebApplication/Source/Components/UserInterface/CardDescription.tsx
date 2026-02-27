@@ -9,6 +9,6 @@ export interface CardDescriptionProps extends React.HTMLAttributes<HTMLParagraph
 export const CardDescription = React.forwardRef<HTMLParagraphElement, CardDescriptionProps>(
   ({ className, ...props }, ref) => {
     return <p ref={ref} className={cn(CARD_DESCRIPTION_BASE_CLASS_NAME, className)} {...props} />;
-  }
+  },
 );
 CardDescription.displayName = CARD_DESCRIPTION_COMPONENT_DISPLAY_NAME;

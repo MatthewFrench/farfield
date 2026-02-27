@@ -11,12 +11,12 @@ const AUTO_HEAL_PREFERENCE_FIXTURES: ReadonlyArray<{
 }> = [
   {
     enabled: true,
-    storedValue: PUSH_AUTO_HEAL_ENABLED_STORAGE_VALUE
+    storedValue: PUSH_AUTO_HEAL_ENABLED_STORAGE_VALUE,
   },
   {
     enabled: false,
-    storedValue: PUSH_AUTO_HEAL_DISABLED_STORAGE_VALUE
-  }
+    storedValue: PUSH_AUTO_HEAL_DISABLED_STORAGE_VALUE,
+  },
 ];
 const originalLocalStorage = window.localStorage;
 
@@ -42,7 +42,7 @@ function createStorageMock(): Storage {
     },
     setItem(key: string, value: string): void {
       storageValues.set(key, value);
-    }
+    },
   };
 }
 
@@ -54,14 +54,14 @@ describe("PushPreferenceStore", () => {
   beforeEach(() => {
     Object.defineProperty(window, "localStorage", {
       configurable: true,
-      value: createStorageMock()
+      value: createStorageMock(),
     });
   });
 
   afterEach(() => {
     Object.defineProperty(window, "localStorage", {
       configurable: true,
-      value: originalLocalStorage
+      value: originalLocalStorage,
     });
   });
 
@@ -73,27 +73,29 @@ describe("PushPreferenceStore", () => {
     expect(enabled).toBe(false);
   });
 
-  it.each(AUTO_HEAL_PREFERENCE_FIXTURES)(
-    "reads $storedValue as auto-heal enabled = $enabled",
-    ({ enabled, storedValue }) => {
-      const store = createStore();
-      window.localStorage.setItem(PUSH_AUTO_HEAL_STORAGE_KEY, storedValue);
+  it.each(AUTO_HEAL_PREFERENCE_FIXTURES)("reads $storedValue as auto-heal enabled = $enabled", ({
+    enabled,
+    storedValue,
+  }) => {
+    const store = createStore();
+    window.localStorage.setItem(PUSH_AUTO_HEAL_STORAGE_KEY, storedValue);
 
-      const actualEnabled = store.readAutoHealPreferenceEnabled();
+    const actualEnabled = store.readAutoHealPreferenceEnabled();
 
-      expect(actualEnabled).toBe(enabled);
-    }
-  );
+    expect(actualEnabled).toBe(enabled);
+  });
 
-  it.each(AUTO_HEAL_PREFERENCE_FIXTURES)(
-    "writes auto-heal enabled = $enabled using storage value $storedValue",
-    ({ enabled, storedValue }) => {
-      const store = createStore();
-      store.writeAutoHealPreferenceEnabled(enabled);
+  it.each(
+    AUTO_HEAL_PREFERENCE_FIXTURES,
+  )("writes auto-heal enabled = $enabled using storage value $storedValue", ({
+    enabled,
+    storedValue,
+  }) => {
+    const store = createStore();
+    store.writeAutoHealPreferenceEnabled(enabled);
 
-      expect(window.localStorage.getItem(PUSH_AUTO_HEAL_STORAGE_KEY)).toBe(storedValue);
-    }
-  );
+    expect(window.localStorage.getItem(PUSH_AUTO_HEAL_STORAGE_KEY)).toBe(storedValue);
+  });
 
   it("overwrites previously stored auto-heal preference", () => {
     const store = createStore();
@@ -101,7 +103,7 @@ describe("PushPreferenceStore", () => {
     store.writeAutoHealPreferenceEnabled(false);
 
     expect(window.localStorage.getItem(PUSH_AUTO_HEAL_STORAGE_KEY)).toBe(
-      PUSH_AUTO_HEAL_DISABLED_STORAGE_VALUE
+      PUSH_AUTO_HEAL_DISABLED_STORAGE_VALUE,
     );
     expect(store.readAutoHealPreferenceEnabled()).toBe(false);
   });
@@ -111,7 +113,7 @@ describe("PushPreferenceStore", () => {
     window.localStorage.setItem(PUSH_AUTO_HEAL_STORAGE_KEY, INVALID_PUSH_AUTO_HEAL_STORAGE_VALUE);
 
     expect(() => store.readAutoHealPreferenceEnabled()).toThrowError(
-      `Push auto-heal preference at key "${PUSH_AUTO_HEAL_STORAGE_KEY}" is invalid. Expected "${PUSH_AUTO_HEAL_ENABLED_STORAGE_VALUE}" or "${PUSH_AUTO_HEAL_DISABLED_STORAGE_VALUE}".`
+      `Push auto-heal preference at key "${PUSH_AUTO_HEAL_STORAGE_KEY}" is invalid. Expected "${PUSH_AUTO_HEAL_ENABLED_STORAGE_VALUE}" or "${PUSH_AUTO_HEAL_DISABLED_STORAGE_VALUE}".`,
     );
   });
 });

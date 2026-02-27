@@ -3,7 +3,7 @@ import type {
   EventMessageUpdated,
   EventPermissionUpdated,
   EventSessionStatus,
-  EventSessionUpdated
+  EventSessionUpdated,
 } from "@opencode-ai/sdk";
 import type { OpenCodeStructuredDataValue } from "./Schemas.js";
 

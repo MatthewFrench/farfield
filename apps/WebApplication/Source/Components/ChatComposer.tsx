@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Loader2, Square } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/Components/UserInterface/Button";
 import { Textarea } from "@/Components/UserInterface/Textarea";
 
@@ -38,7 +38,7 @@ export function ChatComposer({
   isGenerating,
   placeholder = DEFAULT_PLACEHOLDER_TEXT,
   onInterrupt,
-  onSend
+  onSend,
 }: ChatComposerProps): React.JSX.Element {
   const [draft, setDraft] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);

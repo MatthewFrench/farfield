@@ -1,12 +1,12 @@
+import { type DebugErrorSeverity } from "@farfield/protocol";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { type DebugErrorSeverity } from "@farfield/protocol";
 import {
-  ServerTransportErrorClassifier,
   type ServerTransportErrorCategory,
   type ServerTransportErrorClassification,
+  ServerTransportErrorClassifier,
   type ServerTransportErrorLogEventName,
-  type ServerTransportErrorLogLevel
+  type ServerTransportErrorLogLevel,
 } from "../Source/Network/ServerTransportErrorClassifier.js";
 
 const STATUS_CODE_BAD_REQUEST = 400;
@@ -38,7 +38,7 @@ const CLASSIFICATION_EXPECTATION_BY_CATEGORY: Record<
     logEventName: "request-validation-failed",
     shouldRecordServerError: true,
     shouldPushSystemEvent: false,
-    shouldBroadcastRuntimeState: false
+    shouldBroadcastRuntimeState: false,
   },
   shutdown_transport: {
     category: "shutdown_transport",
@@ -48,7 +48,7 @@ const CLASSIFICATION_EXPECTATION_BY_CATEGORY: Record<
     logEventName: "request-closed-during-shutdown",
     shouldRecordServerError: false,
     shouldPushSystemEvent: false,
-    shouldBroadcastRuntimeState: false
+    shouldBroadcastRuntimeState: false,
   },
   internal: {
     category: "internal",
@@ -58,13 +58,13 @@ const CLASSIFICATION_EXPECTATION_BY_CATEGORY: Record<
     logEventName: "request-failed",
     shouldRecordServerError: true,
     shouldPushSystemEvent: true,
-    shouldBroadcastRuntimeState: true
-  }
+    shouldBroadcastRuntimeState: true,
+  },
 };
 
 function createExpectedClassification(
   category: ServerTransportErrorCategory,
-  runtimeErrorMessage: string
+  runtimeErrorMessage: string,
 ): ServerTransportErrorClassification {
   const expectationTemplate = CLASSIFICATION_EXPECTATION_BY_CATEGORY[category];
   return {
@@ -76,7 +76,7 @@ function createExpectedClassification(
     shouldRecordServerError: expectationTemplate.shouldRecordServerError,
     shouldPushSystemEvent: expectationTemplate.shouldPushSystemEvent,
     shouldBroadcastRuntimeState: expectationTemplate.shouldBroadcastRuntimeState,
-    runtimeErrorMessage
+    runtimeErrorMessage,
   };
 }
 
@@ -85,7 +85,9 @@ describe("ServerTransportErrorClassifier", () => {
     const classifier = new ServerTransportErrorClassifier();
     const classification = classifier.classifyValidationError("invalid payload");
 
-    expect(classification).toEqual(createExpectedClassification("request_validation", "invalid payload"));
+    expect(classification).toEqual(
+      createExpectedClassification("request_validation", "invalid payload"),
+    );
   });
 
   it("classifies expected shutdown transport errors without invoking internal message mapping", () => {
@@ -97,11 +99,11 @@ describe("ServerTransportErrorClassifier", () => {
       (value) => {
         toErrorMessageInvocationCount += 1;
         return value.message;
-      }
+      },
     );
 
     expect(classification).toEqual(
-      createExpectedClassification("shutdown_transport", SHUTDOWN_RUNTIME_ERROR_MESSAGE)
+      createExpectedClassification("shutdown_transport", SHUTDOWN_RUNTIME_ERROR_MESSAGE),
     );
     expect(toErrorMessageInvocationCount).toBe(0);
   });
@@ -111,7 +113,7 @@ describe("ServerTransportErrorClassifier", () => {
     const classification = classifier.classifyRuntimeError(
       new Error("boom"),
       () => false,
-      (value) => value.message
+      (value) => value.message,
     );
 
     expect(classification).toEqual(createExpectedClassification("internal", "boom"));
@@ -127,11 +129,11 @@ describe("ServerTransportErrorClassifier", () => {
     const classification = classifier.classifyRuntimeError(
       zodError.error,
       () => false,
-      (value) => value.message
+      (value) => value.message,
     );
 
     expect(classification).toEqual(
-      createExpectedClassification("request_validation", zodError.error.message)
+      createExpectedClassification("request_validation", zodError.error.message),
     );
   });
 
@@ -142,7 +144,7 @@ describe("ServerTransportErrorClassifier", () => {
       () => {
         throw new Error("shutdown predicate failure");
       },
-      (value) => `mapped:${value.message}`
+      (value) => `mapped:${value.message}`,
     );
 
     expect(classification).toEqual(createExpectedClassification("internal", "mapped:boom"));
@@ -155,7 +157,7 @@ describe("ServerTransportErrorClassifier", () => {
       () => false,
       () => {
         throw new Error("mapper failure");
-      }
+      },
     );
 
     expect(classification).toEqual(createExpectedClassification("internal", "boom"));
@@ -168,11 +170,11 @@ describe("ServerTransportErrorClassifier", () => {
       () => false,
       () => {
         throw new Error("mapper failure");
-      }
+      },
     );
 
     expect(classification).toEqual(
-      createExpectedClassification("internal", INTERNAL_RUNTIME_ERROR_MESSAGE)
+      createExpectedClassification("internal", INTERNAL_RUNTIME_ERROR_MESSAGE),
     );
   });
 });

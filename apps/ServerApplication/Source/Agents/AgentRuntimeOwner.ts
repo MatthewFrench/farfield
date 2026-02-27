@@ -1,9 +1,9 @@
-import { AgentRegistry } from "./Registry.js";
 import { CodexAgentAdapter, type CodexIpcFrameEvent } from "./Adapters/CodexAgentAdapter.js";
 import { OpenCodeAgentAdapter } from "./Adapters/OpenCodeAgentAdapter.js";
+import { AgentRegistry } from "./Registry.js";
 import {
   THREAD_STREAM_STATE_CHANGED_METHOD,
-  type ThreadStreamStateChangedMethod
+  type ThreadStreamStateChangedMethod,
 } from "./ThreadStreamStateChangedContract.js";
 import type { AgentAdapter, AgentId } from "./Types.js";
 
@@ -37,7 +37,7 @@ function hasNonWhitespaceThreadIdentifier(threadId: string | null): threadId is 
  * Outbound replay preview frames are diagnostic-only and must not trigger side effects.
  */
 export function shouldScheduleThreadStreamStateChanged(
-  event: CodexIpcFrameEvent
+  event: CodexIpcFrameEvent,
 ): event is CodexIpcFrameEvent & {
   direction: "in";
   method: ThreadStreamStateChangedMethod;
@@ -99,7 +99,7 @@ export class AgentRuntimeOwner {
   }
 
   private createAndWireCodexAdapter(
-    dependencies: AgentRuntimeOwnerDependencies
+    dependencies: AgentRuntimeOwnerDependencies,
   ): CodexAgentAdapter {
     const codexAdapter = new CodexAgentAdapter({
       appExecutable: dependencies.codexExecutablePath,
@@ -109,7 +109,7 @@ export class AgentRuntimeOwner {
       workspaceDir: dependencies.defaultWorkspacePath,
       userAgent: dependencies.userAgent,
       reconnectDelayMs: dependencies.ipcReconnectDelayMs,
-      onStateChange: dependencies.onCodexStateChange
+      onStateChange: dependencies.onCodexStateChange,
     });
 
     codexAdapter.onIpcFrame((event) => {
@@ -128,7 +128,7 @@ export class AgentRuntimeOwner {
 
   private handleCodexIpcFrame(
     dependencies: AgentRuntimeOwnerDependencies,
-    event: CodexIpcFrameEvent
+    event: CodexIpcFrameEvent,
   ): void {
     // Consumers should always observe the raw frame before completion side effects are scheduled.
     dependencies.onCodexFrame(event);

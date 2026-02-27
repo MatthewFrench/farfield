@@ -3,9 +3,7 @@
  * This module wires typed owner hooks into the shell layout while keeping
  * feature behavior in dedicated owner modules.
  */
-import {
-  useMemo
-} from "react";
+import { useMemo } from "react";
 import {
   APP_DEFAULT_VALUE,
   ARCHIVED_THREAD_LIST_MAX_PAGES,
@@ -35,48 +33,34 @@ import {
   THREAD_QUERY_CACHE_MAXIMUM_ENTRIES,
   THREAD_QUERY_CACHE_TIME_TO_LIVE_MS,
   UNSUPPORTED_PUSH_CLIENT_STATE,
-  VISIBLE_CHAT_ITEMS_STEP
+  VISIBLE_CHAT_ITEMS_STEP,
 } from "@/Application/Configuration/ApplicationBehaviorConfiguration";
 import { ApplicationRouteStateMapper } from "@/Application/DomainModel/ApplicationRouteStateMapper";
-import {
-  type CoreDataCapabilitySnapshot,
-  useCoreDataLoaders
-} from "@/Application/StateManagement/UseCoreDataLoaders";
 import type { CoreDataModesResponse } from "@/Application/StateManagement/CoreDataSnapshotContracts";
-import {
-  useApplicationDerivedState
-} from "@/Application/StateManagement/UseApplicationDerivedState";
-import {
-  useApplicationOwnerDependencies
-} from "@/Application/StateManagement/UseApplicationOwnerDependencies";
-import {
-  useApplicationRuntimeRequestHandlers
-} from "@/Application/StateManagement/UseApplicationRuntimeRequestHandlers";
-import {
-  useApplicationRuntimeComposition
-} from "@/Application/StateManagement/UseApplicationRuntimeComposition";
-import {
-  useApplicationShellState
-} from "@/Application/StateManagement/UseApplicationShellState";
+import { useApplicationDerivedState } from "@/Application/StateManagement/UseApplicationDerivedState";
+import { useApplicationOwnerDependencies } from "@/Application/StateManagement/UseApplicationOwnerDependencies";
 import {
   useApplicationFormattingHelpers,
-  useStreamEventCards
+  useStreamEventCards,
 } from "@/Application/StateManagement/UseApplicationPresentationHelpers";
+import { useApplicationRuntimeComposition } from "@/Application/StateManagement/UseApplicationRuntimeComposition";
+import { useApplicationRuntimeRequestHandlers } from "@/Application/StateManagement/UseApplicationRuntimeRequestHandlers";
+import { useApplicationShellState } from "@/Application/StateManagement/UseApplicationShellState";
 import {
-  ApplicationShellLayout
-} from "@/Application/UserInterface/ApplicationShellLayout";
+  type CoreDataCapabilitySnapshot,
+  useCoreDataLoaders,
+} from "@/Application/StateManagement/UseCoreDataLoaders";
+import { ApplicationShellLayout } from "@/Application/UserInterface/ApplicationShellLayout";
+import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 import { ConversationSyncSignatureBuilder } from "@/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
 import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
-import {
-  useSelectedThreadLoaders
-} from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
+import { useSelectedThreadLoaders } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import { useTheme } from "@/Features/Theme/StateManagement/UseTheme";
-import {
-  TooltipProvider
-} from "@/Components/UserInterface/Tooltip";
 
 const modeSelectionStateResolver = new ModeSelectionStateResolver();
-const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(modeSelectionStateResolver);
+const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
+  modeSelectionStateResolver,
+);
 const applicationRouteStateMapper = new ApplicationRouteStateMapper();
 const APPLICATION_SHELL_TOOLTIP_DELAY_MILLISECONDS = 120;
 const THREAD_ONLY_HISTORY_METHOD_IDENTIFIERS = Array.from(THREAD_ONLY_HISTORY_METHOD_NAMES);
@@ -86,7 +70,9 @@ const THREAD_ONLY_HISTORY_METHOD_IDENTIFIERS = Array.from(THREAD_ONLY_HISTORY_ME
  * This preserves chat-first startup while still honoring plan-only agent capability sets.
  */
 export function readInitialModeKeyFromModes(availableModes: CoreDataModesResponse["data"]): string {
-  const nonPlanDefault = availableModes.find((mode) => !modeSelectionStateResolver.isPlanModeOption(mode));
+  const nonPlanDefault = availableModes.find(
+    (mode) => !modeSelectionStateResolver.isPlanModeOption(mode),
+  );
   return nonPlanDefault?.mode ?? availableModes[0]?.mode ?? "";
 }
 
@@ -94,13 +80,13 @@ export function App(): React.JSX.Element {
   const { theme, toggle: toggleTheme } = useTheme();
   const initialUiState = useMemo(
     () => applicationRouteStateMapper.parseFromPathname(window.location.pathname),
-    []
+    [],
   );
 
   const applicationShellState = useApplicationShellState({
     initialUiState,
     unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
-    initialVisibleChatItems: INITIAL_VISIBLE_CHAT_ITEMS
+    initialVisibleChatItems: INITIAL_VISIBLE_CHAT_ITEMS,
   });
 
   const applicationOwnerDependencies = useApplicationOwnerDependencies<CoreDataCapabilitySnapshot>({
@@ -121,7 +107,7 @@ export function App(): React.JSX.Element {
     readThreadRetryBaseDelayMilliseconds: READ_THREAD_RETRY_BASE_DELAY_MS,
     readThreadRetryMaximumDelayMilliseconds: READ_THREAD_RETRY_MAX_DELAY_MS,
     threadQueryCacheTimeToLiveMilliseconds: THREAD_QUERY_CACHE_TIME_TO_LIVE_MS,
-    threadQueryCacheMaximumEntries: THREAD_QUERY_CACHE_MAXIMUM_ENTRIES
+    threadQueryCacheMaximumEntries: THREAD_QUERY_CACHE_MAXIMUM_ENTRIES,
   });
 
   const applicationDerivedState = useApplicationDerivedState({
@@ -159,30 +145,29 @@ export function App(): React.JSX.Element {
     pendingUserInputRequestSelector: applicationOwnerDependencies.pendingUserInputRequestSelector,
     conversationItemFlattener: applicationOwnerDependencies.conversationItemFlattener,
     debugIssueStateResolver: applicationOwnerDependencies.debugIssueStateResolver,
-    threadListStateController: applicationOwnerDependencies.threadListStateController
+    threadListStateController: applicationOwnerDependencies.threadListStateController,
   });
 
   const streamEventCards = useStreamEventCards({
-    streamEvents: applicationShellState.streamEvents
+    streamEvents: applicationShellState.streamEvents,
   });
 
   const runtimeRequestHandlers = useApplicationRuntimeRequestHandlers({
-    trackedUserInterfaceErrorReporter: applicationOwnerDependencies.trackedUserInterfaceErrorReporter,
-    userInterfaceActionRequestBuilder: applicationOwnerDependencies.userInterfaceActionRequestBuilder,
+    trackedUserInterfaceErrorReporter:
+      applicationOwnerDependencies.trackedUserInterfaceErrorReporter,
+    userInterfaceActionRequestBuilder:
+      applicationOwnerDependencies.userInterfaceActionRequestBuilder,
     apiAuthenticationErrorClassifier: applicationOwnerDependencies.apiAuthenticationErrorClassifier,
     apiSessionBootstrapCoordinator: applicationOwnerDependencies.apiSessionBootstrapCoordinator,
     requiresApiSessionToken: applicationShellState.requiresApiSessionToken,
     apiSessionBootstrapErrorMessage: applicationShellState.apiSessionBootstrapError,
     setRequiresApiSessionToken: applicationShellState.setRequiresApiSessionToken,
     setApiSessionBootstrapErrorMessage: applicationShellState.setApiSessionBootstrapError,
-    setErrorMessage: applicationShellState.setError
+    setErrorMessage: applicationShellState.setError,
   });
 
-  const {
-    renderAgentFavicon,
-    formatDateValue
-  } = useApplicationFormattingHelpers({
-    dateValueFormatter: applicationOwnerDependencies.dateValueFormatter
+  const { renderAgentFavicon, formatDateValue } = useApplicationFormattingHelpers({
+    dateValueFormatter: applicationOwnerDependencies.dateValueFormatter,
   });
 
   const coreDataLoaders = useCoreDataLoaders({
@@ -197,7 +182,8 @@ export function App(): React.JSX.Element {
     debugServerClient: applicationOwnerDependencies.debugServerClient,
     debugWorkspaceDataReader: applicationOwnerDependencies.debugWorkspaceDataReader,
     debugWorkspaceStateStore: applicationOwnerDependencies.debugWorkspaceStateStore,
-    coreDataRefreshConcurrencyCoordinator: applicationOwnerDependencies.coreDataRefreshConcurrencyCoordinator,
+    coreDataRefreshConcurrencyCoordinator:
+      applicationOwnerDependencies.coreDataRefreshConcurrencyCoordinator,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
     activeTabRef: applicationShellState.activeTabRef,
     unreadThreadIdsRef: applicationShellState.unreadThreadIdsRef,
@@ -230,28 +216,28 @@ export function App(): React.JSX.Element {
     ensureApiSessionBootstrapped: runtimeRequestHandlers.ensureApiSessionBootstrapped,
     buildActionRequestOptions: runtimeRequestHandlers.buildActionRequestOptions,
     readInitialModeKey: readInitialModeKeyFromModes,
-    handleRuntimeRequestError: runtimeRequestHandlers.handleRuntimeRequestError
+    handleRuntimeRequestError: runtimeRequestHandlers.handleRuntimeRequestError,
   });
 
-  const {
-    loadSelectedThreadTracked,
-    applySelectedThreadStreamDelta
-  } = useSelectedThreadLoaders({
+  const { loadSelectedThreadTracked, applySelectedThreadStreamDelta } = useSelectedThreadLoaders({
     threads: applicationShellState.threads,
     selectedAgentId: applicationShellState.selectedAgentId,
     agentsById: applicationDerivedState.agentsById,
     appDefaultModel: applicationDerivedState.appDefaultModel,
     appDefaultReasoningEffort: applicationDerivedState.appDefaultReasoningEffort,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
-    pendingThreadMaterializationCoordinator: applicationShellState.pendingThreadMaterializationCoordinator,
+    pendingThreadMaterializationCoordinator:
+      applicationShellState.pendingThreadMaterializationCoordinator,
     conversationSyncSignatureBuilder,
-    selectedThreadDataRefreshCoordinator: applicationOwnerDependencies.selectedThreadDataRefreshCoordinator,
-    selectedThreadRefreshConcurrencyCoordinator: applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,
+    selectedThreadDataRefreshCoordinator:
+      applicationOwnerDependencies.selectedThreadDataRefreshCoordinator,
+    selectedThreadRefreshConcurrencyCoordinator:
+      applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,
     readThreadStateMerger: applicationOwnerDependencies.readThreadStateMerger,
     chatServerClient: applicationOwnerDependencies.chatServerClient,
     setLiveState: applicationShellState.setLiveState,
     setReadThreadState: applicationShellState.setReadThreadState,
-    setStreamEvents: applicationShellState.setStreamEvents
+    setStreamEvents: applicationShellState.setStreamEvents,
   });
 
   const runtimeComposition = useApplicationRuntimeComposition({
@@ -274,7 +260,7 @@ export function App(): React.JSX.Element {
     applySelectedThreadStreamDelta,
     streamEventCards,
     renderAgentFavicon,
-    formatDateValue
+    formatDateValue,
   });
   const { shellComposition } = runtimeComposition;
 

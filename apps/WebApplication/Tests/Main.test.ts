@@ -17,12 +17,12 @@ interface ServiceWorkerStartupRegistration {
   addEventListener: (
     type: string,
     listener: EventListenerOrEventListenerObject | null,
-    options?: boolean | AddEventListenerOptions
+    options?: boolean | AddEventListenerOptions,
   ) => void;
   removeEventListener: (
     type: string,
     listener: EventListenerOrEventListenerObject | null,
-    options?: boolean | EventListenerOptions
+    options?: boolean | EventListenerOptions,
   ) => void;
   dispatchEvent: (event: Event) => boolean;
 }
@@ -33,12 +33,12 @@ interface ServiceWorkerStartupContainer {
   addEventListener: (
     type: string,
     listener: EventListenerOrEventListenerObject | null,
-    options?: boolean | AddEventListenerOptions
+    options?: boolean | AddEventListenerOptions,
   ) => void;
   removeEventListener: (
     type: string,
     listener: EventListenerOrEventListenerObject | null,
-    options?: boolean | EventListenerOptions
+    options?: boolean | EventListenerOptions,
   ) => void;
   dispatchEvent: (event: Event) => boolean;
 }
@@ -58,22 +58,22 @@ const mainModuleMocks = vi.hoisted(() => {
       render: (content: ReactNode) => void;
     }
   >(() => ({
-    render
+    render,
   }));
   const reconcilePushSubscription = vi.fn(async (): Promise<void> => {});
   const installGlobalClientCrashReporter = vi.fn(
     (_options: GlobalClientCrashReporterOptions): { remove: () => void } => ({
-      remove: (): void => {}
-    })
+      remove: (): void => {},
+    }),
   );
   const parseFromPathname = vi.fn((_pathname: string): { threadId: string | null } => ({
-    threadId: "thread-from-mapper"
+    threadId: "thread-from-mapper",
   }));
   const serviceWorkerControllerChangeReloadOwnerConstructorArguments: boolean[] = [];
   const readReloadDecision = vi.fn(
     (_input: ServiceWorkerControllerChangeReloadDecisionInput): { shouldReload: boolean } => ({
-      shouldReload: false
-    })
+      shouldReload: false,
+    }),
   );
 
   class MockServiceWorkerControllerChangeReloadOwner {
@@ -81,9 +81,9 @@ const mainModuleMocks = vi.hoisted(() => {
       serviceWorkerControllerChangeReloadOwnerConstructorArguments.push(hasInitialController);
     }
 
-    public readDecision(
-      input: ServiceWorkerControllerChangeReloadDecisionInput
-    ): { shouldReload: boolean } {
+    public readDecision(input: ServiceWorkerControllerChangeReloadDecisionInput): {
+      shouldReload: boolean;
+    } {
       return readReloadDecision(input);
     }
   }
@@ -96,29 +96,29 @@ const mainModuleMocks = vi.hoisted(() => {
     parseFromPathname,
     serviceWorkerControllerChangeReloadOwnerConstructorArguments,
     readReloadDecision,
-    MockServiceWorkerControllerChangeReloadOwner
+    MockServiceWorkerControllerChangeReloadOwner,
   };
 });
 
 vi.mock("react-dom/client", () => ({
-  createRoot: mainModuleMocks.createRoot
+  createRoot: mainModuleMocks.createRoot,
 }));
 
 vi.mock("../Source/App", () => ({
-  App: (): null => null
+  App: (): null => null,
 }));
 
 vi.mock("../Source/Features/PushNotifications/DataAccess/PushClientApi", () => ({
-  reconcilePushSubscription: mainModuleMocks.reconcilePushSubscription
+  reconcilePushSubscription: mainModuleMocks.reconcilePushSubscription,
 }));
 
 vi.mock("../Source/Application/Boot/InstallClientErrorReporter", () => ({
-  installGlobalClientCrashReporter: mainModuleMocks.installGlobalClientCrashReporter
+  installGlobalClientCrashReporter: mainModuleMocks.installGlobalClientCrashReporter,
 }));
 
 vi.mock("../Source/Application/Boot/ServiceWorkerControllerChangeReloadOwner", () => ({
   ServiceWorkerControllerChangeReloadOwner:
-    mainModuleMocks.MockServiceWorkerControllerChangeReloadOwner
+    mainModuleMocks.MockServiceWorkerControllerChangeReloadOwner,
 }));
 
 vi.mock("../Source/Application/DomainModel/ApplicationRouteStateMapper", () => {
@@ -129,7 +129,7 @@ vi.mock("../Source/Application/DomainModel/ApplicationRouteStateMapper", () => {
   }
 
   return {
-    ApplicationRouteStateMapper: MockApplicationRouteStateMapper
+    ApplicationRouteStateMapper: MockApplicationRouteStateMapper,
   };
 });
 
@@ -138,28 +138,26 @@ let animationFrameCallbacks: FrameRequestCallback[] = [];
 
 function createMediaQueryList(query: string): MediaQueryList {
   return {
-    matches:
-      query === DISPLAY_MODE_STANDALONE_MEDIA_QUERY
-      && standaloneDisplayModeEnabled,
+    matches: query === DISPLAY_MODE_STANDALONE_MEDIA_QUERY && standaloneDisplayModeEnabled,
     media: query,
     onchange: null,
     addListener: (
-      _listener: ((this: MediaQueryList, ev: MediaQueryListEvent) => void) | null
+      _listener: ((this: MediaQueryList, ev: MediaQueryListEvent) => void) | null,
     ): void => {},
     removeListener: (
-      _listener: ((this: MediaQueryList, ev: MediaQueryListEvent) => void) | null
+      _listener: ((this: MediaQueryList, ev: MediaQueryListEvent) => void) | null,
     ): void => {},
     addEventListener: (
       _type: string,
       _listener: EventListenerOrEventListenerObject | null,
-      _options?: boolean | AddEventListenerOptions
+      _options?: boolean | AddEventListenerOptions,
     ): void => {},
     removeEventListener: (
       _type: string,
       _listener: EventListenerOrEventListenerObject | null,
-      _options?: boolean | EventListenerOptions
+      _options?: boolean | EventListenerOptions,
     ): void => {},
-    dispatchEvent: (_event: Event): boolean => true
+    dispatchEvent: (_event: Event): boolean => true,
   };
 }
 
@@ -167,7 +165,7 @@ function installWindowBootstrapStubs(): void {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     writable: true,
-    value: (query: string): MediaQueryList => createMediaQueryList(query)
+    value: (query: string): MediaQueryList => createMediaQueryList(query),
   });
 
   animationFrameCallbacks = [];
@@ -177,7 +175,7 @@ function installWindowBootstrapStubs(): void {
     value: (callback: FrameRequestCallback): number => {
       animationFrameCallbacks.push(callback);
       return animationFrameCallbacks.length;
-    }
+    },
   });
 }
 
@@ -226,7 +224,9 @@ afterEach(() => {
 
 describe("Main bootstrap", () => {
   it("throws a clear error when the #root mount element is missing", async () => {
-    await expect(importMainModule()).rejects.toThrow("Failed to mount Farfield: missing #root element");
+    await expect(importMainModule()).rejects.toThrow(
+      "Failed to mount Farfield: missing #root element",
+    );
   });
 
   it("mounts app shell, wires crash reporting readers, and dismisses boot splash after two paint frames", async () => {
@@ -239,7 +239,9 @@ describe("Main bootstrap", () => {
 
     expect(mainModuleMocks.createRoot).toHaveBeenCalledWith(rootElement);
     expect(mainModuleMocks.render).toHaveBeenCalledTimes(1);
-    expect(document.documentElement.classList.contains(STANDALONE_DISPLAY_MODE_CLASS_NAME)).toBe(true);
+    expect(document.documentElement.classList.contains(STANDALONE_DISPLAY_MODE_CLASS_NAME)).toBe(
+      true,
+    );
 
     const crashReporterCall = mainModuleMocks.installGlobalClientCrashReporter.mock.calls[0];
     if (!crashReporterCall) {
@@ -265,36 +267,35 @@ describe("Main bootstrap", () => {
       waiting: null,
       installing: null,
       addEventListener: serviceWorkerRegistrationEvents.addEventListener.bind(
-        serviceWorkerRegistrationEvents
+        serviceWorkerRegistrationEvents,
       ),
       removeEventListener: serviceWorkerRegistrationEvents.removeEventListener.bind(
-        serviceWorkerRegistrationEvents
+        serviceWorkerRegistrationEvents,
       ),
       dispatchEvent: serviceWorkerRegistrationEvents.dispatchEvent.bind(
-        serviceWorkerRegistrationEvents
-      )
+        serviceWorkerRegistrationEvents,
+      ),
     };
     const registerServiceWorker = vi.fn(
-      async (_scriptUrl: string): Promise<ServiceWorkerStartupRegistration> => serviceWorkerRegistration
+      async (_scriptUrl: string): Promise<ServiceWorkerStartupRegistration> =>
+        serviceWorkerRegistration,
     );
     const serviceWorkerContainerEvents = new EventTarget();
     const serviceWorkerContainer: ServiceWorkerStartupContainer = {
       controller: null,
       register: registerServiceWorker,
       addEventListener: serviceWorkerContainerEvents.addEventListener.bind(
-        serviceWorkerContainerEvents
+        serviceWorkerContainerEvents,
       ),
       removeEventListener: serviceWorkerContainerEvents.removeEventListener.bind(
-        serviceWorkerContainerEvents
+        serviceWorkerContainerEvents,
       ),
-      dispatchEvent: serviceWorkerContainerEvents.dispatchEvent.bind(
-        serviceWorkerContainerEvents
-      )
+      dispatchEvent: serviceWorkerContainerEvents.dispatchEvent.bind(serviceWorkerContainerEvents),
     };
 
     Object.defineProperty(window.navigator, "serviceWorker", {
       configurable: true,
-      value: serviceWorkerContainer
+      value: serviceWorkerContainer,
     });
 
     await importMainModule();
@@ -306,7 +307,7 @@ describe("Main bootstrap", () => {
     expect(registerServiceWorker).toHaveBeenCalledWith(SERVICE_WORKER_SCRIPT_PATH);
     expect(mainModuleMocks.reconcilePushSubscription).toHaveBeenCalledTimes(1);
     expect(mainModuleMocks.serviceWorkerControllerChangeReloadOwnerConstructorArguments).toEqual([
-      false
+      false,
     ]);
   });
 });

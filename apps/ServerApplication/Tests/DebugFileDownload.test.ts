@@ -1,13 +1,13 @@
 import fs from "node:fs";
+import type { ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
-import type { ServerResponse } from "node:http";
 import { Readable, Writable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import {
   DebugFileDownloadError,
   DebugFileDownloadErrorCodeByName,
-  streamDebugFileDownload
+  streamDebugFileDownload,
 } from "../Source/Network/Routes/DebugFileDownload.js";
 
 class DownloadResponseRecorder extends Writable {
@@ -17,7 +17,7 @@ class DownloadResponseRecorder extends Writable {
 
   public writeHead(
     statusCode: number,
-    headers: Record<string, number | string | readonly string[]>
+    headers: Record<string, number | string | readonly string[]>,
   ): void {
     this.statusCode = statusCode;
     this.headers = headers;
@@ -26,11 +26,9 @@ class DownloadResponseRecorder extends Writable {
   protected _write(
     chunk: Buffer | string,
     encoding: BufferEncoding,
-    callback: (error?: Error | null) => void
+    callback: (error?: Error | null) => void,
   ): void {
-    this.chunks.push(
-      typeof chunk === "string" ? Buffer.from(chunk, encoding) : Buffer.from(chunk)
-    );
+    this.chunks.push(typeof chunk === "string" ? Buffer.from(chunk, encoding) : Buffer.from(chunk));
     callback();
   }
 
@@ -46,7 +44,7 @@ class DownloadResponseRecorder extends Writable {
 async function readRejectedDownloadError(
   response: ServerResponse,
   filePath: string,
-  downloadFileName: string
+  downloadFileName: string,
 ): Promise<DebugFileDownloadError> {
   try {
     await streamDebugFileDownload(response, filePath, downloadFileName);
@@ -63,11 +61,11 @@ function createFailingReadStream(fileSystemErrorCode: string): fs.ReadStream {
   const failingStream = new Readable({
     read() {
       const streamError: NodeJS.ErrnoException = new Error(
-        `Simulated stream failure with code ${fileSystemErrorCode}`
+        `Simulated stream failure with code ${fileSystemErrorCode}`,
       );
       streamError.code = fileSystemErrorCode;
       this.destroy(streamError);
-    }
+    },
   });
   return failingStream as fs.ReadStream;
 }
@@ -81,13 +79,13 @@ describe("streamDebugFileDownload", () => {
       const error = await readRejectedDownloadError(
         response.asServerResponse(),
         missingFilePath,
-        "missing.ndjson"
+        "missing.ndjson",
       );
       expect(error.code).toBe(DebugFileDownloadErrorCodeByName.notFound);
     } finally {
       fs.rmSync(temporaryDirectory, {
         recursive: true,
-        force: true
+        force: true,
       });
     }
   });
@@ -99,13 +97,13 @@ describe("streamDebugFileDownload", () => {
       const error = await readRejectedDownloadError(
         response.asServerResponse(),
         temporaryDirectory,
-        "directory.ndjson"
+        "directory.ndjson",
       );
       expect(error.code).toBe(DebugFileDownloadErrorCodeByName.notFile);
     } finally {
       fs.rmSync(temporaryDirectory, {
         recursive: true,
-        force: true
+        force: true,
       });
     }
   });
@@ -113,33 +111,33 @@ describe("streamDebugFileDownload", () => {
   it("rejects invalid file path and file name contracts before file-system operations", async () => {
     const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "debug-download-contracts-"));
     const filePath = path.join(temporaryDirectory, "trace.ndjson");
-    fs.writeFileSync(filePath, "{\"ok\":true}\n", "utf8");
+    fs.writeFileSync(filePath, '{"ok":true}\n', "utf8");
     try {
       const invalidPathResponse = new DownloadResponseRecorder();
       const invalidPathError = await readRejectedDownloadError(
         invalidPathResponse.asServerResponse(),
         "   ",
-        "trace.ndjson"
+        "trace.ndjson",
       );
       expect(invalidPathError.code).toBe(DebugFileDownloadErrorCodeByName.invalidRequest);
       expect(invalidPathError.message).toBe(
-        "Debug download file path must contain at least one non-whitespace character"
+        "Debug download file path must contain at least one non-whitespace character",
       );
 
       const invalidFileNameResponse = new DownloadResponseRecorder();
       const invalidFileNameError = await readRejectedDownloadError(
         invalidFileNameResponse.asServerResponse(),
         filePath,
-        "nested/trace.ndjson"
+        "nested/trace.ndjson",
       );
       expect(invalidFileNameError.code).toBe(DebugFileDownloadErrorCodeByName.invalidRequest);
       expect(invalidFileNameError.message).toBe(
-        "Debug download file name must not contain path separators"
+        "Debug download file name must not contain path separators",
       );
     } finally {
       fs.rmSync(temporaryDirectory, {
         recursive: true,
-        force: true
+        force: true,
       });
     }
   });
@@ -147,7 +145,7 @@ describe("streamDebugFileDownload", () => {
   it("writes deterministic download headers and streams the expected body", async () => {
     const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "debug-download-headers-"));
     const filePath = path.join(temporaryDirectory, "trace.ndjson");
-    const fileBody = "{\"event\":\"trace-start\"}\n{\"event\":\"trace-stop\"}\n";
+    const fileBody = '{"event":"trace-start"}\n{"event":"trace-stop"}\n';
     fs.writeFileSync(filePath, fileBody, "utf8");
     try {
       const response = new DownloadResponseRecorder();
@@ -157,14 +155,14 @@ describe("streamDebugFileDownload", () => {
       expect(response.headers).toEqual({
         "Content-Type": "application/x-ndjson",
         "Content-Length": Buffer.byteLength(fileBody, "utf8"),
-        "Content-Disposition": "attachment; filename=\"trace.ndjson\"",
-        "Access-Control-Allow-Origin": "*"
+        "Content-Disposition": 'attachment; filename="trace.ndjson"',
+        "Access-Control-Allow-Origin": "*",
       });
       expect(response.readBody().toString("utf8")).toBe(fileBody);
     } finally {
       fs.rmSync(temporaryDirectory, {
         recursive: true,
-        force: true
+        force: true,
       });
     }
   });
@@ -172,7 +170,7 @@ describe("streamDebugFileDownload", () => {
   it("maps create-read-stream missing-path failures to typed not-found errors", async () => {
     const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "debug-download-stream-404-"));
     const filePath = path.join(temporaryDirectory, "trace.ndjson");
-    fs.writeFileSync(filePath, "{\"ok\":true}\n", "utf8");
+    fs.writeFileSync(filePath, '{"ok":true}\n', "utf8");
     const streamSpy = vi
       .spyOn(fs, "createReadStream")
       .mockImplementation((): fs.ReadStream => createFailingReadStream("ENOENT"));
@@ -182,19 +180,17 @@ describe("streamDebugFileDownload", () => {
       const error = await readRejectedDownloadError(
         response.asServerResponse(),
         filePath,
-        "trace.ndjson"
+        "trace.ndjson",
       );
 
       expect(error.code).toBe(DebugFileDownloadErrorCodeByName.notFound);
       expect(response.statusCode).toBe(200);
-      expect(response.headers?.["Content-Disposition"]).toBe(
-        "attachment; filename=\"trace.ndjson\""
-      );
+      expect(response.headers?.["Content-Disposition"]).toBe('attachment; filename="trace.ndjson"');
     } finally {
       streamSpy.mockRestore();
       fs.rmSync(temporaryDirectory, {
         recursive: true,
-        force: true
+        force: true,
       });
     }
   });
@@ -202,7 +198,7 @@ describe("streamDebugFileDownload", () => {
   it("maps non-recoverable create-read-stream failures to typed stream-failed errors", async () => {
     const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "debug-download-stream-500-"));
     const filePath = path.join(temporaryDirectory, "trace.ndjson");
-    fs.writeFileSync(filePath, "{\"ok\":true}\n", "utf8");
+    fs.writeFileSync(filePath, '{"ok":true}\n', "utf8");
     const streamSpy = vi
       .spyOn(fs, "createReadStream")
       .mockImplementation((): fs.ReadStream => createFailingReadStream("EACCES"));
@@ -212,7 +208,7 @@ describe("streamDebugFileDownload", () => {
       const error = await readRejectedDownloadError(
         response.asServerResponse(),
         filePath,
-        "trace.ndjson"
+        "trace.ndjson",
       );
       expect(error.code).toBe(DebugFileDownloadErrorCodeByName.streamFailed);
       expect(error.message).toBe("Failed to stream debug download file");
@@ -220,7 +216,7 @@ describe("streamDebugFileDownload", () => {
       streamSpy.mockRestore();
       fs.rmSync(temporaryDirectory, {
         recursive: true,
-        force: true
+        force: true,
       });
     }
   });

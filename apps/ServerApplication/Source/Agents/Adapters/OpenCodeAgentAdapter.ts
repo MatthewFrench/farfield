@@ -1,11 +1,8 @@
-import {
-  OpenCodeConnection,
-  OpenCodeMonitorService
-} from "@farfield/opencode-api";
+import { OpenCodeConnection, OpenCodeMonitorService } from "@farfield/opencode-api";
 import {
   AppServerThreadListItemSchema,
   JsonValueSchema,
-  parseThreadConversationState
+  parseThreadConversationState,
 } from "@farfield/protocol";
 import type {
   AgentAdapter,
@@ -17,7 +14,7 @@ import type {
   AgentListThreadsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
-  AgentSendMessageInput
+  AgentSendMessageInput,
 } from "../Types.js";
 import { OpenCodeDirectoryOwner } from "./OpenCodeDirectoryOwner.js";
 import { OpenCodeThreadListingOwner } from "./OpenCodeThreadListingOwner.js";
@@ -42,7 +39,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
     canSetCollaborationMode: false,
     canSubmitUserInput: false,
     canReadLiveState: false,
-    canReadStreamEvents: false
+    canReadStreamEvents: false,
   };
 
   private readonly connection: OpenCodeConnection;
@@ -53,7 +50,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
   public constructor(options: OpenCodeAgentOptions = {}) {
     this.connection = new OpenCodeConnection({
       ...(options.url !== undefined && options.url.length > 0 ? { url: options.url } : {}),
-      ...(options.port !== undefined ? { port: options.port } : {})
+      ...(options.port !== undefined ? { port: options.port } : {}),
     });
     this.service = new OpenCodeMonitorService(this.connection);
     this.directoryOwner = new OpenCodeDirectoryOwner();
@@ -66,14 +63,13 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
         return this.service.listSessions(input);
       },
       resolveSessionDirectories: (inputDirectory) => {
-        return this.directoryOwner.resolveSessionDirectories(
-          inputDirectory,
-          async () => this.listProjectDirectories()
+        return this.directoryOwner.resolveSessionDirectories(inputDirectory, async () =>
+          this.listProjectDirectories(),
         );
       },
       cacheThreadDirectory: (threadId, directory) => {
         this.directoryOwner.cacheThreadDirectory(threadId, directory);
-      }
+      },
     });
   }
 
@@ -105,12 +101,11 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
   public async createThread(input: AgentCreateThreadInput): Promise<AgentCreateThreadResult> {
     this.ensureConnected();
 
-    const directory = input.cwd !== undefined
-      ? this.directoryOwner.normalizeDirectoryInput(input.cwd)
-      : undefined;
+    const directory =
+      input.cwd !== undefined ? this.directoryOwner.normalizeDirectoryInput(input.cwd) : undefined;
     const result = await this.service.createSession({
       ...(input.model !== undefined ? { title: input.model } : {}),
-      ...(directory !== undefined && directory.length > 0 ? { directory } : {})
+      ...(directory !== undefined && directory.length > 0 ? { directory } : {}),
     });
 
     if (result.mapped.cwd !== undefined && result.mapped.cwd.trim().length > 0) {
@@ -124,7 +119,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
     return {
       threadId: result.threadId,
       thread: mappedThread,
-      cwd: mappedThread.cwd
+      cwd: mappedThread.cwd,
     };
   }
 
@@ -136,21 +131,22 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
     this.directoryOwner.cacheThreadDirectory(input.threadId, state.cwd);
 
     return {
-      thread: parseThreadConversationState(JsonValueSchema.parse(state))
+      thread: parseThreadConversationState(JsonValueSchema.parse(state)),
     };
   }
 
   public async sendMessage(input: AgentSendMessageInput): Promise<void> {
     this.ensureConnected();
 
-    const directory = input.cwd !== undefined
-      ? this.directoryOwner.normalizeDirectoryInput(input.cwd)
-      : this.directoryOwner.resolveThreadDirectory(input.threadId);
+    const directory =
+      input.cwd !== undefined
+        ? this.directoryOwner.normalizeDirectoryInput(input.cwd)
+        : this.directoryOwner.resolveThreadDirectory(input.threadId);
 
     await this.service.sendMessage({
       sessionId: input.threadId,
       text: input.text,
-      ...(directory !== undefined && directory.length > 0 ? { directory } : {})
+      ...(directory !== undefined && directory.length > 0 ? { directory } : {}),
     });
   }
 

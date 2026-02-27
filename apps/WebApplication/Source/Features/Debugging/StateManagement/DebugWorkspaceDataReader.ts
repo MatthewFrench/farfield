@@ -2,16 +2,17 @@
  * Owns debug workspace snapshot reads and deterministic debug-error signature projection.
  * Signatures are state-store comparison keys; they must remain unambiguous across field values.
  */
+
+import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import type {
   DebugErrorListResponse,
   DebugHistoryResponse,
-  DebugServerClient
+  DebugServerClient,
 } from "../DataAccess/DebugServerClient";
 import {
   buildDebugErrorSignature,
-  type DebugErrorSignatureInput
+  type DebugErrorSignatureInput,
 } from "../DomainModel/DebugErrorSignature";
-import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
 export interface DebugWorkspaceDataSnapshot {
   history: DebugHistoryResponse["history"];
@@ -27,12 +28,12 @@ export interface DebugWorkspaceDataReadOptions {
 }
 
 function readDebugErrorSignatureInput(
-  debugError: DebugErrorListResponse["data"][number]
+  debugError: DebugErrorListResponse["data"][number],
 ): DebugErrorSignatureInput {
   return {
     errorId: debugError.errorId,
     recordedAt: debugError.recordedAt,
-    message: debugError.message
+    message: debugError.message,
   };
 }
 
@@ -46,11 +47,11 @@ export class DebugWorkspaceDataReader {
   public async readSnapshot(
     historyLimit: number,
     errorListLimit: number,
-    options?: DebugWorkspaceDataReadOptions
+    options?: DebugWorkspaceDataReadOptions,
   ): Promise<DebugWorkspaceDataSnapshot> {
     const [historyResponse, debugErrorsResponse] = await Promise.all([
       this.debugServerClient.listHistory(historyLimit, options?.historyRequestOptions),
-      this.debugServerClient.listClientErrors(errorListLimit, options?.debugErrorsRequestOptions)
+      this.debugServerClient.listClientErrors(errorListLimit, options?.debugErrorsRequestOptions),
     ]);
 
     return {
@@ -59,8 +60,8 @@ export class DebugWorkspaceDataReader {
       debugErrorSessionId: debugErrorsResponse.sessionId,
       debugErrorSessionLogPath: debugErrorsResponse.sessionLogPath,
       debugErrorsSignature: debugErrorsResponse.data.map((debugError) =>
-        buildDebugErrorSignature(readDebugErrorSignatureInput(debugError))
-      )
+        buildDebugErrorSignature(readDebugErrorSignatureInput(debugError)),
+      ),
     };
   }
 }

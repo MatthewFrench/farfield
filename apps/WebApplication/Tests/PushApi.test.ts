@@ -7,7 +7,7 @@ import {
   getPushStatus,
   getPushVapidPublicKey,
   savePushSubscription,
-  sendPushTestNotification
+  sendPushTestNotification,
 } from "@/Features/PushNotifications/DataAccess/PushApi";
 import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 
@@ -15,8 +15,8 @@ function createJsonResponse(body: StructuredDataValue): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: {
-      "Content-Type": "application/json"
-    }
+      "Content-Type": "application/json",
+    },
   });
 }
 
@@ -32,8 +32,8 @@ describe("PushApi", () => {
         enabled: true,
         permissionRequired: true,
         subscriptionCount: 3,
-        privateModeDefault: false
-      })
+        privateModeDefault: false,
+      }),
     );
 
     const pushStatusResponse = await getPushStatus();
@@ -42,7 +42,7 @@ describe("PushApi", () => {
       enabled: true,
       permissionRequired: true,
       subscriptionCount: 3,
-      privateModeDefault: false
+      privateModeDefault: false,
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -52,15 +52,15 @@ describe("PushApi", () => {
       createJsonResponse({
         ok: true,
         publicKey:
-          "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U"
-      })
+          "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U",
+      }),
     );
 
     const pushVapidPublicKeyResponse = await getPushVapidPublicKey();
 
     expect(pushVapidPublicKeyResponse).toEqual({
       publicKey:
-        "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U"
+        "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U",
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -72,8 +72,8 @@ describe("PushApi", () => {
         enabled: true,
         permissionRequired: true,
         subscriptionCount: -1,
-        privateModeDefault: false
-      })
+        privateModeDefault: false,
+      }),
     );
 
     await expect(getPushStatus()).rejects.toThrowError();
@@ -81,21 +81,28 @@ describe("PushApi", () => {
   });
 
   it("requests latest push receipt, send, and local certificate authority status from push routes", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(createJsonResponse({
-        ok: true,
-        latest: null,
-        count: 0
-      }))
-      .mockResolvedValueOnce(createJsonResponse({
-        ok: true,
-        latest: null
-      }))
-      .mockResolvedValueOnce(createJsonResponse({
-        ok: true,
-        available: true,
-        downloadPath: null
-      }));
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          ok: true,
+          latest: null,
+          count: 0,
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          ok: true,
+          latest: null,
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          ok: true,
+          available: true,
+          downloadPath: null,
+        }),
+      );
 
     const latestPushReceipt = await getLatestPushReceipt();
     const latestPushSend = await getLatestPushSend();
@@ -107,14 +114,14 @@ describe("PushApi", () => {
     expect(String(fetchMock.mock.calls[2]?.[0] ?? "")).toBe("/api/push/local-ca");
     expect(latestPushReceipt).toEqual({
       latest: null,
-      count: 0
+      count: 0,
     });
     expect(latestPushSend).toEqual({
-      latest: null
+      latest: null,
     });
     expect(pushLocalCertificateAuthorityStatus).toEqual({
       available: true,
-      downloadPath: null
+      downloadPath: null,
     });
   });
 
@@ -122,8 +129,8 @@ describe("PushApi", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
         ok: true,
-        subscriptionId: "subscription_1"
-      })
+        subscriptionId: "subscription_1",
+      }),
     );
 
     const response = await savePushSubscription({
@@ -131,12 +138,12 @@ describe("PushApi", () => {
         endpoint: "https://push.example.test/subscriptions/current",
         keys: {
           p256dh: "P256DH_123",
-          auth: "AUTH_123"
-        }
+          auth: "AUTH_123",
+        },
       },
       settings: {
-        privateMode: true
-      }
+        privateMode: true,
+      },
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -144,20 +151,22 @@ describe("PushApi", () => {
     const requestInit = fetchMock.mock.calls[0]?.[1];
     expect(requestInit?.method).toBe("POST");
     expect(new Headers(requestInit?.headers).get("Content-Type")).toBe("application/json");
-    expect(String(requestInit?.body)).toBe(JSON.stringify({
-      subscription: {
-        endpoint: "https://push.example.test/subscriptions/current",
-        keys: {
-          p256dh: "P256DH_123",
-          auth: "AUTH_123"
-        }
-      },
-      settings: {
-        privateMode: true
-      }
-    }));
+    expect(String(requestInit?.body)).toBe(
+      JSON.stringify({
+        subscription: {
+          endpoint: "https://push.example.test/subscriptions/current",
+          keys: {
+            p256dh: "P256DH_123",
+            auth: "AUTH_123",
+          },
+        },
+        settings: {
+          privateMode: true,
+        },
+      }),
+    );
     expect(response).toEqual({
-      subscriptionId: "subscription_1"
+      subscriptionId: "subscription_1",
     });
   });
 
@@ -165,12 +174,12 @@ describe("PushApi", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
         ok: true,
-        deleted: true
-      })
+        deleted: true,
+      }),
     );
 
     const response = await deletePushSubscription({
-      endpoint: "https://push.example.test/subscriptions/current"
+      endpoint: "https://push.example.test/subscriptions/current",
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -178,11 +187,13 @@ describe("PushApi", () => {
     const requestInit = fetchMock.mock.calls[0]?.[1];
     expect(requestInit?.method).toBe("DELETE");
     expect(new Headers(requestInit?.headers).get("Content-Type")).toBe("application/json");
-    expect(String(requestInit?.body)).toBe(JSON.stringify({
-      endpoint: "https://push.example.test/subscriptions/current"
-    }));
+    expect(String(requestInit?.body)).toBe(
+      JSON.stringify({
+        endpoint: "https://push.example.test/subscriptions/current",
+      }),
+    );
     expect(response).toEqual({
-      deleted: true
+      deleted: true,
     });
   });
 
@@ -196,8 +207,8 @@ describe("PushApi", () => {
         reason: "push test accepted",
         attempted: 1,
         delivered: 1,
-        failures: 0
-      })
+        failures: 0,
+      }),
     );
 
     const response = await sendPushTestNotification({
@@ -205,7 +216,7 @@ describe("PushApi", () => {
       turnId: "turn-1",
       title: "",
       body: "hello from test",
-      dryRun: true
+      dryRun: true,
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -213,13 +224,15 @@ describe("PushApi", () => {
     const requestInit = fetchMock.mock.calls[0]?.[1];
     expect(requestInit?.method).toBe("POST");
     expect(new Headers(requestInit?.headers).get("Content-Type")).toBe("application/json");
-    expect(String(requestInit?.body)).toBe(JSON.stringify({
-      threadId: "thread-1",
-      turnId: "turn-1",
-      title: "",
-      body: "hello from test",
-      dryRun: true
-    }));
+    expect(String(requestInit?.body)).toBe(
+      JSON.stringify({
+        threadId: "thread-1",
+        turnId: "turn-1",
+        title: "",
+        body: "hello from test",
+        dryRun: true,
+      }),
+    );
     expect(response).toEqual({
       dryRun: true,
       notificationId: null,
@@ -227,7 +240,7 @@ describe("PushApi", () => {
       reason: "push test accepted",
       attempted: 1,
       delivered: 1,
-      failures: 0
+      failures: 0,
     });
   });
 
@@ -237,8 +250,8 @@ describe("PushApi", () => {
     await expect(
       sendPushTestNotification({
         threadId: "   ",
-        turnId: "turn-1"
-      })
+        turnId: "turn-1",
+      }),
     ).rejects.toThrowError();
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -250,8 +263,8 @@ describe("PushApi", () => {
     await expect(
       sendPushTestNotification({
         threadId: "thread-1",
-        turnId: "   "
-      })
+        turnId: "   ",
+      }),
     ).rejects.toThrowError();
 
     expect(fetchMock).not.toHaveBeenCalled();

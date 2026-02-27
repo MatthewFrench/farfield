@@ -1,13 +1,13 @@
 import type { IpcFrame } from "@farfield/protocol";
 import { describe, expect, it } from "vitest";
-import { resolveNextStreamEventsState } from "@/Features/Chat/DomainModel/SelectedThreadStreamEventStateResolver";
 import type { ChatStreamEventsResponse } from "@/Features/Chat/DataAccess/ChatServerClient";
+import { resolveNextStreamEventsState } from "@/Features/Chat/DomainModel/SelectedThreadStreamEventStateResolver";
 
 function buildEvent(method: string): IpcFrame {
   return {
     type: "broadcast",
     method,
-    params: {}
+    params: {},
   };
 }
 
@@ -23,7 +23,7 @@ function buildStreamSnapshot(input: {
     events: input.events,
     nextSequence: input.nextSequence,
     firstAvailableSequence: 0,
-    resetRequired: input.resetRequired
+    resetRequired: input.resetRequired,
   };
 }
 
@@ -37,16 +37,18 @@ describe("SelectedThreadStreamEventStateResolver", () => {
       streamEventsSnapshot: buildStreamSnapshot({
         events: nextEvents,
         nextSequence: 2,
-        resetRequired: true
+        resetRequired: true,
       }),
-      streamEventsSinceSequenceUsed: null
+      streamEventsSinceSequenceUsed: null,
     });
 
     expect(resolvedEvents).toBe(previousEvents);
   });
 
   it("appends cursor-scoped events and enforces retention bounds", () => {
-    const previousEvents = Array.from({ length: 399 }, (_, index) => buildEvent(`previous-${String(index)}`));
+    const previousEvents = Array.from({ length: 399 }, (_, index) =>
+      buildEvent(`previous-${String(index)}`),
+    );
     const nextEvents = [buildEvent("next-1"), buildEvent("next-2")];
 
     const resolvedEvents = resolveNextStreamEventsState({
@@ -54,9 +56,9 @@ describe("SelectedThreadStreamEventStateResolver", () => {
       streamEventsSnapshot: buildStreamSnapshot({
         events: nextEvents,
         nextSequence: 401,
-        resetRequired: false
+        resetRequired: false,
       }),
-      streamEventsSinceSequenceUsed: 399
+      streamEventsSinceSequenceUsed: 399,
     });
 
     expect(resolvedEvents).toHaveLength(400);
@@ -71,9 +73,9 @@ describe("SelectedThreadStreamEventStateResolver", () => {
       streamEventsSnapshot: buildStreamSnapshot({
         events: [buildEvent("event-2")],
         nextSequence: 2,
-        resetRequired: false
+        resetRequired: false,
       }),
-      streamEventsSinceSequenceUsed: null
+      streamEventsSinceSequenceUsed: null,
     });
 
     expect(resolvedEvents).toEqual([buildEvent("event-2")]);

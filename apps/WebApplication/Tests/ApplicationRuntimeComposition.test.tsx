@@ -9,7 +9,11 @@ interface PushFeatureCompositionMock {
 
 interface ChatFeatureCompositionMock {
   submitMessage: (draft: string) => Promise<void>;
-  applyModeDraft: (draft: { modeKey: string; modelId: string; reasoningEffort: string }) => Promise<void>;
+  applyModeDraft: (draft: {
+    modeKey: string;
+    modelId: string;
+    reasoningEffort: string;
+  }) => Promise<void>;
   submitPendingRequest: () => Promise<void>;
   skipPendingRequest: () => Promise<void>;
   runInterrupt: () => Promise<void>;
@@ -46,7 +50,7 @@ interface ApplicationSynchronizationEffectsCapture {
     options?: {
       includeTurns?: boolean;
       includeReadThread?: boolean;
-    }
+    },
   ) => Promise<void>;
   loadHistoryDetail: (historyEntryId: string) => Promise<void>;
 }
@@ -68,52 +72,50 @@ const hookMocks = vi.hoisted(() => ({
   useApplicationChatFeatureComposition: vi.fn(),
   useApplicationDebugFeatureComposition: vi.fn(),
   useApplicationSynchronizationEffects: vi.fn(),
-  useApplicationShellComposition: vi.fn()
+  useApplicationShellComposition: vi.fn(),
 }));
 
 vi.mock("../Source/Application/StateManagement/UseApplicationPushFeatureComposition", () => ({
-  useApplicationPushFeatureComposition: hookMocks.useApplicationPushFeatureComposition
+  useApplicationPushFeatureComposition: hookMocks.useApplicationPushFeatureComposition,
 }));
 
 vi.mock("../Source/Application/StateManagement/UseViewportShellEffects", () => ({
-  useViewportShellEffects: hookMocks.useViewportShellEffects
+  useViewportShellEffects: hookMocks.useViewportShellEffects,
 }));
 
 vi.mock("../Source/Application/StateManagement/UseApplicationRefreshEffects", () => ({
-  useApplicationRefreshEffects: hookMocks.useApplicationRefreshEffects
+  useApplicationRefreshEffects: hookMocks.useApplicationRefreshEffects,
 }));
 
 vi.mock("../Source/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects", () => ({
-  useSelectedThreadLifecycleEffects: hookMocks.useSelectedThreadLifecycleEffects
+  useSelectedThreadLifecycleEffects: hookMocks.useSelectedThreadLifecycleEffects,
 }));
 
 vi.mock("../Source/Application/StateManagement/UseEventStreamEffects", () => ({
-  useEventStreamEffects: hookMocks.useEventStreamEffects
+  useEventStreamEffects: hookMocks.useEventStreamEffects,
 }));
 
 vi.mock("../Source/Features/Chat/StateManagement/UseModeAndPendingRequestEffects", () => ({
-  useModeAndPendingRequestEffects: hookMocks.useModeAndPendingRequestEffects
+  useModeAndPendingRequestEffects: hookMocks.useModeAndPendingRequestEffects,
 }));
 
 vi.mock("../Source/Application/StateManagement/UseApplicationChatFeatureComposition", () => ({
-  useApplicationChatFeatureComposition: hookMocks.useApplicationChatFeatureComposition
+  useApplicationChatFeatureComposition: hookMocks.useApplicationChatFeatureComposition,
 }));
 
 vi.mock("../Source/Application/StateManagement/UseApplicationDebugFeatureComposition", () => ({
-  useApplicationDebugFeatureComposition: hookMocks.useApplicationDebugFeatureComposition
+  useApplicationDebugFeatureComposition: hookMocks.useApplicationDebugFeatureComposition,
 }));
 
 vi.mock("../Source/Application/StateManagement/UseApplicationSynchronizationEffects", () => ({
-  useApplicationSynchronizationEffects: hookMocks.useApplicationSynchronizationEffects
+  useApplicationSynchronizationEffects: hookMocks.useApplicationSynchronizationEffects,
 }));
 
 vi.mock("../Source/Application/StateManagement/UseApplicationShellComposition", () => ({
-  useApplicationShellComposition: hookMocks.useApplicationShellComposition
+  useApplicationShellComposition: hookMocks.useApplicationShellComposition,
 }));
 
-import {
-  useMemo
-} from "react";
+import { useMemo } from "react";
 import {
   APP_DEFAULT_VALUE,
   ARCHIVED_THREAD_LIST_MAX_PAGES,
@@ -143,25 +145,35 @@ import {
   THREAD_QUERY_CACHE_MAXIMUM_ENTRIES,
   THREAD_QUERY_CACHE_TIME_TO_LIVE_MS,
   UNSUPPORTED_PUSH_CLIENT_STATE,
-  VISIBLE_CHAT_ITEMS_STEP
+  VISIBLE_CHAT_ITEMS_STEP,
 } from "../Source/Application/Configuration/ApplicationBehaviorConfiguration";
 import { ApplicationRouteStateMapper } from "../Source/Application/DomainModel/ApplicationRouteStateMapper";
+import { useApplicationDerivedState } from "../Source/Application/StateManagement/UseApplicationDerivedState";
+import { useApplicationOwnerDependencies } from "../Source/Application/StateManagement/UseApplicationOwnerDependencies";
+import {
+  useApplicationFormattingHelpers,
+  useStreamEventCards,
+} from "../Source/Application/StateManagement/UseApplicationPresentationHelpers";
+import { useApplicationRuntimeComposition } from "../Source/Application/StateManagement/UseApplicationRuntimeComposition";
+import {
+  type ApplicationRuntimeRequestHandlers,
+  useApplicationRuntimeRequestHandlers,
+} from "../Source/Application/StateManagement/UseApplicationRuntimeRequestHandlers";
+import {
+  type ApplicationShellState,
+  useApplicationShellState,
+} from "../Source/Application/StateManagement/UseApplicationShellState";
 import {
   type CoreDataCapabilitySnapshot,
   type CoreDataLoaders,
-  useCoreDataLoaders
+  useCoreDataLoaders,
 } from "../Source/Application/StateManagement/UseCoreDataLoaders";
-import { useApplicationDerivedState } from "../Source/Application/StateManagement/UseApplicationDerivedState";
-import { useApplicationOwnerDependencies } from "../Source/Application/StateManagement/UseApplicationOwnerDependencies";
-import { useApplicationFormattingHelpers, useStreamEventCards } from "../Source/Application/StateManagement/UseApplicationPresentationHelpers";
-import { type ApplicationRuntimeRequestHandlers, useApplicationRuntimeRequestHandlers } from "../Source/Application/StateManagement/UseApplicationRuntimeRequestHandlers";
-import {
-  useApplicationRuntimeComposition
-} from "../Source/Application/StateManagement/UseApplicationRuntimeComposition";
-import { type ApplicationShellState, useApplicationShellState } from "../Source/Application/StateManagement/UseApplicationShellState";
 import { ConversationSyncSignatureBuilder } from "../Source/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
 import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
-import { type SelectedThreadLoaders, useSelectedThreadLoaders } from "../Source/Features/Chat/StateManagement/UseSelectedThreadLoaders";
+import {
+  type SelectedThreadLoaders,
+  useSelectedThreadLoaders,
+} from "../Source/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 
 interface RuntimeHarnessSnapshot {
   applicationShellState: ApplicationShellState;
@@ -173,7 +185,8 @@ interface RuntimeHarnessSnapshot {
 
 let latestRuntimeHarnessSnapshot: RuntimeHarnessSnapshot | null = null;
 let applicationRefreshEffectsCapture: ApplicationRefreshEffectsCapture | null = null;
-let applicationSynchronizationEffectsCapture: ApplicationSynchronizationEffectsCapture | null = null;
+let applicationSynchronizationEffectsCapture: ApplicationSynchronizationEffectsCapture | null =
+  null;
 let applicationShellCompositionCapture: ApplicationShellCompositionCapture | null = null;
 
 let pushFeatureCompositionMock: PushFeatureCompositionMock;
@@ -181,14 +194,16 @@ let chatFeatureCompositionMock: ChatFeatureCompositionMock;
 let debugFeatureCompositionMock: DebugFeatureCompositionMock;
 
 const modeSelectionStateResolver = new ModeSelectionStateResolver();
-const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(modeSelectionStateResolver);
+const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
+  modeSelectionStateResolver,
+);
 const applicationRouteStateMapper = new ApplicationRouteStateMapper();
 
 function createPushFeatureCompositionMock(): PushFeatureCompositionMock {
   return {
     submitApiSessionToken: vi.fn(async (): Promise<void> => {}),
     refreshPushClientState: vi.fn(async (): Promise<void> => {}),
-    enablePushNotificationsFromToolbar: vi.fn(async (): Promise<void> => {})
+    enablePushNotificationsFromToolbar: vi.fn(async (): Promise<void> => {}),
   };
 }
 
@@ -201,8 +216,8 @@ function createChatFeatureCompositionMock(): ChatFeatureCompositionMock {
     runInterrupt: vi.fn(async (): Promise<void> => {}),
     handleAnswerChange: vi.fn(),
     chatModeToolbarProperties: {
-      isModeSyncing: false
-    }
+      isModeSyncing: false,
+    },
   };
 }
 
@@ -214,20 +229,17 @@ function createDebugFeatureCompositionMock(): DebugFeatureCompositionMock {
     startTraceFromDebugPanel: vi.fn(),
     markTraceFromDebugPanel: vi.fn(),
     stopTraceFromDebugPanel: vi.fn(),
-    openDebugFromErrorBanner: vi.fn()
+    openDebugFromErrorBanner: vi.fn(),
   };
 }
 
 function RuntimeCompositionHarness(): React.JSX.Element {
-  const initialUiState = useMemo(
-    () => applicationRouteStateMapper.parseFromPathname("/"),
-    []
-  );
+  const initialUiState = useMemo(() => applicationRouteStateMapper.parseFromPathname("/"), []);
 
   const applicationShellState = useApplicationShellState({
     initialUiState,
     unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
-    initialVisibleChatItems: INITIAL_VISIBLE_CHAT_ITEMS
+    initialVisibleChatItems: INITIAL_VISIBLE_CHAT_ITEMS,
   });
 
   const applicationOwnerDependencies = useApplicationOwnerDependencies<CoreDataCapabilitySnapshot>({
@@ -248,7 +260,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     readThreadRetryBaseDelayMilliseconds: READ_THREAD_RETRY_BASE_DELAY_MS,
     readThreadRetryMaximumDelayMilliseconds: READ_THREAD_RETRY_MAX_DELAY_MS,
     threadQueryCacheTimeToLiveMilliseconds: THREAD_QUERY_CACHE_TIME_TO_LIVE_MS,
-    threadQueryCacheMaximumEntries: THREAD_QUERY_CACHE_MAXIMUM_ENTRIES
+    threadQueryCacheMaximumEntries: THREAD_QUERY_CACHE_MAXIMUM_ENTRIES,
   });
 
   const applicationDerivedState = useApplicationDerivedState({
@@ -286,23 +298,25 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     pendingUserInputRequestSelector: applicationOwnerDependencies.pendingUserInputRequestSelector,
     conversationItemFlattener: applicationOwnerDependencies.conversationItemFlattener,
     debugIssueStateResolver: applicationOwnerDependencies.debugIssueStateResolver,
-    threadListStateController: applicationOwnerDependencies.threadListStateController
+    threadListStateController: applicationOwnerDependencies.threadListStateController,
   });
 
   const streamEventCards = useStreamEventCards({
-    streamEvents: applicationShellState.streamEvents
+    streamEvents: applicationShellState.streamEvents,
   });
 
   const runtimeRequestHandlers = useApplicationRuntimeRequestHandlers({
-    trackedUserInterfaceErrorReporter: applicationOwnerDependencies.trackedUserInterfaceErrorReporter,
-    userInterfaceActionRequestBuilder: applicationOwnerDependencies.userInterfaceActionRequestBuilder,
+    trackedUserInterfaceErrorReporter:
+      applicationOwnerDependencies.trackedUserInterfaceErrorReporter,
+    userInterfaceActionRequestBuilder:
+      applicationOwnerDependencies.userInterfaceActionRequestBuilder,
     apiAuthenticationErrorClassifier: applicationOwnerDependencies.apiAuthenticationErrorClassifier,
     apiSessionBootstrapCoordinator: applicationOwnerDependencies.apiSessionBootstrapCoordinator,
     requiresApiSessionToken: applicationShellState.requiresApiSessionToken,
     apiSessionBootstrapErrorMessage: applicationShellState.apiSessionBootstrapError,
     setRequiresApiSessionToken: applicationShellState.setRequiresApiSessionToken,
     setApiSessionBootstrapErrorMessage: applicationShellState.setApiSessionBootstrapError,
-    setErrorMessage: applicationShellState.setError
+    setErrorMessage: applicationShellState.setError,
   });
 
   const coreDataLoaders = useCoreDataLoaders({
@@ -317,7 +331,8 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     debugServerClient: applicationOwnerDependencies.debugServerClient,
     debugWorkspaceDataReader: applicationOwnerDependencies.debugWorkspaceDataReader,
     debugWorkspaceStateStore: applicationOwnerDependencies.debugWorkspaceStateStore,
-    coreDataRefreshConcurrencyCoordinator: applicationOwnerDependencies.coreDataRefreshConcurrencyCoordinator,
+    coreDataRefreshConcurrencyCoordinator:
+      applicationOwnerDependencies.coreDataRefreshConcurrencyCoordinator,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
     activeTabRef: applicationShellState.activeTabRef,
     unreadThreadIdsRef: applicationShellState.unreadThreadIdsRef,
@@ -350,38 +365,37 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     ensureApiSessionBootstrapped: runtimeRequestHandlers.ensureApiSessionBootstrapped,
     buildActionRequestOptions: runtimeRequestHandlers.buildActionRequestOptions,
     readInitialModeKey: (availableModes) => {
-      const nonPlanDefault = availableModes.find((mode) => !modeSelectionStateResolver.isPlanModeOption(mode));
+      const nonPlanDefault = availableModes.find(
+        (mode) => !modeSelectionStateResolver.isPlanModeOption(mode),
+      );
       return nonPlanDefault?.mode ?? availableModes[0]?.mode ?? "";
     },
-    handleRuntimeRequestError: runtimeRequestHandlers.handleRuntimeRequestError
+    handleRuntimeRequestError: runtimeRequestHandlers.handleRuntimeRequestError,
   });
 
-  const {
-    loadSelectedThreadTracked,
-    applySelectedThreadStreamDelta
-  } = useSelectedThreadLoaders({
+  const { loadSelectedThreadTracked, applySelectedThreadStreamDelta } = useSelectedThreadLoaders({
     threads: applicationShellState.threads,
     selectedAgentId: applicationShellState.selectedAgentId,
     agentsById: applicationDerivedState.agentsById,
     appDefaultModel: applicationDerivedState.appDefaultModel,
     appDefaultReasoningEffort: applicationDerivedState.appDefaultReasoningEffort,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
-    pendingThreadMaterializationCoordinator: applicationShellState.pendingThreadMaterializationCoordinator,
+    pendingThreadMaterializationCoordinator:
+      applicationShellState.pendingThreadMaterializationCoordinator,
     conversationSyncSignatureBuilder,
-    selectedThreadDataRefreshCoordinator: applicationOwnerDependencies.selectedThreadDataRefreshCoordinator,
-    selectedThreadRefreshConcurrencyCoordinator: applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,
+    selectedThreadDataRefreshCoordinator:
+      applicationOwnerDependencies.selectedThreadDataRefreshCoordinator,
+    selectedThreadRefreshConcurrencyCoordinator:
+      applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,
     readThreadStateMerger: applicationOwnerDependencies.readThreadStateMerger,
     chatServerClient: applicationOwnerDependencies.chatServerClient,
     setLiveState: applicationShellState.setLiveState,
     setReadThreadState: applicationShellState.setReadThreadState,
-    setStreamEvents: applicationShellState.setStreamEvents
+    setStreamEvents: applicationShellState.setStreamEvents,
   });
 
-  const {
-    renderAgentFavicon,
-    formatDateValue
-  } = useApplicationFormattingHelpers({
-    dateValueFormatter: applicationOwnerDependencies.dateValueFormatter
+  const { renderAgentFavicon, formatDateValue } = useApplicationFormattingHelpers({
+    dateValueFormatter: applicationOwnerDependencies.dateValueFormatter,
   });
 
   useApplicationRuntimeComposition({
@@ -404,7 +418,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     applySelectedThreadStreamDelta,
     streamEventCards,
     renderAgentFavicon,
-    formatDateValue
+    formatDateValue,
   });
 
   latestRuntimeHarnessSnapshot = {
@@ -412,7 +426,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     coreDataLoaders,
     loadSelectedThreadTracked,
     applySelectedThreadStreamDelta,
-    runtimeRequestHandlers
+    runtimeRequestHandlers,
   };
 
   return <div data-testid="runtime-composition-harness" />;
@@ -440,22 +454,28 @@ describe("useApplicationRuntimeComposition", () => {
     hookMocks.useEventStreamEffects.mockImplementation((): void => {});
     hookMocks.useModeAndPendingRequestEffects.mockImplementation((): void => {});
 
-    hookMocks.useApplicationRefreshEffects.mockImplementation((input: ApplicationRefreshEffectsCapture): void => {
-      applicationRefreshEffectsCapture = input;
-    });
+    hookMocks.useApplicationRefreshEffects.mockImplementation(
+      (input: ApplicationRefreshEffectsCapture): void => {
+        applicationRefreshEffectsCapture = input;
+      },
+    );
 
-    hookMocks.useApplicationSynchronizationEffects.mockImplementation((input: ApplicationSynchronizationEffectsCapture): void => {
-      applicationSynchronizationEffectsCapture = input;
-    });
+    hookMocks.useApplicationSynchronizationEffects.mockImplementation(
+      (input: ApplicationSynchronizationEffectsCapture): void => {
+        applicationSynchronizationEffectsCapture = input;
+      },
+    );
 
-    hookMocks.useApplicationShellComposition.mockImplementation((input: ApplicationShellCompositionCapture) => {
-      applicationShellCompositionCapture = input;
-      return {
-        threadListPaneProperties: {
-          threadListState: "ready"
-        }
-      };
-    });
+    hookMocks.useApplicationShellComposition.mockImplementation(
+      (input: ApplicationShellCompositionCapture) => {
+        applicationShellCompositionCapture = input;
+        return {
+          threadListPaneProperties: {
+            threadListState: "ready",
+          },
+        };
+      },
+    );
   });
 
   afterEach(() => {
@@ -472,10 +492,10 @@ describe("useApplicationRuntimeComposition", () => {
     }
 
     expect(harnessSnapshot.applicationShellState.loadCoreDataTrackedRef.current).toBe(
-      harnessSnapshot.coreDataLoaders.loadCoreDataTracked
+      harnessSnapshot.coreDataLoaders.loadCoreDataTracked,
     );
     expect(harnessSnapshot.applicationShellState.loadSelectedThreadRef.current).toBe(
-      harnessSnapshot.loadSelectedThreadTracked
+      harnessSnapshot.loadSelectedThreadTracked,
     );
 
     const shellCompositionInput = applicationShellCompositionCapture;
@@ -502,10 +522,10 @@ describe("useApplicationRuntimeComposition", () => {
     }
 
     expect(refreshEffectsInput.loadCoreDataTracked).toBe(
-      harnessSnapshot.coreDataLoaders.loadCoreDataTracked
+      harnessSnapshot.coreDataLoaders.loadCoreDataTracked,
     );
     expect(refreshEffectsInput.refreshPushClientState).toBe(
-      pushFeatureCompositionMock.refreshPushClientState
+      pushFeatureCompositionMock.refreshPushClientState,
     );
 
     const shellCompositionInput = applicationShellCompositionCapture;
@@ -513,7 +533,7 @@ describe("useApplicationRuntimeComposition", () => {
       throw new Error("Expected shell composition input to be captured");
     }
     expect(shellCompositionInput.refreshCoreDataAndSelectedThread).toBe(
-      refreshEffectsInput.refreshCoreDataAndSelectedThread
+      refreshEffectsInput.refreshCoreDataAndSelectedThread,
     );
 
     const synchronizationEffectsInput = applicationSynchronizationEffectsCapture;
@@ -522,13 +542,13 @@ describe("useApplicationRuntimeComposition", () => {
     }
 
     expect(synchronizationEffectsInput.loadCoreDataTracked).toBe(
-      harnessSnapshot.coreDataLoaders.loadCoreDataTracked
+      harnessSnapshot.coreDataLoaders.loadCoreDataTracked,
     );
     expect(synchronizationEffectsInput.loadSelectedThreadTracked).toBe(
-      harnessSnapshot.loadSelectedThreadTracked
+      harnessSnapshot.loadSelectedThreadTracked,
     );
     expect(synchronizationEffectsInput.loadHistoryDetail).toBe(
-      debugFeatureCompositionMock.loadHistoryDetail
+      debugFeatureCompositionMock.loadHistoryDetail,
     );
   });
 
@@ -556,7 +576,8 @@ describe("useApplicationRuntimeComposition", () => {
     });
 
     harnessSnapshot.applicationShellState.loadCoreDataTrackedRef.current = secondCoreLoader;
-    harnessSnapshot.applicationShellState.loadSelectedThreadRef.current = secondSelectedThreadLoader;
+    harnessSnapshot.applicationShellState.loadSelectedThreadRef.current =
+      secondSelectedThreadLoader;
     harnessSnapshot.applicationShellState.selectedThreadIdRef.current = "thread-2";
     await act(async (): Promise<void> => {
       await refreshEffectsInput.refreshCoreDataAndSelectedThread();
@@ -594,7 +615,7 @@ describe("useApplicationRuntimeComposition", () => {
       throw new Error("Expected runtime harness snapshot after refresh");
     }
     expect(updatedHarnessSnapshot.applicationShellState.error).toContain(
-      "Runtime refresh invariant violated: selected-thread loader is unavailable for active selection."
+      "Runtime refresh invariant violated: selected-thread loader is unavailable for active selection.",
     );
   });
 });

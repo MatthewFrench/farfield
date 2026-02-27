@@ -12,29 +12,27 @@ import type {
   AgentListThreadsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
-  AgentSendMessageInput
+  AgentSendMessageInput,
 } from "../Source/Agents/Types.js";
-import { ThreadListAggregationCache } from "../Source/Network/ThreadListAggregationCache.js";
 import {
+  type ThreadCollectionRouteMethod,
   ThreadCollectionRouteMethodByName,
   ThreadCollectionRoutePathnameByName,
-  type ThreadCollectionRouteMethod
 } from "../Source/Network/Routes/ThreadCollectionRouteContracts.js";
 import {
   handleThreadCollectionRoutes,
-  type ThreadCollectionRouteDependencies
+  type ThreadCollectionRouteDependencies,
 } from "../Source/Network/Routes/ThreadCollectionRoutes.js";
+import { ThreadListAggregationCache } from "../Source/Network/ThreadListAggregationCache.js";
 
-type ResolveCreateThreadAdapter = (
-  requestedAgentId: AgentId | undefined
-) => AgentAdapter | null;
+type ResolveCreateThreadAdapter = (requestedAgentId: AgentId | undefined) => AgentAdapter | null;
 
 const ThreadCollectionRouteTestOrigin = "http://localhost";
 
 function buildThreadCollectionRouteUrl(queryString = ""): URL {
   return new URL(
     `${ThreadCollectionRoutePathnameByName.threads}${queryString}`,
-    ThreadCollectionRouteTestOrigin
+    ThreadCollectionRouteTestOrigin,
   );
 }
 
@@ -44,14 +42,14 @@ function createMockRequestResponsePair(): { request: IncomingMessage; response: 
   const response = new ServerResponse(request);
   return {
     request,
-    response
+    response,
   };
 }
 
 function createMockAgentAdapter(
   agentId: "codex" | "opencode",
   listThreads: (input: AgentListThreadsInput) => Promise<AgentListThreadsResult>,
-  createThread?: (input: AgentCreateThreadInput) => Promise<AgentCreateThreadResult>
+  createThread?: (input: AgentCreateThreadInput) => Promise<AgentCreateThreadResult>,
 ): AgentAdapter {
   return {
     id: agentId,
@@ -62,7 +60,7 @@ function createMockAgentAdapter(
       canSetCollaborationMode: false,
       canSubmitUserInput: false,
       canReadLiveState: false,
-      canReadStreamEvents: false
+      canReadStreamEvents: false,
     },
     async start(): Promise<void> {},
     async stop(): Promise<void> {},
@@ -87,7 +85,7 @@ function createMockAgentAdapter(
     },
     async interrupt(_input: AgentInterruptInput): Promise<void> {
       throw new Error("Not used in thread collection route test");
-    }
+    },
   };
 }
 
@@ -103,7 +101,7 @@ function createCollectionRouteDependencies(input: {
   withTimeout?: <ValueType>(
     promise: Promise<ValueType>,
     timeoutMs: number,
-    label: string
+    label: string,
   ) => Promise<ValueType>;
 }): ThreadCollectionRouteDependencies {
   const { request, response } = createMockRequestResponsePair();
@@ -140,7 +138,7 @@ function createCollectionRouteDependencies(input: {
     invalidateThreadListAggregationCache: () => {},
     pushActionEventWithRequestContext: () => {},
     pushActionErrorWithRequestContext: () => "action-error-id",
-    withTimeout: input.withTimeout ?? (async (promise) => promise)
+    withTimeout: input.withTimeout ?? (async (promise) => promise),
   };
 }
 
@@ -156,20 +154,20 @@ describe("handleThreadCollectionRoutes", () => {
         listEnabledAdapters: () => [],
         resolveCreateThreadAdapter: () => null,
         readJsonBody: async () => ({
-          agentId: "codex"
+          agentId: "codex",
         }),
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
           capturedBody = body;
-        }
-      })
+        },
+      }),
     );
 
     expect(handled).toBe(true);
     expect(capturedStatusCode).toBe(503);
     expect(capturedBody).toEqual({
       ok: false,
-      error: "Requested agent codex is not enabled."
+      error: "Requested agent codex is not enabled.",
     });
   });
 
@@ -184,18 +182,18 @@ describe("handleThreadCollectionRoutes", () => {
           preview: "new thread",
           createdAt: 1_736_100_000_000,
           updatedAt: 1_736_100_000_001,
-          cwd: input.cwd
+          cwd: input.cwd,
         },
-        cwd: input.cwd
-      })
+        cwd: input.cwd,
+      }),
     );
     const adapter = createMockAgentAdapter(
       "codex",
       async (): Promise<AgentListThreadsResult> => ({
         data: [],
-        nextCursor: null
+        nextCursor: null,
       }),
-      createThread
+      createThread,
     );
 
     const handled = await handleThreadCollectionRoutes(
@@ -209,19 +207,19 @@ describe("handleThreadCollectionRoutes", () => {
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
           capturedBody = body;
-        }
-      })
+        },
+      }),
     );
 
     expect(handled).toBe(true);
     expect(createThread).toHaveBeenCalledWith({
-      cwd: "/workspace/default"
+      cwd: "/workspace/default",
     });
     expect(capturedStatusCode).toBe(200);
     expect(capturedBody).toMatchObject({
       ok: true,
       threadId: "thread_created",
-      agentId: "codex"
+      agentId: "codex",
     });
   });
 
@@ -234,18 +232,18 @@ describe("handleThreadCollectionRoutes", () => {
           preview: "new thread",
           createdAt: 1_736_100_000_000,
           updatedAt: 1_736_100_000_001,
-          cwd: input.cwd
+          cwd: input.cwd,
         },
-        cwd: input.cwd
-      })
+        cwd: input.cwd,
+      }),
     );
     const adapter = createMockAgentAdapter(
       "codex",
       async (): Promise<AgentListThreadsResult> => ({
         data: [],
-        nextCursor: null
+        nextCursor: null,
       }),
-      createThread
+      createThread,
     );
 
     const handled = await handleThreadCollectionRoutes(
@@ -262,10 +260,10 @@ describe("handleThreadCollectionRoutes", () => {
           personality: "",
           sandbox: "",
           approvalPolicy: "",
-          ephemeral: false
+          ephemeral: false,
         }),
-        onJsonResponse: () => {}
-      })
+        onJsonResponse: () => {},
+      }),
     );
 
     expect(handled).toBe(true);
@@ -276,16 +274,18 @@ describe("handleThreadCollectionRoutes", () => {
       personality: "",
       sandbox: "",
       approvalPolicy: "",
-      ephemeral: false
+      ephemeral: false,
     });
   });
 
   it("returns false when pathname does not match the collection route contract", async () => {
     let wasResponseWritten = false;
-    const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
-      data: [],
-      nextCursor: null
-    }));
+    const listThreads = vi.fn(
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [],
+        nextCursor: null,
+      }),
+    );
     const adapter = createMockAgentAdapter("codex", listThreads);
 
     const handled = await handleThreadCollectionRoutes(
@@ -295,8 +295,8 @@ describe("handleThreadCollectionRoutes", () => {
         listEnabledAdapters: () => [adapter],
         onJsonResponse: () => {
           wasResponseWritten = true;
-        }
-      })
+        },
+      }),
     );
 
     expect(handled).toBe(false);
@@ -307,10 +307,12 @@ describe("handleThreadCollectionRoutes", () => {
   it("returns 400 when limit exceeds the route maximum", async () => {
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
-    const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
-      data: [],
-      nextCursor: null
-    }));
+    const listThreads = vi.fn(
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [],
+        nextCursor: null,
+      }),
+    );
     const adapter = createMockAgentAdapter("codex", listThreads);
 
     const handled = await handleThreadCollectionRoutes(
@@ -320,8 +322,8 @@ describe("handleThreadCollectionRoutes", () => {
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
           capturedBody = body;
-        }
-      })
+        },
+      }),
     );
 
     expect(handled).toBe(true);
@@ -329,16 +331,18 @@ describe("handleThreadCollectionRoutes", () => {
     expect(capturedStatusCode).toBe(400);
     expect(capturedBody).toMatchObject({
       ok: false,
-      error: "Invalid thread list query parameters"
+      error: "Invalid thread list query parameters",
     });
   });
 
   it("returns 400 when boolean query parameters are invalid", async () => {
     let capturedStatusCode: number | null = null;
-    const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
-      data: [],
-      nextCursor: null
-    }));
+    const listThreads = vi.fn(
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [],
+        nextCursor: null,
+      }),
+    );
     const adapter = createMockAgentAdapter("codex", listThreads);
 
     await handleThreadCollectionRoutes(
@@ -347,8 +351,8 @@ describe("handleThreadCollectionRoutes", () => {
         listEnabledAdapters: () => [adapter],
         onJsonResponse: (statusCode) => {
           capturedStatusCode = statusCode;
-        }
-      })
+        },
+      }),
     );
 
     expect(listThreads).not.toHaveBeenCalled();
@@ -358,10 +362,12 @@ describe("handleThreadCollectionRoutes", () => {
   it("returns 400 when cursor payload cannot be decoded", async () => {
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
-    const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
-      data: [],
-      nextCursor: null
-    }));
+    const listThreads = vi.fn(
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [],
+        nextCursor: null,
+      }),
+    );
     const adapter = createMockAgentAdapter("codex", listThreads);
 
     await handleThreadCollectionRoutes(
@@ -371,8 +377,8 @@ describe("handleThreadCollectionRoutes", () => {
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
           capturedBody = body;
-        }
-      })
+        },
+      }),
     );
 
     expect(listThreads).not.toHaveBeenCalled();
@@ -382,41 +388,43 @@ describe("handleThreadCollectionRoutes", () => {
       error: "Invalid cursor",
       issues: [
         {
-          path: "cursor"
-        }
-      ]
+          path: "cursor",
+        },
+      ],
     });
   });
 
   it("parses validated query parameters and forwards typed list input", async () => {
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
-    const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
-      data: [
-        {
-          id: "thread_1",
-          preview: "hello world",
-          createdAt: 1_735_600_000_000,
-          updatedAt: 1_735_600_000_001
-        }
-      ],
-      nextCursor: null,
-      pages: 1,
-      truncated: false
-    }));
+    const listThreads = vi.fn(
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [
+          {
+            id: "thread_1",
+            preview: "hello world",
+            createdAt: 1_735_600_000_000,
+            updatedAt: 1_735_600_000_001,
+          },
+        ],
+        nextCursor: null,
+        pages: 1,
+        truncated: false,
+      }),
+    );
     const adapter = createMockAgentAdapter("codex", listThreads);
 
     const handled = await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
         url: buildThreadCollectionRouteUrl(
-          "?limit=10&maxPages=2&archived=false&all=false&sortKey=created_at"
+          "?limit=10&maxPages=2&archived=false&all=false&sortKey=created_at",
         ),
         listEnabledAdapters: () => [adapter],
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
           capturedBody = body;
-        }
-      })
+        },
+      }),
     );
 
     expect(handled).toBe(true);
@@ -427,29 +435,31 @@ describe("handleThreadCollectionRoutes", () => {
       maxPages: 2,
       cursor: null,
       sortKey: "created_at",
-      cwd: null
+      cwd: null,
     });
     expect(capturedStatusCode).toBe(200);
     expect(capturedBody).toMatchObject({
       ok: true,
       pages: 1,
-      truncated: false
+      truncated: false,
     });
   });
 
   it("uses updated_at as the default sort key when query sortKey is omitted", async () => {
-    const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
-      data: [],
-      nextCursor: null
-    }));
+    const listThreads = vi.fn(
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [],
+        nextCursor: null,
+      }),
+    );
     const adapter = createMockAgentAdapter("codex", listThreads);
 
     await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
         url: buildThreadCollectionRouteUrl("?limit=10"),
         listEnabledAdapters: () => [adapter],
-        onJsonResponse: () => {}
-      })
+        onJsonResponse: () => {},
+      }),
     );
 
     expect(listThreads).toHaveBeenCalledWith({
@@ -459,7 +469,7 @@ describe("handleThreadCollectionRoutes", () => {
       maxPages: 20,
       cursor: null,
       sortKey: "updated_at",
-      cwd: null
+      cwd: null,
     });
   });
 
@@ -469,35 +479,37 @@ describe("handleThreadCollectionRoutes", () => {
     const encodedCursor = Buffer.from(
       JSON.stringify({
         version: 1,
-        offset: 1
+        offset: 1,
       }),
-      "utf8"
+      "utf8",
     ).toString("base64url");
-    const listThreads = vi.fn(async (): Promise<AgentListThreadsResult> => ({
-      data: [
-        {
-          id: "thread_3",
-          preview: "third",
-          createdAt: 3,
-          updatedAt: 3
-        },
-        {
-          id: "thread_2",
-          preview: "second",
-          createdAt: 2,
-          updatedAt: 2
-        },
-        {
-          id: "thread_1",
-          preview: "first",
-          createdAt: 1,
-          updatedAt: 1
-        }
-      ],
-      nextCursor: null,
-      pages: 3,
-      truncated: false
-    }));
+    const listThreads = vi.fn(
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [
+          {
+            id: "thread_3",
+            preview: "third",
+            createdAt: 3,
+            updatedAt: 3,
+          },
+          {
+            id: "thread_2",
+            preview: "second",
+            createdAt: 2,
+            updatedAt: 2,
+          },
+          {
+            id: "thread_1",
+            preview: "first",
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+        nextCursor: null,
+        pages: 3,
+        truncated: false,
+      }),
+    );
     const adapter = createMockAgentAdapter("codex", listThreads);
 
     const handled = await handleThreadCollectionRoutes(
@@ -507,8 +519,8 @@ describe("handleThreadCollectionRoutes", () => {
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
           capturedBody = body;
-        }
-      })
+        },
+      }),
     );
 
     expect(handled).toBe(true);
@@ -518,34 +530,40 @@ describe("handleThreadCollectionRoutes", () => {
       data: [
         {
           id: "thread_2",
-          agentId: "codex"
-        }
+          agentId: "codex",
+        },
       ],
-      pages: 1
+      pages: 1,
     });
   });
 
   it("returns partial data when one adapter list call times out", async () => {
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
-    const fastAdapter = createMockAgentAdapter("codex", async (): Promise<AgentListThreadsResult> => ({
-      data: [
-        {
-          id: "thread_fast",
-          preview: "fast",
-          createdAt: 1_735_600_000_000,
-          updatedAt: 1_735_600_000_001
-        }
-      ],
-      nextCursor: null,
-      pages: 1,
-      truncated: false
-    }));
-    const slowAdapter = createMockAgentAdapter("opencode", async (): Promise<AgentListThreadsResult> => {
-      return new Promise<AgentListThreadsResult>(() => {
-        // Intentionally unresolved to simulate a stalled adapter call.
-      });
-    });
+    const fastAdapter = createMockAgentAdapter(
+      "codex",
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [
+          {
+            id: "thread_fast",
+            preview: "fast",
+            createdAt: 1_735_600_000_000,
+            updatedAt: 1_735_600_000_001,
+          },
+        ],
+        nextCursor: null,
+        pages: 1,
+        truncated: false,
+      }),
+    );
+    const slowAdapter = createMockAgentAdapter(
+      "opencode",
+      async (): Promise<AgentListThreadsResult> => {
+        return new Promise<AgentListThreadsResult>(() => {
+          // Intentionally unresolved to simulate a stalled adapter call.
+        });
+      },
+    );
 
     const handled = await handleThreadCollectionRoutes(
       createCollectionRouteDependencies({
@@ -569,8 +587,8 @@ describe("handleThreadCollectionRoutes", () => {
               clearTimeout(timeoutHandle);
             }
           }
-        }
-      })
+        },
+      }),
     );
 
     expect(handled).toBe(true);
@@ -580,9 +598,9 @@ describe("handleThreadCollectionRoutes", () => {
       data: [
         {
           id: "thread_fast",
-          agentId: "codex"
-        }
-      ]
+          agentId: "codex",
+        },
+      ],
     });
   });
 });

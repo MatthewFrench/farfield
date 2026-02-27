@@ -1,8 +1,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { type ThreadListItem, type ThreadProjectGroup } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
-import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
+import {
+  type ThreadListItem,
+  type ThreadProjectGroup,
+} from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import { ThreadListPane } from "@/Features/Threads/UserInterface/ThreadListPane";
+import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 
 const ACTIVE_THREAD_ITEMS: ThreadListItem[] = [
   {
@@ -12,7 +15,7 @@ const ACTIVE_THREAD_ITEMS: ThreadListItem[] = [
     updatedAt: 1_735_600_000_101,
     cwd: "/Users/example/alpha",
     path: "/Users/example/alpha",
-    agentId: "codex"
+    agentId: "codex",
   },
   {
     id: "thread_active_two",
@@ -21,8 +24,8 @@ const ACTIVE_THREAD_ITEMS: ThreadListItem[] = [
     updatedAt: 1_735_600_000_102,
     cwd: "/Users/example/beta",
     path: "/Users/example/beta",
-    agentId: "codex"
-  }
+    agentId: "codex",
+  },
 ];
 
 const ARCHIVED_THREAD_ITEMS: ThreadListItem[] = [
@@ -33,8 +36,8 @@ const ARCHIVED_THREAD_ITEMS: ThreadListItem[] = [
     updatedAt: 1_735_500_000_101,
     cwd: "/Users/example/archive",
     path: "/Users/example/archive",
-    agentId: "codex"
-  }
+    agentId: "codex",
+  },
 ];
 
 const ACTIVE_PROJECT_GROUPS: ThreadProjectGroup[] = [
@@ -45,8 +48,8 @@ const ACTIVE_PROJECT_GROUPS: ThreadProjectGroup[] = [
     projectCreatedAt: 1_735_600_000_001,
     latestUpdatedAt: 1_735_600_000_102,
     threads: ACTIVE_THREAD_ITEMS,
-    isRemoved: false
-  }
+    isRemoved: false,
+  },
 ];
 
 const ARCHIVED_PROJECT_GROUPS: ThreadProjectGroup[] = [
@@ -57,8 +60,8 @@ const ARCHIVED_PROJECT_GROUPS: ThreadProjectGroup[] = [
     projectCreatedAt: 1_735_500_000_001,
     latestUpdatedAt: 1_735_500_000_101,
     threads: ARCHIVED_THREAD_ITEMS,
-    isRemoved: false
-  }
+    isRemoved: false,
+  },
 ];
 
 function createThreadListPaneProperties(): ThreadListPaneProperties {
@@ -69,14 +72,14 @@ function createThreadListPaneProperties(): ThreadListPaneProperties {
     availableAgentIds: ["codex"],
     selectedAgentDescriptor: {
       label: "Codex",
-      projectDirectories: ["/Users/example/alpha"]
+      projectDirectories: ["/Users/example/alpha"],
     },
     selectedAgentLabel: "Codex",
     agentsById: {
       codex: {
         label: "Codex",
-        projectDirectories: ["/Users/example/alpha"]
-      }
+        projectDirectories: ["/Users/example/alpha"],
+      },
     },
     isBusy: false,
     activeProjectGroups: ACTIVE_PROJECT_GROUPS,
@@ -101,7 +104,7 @@ function createThreadListPaneProperties(): ThreadListPaneProperties {
     onToggleArchivedProjectGroup: () => {},
     onUnarchiveThread: () => {},
     formatDate: () => "",
-    renderAgentFavicon: () => null
+    renderAgentFavicon: () => null,
   };
 }
 
@@ -115,13 +118,15 @@ describe("ThreadListPane", () => {
     expect(screen.queryByText("Archived regression follow-up")).not.toBeNull();
 
     fireEvent.change(screen.getByTestId("thread-list-search-input"), {
-      target: { value: "archived" }
+      target: { value: "archived" },
     });
 
     expect(screen.queryByText("Payment bug investigation")).toBeNull();
     expect(screen.queryByText("Landing page cleanup")).toBeNull();
     expect(screen.queryByText("Archived regression follow-up")).not.toBeNull();
-    expect(screen.getByTestId("thread-list-search-summary").textContent).toContain("1 matching thread");
+    expect(screen.getByTestId("thread-list-search-summary").textContent).toContain(
+      "1 matching thread",
+    );
   });
 
   it("restores complete list after clearing search input", () => {
@@ -129,7 +134,7 @@ describe("ThreadListPane", () => {
     render(<ThreadListPane {...createThreadListPaneProperties()} />);
 
     fireEvent.change(screen.getByTestId("thread-list-search-input"), {
-      target: { value: "payment" }
+      target: { value: "payment" },
     });
 
     expect(screen.queryByText("Landing page cleanup")).toBeNull();
@@ -146,12 +151,14 @@ describe("ThreadListPane", () => {
     render(<ThreadListPane {...createThreadListPaneProperties()} />);
 
     fireEvent.change(screen.getByTestId("thread-list-search-input"), {
-      target: { value: "no-results-here" }
+      target: { value: "no-results-here" },
     });
 
     expect(screen.queryByText("Payment bug investigation")).toBeNull();
     expect(screen.queryByText("Landing page cleanup")).toBeNull();
     expect(screen.queryByText("Archived regression follow-up")).toBeNull();
-    expect(screen.getByTestId("thread-list-search-summary").textContent).toContain("No matching threads");
+    expect(screen.getByTestId("thread-list-search-summary").textContent).toContain(
+      "No matching threads",
+    );
   });
 });

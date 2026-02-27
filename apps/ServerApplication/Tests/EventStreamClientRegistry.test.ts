@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FarfieldEventStreamEvent } from "@farfield/protocol";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
 
 const EVENT_STREAM_RETRY_DIRECTIVE = "retry: 1000\n\n";
@@ -27,8 +27,8 @@ function buildRuntimeStateChangedEvent(): FarfieldEventStreamEvent {
       lastError: null,
       historyCount: 0,
       threadOwnerCount: 0,
-      pushSubscriptionCount: 0
-    }
+      pushSubscriptionCount: 0,
+    },
   };
 }
 
@@ -93,7 +93,7 @@ describe("EventStreamClientRegistry", () => {
     expect(firstWriteSpy).toHaveBeenCalled();
     expect(secondWriteSpy).toHaveBeenNthCalledWith(1, EVENT_STREAM_RETRY_DIRECTIVE);
     expect(secondWriteSpy).toHaveBeenNthCalledWith(2, "id: 1\n");
-    expect(secondWriteSpy).toHaveBeenNthCalledWith(3, expect.stringContaining("\"sequence\":1"));
+    expect(secondWriteSpy).toHaveBeenNthCalledWith(3, expect.stringContaining('"sequence":1'));
   });
 
   it("removes clients and increments failure counters when event writes throw", () => {

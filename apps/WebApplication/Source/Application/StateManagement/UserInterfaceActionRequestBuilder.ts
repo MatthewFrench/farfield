@@ -6,8 +6,8 @@ const EMPTY_ACTION_NAME_ERROR_MESSAGE = "Action name is required";
 
 function createUserInterfaceActionId(): string {
   return (
-    `${ACTION_IDENTIFIER_PREFIX}_${String(Date.now())}_`
-    + `${Math.floor(Math.random() * ACTION_IDENTIFIER_RANDOM_UPPER_BOUND).toString(16)}`
+    `${ACTION_IDENTIFIER_PREFIX}_${String(Date.now())}_` +
+    `${Math.floor(Math.random() * ACTION_IDENTIFIER_RANDOM_UPPER_BOUND).toString(16)}`
   );
 }
 
@@ -38,8 +38,8 @@ export class UserInterfaceActionRequestBuilder {
       actionId,
       requestOptions: {
         actionId,
-        actionName: normalizedActionName
-      }
+        actionName: normalizedActionName,
+      },
     };
   }
 }

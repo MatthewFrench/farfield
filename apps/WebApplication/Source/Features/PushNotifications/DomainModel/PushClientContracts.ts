@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const PushNotificationPreferenceInputSchema = z
   .object({
-    privateMode: z.boolean()
+    privateMode: z.boolean(),
   })
   .strict();
 
@@ -10,7 +10,7 @@ export type PushNotificationPreferenceInput = z.infer<typeof PushNotificationPre
 
 export const PushSubscriptionReconcileInputSchema = z
   .object({
-    privateMode: z.boolean().optional()
+    privateMode: z.boolean().optional(),
   })
   .strict();
 
@@ -43,7 +43,7 @@ export const PushSubscriptionReconcileReasonSchema = z.enum([
   "permission-not-granted",
   "server-disabled",
   "subscription-restored",
-  "subscription-confirmed"
+  "subscription-confirmed",
 ]);
 
 export type PushSubscriptionReconcileReason = z.infer<typeof PushSubscriptionReconcileReasonSchema>;

@@ -1,8 +1,8 @@
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
+import os from "node:os";
+import path from "node:path";
 import {
   FarfieldApiErrorResponseSchema,
   FarfieldCreatePushSubscriptionEnvelopeSchema,
@@ -14,21 +14,21 @@ import {
   FarfieldPushTestBodySchema,
   FarfieldPushVapidPublicKeyEnvelopeSchema,
   type JsonValue,
-  type PushNotificationPayload
+  type PushNotificationPayload,
 } from "@farfield/protocol";
 import { describe, expect, it, vi } from "vitest";
-import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
-import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
 import { PushReceiptStore } from "../Source/Modules/PushNotifications/PushReceiptStore.js";
 import { PushSendStore } from "../Source/Modules/PushNotifications/PushSendStore.js";
+import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
+import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
 import { PushMutationConcurrencyCoordinator } from "../Source/Network/PushMutationConcurrencyCoordinator.js";
 import {
   PushRouteMethodByName,
-  PushRoutePathnameByName
+  PushRoutePathnameByName,
 } from "../Source/Network/Routes/PushRouteContracts.js";
 import {
   handlePushRoutes,
-  type PushRouteDependencies
+  type PushRouteDependencies,
 } from "../Source/Network/Routes/PushRoutes.js";
 
 interface RouteExecutionResult {
@@ -50,14 +50,14 @@ function createRequestResponsePair(): { request: IncomingMessage; response: Serv
   const response = new ServerResponse(request);
   return {
     request,
-    response
+    response,
   };
 }
 
 function createPushPayload(
   threadId: string,
   turnId: string,
-  privateMode: boolean
+  privateMode: boolean,
 ): PushNotificationPayload {
   return {
     notificationId: `push_${privateMode ? "private" : "detailed"}`,
@@ -66,7 +66,7 @@ function createPushPayload(
     threadId,
     turnId,
     url: `/threads/${threadId}`,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
 }
 
@@ -106,7 +106,7 @@ function buildDependencies(input: {
     buildPushTestPayload: (payload, privateMode) => {
       return createPushPayload(payload.threadId, payload.turnId, privateMode);
     },
-    withTimeout: async (promise) => promise
+    withTimeout: async (promise) => promise,
   };
 }
 
@@ -130,14 +130,14 @@ async function executePushRoute(input: {
       onJsonResponse: (nextStatusCode, nextBody) => {
         statusCode = nextStatusCode;
         body = nextBody;
-      }
-    })
+      },
+    }),
   );
 
   return {
     handled,
     statusCode,
-    body
+    body,
   };
 }
 
@@ -149,14 +149,14 @@ describe("handlePushRoutes", () => {
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: "mailto:test@example.com"
+        vapidSubject: "mailto:test@example.com",
       });
       const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
       pushStore.load();
       const pushReceiptStore = new PushReceiptStore(
         path.join(temporaryDirectory, "push-receipts.json"),
         100,
-        86_400_000
+        86_400_000,
       );
       pushReceiptStore.load();
       const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
@@ -172,18 +172,20 @@ describe("handlePushRoutes", () => {
         pushSendStore,
         pushMutationConcurrencyCoordinator,
         pushLocalCaSourcePath: path.join(temporaryDirectory, "rootCA.pem"),
-        readJsonBody: async () => ({})
+        readJsonBody: async () => ({}),
       });
 
       expect(statusResult.handled).toBe(true);
       expect(statusResult.statusCode).toBe(200);
-      const parsedStatusResponse = FarfieldPushStatusEnvelopeSchema.parse(readRouteBody(statusResult));
+      const parsedStatusResponse = FarfieldPushStatusEnvelopeSchema.parse(
+        readRouteBody(statusResult),
+      );
       expect(parsedStatusResponse).toEqual({
         ok: true,
         enabled: false,
         permissionRequired: true,
         subscriptionCount: 0,
-        privateModeDefault: true
+        privateModeDefault: true,
       });
 
       const disabledKeyResult = await executePushRoute({
@@ -195,17 +197,17 @@ describe("handlePushRoutes", () => {
         pushSendStore,
         pushMutationConcurrencyCoordinator,
         pushLocalCaSourcePath: path.join(temporaryDirectory, "rootCA.pem"),
-        readJsonBody: async () => ({})
+        readJsonBody: async () => ({}),
       });
 
       expect(disabledKeyResult.handled).toBe(true);
       expect(disabledKeyResult.statusCode).toBe(503);
       const parsedDisabledPublicKeyResponse = FarfieldApiErrorResponseSchema.parse(
-        readRouteBody(disabledKeyResult)
+        readRouteBody(disabledKeyResult),
       );
       expect(parsedDisabledPublicKeyResponse).toEqual({
         ok: false,
-        error: "Push notifications are disabled"
+        error: "Push notifications are disabled",
       });
 
       vi.spyOn(pushService, "isEnabled").mockReturnValue(true);
@@ -220,17 +222,17 @@ describe("handlePushRoutes", () => {
         pushSendStore,
         pushMutationConcurrencyCoordinator,
         pushLocalCaSourcePath: path.join(temporaryDirectory, "rootCA.pem"),
-        readJsonBody: async () => ({})
+        readJsonBody: async () => ({}),
       });
 
       expect(enabledKeyResult.handled).toBe(true);
       expect(enabledKeyResult.statusCode).toBe(200);
       const parsedEnabledPublicKeyResponse = FarfieldPushVapidPublicKeyEnvelopeSchema.parse(
-        readRouteBody(enabledKeyResult)
+        readRouteBody(enabledKeyResult),
       );
       expect(parsedEnabledPublicKeyResponse).toEqual({
         ok: true,
-        publicKey: "PublicVapidKey"
+        publicKey: "PublicVapidKey",
       });
     } finally {
       fs.rmSync(temporaryDirectory, { recursive: true, force: true });
@@ -244,14 +246,14 @@ describe("handlePushRoutes", () => {
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: "mailto:test@example.com"
+        vapidSubject: "mailto:test@example.com",
       });
       const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
       pushStore.load();
       const pushReceiptStore = new PushReceiptStore(
         path.join(temporaryDirectory, "push-receipts.json"),
         100,
-        86_400_000
+        86_400_000,
       );
       pushReceiptStore.load();
       const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
@@ -275,14 +277,14 @@ describe("handlePushRoutes", () => {
           threadId: "thread_1",
           turnId: "turn_1",
           message: "shown",
-          createdAt
-        })
+          createdAt,
+        }),
       });
 
       expect(recordResult.handled).toBe(true);
       expect(recordResult.statusCode).toBe(200);
       const parsedReceiptCreateResponse = FarfieldPushReceiptCreateEnvelopeSchema.parse(
-        readRouteBody(recordResult)
+        readRouteBody(recordResult),
       );
       expect(parsedReceiptCreateResponse).toEqual({ ok: true, recorded: true });
       expect(pushReceiptStore.getCount()).toBe(1);
@@ -296,13 +298,13 @@ describe("handlePushRoutes", () => {
         pushSendStore,
         pushMutationConcurrencyCoordinator,
         pushLocalCaSourcePath: path.join(temporaryDirectory, "rootCA.pem"),
-        readJsonBody: async () => ({})
+        readJsonBody: async () => ({}),
       });
 
       expect(latestReceiptResult.handled).toBe(true);
       expect(latestReceiptResult.statusCode).toBe(200);
       const parsedLatestReceiptResponse = FarfieldPushReceiptLatestEnvelopeSchema.parse(
-        readRouteBody(latestReceiptResult)
+        readRouteBody(latestReceiptResult),
       );
       expect(parsedLatestReceiptResponse).toEqual({
         ok: true,
@@ -314,8 +316,8 @@ describe("handlePushRoutes", () => {
           threadId: "thread_1",
           turnId: "turn_1",
           message: "shown",
-          createdAt
-        }
+          createdAt,
+        },
       });
     } finally {
       fs.rmSync(temporaryDirectory, { recursive: true, force: true });
@@ -324,21 +326,21 @@ describe("handlePushRoutes", () => {
 
   it("preserves explicitly empty receipt message values", async () => {
     const temporaryDirectory = fs.mkdtempSync(
-      path.join(os.tmpdir(), "push-routes-receipts-empty-message-")
+      path.join(os.tmpdir(), "push-routes-receipts-empty-message-"),
     );
     try {
       const pushService = new PushService({
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: "mailto:test@example.com"
+        vapidSubject: "mailto:test@example.com",
       });
       const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
       pushStore.load();
       const pushReceiptStore = new PushReceiptStore(
         path.join(temporaryDirectory, "push-receipts.json"),
         100,
-        86_400_000
+        86_400_000,
       );
       pushReceiptStore.load();
       const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
@@ -362,14 +364,14 @@ describe("handlePushRoutes", () => {
           threadId: "thread_1",
           turnId: "turn_1",
           message: "",
-          createdAt
-        })
+          createdAt,
+        }),
       });
 
       expect(recordResult.handled).toBe(true);
       expect(recordResult.statusCode).toBe(200);
       const parsedReceiptCreateResponse = FarfieldPushReceiptCreateEnvelopeSchema.parse(
-        readRouteBody(recordResult)
+        readRouteBody(recordResult),
       );
       expect(parsedReceiptCreateResponse).toEqual({ ok: true, recorded: true });
 
@@ -389,13 +391,13 @@ describe("handlePushRoutes", () => {
         pushSendStore,
         pushMutationConcurrencyCoordinator,
         pushLocalCaSourcePath: path.join(temporaryDirectory, "rootCA.pem"),
-        readJsonBody: async () => ({})
+        readJsonBody: async () => ({}),
       });
 
       expect(latestReceiptResult.handled).toBe(true);
       expect(latestReceiptResult.statusCode).toBe(200);
       const parsedLatestReceiptResponse = FarfieldPushReceiptLatestEnvelopeSchema.parse(
-        readRouteBody(latestReceiptResult)
+        readRouteBody(latestReceiptResult),
       );
       expect(parsedLatestReceiptResponse.count).toBe(1);
       expect(parsedLatestReceiptResponse.latest).not.toBeNull();
@@ -415,14 +417,14 @@ describe("handlePushRoutes", () => {
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: "mailto:test@example.com"
+        vapidSubject: "mailto:test@example.com",
       });
       const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
       pushStore.load();
       const pushReceiptStore = new PushReceiptStore(
         path.join(temporaryDirectory, "push-receipts.json"),
         100,
-        86_400_000
+        86_400_000,
       );
       pushReceiptStore.load();
       const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
@@ -439,18 +441,18 @@ describe("handlePushRoutes", () => {
         pushSendStore,
         pushMutationConcurrencyCoordinator,
         pushLocalCaSourcePath,
-        readJsonBody: async () => ({})
+        readJsonBody: async () => ({}),
       });
 
       expect(localCaStatusResult.handled).toBe(true);
       expect(localCaStatusResult.statusCode).toBe(200);
       const parsedLocalCaStatusResponse = FarfieldPushLocalCaStatusEnvelopeSchema.parse(
-        readRouteBody(localCaStatusResult)
+        readRouteBody(localCaStatusResult),
       );
       expect(parsedLocalCaStatusResponse).toEqual({
         ok: true,
         available: false,
-        downloadPath: null
+        downloadPath: null,
       });
 
       const missingDownloadResult = await executePushRoute({
@@ -462,17 +464,17 @@ describe("handlePushRoutes", () => {
         pushSendStore,
         pushMutationConcurrencyCoordinator,
         pushLocalCaSourcePath,
-        readJsonBody: async () => ({})
+        readJsonBody: async () => ({}),
       });
 
       expect(missingDownloadResult.handled).toBe(true);
       expect(missingDownloadResult.statusCode).toBe(404);
       const parsedMissingDownloadResponse = FarfieldApiErrorResponseSchema.parse(
-        readRouteBody(missingDownloadResult)
+        readRouteBody(missingDownloadResult),
       );
       expect(parsedMissingDownloadResponse).toEqual({
         ok: false,
-        error: "Local Caddy root certificate not found"
+        error: "Local Caddy root certificate not found",
       });
     } finally {
       fs.rmSync(temporaryDirectory, { recursive: true, force: true });
@@ -486,14 +488,14 @@ describe("handlePushRoutes", () => {
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: "mailto:test@example.com"
+        vapidSubject: "mailto:test@example.com",
       });
       const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
       pushStore.load();
       const pushReceiptStore = new PushReceiptStore(
         path.join(temporaryDirectory, "push-receipts.json"),
         100,
-        86_400_000
+        86_400_000,
       );
       pushReceiptStore.load();
       const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
@@ -514,19 +516,19 @@ describe("handlePushRoutes", () => {
             endpoint: "https://push.example.test/subscription_1",
             keys: {
               p256dh: "P256DhKey",
-              auth: "AuthKey"
-            }
+              auth: "AuthKey",
+            },
           },
           settings: {
-            privateMode: false
-          }
-        })
+            privateMode: false,
+          },
+        }),
       });
 
       expect(createResult.handled).toBe(true);
       expect(createResult.statusCode).toBe(200);
       const parsedCreateSubscriptionResponse = FarfieldCreatePushSubscriptionEnvelopeSchema.parse(
-        readRouteBody(createResult)
+        readRouteBody(createResult),
       );
       expect(parsedCreateSubscriptionResponse.ok).toBe(true);
       expect(parsedCreateSubscriptionResponse.subscriptionId.length).toBeGreaterThan(0);
@@ -542,14 +544,14 @@ describe("handlePushRoutes", () => {
         pushMutationConcurrencyCoordinator,
         pushLocalCaSourcePath: path.join(temporaryDirectory, "rootCA.pem"),
         readJsonBody: async () => ({
-          endpoint: "https://push.example.test/subscription_1"
-        })
+          endpoint: "https://push.example.test/subscription_1",
+        }),
       });
 
       expect(deleteResult.handled).toBe(true);
       expect(deleteResult.statusCode).toBe(200);
       const parsedDeleteSubscriptionResponse = FarfieldDeletePushSubscriptionEnvelopeSchema.parse(
-        readRouteBody(deleteResult)
+        readRouteBody(deleteResult),
       );
       expect(parsedDeleteSubscriptionResponse).toEqual({ ok: true, deleted: true });
       expect(pushStore.getSubscriptionCount()).toBe(0);
@@ -565,14 +567,14 @@ describe("handlePushRoutes", () => {
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: "mailto:test@example.com"
+        vapidSubject: "mailto:test@example.com",
       });
       const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
       pushStore.load();
       const pushReceiptStore = new PushReceiptStore(
         path.join(temporaryDirectory, "push-receipts.json"),
         100,
-        86_400_000
+        86_400_000,
       );
       pushReceiptStore.load();
       const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
@@ -588,7 +590,7 @@ describe("handlePushRoutes", () => {
         pushSendStore,
         pushMutationConcurrencyCoordinator,
         pushLocalCaSourcePath: path.join(temporaryDirectory, "rootCA.pem"),
-        readJsonBody: async () => ({})
+        readJsonBody: async () => ({}),
       });
 
       expect(result.handled).toBe(false);
@@ -600,20 +602,22 @@ describe("handlePushRoutes", () => {
   });
 
   it("returns false for unowned push route paths", async () => {
-    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "push-routes-unowned-push-path-"));
+    const temporaryDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "push-routes-unowned-push-path-"),
+    );
     try {
       const pushService = new PushService({
         enabled: false,
         vapidPublicKey: "",
         vapidPrivateKey: "",
-        vapidSubject: "mailto:test@example.com"
+        vapidSubject: "mailto:test@example.com",
       });
       const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
       pushStore.load();
       const pushReceiptStore = new PushReceiptStore(
         path.join(temporaryDirectory, "push-receipts.json"),
         100,
-        86_400_000
+        86_400_000,
       );
       pushReceiptStore.load();
       const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
@@ -629,7 +633,7 @@ describe("handlePushRoutes", () => {
         pushSendStore,
         pushMutationConcurrencyCoordinator,
         pushLocalCaSourcePath: path.join(temporaryDirectory, "rootCA.pem"),
-        readJsonBody: async () => ({})
+        readJsonBody: async () => ({}),
       });
 
       expect(result.handled).toBe(false);

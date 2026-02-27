@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  configureLogger,
   DEFAULT_SERVER_LOGGER_LEVEL,
   LoggerLevelSchema,
+  logger,
   SERVER_LOGGER_NAME,
-  configureLogger,
-  logger
 } from "../Source/Shared/Logging/Logger.js";
 
 function resetLoggerLevelToDefault(): void {

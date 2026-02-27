@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { ProtocolValidationError } from "./Errors.js";
 import { type JsonValue } from "./Common.js";
+import { ProtocolValidationError } from "./Errors.js";
 
 /**
  * Owns boundary schema parsing so protocol modules emit consistent validation diagnostics
@@ -9,7 +9,7 @@ import { type JsonValue } from "./Common.js";
 export function parseSchemaOrThrow<Schema extends z.ZodTypeAny>(
   schema: Schema,
   value: z.input<Schema> | JsonValue,
-  context: string
+  context: string,
 ): z.output<Schema> {
   const result = schema.safeParse(value);
   if (!result.success) {

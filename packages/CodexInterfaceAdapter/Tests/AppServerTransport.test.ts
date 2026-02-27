@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  type AppServerTransport,
   buildAppServerSpawnEnvironment,
   isChildProcessAppServerTransportOptions,
-  type AppServerTransport
 } from "../Source/AppServerTransport.js";
 
 describe("buildAppServerSpawnEnvironment", () => {
@@ -11,17 +11,17 @@ describe("buildAppServerSpawnEnvironment", () => {
       baseEnvironment: {
         HOME: "/Users/tester",
         PATH: "/usr/bin",
-        RANDOM_KEY: "ignored"
+        RANDOM_KEY: "ignored",
       },
       userAgent: "farfield-tests",
-      clientId: "client-1"
+      clientId: "client-1",
     });
 
     expect(environment).toEqual({
       HOME: "/Users/tester",
       PATH: "/usr/bin",
       CODEX_USER_AGENT: "farfield-tests",
-      CODEX_CLIENT_ID: "client-1"
+      CODEX_CLIENT_ID: "client-1",
     });
   });
 
@@ -29,14 +29,14 @@ describe("buildAppServerSpawnEnvironment", () => {
     const environment = buildAppServerSpawnEnvironment({
       baseEnvironment: {
         HOME: "/Users/tester",
-        PATH: "/usr/bin"
+        PATH: "/usr/bin",
       },
       overrideEnvironment: {
         PATH: "/custom/bin",
-        CODEX_HOME: "/Users/tester/.codex"
+        CODEX_HOME: "/Users/tester/.codex",
       },
       userAgent: "farfield-tests",
-      clientId: "client-2"
+      clientId: "client-2",
     });
 
     expect(environment).toEqual({
@@ -44,7 +44,7 @@ describe("buildAppServerSpawnEnvironment", () => {
       PATH: "/custom/bin",
       CODEX_HOME: "/Users/tester/.codex",
       CODEX_USER_AGENT: "farfield-tests",
-      CODEX_CLIENT_ID: "client-2"
+      CODEX_CLIENT_ID: "client-2",
     });
   });
 
@@ -53,11 +53,11 @@ describe("buildAppServerSpawnEnvironment", () => {
       buildAppServerSpawnEnvironment({
         baseEnvironment: {},
         overrideEnvironment: {
-          UNSAFE_KEY: "not-allowed"
+          UNSAFE_KEY: "not-allowed",
         },
         userAgent: "farfield-tests",
-        clientId: "client-3"
-      })
+        clientId: "client-3",
+      }),
     ).toThrowError(/Unrecognized key/);
   });
 
@@ -66,16 +66,16 @@ describe("buildAppServerSpawnEnvironment", () => {
       buildAppServerSpawnEnvironment({
         baseEnvironment: {},
         userAgent: "",
-        clientId: "client-4"
-      })
+        clientId: "client-4",
+      }),
     ).toThrowError(/at least 1 character/);
 
     expect(() =>
       buildAppServerSpawnEnvironment({
         baseEnvironment: {},
         userAgent: "farfield-tests",
-        clientId: ""
-      })
+        clientId: "",
+      }),
     ).toThrowError(/at least 1 character/);
   });
 });
@@ -86,10 +86,10 @@ describe("isChildProcessAppServerTransportOptions", () => {
       executablePath: "/usr/local/bin/codex",
       userAgent: "farfield-tests",
       baseEnvironment: {
-        PATH: "/usr/bin"
+        PATH: "/usr/bin",
       },
       cwd: "/tmp/project",
-      requestTimeoutMs: 5_000
+      requestTimeoutMs: 5_000,
     });
 
     expect(isOptions).toBe(true);
@@ -98,7 +98,7 @@ describe("isChildProcessAppServerTransportOptions", () => {
   it("returns false for pre-built transport implementations", () => {
     const transport: AppServerTransport = {
       request: async () => ({}),
-      close: async () => Promise.resolve()
+      close: async () => Promise.resolve(),
     };
 
     expect(isChildProcessAppServerTransportOptions(transport)).toBe(false);

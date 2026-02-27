@@ -1,18 +1,15 @@
 import {
   AppServerCollaborationModeListResponseSchema,
   AppServerListModelsResponseSchema,
-  FarfieldHealthResponseSchema
+  FarfieldHealthResponseSchema,
 } from "@farfield/protocol";
 import { z } from "zod";
 import {
-  AgentIdSchema,
   type AgentId,
-  type ApiRequestOptions
+  AgentIdSchema,
+  type ApiRequestOptions,
 } from "@/Shared/Contracts/ApiContracts";
-import {
-  request,
-  requestInitWithOptions
-} from "@/Shared/Transport/FarfieldHttpTransport";
+import { request, requestInitWithOptions } from "@/Shared/Transport/FarfieldHttpTransport";
 
 const HEALTH_ENDPOINT = "/api/health";
 const AGENTS_ENDPOINT = "/api/agents";
@@ -34,7 +31,7 @@ const AgentCapabilitiesSchema = z
     canSetCollaborationMode: z.boolean(),
     canSubmitUserInput: z.boolean(),
     canReadLiveState: z.boolean(),
-    canReadStreamEvents: z.boolean()
+    canReadStreamEvents: z.boolean(),
   })
   .strict();
 export type ApiAgentCapabilities = z.infer<typeof AgentCapabilitiesSchema>;
@@ -49,10 +46,10 @@ const AgentsResponseSchema = z
         enabled: z.boolean(),
         connected: z.boolean(),
         capabilities: AgentCapabilitiesSchema,
-        projectDirectories: z.array(z.string())
-      })
+        projectDirectories: z.array(z.string()),
+      }),
     ),
-    defaultAgentId: AgentIdSchema
+    defaultAgentId: AgentIdSchema,
   })
   .strict();
 export type ApiAgentsResponse = z.infer<typeof AgentsResponseSchema>;
@@ -62,7 +59,7 @@ const ConfigDefaultsResponseSchema = z
     ok: z.literal(true),
     agentId: z.union([AgentIdSchema, z.null()]),
     model: z.union([z.string(), z.null()]),
-    reasoningEffort: z.union([ReasoningEffortSchema, z.null()])
+    reasoningEffort: z.union([ReasoningEffortSchema, z.null()]),
   })
   .strict();
 export type ApiConfigDefaultsResponse = z.infer<typeof ConfigDefaultsResponseSchema>;
@@ -82,38 +79,44 @@ function readConfigDefaultsPath(options?: ApiConfigDefaultsOptions): string {
 
 const CollaborationModeListEnvelopeSchema = z
   .object({
-    ok: z.literal(true)
+    ok: z.literal(true),
   })
   .merge(AppServerCollaborationModeListResponseSchema)
   .transform(({ ok: _ok, ...collaborationModesResponse }) => collaborationModesResponse);
-export type ApiCollaborationModesResponse = z.infer<typeof AppServerCollaborationModeListResponseSchema>;
+export type ApiCollaborationModesResponse = z.infer<
+  typeof AppServerCollaborationModeListResponseSchema
+>;
 
 const ModelListEnvelopeSchema = z
   .object({
-    ok: z.literal(true)
+    ok: z.literal(true),
   })
   .merge(AppServerListModelsResponseSchema)
   .transform(({ ok: _ok, ...modelsResponse }) => modelsResponse);
 export type ApiModelsResponse = z.infer<typeof AppServerListModelsResponseSchema>;
 
 export async function getHealth(options?: ApiRequestOptions): Promise<ApiHealthResponse> {
-  return HealthResponseSchema.parse(await request(HEALTH_ENDPOINT, requestInitWithOptions(options)));
+  return HealthResponseSchema.parse(
+    await request(HEALTH_ENDPOINT, requestInitWithOptions(options)),
+  );
 }
 
 export async function listAgents(options?: ApiRequestOptions): Promise<ApiAgentsResponse> {
-  return AgentsResponseSchema.parse(await request(AGENTS_ENDPOINT, requestInitWithOptions(options)));
+  return AgentsResponseSchema.parse(
+    await request(AGENTS_ENDPOINT, requestInitWithOptions(options)),
+  );
 }
 
 export async function getConfigDefaults(
-  options?: ApiConfigDefaultsOptions
+  options?: ApiConfigDefaultsOptions,
 ): Promise<ApiConfigDefaultsResponse> {
   return ConfigDefaultsResponseSchema.parse(
-    await request(readConfigDefaultsPath(options), requestInitWithOptions(options))
+    await request(readConfigDefaultsPath(options), requestInitWithOptions(options)),
   );
 }
 
 export async function listCollaborationModes(
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiCollaborationModesResponse> {
   const data = await request(COLLABORATION_MODES_ENDPOINT, requestInitWithOptions(options));
   return CollaborationModeListEnvelopeSchema.parse(data);
@@ -122,7 +125,7 @@ export async function listCollaborationModes(
 export async function listModels(options?: ApiRequestOptions): Promise<ApiModelsResponse> {
   const data = await request(
     `${MODELS_ENDPOINT}?limit=${String(MODELS_LIST_LIMIT)}`,
-    requestInitWithOptions(options)
+    requestInitWithOptions(options),
   );
   return ModelListEnvelopeSchema.parse(data);
 }

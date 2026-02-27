@@ -1,9 +1,5 @@
+import { type JsonValue, JsonValueSchema, ProtocolValidationError } from "@farfield/protocol";
 import { z } from "zod";
-import {
-  JsonValueSchema,
-  ProtocolValidationError,
-  type JsonValue
-} from "@farfield/protocol";
 
 /**
  * Owns JSON-RPC boundary schemas and incoming envelope classification for adapter transport payloads.
@@ -12,7 +8,8 @@ import {
 const JSON_RPC_VERSION = "2.0";
 const JSON_RPC_RESPONSE_PARSE_CONTEXT = "JsonRpcResponse";
 const JSON_RPC_INCOMING_MESSAGE_PARSE_CONTEXT = "JsonRpcIncomingMessage";
-const RESPONSE_MUST_INCLUDE_RESULT_OR_ERROR_MESSAGE = "Response must include either result or error";
+const RESPONSE_MUST_INCLUDE_RESULT_OR_ERROR_MESSAGE =
+  "Response must include either result or error";
 const RESPONSE_MUST_NOT_INCLUDE_BOTH_RESULT_AND_ERROR_MESSAGE =
   "Response must not include both result and error";
 
@@ -20,7 +17,7 @@ const JsonRpcErrorSchema = z
   .object({
     code: z.number().int(),
     message: z.string(),
-    data: JsonValueSchema.optional()
+    data: JsonValueSchema.optional(),
   })
   .passthrough();
 
@@ -29,7 +26,7 @@ const JsonRpcResponseEnvelopeSchema = z
     jsonrpc: z.literal(JSON_RPC_VERSION).optional(),
     id: z.number().int().nonnegative(),
     result: JsonValueSchema.optional(),
-    error: JsonRpcErrorSchema.optional()
+    error: JsonRpcErrorSchema.optional(),
   })
   .passthrough();
 
@@ -37,19 +34,19 @@ type JsonRpcResponseEnvelope = z.infer<typeof JsonRpcResponseEnvelopeSchema>;
 
 function validateResponseResultAndErrorExclusivity(
   value: JsonRpcResponseEnvelope,
-  context: z.RefinementCtx
+  context: z.RefinementCtx,
 ): void {
   if (value.result === undefined && value.error === undefined) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      message: RESPONSE_MUST_INCLUDE_RESULT_OR_ERROR_MESSAGE
+      message: RESPONSE_MUST_INCLUDE_RESULT_OR_ERROR_MESSAGE,
     });
   }
 
   if (value.result !== undefined && value.error !== undefined) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      message: RESPONSE_MUST_NOT_INCLUDE_BOTH_RESULT_AND_ERROR_MESSAGE
+      message: RESPONSE_MUST_NOT_INCLUDE_BOTH_RESULT_AND_ERROR_MESSAGE,
     });
   }
 }
@@ -57,7 +54,7 @@ function validateResponseResultAndErrorExclusivity(
 function parseBoundarySchemaOrThrow<SchemaType extends z.ZodTypeAny>(
   schema: SchemaType,
   value: JsonValue,
-  context: string
+  context: string,
 ): z.output<SchemaType> {
   const parsed = schema.safeParse(value);
   if (!parsed.success) {
@@ -69,7 +66,7 @@ function parseBoundarySchemaOrThrow<SchemaType extends z.ZodTypeAny>(
 
 function buildIncomingMessageCombinedError(
   responseError: z.ZodError,
-  notificationError: z.ZodError
+  notificationError: z.ZodError,
 ): z.ZodError {
   return new z.ZodError([...responseError.issues, ...notificationError.issues]);
 }
@@ -79,12 +76,13 @@ export const JsonRpcRequestSchema = z
     jsonrpc: z.literal(JSON_RPC_VERSION),
     id: z.number().int().nonnegative(),
     method: z.string().min(1),
-    params: JsonValueSchema.optional()
+    params: JsonValueSchema.optional(),
   })
   .passthrough();
 
-export const JsonRpcResponseSchema =
-  JsonRpcResponseEnvelopeSchema.superRefine(validateResponseResultAndErrorExclusivity);
+export const JsonRpcResponseSchema = JsonRpcResponseEnvelopeSchema.superRefine(
+  validateResponseResultAndErrorExclusivity,
+);
 
 export type JsonRpcResponse = z.infer<typeof JsonRpcResponseSchema>;
 
@@ -99,7 +97,7 @@ export const JsonRpcNotificationSchema = z
     params: JsonValueSchema.optional(),
     id: z.never().optional(),
     result: z.never().optional(),
-    error: z.never().optional()
+    error: z.never().optional(),
   })
   .passthrough();
 
@@ -114,7 +112,7 @@ export function parseJsonRpcIncomingMessage(value: JsonValue): JsonRpcIncomingMe
   if (parsedResponse.success) {
     return {
       kind: "response",
-      value: parsedResponse.data
+      value: parsedResponse.data,
     };
   }
 
@@ -122,13 +120,13 @@ export function parseJsonRpcIncomingMessage(value: JsonValue): JsonRpcIncomingMe
   if (parsedNotification.success) {
     return {
       kind: "notification",
-      value: parsedNotification.data
+      value: parsedNotification.data,
     };
   }
 
   const combinedError = buildIncomingMessageCombinedError(
     parsedResponse.error,
-    parsedNotification.error
+    parsedNotification.error,
   );
   throw ProtocolValidationError.fromZod(JSON_RPC_INCOMING_MESSAGE_PARSE_CONTEXT, combinedError);
 }

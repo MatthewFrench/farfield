@@ -1,7 +1,7 @@
+import type { CommandExecutionItemSchema } from "@farfield/protocol";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { z } from "zod";
-import type { CommandExecutionItemSchema } from "@farfield/protocol";
 import { CommandBlock } from "@/Components/CommandBlock";
 
 type CommandExecutionItem = z.infer<typeof CommandExecutionItemSchema>;
@@ -9,7 +9,7 @@ type CommandExecutionItem = z.infer<typeof CommandExecutionItemSchema>;
 vi.mock("@/Components/CodeSnippet", () => ({
   CodeSnippet(input: { code: string }) {
     return <pre>{input.code}</pre>;
-  }
+  },
 }));
 
 function createCommandExecutionItem(input?: {
@@ -22,7 +22,7 @@ function createCommandExecutionItem(input?: {
     command: "echo hello",
     status: "completed",
     aggregatedOutput: input?.aggregatedOutput,
-    commandActions: input?.commandActions
+    commandActions: input?.commandActions,
   };
 }
 

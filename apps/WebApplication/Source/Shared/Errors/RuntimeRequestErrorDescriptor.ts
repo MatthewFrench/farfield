@@ -6,7 +6,7 @@ import { z } from "zod";
 import {
   ACTION_ID_LABEL,
   ActionIdentifierInMessagePattern,
-  RequestMetadataTokenSchema
+  RequestMetadataTokenSchema,
 } from "@/Shared/Contracts/RequestMetadataContracts";
 
 const OPERATION_PREFIX_PATTERN = /^([a-z][a-z0-9._-]{1,64}):\s*(.+)$/i;
@@ -18,14 +18,14 @@ const RuntimeRequestOperationSchema = z
   .trim()
   .regex(
     /^[a-z][a-z0-9._-]{1,64}$/i,
-    "Runtime request operation must start with a letter and include only letters, numbers, periods, underscores, and hyphens."
+    "Runtime request operation must start with a letter and include only letters, numbers, periods, underscores, and hyphens.",
   );
 
 const RuntimeRequestErrorDescriptorInputSchema = z
   .object({
     rawMessage: z.string(),
     defaultOperation: RuntimeRequestOperationSchema,
-    actionId: RequestMetadataTokenSchema.optional()
+    actionId: RequestMetadataTokenSchema.optional(),
   })
   .strict();
 
@@ -69,7 +69,7 @@ function appendActionIdentifier(message: string, actionId: string | undefined): 
 function buildOperationScopedMessage(
   operation: string,
   trackingErrorMessage: string,
-  parsedOperation: string | null
+  parsedOperation: string | null,
 ): string {
   if (parsedOperation !== null && parsedOperation.length > 0) {
     return trackingErrorMessage;
@@ -78,7 +78,7 @@ function buildOperationScopedMessage(
 }
 
 export function resolveRuntimeRequestErrorDescriptor(
-  input: RuntimeRequestErrorDescriptorInput
+  input: RuntimeRequestErrorDescriptorInput,
 ): RuntimeRequestErrorDescriptor {
   const parsedInput = RuntimeRequestErrorDescriptorInputSchema.parse(input);
   const trackingErrorMessage = normalizeMessage(parsedInput.rawMessage);
@@ -87,12 +87,12 @@ export function resolveRuntimeRequestErrorDescriptor(
   const operationScopedMessage = buildOperationScopedMessage(
     operation,
     trackingErrorMessage,
-    parsedOperation
+    parsedOperation,
   );
 
   return {
     operation,
     trackingErrorMessage,
-    bannerErrorMessage: appendActionIdentifier(operationScopedMessage, parsedInput.actionId)
+    bannerErrorMessage: appendActionIdentifier(operationScopedMessage, parsedInput.actionId),
   };
 }

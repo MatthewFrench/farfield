@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { ReadThreadStateMerger, type ReadThreadStateLike } from "../Source/Features/Chat/StateManagement/ReadThreadStateMerger";
+import {
+  type ReadThreadStateLike,
+  ReadThreadStateMerger,
+} from "../Source/Features/Chat/StateManagement/ReadThreadStateMerger";
 
 interface TestTurn {
   id: string;
@@ -23,9 +26,9 @@ function createReadThreadState(input: {
     thread: {
       id: input.threadId,
       turns: input.turnIds.map((turnId) => ({
-        id: turnId
-      }))
-    }
+        id: turnId,
+      })),
+    },
   };
 }
 
@@ -35,13 +38,13 @@ describe("ReadThreadStateMerger", () => {
     const incoming = createReadThreadState({
       threadId: "thread-1",
       turnIds: [],
-      requestId: "incoming-request"
+      requestId: "incoming-request",
     });
 
     const merged = merger.merge({
       previous: null,
       incoming,
-      includeTurns: false
+      includeTurns: false,
     });
 
     expect(merged).toBe(incoming);
@@ -52,17 +55,17 @@ describe("ReadThreadStateMerger", () => {
     const incoming = createReadThreadState({
       threadId: "thread-1",
       turnIds: ["incoming-1"],
-      requestId: "incoming-request"
+      requestId: "incoming-request",
     });
 
     const merged = merger.merge({
       previous: createReadThreadState({
         threadId: "thread-1",
         turnIds: ["previous-1"],
-        requestId: "previous-request"
+        requestId: "previous-request",
       }),
       incoming,
-      includeTurns: true
+      includeTurns: true,
     });
 
     expect(merged).toBe(incoming);
@@ -73,18 +76,18 @@ describe("ReadThreadStateMerger", () => {
     const previous = createReadThreadState({
       threadId: "thread-1",
       turnIds: ["previous-1", "previous-2"],
-      requestId: "previous-request"
+      requestId: "previous-request",
     });
     const incoming = createReadThreadState({
       threadId: "thread-1",
       turnIds: [],
-      requestId: "incoming-request"
+      requestId: "incoming-request",
     });
 
     const merged = merger.merge({
       previous,
       incoming,
-      includeTurns: false
+      includeTurns: false,
     });
 
     expect(merged).not.toBe(incoming);
@@ -97,17 +100,17 @@ describe("ReadThreadStateMerger", () => {
     const incoming = createReadThreadState({
       threadId: "thread-2",
       turnIds: [],
-      requestId: "incoming-request"
+      requestId: "incoming-request",
     });
 
     const merged = merger.merge({
       previous: createReadThreadState({
         threadId: "thread-1",
         turnIds: ["previous-1"],
-        requestId: "previous-request"
+        requestId: "previous-request",
       }),
       incoming,
-      includeTurns: false
+      includeTurns: false,
     });
 
     expect(merged).toBe(incoming);
@@ -118,17 +121,17 @@ describe("ReadThreadStateMerger", () => {
     const incoming = createReadThreadState({
       threadId: "thread-1",
       turnIds: [],
-      requestId: "incoming-request"
+      requestId: "incoming-request",
     });
 
     const merged = merger.merge({
       previous: createReadThreadState({
         threadId: "thread-1",
         turnIds: [],
-        requestId: "previous-request"
+        requestId: "previous-request",
       }),
       incoming,
-      includeTurns: false
+      includeTurns: false,
     });
 
     expect(merged).toBe(incoming);

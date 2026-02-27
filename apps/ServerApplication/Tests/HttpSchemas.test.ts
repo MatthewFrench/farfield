@@ -8,17 +8,17 @@ import {
   parseSendMessageBody,
   parseSetModeBody,
   parseStartThreadBody,
+  parseSubmitUserInputBody,
   parseTraceMarkBody,
   parseTraceStartBody,
-  parseSubmitUserInputBody,
-  StartThreadBodySchema
+  StartThreadBodySchema,
 } from "../Source/Network/RequestSchemas/HttpSchemas.js";
 
 describe("server request schemas", () => {
   it("accepts valid send message body", () => {
     const parsed = parseSendMessageBody({
       text: "hello",
-      isSteering: false
+      isSteering: false,
     });
 
     expect(parsed.text).toBe("hello");
@@ -28,8 +28,8 @@ describe("server request schemas", () => {
     const parseError = parseInvalidBodyAndReadError(() =>
       parseSendMessageBody({
         text: "hello",
-        extra: true
-      })
+        extra: true,
+      }),
     );
 
     expect(parseError.details.errorType).toBe(HttpBodyParseErrorTypeByName.invalidHttpRequestBody);
@@ -37,7 +37,7 @@ describe("server request schemas", () => {
     expect(parseError.details.issues).toContainEqual({
       path: "body",
       issueCode: "unrecognized_keys",
-      message: expect.any(String)
+      message: expect.any(String),
     });
     expect(parseError.message).toContain("SendMessageBody");
   });
@@ -49,9 +49,9 @@ describe("server request schemas", () => {
         settings: {
           model: "gpt-5.3-codex",
           reasoning_effort: "high",
-          developer_instructions: "x"
-        }
-      }
+          developer_instructions: "x",
+        },
+      },
     });
 
     expect(parsed.collaborationMode.mode).toBe("plan");
@@ -61,8 +61,8 @@ describe("server request schemas", () => {
     const parseError = parseInvalidBodyAndReadError(() =>
       parseSubmitUserInputBody({
         requestId: "bad",
-        response: {}
-      })
+        response: {},
+      }),
     );
 
     expect(parseError.details.errorType).toBe(HttpBodyParseErrorTypeByName.invalidHttpRequestBody);
@@ -70,14 +70,14 @@ describe("server request schemas", () => {
     expect(parseError.details.issues).toContainEqual({
       path: "body.requestId",
       issueCode: "invalid_type",
-      message: expect.any(String)
+      message: expect.any(String),
     });
   });
 
   it("validates replay body", () => {
     const parsed = parseReplayBody({
       entryId: "abc",
-      waitForResponse: true
+      waitForResponse: true,
     });
 
     expect(parsed.waitForResponse).toBe(true);
@@ -86,7 +86,7 @@ describe("server request schemas", () => {
   it("validates start thread body with agentId", () => {
     const parsed = parseStartThreadBody({
       agentId: "opencode",
-      cwd: "/tmp/workspace"
+      cwd: "/tmp/workspace",
     });
 
     expect(parsed.agentId).toBe("opencode");
@@ -95,8 +95,8 @@ describe("server request schemas", () => {
   it("rejects deprecated agentKind field with deterministic metadata", () => {
     const parseError = parseInvalidBodyAndReadError(() =>
       parseStartThreadBody({
-        agentKind: "opencode"
-      })
+        agentKind: "opencode",
+      }),
     );
 
     expect(parseError.details.errorType).toBe(HttpBodyParseErrorTypeByName.invalidHttpRequestBody);
@@ -104,13 +104,13 @@ describe("server request schemas", () => {
     expect(parseError.details.issues).toContainEqual({
       path: "body",
       issueCode: "unrecognized_keys",
-      message: expect.any(String)
+      message: expect.any(String),
     });
   });
 
   it("keeps generic schema parsing available for externally owned body schemas", () => {
     const parsed = parseBody(StartThreadBodySchema, {
-      cwd: "/tmp/workspace"
+      cwd: "/tmp/workspace",
     });
 
     expect(parsed.cwd).toBe("/tmp/workspace");
@@ -119,8 +119,8 @@ describe("server request schemas", () => {
   it("enforces trace label maximum length with deterministic issue path", () => {
     const parseError = parseInvalidBodyAndReadError(() =>
       parseTraceStartBody({
-        label: "x".repeat(121)
-      })
+        label: "x".repeat(121),
+      }),
     );
 
     expect(parseError.details.errorType).toBe(HttpBodyParseErrorTypeByName.invalidHttpRequestBody);
@@ -128,15 +128,15 @@ describe("server request schemas", () => {
     expect(parseError.details.issues).toContainEqual({
       path: "body.label",
       issueCode: "too_big",
-      message: expect.any(String)
+      message: expect.any(String),
     });
   });
 
   it("enforces trace mark note maximum length with deterministic issue path", () => {
     const parseError = parseInvalidBodyAndReadError(() =>
       parseTraceMarkBody({
-        note: "x".repeat(501)
-      })
+        note: "x".repeat(501),
+      }),
     );
 
     expect(parseError.details.errorType).toBe(HttpBodyParseErrorTypeByName.invalidHttpRequestBody);
@@ -144,7 +144,7 @@ describe("server request schemas", () => {
     expect(parseError.details.issues).toContainEqual({
       path: "body.note",
       issueCode: "too_big",
-      message: expect.any(String)
+      message: expect.any(String),
     });
   });
 
@@ -152,8 +152,8 @@ describe("server request schemas", () => {
     const parseError = parseInvalidBodyAndReadError(() =>
       parseSendMessageBody({
         text: "hello",
-        extra: true
-      })
+        extra: true,
+      }),
     );
 
     expect(parseError).toBeInstanceOf(z.ZodError);
@@ -162,15 +162,15 @@ describe("server request schemas", () => {
   it("uses a stable schema identity for generic parseBody errors", () => {
     const parseError = parseInvalidBodyAndReadError(() =>
       parseBody(StartThreadBodySchema, {
-        agentKind: "opencode"
-      })
+        agentKind: "opencode",
+      }),
     );
 
     expect(parseError.details.schemaName).toBe("GenericRequestBody");
     expect(parseError.details.issues).toContainEqual({
       path: "body",
       issueCode: "unrecognized_keys",
-      message: expect.any(String)
+      message: expect.any(String),
     });
   });
 });

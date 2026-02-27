@@ -1,24 +1,20 @@
 import { z } from "zod";
+import { ThreadMemberMutationRouteOwner } from "./ThreadMemberMutationRouteOwner.js";
+import { ThreadMemberReadRouteOwner } from "./ThreadMemberReadRouteOwner.js";
 import {
-  ThreadMemberMutationRouteOwner
-} from "./ThreadMemberMutationRouteOwner.js";
-import {
-  ThreadMemberReadRouteOwner
-} from "./ThreadMemberReadRouteOwner.js";
-import {
-  ThreadMemberRouteSegmentIndexByName,
+  type ThreadMemberRouteDependencies,
   ThreadMemberRouteSegmentByName,
-  type ThreadMemberRouteDependencies
+  ThreadMemberRouteSegmentIndexByName,
 } from "./ThreadMemberRouteContracts.js";
 
 export type { ThreadMemberRouteDependencies } from "./ThreadMemberRouteContracts.js";
 
 const ThreadMemberRouteStatusCodeByName = {
-  badRequest: 400
+  badRequest: 400,
 } as const;
 
 const ThreadMemberRouteErrorByName = {
-  invalidThreadIdentifier: "Invalid thread identifier"
+  invalidThreadIdentifier: "Invalid thread identifier",
 } as const;
 
 // Boundary route parsing keeps `/api/threads/:threadId*` ownership deterministic and explicit.
@@ -26,7 +22,7 @@ const ThreadMemberRouteSegmentsSchema = z
   .tuple([
     z.literal(ThreadMemberRouteSegmentByName.api),
     z.literal(ThreadMemberRouteSegmentByName.threads),
-    z.string().min(1)
+    z.string().min(1),
   ])
   .rest(z.string());
 
@@ -34,11 +30,11 @@ type ThreadMemberRouteSegments = [
   typeof ThreadMemberRouteSegmentByName.api,
   typeof ThreadMemberRouteSegmentByName.threads,
   string,
-  ...string[]
+  ...string[],
 ];
 
 export async function handleThreadMemberRoutes(
-  dependencies: ThreadMemberRouteDependencies
+  dependencies: ThreadMemberRouteDependencies,
 ): Promise<boolean> {
   const { segments, resolveAdapterForThread, jsonResponse, res } = dependencies;
   const parsedSegments = parseThreadMemberRouteSegments(segments);
@@ -46,13 +42,12 @@ export async function handleThreadMemberRoutes(
     return false;
   }
 
-  const rawThreadIdentifier =
-    parsedSegments[ThreadMemberRouteSegmentIndexByName.threadIdentifier];
+  const rawThreadIdentifier = parsedSegments[ThreadMemberRouteSegmentIndexByName.threadIdentifier];
   const threadId = tryDecodeThreadIdentifier(rawThreadIdentifier);
   if (threadId === null) {
     jsonResponse(res, ThreadMemberRouteStatusCodeByName.badRequest, {
       ok: false,
-      error: ThreadMemberRouteErrorByName.invalidThreadIdentifier
+      error: ThreadMemberRouteErrorByName.invalidThreadIdentifier,
     });
     return true;
   }
@@ -62,7 +57,7 @@ export async function handleThreadMemberRoutes(
     jsonResponse(res, resolved.status, {
       ok: false,
       error: resolved.error,
-      threadId
+      threadId,
     });
     return true;
   }
@@ -70,12 +65,12 @@ export async function handleThreadMemberRoutes(
   const context = {
     threadId,
     adapter: resolved.adapter,
-    agentId: resolved.agentId
+    agentId: resolved.agentId,
   };
 
   const readRouteOwner = new ThreadMemberReadRouteOwner({
     dependencies,
-    context
+    context,
   });
   if (await readRouteOwner.handle()) {
     return true;
@@ -83,13 +78,13 @@ export async function handleThreadMemberRoutes(
 
   const mutationRouteOwner = new ThreadMemberMutationRouteOwner({
     dependencies,
-    context
+    context,
   });
   return mutationRouteOwner.handle();
 }
 
 function parseThreadMemberRouteSegments(
-  segments: readonly string[]
+  segments: readonly string[],
 ): ThreadMemberRouteSegments | null {
   const parsedSegments = ThreadMemberRouteSegmentsSchema.safeParse(segments);
   if (!parsedSegments.success) {

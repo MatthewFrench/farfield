@@ -1,26 +1,26 @@
 import fs from "node:fs";
 import path from "node:path";
-import { z } from "zod";
 import { applyTrustedPatchSequence, StrictPatchSequenceError } from "@farfield/api";
 import {
-  JsonValueSchema,
-  parseThreadStreamStateChangedBroadcast,
-  ProtocolValidationError,
-  type JsonValue,
   type IpcBroadcastFrame,
   type IpcFrame,
   type IpcRequestFrame,
+  type JsonValue,
+  JsonValueSchema,
+  ProtocolValidationError,
+  parseThreadStreamStateChangedBroadcast,
   type ThreadStreamPatch,
-  type ThreadStreamStateChangedBroadcast
+  type ThreadStreamStateChangedBroadcast,
 } from "@farfield/protocol";
-import { logger } from "../../Shared/Logging/Logger.js";
+import { z } from "zod";
 import { resolveOwnerClientId } from "../../Modules/Threads/ThreadOwner.js";
+import { logger } from "../../Shared/Logging/Logger.js";
+import { THREAD_STREAM_STATE_CHANGED_METHOD } from "../ThreadStreamStateChangedContract.js";
 import type {
   AgentReadStreamEventsInput,
   AgentThreadLiveState,
-  AgentThreadStreamEvents
+  AgentThreadStreamEvents,
 } from "../Types.js";
-import { THREAD_STREAM_STATE_CHANGED_METHOD } from "../ThreadStreamStateChangedContract.js";
 
 interface ThreadLiveStateProjection {
   ownerClientId: string | null;
@@ -93,7 +93,7 @@ const THREAD_IDENTIFIER_CANDIDATES_SCHEMA = z
   .object({
     conversationId: z.string().optional(),
     threadId: z.string().optional(),
-    turnId: z.string().optional()
+    turnId: z.string().optional(),
   })
   .passthrough();
 type ThreadIdentifierCandidates = z.infer<typeof THREAD_IDENTIFIER_CANDIDATES_SCHEMA>;
@@ -102,7 +102,7 @@ const DEFAULT_INVALID_STREAM_EVENT_LOG_PATH = path.resolve(
   ".runtime",
   "logs",
   "threads",
-  "invalid-thread-stream-events.ndjson"
+  "invalid-thread-stream-events.ndjson",
 );
 
 export class CodexThreadStreamStateOwner {
@@ -120,10 +120,13 @@ export class CodexThreadStreamStateOwner {
   public constructor(options: CodexThreadStreamStateOwnerOptions = {}) {
     // Invalid event logs are intentionally routed through one owner path so malformed
     // stream payloads can be audited without coupling to transport pipeline internals.
-    this.invalidStreamEventsLogPath = options.invalidStreamEventsLogPath
-      ?? DEFAULT_INVALID_STREAM_EVENT_LOG_PATH;
+    this.invalidStreamEventsLogPath =
+      options.invalidStreamEventsLogPath ?? DEFAULT_INVALID_STREAM_EVENT_LOG_PATH;
     this.streamEventLimit = options.streamEventLimit ?? DEFAULT_STREAM_EVENT_LIMIT;
-    if (!Number.isInteger(this.streamEventLimit) || this.streamEventLimit < MINIMUM_STREAM_EVENT_LIMIT) {
+    if (
+      !Number.isInteger(this.streamEventLimit) ||
+      this.streamEventLimit < MINIMUM_STREAM_EVENT_LIMIT
+    ) {
       throw new Error(STREAM_EVENT_LIMIT_ERROR_MESSAGE);
     }
     this.ensureInvalidStreamEventLogDirectoryExists();
@@ -132,7 +135,7 @@ export class CodexThreadStreamStateOwner {
   public describeFrame(frame: IpcFrame): CodexIpcFrameDescription {
     return {
       method: this.readFrameMethod(frame),
-      threadId: this.extractThreadId(frame)
+      threadId: this.extractThreadId(frame),
     };
   }
 
@@ -143,9 +146,7 @@ export class CodexThreadStreamStateOwner {
 
     let streamStateChangedBroadcast: ThreadStreamStateChangedBroadcast;
     try {
-      streamStateChangedBroadcast = parseThreadStreamStateChangedBroadcast(
-        frame as JsonValue
-      );
+      streamStateChangedBroadcast = parseThreadStreamStateChangedBroadcast(frame as JsonValue);
     } catch (error) {
       const invalidEventDetail = this.createInvalidStreamEventDetail(frame, error);
       logger.warn(invalidEventDetail, INVALID_THREAD_STREAM_EVENT_DETAIL_LOG_NAME);
@@ -169,9 +170,11 @@ export class CodexThreadStreamStateOwner {
 
   public resolveKnownOwnerClientId(
     threadId: string,
-    overrideOwnerClientId: string | null | undefined
+    overrideOwnerClientId: string | null | undefined,
   ): string | null {
-    const normalizedMappedOwnerClientId = normalizeNullableIdentifier(this.threadOwnerById.get(threadId));
+    const normalizedMappedOwnerClientId = normalizeNullableIdentifier(
+      this.threadOwnerById.get(threadId),
+    );
     if (normalizedMappedOwnerClientId !== null) {
       return normalizedMappedOwnerClientId;
     }
@@ -181,17 +184,13 @@ export class CodexThreadStreamStateOwner {
 
   public resolveRequiredOwnerClientId(
     threadId: string,
-    overrideOwnerClientId: string | null | undefined
+    overrideOwnerClientId: string | null | undefined,
   ): string {
-    return resolveOwnerClientId(
-      this.threadOwnerById,
-      threadId,
-      overrideOwnerClientId ?? undefined
-    );
+    return resolveOwnerClientId(this.threadOwnerById, threadId, overrideOwnerClientId ?? undefined);
   }
 
   public getProjectedConversationState(
-    threadId: string
+    threadId: string,
   ): AgentThreadLiveState["conversationState"] | null {
     return this.liveStateProjectionByThreadId.get(threadId)?.conversationState ?? null;
   }
@@ -202,27 +201,37 @@ export class CodexThreadStreamStateOwner {
       return {
         ownerClientId: this.readOwnerClientId(threadId),
         conversationState: null,
-        liveStateError: null
+        liveStateError: null,
       };
     }
 
     return {
       ownerClientId: projectedState.ownerClientId ?? this.readOwnerClientId(threadId),
       conversationState: projectedState.conversationState,
-      liveStateError: projectedState.liveStateError
+      liveStateError: projectedState.liveStateError,
     };
   }
 
-  public readStreamEvents(threadId: string, input: AgentReadStreamEventsInput): AgentThreadStreamEvents {
+  public readStreamEvents(
+    threadId: string,
+    input: AgentReadStreamEventsInput,
+  ): AgentThreadStreamEvents {
     const threadStreamEntries = this.streamEventEntriesByThreadId.get(threadId) ?? [];
     const sequenceWindow = this.readThreadStreamSequenceWindow(threadStreamEntries);
-    const resetRequired = this.isResetRequired(input.sinceSequence, sequenceWindow.firstAvailableSequence);
-    const selectedEntries = this.selectStreamEntriesForRead(threadStreamEntries, input, resetRequired);
+    const resetRequired = this.isResetRequired(
+      input.sinceSequence,
+      sequenceWindow.firstAvailableSequence,
+    );
+    const selectedEntries = this.selectStreamEntriesForRead(
+      threadStreamEntries,
+      input,
+      resetRequired,
+    );
     return this.createStreamEventsSliceResponse(
       threadId,
       selectedEntries,
       sequenceWindow,
-      resetRequired
+      resetRequired,
     );
   }
 
@@ -231,7 +240,7 @@ export class CodexThreadStreamStateOwner {
     const sequence = this.readNextSequence(currentEntries);
     currentEntries.push({
       sequence,
-      frame
+      frame,
     });
     if (currentEntries.length > this.streamEventLimit) {
       currentEntries.splice(0, currentEntries.length - this.streamEventLimit);
@@ -245,26 +254,30 @@ export class CodexThreadStreamStateOwner {
     return lastEntry ? lastEntry.sequence + 1 : INITIAL_STREAM_EVENT_SEQUENCE;
   }
 
-  private readThreadStreamSequenceWindow(entries: ThreadStreamEventEntry[]): ThreadStreamSequenceWindow {
+  private readThreadStreamSequenceWindow(
+    entries: ThreadStreamEventEntry[],
+  ): ThreadStreamSequenceWindow {
     const nextSequence = this.readNextSequence(entries);
     const firstEntry = entries[0];
     const firstAvailableSequence = firstEntry ? firstEntry.sequence : nextSequence;
     return {
       nextSequence,
-      firstAvailableSequence
+      firstAvailableSequence,
     };
   }
 
   private isResetRequired(sinceSequence: number | null, firstAvailableSequence: number): boolean {
     // Cursor values represent the last seen event sequence, so subtract one to compare against retained floor.
-    return sinceSequence !== null
-      && sinceSequence < firstAvailableSequence - RESET_CURSOR_SEQUENCE_OFFSET;
+    return (
+      sinceSequence !== null &&
+      sinceSequence < firstAvailableSequence - RESET_CURSOR_SEQUENCE_OFFSET
+    );
   }
 
   private selectStreamEntriesForRead(
     entries: ThreadStreamEventEntry[],
     input: AgentReadStreamEventsInput,
-    resetRequired: boolean
+    resetRequired: boolean,
   ): ThreadStreamEventEntry[] {
     const { sinceSequence, limit } = input;
     if (resetRequired || sinceSequence === null) {
@@ -278,14 +291,14 @@ export class CodexThreadStreamStateOwner {
     threadId: string,
     selectedEntries: ThreadStreamEventEntry[],
     sequenceWindow: ThreadStreamSequenceWindow,
-    resetRequired: boolean
+    resetRequired: boolean,
   ): AgentThreadStreamEvents {
     return {
       ownerClientId: this.readOwnerClientId(threadId),
       events: selectedEntries.map((entry) => entry.frame),
       nextSequence: sequenceWindow.nextSequence,
       firstAvailableSequence: sequenceWindow.firstAvailableSequence,
-      resetRequired
+      resetRequired,
     };
   }
 
@@ -295,18 +308,14 @@ export class CodexThreadStreamStateOwner {
 
   private projectThreadLiveState(
     event: ThreadStreamStateChangedBroadcast,
-    eventIndex: number
+    eventIndex: number,
   ): void {
     const threadId = event.params.conversationId;
     const change = event.params.change;
     if (change.type === THREAD_STREAM_CHANGE_TYPE_SNAPSHOT) {
       this.liveStateProjectionByThreadId.set(
         threadId,
-        this.createThreadLiveStateProjection(
-          event.sourceClientId,
-          change.conversationState,
-          null
-        )
+        this.createThreadLiveStateProjection(event.sourceClientId, change.conversationState, null),
       );
       return;
     }
@@ -314,7 +323,7 @@ export class CodexThreadStreamStateOwner {
       threadId,
       ownerClientId: event.sourceClientId,
       patches: change.patches,
-      eventIndex
+      eventIndex,
     });
     this.liveStateProjectionByThreadId.set(threadId, reducedProjection);
   }
@@ -330,19 +339,23 @@ export class CodexThreadStreamStateOwner {
     try {
       const updatedConversationState = applyTrustedPatchSequence(
         previousProjection.conversationState,
-        input.patches
+        input.patches,
       );
-      return this.createThreadLiveStateProjection(input.ownerClientId, updatedConversationState, null);
+      return this.createThreadLiveStateProjection(
+        input.ownerClientId,
+        updatedConversationState,
+        null,
+      );
     } catch (error) {
       const reductionFailureLocalization = this.createReductionFailureLocalization(
         error,
-        input.eventIndex
+        input.eventIndex,
       );
       this.logReductionFailure(input.threadId, reductionFailureLocalization);
       return this.createThreadLiveStateProjection(
         input.ownerClientId,
         null,
-        this.createReductionFailedLiveStateError(reductionFailureLocalization)
+        this.createReductionFailedLiveStateError(reductionFailureLocalization),
       );
     }
   }
@@ -356,52 +369,50 @@ export class CodexThreadStreamStateOwner {
     return this.createThreadLiveStateProjection(
       this.threadOwnerById.get(threadId) ?? null,
       null,
-      null
+      null,
     );
   }
 
   private createThreadLiveStateProjection(
     ownerClientId: string | null,
     conversationState: AgentThreadLiveState["conversationState"],
-    liveStateError: AgentThreadLiveState["liveStateError"]
+    liveStateError: AgentThreadLiveState["liveStateError"],
   ): ThreadLiveStateProjection {
     return {
       ownerClientId,
       conversationState,
-      liveStateError
+      liveStateError,
     };
   }
 
   private logReductionFailure(
     threadId: string,
-    reductionFailureLocalization: ThreadStreamReductionFailureLocalization
+    reductionFailureLocalization: ThreadStreamReductionFailureLocalization,
   ): void {
     logger.error(
       {
         threadId,
         error: reductionFailureLocalization.message,
         eventIndex: reductionFailureLocalization.eventIndex,
-        patchIndex: reductionFailureLocalization.patchIndex
+        patchIndex: reductionFailureLocalization.patchIndex,
       },
-      THREAD_STREAM_REDUCTION_FAILED_LOG_NAME
+      THREAD_STREAM_REDUCTION_FAILED_LOG_NAME,
     );
   }
 
   private writeInvalidStreamEventDetail(detail: InvalidThreadStreamEventDetail): void {
     try {
       const parsedDetail = JsonValueSchema.parse(detail);
-      fs.appendFileSync(
-        this.invalidStreamEventsLogPath,
-        JSON.stringify(parsedDetail) + "\n",
-        { encoding: "utf8" }
-      );
+      fs.appendFileSync(this.invalidStreamEventsLogPath, JSON.stringify(parsedDetail) + "\n", {
+        encoding: "utf8",
+      });
     } catch (error) {
       logger.warn(
         {
           path: this.invalidStreamEventsLogPath,
-          error: toErrorMessage(error)
+          error: toErrorMessage(error),
         },
-        INVALID_THREAD_STREAM_EVENT_DETAIL_WRITE_FAILED_LOG_NAME
+        INVALID_THREAD_STREAM_EVENT_DETAIL_WRITE_FAILED_LOG_NAME,
       );
     }
   }
@@ -409,15 +420,15 @@ export class CodexThreadStreamStateOwner {
   private ensureInvalidStreamEventLogDirectoryExists(): void {
     try {
       fs.mkdirSync(path.dirname(this.invalidStreamEventsLogPath), {
-        recursive: true
+        recursive: true,
       });
     } catch (error) {
       logger.warn(
         {
           path: this.invalidStreamEventsLogPath,
-          error: toErrorMessage(error)
+          error: toErrorMessage(error),
         },
-        INVALID_THREAD_STREAM_EVENT_DIRECTORY_CREATE_FAILED_LOG_NAME
+        INVALID_THREAD_STREAM_EVENT_DIRECTORY_CREATE_FAILED_LOG_NAME,
       );
     }
   }
@@ -457,7 +468,7 @@ export class CodexThreadStreamStateOwner {
     const candidates = [
       parsedRequestParams.conversationId,
       parsedRequestParams.threadId,
-      parsedRequestParams.turnId
+      parsedRequestParams.turnId,
     ];
 
     for (const candidate of candidates) {
@@ -484,11 +495,13 @@ export class CodexThreadStreamStateOwner {
   }
 
   private isThreadStreamStateChangedFrame(frame: IpcFrame): boolean {
-    return frame.type === IPC_FRAME_TYPE_BROADCAST && frame.method === THREAD_STREAM_STATE_CHANGED_METHOD;
+    return (
+      frame.type === IPC_FRAME_TYPE_BROADCAST && frame.method === THREAD_STREAM_STATE_CHANGED_METHOD
+    );
   }
 
   private parseThreadIdentifierCandidates(
-    frameParams: IpcFrame["params"]
+    frameParams: IpcFrame["params"],
   ): ThreadIdentifierCandidates | null {
     const parsedCandidates = THREAD_IDENTIFIER_CANDIDATES_SCHEMA.safeParse(frameParams);
     if (!parsedCandidates.success) {
@@ -499,36 +512,36 @@ export class CodexThreadStreamStateOwner {
 
   private createInvalidStreamEventDetail<ErrorType>(
     frame: IpcFrame,
-    error: ErrorType
+    error: ErrorType,
   ): InvalidThreadStreamEventDetail {
     return {
       threadId: this.extractThreadId(frame),
       error: toErrorMessage(error),
       ...(error instanceof ProtocolValidationError ? { issues: error.issues } : {}),
       rawPayload: frame,
-      loggedAt: new Date().toISOString()
+      loggedAt: new Date().toISOString(),
     };
   }
 
   private createReductionFailureLocalization<ErrorType>(
     error: ErrorType,
-    eventIndex: number
+    eventIndex: number,
   ): ThreadStreamReductionFailureLocalization {
     return {
       message: toErrorMessage(error),
       eventIndex,
-      patchIndex: readPatchIndex(error)
+      patchIndex: readPatchIndex(error),
     };
   }
 
   private createReductionFailedLiveStateError(
-    reductionFailureLocalization: ThreadStreamReductionFailureLocalization
+    reductionFailureLocalization: ThreadStreamReductionFailureLocalization,
   ): AgentThreadLiveState["liveStateError"] {
     return {
       kind: LIVE_STATE_ERROR_KIND_REDUCTION_FAILED,
       message: reductionFailureLocalization.message,
       eventIndex: reductionFailureLocalization.eventIndex,
-      patchIndex: reductionFailureLocalization.patchIndex
+      patchIndex: reductionFailureLocalization.patchIndex,
     };
   }
 }
@@ -548,9 +561,7 @@ function readPatchIndex<ErrorType>(error: ErrorType): number | null {
     return null;
   }
 
-  return Number.isInteger(error.patchIndex) && error.patchIndex >= 0
-    ? error.patchIndex
-    : null;
+  return Number.isInteger(error.patchIndex) && error.patchIndex >= 0 ? error.patchIndex : null;
 }
 
 function normalizeNullableIdentifier(identifier: string | null | undefined): string | null {

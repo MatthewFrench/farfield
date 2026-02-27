@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type UseChatModeToolbarPropertiesInput,
-  useChatModeToolbarProperties
+  useChatModeToolbarProperties,
 } from "@/Features/Chat/StateManagement/UseChatModeToolbarProperties";
 import type { ChatModeToolbarProps } from "@/Features/Chat/UserInterface/ChatModeToolbar";
 
@@ -12,7 +12,9 @@ interface ToolbarPropertiesHarnessProperties {
   onPropertiesReady: (properties: ChatModeToolbarProps) => void;
 }
 
-function ToolbarPropertiesHarness(properties: ToolbarPropertiesHarnessProperties): React.JSX.Element {
+function ToolbarPropertiesHarness(
+  properties: ToolbarPropertiesHarnessProperties,
+): React.JSX.Element {
   const toolbarProperties = useChatModeToolbarProperties(properties.input);
 
   useEffect(() => {
@@ -28,7 +30,7 @@ function createInput(): UseChatModeToolbarPropertiesInput {
     canListCollaborationModes: true,
     canListModels: true,
     planModeOption: {
-      mode: "plan"
+      mode: "plan",
     },
     defaultModeKey: "default",
     isPlanModeEnabled: false,
@@ -42,8 +44,8 @@ function createInput(): UseChatModeToolbarPropertiesInput {
     modelOptionsWithoutAssumedDefault: [
       {
         id: "gpt-5",
-        label: "GPT-5"
-      }
+        label: "GPT-5",
+      },
     ],
     effortOptionsWithoutAssumedDefault: ["low", "medium"],
     isModeSyncing: false,
@@ -51,7 +53,7 @@ function createInput(): UseChatModeToolbarPropertiesInput {
     setSelectedModeKey: vi.fn(),
     setSelectedModelId: vi.fn(),
     setSelectedReasoningEffort: vi.fn(),
-    applyModeDraft: vi.fn(async () => {})
+    applyModeDraft: vi.fn(async () => {}),
   };
 }
 
@@ -73,7 +75,7 @@ describe("useChatModeToolbarProperties", () => {
   it("delegates toolbar actions through state setters and draft application", async () => {
     const input = createInput();
     const toolbarPropertiesSnapshot: { current: ChatModeToolbarProps | null } = {
-      current: null
+      current: null,
     };
 
     render(
@@ -82,7 +84,7 @@ describe("useChatModeToolbarProperties", () => {
         onPropertiesReady={(properties) => {
           toolbarPropertiesSnapshot.current = properties;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -100,17 +102,17 @@ describe("useChatModeToolbarProperties", () => {
     expect(input.applyModeDraft).toHaveBeenCalledWith({
       modeKey: "default",
       modelId: "gpt-5.1",
-      reasoningEffort: "medium"
+      reasoningEffort: "medium",
     });
     expect(input.applyModeDraft).toHaveBeenCalledWith({
       modeKey: "default",
       modelId: "gpt-5",
-      reasoningEffort: "low"
+      reasoningEffort: "low",
     });
     expect(input.applyModeDraft).toHaveBeenCalledWith({
       modeKey: "plan",
       modelId: "gpt-5",
-      reasoningEffort: "medium"
+      reasoningEffort: "medium",
     });
   });
 });

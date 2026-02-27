@@ -1,19 +1,16 @@
 import { describe, expect, it } from "vitest";
-import {
-  sessionToThreadListItem,
-  sessionToConversationState
-} from "../Source/SessionMapper.js";
 import { messagesToTurns } from "../Source/ConversationTurnMapper.js";
-import { partToTurnItem } from "../Source/TurnItemMapper.js";
 import {
-  OpenCodeMessageSchema,
-  OpenCodePartSchema,
-  parseOpenCodeSession,
   type OpenCodeMessage,
+  OpenCodeMessageSchema,
   type OpenCodePart,
+  OpenCodePartSchema,
   type OpenCodeSession,
-  type OpenCodeStructuredDataValue
+  type OpenCodeStructuredDataValue,
+  parseOpenCodeSession,
 } from "../Source/Schemas.js";
+import { sessionToConversationState, sessionToThreadListItem } from "../Source/SessionMapper.js";
+import { partToTurnItem } from "../Source/TurnItemMapper.js";
 
 interface RunningToolPartStateInput {
   status: "running";
@@ -45,7 +42,7 @@ function makeSession(overrides: Partial<OpenCodeSession> = {}): OpenCodeSession 
     title: "Test Session",
     directory: "/tmp/project",
     time: { created: 1700000000, updated: 1700001000 },
-    ...overrides
+    ...overrides,
   });
 }
 
@@ -59,7 +56,7 @@ function makeUserMessage(id: string, options: UserMessageOptions = {}): OpenCode
     role: "user",
     sessionID: "sess-1",
     parentID: "root",
-    time: { created: options.createdAt ?? 1700000100 }
+    time: { created: options.createdAt ?? 1700000100 },
   });
 }
 
@@ -74,7 +71,7 @@ interface AssistantMessageOptions {
 function makeAssistantMessage(
   id: string,
   parentID: string,
-  options: AssistantMessageOptions = {}
+  options: AssistantMessageOptions = {},
 ): OpenCodeMessage {
   return OpenCodeMessageSchema.parse({
     id,
@@ -85,7 +82,7 @@ function makeAssistantMessage(
     modelID: options.modelID ?? "claude-sonnet",
     ...(options.finish !== undefined ? { finish: options.finish } : {}),
     ...(options.error !== undefined ? { error: options.error } : {}),
-    time: { created: options.createdAt ?? 1700000200 }
+    time: { created: options.createdAt ?? 1700000200 },
   });
 }
 
@@ -97,11 +94,7 @@ function makeReasoningPart(id: string, text: string): OpenCodePart {
   return OpenCodePartSchema.parse({ id, type: "reasoning", text });
 }
 
-function makeToolPart(
-  id: string,
-  tool: string,
-  state: ToolPartStateInput
-): OpenCodePart {
+function makeToolPart(id: string, tool: string, state: ToolPartStateInput): OpenCodePart {
   if (state.status === "running") {
     return OpenCodePartSchema.parse({
       id,
@@ -110,8 +103,8 @@ function makeToolPart(
       state: {
         status: "running",
         input: state.input,
-        time: { start: 1700000100 }
-      }
+        time: { start: 1700000100 },
+      },
     });
   }
 
@@ -125,8 +118,8 @@ function makeToolPart(
         input: state.input,
         output: state.output ?? "",
         ...(state.metadata !== undefined ? { metadata: state.metadata } : {}),
-        time: { start: 1700000100, end: 1700000200 }
-      }
+        time: { start: 1700000100, end: 1700000200 },
+      },
     });
   }
 
@@ -139,8 +132,8 @@ function makeToolPart(
       input: state.input,
       error: state.error ?? "tool execution failed",
       ...(state.metadata !== undefined ? { metadata: state.metadata } : {}),
-      time: { start: 1700000100, end: 1700000200 }
-    }
+      time: { start: 1700000100, end: 1700000200 },
+    },
   });
 }
 
@@ -207,10 +200,10 @@ describe("messagesToTurns", () => {
     const userMessage = makeUserMessage("u1");
     const newestAssistant = makeAssistantMessage("a-new", "u1", {
       createdAt: 1700000500,
-      finish: "stop"
+      finish: "stop",
     });
     const olderAssistant = makeAssistantMessage("a-old", "u1", {
-      createdAt: 1700000400
+      createdAt: 1700000400,
     });
     const messages: OpenCodeMessage[] = [userMessage, newestAssistant, olderAssistant];
 
@@ -235,16 +228,12 @@ describe("messagesToTurns", () => {
   it("uses a deterministic identifier tie-break when assistant timestamps match", () => {
     const userMessage = makeUserMessage("u1");
     const assistantWithHigherId = makeAssistantMessage("a-z", "u1", {
-      createdAt: 1700000400
+      createdAt: 1700000400,
     });
     const assistantWithLowerId = makeAssistantMessage("a-a", "u1", {
-      createdAt: 1700000400
+      createdAt: 1700000400,
     });
-    const messages: OpenCodeMessage[] = [
-      userMessage,
-      assistantWithLowerId,
-      assistantWithHigherId
-    ];
+    const messages: OpenCodeMessage[] = [userMessage, assistantWithLowerId, assistantWithHigherId];
 
     const partsByMessage = new Map<string, OpenCodePart[]>();
     partsByMessage.set("u1", [makeTextPart("p-user", "hello")]);
@@ -288,7 +277,7 @@ describe("partToTurnItem", () => {
     const part = makeToolPart("p1", "bash", {
       status: "completed",
       input: { command: "ls -la", cwd: "/tmp" },
-      output: "file1.txt\nfile2.txt"
+      output: "file1.txt\nfile2.txt",
     });
     const result = partToTurnItem(part);
 
@@ -304,7 +293,7 @@ describe("partToTurnItem", () => {
   it("uses tool name when command input is missing", () => {
     const part = makeToolPart("p1", "bash", {
       status: "running",
-      input: { cwd: "/tmp" }
+      input: { cwd: "/tmp" },
     });
     const result = partToTurnItem(part);
 
@@ -325,7 +314,7 @@ describe("partToTurnItem", () => {
       status: "error",
       input: { command: "npm test" },
       error: "tests failed",
-      metadata: { exit_code: 2 }
+      metadata: { exit_code: 2 },
     });
     const result = partToTurnItem(part);
 
@@ -344,7 +333,7 @@ describe("partToTurnItem", () => {
     const part = makeToolPart("p1", "write", {
       status: "completed",
       input: { file_path: "/tmp/foo.ts" },
-      output: "wrote 50 lines"
+      output: "wrote 50 lines",
     });
     const result = partToTurnItem(part);
 
@@ -361,7 +350,7 @@ describe("partToTurnItem", () => {
     const part = makeToolPart("p1", "edit", {
       status: "completed",
       input: { path: "/tmp/bar.ts" },
-      output: "updated file"
+      output: "updated file",
     });
     const result = partToTurnItem(part);
 
@@ -375,7 +364,7 @@ describe("partToTurnItem", () => {
   it("omits file diff details when a file-change tool is still running", () => {
     const part = makeToolPart("p1", "edit", {
       status: "running",
-      input: { path: "/tmp/bar.ts" }
+      input: { path: "/tmp/bar.ts" },
     });
     const result = partToTurnItem(part);
 
@@ -393,7 +382,7 @@ describe("partToTurnItem", () => {
     const part = makeToolPart("p1", "write", {
       status: "completed",
       input: {},
-      output: "created file"
+      output: "created file",
     });
     const result = partToTurnItem(part);
 
@@ -408,7 +397,7 @@ describe("partToTurnItem", () => {
     const part = makeToolPart("p1", "bash", {
       status: "completed",
       input: { command: 42 },
-      output: "done"
+      output: "done",
     });
 
     expect(() => partToTurnItem(part)).toThrow(/command/i);
@@ -419,7 +408,7 @@ describe("partToTurnItem", () => {
       status: "completed",
       input: { command: "echo ok" },
       output: "ok",
-      metadata: { exit_code: "0" }
+      metadata: { exit_code: "0" },
     });
 
     expect(() => partToTurnItem(part)).toThrow(/exit_code/i);
@@ -464,12 +453,12 @@ describe("sessionToConversationState", () => {
     const newestAssistant = makeAssistantMessage("a-new", "u1", {
       createdAt: 1700000600,
       providerID: "openai",
-      modelID: "gpt-4.1"
+      modelID: "gpt-4.1",
     });
     const olderAssistant = makeAssistantMessage("a-old", "u1", {
       createdAt: 1700000500,
       providerID: "anthropic",
-      modelID: "claude-sonnet"
+      modelID: "claude-sonnet",
     });
     const messages: OpenCodeMessage[] = [userMessage, newestAssistant, olderAssistant];
 

@@ -1,19 +1,19 @@
 import fs from "node:fs";
-import path from "node:path";
 import type { ServerResponse } from "node:http";
+import path from "node:path";
 import {
+  type CreatePushReceiptBody,
   CreatePushReceiptBodySchema,
   CreatePushSubscriptionBodySchema,
-  type CreatePushReceiptBody,
-  DeletePushSubscriptionBodySchema
+  DeletePushSubscriptionBodySchema,
 } from "@farfield/protocol";
 import { z } from "zod";
 import { parseBody } from "../RequestSchemas/HttpSchemas.js";
 import {
+  type PushRouteDependencies,
   PushRouteMethodByName,
   PushRoutePathnameByName,
   PushRouteSegmentByName,
-  type PushRouteDependencies
 } from "./PushRouteContracts.js";
 import { PushTestRouteOwner } from "./PushTestRouteOwner.js";
 
@@ -25,25 +25,25 @@ const PushRouteStatusCodeByName = {
   ok: 200,
   notFound: 404,
   serverError: 500,
-  serviceUnavailable: 503
+  serviceUnavailable: 503,
 } as const;
 
 const PushRouteErrorByName = {
   notificationsDisabled: "Push notifications are disabled",
-  localCaNotFound: "Local Caddy root certificate not found"
+  localCaNotFound: "Local Caddy root certificate not found",
 } as const;
 
 const PushRouteContentTypeByName = {
-  pemFile: "application/x-pem-file"
+  pemFile: "application/x-pem-file",
 } as const;
 
 const PushRouteFileSystemErrorCodeByName = {
-  missingPath: "ENOENT"
+  missingPath: "ENOENT",
 } as const;
 
 const FileSystemErrorSchema = z
   .object({
-    code: z.string().optional()
+    code: z.string().optional(),
   })
   .passthrough();
 
@@ -61,7 +61,7 @@ async function streamBinaryFileDownload(
   res: ServerResponse,
   filePath: string,
   downloadFileName: string,
-  contentType: string
+  contentType: string,
 ): Promise<void> {
   const fileStats = await fs.promises.stat(filePath);
   if (!fileStats.isFile()) {
@@ -72,7 +72,7 @@ async function streamBinaryFileDownload(
     "Content-Type": contentType,
     "Content-Length": fileStats.size,
     "Content-Disposition": `attachment; filename=\"${downloadFileName}\"`,
-    "Access-Control-Allow-Origin": "*"
+    "Access-Control-Allow-Origin": "*",
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -91,7 +91,7 @@ function isPushRouteRequest(
   method: string | undefined,
   pathname: string,
   expectedMethod: string,
-  expectedPathname: string
+  expectedPathname: string,
 ): boolean {
   return method === expectedMethod && pathname === expectedPathname;
 }
@@ -104,15 +104,15 @@ function normalizePushReceiptBody(body: CreatePushReceiptBody): CreatePushReceip
     threadId: body.threadId ?? null,
     turnId: body.turnId ?? null,
     ...(body.message !== undefined ? { message: body.message } : {}),
-    createdAt: body.createdAt
+    createdAt: body.createdAt,
   };
 }
 
 function isMissingPathError<ErrorType>(error: ErrorType): boolean {
   const parsedFileSystemError = FileSystemErrorSchema.safeParse(error);
   return (
-    parsedFileSystemError.success
-    && parsedFileSystemError.data.code === PushRouteFileSystemErrorCodeByName.missingPath
+    parsedFileSystemError.success &&
+    parsedFileSystemError.data.code === PushRouteFileSystemErrorCodeByName.missingPath
   );
 }
 
@@ -136,7 +136,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     readJsonBody,
     jsonResponse,
     buildPushTestPayload,
-    withTimeout
+    withTimeout,
   } = deps;
   const pushTestRouteOwner = new PushTestRouteOwner({
     pushService,
@@ -148,7 +148,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     jsonResponse,
     buildPushTestPayload,
     pushTestSendTimeoutMs,
-    withTimeout
+    withTimeout,
   });
 
   if (!isPushRoutePrefix(segments)) {
@@ -160,7 +160,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       req.method,
       pathname,
       PushRouteMethodByName.get,
-      PushRoutePathnameByName.status
+      PushRoutePathnameByName.status,
     )
   ) {
     jsonResponse(res, PushRouteStatusCodeByName.ok, {
@@ -168,7 +168,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       enabled: pushService.isEnabled(),
       permissionRequired: true,
       subscriptionCount: pushStore.getSubscriptionCount(),
-      privateModeDefault: pushPrivateModeDefault
+      privateModeDefault: pushPrivateModeDefault,
     });
     return true;
   }
@@ -178,20 +178,20 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       req.method,
       pathname,
       PushRouteMethodByName.get,
-      PushRoutePathnameByName.vapidPublicKey
+      PushRoutePathnameByName.vapidPublicKey,
     )
   ) {
     if (!pushService.isEnabled()) {
       jsonResponse(res, PushRouteStatusCodeByName.serviceUnavailable, {
         ok: false,
-        error: PushRouteErrorByName.notificationsDisabled
+        error: PushRouteErrorByName.notificationsDisabled,
       });
       return true;
     }
 
     jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
-      publicKey: pushService.getPublicKey()
+      publicKey: pushService.getPublicKey(),
     });
     return true;
   }
@@ -201,13 +201,13 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       req.method,
       pathname,
       PushRouteMethodByName.get,
-      PushRoutePathnameByName.receiptsLatest
+      PushRoutePathnameByName.receiptsLatest,
     )
   ) {
     jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
       latest: pushReceiptStore.getLatest(),
-      count: pushReceiptStore.getCount()
+      count: pushReceiptStore.getCount(),
     });
     return true;
   }
@@ -217,7 +217,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       req.method,
       pathname,
       PushRouteMethodByName.post,
-      PushRoutePathnameByName.receipts
+      PushRoutePathnameByName.receipts,
     )
   ) {
     const body = parseBody(CreatePushReceiptBodySchema, await readJsonBody(req));
@@ -230,12 +230,12 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       threadId: normalizedBody.threadId ?? null,
       turnId: normalizedBody.turnId ?? null,
       message: normalizedBody.message ?? null,
-      createdAt: normalizedBody.createdAt
+      createdAt: normalizedBody.createdAt,
     });
 
     jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
-      recorded: true
+      recorded: true,
     });
     return true;
   }
@@ -245,12 +245,12 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       req.method,
       pathname,
       PushRouteMethodByName.get,
-      PushRoutePathnameByName.sendsLatest
+      PushRoutePathnameByName.sendsLatest,
     )
   ) {
     jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
-      latest: pushSendStore.getLatest()
+      latest: pushSendStore.getLatest(),
     });
     return true;
   }
@@ -260,14 +260,14 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       req.method,
       pathname,
       PushRouteMethodByName.get,
-      PushRoutePathnameByName.localCa
+      PushRoutePathnameByName.localCa,
     )
   ) {
     const available = fs.existsSync(pushLocalCaSourcePath);
     jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
       available,
-      downloadPath: available ? PushRoutePathnameByName.localCaDownload : null
+      downloadPath: available ? PushRoutePathnameByName.localCaDownload : null,
     });
     return true;
   }
@@ -277,7 +277,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       req.method,
       pathname,
       PushRouteMethodByName.get,
-      PushRoutePathnameByName.localCaDownload
+      PushRoutePathnameByName.localCaDownload,
     )
   ) {
     const fileName = path.basename(pushLocalCaSourcePath);
@@ -286,20 +286,20 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
         res,
         pushLocalCaSourcePath,
         fileName,
-        PushRouteContentTypeByName.pemFile
+        PushRouteContentTypeByName.pemFile,
       );
       return true;
     } catch (error) {
       if (isMissingPathError(error)) {
         jsonResponse(res, PushRouteStatusCodeByName.notFound, {
           ok: false,
-          error: PushRouteErrorByName.localCaNotFound
+          error: PushRouteErrorByName.localCaNotFound,
         });
         return true;
       }
       jsonResponse(res, PushRouteStatusCodeByName.serverError, {
         ok: false,
-        error: toErrorMessage(error)
+        error: toErrorMessage(error),
       });
       return true;
     }
@@ -310,18 +310,18 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       req.method,
       pathname,
       PushRouteMethodByName.post,
-      PushRoutePathnameByName.subscriptions
+      PushRoutePathnameByName.subscriptions,
     )
   ) {
     const body = parseBody(CreatePushSubscriptionBodySchema, await readJsonBody(req));
     const subscription = await pushMutationConcurrencyCoordinator.runExclusive(async () => {
       return pushStore.upsertSubscription(body.subscription, {
-        privateMode: body.settings?.privateMode ?? pushPrivateModeDefault
+        privateMode: body.settings?.privateMode ?? pushPrivateModeDefault,
       });
     });
     jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
-      subscriptionId: subscription.id
+      subscriptionId: subscription.id,
     });
     return true;
   }
@@ -331,7 +331,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
       req.method,
       pathname,
       PushRouteMethodByName.delete,
-      PushRoutePathnameByName.subscriptions
+      PushRoutePathnameByName.subscriptions,
     )
   ) {
     const body = parseBody(DeletePushSubscriptionBodySchema, await readJsonBody(req));
@@ -340,7 +340,7 @@ export async function handlePushRoutes(deps: PushRouteDependencies): Promise<boo
     });
     jsonResponse(res, PushRouteStatusCodeByName.ok, {
       ok: true,
-      deleted
+      deleted,
     });
     return true;
   }

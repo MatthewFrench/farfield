@@ -3,10 +3,10 @@ import { createRoot } from "react-dom/client";
 import { z } from "zod";
 import { App } from "./App";
 import "./Index.css";
-import { reconcilePushSubscription } from "./Features/PushNotifications/DataAccess/PushClientApi";
 import { installGlobalClientCrashReporter } from "./Application/Boot/InstallClientErrorReporter";
 import { ServiceWorkerControllerChangeReloadOwner } from "./Application/Boot/ServiceWorkerControllerChangeReloadOwner";
 import { ApplicationRouteStateMapper } from "./Application/DomainModel/ApplicationRouteStateMapper";
+import { reconcilePushSubscription } from "./Features/PushNotifications/DataAccess/PushClientApi";
 
 const SERVICE_WORKER_UPDATE_EVENT_NAME = "farfield-sw-update-available";
 const BOOT_STATUS_EVENT_NAME = "farfield:boot-status";
@@ -46,9 +46,9 @@ const ViteErrorPayloadSchema = z
         message: z.string(),
         stack: z.string().optional(),
         plugin: z.string().optional(),
-        id: z.string().optional()
+        id: z.string().optional(),
       })
-      .strict()
+      .strict(),
   })
   .strict();
 
@@ -82,7 +82,7 @@ function publishConnectedDevelopmentBootStatus(): void {
     isError: false,
     showActions: false,
     detailsOpen: false,
-    hmrStatus: DEVELOPMENT_HMR_STATUS_CONNECTED
+    hmrStatus: DEVELOPMENT_HMR_STATUS_CONNECTED,
   });
 }
 
@@ -93,7 +93,7 @@ function publishDisconnectedDevelopmentBootStatus(): void {
     isError: true,
     showActions: true,
     detailsOpen: true,
-    hmrStatus: DEVELOPMENT_HMR_STATUS_DISCONNECTED
+    hmrStatus: DEVELOPMENT_HMR_STATUS_DISCONNECTED,
   });
 }
 
@@ -104,7 +104,7 @@ function publishUpdatingDevelopmentBootStatus(): void {
     isError: false,
     showActions: false,
     detailsOpen: false,
-    hmrStatus: DEVELOPMENT_HMR_STATUS_UPDATING
+    hmrStatus: DEVELOPMENT_HMR_STATUS_UPDATING,
   });
 }
 
@@ -115,7 +115,7 @@ function publishCompileFailedDevelopmentBootStatus(details: string): void {
     isError: true,
     showActions: true,
     detailsOpen: true,
-    hmrStatus: DEVELOPMENT_HMR_STATUS_COMPILE_FAILED
+    hmrStatus: DEVELOPMENT_HMR_STATUS_COMPILE_FAILED,
   });
 }
 
@@ -130,7 +130,7 @@ function isStandaloneDisplayMode(): boolean {
 function syncDisplayModeClass(): void {
   document.documentElement.classList.toggle(
     STANDALONE_DISPLAY_MODE_CLASS_NAME,
-    isStandaloneDisplayMode()
+    isStandaloneDisplayMode(),
   );
 }
 
@@ -147,8 +147,9 @@ function installBootstrapWindowOwners(): void {
   installDisplayModeSync();
   installGlobalClientCrashReporter({
     source: CLIENT_CRASH_REPORT_SOURCE,
-    readThreadId: () => applicationRouteStateMapper.parseFromPathname(window.location.pathname).threadId,
-    readUrl: () => window.location.pathname + window.location.search
+    readThreadId: () =>
+      applicationRouteStateMapper.parseFromPathname(window.location.pathname).threadId,
+    readUrl: () => window.location.pathname + window.location.search,
   });
 }
 
@@ -229,7 +230,7 @@ function installServiceWorkerStartupRegistration(): void {
 
   window.addEventListener("load", () => {
     const serviceWorkerControllerChangeReloadOwner = new ServiceWorkerControllerChangeReloadOwner(
-      serviceWorkerContainer.controller !== null
+      serviceWorkerContainer.controller !== null,
     );
 
     void serviceWorkerContainer
@@ -254,7 +255,7 @@ function installServiceWorkerStartupRegistration(): void {
 
         serviceWorkerContainer.addEventListener("controllerchange", () => {
           const reloadDecision = serviceWorkerControllerChangeReloadOwner.readDecision({
-            reloadSuppressed: isServiceWorkerReloadSuppressed()
+            reloadSuppressed: isServiceWorkerReloadSuppressed(),
           });
           if (!reloadDecision.shouldReload) {
             return;
@@ -279,7 +280,7 @@ function mountApplication(): void {
   createRoot(applicationRootElement).render(
     <React.StrictMode>
       <App />
-    </React.StrictMode>
+    </React.StrictMode>,
   );
 }
 

@@ -1,7 +1,7 @@
 import type {
   JsonValue,
   ThreadStreamPatch,
-  ThreadStreamStateChangedBroadcast
+  ThreadStreamStateChangedBroadcast,
 } from "@farfield/protocol";
 import { JsonValueSchema } from "@farfield/protocol";
 
@@ -17,11 +17,7 @@ export class StrictPatchSequenceError extends Error {
   public readonly patchIndex: number;
   public override readonly cause: LiveStateErrorCause | undefined;
 
-  public constructor(
-    message: string,
-    patchIndex: number,
-    cause?: LiveStateErrorCause
-  ) {
+  public constructor(message: string, patchIndex: number, cause?: LiveStateErrorCause) {
     super(message);
     this.name = STRICT_PATCH_SEQUENCE_ERROR_NAME;
     this.patchIndex = patchIndex;
@@ -31,23 +27,23 @@ export class StrictPatchSequenceError extends Error {
 
 export function createPatchSequenceFailureError(
   patchIndex: number,
-  cause: LiveStateErrorCause
+  cause: LiveStateErrorCause,
 ): StrictPatchSequenceError {
   return new StrictPatchSequenceError(
     `${PATCH_SEQUENCE_FAILURE_MESSAGE_PREFIX} ${String(patchIndex)}: ${toErrorMessage(cause)}`,
     patchIndex,
-    cause
+    cause,
   );
 }
 
 export function createPatchSequenceInvalidStateError(
   patchIndex: number,
-  cause: LiveStateErrorCause
+  cause: LiveStateErrorCause,
 ): StrictPatchSequenceError {
   return new StrictPatchSequenceError(
     `${PATCH_SEQUENCE_INVALID_STATE_MESSAGE_PREFIX} ${String(patchIndex)}: ${toErrorMessage(cause)}`,
     patchIndex,
-    cause
+    cause,
   );
 }
 
@@ -66,7 +62,7 @@ export class ThreadStreamReductionError extends Error {
   public constructor(
     message: string,
     details: ThreadStreamReductionErrorDetails,
-    cause?: LiveStateErrorCause
+    cause?: LiveStateErrorCause,
   ) {
     super(message);
     this.name = THREAD_STREAM_REDUCTION_ERROR_NAME;
@@ -81,20 +77,20 @@ export function createThreadStreamReductionError(
   patchIndex: number,
   event: ThreadStreamStateChangedBroadcast,
   patch: ThreadStreamPatch,
-  cause: LiveStateErrorCause
+  cause: LiveStateErrorCause,
 ): ThreadStreamReductionError {
   return new ThreadStreamReductionError(
     `Thread stream reduction failed for thread ${threadId} at event ${eventIndex}, patch ${patchIndex}: ${toErrorMessage(
-      cause
+      cause,
     )}`,
     {
       threadId,
       eventIndex,
       patchIndex,
       event,
-      patch
+      patch,
     },
-    cause
+    cause,
   );
 }
 

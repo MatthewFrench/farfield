@@ -1,26 +1,26 @@
 import { cleanup, render, waitFor } from "@testing-library/react";
-import { useEffect, useState, type MutableRefObject } from "react";
+import { type MutableRefObject, useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import {
   PendingUserInputAnswerBuilder,
-  type PendingUserInputAnswerDraftByQuestionId
+  type PendingUserInputAnswerDraftByQuestionId,
 } from "@/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
-import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import { type PendingUserInputRequest } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
 import {
-  ChatRequestActionCoordinator,
   type ChatRequestActionChatClient,
-  type ChatRequestActionThreadMutationClient
+  ChatRequestActionCoordinator,
+  type ChatRequestActionThreadMutationClient,
 } from "@/Features/Chat/StateManagement/ChatRequestActionCoordinator";
 import {
-  CollaborationModeActionCoordinator,
   type CollaborationModeActionChatClient,
-  type CollaborationModeActionModeOption
+  CollaborationModeActionCoordinator,
+  type CollaborationModeActionModeOption,
 } from "@/Features/Chat/StateManagement/CollaborationModeActionCoordinator";
 import {
   type ChatActionHandlers,
   type UseChatActionHandlersInput,
-  useChatActionHandlers
+  useChatActionHandlers,
 } from "@/Features/Chat/StateManagement/UseChatActionHandlers";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 
@@ -34,7 +34,7 @@ interface StatefulAnswerHarnessProps {
   initialAnswerDraft: PendingUserInputAnswerDraftByQuestionId;
   onStateChanged: (
     handlers: ChatActionHandlers,
-    answerDraft: PendingUserInputAnswerDraftByQuestionId
+    answerDraft: PendingUserInputAnswerDraftByQuestionId,
   ) => void;
 }
 
@@ -51,7 +51,11 @@ type NullableThreadIdentifierSetterValue =
   | null
   | ((previousValue: string | null) => string | null);
 type BooleanSetterValue = boolean | ((previousValue: boolean) => boolean);
-type AnswerDraftSetterValue = PendingUserInputAnswerDraftByQuestionId | ((previousValue: PendingUserInputAnswerDraftByQuestionId) => PendingUserInputAnswerDraftByQuestionId);
+type AnswerDraftSetterValue =
+  | PendingUserInputAnswerDraftByQuestionId
+  | ((
+      previousValue: PendingUserInputAnswerDraftByQuestionId,
+    ) => PendingUserInputAnswerDraftByQuestionId);
 type ChatActionHandlersChatClient = ChatRequestActionChatClient & CollaborationModeActionChatClient;
 
 const DEFAULT_AGENT_IDENTIFIER = "codex";
@@ -60,8 +64,8 @@ const CREATED_THREAD_IDENTIFIER = "thread-created";
 const DEFAULT_MODES: CollaborationModeActionModeOption[] = [
   {
     mode: "default",
-    developer_instructions: "Use explicit reasoning."
-  }
+    developer_instructions: "Use explicit reasoning.",
+  },
 ];
 
 function HandlerHarness({ input, onHandlersReady }: HandlerHarnessProps): React.JSX.Element {
@@ -77,15 +81,14 @@ function HandlerHarness({ input, onHandlersReady }: HandlerHarnessProps): React.
 function StatefulAnswerHarness({
   input,
   initialAnswerDraft,
-  onStateChanged
+  onStateChanged,
 }: StatefulAnswerHarnessProps): React.JSX.Element {
-  const [answerDraft, setAnswerDraft] = useState<PendingUserInputAnswerDraftByQuestionId>(
-    initialAnswerDraft
-  );
+  const [answerDraft, setAnswerDraft] =
+    useState<PendingUserInputAnswerDraftByQuestionId>(initialAnswerDraft);
   const handlers = useChatActionHandlers({
     ...input,
     answerDraft,
-    setAnswerDraft
+    setAnswerDraft,
   });
 
   useEffect(() => {
@@ -100,8 +103,8 @@ function buildActionRequestOptions(actionName: string) {
     actionId: `action-${actionName}`,
     requestOptions: {
       actionId: `action-${actionName}`,
-      actionName
-    }
+      actionName,
+    },
   };
 }
 
@@ -123,13 +126,13 @@ function buildPendingUserInputRequest(): PendingUserInputRequest {
           options: [
             {
               label: "Alpha",
-              description: "First option"
-            }
-          ]
-        }
-      ]
+              description: "First option",
+            },
+          ],
+        },
+      ],
     },
-    completed: false
+    completed: false,
   };
 }
 
@@ -138,22 +141,22 @@ function createChatClient(): ChatActionHandlersChatClient {
     sendMessage: vi.fn(async () => {}),
     submitUserInput: vi.fn(async () => {}),
     interruptThread: vi.fn(async () => {}),
-    setCollaborationMode: vi.fn(async () => {})
+    setCollaborationMode: vi.fn(async () => {}),
   };
 }
 
 function createThreadMutationClient(): ChatRequestActionThreadMutationClient {
   return {
     createThread: vi.fn(async () => ({
-      threadId: CREATED_THREAD_IDENTIFIER
-    }))
+      threadId: CREATED_THREAD_IDENTIFIER,
+    })),
   };
 }
 
 function createTestInput(overrides: TestInputOverrides = {}) {
   const chatRequestActionCoordinator = new ChatRequestActionCoordinator();
   const collaborationModeActionCoordinator = new CollaborationModeActionCoordinator(
-    new ModeSelectionStateResolver()
+    new ModeSelectionStateResolver(),
   );
   const pendingThreadMaterializationCoordinator = new PendingThreadMaterializationCoordinator();
   const pendingUserInputAnswerBuilder = new PendingUserInputAnswerBuilder();
@@ -161,11 +164,12 @@ function createTestInput(overrides: TestInputOverrides = {}) {
   const setIsBusy = vi.fn<(value: BooleanSetterValue) => void>();
   const setIsModeSyncing = vi.fn<(value: BooleanSetterValue) => void>();
   const setSelectedThreadId = vi.fn<(value: NullableThreadIdentifierSetterValue) => void>();
-  const selectedThreadId = overrides.selectedThreadId === undefined
-    ? DEFAULT_THREAD_IDENTIFIER
-    : overrides.selectedThreadId;
+  const selectedThreadId =
+    overrides.selectedThreadId === undefined
+      ? DEFAULT_THREAD_IDENTIFIER
+      : overrides.selectedThreadId;
   const selectedThreadIdRef: MutableRefObject<string | null> = {
-    current: selectedThreadId
+    current: selectedThreadId,
   };
   const loadCoreDataTracked = vi.fn(async () => {});
   const onReloadSelectedThread = vi.fn(async (_threadId: string) => {});
@@ -177,7 +181,7 @@ function createTestInput(overrides: TestInputOverrides = {}) {
       threadId: string | null;
       error: Error | string | number | boolean | bigint | symbol | null | undefined | object;
       details?: Record<string, string | number | boolean | null>;
-    }) => {}
+    }) => {},
   );
 
   const input: UseChatActionHandlersInput = {
@@ -204,7 +208,7 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     onInvalidateActiveThreadQuery,
     loadCoreDataTracked,
     onReloadSelectedThread,
-    reportTrackedUserInterfaceError
+    reportTrackedUserInterfaceError,
   };
 
   return {
@@ -214,7 +218,7 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     pendingThreadMaterializationCoordinator,
     pendingUserInputAnswerBuilder,
     setSelectedThreadId,
-    selectedThreadIdRef
+    selectedThreadIdRef,
   };
 }
 
@@ -229,28 +233,19 @@ describe("UseChatActionHandlers", () => {
       chatRequestActionCoordinator,
       pendingThreadMaterializationCoordinator,
       setSelectedThreadId,
-      selectedThreadIdRef
+      selectedThreadIdRef,
     } = createTestInput({
-      selectedThreadId: null
+      selectedThreadId: null,
     });
-    const markPendingSpy = vi.spyOn(
-      pendingThreadMaterializationCoordinator,
-      "markPending"
-    );
-    const clearPendingSpy = vi.spyOn(
-      pendingThreadMaterializationCoordinator,
-      "clearPending"
-    );
-    const sendMessageSpy = vi.spyOn(
-      chatRequestActionCoordinator,
-      "sendMessage"
-    ).mockImplementation(
-      async (nextInput) => {
+    const markPendingSpy = vi.spyOn(pendingThreadMaterializationCoordinator, "markPending");
+    const clearPendingSpy = vi.spyOn(pendingThreadMaterializationCoordinator, "clearPending");
+    const sendMessageSpy = vi
+      .spyOn(chatRequestActionCoordinator, "sendMessage")
+      .mockImplementation(async (nextInput) => {
         nextInput.onMarkThreadPendingMaterialization(CREATED_THREAD_IDENTIFIER);
         nextInput.onThreadSelected(CREATED_THREAD_IDENTIFIER);
         nextInput.onClearThreadPendingMaterialization(CREATED_THREAD_IDENTIFIER);
-      }
-    );
+      });
 
     const handlerState: { current: ChatActionHandlers | null } = { current: null };
     render(
@@ -259,7 +254,7 @@ describe("UseChatActionHandlers", () => {
         onHandlersReady={(handlers) => {
           handlerState.current = handlers;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -276,28 +271,25 @@ describe("UseChatActionHandlers", () => {
       expect.objectContaining({
         draft: "hello world",
         selectedThreadId: null,
-        selectedAgentId: DEFAULT_AGENT_IDENTIFIER
-      })
+        selectedAgentId: DEFAULT_AGENT_IDENTIFIER,
+      }),
     );
     expect(markPendingSpy).toHaveBeenCalledWith(CREATED_THREAD_IDENTIFIER);
     expect(clearPendingSpy).toHaveBeenCalledWith(CREATED_THREAD_IDENTIFIER);
     expect(setSelectedThreadId).toHaveBeenCalledWith(CREATED_THREAD_IDENTIFIER);
     expect(selectedThreadIdRef.current).toBe(CREATED_THREAD_IDENTIFIER);
-    expect(
-      pendingThreadMaterializationCoordinator.isPending(CREATED_THREAD_IDENTIFIER)
-    ).toBe(false);
+    expect(pendingThreadMaterializationCoordinator.isPending(CREATED_THREAD_IDENTIFIER)).toBe(
+      false,
+    );
   });
 
   it("delegates mode draft application with the current owner state", async () => {
     const { input, collaborationModeActionCoordinator } = createTestInput();
-    const applyDraftSpy = vi.spyOn(
-      collaborationModeActionCoordinator,
-      "applyDraft"
-    ).mockImplementation(
-      async (nextInput) => {
+    const applyDraftSpy = vi
+      .spyOn(collaborationModeActionCoordinator, "applyDraft")
+      .mockImplementation(async (nextInput) => {
         void nextInput;
-      }
-    );
+      });
 
     const handlerState: { current: ChatActionHandlers | null } = { current: null };
     render(
@@ -306,7 +298,7 @@ describe("UseChatActionHandlers", () => {
         onHandlersReady={(handlers) => {
           handlerState.current = handlers;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -321,7 +313,7 @@ describe("UseChatActionHandlers", () => {
     await handlers.applyModeDraft({
       modeKey: "default",
       modelId: "gpt-5",
-      reasoningEffort: "medium"
+      reasoningEffort: "medium",
     });
 
     expect(applyDraftSpy).toHaveBeenCalledWith(
@@ -329,12 +321,12 @@ describe("UseChatActionHandlers", () => {
         draft: {
           modeKey: "default",
           modelId: "gpt-5",
-          reasoningEffort: "medium"
+          reasoningEffort: "medium",
         },
         selectedThreadId: DEFAULT_THREAD_IDENTIFIER,
         modes: DEFAULT_MODES,
-        onSetModeSyncing: input.setIsModeSyncing
-      })
+        onSetModeSyncing: input.setIsModeSyncing,
+      }),
     );
   });
 
@@ -343,27 +335,19 @@ describe("UseChatActionHandlers", () => {
     const answerDraft: PendingUserInputAnswerDraftByQuestionId = {
       "question-1": {
         option: "Alpha",
-        freeform: ""
-      }
+        freeform: "",
+      },
     };
-    const {
-      input,
-      chatRequestActionCoordinator,
-      pendingUserInputAnswerBuilder
-    } = createTestInput({
+    const { input, chatRequestActionCoordinator, pendingUserInputAnswerBuilder } = createTestInput({
       activeRequest,
-      answerDraft
+      answerDraft,
     });
-    const buildAnswersSpy = vi.spyOn(
-      pendingUserInputAnswerBuilder,
-      "buildAnswersByQuestionId"
-    );
-    const submitPendingUserInputSpy = vi.spyOn(
-      chatRequestActionCoordinator,
-      "submitPendingUserInput"
-    ).mockImplementation(async (nextInput) => {
-      void nextInput;
-    });
+    const buildAnswersSpy = vi.spyOn(pendingUserInputAnswerBuilder, "buildAnswersByQuestionId");
+    const submitPendingUserInputSpy = vi
+      .spyOn(chatRequestActionCoordinator, "submitPendingUserInput")
+      .mockImplementation(async (nextInput) => {
+        void nextInput;
+      });
 
     const handlerState: { current: ChatActionHandlers | null } = { current: null };
     render(
@@ -372,7 +356,7 @@ describe("UseChatActionHandlers", () => {
         onHandlersReady={(handlers) => {
           handlerState.current = handlers;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -387,7 +371,7 @@ describe("UseChatActionHandlers", () => {
 
     expect(buildAnswersSpy).toHaveBeenCalledWith({
       questions: activeRequest.params.questions,
-      answerDraftByQuestionId: answerDraft
+      answerDraftByQuestionId: answerDraft,
     });
     expect(submitPendingUserInputSpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -395,25 +379,22 @@ describe("UseChatActionHandlers", () => {
         requestId: activeRequest.id,
         answers: {
           "question-1": {
-            answers: ["Alpha"]
-          }
-        }
-      })
+            answers: ["Alpha"],
+          },
+        },
+      }),
     );
   });
 
   it("does not submit or skip pending requests when there is no active request", async () => {
     const { input, chatRequestActionCoordinator } = createTestInput({
-      activeRequest: null
+      activeRequest: null,
     });
     const submitPendingUserInputSpy = vi.spyOn(
       chatRequestActionCoordinator,
-      "submitPendingUserInput"
+      "submitPendingUserInput",
     );
-    const skipPendingUserInputSpy = vi.spyOn(
-      chatRequestActionCoordinator,
-      "skipPendingUserInput"
-    );
+    const skipPendingUserInputSpy = vi.spyOn(chatRequestActionCoordinator, "skipPendingUserInput");
 
     const handlerState: { current: ChatActionHandlers | null } = { current: null };
     render(
@@ -422,7 +403,7 @@ describe("UseChatActionHandlers", () => {
         onHandlersReady={(handlers) => {
           handlerState.current = handlers;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -447,7 +428,7 @@ describe("UseChatActionHandlers", () => {
       answerDraft: PendingUserInputAnswerDraftByQuestionId;
     } = {
       handlers: null,
-      answerDraft: {}
+      answerDraft: {},
     };
 
     render(
@@ -458,7 +439,7 @@ describe("UseChatActionHandlers", () => {
           harnessState.handlers = handlers;
           harnessState.answerDraft = answerDraft;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -475,8 +456,8 @@ describe("UseChatActionHandlers", () => {
       expect(harnessState.answerDraft).toEqual({
         "question-1": {
           option: "Alpha",
-          freeform: ""
-        }
+          freeform: "",
+        },
       });
     });
 
@@ -485,8 +466,8 @@ describe("UseChatActionHandlers", () => {
       expect(harnessState.answerDraft).toEqual({
         "question-1": {
           option: "Alpha",
-          freeform: "Other answer"
-        }
+          freeform: "Other answer",
+        },
       });
     });
   });

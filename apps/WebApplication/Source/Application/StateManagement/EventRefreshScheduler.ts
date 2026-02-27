@@ -7,34 +7,32 @@ export interface EventRefreshFlags {
 const EMPTY_EVENT_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: false,
   refreshHistory: false,
-  refreshSelectedThread: false
+  refreshSelectedThread: false,
 };
 
 function createEmptyEventRefreshFlags(): EventRefreshFlags {
   return {
     refreshCore: EMPTY_EVENT_REFRESH_FLAGS.refreshCore,
     refreshHistory: EMPTY_EVENT_REFRESH_FLAGS.refreshHistory,
-    refreshSelectedThread: EMPTY_EVENT_REFRESH_FLAGS.refreshSelectedThread
+    refreshSelectedThread: EMPTY_EVENT_REFRESH_FLAGS.refreshSelectedThread,
   };
 }
 
 export function mergeEventRefreshFlags(
   existingRefreshFlags: EventRefreshFlags,
-  nextRefreshFlags: EventRefreshFlags
+  nextRefreshFlags: EventRefreshFlags,
 ): EventRefreshFlags {
   return {
     refreshCore: existingRefreshFlags.refreshCore || nextRefreshFlags.refreshCore,
     refreshHistory: existingRefreshFlags.refreshHistory || nextRefreshFlags.refreshHistory,
     refreshSelectedThread:
-      existingRefreshFlags.refreshSelectedThread || nextRefreshFlags.refreshSelectedThread
+      existingRefreshFlags.refreshSelectedThread || nextRefreshFlags.refreshSelectedThread,
   };
 }
 
 export function hasEventRefreshWork(refreshFlags: EventRefreshFlags): boolean {
   return (
-    refreshFlags.refreshCore
-    || refreshFlags.refreshHistory
-    || refreshFlags.refreshSelectedThread
+    refreshFlags.refreshCore || refreshFlags.refreshHistory || refreshFlags.refreshSelectedThread
   );
 }
 
@@ -54,7 +52,7 @@ export class EventRefreshScheduler {
 
   public enqueueRefresh(
     refreshFlags: EventRefreshFlags,
-    executeRefresh: (refreshFlags: EventRefreshFlags) => Promise<void>
+    executeRefresh: (refreshFlags: EventRefreshFlags) => Promise<void>,
   ): void {
     this.pendingRefreshFlags = mergeEventRefreshFlags(this.pendingRefreshFlags, refreshFlags);
 

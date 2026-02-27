@@ -1,13 +1,9 @@
-import {
-  createOpencode,
-  createOpencodeClient,
-  type OpencodeClientConfig
-} from "@opencode-ai/sdk";
+import { createOpencode, createOpencodeClient, type OpencodeClientConfig } from "@opencode-ai/sdk";
 import { z } from "zod";
 import type {
   OpenCodeApiResponseEnvelope,
   OpenCodeConnectionClientProvider,
-  OpenCodeMonitorClient
+  OpenCodeMonitorClient,
 } from "./ClientContracts.js";
 import { OpenCodeStructuredDataValueSchema } from "./Schemas.js";
 
@@ -49,7 +45,7 @@ const OpenCodeClientOptionsSchema = z
   .object({
     hostname: OpenCodeHostnameSchema.optional(),
     port: OpenCodePortSchema.optional(),
-    url: OpenCodeBaseUrlSchema.optional()
+    url: OpenCodeBaseUrlSchema.optional(),
   })
   .strict();
 
@@ -59,30 +55,28 @@ interface OpenCodeSdkResponseEnvelope<DataType> {
   data: DataType | undefined;
 }
 
-function mapSdkResponseEnvelope<DataType>(
-  data: DataType | undefined
-): OpenCodeApiResponseEnvelope {
+function mapSdkResponseEnvelope<DataType>(data: DataType | undefined): OpenCodeApiResponseEnvelope {
   if (data === undefined) {
     return {};
   }
 
   return {
-    data: OpenCodeStructuredDataValueSchema.parse(data)
+    data: OpenCodeStructuredDataValueSchema.parse(data),
   };
 }
 
 async function mapSdkResponsePromise<DataType>(
-  responsePromise: Promise<OpenCodeSdkResponseEnvelope<DataType>>
+  responsePromise: Promise<OpenCodeSdkResponseEnvelope<DataType>>,
 ): Promise<OpenCodeApiResponseEnvelope> {
   const response = await responsePromise;
   return mapSdkResponseEnvelope(response.data);
 }
 
 function createDefaultOpenCodeClient(
-  configuration: OpenCodeClientConfiguration
+  configuration: OpenCodeClientConfiguration,
 ): OpenCodeMonitorClient {
   const sdkConfiguration: OpencodeClientConfig = {
-    baseUrl: configuration.baseUrl
+    baseUrl: configuration.baseUrl,
   };
   const sdkClient = createOpencodeClient(sdkConfiguration);
   const sdkSessionClient = sdkClient.session;
@@ -96,28 +90,28 @@ function createDefaultOpenCodeClient(
       messages: async (input) => mapSdkResponsePromise(sdkSessionClient.messages(input)),
       prompt: async (input) => mapSdkResponsePromise(sdkSessionClient.prompt(input)),
       abort: async (input) => mapSdkResponsePromise(sdkSessionClient.abort(input)),
-      delete: async (input) => mapSdkResponsePromise(sdkSessionClient.delete(input))
+      delete: async (input) => mapSdkResponsePromise(sdkSessionClient.delete(input)),
     },
     project: {
-      list: async () => mapSdkResponsePromise(sdkProjectClient.list())
-    }
+      list: async () => mapSdkResponsePromise(sdkProjectClient.list()),
+    },
   };
 }
 
 async function createDefaultOpenCodeServer(
-  options: OpenCodeServerStartOptions
+  options: OpenCodeServerStartOptions,
 ): Promise<OpenCodeServerHandle> {
   const result = await createOpencode({
     hostname: options.hostname,
     port: options.port,
-    timeout: options.timeoutMilliseconds
+    timeout: options.timeoutMilliseconds,
   });
   return result.server;
 }
 
 const DefaultOpenCodeConnectionDependencies: OpenCodeConnectionDependencies = {
   createServer: createDefaultOpenCodeServer,
-  createClient: createDefaultOpenCodeClient
+  createClient: createDefaultOpenCodeClient,
 };
 
 /**
@@ -133,7 +127,7 @@ export class OpenCodeConnection implements OpenCodeConnectionClientProvider {
 
   public constructor(
     options: OpenCodeClientOptions = {},
-    dependencies: OpenCodeConnectionDependencies = DefaultOpenCodeConnectionDependencies
+    dependencies: OpenCodeConnectionDependencies = DefaultOpenCodeConnectionDependencies,
   ) {
     this.options = OpenCodeClientOptionsSchema.parse(options);
     this.dependencies = dependencies;
@@ -148,7 +142,7 @@ export class OpenCodeConnection implements OpenCodeConnectionClientProvider {
     return {
       hostname: this.options.hostname ?? OPEN_CODE_DEFAULT_HOSTNAME,
       port: this.options.port ?? OPEN_CODE_DEFAULT_PORT,
-      timeoutMilliseconds: OPEN_CODE_START_TIMEOUT_MILLISECONDS
+      timeoutMilliseconds: OPEN_CODE_START_TIMEOUT_MILLISECONDS,
     };
   }
 

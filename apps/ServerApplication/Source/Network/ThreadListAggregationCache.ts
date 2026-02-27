@@ -2,7 +2,9 @@ import type { AppServerListThreadsResponse } from "@farfield/protocol";
 import type { AgentId } from "../Agents/Types.js";
 
 export type ThreadListSortKey = "created_at" | "updated_at";
-export type ThreadListItemWithAgentId = AppServerListThreadsResponse["data"][number] & { agentId: AgentId };
+export type ThreadListItemWithAgentId = AppServerListThreadsResponse["data"][number] & {
+  agentId: AgentId;
+};
 
 export interface ThreadListAggregationQuery {
   enabledAgentIds: AgentId[];
@@ -77,7 +79,10 @@ export class ThreadListAggregationCache {
   private readonly timeToLiveMs: number;
   private readonly maximumEntries: number;
   private readonly entryByKey: Map<ThreadListAggregationCacheKey, ThreadListAggregationCacheEntry>;
-  private readonly inFlightSnapshotByKey: Map<ThreadListAggregationCacheKey, ThreadListAggregationInFlightSnapshot>;
+  private readonly inFlightSnapshotByKey: Map<
+    ThreadListAggregationCacheKey,
+    ThreadListAggregationInFlightSnapshot
+  >;
   private hitCount: number;
   private missCount: number;
   private coalescedCount: number;
@@ -95,7 +100,10 @@ export class ThreadListAggregationCache {
     this.timeToLiveMs = timeToLiveMs;
     this.maximumEntries = maximumEntries;
     this.entryByKey = new Map<ThreadListAggregationCacheKey, ThreadListAggregationCacheEntry>();
-    this.inFlightSnapshotByKey = new Map<ThreadListAggregationCacheKey, ThreadListAggregationInFlightSnapshot>();
+    this.inFlightSnapshotByKey = new Map<
+      ThreadListAggregationCacheKey,
+      ThreadListAggregationInFlightSnapshot
+    >();
     this.hitCount = 0;
     this.missCount = 0;
     this.coalescedCount = 0;
@@ -113,7 +121,7 @@ export class ThreadListAggregationCache {
 
   public async readFreshOrLoad(
     query: ThreadListAggregationQuery,
-    loadSnapshot: () => Promise<ThreadListAggregationSnapshot>
+    loadSnapshot: () => Promise<ThreadListAggregationSnapshot>,
   ): Promise<ThreadListAggregationCacheReadResult> {
     const normalizedQuery = this.normalizeQuery(query);
     const key = this.buildKey(normalizedQuery);
@@ -122,7 +130,7 @@ export class ThreadListAggregationCache {
       this.hitCount += 1;
       return {
         snapshot: this.cloneSnapshot(cachedEntry.snapshot),
-        readState: "hit"
+        readState: "hit",
       };
     }
 
@@ -132,7 +140,7 @@ export class ThreadListAggregationCache {
       const loadedSnapshot = await existingInFlightSnapshot.snapshotPromise;
       return {
         snapshot: this.cloneSnapshot(loadedSnapshot),
-        readState: "coalesced"
+        readState: "coalesced",
       };
     }
     if (existingInFlightSnapshot) {
@@ -158,12 +166,12 @@ export class ThreadListAggregationCache {
     this.inFlightSnapshotByKey.set(key, {
       query: normalizedQuery,
       writeVersion,
-      snapshotPromise: inFlightSnapshotPromise
+      snapshotPromise: inFlightSnapshotPromise,
     });
     const loadedSnapshot = await inFlightSnapshotPromise;
     return {
       snapshot: this.cloneSnapshot(loadedSnapshot),
-      readState: "miss"
+      readState: "miss",
     };
   }
 
@@ -176,7 +184,7 @@ export class ThreadListAggregationCache {
       evictionCount: this.evictionCount,
       invalidationCount: this.invalidationCount,
       entryCount: this.entryByKey.size,
-      inFlightCount: this.inFlightSnapshotByKey.size
+      inFlightCount: this.inFlightSnapshotByKey.size,
     };
   }
 
@@ -200,7 +208,9 @@ export class ThreadListAggregationCache {
     }
   }
 
-  private readFreshByKey(key: ThreadListAggregationCacheKey): ThreadListAggregationCacheEntry | null {
+  private readFreshByKey(
+    key: ThreadListAggregationCacheKey,
+  ): ThreadListAggregationCacheEntry | null {
     const entry = this.entryByKey.get(key);
     if (!entry) {
       return null;
@@ -218,15 +228,17 @@ export class ThreadListAggregationCache {
 
   private cloneSnapshot(snapshot: ThreadListAggregationSnapshot): ThreadListAggregationSnapshot {
     return {
-      mergedData: snapshot.mergedData.map((threadListItem) => this.cloneThreadListItem(threadListItem)),
-      combinedTruncated: snapshot.combinedTruncated
+      mergedData: snapshot.mergedData.map((threadListItem) =>
+        this.cloneThreadListItem(threadListItem),
+      ),
+      combinedTruncated: snapshot.combinedTruncated,
     };
   }
 
   private writeByKey(
     query: ThreadListAggregationQuery,
     key: ThreadListAggregationCacheKey,
-    snapshot: ThreadListAggregationSnapshot
+    snapshot: ThreadListAggregationSnapshot,
   ): void {
     if (this.entryByKey.has(key)) {
       this.entryByKey.delete(key);
@@ -235,7 +247,7 @@ export class ThreadListAggregationCache {
     this.entryByKey.set(key, {
       query: this.cloneQuery(query),
       snapshot: this.cloneSnapshot(snapshot),
-      expiresAtEpochMs: Date.now() + this.timeToLiveMs
+      expiresAtEpochMs: Date.now() + this.timeToLiveMs,
     });
 
     this.evictUntilWithinBounds();
@@ -264,7 +276,9 @@ export class ThreadListAggregationCache {
     return invalidatedEntryCount;
   }
 
-  private invalidateInFlightSnapshots(predicate: (query: ThreadListAggregationQuery) => boolean): number {
+  private invalidateInFlightSnapshots(
+    predicate: (query: ThreadListAggregationQuery) => boolean,
+  ): number {
     let invalidatedInFlightCount = 0;
     for (const [key, inFlightSnapshot] of this.inFlightSnapshotByKey.entries()) {
       if (!predicate(inFlightSnapshot.query)) {
@@ -284,7 +298,7 @@ export class ThreadListAggregationCache {
       all: query.all,
       maxPages: query.maxPages,
       sortKey: query.sortKey,
-      cwd: query.cwd
+      cwd: query.cwd,
     };
   }
 
@@ -296,13 +310,15 @@ export class ThreadListAggregationCache {
       all: query.all,
       maxPages: query.maxPages,
       sortKey: query.sortKey,
-      cwd: query.cwd
+      cwd: query.cwd,
     };
   }
 
-  private cloneThreadListItem(threadListItem: ThreadListItemWithAgentId): ThreadListItemWithAgentId {
+  private cloneThreadListItem(
+    threadListItem: ThreadListItemWithAgentId,
+  ): ThreadListItemWithAgentId {
     return {
-      ...threadListItem
+      ...threadListItem,
     };
   }
 
@@ -314,7 +330,7 @@ export class ThreadListAggregationCache {
       all: query.all,
       maxPages: query.maxPages,
       sortKey: query.sortKey,
-      cwd: query.cwd
+      cwd: query.cwd,
     };
   }
 

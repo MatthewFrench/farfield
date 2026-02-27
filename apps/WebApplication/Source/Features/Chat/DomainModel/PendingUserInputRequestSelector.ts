@@ -4,7 +4,7 @@ export type PendingUserInputRequest = UserInputRequest;
 
 export class PendingUserInputRequestSelector {
   public readPendingUserInputRequests(
-    conversationState: ThreadConversationState | null
+    conversationState: ThreadConversationState | null,
   ): PendingUserInputRequest[] {
     if (!conversationState) {
       return [];

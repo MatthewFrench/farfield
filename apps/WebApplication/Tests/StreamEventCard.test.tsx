@@ -1,6 +1,6 @@
+import type { IpcFrame } from "@farfield/protocol";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { IpcFrame } from "@farfield/protocol";
 
 interface DiffBlockMockProps {
   changes: readonly {
@@ -15,8 +15,10 @@ interface DiffBlockMockProps {
 
 vi.mock("@/Components/DiffBlock", () => ({
   DiffBlock(input: DiffBlockMockProps) {
-    return <div data-testid="stream-event-diff-block">{`changes:${String(input.changes.length)}`}</div>;
-  }
+    return (
+      <div data-testid="stream-event-diff-block">{`changes:${String(input.changes.length)}`}</div>
+    );
+  },
 }));
 
 import { StreamEventCard } from "@/Components/StreamEventCard";
@@ -32,12 +34,12 @@ function createFileChangeRequestEvent(): IpcFrame {
           path: "apps/WebApplication/Source/App.tsx",
           kind: {
             type: "update",
-            move_path: null
+            move_path: null,
           },
-          diff: "@@ -1 +1 @@\n-old\n+new"
-        }
-      ]
-    }
+          diff: "@@ -1 +1 @@\n-old\n+new",
+        },
+      ],
+    },
   };
 }
 
@@ -48,8 +50,8 @@ function createResponseEvent(input?: { method?: string }): IpcFrame {
     method: input?.method,
     resultType: "success",
     result: {
-      ok: true
-    }
+      ok: true,
+    },
   };
 }
 

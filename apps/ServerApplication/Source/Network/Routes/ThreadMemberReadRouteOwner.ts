@@ -2,11 +2,11 @@ import { z } from "zod";
 import { AgentIdentifierByName } from "../../Agents/Types.js";
 import {
   isThreadMemberSubresourceRoute,
-  ThreadMemberRouteSegmentCountByName,
+  type ThreadMemberResolvedRouteContext,
+  type ThreadMemberRouteDependencies,
   ThreadMemberRouteMethodByName,
   ThreadMemberRouteSegmentByName,
-  type ThreadMemberRouteDependencies,
-  type ThreadMemberResolvedRouteContext
+  ThreadMemberRouteSegmentCountByName,
 } from "./ThreadMemberRouteContracts.js";
 
 export interface ThreadMemberReadRouteOwnerOptions {
@@ -17,22 +17,22 @@ export interface ThreadMemberReadRouteOwnerOptions {
 const ThreadMemberReadRouteStatusCodeByName = {
   success: 200,
   badRequest: 400,
-  notFound: 404
+  notFound: 404,
 } as const;
 
 const ThreadMemberReadRouteQueryParameterByName = {
   includeTurns: "includeTurns",
   limit: "limit",
-  sinceSequence: "sinceSequence"
+  sinceSequence: "sinceSequence",
 } as const;
 
 const ThreadMemberReadRouteErrorByName = {
-  invalidStreamEventQueryParameters: "Invalid stream event query parameters"
+  invalidStreamEventQueryParameters: "Invalid stream event query parameters",
 } as const;
 
 const ThreadMemberReadRouteUnsupportedCapabilityName = {
   liveThreadState: "live thread state",
-  streamEvents: "stream events"
+  streamEvents: "stream events",
 } as const;
 
 export class ThreadMemberReadRouteOwner {
@@ -49,12 +49,12 @@ export class ThreadMemberReadRouteOwner {
     const { adapter, agentId, threadId } = this.context;
 
     if (
-      req.method === ThreadMemberRouteMethodByName.get
-      && segments.length === ThreadMemberRouteSegmentCountByName.threadRead
+      req.method === ThreadMemberRouteMethodByName.get &&
+      segments.length === ThreadMemberRouteSegmentCountByName.threadRead
     ) {
       const includeTurns = parseBoolean(
         url.searchParams.get(ThreadMemberReadRouteQueryParameterByName.includeTurns),
-        true
+        true,
       );
 
       try {
@@ -62,7 +62,7 @@ export class ThreadMemberReadRouteOwner {
         jsonResponse(res, ThreadMemberReadRouteStatusCodeByName.success, {
           ok: true,
           ...result,
-          agentId
+          agentId,
         });
         return true;
       } catch (error) {
@@ -74,12 +74,12 @@ export class ThreadMemberReadRouteOwner {
     }
 
     if (
-      req.method === ThreadMemberRouteMethodByName.get
-      && isThreadMemberSubresourceRoute(segments, ThreadMemberRouteSegmentByName.liveState)
+      req.method === ThreadMemberRouteMethodByName.get &&
+      isThreadMemberSubresourceRoute(segments, ThreadMemberRouteSegmentByName.liveState)
     ) {
       if (!adapter.capabilities.canReadLiveState || !adapter.readLiveState) {
         return this.writeUnsupportedCapabilityResponse(
-          ThreadMemberReadRouteUnsupportedCapabilityName.liveThreadState
+          ThreadMemberReadRouteUnsupportedCapabilityName.liveThreadState,
         );
       }
 
@@ -90,7 +90,7 @@ export class ThreadMemberReadRouteOwner {
           threadId,
           ownerClientId: liveState.ownerClientId,
           conversationState: liveState.conversationState,
-          liveStateError: liveState.liveStateError
+          liveStateError: liveState.liveStateError,
         });
         return true;
       } catch (error) {
@@ -102,12 +102,12 @@ export class ThreadMemberReadRouteOwner {
     }
 
     if (
-      req.method === ThreadMemberRouteMethodByName.get
-      && isThreadMemberSubresourceRoute(segments, ThreadMemberRouteSegmentByName.streamEvents)
+      req.method === ThreadMemberRouteMethodByName.get &&
+      isThreadMemberSubresourceRoute(segments, ThreadMemberRouteSegmentByName.streamEvents)
     ) {
       if (!adapter.capabilities.canReadStreamEvents || !adapter.readStreamEvents) {
         return this.writeUnsupportedCapabilityResponse(
-          ThreadMemberReadRouteUnsupportedCapabilityName.streamEvents
+          ThreadMemberReadRouteUnsupportedCapabilityName.streamEvents,
         );
       }
 
@@ -116,7 +116,7 @@ export class ThreadMemberReadRouteOwner {
         jsonResponse(res, ThreadMemberReadRouteStatusCodeByName.badRequest, {
           ok: false,
           error: ThreadMemberReadRouteErrorByName.invalidStreamEventQueryParameters,
-          details: parsedStreamEventsQuery.error.issues
+          details: parsedStreamEventsQuery.error.issues,
         });
         return true;
       }
@@ -130,7 +130,7 @@ export class ThreadMemberReadRouteOwner {
           events: streamEvents.events,
           nextSequence: streamEvents.nextSequence,
           firstAvailableSequence: streamEvents.firstAvailableSequence,
-          resetRequired: streamEvents.resetRequired
+          resetRequired: streamEvents.resetRequired,
         });
         return true;
       } catch (error) {
@@ -153,7 +153,7 @@ export class ThreadMemberReadRouteOwner {
     jsonResponse(res, ThreadMemberReadRouteStatusCodeByName.notFound, {
       ok: false,
       error: `Thread not loaded in app-server: ${threadId}`,
-      threadId
+      threadId,
     });
     return true;
   }
@@ -161,9 +161,11 @@ export class ThreadMemberReadRouteOwner {
   // Keep codex "thread not loaded" normalization centralized so read/live/stream contracts stay aligned.
   private isCodexThreadNotLoadedError(error: Error): boolean {
     const { codexAdapter } = this.dependencies;
-    return this.context.agentId === AgentIdentifierByName.codex
-      && codexAdapter !== null
-      && codexAdapter.isThreadNotLoadedError(error);
+    return (
+      this.context.agentId === AgentIdentifierByName.codex &&
+      codexAdapter !== null &&
+      codexAdapter.isThreadNotLoadedError(error)
+    );
   }
 
   private writeUnsupportedCapabilityResponse(capability: string): boolean {
@@ -172,7 +174,7 @@ export class ThreadMemberReadRouteOwner {
     jsonResponse(res, ThreadMemberReadRouteStatusCodeByName.badRequest, {
       ok: false,
       error: `Agent ${agentId} does not support ${capability}`,
-      threadId
+      threadId,
     });
     return true;
   }
@@ -190,13 +192,13 @@ const STREAM_EVENT_QUERY_LIMIT_DEFAULT = 60;
 const StreamEventsQuerySchema = z
   .object({
     limit: z.preprocess(
-      (value) => value === undefined ? STREAM_EVENT_QUERY_LIMIT_DEFAULT : value,
-      z.coerce.number().int().positive().max(STREAM_EVENT_QUERY_LIMIT_MAXIMUM)
+      (value) => (value === undefined ? STREAM_EVENT_QUERY_LIMIT_DEFAULT : value),
+      z.coerce.number().int().positive().max(STREAM_EVENT_QUERY_LIMIT_MAXIMUM),
     ),
     sinceSequence: z.preprocess(
-      (value) => value === undefined ? null : value,
-      z.union([z.null(), z.coerce.number().int().nonnegative()])
-    )
+      (value) => (value === undefined ? null : value),
+      z.union([z.null(), z.coerce.number().int().nonnegative()]),
+    ),
   })
   .strict();
 
@@ -204,7 +206,7 @@ function parseStreamEventsQuery(searchParameters: URLSearchParams) {
   const query: StreamEventsQueryInput = {
     limit: searchParameters.get(ThreadMemberReadRouteQueryParameterByName.limit) ?? undefined,
     sinceSequence:
-      searchParameters.get(ThreadMemberReadRouteQueryParameterByName.sinceSequence) ?? undefined
+      searchParameters.get(ThreadMemberReadRouteQueryParameterByName.sinceSequence) ?? undefined,
   };
   return StreamEventsQuerySchema.safeParse(query);
 }

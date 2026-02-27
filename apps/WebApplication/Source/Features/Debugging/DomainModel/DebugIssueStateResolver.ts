@@ -1,13 +1,13 @@
 import {
-  buildDebugErrorIssue,
-  buildDebugWarningIssuesFromHistory,
-  sortDebugIssuesByTimeDesc
-} from "@/Features/Debugging/DomainModel/DebugIssueDerivation";
-import {
   type DebugErrorLike,
   type DebugHistoryEntryLike,
-  type DebugIssue
+  type DebugIssue,
 } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
+import {
+  buildDebugErrorIssue,
+  buildDebugWarningIssuesFromHistory,
+  sortDebugIssuesByTimeDesc,
+} from "@/Features/Debugging/DomainModel/DebugIssueDerivation";
 
 export const DEBUG_ISSUE_SEVERITY_FILTER_ALL = "all";
 export const DEBUG_ISSUE_SEVERITY_FILTER_ERROR = "error";
@@ -52,10 +52,7 @@ export class DebugIssueStateResolver {
   }
 
   public readCombinedDebugIssues(input: ReadCombinedDebugIssuesInput): DebugIssue[] {
-    const debugIssues: DebugIssue[] = [
-      ...input.debugErrorIssues,
-      ...input.debugWarningIssues
-    ];
+    const debugIssues: DebugIssue[] = [...input.debugErrorIssues, ...input.debugWarningIssues];
     debugIssues.sort(sortDebugIssuesByTimeDesc);
     return debugIssues;
   }
@@ -64,8 +61,8 @@ export class DebugIssueStateResolver {
     const normalizedQuery = normalizeDebugIssueFilterQuery(input.filterQuery);
     return input.debugIssues.filter((issue) => {
       if (
-        input.severityFilter !== DEBUG_ISSUE_SEVERITY_FILTER_ALL
-        && issue.severity !== input.severityFilter
+        input.severityFilter !== DEBUG_ISSUE_SEVERITY_FILTER_ALL &&
+        issue.severity !== input.severityFilter
       ) {
         return false;
       }
@@ -88,7 +85,7 @@ export class DebugIssueStateResolver {
       return EMPTY_DEBUG_ISSUE_IDENTIFIER;
     }
     const hasSelectedIssue = input.debugIssues.some(
-      (issue) => issue.id === input.selectedIssueIdentifier
+      (issue) => issue.id === input.selectedIssueIdentifier,
     );
     if (hasSelectedIssue) {
       return input.selectedIssueIdentifier;

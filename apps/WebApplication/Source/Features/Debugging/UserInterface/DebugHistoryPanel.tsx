@@ -1,7 +1,7 @@
 import { Button } from "@/Components/UserInterface/Button";
 import {
   DebugHistoryDetailPanel,
-  type ReplayHistoryEntryRequestInput
+  type ReplayHistoryEntryRequestInput,
 } from "./DebugHistoryDetailPanel";
 
 export interface DebugHistoryEntryListItem {
@@ -12,11 +12,12 @@ export interface DebugHistoryEntryListItem {
 }
 
 type DebugHistoryDirection = DebugHistoryEntryListItem["direction"];
-const HISTORY_ENTRY_DIRECTION_BADGE_CLASS_NAME_BY_DIRECTION: Record<DebugHistoryDirection, string> = {
-  in: "bg-success/15 text-success",
-  out: "bg-blue-500/15 text-blue-400",
-  system: "bg-muted text-muted-foreground"
-};
+const HISTORY_ENTRY_DIRECTION_BADGE_CLASS_NAME_BY_DIRECTION: Record<DebugHistoryDirection, string> =
+  {
+    in: "bg-success/15 text-success",
+    out: "bg-blue-500/15 text-blue-400",
+    system: "bg-muted text-muted-foreground",
+  };
 
 interface DebugHistoryPanelProps {
   historyEntries: readonly DebugHistoryEntryListItem[];
@@ -37,10 +38,13 @@ export function DebugHistoryPanel({
   waitForReplayResponse,
   onHistoryEntrySelect,
   onWaitForReplayResponseChange,
-  onReplayHistoryEntry
+  onReplayHistoryEntry,
 }: DebugHistoryPanelProps): React.JSX.Element {
   return (
-    <div data-testid="debug-history-panel" className="flex-1 grid grid-cols-[200px_minmax(0,1fr)] min-h-0 divide-x divide-border overflow-hidden">
+    <div
+      data-testid="debug-history-panel"
+      className="flex-1 grid grid-cols-[200px_minmax(0,1fr)] min-h-0 divide-x divide-border overflow-hidden"
+    >
       <div className="overflow-y-auto py-1">
         {historyEntries
           .slice()

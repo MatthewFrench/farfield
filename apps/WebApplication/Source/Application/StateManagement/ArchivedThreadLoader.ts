@@ -1,7 +1,5 @@
-import { startTransition, type Dispatch, type SetStateAction } from "react";
-import {
-  ThreadListStateController
-} from "@/Features/Threads/StateManagement/ThreadListStateController";
+import { type Dispatch, type SetStateAction, startTransition } from "react";
+import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import type { CoreDataThreadsResponse } from "./CoreDataSnapshotContracts";
 
 const THREAD_LIST_UPDATED_AT_SORT_KEY = "updated_at" as const;
@@ -16,7 +14,7 @@ export interface ArchivedThreadLoaderDependencies {
   setArchivedThreads: Dispatch<SetStateAction<ThreadsResponse["data"]>>;
   setArchivedThreadsTruncated: Dispatch<SetStateAction<boolean>>;
   setHasLoadedArchivedThreads: Dispatch<SetStateAction<boolean>>;
-  handleRuntimeRequestError: <ErrorType,>(error: ErrorType) => void;
+  handleRuntimeRequestError: <ErrorType>(error: ErrorType) => void;
 }
 
 /**
@@ -40,7 +38,7 @@ export class ArchivedThreadLoader {
         limit: this.deps.threadListLimit,
         maxPages: this.deps.archivedThreadListMaxPages,
         sortKey: THREAD_LIST_UPDATED_AT_SORT_KEY,
-        readFromCache: true
+        readFromCache: true,
       });
 
       startTransition(() => {

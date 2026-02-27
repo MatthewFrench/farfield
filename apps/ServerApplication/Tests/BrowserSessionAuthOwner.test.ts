@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BrowserSessionAuthOwner,
-  type BrowserSessionAuthOwnerConfiguration
+  type BrowserSessionAuthOwnerConfiguration,
 } from "../Source/Network/BrowserSessionAuthOwner.js";
 
 const DefaultIssuedAtMilliseconds = 1_700_000_000_000;
@@ -20,25 +20,28 @@ interface BrowserSessionAuthOwnerConfigurationOverrides {
 }
 
 function createBrowserSessionAuthOwnerConfiguration(
-  overrides: BrowserSessionAuthOwnerConfigurationOverrides = {}
+  overrides: BrowserSessionAuthOwnerConfigurationOverrides = {},
 ): BrowserSessionAuthOwnerConfiguration {
   return {
     cookieName: overrides.cookieName ?? DefaultCookieName,
     sessionTimeToLiveMs: overrides.sessionTimeToLiveMs ?? DefaultSessionTimeToLiveMilliseconds,
     signingSecret: overrides.signingSecret ?? DefaultSigningSecret,
-    secureCookie: overrides.secureCookie ?? false
+    secureCookie: overrides.secureCookie ?? false,
   };
 }
 
 function createBrowserSessionAuthOwner(
   configurationOverrides: BrowserSessionAuthOwnerConfigurationOverrides = {},
   now: () => number = () => DefaultIssuedAtMilliseconds,
-  randomBytesValue: string = "session_nonce_value_default"
+  randomBytesValue: string = "session_nonce_value_default",
 ): BrowserSessionAuthOwner {
-  return new BrowserSessionAuthOwner(createBrowserSessionAuthOwnerConfiguration(configurationOverrides), {
-    now,
-    randomBytesFactory: () => Buffer.from(randomBytesValue)
-  });
+  return new BrowserSessionAuthOwner(
+    createBrowserSessionAuthOwnerConfiguration(configurationOverrides),
+    {
+      now,
+      randomBytesFactory: () => Buffer.from(randomBytesValue),
+    },
+  );
 }
 
 function readCookieNameValuePairFromSetCookieHeader(setCookieHeaderValue: string): string {
@@ -53,8 +56,8 @@ function readCookieValueFromSetCookieHeader(setCookieHeaderValue: string): strin
   const cookieNameValuePair = readCookieNameValuePairFromSetCookieHeader(setCookieHeaderValue);
   const cookieNameValueDelimiterIndex = cookieNameValuePair.indexOf(CookieNameValueDelimiter);
   if (
-    cookieNameValueDelimiterIndex <= 0
-    || cookieNameValueDelimiterIndex >= cookieNameValuePair.length - 1
+    cookieNameValueDelimiterIndex <= 0 ||
+    cookieNameValueDelimiterIndex >= cookieNameValuePair.length - 1
   ) {
     throw new Error("Expected cookie name and value pair");
   }
@@ -67,7 +70,9 @@ describe("BrowserSessionAuthOwner", () => {
     const owner = createBrowserSessionAuthOwner({}, () => nowMilliseconds, "session_nonce_value_1");
 
     const issued = owner.issueSessionCookie();
-    expect(issued.expiresAt).toBe(new Date(nowMilliseconds + DefaultSessionTimeToLiveMilliseconds).toISOString());
+    expect(issued.expiresAt).toBe(
+      new Date(nowMilliseconds + DefaultSessionTimeToLiveMilliseconds).toISOString(),
+    );
     expect(issued.setCookieHeaderValue).toContain("farfield_session=");
     expect(issued.setCookieHeaderValue).toContain("HttpOnly");
     expect(issued.setCookieHeaderValue).toContain("SameSite=Lax");
@@ -83,7 +88,11 @@ describe("BrowserSessionAuthOwner", () => {
   });
 
   it("rejects tampered token payloads", () => {
-    const owner = createBrowserSessionAuthOwner({}, () => DefaultIssuedAtMilliseconds, "session_nonce_value_2");
+    const owner = createBrowserSessionAuthOwner(
+      {},
+      () => DefaultIssuedAtMilliseconds,
+      "session_nonce_value_2",
+    );
 
     const issued = owner.issueSessionCookie();
     const tokenValue = readCookieValueFromSetCookieHeader(issued.setCookieHeaderValue);
@@ -102,10 +111,10 @@ describe("BrowserSessionAuthOwner", () => {
   it("uses at least one second for cookie max-age when session time to live is sub-second", () => {
     const owner = createBrowserSessionAuthOwner(
       {
-        sessionTimeToLiveMs: 500
+        sessionTimeToLiveMs: 500,
       },
       () => DefaultIssuedAtMilliseconds,
-      "session_nonce_value_3"
+      "session_nonce_value_3",
     );
 
     const issued = owner.issueSessionCookie();
@@ -115,10 +124,10 @@ describe("BrowserSessionAuthOwner", () => {
   it("includes the secure directive when secure cookies are enabled", () => {
     const owner = createBrowserSessionAuthOwner(
       {
-        secureCookie: true
+        secureCookie: true,
       },
       () => DefaultIssuedAtMilliseconds,
-      "session_nonce_value_secure"
+      "session_nonce_value_secure",
     );
 
     const issued = owner.issueSessionCookie();
@@ -126,9 +135,15 @@ describe("BrowserSessionAuthOwner", () => {
   });
 
   it("reads the configured session cookie from a multi-cookie header", () => {
-    const owner = createBrowserSessionAuthOwner({}, () => DefaultIssuedAtMilliseconds, "session_nonce_value_multi");
+    const owner = createBrowserSessionAuthOwner(
+      {},
+      () => DefaultIssuedAtMilliseconds,
+      "session_nonce_value_multi",
+    );
     const issued = owner.issueSessionCookie();
-    const sessionCookieNameValuePair = readCookieNameValuePairFromSetCookieHeader(issued.setCookieHeaderValue);
+    const sessionCookieNameValuePair = readCookieNameValuePairFromSetCookieHeader(
+      issued.setCookieHeaderValue,
+    );
     const cookieHeaderValue = `tracking_cookie=enabled; ${sessionCookieNameValuePair}; theme=light`;
 
     const session = owner.readSession(cookieHeaderValue);
@@ -138,18 +153,28 @@ describe("BrowserSessionAuthOwner", () => {
   });
 
   it("rejects malformed token segments with non-base64url content", () => {
-    const owner = createBrowserSessionAuthOwner({}, () => DefaultIssuedAtMilliseconds, "session_nonce_value_4");
+    const owner = createBrowserSessionAuthOwner(
+      {},
+      () => DefaultIssuedAtMilliseconds,
+      "session_nonce_value_4",
+    );
 
-    const malformedSession = owner.readSession("farfield_session=1700000000000.1700000060000.bad+segment.signature");
+    const malformedSession = owner.readSession(
+      "farfield_session=1700000000000.1700000060000.bad+segment.signature",
+    );
     expect(malformedSession.authenticated).toBe(false);
     expect(malformedSession.expiresAt).toBeNull();
   });
 
   it("rejects token segments where expiry timestamp is not after issue timestamp", () => {
-    const owner = createBrowserSessionAuthOwner({}, () => DefaultIssuedAtMilliseconds, "session_nonce_value_5");
+    const owner = createBrowserSessionAuthOwner(
+      {},
+      () => DefaultIssuedAtMilliseconds,
+      "session_nonce_value_5",
+    );
 
     const malformedSession = owner.readSession(
-      "farfield_session=1700000000000.1700000000000.noncevalue.signaturevalue"
+      "farfield_session=1700000000000.1700000000000.noncevalue.signaturevalue",
     );
     expect(malformedSession.authenticated).toBe(false);
     expect(malformedSession.expiresAt).toBeNull();
@@ -157,13 +182,13 @@ describe("BrowserSessionAuthOwner", () => {
 
   it("validates constructor configuration with explicit errors", () => {
     expect(() => createBrowserSessionAuthOwner({ cookieName: "   " })).toThrow(
-      "BrowserSessionAuthOwner requires a non-empty cookieName"
+      "BrowserSessionAuthOwner requires a non-empty cookieName",
     );
     expect(() => createBrowserSessionAuthOwner({ sessionTimeToLiveMs: 0 })).toThrow(
-      "BrowserSessionAuthOwner requires a positive integer sessionTimeToLiveMs"
+      "BrowserSessionAuthOwner requires a positive integer sessionTimeToLiveMs",
     );
     expect(() => createBrowserSessionAuthOwner({ signingSecret: "   " })).toThrow(
-      "BrowserSessionAuthOwner requires a non-empty signingSecret"
+      "BrowserSessionAuthOwner requires a non-empty signingSecret",
     );
   });
 });

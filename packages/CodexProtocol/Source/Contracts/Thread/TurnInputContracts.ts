@@ -1,9 +1,5 @@
 import { z } from "zod";
-import {
-  JsonValueSchema,
-  NonEmptyStringSchema,
-  NullableStringSchema
-} from "../../Common.js";
+import { JsonValueSchema, NonEmptyStringSchema, NullableStringSchema } from "../../Common.js";
 import { CollaborationModeSchema } from "./CollaborationModeContracts.js";
 
 const OptionalNullableJsonValueSchema = z.union([JsonValueSchema, z.null()]).optional();
@@ -16,14 +12,14 @@ export const InputTextPartSchema = z
   .object({
     type: z.literal("text"),
     text: z.string(),
-    text_elements: z.array(JsonValueSchema).optional()
+    text_elements: z.array(JsonValueSchema).optional(),
   })
   .passthrough();
 
 export const InputImagePartSchema = z
   .object({
     type: z.literal("image"),
-    url: z.string()
+    url: z.string(),
   })
   .passthrough();
 
@@ -42,7 +38,7 @@ export const TurnStartParamsSchema = z
     attachments: z.array(JsonValueSchema).optional(),
     collaborationMode: OptionalNullableCollaborationModeSchema,
     personality: OptionalNullableJsonValueSchema,
-    outputSchema: OptionalNullableJsonValueSchema
+    outputSchema: OptionalNullableJsonValueSchema,
   })
   .passthrough();
 

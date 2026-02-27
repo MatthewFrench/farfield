@@ -15,7 +15,7 @@ describe("ApplicationRouteStateMapper", () => {
 
     expect(parsed).toEqual({
       threadId: "thread/123",
-      tab: "debug"
+      tab: "debug",
     });
   });
 
@@ -26,11 +26,11 @@ describe("ApplicationRouteStateMapper", () => {
 
     expect(malformedParsed).toEqual({
       threadId: null,
-      tab: "chat"
+      tab: "chat",
     });
     expect(whitespaceParsed).toEqual({
       threadId: null,
-      tab: "chat"
+      tab: "chat",
     });
   });
 
@@ -39,11 +39,11 @@ describe("ApplicationRouteStateMapper", () => {
 
     expect(mapper.parseFromPathname("/threads")).toEqual({
       threadId: null,
-      tab: "chat"
+      tab: "chat",
     });
     expect(mapper.parseFromPathname("/settings")).toEqual({
       threadId: null,
-      tab: "chat"
+      tab: "chat",
     });
   });
 
@@ -56,7 +56,7 @@ describe("ApplicationRouteStateMapper", () => {
     expect(mapper.buildPath({ threadId: "   ", tab: "debug" })).toBe("/debug");
     expect(mapper.buildPath({ threadId: "thread/123", tab: "chat" })).toBe("/threads/thread%2F123");
     expect(mapper.buildPath({ threadId: "thread/123", tab: "debug" })).toBe(
-      "/threads/thread%2F123/debug"
+      "/threads/thread%2F123/debug",
     );
   });
 });

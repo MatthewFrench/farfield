@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type {
+  ThreadListItem,
+  ThreadProjectGroup,
+} from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import { ThreadListSearchFilter } from "@/Features/Threads/DomainModel/ThreadListSearchFilter";
-import type { ThreadListItem, ThreadProjectGroup } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 
 function buildThread(input: {
   id: string;
@@ -16,7 +19,7 @@ function buildThread(input: {
     updatedAt: 1_735_000_000_100,
     cwd: input.cwd,
     path: input.path,
-    agentId: input.agentId
+    agentId: input.agentId,
   };
 }
 
@@ -33,7 +36,7 @@ function buildProjectGroup(input: {
     projectCreatedAt: 1_735_000_000_000,
     latestUpdatedAt: 1_735_000_000_100,
     threads: input.threads,
-    isRemoved: false
+    isRemoved: false,
   };
 }
 
@@ -50,16 +53,16 @@ describe("ThreadListSearchFilter", () => {
             preview: "Alpha thread",
             cwd: "/tmp/alpha",
             path: "/tmp/alpha",
-            agentId: "codex"
-          })
-        ]
-      })
+            agentId: "codex",
+          }),
+        ],
+      }),
     ];
 
     const result = ThreadListSearchFilter.filterProjectGroups({
       projectGroups,
       query: "   ",
-      readAgentLabel: () => "Codex"
+      readAgentLabel: () => "Codex",
     });
 
     expect(result).toBe(projectGroups);
@@ -72,29 +75,29 @@ describe("ThreadListSearchFilter", () => {
         preview: "Alpha first",
         cwd: "/tmp/alpha",
         path: "/tmp/alpha",
-        agentId: "codex"
+        agentId: "codex",
       }),
       buildThread({
         id: "thread-2",
         preview: "Alpha second",
         cwd: "/tmp/alpha",
         path: "/tmp/alpha",
-        agentId: "opencode"
-      })
+        agentId: "opencode",
+      }),
     ];
     const projectGroups: ThreadProjectGroup[] = [
       buildProjectGroup({
         key: "project:/tmp/alpha",
         label: "Alpha Workspace",
         projectPath: "/tmp/alpha",
-        threads: alphaThreads
-      })
+        threads: alphaThreads,
+      }),
     ];
 
     const result = ThreadListSearchFilter.filterProjectGroups({
       projectGroups,
       query: "workspace",
-      readAgentLabel: (thread) => thread.agentId === "codex" ? "Codex" : "OpenCode"
+      readAgentLabel: (thread) => (thread.agentId === "codex" ? "Codex" : "OpenCode"),
     });
 
     expect(result).toHaveLength(1);
@@ -114,23 +117,23 @@ describe("ThreadListSearchFilter", () => {
             preview: "Codex thread",
             cwd: "/tmp/threads",
             path: "/tmp/threads",
-            agentId: "codex"
+            agentId: "codex",
           }),
           buildThread({
             id: "thread-opencode",
             preview: "OpenCode thread",
             cwd: "/tmp/threads",
             path: "/tmp/threads",
-            agentId: "opencode"
-          })
-        ]
-      })
+            agentId: "opencode",
+          }),
+        ],
+      }),
     ];
 
     const result = ThreadListSearchFilter.filterProjectGroups({
       projectGroups,
       query: "opencode",
-      readAgentLabel: (thread) => thread.agentId === "codex" ? "Codex" : "OpenCode"
+      readAgentLabel: (thread) => (thread.agentId === "codex" ? "Codex" : "OpenCode"),
     });
 
     expect(result).toHaveLength(1);

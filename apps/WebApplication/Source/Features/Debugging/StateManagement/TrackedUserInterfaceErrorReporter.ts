@@ -2,21 +2,20 @@
  * Owns tracked user-interface error reporting for action handlers, including short-window
  * deduplication and deterministic error-banner message formatting.
  */
-import {
-  reportClientError,
-  type ClientErrorReportInput,
-  type ClientErrorReportResult
-} from "@/Features/Debugging/DataAccess/ClientErrorReporter";
-import {
-  type FarfieldHttpRequestFailureDetails
-} from "@/Shared/Contracts/FarfieldHttpRequestFailureDetails";
+
 import { z } from "zod";
-import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
+import {
+  type ClientErrorReportInput,
+  type ClientErrorReportResult,
+  reportClientError,
+} from "@/Features/Debugging/DataAccess/ClientErrorReporter";
 import {
   extractRequestIdFromErrorMessage,
   formatTrackedUiErrorMessage,
-  shouldIgnoreUiErrorMessage
+  shouldIgnoreUiErrorMessage,
 } from "@/Features/Debugging/StateManagement/TrackedUserInterfaceErrorPolicy";
+import { type FarfieldHttpRequestFailureDetails } from "@/Shared/Contracts/FarfieldHttpRequestFailureDetails";
+import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 
 type ClientErrorDetailValue = string | number | boolean | null;
 type ErrorInput = Error | string | number | boolean | bigint | symbol | null | undefined | object;
@@ -66,16 +65,19 @@ const RequestFailureDetailsSchema = z.object({
   requestId: z.string().trim().min(1).nullable(),
   responseText: z.string().trim().min(1).nullable(),
   responseTextLength: z.number().int().positive().nullable().optional().default(null),
-  responseTextTruncated: z.boolean().optional().default(false)
+  responseTextTruncated: z.boolean().optional().default(false),
 });
 
-const RequestFailureErrorSchema = z.object({
-  requestFailureDetails: RequestFailureDetailsSchema
-}).passthrough();
+const RequestFailureErrorSchema = z
+  .object({
+    requestFailureDetails: RequestFailureDetailsSchema,
+  })
+  .passthrough();
 
 const ReportDeduplicationWindowMillisecondsSchema = z.number().int().positive();
 const DEFAULT_REPORT_DEDUPLICATION_WINDOW_MILLISECONDS = 15_000;
-const REPORT_DEDUPLICATION_WINDOW_VALIDATION_ERROR_MESSAGE = "reportDeduplicationWindowMs must be a positive integer";
+const REPORT_DEDUPLICATION_WINDOW_VALIDATION_ERROR_MESSAGE =
+  "reportDeduplicationWindowMs must be a positive integer";
 const CLIENT_ERROR_SOURCE = "farfield-web";
 const CLIENT_ERROR_SEVERITY = "error";
 const REPORT_KEY_SEGMENT_SEPARATOR = "|";
@@ -101,21 +103,26 @@ function readValidatedReportDeduplicationWindowMilliseconds(value: number): numb
 export class TrackedUserInterfaceErrorReporter {
   private readonly reportDeduplicationWindowMs: number;
   private readonly setErrorMessage: (errorMessage: string) => void;
-  private readonly reportClientErrorFn: (input: ClientErrorReportInput) => Promise<ClientErrorReportResult>;
+  private readonly reportClientErrorFn: (
+    input: ClientErrorReportInput,
+  ) => Promise<ClientErrorReportResult>;
   private readonly readPathnameAndSearch: () => string;
   private readonly readNow: () => number;
   private readonly mostRecentErrorReportTimestampByKey: Map<string, number>;
 
   public constructor(dependencies: TrackedUserInterfaceErrorReporterDependencies) {
     // Keep a small default suppression window so repeated action errors do not flood remote diagnostics.
-    const reportDeduplicationWindowMs = dependencies.reportDeduplicationWindowMs
-      ?? DEFAULT_REPORT_DEDUPLICATION_WINDOW_MILLISECONDS;
+    const reportDeduplicationWindowMs =
+      dependencies.reportDeduplicationWindowMs ?? DEFAULT_REPORT_DEDUPLICATION_WINDOW_MILLISECONDS;
 
-    this.reportDeduplicationWindowMs = readValidatedReportDeduplicationWindowMilliseconds(reportDeduplicationWindowMs);
+    this.reportDeduplicationWindowMs = readValidatedReportDeduplicationWindowMilliseconds(
+      reportDeduplicationWindowMs,
+    );
     this.setErrorMessage = dependencies.setErrorMessage;
     this.reportClientErrorFn = dependencies.reportClientErrorFn ?? reportClientError;
-    this.readPathnameAndSearch = dependencies.readPathnameAndSearch
-      ?? (() => window.location.pathname + window.location.search);
+    this.readPathnameAndSearch =
+      dependencies.readPathnameAndSearch ??
+      (() => window.location.pathname + window.location.search);
     this.readNow = dependencies.readNow ?? (() => Date.now());
     this.mostRecentErrorReportTimestampByKey = new Map<string, number>();
   }
@@ -126,12 +133,14 @@ export class TrackedUserInterfaceErrorReporter {
       return;
     }
 
-    if (this.shouldSkipDuplicateErrorReport({
-      operation: input.operation,
-      errorMessage: parsedErrorContext.errorMessage,
-      requestId: parsedErrorContext.requestId,
-      threadId: input.threadId
-    })) {
+    if (
+      this.shouldSkipDuplicateErrorReport({
+        operation: input.operation,
+        errorMessage: parsedErrorContext.errorMessage,
+        requestId: parsedErrorContext.requestId,
+        threadId: input.threadId,
+      })
+    ) {
       return;
     }
 
@@ -141,16 +150,18 @@ export class TrackedUserInterfaceErrorReporter {
       threadId: input.threadId,
       errorMessage: parsedErrorContext.errorMessage,
       requestId: parsedErrorContext.requestId,
-      details
+      details,
     });
 
-    this.setErrorMessage(formatTrackedUiErrorMessage({
-      operation: input.operation,
-      errorMessage: parsedErrorContext.errorMessage,
-      actionId: input.actionId,
-      requestId: parsedErrorContext.requestId,
-      errorId
-    }));
+    this.setErrorMessage(
+      formatTrackedUiErrorMessage({
+        operation: input.operation,
+        errorMessage: parsedErrorContext.errorMessage,
+        actionId: input.actionId,
+        requestId: parsedErrorContext.requestId,
+        errorId,
+      }),
+    );
   }
 
   private readParsedErrorContext(error: ErrorInput): ParsedErrorContext {
@@ -163,16 +174,16 @@ export class TrackedUserInterfaceErrorReporter {
     return {
       errorMessage,
       requestFailureDetails,
-      requestId: requestFailureDetails?.requestId ?? extractRequestIdFromErrorMessage(errorMessage)
+      requestId: requestFailureDetails?.requestId ?? extractRequestIdFromErrorMessage(errorMessage),
     };
   }
 
   private createClientErrorDetails(
     input: TrackedUserInterfaceErrorReportInput,
-    requestFailureDetails: FarfieldHttpRequestFailureDetails | null
+    requestFailureDetails: FarfieldHttpRequestFailureDetails | null,
   ): ClientErrorDetails {
     const details: ClientErrorDetails = {
-      ...(input.details ?? {})
+      ...(input.details ?? {}),
     };
     details[CLIENT_ERROR_DETAIL_ACTION_IDENTIFIER_KEY] = input.actionId;
     details[CLIENT_ERROR_DETAIL_ACTION_NAME_KEY] = input.operation;
@@ -182,8 +193,10 @@ export class TrackedUserInterfaceErrorReporter {
       details[CLIENT_ERROR_DETAIL_REQUEST_STATUS_KEY] = requestFailureDetails.status;
       details[CLIENT_ERROR_DETAIL_REQUEST_STATUS_TEXT_KEY] = requestFailureDetails.statusText;
       details[CLIENT_ERROR_DETAIL_RESPONSE_TEXT_KEY] = requestFailureDetails.responseText;
-      details[CLIENT_ERROR_DETAIL_RESPONSE_TEXT_LENGTH_KEY] = requestFailureDetails.responseTextLength;
-      details[CLIENT_ERROR_DETAIL_RESPONSE_TEXT_TRUNCATED_KEY] = requestFailureDetails.responseTextTruncated;
+      details[CLIENT_ERROR_DETAIL_RESPONSE_TEXT_LENGTH_KEY] =
+        requestFailureDetails.responseTextLength;
+      details[CLIENT_ERROR_DETAIL_RESPONSE_TEXT_TRUNCATED_KEY] =
+        requestFailureDetails.responseTextTruncated;
     }
 
     return details;
@@ -201,7 +214,7 @@ export class TrackedUserInterfaceErrorReporter {
         requestId: input.requestId,
         threadId: input.threadId,
         url: this.readPathnameAndSearch(),
-        details: input.details
+        details: input.details,
       });
       return report.errorId;
     } catch {
@@ -236,11 +249,8 @@ export class TrackedUserInterfaceErrorReporter {
   private createReportKey(input: DeduplicationKeyInput): string {
     const requestIdentifier = input.requestId ?? REPORT_KEY_MISSING_REQUEST_IDENTIFIER;
     const threadIdentifier = input.threadId ?? REPORT_KEY_MISSING_THREAD_IDENTIFIER;
-    return [
-      input.operation,
-      requestIdentifier,
-      threadIdentifier,
-      input.errorMessage
-    ].join(REPORT_KEY_SEGMENT_SEPARATOR);
+    return [input.operation, requestIdentifier, threadIdentifier, input.errorMessage].join(
+      REPORT_KEY_SEGMENT_SEPARATOR,
+    );
   }
 }

@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   ThreadListAggregationCache,
   type ThreadListAggregationQuery,
-  type ThreadListAggregationSnapshot
+  type ThreadListAggregationSnapshot,
 } from "../Source/Network/ThreadListAggregationCache.js";
 
-function buildQuery(overrides: Partial<ThreadListAggregationQuery> = {}): ThreadListAggregationQuery {
+function buildQuery(
+  overrides: Partial<ThreadListAggregationQuery> = {},
+): ThreadListAggregationQuery {
   return {
     enabledAgentIds: ["codex"],
     limit: 20,
@@ -14,17 +16,17 @@ function buildQuery(overrides: Partial<ThreadListAggregationQuery> = {}): Thread
     maxPages: 10,
     sortKey: "updated_at",
     cwd: null,
-    ...overrides
+    ...overrides,
   };
 }
 
 function buildSnapshot(
-  overrides: Partial<ThreadListAggregationSnapshot> = {}
+  overrides: Partial<ThreadListAggregationSnapshot> = {},
 ): ThreadListAggregationSnapshot {
   return {
     mergedData: [],
     combinedTruncated: false,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -35,7 +37,7 @@ function buildThreadListItem(preview: string): ThreadListAggregationSnapshot["me
     createdAt: 1,
     updatedAt: 1,
     source: "opencode",
-    agentId: "opencode"
+    agentId: "opencode",
   };
 }
 
@@ -82,10 +84,10 @@ describe("ThreadListAggregationCache", () => {
   it("normalizes enabled agent identifiers when building cache keys", () => {
     const cache = new ThreadListAggregationCache(1_000, 4);
     const writeQuery = buildQuery({
-      enabledAgentIds: ["opencode", "codex"]
+      enabledAgentIds: ["opencode", "codex"],
     });
     const readQuery = buildQuery({
-      enabledAgentIds: ["codex", "opencode"]
+      enabledAgentIds: ["codex", "opencode"],
     });
 
     cache.write(writeQuery, buildSnapshot({ combinedTruncated: true }));
@@ -99,9 +101,10 @@ describe("ThreadListAggregationCache", () => {
     const query = buildQuery();
 
     let resolveLoad: ((value: ThreadListAggregationSnapshot) => void) | null = null;
-    const loader = () => new Promise<ThreadListAggregationSnapshot>((resolve) => {
-      resolveLoad = resolve;
-    });
+    const loader = () =>
+      new Promise<ThreadListAggregationSnapshot>((resolve) => {
+        resolveLoad = resolve;
+      });
 
     const firstReadPromise = cache.readFreshOrLoad(query, loader);
     const secondReadPromise = cache.readFreshOrLoad(query, loader);
@@ -111,7 +114,7 @@ describe("ThreadListAggregationCache", () => {
 
     const [firstReadResult, secondReadResult] = await Promise.all([
       firstReadPromise,
-      secondReadPromise
+      secondReadPromise,
     ]);
 
     expect(firstReadResult.readState).toBe("miss");
@@ -128,9 +131,13 @@ describe("ThreadListAggregationCache", () => {
     const query = buildQuery();
 
     let resolveLoad: ((value: ThreadListAggregationSnapshot) => void) | null = null;
-    const readPromise = cache.readFreshOrLoad(query, () => new Promise<ThreadListAggregationSnapshot>((resolve) => {
-      resolveLoad = resolve;
-    }));
+    const readPromise = cache.readFreshOrLoad(
+      query,
+      () =>
+        new Promise<ThreadListAggregationSnapshot>((resolve) => {
+          resolveLoad = resolve;
+        }),
+    );
 
     cache.invalidateAll();
     resolveLoad?.(buildSnapshot({ combinedTruncated: true }));
@@ -146,9 +153,13 @@ describe("ThreadListAggregationCache", () => {
     const query = buildQuery({ archived: false });
 
     let resolveLoad: ((value: ThreadListAggregationSnapshot) => void) | null = null;
-    const readPromise = cache.readFreshOrLoad(query, () => new Promise<ThreadListAggregationSnapshot>((resolve) => {
-      resolveLoad = resolve;
-    }));
+    const readPromise = cache.readFreshOrLoad(
+      query,
+      () =>
+        new Promise<ThreadListAggregationSnapshot>((resolve) => {
+          resolveLoad = resolve;
+        }),
+    );
 
     cache.invalidateWhere((candidateQuery) => candidateQuery.archived);
     expect(cache.readStatistics().invalidationCount).toBe(0);
@@ -185,7 +196,7 @@ describe("ThreadListAggregationCache", () => {
     cache.invalidateWhere((candidateQuery) => candidateQuery.archived);
 
     expect(cache.readFresh(buildQuery({ archived: false }))).toEqual(
-      buildSnapshot({ combinedTruncated: true })
+      buildSnapshot({ combinedTruncated: true }),
     );
     expect(cache.readStatistics().invalidationCount).toBe(0);
   });
@@ -194,7 +205,7 @@ describe("ThreadListAggregationCache", () => {
     const cache = new ThreadListAggregationCache(1_000, 4);
     const query = buildQuery();
     const originalSnapshot = buildSnapshot({
-      mergedData: [buildThreadListItem("original")]
+      mergedData: [buildThreadListItem("original")],
     });
 
     cache.write(query, originalSnapshot);

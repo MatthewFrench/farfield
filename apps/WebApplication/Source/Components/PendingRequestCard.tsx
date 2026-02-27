@@ -1,20 +1,21 @@
 import { motion } from "framer-motion";
-import {
-  createEmptyPendingUserInputAnswerDraft,
-  type PendingUserInputAnswerDraftByQuestionId
-} from "@/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
-import { type PendingUserInputRequest } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
 import { Button } from "@/Components/UserInterface/Button";
 import { Input } from "@/Components/UserInterface/Input";
 import { Label } from "@/Components/UserInterface/Label";
 import { RadioGroup, RadioGroupItem } from "@/Components/UserInterface/RadioGroup";
+import {
+  createEmptyPendingUserInputAnswerDraft,
+  type PendingUserInputAnswerDraftByQuestionId,
+} from "@/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
+import { type PendingUserInputRequest } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
 
 type PendingRequestDraftField = "option" | "freeform";
 
 const FREEFORM_INPUT_PLACEHOLDER = "Free-form answer…";
 const OPTION_CONTAINER_CLASS_NAME = "space-y-1";
 const SELECTED_OPTION_CLASS_NAME = "bg-muted text-foreground";
-const UNSELECTED_OPTION_CLASS_NAME = "hover:bg-muted/50 text-muted-foreground hover:text-foreground";
+const UNSELECTED_OPTION_CLASS_NAME =
+  "hover:bg-muted/50 text-muted-foreground hover:text-foreground";
 
 export interface PendingRequestCardProps {
   request: PendingUserInputRequest;
@@ -40,7 +41,7 @@ export function PendingRequestCard({
   onDraftChange,
   onSubmit,
   onSkip,
-  isBusy
+  isBusy,
 }: PendingRequestCardProps): React.JSX.Element {
   return (
     <motion.div
@@ -63,7 +64,10 @@ export function PendingRequestCard({
                 className="space-y-1"
               >
                 {question.options.map((option, optionIndex) => {
-                  const optionInputIdentifier = readOptionInputIdentifier(questionIndex, optionIndex);
+                  const optionInputIdentifier = readOptionInputIdentifier(
+                    questionIndex,
+                    optionIndex,
+                  );
                   const descriptionText = readQuestionDescription(option.description);
                   return (
                     <Label

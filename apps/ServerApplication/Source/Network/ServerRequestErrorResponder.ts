@@ -1,14 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
 import { logger } from "../Shared/Logging/Logger.js";
-import type { ServerErrorEventRecordInput } from "./ServerErrorEventRecorder.js";
-import {
-  ServerTransportErrorClassifier,
-  type ServerTransportErrorCategory,
-  type ServerTransportErrorClassification
-} from "./ServerTransportErrorClassifier.js";
 import type { HistoryEntry } from "./DebugContracts.js";
 import type { ThreadRouteDependencies } from "./Routes/ThreadRoutes.js";
+import type { ServerErrorEventRecordInput } from "./ServerErrorEventRecorder.js";
+import {
+  type ServerTransportErrorCategory,
+  type ServerTransportErrorClassification,
+  ServerTransportErrorClassifier,
+} from "./ServerTransportErrorClassifier.js";
 
 const SERVER_ERROR_SOURCE = "farfield-server";
 const HTTP_REQUEST_OPERATION = "http:request";
@@ -53,20 +53,20 @@ const RESPONSE_BEHAVIOR_BY_ERROR_CATEGORY: Record<
     shouldSetRuntimeLastError: false,
     shouldRecordServerError: true,
     shouldPushSystemEvent: false,
-    shouldBroadcastRuntimeState: false
+    shouldBroadcastRuntimeState: false,
   },
   shutdown_transport: {
     shouldSetRuntimeLastError: true,
     shouldRecordServerError: false,
     shouldPushSystemEvent: false,
-    shouldBroadcastRuntimeState: false
+    shouldBroadcastRuntimeState: false,
   },
   internal: {
     shouldSetRuntimeLastError: true,
     shouldRecordServerError: true,
     shouldPushSystemEvent: true,
-    shouldBroadcastRuntimeState: true
-  }
+    shouldBroadcastRuntimeState: true,
+  },
 };
 
 export interface ServerRequestErrorContext {
@@ -104,13 +104,14 @@ export class ServerRequestErrorResponder {
   public respond<ErrorType>(input: ServerRequestErrorResponseInput<ErrorType>): void {
     const { req, res, error, context } = input;
     const normalizedError = this.normalizeError(error);
-    const classification = normalizedError instanceof z.ZodError
-      ? this.classifier.classifyValidationError(normalizedError.message)
-      : this.classifier.classifyRuntimeError(
-          normalizedError,
-          this.deps.isExpectedShutdownTransportError,
-          this.deps.toErrorMessage
-        );
+    const classification =
+      normalizedError instanceof z.ZodError
+        ? this.classifier.classifyValidationError(normalizedError.message)
+        : this.classifier.classifyRuntimeError(
+            normalizedError,
+            this.deps.isExpectedShutdownTransportError,
+            this.deps.toErrorMessage,
+          );
     const responseBehavior = RESPONSE_BEHAVIOR_BY_ERROR_CATEGORY[classification.category];
     const requestRuntimeMetadata = this.createRequestRuntimeMetadata(req, context);
     const logInput = this.createLogInput(requestRuntimeMetadata, classification);
@@ -124,13 +125,13 @@ export class ServerRequestErrorResponder {
       requestUrl: req.url ?? null,
       logInput,
       classification,
-      shouldRecordServerError: responseBehavior.shouldRecordServerError
+      shouldRecordServerError: responseBehavior.shouldRecordServerError,
     });
     this.logClassification(classification, logInput);
 
     if (responseBehavior.shouldPushSystemEvent) {
       this.deps.pushSystem(REQUEST_FAILED_SYSTEM_MESSAGE, {
-        ...logInput
+        ...logInput,
       });
     }
 
@@ -141,7 +142,7 @@ export class ServerRequestErrorResponder {
     this.writeErrorResponse({
       res,
       classification,
-      context
+      context,
     });
   }
 
@@ -152,7 +153,8 @@ export class ServerRequestErrorResponder {
     classification: ServerTransportErrorClassification;
     shouldRecordServerError: boolean;
   }): void {
-    const { normalizedError, requestUrl, logInput, classification, shouldRecordServerError } = input;
+    const { normalizedError, requestUrl, logInput, classification, shouldRecordServerError } =
+      input;
     if (!shouldRecordServerError) {
       return;
     }
@@ -172,24 +174,24 @@ export class ServerRequestErrorResponder {
           method: logInput.method,
           actionId: logInput.actionId,
           actionName: logInput.actionName,
-          errorCategory: logInput.errorCategory
-        }
+          errorCategory: logInput.errorCategory,
+        },
       });
     } catch (recordError) {
       logger.error(
         {
           error: this.deps.toErrorMessage(recordError),
           originalError: classification.runtimeErrorMessage,
-          errorCategory: classification.category
+          errorCategory: classification.category,
         },
-        "server-error-record-failed"
+        "server-error-record-failed",
       );
     }
   }
 
   private logClassification(
     classification: ServerTransportErrorClassification,
-    logInput: ServerRequestErrorLogInput
+    logInput: ServerRequestErrorLogInput,
   ): void {
     if (classification.logLevel === "info") {
       logger.info(logInput, classification.logEventName);
@@ -214,25 +216,25 @@ export class ServerRequestErrorResponder {
 
   private createRequestRuntimeMetadata(
     req: IncomingMessage,
-    context: ServerRequestErrorContext
+    context: ServerRequestErrorContext,
   ): ServerRequestRuntimeMetadata {
     return {
       method: req.method ?? UNKNOWN_REQUEST_METHOD,
       url: req.url ?? UNKNOWN_REQUEST_URL,
       requestId: context.requestId,
       actionId: context.actionId,
-      actionName: context.actionName
+      actionName: context.actionName,
     };
   }
 
   private createLogInput(
     runtimeMetadata: ServerRequestRuntimeMetadata,
-    classification: ServerTransportErrorClassification
+    classification: ServerTransportErrorClassification,
   ): ServerRequestErrorLogInput {
     return {
       ...runtimeMetadata,
       error: classification.runtimeErrorMessage,
-      errorCategory: classification.category
+      errorCategory: classification.category,
     };
   }
 
@@ -251,7 +253,7 @@ export class ServerRequestErrorResponder {
       error: classification.runtimeErrorMessage,
       requestId: context.requestId,
       actionId: context.actionId,
-      actionName: context.actionName
+      actionName: context.actionName,
     };
 
     this.deps.jsonResponse(res, classification.statusCode, responseBody);

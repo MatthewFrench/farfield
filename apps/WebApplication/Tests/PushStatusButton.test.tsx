@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { PushStatusButton } from "@/Features/PushNotifications/UserInterface/PushStatusButton";
-import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 
 function renderPushStatusButton(input: {
   pushClientState: PushClientState;
@@ -17,7 +17,7 @@ function renderPushStatusButton(input: {
         isEnablingPushNotifications={input.isEnablingPushNotifications ?? false}
         onEnablePushNotifications={input.onEnablePushNotifications ?? (() => {})}
       />
-    </TooltipProvider>
+    </TooltipProvider>,
   );
 }
 
@@ -28,8 +28,8 @@ describe("PushStatusButton", () => {
         supported: false,
         serviceWorkerRegistered: false,
         permission: "unsupported",
-        subscribed: false
-      }
+        subscribed: false,
+      },
     });
 
     expect(screen.queryByTestId("enable-notifications-button")).toBeNull();
@@ -41,8 +41,8 @@ describe("PushStatusButton", () => {
         supported: true,
         serviceWorkerRegistered: true,
         permission: "granted",
-        subscribed: true
-      }
+        subscribed: true,
+      },
     });
 
     const button = screen.getByTestId("enable-notifications-button");
@@ -56,8 +56,8 @@ describe("PushStatusButton", () => {
         supported: true,
         serviceWorkerRegistered: true,
         permission: "denied",
-        subscribed: false
-      }
+        subscribed: false,
+      },
     });
 
     const button = screen.getByTestId("enable-notifications-button");
@@ -73,9 +73,9 @@ describe("PushStatusButton", () => {
         supported: true,
         serviceWorkerRegistered: true,
         permission: "denied",
-        subscribed: true
+        subscribed: true,
       },
-      onEnablePushNotifications
+      onEnablePushNotifications,
     });
 
     const button = screen.getByTestId("enable-notifications-button");
@@ -92,9 +92,9 @@ describe("PushStatusButton", () => {
         supported: true,
         serviceWorkerRegistered: true,
         permission: "default",
-        subscribed: false
+        subscribed: false,
       },
-      isEnablingPushNotifications: true
+      isEnablingPushNotifications: true,
     });
 
     const button = screen.getByTestId("enable-notifications-button");
@@ -110,9 +110,9 @@ describe("PushStatusButton", () => {
         supported: true,
         serviceWorkerRegistered: true,
         permission: "default",
-        subscribed: false
+        subscribed: false,
       },
-      onEnablePushNotifications
+      onEnablePushNotifications,
     });
 
     fireEvent.click(screen.getByTestId("enable-notifications-button"));

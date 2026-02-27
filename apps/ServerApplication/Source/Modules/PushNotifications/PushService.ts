@@ -1,10 +1,10 @@
-import { z } from "zod";
-import webPush from "web-push";
 import {
-  parsePushNotificationPayload,
   type PushNotificationPayload,
-  type StoredPushSubscription
+  parsePushNotificationPayload,
+  type StoredPushSubscription,
 } from "@farfield/protocol";
+import webPush from "web-push";
+import { z } from "zod";
 
 export interface PushServiceConfig {
   enabled: boolean;
@@ -30,7 +30,7 @@ const WebPushErrorSchema = z
   .object({
     statusCode: z.number().int().optional(),
     body: z.string().optional(),
-    message: z.string().optional()
+    message: z.string().optional(),
   })
   .passthrough();
 
@@ -57,13 +57,13 @@ function describePushError<ErrorType>(error: ErrorType): DescribedPushError {
   if (!parsedError.success) {
     return {
       statusCode: null,
-      message: PUSH_SEND_FAILURE_MESSAGE
+      message: PUSH_SEND_FAILURE_MESSAGE,
     };
   }
 
   return {
     statusCode: parsedError.data.statusCode ?? null,
-    message: parsedError.data.message ?? PUSH_SEND_FAILURE_MESSAGE
+    message: parsedError.data.message ?? PUSH_SEND_FAILURE_MESSAGE,
   };
 }
 
@@ -83,7 +83,7 @@ function sleep(delayMs: number): Promise<void> {
 async function sendNotificationWithRetry(
   subscription: webPush.PushSubscription,
   payload: string,
-  requestOptions: webPush.RequestOptions
+  requestOptions: webPush.RequestOptions,
 ): Promise<void> {
   let attempt = 0;
   while (attempt < MAX_PUSH_SEND_ATTEMPTS) {
@@ -93,10 +93,7 @@ async function sendNotificationWithRetry(
     } catch (error) {
       attempt += 1;
       const described = describePushError(error);
-      if (
-        attempt >= MAX_PUSH_SEND_ATTEMPTS ||
-        !shouldRetrySendFailure(described.statusCode)
-      ) {
+      if (attempt >= MAX_PUSH_SEND_ATTEMPTS || !shouldRetrySendFailure(described.statusCode)) {
         throw error;
       }
 
@@ -113,8 +110,8 @@ function toWireSubscription(subscription: StoredPushSubscription): webPush.PushS
     endpoint: subscription.subscription.endpoint,
     keys: {
       p256dh: subscription.subscription.keys.p256dh,
-      auth: subscription.subscription.keys.auth
-    }
+      auth: subscription.subscription.keys.auth,
+    },
   };
 }
 
@@ -127,7 +124,7 @@ interface PushDispatchResult {
 async function sendSubscriptionsWithConcurrencyLimit(
   subscriptions: StoredPushSubscription[],
   payload: string,
-  requestOptions: webPush.RequestOptions
+  requestOptions: webPush.RequestOptions,
 ): Promise<PushDispatchResult> {
   const failures: PushSendFailure[] = [];
   const prunedEndpoints: string[] = [];
@@ -146,11 +143,7 @@ async function sendSubscriptionsWithConcurrencyLimit(
       }
 
       try {
-        await sendNotificationWithRetry(
-          toWireSubscription(subscription),
-          payload,
-          requestOptions
-        );
+        await sendNotificationWithRetry(toWireSubscription(subscription), payload, requestOptions);
         delivered += 1;
       } catch (error) {
         const described = describePushError(error);
@@ -158,11 +151,11 @@ async function sendSubscriptionsWithConcurrencyLimit(
         failures.push({
           endpoint: subscription.subscription.endpoint,
           statusCode: described.statusCode,
-          message: described.message
+          message: described.message,
         });
         if (
-          described.statusCode !== null
-          && PRUNED_PUSH_SUBSCRIPTION_STATUS_CODES.has(described.statusCode)
+          described.statusCode !== null &&
+          PRUNED_PUSH_SUBSCRIPTION_STATUS_CODES.has(described.statusCode)
         ) {
           prunedEndpoints.push(subscription.subscription.endpoint);
         }
@@ -174,7 +167,7 @@ async function sendSubscriptionsWithConcurrencyLimit(
   return {
     delivered,
     failures,
-    prunedEndpoints
+    prunedEndpoints,
   };
 }
 
@@ -183,7 +176,7 @@ function buildDisabledPushSendResult(): PushSendResult {
     attempted: 0,
     delivered: 0,
     failures: [],
-    prunedEndpoints: []
+    prunedEndpoints: [],
   };
 }
 
@@ -216,7 +209,7 @@ export class PushService {
 
   public async sendToSubscriptions(
     subscriptions: StoredPushSubscription[],
-    payload: PushNotificationPayload
+    payload: PushNotificationPayload,
   ): Promise<PushSendResult> {
     if (!this.enabled) {
       return buildDisabledPushSendResult();
@@ -226,19 +219,19 @@ export class PushService {
     const body = JSON.stringify(strictPayload);
     const requestOptions: webPush.RequestOptions = {
       TTL: PUSH_REQUEST_TIME_TO_LIVE_SECONDS,
-      urgency: PUSH_REQUEST_URGENCY
+      urgency: PUSH_REQUEST_URGENCY,
     };
     const sendResult = await sendSubscriptionsWithConcurrencyLimit(
       subscriptions,
       body,
-      requestOptions
+      requestOptions,
     );
 
     return {
       attempted: subscriptions.length,
       delivered: sendResult.delivered,
       failures: sendResult.failures,
-      prunedEndpoints: sendResult.prunedEndpoints
+      prunedEndpoints: sendResult.prunedEndpoints,
     };
   }
 }

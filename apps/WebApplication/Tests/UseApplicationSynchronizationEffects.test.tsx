@@ -1,15 +1,9 @@
 import { cleanup, render } from "@testing-library/react";
-import {
-  afterEach,
-  describe,
-  expect,
-  it,
-  vi
-} from "vitest";
 import type { MutableRefObject } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  type UseApplicationSynchronizationEffectsInput,
   useApplicationSynchronizationEffects,
-  type UseApplicationSynchronizationEffectsInput
 } from "../Source/Application/StateManagement/UseApplicationSynchronizationEffects";
 
 interface HarnessProperties {
@@ -32,12 +26,19 @@ describe("useApplicationSynchronizationEffects", () => {
 
   it("keeps loader refs synchronized with the latest owner functions", () => {
     const loadCoreDataTrackedRef = createLoaderReference<() => Promise<void>>();
-    const loadSelectedThreadRef = createLoaderReference<
-      (threadId: string, options?: { includeReadThread?: boolean; includeTurns?: boolean }) => Promise<void>
-    >();
+    const loadSelectedThreadRef =
+      createLoaderReference<
+        (
+          threadId: string,
+          options?: { includeReadThread?: boolean; includeTurns?: boolean },
+        ) => Promise<void>
+      >();
     const firstLoadCoreDataTracked = vi.fn(async (): Promise<void> => {});
     const firstLoadSelectedThreadTracked = vi.fn(
-      async (_threadId: string, _options?: { includeReadThread?: boolean; includeTurns?: boolean }): Promise<void> => {}
+      async (
+        _threadId: string,
+        _options?: { includeReadThread?: boolean; includeTurns?: boolean },
+      ): Promise<void> => {},
     );
     const loadHistoryDetail = vi.fn(async (_historyEntryId: string): Promise<void> => {});
     const handleRuntimeRequestError = vi.fn();
@@ -51,9 +52,9 @@ describe("useApplicationSynchronizationEffects", () => {
           loadSelectedThreadRef,
           loadHistoryDetail,
           selectedHistoryId: "",
-          handleRuntimeRequestError
+          handleRuntimeRequestError,
         }}
-      />
+      />,
     );
 
     expect(loadCoreDataTrackedRef.current).toBe(firstLoadCoreDataTracked);
@@ -61,7 +62,10 @@ describe("useApplicationSynchronizationEffects", () => {
 
     const secondLoadCoreDataTracked = vi.fn(async (): Promise<void> => {});
     const secondLoadSelectedThreadTracked = vi.fn(
-      async (_threadId: string, _options?: { includeReadThread?: boolean; includeTurns?: boolean }): Promise<void> => {}
+      async (
+        _threadId: string,
+        _options?: { includeReadThread?: boolean; includeTurns?: boolean },
+      ): Promise<void> => {},
     );
 
     rerender(
@@ -73,9 +77,9 @@ describe("useApplicationSynchronizationEffects", () => {
           loadSelectedThreadRef,
           loadHistoryDetail,
           selectedHistoryId: "",
-          handleRuntimeRequestError
+          handleRuntimeRequestError,
         }}
-      />
+      />,
     );
 
     expect(loadCoreDataTrackedRef.current).toBe(secondLoadCoreDataTracked);
@@ -91,16 +95,23 @@ describe("useApplicationSynchronizationEffects", () => {
           loadCoreDataTracked: vi.fn(async (): Promise<void> => {}),
           loadCoreDataTrackedRef: createLoaderReference<() => Promise<void>>(),
           loadSelectedThreadTracked: vi.fn(
-            async (_threadId: string, _options?: { includeReadThread?: boolean; includeTurns?: boolean }): Promise<void> => {}
+            async (
+              _threadId: string,
+              _options?: { includeReadThread?: boolean; includeTurns?: boolean },
+            ): Promise<void> => {},
           ),
-          loadSelectedThreadRef: createLoaderReference<
-            (threadId: string, options?: { includeReadThread?: boolean; includeTurns?: boolean }) => Promise<void>
-          >(),
+          loadSelectedThreadRef:
+            createLoaderReference<
+              (
+                threadId: string,
+                options?: { includeReadThread?: boolean; includeTurns?: boolean },
+              ) => Promise<void>
+            >(),
           loadHistoryDetail,
           selectedHistoryId: "",
-          handleRuntimeRequestError: vi.fn()
+          handleRuntimeRequestError: vi.fn(),
         }}
-      />
+      />,
     );
 
     expect(loadHistoryDetail).not.toHaveBeenCalled();
@@ -119,16 +130,23 @@ describe("useApplicationSynchronizationEffects", () => {
           loadCoreDataTracked: vi.fn(async (): Promise<void> => {}),
           loadCoreDataTrackedRef: createLoaderReference<() => Promise<void>>(),
           loadSelectedThreadTracked: vi.fn(
-            async (_threadId: string, _options?: { includeReadThread?: boolean; includeTurns?: boolean }): Promise<void> => {}
+            async (
+              _threadId: string,
+              _options?: { includeReadThread?: boolean; includeTurns?: boolean },
+            ): Promise<void> => {},
           ),
-          loadSelectedThreadRef: createLoaderReference<
-            (threadId: string, options?: { includeReadThread?: boolean; includeTurns?: boolean }) => Promise<void>
-          >(),
+          loadSelectedThreadRef:
+            createLoaderReference<
+              (
+                threadId: string,
+                options?: { includeReadThread?: boolean; includeTurns?: boolean },
+              ) => Promise<void>
+            >(),
           loadHistoryDetail,
           selectedHistoryId: "history-1",
-          handleRuntimeRequestError
+          handleRuntimeRequestError,
         }}
-      />
+      />,
     );
 
     await Promise.resolve();

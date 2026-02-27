@@ -1,12 +1,12 @@
 import { z } from "zod";
+import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import {
-  archiveThread,
-  createThread,
   type ApiCreateThreadInput,
   type ApiCreateThreadResponse,
-  unarchiveThread
+  archiveThread,
+  createThread,
+  unarchiveThread,
 } from "./ThreadApi";
-import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
 export type ThreadMutationCreateThreadInput = ApiCreateThreadInput;
 export type ThreadMutationCreateThreadResponse = ApiCreateThreadResponse;
@@ -22,7 +22,7 @@ const INVALID_THREAD_IDENTIFIER_MESSAGE =
 export class ThreadMutationServerClient {
   public async createThread(
     input?: ThreadMutationCreateThreadInput,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<ThreadMutationCreateThreadResponse> {
     return createThread(input, options);
   }

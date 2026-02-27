@@ -49,7 +49,7 @@ export class OpenCodeDirectoryOwner {
 
   public async resolveSessionDirectories(
     inputDirectory: string | null,
-    listProjectDirectories: () => Promise<string[]>
+    listProjectDirectories: () => Promise<string[]>,
   ): Promise<string[]> {
     if (hasTrimmedText(inputDirectory)) {
       return [this.normalizeDirectoryInput(inputDirectory)];

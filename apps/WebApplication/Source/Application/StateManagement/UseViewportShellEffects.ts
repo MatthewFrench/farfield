@@ -1,9 +1,9 @@
 import {
-  useEffect,
   type Dispatch,
   type MutableRefObject,
   type RefObject,
-  type SetStateAction
+  type SetStateAction,
+  useEffect,
 } from "react";
 import { ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { PageTouchOverscrollGuardCoordinator } from "./PageTouchOverscrollGuardCoordinator";
@@ -25,7 +25,7 @@ export interface UseViewportShellEffectsInput {
 }
 
 function cancelScheduledKeyboardOpenPin(
-  keyboardOpenScrollRafReference: MutableRefObject<number | null>
+  keyboardOpenScrollRafReference: MutableRefObject<number | null>,
 ): void {
   const keyboardOpenScrollRafRef = keyboardOpenScrollRafReference;
   if (keyboardOpenScrollRafRef.current === null) {
@@ -37,7 +37,7 @@ function cancelScheduledKeyboardOpenPin(
 
 function scheduleKeyboardOpenPin(
   keyboardOpenScrollRafReference: MutableRefObject<number | null>,
-  callback: () => void
+  callback: () => void,
 ): void {
   const keyboardOpenScrollRafRef = keyboardOpenScrollRafReference;
   keyboardOpenScrollRafRef.current = window.requestAnimationFrame(() => {
@@ -64,10 +64,10 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
       viewportKeyboardStateRef.current = metrics.keyboardOpen;
 
       if (
-        metrics.keyboardOpen
-        && previousKeyboardState !== true
-        && window.matchMedia(POINTER_COARSE_MEDIA_QUERY).matches
-        && input.activeTabRef.current === "chat"
+        metrics.keyboardOpen &&
+        previousKeyboardState !== true &&
+        window.matchMedia(POINTER_COARSE_MEDIA_QUERY).matches &&
+        input.activeTabRef.current === "chat"
       ) {
         cancelScheduledKeyboardOpenPin(input.keyboardOpenScrollRafRef);
         scheduleKeyboardOpenPin(input.keyboardOpenScrollRafRef, () => {
@@ -130,7 +130,7 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
     input.runtimeViewportSizingCoordinator,
     input.scrollRef,
     input.setIsChatAtBottom,
-    input.viewportKeyboardStateRef
+    input.viewportKeyboardStateRef,
   ]);
 
   useEffect(() => {

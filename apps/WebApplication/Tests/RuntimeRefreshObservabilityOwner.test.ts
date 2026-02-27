@@ -1,12 +1,8 @@
+import { describe, expect, it } from "vitest";
 import {
-  describe,
-  expect,
-  it
-} from "vitest";
-import {
-  RuntimeRefreshObservabilityOwner,
   type RuntimeRefreshMeasurement,
-  type RuntimeRefreshObservabilityClock
+  type RuntimeRefreshObservabilityClock,
+  RuntimeRefreshObservabilityOwner,
 } from "../Source/Application/StateManagement/RuntimeRefreshObservabilityOwner";
 
 class DeterministicRuntimeRefreshObservabilityClock implements RuntimeRefreshObservabilityClock {
@@ -109,7 +105,7 @@ describe("RuntimeRefreshObservabilityOwner", () => {
 
     const untrackedMeasurement: RuntimeRefreshMeasurement = {
       startedAtEpochMilliseconds: 20_000,
-      startedAtHighResolutionMilliseconds: 30_000
+      startedAtHighResolutionMilliseconds: 30_000,
     };
     expect(owner.completeRefreshFailure(untrackedMeasurement)).toBe(false);
 

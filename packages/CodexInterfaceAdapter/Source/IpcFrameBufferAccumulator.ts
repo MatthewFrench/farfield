@@ -57,7 +57,7 @@ export class IpcFrameBufferAccumulator {
     if (size > maxFrameSizeBytes) {
       return {
         type: "frame-too-large",
-        size
+        size,
       };
     }
 
@@ -73,7 +73,7 @@ export class IpcFrameBufferAccumulator {
 
     return {
       type: "payload",
-      payload
+      payload,
     };
   }
 

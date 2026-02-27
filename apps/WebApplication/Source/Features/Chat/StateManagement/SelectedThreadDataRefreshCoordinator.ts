@@ -1,13 +1,13 @@
 import { isTransientReadThreadError } from "@/Features/Chat/DomainModel/ReadThreadErrorClassifier";
+import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import type {
   ChatLiveStateResponse,
   ChatReadStreamEventsOptions,
   ChatReadThreadOptions,
   ChatReadThreadResponse,
-  ChatStreamEventsResponse
+  ChatStreamEventsResponse,
 } from "../DataAccess/ChatServerClient";
-import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
 export type SelectedThreadLiveStateSnapshot = ChatLiveStateResponse;
 export type SelectedThreadStreamEventsSnapshot = ChatStreamEventsResponse;
@@ -16,15 +16,15 @@ export type SelectedThreadReadThreadSnapshot = ChatReadThreadResponse;
 export interface SelectedThreadDataRefreshChatClient {
   readThread(
     threadId: string,
-    options?: ChatReadThreadOptions
+    options?: ChatReadThreadOptions,
   ): Promise<SelectedThreadReadThreadSnapshot>;
   readLiveState(
     threadId: string,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<SelectedThreadLiveStateSnapshot>;
   readStreamEvents(
     threadId: string,
-    options?: ChatReadStreamEventsOptions
+    options?: ChatReadStreamEventsOptions,
   ): Promise<SelectedThreadStreamEventsSnapshot>;
 }
 
@@ -73,7 +73,7 @@ interface SelectedThreadReadThreadRetryState {
 const DEFAULT_RETRY_CONFIGURATION: SelectedThreadDataRefreshRetryConfiguration = {
   maximumAttempts: 6,
   baseDelayMilliseconds: 140,
-  maximumDelayMilliseconds: 1_000
+  maximumDelayMilliseconds: 1_000,
 };
 const STREAM_EVENTS_EMPTY_SEQUENCE = 0;
 const READ_THREAD_RETRY_BACKOFF_MULTIPLIER = 2;
@@ -90,7 +90,7 @@ function buildUnreadableLiveStateSnapshot(threadId: string): SelectedThreadLiveS
     threadId,
     ownerClientId: null,
     conversationState: null,
-    liveStateError: null
+    liveStateError: null,
   };
 }
 
@@ -102,7 +102,7 @@ function buildUnreadableStreamEventsSnapshot(threadId: string): SelectedThreadSt
     events: [],
     nextSequence: STREAM_EVENTS_EMPTY_SEQUENCE,
     firstAvailableSequence: STREAM_EVENTS_EMPTY_SEQUENCE,
-    resetRequired: false
+    resetRequired: false,
   };
 }
 
@@ -121,18 +121,21 @@ export class SelectedThreadDataRefreshCoordinator {
     this.isTransientReadError = dependencies?.isTransientReadError ?? isTransientReadThreadError;
   }
 
-  public async readSnapshot(input: SelectedThreadDataRefreshInput): Promise<SelectedThreadDataRefreshResult> {
-    const readThreadSnapshotPromise: Promise<SelectedThreadReadThreadSnapshotResult> = input.includeReadThread
-      ? this.readThreadSnapshotWithRetry(input)
-      : Promise.resolve({
-        readThreadSnapshot: null,
-        includeTurnsUsedForRead: input.includeTurns
-      });
+  public async readSnapshot(
+    input: SelectedThreadDataRefreshInput,
+  ): Promise<SelectedThreadDataRefreshResult> {
+    const readThreadSnapshotPromise: Promise<SelectedThreadReadThreadSnapshotResult> =
+      input.includeReadThread
+        ? this.readThreadSnapshotWithRetry(input)
+        : Promise.resolve({
+            readThreadSnapshot: null,
+            includeTurnsUsedForRead: input.includeTurns,
+          });
 
     const [liveStateSnapshot, streamEventsSnapshot, readThreadSnapshotResult] = await Promise.all([
       this.readLiveStateSnapshot(input),
       this.readStreamEventsSnapshot(input),
-      readThreadSnapshotPromise
+      readThreadSnapshotPromise,
     ]);
 
     return {
@@ -143,13 +146,13 @@ export class SelectedThreadDataRefreshCoordinator {
       includeTurnsUsedForRead: readThreadSnapshotResult.includeTurnsUsedForRead,
       containsAnyTurns: this.hasAnyTurns(
         liveStateSnapshot,
-        readThreadSnapshotResult.readThreadSnapshot
-      )
+        readThreadSnapshotResult.readThreadSnapshot,
+      ),
     };
   }
 
   private async readLiveStateSnapshot(
-    input: SelectedThreadDataRefreshInput
+    input: SelectedThreadDataRefreshInput,
   ): Promise<SelectedThreadLiveStateSnapshot> {
     if (!input.canReadLiveState) {
       return buildUnreadableLiveStateSnapshot(input.threadId);
@@ -161,34 +164,38 @@ export class SelectedThreadDataRefreshCoordinator {
   }
 
   private async readStreamEventsSnapshot(
-    input: SelectedThreadDataRefreshInput
+    input: SelectedThreadDataRefreshInput,
   ): Promise<SelectedThreadStreamEventsSnapshot> {
     if (!input.canReadStreamEvents) {
       return buildUnreadableStreamEventsSnapshot(input.threadId);
     }
     return input.chatClient.readStreamEvents(
       input.threadId,
-      this.buildStreamEventsRequestOptions(input.streamEventsSinceSequence, input.signal)
+      this.buildStreamEventsRequestOptions(input.streamEventsSinceSequence, input.signal),
     );
   }
 
   private async readThreadSnapshotWithRetry(
-    input: SelectedThreadDataRefreshInput
+    input: SelectedThreadDataRefreshInput,
   ): Promise<SelectedThreadReadThreadSnapshotResult> {
     const retryState: SelectedThreadReadThreadRetryState = {
       includeTurnsForRead: input.includeTurns,
-      nextRetryDelayMilliseconds: this.retryConfiguration.baseDelayMilliseconds
+      nextRetryDelayMilliseconds: this.retryConfiguration.baseDelayMilliseconds,
     };
 
-    for (let attemptIndex = 0; attemptIndex < this.retryConfiguration.maximumAttempts; attemptIndex += 1) {
+    for (
+      let attemptIndex = 0;
+      attemptIndex < this.retryConfiguration.maximumAttempts;
+      attemptIndex += 1
+    ) {
       try {
         const readThreadSnapshot = await input.chatClient.readThread(
           input.threadId,
-          this.buildReadThreadRequestOptions(retryState.includeTurnsForRead, input.signal)
+          this.buildReadThreadRequestOptions(retryState.includeTurnsForRead, input.signal),
         );
         return {
           readThreadSnapshot,
-          includeTurnsUsedForRead: retryState.includeTurnsForRead
+          includeTurnsUsedForRead: retryState.includeTurnsForRead,
         };
       } catch (error) {
         if (!this.canRetryReadThread(error, attemptIndex)) {
@@ -199,13 +206,13 @@ export class SelectedThreadDataRefreshCoordinator {
         retryState.includeTurnsForRead = true;
         await this.waitForMilliseconds(retryState.nextRetryDelayMilliseconds);
         retryState.nextRetryDelayMilliseconds = this.computeNextRetryDelayMilliseconds(
-          retryState.nextRetryDelayMilliseconds
+          retryState.nextRetryDelayMilliseconds,
         );
       }
     }
 
     throw new Error(
-      `Failed to read thread after ${String(this.retryConfiguration.maximumAttempts)} attempts`
+      `Failed to read thread after ${String(this.retryConfiguration.maximumAttempts)} attempts`,
     );
   }
 
@@ -219,36 +226,36 @@ export class SelectedThreadDataRefreshCoordinator {
   private computeNextRetryDelayMilliseconds(currentDelayMilliseconds: number): number {
     return Math.min(
       currentDelayMilliseconds * READ_THREAD_RETRY_BACKOFF_MULTIPLIER,
-      this.retryConfiguration.maximumDelayMilliseconds
+      this.retryConfiguration.maximumDelayMilliseconds,
     );
   }
 
   private hasAnyTurns(
     liveStateSnapshot: SelectedThreadLiveStateSnapshot,
-    readThreadSnapshot: SelectedThreadReadThreadSnapshot | null
+    readThreadSnapshot: SelectedThreadReadThreadSnapshot | null,
   ): boolean {
     return (
-      (liveStateSnapshot.conversationState?.turns.length ?? 0) > 0
-      || (readThreadSnapshot?.thread.turns.length ?? 0) > 0
+      (liveStateSnapshot.conversationState?.turns.length ?? 0) > 0 ||
+      (readThreadSnapshot?.thread.turns.length ?? 0) > 0
     );
   }
 
   private buildReadThreadRequestOptions(
     includeTurns: boolean,
-    signal: AbortSignal | undefined
+    signal: AbortSignal | undefined,
   ): ChatReadThreadOptions {
     if (!signal) {
       return { includeTurns };
     }
     return {
       includeTurns,
-      signal
+      signal,
     };
   }
 
   private buildStreamEventsRequestOptions(
     streamEventsSinceSequence: number | null,
-    signal: AbortSignal | undefined
+    signal: AbortSignal | undefined,
   ): ChatReadStreamEventsOptions {
     const options: ChatReadStreamEventsOptions = {};
     if (streamEventsSinceSequence !== null) {

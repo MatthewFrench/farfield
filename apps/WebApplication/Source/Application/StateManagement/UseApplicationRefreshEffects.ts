@@ -1,13 +1,8 @@
-import {
-  useEffect,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction
-} from "react";
+import { type Dispatch, type MutableRefObject, type SetStateAction, useEffect } from "react";
 import { ApplicationRouteStateMapper } from "@/Application/DomainModel/ApplicationRouteStateMapper";
+import type { DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { DebugIssueStateResolver } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
-import type { DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 
 const DEBUG_APPLICATION_TAB = "debug";
 const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
@@ -15,7 +10,7 @@ const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
 function readNextWatchdogDelayMilliseconds(
   eventsConnected: boolean,
   connectedMinimumIntervalMilliseconds: number,
-  disconnectedIntervalMilliseconds: number
+  disconnectedIntervalMilliseconds: number,
 ): number {
   return eventsConnected ? connectedMinimumIntervalMilliseconds : disconnectedIntervalMilliseconds;
 }
@@ -37,9 +32,8 @@ function shouldRefreshCoreDataForWatchdogCycle(input: WatchdogRefreshDecisionInp
     return true;
   }
 
-  const elapsedSinceLastCoreRefreshMilliseconds = (
-    input.nowMilliseconds - input.lastCoreRefreshAtMilliseconds
-  );
+  const elapsedSinceLastCoreRefreshMilliseconds =
+    input.nowMilliseconds - input.lastCoreRefreshAtMilliseconds;
   return elapsedSinceLastCoreRefreshMilliseconds >= input.connectedMinimumIntervalMilliseconds;
 }
 
@@ -70,7 +64,7 @@ export interface UseApplicationRefreshEffectsInput {
   loadArchivedThreads: () => Promise<void>;
   refreshCoreDataAndSelectedThread: () => Promise<void>;
   refreshPushClientState: () => Promise<void>;
-  handleRuntimeRequestError: <ErrorType,>(error: ErrorType) => void;
+  handleRuntimeRequestError: <ErrorType>(error: ErrorType) => void;
   coreRefreshIntervalMs: number;
   coreRefreshConnectedMinIntervalMs: number;
 }
@@ -86,14 +80,14 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
     input.setUnreadThreadIds((previousUnreadThreadIdentifiers) =>
       input.threadListStateController.computeUnreadThreadIdentifiersAfterSelectionChange({
         previousUnreadThreadIdentifiers,
-        selectedThreadIdentifier: input.selectedThreadId
-      })
+        selectedThreadIdentifier: input.selectedThreadId,
+      }),
     );
   }, [
     input.selectedThreadId,
     input.selectedThreadIdRef,
     input.setUnreadThreadIds,
-    input.threadListStateController
+    input.threadListStateController,
   ]);
 
   useEffect(() => {
@@ -117,10 +111,11 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   }, [input.activeTab, input.handleRuntimeRequestError, input.loadCoreDataTracked]);
 
   useEffect(() => {
-    const nextSelectedDebugIssueIdentifier = input.debugIssueStateResolver.readNextSelectedDebugIssueIdentifier({
-      debugIssues: input.filteredDebugIssues,
-      selectedIssueIdentifier: input.selectedDebugIssueId
-    });
+    const nextSelectedDebugIssueIdentifier =
+      input.debugIssueStateResolver.readNextSelectedDebugIssueIdentifier({
+        debugIssues: input.filteredDebugIssues,
+        selectedIssueIdentifier: input.selectedDebugIssueId,
+      });
 
     if (nextSelectedDebugIssueIdentifier !== input.selectedDebugIssueId) {
       input.setSelectedDebugIssueId(nextSelectedDebugIssueIdentifier);
@@ -129,7 +124,7 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
     input.debugIssueStateResolver,
     input.filteredDebugIssues,
     input.selectedDebugIssueId,
-    input.setSelectedDebugIssueId
+    input.setSelectedDebugIssueId,
   ]);
 
   useEffect(() => {
@@ -144,7 +139,9 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
 
   useEffect(() => {
     const onPopState = () => {
-      const nextRouteState = input.applicationRouteStateMapper.parseFromPathname(window.location.pathname);
+      const nextRouteState = input.applicationRouteStateMapper.parseFromPathname(
+        window.location.pathname,
+      );
       input.setSelectedThreadId(nextRouteState.threadId);
       input.setActiveTab(nextRouteState.tab);
     };
@@ -158,7 +155,7 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   useEffect(() => {
     const nextPath = input.applicationRouteStateMapper.buildPath({
       threadId: input.selectedThreadId,
-      tab: input.activeTab
+      tab: input.activeTab,
     });
     if (window.location.pathname === nextPath) {
       return;
@@ -217,8 +214,8 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
         readNextWatchdogDelayMilliseconds(
           input.eventsConnectedRef.current,
           input.coreRefreshConnectedMinIntervalMs,
-          input.coreRefreshIntervalMs
-        )
+          input.coreRefreshIntervalMs,
+        ),
       );
     };
 
@@ -232,7 +229,7 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
           eventsConnected: input.eventsConnectedRef.current,
           nowMilliseconds: Date.now(),
           lastCoreRefreshAtMilliseconds: input.lastCoreRefreshAtRef.current,
-          connectedMinimumIntervalMilliseconds: input.coreRefreshConnectedMinIntervalMs
+          connectedMinimumIntervalMilliseconds: input.coreRefreshConnectedMinIntervalMs,
         });
 
         if (shouldRefreshCoreData) {
@@ -266,6 +263,6 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
     input.eventsConnectedRef,
     input.handleRuntimeRequestError,
     input.lastCoreRefreshAtRef,
-    input.loadCoreDataTracked
+    input.loadCoreDataTracked,
   ]);
 }

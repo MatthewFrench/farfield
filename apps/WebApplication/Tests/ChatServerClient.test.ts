@@ -7,7 +7,7 @@ vi.mock("../Source/Features/Chat/DataAccess/ChatApi", () => ({
   readThread: vi.fn(),
   sendMessage: vi.fn(),
   setCollaborationMode: vi.fn(),
-  submitUserInput: vi.fn()
+  submitUserInput: vi.fn(),
 }));
 
 import {
@@ -17,13 +17,13 @@ import {
   readThread,
   sendMessage,
   setCollaborationMode,
-  submitUserInput
+  submitUserInput,
 } from "../Source/Features/Chat/DataAccess/ChatApi";
 import {
-  ChatServerClient,
   type ChatLiveStateResponse,
   type ChatReadThreadResponse,
-  type ChatStreamEventsResponse
+  ChatServerClient,
+  type ChatStreamEventsResponse,
 } from "../Source/Features/Chat/DataAccess/ChatServerClient";
 
 function createReadThreadSnapshot(): ChatReadThreadResponse {
@@ -41,11 +41,11 @@ function createReadThreadSnapshot(): ChatReadThreadResponse {
         settings: {
           model: "gpt-5.3-codex",
           reasoning_effort: "medium",
-          developer_instructions: null
-        }
-      }
+          developer_instructions: null,
+        },
+      },
     },
-    agentId: "codex"
+    agentId: "codex",
   };
 }
 
@@ -55,7 +55,7 @@ function createLiveStateSnapshot(): ChatLiveStateResponse {
     threadId: "thread-1",
     ownerClientId: null,
     conversationState: null,
-    liveStateError: null
+    liveStateError: null,
   };
 }
 
@@ -67,7 +67,7 @@ function createStreamEventsSnapshot(): ChatStreamEventsResponse {
     events: [],
     nextSequence: 20,
     firstAvailableSequence: 0,
-    resetRequired: false
+    resetRequired: false,
   };
 }
 
@@ -86,9 +86,13 @@ describe("ChatServerClient", () => {
   it("delegates read calls to ChatApi and returns typed snapshots", async () => {
     const chatServerClient = new ChatServerClient();
 
-    const readThreadSnapshot = await chatServerClient.readThread("thread-1", { includeTurns: true });
+    const readThreadSnapshot = await chatServerClient.readThread("thread-1", {
+      includeTurns: true,
+    });
     const liveStateSnapshot = await chatServerClient.readLiveState("thread-1");
-    const streamEventsSnapshot = await chatServerClient.readStreamEvents("thread-1", { sinceSequence: 10 });
+    const streamEventsSnapshot = await chatServerClient.readStreamEvents("thread-1", {
+      sinceSequence: 10,
+    });
 
     expect(readThread).toHaveBeenCalledWith("thread-1", { includeTurns: true });
     expect(getLiveState).toHaveBeenCalledWith("thread-1", undefined);
@@ -104,7 +108,7 @@ describe("ChatServerClient", () => {
     await chatServerClient.sendMessage({
       threadId: "thread-1",
       ownerClientId: "client-1",
-      text: "Hello"
+      text: "Hello",
     });
     await chatServerClient.setCollaborationMode({
       threadId: "thread-1",
@@ -113,9 +117,9 @@ describe("ChatServerClient", () => {
         settings: {
           model: "gpt-5.3-codex",
           reasoning_effort: "medium",
-          developer_instructions: null
-        }
-      }
+          developer_instructions: null,
+        },
+      },
     });
     await chatServerClient.submitUserInput({
       threadId: "thread-1",
@@ -123,13 +127,13 @@ describe("ChatServerClient", () => {
       response: {
         answers: {
           "question-1": {
-            answers: ["option-1"]
-          }
-        }
-      }
+            answers: ["option-1"],
+          },
+        },
+      },
     });
     await chatServerClient.interruptThread({
-      threadId: "thread-1"
+      threadId: "thread-1",
     });
 
     expect(sendMessage).toHaveBeenCalledTimes(1);

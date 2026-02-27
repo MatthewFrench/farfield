@@ -3,14 +3,14 @@ import {
   AppServerRpcError,
   CodexMonitorService,
   DesktopIpcClient,
-  type SendRequestOptions
+  type SendRequestOptions,
 } from "@farfield/api";
 import type {
   AppServerCollaborationModeListResponse,
   AppServerListModelsResponse,
   IpcFrame,
   IpcRequestFrame,
-  IpcResponseFrame
+  IpcResponseFrame,
 } from "@farfield/protocol";
 import type {
   AgentAdapter,
@@ -28,7 +28,7 @@ import type {
   AgentSetCollaborationModeInput,
   AgentSubmitUserInputInput,
   AgentThreadLiveState,
-  AgentThreadStreamEvents
+  AgentThreadStreamEvents,
 } from "../Types.js";
 import { CodexAppServerStderrOwner } from "./CodexAppServerStderrOwner.js";
 import { CodexConnectionLifecycleOwner } from "./CodexConnectionLifecycleOwner.js";
@@ -42,7 +42,7 @@ const CODEX_AGENT_LABEL = "Codex";
 const APP_SERVER_INVALID_REQUEST_ERROR_CODE = -32600;
 const APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT = {
   threadNotLoaded: "thread not loaded",
-  conversationNotFound: "conversation not found"
+  conversationNotFound: "conversation not found",
 } as const;
 const STEERING_UNSUPPORTED_ENDPOINT_ERROR = "Steering messages are not supported on this endpoint.";
 
@@ -68,7 +68,7 @@ const CODEX_AGENT_CAPABILITIES: AgentCapabilities = {
   canSetCollaborationMode: true,
   canSubmitUserInput: true,
   canReadLiveState: true,
-  canReadStreamEvents: true
+  canReadStreamEvents: true,
 };
 
 export interface CodexAgentOptions {
@@ -84,7 +84,7 @@ export interface CodexAgentOptions {
 
 function isInvalidRequestErrorMatchingMessageFragment<ErrorType>(
   error: ErrorType,
-  messageFragment: string
+  messageFragment: string,
 ): boolean {
   if (!(error instanceof AppServerRpcError)) {
     return false;
@@ -123,7 +123,7 @@ export class CodexAgentAdapter implements AgentAdapter {
     this.workspaceDir = options.workspaceDir;
     this.appServerStderrOwner = new CodexAppServerStderrOwner();
     this.threadStreamStateOwner = new CodexThreadStreamStateOwner({
-      invalidStreamEventsLogPath: options.invalidStreamEventsLogPath
+      invalidStreamEventsLogPath: options.invalidStreamEventsLogPath,
     });
 
     this.appClient = new AppServerClient({
@@ -133,11 +133,11 @@ export class CodexAgentAdapter implements AgentAdapter {
       cwd: options.workspaceDir,
       onStderr: (line) => {
         this.appServerStderrOwner.handleStderrLine(line);
-      }
+      },
     });
 
     this.ipcClient = new DesktopIpcClient({
-      socketPath: options.socketPath
+      socketPath: options.socketPath,
     });
     this.service = new CodexMonitorService(this.ipcClient);
     this.connectionLifecycleOwner = new CodexConnectionLifecycleOwner({
@@ -145,9 +145,11 @@ export class CodexAgentAdapter implements AgentAdapter {
       ipcClient: this.ipcClient,
       label: this.label,
       reconnectDelayMs: options.reconnectDelayMs,
-      onStateChange: options.onStateChange ?? null
+      onStateChange: options.onStateChange ?? null,
     });
-    const runAppServerCall = async <ValueType,>(operation: () => Promise<ValueType>): Promise<ValueType> => {
+    const runAppServerCall = async <ValueType>(
+      operation: () => Promise<ValueType>,
+    ): Promise<ValueType> => {
       return this.connectionLifecycleOwner.runAppServerCall(operation);
     };
     this.messageDispatchOwner = new CodexMessageDispatchOwner({
@@ -155,16 +157,16 @@ export class CodexAgentAdapter implements AgentAdapter {
       service: this.service,
       threadStreamStateOwner: this.threadStreamStateOwner,
       runAppServerCall,
-      isConversationNotFoundError: <ErrorType,>(error: ErrorType): boolean => {
+      isConversationNotFoundError: <ErrorType>(error: ErrorType): boolean => {
         return this.isConversationNotFoundError(error);
-      }
+      },
     });
     this.threadManagementOwner = new CodexThreadManagementOwner({
       appClient: this.appClient,
       runAppServerCall,
       ensureCodexAvailable: () => {
         this.ensureCodexAvailable();
-      }
+      },
     });
     this.threadInteractionOwner = new CodexThreadInteractionOwner({
       service: this.service,
@@ -178,7 +180,7 @@ export class CodexAgentAdapter implements AgentAdapter {
       },
       emitIpcFrame: (event) => {
         this.emitIpcFrame(event);
-      }
+      },
     });
 
     this.ipcClient.onConnectionState((state) => {
@@ -192,7 +194,7 @@ export class CodexAgentAdapter implements AgentAdapter {
         direction: INBOUND_IPC_FRAME_DIRECTION,
         frame,
         method: frameDescription.method,
-        threadId: frameDescription.threadId
+        threadId: frameDescription.threadId,
       });
       this.threadStreamStateOwner.ingestInboundFrame(frame);
     });
@@ -216,14 +218,14 @@ export class CodexAgentAdapter implements AgentAdapter {
   public isThreadNotLoadedError(error: Error): boolean {
     return isInvalidRequestErrorMatchingMessageFragment(
       error,
-      APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT.threadNotLoaded
+      APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT.threadNotLoaded,
     );
   }
 
   public isConversationNotFoundError<ErrorType>(error: ErrorType): boolean {
     return isInvalidRequestErrorMatchingMessageFragment(
       error,
-      APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT.conversationNotFound
+      APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT.conversationNotFound,
     );
   }
 
@@ -298,12 +300,14 @@ export class CodexAgentAdapter implements AgentAdapter {
     return this.threadManagementOwner.readConfigDefaults();
   }
 
-  public async setCollaborationMode(input: AgentSetCollaborationModeInput): Promise<{ ownerClientId: string }> {
+  public async setCollaborationMode(
+    input: AgentSetCollaborationModeInput,
+  ): Promise<{ ownerClientId: string }> {
     return this.threadInteractionOwner.setCollaborationMode(input);
   }
 
   public async submitUserInput(
-    input: AgentSubmitUserInputInput
+    input: AgentSubmitUserInputInput,
   ): Promise<{ ownerClientId: string; requestId: number }> {
     return this.threadInteractionOwner.submitUserInput(input);
   }
@@ -314,7 +318,7 @@ export class CodexAgentAdapter implements AgentAdapter {
 
   public async readStreamEvents(
     threadId: string,
-    input: AgentReadStreamEventsInput
+    input: AgentReadStreamEventsInput,
   ): Promise<AgentThreadStreamEvents> {
     return this.threadInteractionOwner.readStreamEvents(threadId, input);
   }
@@ -322,7 +326,7 @@ export class CodexAgentAdapter implements AgentAdapter {
   public async replayRequest(
     method: string,
     params: IpcRequestFrame["params"],
-    options: SendRequestOptions = {}
+    options: SendRequestOptions = {},
   ): Promise<IpcResponseFrame["result"]> {
     return this.threadInteractionOwner.replayRequest(method, params, options);
   }
@@ -330,7 +334,7 @@ export class CodexAgentAdapter implements AgentAdapter {
   public replayBroadcast(
     method: string,
     params: IpcRequestFrame["params"],
-    options: SendRequestOptions = {}
+    options: SendRequestOptions = {},
   ): void {
     this.threadInteractionOwner.replayBroadcast(method, params, options);
   }

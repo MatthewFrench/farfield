@@ -1,39 +1,39 @@
 import { act, cleanup, render } from "@testing-library/react";
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { type Dispatch, type SetStateAction, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CoreDataRefreshConcurrencyCoordinator } from "../Source/Application/StateManagement/CoreDataRefreshConcurrencyCoordinator";
 import {
   STARTUP_CRITICAL_THREADS_OPERATION,
   STARTUP_DEFERRED_AGENTS_OPERATION,
   STARTUP_DEFERRED_DEBUG_HISTORY_OPERATION,
-  STARTUP_DEFERRED_HEALTH_OPERATION
+  STARTUP_DEFERRED_HEALTH_OPERATION,
 } from "../Source/Application/StateManagement/CoreDataStartupRequestProfile";
 import {
   type CoreDataCapabilitySnapshot,
   type CoreDataLoaders,
   type UseCoreDataLoadersInput,
-  useCoreDataLoaders
+  useCoreDataLoaders,
 } from "../Source/Application/StateManagement/UseCoreDataLoaders";
-import { CoreDataRefreshConcurrencyCoordinator } from "../Source/Application/StateManagement/CoreDataRefreshConcurrencyCoordinator";
 import {
-  CapabilityServerClient,
   type CapabilityAgentsResponse,
   type CapabilityCollaborationModesResponse,
   type CapabilityConfigDefaultsResponse,
   type CapabilityHealthResponse,
-  type CapabilityModelsResponse
+  type CapabilityModelsResponse,
+  CapabilityServerClient,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { CapabilitySnapshotCache } from "../Source/Features/Capabilities/DataAccess/CapabilitySnapshotCache";
 import { DebugServerClient } from "../Source/Features/Debugging/DataAccess/DebugServerClient";
 import { DebugWorkspaceDataReader } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
 import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
-import type { ThreadListResponse } from "../Source/Features/Threads/DomainModel/ThreadGroupTypes";
 import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
+import type { ThreadListResponse } from "../Source/Features/Threads/DomainModel/ThreadGroupTypes";
+import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import {
   type LoadActiveThreadStateResult,
-  ThreadListStateController
+  ThreadListStateController,
 } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
-import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement/ThreadListStateStore";
 import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
 import type { AgentId, ApiRequestOptions } from "../Source/Shared/Contracts/ApiContracts";
@@ -49,8 +49,8 @@ const HEALTH_RESPONSE: CapabilityHealthResponse = {
     ipcInitialized: true,
     lastError: null,
     historyCount: 0,
-    threadOwnerCount: 0
-  }
+    threadOwnerCount: 0,
+  },
 };
 const AGENTS_RESPONSE: CapabilityAgentsResponse = {
   ok: true,
@@ -66,12 +66,12 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canSetCollaborationMode: true,
         canSubmitUserInput: true,
         canReadLiveState: true,
-        canReadStreamEvents: true
+        canReadStreamEvents: true,
       },
-      projectDirectories: []
-    }
+      projectDirectories: [],
+    },
   ],
-  defaultAgentId: "codex"
+  defaultAgentId: "codex",
 };
 const COLLABORATION_MODES_RESPONSE: CapabilityCollaborationModesResponse = {
   data: [
@@ -79,9 +79,9 @@ const COLLABORATION_MODES_RESPONSE: CapabilityCollaborationModesResponse = {
       name: "Balanced",
       mode: "default",
       model: "gpt-5",
-      reasoning_effort: "medium"
-    }
-  ]
+      reasoning_effort: "medium",
+    },
+  ],
 };
 const MODELS_RESPONSE: CapabilityModelsResponse = {
   data: [
@@ -96,20 +96,20 @@ const MODELS_RESPONSE: CapabilityModelsResponse = {
       supportedReasoningEfforts: [
         {
           reasoningEffort: "medium",
-          description: "Balanced reasoning"
-        }
+          description: "Balanced reasoning",
+        },
       ],
       inputModalities: ["text", "image"],
-      supportsPersonality: false
-    }
+      supportsPersonality: false,
+    },
   ],
-  nextCursor: null
+  nextCursor: null,
 };
 const CONFIG_DEFAULTS_RESPONSE: CapabilityConfigDefaultsResponse = {
   ok: true,
   agentId: "codex",
   model: "gpt-5",
-  reasoningEffort: "medium"
+  reasoningEffort: "medium",
 };
 const THREADS: ThreadListResponse["data"] = [
   {
@@ -117,14 +117,14 @@ const THREADS: ThreadListResponse["data"] = [
     preview: "",
     createdAt: 1_700_000_000,
     updatedAt: 1_700_000_000,
-    agentId: "codex"
-  }
+    agentId: "codex",
+  },
 ];
 const ACTIVE_THREAD_STATE: LoadActiveThreadStateResult = {
   didChangeThreads: true,
   nextThreads: THREADS,
   nextUnreadThreadIdentifiers: {},
-  loadedFromCache: false
+  loadedFromCache: false,
 };
 interface CoreDataLoadersHarnessProperties {
   input: UseCoreDataLoadersInput;
@@ -157,7 +157,7 @@ function createControlledPromise<Value>(): ControlledPromise<Value> {
         throw new Error("Expected controlled promise resolver to be initialized");
       }
       resolvePromise(value);
-    }
+    },
   };
 }
 
@@ -166,11 +166,11 @@ function createThreadListStateController(): ThreadListStateController {
     threadServerClient: new ThreadServerClient(),
     threadQueryCache: new ThreadQueryCache(
       THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS,
-      THREAD_QUERY_CACHE_MAXIMUM_ENTRIES
+      THREAD_QUERY_CACHE_MAXIMUM_ENTRIES,
     ),
     threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
     threadListStateStore: new ThreadListStateStore(),
-    threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+    threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
   });
 }
 
@@ -187,8 +187,8 @@ function createActionRequestBuilder(actionLog: string[]): (actionName: string) =
       actionId,
       requestOptions: {
         actionId,
-        actionName
-      }
+        actionName,
+      },
     };
   };
 }
@@ -209,7 +209,7 @@ function createHarness(activeTab: "chat" | "debug" = "chat"): CoreDataLoadersTes
     archivedThreadListMaxPages: 1,
     capabilityServerClient,
     capabilitySnapshotCache: new CapabilitySnapshotCache<CoreDataCapabilitySnapshot>(
-      CAPABILITY_SNAPSHOT_REFRESH_INTERVAL_MILLISECONDS
+      CAPABILITY_SNAPSHOT_REFRESH_INTERVAL_MILLISECONDS,
     ),
     threadListStateController,
     debugServerClient,
@@ -248,7 +248,7 @@ function createHarness(activeTab: "chat" | "debug" = "chat"): CoreDataLoadersTes
     ensureApiSessionBootstrapped: vi.fn(async () => true),
     buildActionRequestOptions: createActionRequestBuilder(actionLog),
     readInitialModeKey: (modes) => modes[0]?.mode ?? "default",
-    handleRuntimeRequestError: vi.fn()
+    handleRuntimeRequestError: vi.fn(),
   };
 
   return {
@@ -256,7 +256,7 @@ function createHarness(activeTab: "chat" | "debug" = "chat"): CoreDataLoadersTes
     capabilityServerClient,
     threadListStateController,
     setHealthMock,
-    actionLog
+    actionLog,
   };
 }
 
@@ -270,7 +270,7 @@ function CoreDataLoadersHarness(properties: CoreDataLoadersHarnessProperties): R
 
 async function renderHarness(input: UseCoreDataLoadersInput): Promise<CoreDataLoaders> {
   const snapshotReference: { current: CoreDataLoaders | null } = {
-    current: null
+    current: null,
   };
 
   render(
@@ -279,7 +279,7 @@ async function renderHarness(input: UseCoreDataLoadersInput): Promise<CoreDataLo
       onSnapshot={(snapshot) => {
         snapshotReference.current = snapshot;
       }}
-    />
+    />,
   );
 
   await act(async () => {
@@ -306,21 +306,19 @@ describe("useCoreDataLoaders", () => {
 
   it("runs deferred startup reads on the next turn after critical thread state is loaded", async () => {
     const harness = createHarness("chat");
-    const loadActiveThreadStateSpy = vi.spyOn(
-      harness.threadListStateController,
-      "loadActiveThreadState"
-    ).mockResolvedValue(ACTIVE_THREAD_STATE);
-    const readHealthStatusSpy = vi.spyOn(
-      harness.capabilityServerClient,
-      "readHealthStatus"
-    ).mockResolvedValue(HEALTH_RESPONSE);
+    const loadActiveThreadStateSpy = vi
+      .spyOn(harness.threadListStateController, "loadActiveThreadState")
+      .mockResolvedValue(ACTIVE_THREAD_STATE);
+    const readHealthStatusSpy = vi
+      .spyOn(harness.capabilityServerClient, "readHealthStatus")
+      .mockResolvedValue(HEALTH_RESPONSE);
     vi.spyOn(harness.capabilityServerClient, "listAgents").mockResolvedValue(AGENTS_RESPONSE);
     vi.spyOn(harness.capabilityServerClient, "listCollaborationModes").mockResolvedValue(
-      COLLABORATION_MODES_RESPONSE
+      COLLABORATION_MODES_RESPONSE,
     );
     vi.spyOn(harness.capabilityServerClient, "listModels").mockResolvedValue(MODELS_RESPONSE);
     vi.spyOn(harness.capabilityServerClient, "readConfigDefaults").mockResolvedValue(
-      CONFIG_DEFAULTS_RESPONSE
+      CONFIG_DEFAULTS_RESPONSE,
     );
 
     const loaders = await renderHarness(harness.input);
@@ -348,26 +346,27 @@ describe("useCoreDataLoaders", () => {
     const firstDeferredHealth = createControlledPromise<CapabilityHealthResponse>();
     const queuedHealthResponses: Array<Promise<CapabilityHealthResponse>> = [
       firstDeferredHealth.promise,
-      Promise.resolve(HEALTH_RESPONSE)
+      Promise.resolve(HEALTH_RESPONSE),
     ];
-    vi.spyOn(harness.threadListStateController, "loadActiveThreadState").mockResolvedValue(ACTIVE_THREAD_STATE);
-    const readHealthStatusSpy = vi.spyOn(
-      harness.capabilityServerClient,
-      "readHealthStatus"
-    ).mockImplementation(async () => {
-      const nextResponse = queuedHealthResponses.shift();
-      if (!nextResponse) {
-        throw new Error("Expected a queued health response");
-      }
-      return nextResponse;
-    });
+    vi.spyOn(harness.threadListStateController, "loadActiveThreadState").mockResolvedValue(
+      ACTIVE_THREAD_STATE,
+    );
+    const readHealthStatusSpy = vi
+      .spyOn(harness.capabilityServerClient, "readHealthStatus")
+      .mockImplementation(async () => {
+        const nextResponse = queuedHealthResponses.shift();
+        if (!nextResponse) {
+          throw new Error("Expected a queued health response");
+        }
+        return nextResponse;
+      });
     vi.spyOn(harness.capabilityServerClient, "listAgents").mockResolvedValue(AGENTS_RESPONSE);
     vi.spyOn(harness.capabilityServerClient, "listCollaborationModes").mockResolvedValue(
-      COLLABORATION_MODES_RESPONSE
+      COLLABORATION_MODES_RESPONSE,
     );
     vi.spyOn(harness.capabilityServerClient, "listModels").mockResolvedValue(MODELS_RESPONSE);
     vi.spyOn(harness.capabilityServerClient, "readConfigDefaults").mockResolvedValue(
-      CONFIG_DEFAULTS_RESPONSE
+      CONFIG_DEFAULTS_RESPONSE,
     );
 
     const loaders = await renderHarness(harness.input);

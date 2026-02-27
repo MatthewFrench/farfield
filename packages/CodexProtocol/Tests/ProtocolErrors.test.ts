@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  ProtocolValidationError,
   type JsonValue,
+  ProtocolValidationError,
+  parseThreadConversationState,
   UserInputRequestMethod,
-  parseThreadConversationState
 } from "../Source/Index.js";
 
 function captureThreadConversationStateParseError(value: JsonValue): ProtocolValidationError {
@@ -31,7 +31,7 @@ describe("codex-protocol validation error formatting", () => {
       pathSegments: [],
       path: "<root>",
       message: "Expected object, received string",
-      summary: "<root>: Expected object, received string"
+      summary: "<root>: Expected object, received string",
     });
   });
 
@@ -54,17 +54,17 @@ describe("codex-protocol validation error formatting", () => {
                 question: "Question text",
                 isOther: false,
                 isSecret: false,
-                options: []
-              }
-            ]
-          }
-        }
-      ]
+                options: [],
+              },
+            ],
+          },
+        },
+      ],
     });
 
-    expect(error.issues.some((issue) => issue.startsWith("requests[0].params.questions[0].id:"))).toBe(
-      true
-    );
+    expect(
+      error.issues.some((issue) => issue.startsWith("requests[0].params.questions[0].id:")),
+    ).toBe(true);
     expect(error.issues.every((issue) => !issue.includes(".["))).toBe(true);
     expect(error.message).toContain("requests[0].params.questions[0].id:");
     expect(error.metadata.issuePaths).toContain("requests[0].params.questions[0].id");
@@ -72,7 +72,7 @@ describe("codex-protocol validation error formatting", () => {
       pathSegments: ["requests", 0, "params", "questions", 0, "id"],
       path: "requests[0].params.questions[0].id",
       message: "String must contain at least 1 character(s)",
-      summary: "requests[0].params.questions[0].id: String must contain at least 1 character(s)"
+      summary: "requests[0].params.questions[0].id: String must contain at least 1 character(s)",
     });
   });
 });

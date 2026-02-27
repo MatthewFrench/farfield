@@ -1,8 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { type ChatModeToolbarProps } from "@/Features/Chat/UserInterface/ChatModeToolbar";
-import {
-  ChatModeToolbarPropertiesBuilder
-} from "@/Features/Chat/UserInterface/ChatModeToolbarPropertiesBuilder";
+import { ChatModeToolbarPropertiesBuilder } from "@/Features/Chat/UserInterface/ChatModeToolbarPropertiesBuilder";
 
 interface PlanModeOption {
   mode?: string | null | undefined;
@@ -39,11 +37,11 @@ export interface UseChatModeToolbarPropertiesInput {
 }
 
 export function useChatModeToolbarProperties(
-  input: UseChatModeToolbarPropertiesInput
+  input: UseChatModeToolbarPropertiesInput,
 ): ChatModeToolbarProps {
   const chatModeToolbarPropertiesBuilder = useMemo(
     () => new ChatModeToolbarPropertiesBuilder(),
-    []
+    [],
   );
   const {
     canSetCollaborationMode,
@@ -66,12 +64,15 @@ export function useChatModeToolbarProperties(
     setSelectedModeKey,
     setSelectedModelId,
     setSelectedReasoningEffort,
-    applyModeDraft
+    applyModeDraft,
   } = input;
-  const handleApplyModeDraft = useCallback((draft: ModeDraft): void => {
-    // Draft application owns error handling and optimistic state policy.
-    void applyModeDraft(draft);
-  }, [applyModeDraft]);
+  const handleApplyModeDraft = useCallback(
+    (draft: ModeDraft): void => {
+      // Draft application owns error handling and optimistic state policy.
+      void applyModeDraft(draft);
+    },
+    [applyModeDraft],
+  );
 
   return useMemo<ChatModeToolbarProps>(
     () =>
@@ -96,7 +97,7 @@ export function useChatModeToolbarProperties(
         onSetSelectedModeKey: setSelectedModeKey,
         onSetSelectedModelId: setSelectedModelId,
         onSetSelectedReasoningEffort: setSelectedReasoningEffort,
-        onApplyModeDraft: handleApplyModeDraft
+        onApplyModeDraft: handleApplyModeDraft,
       }),
     [
       appDefaultModel,
@@ -120,7 +121,7 @@ export function useChatModeToolbarProperties(
       selectedThreadId,
       setSelectedModeKey,
       setSelectedModelId,
-      setSelectedReasoningEffort
-    ]
+      setSelectedReasoningEffort,
+    ],
   );
 }

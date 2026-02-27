@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiSessionBootstrapCoordinator,
-  type ApiSessionBootstrapResponse
+  type ApiSessionBootstrapResponse,
 } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
 
 describe("ApiSessionBootstrapCoordinator", () => {
@@ -10,16 +10,16 @@ describe("ApiSessionBootstrapCoordinator", () => {
     const readSession = vi.fn(async () => ({
       authRequired: false,
       bootstrapped: true,
-      expiresAt: null
+      expiresAt: null,
     }));
 
     expect(await coordinator.ensureSession(readSession, 1_000)).toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
     expect(await coordinator.ensureSession(readSession, 2_000)).toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
 
     expect(readSession).toHaveBeenCalledTimes(1);
@@ -30,16 +30,16 @@ describe("ApiSessionBootstrapCoordinator", () => {
     const readSession = vi.fn(async () => ({
       authRequired: true,
       bootstrapped: false,
-      expiresAt: null
+      expiresAt: null,
     }));
 
     expect(await coordinator.ensureSession(readSession, 1_000)).toEqual({
       isReady: false,
-      requiresApiToken: true
+      requiresApiToken: true,
     });
     expect(await coordinator.ensureSession(readSession, 2_000)).toEqual({
       isReady: false,
-      requiresApiToken: true
+      requiresApiToken: true,
     });
 
     expect(readSession).toHaveBeenCalledTimes(1);
@@ -51,40 +51,44 @@ describe("ApiSessionBootstrapCoordinator", () => {
     const initialRead = vi.fn(async () => ({
       authRequired: true,
       bootstrapped: false,
-      expiresAt: null
+      expiresAt: null,
     }));
     const readWithApiToken = vi.fn(async (_apiToken: string) => ({
       authRequired: true,
       bootstrapped: true,
-      expiresAt: "2099-01-01T00:00:20.000Z"
+      expiresAt: "2099-01-01T00:00:20.000Z",
     }));
     const steadyStateRead = vi.fn(async () => ({
       authRequired: true,
       bootstrapped: true,
-      expiresAt: "2099-01-01T00:00:20.000Z"
+      expiresAt: "2099-01-01T00:00:20.000Z",
     }));
     const nearExpiryRead = vi.fn(async () => ({
       authRequired: true,
       bootstrapped: true,
-      expiresAt: "2099-01-01T00:00:40.000Z"
+      expiresAt: "2099-01-01T00:00:40.000Z",
     }));
     const firstExpiryEpochMs = Date.parse("2099-01-01T00:00:20.000Z");
 
     expect(await coordinator.ensureSession(initialRead)).toEqual({
       isReady: false,
-      requiresApiToken: true
+      requiresApiToken: true,
     });
     expect(await coordinator.submitApiToken("token-123", readWithApiToken)).toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
-    expect(await coordinator.ensureSession(steadyStateRead, firstExpiryEpochMs - refreshLeadTimeMs - 1)).toEqual({
+    expect(
+      await coordinator.ensureSession(steadyStateRead, firstExpiryEpochMs - refreshLeadTimeMs - 1),
+    ).toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
-    expect(await coordinator.ensureSession(nearExpiryRead, firstExpiryEpochMs - refreshLeadTimeMs + 1)).toEqual({
+    expect(
+      await coordinator.ensureSession(nearExpiryRead, firstExpiryEpochMs - refreshLeadTimeMs + 1),
+    ).toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
 
     expect(initialRead).toHaveBeenCalledTimes(1);
@@ -102,22 +106,29 @@ describe("ApiSessionBootstrapCoordinator", () => {
     const initializeRead = vi.fn(async () => ({
       authRequired: true,
       bootstrapped: true,
-      expiresAt
+      expiresAt,
     }));
     const nearExpiryRefreshRead = vi.fn(async () => ({
       authRequired: true,
       bootstrapped: true,
-      expiresAt
+      expiresAt,
     }));
 
-    expect(await coordinator.ensureSession(initializeRead, expiresAtEpochMs - refreshLeadTimeMs - 1)).toEqual({
+    expect(
+      await coordinator.ensureSession(initializeRead, expiresAtEpochMs - refreshLeadTimeMs - 1),
+    ).toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
 
-    expect(await coordinator.ensureSession(nearExpiryRefreshRead, expiresAtEpochMs - refreshLeadTimeMs + 1)).toEqual({
+    expect(
+      await coordinator.ensureSession(
+        nearExpiryRefreshRead,
+        expiresAtEpochMs - refreshLeadTimeMs + 1,
+      ),
+    ).toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
 
     expect(initializeRead).toHaveBeenCalledTimes(1);
@@ -133,7 +144,7 @@ describe("ApiSessionBootstrapCoordinator", () => {
     const initializeRead = vi.fn(async () => ({
       authRequired: true,
       bootstrapped: true,
-      expiresAt
+      expiresAt,
     }));
 
     let rejectBackgroundRefresh: (error: Error) => void = () => {
@@ -145,32 +156,44 @@ describe("ApiSessionBootstrapCoordinator", () => {
           rejectBackgroundRefresh = (error: Error) => {
             reject(error);
           };
-        })
+        }),
     );
 
     const succeedingBackgroundRefreshRead = vi.fn(async () => ({
       authRequired: true,
       bootstrapped: true,
-      expiresAt
+      expiresAt,
     }));
 
-    expect(await coordinator.ensureSession(initializeRead, expiresAtEpochMs - refreshLeadTimeMs - 1)).toEqual({
+    expect(
+      await coordinator.ensureSession(initializeRead, expiresAtEpochMs - refreshLeadTimeMs - 1),
+    ).toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
 
-    expect(await coordinator.ensureSession(failingBackgroundRefreshRead, expiresAtEpochMs - refreshLeadTimeMs + 1)).toEqual({
+    expect(
+      await coordinator.ensureSession(
+        failingBackgroundRefreshRead,
+        expiresAtEpochMs - refreshLeadTimeMs + 1,
+      ),
+    ).toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
 
     rejectBackgroundRefresh(new Error("refresh-error"));
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(await coordinator.ensureSession(succeedingBackgroundRefreshRead, expiresAtEpochMs - refreshLeadTimeMs + 2)).toEqual({
+    expect(
+      await coordinator.ensureSession(
+        succeedingBackgroundRefreshRead,
+        expiresAtEpochMs - refreshLeadTimeMs + 2,
+      ),
+    ).toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
 
     expect(initializeRead).toHaveBeenCalledTimes(1);
@@ -183,13 +206,13 @@ describe("ApiSessionBootstrapCoordinator", () => {
     const readSession = vi.fn(async () => ({
       authRequired: true,
       bootstrapped: true,
-      expiresAt: "2099-01-01T00:00:20.000Z"
+      expiresAt: "2099-01-01T00:00:20.000Z",
     }));
 
     coordinator.markApiTokenRequired();
     expect(await coordinator.ensureSession(readSession)).toEqual({
       isReady: false,
-      requiresApiToken: true
+      requiresApiToken: true,
     });
 
     expect(readSession).toHaveBeenCalledTimes(0);
@@ -200,10 +223,11 @@ describe("ApiSessionBootstrapCoordinator", () => {
     let resolveBootstrapRead: (response: ApiSessionBootstrapResponse) => void = () => {
       throw new Error("Expected bootstrap resolver to be initialized");
     };
-    const readSession = vi.fn(() =>
-      new Promise<ApiSessionBootstrapResponse>((resolve) => {
-        resolveBootstrapRead = resolve;
-      })
+    const readSession = vi.fn(
+      () =>
+        new Promise<ApiSessionBootstrapResponse>((resolve) => {
+          resolveBootstrapRead = resolve;
+        }),
     );
 
     const firstDecisionPromise = coordinator.ensureSession(readSession, 1_000);
@@ -213,16 +237,16 @@ describe("ApiSessionBootstrapCoordinator", () => {
     resolveBootstrapRead({
       authRequired: false,
       bootstrapped: true,
-      expiresAt: null
+      expiresAt: null,
     });
 
     await expect(firstDecisionPromise).resolves.toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
     await expect(secondDecisionPromise).resolves.toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
   });
 
@@ -231,10 +255,12 @@ describe("ApiSessionBootstrapCoordinator", () => {
     const readWithApiToken = vi.fn(async (_apiToken: string) => ({
       authRequired: true,
       bootstrapped: true,
-      expiresAt: "2099-01-01T00:00:20.000Z"
+      expiresAt: "2099-01-01T00:00:20.000Z",
     }));
 
-    await expect(coordinator.submitApiToken("   ", readWithApiToken)).rejects.toThrowError("API token is required");
+    await expect(coordinator.submitApiToken("   ", readWithApiToken)).rejects.toThrowError(
+      "API token is required",
+    );
     expect(readWithApiToken).toHaveBeenCalledTimes(0);
   });
 
@@ -243,12 +269,12 @@ describe("ApiSessionBootstrapCoordinator", () => {
     const readWithApiToken = vi.fn(async (_apiToken: string) => ({
       authRequired: false,
       bootstrapped: true,
-      expiresAt: null
+      expiresAt: null,
     }));
 
     await expect(coordinator.submitApiToken("  token-123  ", readWithApiToken)).resolves.toEqual({
       isReady: true,
-      requiresApiToken: false
+      requiresApiToken: false,
     });
 
     expect(readWithApiToken).toHaveBeenCalledWith("token-123");
@@ -260,11 +286,11 @@ describe("ApiSessionBootstrapCoordinator", () => {
     const readSession = vi.fn(async () => ({
       authRequired: true,
       bootstrapped: true,
-      expiresAt: "invalid-date-value"
+      expiresAt: "invalid-date-value",
     }));
 
     await expect(coordinator.ensureSession(readSession, 1_000)).rejects.toThrowError(
-      "ApiSessionBootstrapCoordinator received an invalid expiresAt value: invalid-date-value"
+      "ApiSessionBootstrapCoordinator received an invalid expiresAt value: invalid-date-value",
     );
     expect(readSession).toHaveBeenCalledTimes(1);
   });

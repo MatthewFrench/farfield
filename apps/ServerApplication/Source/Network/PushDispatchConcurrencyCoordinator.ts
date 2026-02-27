@@ -38,7 +38,7 @@ export class PushDispatchConcurrencyCoordinator {
   public constructor(
     debounceMilliseconds: number,
     shouldSchedule: () => boolean,
-    runCheck: (threadId: string) => Promise<void>
+    runCheck: (threadId: string) => Promise<void>,
   ) {
     if (
       !Number.isInteger(debounceMilliseconds) ||
@@ -91,7 +91,7 @@ export class PushDispatchConcurrencyCoordinator {
       activeTimerCount: this.timerByThreadId.size,
       inFlightThreadCount: this.inFlightThreadIdSet.size,
       pendingRerunThreadCount: this.pendingRerunThreadIdSet.size,
-      isStopped: this.isStopped
+      isStopped: this.isStopped,
     };
   }
 

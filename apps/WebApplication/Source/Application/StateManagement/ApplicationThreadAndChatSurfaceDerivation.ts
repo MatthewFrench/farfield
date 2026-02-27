@@ -4,7 +4,7 @@ import {
   type ApplicationThreadListState,
   type ChatSurfaceStateInput,
   type SelectedThreadLabelInput,
-  type ThreadListStateInput
+  type ThreadListStateInput,
 } from "./UseApplicationDerivedStateContracts";
 
 const LOADING_THREAD_LABEL = "Loading thread...";
@@ -33,12 +33,7 @@ export function readThreadListState(input: ThreadListStateInput): ApplicationThr
 }
 
 export function readChatSurfaceState(input: ChatSurfaceStateInput): ApplicationChatSurfaceState {
-  const {
-    selectedThreadId,
-    isCoreLoading,
-    isSelectedThreadLoading,
-    turnCount
-  } = input;
+  const { selectedThreadId, isCoreLoading, isSelectedThreadLoading, turnCount } = input;
   const hasSelectedThread = selectedThreadId !== null && selectedThreadId.length > 0;
   if (!hasSelectedThread && isCoreLoading) {
     return "loading-threads";

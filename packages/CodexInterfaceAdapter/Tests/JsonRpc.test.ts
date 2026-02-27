@@ -5,7 +5,7 @@ describe("parseJsonRpcResponse", () => {
   it("accepts response without jsonrpc", () => {
     const parsed = parseJsonRpcResponse({
       id: 1,
-      result: { ok: true }
+      result: { ok: true },
     });
 
     expect(parsed.id).toBe(1);
@@ -18,8 +18,8 @@ describe("parseJsonRpcResponse", () => {
       id: 2,
       error: {
         code: -32600,
-        message: "bad"
-      }
+        message: "bad",
+      },
     });
 
     expect(parsed.id).toBe(2);
@@ -29,13 +29,13 @@ describe("parseJsonRpcResponse", () => {
   it("rejects response missing both result and error", () => {
     expect(() =>
       parseJsonRpcResponse({
-        id: 3
-      })
+        id: 3,
+      }),
     ).toThrowError(/result or error/i);
     expect(() =>
       parseJsonRpcResponse({
-        id: 3
-      })
+        id: 3,
+      }),
     ).toThrowError(/JsonRpcResponse did not match expected schema/i);
   });
 
@@ -46,9 +46,9 @@ describe("parseJsonRpcResponse", () => {
         result: { ok: true },
         error: {
           code: -32600,
-          message: "bad"
-        }
-      })
+          message: "bad",
+        },
+      }),
     ).toThrowError(/must not include both/i);
   });
 });
@@ -58,7 +58,7 @@ describe("parseJsonRpcIncomingMessage", () => {
     const parsed = parseJsonRpcIncomingMessage({
       jsonrpc: "2.0",
       method: "thread/updated",
-      params: { threadId: "thread-1" }
+      params: { threadId: "thread-1" },
     });
 
     expect(parsed.kind).toBe("notification");
@@ -71,7 +71,7 @@ describe("parseJsonRpcIncomingMessage", () => {
   it("accepts response payload", () => {
     const parsed = parseJsonRpcIncomingMessage({
       id: 7,
-      result: { ok: true }
+      result: { ok: true },
     });
 
     expect(parsed.kind).toBe("response");
@@ -87,16 +87,16 @@ describe("parseJsonRpcIncomingMessage", () => {
       id: 11,
       method: "thread/read",
       params: {
-        threadId: "thread-1"
-      }
+        threadId: "thread-1",
+      },
     };
 
     expect(() => parseJsonRpcIncomingMessage(requestShapedPayload)).toThrow();
     expect(() => parseJsonRpcIncomingMessage(requestShapedPayload)).toThrowError(
-      /JsonRpcIncomingMessage did not match expected schema/i
+      /JsonRpcIncomingMessage did not match expected schema/i,
     );
     expect(() => parseJsonRpcIncomingMessage(requestShapedPayload)).toThrowError(
-      /id: Expected never, received number/i
+      /id: Expected never, received number/i,
     );
   });
 });

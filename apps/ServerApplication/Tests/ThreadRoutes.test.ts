@@ -2,12 +2,12 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentAdapter, AgentCapabilities } from "../Source/Agents/Types.js";
-import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
-import { ThreadListAggregationCache } from "../Source/Network/ThreadListAggregationCache.js";
 import {
   handleThreadRoutes,
-  type ThreadRouteDependencies
+  type ThreadRouteDependencies,
 } from "../Source/Network/Routes/ThreadRoutes.js";
+import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
+import { ThreadListAggregationCache } from "../Source/Network/ThreadListAggregationCache.js";
 
 const ThreadRouteTestAdapterCapabilities: AgentCapabilities = {
   canListModels: false,
@@ -15,7 +15,7 @@ const ThreadRouteTestAdapterCapabilities: AgentCapabilities = {
   canSetCollaborationMode: false,
   canSubmitUserInput: false,
   canReadLiveState: false,
-  canReadStreamEvents: false
+  canReadStreamEvents: false,
 };
 
 function createMockRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
@@ -24,7 +24,7 @@ function createMockRequestResponsePair(): { request: IncomingMessage; response: 
   const response = new ServerResponse(request);
   return {
     request,
-    response
+    response,
   };
 }
 
@@ -55,7 +55,7 @@ function createThreadRouteTestAdapter(id: "codex" | "opencode"): AgentAdapter {
     },
     async interrupt(): Promise<never> {
       throw new Error("Unexpected interrupt invocation in ThreadRoutes test");
-    }
+    },
   };
 }
 
@@ -110,7 +110,7 @@ function createThreadRouteDependencies(input: {
     pushActionEventWithRequestContext: () => {},
     pushActionErrorWithRequestContext: () => "action-error-id",
     withTimeout: async (promise) => promise,
-    threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator()
+    threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
   };
 }
 
@@ -119,13 +119,13 @@ describe("handleThreadRoutes", () => {
     const { request, response } = createMockRequestResponsePair();
     request.method = "GET";
 
-    const resolveAdapterForThread = vi.fn<
-      ThreadRouteDependencies["resolveAdapterForThread"]
-    >(async () => ({
-      ok: false,
-      status: 404,
-      error: "thread not found"
-    }));
+    const resolveAdapterForThread = vi.fn<ThreadRouteDependencies["resolveAdapterForThread"]>(
+      async () => ({
+        ok: false,
+        status: 404,
+        error: "thread not found",
+      }),
+    );
 
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
@@ -141,8 +141,8 @@ describe("handleThreadRoutes", () => {
           capturedStatusCode = statusCode;
           capturedBody = body;
         },
-        resolveAdapterForThread
-      })
+        resolveAdapterForThread,
+      }),
     );
 
     expect(handled).toBe(true);
@@ -153,7 +153,7 @@ describe("handleThreadRoutes", () => {
       data: [],
       nextCursor: null,
       pages: 0,
-      truncated: false
+      truncated: false,
     });
   });
 
@@ -161,13 +161,13 @@ describe("handleThreadRoutes", () => {
     const { request, response } = createMockRequestResponsePair();
     request.method = "GET";
 
-    const resolveAdapterForThread = vi.fn<
-      ThreadRouteDependencies["resolveAdapterForThread"]
-    >(async () => ({
-      ok: false,
-      status: 404,
-      error: "Thread not found"
-    }));
+    const resolveAdapterForThread = vi.fn<ThreadRouteDependencies["resolveAdapterForThread"]>(
+      async () => ({
+        ok: false,
+        status: 404,
+        error: "Thread not found",
+      }),
+    );
 
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
@@ -183,8 +183,8 @@ describe("handleThreadRoutes", () => {
           capturedStatusCode = statusCode;
           capturedBody = body;
         },
-        resolveAdapterForThread
-      })
+        resolveAdapterForThread,
+      }),
     );
 
     expect(handled).toBe(true);
@@ -193,7 +193,7 @@ describe("handleThreadRoutes", () => {
     expect(capturedBody).toEqual({
       ok: false,
       error: "Thread not found",
-      threadId: "thread_missing"
+      threadId: "thread_missing",
     });
   });
 
@@ -201,13 +201,13 @@ describe("handleThreadRoutes", () => {
     const { request, response } = createMockRequestResponsePair();
     request.method = "GET";
 
-    const resolveAdapterForThread = vi.fn<
-      ThreadRouteDependencies["resolveAdapterForThread"]
-    >(async () => ({
-      ok: false,
-      status: 404,
-      error: "Thread not found"
-    }));
+    const resolveAdapterForThread = vi.fn<ThreadRouteDependencies["resolveAdapterForThread"]>(
+      async () => ({
+        ok: false,
+        status: 404,
+        error: "Thread not found",
+      }),
+    );
 
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
@@ -223,8 +223,8 @@ describe("handleThreadRoutes", () => {
           capturedStatusCode = statusCode;
           capturedBody = body;
         },
-        resolveAdapterForThread
-      })
+        resolveAdapterForThread,
+      }),
     );
 
     expect(handled).toBe(false);
@@ -237,13 +237,13 @@ describe("handleThreadRoutes", () => {
     const { request, response } = createMockRequestResponsePair();
     request.method = "POST";
 
-    const resolveAdapterForThread = vi.fn<
-      ThreadRouteDependencies["resolveAdapterForThread"]
-    >(async () => ({
-      ok: true,
-      adapter: createThreadRouteTestAdapter("codex"),
-      agentId: "codex"
-    }));
+    const resolveAdapterForThread = vi.fn<ThreadRouteDependencies["resolveAdapterForThread"]>(
+      async () => ({
+        ok: true,
+        adapter: createThreadRouteTestAdapter("codex"),
+        agentId: "codex",
+      }),
+    );
 
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
@@ -259,8 +259,8 @@ describe("handleThreadRoutes", () => {
           capturedStatusCode = statusCode;
           capturedBody = body;
         },
-        resolveAdapterForThread
-      })
+        resolveAdapterForThread,
+      }),
     );
 
     expect(handled).toBe(false);

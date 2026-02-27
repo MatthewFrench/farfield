@@ -34,12 +34,14 @@ describe("CoreDataRefreshConcurrencyCoordinator", () => {
     const coordinator = new CoreDataRefreshConcurrencyCoordinator();
     let firstCall = true;
 
-    await expect(coordinator.run(async () => {
-      if (firstCall) {
-        firstCall = false;
-        throw new Error("refresh failed");
-      }
-    })).rejects.toThrowError("refresh failed");
+    await expect(
+      coordinator.run(async () => {
+        if (firstCall) {
+          firstCall = false;
+          throw new Error("refresh failed");
+        }
+      }),
+    ).rejects.toThrowError("refresh failed");
 
     await expect(coordinator.run(async () => {})).resolves.toBeUndefined();
   });

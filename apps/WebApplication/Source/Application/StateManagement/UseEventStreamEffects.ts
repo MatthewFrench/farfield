@@ -1,28 +1,28 @@
 import {
-  startTransition,
-  useEffect,
   type Dispatch,
   type MutableRefObject,
-  type SetStateAction
+  type SetStateAction,
+  startTransition,
+  useEffect,
 } from "react";
-import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
+import { type ApplySelectedThreadStreamDeltaInput } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import type {
   DebugErrorListResponse,
-  DebugHistoryResponse
+  DebugHistoryResponse,
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { DebugWorkspaceDataReader } from "@/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
-import { type ApplySelectedThreadStreamDeltaInput } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
-import type { SelectedThreadLoaderOptions } from "./UseCoreDataLoaders";
-import { EventRefreshScheduler, type EventRefreshFlags } from "./EventRefreshScheduler";
+import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
+import { type EventRefreshFlags, EventRefreshScheduler } from "./EventRefreshScheduler";
 import { EventStreamConnectionCoordinator } from "./EventStreamConnectionCoordinator";
 import { EventStreamRefreshDecisionEngine } from "./EventStreamRefreshDecisionEngine";
+import type { SelectedThreadLoaderOptions } from "./UseCoreDataLoaders";
 
 const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
 const DEBUG_APPLICATION_TAB = "debug";
 const SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS: SelectedThreadLoaderOptions = {
   includeReadThread: true,
-  includeTurns: false
+  includeTurns: false,
 };
 
 interface ScheduledRefreshExecutionSnapshot {
@@ -36,19 +36,21 @@ function isScheduledRefreshDocumentVisible(): boolean {
 
 function readScheduledRefreshExecutionSnapshot(
   activeTabRef: MutableRefObject<"chat" | "debug">,
-  selectedThreadIdRef: MutableRefObject<string | null>
+  selectedThreadIdRef: MutableRefObject<string | null>,
 ): ScheduledRefreshExecutionSnapshot {
   return {
     activeTab: activeTabRef.current,
-    selectedThreadId: selectedThreadIdRef.current
+    selectedThreadId: selectedThreadIdRef.current,
   };
 }
 
 function shouldRefreshDebugWorkspace(
   refreshFlags: EventRefreshFlags,
-  activeTab: "chat" | "debug"
+  activeTab: "chat" | "debug",
 ): boolean {
-  return !refreshFlags.refreshCore && refreshFlags.refreshHistory && activeTab === DEBUG_APPLICATION_TAB;
+  return (
+    !refreshFlags.refreshCore && refreshFlags.refreshHistory && activeTab === DEBUG_APPLICATION_TAB
+  );
 }
 
 export interface UseEventStreamEffectsInput {
@@ -60,7 +62,9 @@ export interface UseEventStreamEffectsInput {
   activeTabRef: MutableRefObject<"chat" | "debug">;
   selectedThreadIdRef: MutableRefObject<string | null>;
   loadCoreDataTrackedRef: MutableRefObject<(() => Promise<void>) | null>;
-  loadSelectedThreadRef: MutableRefObject<((threadId: string, options?: SelectedThreadLoaderOptions) => Promise<void>) | null>;
+  loadSelectedThreadRef: MutableRefObject<
+    ((threadId: string, options?: SelectedThreadLoaderOptions) => Promise<void>) | null
+  >;
   debugWorkspaceDataReader: DebugWorkspaceDataReader;
   debugWorkspaceStateStore: DebugWorkspaceStateStore;
   debugErrorsSignatureRef: MutableRefObject<string[]>;
@@ -70,7 +74,7 @@ export interface UseEventStreamEffectsInput {
   setDebugErrorSessionId: Dispatch<SetStateAction<string>>;
   setDebugErrorSessionLogPath: Dispatch<SetStateAction<string>>;
   applySelectedThreadStreamDelta: (input: ApplySelectedThreadStreamDeltaInput) => void;
-  handleRuntimeRequestError: <ErrorType,>(error: ErrorType) => void;
+  handleRuntimeRequestError: <ErrorType>(error: ErrorType) => void;
 }
 
 export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
@@ -80,7 +84,7 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
       eventStreamRefreshDecisionEngine: input.eventStreamRefreshDecisionEngine,
       readSnapshot: () => ({
         activeTab: input.activeTabRef.current,
-        selectedThreadId: input.selectedThreadIdRef.current
+        selectedThreadId: input.selectedThreadIdRef.current,
       }),
       executeScheduledRefresh: async (flags) => {
         if (!isScheduledRefreshDocumentVisible()) {
@@ -91,7 +95,7 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
           // Freeze mutable refs once so each scheduled refresh run applies one consistent snapshot.
           const scheduledRefreshSnapshot = readScheduledRefreshExecutionSnapshot(
             input.activeTabRef,
-            input.selectedThreadIdRef
+            input.selectedThreadIdRef,
           );
           const loadCoreDataFunction = input.loadCoreDataTrackedRef.current;
           const loadSelectedThreadFunction = input.loadSelectedThreadRef.current;
@@ -104,18 +108,21 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
           } else if (shouldRefreshDebugWorkspace(flags, scheduledRefreshSnapshot.activeTab)) {
             const debugWorkspaceSnapshot = await input.debugWorkspaceDataReader.readSnapshot(
               input.debugHistoryLimit,
-              input.debugErrorListLimit
+              input.debugErrorListLimit,
             );
 
             startTransition(() => {
               input.setHistory((previousHistory) =>
-                input.debugWorkspaceStateStore.readNextHistory(previousHistory, debugWorkspaceSnapshot.history)
+                input.debugWorkspaceStateStore.readNextHistory(
+                  previousHistory,
+                  debugWorkspaceSnapshot.history,
+                ),
               );
 
               if (
                 input.debugWorkspaceStateStore.shouldApplyDebugErrors(
                   input.debugErrorsSignatureRef.current,
-                  debugWorkspaceSnapshot.debugErrorsSignature
+                  debugWorkspaceSnapshot.debugErrorsSignature,
                 )
               ) {
                 const debugErrorsSignatureRef = input.debugErrorsSignatureRef;
@@ -129,16 +136,16 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
           }
 
           if (
-            flags.refreshSelectedThread
-            && scheduledRefreshSnapshot.selectedThreadId !== null
-            && scheduledRefreshSnapshot.selectedThreadId.length > 0
-            && loadSelectedThreadFunction
+            flags.refreshSelectedThread &&
+            scheduledRefreshSnapshot.selectedThreadId !== null &&
+            scheduledRefreshSnapshot.selectedThreadId.length > 0 &&
+            loadSelectedThreadFunction
           ) {
             refreshOperations.push(
               loadSelectedThreadFunction(
                 scheduledRefreshSnapshot.selectedThreadId,
-                SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS
-              )
+                SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS,
+              ),
             );
           }
 
@@ -157,13 +164,13 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
           threadId: threadStreamDelta.threadId,
           liveStateSnapshot: threadStreamDelta.liveStateSnapshot,
           streamEventsSnapshot: threadStreamDelta.streamEventsSnapshot,
-          streamEventsSinceSequenceUsed: threadStreamDelta.streamEventsSinceSequenceUsed
+          streamEventsSinceSequenceUsed: threadStreamDelta.streamEventsSinceSequenceUsed,
         });
       },
       onConnectionStatusChange: (connected) => {
         const eventsConnectedRef = input.eventsConnectedRef;
         eventsConnectedRef.current = connected;
-      }
+      },
     });
 
     return () => {
@@ -188,6 +195,6 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
     input.setDebugErrorSessionId,
     input.setDebugErrorSessionLogPath,
     input.setDebugErrors,
-    input.setHistory
+    input.setHistory,
   ]);
 }

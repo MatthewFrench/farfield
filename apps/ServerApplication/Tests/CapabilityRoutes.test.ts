@@ -1,15 +1,15 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import {
+  type AppServerCollaborationModeListResponse,
   AppServerCollaborationModeListResponseSchema,
+  type AppServerListModelsResponse,
   AppServerListModelsResponseSchema,
   AppServerReasoningEffortSchema,
   FarfieldApiErrorResponseSchema,
-  type AppServerCollaborationModeListResponse,
-  type AppServerListModelsResponse
 } from "@farfield/protocol";
-import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import type {
   AgentAdapter,
@@ -23,7 +23,7 @@ import type {
   AgentListThreadsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
-  AgentSendMessageInput
+  AgentSendMessageInput,
 } from "../Source/Agents/Types.js";
 import { handleCapabilityRoutes } from "../Source/Network/Routes/CapabilityRoutes.js";
 
@@ -32,19 +32,19 @@ const CapabilityConfigDefaultsResponseSchema = z
     ok: z.literal(true),
     agentId: z.union([z.literal("codex"), z.literal("opencode"), z.null()]),
     model: z.string().nullable(),
-    reasoningEffort: AppServerReasoningEffortSchema.nullable()
+    reasoningEffort: AppServerReasoningEffortSchema.nullable(),
   })
   .strict();
 
 const CapabilityModelsEnvelopeSchema = z
   .object({
-    ok: z.literal(true)
+    ok: z.literal(true),
   })
   .merge(AppServerListModelsResponseSchema);
 
 const CapabilityCollaborationModesEnvelopeSchema = z
   .object({
-    ok: z.literal(true)
+    ok: z.literal(true),
   })
   .merge(AppServerCollaborationModeListResponseSchema);
 
@@ -59,7 +59,7 @@ type ParseAgentId = (value: string | null) => AgentId | null;
 type WithTimeout = <ValueType>(
   promise: Promise<ValueType>,
   timeoutMs: number,
-  label: string
+  label: string,
 ) => Promise<ValueType>;
 
 interface ExecuteCapabilityRouteInput {
@@ -96,7 +96,7 @@ function createMockRequestResponsePair(): { request: IncomingMessage; response: 
   const response = new ServerResponse(request);
   return {
     request,
-    response
+    response,
   };
 }
 
@@ -108,7 +108,7 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canSubmitUserInput: false,
     canReadLiveState: false,
     canReadStreamEvents: false,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -128,7 +128,7 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
     async listThreads(_input: AgentListThreadsInput): Promise<AgentListThreadsResult> {
       return {
         data: [],
-        nextCursor: null
+        nextCursor: null,
       };
     },
     async createThread(_input: AgentCreateThreadInput): Promise<AgentCreateThreadResult> {
@@ -142,7 +142,7 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
     },
     async interrupt(_input: AgentInterruptInput): Promise<void> {
       throw new Error("Not used in capability route tests");
-    }
+    },
   };
 
   if (options.listModels) {
@@ -190,7 +190,7 @@ function parseInteger(value: string | null, defaultValue: number): number {
 }
 
 async function executeCapabilityRoute(
-  input: ExecuteCapabilityRouteInput
+  input: ExecuteCapabilityRouteInput,
 ): Promise<CapabilityRouteExecutionResult> {
   const { request, response } = createMockRequestResponsePair();
   request.method = input.method ?? "GET";
@@ -211,13 +211,13 @@ async function executeCapabilityRoute(
     jsonResponse: (_response, nextStatusCode, nextBody) => {
       statusCode = nextStatusCode;
       body = nextBody;
-    }
+    },
   });
 
   return {
     handled,
     statusCode,
-    body
+    body,
   };
 }
 
@@ -225,7 +225,7 @@ describe("handleCapabilityRoutes", () => {
   it("returns 400 when config defaults query contains an invalid agent identifier", async () => {
     const result = await executeCapabilityRoute({
       pathname: "/api/config/defaults",
-      url: new URL("http://localhost/api/config/defaults?agentId=not-an-agent")
+      url: new URL("http://localhost/api/config/defaults?agentId=not-an-agent"),
     });
 
     expect(result.handled).toBe(true);
@@ -233,7 +233,7 @@ describe("handleCapabilityRoutes", () => {
     const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
     expect(parsedErrorResponse).toEqual({
       ok: false,
-      error: "Invalid agentId: not-an-agent"
+      error: "Invalid agentId: not-an-agent",
     });
   });
 
@@ -242,26 +242,26 @@ describe("handleCapabilityRoutes", () => {
       id: "codex",
       readConfigDefaults: async (): Promise<AgentConfigDefaults> => ({
         model: "gpt-5",
-        reasoningEffort: "not-a-valid-effort"
-      })
+        reasoningEffort: "not-a-valid-effort",
+      }),
     });
 
     const result = await executeCapabilityRoute({
       pathname: "/api/config/defaults",
       url: new URL("http://localhost/api/config/defaults"),
-      adapters: [adapter]
+      adapters: [adapter],
     });
 
     expect(result.handled).toBe(true);
     expect(result.statusCode).toBe(200);
     const parsedConfigDefaultsResponse = CapabilityConfigDefaultsResponseSchema.parse(
-      readRouteBody(result)
+      readRouteBody(result),
     );
     expect(parsedConfigDefaultsResponse).toEqual({
       ok: true,
       agentId: "codex",
       model: "gpt-5",
-      reasoningEffort: null
+      reasoningEffort: null,
     });
   });
 
@@ -272,9 +272,11 @@ describe("handleCapabilityRoutes", () => {
       }
       return Number(value);
     });
-    const listModelsSpy = vi.fn(async (_limit: number): Promise<AppServerListModelsResponse> => ({
-      data: []
-    }));
+    const listModelsSpy = vi.fn(
+      async (_limit: number): Promise<AppServerListModelsResponse> => ({
+        data: [],
+      }),
+    );
 
     const result = await executeCapabilityRoute({
       pathname: "/api/models",
@@ -283,12 +285,12 @@ describe("handleCapabilityRoutes", () => {
         createMockAgentAdapter({
           id: "codex",
           capabilities: {
-            canListModels: true
+            canListModels: true,
           },
-          listModels: listModelsSpy
-        })
+          listModels: listModelsSpy,
+        }),
       ],
-      parseInteger: parseIntegerSpy
+      parseInteger: parseIntegerSpy,
     });
 
     expect(result.handled).toBe(true);
@@ -299,7 +301,7 @@ describe("handleCapabilityRoutes", () => {
     expect(parsedModelsResponse).toEqual({
       ok: true,
       data: [],
-      nextCursor: null
+      nextCursor: null,
     });
   });
 
@@ -311,13 +313,13 @@ describe("handleCapabilityRoutes", () => {
         createMockAgentAdapter({
           id: "codex",
           capabilities: {
-            canListModels: true
+            canListModels: true,
           },
           listModels: async (): Promise<AppServerListModelsResponse> => {
             throw new Error("listing failure");
-          }
-        })
-      ]
+          },
+        }),
+      ],
     });
 
     expect(result.handled).toBe(true);
@@ -325,7 +327,7 @@ describe("handleCapabilityRoutes", () => {
     const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
     expect(parsedErrorResponse).toEqual({
       ok: false,
-      error: "Failed to list models: listing failure"
+      error: "Failed to list models: listing failure",
     });
   });
 
@@ -335,19 +337,19 @@ describe("handleCapabilityRoutes", () => {
       url: new URL("http://localhost/api/collaboration-modes"),
       adapters: [
         createMockAgentAdapter({
-          id: "codex"
-        })
-      ]
+          id: "codex",
+        }),
+      ],
     });
 
     expect(result.handled).toBe(true);
     expect(result.statusCode).toBe(200);
     const parsedCollaborationModesResponse = CapabilityCollaborationModesEnvelopeSchema.parse(
-      readRouteBody(result)
+      readRouteBody(result),
     );
     expect(parsedCollaborationModesResponse).toEqual({
       ok: true,
-      data: []
+      data: [],
     });
   });
 });

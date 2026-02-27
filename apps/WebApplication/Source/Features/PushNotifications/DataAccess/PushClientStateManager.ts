@@ -1,5 +1,10 @@
 import { PushSubscriptionSchema } from "@farfield/protocol";
 import { z } from "zod";
+import { PushPreferenceStore } from "@/Features/PushNotifications/DataAccess/PushPreferenceStore";
+import {
+  type PushCreateSubscriptionResponse,
+  PushServerClient,
+} from "@/Features/PushNotifications/DataAccess/PushServerClient";
 import {
   type PushClientState,
   type PushNotificationDisableResult,
@@ -8,17 +13,12 @@ import {
   PushNotificationPreferenceInputSchema,
   type PushNotificationSettingsUpdateResult,
   type PushRecoveryResult,
+  type PushSubscriptionReconcileInput,
   PushSubscriptionReconcileInputSchema,
   type PushSubscriptionReconcileReason,
   PushSubscriptionReconcileReasonSchema,
-  type PushSubscriptionReconcileInput,
-  type PushSubscriptionReconcileResult
+  type PushSubscriptionReconcileResult,
 } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
-import { PushPreferenceStore } from "@/Features/PushNotifications/DataAccess/PushPreferenceStore";
-import {
-  type PushCreateSubscriptionResponse,
-  PushServerClient
-} from "@/Features/PushNotifications/DataAccess/PushServerClient";
 
 interface WindowWithSwReloadSuppression extends Window {
   __farfieldSuppressSwReload?: boolean;
@@ -52,7 +52,8 @@ const PUSH_SUPPORT_NOTIFICATION_PROPERTY_NAME = "Notification";
 const PUSH_SUBSCRIPTION_EMPTY_KEY_DEFAULT = "";
 const SERVICE_WORKER_SKIP_WAITING_MESSAGE_TYPE = "SKIP_WAITING";
 const SERVICE_WORKER_CONTROLLER_CHANGE_EVENT_NAME = "controllerchange";
-const SERVICE_WORKER_RELOAD_SUPPRESSION_WINDOW_PROPERTY_NAME = "__farfieldSuppressSwReload" as const;
+const SERVICE_WORKER_RELOAD_SUPPRESSION_WINDOW_PROPERTY_NAME =
+  "__farfieldSuppressSwReload" as const;
 const NOTIFICATION_PERMISSION_DEFAULT: NotificationPermission = "default";
 const NOTIFICATION_PERMISSION_GRANTED: NotificationPermission = "granted";
 const PUSH_SUBSCRIPTION_P256DH_KEY_NAME = "p256dh";
@@ -78,7 +79,7 @@ export class PushClientStateManager {
         supported: false,
         serviceWorkerRegistered: false,
         permission: NOTIFICATION_PERMISSION_UNSUPPORTED,
-        subscribed: false
+        subscribed: false,
       };
     }
 
@@ -88,18 +89,18 @@ export class PushClientStateManager {
       supported: true,
       serviceWorkerRegistered: registration !== undefined,
       permission: Notification.permission,
-      subscribed: subscription !== null
+      subscribed: subscription !== null,
     };
   }
 
   public async enablePrivateModePushNotifications(): Promise<void> {
     await this.enablePushNotifications({
-      privateMode: true
+      privateMode: true,
     });
   }
 
   public async enablePushNotifications(
-    input: PushNotificationPreferenceInput
+    input: PushNotificationPreferenceInput,
   ): Promise<PushNotificationEnableResult> {
     const parsedInput = PushNotificationPreferenceInputSchema.parse(input);
     if (!this.isPushSupported()) {
@@ -125,25 +126,25 @@ export class PushClientStateManager {
       const vapid = await this.pushServerClient.readPushVapidPublicKey();
       browserSubscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: this.decodeBase64Url(vapid.publicKey)
+        applicationServerKey: this.decodeBase64Url(vapid.publicKey),
       });
     }
 
     const saved = await this.savePushSubscriptionWithSettings({
       browserSubscription,
-      privateMode: parsedInput.privateMode
+      privateMode: parsedInput.privateMode,
     });
     this.pushPreferenceStore.writeAutoHealPreferenceEnabled(true);
 
     return {
       permission,
       subscribed: true,
-      subscriptionId: saved.subscriptionId
+      subscriptionId: saved.subscriptionId,
     };
   }
 
   public async updatePushSettings(
-    input: PushNotificationPreferenceInput
+    input: PushNotificationPreferenceInput,
   ): Promise<PushNotificationSettingsUpdateResult> {
     const parsedInput = PushNotificationPreferenceInputSchema.parse(input);
     if (!this.isPushSupported()) {
@@ -158,7 +159,7 @@ export class PushClientStateManager {
 
     await this.savePushSubscriptionWithSettings({
       browserSubscription,
-      privateMode: parsedInput.privateMode
+      privateMode: parsedInput.privateMode,
     });
 
     return { updated: true };
@@ -190,7 +191,7 @@ export class PushClientStateManager {
     let serverDeleted = false;
     try {
       const deleteResponse = await this.pushServerClient.deletePushSubscription({
-        endpoint: browserSubscription.endpoint
+        endpoint: browserSubscription.endpoint,
       });
       serverDeleted = deleteResponse.deleted;
     } catch {
@@ -205,7 +206,7 @@ export class PushClientStateManager {
   }
 
   public async reconcilePushSubscription(
-    input?: PushSubscriptionReconcileInput
+    input?: PushSubscriptionReconcileInput,
   ): Promise<PushSubscriptionReconcileResult> {
     const parsedInput = PushSubscriptionReconcileInputSchema.parse(input ?? {});
     if (!this.isPushSupported()) {
@@ -218,7 +219,7 @@ export class PushClientStateManager {
 
     if (Notification.permission !== NOTIFICATION_PERMISSION_GRANTED) {
       return this.createReconcileSkippedResult(
-        PushSubscriptionReconcileReasons["permission-not-granted"]
+        PushSubscriptionReconcileReasons["permission-not-granted"],
       );
     }
 
@@ -235,7 +236,7 @@ export class PushClientStateManager {
       const vapid = await this.pushServerClient.readPushVapidPublicKey();
       browserSubscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: this.decodeBase64Url(vapid.publicKey)
+        applicationServerKey: this.decodeBase64Url(vapid.publicKey),
       });
       repaired = true;
     }
@@ -243,7 +244,7 @@ export class PushClientStateManager {
     const privateMode = parsedInput.privateMode ?? status.privateModeDefault;
     await this.savePushSubscriptionWithSettings({
       browserSubscription,
-      privateMode
+      privateMode,
     });
 
     return {
@@ -252,12 +253,12 @@ export class PushClientStateManager {
       repaired,
       reason: repaired
         ? PushSubscriptionReconcileReasons["subscription-restored"]
-        : PushSubscriptionReconcileReasons["subscription-confirmed"]
+        : PushSubscriptionReconcileReasons["subscription-confirmed"],
     };
   }
 
   public async recoverPushNotifications(
-    input: PushNotificationPreferenceInput
+    input: PushNotificationPreferenceInput,
   ): Promise<PushRecoveryResult> {
     const parsedInput = PushNotificationPreferenceInputSchema.parse(input);
     if (!this.isPushSupported()) {
@@ -268,7 +269,7 @@ export class PushClientStateManager {
     const existingSubscription = await registration.pushManager.getSubscription();
     if (existingSubscription) {
       await this.pushServerClient.deletePushSubscription({
-        endpoint: existingSubscription.endpoint
+        endpoint: existingSubscription.endpoint,
       });
       await existingSubscription.unsubscribe();
     }
@@ -281,12 +282,12 @@ export class PushClientStateManager {
       await this.clearServiceWorkerCaches();
       await this.registerPushServiceWorker();
       const enabled = await this.enablePushNotifications({
-        privateMode: parsedInput.privateMode
+        privateMode: parsedInput.privateMode,
       });
       return {
         updatedServiceWorker,
         subscribed: enabled.subscribed,
-        subscriptionId: enabled.subscriptionId
+        subscriptionId: enabled.subscriptionId,
       };
     } finally {
       this.setServiceWorkerReloadSuppressed(false);
@@ -304,7 +305,7 @@ export class PushClientStateManager {
   private decodeBase64Url(value: string): ArrayBuffer {
     const padding = BASE64_PADDING_CHARACTER.repeat(
       (BASE64_PADDING_GROUP_LENGTH - (value.length % BASE64_PADDING_GROUP_LENGTH)) %
-        BASE64_PADDING_GROUP_LENGTH
+        BASE64_PADDING_GROUP_LENGTH,
     );
     const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
     const binary = atob(base64);
@@ -321,38 +322,39 @@ export class PushClientStateManager {
   }
 
   private strictSubscriptionPayload(
-    subscription: PushSubscription
+    subscription: PushSubscription,
   ): z.infer<typeof PushSubscriptionSchema> {
     const raw = subscription.toJSON();
     return PushSubscriptionSchema.parse({
       endpoint: raw.endpoint ?? subscription.endpoint,
       keys: {
-        p256dh: raw.keys?.[PUSH_SUBSCRIPTION_P256DH_KEY_NAME] ?? PUSH_SUBSCRIPTION_EMPTY_KEY_DEFAULT,
-        auth: raw.keys?.[PUSH_SUBSCRIPTION_AUTH_KEY_NAME] ?? PUSH_SUBSCRIPTION_EMPTY_KEY_DEFAULT
-      }
+        p256dh:
+          raw.keys?.[PUSH_SUBSCRIPTION_P256DH_KEY_NAME] ?? PUSH_SUBSCRIPTION_EMPTY_KEY_DEFAULT,
+        auth: raw.keys?.[PUSH_SUBSCRIPTION_AUTH_KEY_NAME] ?? PUSH_SUBSCRIPTION_EMPTY_KEY_DEFAULT,
+      },
     });
   }
 
   private createReconcileSkippedResult(
-    reason: PushSubscriptionReconcileReason
+    reason: PushSubscriptionReconcileReason,
   ): PushSubscriptionReconcileResult {
     return {
       attempted: false,
       subscribed: false,
       repaired: false,
-      reason
+      reason,
     };
   }
 
   private async savePushSubscriptionWithSettings(
-    input: SavePushSubscriptionWithSettingsInput
+    input: SavePushSubscriptionWithSettingsInput,
   ): Promise<PushCreateSubscriptionResponse> {
     const payload = this.strictSubscriptionPayload(input.browserSubscription);
     return await this.pushServerClient.savePushSubscription({
       subscription: payload,
       settings: {
-        privateMode: input.privateMode
-      }
+        privateMode: input.privateMode,
+      },
     });
   }
 
@@ -379,7 +381,7 @@ export class PushClientStateManager {
         window.clearTimeout(controllerChangeTimeoutIdentifier);
         navigator.serviceWorker.removeEventListener(
           SERVICE_WORKER_CONTROLLER_CHANGE_EVENT_NAME,
-          handleControllerChange
+          handleControllerChange,
         );
         resolve();
       };
@@ -392,23 +394,26 @@ export class PushClientStateManager {
         completeControllerChangeWait();
       };
 
-      controllerChangeTimeoutIdentifier = window.setTimeout(handleControllerChangeTimeout, timeoutMs);
+      controllerChangeTimeoutIdentifier = window.setTimeout(
+        handleControllerChangeTimeout,
+        timeoutMs,
+      );
       navigator.serviceWorker.addEventListener(
         SERVICE_WORKER_CONTROLLER_CHANGE_EVENT_NAME,
-        handleControllerChange
+        handleControllerChange,
       );
     });
   }
 
   private async activateWaitingServiceWorker(
-    registration: ServiceWorkerRegistration
+    registration: ServiceWorkerRegistration,
   ): Promise<boolean> {
     const waitingWorker = registration.waiting;
     if (!waitingWorker) {
       return false;
     }
     const controllerChangePromise = this.waitForControllerChange(
-      CONTROLLER_CHANGE_WAIT_TIMEOUT_MILLISECONDS
+      CONTROLLER_CHANGE_WAIT_TIMEOUT_MILLISECONDS,
     );
     waitingWorker.postMessage({ type: SERVICE_WORKER_SKIP_WAITING_MESSAGE_TYPE });
     await controllerChangePromise;
@@ -420,7 +425,7 @@ export class PushClientStateManager {
     await Promise.all(
       registrations.map(async (registration) => {
         await registration.unregister();
-      })
+      }),
     );
   }
 
@@ -433,7 +438,7 @@ export class PushClientStateManager {
     await Promise.all(
       cacheKeys.map(async (cacheKey) => {
         await window.caches.delete(cacheKey);
-      })
+      }),
     );
   }
 }

@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  NonEmptyStringSchema,
-  NonNegativeIntSchema
-} from "../../Common.js";
+import { NonEmptyStringSchema, NonNegativeIntSchema } from "../../Common.js";
 import { ToolRequestUserInputResponseSchema } from "../../Generated/app-server/index.js";
 
 export const UserInputRequestMethod = "item/tool/requestUserInput";
@@ -10,7 +7,7 @@ export const UserInputRequestMethod = "item/tool/requestUserInput";
 export const UserInputOptionSchema = z
   .object({
     label: z.string(),
-    description: z.string()
+    description: z.string(),
   })
   .passthrough();
 
@@ -21,7 +18,7 @@ export const UserInputQuestionSchema = z
     question: z.string(),
     isOther: z.boolean(),
     isSecret: z.boolean(),
-    options: z.array(UserInputOptionSchema)
+    options: z.array(UserInputOptionSchema),
   })
   .passthrough();
 
@@ -30,7 +27,7 @@ export const UserInputRequestParamsSchema = z
     threadId: NonEmptyStringSchema,
     turnId: NonEmptyStringSchema,
     itemId: NonEmptyStringSchema,
-    questions: z.array(UserInputQuestionSchema)
+    questions: z.array(UserInputQuestionSchema),
   })
   .passthrough();
 
@@ -39,13 +36,13 @@ export const UserInputRequestSchema = z
     method: z.literal(UserInputRequestMethod),
     id: NonNegativeIntSchema,
     params: UserInputRequestParamsSchema,
-    completed: z.boolean().optional()
+    completed: z.boolean().optional(),
   })
   .passthrough();
 
 export const UserInputAnswerSchema = z
   .object({
-    answers: z.array(z.string())
+    answers: z.array(z.string()),
   })
   .passthrough();
 

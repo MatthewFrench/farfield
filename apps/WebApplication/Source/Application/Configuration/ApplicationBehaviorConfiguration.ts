@@ -9,7 +9,10 @@ export const CHAT_SCROLL_BOTTOM_THRESHOLD_PX = 48;
 export const CORE_REFRESH_INTERVAL_MS = 5_000;
 export const CORE_REFRESH_CONNECTED_MIN_INTERVAL_MS = 60_000;
 export const CAPABILITY_REFRESH_INTERVAL_MS = 5 * 60_000;
-export const THREAD_ONLY_HISTORY_METHOD_NAMES = ["thread-stream-state-changed", "thread-queued-followups-changed"] as const;
+export const THREAD_ONLY_HISTORY_METHOD_NAMES = [
+  "thread-stream-state-changed",
+  "thread-queued-followups-changed",
+] as const;
 export const READ_THREAD_RETRY_ATTEMPTS = 6;
 export const READ_THREAD_RETRY_BASE_DELAY_MS = 140;
 export const READ_THREAD_RETRY_MAX_DELAY_MS = 1_000;
@@ -35,5 +38,5 @@ export const UNSUPPORTED_PUSH_CLIENT_STATE: PushClientState = {
   supported: false,
   serviceWorkerRegistered: false,
   permission: "unsupported",
-  subscribed: false
+  subscribed: false,
 };

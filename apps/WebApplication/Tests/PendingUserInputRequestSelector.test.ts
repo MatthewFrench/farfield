@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
 import type { ThreadConversationState } from "@farfield/protocol";
+import { describe, expect, it } from "vitest";
 import { PendingUserInputRequestSelector } from "../Source/Features/Chat/DomainModel/PendingUserInputRequestSelector";
 
-function createRequest(input: { id: number; completed?: boolean }): ThreadConversationState["requests"][number] {
+function createRequest(input: {
+  id: number;
+  completed?: boolean;
+}): ThreadConversationState["requests"][number] {
   return {
     method: "item/tool/requestUserInput",
     id: input.id,
@@ -21,22 +24,22 @@ function createRequest(input: { id: number; completed?: boolean }): ThreadConver
           options: [
             {
               label: "Option",
-              description: "Option description"
-            }
-          ]
-        }
-      ]
-    }
+              description: "Option description",
+            },
+          ],
+        },
+      ],
+    },
   };
 }
 
 function createConversationState(
-  requests: ThreadConversationState["requests"]
+  requests: ThreadConversationState["requests"],
 ): ThreadConversationState {
   return {
     id: "thread-1",
     turns: [],
-    requests
+    requests,
   };
 }
 
@@ -54,7 +57,7 @@ describe("PendingUserInputRequestSelector", () => {
     const conversationState = createConversationState([
       createRequest({ id: 1 }),
       createRequest({ id: 2, completed: false }),
-      createRequest({ id: 3, completed: true })
+      createRequest({ id: 3, completed: true }),
     ]);
 
     const pendingRequests = selector.readPendingUserInputRequests(conversationState);

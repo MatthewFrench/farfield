@@ -1,13 +1,13 @@
 import net from "node:net";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   IpcClientDiscoveryRequestFrameSchema,
+  type IpcFrame,
   IpcRequestFrameSchema,
   IpcResponseFrameSchema,
   JsonValueSchema,
   parseIpcFrame,
-  type IpcFrame
 } from "@farfield/protocol";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DesktopIpcClient } from "../Source/IpcClient.js";
 
 const TEST_SOCKET_PATH = "/tmp/farfield-ipc-test.sock";
@@ -67,10 +67,9 @@ class InMemorySocket extends net.Socket {
   public override write(
     chunk: string | Uint8Array,
     encodingOrCallback?: BufferEncoding | ((error: Error | null | undefined) => void),
-    maybeCallback?: (error: Error | null | undefined) => void
+    maybeCallback?: (error: Error | null | undefined) => void,
   ): boolean {
-    const callback =
-      typeof encodingOrCallback === "function" ? encodingOrCallback : maybeCallback;
+    const callback = typeof encodingOrCallback === "function" ? encodingOrCallback : maybeCallback;
     const encoding = typeof encodingOrCallback === "string" ? encodingOrCallback : undefined;
 
     if (this.nextWriteError) {
@@ -80,7 +79,8 @@ class InMemorySocket extends net.Socket {
       throw writeError;
     }
 
-    const encodedChunk = typeof chunk === "string" ? Buffer.from(chunk, encoding) : Buffer.from(chunk);
+    const encodedChunk =
+      typeof chunk === "string" ? Buffer.from(chunk, encoding) : Buffer.from(chunk);
     this.writes.push(encodedChunk);
     callback?.(undefined);
     return true;
@@ -89,7 +89,7 @@ class InMemorySocket extends net.Socket {
   public override end(
     chunkOrCallback?: string | Uint8Array | (() => void),
     encodingOrCallback?: BufferEncoding | (() => void),
-    maybeCallback?: () => void
+    maybeCallback?: () => void,
   ): this {
     const callback =
       typeof chunkOrCallback === "function"
@@ -129,9 +129,11 @@ function decodeFrameFromWrite(buffer: Buffer): IpcFrame {
   const payloadSize = buffer.readUInt32LE(IPC_FRAME_HEADER_LENGTH_OFFSET_BYTES);
   const payload = buffer.subarray(
     IPC_FRAME_HEADER_SIZE_BYTES,
-    IPC_FRAME_HEADER_SIZE_BYTES + payloadSize
+    IPC_FRAME_HEADER_SIZE_BYTES + payloadSize,
   );
-  const parsedPayload = JsonValueSchema.parse(JSON.parse(payload.toString(IPC_FRAME_PAYLOAD_ENCODING)));
+  const parsedPayload = JsonValueSchema.parse(
+    JSON.parse(payload.toString(IPC_FRAME_PAYLOAD_ENCODING)),
+  );
   return parseIpcFrame(parsedPayload);
 }
 
@@ -152,12 +154,15 @@ function pushBufferInChunks(socket: InMemorySocket, buffer: Buffer, chunkByteSiz
   }
 }
 
-async function connectClient(socket: InMemorySocket, requestTimeoutMs?: number): Promise<DesktopIpcClient> {
+async function connectClient(
+  socket: InMemorySocket,
+  requestTimeoutMs?: number,
+): Promise<DesktopIpcClient> {
   vi.spyOn(net, "createConnection").mockReturnValue(socket);
 
   const client = new DesktopIpcClient({
     socketPath: TEST_SOCKET_PATH,
-    ...(requestTimeoutMs ? { requestTimeoutMs } : {})
+    ...(requestTimeoutMs ? { requestTimeoutMs } : {}),
   });
 
   const connectPromise = client.connect();
@@ -180,12 +185,12 @@ describe("DesktopIpcClient", () => {
     const responsePromise = client.sendRequestAndWait(
       REQUEST_METHOD_INTERRUPT_TURN,
       {
-        conversationId: "thread-1"
+        conversationId: "thread-1",
       },
       {
         targetClientId: "owner-client",
-        version: 7
-      }
+        version: 7,
+      },
     );
 
     const requestFrame = requireWrittenFrame(socket, 0);
@@ -194,7 +199,7 @@ describe("DesktopIpcClient", () => {
       method: REQUEST_METHOD_INTERRUPT_TURN,
       sourceClientId: IPC_INITIALIZING_SOURCE_CLIENT_ID,
       targetClientId: "owner-client",
-      version: 7
+      version: 7,
     });
     if (requestFrame.type !== IPC_REQUEST_FRAME_TYPE) {
       throw new Error("Expected request frame");
@@ -207,10 +212,10 @@ describe("DesktopIpcClient", () => {
           requestId: requestFrame.requestId,
           resultType: IPC_SUCCESS_RESULT_TYPE,
           result: {
-            ok: true
-          }
-        })
-      )
+            ok: true,
+          },
+        }),
+      ),
     );
 
     const response = await responsePromise;
@@ -229,7 +234,7 @@ describe("DesktopIpcClient", () => {
       type: IPC_REQUEST_FRAME_TYPE,
       method: IPC_INITIALIZE_METHOD,
       sourceClientId: IPC_INITIALIZING_SOURCE_CLIENT_ID,
-      version: IPC_PROTOCOL_VERSION
+      version: IPC_PROTOCOL_VERSION,
     });
     if (initializeRequestFrame.type !== IPC_REQUEST_FRAME_TYPE) {
       throw new Error("Expected initialize request frame");
@@ -243,22 +248,22 @@ describe("DesktopIpcClient", () => {
           method: IPC_INITIALIZE_METHOD,
           resultType: IPC_SUCCESS_RESULT_TYPE,
           result: {
-            clientId: "desktop-client-42"
-          }
-        })
-      )
+            clientId: "desktop-client-42",
+          },
+        }),
+      ),
     );
 
     await initializePromise;
 
     client.sendBroadcast(REQUEST_METHOD_SUBSCRIBE, {
-      conversationId: "thread-1"
+      conversationId: "thread-1",
     });
     const broadcastFrame = requireWrittenFrame(socket, 1);
     expect(broadcastFrame).toMatchObject({
       type: IPC_BROADCAST_FRAME_TYPE,
       method: REQUEST_METHOD_SUBSCRIBE,
-      sourceClientId: "desktop-client-42"
+      sourceClientId: "desktop-client-42",
     });
 
     await client.disconnect();
@@ -281,9 +286,9 @@ describe("DesktopIpcClient", () => {
         requestId: "nested-1",
         method: REQUEST_METHOD_INTERRUPT_TURN,
         params: {
-          conversationId: "thread-1"
-        }
-      })
+          conversationId: "thread-1",
+        },
+      }),
     });
 
     const requestFrame = IpcRequestFrameSchema.parse({
@@ -291,24 +296,24 @@ describe("DesktopIpcClient", () => {
       requestId: "request-without-handler",
       method: REQUEST_METHOD_START_TURN,
       params: {
-        conversationId: "thread-1"
-      }
+        conversationId: "thread-1",
+      },
     });
 
     pushBufferInChunks(
       socket,
       Buffer.concat([encodeFrame(discoveryFrame), encodeFrame(requestFrame)]),
-      5
+      5,
     );
 
     expect(receivedFrames).toHaveLength(2);
     expect(receivedFrames[0]).toMatchObject({
       type: IPC_CLIENT_DISCOVERY_REQUEST_FRAME_TYPE,
-      requestId: "discovery-1"
+      requestId: "discovery-1",
     });
     expect(receivedFrames[1]).toMatchObject({
       type: IPC_REQUEST_FRAME_TYPE,
-      requestId: "request-without-handler"
+      requestId: "request-without-handler",
     });
 
     const discoveryResponseFrame = requireWrittenFrame(socket, 0);
@@ -316,8 +321,8 @@ describe("DesktopIpcClient", () => {
       type: IPC_CLIENT_DISCOVERY_RESPONSE_FRAME_TYPE,
       requestId: "discovery-1",
       response: {
-        canHandle: false
-      }
+        canHandle: false,
+      },
     });
 
     const noHandlerFrame = requireWrittenFrame(socket, 1);
@@ -325,7 +330,7 @@ describe("DesktopIpcClient", () => {
       type: IPC_RESPONSE_FRAME_TYPE,
       requestId: "request-without-handler",
       resultType: IPC_ERROR_RESULT_TYPE,
-      error: IPC_NO_HANDLER_FOR_REQUEST_ERROR
+      error: IPC_NO_HANDLER_FOR_REQUEST_ERROR,
     });
 
     unsubscribe();
@@ -349,14 +354,14 @@ describe("DesktopIpcClient", () => {
           requestId: requestFrame.requestId,
           resultType: IPC_ERROR_RESULT_TYPE,
           error: {
-            reason: "permission denied"
-          }
-        })
-      )
+            reason: "permission denied",
+          },
+        }),
+      ),
     );
 
     await expect(responsePromise).rejects.toThrowError(
-      `IPC ${REQUEST_METHOD_SUBMIT_USER_INPUT} failed: {"reason":"permission denied"}`
+      `IPC ${REQUEST_METHOD_SUBMIT_USER_INPUT} failed: {"reason":"permission denied"}`,
     );
 
     await client.disconnect();
@@ -378,13 +383,13 @@ describe("DesktopIpcClient", () => {
           type: IPC_RESPONSE_FRAME_TYPE,
           requestId: requestFrame.requestId,
           resultType: IPC_ERROR_RESULT_TYPE,
-          error: false
-        })
-      )
+          error: false,
+        }),
+      ),
     );
 
     await expect(responsePromise).rejects.toThrowError(
-      `IPC ${REQUEST_METHOD_SUBMIT_USER_INPUT} failed: false`
+      `IPC ${REQUEST_METHOD_SUBMIT_USER_INPUT} failed: false`,
     );
 
     await client.disconnect();
@@ -407,10 +412,10 @@ describe("DesktopIpcClient", () => {
           requestId: "different-request-id",
           resultType: IPC_SUCCESS_RESULT_TYPE,
           result: {
-            ignored: true
-          }
-        })
-      )
+            ignored: true,
+          },
+        }),
+      ),
     );
 
     socket.pushInboundData(
@@ -420,10 +425,10 @@ describe("DesktopIpcClient", () => {
           requestId: requestFrame.requestId,
           resultType: IPC_SUCCESS_RESULT_TYPE,
           result: {
-            ok: true
-          }
-        })
-      )
+            ok: true,
+          },
+        }),
+      ),
     );
 
     const response = await responsePromise;
@@ -437,9 +442,13 @@ describe("DesktopIpcClient", () => {
     const socket = new InMemorySocket();
     const client = await connectClient(socket);
 
-    const responsePromise = client.sendRequestAndWait(REQUEST_METHOD_START_TURN, {}, { timeoutMs: 10 });
+    const responsePromise = client.sendRequestAndWait(
+      REQUEST_METHOD_START_TURN,
+      {},
+      { timeoutMs: 10 },
+    );
     const timeoutExpectation = expect(responsePromise).rejects.toThrowError(
-      `${IPC_REQUEST_TIMEOUT_ERROR_PREFIX}: ${REQUEST_METHOD_START_TURN}`
+      `${IPC_REQUEST_TIMEOUT_ERROR_PREFIX}: ${REQUEST_METHOD_START_TURN}`,
     );
     await vi.advanceTimersByTimeAsync(11);
 
@@ -463,8 +472,8 @@ describe("DesktopIpcClient", () => {
     expect(connectionStates).toEqual([
       {
         connected: false,
-        reason: IPC_SOCKET_CLOSED_REASON
-      }
+        reason: IPC_SOCKET_CLOSED_REASON,
+      },
     ]);
 
     unsubscribe();
@@ -485,8 +494,8 @@ describe("DesktopIpcClient", () => {
     expect(connectionStates).toEqual([
       {
         connected: false,
-        reason: `${IPC_SOCKET_ERROR_PREFIX}: stream reset`
-      }
+        reason: `${IPC_SOCKET_ERROR_PREFIX}: stream reset`,
+      },
     ]);
   });
 
@@ -517,8 +526,8 @@ describe("DesktopIpcClient", () => {
     expect(connectionStates).toEqual([
       {
         connected: false,
-        reason: IPC_SOCKET_CLOSED_REASON
-      }
+        reason: IPC_SOCKET_CLOSED_REASON,
+      },
     ]);
   });
 
@@ -532,7 +541,7 @@ describe("DesktopIpcClient", () => {
     socket.pushInboundData(oversizedHeader);
 
     await expect(responsePromise).rejects.toThrowError(
-      `IPC frame exceeded limit (${String(MAX_FRAME_SIZE_BYTES + 1)} > ${String(MAX_FRAME_SIZE_BYTES)})`
+      `IPC frame exceeded limit (${String(MAX_FRAME_SIZE_BYTES + 1)} > ${String(MAX_FRAME_SIZE_BYTES)})`,
     );
     expect(client.isConnected()).toBe(false);
   });
@@ -543,12 +552,12 @@ describe("DesktopIpcClient", () => {
 
     socket.setNextWriteError(new Error(BROKEN_PIPE_ERROR));
     await expect(client.sendRequestAndWait(REQUEST_METHOD_START_TURN, {})).rejects.toThrowError(
-      `${IPC_REQUEST_WRITE_FAILURE_ERROR_PREFIX} ${REQUEST_METHOD_START_TURN}: ${BROKEN_PIPE_ERROR}`
+      `${IPC_REQUEST_WRITE_FAILURE_ERROR_PREFIX} ${REQUEST_METHOD_START_TURN}: ${BROKEN_PIPE_ERROR}`,
     );
 
     socket.setNextWriteError(new Error(BROKEN_PIPE_ERROR));
     await expect(client.initialize("farfield-tests")).rejects.toThrowError(
-      `${IPC_INITIALIZE_WRITE_FAILURE_ERROR}: ${BROKEN_PIPE_ERROR}`
+      `${IPC_INITIALIZE_WRITE_FAILURE_ERROR}: ${BROKEN_PIPE_ERROR}`,
     );
 
     await client.disconnect();
@@ -556,13 +565,13 @@ describe("DesktopIpcClient", () => {
 
   it("throws when sending frames without an active socket connection", () => {
     const client = new DesktopIpcClient({
-      socketPath: TEST_SOCKET_PATH
+      socketPath: TEST_SOCKET_PATH,
     });
 
     expect(() =>
       client.sendBroadcast(REQUEST_METHOD_START_TURN, {
-        conversationId: "thread-1"
-      })
+        conversationId: "thread-1",
+      }),
     ).toThrowError(IPC_SOCKET_NOT_CONNECTED_ERROR);
   });
 
@@ -579,7 +588,7 @@ describe("DesktopIpcClient", () => {
     vi.spyOn(net, "createConnection").mockReturnValue(socket);
 
     const client = new DesktopIpcClient({
-      socketPath: TEST_SOCKET_PATH
+      socketPath: TEST_SOCKET_PATH,
     });
 
     const connectPromise = client.connect();

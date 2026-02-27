@@ -1,30 +1,30 @@
 import { type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { type ApplicationRouteState } from "@/Application/DomainModel/ApplicationRouteStateMapper";
-import { type AgentId } from "@/Shared/Contracts/ApiContracts";
-import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import {
   type CapabilityAgentsResponse,
   type CapabilityCollaborationModesResponse,
   type CapabilityConfigDefaultsResponse,
   type CapabilityHealthResponse,
-  type CapabilityModelsResponse
+  type CapabilityModelsResponse,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import {
   type ChatLiveStateResponse,
   type ChatReadThreadResponse,
-  type ChatStreamEventsResponse
+  type ChatStreamEventsResponse,
 } from "@/Features/Chat/DataAccess/ChatServerClient";
 import { type LoadSelectedThreadOptions } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import {
   type DebugErrorListResponse,
   type DebugHistoryDetailResponse,
   type DebugHistoryResponse,
-  type DebugTraceStatusResponse
+  type DebugTraceStatusResponse,
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { type DebugIssueSeverityFilter } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
-import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
+import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 
 type AgentDescriptor = CapabilityAgentsResponse["agents"][number];
 type ApplicationShellStateSetter<Value> = Dispatch<SetStateAction<Value>>;
@@ -40,7 +40,7 @@ export type ApplicationShellTab = "chat" | "debug";
 export type CoreDataLoadFunction = () => Promise<void>;
 export type SelectedThreadLoadFunction = (
   threadId: string,
-  options?: LoadSelectedThreadOptions
+  options?: LoadSelectedThreadOptions,
 ) => Promise<void>;
 export type SignatureTokens = string[];
 

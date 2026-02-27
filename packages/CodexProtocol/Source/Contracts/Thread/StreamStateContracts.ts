@@ -1,36 +1,32 @@
 import { z } from "zod";
-import {
-  JsonValueSchema,
-  NonEmptyStringSchema,
-  NonNegativeIntSchema
-} from "../../Common.js";
+import { JsonValueSchema, NonEmptyStringSchema, NonNegativeIntSchema } from "../../Common.js";
 import { ThreadConversationStateSchema } from "./ConversationStateContracts.js";
 
 export const ThreadStreamPatchPathSegmentSchema = z.union([
   NonNegativeIntSchema,
-  NonEmptyStringSchema
+  NonEmptyStringSchema,
 ]);
 
 const ThreadStreamPatchBaseSchema = z
   .object({
-    path: z.array(ThreadStreamPatchPathSegmentSchema).min(1)
+    path: z.array(ThreadStreamPatchPathSegmentSchema).min(1),
   })
   .passthrough();
 
 const ThreadStreamAddPatchSchema = ThreadStreamPatchBaseSchema.extend({
   op: z.literal("add"),
-  value: JsonValueSchema
+  value: JsonValueSchema,
 });
 
 const ThreadStreamReplacePatchSchema = ThreadStreamPatchBaseSchema.extend({
   op: z.literal("replace"),
-  value: JsonValueSchema
+  value: JsonValueSchema,
 });
 
 const ThreadStreamRemovePatchSchema = ThreadStreamPatchBaseSchema.extend({
   op: z.literal("remove"),
   // Remove patches target existing state and must not include payloads.
-  value: z.never().optional()
+  value: z.never().optional(),
 });
 
 export const ThreadStreamPatchSchema: z.ZodDiscriminatedUnion<
@@ -38,12 +34,12 @@ export const ThreadStreamPatchSchema: z.ZodDiscriminatedUnion<
   [
     typeof ThreadStreamAddPatchSchema,
     typeof ThreadStreamReplacePatchSchema,
-    typeof ThreadStreamRemovePatchSchema
+    typeof ThreadStreamRemovePatchSchema,
   ]
 > = z.discriminatedUnion("op", [
   ThreadStreamAddPatchSchema,
   ThreadStreamReplacePatchSchema,
-  ThreadStreamRemovePatchSchema
+  ThreadStreamRemovePatchSchema,
 ]);
 
 export const ThreadStreamSnapshotChangeSchema: z.ZodObject<
@@ -55,7 +51,7 @@ export const ThreadStreamSnapshotChangeSchema: z.ZodObject<
 > = z
   .object({
     type: z.literal("snapshot"),
-    conversationState: ThreadConversationStateSchema
+    conversationState: ThreadConversationStateSchema,
   })
   .passthrough();
 
@@ -68,7 +64,7 @@ export const ThreadStreamPatchesChangeSchema: z.ZodObject<
 > = z
   .object({
     type: z.literal("patches"),
-    patches: z.array(ThreadStreamPatchSchema)
+    patches: z.array(ThreadStreamPatchSchema),
   })
   .passthrough();
 
@@ -77,7 +73,7 @@ export const ThreadStreamChangeSchema: z.ZodDiscriminatedUnion<
   [typeof ThreadStreamSnapshotChangeSchema, typeof ThreadStreamPatchesChangeSchema]
 > = z.discriminatedUnion("type", [
   ThreadStreamSnapshotChangeSchema,
-  ThreadStreamPatchesChangeSchema
+  ThreadStreamPatchesChangeSchema,
 ]);
 
 export const ThreadStreamStateChangedEventType = "thread-stream-state-changed";
@@ -95,7 +91,7 @@ export const ThreadStreamStateChangedParamsSchema: z.ZodObject<
     conversationId: NonEmptyStringSchema,
     change: ThreadStreamChangeSchema,
     version: NonNegativeIntSchema,
-    type: z.literal(ThreadStreamStateChangedEventType)
+    type: z.literal(ThreadStreamStateChangedEventType),
   })
   .passthrough();
 

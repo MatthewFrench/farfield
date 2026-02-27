@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { AppServerClient } from "../Source/AppServerClient.js";
 import { AppServerRpcError, DesktopIpcError } from "../Source/Errors.js";
+import * as PublicApi from "../Source/Index.js";
 import { DesktopIpcClient } from "../Source/IpcClient.js";
 import { applyStrictPatchSequence, ThreadStreamReductionError } from "../Source/LiveState.js";
 import { CodexMonitorService } from "../Source/Service.js";
-import * as PublicApi from "../Source/Index.js";
 
 const EXPECTED_RUNTIME_PUBLIC_API_KEYS = [
   "AppServerClient",
@@ -23,7 +23,7 @@ const EXPECTED_RUNTIME_PUBLIC_API_KEYS = [
   "buildAppServerSpawnEnvironment",
   "findLatestTurnParamsTemplate",
   "isChildProcessAppServerTransportOptions",
-  "reduceThreadStreamEvents"
+  "reduceThreadStreamEvents",
 ];
 
 describe("Index", () => {

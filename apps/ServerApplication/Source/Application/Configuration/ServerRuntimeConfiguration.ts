@@ -1,20 +1,18 @@
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: runtime configuration contracts remain centralized while configuration owners are being split.
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { z } from "zod";
 import {
-  resolvePushStatePath,
-  type PushStatePathResolution
-} from "../../Modules/PushNotifications/PushStatePath.js";
-import {
+  type NtfyConfig,
   parseNtfyConfigFromEnv,
-  type NtfyConfig
 } from "../../Modules/PushNotifications/NtfyNotifier.js";
 import {
-  LoggerLevelSchema,
-  type LoggerLevel
-} from "../../Shared/Logging/Logger.js";
+  type PushStatePathResolution,
+  resolvePushStatePath,
+} from "../../Modules/PushNotifications/PushStatePath.js";
+import { type LoggerLevel, LoggerLevelSchema } from "../../Shared/Logging/Logger.js";
 
 // Owner note: this module is the single startup boundary for server environment
 // parsing, including key ownership, defaults, and precedence decisions.
@@ -55,7 +53,7 @@ const ServerRuntimeEnvironmentVariableNames = Object.freeze({
   webBuildId: "WEB_BUILD_ID",
   webServiceWorkerVersion: "WEB_SERVICE_WORKER_VERSION",
   xdgDataHome: "XDG_DATA_HOME",
-  xdgStateHome: "XDG_STATE_HOME"
+  xdgStateHome: "XDG_STATE_HOME",
 });
 const ServerRuntimeDefaultValues = Object.freeze({
   apiSessionSecureCookie: false,
@@ -82,7 +80,7 @@ const ServerRuntimeDefaultValues = Object.freeze({
   // Bound thread-list aggregation cache cardinality to keep memory growth predictable.
   threadListAggregationCacheMaximumEntries: 48,
   threadListAggregationCacheTimeToLiveMilliseconds: 2_000,
-  webHealthBuildId: "dev"
+  webHealthBuildId: "dev",
 });
 const ServerRuntimeStaticConfiguration = Object.freeze({
   apiSessionCookieName: "farfield_session",
@@ -108,14 +106,14 @@ const ServerRuntimeStaticConfiguration = Object.freeze({
   threadLogsDirectoryName: "threads",
   traceDirectoryName: "traces",
   userAgent: "farfield/0.2.0",
-  windowsCodexIpcSocketPath: "\\\\.\\pipe\\codex-ipc"
+  windowsCodexIpcSocketPath: "\\\\.\\pipe\\codex-ipc",
 });
 const ServerRuntimeParsingConstants = Object.freeze({
   falseText: "false",
   falseNumeric: "0",
   minimumPositiveInteger: 1,
   trueText: "true",
-  trueNumeric: "1"
+  trueNumeric: "1",
 });
 const PositiveIntegerEnvironmentValueSchema = z.coerce
   .number()
@@ -125,22 +123,22 @@ const BooleanEnvironmentValueSchema = z.enum([
   ServerRuntimeParsingConstants.trueNumeric,
   ServerRuntimeParsingConstants.trueText,
   ServerRuntimeParsingConstants.falseNumeric,
-  ServerRuntimeParsingConstants.falseText
+  ServerRuntimeParsingConstants.falseText,
 ]);
 const ServerRuntimeGitCommandConfiguration = Object.freeze({
   command: "git",
   outputEncoding: "utf8",
-  shortHeadArguments: Object.freeze(["rev-parse", "--short", "HEAD"])
+  shortHeadArguments: Object.freeze(["rev-parse", "--short", "HEAD"]),
 });
 const ServerRuntimeFormattingConstants = Object.freeze({
   clientErrorSessionTimestampUnsafeCharactersPattern: /[:.]/g,
-  clientErrorSessionTimestampSeparator: "-"
+  clientErrorSessionTimestampSeparator: "-",
 });
 const MissingPushVapidConfigurationErrorMessage =
-  `${ServerRuntimeEnvironmentVariableNames.pushEnabled}=true requires `
-  + `${ServerRuntimeEnvironmentVariableNames.pushVapidPublicKey}, `
-  + `${ServerRuntimeEnvironmentVariableNames.pushVapidPrivateKey}, and `
-  + ServerRuntimeEnvironmentVariableNames.pushVapidSubject;
+  `${ServerRuntimeEnvironmentVariableNames.pushEnabled}=true requires ` +
+  `${ServerRuntimeEnvironmentVariableNames.pushVapidPublicKey}, ` +
+  `${ServerRuntimeEnvironmentVariableNames.pushVapidPrivateKey}, and ` +
+  ServerRuntimeEnvironmentVariableNames.pushVapidSubject;
 
 function readEnvironmentValue(env: NodeJS.ProcessEnv, variableName: string): string | null {
   return env[variableName] ?? null;
@@ -162,11 +160,16 @@ function parseBooleanEnvironmentValue(value: string | null, defaultValue: boolea
     return defaultValue;
   }
 
-  return parsed.data === ServerRuntimeParsingConstants.trueNumeric
-    || parsed.data === ServerRuntimeParsingConstants.trueText;
+  return (
+    parsed.data === ServerRuntimeParsingConstants.trueNumeric ||
+    parsed.data === ServerRuntimeParsingConstants.trueText
+  );
 }
 
-function parseOptionalPathEnvironmentValue(label: string, value: string | undefined): string | null {
+function parseOptionalPathEnvironmentValue(
+  label: string,
+  value: string | undefined,
+): string | null {
   const parsed = OptionalPathEnvSchema.safeParse(value);
   if (!parsed.success) {
     throw new Error(`${label} must be a non-empty path when set`);
@@ -182,7 +185,7 @@ function parseOptionalPathEnvironmentValue(label: string, value: string | undefi
 function readPositiveIntegerEnvironmentValue(
   env: NodeJS.ProcessEnv,
   variableName: string,
-  defaultValue: number
+  defaultValue: number,
 ): number {
   return parsePositiveInteger(readEnvironmentValue(env, variableName), defaultValue);
 }
@@ -190,12 +193,15 @@ function readPositiveIntegerEnvironmentValue(
 function readBooleanEnvironmentValue(
   env: NodeJS.ProcessEnv,
   variableName: string,
-  defaultValue: boolean
+  defaultValue: boolean,
 ): boolean {
   return parseBooleanEnvironmentValue(readEnvironmentValue(env, variableName), defaultValue);
 }
 
-function readOptionalPathEnvironmentValue(env: NodeJS.ProcessEnv, variableName: string): string | null {
+function readOptionalPathEnvironmentValue(
+  env: NodeJS.ProcessEnv,
+  variableName: string,
+): string | null {
   return parseOptionalPathEnvironmentValue(variableName, env[variableName]);
 }
 
@@ -210,9 +216,9 @@ function resolveApiTokenFromEnvironment(env: NodeJS.ProcessEnv): string {
 
 function resolveWebHealthBuildIdentifierFromEnvironment(env: NodeJS.ProcessEnv): string {
   const buildIdentifierCandidate =
-    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.webBuildId)
-    ?? readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.webApplicationBuildId)
-    ?? ServerRuntimeDefaultValues.webHealthBuildId;
+    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.webBuildId) ??
+    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.webApplicationBuildId) ??
+    ServerRuntimeDefaultValues.webHealthBuildId;
   const normalizedBuildIdentifier = buildIdentifierCandidate.trim();
   return normalizedBuildIdentifier.length > 0
     ? normalizedBuildIdentifier
@@ -221,8 +227,7 @@ function resolveWebHealthBuildIdentifierFromEnvironment(env: NodeJS.ProcessEnv):
 
 function resolveApiSessionSigningSecret(env: NodeJS.ProcessEnv, apiToken: string): string {
   const sessionSecretCandidate =
-    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.apiSessionSecret)
-    ?? apiToken;
+    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.apiSessionSecret) ?? apiToken;
   const normalizedSessionSecret = sessionSecretCandidate.trim();
   return normalizedSessionSecret.length > 0
     ? normalizedSessionSecret
@@ -230,7 +235,10 @@ function resolveApiSessionSigningSecret(env: NodeJS.ProcessEnv, apiToken: string
 }
 
 function resolveCodexExecutablePathFromEnvironment(env: NodeJS.ProcessEnv): string {
-  const configuredPath = readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.codexCliPath);
+  const configuredPath = readEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.codexCliPath,
+  );
   if (configuredPath !== null && configuredPath.length > 0) {
     return configuredPath;
   }
@@ -244,7 +252,10 @@ function resolveCodexExecutablePathFromEnvironment(env: NodeJS.ProcessEnv): stri
 }
 
 function resolveIpcSocketPathFromEnvironment(env: NodeJS.ProcessEnv): string {
-  const configuredPath = readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.codexIpcSocketPath);
+  const configuredPath = readEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.codexIpcSocketPath,
+  );
   if (configuredPath !== null && configuredPath.length > 0) {
     return configuredPath;
   }
@@ -257,7 +268,7 @@ function resolveIpcSocketPathFromEnvironment(env: NodeJS.ProcessEnv): string {
   return path.join(
     os.tmpdir(),
     ServerRuntimeStaticConfiguration.codexIpcDirectoryName,
-    `ipc-${String(userIdentifier)}.sock`
+    `ipc-${String(userIdentifier)}.sock`,
   );
 }
 
@@ -268,8 +279,8 @@ function resolveGitCommitHash(defaultWorkspacePath: string): string | null {
       ServerRuntimeGitCommandConfiguration.shortHeadArguments,
       {
         cwd: defaultWorkspacePath,
-        encoding: ServerRuntimeGitCommandConfiguration.outputEncoding
-      }
+        encoding: ServerRuntimeGitCommandConfiguration.outputEncoding,
+      },
     ).trim();
     return hash.length > 0 ? hash : null;
   } catch {
@@ -278,7 +289,10 @@ function resolveGitCommitHash(defaultWorkspacePath: string): string | null {
 }
 
 function resolvePushLocalCaSourcePath(env: NodeJS.ProcessEnv): string {
-  const configuredPath = readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushLocalCaPath);
+  const configuredPath = readOptionalPathEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.pushLocalCaPath,
+  );
   if (configuredPath !== null) {
     return configuredPath;
   }
@@ -293,20 +307,20 @@ function resolvePushLocalCaSourcePath(env: NodeJS.ProcessEnv): string {
       "pki",
       "authorities",
       "local",
-      "root.crt"
+      "root.crt",
     );
   }
 
   if (process.platform === "win32") {
     const appDataDirectory =
-      readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.appDataPath)
-      ?? path.join(homeDirectory, "AppData", "Roaming");
+      readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.appDataPath) ??
+      path.join(homeDirectory, "AppData", "Roaming");
     return path.join(appDataDirectory, "Caddy", "pki", "authorities", "local", "root.crt");
   }
 
   const xdgDataHome =
-    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.xdgDataHome)
-    ?? path.join(homeDirectory, ".local", "share");
+    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.xdgDataHome) ??
+    path.join(homeDirectory, ".local", "share");
   return path.join(xdgDataHome, "caddy", "pki", "authorities", "local", "root.crt");
 }
 
@@ -374,43 +388,52 @@ export function readServerRuntimeConfigurationFromCurrentProcessEnvironment(): S
 export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRuntimeConfiguration {
   const defaultWorkspacePath = path.resolve(process.cwd());
   const logLevel = LoggerLevelSchema.parse(
-    (readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.logLevel) ?? ServerRuntimeDefaultValues.logLevel)
+    (
+      readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.logLevel) ??
+      ServerRuntimeDefaultValues.logLevel
+    )
       .trim()
-      .toLowerCase()
+      .toLowerCase(),
   );
-  const host = readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.host) ?? ServerRuntimeDefaultValues.host;
+  const host =
+    readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.host) ??
+    ServerRuntimeDefaultValues.host;
   const port = readPositiveIntegerEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.port,
-    ServerRuntimeDefaultValues.port
+    ServerRuntimeDefaultValues.port,
   );
   const historyLimit = ServerRuntimeDefaultValues.historyLimit;
   const historyPayloadSummaryMaximumBytes = readPositiveIntegerEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.historyPayloadSummaryMaximumBytes,
-    ServerRuntimeDefaultValues.historyPayloadSummaryMaximumBytes
+    ServerRuntimeDefaultValues.historyPayloadSummaryMaximumBytes,
   );
   const userAgent = ServerRuntimeStaticConfiguration.userAgent;
   const runtimeStateSnapshotCacheTimeToLiveMs = readPositiveIntegerEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.runtimeStateSnapshotCacheTimeToLiveMilliseconds,
-    ServerRuntimeDefaultValues.runtimeStateSnapshotCacheTimeToLiveMilliseconds
+    ServerRuntimeDefaultValues.runtimeStateSnapshotCacheTimeToLiveMilliseconds,
   );
   const ipcReconnectDelayMs = ServerRuntimeDefaultValues.ipcReconnectDelayMilliseconds;
-  const ntfyCompletionDebounceMs = ServerRuntimeDefaultValues.notificationCompletionDebounceMilliseconds;
+  const ntfyCompletionDebounceMs =
+    ServerRuntimeDefaultValues.notificationCompletionDebounceMilliseconds;
   const capabilityListTimeoutMs = ServerRuntimeDefaultValues.capabilityListTimeoutMilliseconds;
   const threadListAdapterTimeoutMs = readPositiveIntegerEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.threadListAdapterTimeoutMilliseconds,
-    ServerRuntimeDefaultValues.threadListAdapterTimeoutMilliseconds
+    ServerRuntimeDefaultValues.threadListAdapterTimeoutMilliseconds,
   );
   const pushTestSendTimeoutMs = readPositiveIntegerEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.pushTestSendTimeoutMilliseconds,
-    ServerRuntimeDefaultValues.pushTestSendTimeoutMilliseconds
+    ServerRuntimeDefaultValues.pushTestSendTimeoutMilliseconds,
   );
 
-  const traceDirectoryPath = path.resolve(defaultWorkspacePath, ServerRuntimeStaticConfiguration.traceDirectoryName);
+  const traceDirectoryPath = path.resolve(
+    defaultWorkspacePath,
+    ServerRuntimeStaticConfiguration.traceDirectoryName,
+  );
 
   const apiTokenHeaderName = ServerRuntimeStaticConfiguration.apiTokenHeaderName;
   const apiTokenResponseHeader = ServerRuntimeStaticConfiguration.apiTokenResponseHeader;
@@ -418,93 +441,114 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
   const apiSessionTimeToLiveMs = readPositiveIntegerEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.apiSessionTimeToLiveMilliseconds,
-    ServerRuntimeDefaultValues.apiSessionTimeToLiveMilliseconds
+    ServerRuntimeDefaultValues.apiSessionTimeToLiveMilliseconds,
   );
-  const clientRequestIdHeaderName = ServerRuntimeStaticConfiguration.clientRequestIdentifierHeaderName;
-  const clientRequestIdResponseHeader = ServerRuntimeStaticConfiguration.clientRequestIdentifierResponseHeader;
-  const clientActionIdHeaderName = ServerRuntimeStaticConfiguration.clientActionIdentifierHeaderName;
-  const clientActionIdResponseHeader = ServerRuntimeStaticConfiguration.clientActionIdentifierResponseHeader;
+  const clientRequestIdHeaderName =
+    ServerRuntimeStaticConfiguration.clientRequestIdentifierHeaderName;
+  const clientRequestIdResponseHeader =
+    ServerRuntimeStaticConfiguration.clientRequestIdentifierResponseHeader;
+  const clientActionIdHeaderName =
+    ServerRuntimeStaticConfiguration.clientActionIdentifierHeaderName;
+  const clientActionIdResponseHeader =
+    ServerRuntimeStaticConfiguration.clientActionIdentifierResponseHeader;
   const clientActionNameHeaderName = ServerRuntimeStaticConfiguration.clientActionNameHeaderName;
-  const clientActionNameResponseHeader = ServerRuntimeStaticConfiguration.clientActionNameResponseHeader;
+  const clientActionNameResponseHeader =
+    ServerRuntimeStaticConfiguration.clientActionNameResponseHeader;
   const apiToken = resolveApiTokenFromEnvironment(env);
   const apiAuthRequired = apiToken.length > 0;
   const apiSessionSigningSecret = resolveApiSessionSigningSecret(env, apiToken);
   const apiSessionSecureCookie = readBooleanEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.apiSessionSecureCookie,
-    ServerRuntimeDefaultValues.apiSessionSecureCookie
+    ServerRuntimeDefaultValues.apiSessionSecureCookie,
   );
 
   const pushEnabled = readBooleanEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.pushEnabled,
-    ServerRuntimeDefaultValues.pushEnabled
+    ServerRuntimeDefaultValues.pushEnabled,
   );
   const pushPrivateModeDefault = readBooleanEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.pushPrivateModeDefault,
-    ServerRuntimeDefaultValues.pushPrivateModeDefault
+    ServerRuntimeDefaultValues.pushPrivateModeDefault,
   );
   const pushReceiptsMaxCount = readPositiveIntegerEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.pushReceiptsMaxCount,
-    ServerRuntimeDefaultValues.pushReceiptsMaxCount
+    ServerRuntimeDefaultValues.pushReceiptsMaxCount,
   );
   const pushReceiptsMaxAgeDays = readPositiveIntegerEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.pushReceiptsMaxAgeDays,
-    ServerRuntimeDefaultValues.pushReceiptsMaxAgeDays
+    ServerRuntimeDefaultValues.pushReceiptsMaxAgeDays,
   );
   const threadListAggregationCacheTimeToLiveMs = readPositiveIntegerEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.threadListAggregationCacheTimeToLiveMilliseconds,
-    ServerRuntimeDefaultValues.threadListAggregationCacheTimeToLiveMilliseconds
+    ServerRuntimeDefaultValues.threadListAggregationCacheTimeToLiveMilliseconds,
   );
   const threadListAggregationCacheMaximumEntries = readPositiveIntegerEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.threadListAggregationCacheMaximumEntries,
-    ServerRuntimeDefaultValues.threadListAggregationCacheMaximumEntries
+    ServerRuntimeDefaultValues.threadListAggregationCacheMaximumEntries,
   );
 
   const webHealthBuildId = resolveWebHealthBuildIdentifierFromEnvironment(env);
   const webHealthServiceWorkerVersionValue = readTrimmedEnvironmentValue(
     env,
-    ServerRuntimeEnvironmentVariableNames.webServiceWorkerVersion
+    ServerRuntimeEnvironmentVariableNames.webServiceWorkerVersion,
   );
-  const webHealthServiceWorkerVersion = webHealthServiceWorkerVersionValue.length > 0
-    ? webHealthServiceWorkerVersionValue
-    : null;
+  const webHealthServiceWorkerVersion =
+    webHealthServiceWorkerVersionValue.length > 0 ? webHealthServiceWorkerVersionValue : null;
 
   const codexExecutablePath = resolveCodexExecutablePathFromEnvironment(env);
   const ipcSocketPath = resolveIpcSocketPathFromEnvironment(env);
   const gitCommit = resolveGitCommitHash(defaultWorkspacePath);
 
   const pushStatePathResolution = resolvePushStatePath({
-    envPath: readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushStatePath) ?? undefined,
-    appDataPath: readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.appDataPath) ?? undefined,
-    xdgStateHome: readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.xdgStateHome) ?? undefined,
+    envPath:
+      readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushStatePath) ?? undefined,
+    appDataPath:
+      readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.appDataPath) ?? undefined,
+    xdgStateHome:
+      readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.xdgStateHome) ?? undefined,
     homeDirectory: os.homedir(),
-    platform: process.platform
+    platform: process.platform,
   });
 
   const pushReceiptsPath =
-    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushReceiptsPath)
-    ?? path.join(path.dirname(pushStatePathResolution.filePath), ServerRuntimeStaticConfiguration.pushReceiptsFileName);
+    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushReceiptsPath) ??
+    path.join(
+      path.dirname(pushStatePathResolution.filePath),
+      ServerRuntimeStaticConfiguration.pushReceiptsFileName,
+    );
   const pushSendsPath =
-    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushSendsPath)
-    ?? path.join(path.dirname(pushStatePathResolution.filePath), ServerRuntimeStaticConfiguration.pushSendsFileName);
+    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushSendsPath) ??
+    path.join(
+      path.dirname(pushStatePathResolution.filePath),
+      ServerRuntimeStaticConfiguration.pushSendsFileName,
+    );
 
   const pushLocalCaSourcePath = resolvePushLocalCaSourcePath(env);
-  const pushVapidPublicKey = readTrimmedEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushVapidPublicKey);
+  const pushVapidPublicKey = readTrimmedEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.pushVapidPublicKey,
+  );
   const pushVapidPrivateKey = readTrimmedEnvironmentValue(
     env,
-    ServerRuntimeEnvironmentVariableNames.pushVapidPrivateKey
+    ServerRuntimeEnvironmentVariableNames.pushVapidPrivateKey,
   );
-  const pushVapidSubject = readTrimmedEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushVapidSubject);
+  const pushVapidSubject = readTrimmedEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.pushVapidSubject,
+  );
 
   if (
-    pushEnabled
-    && (pushVapidPublicKey.length === 0 || pushVapidPrivateKey.length === 0 || pushVapidSubject.length === 0)
+    pushEnabled &&
+    (pushVapidPublicKey.length === 0 ||
+      pushVapidPrivateKey.length === 0 ||
+      pushVapidSubject.length === 0)
   ) {
     throw new Error(MissingPushVapidConfigurationErrorMessage);
   }
@@ -512,32 +556,37 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
   const clientErrorSessionStartedAt = new Date().toISOString();
   const clientErrorSessionTimestamp = clientErrorSessionStartedAt.replace(
     ServerRuntimeFormattingConstants.clientErrorSessionTimestampUnsafeCharactersPattern,
-    ServerRuntimeFormattingConstants.clientErrorSessionTimestampSeparator
+    ServerRuntimeFormattingConstants.clientErrorSessionTimestampSeparator,
   );
-  const clientErrorSessionId =
-    `${ServerRuntimeStaticConfiguration.sessionIdentifierPrefix}${clientErrorSessionTimestamp}-${String(process.pid)}`;
+  const clientErrorSessionId = `${ServerRuntimeStaticConfiguration.sessionIdentifierPrefix}${clientErrorSessionTimestamp}-${String(process.pid)}`;
   const clientErrorLogPath =
-    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.debugClientErrorLogPath)
-    ?? path.join(
+    readOptionalPathEnvironmentValue(
+      env,
+      ServerRuntimeEnvironmentVariableNames.debugClientErrorLogPath,
+    ) ??
+    path.join(
       defaultWorkspacePath,
       ServerRuntimeStaticConfiguration.runtimeDirectoryName,
       ServerRuntimeStaticConfiguration.logsDirectoryName,
       ServerRuntimeStaticConfiguration.errorsLogDirectoryName,
-      ServerRuntimeStaticConfiguration.clientErrorLogFileName
+      ServerRuntimeStaticConfiguration.clientErrorLogFileName,
     );
   const clientErrorMaxEntries = readPositiveIntegerEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.debugClientErrorMaximumEntries,
-    ServerRuntimeDefaultValues.clientErrorMaximumEntries
+    ServerRuntimeDefaultValues.clientErrorMaximumEntries,
   );
   const invalidThreadStreamEventsLogPath =
-    readOptionalPathEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.invalidThreadStreamEventsLogPath)
-    ?? path.resolve(
+    readOptionalPathEnvironmentValue(
+      env,
+      ServerRuntimeEnvironmentVariableNames.invalidThreadStreamEventsLogPath,
+    ) ??
+    path.resolve(
       defaultWorkspacePath,
       ServerRuntimeStaticConfiguration.runtimeDirectoryName,
       ServerRuntimeStaticConfiguration.logsDirectoryName,
       ServerRuntimeStaticConfiguration.threadLogsDirectoryName,
-      ServerRuntimeStaticConfiguration.invalidThreadStreamEventsLogFileName
+      ServerRuntimeStaticConfiguration.invalidThreadStreamEventsLogFileName,
     );
   const ntfyConfiguration = parseNtfyConfigFromEnv(env);
 
@@ -595,6 +644,6 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
     clientErrorLogPath,
     clientErrorMaxEntries,
     invalidThreadStreamEventsLogPath,
-    ntfyConfiguration
+    ntfyConfiguration,
   };
 }

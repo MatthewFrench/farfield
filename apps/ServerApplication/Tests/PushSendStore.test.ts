@@ -39,7 +39,7 @@ describe("PushSendStore", () => {
       sentAt: "2026-02-18T00:00:00.000Z",
       attempted: 2,
       delivered: 1,
-      failures: 1
+      failures: 1,
     });
 
     const reloaded = new PushSendStore(filePath);
@@ -51,7 +51,7 @@ describe("PushSendStore", () => {
       sentAt: "2026-02-18T00:00:00.000Z",
       attempted: 2,
       delivered: 1,
-      failures: 1
+      failures: 1,
     });
   });
 
@@ -65,7 +65,7 @@ describe("PushSendStore", () => {
       sentAt: "2026-02-19T00:00:00.000Z",
       attempted: 1,
       delivered: 1,
-      failures: 0
+      failures: 0,
     });
 
     const firstRead = store.getLatest();
@@ -81,7 +81,7 @@ describe("PushSendStore", () => {
       sentAt: "2026-02-19T00:00:00.000Z",
       attempted: 1,
       delivered: 1,
-      failures: 0
+      failures: 0,
     });
   });
 });

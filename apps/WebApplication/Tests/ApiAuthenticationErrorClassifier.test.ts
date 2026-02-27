@@ -6,7 +6,9 @@ describe("ApiAuthenticationErrorClassifier", () => {
     const classifier = new ApiAuthenticationErrorClassifier();
 
     expect(
-      classifier.isApiTokenAuthenticationError("  unauthorized: missing or invalid X-Farfield-Token  ")
+      classifier.isApiTokenAuthenticationError(
+        "  unauthorized: missing or invalid X-Farfield-Token  ",
+      ),
     ).toBe(true);
   });
 

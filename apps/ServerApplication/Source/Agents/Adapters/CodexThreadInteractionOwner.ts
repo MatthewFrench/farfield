@@ -1,14 +1,10 @@
+import { CodexMonitorService, DesktopIpcClient, type SendRequestOptions } from "@farfield/api";
 import {
-  CodexMonitorService,
-  DesktopIpcClient,
-  type SendRequestOptions
-} from "@farfield/api";
-import {
-  JsonValueSchema,
-  parseUserInputResponsePayload,
   type IpcFrame,
   type IpcRequestFrame,
-  type IpcResponseFrame
+  type IpcResponseFrame,
+  JsonValueSchema,
+  parseUserInputResponsePayload,
 } from "@farfield/protocol";
 import type {
   AgentInterruptInput,
@@ -16,11 +12,9 @@ import type {
   AgentSetCollaborationModeInput,
   AgentSubmitUserInputInput,
   AgentThreadLiveState,
-  AgentThreadStreamEvents
+  AgentThreadStreamEvents,
 } from "../Types.js";
-import {
-  type CodexIpcFrameEvent
-} from "./CodexAgentAdapter.js";
+import { type CodexIpcFrameEvent } from "./CodexAgentAdapter.js";
 import type { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
 
 const MONITOR_PREVIEW_REQUEST_IDENTIFIER = "monitor-preview-request-id";
@@ -31,7 +25,7 @@ type IpcRequestParameters = IpcRequestFrame["params"];
 function createPreviewRequestFrame(
   method: string,
   params: IpcRequestParameters,
-  options: SendRequestOptions
+  options: SendRequestOptions,
 ): IpcRequestFrame {
   return {
     type: "request",
@@ -39,21 +33,21 @@ function createPreviewRequestFrame(
     method,
     params,
     targetClientId: options.targetClientId,
-    version: options.version
+    version: options.version,
   };
 }
 
 function createPreviewBroadcastFrame(
   method: string,
   params: IpcRequestParameters,
-  options: SendRequestOptions
+  options: SendRequestOptions,
 ): IpcFrame {
   return {
     type: "broadcast",
     method,
     params,
     targetClientId: options.targetClientId,
-    version: options.version
+    version: options.version,
   };
 }
 
@@ -93,12 +87,12 @@ export class CodexThreadInteractionOwner {
 
     await this.service.interrupt({
       threadId: input.threadId,
-      ownerClientId
+      ownerClientId,
     });
   }
 
   public async setCollaborationMode(
-    input: AgentSetCollaborationModeInput
+    input: AgentSetCollaborationModeInput,
   ): Promise<{ ownerClientId: string }> {
     this.ensureInteractionReady();
     const ownerClientId = this.resolveRequiredOwnerClientId(input.threadId, input.ownerClientId);
@@ -106,16 +100,16 @@ export class CodexThreadInteractionOwner {
     await this.service.setCollaborationMode({
       threadId: input.threadId,
       ownerClientId,
-      collaborationMode: input.collaborationMode
+      collaborationMode: input.collaborationMode,
     });
 
     return {
-      ownerClientId
+      ownerClientId,
     };
   }
 
   public async submitUserInput(
-    input: AgentSubmitUserInputInput
+    input: AgentSubmitUserInputInput,
   ): Promise<{ ownerClientId: string; requestId: number }> {
     this.ensureInteractionReady();
     const ownerClientId = this.resolveRequiredOwnerClientId(input.threadId, input.ownerClientId);
@@ -124,12 +118,12 @@ export class CodexThreadInteractionOwner {
       threadId: input.threadId,
       ownerClientId,
       requestId: input.requestId,
-      response: parseUserInputResponsePayload(JsonValueSchema.parse(input.response))
+      response: parseUserInputResponsePayload(JsonValueSchema.parse(input.response)),
     });
 
     return {
       ownerClientId,
-      requestId: input.requestId
+      requestId: input.requestId,
     };
   }
 
@@ -139,7 +133,7 @@ export class CodexThreadInteractionOwner {
 
   public async readStreamEvents(
     threadId: string,
-    input: AgentReadStreamEventsInput
+    input: AgentReadStreamEventsInput,
   ): Promise<AgentThreadStreamEvents> {
     return this.threadStreamStateOwner.readStreamEvents(threadId, input);
   }
@@ -147,7 +141,7 @@ export class CodexThreadInteractionOwner {
   public async replayRequest(
     method: string,
     params: IpcRequestParameters,
-    options: SendRequestOptions = {}
+    options: SendRequestOptions = {},
   ): Promise<IpcResponseFrame["result"]> {
     this.ensureIpcReady();
     const previewFrame = createPreviewRequestFrame(method, params, options);
@@ -160,7 +154,7 @@ export class CodexThreadInteractionOwner {
   public replayBroadcast(
     method: string,
     params: IpcRequestParameters,
-    options: SendRequestOptions = {}
+    options: SendRequestOptions = {},
   ): void {
     this.ensureIpcReady();
     const previewFrame = createPreviewBroadcastFrame(method, params, options);
@@ -179,7 +173,7 @@ export class CodexThreadInteractionOwner {
 
   private resolveRequiredOwnerClientId(
     threadId: string,
-    ownerClientId: string | undefined
+    ownerClientId: string | undefined,
   ): string {
     return this.threadStreamStateOwner.resolveRequiredOwnerClientId(threadId, ownerClientId);
   }
@@ -187,14 +181,14 @@ export class CodexThreadInteractionOwner {
   private emitOutboundPreviewFrame(
     method: string,
     frame: IpcFrame,
-    descriptionFrame: IpcFrame
+    descriptionFrame: IpcFrame,
   ): void {
     const frameDescription = this.threadStreamStateOwner.describeFrame(descriptionFrame);
     this.emitIpcFrame({
       direction: OUTBOUND_IPC_FRAME_DIRECTION,
       frame,
       method,
-      threadId: frameDescription.threadId
+      threadId: frameDescription.threadId,
     });
   }
 }

@@ -1,12 +1,7 @@
 import { z } from "zod";
-import {
-  JsonValueSchema,
-  NonEmptyStringSchema,
-  NullableStringSchema
-} from "./Common.js";
+import { JsonValueSchema, NonEmptyStringSchema, NullableStringSchema } from "./Common.js";
 import { CollaborationModeSchema } from "./Contracts/Thread/CollaborationModeContracts.js";
 import { ThreadConversationStateSchema } from "./Contracts/Thread/ConversationStateContracts.js";
-import { parseSchemaOrThrow } from "./ProtocolSchemaParsers.js";
 import {
   CollaborationModeListResponseSchema as GeneratedCollaborationModeListResponseSchema,
   ModelListResponseSchema as GeneratedModelListResponseSchema,
@@ -14,8 +9,9 @@ import {
   SendUserMessageResponseSchema as GeneratedSendUserMessageResponseSchema,
   ThreadListResponseSchema as GeneratedThreadListResponseSchema,
   ThreadReadResponseSchema as GeneratedThreadReadResponseSchema,
-  ThreadStartParamsSchema as GeneratedThreadStartParamsSchema
+  ThreadStartParamsSchema as GeneratedThreadStartParamsSchema,
 } from "./Generated/app-server/index.js";
+import { parseSchemaOrThrow } from "./ProtocolSchemaParsers.js";
 
 const AppServerThreadListResponseBaseSchema = GeneratedThreadListResponseSchema.passthrough();
 const AppServerThreadReadResponseBaseSchema = GeneratedThreadReadResponseSchema.passthrough();
@@ -23,13 +19,15 @@ const AppServerModelListResponseBaseSchema = GeneratedModelListResponseSchema.pa
 const AppServerCollaborationModeListResponseBaseSchema =
   GeneratedCollaborationModeListResponseSchema.passthrough();
 const AppServerStartThreadRequestBaseSchema = GeneratedThreadStartParamsSchema.passthrough();
-const AppServerSendUserMessageRequestBaseSchema = GeneratedSendUserMessageParamsSchema.passthrough();
+const AppServerSendUserMessageRequestBaseSchema =
+  GeneratedSendUserMessageParamsSchema.passthrough();
 const AppServerSendUserMessageResponseBaseSchema = GeneratedSendUserMessageResponseSchema;
 const OptionalNullableStringSchema = NullableStringSchema.optional();
 const OptionalNullableStringWithNullDefaultSchema = NullableStringSchema.optional().default(null);
 const DefaultDebugErrorSeverity = "error";
 
-const AppServerGeneratedThreadListItemSchema = AppServerThreadListResponseBaseSchema.shape.data.element;
+const AppServerGeneratedThreadListItemSchema =
+  AppServerThreadListResponseBaseSchema.shape.data.element;
 
 // Thread list payloads are sourced from both app-server generated contracts and OpenCode sessions.
 // Keep both variants in one owner schema so thread list parsing stays centralized.
@@ -40,13 +38,13 @@ const OpenCodeThreadListItemSchema = z
     createdAt: z.number().int().nonnegative(),
     updatedAt: z.number().int().nonnegative(),
     cwd: z.string().optional(),
-    source: z.literal("opencode")
+    source: z.literal("opencode"),
   })
   .passthrough();
 
 export const AppServerThreadListItemSchema = z.union([
   AppServerGeneratedThreadListItemSchema,
-  OpenCodeThreadListItemSchema
+  OpenCodeThreadListItemSchema,
 ]);
 
 export const AppServerListThreadsResponseSchema = z
@@ -54,7 +52,7 @@ export const AppServerListThreadsResponseSchema = z
     data: z.array(AppServerThreadListItemSchema),
     nextCursor: OptionalNullableStringSchema,
     pages: z.number().int().nonnegative().optional(),
-    truncated: z.boolean().optional()
+    truncated: z.boolean().optional(),
   })
   .passthrough();
 
@@ -65,7 +63,7 @@ export const AppServerReadThreadResponseSchema: z.ZodObject<
   "passthrough"
 > = z
   .object({
-    thread: ThreadConversationStateSchema
+    thread: ThreadConversationStateSchema,
   })
   .passthrough();
 
@@ -97,7 +95,7 @@ export const AppServerStartThreadResponseSchema = z
     cwd: z.string().optional(),
     approvalPolicy: z.string().optional(),
     sandbox: JsonValueSchema.optional(),
-    reasoningEffort: OptionalNullableStringSchema
+    reasoningEffort: OptionalNullableStringSchema,
   })
   .passthrough();
 
@@ -110,7 +108,7 @@ const NullableAppServerReasoningEffortSchema = AppServerReasoningEffortSchema.nu
 export const AppServerConfigProfileSchema = z
   .object({
     model: OptionalNullableStringWithNullDefaultSchema,
-    model_reasoning_effort: NullableAppServerReasoningEffortSchema.optional().default(null)
+    model_reasoning_effort: NullableAppServerReasoningEffortSchema.optional().default(null),
   })
   .passthrough();
 
@@ -119,20 +117,20 @@ export const AppServerConfigReadConfigSchema = z
     profile: OptionalNullableStringWithNullDefaultSchema,
     model: OptionalNullableStringWithNullDefaultSchema,
     model_reasoning_effort: NullableAppServerReasoningEffortSchema.optional().default(null),
-    profiles: z.record(AppServerConfigProfileSchema).optional().default({})
+    profiles: z.record(AppServerConfigProfileSchema).optional().default({}),
   })
   .passthrough();
 
 export const AppServerConfigReadResponseSchema = z
   .object({
-    config: AppServerConfigReadConfigSchema
+    config: AppServerConfigReadConfigSchema,
   })
   .passthrough();
 
 export const AppServerSetModeRequestSchema = z
   .object({
     conversationId: z.string().min(1),
-    collaborationMode: CollaborationModeSchema
+    collaborationMode: CollaborationModeSchema,
   })
   .passthrough();
 
@@ -151,7 +149,7 @@ export const CreateDebugClientErrorBodySchema = z
     threadId: OptionalNullableStringWithNullDefaultSchema,
     url: OptionalNullableStringWithNullDefaultSchema,
     occurredAt: z.string().datetime().optional(),
-    details: z.record(JsonValueSchema).optional().default({})
+    details: z.record(JsonValueSchema).optional().default({}),
   })
   .strict();
 
@@ -171,7 +169,7 @@ export const DebugErrorEventSchema = z
     url: NullableStringSchema,
     occurredAt: z.string().datetime(),
     recordedAt: z.string().datetime(),
-    details: z.record(JsonValueSchema)
+    details: z.record(JsonValueSchema),
   })
   .strict();
 
@@ -179,7 +177,7 @@ export const DebugErrorCreateResponseSchema = z
   .object({
     errorId: NonEmptyStringSchema,
     sessionId: NonEmptyStringSchema,
-    recordedAt: z.string().datetime()
+    recordedAt: z.string().datetime(),
   })
   .strict();
 
@@ -187,7 +185,7 @@ export const DebugErrorClearResponseSchema = z
   .object({
     clearedCount: z.number().int().nonnegative(),
     sessionId: NonEmptyStringSchema,
-    sessionLogPath: NonEmptyStringSchema
+    sessionLogPath: NonEmptyStringSchema,
   })
   .strict();
 
@@ -195,7 +193,7 @@ export const DebugErrorListResponseSchema = z
   .object({
     data: z.array(DebugErrorEventSchema),
     sessionId: NonEmptyStringSchema,
-    sessionLogPath: NonEmptyStringSchema
+    sessionLogPath: NonEmptyStringSchema,
   })
   .strict();
 
@@ -203,7 +201,7 @@ export const DebugErrorDetailResponseSchema = z
   .object({
     error: DebugErrorEventSchema,
     sessionId: NonEmptyStringSchema,
-    sessionLogPath: NonEmptyStringSchema
+    sessionLogPath: NonEmptyStringSchema,
   })
   .strict();
 
@@ -235,26 +233,26 @@ const ParseContext = {
   debugErrorCreateResponse: "DebugErrorCreateResponse",
   debugErrorClearResponse: "DebugErrorClearResponse",
   debugErrorListResponse: "DebugErrorListResponse",
-  debugErrorDetailResponse: "DebugErrorDetailResponse"
+  debugErrorDetailResponse: "DebugErrorDetailResponse",
 } as const;
 
 export function parseAppServerListThreadsResponse(
-  value: z.input<typeof AppServerListThreadsResponseSchema>
+  value: z.input<typeof AppServerListThreadsResponseSchema>,
 ): AppServerListThreadsResponse {
   return parseSchemaOrThrow(
     AppServerListThreadsResponseSchema,
     value,
-    ParseContext.listThreadsResponse
+    ParseContext.listThreadsResponse,
   );
 }
 
 export function parseAppServerReadThreadResponse(
-  value: z.input<typeof AppServerThreadReadResponseBaseSchema>
+  value: z.input<typeof AppServerThreadReadResponseBaseSchema>,
 ): AppServerReadThreadResponse {
   const parsed = parseSchemaOrThrow(
     AppServerThreadReadResponseBaseSchema,
     value,
-    ParseContext.readThreadGeneratedResponse
+    ParseContext.readThreadGeneratedResponse,
   );
 
   // Generated thread/read accepts transport-level thread variants and strips unknown inner keys.
@@ -263,101 +261,103 @@ export function parseAppServerReadThreadResponse(
     thread: parseSchemaOrThrow(
       ThreadConversationStateSchema,
       parsed.thread,
-      ParseContext.readThreadConversationState
-    )
+      ParseContext.readThreadConversationState,
+    ),
   };
 }
 
 export function parseAppServerListModelsResponse(
-  value: z.input<typeof AppServerListModelsResponseSchema>
+  value: z.input<typeof AppServerListModelsResponseSchema>,
 ): AppServerListModelsResponse {
   return parseSchemaOrThrow(
     AppServerListModelsResponseSchema,
     value,
-    ParseContext.listModelsResponse
+    ParseContext.listModelsResponse,
   );
 }
 
 export function parseAppServerCollaborationModeListResponse(
-  value: z.input<typeof AppServerCollaborationModeListResponseSchema>
+  value: z.input<typeof AppServerCollaborationModeListResponseSchema>,
 ): AppServerCollaborationModeListResponse {
   return parseSchemaOrThrow(
     AppServerCollaborationModeListResponseSchema,
     value,
-    ParseContext.collaborationModeListResponse
+    ParseContext.collaborationModeListResponse,
   );
 }
 
 export function parseAppServerStartThreadResponse(
-  value: z.input<typeof AppServerStartThreadResponseSchema>
+  value: z.input<typeof AppServerStartThreadResponseSchema>,
 ): AppServerStartThreadResponse {
   return parseSchemaOrThrow(
     AppServerStartThreadResponseSchema,
     value,
-    ParseContext.startThreadResponse
+    ParseContext.startThreadResponse,
   );
 }
 
 export function parseAppServerConfigReadResponse(
-  value: z.input<typeof AppServerConfigReadResponseSchema>
+  value: z.input<typeof AppServerConfigReadResponseSchema>,
 ): AppServerConfigReadResponse {
   return parseSchemaOrThrow(
     AppServerConfigReadResponseSchema,
     value,
-    ParseContext.configReadResponse
+    ParseContext.configReadResponse,
   );
 }
 
 export function parseCreateDebugClientErrorBody(
-  value: z.input<typeof CreateDebugClientErrorBodySchema>
+  value: z.input<typeof CreateDebugClientErrorBodySchema>,
 ): CreateDebugClientErrorBody {
   return parseSchemaOrThrow(
     CreateDebugClientErrorBodySchema,
     value,
-    ParseContext.createDebugClientErrorBody
+    ParseContext.createDebugClientErrorBody,
   );
 }
 
-export function parseDebugErrorEvent(value: z.input<typeof DebugErrorEventSchema>): DebugErrorEvent {
+export function parseDebugErrorEvent(
+  value: z.input<typeof DebugErrorEventSchema>,
+): DebugErrorEvent {
   return parseSchemaOrThrow(DebugErrorEventSchema, value, ParseContext.debugErrorEvent);
 }
 
 export function parseDebugErrorCreateResponse(
-  value: z.input<typeof DebugErrorCreateResponseSchema>
+  value: z.input<typeof DebugErrorCreateResponseSchema>,
 ): DebugErrorCreateResponse {
   return parseSchemaOrThrow(
     DebugErrorCreateResponseSchema,
     value,
-    ParseContext.debugErrorCreateResponse
+    ParseContext.debugErrorCreateResponse,
   );
 }
 
 export function parseDebugErrorClearResponse(
-  value: z.input<typeof DebugErrorClearResponseSchema>
+  value: z.input<typeof DebugErrorClearResponseSchema>,
 ): DebugErrorClearResponse {
   return parseSchemaOrThrow(
     DebugErrorClearResponseSchema,
     value,
-    ParseContext.debugErrorClearResponse
+    ParseContext.debugErrorClearResponse,
   );
 }
 
 export function parseDebugErrorListResponse(
-  value: z.input<typeof DebugErrorListResponseSchema>
+  value: z.input<typeof DebugErrorListResponseSchema>,
 ): DebugErrorListResponse {
   return parseSchemaOrThrow(
     DebugErrorListResponseSchema,
     value,
-    ParseContext.debugErrorListResponse
+    ParseContext.debugErrorListResponse,
   );
 }
 
 export function parseDebugErrorDetailResponse(
-  value: z.input<typeof DebugErrorDetailResponseSchema>
+  value: z.input<typeof DebugErrorDetailResponseSchema>,
 ): DebugErrorDetailResponse {
   return parseSchemaOrThrow(
     DebugErrorDetailResponseSchema,
     value,
-    ParseContext.debugErrorDetailResponse
+    ParseContext.debugErrorDetailResponse,
   );
 }

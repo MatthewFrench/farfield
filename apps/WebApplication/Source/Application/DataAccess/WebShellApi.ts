@@ -1,10 +1,7 @@
 import { FarfieldEventsSessionResponseSchema } from "@farfield/protocol";
 import { z } from "zod";
 import { type ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
-import {
-  applyRequestOptions,
-  request
-} from "@/Shared/Transport/FarfieldHttpTransport";
+import { applyRequestOptions, request } from "@/Shared/Transport/FarfieldHttpTransport";
 
 const EVENTS_SESSION_ENDPOINT = "/api/events/session";
 const WEB_SHELL_HEALTH_ENDPOINT = "/healthz";
@@ -18,26 +15,28 @@ const WebShellHealthResponseSchema = z
     buildId: z.string().min(1),
     gitCommit: z.string().nullable(),
     serviceWorkerVersion: z.string().nullable(),
-    timestamp: z.string().datetime()
+    timestamp: z.string().datetime(),
   })
   .strict();
 export type ApiWebShellHealthResponse = z.infer<typeof WebShellHealthResponseSchema>;
 
 const EventsSessionBootstrapResponseSchema = FarfieldEventsSessionResponseSchema;
-export type ApiEventsSessionBootstrapResponse = z.infer<typeof EventsSessionBootstrapResponseSchema>;
+export type ApiEventsSessionBootstrapResponse = z.infer<
+  typeof EventsSessionBootstrapResponseSchema
+>;
 const EventsSessionBootstrapRequestSchema = z
   .object({
-    apiToken: z.string().trim().min(1)
+    apiToken: z.string().trim().min(1),
   })
   .strict();
 export type ApiEventsSessionBootstrapRequest = z.infer<typeof EventsSessionBootstrapRequestSchema>;
 
 function buildEventsSessionBootstrapRequestInit(
-  input?: ApiEventsSessionBootstrapRequest
+  input?: ApiEventsSessionBootstrapRequest,
 ): RequestInit {
   if (!input) {
     return {
-      method: POST_METHOD
+      method: POST_METHOD,
     };
   }
 
@@ -45,20 +44,22 @@ function buildEventsSessionBootstrapRequestInit(
   return {
     method: POST_METHOD,
     headers: {
-      "Content-Type": JSON_CONTENT_TYPE_HEADER_VALUE
+      "Content-Type": JSON_CONTENT_TYPE_HEADER_VALUE,
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   };
 }
 
 export async function bootstrapEventsSession(
   input?: ApiEventsSessionBootstrapRequest,
-  options?: ApiRequestOptions
+  options?: ApiRequestOptions,
 ): Promise<ApiEventsSessionBootstrapResponse> {
-  return EventsSessionBootstrapResponseSchema.parse(await request(
-    EVENTS_SESSION_ENDPOINT,
-    applyRequestOptions(buildEventsSessionBootstrapRequestInit(input), options)
-  ));
+  return EventsSessionBootstrapResponseSchema.parse(
+    await request(
+      EVENTS_SESSION_ENDPOINT,
+      applyRequestOptions(buildEventsSessionBootstrapRequestInit(input), options),
+    ),
+  );
 }
 
 export async function getWebShellHealth(): Promise<ApiWebShellHealthResponse> {

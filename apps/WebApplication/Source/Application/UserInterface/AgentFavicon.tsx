@@ -7,20 +7,20 @@ function buildAgentFaviconDataUrl(backgroundHexColor: string, labelText: string)
     "<text x='16' y='21' text-anchor='middle' font-family='system-ui, sans-serif' font-size='16' font-weight='700' fill='white'>",
     labelText,
     "</text>",
-    "</svg>"
+    "</svg>",
   ].join("");
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 const AGENT_FAVICON_BY_ID: Record<AgentId, string> = {
   codex: buildAgentFaviconDataUrl("#10A37F", "C"),
-  opencode: buildAgentFaviconDataUrl("#F97316", "O")
+  opencode: buildAgentFaviconDataUrl("#F97316", "O"),
 };
 
 export function AgentFavicon({
   agentId,
   label,
-  className
+  className,
 }: {
   agentId: AgentId;
   label: string;

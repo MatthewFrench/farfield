@@ -1,5 +1,8 @@
 import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
-import type { ThreadListItem, ThreadProjectGroup } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import type {
+  ThreadListItem,
+  ThreadProjectGroup,
+} from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 
 interface FilterProjectGroupsInput {
   projectGroups: ThreadProjectGroup[];
@@ -30,14 +33,21 @@ export class ThreadListSearchFilter {
 
     const filteredProjectGroups: ThreadProjectGroup[] = [];
     for (const projectGroup of input.projectGroups) {
-      const projectMatches = ThreadListSearchFilter.projectGroupMatchesQuery(projectGroup, normalizedQuery);
+      const projectMatches = ThreadListSearchFilter.projectGroupMatchesQuery(
+        projectGroup,
+        normalizedQuery,
+      );
       if (projectMatches) {
         filteredProjectGroups.push(projectGroup);
         continue;
       }
 
       const matchingThreads = projectGroup.threads.filter((thread) =>
-        ThreadListSearchFilter.threadMatchesQuery(thread, normalizedQuery, input.readAgentLabel(thread))
+        ThreadListSearchFilter.threadMatchesQuery(
+          thread,
+          normalizedQuery,
+          input.readAgentLabel(thread),
+        ),
       );
       if (matchingThreads.length === 0) {
         continue;
@@ -45,31 +55,37 @@ export class ThreadListSearchFilter {
 
       filteredProjectGroups.push({
         ...projectGroup,
-        threads: matchingThreads
+        threads: matchingThreads,
       });
     }
 
     return filteredProjectGroups;
   }
 
-  private static projectGroupMatchesQuery(projectGroup: ThreadProjectGroup, query: string): boolean {
+  private static projectGroupMatchesQuery(
+    projectGroup: ThreadProjectGroup,
+    query: string,
+  ): boolean {
     return (
-      ThreadListSearchFilter.searchTextMatchesQuery(projectGroup.label, query)
-      || ThreadListSearchFilter.searchTextMatchesQuery(projectGroup.projectPath, query)
+      ThreadListSearchFilter.searchTextMatchesQuery(projectGroup.label, query) ||
+      ThreadListSearchFilter.searchTextMatchesQuery(projectGroup.projectPath, query)
     );
   }
 
   private static threadMatchesQuery(
     thread: ThreadListItem,
     query: string,
-    agentLabel: string
+    agentLabel: string,
   ): boolean {
     return (
-      ThreadListSearchFilter.searchTextMatchesQuery(ThreadGroupSelectors.threadLabel(thread), query)
-      || ThreadListSearchFilter.searchTextMatchesQuery(thread.id, query)
-      || ThreadListSearchFilter.searchTextMatchesQuery(thread.cwd, query)
-      || ThreadListSearchFilter.searchTextMatchesQuery(thread.path, query)
-      || ThreadListSearchFilter.searchTextMatchesQuery(agentLabel, query)
+      ThreadListSearchFilter.searchTextMatchesQuery(
+        ThreadGroupSelectors.threadLabel(thread),
+        query,
+      ) ||
+      ThreadListSearchFilter.searchTextMatchesQuery(thread.id, query) ||
+      ThreadListSearchFilter.searchTextMatchesQuery(thread.cwd, query) ||
+      ThreadListSearchFilter.searchTextMatchesQuery(thread.path, query) ||
+      ThreadListSearchFilter.searchTextMatchesQuery(agentLabel, query)
     );
   }
 

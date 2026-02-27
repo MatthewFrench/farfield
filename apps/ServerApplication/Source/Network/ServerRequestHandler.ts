@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { FarfieldPushTestBodySchema, type PushNotificationPayload } from "@farfield/protocol";
 import { z } from "zod";
+import type { CodexAgentAdapter } from "../Agents/Adapters/CodexAgentAdapter.js";
 import type { AgentRegistry } from "../Agents/Registry.js";
 import type { ThreadAdapterResolver } from "../Agents/ThreadAdapterResolver.js";
-import type { CodexAgentAdapter } from "../Agents/Adapters/CodexAgentAdapter.js";
 import type { AgentAdapter, AgentDescriptor, AgentId } from "../Agents/Types.js";
 import type { ActivityHistoryService } from "../Modules/Activity/ActivityHistoryService.js";
 import type { ClientErrorStore } from "../Modules/Debugging/ClientErrorStore.js";
@@ -11,43 +11,39 @@ import type { PushReceiptStore } from "../Modules/PushNotifications/PushReceiptS
 import type { PushSendStore } from "../Modules/PushNotifications/PushSendStore.js";
 import type { PushService } from "../Modules/PushNotifications/PushService.js";
 import type { PushStore } from "../Modules/PushNotifications/PushStore.js";
-import type { ServerErrorEventRecordInput } from "./ServerErrorEventRecorder.js";
-import type { ServerObservabilitySnapshot } from "./ServerObservabilitySnapshotOwner.js";
-import type { HistoryEntry } from "./DebugContracts.js";
-import {
-  ServerRequestErrorResponder,
-  type ServerRequestErrorContext
-} from "./ServerRequestErrorResponder.js";
 import type { BrowserSessionAuthOwner } from "./BrowserSessionAuthOwner.js";
-import type { RequestObservabilityOwner } from "./RequestObservabilityOwner.js";
-import type { DebugRouteDependencies } from "./Routes/DebugRoutes.js";
-import {
-  type RuntimeStateSnapshotReader
-} from "./Routes/RuntimeRoutes.js";
-import type { ThreadRouteDependencies } from "./Routes/ThreadRoutes.js";
+import type { HistoryEntry } from "./DebugContracts.js";
 import type { EventStreamClientRegistry } from "./EventStreamClientRegistry.js";
-import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinator.js";
-import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js";
 import type { PushMutationConcurrencyCoordinator } from "./PushMutationConcurrencyCoordinator.js";
+import type { RequestObservabilityOwner } from "./RequestObservabilityOwner.js";
 import {
   parseRequestUrlPathname,
   RequestMethodByName,
   RequestPathnameByName,
   RequestUrlPathnameParseStatusByName,
-  readPathnameForRequestMetricsFromRequestUrl
+  readPathnameForRequestMetricsFromRequestUrl,
 } from "./RequestPathContracts.js";
-import {
-  ServerRequestLifecycleOwner
-} from "./ServerRequestLifecycleOwner.js";
+import type { DebugRouteDependencies } from "./Routes/DebugRoutes.js";
+import { type RuntimeStateSnapshotReader } from "./Routes/RuntimeRoutes.js";
+import type { ThreadRouteDependencies } from "./Routes/ThreadRoutes.js";
+import type { ServerErrorEventRecordInput } from "./ServerErrorEventRecorder.js";
+import type { ServerObservabilitySnapshot } from "./ServerObservabilitySnapshotOwner.js";
 import { ServerRequestAuthenticationOwner } from "./ServerRequestAuthenticationOwner.js";
+import {
+  type ServerRequestErrorContext,
+  ServerRequestErrorResponder,
+} from "./ServerRequestErrorResponder.js";
+import { ServerRequestLifecycleOwner } from "./ServerRequestLifecycleOwner.js";
 import { ServerRequestRouteDispatchOwner } from "./ServerRequestRouteDispatchOwner.js";
+import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinator.js";
+import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js";
 
 const STATUS_CODE_BY_NAME = {
   successOk: 200,
   successNoContent: 204,
   clientErrorBadRequest: 400,
   clientErrorNotFound: 404,
-  serverErrorServiceUnavailable: 503
+  serverErrorServiceUnavailable: 503,
 } as const;
 const MISSING_REQUEST_URL_ERROR_MESSAGE = "Missing request URL";
 const MALFORMED_REQUEST_URL_ERROR_MESSAGE = "Malformed request URL";
@@ -99,13 +95,17 @@ export interface ServerRequestHandlerDependencies {
   pushTestBodySchema: typeof FarfieldPushTestBodySchema;
   buildPushTestPayload: (
     input: z.infer<typeof FarfieldPushTestBodySchema>,
-    privateMode: boolean
+    privateMode: boolean,
   ) => PushNotificationPayload;
   parseInteger: (value: string | null, defaultValue: number) => number;
   parseBoolean: (value: string | null, defaultValue: boolean) => boolean;
   parseAgentId: (value: string | null) => AgentId | null;
   normalizeOptionalString: (value: string | null) => string | null;
-  withTimeout: <ValueType>(promise: Promise<ValueType>, timeoutMs: number, label: string) => Promise<ValueType>;
+  withTimeout: <ValueType>(
+    promise: Promise<ValueType>,
+    timeoutMs: number,
+    label: string,
+  ) => Promise<ValueType>;
   readJsonBody: ThreadRouteDependencies["readJsonBody"];
   jsonResponse: ThreadRouteDependencies["jsonResponse"];
   toErrorMessage: DebugRouteDependencies["toErrorMessage"];
@@ -140,7 +140,7 @@ export class ServerRequestHandler {
       recordServerErrorEvent: this.deps.recordServerErrorEvent,
       setRuntimeLastError: this.deps.setRuntimeLastError,
       pushSystem: this.deps.pushSystem,
-      broadcastRuntimeState: this.deps.broadcastRuntimeState
+      broadcastRuntimeState: this.deps.broadcastRuntimeState,
     });
     this.requestLifecycleOwner = new ServerRequestLifecycleOwner({
       clientRequestIdHeaderName: this.deps.clientRequestIdHeaderName,
@@ -151,7 +151,7 @@ export class ServerRequestHandler {
       clientActionNameResponseHeader: this.deps.clientActionNameResponseHeader,
       normalizeOptionalString: this.deps.normalizeOptionalString,
       requestObservabilityOwner: this.deps.requestObservabilityOwner,
-      readCurrentEventLoopLagMs: this.deps.readCurrentEventLoopLagMs
+      readCurrentEventLoopLagMs: this.deps.readCurrentEventLoopLagMs,
     });
     this.requestAuthenticationOwner = new ServerRequestAuthenticationOwner({
       apiAuthRequired: this.deps.apiAuthRequired,
@@ -160,7 +160,7 @@ export class ServerRequestHandler {
       apiTokenResponseHeader: this.deps.apiTokenResponseHeader,
       browserSessionAuthOwner: this.deps.browserSessionAuthOwner,
       jsonResponse: this.deps.jsonResponse,
-      readHeader: (req, name) => this.requestLifecycleOwner.readHeader(req, name)
+      readHeader: (req, name) => this.requestLifecycleOwner.readHeader(req, name),
     });
     this.requestRouteDispatchOwner = new ServerRequestRouteDispatchOwner({
       defaultWorkspace: this.deps.defaultWorkspace,
@@ -203,7 +203,7 @@ export class ServerRequestHandler {
       ensureTraceDirectory: this.deps.ensureTraceDirectory,
       pushSystem: this.deps.pushSystem,
       invalidateThreadListAggregationCache: this.deps.invalidateThreadListAggregationCache,
-      buildAgentDescriptor: this.deps.buildAgentDescriptor
+      buildAgentDescriptor: this.deps.buildAgentDescriptor,
     });
   }
 
@@ -213,19 +213,21 @@ export class ServerRequestHandler {
     let pathnameForMetrics = readPathnameForRequestMetricsFromRequestUrl(req.url);
     this.requestLifecycleOwner.writeRequestContextResponseHeaders(res, requestLifecycleContext);
 
-    const requestContext = this.requestLifecycleOwner.createRequestErrorContext(requestLifecycleContext);
-    const requestContextDetails = this.requestLifecycleOwner.createRequestContextDetails(requestLifecycleContext);
+    const requestContext =
+      this.requestLifecycleOwner.createRequestErrorContext(requestLifecycleContext);
+    const requestContextDetails =
+      this.requestLifecycleOwner.createRequestContextDetails(requestLifecycleContext);
     // Record request start before any early-return path so lifecycle timelines stay balanced.
     this.requestLifecycleOwner.recordRequestStartedForObservability(
       requestLifecycleContext,
-      pathnameForMetrics
+      pathnameForMetrics,
     );
 
     try {
       if (req.url === undefined || req.url.length === 0) {
         this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.clientErrorBadRequest, {
           ok: false,
-          error: MISSING_REQUEST_URL_ERROR_MESSAGE
+          error: MISSING_REQUEST_URL_ERROR_MESSAGE,
         });
         return;
       }
@@ -238,17 +240,17 @@ export class ServerRequestHandler {
       const requestUrlPathnameParseResult = parseRequestUrlPathname({
         requestUrl: req.url,
         host: this.deps.host,
-        port: this.deps.port
+        port: this.deps.port,
       });
       if (
-        requestUrlPathnameParseResult.status
-        === RequestUrlPathnameParseStatusByName.malformedRequestUrl
+        requestUrlPathnameParseResult.status ===
+        RequestUrlPathnameParseStatusByName.malformedRequestUrl
       ) {
         // Malformed URL observations must aggregate under one deterministic metrics pathname.
         pathnameForMetrics = RequestPathnameByName.malformedRequestUrl;
         this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.clientErrorBadRequest, {
           ok: false,
-          error: MALFORMED_REQUEST_URL_ERROR_MESSAGE
+          error: MALFORMED_REQUEST_URL_ERROR_MESSAGE,
         });
         return;
       }
@@ -265,14 +267,14 @@ export class ServerRequestHandler {
           error: SERVER_SHUTTING_DOWN_ERROR_MESSAGE,
           requestId: requestLifecycleContext.requestId,
           actionId: requestLifecycleContext.requestActionId,
-          actionName: requestLifecycleContext.requestActionName
+          actionName: requestLifecycleContext.requestActionName,
         });
         return;
       }
 
       if (
-        requestLifecycleContext.requestMethod === RequestMethodByName.get
-        && pathname === RequestPathnameByName.healthCheck
+        requestLifecycleContext.requestMethod === RequestMethodByName.get &&
+        pathname === RequestPathnameByName.healthCheck
       ) {
         this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.successOk, {
           ok: true,
@@ -280,7 +282,7 @@ export class ServerRequestHandler {
           buildId: this.deps.webHealthBuildId,
           gitCommit: this.deps.gitCommit,
           serviceWorkerVersion: this.deps.webHealthServiceWorkerVersion,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
         return;
       }
@@ -295,7 +297,7 @@ export class ServerRequestHandler {
         pathname,
         segments,
         url,
-        requestContextDetails
+        requestContextDetails,
       });
       if (handledRoute) {
         return;
@@ -303,7 +305,7 @@ export class ServerRequestHandler {
 
       this.deps.jsonResponse(res, STATUS_CODE_BY_NAME.clientErrorNotFound, {
         ok: false,
-        error: NOT_FOUND_ERROR_MESSAGE
+        error: NOT_FOUND_ERROR_MESSAGE,
       });
     } catch (error) {
       this.respondWithHandledError(req, res, error, requestContext);
@@ -311,7 +313,7 @@ export class ServerRequestHandler {
       this.requestLifecycleOwner.recordRequestCompletedForObservability({
         requestLifecycleContext,
         pathnameForMetrics,
-        statusCode: res.statusCode
+        statusCode: res.statusCode,
       });
     }
   }
@@ -320,13 +322,13 @@ export class ServerRequestHandler {
     req: IncomingMessage,
     res: ServerResponse,
     error: ErrorType,
-    context: ServerRequestErrorContext
+    context: ServerRequestErrorContext,
   ): void {
     this.requestErrorResponder.respond({
       req,
       res,
       error,
-      context
+      context,
     });
   }
 }

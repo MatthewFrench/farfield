@@ -9,6 +9,6 @@ export interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {}
 export const CardHeader = React.forwardRef<HTMLDivElement, CardHeaderProps>(
   ({ className, ...props }, ref) => {
     return <div ref={ref} className={cn(CARD_HEADER_BASE_CLASS_NAME, className)} {...props} />;
-  }
+  },
 );
 CardHeader.displayName = CARD_HEADER_COMPONENT_DISPLAY_NAME;

@@ -1,8 +1,8 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import { FarfieldThreadStreamEventsSnapshotSchema } from "@farfield/protocol";
-import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import type {
   AgentAdapter,
   AgentCreateThreadInput,
@@ -12,14 +12,14 @@ import type {
   AgentListThreadsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
-  AgentSendMessageInput
+  AgentSendMessageInput,
 } from "../Source/Agents/Types.js";
-import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 import { ThreadMemberReadRouteOwner } from "../Source/Network/Routes/ThreadMemberReadRouteOwner.js";
 import type {
+  ThreadMemberResolvedRouteContext,
   ThreadMemberRouteDependencies,
-  ThreadMemberResolvedRouteContext
 } from "../Source/Network/Routes/ThreadMemberRouteContracts.js";
+import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 
 const ThreadMemberReadRouteValidationErrorSchema = z
   .object({
@@ -28,10 +28,10 @@ const ThreadMemberReadRouteValidationErrorSchema = z
     details: z.array(
       z
         .object({
-          message: z.string().min(1)
+          message: z.string().min(1),
         })
-        .passthrough()
-    )
+        .passthrough(),
+    ),
   })
   .strict();
 
@@ -48,7 +48,7 @@ function createMockRequestResponsePair(): { request: IncomingMessage; response: 
   const response = new ServerResponse(request);
   return {
     request,
-    response
+    response,
   };
 }
 
@@ -62,7 +62,7 @@ function createUnsupportedAgentAdapter(): AgentAdapter {
       canSetCollaborationMode: false,
       canSubmitUserInput: false,
       canReadLiveState: false,
-      canReadStreamEvents: false
+      canReadStreamEvents: false,
     },
     async start(): Promise<void> {},
     async stop(): Promise<void> {},
@@ -86,7 +86,7 @@ function createUnsupportedAgentAdapter(): AgentAdapter {
     },
     async interrupt(_input: AgentInterruptInput): Promise<void> {
       throw new Error("Not used in route-owner test");
-    }
+    },
   };
 }
 
@@ -100,7 +100,7 @@ describe("ThreadMemberReadRouteOwner", () => {
       events: [],
       nextSequence: 23,
       firstAvailableSequence: 10,
-      resetRequired: false
+      resetRequired: false,
     }));
     const adapter: AgentAdapter = {
       ...createUnsupportedAgentAdapter(),
@@ -110,9 +110,9 @@ describe("ThreadMemberReadRouteOwner", () => {
         canSetCollaborationMode: false,
         canSubmitUserInput: false,
         canReadLiveState: false,
-        canReadStreamEvents: true
+        canReadStreamEvents: true,
       },
-      readStreamEvents
+      readStreamEvents,
     };
 
     let capturedStatusCode: number | null = null;
@@ -133,7 +133,7 @@ describe("ThreadMemberReadRouteOwner", () => {
       resolveAdapterForThread: async () => ({
         ok: true,
         adapter,
-        agentId: "codex"
+        agentId: "codex",
       }),
       readJsonBody: async () => ({}),
       jsonResponse: (_res, statusCode, body) => {
@@ -142,28 +142,28 @@ describe("ThreadMemberReadRouteOwner", () => {
       },
       invalidateThreadListAggregationCache: () => {},
       pushActionEventWithRequestContext: () => {},
-      pushActionErrorWithRequestContext: () => "action-error-id"
+      pushActionErrorWithRequestContext: () => "action-error-id",
     };
     const context: ThreadMemberResolvedRouteContext = {
       threadId: "thread-1",
       adapter,
-      agentId: "codex"
+      agentId: "codex",
     };
 
     const owner = new ThreadMemberReadRouteOwner({
       dependencies,
-      context
+      context,
     });
     const handled = await owner.handle();
 
     expect(handled).toBe(true);
     expect(readStreamEvents).toHaveBeenCalledWith("thread-1", {
       limit: 50,
-      sinceSequence: 14
+      sinceSequence: 14,
     });
     expect(capturedStatusCode).toBe(200);
     const parsedResponse = FarfieldThreadStreamEventsSnapshotSchema.parse(
-      readJsonResponseBody(capturedResponseBody)
+      readJsonResponseBody(capturedResponseBody),
     );
     expect(parsedResponse).toEqual({
       ok: true,
@@ -172,7 +172,7 @@ describe("ThreadMemberReadRouteOwner", () => {
       events: [],
       nextSequence: 23,
       firstAvailableSequence: 10,
-      resetRequired: false
+      resetRequired: false,
     });
   });
 
@@ -185,7 +185,7 @@ describe("ThreadMemberReadRouteOwner", () => {
       events: [],
       nextSequence: 0,
       firstAvailableSequence: 0,
-      resetRequired: false
+      resetRequired: false,
     }));
     const adapter: AgentAdapter = {
       ...createUnsupportedAgentAdapter(),
@@ -195,9 +195,9 @@ describe("ThreadMemberReadRouteOwner", () => {
         canSetCollaborationMode: false,
         canSubmitUserInput: false,
         canReadLiveState: false,
-        canReadStreamEvents: true
+        canReadStreamEvents: true,
       },
-      readStreamEvents
+      readStreamEvents,
     };
 
     let capturedStatusCode: number | null = null;
@@ -218,7 +218,7 @@ describe("ThreadMemberReadRouteOwner", () => {
       resolveAdapterForThread: async () => ({
         ok: true,
         adapter,
-        agentId: "codex"
+        agentId: "codex",
       }),
       readJsonBody: async () => ({}),
       jsonResponse: (_res, statusCode, body) => {
@@ -227,17 +227,17 @@ describe("ThreadMemberReadRouteOwner", () => {
       },
       invalidateThreadListAggregationCache: () => {},
       pushActionEventWithRequestContext: () => {},
-      pushActionErrorWithRequestContext: () => "action-error-id"
+      pushActionErrorWithRequestContext: () => "action-error-id",
     };
     const context: ThreadMemberResolvedRouteContext = {
       threadId: "thread-1",
       adapter,
-      agentId: "codex"
+      agentId: "codex",
     };
 
     const owner = new ThreadMemberReadRouteOwner({
       dependencies,
-      context
+      context,
     });
     const handled = await owner.handle();
 
@@ -245,7 +245,7 @@ describe("ThreadMemberReadRouteOwner", () => {
     expect(readStreamEvents).not.toHaveBeenCalled();
     expect(capturedStatusCode).toBe(400);
     const parsedValidationErrorResponse = ThreadMemberReadRouteValidationErrorSchema.parse(
-      readJsonResponseBody(capturedResponseBody)
+      readJsonResponseBody(capturedResponseBody),
     );
     expect(parsedValidationErrorResponse.details.length).toBeGreaterThan(0);
   });
@@ -259,7 +259,7 @@ describe("ThreadMemberReadRouteOwner", () => {
       events: [],
       nextSequence: 0,
       firstAvailableSequence: 0,
-      resetRequired: false
+      resetRequired: false,
     }));
     const adapter: AgentAdapter = {
       ...createUnsupportedAgentAdapter(),
@@ -269,9 +269,9 @@ describe("ThreadMemberReadRouteOwner", () => {
         canSetCollaborationMode: false,
         canSubmitUserInput: false,
         canReadLiveState: false,
-        canReadStreamEvents: true
+        canReadStreamEvents: true,
       },
-      readStreamEvents
+      readStreamEvents,
     };
 
     let capturedStatusCode: number | null = null;
@@ -291,7 +291,7 @@ describe("ThreadMemberReadRouteOwner", () => {
       resolveAdapterForThread: async () => ({
         ok: true,
         adapter,
-        agentId: "codex"
+        agentId: "codex",
       }),
       readJsonBody: async () => ({}),
       jsonResponse: (_res, statusCode, body) => {
@@ -300,17 +300,17 @@ describe("ThreadMemberReadRouteOwner", () => {
       },
       invalidateThreadListAggregationCache: () => {},
       pushActionEventWithRequestContext: () => {},
-      pushActionErrorWithRequestContext: () => "action-error-id"
+      pushActionErrorWithRequestContext: () => "action-error-id",
     };
     const context: ThreadMemberResolvedRouteContext = {
       threadId: "thread-1",
       adapter,
-      agentId: "codex"
+      agentId: "codex",
     };
 
     const owner = new ThreadMemberReadRouteOwner({
       dependencies,
-      context
+      context,
     });
     const handled = await owner.handle();
 
@@ -318,7 +318,7 @@ describe("ThreadMemberReadRouteOwner", () => {
     expect(readStreamEvents).not.toHaveBeenCalled();
     expect(capturedStatusCode).toBe(400);
     const parsedValidationErrorResponse = ThreadMemberReadRouteValidationErrorSchema.parse(
-      readJsonResponseBody(capturedResponseBody)
+      readJsonResponseBody(capturedResponseBody),
     );
     expect(parsedValidationErrorResponse.details.length).toBeGreaterThan(0);
   });
@@ -330,7 +330,7 @@ describe("ThreadMemberReadRouteOwner", () => {
     const readLiveState = vi.fn(async () => ({
       ownerClientId: "client-a",
       conversationState: null,
-      liveStateError: null
+      liveStateError: null,
     }));
     const adapter: AgentAdapter = {
       ...createUnsupportedAgentAdapter(),
@@ -340,9 +340,9 @@ describe("ThreadMemberReadRouteOwner", () => {
         canSetCollaborationMode: false,
         canSubmitUserInput: false,
         canReadLiveState: true,
-        canReadStreamEvents: false
+        canReadStreamEvents: false,
       },
-      readLiveState
+      readLiveState,
     };
 
     let capturedStatusCode: number | null = null;
@@ -362,7 +362,7 @@ describe("ThreadMemberReadRouteOwner", () => {
       resolveAdapterForThread: async () => ({
         ok: true,
         adapter,
-        agentId: "codex"
+        agentId: "codex",
       }),
       readJsonBody: async () => ({}),
       jsonResponse: (_res, statusCode, body) => {
@@ -371,17 +371,17 @@ describe("ThreadMemberReadRouteOwner", () => {
       },
       invalidateThreadListAggregationCache: () => {},
       pushActionEventWithRequestContext: () => {},
-      pushActionErrorWithRequestContext: () => "action-error-id"
+      pushActionErrorWithRequestContext: () => "action-error-id",
     };
     const context: ThreadMemberResolvedRouteContext = {
       threadId: "thread-1",
       adapter,
-      agentId: "codex"
+      agentId: "codex",
     };
 
     const owner = new ThreadMemberReadRouteOwner({
       dependencies,
-      context
+      context,
     });
     const handled = await owner.handle();
 

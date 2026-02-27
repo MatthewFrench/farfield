@@ -37,13 +37,13 @@ export class DateValueFormatter {
       return dateValue.toLocaleTimeString(this.locales, {
         hour: "2-digit",
         minute: "2-digit",
-        timeZone: this.timeZone
+        timeZone: this.timeZone,
       });
     }
 
     return dateValue.toLocaleTimeString(this.locales, {
       hour: "2-digit",
-      minute: "2-digit"
+      minute: "2-digit",
     });
   }
 }

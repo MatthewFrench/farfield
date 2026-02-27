@@ -141,8 +141,13 @@
   --danger: oklch(0.71 0.19 22);
 }
 
-*, *::before, *::after { box-sizing: border-box; }
-html, body {
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
   width: 100%;
   min-height: 100%;
   height: 100%;
@@ -188,21 +193,38 @@ body {
   left: var(--safe-area-inset-left);
 }
 
-pre, code { margin: 0; }
+pre,
+code {
+  margin: 0;
+}
 
 pre {
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
 
 @keyframes reasoning-shimmer {
-  0% { background-position: -300% center; }
-  100% { background-position: 300% center; }
+  0% {
+    background-position: -300% center;
+  }
+  100% {
+    background-position: 300% center;
+  }
 }
 
 .reasoning-shimmer {

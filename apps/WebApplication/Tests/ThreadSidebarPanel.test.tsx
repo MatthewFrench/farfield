@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 import { ThreadSidebarPanel } from "@/Features/Threads/UserInterface/ThreadSidebarPanel";
-import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 
 const BASE_THREAD_LIST_PANE_PROPERTIES: ThreadListPaneProperties = {
   threadListState: "empty",
@@ -35,7 +35,7 @@ const BASE_THREAD_LIST_PANE_PROPERTIES: ThreadListPaneProperties = {
   onToggleArchivedProjectGroup: () => {},
   onUnarchiveThread: () => {},
   formatDate: () => "",
-  renderAgentFavicon: () => null
+  renderAgentFavicon: () => null,
 };
 
 function renderThreadSidebarPanel(input: {
@@ -61,18 +61,18 @@ function renderThreadSidebarPanel(input: {
             id: "codex",
             label: "Codex",
             enabled: true,
-            connected: true
-          }
+            connected: true,
+          },
         ]}
         codexConfigured={true}
         healthState={{
           appReady: true,
           ipcConnected: true,
           ipcInitialized: true,
-          lastError: null
+          lastError: null,
         }}
       />
-    </TooltipProvider>
+    </TooltipProvider>,
   );
 }
 
@@ -81,7 +81,7 @@ describe("ThreadSidebarPanel", () => {
     const onHideDesktopSidebar = vi.fn();
     renderThreadSidebarPanel({
       viewport: "desktop",
-      onHideDesktopSidebar
+      onHideDesktopSidebar,
     });
 
     const closeButton = screen.getByRole("button", { name: "Hide sidebar" });
@@ -93,7 +93,7 @@ describe("ThreadSidebarPanel", () => {
     const onCloseMobileSidebar = vi.fn();
     renderThreadSidebarPanel({
       viewport: "mobile",
-      onCloseMobileSidebar
+      onCloseMobileSidebar,
     });
 
     const closeButton = screen.getByRole("button", { name: "Close sidebar" });
@@ -105,7 +105,7 @@ describe("ThreadSidebarPanel", () => {
     renderThreadSidebarPanel({
       viewport: "desktop",
       allSystemsReady: true,
-      hasAnySystemFailure: false
+      hasAnySystemFailure: false,
     });
 
     expect(screen.getByTestId("sidebar-health-indicator").getAttribute("data-state")).toBe("ready");
@@ -115,9 +115,11 @@ describe("ThreadSidebarPanel", () => {
     renderThreadSidebarPanel({
       viewport: "desktop",
       allSystemsReady: false,
-      hasAnySystemFailure: true
+      hasAnySystemFailure: true,
     });
 
-    expect(screen.getByTestId("sidebar-health-indicator").getAttribute("data-state")).toBe("failure");
+    expect(screen.getByTestId("sidebar-health-indicator").getAttribute("data-state")).toBe(
+      "failure",
+    );
   });
 });

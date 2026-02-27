@@ -21,9 +21,11 @@ export class RuntimeViewportSizingCoordinator {
   private readonly positiveFiniteNumberSchema: z.ZodNumber;
 
   public constructor(keyboardOpenDeltaThresholdPx: number) {
-    this.keyboardOpenDeltaThresholdPx = z.number().finite().nonnegative().parse(
-      keyboardOpenDeltaThresholdPx
-    );
+    this.keyboardOpenDeltaThresholdPx = z
+      .number()
+      .finite()
+      .nonnegative()
+      .parse(keyboardOpenDeltaThresholdPx);
     this.maxVisualHeightPortrait = 0;
     this.maxVisualHeightLandscape = 0;
     this.positiveFiniteNumberSchema = z.number().finite().positive();
@@ -46,9 +48,8 @@ export class RuntimeViewportSizingCoordinator {
       this.maxVisualHeightPortrait = Math.max(this.maxVisualHeightPortrait, visualViewportHeight);
     }
 
-    const baselineHeight = orientation === "landscape"
-      ? this.maxVisualHeightLandscape
-      : this.maxVisualHeightPortrait;
+    const baselineHeight =
+      orientation === "landscape" ? this.maxVisualHeightLandscape : this.maxVisualHeightPortrait;
     const keyboardDelta = Math.max(0, baselineHeight - visualViewportHeight);
     const keyboardOpen = keyboardDelta >= this.keyboardOpenDeltaThresholdPx;
     const safeAreaInsetBottom = this.readCssPixelVariable("--safe-area-inset-bottom-clamped");
@@ -58,7 +59,7 @@ export class RuntimeViewportSizingCoordinator {
     root.style.setProperty("--app-height", `${String(appHeight)}px`);
     root.style.setProperty(
       "--composer-safe-bottom-inset",
-      `${String(Math.max(0, Math.round(composerSafeBottomInset)))}px`
+      `${String(Math.max(0, Math.round(composerSafeBottomInset)))}px`,
     );
 
     return {
@@ -68,7 +69,7 @@ export class RuntimeViewportSizingCoordinator {
       layoutViewportHeight,
       keyboardDelta,
       keyboardOpen,
-      safeAreaInsetBottom
+      safeAreaInsetBottom,
     };
   }
 
@@ -78,7 +79,10 @@ export class RuntimeViewportSizingCoordinator {
   }
 
   private readCssPixelVariable(variableName: string): number {
-    const raw = window.getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+    const raw = window
+      .getComputedStyle(document.documentElement)
+      .getPropertyValue(variableName)
+      .trim();
     if (raw.length === 0) {
       return 0;
     }
@@ -92,7 +96,7 @@ export class RuntimeViewportSizingCoordinator {
 
   private readVisualViewportHeightPx(): number {
     const visualViewportHeightResult = this.positiveFiniteNumberSchema.safeParse(
-      window.visualViewport?.height
+      window.visualViewport?.height,
     );
     if (visualViewportHeightResult.success) {
       return visualViewportHeightResult.data;

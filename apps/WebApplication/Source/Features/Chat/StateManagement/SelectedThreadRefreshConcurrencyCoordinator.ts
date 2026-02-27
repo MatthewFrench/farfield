@@ -6,10 +6,7 @@ export interface SelectedThreadRefreshRequest {
 
 export interface SelectedThreadRefreshRunInput {
   request: SelectedThreadRefreshRequest;
-  executeRefresh: (
-    request: SelectedThreadRefreshRequest,
-    signal: AbortSignal
-  ) => Promise<void>;
+  executeRefresh: (request: SelectedThreadRefreshRequest, signal: AbortSignal) => Promise<void>;
   isCanceledError: (error: Error) => boolean;
 }
 
@@ -40,9 +37,9 @@ export class SelectedThreadRefreshConcurrencyCoordinator {
         ? this.mergeRequests(this.queuedRefreshRequest, input.request)
         : input.request;
       if (
-        this.activeThreadId !== null
-        && this.activeThreadId.length > 0
-        && this.activeThreadId !== input.request.threadId
+        this.activeThreadId !== null &&
+        this.activeThreadId.length > 0 &&
+        this.activeThreadId !== input.request.threadId
       ) {
         this.activeRefreshAbortController?.abort();
       }
@@ -87,7 +84,7 @@ export class SelectedThreadRefreshConcurrencyCoordinator {
 
   private mergeRequests(
     existing: SelectedThreadRefreshRequest,
-    incoming: SelectedThreadRefreshRequest
+    incoming: SelectedThreadRefreshRequest,
   ): SelectedThreadRefreshRequest {
     if (existing.threadId !== incoming.threadId) {
       return incoming;
@@ -96,7 +93,7 @@ export class SelectedThreadRefreshConcurrencyCoordinator {
     return {
       threadId: existing.threadId,
       includeTurns: existing.includeTurns || incoming.includeTurns,
-      includeReadThread: existing.includeReadThread || incoming.includeReadThread
+      includeReadThread: existing.includeReadThread || incoming.includeReadThread,
     };
   }
 

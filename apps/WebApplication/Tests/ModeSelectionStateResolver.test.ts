@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   type CollaborationModeOption,
+  type ModeSelectionConversationState,
   ModeSelectionStateResolver,
-  type ModeSelectionConversationState
 } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
 
 const DEFAULT_MODEL = "gpt-5.3-codex";
@@ -14,15 +14,15 @@ describe("ModeSelectionStateResolver", () => {
 
     const planByKey: CollaborationModeOption = {
       name: "Default",
-      mode: "plan"
+      mode: "plan",
     };
     const planByName: CollaborationModeOption = {
       name: "Plan Workflow",
-      mode: null
+      mode: null,
     };
     const nonPlanMode: CollaborationModeOption = {
       name: "Default",
-      mode: "default"
+      mode: "default",
     };
 
     expect(resolver.isPlanModeOption(planByKey)).toBe(true);
@@ -34,11 +34,15 @@ describe("ModeSelectionStateResolver", () => {
     const resolver = new ModeSelectionStateResolver();
 
     expect(
-      resolver.readModeSelectionFromConversationState(null, DEFAULT_MODEL, DEFAULT_REASONING_EFFORT)
+      resolver.readModeSelectionFromConversationState(
+        null,
+        DEFAULT_MODEL,
+        DEFAULT_REASONING_EFFORT,
+      ),
     ).toEqual({
       modeKey: "",
       modelId: "",
-      reasoningEffort: ""
+      reasoningEffort: "",
     });
   });
 
@@ -49,21 +53,21 @@ describe("ModeSelectionStateResolver", () => {
         mode: "default",
         settings: {
           model: DEFAULT_MODEL,
-          reasoning_effort: DEFAULT_REASONING_EFFORT
-        }
-      }
+          reasoning_effort: DEFAULT_REASONING_EFFORT,
+        },
+      },
     };
 
     expect(
       resolver.readModeSelectionFromConversationState(
         conversationState,
         DEFAULT_MODEL,
-        DEFAULT_REASONING_EFFORT
-      )
+        DEFAULT_REASONING_EFFORT,
+      ),
     ).toEqual({
       modeKey: "default",
       modelId: "",
-      reasoningEffort: ""
+      reasoningEffort: "",
     });
   });
 
@@ -72,19 +76,19 @@ describe("ModeSelectionStateResolver", () => {
     const conversationState: ModeSelectionConversationState = {
       latestModel: "gpt-4.1",
       latestReasoningEffort: "high",
-      latestCollaborationMode: null
+      latestCollaborationMode: null,
     };
 
     expect(
       resolver.readModeSelectionFromConversationState(
         conversationState,
         DEFAULT_MODEL,
-        DEFAULT_REASONING_EFFORT
-      )
+        DEFAULT_REASONING_EFFORT,
+      ),
     ).toEqual({
       modeKey: "",
       modelId: "gpt-4.1",
-      reasoningEffort: "high"
+      reasoningEffort: "high",
     });
   });
 });

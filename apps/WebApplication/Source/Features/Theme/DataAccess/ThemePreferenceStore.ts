@@ -20,7 +20,7 @@ export class ThemePreferenceStore {
     const parsedThemePreference = ThemePreferenceSchema.safeParse(rawThemePreference);
     if (!parsedThemePreference.success) {
       throw new Error(
-        `Theme preference at key "${this.storageKey}" is invalid. Expected "light" or "dark".`
+        `Theme preference at key "${this.storageKey}" is invalid. Expected "light" or "dark".`,
       );
     }
     return parsedThemePreference.data;

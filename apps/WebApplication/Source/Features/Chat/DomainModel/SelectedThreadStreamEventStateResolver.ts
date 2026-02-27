@@ -15,10 +15,7 @@ interface ResolveNextStreamEventsStateInput {
 // Bounds client-owned stream history to avoid unbounded growth during long-lived sessions.
 const STREAM_EVENT_RETENTION_LIMIT = 400;
 
-function matchesStreamEventTail(
-  previousEvents: IpcFrame[],
-  nextEvents: IpcFrame[]
-): boolean {
+function matchesStreamEventTail(previousEvents: IpcFrame[], nextEvents: IpcFrame[]): boolean {
   const previousLastEvent = previousEvents[previousEvents.length - 1];
   const nextLastEvent = nextEvents[nextEvents.length - 1];
   const previousLastSignature = previousLastEvent ? JSON.stringify(previousLastEvent) : "";
@@ -27,9 +24,7 @@ function matchesStreamEventTail(
   return previousEvents.length === nextEvents.length && previousLastSignature === nextLastSignature;
 }
 
-export function resolveNextStreamEventsState(
-  input: ResolveNextStreamEventsStateInput
-): IpcFrame[] {
+export function resolveNextStreamEventsState(input: ResolveNextStreamEventsStateInput): IpcFrame[] {
   if (input.streamEventsSnapshot.resetRequired) {
     if (matchesStreamEventTail(input.previousStreamEvents, input.streamEventsSnapshot.events)) {
       return input.previousStreamEvents;

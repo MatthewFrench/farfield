@@ -1,53 +1,53 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   AppServerCollaborationModeListItemSchema,
+  type AppServerCollaborationModeListResponse,
+  type AppServerListModelsResponse,
   AppServerModelSchema,
   AppServerReasoningEffortSchema,
-  type AppServerCollaborationModeListResponse,
-  type AppServerListModelsResponse
 } from "@farfield/protocol";
 import type { z } from "zod";
-import { logger } from "../../Shared/Logging/Logger.js";
-import type { AgentConfigDefaults, AgentId } from "../../Agents/Types.js";
 import type { AgentRegistry } from "../../Agents/Registry.js";
+import type { AgentConfigDefaults, AgentId } from "../../Agents/Types.js";
+import { logger } from "../../Shared/Logging/Logger.js";
 
 const CapabilityRouteMethodByName = {
-  get: "GET"
+  get: "GET",
 } as const;
 
 const CapabilityRoutePathnameByName = {
   defaults: "/api/config/defaults",
   models: "/api/models",
-  collaborationModes: "/api/collaboration-modes"
+  collaborationModes: "/api/collaboration-modes",
 } as const;
 
 const CapabilityRouteStatusCodeByName = {
   success: 200,
   badRequest: 400,
-  serviceUnavailable: 503
+  serviceUnavailable: 503,
 } as const;
 
 const CapabilityRouteQueryParameterByName = {
   agentId: "agentId",
-  limit: "limit"
+  limit: "limit",
 } as const;
 
 const CapabilityRouteLogEventByName = {
   defaultsReadFailed: "agent-config-defaults-read-failed",
   defaultsInvalidReasoningEffort: "agent-config-defaults-invalid-reasoning-effort",
   modelsListTimeout: "models-list-timeout",
-  collaborationModesListTimeout: "collaboration-modes-list-timeout"
+  collaborationModesListTimeout: "collaboration-modes-list-timeout",
 } as const;
 
 const CapabilityRouteErrorMessagePrefixByName = {
   invalidAgentId: "Invalid agentId: ",
   failedToListModels: "Failed to list models: ",
-  failedToListCollaborationModes: "Failed to list collaboration modes: "
+  failedToListCollaborationModes: "Failed to list collaboration modes: ",
 } as const;
 
 const CapabilityRouteTimeoutLabelByName = {
   modelsList: "models listing",
-  collaborationModesList: "collaboration modes listing"
+  collaborationModesList: "collaboration modes listing",
 } as const;
 
 const CapabilityRouteModelsLimitDefault = 100;
@@ -87,14 +87,12 @@ function toErrorMessage<ErrorType>(error: ErrorType): string {
 function isCapabilityRouteRequest(
   method: string | undefined,
   pathname: string,
-  expectedPathname: string
+  expectedPathname: string,
 ): boolean {
   return method === CapabilityRouteMethodByName.get && pathname === expectedPathname;
 }
 
-function parseReasoningEffort(
-  value: string | null
-): CapabilityReasoningEffort | null {
+function parseReasoningEffort(value: string | null): CapabilityReasoningEffort | null {
   if (value === null) {
     return null;
   }
@@ -104,14 +102,14 @@ function parseReasoningEffort(
 
 function mapDefaultsResponse(
   agentId: AgentId | null,
-  defaults: AgentConfigDefaults | null
+  defaults: AgentConfigDefaults | null,
 ): CapabilityDefaultsResponseBody {
   if (agentId === null || defaults === null) {
     return {
       ok: true,
       agentId,
       model: null,
-      reasoningEffort: null
+      reasoningEffort: null,
     };
   }
 
@@ -120,9 +118,9 @@ function mapDefaultsResponse(
     logger.warn(
       {
         agentId,
-        reasoningEffort: defaults.reasoningEffort
+        reasoningEffort: defaults.reasoningEffort,
       },
-      CapabilityRouteLogEventByName.defaultsInvalidReasoningEffort
+      CapabilityRouteLogEventByName.defaultsInvalidReasoningEffort,
     );
   }
 
@@ -130,7 +128,7 @@ function mapDefaultsResponse(
     ok: true,
     agentId,
     model: defaults.model,
-    reasoningEffort: normalizedReasoningEffort
+    reasoningEffort: normalizedReasoningEffort,
   };
 }
 
@@ -138,16 +136,16 @@ function mapModelsResponse(result: AppServerListModelsResponse): CapabilityModel
   return {
     ok: true,
     ...result,
-    nextCursor: result.nextCursor ?? null
+    nextCursor: result.nextCursor ?? null,
   };
 }
 
 function mapCollaborationModesResponse(
-  result: AppServerCollaborationModeListResponse
+  result: AppServerCollaborationModeListResponse,
 ): CapabilityCollaborationModesResponseBody {
   return {
     ok: true,
-    ...result
+    ...result,
   };
 }
 
@@ -165,15 +163,7 @@ export interface CapabilityRouteDependencies {
 }
 
 async function handleConfigDefaultsRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
-  const {
-    req,
-    res,
-    pathname,
-    url,
-    registry,
-    parseAgentId,
-    jsonResponse
-  } = deps;
+  const { req, res, pathname, url, registry, parseAgentId, jsonResponse } = deps;
 
   if (!isCapabilityRouteRequest(req.method, pathname, CapabilityRoutePathnameByName.defaults)) {
     return false;
@@ -181,14 +171,10 @@ async function handleConfigDefaultsRoute(deps: CapabilityRouteDependencies): Pro
 
   const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
   const requestedAgentId = parseAgentId(requestedAgentRaw);
-  if (
-    requestedAgentRaw !== null
-    && requestedAgentRaw.length > 0
-    && requestedAgentId === null
-  ) {
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
     jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
       ok: false,
-      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
     });
     return true;
   }
@@ -204,7 +190,7 @@ async function handleConfigDefaultsRoute(deps: CapabilityRouteDependencies): Pro
     jsonResponse(
       res,
       CapabilityRouteStatusCodeByName.success,
-      mapDefaultsResponse(resolvedAgentId, null)
+      mapDefaultsResponse(resolvedAgentId, null),
     );
     return true;
   }
@@ -214,20 +200,20 @@ async function handleConfigDefaultsRoute(deps: CapabilityRouteDependencies): Pro
     jsonResponse(
       res,
       CapabilityRouteStatusCodeByName.success,
-      mapDefaultsResponse(resolvedAgentId, defaults)
+      mapDefaultsResponse(resolvedAgentId, defaults),
     );
   } catch (error) {
     logger.warn(
       {
         agentId: resolvedAgentId,
-        error: toErrorMessage(error)
+        error: toErrorMessage(error),
       },
-      CapabilityRouteLogEventByName.defaultsReadFailed
+      CapabilityRouteLogEventByName.defaultsReadFailed,
     );
     jsonResponse(
       res,
       CapabilityRouteStatusCodeByName.success,
-      mapDefaultsResponse(resolvedAgentId, null)
+      mapDefaultsResponse(resolvedAgentId, null),
     );
   }
   return true;
@@ -243,7 +229,7 @@ async function handleModelsRoute(deps: CapabilityRouteDependencies): Promise<boo
     registry,
     parseInteger,
     withTimeout,
-    jsonResponse
+    jsonResponse,
   } = deps;
 
   if (!isCapabilityRouteRequest(req.method, pathname, CapabilityRoutePathnameByName.models)) {
@@ -255,54 +241,46 @@ async function handleModelsRoute(deps: CapabilityRouteDependencies): Promise<boo
     jsonResponse(res, CapabilityRouteStatusCodeByName.success, {
       ok: true,
       data: [],
-      nextCursor: null
+      nextCursor: null,
     });
     return true;
   }
 
   const limit = parseInteger(
     url.searchParams.get(CapabilityRouteQueryParameterByName.limit),
-    CapabilityRouteModelsLimitDefault
+    CapabilityRouteModelsLimitDefault,
   );
   try {
     const result = await withTimeout(
       adapter.listModels(limit),
       capabilityListTimeoutMs,
-      CapabilityRouteTimeoutLabelByName.modelsList
+      CapabilityRouteTimeoutLabelByName.modelsList,
     );
     jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapModelsResponse(result));
   } catch (error) {
     const message = toErrorMessage(error);
     logger.warn(
       {
-        error: message
+        error: message,
       },
-      CapabilityRouteLogEventByName.modelsListTimeout
+      CapabilityRouteLogEventByName.modelsListTimeout,
     );
     jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
       ok: false,
-      error: `${CapabilityRouteErrorMessagePrefixByName.failedToListModels}${message}`
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToListModels}${message}`,
     });
   }
   return true;
 }
 
 async function handleCollaborationModesRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
-  const {
-    req,
-    res,
-    pathname,
-    capabilityListTimeoutMs,
-    registry,
-    withTimeout,
-    jsonResponse
-  } = deps;
+  const { req, res, pathname, capabilityListTimeoutMs, registry, withTimeout, jsonResponse } = deps;
 
   if (
     !isCapabilityRouteRequest(
       req.method,
       pathname,
-      CapabilityRoutePathnameByName.collaborationModes
+      CapabilityRoutePathnameByName.collaborationModes,
     )
   ) {
     return false;
@@ -312,7 +290,7 @@ async function handleCollaborationModesRoute(deps: CapabilityRouteDependencies):
   if (!adapter || !adapter.listCollaborationModes) {
     jsonResponse(res, CapabilityRouteStatusCodeByName.success, {
       ok: true,
-      data: []
+      data: [],
     });
     return true;
   }
@@ -321,24 +299,24 @@ async function handleCollaborationModesRoute(deps: CapabilityRouteDependencies):
     const result = await withTimeout(
       adapter.listCollaborationModes(),
       capabilityListTimeoutMs,
-      CapabilityRouteTimeoutLabelByName.collaborationModesList
+      CapabilityRouteTimeoutLabelByName.collaborationModesList,
     );
     jsonResponse(
       res,
       CapabilityRouteStatusCodeByName.success,
-      mapCollaborationModesResponse(result)
+      mapCollaborationModesResponse(result),
     );
   } catch (error) {
     const message = toErrorMessage(error);
     logger.warn(
       {
-        error: message
+        error: message,
       },
-      CapabilityRouteLogEventByName.collaborationModesListTimeout
+      CapabilityRouteLogEventByName.collaborationModesListTimeout,
     );
     jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
       ok: false,
-      error: `${CapabilityRouteErrorMessagePrefixByName.failedToListCollaborationModes}${message}`
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToListCollaborationModes}${message}`,
     });
   }
   return true;

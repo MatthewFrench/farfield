@@ -4,12 +4,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "@/Components/UserInterface/DropdownMenu";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 import {
   DEFAULT_AGENT_LABEL,
-  DEFAULT_THREAD_PROJECT_DIRECTORY
+  DEFAULT_THREAD_PROJECT_DIRECTORY,
 } from "@/Features/Threads/UserInterface/ThreadListUserInterfaceConstants";
 
 interface ThreadListEmptyStateProps {
@@ -17,14 +17,17 @@ interface ThreadListEmptyStateProps {
 }
 
 export function ThreadListEmptyState({
-  properties
+  properties,
 }: ThreadListEmptyStateProps): React.JSX.Element | null {
   if (properties.threads.length > 0) {
     return null;
   }
 
   return (
-    <div data-testid="thread-list-empty" className="px-4 py-6 text-xs text-muted-foreground text-center space-y-3">
+    <div
+      data-testid="thread-list-empty"
+      className="px-4 py-6 text-xs text-muted-foreground text-center space-y-3"
+    >
       {properties.isCoreLoading ? (
         <div data-testid="thread-list-loading" className="flex items-center justify-center gap-2">
           <Loader2 size={14} className="animate-spin" />
@@ -33,8 +36,8 @@ export function ThreadListEmptyState({
       ) : (
         <div>No threads</div>
       )}
-      {properties.availableAgentIds.length > 0 && (
-        properties.availableAgentIds.length === 1 ? (
+      {properties.availableAgentIds.length > 0 &&
+        (properties.availableAgentIds.length === 1 ? (
           <Button
             type="button"
             variant="outline"
@@ -42,8 +45,9 @@ export function ThreadListEmptyState({
             className="rounded-full"
             disabled={properties.isBusy}
             onClick={() => {
-              const defaultProjectPath = properties.selectedAgentDescriptor?.projectDirectories[0]
-                ?? DEFAULT_THREAD_PROJECT_DIRECTORY;
+              const defaultProjectPath =
+                properties.selectedAgentDescriptor?.projectDirectories[0] ??
+                DEFAULT_THREAD_PROJECT_DIRECTORY;
               properties.onCreateThreadForSingleAgent(defaultProjectPath);
             }}
           >
@@ -69,8 +73,9 @@ export function ThreadListEmptyState({
                 <DropdownMenuItem
                   key={agentId}
                   onSelect={() => {
-                    const defaultProjectPath = properties.agentsById[agentId]?.projectDirectories[0]
-                      ?? DEFAULT_THREAD_PROJECT_DIRECTORY;
+                    const defaultProjectPath =
+                      properties.agentsById[agentId]?.projectDirectories[0] ??
+                      DEFAULT_THREAD_PROJECT_DIRECTORY;
                     properties.onCreateNewThread(defaultProjectPath, agentId);
                   }}
                 >
@@ -78,7 +83,7 @@ export function ThreadListEmptyState({
                     {properties.renderAgentFavicon(
                       agentId,
                       properties.agentsById[agentId]?.label ?? DEFAULT_AGENT_LABEL,
-                      "h-3.5 w-3.5"
+                      "h-3.5 w-3.5",
                     )}
                   </span>
                   New {properties.agentsById[agentId]?.label ?? agentId} thread
@@ -86,8 +91,7 @@ export function ThreadListEmptyState({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-        )
-      )}
+        ))}
     </div>
   );
 }

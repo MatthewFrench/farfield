@@ -1,16 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   ConversationItemFlattener,
-  type ConversationTurn
+  type ConversationTurn,
 } from "../Source/Features/Chat/DomainModel/ConversationItemFlattener";
 
-function createTurn(input: {
-  status: string;
-  items: ConversationTurn["items"];
-}): ConversationTurn {
+function createTurn(input: { status: string; items: ConversationTurn["items"] }): ConversationTurn {
   return {
     status: input.status,
-    items: input.items
+    items: input.items,
   };
 }
 
@@ -36,16 +33,16 @@ describe("ConversationItemFlattener", () => {
             content: [
               {
                 type: "text",
-                text: ""
-              }
-            ]
+                text: "",
+              },
+            ],
           },
           {
             id: "agent-visible",
             type: "agentMessage",
-            text: "hello"
-          }
-        ]
+            text: "hello",
+          },
+        ],
       }),
       createTurn({
         status: "inProgress",
@@ -53,15 +50,15 @@ describe("ConversationItemFlattener", () => {
           {
             id: "reasoning-visible",
             type: "reasoning",
-            summary: ["thinking"]
+            summary: ["thinking"],
           },
           {
             id: "error-visible",
             type: "error",
-            message: "boom"
-          }
-        ]
-      })
+            message: "boom",
+          },
+        ],
+      }),
     ];
 
     const flattened = flattener.flattenConversationItems(turns, true);
@@ -69,7 +66,7 @@ describe("ConversationItemFlattener", () => {
     expect(flattened.map((item) => item.key)).toEqual([
       "agent-visible",
       "reasoning-visible",
-      "error-visible"
+      "error-visible",
     ]);
     expect(flattened.map((item) => item.spacingTop)).toEqual([0, 16, 10]);
     expect(flattened.map((item) => item.turnIsInProgress)).toEqual([false, true, true]);
@@ -87,7 +84,7 @@ describe("ConversationItemFlattener", () => {
           {
             id: "reasoning-empty",
             type: "reasoning",
-            summary: []
+            summary: [],
           },
           {
             id: "response-empty",
@@ -95,14 +92,14 @@ describe("ConversationItemFlattener", () => {
             requestId: 1,
             turnId: "turn-1",
             questions: [],
-            answers: {}
+            answers: {},
           },
           {
             id: "context-compaction",
-            type: "contextCompaction"
-          }
-        ]
-      })
+            type: "contextCompaction",
+          },
+        ],
+      }),
     ];
 
     const flattened = flattener.flattenConversationItems(turns, false);
@@ -119,10 +116,10 @@ describe("ConversationItemFlattener", () => {
           {
             id: "agent-visible",
             type: "agentMessage",
-            text: "hello"
-          }
-        ]
-      })
+            text: "hello",
+          },
+        ],
+      }),
     ];
 
     const flattened = flattener.flattenConversationItems(turns, true);
@@ -139,8 +136,8 @@ describe("ConversationItemFlattener", () => {
       items: Array.from({ length: itemsPerTurn }, (_item, itemIndex) => ({
         id: `turn-${String(turnIndex)}-item-${String(itemIndex)}`,
         type: "agentMessage",
-        text: "message"
-      }))
+        text: "message",
+      })),
     }));
 
     const startedAtMilliseconds = performance.now();

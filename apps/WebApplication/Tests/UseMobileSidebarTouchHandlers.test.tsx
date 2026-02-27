@@ -1,28 +1,13 @@
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { Dispatch, SetStateAction } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  cleanup,
-  fireEvent,
-  render,
-  screen
-} from "@testing-library/react";
-import type {
-  Dispatch,
-  SetStateAction
-} from "react";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi
-} from "vitest";
-import { RuntimeViewportSizingCoordinator } from "../Source/Application/StateManagement/RuntimeViewportSizingCoordinator";
-import {
-  MobileSidebarSwipeCoordinator,
   type BeginMobileSidebarSwipeTrackingInput,
   type ContinueMobileSidebarSwipeTrackingInput,
-  type ContinueMobileSidebarSwipeTrackingOutput
+  type ContinueMobileSidebarSwipeTrackingOutput,
+  MobileSidebarSwipeCoordinator,
 } from "../Source/Application/StateManagement/MobileSidebarSwipeCoordinator";
+import { RuntimeViewportSizingCoordinator } from "../Source/Application/StateManagement/RuntimeViewportSizingCoordinator";
 import { useMobileSidebarTouchHandlers } from "../Source/Application/StateManagement/UseMobileSidebarTouchHandlers";
 
 interface TouchHandlersHarnessProperties {
@@ -44,7 +29,7 @@ class TestMobileSidebarSwipeCoordinator extends MobileSidebarSwipeCoordinator {
       sidebarSwipeEdgePx: 32,
       sidebarSwipeTriggerPx: 56,
       sidebarSwipeMaximumVerticalDriftPx: 36,
-      sidebarSwipeCancelNegativePx: -14
+      sidebarSwipeCancelNegativePx: -14,
     });
     this.nextContinueTrackingOutput = { shouldOpenSidebar: false };
   }
@@ -58,7 +43,7 @@ class TestMobileSidebarSwipeCoordinator extends MobileSidebarSwipeCoordinator {
   }
 
   public override continueTracking(
-    input: ContinueMobileSidebarSwipeTrackingInput
+    input: ContinueMobileSidebarSwipeTrackingInput,
   ): ContinueMobileSidebarSwipeTrackingOutput {
     this.continueTrackingCalls.push(input);
     return this.nextContinueTrackingOutput;
@@ -74,7 +59,7 @@ function TouchHandlersHarness(properties: TouchHandlersHarnessProperties): React
     mobileSidebarOpen: properties.mobileSidebarOpen,
     setMobileSidebarOpen: properties.setMobileSidebarOpen,
     mobileSidebarSwipeCoordinator: properties.mobileSidebarSwipeCoordinator,
-    runtimeViewportSizingCoordinator: properties.runtimeViewportSizingCoordinator
+    runtimeViewportSizingCoordinator: properties.runtimeViewportSizingCoordinator,
   });
 
   return (
@@ -94,7 +79,7 @@ describe("useMobileSidebarTouchHandlers", () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       writable: true,
-      value: 390
+      value: 390,
     });
   });
 
@@ -103,7 +88,7 @@ describe("useMobileSidebarTouchHandlers", () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       writable: true,
-      value: originalInnerWidth
+      value: originalInnerWidth,
     });
   });
 
@@ -119,24 +104,28 @@ describe("useMobileSidebarTouchHandlers", () => {
         setMobileSidebarOpen={setMobileSidebarOpen}
         mobileSidebarSwipeCoordinator={mobileSidebarSwipeCoordinator}
         runtimeViewportSizingCoordinator={runtimeViewportSizingCoordinator}
-      />
+      />,
     );
 
     fireEvent.touchStart(screen.getByTestId("touch-shell"), {
-      touches: [{
-        clientX: 16,
-        clientY: 20
-      }]
+      touches: [
+        {
+          clientX: 16,
+          clientY: 20,
+        },
+      ],
     });
 
-    expect(mobileSidebarSwipeCoordinator.beginTrackingCalls).toEqual([{
-      mobileSidebarOpen: false,
-      viewportWidthPx: 390,
-      touchCount: 1,
-      touchClientX: 16,
-      touchClientY: 20,
-      safeAreaInsetLeftPx: 12
-    }]);
+    expect(mobileSidebarSwipeCoordinator.beginTrackingCalls).toEqual([
+      {
+        mobileSidebarOpen: false,
+        viewportWidthPx: 390,
+        touchCount: 1,
+        touchClientX: 16,
+        touchClientY: 20,
+        safeAreaInsetLeftPx: 12,
+      },
+    ]);
   });
 
   it("ends swipe tracking when touch-move events have no primary touch", () => {
@@ -150,11 +139,11 @@ describe("useMobileSidebarTouchHandlers", () => {
         setMobileSidebarOpen={setMobileSidebarOpen}
         mobileSidebarSwipeCoordinator={mobileSidebarSwipeCoordinator}
         runtimeViewportSizingCoordinator={runtimeViewportSizingCoordinator}
-      />
+      />,
     );
 
     fireEvent.touchMove(screen.getByTestId("touch-shell"), {
-      touches: []
+      touches: [],
     });
 
     expect(mobileSidebarSwipeCoordinator.endTrackingCallCount).toBe(1);
@@ -165,7 +154,7 @@ describe("useMobileSidebarTouchHandlers", () => {
   it("opens the sidebar when swipe tracking reports a completed open gesture", () => {
     const mobileSidebarSwipeCoordinator = new TestMobileSidebarSwipeCoordinator();
     mobileSidebarSwipeCoordinator.setNextContinueTrackingOutput({
-      shouldOpenSidebar: true
+      shouldOpenSidebar: true,
     });
     const runtimeViewportSizingCoordinator = new RuntimeViewportSizingCoordinator(120);
     const setMobileSidebarOpen = vi.fn();
@@ -176,21 +165,25 @@ describe("useMobileSidebarTouchHandlers", () => {
         setMobileSidebarOpen={setMobileSidebarOpen}
         mobileSidebarSwipeCoordinator={mobileSidebarSwipeCoordinator}
         runtimeViewportSizingCoordinator={runtimeViewportSizingCoordinator}
-      />
+      />,
     );
 
     fireEvent.touchMove(screen.getByTestId("touch-shell"), {
-      touches: [{
-        clientX: 88,
-        clientY: 24
-      }]
+      touches: [
+        {
+          clientX: 88,
+          clientY: 24,
+        },
+      ],
     });
 
-    expect(mobileSidebarSwipeCoordinator.continueTrackingCalls).toEqual([{
-      touchCount: 1,
-      touchClientX: 88,
-      touchClientY: 24
-    }]);
+    expect(mobileSidebarSwipeCoordinator.continueTrackingCalls).toEqual([
+      {
+        touchCount: 1,
+        touchClientX: 88,
+        touchClientY: 24,
+      },
+    ]);
     expect(setMobileSidebarOpen).toHaveBeenCalledTimes(1);
     expect(setMobileSidebarOpen).toHaveBeenCalledWith(true);
   });

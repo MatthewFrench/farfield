@@ -1,19 +1,15 @@
-import {
-  useCallback,
-  type Dispatch,
-  type SetStateAction
-} from "react";
+import { type Dispatch, type SetStateAction, useCallback } from "react";
 import type { ErrorBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
-import type { DebugIssueSeverityFilter } from "../DomainModel/DebugIssueStateResolver";
 import {
-  DEBUG_ISSUE_SEVERITY_FILTER_ALL
-} from "../DomainModel/DebugIssueStateResolver";
+  type DebugHistoryDetailResponse,
+  type DebugServerClient,
+} from "../DataAccess/DebugServerClient";
 import { buildDebugErrorIssueIdentifier } from "../DomainModel/DebugIssueIdentifier";
-import { DebugWorkspaceActionCoordinator } from "./DebugWorkspaceActionCoordinator";
-import { type DebugServerClient } from "../DataAccess/DebugServerClient";
-import { type ReplayHistoryEntryRequestInput } from "../UserInterface/DebugHistoryDetailPanel";
+import type { DebugIssueSeverityFilter } from "../DomainModel/DebugIssueStateResolver";
+import { DEBUG_ISSUE_SEVERITY_FILTER_ALL } from "../DomainModel/DebugIssueStateResolver";
 import { type DebugWorkspaceSection } from "../DomainModel/DebugWorkspaceSectionContracts";
-import { type DebugHistoryDetailResponse } from "../DataAccess/DebugServerClient";
+import { type ReplayHistoryEntryRequestInput } from "../UserInterface/DebugHistoryDetailPanel";
+import { DebugWorkspaceActionCoordinator } from "./DebugWorkspaceActionCoordinator";
 
 const DEBUG_APPLICATION_TAB = "debug";
 const DEBUG_ISSUES_WORKSPACE_SECTION: DebugWorkspaceSection = "issues";
@@ -58,58 +54,71 @@ function readDebugIssueFilterQueryFromErrorBanner(errorBannerDetails: ErrorBanne
 }
 
 export function useDebugActionHandlers(input: UseDebugActionHandlersInput): DebugActionHandlers {
-  const loadHistoryDetail = useCallback(async (id: string) => {
-    await input.debugWorkspaceActionCoordinator.loadHistoryDetail({
-      historyEntryId: id,
-      debugClient: input.debugServerClient,
-      onHistoryDetailLoaded: input.onHistoryDetailLoaded
-    });
-  }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.onHistoryDetailLoaded]);
+  const loadHistoryDetail = useCallback(
+    async (id: string) => {
+      await input.debugWorkspaceActionCoordinator.loadHistoryDetail({
+        historyEntryId: id,
+        debugClient: input.debugServerClient,
+        onHistoryDetailLoaded: input.onHistoryDetailLoaded,
+      });
+    },
+    [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.onHistoryDetailLoaded],
+  );
 
   const replayHistoryEntryFromDetail = useCallback(
     (replayInput: ReplayHistoryEntryRequestInput) => {
       void input.debugWorkspaceActionCoordinator.replayHistoryEntry({
         replayRequest: replayInput,
         debugClient: input.debugServerClient,
-        refreshCoreData: input.refreshCoreData
+        refreshCoreData: input.refreshCoreData,
       });
     },
-    [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData]
+    [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData],
   );
 
   const clearDebugIssuesFromPanel = useCallback(() => {
     input.setSelectedDebugIssueId("");
     void input.debugWorkspaceActionCoordinator.clearClientErrors({
       debugClient: input.debugServerClient,
-      refreshCoreData: input.refreshCoreData
+      refreshCoreData: input.refreshCoreData,
     });
   }, [
     input.debugServerClient,
     input.debugWorkspaceActionCoordinator,
     input.refreshCoreData,
-    input.setSelectedDebugIssueId
+    input.setSelectedDebugIssueId,
   ]);
 
   const startTraceFromDebugPanel = useCallback(() => {
     void input.debugWorkspaceActionCoordinator.startTrace({
       traceLabel: input.traceLabel,
       debugClient: input.debugServerClient,
-      refreshCoreData: input.refreshCoreData
+      refreshCoreData: input.refreshCoreData,
     });
-  }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData, input.traceLabel]);
+  }, [
+    input.debugServerClient,
+    input.debugWorkspaceActionCoordinator,
+    input.refreshCoreData,
+    input.traceLabel,
+  ]);
 
   const markTraceFromDebugPanel = useCallback(() => {
     void input.debugWorkspaceActionCoordinator.markTrace({
       traceNote: input.traceNote,
       debugClient: input.debugServerClient,
-      refreshCoreData: input.refreshCoreData
+      refreshCoreData: input.refreshCoreData,
     });
-  }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData, input.traceNote]);
+  }, [
+    input.debugServerClient,
+    input.debugWorkspaceActionCoordinator,
+    input.refreshCoreData,
+    input.traceNote,
+  ]);
 
   const stopTraceFromDebugPanel = useCallback(() => {
     void input.debugWorkspaceActionCoordinator.stopTrace({
       debugClient: input.debugServerClient,
-      refreshCoreData: input.refreshCoreData
+      refreshCoreData: input.refreshCoreData,
     });
   }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData]);
 
@@ -120,14 +129,14 @@ export function useDebugActionHandlers(input: UseDebugActionHandlersInput): Debu
 
     if (input.errorBannerDetails.errorId !== null && input.errorBannerDetails.errorId.length > 0) {
       input.setSelectedDebugIssueId(
-        buildDebugErrorIssueIdentifier(input.errorBannerDetails.errorId)
+        buildDebugErrorIssueIdentifier(input.errorBannerDetails.errorId),
       );
       input.setDebugIssueFilterQuery(input.errorBannerDetails.errorId);
       return;
     }
 
     input.setDebugIssueFilterQuery(
-      readDebugIssueFilterQueryFromErrorBanner(input.errorBannerDetails)
+      readDebugIssueFilterQueryFromErrorBanner(input.errorBannerDetails),
     );
   }, [
     input.errorBannerDetails.actionId,
@@ -138,7 +147,7 @@ export function useDebugActionHandlers(input: UseDebugActionHandlersInput): Debu
     input.setDebugIssueFilterQuery,
     input.setDebugIssueSeverityFilter,
     input.setDebugWorkspaceSection,
-    input.setSelectedDebugIssueId
+    input.setSelectedDebugIssueId,
   ]);
 
   return {
@@ -148,6 +157,6 @@ export function useDebugActionHandlers(input: UseDebugActionHandlersInput): Debu
     startTraceFromDebugPanel,
     markTraceFromDebugPanel,
     stopTraceFromDebugPanel,
-    openDebugFromErrorBanner
+    openDebugFromErrorBanner,
   };
 }

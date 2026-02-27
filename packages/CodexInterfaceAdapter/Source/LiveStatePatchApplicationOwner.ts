@@ -1,15 +1,15 @@
 import {
-  JsonValueSchema,
   type JsonObject,
   type JsonValue,
-  type ThreadConversationState,
+  JsonValueSchema,
   parseThreadConversationState,
-  type ThreadStreamPatch
+  type ThreadConversationState,
+  type ThreadStreamPatch,
 } from "@farfield/protocol";
 import {
   createPatchSequenceFailureError,
   createPatchSequenceInvalidStateError,
-  normalizeErrorCause
+  normalizeErrorCause,
 } from "./LiveStateErrorContracts.js";
 
 type PatchPathSegment = number | string;
@@ -49,7 +49,7 @@ function toObjectPathKey(segment: PatchPathSegment): string {
 }
 
 function hasOwnJsonProperty(target: JsonObject, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(target, key);
+  return Object.hasOwn(target, key);
 }
 
 function isJsonArray(value: JsonValue): value is JsonValue[] {
@@ -75,7 +75,7 @@ function splitPatchPath(path: PatchPathSegment[]): {
 
   return {
     parentPath: path.slice(0, -1),
-    lastSegment
+    lastSegment,
   };
 }
 
@@ -124,7 +124,7 @@ function requirePatchValue(patch: ThreadStreamPatch): JsonValue {
 function applyArrayPatch(
   target: JsonValue[],
   lastSegment: PatchPathSegment,
-  patch: ThreadStreamPatch
+  patch: ThreadStreamPatch,
 ): void {
   const mutableTarget = target;
   const operation = patch.op;
@@ -166,7 +166,7 @@ function applyArrayPatch(
 function applyObjectPatch(
   target: JsonObject,
   lastSegment: PatchPathSegment,
-  patch: ThreadStreamPatch
+  patch: ThreadStreamPatch,
 ): void {
   const mutableTarget = target;
   const operation = patch.op;
@@ -201,7 +201,7 @@ function applyPatchToState(state: JsonValue, patch: ThreadStreamPatch): void {
 
 function applyPatchSequenceToMutableState(
   mutableState: JsonValue,
-  patches: ThreadStreamPatch[]
+  patches: ThreadStreamPatch[],
 ): void {
   for (let patchIndex = 0; patchIndex < patches.length; patchIndex += 1) {
     const patch = patches[patchIndex];
@@ -224,7 +224,7 @@ function getLastAppliedPatchIndex(patchCount: number): number {
 
 function localizeFirstInvalidFinalStatePatchIndex(
   source: ThreadConversationState,
-  patches: ThreadStreamPatch[]
+  patches: ThreadStreamPatch[],
 ): number {
   const defaultFailingPatchIndex = getLastAppliedPatchIndex(patches.length);
   if (patches.length === 0) {
@@ -253,7 +253,7 @@ function localizeFirstInvalidFinalStatePatchIndex(
 
 export function applyStrictPatch(
   source: ThreadConversationState,
-  patch: ThreadStreamPatch
+  patch: ThreadStreamPatch,
 ): ThreadConversationState {
   const state = JsonValueSchema.parse(cloneState(source));
   applyPatchToState(state, patch);
@@ -262,7 +262,7 @@ export function applyStrictPatch(
 
 export function applyStrictPatchSequence(
   source: ThreadConversationState,
-  patches: ThreadStreamPatch[]
+  patches: ThreadStreamPatch[],
 ): ThreadConversationState {
   const state = JsonValueSchema.parse(cloneState(source));
   applyPatchSequenceToMutableState(state, patches);
@@ -283,7 +283,7 @@ export function applyStrictPatchSequence(
  */
 export function applyTrustedPatchSequence(
   source: ThreadConversationState,
-  patches: ThreadStreamPatch[]
+  patches: ThreadStreamPatch[],
 ): ThreadConversationState {
   const mutableState = source as JsonValue;
   applyPatchSequenceToMutableState(mutableState, patches);

@@ -30,7 +30,7 @@ class StructuredRequestFailureError extends Error {
       requestId: input.requestId,
       responseText: input.responseText,
       responseTextLength: input.responseTextLength,
-      responseTextTruncated: input.responseTextTruncated
+      responseTextTruncated: input.responseTextTruncated,
     };
   }
 }
@@ -40,14 +40,14 @@ describe("TrackedUserInterfaceErrorReporter", () => {
     expect(() => {
       return new TrackedUserInterfaceErrorReporter({
         setErrorMessage: vi.fn(),
-        reportDeduplicationWindowMs: 0
+        reportDeduplicationWindowMs: 0,
       });
     }).toThrow("reportDeduplicationWindowMs must be a positive integer");
 
     expect(() => {
       return new TrackedUserInterfaceErrorReporter({
         setErrorMessage: vi.fn(),
-        reportDeduplicationWindowMs: 1.5
+        reportDeduplicationWindowMs: 1.5,
       });
     }).toThrow("reportDeduplicationWindowMs must be a positive integer");
   });
@@ -58,24 +58,24 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       ok: true as const,
       errorId: "error-123",
       sessionId: "session-1",
-      recordedAt: "2026-01-01T00:00:00.000Z"
+      recordedAt: "2026-01-01T00:00:00.000Z",
     }));
     const reporter = new TrackedUserInterfaceErrorReporter({
       setErrorMessage,
       reportClientErrorFn,
-      readPathnameAndSearch: () => "/threads/thread-1?tab=chat"
+      readPathnameAndSearch: () => "/threads/thread-1?tab=chat",
     });
 
     await reporter.report({
       operation: "send-message",
       actionId: "action-1",
       threadId: "thread-1",
-      error: new Error("failure requestId=req-7")
+      error: new Error("failure requestId=req-7"),
     });
 
     expect(reportClientErrorFn).toHaveBeenCalledTimes(1);
     expect(setErrorMessage).toHaveBeenCalledWith(
-      "send-message: failure requestId=req-7 actionId=action-1 requestId=req-7 errorId=error-123"
+      "send-message: failure requestId=req-7 actionId=action-1 requestId=req-7 errorId=error-123",
     );
   });
 
@@ -85,19 +85,19 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       ok: true as const,
       errorId: "error-123",
       sessionId: "session-1",
-      recordedAt: "2026-01-01T00:00:00.000Z"
+      recordedAt: "2026-01-01T00:00:00.000Z",
     }));
     const reporter = new TrackedUserInterfaceErrorReporter({
       setErrorMessage,
       reportClientErrorFn,
-      readPathnameAndSearch: () => "/"
+      readPathnameAndSearch: () => "/",
     });
 
     await reporter.report({
       operation: "send-message",
       actionId: "action-1",
       threadId: "thread-1",
-      error: new Error("Request canceled for thread thread-1")
+      error: new Error("Request canceled for thread thread-1"),
     });
 
     expect(reportClientErrorFn).not.toHaveBeenCalled();
@@ -112,18 +112,18 @@ describe("TrackedUserInterfaceErrorReporter", () => {
     const reporter = new TrackedUserInterfaceErrorReporter({
       setErrorMessage,
       reportClientErrorFn,
-      readPathnameAndSearch: () => "/"
+      readPathnameAndSearch: () => "/",
     });
 
     await reporter.report({
       operation: "archive-thread",
       actionId: "action-9",
       threadId: "thread-2",
-      error: new Error("archive failed")
+      error: new Error("archive failed"),
     });
 
     expect(setErrorMessage).toHaveBeenCalledWith(
-      "archive-thread: archive failed actionId=action-9"
+      "archive-thread: archive failed actionId=action-9",
     );
   });
 
@@ -133,7 +133,7 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       ok: true as const,
       errorId: "error-777",
       sessionId: "session-1",
-      recordedAt: "2026-01-01T00:00:00.000Z"
+      recordedAt: "2026-01-01T00:00:00.000Z",
     }));
     let now = 10_000;
     const reporter = new TrackedUserInterfaceErrorReporter({
@@ -141,14 +141,14 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       reportClientErrorFn,
       readPathnameAndSearch: () => "/",
       readNow: () => now,
-      reportDeduplicationWindowMs: 30_000
+      reportDeduplicationWindowMs: 30_000,
     });
 
     await reporter.report({
       operation: "core.load",
       actionId: "action-1",
       threadId: null,
-      error: new Error("Request timed out for /api/health requestId req-1")
+      error: new Error("Request timed out for /api/health requestId req-1"),
     });
 
     now += 500;
@@ -156,7 +156,7 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       operation: "core.load",
       actionId: "action-2",
       threadId: null,
-      error: new Error("Request timed out for /api/health requestId req-1")
+      error: new Error("Request timed out for /api/health requestId req-1"),
     });
 
     expect(reportClientErrorFn).toHaveBeenCalledTimes(1);
@@ -169,7 +169,7 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       ok: true as const,
       errorId: "error-778",
       sessionId: "session-1",
-      recordedAt: "2026-01-01T00:00:00.000Z"
+      recordedAt: "2026-01-01T00:00:00.000Z",
     }));
     let now = 20_000;
     const reporter = new TrackedUserInterfaceErrorReporter({
@@ -177,14 +177,14 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       reportClientErrorFn,
       readPathnameAndSearch: () => "/",
       readNow: () => now,
-      reportDeduplicationWindowMs: 3_000
+      reportDeduplicationWindowMs: 3_000,
     });
 
     await reporter.report({
       operation: "core.load",
       actionId: "action-1",
       threadId: null,
-      error: new Error("Request timed out for /api/health requestId req-1")
+      error: new Error("Request timed out for /api/health requestId req-1"),
     });
 
     now += 3_500;
@@ -192,7 +192,7 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       operation: "core.load",
       actionId: "action-2",
       threadId: null,
-      error: new Error("Request timed out for /api/health requestId req-1")
+      error: new Error("Request timed out for /api/health requestId req-1"),
     });
 
     expect(reportClientErrorFn).toHaveBeenCalledTimes(2);
@@ -205,7 +205,7 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       ok: true as const,
       errorId: "error-779",
       sessionId: "session-1",
-      recordedAt: "2026-01-01T00:00:00.000Z"
+      recordedAt: "2026-01-01T00:00:00.000Z",
     }));
     let now = 30_000;
     const reporter = new TrackedUserInterfaceErrorReporter({
@@ -213,14 +213,14 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       reportClientErrorFn,
       readPathnameAndSearch: () => "/",
       readNow: () => now,
-      reportDeduplicationWindowMs: 3_000
+      reportDeduplicationWindowMs: 3_000,
     });
 
     await reporter.report({
       operation: "core.load",
       actionId: "action-1",
       threadId: null,
-      error: new Error("Request timed out for /api/health requestId req-1")
+      error: new Error("Request timed out for /api/health requestId req-1"),
     });
 
     now += 1_500;
@@ -228,7 +228,7 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       operation: "core.load",
       actionId: "action-2",
       threadId: null,
-      error: new Error("Request timed out for /api/health requestId req-1")
+      error: new Error("Request timed out for /api/health requestId req-1"),
     });
 
     now += 2_500;
@@ -236,7 +236,7 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       operation: "core.load",
       actionId: "action-3",
       threadId: null,
-      error: new Error("Request timed out for /api/health requestId req-1")
+      error: new Error("Request timed out for /api/health requestId req-1"),
     });
 
     now += 3_100;
@@ -244,7 +244,7 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       operation: "core.load",
       actionId: "action-4",
       threadId: null,
-      error: new Error("Request timed out for /api/health requestId req-1")
+      error: new Error("Request timed out for /api/health requestId req-1"),
     });
 
     expect(reportClientErrorFn).toHaveBeenCalledTimes(2);
@@ -257,12 +257,12 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       ok: true as const,
       errorId: "error-555",
       sessionId: "session-1",
-      recordedAt: "2026-01-01T00:00:00.000Z"
+      recordedAt: "2026-01-01T00:00:00.000Z",
     }));
     const reporter = new TrackedUserInterfaceErrorReporter({
       setErrorMessage,
       reportClientErrorFn,
-      readPathnameAndSearch: () => "/"
+      readPathnameAndSearch: () => "/",
     });
 
     await reporter.report({
@@ -270,22 +270,24 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       actionId: "action-55",
       threadId: "thread-1",
       error: new StructuredRequestFailureError({
-        message: "Request failed for /api/threads/thread-1/collaboration-mode status=500 requestId req-22",
+        message:
+          "Request failed for /api/threads/thread-1/collaboration-mode status=500 requestId req-22",
         path: "/api/threads/thread-1/collaboration-mode",
         status: 500,
         statusText: "Internal Server Error",
         requestId: "req-22",
-        responseText: "{\"ok\":false,\"error\":\"boom\"}",
+        responseText: '{"ok":false,"error":"boom"}',
         responseTextLength: 27,
-        responseTextTruncated: false
-      })
+        responseTextTruncated: false,
+      }),
     });
 
     expect(reportClientErrorFn).toHaveBeenCalledTimes(1);
     expect(reportClientErrorFn).toHaveBeenCalledWith({
       source: "farfield-web",
       operation: "set-collaboration-mode",
-      message: "Request failed for /api/threads/thread-1/collaboration-mode status=500 requestId req-22",
+      message:
+        "Request failed for /api/threads/thread-1/collaboration-mode status=500 requestId req-22",
       severity: "error",
       name: null,
       stack: null,
@@ -298,10 +300,10 @@ describe("TrackedUserInterfaceErrorReporter", () => {
         path: "/api/threads/thread-1/collaboration-mode",
         requestStatus: 500,
         requestStatusText: "Internal Server Error",
-        responseText: "{\"ok\":false,\"error\":\"boom\"}",
+        responseText: '{"ok":false,"error":"boom"}',
         responseTextLength: 27,
-        responseTextTruncated: false
-      }
+        responseTextTruncated: false,
+      },
     });
   });
 
@@ -311,12 +313,12 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       ok: true as const,
       errorId: "error-556",
       sessionId: "session-1",
-      recordedAt: "2026-01-01T00:00:00.000Z"
+      recordedAt: "2026-01-01T00:00:00.000Z",
     }));
     const reporter = new TrackedUserInterfaceErrorReporter({
       setErrorMessage,
       reportClientErrorFn,
-      readPathnameAndSearch: () => "/"
+      readPathnameAndSearch: () => "/",
     });
 
     await reporter.report({
@@ -327,8 +329,8 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       details: {
         actionId: 999,
         actionName: false,
-        category: "custom"
-      }
+        category: "custom",
+      },
     });
 
     expect(reportClientErrorFn).toHaveBeenCalledTimes(1);
@@ -345,8 +347,8 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       details: {
         actionId: "action-56",
         actionName: "set-collaboration-mode",
-        category: "custom"
-      }
+        category: "custom",
+      },
     });
   });
 
@@ -356,19 +358,19 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       ok: true as const,
       errorId: "error-888",
       sessionId: "session-1",
-      recordedAt: "2026-01-01T00:00:00.000Z"
+      recordedAt: "2026-01-01T00:00:00.000Z",
     }));
     const reporter = new TrackedUserInterfaceErrorReporter({
       setErrorMessage,
       reportClientErrorFn,
-      readPathnameAndSearch: () => "/"
+      readPathnameAndSearch: () => "/",
     });
 
     await reporter.report({
       operation: "set-collaboration-mode",
       actionId: "action-88",
       threadId: "thread-1",
-      error: "Request failed for /api/threads/thread-1/collaboration-mode status=500"
+      error: "Request failed for /api/threads/thread-1/collaboration-mode status=500",
     });
 
     expect(reportClientErrorFn).toHaveBeenCalledTimes(1);
@@ -384,8 +386,8 @@ describe("TrackedUserInterfaceErrorReporter", () => {
       url: "/",
       details: {
         actionId: "action-88",
-        actionName: "set-collaboration-mode"
-      }
+        actionName: "set-collaboration-mode",
+      },
     });
   });
 });

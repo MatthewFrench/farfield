@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClientErrorStore } from "../Source/Modules/Debugging/ClientErrorStore.js";
 import {
   ServerErrorEventRecorder,
-  type ServerErrorEventRecordInput
+  type ServerErrorEventRecordInput,
 } from "../Source/Network/ServerErrorEventRecorder.js";
 import { logger } from "../Source/Shared/Logging/Logger.js";
 
@@ -25,7 +25,7 @@ function createStore(): ClientErrorStore {
   return new ClientErrorStore(
     path.join(temporaryDirectoryPath, "client-errors.ndjson"),
     TEST_SESSION_IDENTIFIER,
-    TEST_MAXIMUM_ENTRY_COUNT
+    TEST_MAXIMUM_ENTRY_COUNT,
   );
 }
 
@@ -43,8 +43,8 @@ function createValidRecordInput(): ServerErrorEventRecordInput {
     details: {
       method: "POST",
       actionId: "action_1",
-      actionName: "send-message"
-    }
+      actionName: "send-message",
+    },
   };
 }
 
@@ -63,7 +63,7 @@ describe("ServerErrorEventRecorder", () => {
     const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => undefined);
     const warningSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     const recorder = new ServerErrorEventRecorder(store, {
-      readNowIsoString: () => "2026-02-25T00:00:00.000Z"
+      readNowIsoString: () => "2026-02-25T00:00:00.000Z",
     });
 
     recorder.record(createValidRecordInput());
@@ -94,7 +94,7 @@ describe("ServerErrorEventRecorder", () => {
       operation: "http:request",
       requestId: "request_1",
       threadId: "thread_1",
-      message: "Request failed"
+      message: "Request failed",
     });
     expect(errorSpy.mock.calls[0]?.[1]).toBe(CLIENT_ERROR_RECORDED_LOG_EVENT);
   });
@@ -104,14 +104,14 @@ describe("ServerErrorEventRecorder", () => {
     const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => undefined);
     const warningSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     const recorder = new ServerErrorEventRecorder(store, {
-      readNowIsoString: () => "2026-02-25T01:00:00.000Z"
+      readNowIsoString: () => "2026-02-25T01:00:00.000Z",
     });
 
     recorder.record({
       ...createValidRecordInput(),
       operation: "http:request:validation",
       message: "Validation failed",
-      severity: "warning"
+      severity: "warning",
     });
 
     const entries = store.list(10);
@@ -127,7 +127,7 @@ describe("ServerErrorEventRecorder", () => {
       operation: "http:request:validation",
       requestId: "request_1",
       threadId: "thread_1",
-      message: "Validation failed"
+      message: "Validation failed",
     });
     expect(warningSpy.mock.calls[0]?.[1]).toBe(CLIENT_ERROR_RECORDED_LOG_EVENT);
   });
@@ -146,7 +146,7 @@ describe("ServerErrorEventRecorder", () => {
         }
         occurredAtReadCount += 1;
         return occurredAt;
-      }
+      },
     });
 
     recorder.record(createValidRecordInput());
@@ -154,7 +154,7 @@ describe("ServerErrorEventRecorder", () => {
       ...createValidRecordInput(),
       operation: "http:request:retry",
       message: "Retry failed",
-      requestId: "request_2"
+      requestId: "request_2",
     });
 
     expect(store.list(10).map((entry) => entry.occurredAt)).toEqual(occurredAtValues);
@@ -168,7 +168,7 @@ describe("ServerErrorEventRecorder", () => {
     expect(() => {
       recorder.record({
         ...createValidRecordInput(),
-        source: ""
+        source: "",
       });
     }).toThrowError(/source/);
     expect(store.list(10)).toHaveLength(0);
@@ -179,7 +179,7 @@ describe("ServerErrorEventRecorder", () => {
     const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => undefined);
     const warningSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     const recorder = new ServerErrorEventRecorder(store, {
-      readNowIsoString: () => "invalid-timestamp"
+      readNowIsoString: () => "invalid-timestamp",
     });
 
     expect(() => {

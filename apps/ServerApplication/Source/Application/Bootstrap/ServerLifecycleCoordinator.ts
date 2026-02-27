@@ -1,17 +1,17 @@
 import type { Server } from "node:http";
 import { AppServerTransportError } from "@farfield/api";
-import { logger } from "../../Shared/Logging/Logger.js";
+import type { OpenCodeAgentAdapter } from "../../Agents/Adapters/OpenCodeAgentAdapter.js";
 import type { AgentRegistry } from "../../Agents/Registry.js";
 import type { AgentId } from "../../Agents/Types.js";
 import type { ActivityHistoryService } from "../../Modules/Activity/ActivityHistoryService.js";
 import type { ClientErrorStore } from "../../Modules/Debugging/ClientErrorStore.js";
 import type { NtfyNotifier } from "../../Modules/PushNotifications/NtfyNotifier.js";
-import type { OpenCodeAgentAdapter } from "../../Agents/Adapters/OpenCodeAgentAdapter.js";
-import type { PushDispatchConcurrencyCoordinator } from "../../Network/PushDispatchConcurrencyCoordinator.js";
-import type { EventStreamClientRegistry } from "../../Network/EventStreamClientRegistry.js";
 import type { PushReceiptStore } from "../../Modules/PushNotifications/PushReceiptStore.js";
 import type { PushService } from "../../Modules/PushNotifications/PushService.js";
 import type { PushStore } from "../../Modules/PushNotifications/PushStore.js";
+import type { EventStreamClientRegistry } from "../../Network/EventStreamClientRegistry.js";
+import type { PushDispatchConcurrencyCoordinator } from "../../Network/PushDispatchConcurrencyCoordinator.js";
+import { logger } from "../../Shared/Logging/Logger.js";
 
 const AppServerTransportClosedErrorMessage = "app-server transport closed";
 const AppServerExitedErrorMessagePrefix = "app-server exited (";
@@ -31,7 +31,7 @@ const ServerLifecycleMessages = Object.freeze({
   ntfyNotifierReady: "ntfy notifier ready",
   openCodeBackendConnected: "OpenCode backend connected",
   pushSubsystemReady: "Push subsystem ready",
-  startingMonitorServer: "Starting Farfield monitor server"
+  startingMonitorServer: "Starting Farfield monitor server",
 });
 
 export interface ServerLifecycleCoordinatorDependencies {
@@ -89,8 +89,8 @@ export class ServerLifecycleCoordinator {
     }
 
     return (
-      error.message === AppServerTransportClosedErrorMessage
-      || error.message.startsWith(AppServerExitedErrorMessagePrefix)
+      error.message === AppServerTransportClosedErrorMessage ||
+      error.message.startsWith(AppServerExitedErrorMessagePrefix)
     );
   }
 
@@ -100,7 +100,7 @@ export class ServerLifecycleCoordinator {
     this.deps.pushSystem(ServerLifecycleMessages.startingMonitorServer, {
       appExecutable: this.deps.appExecutablePath,
       socketPath: this.deps.socketPath,
-      agentIds: this.readConfiguredAgentIdentifierSummary()
+      agentIds: this.readConfiguredAgentIdentifierSummary(),
     });
 
     await this.startMonitorServer();
@@ -109,7 +109,7 @@ export class ServerLifecycleCoordinator {
       url: this.readServerUrl(),
       appExecutable: this.deps.appExecutablePath,
       socketPath: this.deps.socketPath,
-      agentIds: this.readConfiguredAgentIdentifierSummary()
+      agentIds: this.readConfiguredAgentIdentifierSummary(),
     });
 
     this.deps.pushSystem(ServerLifecycleMessages.pushSubsystemReady, {
@@ -125,30 +125,33 @@ export class ServerLifecycleCoordinator {
       receiptsMaxAgeDays: this.deps.pushReceiptsMaxAgeDays,
       subscriptionCount: this.deps.pushStore.getSubscriptionCount(),
       watermarkCount: this.deps.pushStore.listCompletionWatermarks().length,
-      receiptCount: this.deps.pushReceiptStore.getCount()
+      receiptCount: this.deps.pushReceiptStore.getCount(),
     });
 
     this.deps.pushSystem(ServerLifecycleMessages.clientErrorStoreReady, {
       sessionId: this.deps.clientErrorStore.getSessionId(),
       sessionLogPath: this.deps.clientErrorStore.getSessionLogPath(),
-      maxEntries: this.deps.clientErrorMaxEntries
+      maxEntries: this.deps.clientErrorMaxEntries,
     });
 
-    this.deps.pushSystem(ServerLifecycleMessages.ntfyNotifierReady, this.deps.ntfyNotifier.getSummary());
+    this.deps.pushSystem(
+      ServerLifecycleMessages.ntfyNotifierReady,
+      this.deps.ntfyNotifier.getSummary(),
+    );
 
     for (const adapter of this.deps.registry.listAdapters()) {
       try {
         await adapter.start();
         this.deps.pushSystem(ServerLifecycleMessages.agentConnected, {
           agentId: adapter.id,
-          connected: adapter.isConnected()
+          connected: adapter.isConnected(),
         });
 
         if (adapter.id === OpenCodeAgentIdentifier) {
           const openCodeAdapter = this.deps.readOpenCodeAdapter();
           if (openCodeAdapter) {
             this.deps.pushSystem(ServerLifecycleMessages.openCodeBackendConnected, {
-              url: openCodeAdapter.getUrl()
+              url: openCodeAdapter.getUrl(),
             });
           }
         }
@@ -156,14 +159,14 @@ export class ServerLifecycleCoordinator {
         const errorMessage = this.errorMessageFromValue(error);
         this.deps.pushSystem(ServerLifecycleMessages.agentFailedToConnect, {
           agentId: adapter.id,
-          error: errorMessage
+          error: errorMessage,
         });
         logger.error(
           {
             agentId: adapter.id,
-            error: errorMessage
+            error: errorMessage,
           },
-          AgentStartFailedLogMessage
+          AgentStartFailedLogMessage,
         );
       }
     }

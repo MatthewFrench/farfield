@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  parsePushReceiptStore,
   type PushReceipt,
-  type PushReceiptStore as PushReceiptStoreState
+  type PushReceiptStore as PushReceiptStoreState,
+  parsePushReceiptStore,
 } from "@farfield/protocol";
 
 const PUSH_RECEIPT_STORE_VERSION = 2;
@@ -16,7 +16,7 @@ const WINDOWS_PLATFORM = "win32";
 function buildDefaultState(): PushReceiptStoreState {
   return parsePushReceiptStore({
     version: PUSH_RECEIPT_STORE_VERSION,
-    receipts: []
+    receipts: [],
   });
 }
 

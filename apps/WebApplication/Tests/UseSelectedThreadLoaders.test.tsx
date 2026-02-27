@@ -1,29 +1,29 @@
-import { cleanup, render, waitFor } from "@testing-library/react";
 import type { IpcFrame } from "@farfield/protocol";
+import { cleanup, render, waitFor } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { AgentId } from "@/Shared/Contracts/ApiContracts";
-import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
-import type { ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
-import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
-import { ConversationSyncSignatureBuilder } from "@/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
 import {
   type ChatLiveStateResponse,
   type ChatReadThreadResponse,
   ChatServerClient,
-  type ChatStreamEventsResponse
+  type ChatStreamEventsResponse,
 } from "@/Features/Chat/DataAccess/ChatServerClient";
+import { ConversationSyncSignatureBuilder } from "@/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
+import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import { ReadThreadStateMerger } from "@/Features/Chat/StateManagement/ReadThreadStateMerger";
 import {
   SelectedThreadDataRefreshCoordinator,
   type SelectedThreadDataRefreshInput,
-  type SelectedThreadDataRefreshResult
+  type SelectedThreadDataRefreshResult,
 } from "@/Features/Chat/StateManagement/SelectedThreadDataRefreshCoordinator";
 import { SelectedThreadRefreshConcurrencyCoordinator } from "@/Features/Chat/StateManagement/SelectedThreadRefreshConcurrencyCoordinator";
 import {
   type SelectedThreadLoaders,
-  useSelectedThreadLoaders
+  useSelectedThreadLoaders,
 } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
+import type { ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
+import type { AgentId } from "@/Shared/Contracts/ApiContracts";
 
 interface SelectedThreadLoadersHarnessSnapshot {
   loaders: SelectedThreadLoaders;
@@ -58,7 +58,7 @@ class TestSelectedThreadDataRefreshCoordinator extends SelectedThreadDataRefresh
   }
 
   public override async readSnapshot(
-    input: SelectedThreadDataRefreshInput
+    input: SelectedThreadDataRefreshInput,
   ): Promise<SelectedThreadDataRefreshResult> {
     this.readSnapshotCalls.push(input);
     const nextResult = this.queuedResults.shift();
@@ -70,7 +70,7 @@ class TestSelectedThreadDataRefreshCoordinator extends SelectedThreadDataRefresh
 }
 
 function SelectedThreadLoadersHarness(
-  properties: SelectedThreadLoadersHarnessProperties
+  properties: SelectedThreadLoadersHarnessProperties,
 ): React.JSX.Element {
   const [liveState, setLiveState] = useState<ChatLiveStateResponse | null>(null);
   const [readThreadState, setReadThreadState] = useState<ChatReadThreadResponse | null>(null);
@@ -86,12 +86,13 @@ function SelectedThreadLoadersHarness(
     pendingThreadMaterializationCoordinator: properties.pendingThreadMaterializationCoordinator,
     conversationSyncSignatureBuilder: properties.conversationSyncSignatureBuilder,
     selectedThreadDataRefreshCoordinator: properties.selectedThreadDataRefreshCoordinator,
-    selectedThreadRefreshConcurrencyCoordinator: properties.selectedThreadRefreshConcurrencyCoordinator,
+    selectedThreadRefreshConcurrencyCoordinator:
+      properties.selectedThreadRefreshConcurrencyCoordinator,
     readThreadStateMerger: properties.readThreadStateMerger,
     chatServerClient: properties.chatServerClient,
     setLiveState,
     setReadThreadState,
-    setStreamEvents
+    setStreamEvents,
   });
 
   useEffect(() => {
@@ -99,7 +100,7 @@ function SelectedThreadLoadersHarness(
       loaders,
       liveState,
       readThreadState,
-      streamEvents
+      streamEvents,
     });
   }, [liveState, loaders, properties, readThreadState, streamEvents]);
 
@@ -112,7 +113,7 @@ function buildThreadListItem(threadId: string): ThreadListItem {
     preview: "",
     createdAt: 1_700_000_000,
     updatedAt: 1_700_000_000,
-    agentId: "codex"
+    agentId: "codex",
   };
 }
 
@@ -120,20 +121,20 @@ function buildBroadcastEvent(method: string): IpcFrame {
   return {
     type: "broadcast",
     method,
-    params: {}
+    params: {},
   };
 }
 
 function buildConversationState(
   threadId: string,
-  turnIds: string[]
+  turnIds: string[],
 ): NonNullable<ChatLiveStateResponse["conversationState"]> {
   return {
     id: threadId,
     turns: turnIds.map((turnId) => ({
       id: turnId,
       status: "completed",
-      items: []
+      items: [],
     })),
     requests: [],
     updatedAt: 1_700_000_000,
@@ -144,9 +145,9 @@ function buildConversationState(
       settings: {
         model: "gpt-5.3-codex",
         reasoning_effort: "medium",
-        developer_instructions: null
-      }
-    }
+        developer_instructions: null,
+      },
+    },
   };
 }
 
@@ -156,7 +157,7 @@ function buildLiveStateSnapshot(threadId: string, turnIds: string[]): ChatLiveSt
     threadId,
     ownerClientId: null,
     conversationState: buildConversationState(threadId, turnIds),
-    liveStateError: null
+    liveStateError: null,
   };
 }
 
@@ -164,7 +165,7 @@ function buildReadThreadSnapshot(threadId: string, turnIds: string[]): ChatReadT
   return {
     ok: true,
     thread: buildConversationState(threadId, turnIds),
-    agentId: "codex"
+    agentId: "codex",
   };
 }
 
@@ -181,7 +182,7 @@ function buildStreamEventsSnapshot(input: {
     events: input.events,
     nextSequence: input.nextSequence,
     firstAvailableSequence: 0,
-    resetRequired: input.resetRequired
+    resetRequired: input.resetRequired,
   };
 }
 
@@ -210,12 +211,12 @@ describe("useSelectedThreadLoaders", () => {
           threadId: "thread-1",
           events: [buildBroadcastEvent("event-1")],
           nextSequence: 11,
-          resetRequired: false
+          resetRequired: false,
         }),
         streamEventsSinceSequenceUsed: null,
         readThreadSnapshot: buildReadThreadSnapshot("thread-1", ["read-turn-1"]),
         includeTurnsUsedForRead: true,
-        containsAnyTurns: true
+        containsAnyTurns: true,
       },
       {
         liveStateSnapshot: buildLiveStateSnapshot("thread-1", ["live-turn-1"]),
@@ -223,20 +224,23 @@ describe("useSelectedThreadLoaders", () => {
           threadId: "thread-1",
           events: [buildBroadcastEvent("event-2")],
           nextSequence: 12,
-          resetRequired: false
+          resetRequired: false,
         }),
         streamEventsSinceSequenceUsed: 11,
         readThreadSnapshot: null,
         includeTurnsUsedForRead: false,
-        containsAnyTurns: true
-      }
+        containsAnyTurns: true,
+      },
     ]);
     const selectedThreadIdRef = { current: "thread-1" };
     const modeSelectionStateResolver = new ModeSelectionStateResolver();
-    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(modeSelectionStateResolver);
-    const selectedThreadRefreshConcurrencyCoordinator = new SelectedThreadRefreshConcurrencyCoordinator();
+    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
+      modeSelectionStateResolver,
+    );
+    const selectedThreadRefreshConcurrencyCoordinator =
+      new SelectedThreadRefreshConcurrencyCoordinator();
     const snapshotReference: { current: SelectedThreadLoadersHarnessSnapshot | null } = {
-      current: null
+      current: null,
     };
 
     render(
@@ -255,7 +259,7 @@ describe("useSelectedThreadLoaders", () => {
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -265,7 +269,7 @@ describe("useSelectedThreadLoaders", () => {
 
     await loadersSnapshot.loaders.loadSelectedThread("thread-1", {
       includeTurns: true,
-      includeReadThread: true
+      includeReadThread: true,
     });
 
     await waitFor(() => {
@@ -276,15 +280,19 @@ describe("useSelectedThreadLoaders", () => {
 
     await loadersSnapshot.loaders.loadSelectedThread("thread-1", {
       includeTurns: false,
-      includeReadThread: false
+      includeReadThread: false,
     });
 
     await waitFor(() => {
       expect(snapshotReference.current?.streamEvents.length).toBe(2);
       expect(snapshotReference.current?.streamEvents[1]).toEqual(buildBroadcastEvent("event-2"));
     });
-    expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls[1]?.streamEventsSinceSequence).toBe(11);
-    expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls[1]?.includeReadThread).toBe(false);
+    expect(
+      selectedThreadDataRefreshCoordinator.readSnapshotCalls[1]?.streamEventsSinceSequence,
+    ).toBe(11);
+    expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls[1]?.includeReadThread).toBe(
+      false,
+    );
   });
 
   it("defaults includeReadThread to true when no options are provided", async () => {
@@ -295,20 +303,23 @@ describe("useSelectedThreadLoaders", () => {
           threadId: "thread-1",
           events: [],
           nextSequence: 1,
-          resetRequired: false
+          resetRequired: false,
         }),
         streamEventsSinceSequenceUsed: null,
         readThreadSnapshot: buildReadThreadSnapshot("thread-1", ["read-turn-1"]),
         includeTurnsUsedForRead: true,
-        containsAnyTurns: true
-      }
+        containsAnyTurns: true,
+      },
     ]);
     const selectedThreadIdRef = { current: "thread-1" };
     const modeSelectionStateResolver = new ModeSelectionStateResolver();
-    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(modeSelectionStateResolver);
-    const selectedThreadRefreshConcurrencyCoordinator = new SelectedThreadRefreshConcurrencyCoordinator();
+    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
+      modeSelectionStateResolver,
+    );
+    const selectedThreadRefreshConcurrencyCoordinator =
+      new SelectedThreadRefreshConcurrencyCoordinator();
     const snapshotReference: { current: SelectedThreadLoadersHarnessSnapshot | null } = {
-      current: null
+      current: null,
     };
 
     render(
@@ -327,7 +338,7 @@ describe("useSelectedThreadLoaders", () => {
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -347,10 +358,13 @@ describe("useSelectedThreadLoaders", () => {
     const selectedThreadDataRefreshCoordinator = new TestSelectedThreadDataRefreshCoordinator([]);
     const selectedThreadIdRef = { current: "thread-1" };
     const modeSelectionStateResolver = new ModeSelectionStateResolver();
-    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(modeSelectionStateResolver);
-    const selectedThreadRefreshConcurrencyCoordinator = new SelectedThreadRefreshConcurrencyCoordinator();
+    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
+      modeSelectionStateResolver,
+    );
+    const selectedThreadRefreshConcurrencyCoordinator =
+      new SelectedThreadRefreshConcurrencyCoordinator();
     const snapshotReference: { current: SelectedThreadLoadersHarnessSnapshot | null } = {
-      current: null
+      current: null,
     };
 
     render(
@@ -369,7 +383,7 @@ describe("useSelectedThreadLoaders", () => {
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -384,13 +398,15 @@ describe("useSelectedThreadLoaders", () => {
         threadId: "thread-1",
         events: [buildBroadcastEvent("selected-event")],
         nextSequence: 1,
-        resetRequired: false
+        resetRequired: false,
       }),
-      streamEventsSinceSequenceUsed: null
+      streamEventsSinceSequenceUsed: null,
     });
 
     await waitFor(() => {
-      expect(snapshotReference.current?.streamEvents).toEqual([buildBroadcastEvent("selected-event")]);
+      expect(snapshotReference.current?.streamEvents).toEqual([
+        buildBroadcastEvent("selected-event"),
+      ]);
     });
 
     loadersSnapshot.loaders.applySelectedThreadStreamDelta({
@@ -400,13 +416,15 @@ describe("useSelectedThreadLoaders", () => {
         threadId: "thread-2",
         events: [buildBroadcastEvent("unselected-event")],
         nextSequence: 1,
-        resetRequired: false
+        resetRequired: false,
       }),
-      streamEventsSinceSequenceUsed: null
+      streamEventsSinceSequenceUsed: null,
     });
 
     await waitFor(() => {
-      expect(snapshotReference.current?.streamEvents).toEqual([buildBroadcastEvent("selected-event")]);
+      expect(snapshotReference.current?.streamEvents).toEqual([
+        buildBroadcastEvent("selected-event"),
+      ]);
     });
 
     loadersSnapshot.loaders.applySelectedThreadStreamDelta({
@@ -416,9 +434,9 @@ describe("useSelectedThreadLoaders", () => {
         threadId: "thread-1",
         events: [buildBroadcastEvent("reset-event")],
         nextSequence: 2,
-        resetRequired: true
+        resetRequired: true,
       }),
-      streamEventsSinceSequenceUsed: null
+      streamEventsSinceSequenceUsed: null,
     });
 
     await waitFor(() => {
@@ -430,10 +448,13 @@ describe("useSelectedThreadLoaders", () => {
     const selectedThreadDataRefreshCoordinator = new TestSelectedThreadDataRefreshCoordinator([]);
     const selectedThreadIdRef = { current: "thread-1" };
     const modeSelectionStateResolver = new ModeSelectionStateResolver();
-    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(modeSelectionStateResolver);
-    const selectedThreadRefreshConcurrencyCoordinator = new SelectedThreadRefreshConcurrencyCoordinator();
+    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
+      modeSelectionStateResolver,
+    );
+    const selectedThreadRefreshConcurrencyCoordinator =
+      new SelectedThreadRefreshConcurrencyCoordinator();
     const snapshotReference: { current: SelectedThreadLoadersHarnessSnapshot | null } = {
-      current: null
+      current: null,
     };
 
     render(
@@ -452,7 +473,7 @@ describe("useSelectedThreadLoaders", () => {
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -460,9 +481,9 @@ describe("useSelectedThreadLoaders", () => {
     });
     const loadersSnapshot = readLoadersSnapshot(snapshotReference);
 
-    const initialEvents = Array.from({ length: 400 }, (_value, index) => (
-      buildBroadcastEvent(`event-${String(index)}`)
-    ));
+    const initialEvents = Array.from({ length: 400 }, (_value, index) =>
+      buildBroadcastEvent(`event-${String(index)}`),
+    );
     const appendedEvent = buildBroadcastEvent("event-400");
 
     loadersSnapshot.loaders.applySelectedThreadStreamDelta({
@@ -472,9 +493,9 @@ describe("useSelectedThreadLoaders", () => {
         threadId: "thread-1",
         events: initialEvents,
         nextSequence: 400,
-        resetRequired: false
+        resetRequired: false,
       }),
-      streamEventsSinceSequenceUsed: null
+      streamEventsSinceSequenceUsed: null,
     });
 
     await waitFor(() => {
@@ -488,9 +509,9 @@ describe("useSelectedThreadLoaders", () => {
         threadId: "thread-1",
         events: [appendedEvent],
         nextSequence: 401,
-        resetRequired: false
+        resetRequired: false,
       }),
-      streamEventsSinceSequenceUsed: 400
+      streamEventsSinceSequenceUsed: 400,
     });
 
     await waitFor(() => {

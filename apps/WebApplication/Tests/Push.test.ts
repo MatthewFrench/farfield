@@ -1,20 +1,23 @@
-import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 vi.mock("../Source/Features/PushNotifications/DataAccess/PushApi", () => ({
   deletePushSubscription: vi.fn(),
   getPushStatus: vi.fn(),
   getPushVapidPublicKey: vi.fn(),
-  savePushSubscription: vi.fn()
+  savePushSubscription: vi.fn(),
 }));
 
 import {
   deletePushSubscription,
   getPushStatus,
   getPushVapidPublicKey,
-  savePushSubscription
+  savePushSubscription,
 } from "../Source/Features/PushNotifications/DataAccess/PushApi";
+import {
+  disablePushNotifications,
+  recoverPushNotifications,
+} from "../Source/Features/PushNotifications/DataAccess/PushClientApi";
 import { PushPreferenceStore } from "../Source/Features/PushNotifications/DataAccess/PushPreferenceStore";
-import { disablePushNotifications, recoverPushNotifications } from "../Source/Features/PushNotifications/DataAccess/PushClientApi";
 
 const SERVICE_WORKER_SKIP_WAITING_MESSAGE_TYPE = "SKIP_WAITING";
 const SERVICE_WORKER_CONTROLLER_CHANGE_EVENT_NAME = "controllerchange";
@@ -57,12 +60,12 @@ function installLocalStorageMock(): void {
     },
     setItem(key: string, value: string): void {
       storageEntries.set(key, value);
-    }
+    },
   };
 
   Object.defineProperty(window, "localStorage", {
     configurable: true,
-    value: localStorageMock
+    value: localStorageMock,
   });
 }
 
@@ -70,7 +73,7 @@ function createMockCookieStoreManager(): CookieStoreManager {
   return {
     getSubscriptions: async () => [],
     subscribe: async () => undefined,
-    unsubscribe: async () => undefined
+    unsubscribe: async () => undefined,
   };
 }
 
@@ -80,22 +83,22 @@ function createMockNavigationPreloadManager(): NavigationPreloadManager {
     enable: async () => undefined,
     getState: async () => ({
       enabled: false,
-      headerValue: "true"
+      headerValue: "true",
     }),
-    setHeaderValue: async () => undefined
+    setHeaderValue: async () => undefined,
   };
 }
 
 function createMockPushSubscription(
   endpoint: string,
-  unsubscribeMock: Mock<() => Promise<boolean>>
+  unsubscribeMock: Mock<() => Promise<boolean>>,
 ): PushSubscription {
   return {
     endpoint,
     expirationTime: null,
     options: {
       applicationServerKey: null,
-      userVisibleOnly: true
+      userVisibleOnly: true,
     },
     getKey: () => null,
     toJSON: () => ({
@@ -103,10 +106,10 @@ function createMockPushSubscription(
       expirationTime: null,
       keys: {
         p256dh: "BElidedKeyMaterial_123",
-        auth: "CAuthValue_456"
-      }
+        auth: "CAuthValue_456",
+      },
     }),
-    unsubscribe: unsubscribeMock
+    unsubscribe: unsubscribeMock,
   } as PushSubscription;
 }
 
@@ -115,11 +118,11 @@ function installPushRecoveryHarness(options: InstallPushRecoveryHarnessInput): P
   const existingSubscriptionUnsubscribeMock = vi.fn(async () => true);
   const existingSubscription = createMockPushSubscription(
     "https://push.example.test/subscriptions/existing",
-    existingSubscriptionUnsubscribeMock
+    existingSubscriptionUnsubscribeMock,
   );
   const newSubscription = createMockPushSubscription(
     "https://push.example.test/subscriptions/new",
-    vi.fn(async () => true)
+    vi.fn(async () => true),
   );
 
   const getSubscriptionMock = vi
@@ -142,17 +145,17 @@ function installPushRecoveryHarness(options: InstallPushRecoveryHarnessInput): P
             emitControllerChangeOnSkipWaiting
           ) {
             serviceWorkerContainerEvents.dispatchEvent(
-              new Event(SERVICE_WORKER_CONTROLLER_CHANGE_EVENT_NAME)
+              new Event(SERVICE_WORKER_CONTROLLER_CHANGE_EVENT_NAME),
             );
           }
-        }
+        },
       } as ServiceWorker)
     : null;
 
   const pushManager: PushManager = {
     getSubscription: getSubscriptionMock,
     subscribe: subscribeMock,
-    permissionState: async () => "granted"
+    permissionState: async () => "granted",
   };
 
   const registration: ServiceWorkerRegistration = {
@@ -171,7 +174,7 @@ function installPushRecoveryHarness(options: InstallPushRecoveryHarnessInput): P
     update: async () => registration,
     addEventListener: registrationEvents.addEventListener.bind(registrationEvents),
     removeEventListener: registrationEvents.removeEventListener.bind(registrationEvents),
-    dispatchEvent: registrationEvents.dispatchEvent.bind(registrationEvents)
+    dispatchEvent: registrationEvents.dispatchEvent.bind(registrationEvents),
   };
 
   const registerMock = vi.fn(async () => registration);
@@ -186,25 +189,29 @@ function installPushRecoveryHarness(options: InstallPushRecoveryHarnessInput): P
     getRegistration: async () => registration,
     getRegistrations: getRegistrationsMock,
     startMessages: () => undefined,
-    addEventListener: serviceWorkerContainerEvents.addEventListener.bind(serviceWorkerContainerEvents),
-    removeEventListener: serviceWorkerContainerEvents.removeEventListener.bind(serviceWorkerContainerEvents),
-    dispatchEvent: serviceWorkerContainerEvents.dispatchEvent.bind(serviceWorkerContainerEvents)
+    addEventListener: serviceWorkerContainerEvents.addEventListener.bind(
+      serviceWorkerContainerEvents,
+    ),
+    removeEventListener: serviceWorkerContainerEvents.removeEventListener.bind(
+      serviceWorkerContainerEvents,
+    ),
+    dispatchEvent: serviceWorkerContainerEvents.dispatchEvent.bind(serviceWorkerContainerEvents),
   };
 
   Object.defineProperty(navigator, "serviceWorker", {
     configurable: true,
-    value: serviceWorkerContainer
+    value: serviceWorkerContainer,
   });
   Object.defineProperty(window, "PushManager", {
     configurable: true,
-    value: class {}
+    value: class {},
   });
   Object.defineProperty(window, "Notification", {
     configurable: true,
     value: {
       permission: "granted",
-      requestPermission: async () => "granted"
-    }
+      requestPermission: async () => "granted",
+    },
   });
   const cacheStorage: CacheStorage = {
     open: async () => {
@@ -213,11 +220,11 @@ function installPushRecoveryHarness(options: InstallPushRecoveryHarnessInput): P
     has: async () => false,
     match: async () => undefined,
     delete: cacheDeleteMock,
-    keys: cacheKeysMock
+    keys: cacheKeysMock,
   };
   Object.defineProperty(window, "caches", {
     configurable: true,
-    value: cacheStorage
+    value: cacheStorage,
   });
 
   return {
@@ -228,7 +235,7 @@ function installPushRecoveryHarness(options: InstallPushRecoveryHarnessInput): P
     unregisterMock,
     existingSubscriptionUnsubscribeMock,
     cacheKeysMock,
-    cacheDeleteMock
+    cacheDeleteMock,
   };
 }
 
@@ -240,17 +247,17 @@ describe("recoverPushNotifications", () => {
       enabled: true,
       permissionRequired: true,
       subscriptionCount: 0,
-      privateModeDefault: true
+      privateModeDefault: true,
     });
     vi.mocked(getPushVapidPublicKey).mockResolvedValue({
       publicKey:
-        "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U"
+        "BPItc9n5cEBFiYtrIgv4iMahikEkQeXwdD4Q9MTDmTrU4Ty-pj1_XqHdL0pF-RQVUKS_k7_C5P_rXX6crzWkL2U",
     });
     vi.mocked(savePushSubscription).mockResolvedValue({
-      subscriptionId: "sub_new"
+      subscriptionId: "sub_new",
     });
     vi.mocked(deletePushSubscription).mockResolvedValue({
-      deleted: true
+      deleted: true,
     });
   });
 
@@ -258,7 +265,7 @@ describe("recoverPushNotifications", () => {
     const harness = installPushRecoveryHarness({ waitingWorker: true });
 
     const result = await recoverPushNotifications({
-      privateMode: false
+      privateMode: false,
     });
 
     expect(result.updatedServiceWorker).toBe(true);
@@ -284,7 +291,9 @@ describe("recoverPushNotifications", () => {
     }
     expect(firstSaveSettings.privateMode).toBe(false);
     expect(harness.registerMock).toHaveBeenCalledTimes(3);
-    expect((window as { __farfieldSuppressSwReload?: boolean }).__farfieldSuppressSwReload).toBeUndefined();
+    expect(
+      (window as { __farfieldSuppressSwReload?: boolean }).__farfieldSuppressSwReload,
+    ).toBeUndefined();
   });
 
   it("completes recovery if controllerchange is never emitted", async () => {
@@ -292,11 +301,11 @@ describe("recoverPushNotifications", () => {
     try {
       const harness = installPushRecoveryHarness({
         waitingWorker: true,
-        emitControllerChangeOnSkipWaiting: false
+        emitControllerChangeOnSkipWaiting: false,
       });
 
       const recoveryPromise = recoverPushNotifications({
-        privateMode: true
+        privateMode: true,
       });
       await vi.advanceTimersByTimeAsync(CONTROLLER_CHANGE_WAIT_TIMEOUT_MILLISECONDS);
       const result = await recoveryPromise;
@@ -313,7 +322,7 @@ describe("recoverPushNotifications", () => {
     const harness = installPushRecoveryHarness({ waitingWorker: false });
 
     const result = await recoverPushNotifications({
-      privateMode: true
+      privateMode: true,
     });
 
     expect(result.updatedServiceWorker).toBe(false);
@@ -337,7 +346,7 @@ describe("disablePushNotifications", () => {
     vi.resetAllMocks();
     installLocalStorageMock();
     vi.mocked(deletePushSubscription).mockResolvedValue({
-      deleted: true
+      deleted: true,
     });
   });
 
@@ -363,7 +372,7 @@ describe("disablePushNotifications", () => {
     vi.mocked(deletePushSubscription).mockRejectedValue(new Error("server request failed"));
 
     await expect(disablePushNotifications()).rejects.toThrowError(
-      "Failed to disable push notifications"
+      "Failed to disable push notifications",
     );
     expect(pushPreferenceStore.readAutoHealPreferenceEnabled()).toBe(false);
     expect(harness.existingSubscriptionUnsubscribeMock).toHaveBeenCalledTimes(1);

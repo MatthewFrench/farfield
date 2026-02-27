@@ -17,7 +17,7 @@ function renderChatComposer(input?: {
       isGenerating={input?.isGenerating ?? false}
       onInterrupt={input?.onInterrupt ?? (() => {})}
       onSend={input?.onSend ?? (() => {})}
-    />
+    />,
   );
 }
 
@@ -69,7 +69,7 @@ describe("ChatComposer", () => {
     renderChatComposer({
       isGenerating: true,
       onInterrupt,
-      onSend
+      onSend,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Stop" }));

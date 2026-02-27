@@ -1,4 +1,7 @@
-import type { AppServerCollaborationModeListResponse, ThreadConversationState } from "@farfield/protocol";
+import type {
+  AppServerCollaborationModeListResponse,
+  ThreadConversationState,
+} from "@farfield/protocol";
 
 export interface ModeSelectionState {
   modeKey: string;
@@ -25,7 +28,7 @@ export class ModeSelectionStateResolver {
   public readModeSelectionFromConversationState(
     state: ModeSelectionConversationState | null,
     appDefaultModel: string,
-    appDefaultEffort: string
+    appDefaultEffort: string,
   ): ModeSelectionState {
     if (!state) {
       return this.readEmptyModeSelectionState();
@@ -36,31 +39,34 @@ export class ModeSelectionStateResolver {
         modeKey: state.latestCollaborationMode.mode,
         modelId: this.normalizeModeSettingValue(
           state.latestCollaborationMode.settings.model,
-          appDefaultModel
+          appDefaultModel,
         ),
         reasoningEffort: this.normalizeModeSettingValue(
           state.latestCollaborationMode.settings.reasoning_effort,
-          appDefaultEffort
-        )
+          appDefaultEffort,
+        ),
       };
     }
 
     return {
       modeKey: "",
       modelId: this.normalizeModeSettingValue(state.latestModel, appDefaultModel),
-      reasoningEffort: this.normalizeModeSettingValue(state.latestReasoningEffort, appDefaultEffort)
+      reasoningEffort: this.normalizeModeSettingValue(
+        state.latestReasoningEffort,
+        appDefaultEffort,
+      ),
     };
   }
 
   public readModeSelectionSignatureFromConversationState(
     state: ModeSelectionConversationState | null | undefined,
     appDefaultModel: string,
-    appDefaultEffort: string
+    appDefaultEffort: string,
   ): string {
     const selection = this.readModeSelectionFromConversationState(
       state ?? null,
       appDefaultModel,
-      appDefaultEffort
+      appDefaultEffort,
     );
     return this.buildModeSignature(selection.modeKey, selection.modelId, selection.reasoningEffort);
   }
@@ -69,7 +75,7 @@ export class ModeSelectionStateResolver {
     return {
       modeKey: "",
       modelId: "",
-      reasoningEffort: ""
+      reasoningEffort: "",
     };
   }
 
@@ -83,7 +89,7 @@ export class ModeSelectionStateResolver {
 
   private normalizeModeSettingValue(
     value: string | null | undefined,
-    assumedDefault: string
+    assumedDefault: string,
   ): string {
     const normalized = this.normalizeNullableModeValue(value);
     if (normalized.length === 0) {

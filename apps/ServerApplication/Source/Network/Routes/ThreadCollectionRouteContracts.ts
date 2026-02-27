@@ -1,9 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { JsonValue } from "@farfield/protocol";
 import type { AgentAdapter, AgentId } from "../../Agents/Types.js";
-import type {
-  ThreadListAggregationCache
-} from "../ThreadListAggregationCache.js";
+import type { ThreadListAggregationCache } from "../ThreadListAggregationCache.js";
 
 export type ThreadCollectionRouteMethod = "GET" | "POST";
 
@@ -14,7 +12,7 @@ export interface ThreadCollectionRouteMethodMap {
 
 export const ThreadCollectionRouteMethodByName: Readonly<ThreadCollectionRouteMethodMap> = {
   get: "GET",
-  post: "POST"
+  post: "POST",
 };
 
 export type ThreadCollectionRoutePathname = "/api/threads";
@@ -24,7 +22,7 @@ export interface ThreadCollectionRoutePathnameMap {
 }
 
 export const ThreadCollectionRoutePathnameByName: Readonly<ThreadCollectionRoutePathnameMap> = {
-  threads: "/api/threads"
+  threads: "/api/threads",
 };
 
 export type ThreadCollectionRouteActionStage = "attempt" | "success" | "error";
@@ -46,20 +44,23 @@ export interface ThreadCollectionRouteDependencies {
   resolveCreateThreadAdapter: (requestedAgentId: AgentId | undefined) => AgentAdapter | null;
   readJsonBody: (req: IncomingMessage) => Promise<JsonValue>;
   jsonResponse: (res: ServerResponse, statusCode: number, body: object) => void;
-  invalidateThreadListAggregationCache: (reason: string, details?: Record<string, JsonValue>) => void;
+  invalidateThreadListAggregationCache: (
+    reason: string,
+    details?: Record<string, JsonValue>,
+  ) => void;
   pushActionEventWithRequestContext: (
     action: string,
     stage: ThreadCollectionRouteActionStage,
-    details: ThreadCollectionRouteActionDetails
+    details: ThreadCollectionRouteActionDetails,
   ) => void;
   pushActionErrorWithRequestContext: <ErrorType>(
     action: string,
     error: ErrorType,
-    details: ThreadCollectionRouteActionDetails
+    details: ThreadCollectionRouteActionDetails,
   ) => string;
   withTimeout: <ValueType>(
     promise: Promise<ValueType>,
     timeoutMs: number,
-    label: string
+    label: string,
   ) => Promise<ValueType>;
 }

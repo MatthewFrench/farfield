@@ -13,7 +13,7 @@ export interface ReadThreadStateMergeInput<TReadThreadState extends ReadThreadSt
 
 export class ReadThreadStateMerger {
   public merge<TReadThreadState extends ReadThreadStateLike>(
-    input: ReadThreadStateMergeInput<TReadThreadState>
+    input: ReadThreadStateMergeInput<TReadThreadState>,
   ): TReadThreadState {
     const previousState = input.previous;
     if (input.includeTurns) {
@@ -33,8 +33,8 @@ export class ReadThreadStateMerger {
       ...input.incoming,
       thread: {
         ...input.incoming.thread,
-        turns: previousState.thread.turns
-      }
+        turns: previousState.thread.turns,
+      },
     };
   }
 }

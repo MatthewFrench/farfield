@@ -7,7 +7,7 @@ function createCoordinator(): MobileSidebarSwipeCoordinator {
     sidebarSwipeEdgePx: 32,
     sidebarSwipeTriggerPx: 56,
     sidebarSwipeMaximumVerticalDriftPx: 36,
-    sidebarSwipeCancelNegativePx: -14
+    sidebarSwipeCancelNegativePx: -14,
   });
 }
 
@@ -21,13 +21,13 @@ describe("MobileSidebarSwipeCoordinator", () => {
       touchCount: 1,
       touchClientX: 10,
       touchClientY: 10,
-      safeAreaInsetLeftPx: 0
+      safeAreaInsetLeftPx: 0,
     });
 
     const output = coordinator.continueTracking({
       touchCount: 1,
       touchClientX: 90,
-      touchClientY: 10
+      touchClientY: 10,
     });
 
     expect(output.shouldOpenSidebar).toBe(false);
@@ -43,13 +43,13 @@ describe("MobileSidebarSwipeCoordinator", () => {
       touchCount: 1,
       touchClientX: 80,
       touchClientY: 10,
-      safeAreaInsetLeftPx: 0
+      safeAreaInsetLeftPx: 0,
     });
 
     const output = coordinator.continueTracking({
       touchCount: 1,
       touchClientX: 160,
-      touchClientY: 10
+      touchClientY: 10,
     });
 
     expect(output.shouldOpenSidebar).toBe(false);
@@ -65,13 +65,13 @@ describe("MobileSidebarSwipeCoordinator", () => {
       touchCount: 1,
       touchClientX: 8,
       touchClientY: 12,
-      safeAreaInsetLeftPx: 0
+      safeAreaInsetLeftPx: 0,
     });
 
     const output = coordinator.continueTracking({
       touchCount: 1,
       touchClientX: 90,
-      touchClientY: 12
+      touchClientY: 12,
     });
 
     expect(output.shouldOpenSidebar).toBe(false);
@@ -87,13 +87,13 @@ describe("MobileSidebarSwipeCoordinator", () => {
       touchCount: 1,
       touchClientX: 42,
       touchClientY: 12,
-      safeAreaInsetLeftPx: 10
+      safeAreaInsetLeftPx: 10,
     });
 
     const output = coordinator.continueTracking({
       touchCount: 1,
       touchClientX: 104,
-      touchClientY: 18
+      touchClientY: 18,
     });
 
     expect(output.shouldOpenSidebar).toBe(true);
@@ -109,13 +109,13 @@ describe("MobileSidebarSwipeCoordinator", () => {
       touchCount: 1,
       touchClientX: 8,
       touchClientY: 12,
-      safeAreaInsetLeftPx: 0
+      safeAreaInsetLeftPx: 0,
     });
 
     const output = coordinator.continueTracking({
       touchCount: 1,
       touchClientX: 70,
-      touchClientY: 18
+      touchClientY: 18,
     });
 
     expect(output.shouldOpenSidebar).toBe(true);
@@ -131,13 +131,13 @@ describe("MobileSidebarSwipeCoordinator", () => {
       touchCount: 1,
       touchClientX: 8,
       touchClientY: 12,
-      safeAreaInsetLeftPx: 0
+      safeAreaInsetLeftPx: 0,
     });
 
     const output = coordinator.continueTracking({
       touchCount: 1,
       touchClientX: 20,
-      touchClientY: 80
+      touchClientY: 80,
     });
 
     expect(output.shouldOpenSidebar).toBe(false);
@@ -153,13 +153,13 @@ describe("MobileSidebarSwipeCoordinator", () => {
       touchCount: 1,
       touchClientX: 30,
       touchClientY: 30,
-      safeAreaInsetLeftPx: 0
+      safeAreaInsetLeftPx: 0,
     });
 
     const output = coordinator.continueTracking({
       touchCount: 1,
       touchClientX: 10,
-      touchClientY: 32
+      touchClientY: 32,
     });
 
     expect(output.shouldOpenSidebar).toBe(false);
@@ -175,13 +175,13 @@ describe("MobileSidebarSwipeCoordinator", () => {
       touchCount: 1,
       touchClientX: 8,
       touchClientY: 12,
-      safeAreaInsetLeftPx: 0
+      safeAreaInsetLeftPx: 0,
     });
 
     const firstOutput = coordinator.continueTracking({
       touchCount: 2,
       touchClientX: 40,
-      touchClientY: 14
+      touchClientY: 14,
     });
     expect(firstOutput.shouldOpenSidebar).toBe(false);
     expect(firstOutput.reason).toBe("touch-count-mismatch");
@@ -189,7 +189,7 @@ describe("MobileSidebarSwipeCoordinator", () => {
     const secondOutput = coordinator.continueTracking({
       touchCount: 1,
       touchClientX: 90,
-      touchClientY: 14
+      touchClientY: 14,
     });
     expect(secondOutput.shouldOpenSidebar).toBe(false);
     expect(secondOutput.reason).toBe("not-tracking");
@@ -204,7 +204,7 @@ describe("MobileSidebarSwipeCoordinator", () => {
       touchCount: 1,
       touchClientX: 8,
       touchClientY: 12,
-      safeAreaInsetLeftPx: 0
+      safeAreaInsetLeftPx: 0,
     });
 
     coordinator.beginTracking({
@@ -213,13 +213,13 @@ describe("MobileSidebarSwipeCoordinator", () => {
       touchCount: 1,
       touchClientX: 20,
       touchClientY: 12,
-      safeAreaInsetLeftPx: 0
+      safeAreaInsetLeftPx: 0,
     });
 
     const output = coordinator.continueTracking({
       touchCount: 1,
       touchClientX: 70,
-      touchClientY: 20
+      touchClientY: 20,
     });
 
     expect(output.shouldOpenSidebar).toBe(false);

@@ -1,25 +1,34 @@
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { DebugServerClient } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { type ErrorBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { buildDebugErrorIssueIdentifier } from "@/Features/Debugging/DomainModel/DebugIssueIdentifier";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
-import { DebugServerClient } from "@/Features/Debugging/DataAccess/DebugServerClient";
+import { DebugWorkspaceActionCoordinator } from "@/Features/Debugging/StateManagement/DebugWorkspaceActionCoordinator";
 import {
   type DebugActionHandlers,
   type UseDebugActionHandlersInput,
-  useDebugActionHandlers
+  useDebugActionHandlers,
 } from "@/Features/Debugging/StateManagement/UseDebugActionHandlers";
-import { DebugWorkspaceActionCoordinator } from "@/Features/Debugging/StateManagement/DebugWorkspaceActionCoordinator";
 
 interface HandlerHarnessProps {
   input: UseDebugActionHandlersInput;
   onHandlersReady: (handlers: DebugActionHandlers) => void;
 }
 
-type ActiveTabSetterValue = "chat" | "debug" | ((previousValue: "chat" | "debug") => "chat" | "debug");
-type DebugWorkspaceSectionSetterValue = DebugWorkspaceSection | ((previousValue: DebugWorkspaceSection) => DebugWorkspaceSection);
-type DebugIssueSeverityFilterSetterValue = "all" | "error" | "warning" | ((previousValue: "all" | "error" | "warning") => "all" | "error" | "warning");
+type ActiveTabSetterValue =
+  | "chat"
+  | "debug"
+  | ((previousValue: "chat" | "debug") => "chat" | "debug");
+type DebugWorkspaceSectionSetterValue =
+  | DebugWorkspaceSection
+  | ((previousValue: DebugWorkspaceSection) => DebugWorkspaceSection);
+type DebugIssueSeverityFilterSetterValue =
+  | "all"
+  | "error"
+  | "warning"
+  | ((previousValue: "all" | "error" | "warning") => "all" | "error" | "warning");
 type StringSetterValue = string | ((previousValue: string) => string);
 
 function HandlerHarness({ input, onHandlersReady }: HandlerHarnessProps): React.JSX.Element {
@@ -51,7 +60,7 @@ function buildTestInput(errorBannerDetails: ErrorBannerDetails) {
     setDebugIssueSeverityFilter,
     setSelectedDebugIssueId,
     setDebugIssueFilterQuery,
-    onHistoryDetailLoaded: () => {}
+    onHistoryDetailLoaded: () => {},
   };
 
   return {
@@ -60,7 +69,7 @@ function buildTestInput(errorBannerDetails: ErrorBannerDetails) {
     setDebugWorkspaceSection,
     setDebugIssueSeverityFilter,
     setSelectedDebugIssueId,
-    setDebugIssueFilterQuery
+    setDebugIssueFilterQuery,
   };
 }
 
@@ -73,13 +82,13 @@ describe("UseDebugActionHandlers", () => {
       setDebugWorkspaceSection,
       setDebugIssueSeverityFilter,
       setSelectedDebugIssueId,
-      setDebugIssueFilterQuery
+      setDebugIssueFilterQuery,
     } = buildTestInput({
       operation: "thread.read",
       message: "failed",
       actionId: "action-1",
       requestId: "request-1",
-      errorId: "error-1"
+      errorId: "error-1",
     });
 
     const handlerState: { current: DebugActionHandlers | null } = { current: null };
@@ -89,7 +98,7 @@ describe("UseDebugActionHandlers", () => {
         onHandlersReady={(nextHandlers) => {
           handlerState.current = nextHandlers;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -105,24 +114,18 @@ describe("UseDebugActionHandlers", () => {
     expect(setActiveTab).toHaveBeenCalledWith("debug");
     expect(setDebugWorkspaceSection).toHaveBeenCalledWith("issues");
     expect(setDebugIssueSeverityFilter).toHaveBeenCalledWith("all");
-    expect(setSelectedDebugIssueId).toHaveBeenCalledWith(
-      buildDebugErrorIssueIdentifier("error-1")
-    );
+    expect(setSelectedDebugIssueId).toHaveBeenCalledWith(buildDebugErrorIssueIdentifier("error-1"));
     expect(setDebugIssueFilterQuery).toHaveBeenCalledWith("error-1");
   });
 
   it("uses request and action context when no debug error identifier is present", async () => {
     cleanup();
-    const {
-      input,
-      setSelectedDebugIssueId,
-      setDebugIssueFilterQuery
-    } = buildTestInput({
+    const { input, setSelectedDebugIssueId, setDebugIssueFilterQuery } = buildTestInput({
       operation: "thread.read",
       message: "failed",
       actionId: "action-11",
       requestId: "request-11",
-      errorId: null
+      errorId: null,
     });
 
     const handlerState: { current: DebugActionHandlers | null } = { current: null };
@@ -132,7 +135,7 @@ describe("UseDebugActionHandlers", () => {
         onHandlersReady={(nextHandlers) => {
           handlerState.current = nextHandlers;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {

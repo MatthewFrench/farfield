@@ -1,14 +1,10 @@
 import { z } from "zod";
 import type {
-  OpenCodePart,
-  OpenCodeTextPart,
-  OpenCodeToolPart
-} from "./Schemas.js";
-import type {
   MappedFileChangeEntry,
   MappedToolLifecycleStatus,
-  MappedTurnItem
+  MappedTurnItem,
 } from "./MapperContracts.js";
+import type { OpenCodePart, OpenCodeTextPart, OpenCodeToolPart } from "./Schemas.js";
 
 type OpenCodeToolState = OpenCodeToolPart["state"];
 
@@ -33,7 +29,7 @@ const OpenCodeToolInputProjectionSchema = z
     command: z.string().optional(),
     cwd: z.string().optional(),
     file_path: z.string().optional(),
-    path: z.string().optional()
+    path: z.string().optional(),
   })
   .passthrough();
 
@@ -41,7 +37,7 @@ type OpenCodeToolInputProjection = z.infer<typeof OpenCodeToolInputProjectionSch
 
 const OpenCodeToolMetadataProjectionSchema = z
   .object({
-    exit_code: z.number().int().optional()
+    exit_code: z.number().int().optional(),
   })
   .passthrough();
 
@@ -59,7 +55,7 @@ export function partToTurnItem(part: OpenCodePart): MappedTurnItem | null {
       return {
         id: textPart.id,
         type: "agentMessage",
-        text: textPart.text
+        text: textPart.text,
       };
     }
 
@@ -68,7 +64,7 @@ export function partToTurnItem(part: OpenCodePart): MappedTurnItem | null {
       return {
         id: reasoningPart.id,
         type: "reasoning",
-        text: reasoningPart.text
+        text: reasoningPart.text,
       };
     }
 
@@ -82,11 +78,13 @@ export function partToTurnItem(part: OpenCodePart): MappedTurnItem | null {
       return {
         id: filePart.id,
         type: "fileChange",
-        changes: [{
-          path: filePart.url,
-          kind: { type: "created" }
-        }],
-        status: "completed"
+        changes: [
+          {
+            path: filePart.url,
+            kind: { type: "created" },
+          },
+        ],
+        status: "completed",
       };
     }
 
@@ -113,7 +111,7 @@ function toolPartToTurnItem(toolPart: OpenCodeToolPart): MappedTurnItem {
       id: toolPart.id,
       type: "fileChange",
       changes: extractFileChanges(toolName, input, state),
-      status
+      status,
     };
   }
 
@@ -125,7 +123,7 @@ function toolPartToTurnItem(toolPart: OpenCodeToolPart): MappedTurnItem {
     ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
     aggregatedOutput: extractToolOutput(state),
     exitCode: extractExitCode(state),
-    durationMs: extractDurationMs(state)
+    durationMs: extractDurationMs(state),
   };
 }
 
@@ -136,16 +134,18 @@ function isFileEditTool(toolName: string): boolean {
 function extractFileChanges(
   toolName: string,
   input: OpenCodeToolInputProjection,
-  state: OpenCodeToolState
+  state: OpenCodeToolState,
 ): MappedFileChangeEntry[] {
   const filePath = input.file_path ?? input.path ?? UNKNOWN_FILE_PATH;
 
   const output = extractToolOutput(state);
-  return [{
-    path: filePath,
-    kind: { type: resolveFileChangeKind(toolName) },
-    ...(output !== null ? { diff: output } : {})
-  }];
+  return [
+    {
+      path: filePath,
+      kind: { type: resolveFileChangeKind(toolName) },
+      ...(output !== null ? { diff: output } : {}),
+    },
+  ];
 }
 
 function resolveToolStatus(state: OpenCodeToolState): MappedToolLifecycleStatus {
@@ -189,16 +189,11 @@ function shouldIgnoreTextPart(textPart: OpenCodeTextPart): boolean {
   return textPart.synthetic === true || textPart.ignored === true;
 }
 
-function resolveCommandText(
-  toolName: string,
-  input: OpenCodeToolInputProjection
-): string {
+function resolveCommandText(toolName: string, input: OpenCodeToolInputProjection): string {
   // Some tool payloads omit a command string; use the tool name for a stable label.
   return input.command ?? toolName;
 }
 
-function resolveFileChangeKind(
-  toolName: string
-): MappedFileChangeEntry["kind"]["type"] {
+function resolveFileChangeKind(toolName: string): MappedFileChangeEntry["kind"]["type"] {
   return toolName === FILE_CREATE_TOOL_NAME ? "created" : "modified";
 }

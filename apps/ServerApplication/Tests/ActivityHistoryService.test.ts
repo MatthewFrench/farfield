@@ -9,7 +9,9 @@ import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRe
 const temporaryDirectoryPaths: string[] = [];
 
 function createTemporaryDirectory(): string {
-  const temporaryDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-history-service-"));
+  const temporaryDirectoryPath = fs.mkdtempSync(
+    path.join(os.tmpdir(), "farfield-history-service-"),
+  );
   temporaryDirectoryPaths.push(temporaryDirectoryPath);
   return temporaryDirectoryPath;
 }
@@ -27,10 +29,10 @@ describe("ActivityHistoryService", () => {
     const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
 
     expect(() => new ActivityHistoryService(0, eventStreamClientRegistry)).toThrow(
-      "ActivityHistoryService requires positive integer historyLimit"
+      "ActivityHistoryService requires positive integer historyLimit",
     );
     expect(() => new ActivityHistoryService(4, eventStreamClientRegistry, 0)).toThrow(
-      "ActivityHistoryService requires positive integer historyPayloadSummaryMaximumBytes"
+      "ActivityHistoryService requires positive integer historyPayloadSummaryMaximumBytes",
     );
   });
 
@@ -108,7 +110,7 @@ describe("ActivityHistoryService", () => {
     const service = new ActivityHistoryService(20, eventStreamClientRegistry);
 
     const errorMessage = service.pushActionFailure("messages", "failed to send", {
-      threadId: "thread_1"
+      threadId: "thread_1",
     });
 
     expect(errorMessage).toBe("failed to send");
@@ -175,19 +177,21 @@ describe("ActivityHistoryService", () => {
     const service = new ActivityHistoryService(4, eventStreamClientRegistry, 64);
     const oversizedPayload = {
       method: "thread-stream-state-changed",
-      value: "x".repeat(2_048)
+      value: "x".repeat(2_048),
     };
 
     const entry = service.pushHistory("ipc", "in", oversizedPayload, {});
     const history = service.readHistoryEntries();
     const payloadFromList = history[0]?.payload;
     const payloadFromLookup = service.readHistoryById().get(entry.id);
-    const payloadSummarySchema = z.object({
-      type: z.literal("history-payload-summary"),
-      truncated: z.literal(true),
-      originalSizeBytes: z.number().int().positive(),
-      preview: z.string()
-    }).strict();
+    const payloadSummarySchema = z
+      .object({
+        type: z.literal("history-payload-summary"),
+        truncated: z.literal(true),
+        originalSizeBytes: z.number().int().positive(),
+        preview: z.string(),
+      })
+      .strict();
     const parsedPayloadSummary = payloadSummarySchema.parse(payloadFromList);
 
     expect(parsedPayloadSummary.originalSizeBytes).toBeGreaterThan(64);

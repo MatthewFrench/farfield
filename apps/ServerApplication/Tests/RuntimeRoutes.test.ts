@@ -1,22 +1,22 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
-import { describe, expect, it, vi } from "vitest";
 import {
   FarfieldEventsSessionResponseSchema,
   FarfieldHealthStateSchema,
-  type JsonValue
+  type JsonValue,
 } from "@farfield/protocol";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { RuntimeStateOwner } from "../Source/Application/StateManagement/RuntimeStateOwner.js";
 import { BrowserSessionAuthOwner } from "../Source/Network/BrowserSessionAuthOwner.js";
 import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
 import {
   RequestMethodByName,
-  RequestPathnameByName
+  RequestPathnameByName,
 } from "../Source/Network/RequestPathContracts.js";
 import {
   handleRuntimeRoutes,
-  type RuntimeRouteDependencies
+  type RuntimeRouteDependencies,
 } from "../Source/Network/Routes/RuntimeRoutes.js";
 
 const TestApiTokenHeaderName = "x-farfield-token";
@@ -26,7 +26,7 @@ const CookieDirectiveSeparator = ";";
 const HealthRouteEnvelopeSchema = z
   .object({
     ok: z.literal(true),
-    state: FarfieldHealthStateSchema
+    state: FarfieldHealthStateSchema,
   })
   .strict();
 
@@ -37,9 +37,9 @@ const InvalidEventsSessionBootstrapEnvelopeSchema = z
     issues: z.array(
       z.object({
         path: z.string(),
-        message: z.string()
-      })
-    )
+        message: z.string(),
+      }),
+    ),
   })
   .strict();
 
@@ -79,7 +79,7 @@ function createRuntimeStateOwner(): RuntimeStateOwner {
     readPushSubscriptionCount: () => 0,
     readPushReceiptCount: () => 0,
     readClientErrorCount: () => 0,
-    readActiveTraceSummary: () => null
+    readActiveTraceSummary: () => null,
   });
 }
 
@@ -97,7 +97,7 @@ function createRuntimeRouteHarness(options: RuntimeRouteHarnessOptions): Runtime
     cookieName: "farfield-session",
     sessionTimeToLiveMs: 60_000,
     signingSecret: "runtime-route-test-signing-secret",
-    secureCookie: false
+    secureCookie: false,
   });
   const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
   const runtimeStateOwner = createRuntimeStateOwner();
@@ -127,9 +127,9 @@ function createRuntimeRouteHarness(options: RuntimeRouteHarnessOptions): Runtime
         res.statusCode = statusCode;
         jsonResponseCalls.push({
           statusCode,
-          body
+          body,
         });
-      }
+      },
     },
     req: httpPair.req,
     res: httpPair.res,
@@ -139,7 +139,7 @@ function createRuntimeRouteHarness(options: RuntimeRouteHarnessOptions): Runtime
     setReadJsonBodyValue: (value) => {
       readJsonBodyValue = value;
     },
-    readJsonBodyCallCount: () => readJsonBodyInvocationCount
+    readJsonBodyCallCount: () => readJsonBodyInvocationCount,
   };
 }
 
@@ -155,7 +155,7 @@ describe("RuntimeRoutes", () => {
   it("returns false for non-runtime routes", async () => {
     const harness = createRuntimeRouteHarness({
       method: RequestMethodByName.get,
-      pathname: "/api/not-runtime"
+      pathname: "/api/not-runtime",
     });
 
     const handled = await handleRuntimeRoutes(harness.dependencies);
@@ -168,7 +168,7 @@ describe("RuntimeRoutes", () => {
   it("registers event-stream clients for /events", async () => {
     const harness = createRuntimeRouteHarness({
       method: RequestMethodByName.get,
-      pathname: RequestPathnameByName.events
+      pathname: RequestPathnameByName.events,
     });
     const writeHeadSpy = vi.spyOn(harness.res, "writeHead").mockImplementation(() => harness.res);
     const writeSpy = vi.spyOn(harness.res, "write").mockImplementation(() => true);
@@ -181,7 +181,7 @@ describe("RuntimeRoutes", () => {
       expect(writeSpy).toHaveBeenCalled();
       expect(harness.eventStreamClientRegistry.readStatistics()).toMatchObject({
         activeClientCount: 1,
-        addedClientCount: 1
+        addedClientCount: 1,
       });
     } finally {
       harness.req.emit("close");
@@ -191,7 +191,7 @@ describe("RuntimeRoutes", () => {
   it("returns schema-validated runtime health response", async () => {
     const harness = createRuntimeRouteHarness({
       method: RequestMethodByName.get,
-      pathname: RequestPathnameByName.apiHealth
+      pathname: RequestPathnameByName.apiHealth,
     });
 
     const handled = await handleRuntimeRoutes(harness.dependencies);
@@ -211,10 +211,10 @@ describe("RuntimeRoutes", () => {
   it("returns deterministic issue paths for invalid events-session bootstrap body", async () => {
     const harness = createRuntimeRouteHarness({
       method: RequestMethodByName.post,
-      pathname: RequestPathnameByName.apiEventsSession
+      pathname: RequestPathnameByName.apiEventsSession,
     });
     harness.setReadJsonBodyValue({
-      apiToken: 42
+      apiToken: 42,
     });
 
     const handled = await handleRuntimeRoutes(harness.dependencies);
@@ -233,7 +233,7 @@ describe("RuntimeRoutes", () => {
   it("returns root body issue path for non-object events-session bootstrap body", async () => {
     const harness = createRuntimeRouteHarness({
       method: RequestMethodByName.post,
-      pathname: RequestPathnameByName.apiEventsSession
+      pathname: RequestPathnameByName.apiEventsSession,
     });
     harness.setReadJsonBodyValue([]);
 
@@ -253,10 +253,10 @@ describe("RuntimeRoutes", () => {
   it("prefers header api token over request body api token", async () => {
     const harness = createRuntimeRouteHarness({
       method: RequestMethodByName.post,
-      pathname: RequestPathnameByName.apiEventsSession
+      pathname: RequestPathnameByName.apiEventsSession,
     });
     harness.setReadJsonBodyValue({
-      apiToken: "incorrect-token"
+      apiToken: "incorrect-token",
     });
     harness.req.headers[TestApiTokenHeaderName] = TestApiToken;
 
@@ -276,10 +276,10 @@ describe("RuntimeRoutes", () => {
   it("ignores empty repeated header token values and uses first non-empty header token", async () => {
     const harness = createRuntimeRouteHarness({
       method: RequestMethodByName.post,
-      pathname: RequestPathnameByName.apiEventsSession
+      pathname: RequestPathnameByName.apiEventsSession,
     });
     harness.setReadJsonBodyValue({
-      apiToken: "incorrect-token"
+      apiToken: "incorrect-token",
     });
     harness.req.headers[TestApiTokenHeaderName] = ["   ", TestApiToken];
 
@@ -299,10 +299,10 @@ describe("RuntimeRoutes", () => {
   it("keeps first non-empty repeated header token authoritative over request body token", async () => {
     const harness = createRuntimeRouteHarness({
       method: RequestMethodByName.post,
-      pathname: RequestPathnameByName.apiEventsSession
+      pathname: RequestPathnameByName.apiEventsSession,
     });
     harness.setReadJsonBodyValue({
-      apiToken: TestApiToken
+      apiToken: TestApiToken,
     });
     harness.req.headers[TestApiTokenHeaderName] = ["incorrect-token", TestApiToken];
 
@@ -323,12 +323,12 @@ describe("RuntimeRoutes", () => {
   it("does not read request body when cookie session is already authenticated", async () => {
     const harness = createRuntimeRouteHarness({
       method: RequestMethodByName.post,
-      pathname: RequestPathnameByName.apiEventsSession
+      pathname: RequestPathnameByName.apiEventsSession,
     });
     const issuedSession = harness.browserSessionAuthOwner.issueSessionCookie();
     harness.req.headers.cookie = readCookieHeaderValue(issuedSession.setCookieHeaderValue);
     harness.setReadJsonBodyValue({
-      apiToken: 42
+      apiToken: 42,
     });
 
     const handled = await handleRuntimeRoutes(harness.dependencies);

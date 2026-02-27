@@ -1,13 +1,13 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type CapabilitySnapshotRecord } from "../Source/Features/Capabilities/DataAccess/CapabilitySnapshotCache";
-import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
-import { type PushClientState } from "../Source/Features/PushNotifications/DomainModel/PushClientContracts";
 import {
   type ApplicationOwnerDependencies,
   type UseApplicationOwnerDependenciesInput,
-  useApplicationOwnerDependencies
+  useApplicationOwnerDependencies,
 } from "../Source/Application/StateManagement/UseApplicationOwnerDependencies";
+import { type CapabilitySnapshotRecord } from "../Source/Features/Capabilities/DataAccess/CapabilitySnapshotCache";
+import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
+import { type PushClientState } from "../Source/Features/PushNotifications/DomainModel/PushClientContracts";
 
 interface HarnessProperties {
   input: UseApplicationOwnerDependenciesInput;
@@ -17,7 +17,7 @@ let latestOwnerDependencies: ApplicationOwnerDependencies<CapabilitySnapshotReco
 
 function Harness(properties: HarnessProperties): React.JSX.Element {
   latestOwnerDependencies = useApplicationOwnerDependencies<CapabilitySnapshotRecord>(
-    properties.input
+    properties.input,
   );
   return <div data-testid="application-owner-dependencies-harness" />;
 }
@@ -34,7 +34,7 @@ function createUnsupportedPushClientState(): PushClientState {
     supported: false,
     serviceWorkerRegistered: false,
     permission: "unsupported",
-    subscribed: false
+    subscribed: false,
   };
 }
 
@@ -43,7 +43,7 @@ function createSupportedPushClientState(): PushClientState {
     supported: true,
     serviceWorkerRegistered: true,
     permission: "granted",
-    subscribed: true
+    subscribed: true,
   };
 }
 
@@ -66,154 +66,152 @@ function createBaseInput(): UseApplicationOwnerDependenciesInput {
     readThreadRetryBaseDelayMilliseconds: 250,
     readThreadRetryMaximumDelayMilliseconds: 2_000,
     threadQueryCacheTimeToLiveMilliseconds: 30_000,
-    threadQueryCacheMaximumEntries: 200
+    threadQueryCacheMaximumEntries: 200,
   };
 }
 
 function expectSingletonOwnersStable(
   previousDependencies: ApplicationOwnerDependencies<CapabilitySnapshotRecord>,
-  nextDependencies: ApplicationOwnerDependencies<CapabilitySnapshotRecord>
+  nextDependencies: ApplicationOwnerDependencies<CapabilitySnapshotRecord>,
 ): void {
   expect(nextDependencies.apiAuthenticationErrorClassifier).toBe(
-    previousDependencies.apiAuthenticationErrorClassifier
+    previousDependencies.apiAuthenticationErrorClassifier,
   );
   expect(nextDependencies.dateValueFormatter).toBe(previousDependencies.dateValueFormatter);
   expect(nextDependencies.capabilityServerClient).toBe(previousDependencies.capabilityServerClient);
   expect(nextDependencies.apiSessionBootstrapCoordinator).toBe(
-    previousDependencies.apiSessionBootstrapCoordinator
+    previousDependencies.apiSessionBootstrapCoordinator,
   );
   expect(nextDependencies.coreDataRefreshConcurrencyCoordinator).toBe(
-    previousDependencies.coreDataRefreshConcurrencyCoordinator
+    previousDependencies.coreDataRefreshConcurrencyCoordinator,
   );
   expect(nextDependencies.eventStreamConnectionCoordinator).toBe(
-    previousDependencies.eventStreamConnectionCoordinator
+    previousDependencies.eventStreamConnectionCoordinator,
   );
   expect(nextDependencies.pageTouchOverscrollGuardCoordinator).toBe(
-    previousDependencies.pageTouchOverscrollGuardCoordinator
+    previousDependencies.pageTouchOverscrollGuardCoordinator,
   );
   expect(nextDependencies.chatServerClient).toBe(previousDependencies.chatServerClient);
   expect(nextDependencies.selectedThreadRefreshConcurrencyCoordinator).toBe(
-    previousDependencies.selectedThreadRefreshConcurrencyCoordinator
+    previousDependencies.selectedThreadRefreshConcurrencyCoordinator,
   );
   expect(nextDependencies.readThreadStateMerger).toBe(previousDependencies.readThreadStateMerger);
   expect(nextDependencies.pendingUserInputRequestSelector).toBe(
-    previousDependencies.pendingUserInputRequestSelector
+    previousDependencies.pendingUserInputRequestSelector,
   );
   expect(nextDependencies.userInterfaceActionRequestBuilder).toBe(
-    previousDependencies.userInterfaceActionRequestBuilder
+    previousDependencies.userInterfaceActionRequestBuilder,
   );
   expect(nextDependencies.pendingUserInputAnswerBuilder).toBe(
-    previousDependencies.pendingUserInputAnswerBuilder
+    previousDependencies.pendingUserInputAnswerBuilder,
   );
   expect(nextDependencies.chatRequestActionCoordinator).toBe(
-    previousDependencies.chatRequestActionCoordinator
+    previousDependencies.chatRequestActionCoordinator,
   );
   expect(nextDependencies.conversationItemFlattener).toBe(
-    previousDependencies.conversationItemFlattener
+    previousDependencies.conversationItemFlattener,
   );
   expect(nextDependencies.debugServerClient).toBe(previousDependencies.debugServerClient);
   expect(nextDependencies.debugWorkspaceDataReader).toBe(
-    previousDependencies.debugWorkspaceDataReader
+    previousDependencies.debugWorkspaceDataReader,
   );
   expect(nextDependencies.debugWorkspaceStateStore).toBe(
-    previousDependencies.debugWorkspaceStateStore
+    previousDependencies.debugWorkspaceStateStore,
   );
   expect(nextDependencies.debugWorkspaceActionCoordinator).toBe(
-    previousDependencies.debugWorkspaceActionCoordinator
+    previousDependencies.debugWorkspaceActionCoordinator,
   );
   expect(nextDependencies.debugIssueStateResolver).toBe(
-    previousDependencies.debugIssueStateResolver
+    previousDependencies.debugIssueStateResolver,
   );
   expect(nextDependencies.threadMutationServerClient).toBe(
-    previousDependencies.threadMutationServerClient
+    previousDependencies.threadMutationServerClient,
   );
   expect(nextDependencies.threadMutationActionCoordinator).toBe(
-    previousDependencies.threadMutationActionCoordinator
+    previousDependencies.threadMutationActionCoordinator,
   );
-  expect(nextDependencies.pushClientStateManager).toBe(
-    previousDependencies.pushClientStateManager
-  );
+  expect(nextDependencies.pushClientStateManager).toBe(previousDependencies.pushClientStateManager);
 }
 
 function expectConfiguredOwnersStable(
   previousDependencies: ApplicationOwnerDependencies<CapabilitySnapshotRecord>,
-  nextDependencies: ApplicationOwnerDependencies<CapabilitySnapshotRecord>
+  nextDependencies: ApplicationOwnerDependencies<CapabilitySnapshotRecord>,
 ): void {
   expect(nextDependencies.eventStreamRefreshDecisionEngine).toBe(
-    previousDependencies.eventStreamRefreshDecisionEngine
+    previousDependencies.eventStreamRefreshDecisionEngine,
   );
   expect(nextDependencies.eventRefreshScheduler).toBe(previousDependencies.eventRefreshScheduler);
   expect(nextDependencies.runtimeViewportSizingCoordinator).toBe(
-    previousDependencies.runtimeViewportSizingCoordinator
+    previousDependencies.runtimeViewportSizingCoordinator,
   );
   expect(nextDependencies.mobileSidebarSwipeCoordinator).toBe(
-    previousDependencies.mobileSidebarSwipeCoordinator
+    previousDependencies.mobileSidebarSwipeCoordinator,
   );
   expect(nextDependencies.capabilitySnapshotCache).toBe(
-    previousDependencies.capabilitySnapshotCache
+    previousDependencies.capabilitySnapshotCache,
   );
   expect(nextDependencies.modeSelectionSyncCoordinator).toBe(
-    previousDependencies.modeSelectionSyncCoordinator
+    previousDependencies.modeSelectionSyncCoordinator,
   );
   expect(nextDependencies.trackedUserInterfaceErrorReporter).toBe(
-    previousDependencies.trackedUserInterfaceErrorReporter
+    previousDependencies.trackedUserInterfaceErrorReporter,
   );
   expect(nextDependencies.chatScrollStateCoordinator).toBe(
-    previousDependencies.chatScrollStateCoordinator
+    previousDependencies.chatScrollStateCoordinator,
   );
   expect(nextDependencies.collaborationModeActionCoordinator).toBe(
-    previousDependencies.collaborationModeActionCoordinator
+    previousDependencies.collaborationModeActionCoordinator,
   );
   expect(nextDependencies.selectedThreadDataRefreshCoordinator).toBe(
-    previousDependencies.selectedThreadDataRefreshCoordinator
+    previousDependencies.selectedThreadDataRefreshCoordinator,
   );
   expect(nextDependencies.threadListStateController).toBe(
-    previousDependencies.threadListStateController
+    previousDependencies.threadListStateController,
   );
   expect(nextDependencies.pushNotificationToolbarActionCoordinator).toBe(
-    previousDependencies.pushNotificationToolbarActionCoordinator
+    previousDependencies.pushNotificationToolbarActionCoordinator,
   );
 }
 
 function expectConfiguredOwnersRecreated(
   previousDependencies: ApplicationOwnerDependencies<CapabilitySnapshotRecord>,
-  nextDependencies: ApplicationOwnerDependencies<CapabilitySnapshotRecord>
+  nextDependencies: ApplicationOwnerDependencies<CapabilitySnapshotRecord>,
 ): void {
   expect(nextDependencies.eventStreamRefreshDecisionEngine).not.toBe(
-    previousDependencies.eventStreamRefreshDecisionEngine
+    previousDependencies.eventStreamRefreshDecisionEngine,
   );
   expect(nextDependencies.eventRefreshScheduler).not.toBe(
-    previousDependencies.eventRefreshScheduler
+    previousDependencies.eventRefreshScheduler,
   );
   expect(nextDependencies.runtimeViewportSizingCoordinator).not.toBe(
-    previousDependencies.runtimeViewportSizingCoordinator
+    previousDependencies.runtimeViewportSizingCoordinator,
   );
   expect(nextDependencies.mobileSidebarSwipeCoordinator).not.toBe(
-    previousDependencies.mobileSidebarSwipeCoordinator
+    previousDependencies.mobileSidebarSwipeCoordinator,
   );
   expect(nextDependencies.capabilitySnapshotCache).not.toBe(
-    previousDependencies.capabilitySnapshotCache
+    previousDependencies.capabilitySnapshotCache,
   );
   expect(nextDependencies.modeSelectionSyncCoordinator).not.toBe(
-    previousDependencies.modeSelectionSyncCoordinator
+    previousDependencies.modeSelectionSyncCoordinator,
   );
   expect(nextDependencies.trackedUserInterfaceErrorReporter).not.toBe(
-    previousDependencies.trackedUserInterfaceErrorReporter
+    previousDependencies.trackedUserInterfaceErrorReporter,
   );
   expect(nextDependencies.chatScrollStateCoordinator).not.toBe(
-    previousDependencies.chatScrollStateCoordinator
+    previousDependencies.chatScrollStateCoordinator,
   );
   expect(nextDependencies.collaborationModeActionCoordinator).not.toBe(
-    previousDependencies.collaborationModeActionCoordinator
+    previousDependencies.collaborationModeActionCoordinator,
   );
   expect(nextDependencies.selectedThreadDataRefreshCoordinator).not.toBe(
-    previousDependencies.selectedThreadDataRefreshCoordinator
+    previousDependencies.selectedThreadDataRefreshCoordinator,
   );
   expect(nextDependencies.threadListStateController).not.toBe(
-    previousDependencies.threadListStateController
+    previousDependencies.threadListStateController,
   );
   expect(nextDependencies.pushNotificationToolbarActionCoordinator).not.toBe(
-    previousDependencies.pushNotificationToolbarActionCoordinator
+    previousDependencies.pushNotificationToolbarActionCoordinator,
   );
 }
 
@@ -233,7 +231,7 @@ describe("useApplicationOwnerDependencies", () => {
       threadOnlyHistoryMethods: baseInput.threadOnlyHistoryMethods,
       unsupportedPushClientState: baseInput.unsupportedPushClientState,
       modeSelectionStateResolver: baseInput.modeSelectionStateResolver,
-      setErrorMessage: baseInput.setErrorMessage
+      setErrorMessage: baseInput.setErrorMessage,
     };
 
     rerender(<Harness input={sameDependencyInput} />);
@@ -255,19 +253,23 @@ describe("useApplicationOwnerDependencies", () => {
       unsupportedPushClientState: createSupportedPushClientState(),
       threadOnlyHistoryMethods: ["read-thread", "stream-event"],
       eventRefreshScheduleDelayMilliseconds: baseInput.eventRefreshScheduleDelayMilliseconds + 1,
-      mobileVisualViewportKeyboardOpenDeltaPx: baseInput.mobileVisualViewportKeyboardOpenDeltaPx + 1,
+      mobileVisualViewportKeyboardOpenDeltaPx:
+        baseInput.mobileVisualViewportKeyboardOpenDeltaPx + 1,
       mobileLayoutMaximumWidthPx: baseInput.mobileLayoutMaximumWidthPx + 1,
       mobileSidebarSwipeEdgePx: baseInput.mobileSidebarSwipeEdgePx + 1,
       mobileSidebarSwipeTriggerPx: baseInput.mobileSidebarSwipeTriggerPx + 1,
-      mobileSidebarSwipeMaximumVerticalDriftPx: baseInput.mobileSidebarSwipeMaximumVerticalDriftPx + 1,
+      mobileSidebarSwipeMaximumVerticalDriftPx:
+        baseInput.mobileSidebarSwipeMaximumVerticalDriftPx + 1,
       mobileSidebarSwipeCancelNegativePx: baseInput.mobileSidebarSwipeCancelNegativePx + 1,
-      capabilitySnapshotRefreshIntervalMilliseconds: baseInput.capabilitySnapshotRefreshIntervalMilliseconds + 1,
+      capabilitySnapshotRefreshIntervalMilliseconds:
+        baseInput.capabilitySnapshotRefreshIntervalMilliseconds + 1,
       chatScrollBottomThresholdPx: baseInput.chatScrollBottomThresholdPx + 1,
       readThreadRetryMaximumAttempts: baseInput.readThreadRetryMaximumAttempts + 1,
       readThreadRetryBaseDelayMilliseconds: baseInput.readThreadRetryBaseDelayMilliseconds + 1,
-      readThreadRetryMaximumDelayMilliseconds: baseInput.readThreadRetryMaximumDelayMilliseconds + 1,
+      readThreadRetryMaximumDelayMilliseconds:
+        baseInput.readThreadRetryMaximumDelayMilliseconds + 1,
       threadQueryCacheTimeToLiveMilliseconds: baseInput.threadQueryCacheTimeToLiveMilliseconds + 1,
-      threadQueryCacheMaximumEntries: baseInput.threadQueryCacheMaximumEntries + 1
+      threadQueryCacheMaximumEntries: baseInput.threadQueryCacheMaximumEntries + 1,
     };
 
     rerender(<Harness input={changedInput} />);

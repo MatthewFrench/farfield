@@ -22,10 +22,13 @@ export function DebugHistoryDetailPanel({
   historyDetailPayloadText,
   waitForReplayResponse,
   onWaitForReplayResponseChange,
-  onReplayHistoryEntry
+  onReplayHistoryEntry,
 }: DebugHistoryDetailPanelProps): React.JSX.Element {
   return (
-    <div data-testid="debug-history-detail-panel" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div
+      data-testid="debug-history-detail-panel"
+      className="flex-1 flex flex-col min-h-0 overflow-hidden"
+    >
       <div className="overflow-y-auto p-3 space-y-3">
         {historyEntryId === null ? (
           <div className="text-xs text-muted-foreground py-4">Select an entry</div>
@@ -48,7 +51,7 @@ export function DebugHistoryDetailPanel({
                 onClick={() => {
                   onReplayHistoryEntry({
                     entryId: historyEntryId,
-                    waitForResponse: waitForReplayResponse
+                    waitForResponse: waitForReplayResponse,
                   });
                 }}
                 variant="outline"

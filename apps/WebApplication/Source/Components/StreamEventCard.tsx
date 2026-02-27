@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { FileChangeEntrySchema, IpcFrameType, type IpcFrame } from "@farfield/protocol";
+import { FileChangeEntrySchema, type IpcFrame, IpcFrameType } from "@farfield/protocol";
 import { ChevronRight } from "lucide-react";
+import { useState } from "react";
 import { z } from "zod";
 import { DiffBlock } from "@/Components/DiffBlock";
 import { Button } from "@/Components/UserInterface/Button";
@@ -9,7 +9,7 @@ const EVENT_BODY_JSON_INDENT_SPACES = 2;
 
 const StreamEventDiffParametersSchema = z
   .object({
-    changes: z.array(FileChangeEntrySchema)
+    changes: z.array(FileChangeEntrySchema),
   })
   .strict();
 
@@ -23,7 +23,11 @@ function readEventLabel(event: IpcFrame): string {
   if (event.type === IpcFrameType.request || event.type === IpcFrameType.broadcast) {
     return event.method;
   }
-  if (event.type === IpcFrameType.response && event.method !== undefined && event.method.length > 0) {
+  if (
+    event.type === IpcFrameType.response &&
+    event.method !== undefined &&
+    event.method.length > 0
+  ) {
     return event.method;
   }
   return event.type;

@@ -1,10 +1,10 @@
 import { Archive, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
-import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
 import { Button } from "@/Components/UserInterface/Button";
+import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 import {
   THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER,
-  THREAD_GROUP_NO_PROJECT_TOOLTIP
+  THREAD_GROUP_NO_PROJECT_TOOLTIP,
 } from "@/Features/Threads/UserInterface/ThreadListUserInterfaceConstants";
 
 interface ThreadListArchivedSectionProps {
@@ -12,7 +12,7 @@ interface ThreadListArchivedSectionProps {
 }
 
 export function ThreadListArchivedSection({
-  properties
+  properties,
 }: ThreadListArchivedSectionProps): React.JSX.Element {
   return (
     <div className="space-y-1 pt-1">
@@ -50,14 +50,19 @@ export function ThreadListArchivedSection({
               <span>Loading archived threads...</span>
             </div>
           )}
-          {!properties.isArchivedThreadsLoading && properties.archivedProjectGroups.length === 0 && (
-            <div className="px-2 py-1 text-[11px] text-muted-foreground/70">
-              No archived threads
-            </div>
-          )}
+          {!properties.isArchivedThreadsLoading &&
+            properties.archivedProjectGroups.length === 0 && (
+              <div className="px-2 py-1 text-[11px] text-muted-foreground/70">
+                No archived threads
+              </div>
+            )}
           {properties.archivedProjectGroups.map((group) => {
-            const hasSelectedThread = group.threads.some((thread) => thread.id === properties.selectedThreadId);
-            const isCollapsed = hasSelectedThread ? false : Boolean(properties.collapsedArchivedProjectGroups[group.key]);
+            const hasSelectedThread = group.threads.some(
+              (thread) => thread.id === properties.selectedThreadId,
+            );
+            const isCollapsed = hasSelectedThread
+              ? false
+              : Boolean(properties.collapsedArchivedProjectGroups[group.key]);
             return (
               <div key={group.key} className="space-y-1">
                 <Button
@@ -73,7 +78,10 @@ export function ThreadListArchivedSection({
                   ) : (
                     <ChevronDown size={13} className="shrink-0" />
                   )}
-                  <span className="flex-1 truncate" title={group.projectPath ?? THREAD_GROUP_NO_PROJECT_TOOLTIP}>
+                  <span
+                    className="flex-1 truncate"
+                    title={group.projectPath ?? THREAD_GROUP_NO_PROJECT_TOOLTIP}
+                  >
                     {group.label}
                   </span>
                   {group.isRemoved && (
@@ -81,14 +89,17 @@ export function ThreadListArchivedSection({
                       Removed
                     </span>
                   )}
-                  <span className="text-[10px] text-muted-foreground/60">{String(group.threads.length)}</span>
+                  <span className="text-[10px] text-muted-foreground/60">
+                    {String(group.threads.length)}
+                  </span>
                 </Button>
                 {!isCollapsed && (
                   <div className="space-y-1 pl-4">
                     {group.threads.map((thread) => {
                       const isArchivedThread = properties.archivedThreadIds.has(thread.id);
-                      const canUnarchive = isArchivedThread
-                        && thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
+                      const canUnarchive =
+                        isArchivedThread &&
+                        thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
                       return (
                         <div
                           key={thread.id}
@@ -118,7 +129,11 @@ export function ThreadListArchivedSection({
                                     properties.onUnarchiveThread(thread.id);
                                   }
                                 }}
-                                title={canUnarchive ? "Unarchive thread" : "Unarchive is not supported for this agent"}
+                                title={
+                                  canUnarchive
+                                    ? "Unarchive thread"
+                                    : "Unarchive is not supported for this agent"
+                                }
                               >
                                 Unarchive
                               </Button>

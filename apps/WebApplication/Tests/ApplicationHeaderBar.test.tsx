@@ -18,7 +18,7 @@ const DEFAULT_PUSH_CLIENT_STATE = {
   supported: true,
   serviceWorkerRegistered: true,
   permission: "default" as const,
-  subscribed: false
+  subscribed: false,
 };
 
 function renderApplicationHeaderBar(input?: RenderApplicationHeaderBarInput): void {
@@ -45,7 +45,7 @@ function renderApplicationHeaderBar(input?: RenderApplicationHeaderBarInput): vo
         onToggleTheme={() => {}}
         renderAgentFavicon={() => null}
       />
-    </TooltipProvider>
+    </TooltipProvider>,
   );
 }
 
@@ -56,7 +56,7 @@ describe("ApplicationHeaderBar", () => {
 
     renderApplicationHeaderBar({
       onRefresh,
-      onToggleDebugTab
+      onToggleDebugTab,
     });
 
     fireEvent.click(screen.getByTestId("refresh-button"));
@@ -70,7 +70,7 @@ describe("ApplicationHeaderBar", () => {
     const onEnablePushNotifications = vi.fn();
 
     renderApplicationHeaderBar({
-      onEnablePushNotifications
+      onEnablePushNotifications,
     });
 
     fireEvent.click(screen.getByTestId("enable-notifications-button"));
@@ -83,7 +83,7 @@ describe("ApplicationHeaderBar", () => {
 
     renderApplicationHeaderBar({
       onOpenMobileSidebar,
-      onToggleDebugTab
+      onToggleDebugTab,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Threads" }));
@@ -98,7 +98,7 @@ describe("ApplicationHeaderBar", () => {
     renderApplicationHeaderBar({
       activeTab: "debug",
       onOpenMobileSidebar,
-      onToggleDebugTab
+      onToggleDebugTab,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Threads" }));
@@ -115,7 +115,7 @@ describe("ApplicationHeaderBar", () => {
       activeTab: "debug",
       desktopSidebarOpen: false,
       onOpenDesktopSidebar,
-      onToggleDebugTab
+      onToggleDebugTab,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
@@ -129,7 +129,7 @@ describe("ApplicationHeaderBar", () => {
 
     renderApplicationHeaderBar({
       isBusy: true,
-      onRefresh
+      onRefresh,
     });
 
     fireEvent.click(screen.getByTestId("refresh-button"));
@@ -145,7 +145,7 @@ describe("ApplicationHeaderBar", () => {
       activeTab: "chat",
       desktopSidebarOpen: false,
       onOpenDesktopSidebar,
-      onToggleDebugTab
+      onToggleDebugTab,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));

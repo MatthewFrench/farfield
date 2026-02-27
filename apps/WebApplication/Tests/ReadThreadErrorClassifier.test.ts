@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isThreadNotLoadedReadError,
-  isTransientReadThreadError
+  isTransientReadThreadError,
 } from "../Source/Features/Chat/DomainModel/ReadThreadErrorClassifier";
 
 describe("ReadThreadErrorClassifier", () => {

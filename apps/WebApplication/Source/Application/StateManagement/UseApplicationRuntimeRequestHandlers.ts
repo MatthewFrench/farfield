@@ -1,26 +1,16 @@
-import {
-  useCallback,
-  type Dispatch,
-  type SetStateAction
-} from "react";
-import {
-  bootstrapEventsSession
-} from "@/Application/DataAccess/WebShellApi";
+import { type Dispatch, type SetStateAction, useCallback } from "react";
+import { bootstrapEventsSession } from "@/Application/DataAccess/WebShellApi";
 import { ApiAuthenticationErrorClassifier } from "@/Application/DomainModel/ApiAuthenticationErrorClassifier";
 import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
 import { STARTUP_CRITICAL_EVENTS_SESSION_OPERATION } from "@/Application/StateManagement/CoreDataStartupRequestProfile";
 import { UserInterfaceActionRequestBuilder } from "@/Application/StateManagement/UserInterfaceActionRequestBuilder";
-import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
-import {
-  toErrorMessage
-} from "@/Shared/Errors/ErrorMessage";
-import {
-  resolveRuntimeRequestErrorDescriptor
-} from "@/Shared/Errors/RuntimeRequestErrorDescriptor";
 import {
   TrackedUserInterfaceErrorReporter,
-  type TrackedUserInterfaceErrorReportInput
+  type TrackedUserInterfaceErrorReportInput,
 } from "@/Features/Debugging/StateManagement/TrackedUserInterfaceErrorReporter";
+import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
+import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
+import { resolveRuntimeRequestErrorDescriptor } from "@/Shared/Errors/RuntimeRequestErrorDescriptor";
 
 interface ActionRequestOptions {
   actionId: string;
@@ -28,7 +18,8 @@ interface ActionRequestOptions {
 }
 
 const RUNTIME_REQUEST_ERROR_OPERATION = "runtime-request-error";
-const RUNTIME_REQUEST_ERROR_HANDLER_NAME = "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError";
+const RUNTIME_REQUEST_ERROR_HANDLER_NAME =
+  "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError";
 const RUNTIME_REQUEST_ERROR_HANDLER_DETAIL_KEY = "handler";
 const API_SESSION_BOOTSTRAP_EMPTY_ERROR_MESSAGE = "";
 
@@ -50,14 +41,12 @@ interface ApiSessionReadyStateInput extends ApiSessionTokenRequirementStateInput
 }
 
 function clearApiSessionBootstrapErrorMessage(
-  setApiSessionBootstrapErrorMessage: Dispatch<SetStateAction<string>>
+  setApiSessionBootstrapErrorMessage: Dispatch<SetStateAction<string>>,
 ): void {
   setApiSessionBootstrapErrorMessage(API_SESSION_BOOTSTRAP_EMPTY_ERROR_MESSAGE);
 }
 
-function applyApiSessionTokenRequiredState(
-  input: ApiSessionTokenRequirementStateInput
-): void {
+function applyApiSessionTokenRequiredState(input: ApiSessionTokenRequirementStateInput): void {
   input.setRequiresApiSessionToken(true);
   clearApiSessionBootstrapErrorMessage(input.setApiSessionBootstrapErrorMessage);
 }
@@ -73,18 +62,18 @@ function applyApiSessionReadyState(input: ApiSessionReadyStateInput): void {
 
 function createRuntimeRequestErrorReportContract(
   rawMessage: string,
-  actionId: string
+  actionId: string,
 ): RuntimeRequestErrorReportContract {
   const runtimeErrorDescriptor = resolveRuntimeRequestErrorDescriptor({
     rawMessage,
     defaultOperation: RUNTIME_REQUEST_ERROR_OPERATION,
-    actionId
+    actionId,
   });
   return {
     operation: runtimeErrorDescriptor.operation,
     actionId,
     trackingErrorMessage: runtimeErrorDescriptor.trackingErrorMessage,
-    bannerErrorMessage: runtimeErrorDescriptor.bannerErrorMessage
+    bannerErrorMessage: runtimeErrorDescriptor.bannerErrorMessage,
   };
 }
 
@@ -108,71 +97,74 @@ export interface ApplicationRuntimeRequestHandlers {
 }
 
 export function useApplicationRuntimeRequestHandlers(
-  input: UseApplicationRuntimeRequestHandlersInput
+  input: UseApplicationRuntimeRequestHandlersInput,
 ): ApplicationRuntimeRequestHandlers {
   const reportTrackedUserInterfaceError = useCallback(
     async (reportInput: TrackedUserInterfaceErrorReportInput): Promise<void> => {
       await input.trackedUserInterfaceErrorReporter.report(reportInput);
     },
-    [input.trackedUserInterfaceErrorReporter]
+    [input.trackedUserInterfaceErrorReporter],
   );
 
   const buildActionRequestOptions = useCallback(
     (actionName: string): ActionRequestOptions => {
       return input.userInterfaceActionRequestBuilder.create(actionName);
     },
-    [input.userInterfaceActionRequestBuilder]
+    [input.userInterfaceActionRequestBuilder],
   );
 
-  const handleRuntimeRequestError = useCallback(<ErrorType,>(error: ErrorType): void => {
-    const message = toErrorMessage(error);
-    if (input.apiAuthenticationErrorClassifier.isApiTokenAuthenticationError(message)) {
-      input.apiSessionBootstrapCoordinator.markApiTokenRequired();
-      applyApiSessionTokenRequiredState({
-        setRequiresApiSessionToken: input.setRequiresApiSessionToken,
-        setApiSessionBootstrapErrorMessage: input.setApiSessionBootstrapErrorMessage
-      });
-      return;
-    }
-
-    const actionId = input.userInterfaceActionRequestBuilder.create(RUNTIME_REQUEST_ERROR_OPERATION).actionId;
-    const runtimeRequestErrorReport = createRuntimeRequestErrorReportContract(message, actionId);
-    void input.trackedUserInterfaceErrorReporter.report({
-      operation: runtimeRequestErrorReport.operation,
-      actionId: runtimeRequestErrorReport.actionId,
-      threadId: null,
-      error: runtimeRequestErrorReport.trackingErrorMessage,
-      details: {
-        [RUNTIME_REQUEST_ERROR_HANDLER_DETAIL_KEY]: RUNTIME_REQUEST_ERROR_HANDLER_NAME
+  const handleRuntimeRequestError = useCallback(
+    <ErrorType>(error: ErrorType): void => {
+      const message = toErrorMessage(error);
+      if (input.apiAuthenticationErrorClassifier.isApiTokenAuthenticationError(message)) {
+        input.apiSessionBootstrapCoordinator.markApiTokenRequired();
+        applyApiSessionTokenRequiredState({
+          setRequiresApiSessionToken: input.setRequiresApiSessionToken,
+          setApiSessionBootstrapErrorMessage: input.setApiSessionBootstrapErrorMessage,
+        });
+        return;
       }
-    });
-    input.setErrorMessage(runtimeRequestErrorReport.bannerErrorMessage);
-  }, [
-    input.apiAuthenticationErrorClassifier,
-    input.apiSessionBootstrapCoordinator,
-    input.trackedUserInterfaceErrorReporter,
-    input.userInterfaceActionRequestBuilder,
-    input.setApiSessionBootstrapErrorMessage,
-    input.setErrorMessage,
-    input.setRequiresApiSessionToken
-  ]);
+
+      const actionId = input.userInterfaceActionRequestBuilder.create(
+        RUNTIME_REQUEST_ERROR_OPERATION,
+      ).actionId;
+      const runtimeRequestErrorReport = createRuntimeRequestErrorReportContract(message, actionId);
+      void input.trackedUserInterfaceErrorReporter.report({
+        operation: runtimeRequestErrorReport.operation,
+        actionId: runtimeRequestErrorReport.actionId,
+        threadId: null,
+        error: runtimeRequestErrorReport.trackingErrorMessage,
+        details: {
+          [RUNTIME_REQUEST_ERROR_HANDLER_DETAIL_KEY]: RUNTIME_REQUEST_ERROR_HANDLER_NAME,
+        },
+      });
+      input.setErrorMessage(runtimeRequestErrorReport.bannerErrorMessage);
+    },
+    [
+      input.apiAuthenticationErrorClassifier,
+      input.apiSessionBootstrapCoordinator,
+      input.trackedUserInterfaceErrorReporter,
+      input.userInterfaceActionRequestBuilder,
+      input.setApiSessionBootstrapErrorMessage,
+      input.setErrorMessage,
+      input.setRequiresApiSessionToken,
+    ],
+  );
 
   const ensureApiSessionBootstrapped = useCallback(async (): Promise<boolean> => {
-    const bootstrapDecision = await input.apiSessionBootstrapCoordinator.ensureSession(
-      () => {
-        const actionRequest = input.userInterfaceActionRequestBuilder.create(
-          STARTUP_CRITICAL_EVENTS_SESSION_OPERATION
-        );
-        return bootstrapEventsSession(undefined, actionRequest.requestOptions);
-      }
-    );
+    const bootstrapDecision = await input.apiSessionBootstrapCoordinator.ensureSession(() => {
+      const actionRequest = input.userInterfaceActionRequestBuilder.create(
+        STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
+      );
+      return bootstrapEventsSession(undefined, actionRequest.requestOptions);
+    });
 
     if (bootstrapDecision.isReady) {
       applyApiSessionReadyState({
         requiresApiSessionToken: input.requiresApiSessionToken,
         apiSessionBootstrapErrorMessage: input.apiSessionBootstrapErrorMessage,
         setRequiresApiSessionToken: input.setRequiresApiSessionToken,
-        setApiSessionBootstrapErrorMessage: input.setApiSessionBootstrapErrorMessage
+        setApiSessionBootstrapErrorMessage: input.setApiSessionBootstrapErrorMessage,
       });
       return true;
     }
@@ -180,7 +172,7 @@ export function useApplicationRuntimeRequestHandlers(
     if (bootstrapDecision.requiresApiToken) {
       applyApiSessionTokenRequiredState({
         setRequiresApiSessionToken: input.setRequiresApiSessionToken,
-        setApiSessionBootstrapErrorMessage: input.setApiSessionBootstrapErrorMessage
+        setApiSessionBootstrapErrorMessage: input.setApiSessionBootstrapErrorMessage,
       });
     }
     return false;
@@ -190,13 +182,13 @@ export function useApplicationRuntimeRequestHandlers(
     input.requiresApiSessionToken,
     input.userInterfaceActionRequestBuilder,
     input.setApiSessionBootstrapErrorMessage,
-    input.setRequiresApiSessionToken
+    input.setRequiresApiSessionToken,
   ]);
 
   return {
     reportTrackedUserInterfaceError,
     buildActionRequestOptions,
     handleRuntimeRequestError,
-    ensureApiSessionBootstrapped
+    ensureApiSessionBootstrapped,
   };
 }

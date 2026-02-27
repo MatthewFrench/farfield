@@ -1,6 +1,6 @@
 import {
   type ApplicationModelOption,
-  type ModelOptionsInput
+  type ModelOptionsInput,
 } from "./UseApplicationDerivedStateContracts";
 
 function readModelOptionLabel(model: ModelOptionsInput["models"][number]): string {
@@ -19,10 +19,10 @@ export function readModelOptions(input: ModelOptionsInput): ApplicationModelOpti
   }
 
   if (
-    latestModel !== null
-    && latestModel !== undefined
-    && latestModel.length > 0
-    && !modelLabelById.has(latestModel)
+    latestModel !== null &&
+    latestModel !== undefined &&
+    latestModel.length > 0 &&
+    !modelLabelById.has(latestModel)
   ) {
     modelLabelById.set(latestModel, latestModel);
   }

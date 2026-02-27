@@ -15,22 +15,22 @@ function installCoarsePointerSupport(enabled: boolean): void {
       removeListener: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
+      dispatchEvent: vi.fn(),
+    })),
   });
 }
 
 function createTouchEvent(
   eventName: string,
-  coordinates: { clientX: number; clientY: number }
+  coordinates: { clientX: number; clientY: number },
 ): Event {
   const event = new Event(eventName, {
     bubbles: true,
-    cancelable: true
+    cancelable: true,
   });
   Object.defineProperty(event, "touches", {
     configurable: true,
-    value: [coordinates]
+    value: [coordinates],
   });
   return event;
 }
@@ -40,7 +40,7 @@ describe("PageTouchOverscrollGuardCoordinator", () => {
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       writable: true,
-      value: originalMatchMedia
+      value: originalMatchMedia,
     });
     document.body.innerHTML = "";
   });
@@ -66,13 +66,13 @@ describe("PageTouchOverscrollGuardCoordinator", () => {
 
     const touchStartEvent = createTouchEvent("touchstart", {
       clientX: 12,
-      clientY: 12
+      clientY: 12,
     });
     applicationShellElement.dispatchEvent(touchStartEvent);
 
     const touchMoveEvent = createTouchEvent("touchmove", {
       clientX: 12,
-      clientY: 44
+      clientY: 44,
     });
     const preventDefaultSpy = vi.spyOn(touchMoveEvent, "preventDefault");
     applicationShellElement.dispatchEvent(touchMoveEvent);
@@ -91,16 +91,16 @@ describe("PageTouchOverscrollGuardCoordinator", () => {
     scrollableElement.style.overflowY = "auto";
     Object.defineProperty(scrollableElement, "clientHeight", {
       configurable: true,
-      value: 100
+      value: 100,
     });
     Object.defineProperty(scrollableElement, "scrollHeight", {
       configurable: true,
-      value: 300
+      value: 300,
     });
     Object.defineProperty(scrollableElement, "scrollTop", {
       configurable: true,
       writable: true,
-      value: 120
+      value: 120,
     });
     scrollableElement.appendChild(innerElement);
     applicationShellElement.appendChild(scrollableElement);
@@ -110,7 +110,7 @@ describe("PageTouchOverscrollGuardCoordinator", () => {
     innerElement.dispatchEvent(createTouchEvent("touchstart", { clientX: 16, clientY: 16 }));
     const touchMoveEvent = createTouchEvent("touchmove", {
       clientX: 16,
-      clientY: 36
+      clientY: 36,
     });
     const preventDefaultSpy = vi.spyOn(touchMoveEvent, "preventDefault");
     innerElement.dispatchEvent(touchMoveEvent);

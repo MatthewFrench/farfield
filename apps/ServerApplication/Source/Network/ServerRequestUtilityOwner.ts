@@ -5,7 +5,7 @@ const CodexAgentIdentifierLiteral = "codex";
 const OpenCodeAgentIdentifierLiteral = "opencode";
 const AgentIdentifierLiterals = [
   CodexAgentIdentifierLiteral,
-  OpenCodeAgentIdentifierLiteral
+  OpenCodeAgentIdentifierLiteral,
 ] as const;
 const NumericTrueBooleanLiteral = "1";
 const NumericFalseBooleanLiteral = "0";
@@ -15,7 +15,7 @@ const BooleanParameterLiterals = [
   NumericTrueBooleanLiteral,
   NumericFalseBooleanLiteral,
   TextTrueBooleanLiteral,
-  TextFalseBooleanLiteral
+  TextFalseBooleanLiteral,
 ] as const;
 const TimeoutErrorMessageConnector = " timed out after ";
 const TimeoutErrorMessageUnitMilliseconds = "ms";
@@ -24,10 +24,7 @@ const AgentIdParameterSchema = z.enum(AgentIdentifierLiterals);
 const PositiveIntegerParameterSchema = z.coerce.number().int().positive();
 const BooleanParameterSchema = z
   .enum(BooleanParameterLiterals)
-  .transform(
-    (value) =>
-      value === NumericTrueBooleanLiteral || value === TextTrueBooleanLiteral
-  );
+  .transform((value) => value === NumericTrueBooleanLiteral || value === TextTrueBooleanLiteral);
 // Request and query string normalization policy: empty or whitespace-only inputs
 // are treated as missing so downstream owners receive either a meaningful value or null.
 const NonEmptyTrimmedStringSchema = z.string().trim().min(1);
@@ -71,21 +68,23 @@ export class ServerRequestUtilityOwner {
   public async withTimeout<ValueType>(
     promise: Promise<ValueType>,
     timeoutMs: number,
-    label: string
+    label: string,
   ): Promise<ValueType> {
     // Timeout policy is strictly positive to avoid immediate/negative timers that
     // would make request time-limit behavior non-deterministic.
     const parsedTimeoutMs = PositiveIntegerParameterSchema.parse(timeoutMs);
     const parsedLabel = NonEmptyTrimmedStringSchema.parse(label);
-    let rejectOnTimeout: (error: Error) => void = () => {};
+    let rejectOnTimeout: (error: Error) => void = (_error) => {
+      return;
+    };
     const timeoutPromise = new Promise<ValueType>((_resolve, reject) => {
       rejectOnTimeout = reject;
     });
     const timeoutHandle = setTimeout(() => {
       rejectOnTimeout(
         new Error(
-          `${parsedLabel}${TimeoutErrorMessageConnector}${String(parsedTimeoutMs)}${TimeoutErrorMessageUnitMilliseconds}`
-        )
+          `${parsedLabel}${TimeoutErrorMessageConnector}${String(parsedTimeoutMs)}${TimeoutErrorMessageUnitMilliseconds}`,
+        ),
       );
     }, parsedTimeoutMs);
 

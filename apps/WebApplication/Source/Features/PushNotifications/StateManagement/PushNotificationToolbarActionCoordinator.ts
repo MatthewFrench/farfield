@@ -39,13 +39,13 @@ export class PushNotificationToolbarActionCoordinator {
   }
 
   public async enablePushNotificationsFromToolbar(
-    input: EnablePushNotificationsFromToolbarInput
+    input: EnablePushNotificationsFromToolbarInput,
   ): Promise<void> {
     input.onSetEnablingPushNotifications(true);
     try {
       await this.pushClientStateManager.enablePrivateModePushNotifications();
       await this.refreshPushClientState({
-        onPushClientStateRead: input.onPushClientStateRead
+        onPushClientStateRead: input.onPushClientStateRead,
       });
     } catch (error) {
       input.onSetErrorMessage(`${PUSH_ENABLE_OPERATION_NAME}: ${toErrorMessage(error)}`);

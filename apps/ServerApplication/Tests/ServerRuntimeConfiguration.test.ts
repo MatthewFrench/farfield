@@ -7,7 +7,9 @@ import { readServerRuntimeConfiguration } from "../Source/Application/Configurat
 const temporaryDirectoryPaths: string[] = [];
 
 function createTemporaryDirectory(): string {
-  const temporaryDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-runtime-configuration-"));
+  const temporaryDirectoryPath = fs.mkdtempSync(
+    path.join(os.tmpdir(), "farfield-runtime-configuration-"),
+  );
   temporaryDirectoryPaths.push(temporaryDirectoryPath);
   return temporaryDirectoryPath;
 }
@@ -21,7 +23,7 @@ function buildBaseEnvironment(temporaryDirectoryPath: string): NodeJS.ProcessEnv
     PUSH_RECEIPTS_PATH: path.join(temporaryDirectoryPath, "push-receipts.json"),
     PUSH_SENDS_PATH: path.join(temporaryDirectoryPath, "push-sends.json"),
     DEBUG_CLIENT_ERROR_LOG_PATH: path.join(temporaryDirectoryPath, "client-errors.ndjson"),
-    PUSH_LOCAL_CA_PATH: path.join(temporaryDirectoryPath, "local-root.crt")
+    PUSH_LOCAL_CA_PATH: path.join(temporaryDirectoryPath, "local-root.crt"),
   };
 }
 
@@ -36,7 +38,9 @@ afterEach(() => {
 describe("readServerRuntimeConfiguration", () => {
   it("parses configuration with deterministic defaults and paths", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
-    const configuration = readServerRuntimeConfiguration(buildBaseEnvironment(temporaryDirectoryPath));
+    const configuration = readServerRuntimeConfiguration(
+      buildBaseEnvironment(temporaryDirectoryPath),
+    );
 
     expect(configuration.logLevel).toBe("info");
     expect(configuration.host).toBe("127.0.0.1");
@@ -48,18 +52,28 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.threadListAdapterTimeoutMs).toBe(7_500);
     expect(configuration.pushTestSendTimeoutMs).toBe(7_500);
     expect(configuration.pushStatePathResolution.filePath).toBe(
-      path.join(temporaryDirectoryPath, "push-state.json")
+      path.join(temporaryDirectoryPath, "push-state.json"),
     );
-    expect(configuration.pushReceiptsPath).toBe(path.join(temporaryDirectoryPath, "push-receipts.json"));
+    expect(configuration.pushReceiptsPath).toBe(
+      path.join(temporaryDirectoryPath, "push-receipts.json"),
+    );
     expect(configuration.pushSendsPath).toBe(path.join(temporaryDirectoryPath, "push-sends.json"));
-    expect(configuration.clientErrorLogPath).toBe(path.join(temporaryDirectoryPath, "client-errors.ndjson"));
+    expect(configuration.clientErrorLogPath).toBe(
+      path.join(temporaryDirectoryPath, "client-errors.ndjson"),
+    );
     expect(configuration.apiAuthRequired).toBe(false);
     expect(configuration.apiSessionCookieName).toBe("farfield_session");
     expect(configuration.apiSessionTimeToLiveMs).toBe(28_800_000);
     expect(configuration.apiSessionSecureCookie).toBe(false);
     expect(configuration.ntfyConfiguration.enabled).toBe(false);
     expect(configuration.invalidThreadStreamEventsLogPath).toBe(
-      path.resolve(process.cwd(), ".runtime", "logs", "threads", "invalid-thread-stream-events.ndjson")
+      path.resolve(
+        process.cwd(),
+        ".runtime",
+        "logs",
+        "threads",
+        "invalid-thread-stream-events.ndjson",
+      ),
     );
   });
 
@@ -67,12 +81,14 @@ describe("readServerRuntimeConfiguration", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
     const environment: NodeJS.ProcessEnv = {
       ...buildBaseEnvironment(temporaryDirectoryPath),
-      PUSH_ENABLED: "true"
+      PUSH_ENABLED: "true",
     };
 
     expect(() => {
       readServerRuntimeConfiguration(environment);
-    }).toThrow("PUSH_ENABLED=true requires PUSH_VAPID_PUBLIC_KEY, PUSH_VAPID_PRIVATE_KEY, and PUSH_VAPID_SUBJECT");
+    }).toThrow(
+      "PUSH_ENABLED=true requires PUSH_VAPID_PUBLIC_KEY, PUSH_VAPID_PRIVATE_KEY, and PUSH_VAPID_SUBJECT",
+    );
   });
 
   it("uses API token precedence and normalizes invalid port values", () => {
@@ -80,7 +96,7 @@ describe("readServerRuntimeConfiguration", () => {
     const configuration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
       PORT: "not-a-number",
-      PUSH_API_TOKEN: "push_token"
+      PUSH_API_TOKEN: "push_token",
     });
 
     expect(configuration.port).toBe(4311);
@@ -94,7 +110,7 @@ describe("readServerRuntimeConfiguration", () => {
     const configuration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
       API_TOKEN: "primary_token",
-      PUSH_API_TOKEN: "secondary_token"
+      PUSH_API_TOKEN: "secondary_token",
     });
 
     expect(configuration.apiToken).toBe("primary_token");
@@ -106,7 +122,7 @@ describe("readServerRuntimeConfiguration", () => {
     const configuration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
       API_TOKEN: "   ",
-      PUSH_API_TOKEN: "secondary_token"
+      PUSH_API_TOKEN: "secondary_token",
     });
 
     expect(configuration.apiToken).toBe("");
@@ -118,7 +134,7 @@ describe("readServerRuntimeConfiguration", () => {
     const configuration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
       WEB_BUILD_ID: "  ",
-      VITE_APP_BUILD_ID: "vite-build-id"
+      VITE_APP_BUILD_ID: "vite-build-id",
     });
 
     expect(configuration.webHealthBuildId).toBe("dev");
@@ -129,7 +145,7 @@ describe("readServerRuntimeConfiguration", () => {
     const configuration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
       THREAD_LIST_ADAPTER_TIMEOUT_MS: "12000",
-      PUSH_TEST_SEND_TIMEOUT_MS: "3000"
+      PUSH_TEST_SEND_TIMEOUT_MS: "3000",
     });
 
     expect(configuration.threadListAdapterTimeoutMs).toBe(12_000);
@@ -140,15 +156,15 @@ describe("readServerRuntimeConfiguration", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
     const secureCookieEnabledConfiguration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
-      API_SESSION_SECURE_COOKIE: "1"
+      API_SESSION_SECURE_COOKIE: "1",
     });
     const secureCookieDisabledConfiguration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
-      API_SESSION_SECURE_COOKIE: "0"
+      API_SESSION_SECURE_COOKIE: "0",
     });
     const invalidSecureCookieTokenConfiguration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
-      API_SESSION_SECURE_COOKIE: "TRUE"
+      API_SESSION_SECURE_COOKIE: "TRUE",
     });
 
     expect(secureCookieEnabledConfiguration.apiSessionSecureCookie).toBe(true);
@@ -160,7 +176,7 @@ describe("readServerRuntimeConfiguration", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
     const configuration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
-      DEBUG_CLIENT_ERROR_MAX_ENTRIES: "not-an-integer"
+      DEBUG_CLIENT_ERROR_MAX_ENTRIES: "not-an-integer",
     });
 
     expect(configuration.clientErrorMaxEntries).toBe(2_000);
@@ -171,18 +187,21 @@ describe("readServerRuntimeConfiguration", () => {
     expect(() => {
       readServerRuntimeConfiguration({
         ...buildBaseEnvironment(temporaryDirectoryPath),
-        DEBUG_CLIENT_ERROR_LOG_PATH: "   "
+        DEBUG_CLIENT_ERROR_LOG_PATH: "   ",
       });
     }).toThrow("DEBUG_CLIENT_ERROR_LOG_PATH must be a non-empty path when set");
   });
 
   it("validates logger level and optional invalid stream log path", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
-    const configuredInvalidStreamLogPath = path.join(temporaryDirectoryPath, "invalid-stream-events.ndjson");
+    const configuredInvalidStreamLogPath = path.join(
+      temporaryDirectoryPath,
+      "invalid-stream-events.ndjson",
+    );
     const configuration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
       LOG_LEVEL: "debug",
-      FARFIELD_INVALID_STREAM_LOG_PATH: configuredInvalidStreamLogPath
+      FARFIELD_INVALID_STREAM_LOG_PATH: configuredInvalidStreamLogPath,
     });
 
     expect(configuration.logLevel).toBe("debug");
@@ -194,7 +213,7 @@ describe("readServerRuntimeConfiguration", () => {
     expect(() => {
       readServerRuntimeConfiguration({
         ...buildBaseEnvironment(temporaryDirectoryPath),
-        LOG_LEVEL: "verbose"
+        LOG_LEVEL: "verbose",
       });
     }).toThrow();
   });

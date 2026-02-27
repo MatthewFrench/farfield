@@ -1,3 +1,4 @@
+import { type ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import {
   type ApiCreatePushSubscriptionInput,
   type ApiCreatePushSubscriptionResponse,
@@ -17,9 +18,8 @@ import {
   getPushStatus,
   getPushVapidPublicKey,
   savePushSubscription,
-  sendPushTestNotification
+  sendPushTestNotification,
 } from "./PushApi";
-import { type ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
 export type PushRequestOptions = ApiRequestOptions;
 export type PushStatusResponse = ApiPushStatusResponse;
@@ -44,13 +44,13 @@ export class PushServerClient {
   }
 
   public async readPushVapidPublicKey(
-    options?: PushRequestOptions
+    options?: PushRequestOptions,
   ): Promise<PushVapidPublicKeyResponse> {
     return getPushVapidPublicKey(options);
   }
 
   public async readLatestPushReceipt(
-    options?: PushRequestOptions
+    options?: PushRequestOptions,
   ): Promise<PushReceiptLatestResponse> {
     return getLatestPushReceipt(options);
   }
@@ -60,28 +60,28 @@ export class PushServerClient {
   }
 
   public async readPushLocalCertificateAuthorityStatus(
-    options?: PushRequestOptions
+    options?: PushRequestOptions,
   ): Promise<PushLocalCertificateAuthorityStatusResponse> {
     return getPushLocalCaStatus(options);
   }
 
   public async savePushSubscription(
     input: PushCreateSubscriptionInput,
-    options?: PushRequestOptions
+    options?: PushRequestOptions,
   ): Promise<PushCreateSubscriptionResponse> {
     return savePushSubscription(input, options);
   }
 
   public async deletePushSubscription(
     input: PushDeleteSubscriptionInput,
-    options?: PushRequestOptions
+    options?: PushRequestOptions,
   ): Promise<PushDeleteSubscriptionResponse> {
     return deletePushSubscription(input, options);
   }
 
   public async sendPushTestNotification(
     input: PushTestNotificationInput,
-    options?: PushRequestOptions
+    options?: PushRequestOptions,
   ): Promise<PushTestResponse> {
     return sendPushTestNotification(input, options);
   }

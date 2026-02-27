@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   type FarfieldEventStreamEnvelope,
-  type FarfieldEventStreamEvent
+  type FarfieldEventStreamEvent,
 } from "@farfield/protocol";
 
 const EVENT_STREAM_RESPONSE_STATUS_CODE_OK = 200;
@@ -11,7 +11,8 @@ const EVENT_STREAM_HEADERS = {
   Connection: "keep-alive",
   "X-Accel-Buffering": "no",
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "x-farfield-token, x-farfield-request-id, x-farfield-action-id, x-farfield-action-name"
+  "Access-Control-Allow-Headers":
+    "x-farfield-token, x-farfield-request-id, x-farfield-action-id, x-farfield-action-name",
 } as const;
 const EVENT_STREAM_RETRY_DIRECTIVE = "retry: 1000\n\n";
 const EVENT_STREAM_KEEPALIVE_FRAME = ": keepalive\n\n";
@@ -39,7 +40,10 @@ export interface EventStreamClientRegistryStatistics {
 export class EventStreamClientRegistry {
   private readonly keepaliveIntervalMs: number;
   private readonly clientSet: Set<ServerResponse>;
-  private readonly clientLifecycleBindingByResponse: Map<ServerResponse, EventStreamClientLifecycleBinding>;
+  private readonly clientLifecycleBindingByResponse: Map<
+    ServerResponse,
+    EventStreamClientLifecycleBinding
+  >;
   private keepaliveTimer: NodeJS.Timeout | null;
   private lastBroadcastSequence: number;
   private addedClientCount: number;
@@ -56,7 +60,10 @@ export class EventStreamClientRegistry {
 
     this.keepaliveIntervalMs = keepaliveIntervalMs;
     this.clientSet = new Set<ServerResponse>();
-    this.clientLifecycleBindingByResponse = new Map<ServerResponse, EventStreamClientLifecycleBinding>();
+    this.clientLifecycleBindingByResponse = new Map<
+      ServerResponse,
+      EventStreamClientLifecycleBinding
+    >();
     this.keepaliveTimer = null;
     this.lastBroadcastSequence = 0;
     this.addedClientCount = 0;
@@ -94,14 +101,18 @@ export class EventStreamClientRegistry {
     }
   }
 
-  public addClient(req: IncomingMessage, res: ServerResponse, initialEvent: FarfieldEventStreamEvent): void {
+  public addClient(
+    req: IncomingMessage,
+    res: ServerResponse,
+    initialEvent: FarfieldEventStreamEvent,
+  ): void {
     res.writeHead(EVENT_STREAM_RESPONSE_STATUS_CODE_OK, EVENT_STREAM_HEADERS);
     res.write(EVENT_STREAM_RETRY_DIRECTIVE);
 
     this.bindClientLifecycle(req, res);
     this.writeEvent(res, {
       sequence: this.lastBroadcastSequence,
-      event: initialEvent
+      event: initialEvent,
     });
   }
 
@@ -110,7 +121,7 @@ export class EventStreamClientRegistry {
     this.lastBroadcastSequence += 1;
     const envelope: FarfieldEventStreamEnvelope = {
       sequence: this.lastBroadcastSequence,
-      event
+      event,
     };
     for (const client of this.clientSet) {
       this.broadcastDeliveryAttemptCount += 1;
@@ -127,14 +138,11 @@ export class EventStreamClientRegistry {
       broadcastEventCount: this.broadcastEventCount,
       broadcastDeliveryAttemptCount: this.broadcastDeliveryAttemptCount,
       eventWriteFailureCount: this.eventWriteFailureCount,
-      keepaliveWriteFailureCount: this.keepaliveWriteFailureCount
+      keepaliveWriteFailureCount: this.keepaliveWriteFailureCount,
     };
   }
 
-  private writeEvent(
-    client: ServerResponse,
-    envelope: FarfieldEventStreamEnvelope
-  ): void {
+  private writeEvent(client: ServerResponse, envelope: FarfieldEventStreamEnvelope): void {
     try {
       client.write(`id: ${String(envelope.sequence)}\n`);
       client.write(`data: ${JSON.stringify(envelope)}\n\n`);
@@ -167,7 +175,7 @@ export class EventStreamClientRegistry {
     this.clientSet.add(res);
     this.clientLifecycleBindingByResponse.set(res, {
       request: req,
-      closeHandler
+      closeHandler,
     });
     this.addedClientCount += 1;
   }
@@ -178,7 +186,10 @@ export class EventStreamClientRegistry {
       return;
     }
 
-    lifecycleBinding.request.off(EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME, lifecycleBinding.closeHandler);
+    lifecycleBinding.request.off(
+      EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME,
+      lifecycleBinding.closeHandler,
+    );
     client.off(EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME, lifecycleBinding.closeHandler);
     this.clientLifecycleBindingByResponse.delete(client);
   }

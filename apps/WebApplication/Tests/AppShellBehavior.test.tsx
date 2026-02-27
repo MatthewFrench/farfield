@@ -1,17 +1,6 @@
-import {
-  fireEvent,
-  screen,
-  waitFor
-} from "@testing-library/react";
-import {
-  describe,
-  expect,
-  it
-} from "vitest";
-import {
-  OPENCODE_CAPABILITIES,
-  registerAppTestEnvironment
-} from "./AppTestEnvironment";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { OPENCODE_CAPABILITIES, registerAppTestEnvironment } from "./AppTestEnvironment";
 import { type ReadThreadFixture } from "./AppTestFixtureContracts";
 
 const environment = registerAppTestEnvironment();
@@ -33,7 +22,7 @@ function createDeferred<ValueType>(): Deferred<ValueType> {
 
   return {
     promise,
-    resolve: resolver
+    resolve: resolver,
   };
 }
 
@@ -59,17 +48,19 @@ describe("App", () => {
           updatedAt: 1700000000,
           cwd: "/tmp/project",
           source: "opencode",
-          agentId: "codex"
-        }
+          agentId: "codex",
+        },
       ],
       nextCursor: null,
       pages: 1,
-      truncated: false
+      truncated: false,
     });
 
     const conversationState = environment.buildConversationStateFixture(threadId, "gpt-5.3-codex");
     conversationState.turns = [];
-    environment.setReadThreadResolver((_targetThreadId: string, _includeTurns: boolean) => readThreadDeferred.promise);
+    environment.setReadThreadResolver(
+      (_targetThreadId: string, _includeTurns: boolean) => readThreadDeferred.promise,
+    );
 
     environment.renderApp();
 
@@ -80,9 +71,9 @@ describe("App", () => {
       ok: true,
       thread: {
         ...conversationState,
-        id: threadId
+        id: threadId,
       },
-      agentId: "codex"
+      agentId: "codex",
     });
 
     await waitFor(() => {
@@ -102,10 +93,10 @@ describe("App", () => {
           enabled: true,
           connected: true,
           capabilities: OPENCODE_CAPABILITIES,
-          projectDirectories: []
-        }
+          projectDirectories: [],
+        },
       ],
-      defaultAgentId: "opencode"
+      defaultAgentId: "opencode",
     });
 
     environment.renderApp();
@@ -123,7 +114,7 @@ describe("App", () => {
     Object.defineProperty(window, "innerWidth", {
       value: 390,
       configurable: true,
-      writable: true
+      writable: true,
     });
 
     try {
@@ -133,10 +124,10 @@ describe("App", () => {
 
       const appShell = await screen.findByTestId("app-shell");
       fireEvent.touchStart(appShell, {
-        touches: [{ clientX: 8, clientY: 110 }]
+        touches: [{ clientX: 8, clientY: 110 }],
       });
       fireEvent.touchMove(appShell, {
-        touches: [{ clientX: 92, clientY: 116 }]
+        touches: [{ clientX: 92, clientY: 116 }],
       });
 
       await waitFor(() => {
@@ -146,7 +137,7 @@ describe("App", () => {
       Object.defineProperty(window, "innerWidth", {
         value: originalInnerWidth,
         configurable: true,
-        writable: true
+        writable: true,
       });
     }
   });

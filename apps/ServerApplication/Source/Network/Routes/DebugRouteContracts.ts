@@ -1,11 +1,11 @@
-import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import path from "node:path";
 import type { SendRequestOptions } from "@farfield/api";
 import {
   type DebugErrorEvent,
   type DebugErrorSeverity,
   type IpcRequestFrame,
-  type JsonValue
+  type JsonValue,
 } from "@farfield/protocol";
 import type { CodexAgentAdapter } from "../../Agents/Adapters/CodexAgentAdapter.js";
 import type { ActivityHistoryService } from "../../Modules/Activity/ActivityHistoryService.js";
@@ -15,7 +15,7 @@ import type { ServerObservabilitySnapshot } from "../ServerObservabilitySnapshot
 export const DebugRouteMethodByName = {
   get: "GET",
   post: "POST",
-  delete: "DELETE"
+  delete: "DELETE",
 } as const;
 
 export const DebugRoutePathnameByName = {
@@ -27,7 +27,7 @@ export const DebugRoutePathnameByName = {
   traceStatus: "/api/debug/trace/status",
   traceStart: "/api/debug/trace/start",
   traceMark: "/api/debug/trace/mark",
-  traceStop: "/api/debug/trace/stop"
+  traceStop: "/api/debug/trace/stop",
 } as const;
 
 export const DebugRouteSegmentByName = {
@@ -36,16 +36,16 @@ export const DebugRouteSegmentByName = {
   clientErrors: "client-errors",
   history: "history",
   trace: "trace",
-  download: "download"
+  download: "download",
 } as const;
 
 export const DebugReplayFrameTypeByName = {
   request: "request",
-  broadcast: "broadcast"
+  broadcast: "broadcast",
 } as const;
 
 export type DebugReplayFrameType =
-  typeof DebugReplayFrameTypeByName[keyof typeof DebugReplayFrameTypeByName];
+  (typeof DebugReplayFrameTypeByName)[keyof typeof DebugReplayFrameTypeByName];
 
 export interface ParsedReplayFrame {
   type: DebugReplayFrameType;
@@ -56,11 +56,11 @@ export interface ParsedReplayFrame {
 }
 
 export const DebugReplayFrameParseErrorTypeByName = {
-  invalidReplayFramePayload: "invalid-replay-frame-payload"
+  invalidReplayFramePayload: "invalid-replay-frame-payload",
 } as const;
 
 export type DebugReplayFrameParseErrorType =
-  typeof DebugReplayFrameParseErrorTypeByName[keyof typeof DebugReplayFrameParseErrorTypeByName];
+  (typeof DebugReplayFrameParseErrorTypeByName)[keyof typeof DebugReplayFrameParseErrorTypeByName];
 
 export interface DebugReplayFrameParseIssue {
   path: string;
@@ -81,16 +81,16 @@ function cloneReplayFrameParseIssue(issue: DebugReplayFrameParseIssue): DebugRep
   return {
     path: issue.path,
     issueCode: issue.issueCode,
-    message: issue.message
+    message: issue.message,
   };
 }
 
 function cloneReplayFrameParseErrorDetails(
-  details: DebugReplayFrameParseErrorDetails
+  details: DebugReplayFrameParseErrorDetails,
 ): DebugReplayFrameParseErrorDetails {
   return {
     errorType: details.errorType,
-    issues: details.issues.map(cloneReplayFrameParseIssue)
+    issues: details.issues.map(cloneReplayFrameParseIssue),
   };
 }
 
@@ -153,8 +153,6 @@ export function buildSendRequestOptions(parsedReplayFrame: ParsedReplayFrame): S
     ...(parsedReplayFrame.targetClientId === undefined
       ? {}
       : { targetClientId: parsedReplayFrame.targetClientId }),
-    ...(parsedReplayFrame.version === undefined
-      ? {}
-      : { version: parsedReplayFrame.version })
+    ...(parsedReplayFrame.version === undefined ? {} : { version: parsedReplayFrame.version }),
   };
 }

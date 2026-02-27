@@ -1,8 +1,8 @@
-import { memo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronRight, FilePlus, FileMinus, FileEdit, type LucideIcon } from "lucide-react";
-import type { z } from "zod";
 import type { FileChangeEntrySchema } from "@farfield/protocol";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronRight, FileEdit, FileMinus, FilePlus, type LucideIcon } from "lucide-react";
+import { memo, useState } from "react";
+import type { z } from "zod";
 import { Button } from "@/Components/UserInterface/Button";
 
 type FileChange = z.infer<typeof FileChangeEntrySchema>;
@@ -28,7 +28,10 @@ interface DiffBlockProps {
 }
 
 type LineType = "add" | "remove" | "header" | "context";
-interface DiffLine { type: LineType; content: string }
+interface DiffLine {
+  type: LineType;
+  content: string;
+}
 
 const PATH_SEPARATOR = "/";
 const DIFF_HEADER_PREFIXES = ["@@", "+++", "---"] as const;
@@ -57,7 +60,7 @@ function readPathDisplayParts(path: string): PathDisplayParts {
 
   return {
     fileName: path.slice(separatorIndex + 1),
-    directoryPath: path.slice(0, separatorIndex)
+    directoryPath: path.slice(0, separatorIndex),
   };
 }
 
@@ -120,7 +123,7 @@ function readFileChangeKindMetadata(kind: string): FileChangeKindMetadata {
     return {
       Icon: FilePlus,
       label: FILE_CHANGE_CREATED_LABEL,
-      className: FILE_CHANGE_CREATED_CLASS_NAME
+      className: FILE_CHANGE_CREATED_CLASS_NAME,
     };
   }
 
@@ -128,14 +131,14 @@ function readFileChangeKindMetadata(kind: string): FileChangeKindMetadata {
     return {
       Icon: FileMinus,
       label: FILE_CHANGE_DELETED_LABEL,
-      className: FILE_CHANGE_DELETED_CLASS_NAME
+      className: FILE_CHANGE_DELETED_CLASS_NAME,
     };
   }
 
   return {
     Icon: FileEdit,
     label: FILE_CHANGE_MODIFIED_LABEL,
-    className: FILE_CHANGE_MODIFIED_CLASS_NAME
+    className: FILE_CHANGE_MODIFIED_CLASS_NAME,
   };
 }
 
@@ -143,19 +146,19 @@ const LINE_STYLES: Record<LineType, string> = {
   add: "bg-success/8 dark:bg-success/10",
   remove: "bg-danger/8 dark:bg-danger/10",
   header: "bg-muted/60",
-  context: ""
+  context: "",
 };
 const TEXT_STYLES: Record<LineType, string> = {
   add: "text-success dark:text-success/90",
   remove: "text-danger dark:text-danger/90",
   header: "text-muted-foreground/60 italic",
-  context: "text-foreground/70"
+  context: "text-foreground/70",
 };
 const GUTTER_STYLES: Record<LineType, string> = {
   add: "text-success/50",
   remove: "text-danger/50",
   header: "text-muted-foreground/30",
-  context: "text-muted-foreground/25"
+  context: "text-muted-foreground/25",
 };
 const GUTTER_CHAR: Record<LineType, string> = { add: "+", remove: "−", header: "", context: " " };
 
@@ -167,13 +170,17 @@ function DiffBlockComponent({ changes }: DiffBlockProps) {
       {changes.map((change, i) => {
         const isExpanded = expandedIdx === i;
         const { fileName, directoryPath } = readPathDisplayParts(change.path);
-        const lines = change.diff !== undefined && change.diff.length > 0 ? parseDiff(change.diff) : [];
+        const lines =
+          change.diff !== undefined && change.diff.length > 0 ? parseDiff(change.diff) : [];
         const { addedLineCount, removedLineCount } = readDiffSummary(lines);
         const kindMetadata = readFileChangeKindMetadata(change.kind.type);
         const { Icon, label, className } = kindMetadata;
 
         return (
-          <div key={`${change.path}-${String(i)}`} className={i > 0 ? "border-t border-border" : ""}>
+          <div
+            key={`${change.path}-${String(i)}`}
+            className={i > 0 ? "border-t border-border" : ""}
+          >
             <Button
               type="button"
               onClick={() => setExpandedIdx(isExpanded ? null : i)}
@@ -181,7 +188,9 @@ function DiffBlockComponent({ changes }: DiffBlockProps) {
               className="h-auto w-full justify-start rounded-none bg-muted/40 px-3 py-2.5 text-left transition-colors hover:bg-muted/70"
             >
               <Icon size={12} className={`shrink-0 ${className}`} />
-              <span className="font-mono text-xs font-medium text-foreground truncate">{fileName}</span>
+              <span className="font-mono text-xs font-medium text-foreground truncate">
+                {fileName}
+              </span>
               {directoryPath !== null && directoryPath.length > 0 && (
                 <span className="text-[11px] text-muted-foreground/40 truncate hidden sm:block">
                   {directoryPath}
@@ -209,7 +218,10 @@ function DiffBlockComponent({ changes }: DiffBlockProps) {
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: COLLAPSE_TRANSITION_DURATION_SECONDS, ease: COLLAPSE_TRANSITION_EASE }}
+                  transition={{
+                    duration: COLLAPSE_TRANSITION_DURATION_SECONDS,
+                    ease: COLLAPSE_TRANSITION_EASE,
+                  }}
                   className="overflow-hidden"
                 >
                   <div className="border-t border-border overflow-x-auto">
@@ -232,7 +244,9 @@ function DiffBlockComponent({ changes }: DiffBlockProps) {
                         </div>
                       ))
                     ) : (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">{NO_DIFF_AVAILABLE_LABEL}</div>
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        {NO_DIFF_AVAILABLE_LABEL}
+                      </div>
                     )}
                   </div>
                 </motion.div>

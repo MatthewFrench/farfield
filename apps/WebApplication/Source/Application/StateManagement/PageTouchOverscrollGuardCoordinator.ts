@@ -16,7 +16,9 @@ export class PageTouchOverscrollGuardCoordinator {
 
   public install(applicationShellElement: HTMLElement): () => void {
     if (!window.matchMedia(COARSE_POINTER_MEDIA_QUERY).matches) {
-      return () => {};
+      return () => {
+        return;
+      };
     }
 
     const onTouchStart = (event: TouchEvent): void => {
@@ -47,10 +49,9 @@ export class PageTouchOverscrollGuardCoordinator {
       }
 
       const atTop = this.scrollElement.scrollTop <= 0;
-      const atBottom = (
-        this.scrollElement.scrollTop + this.scrollElement.clientHeight
-        >= this.scrollElement.scrollHeight - SCROLL_EDGE_EPSILON_PX
-      );
+      const atBottom =
+        this.scrollElement.scrollTop + this.scrollElement.clientHeight >=
+        this.scrollElement.scrollHeight - SCROLL_EDGE_EPSILON_PX;
       const movingDown = deltaY > 0;
       const movingUp = deltaY < 0;
 
@@ -79,7 +80,7 @@ export class PageTouchOverscrollGuardCoordinator {
 
   private findScrollableAncestor(
     target: EventTarget | null,
-    applicationShellElement: HTMLElement
+    applicationShellElement: HTMLElement,
   ): HTMLElement | null {
     if (!(target instanceof HTMLElement)) {
       return null;
@@ -93,7 +94,9 @@ export class PageTouchOverscrollGuardCoordinator {
       node = node.parentElement;
     }
 
-    return this.canElementScrollVertically(applicationShellElement) ? applicationShellElement : null;
+    return this.canElementScrollVertically(applicationShellElement)
+      ? applicationShellElement
+      : null;
   }
 
   private canElementScrollVertically(element: HTMLElement): boolean {

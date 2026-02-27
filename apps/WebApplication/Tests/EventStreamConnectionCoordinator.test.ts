@@ -1,16 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  EventStreamConnectionCoordinator,
-  type EventSourceLike,
-  type EventStreamConnectionSnapshot
-} from "../Source/Application/StateManagement/EventStreamConnectionCoordinator";
-import {
+  type EventRefreshFlags,
   EventRefreshScheduler,
-  type EventRefreshFlags
 } from "../Source/Application/StateManagement/EventRefreshScheduler";
+import {
+  type EventSourceLike,
+  EventStreamConnectionCoordinator,
+  type EventStreamConnectionSnapshot,
+} from "../Source/Application/StateManagement/EventStreamConnectionCoordinator";
 import { EventStreamRefreshDecisionEngine } from "../Source/Application/StateManagement/EventStreamRefreshDecisionEngine";
 
-const THREAD_ONLY_METHODS = ["thread-stream-state-changed", "thread-queued-followups-changed"] as const;
+const THREAD_ONLY_METHODS = [
+  "thread-stream-state-changed",
+  "thread-queued-followups-changed",
+] as const;
 const EVENT_NAME_OPEN = "open";
 const EVENT_NAME_ERROR = "error";
 const EVENT_NAME_MESSAGE = "message";
@@ -31,14 +34,14 @@ function createActivityHistoryAppendedMessageData(): string {
         direction: "out",
         payload: {
           type: "action",
-          action: "thread-stream-state-changed"
+          action: "thread-stream-state-changed",
         },
         meta: {
           method: "thread-queued-followups-changed",
-          threadId: "thread-1"
-        }
-      }
-    }
+          threadId: "thread-1",
+        },
+      },
+    },
   });
 }
 
@@ -54,7 +57,7 @@ function createThreadStreamDeltaMessageData(): string {
           threadId: "thread-1",
           ownerClientId: "client-a",
           conversationState: null,
-          liveStateError: null
+          liveStateError: null,
         },
         streamEventsSnapshot: {
           ok: true,
@@ -63,11 +66,11 @@ function createThreadStreamDeltaMessageData(): string {
           events: [],
           nextSequence: 2,
           firstAvailableSequence: 0,
-          resetRequired: false
+          resetRequired: false,
         },
-        streamEventsSinceSequenceUsed: 1
-      }
-    }
+        streamEventsSinceSequenceUsed: 1,
+      },
+    },
   });
 }
 
@@ -109,7 +112,7 @@ function createCoordinator(input: {
       return source;
     },
     scheduleTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
-    clearScheduledTimeout: (timerId) => window.clearTimeout(timerId)
+    clearScheduledTimeout: (timerId) => window.clearTimeout(timerId),
   };
   if (input.initialReconnectDelayMs !== undefined) {
     dependencies.initialReconnectDelayMs = input.initialReconnectDelayMs;
@@ -135,7 +138,7 @@ describe("EventStreamConnectionCoordinator", () => {
     const connectionStatusChanges: boolean[] = [];
     const snapshot: EventStreamConnectionSnapshot = {
       activeTab: "debug",
-      selectedThreadId: "thread-1"
+      selectedThreadId: "thread-1",
     };
 
     coordinator.start({
@@ -148,7 +151,7 @@ describe("EventStreamConnectionCoordinator", () => {
       applyThreadStreamDelta: () => {},
       onConnectionStatusChange: (connected) => {
         connectionStatusChanges.push(connected);
-      }
+      },
     });
 
     expect(createdSources).toHaveLength(1);
@@ -159,8 +162,8 @@ describe("EventStreamConnectionCoordinator", () => {
       {
         refreshCore: true,
         refreshHistory: true,
-        refreshSelectedThread: true
-      }
+        refreshSelectedThread: true,
+      },
     ]);
     expect(connectionStatusChanges).toEqual([true]);
 
@@ -178,7 +181,7 @@ describe("EventStreamConnectionCoordinator", () => {
     const executedRefreshes: EventRefreshFlags[] = [];
     let snapshot: EventStreamConnectionSnapshot = {
       activeTab: "chat",
-      selectedThreadId: "thread-1"
+      selectedThreadId: "thread-1",
     };
 
     coordinator.start({
@@ -189,7 +192,7 @@ describe("EventStreamConnectionCoordinator", () => {
         executedRefreshes.push(refreshFlags);
       },
       applyThreadStreamDelta: () => {},
-      onConnectionStatusChange: () => {}
+      onConnectionStatusChange: () => {},
     });
 
     const source = createdSources[0];
@@ -203,12 +206,12 @@ describe("EventStreamConnectionCoordinator", () => {
 
     snapshot = {
       activeTab: "debug",
-      selectedThreadId: "thread-1"
+      selectedThreadId: "thread-1",
     };
     source.onmessage?.(
       new MessageEvent<string>(EVENT_NAME_MESSAGE, {
-        data: createActivityHistoryAppendedMessageData()
-      })
+        data: createActivityHistoryAppendedMessageData(),
+      }),
     );
     await vi.advanceTimersByTimeAsync(20);
 
@@ -216,8 +219,8 @@ describe("EventStreamConnectionCoordinator", () => {
       {
         refreshCore: false,
         refreshHistory: true,
-        refreshSelectedThread: true
-      }
+        refreshSelectedThread: true,
+      },
     ]);
 
     coordinator.stop();
@@ -237,7 +240,7 @@ describe("EventStreamConnectionCoordinator", () => {
       eventStreamRefreshDecisionEngine: decisionEngine,
       readSnapshot: () => ({
         activeTab: "chat",
-        selectedThreadId: "thread-1"
+        selectedThreadId: "thread-1",
       }),
       executeScheduledRefresh: async (refreshFlags) => {
         executedRefreshes.push(refreshFlags);
@@ -245,7 +248,7 @@ describe("EventStreamConnectionCoordinator", () => {
       applyThreadStreamDelta: (threadStreamDelta) => {
         appliedDeltaThreadIds.push(threadStreamDelta.threadId);
       },
-      onConnectionStatusChange: () => {}
+      onConnectionStatusChange: () => {},
     });
 
     const source = createdSources[0];
@@ -259,8 +262,8 @@ describe("EventStreamConnectionCoordinator", () => {
 
     source.onmessage?.(
       new MessageEvent<string>(EVENT_NAME_MESSAGE, {
-        data: createThreadStreamDeltaMessageData()
-      })
+        data: createThreadStreamDeltaMessageData(),
+      }),
     );
     await vi.advanceTimersByTimeAsync(20);
 
@@ -276,7 +279,7 @@ describe("EventStreamConnectionCoordinator", () => {
     const coordinator = createCoordinator({
       createdSources,
       initialReconnectDelayMs: 25,
-      maximumReconnectDelayMs: 100
+      maximumReconnectDelayMs: 100,
     });
     const scheduler = new EventRefreshScheduler(0);
     const decisionEngine = new EventStreamRefreshDecisionEngine(THREAD_ONLY_METHODS);
@@ -286,11 +289,11 @@ describe("EventStreamConnectionCoordinator", () => {
       eventStreamRefreshDecisionEngine: decisionEngine,
       readSnapshot: () => ({
         activeTab: "chat",
-        selectedThreadId: null
+        selectedThreadId: null,
       }),
       executeScheduledRefresh: async () => {},
       applyThreadStreamDelta: () => {},
-      onConnectionStatusChange: () => {}
+      onConnectionStatusChange: () => {},
     });
 
     const firstSource = createdSources[0];
@@ -331,11 +334,9 @@ describe("EventStreamConnectionCoordinator", () => {
     expect(() => {
       createCoordinator({
         createdSources: [],
-        initialReconnectDelayMs: -1
+        initialReconnectDelayMs: -1,
       });
-    }).toThrowError(
-      INITIAL_RECONNECT_DELAY_VALIDATION_ERROR_MESSAGE
-    );
+    }).toThrowError(INITIAL_RECONNECT_DELAY_VALIDATION_ERROR_MESSAGE);
   });
 
   it("rejects maximum reconnect delay lower than initial delay", () => {
@@ -343,10 +344,8 @@ describe("EventStreamConnectionCoordinator", () => {
       createCoordinator({
         createdSources: [],
         initialReconnectDelayMs: 100,
-        maximumReconnectDelayMs: 99
+        maximumReconnectDelayMs: 99,
       });
-    }).toThrowError(
-      RECONNECT_DELAY_RELATIONSHIP_ERROR_MESSAGE
-    );
+    }).toThrowError(RECONNECT_DELAY_RELATIONSHIP_ERROR_MESSAGE);
   });
 });

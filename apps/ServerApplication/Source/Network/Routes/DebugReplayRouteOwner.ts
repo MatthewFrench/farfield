@@ -1,28 +1,28 @@
 import { type SendRequestOptions } from "@farfield/api";
 import { parseReplayBody } from "../RequestSchemas/HttpSchemas.js";
+import { parseReplayFrame } from "./DebugReplayFrameParser.js";
 import {
   buildSendRequestOptions,
   DebugReplayFrameParseError,
   DebugReplayFrameTypeByName,
+  type DebugRouteDependencies,
   DebugRouteMethodByName,
   DebugRoutePathnameByName,
-  type DebugRouteDependencies,
-  type ParsedReplayFrame
+  type ParsedReplayFrame,
 } from "./DebugRouteContracts.js";
-import { parseReplayFrame } from "./DebugReplayFrameParser.js";
 
 const DebugReplayRouteStatusCodeByName = {
   successOk: 200,
   clientErrorNotFound: 404,
   clientErrorConflict: 409,
-  serverErrorServiceUnavailable: 503
+  serverErrorServiceUnavailable: 503,
 } as const;
 
 const DebugReplayRouteErrorMessageByName = {
   codexAdapterNotEnabled: "Codex adapter is not enabled",
   desktopIpcNotConnected: "Desktop IPC is not connected",
   historyEntryNotFound: "History entry not found",
-  historyPayloadNotFound: "History payload not found"
+  historyPayloadNotFound: "History payload not found",
 } as const;
 
 const ReplayRequestFailedSystemMessage = "Replay request failed";
@@ -44,17 +44,19 @@ export class DebugReplayRouteOwner {
       readJsonBody,
       activityHistoryService,
       toErrorMessage,
-      pushSystem
+      pushSystem,
     } = this.dependencies;
 
-    if (!(req.method === DebugRouteMethodByName.post && pathname === DebugRoutePathnameByName.replay)) {
+    if (
+      !(req.method === DebugRouteMethodByName.post && pathname === DebugRoutePathnameByName.replay)
+    ) {
       return false;
     }
 
     if (!codexAdapter) {
       jsonResponse(res, DebugReplayRouteStatusCodeByName.serverErrorServiceUnavailable, {
         ok: false,
-        error: DebugReplayRouteErrorMessageByName.codexAdapterNotEnabled
+        error: DebugReplayRouteErrorMessageByName.codexAdapterNotEnabled,
       });
       return true;
     }
@@ -62,18 +64,21 @@ export class DebugReplayRouteOwner {
     if (!codexAdapter.isIpcReady()) {
       jsonResponse(res, DebugReplayRouteStatusCodeByName.serverErrorServiceUnavailable, {
         ok: false,
-        error: codexAdapter.getRuntimeState().lastError
-          ?? DebugReplayRouteErrorMessageByName.desktopIpcNotConnected
+        error:
+          codexAdapter.getRuntimeState().lastError ??
+          DebugReplayRouteErrorMessageByName.desktopIpcNotConnected,
       });
       return true;
     }
 
     const body = parseReplayBody(await readJsonBody(req));
-    const entry = activityHistoryService.readHistoryEntries().find((item) => item.id === body.entryId);
+    const entry = activityHistoryService
+      .readHistoryEntries()
+      .find((item) => item.id === body.entryId);
     if (!entry) {
       jsonResponse(res, DebugReplayRouteStatusCodeByName.clientErrorNotFound, {
         ok: false,
-        error: DebugReplayRouteErrorMessageByName.historyEntryNotFound
+        error: DebugReplayRouteErrorMessageByName.historyEntryNotFound,
       });
       return true;
     }
@@ -82,7 +87,7 @@ export class DebugReplayRouteOwner {
     if (replayPayload === undefined) {
       jsonResponse(res, DebugReplayRouteStatusCodeByName.clientErrorConflict, {
         ok: false,
-        error: DebugReplayRouteErrorMessageByName.historyPayloadNotFound
+        error: DebugReplayRouteErrorMessageByName.historyPayloadNotFound,
       });
       return true;
     }
@@ -95,7 +100,7 @@ export class DebugReplayRouteOwner {
       if (error instanceof DebugReplayFrameParseError) {
         jsonResponse(res, DebugReplayRouteStatusCodeByName.clientErrorConflict, {
           ok: false,
-          error: error.message
+          error: error.message,
         });
         return true;
       }
@@ -113,7 +118,7 @@ export class DebugReplayRouteOwner {
         jsonResponse(res, DebugReplayRouteStatusCodeByName.successOk, {
           ok: true,
           replayed: true,
-          response
+          response,
         });
         return true;
       }
@@ -121,14 +126,14 @@ export class DebugReplayRouteOwner {
       void replayPromise.catch((error) => {
         pushSystem(ReplayRequestFailedSystemMessage, {
           error: toErrorMessage(error),
-          entryId: entry.id
+          entryId: entry.id,
         });
       });
 
       jsonResponse(res, DebugReplayRouteStatusCodeByName.successOk, {
         ok: true,
         replayed: true,
-        queued: true
+        queued: true,
       });
       return true;
     }

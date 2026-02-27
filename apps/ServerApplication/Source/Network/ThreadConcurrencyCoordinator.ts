@@ -1,4 +1,5 @@
-const EMPTY_THREAD_IDENTIFIER_ERROR_MESSAGE = "ThreadConcurrencyCoordinator requires non-empty threadId";
+const EMPTY_THREAD_IDENTIFIER_ERROR_MESSAGE =
+  "ThreadConcurrencyCoordinator requires non-empty threadId";
 const MINIMUM_NORMALIZED_THREAD_IDENTIFIER_LENGTH = 1;
 const MINIMUM_PENDING_EXECUTION_COUNT = 0;
 const SINGLE_PENDING_EXECUTION_COUNT = 1;
@@ -43,7 +44,7 @@ export class ThreadConcurrencyCoordinator {
 
   public async runExclusive<ResultType>(
     threadId: string,
-    operation: () => Promise<ResultType>
+    operation: () => Promise<ResultType>,
   ): Promise<ResultType> {
     const normalizedThreadId = this.normalizeThreadId(threadId);
     this.recordQueuedExecution(normalizedThreadId);
@@ -70,33 +71,34 @@ export class ThreadConcurrencyCoordinator {
       failedExecutionCount: this.failedExecutionCount,
       activeThreadCount: this.pendingExecutionCountByThreadId.size,
       inFlightThreadCount: this.inFlightThreadIdSet.size,
-      pendingExecutionCount: this.pendingExecutionCount
+      pendingExecutionCount: this.pendingExecutionCount,
     };
   }
 
   private recordQueuedExecution(threadId: string): void {
     this.queuedExecutionCount += 1;
     this.pendingExecutionCount += 1;
-    const currentThreadPendingExecutionCount = this.pendingExecutionCountByThreadId.get(threadId) ?? 0;
+    const currentThreadPendingExecutionCount =
+      this.pendingExecutionCountByThreadId.get(threadId) ?? 0;
     this.pendingExecutionCountByThreadId.set(threadId, currentThreadPendingExecutionCount + 1);
   }
 
   private enqueueThreadExecution(threadId: string): QueuedThreadExecution {
     const previousTail = this.tailByThreadId.get(threadId) ?? Promise.resolve();
-    let releaseCurrentTail: () => void = () => {};
+    let releaseCurrentTail: () => void = () => void 0;
     const currentTail = new Promise<void>((resolve) => {
       releaseCurrentTail = resolve;
     });
     const chainedTail = previousTail.then(
       () => currentTail,
-      () => currentTail
+      () => currentTail,
     );
     this.tailByThreadId.set(threadId, chainedTail);
 
     return {
       previousTail,
       chainedTail,
-      releaseCurrentTail
+      releaseCurrentTail,
     };
   }
 
@@ -105,7 +107,7 @@ export class ThreadConcurrencyCoordinator {
     this.releaseThreadPendingExecution(threadId);
     this.pendingExecutionCount = Math.max(
       MINIMUM_PENDING_EXECUTION_COUNT,
-      this.pendingExecutionCount - 1
+      this.pendingExecutionCount - 1,
     );
     queuedExecution.releaseCurrentTail();
     this.releaseThreadTailIfCurrent(threadId, queuedExecution.chainedTail);

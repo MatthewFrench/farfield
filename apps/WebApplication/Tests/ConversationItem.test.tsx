@@ -1,7 +1,7 @@
-import { cleanup, render, screen, type RenderResult } from "@testing-library/react";
+import type { TurnItemSchema } from "@farfield/protocol";
+import { cleanup, type RenderResult, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
-import type { TurnItemSchema } from "@farfield/protocol";
 import { ConversationItem } from "@/Components/ConversationItem";
 
 type TurnItem = z.infer<typeof TurnItemSchema>;
@@ -21,7 +21,7 @@ function renderConversationItem(input: {
       turnIsInProgress={input.turnIsInProgress ?? false}
       previousItemType={input.previousItemType}
       nextItemType={input.nextItemType}
-    />
+    />,
   );
 }
 
@@ -30,8 +30,8 @@ describe("ConversationItem", () => {
     const renderResult = renderConversationItem({
       item: {
         id: "reasoning-empty",
-        type: "reasoning"
-      }
+        type: "reasoning",
+      },
     });
 
     expect(renderResult.container.innerHTML).toBe("");
@@ -42,8 +42,8 @@ describe("ConversationItem", () => {
       item: {
         id: "reasoning-default-summary",
         type: "reasoning",
-        text: "Inspecting project state"
-      }
+        text: "Inspecting project state",
+      },
     });
 
     expect(screen.getByText("Thinking…")).toBeDefined();
@@ -58,8 +58,8 @@ describe("ConversationItem", () => {
         status: "completed",
         senderThreadId: "thread-sender",
         receiverThreadIds: [],
-        agentsStates: {}
-      }
+        agentsStates: {},
+      },
     });
 
     expect(screen.getByText("receivers: none")).toBeDefined();
@@ -73,11 +73,11 @@ describe("ConversationItem", () => {
         query: "render contracts",
         action: {
           type: "search",
-          query: "render contracts"
-        }
+          query: "render contracts",
+        },
       },
       previousItemType: "commandExecution",
-      nextItemType: "fileChange"
+      nextItemType: "fileChange",
     });
 
     const panel = screen.getByText("Web search").parentElement;
@@ -96,10 +96,10 @@ describe("ConversationItem", () => {
         query: "spacing contracts",
         action: {
           type: "search",
-          query: "spacing contracts"
-        }
+          query: "spacing contracts",
+        },
       },
-      nextItemType: "commandExecution"
+      nextItemType: "commandExecution",
     });
 
     const panel = screen.getByText("Web search").parentElement;
@@ -120,9 +120,9 @@ describe("ConversationItem", () => {
         questions: [],
         answers: {
           q1: ["first", "second"],
-          q2: ["third"]
-        }
-      }
+          q2: ["third"],
+        },
+      },
     });
 
     const responseTextContainer = screen.getByText("Response").nextElementSibling;

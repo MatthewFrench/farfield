@@ -1,6 +1,6 @@
 import {
   FarfieldEventStreamEnvelopeSchema,
-  type FarfieldThreadStreamDelta
+  type FarfieldThreadStreamDelta,
 } from "@farfield/protocol";
 import { z } from "zod";
 
@@ -11,12 +11,12 @@ const THREAD_STREAM_STATE_CHANGED_METHOD = "thread-stream-state-changed";
 const CORE_REFRESH_HISTORY_ENTRY_SOURCES = new Set(["app", "system"]);
 const EVENT_HISTORY_REFRESH_METADATA_STRING_SCHEMA = z.preprocess(
   (value) => (typeof value === "string" && value.length > 0 ? value : null),
-  z.string().min(1).nullable()
+  z.string().min(1).nullable(),
 );
 const EVENT_HISTORY_REFRESH_METADATA_SCHEMA = z
   .object({
     method: EVENT_HISTORY_REFRESH_METADATA_STRING_SCHEMA,
-    threadId: EVENT_HISTORY_REFRESH_METADATA_STRING_SCHEMA
+    threadId: EVENT_HISTORY_REFRESH_METADATA_STRING_SCHEMA,
   })
   .passthrough();
 
@@ -61,25 +61,26 @@ export class EventStreamRefreshDecisionEngine {
       } else if (parseResult.data.event.type === EVENT_TYPE_ACTIVITY_HISTORY_APPENDED) {
         refreshHistory = refreshHistoryForDebugTab;
         const eventHistoryRefreshMetadata = EVENT_HISTORY_REFRESH_METADATA_SCHEMA.parse(
-          parseResult.data.event.entry.meta
+          parseResult.data.event.entry.meta,
         );
         const eventMethod = eventHistoryRefreshMetadata.method;
         const eventThreadId = eventHistoryRefreshMetadata.threadId;
-        const isThreadOnlyMethod = eventMethod !== null && this.threadOnlyHistoryMethods.has(eventMethod);
+        const isThreadOnlyMethod =
+          eventMethod !== null && this.threadOnlyHistoryMethods.has(eventMethod);
 
         if (
-          !isThreadOnlyMethod
-          && CORE_REFRESH_HISTORY_ENTRY_SOURCES.has(parseResult.data.event.entry.source)
+          !isThreadOnlyMethod &&
+          CORE_REFRESH_HISTORY_ENTRY_SOURCES.has(parseResult.data.event.entry.source)
         ) {
           refreshCore = true;
         }
         // This method has its own delta channel; skipping selected-thread refresh avoids duplicate work.
         if (
-          eventMethod !== THREAD_STREAM_STATE_CHANGED_METHOD
-          && eventThreadId !== null
-          && input.selectedThreadId !== null
-          && input.selectedThreadId.length > 0
-          && eventThreadId === input.selectedThreadId
+          eventMethod !== THREAD_STREAM_STATE_CHANGED_METHOD &&
+          eventThreadId !== null &&
+          input.selectedThreadId !== null &&
+          input.selectedThreadId.length > 0 &&
+          eventThreadId === input.selectedThreadId
         ) {
           refreshSelectedThread = true;
         }
@@ -89,9 +90,9 @@ export class EventStreamRefreshDecisionEngine {
         }
       } else {
         if (
-          input.selectedThreadId !== null
-          && input.selectedThreadId.length > 0
-          && parseResult.data.event.delta.threadId === input.selectedThreadId
+          input.selectedThreadId !== null &&
+          input.selectedThreadId.length > 0 &&
+          parseResult.data.event.delta.threadId === input.selectedThreadId
         ) {
           threadStreamDelta = parseResult.data.event.delta;
         }
@@ -105,7 +106,7 @@ export class EventStreamRefreshDecisionEngine {
       refreshCore,
       refreshHistory,
       refreshSelectedThread,
-      threadStreamDelta
+      threadStreamDelta,
     };
   }
 }

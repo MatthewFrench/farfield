@@ -1,5 +1,5 @@
-import type { z } from "zod";
 import type { ThreadTurnSchema, TurnItemSchema } from "@farfield/protocol";
+import type { z } from "zod";
 
 export type ConversationTurn = z.infer<typeof ThreadTurnSchema>;
 export type ConversationTurnItem = z.infer<typeof TurnItemSchema>;
@@ -27,7 +27,7 @@ export class ConversationItemFlattener {
 
   public flattenConversationItems(
     turns: ConversationTurn[],
-    isGenerating: boolean
+    isGenerating: boolean,
   ): FlattenedConversationItem[] {
     const flattened: FlattenedConversationItem[] = [];
     let previousRenderedTurnIndex = -1;
@@ -55,7 +55,7 @@ export class ConversationItemFlattener {
           turnIsInProgress: turnInProgress,
           previousItemType: items[itemIndexInTurn - 1]?.type,
           nextItemType: items[itemIndexInTurn + 1]?.type,
-          spacingTop
+          spacingTop,
         });
         previousRenderedTurnIndex = turnIndex;
       });
@@ -68,7 +68,7 @@ export class ConversationItemFlattener {
 
     return flattened.map((flattenedItem, flattenedItemIndex) => ({
       ...flattenedItem,
-      isLast: flattenedItemIndex === lastItemIndex
+      isLast: flattenedItemIndex === lastItemIndex,
     }));
   }
 

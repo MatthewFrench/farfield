@@ -1,25 +1,25 @@
-import {
-  useEffect,
-  type MutableRefObject
-} from "react";
-import {
-  type LoadSelectedThreadOptions
-} from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
+import { type MutableRefObject, useEffect } from "react";
+import { type LoadSelectedThreadOptions } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 
 const EMPTY_HISTORY_ENTRY_IDENTIFIER = "";
 
 export interface UseApplicationSynchronizationEffectsInput {
   loadCoreDataTracked: () => Promise<void>;
   loadCoreDataTrackedRef: MutableRefObject<(() => Promise<void>) | null>;
-  loadSelectedThreadTracked: (threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>;
-  loadSelectedThreadRef: MutableRefObject<((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null>;
+  loadSelectedThreadTracked: (
+    threadId: string,
+    options?: LoadSelectedThreadOptions,
+  ) => Promise<void>;
+  loadSelectedThreadRef: MutableRefObject<
+    ((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null
+  >;
   loadHistoryDetail: (historyEntryId: string) => Promise<void>;
   selectedHistoryId: string;
   handleRuntimeRequestError: <ErrorType>(error: ErrorType) => void;
 }
 
 export function useApplicationSynchronizationEffects(
-  input: UseApplicationSynchronizationEffectsInput
+  input: UseApplicationSynchronizationEffectsInput,
 ): void {
   useEffect(() => {
     const loadCoreDataTrackedRef = input.loadCoreDataTrackedRef;
@@ -39,9 +39,5 @@ export function useApplicationSynchronizationEffects(
     void input.loadHistoryDetail(input.selectedHistoryId).catch((error) => {
       input.handleRuntimeRequestError(error);
     });
-  }, [
-    input.handleRuntimeRequestError,
-    input.loadHistoryDetail,
-    input.selectedHistoryId
-  ]);
+  }, [input.handleRuntimeRequestError, input.loadHistoryDetail, input.selectedHistoryId]);
 }

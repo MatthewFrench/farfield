@@ -1,11 +1,11 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
 import {
-  parseDebugErrorEvent,
   type CreateDebugClientErrorBody,
   type DebugErrorEvent,
-  type DebugErrorSeverity
+  type DebugErrorSeverity,
+  parseDebugErrorEvent,
 } from "@farfield/protocol";
 import { logger } from "../../Shared/Logging/Logger.js";
 
@@ -122,7 +122,7 @@ export class ClientErrorStore {
       threadId: input.threadId ?? null,
       url: input.url ?? null,
       details: input.details,
-      occurredAt
+      occurredAt,
     });
   }
 
@@ -139,7 +139,7 @@ export class ClientErrorStore {
       threadId: input.threadId ?? null,
       url: input.url ?? null,
       details: input.details,
-      occurredAt: input.occurredAt
+      occurredAt: input.occurredAt,
     });
   }
 
@@ -175,7 +175,7 @@ export class ClientErrorStore {
     const lines = this.readStoredLines(raw);
     const malformedLineSummary: MalformedLineSummary = {
       malformedLineCount: 0,
-      sampledLineNumbers: []
+      sampledLineNumbers: [],
     };
     for (const [lineIndex, line] of lines.entries()) {
       const parsed = this.tryParseStoredLine(line, lineIndex + 1, malformedLineSummary);
@@ -205,7 +205,7 @@ export class ClientErrorStore {
   private cloneEvent(event: DebugErrorEvent): DebugErrorEvent {
     return {
       ...event,
-      details: structuredClone(event.details)
+      details: structuredClone(event.details),
     };
   }
 
@@ -225,7 +225,7 @@ export class ClientErrorStore {
       url: input.url,
       details: input.details,
       occurredAt: input.occurredAt,
-      recordedAt: new Date().toISOString()
+      recordedAt: new Date().toISOString(),
     });
   }
 
@@ -247,7 +247,7 @@ export class ClientErrorStore {
   private tryParseStoredLine(
     line: string,
     lineNumber: number,
-    malformedLineSummary: MalformedLineSummary
+    malformedLineSummary: MalformedLineSummary,
   ): DebugErrorEvent | null {
     try {
       return this.parseStoredLine(line);
@@ -259,11 +259,13 @@ export class ClientErrorStore {
 
   private recordMalformedLine(
     lineNumber: number,
-    malformedLineSummary: MalformedLineSummary
+    malformedLineSummary: MalformedLineSummary,
   ): void {
     const mutableMalformedLineSummary = malformedLineSummary;
     mutableMalformedLineSummary.malformedLineCount += 1;
-    if (mutableMalformedLineSummary.sampledLineNumbers.length < MALFORMED_LINE_NUMBER_SAMPLE_LIMIT) {
+    if (
+      mutableMalformedLineSummary.sampledLineNumbers.length < MALFORMED_LINE_NUMBER_SAMPLE_LIMIT
+    ) {
       mutableMalformedLineSummary.sampledLineNumbers.push(lineNumber);
     }
   }
@@ -274,9 +276,9 @@ export class ClientErrorStore {
         sessionId: this.sessionId,
         logPath: this.filePath,
         malformedLineCount: malformedLineSummary.malformedLineCount,
-        sampledLineNumbers: malformedLineSummary.sampledLineNumbers
+        sampledLineNumbers: malformedLineSummary.sampledLineNumbers,
       },
-      MALFORMED_LINE_LOG_EVENT
+      MALFORMED_LINE_LOG_EVENT,
     );
   }
 
@@ -284,7 +286,7 @@ export class ClientErrorStore {
     fs.appendFileSync(
       this.filePath,
       `${this.serializeEvent(event)}${NDJSON_LINE_BREAK}`,
-      TEXT_FILE_ENCODING
+      TEXT_FILE_ENCODING,
     );
   }
 

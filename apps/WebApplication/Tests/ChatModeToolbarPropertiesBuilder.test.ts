@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  type BuildChatModeToolbarPropertiesInput,
   ChatModeToolbarPropertiesBuilder,
-  type BuildChatModeToolbarPropertiesInput
 } from "../Source/Features/Chat/UserInterface/ChatModeToolbarPropertiesBuilder";
 
 function createInput(): BuildChatModeToolbarPropertiesInput {
@@ -10,7 +10,7 @@ function createInput(): BuildChatModeToolbarPropertiesInput {
     canListCollaborationModes: true,
     canListModels: true,
     planModeOption: {
-      mode: "plan"
+      mode: "plan",
     },
     defaultModeKey: "default",
     isPlanModeEnabled: false,
@@ -28,7 +28,7 @@ function createInput(): BuildChatModeToolbarPropertiesInput {
     onSetSelectedModeKey: vi.fn(),
     onSetSelectedModelId: vi.fn(),
     onSetSelectedReasoningEffort: vi.fn(),
-    onApplyModeDraft: vi.fn()
+    onApplyModeDraft: vi.fn(),
   };
 }
 
@@ -44,7 +44,7 @@ describe("ChatModeToolbarPropertiesBuilder", () => {
     expect(input.onApplyModeDraft).toHaveBeenCalledWith({
       modeKey: "plan",
       modelId: "gpt-5",
-      reasoningEffort: "high"
+      reasoningEffort: "high",
     });
   });
 
@@ -61,7 +61,7 @@ describe("ChatModeToolbarPropertiesBuilder", () => {
     expect(input.onApplyModeDraft).toHaveBeenCalledWith({
       modeKey: "default",
       modelId: "gpt-5",
-      reasoningEffort: "high"
+      reasoningEffort: "high",
     });
   });
 
@@ -90,7 +90,7 @@ describe("ChatModeToolbarPropertiesBuilder", () => {
     expect(input.onApplyModeDraft).toHaveBeenCalledWith({
       modeKey: "default",
       modelId: "gpt-5.1",
-      reasoningEffort: "high"
+      reasoningEffort: "high",
     });
   });
 
@@ -105,7 +105,7 @@ describe("ChatModeToolbarPropertiesBuilder", () => {
     expect(input.onApplyModeDraft).toHaveBeenCalledWith({
       modeKey: "default",
       modelId: "gpt-5",
-      reasoningEffort: "low"
+      reasoningEffort: "low",
     });
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ThreadListStateStore } from "@/Features/Threads/StateManagement/ThreadListStateStore";
 import type { ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { ThreadListStateStore } from "@/Features/Threads/StateManagement/ThreadListStateStore";
 
 interface ThreadFixtureInput {
   id: string;
@@ -20,7 +20,7 @@ function buildThread(input: ThreadFixtureInput): ThreadListItem {
     updatedAt: input.updatedAt ?? 1_735_000_000_100,
     cwd: input.cwd ?? "/tmp/thread-state-store",
     path: input.path ?? "/tmp/thread-state-store",
-    agentId: input.agentId ?? "codex"
+    agentId: input.agentId ?? "codex",
   };
 }
 
@@ -31,15 +31,15 @@ function buildSelectionThreads(): ThreadListItem[] {
       preview: "OpenCode thread",
       createdAt: 1_735_000_000_000,
       updatedAt: 1_735_000_000_100,
-      agentId: "opencode"
+      agentId: "opencode",
     }),
     buildThread({
       id: "thread-codex",
       preview: "Codex thread",
       createdAt: 1_735_000_000_001,
       updatedAt: 1_735_000_000_101,
-      agentId: "codex"
-    })
+      agentId: "codex",
+    }),
   ];
 }
 
@@ -51,14 +51,14 @@ describe("ThreadListStateStore", () => {
     const initialSelection = store.computeInitialSelectedThreadIdentifier({
       currentSelectedThreadIdentifier: null,
       preferredAgentIdentifier: "codex",
-      nextThreads
+      nextThreads,
     });
     expect(initialSelection).toBe("thread-codex");
 
     const secondSelectionWithoutReset = store.computeInitialSelectedThreadIdentifier({
       currentSelectedThreadIdentifier: null,
       preferredAgentIdentifier: "opencode",
-      nextThreads
+      nextThreads,
     });
     expect(secondSelectionWithoutReset).toBeNull();
 
@@ -67,7 +67,7 @@ describe("ThreadListStateStore", () => {
     const selectionAfterReset = store.computeInitialSelectedThreadIdentifier({
       currentSelectedThreadIdentifier: null,
       preferredAgentIdentifier: "opencode",
-      nextThreads
+      nextThreads,
     });
     expect(selectionAfterReset).toBe("thread-opencode");
   });
@@ -81,7 +81,7 @@ describe("ThreadListStateStore", () => {
         updatedAt: 100,
         cwd: "/workspace/alpha",
         path: "/workspace/alpha",
-        agentId: "codex"
+        agentId: "codex",
       }),
       buildThread({
         id: "thread-beta",
@@ -89,14 +89,14 @@ describe("ThreadListStateStore", () => {
         updatedAt: 200,
         cwd: "/workspace/beta",
         path: "/workspace/beta",
-        agentId: "opencode"
-      })
+        agentId: "opencode",
+      }),
     ];
 
     const firstResult = store.computeActiveThreadState({
       nextThreads: firstThreads,
       previousUnreadThreadIdentifiers: {},
-      selectedThreadIdentifier: null
+      selectedThreadIdentifier: null,
     });
     expect(firstResult.didChangeThreads).toBe(true);
     expect(firstResult.nextUnreadThreadIdentifiers).toEqual({});
@@ -108,7 +108,7 @@ describe("ThreadListStateStore", () => {
         updatedAt: 100,
         cwd: "/workspace/alpha",
         path: "/workspace/alpha",
-        agentId: "codex"
+        agentId: "codex",
       }),
       buildThread({
         id: "thread-beta",
@@ -116,14 +116,14 @@ describe("ThreadListStateStore", () => {
         updatedAt: 200,
         cwd: "/workspace/beta",
         path: "/workspace/beta",
-        agentId: "opencode"
-      })
+        agentId: "opencode",
+      }),
     ];
 
     const secondResult = store.computeActiveThreadState({
       nextThreads: secondThreads,
       previousUnreadThreadIdentifiers: firstResult.nextUnreadThreadIdentifiers,
-      selectedThreadIdentifier: null
+      selectedThreadIdentifier: null,
     });
     expect(secondResult.didChangeThreads).toBe(false);
   });
@@ -135,20 +135,20 @@ describe("ThreadListStateStore", () => {
         id: "thread-alpha",
         preview: "Alpha",
         updatedAt: 100,
-        agentId: "codex"
+        agentId: "codex",
       }),
       buildThread({
         id: "thread-beta",
         preview: "Beta",
         updatedAt: 200,
-        agentId: "opencode"
-      })
+        agentId: "opencode",
+      }),
     ];
 
     const initialResult = store.computeActiveThreadState({
       nextThreads: initialThreads,
       previousUnreadThreadIdentifiers: {},
-      selectedThreadIdentifier: null
+      selectedThreadIdentifier: null,
     });
     expect(initialResult.nextUnreadThreadIdentifiers).toEqual({});
 
@@ -157,29 +157,29 @@ describe("ThreadListStateStore", () => {
         id: "thread-alpha",
         preview: "Alpha",
         updatedAt: 101,
-        agentId: "codex"
+        agentId: "codex",
       }),
       buildThread({
         id: "thread-beta",
         preview: "Beta",
         updatedAt: 200,
-        agentId: "opencode"
-      })
+        agentId: "opencode",
+      }),
     ];
 
     const unreadUpdateResult = store.computeActiveThreadState({
       nextThreads: updatedThreads,
       previousUnreadThreadIdentifiers: initialResult.nextUnreadThreadIdentifiers,
-      selectedThreadIdentifier: "thread-beta"
+      selectedThreadIdentifier: "thread-beta",
     });
     expect(unreadUpdateResult.nextUnreadThreadIdentifiers).toEqual({
-      "thread-alpha": true
+      "thread-alpha": true,
     });
 
     const selectedUnreadThreadResult = store.computeActiveThreadState({
       nextThreads: updatedThreads,
       previousUnreadThreadIdentifiers: unreadUpdateResult.nextUnreadThreadIdentifiers,
-      selectedThreadIdentifier: "thread-alpha"
+      selectedThreadIdentifier: "thread-alpha",
     });
     expect(selectedUnreadThreadResult.nextUnreadThreadIdentifiers).toEqual({});
   });
@@ -188,28 +188,29 @@ describe("ThreadListStateStore", () => {
     const store = new ThreadListStateStore();
     const unreadThreadIdentifiers: Record<string, true> = {
       "thread-alpha": true,
-      "thread-beta": true
+      "thread-beta": true,
     };
 
     const nextUnreadAfterSelection = store.computeUnreadThreadIdentifiersAfterSelectionChange({
       previousUnreadThreadIdentifiers: unreadThreadIdentifiers,
-      selectedThreadIdentifier: "thread-alpha"
+      selectedThreadIdentifier: "thread-alpha",
     });
     expect(nextUnreadAfterSelection).toEqual({
-      "thread-beta": true
+      "thread-beta": true,
     });
     expect(nextUnreadAfterSelection).not.toBe(unreadThreadIdentifiers);
 
     const unchangedWhenNoSelection = store.computeUnreadThreadIdentifiersAfterSelectionChange({
       previousUnreadThreadIdentifiers: unreadThreadIdentifiers,
-      selectedThreadIdentifier: null
+      selectedThreadIdentifier: null,
     });
     expect(unchangedWhenNoSelection).toBe(unreadThreadIdentifiers);
 
-    const unchangedWhenSelectionIsNotUnread = store.computeUnreadThreadIdentifiersAfterSelectionChange({
-      previousUnreadThreadIdentifiers: unreadThreadIdentifiers,
-      selectedThreadIdentifier: "thread-missing"
-    });
+    const unchangedWhenSelectionIsNotUnread =
+      store.computeUnreadThreadIdentifiersAfterSelectionChange({
+        previousUnreadThreadIdentifiers: unreadThreadIdentifiers,
+        selectedThreadIdentifier: "thread-missing",
+      });
     expect(unchangedWhenSelectionIsNotUnread).toBe(unreadThreadIdentifiers);
   });
 });

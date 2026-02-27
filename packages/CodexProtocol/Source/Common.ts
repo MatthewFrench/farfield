@@ -14,7 +14,7 @@ export type JsonValue = JsonPrimitive | JsonObject | JsonArray;
 export const JsonObjectSchema: z.ZodType<JsonObject> = z.lazy(() => z.record(JsonValueSchema));
 
 export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([JsonPrimitiveSchema, z.array(JsonValueSchema), JsonObjectSchema])
+  z.union([JsonPrimitiveSchema, z.array(JsonValueSchema), JsonObjectSchema]),
 );
 
 export function assertNever(value: never): never {

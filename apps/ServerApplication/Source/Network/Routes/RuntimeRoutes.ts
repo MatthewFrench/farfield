@@ -1,29 +1,26 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
-  FarfieldHealthStateSchema,
   FarfieldEventsSessionResponseSchema,
-  type JsonValue
+  FarfieldHealthStateSchema,
+  type JsonValue,
 } from "@farfield/protocol";
 import { z } from "zod";
-import type { EventStreamClientRegistry } from "../EventStreamClientRegistry.js";
 import type { BrowserSessionAuthOwner } from "../BrowserSessionAuthOwner.js";
-import {
-  RequestMethodByName,
-  RequestPathnameByName
-} from "../RequestPathContracts.js";
+import type { EventStreamClientRegistry } from "../EventStreamClientRegistry.js";
+import { RequestMethodByName, RequestPathnameByName } from "../RequestPathContracts.js";
 
 const RuntimeRouteStatusCodeByName = {
   successOk: 200,
-  clientErrorBadRequest: 400
+  clientErrorBadRequest: 400,
 } as const;
 
 const RuntimeRouteErrorMessageByName = {
-  invalidEventsSessionBootstrapPayload: "Invalid events session bootstrap payload"
+  invalidEventsSessionBootstrapPayload: "Invalid events session bootstrap payload",
 } as const;
 
 const RuntimeRouteHeaderNameByName = {
   cookie: "cookie",
-  setCookie: "Set-Cookie"
+  setCookie: "Set-Cookie",
 } as const;
 
 const RuntimeStateChangedEventType = "runtime-state-changed";
@@ -39,20 +36,20 @@ const RuntimeRouteHeaderValueListSchema = z
 const EventsSessionBootstrapBodyIssueSchema = z
   .object({
     path: z.string(),
-    message: z.string()
+    message: z.string(),
   })
   .strict();
 const InvalidEventsSessionBootstrapResponseSchema = z
   .object({
     ok: z.literal(false),
     error: z.literal(RuntimeRouteErrorMessageByName.invalidEventsSessionBootstrapPayload),
-    issues: z.array(EventsSessionBootstrapBodyIssueSchema)
+    issues: z.array(EventsSessionBootstrapBodyIssueSchema),
   })
   .strict();
 
 const EventsSessionBootstrapBodySchema = z
   .object({
-    apiToken: z.string().trim().min(1).optional()
+    apiToken: z.string().trim().min(1).optional(),
   })
   .strict();
 
@@ -67,13 +64,13 @@ interface EventsSessionBootstrapBodyIssue {
 
 type EventsSessionBootstrapBodyParseResult =
   | {
-    ok: true;
-    body: EventsSessionBootstrapBody;
-  }
+      ok: true;
+      body: EventsSessionBootstrapBody;
+    }
   | {
-    ok: false;
-    issues: EventsSessionBootstrapBodyIssue[];
-  };
+      ok: false;
+      issues: EventsSessionBootstrapBodyIssue[];
+    };
 
 export interface RuntimeStateSnapshotReader {
   readSnapshot: () => object;
@@ -110,14 +107,14 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
     eventStreamClientRegistry,
     runtimeStateOwner,
     readJsonBody,
-    jsonResponse
+    jsonResponse,
   } = deps;
 
   if (req.method === RequestMethodByName.get && pathname === RequestPathnameByName.events) {
     const runtimeStateSnapshot = FarfieldHealthStateSchema.parse(runtimeStateOwner.readSnapshot());
     eventStreamClientRegistry.addClient(req, res, {
       type: RuntimeStateChangedEventType,
-      state: runtimeStateSnapshot
+      state: runtimeStateSnapshot,
     });
     return true;
   }
@@ -126,14 +123,17 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
     const runtimeStateSnapshot = FarfieldHealthStateSchema.parse(runtimeStateOwner.readSnapshot());
     jsonResponse(res, RuntimeRouteStatusCodeByName.successOk, {
       ok: true,
-      state: runtimeStateSnapshot
+      state: runtimeStateSnapshot,
     });
     return true;
   }
 
-  if (req.method === RequestMethodByName.post && pathname === RequestPathnameByName.apiEventsSession) {
+  if (
+    req.method === RequestMethodByName.post &&
+    pathname === RequestPathnameByName.apiEventsSession
+  ) {
     const currentSession = browserSessionAuthOwner.readSession(
-      readHeaderValue(req, RuntimeRouteHeaderNameByName.cookie)
+      readHeaderValue(req, RuntimeRouteHeaderNameByName.cookie),
     );
     let bootstrapped = !apiAuthRequired || currentSession.authenticated;
     let expiresAt = currentSession.expiresAt;
@@ -144,10 +144,10 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
         const invalidResponse = InvalidEventsSessionBootstrapResponseSchema.parse({
           ok: false,
           error: RuntimeRouteErrorMessageByName.invalidEventsSessionBootstrapPayload,
-          issues: parsedBody.issues
+          issues: parsedBody.issues,
         });
         jsonResponse(res, RuntimeRouteStatusCodeByName.clientErrorBadRequest, {
-          ...invalidResponse
+          ...invalidResponse,
         });
         return true;
       }
@@ -155,7 +155,7 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
       const providedToken = resolveEventsSessionBootstrapToken(
         req,
         apiTokenHeaderName,
-        parsedBody.body.apiToken
+        parsedBody.body.apiToken,
       );
       if (providedToken !== null && providedToken === apiToken) {
         const issuedSession = browserSessionAuthOwner.issueSessionCookie();
@@ -169,7 +169,7 @@ export async function handleRuntimeRoutes(deps: RuntimeRouteDependencies): Promi
       ok: true,
       authRequired: apiAuthRequired,
       bootstrapped,
-      expiresAt: bootstrapped ? expiresAt : null
+      expiresAt: bootstrapped ? expiresAt : null,
     });
     jsonResponse(res, RuntimeRouteStatusCodeByName.successOk, response);
     return true;
@@ -183,7 +183,7 @@ function parseEventsSessionBootstrapBody(value: JsonValue): EventsSessionBootstr
   if (parsedBody.success) {
     return {
       ok: true,
-      body: parsedBody.data
+      body: parsedBody.data,
     };
   }
 
@@ -191,8 +191,8 @@ function parseEventsSessionBootstrapBody(value: JsonValue): EventsSessionBootstr
     ok: false,
     issues: parsedBody.error.issues.map((issue) => ({
       path: buildEventsSessionBootstrapIssuePath(issue.path),
-      message: issue.message
-    }))
+      message: issue.message,
+    })),
   };
 }
 
@@ -206,7 +206,7 @@ function buildEventsSessionBootstrapIssuePath(pathSegments: readonly (string | n
 function resolveEventsSessionBootstrapToken(
   req: IncomingMessage,
   apiTokenHeaderName: string,
-  bodyApiToken: string | undefined
+  bodyApiToken: string | undefined,
 ): string | null {
   // Header token stays authoritative so trusted proxy headers override request-body values.
   const providedHeaderToken = readHeaderValue(req, apiTokenHeaderName);
@@ -221,7 +221,7 @@ function readHeaderValue(req: IncomingMessage, name: string): string | null {
   }
 
   const parsedHeaderValueList = RuntimeRouteHeaderValueListSchema.safeParse(
-    req.headers[parsedHeaderLookupName.data]
+    req.headers[parsedHeaderLookupName.data],
   );
   if (!parsedHeaderValueList.success) {
     return null;

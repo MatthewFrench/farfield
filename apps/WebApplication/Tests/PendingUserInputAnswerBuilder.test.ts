@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createEmptyPendingUserInputAnswerDraft,
-  PendingUserInputAnswerBuilder
+  PendingUserInputAnswerBuilder,
 } from "../Source/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
 
 describe("PendingUserInputAnswerBuilder", () => {
@@ -18,34 +18,30 @@ describe("PendingUserInputAnswerBuilder", () => {
     const builder = new PendingUserInputAnswerBuilder();
 
     const answersByQuestionId = builder.buildAnswersByQuestionId({
-      questions: [
-        { id: "question-1" },
-        { id: "question-2" },
-        { id: "question-3" }
-      ],
+      questions: [{ id: "question-1" }, { id: "question-2" }, { id: "question-3" }],
       answerDraftByQuestionId: {
         "question-1": {
           option: "selected-option",
-          freeform: "ignored text"
+          freeform: "ignored text",
         },
         "question-2": {
           option: "",
-          freeform: "  freeform response  "
+          freeform: "  freeform response  ",
         },
         "question-3": {
           option: "",
-          freeform: "   "
-        }
-      }
+          freeform: "   ",
+        },
+      },
     });
 
     expect(answersByQuestionId).toEqual({
       "question-1": {
-        answers: ["selected-option"]
+        answers: ["selected-option"],
       },
       "question-2": {
-        answers: ["freeform response"]
-      }
+        answers: ["freeform response"],
+      },
     });
   });
 });

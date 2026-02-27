@@ -40,26 +40,28 @@ function formatIssuePath(pathSegments: readonly ProtocolValidationIssuePathSegme
     .replace(/\.\[/g, "[");
 }
 
-function createIssueMetadata(issueInput: ProtocolValidationIssueInput): ProtocolValidationIssueMetadata {
+function createIssueMetadata(
+  issueInput: ProtocolValidationIssueInput,
+): ProtocolValidationIssueMetadata {
   const path = formatIssuePath(issueInput.pathSegments);
   const summary = `${path}: ${issueInput.message}`;
   return {
     pathSegments: [...issueInput.pathSegments],
     path,
     message: issueInput.message,
-    summary
+    summary,
   };
 }
 
 function createMetadata(
   context: string,
-  issueInputs: readonly ProtocolValidationIssueInput[]
+  issueInputs: readonly ProtocolValidationIssueInput[],
 ): ProtocolValidationErrorMetadata {
   const issueDetails = issueInputs.map(createIssueMetadata);
   return {
     context,
     issuePaths: issueDetails.map((issueDetail) => issueDetail.path),
-    issueDetails
+    issueDetails,
   };
 }
 
@@ -76,7 +78,7 @@ function createValidationMessage(metadata: ProtocolValidationErrorMetadata): str
 function createLegacyMetadata(issues: readonly string[]): ProtocolValidationErrorMetadata {
   return createMetadata(
     LegacyErrorContext,
-    issues.map((issue) => ({ pathSegments: [], message: issue }))
+    issues.map((issue) => ({ pathSegments: [], message: issue })),
   );
 }
 
@@ -87,7 +89,7 @@ export class ProtocolValidationError extends Error {
   public constructor(
     message: string,
     issues: string[],
-    metadata: ProtocolValidationErrorMetadata = createLegacyMetadata(issues)
+    metadata: ProtocolValidationErrorMetadata = createLegacyMetadata(issues),
   ) {
     super(message);
     this.name = "ProtocolValidationError";
@@ -97,13 +99,13 @@ export class ProtocolValidationError extends Error {
 
   public static fromIssues(
     context: string,
-    issueInputs: readonly ProtocolValidationIssueInput[]
+    issueInputs: readonly ProtocolValidationIssueInput[],
   ): ProtocolValidationError {
     const metadata = createMetadata(context, issueInputs);
     return new ProtocolValidationError(
       createValidationMessage(metadata),
       metadata.issueDetails.map((issueDetail) => issueDetail.summary),
-      metadata
+      metadata,
     );
   }
 
@@ -112,8 +114,8 @@ export class ProtocolValidationError extends Error {
       context,
       error.issues.map((issue) => ({
         pathSegments: issue.path,
-        message: issue.message
-      }))
+        message: issue.message,
+      })),
     );
   }
 }

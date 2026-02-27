@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   AgentIdSchema,
-  ApiRequestHeaderOptionsSchema
+  ApiRequestHeaderOptionsSchema,
 } from "../Source/Shared/Contracts/ApiContracts";
 
 describe("ApiContracts", () => {
   it("parses and trims request header options", () => {
     const parsed = ApiRequestHeaderOptionsSchema.parse({
       actionId: "  action_1  ",
-      actionName: "  send-message  "
+      actionName: "  send-message  ",
     });
 
     expect(parsed.actionId).toBe("action_1");
@@ -18,8 +18,8 @@ describe("ApiContracts", () => {
   it("rejects invalid request header option tokens", () => {
     expect(() =>
       ApiRequestHeaderOptionsSchema.parse({
-        actionId: "invalid action id"
-      })
+        actionId: "invalid action id",
+      }),
     ).toThrow("Request metadata values may contain only letters");
   });
 
@@ -28,8 +28,8 @@ describe("ApiContracts", () => {
       ApiRequestHeaderOptionsSchema.parse({
         actionId: "action_1",
         actionName: "send-message",
-        extra: "unexpected"
-      })
+        extra: "unexpected",
+      }),
     ).toThrow("Unrecognized key(s) in object");
   });
 

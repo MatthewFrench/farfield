@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
-import { describe, expect, it, vi, type Mock } from "vitest";
+import { describe, expect, it, type Mock, vi } from "vitest";
 
 type PushEventLike = {
   data: { text: () => string } | null;
@@ -73,8 +73,8 @@ function loadServiceWorkerHarness(): ServiceWorkerHarness {
       }
       return new Response(matched, {
         headers: {
-          "Content-Type": "text/plain; charset=utf-8"
-        }
+          "Content-Type": "text/plain; charset=utf-8",
+        },
       });
     },
     put: async (request: Request | string, response: Response) => {
@@ -84,7 +84,7 @@ function loadServiceWorkerHarness(): ServiceWorkerHarness {
     delete: async (request: Request | string) => {
       const requestUrl = typeof request === "string" ? request : request.url;
       return cacheStore.delete(requestUrl);
-    }
+    },
   }));
 
   const scriptPath = path.resolve(process.cwd(), "public/sw.js");
@@ -93,7 +93,10 @@ function loadServiceWorkerHarness(): ServiceWorkerHarness {
   const selfScope = {
     addEventListener: (
       type: string,
-      handler: ((event: PushEventLike) => void) | ((event: NotificationClickEventLike) => void) | ((event: MessageEventLike) => void)
+      handler:
+        | ((event: PushEventLike) => void)
+        | ((event: NotificationClickEventLike) => void)
+        | ((event: MessageEventLike) => void),
     ) => {
       if (type === "push") {
         handlers.push = handler as (event: PushEventLike) => void;
@@ -108,20 +111,20 @@ function loadServiceWorkerHarness(): ServiceWorkerHarness {
       }
     },
     registration: {
-      showNotification: showNotificationMock
+      showNotification: showNotificationMock,
     },
     clients: {
       matchAll: matchAllMock,
-      openWindow: openWindowMock
+      openWindow: openWindowMock,
     },
     caches: {
-      open: cacheOpenMock
+      open: cacheOpenMock,
     },
     skipWaiting: skipWaitingMock,
     location: {
       origin: "https://example.test",
-      href: "https://example.test/sw.js"
-    }
+      href: "https://example.test/sw.js",
+    },
   };
 
   vm.runInNewContext(scriptSource, {
@@ -133,7 +136,7 @@ function loadServiceWorkerHarness(): ServiceWorkerHarness {
     Headers,
     Date,
     Promise,
-    String
+    String,
   });
 
   return {
@@ -143,7 +146,7 @@ function loadServiceWorkerHarness(): ServiceWorkerHarness {
     openWindowMock,
     skipWaitingMock,
     matchAllMock,
-    cacheOpenMock
+    cacheOpenMock,
   };
 }
 
@@ -182,21 +185,23 @@ describe("service worker notifications", () => {
               notification: {
                 title: "Codex response ready",
                 navigate: "/threads/thread_1",
-                tag: "thread:thread_1"
-              }
-            }
-          })
+                tag: "thread:thread_1",
+              },
+            },
+          }),
       },
       waitUntil: (promise) => {
         waitUntilPromises.push(promise.then(() => undefined));
-      }
+      },
     });
 
     await Promise.all(waitUntilPromises);
 
     expect(harness.showNotificationMock).toHaveBeenCalledTimes(1);
     expect(harness.fetchMock).toHaveBeenCalledTimes(1);
-    const receipt = receiptFromFetchCall(harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined);
+    const receipt = receiptFromFetchCall(
+      harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined,
+    );
     expect(receipt.notificationId).toBe("notif_1");
     expect(receipt.event).toBe("shown");
     expect(receipt.url).toBe("/threads/thread_1");
@@ -216,19 +221,21 @@ describe("service worker notifications", () => {
           JSON.stringify({
             notificationId: "notif_bad",
             title: "Codex response ready",
-            body: "missing required fields"
-          })
+            body: "missing required fields",
+          }),
       },
       waitUntil: (promise) => {
         waitUntilPromises.push(promise.then(() => undefined));
-      }
+      },
     });
 
     await Promise.all(waitUntilPromises);
 
     expect(harness.showNotificationMock).not.toHaveBeenCalled();
     expect(harness.fetchMock).toHaveBeenCalledTimes(1);
-    const receipt = receiptFromFetchCall(harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined);
+    const receipt = receiptFromFetchCall(
+      harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined,
+    );
     expect(receipt.event).toBe("error");
     expect(receipt.message).toContain("Push payload validation failed");
   });
@@ -241,7 +248,7 @@ describe("service worker notifications", () => {
     const focusMock = vi.fn(async () => undefined);
     harness.matchAllMock.mockResolvedValueOnce([
       { url: "https://example.test/threads/thread_1", focus: focusMock },
-      { url: "https://example.test/threads/thread_2", focus: vi.fn(async () => undefined) }
+      { url: "https://example.test/threads/thread_2", focus: vi.fn(async () => undefined) },
     ]);
 
     const waitUntilPromises: Promise<void>[] = [];
@@ -252,12 +259,12 @@ describe("service worker notifications", () => {
           notificationId: "notif_1",
           url: "/threads/thread_1",
           threadId: "thread_1",
-          turnId: "turn_1"
-        }
+          turnId: "turn_1",
+        },
       },
       waitUntil: (promise) => {
         waitUntilPromises.push(promise.then(() => undefined));
-      }
+      },
     });
 
     await Promise.all(waitUntilPromises);
@@ -265,7 +272,9 @@ describe("service worker notifications", () => {
     expect(focusMock).toHaveBeenCalledTimes(1);
     expect(harness.openWindowMock).not.toHaveBeenCalled();
     expect(harness.fetchMock).toHaveBeenCalledTimes(1);
-    const receipt = receiptFromFetchCall(harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined);
+    const receipt = receiptFromFetchCall(
+      harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined,
+    );
     expect(receipt.notificationId).toBe("notif_1");
     expect(receipt.event).toBe("clicked");
     expect(receipt.url).toBe("/threads/thread_1");
@@ -282,8 +291,8 @@ describe("service worker notifications", () => {
       {
         url: "https://example.test/threads/thread_2",
         focus: focusMock,
-        navigate: navigateMock
-      }
+        navigate: navigateMock,
+      },
     ]);
 
     const waitUntilPromises: Promise<void>[] = [];
@@ -294,12 +303,12 @@ describe("service worker notifications", () => {
           notificationId: "notif_2",
           url: "/threads/thread_1",
           threadId: "thread_1",
-          turnId: "turn_1"
-        }
+          turnId: "turn_1",
+        },
       },
       waitUntil: (promise) => {
         waitUntilPromises.push(promise.then(() => undefined));
-      }
+      },
     });
 
     await Promise.all(waitUntilPromises);
@@ -309,7 +318,9 @@ describe("service worker notifications", () => {
     expect(focusMock).toHaveBeenCalledTimes(1);
     expect(harness.openWindowMock).not.toHaveBeenCalled();
     expect(harness.fetchMock).toHaveBeenCalledTimes(1);
-    const receipt = receiptFromFetchCall(harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined);
+    const receipt = receiptFromFetchCall(
+      harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined,
+    );
     expect(receipt.notificationId).toBe("notif_2");
     expect(receipt.event).toBe("clicked");
     expect(receipt.url).toBe("/threads/thread_1");
@@ -330,12 +341,12 @@ describe("service worker notifications", () => {
           notificationId: "notif_3",
           url: "/threads/thread_3",
           threadId: "thread_3",
-          turnId: "turn_3"
-        }
+          turnId: "turn_3",
+        },
       },
       waitUntil: (promise) => {
         waitUntilPromises.push(promise.then(() => undefined));
-      }
+      },
     });
 
     await Promise.all(waitUntilPromises);
@@ -343,7 +354,9 @@ describe("service worker notifications", () => {
     expect(harness.openWindowMock).toHaveBeenCalledTimes(1);
     expect(harness.openWindowMock).toHaveBeenCalledWith("https://example.test/threads/thread_3");
     expect(harness.fetchMock).toHaveBeenCalledTimes(1);
-    const receipt = receiptFromFetchCall(harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined);
+    const receipt = receiptFromFetchCall(
+      harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined,
+    );
     expect(receipt.notificationId).toBe("notif_3");
     expect(receipt.event).toBe("clicked");
     expect(receipt.url).toBe("/threads/thread_3");
@@ -361,8 +374,8 @@ describe("service worker notifications", () => {
       {
         url: "https://example.test/threads/thread_2",
         focus: vi.fn(async () => undefined),
-        navigate: failingNavigateMock
-      }
+        navigate: failingNavigateMock,
+      },
     ]);
 
     const waitUntilPromises: Promise<void>[] = [];
@@ -373,12 +386,12 @@ describe("service worker notifications", () => {
           notificationId: "notif_navigation_error",
           url: "/threads/thread_1",
           threadId: "thread_1",
-          turnId: "turn_1"
-        }
+          turnId: "turn_1",
+        },
       },
       waitUntil: (promise) => {
         waitUntilPromises.push(promise.then(() => undefined));
-      }
+      },
     });
 
     await Promise.all(waitUntilPromises);
@@ -386,7 +399,9 @@ describe("service worker notifications", () => {
     expect(failingNavigateMock).toHaveBeenCalledTimes(1);
     expect(harness.openWindowMock).not.toHaveBeenCalled();
     expect(harness.fetchMock).toHaveBeenCalledTimes(1);
-    const receipt = receiptFromFetchCall(harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined);
+    const receipt = receiptFromFetchCall(
+      harness.fetchMock.mock.calls[0] as [string, RequestInit?] | undefined,
+    );
     expect(receipt.notificationId).toBe("notif_navigation_error");
     expect(receipt.event).toBe("error");
     expect(receipt.message).toContain("navigation failed");
@@ -400,11 +415,11 @@ describe("service worker notifications", () => {
     const waitUntilPromises: Promise<void>[] = [];
     messageHandler?.({
       data: {
-        type: "SKIP_WAITING"
+        type: "SKIP_WAITING",
       },
       waitUntil: (promise) => {
         waitUntilPromises.push(promise.then(() => undefined));
-      }
+      },
     });
 
     await Promise.all(waitUntilPromises);
@@ -419,11 +434,11 @@ describe("service worker notifications", () => {
     const waitUntilPromises: Promise<void>[] = [];
     messageHandler?.({
       data: {
-        type: "NO_OPERATION"
+        type: "NO_OPERATION",
       },
       waitUntil: (promise) => {
         waitUntilPromises.push(promise.then(() => undefined));
-      }
+      },
     });
 
     await Promise.all(waitUntilPromises);

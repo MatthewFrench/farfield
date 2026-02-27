@@ -28,12 +28,7 @@ describe("ThreadConcurrencyCoordinator", () => {
     const results = await Promise.all([firstOperation, secondOperation]);
 
     expect(results).toEqual(["first", "second"]);
-    expect(executionOrder).toEqual([
-      "first:start",
-      "first:end",
-      "second:start",
-      "second:end"
-    ]);
+    expect(executionOrder).toEqual(["first:start", "first:end", "second:start", "second:end"]);
   });
 
   it("allows concurrent operations for different threads", async () => {
@@ -100,7 +95,7 @@ describe("ThreadConcurrencyCoordinator", () => {
       "second:start",
       "second:end",
       "third:start",
-      "third:end"
+      "third:end",
     ]);
 
     const statistics = coordinator.readStatistics();
@@ -110,7 +105,7 @@ describe("ThreadConcurrencyCoordinator", () => {
       failedExecutionCount: 1,
       activeThreadCount: 0,
       inFlightThreadCount: 0,
-      pendingExecutionCount: 0
+      pendingExecutionCount: 0,
     });
   });
 
@@ -142,12 +137,7 @@ describe("ThreadConcurrencyCoordinator", () => {
     await expect(firstOperation).resolves.toBe("first");
     await expect(secondOperation).resolves.toBe("second");
 
-    expect(executionOrder).toEqual([
-      "first:start",
-      "first:end",
-      "second:start",
-      "second:end"
-    ]);
+    expect(executionOrder).toEqual(["first:start", "first:end", "second:start", "second:end"]);
   });
 
   it("reports active-thread and in-flight telemetry while operations are running", async () => {
@@ -173,7 +163,7 @@ describe("ThreadConcurrencyCoordinator", () => {
       failedExecutionCount: 0,
       activeThreadCount: 1,
       inFlightThreadCount: 1,
-      pendingExecutionCount: 1
+      pendingExecutionCount: 1,
     });
 
     const queuedThreadOneOperation = coordinator.runExclusive("thread_1", async () => {
@@ -195,7 +185,7 @@ describe("ThreadConcurrencyCoordinator", () => {
       failedExecutionCount: 0,
       activeThreadCount: 2,
       inFlightThreadCount: 2,
-      pendingExecutionCount: 3
+      pendingExecutionCount: 3,
     });
 
     releaseThreadTwoOperation();
@@ -208,16 +198,16 @@ describe("ThreadConcurrencyCoordinator", () => {
       failedExecutionCount: 0,
       activeThreadCount: 0,
       inFlightThreadCount: 0,
-      pendingExecutionCount: 0
+      pendingExecutionCount: 0,
     });
   });
 
   it("rejects blank thread identifiers at the owner boundary", async () => {
     const coordinator = new ThreadConcurrencyCoordinator();
 
-    await expect(
-      coordinator.runExclusive("   ", async () => "never")
-    ).rejects.toThrow("ThreadConcurrencyCoordinator requires non-empty threadId");
+    await expect(coordinator.runExclusive("   ", async () => "never")).rejects.toThrow(
+      "ThreadConcurrencyCoordinator requires non-empty threadId",
+    );
 
     expect(coordinator.readStatistics()).toEqual({
       queuedExecutionCount: 0,
@@ -225,7 +215,7 @@ describe("ThreadConcurrencyCoordinator", () => {
       failedExecutionCount: 0,
       activeThreadCount: 0,
       inFlightThreadCount: 0,
-      pendingExecutionCount: 0
+      pendingExecutionCount: 0,
     });
   });
 
@@ -235,7 +225,7 @@ describe("ThreadConcurrencyCoordinator", () => {
     await expect(
       coordinator.runExclusive("thread_1", async () => {
         throw new Error("operation failed");
-      })
+      }),
     ).rejects.toThrow("operation failed");
 
     const result = await coordinator.runExclusive("thread_1", async () => "ok");
@@ -248,7 +238,7 @@ describe("ThreadConcurrencyCoordinator", () => {
       failedExecutionCount: 1,
       activeThreadCount: 0,
       inFlightThreadCount: 0,
-      pendingExecutionCount: 0
+      pendingExecutionCount: 0,
     });
   });
 });

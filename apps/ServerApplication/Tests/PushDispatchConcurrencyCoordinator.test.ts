@@ -12,15 +12,15 @@ describe("PushDispatchConcurrencyCoordinator", () => {
     const shouldSchedule = (): boolean => true;
     const runCheck = async (): Promise<void> => {};
 
-    expect(
-      () => new PushDispatchConcurrencyCoordinator(0, shouldSchedule, runCheck)
-    ).toThrow("requires positive integer debounceMs");
-    expect(
-      () => new PushDispatchConcurrencyCoordinator(-1, shouldSchedule, runCheck)
-    ).toThrow("requires positive integer debounceMs");
-    expect(
-      () => new PushDispatchConcurrencyCoordinator(1.5, shouldSchedule, runCheck)
-    ).toThrow("requires positive integer debounceMs");
+    expect(() => new PushDispatchConcurrencyCoordinator(0, shouldSchedule, runCheck)).toThrow(
+      "requires positive integer debounceMs",
+    );
+    expect(() => new PushDispatchConcurrencyCoordinator(-1, shouldSchedule, runCheck)).toThrow(
+      "requires positive integer debounceMs",
+    );
+    expect(() => new PushDispatchConcurrencyCoordinator(1.5, shouldSchedule, runCheck)).toThrow(
+      "requires positive integer debounceMs",
+    );
   });
 
   it("debounces repeated schedule calls for the same thread", async () => {
@@ -31,7 +31,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       () => true,
       async (threadId) => {
         calls.push(threadId);
-      }
+      },
     );
 
     coordinator.schedule("thread_1");
@@ -51,7 +51,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       activeTimerCount: 0,
       inFlightThreadCount: 0,
       pendingRerunThreadCount: 0,
-      isStopped: false
+      isStopped: false,
     });
     coordinator.stop();
   });
@@ -64,7 +64,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       () => true,
       async (threadId) => {
         calls.push(threadId);
-      }
+      },
     );
 
     coordinator.schedule("  thread_1  ");
@@ -81,7 +81,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       activeTimerCount: 0,
       inFlightThreadCount: 0,
       pendingRerunThreadCount: 0,
-      isStopped: false
+      isStopped: false,
     });
     coordinator.stop();
   });
@@ -100,7 +100,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       async () => {
         runCount += 1;
         await checkGate;
-      }
+      },
     );
 
     coordinator.schedule("thread_1");
@@ -127,7 +127,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       activeTimerCount: 0,
       inFlightThreadCount: 0,
       pendingRerunThreadCount: 0,
-      isStopped: false
+      isStopped: false,
     });
     coordinator.stop();
   });
@@ -140,7 +140,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       () => true,
       async () => {
         runCount += 1;
-      }
+      },
     );
 
     coordinator.schedule("thread_1");
@@ -159,7 +159,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       () => true,
       async () => {
         throw new Error("check failed");
-      }
+      },
     );
 
     coordinator.schedule("thread_1");
@@ -169,7 +169,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       startedCheckCount: 1,
       completedCheckCount: 0,
       failedCheckCount: 1,
-      suppressedSchedulerErrorCount: 0
+      suppressedSchedulerErrorCount: 0,
     });
     coordinator.stop();
   });
@@ -183,7 +183,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
         shouldScheduleCallCount += 1;
         return false;
       },
-      async () => {}
+      async () => {},
     );
 
     coordinator.schedule("thread_1");
@@ -192,7 +192,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
 
     expect(coordinator.readStatistics()).toMatchObject({
       scheduledCheckCount: 0,
-      startedCheckCount: 0
+      startedCheckCount: 0,
     });
     expect(shouldScheduleCallCount).toBe(1);
     coordinator.stop();
@@ -205,7 +205,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       () => {
         throw new Error("policy failure");
       },
-      async () => {}
+      async () => {},
     );
 
     expect(() => {
@@ -223,7 +223,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       activeTimerCount: 0,
       inFlightThreadCount: 0,
       pendingRerunThreadCount: 0,
-      isStopped: false
+      isStopped: false,
     });
     coordinator.stop();
   });
@@ -237,7 +237,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
         shouldScheduleCallCount += 1;
         return true;
       },
-      async () => {}
+      async () => {},
     );
 
     coordinator.stop();
@@ -255,7 +255,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       activeTimerCount: 0,
       inFlightThreadCount: 0,
       pendingRerunThreadCount: 0,
-      isStopped: true
+      isStopped: true,
     });
   });
 
@@ -273,7 +273,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       async () => {
         runCount += 1;
         await checkGate;
-      }
+      },
     );
 
     coordinator.schedule("thread_1");
@@ -297,7 +297,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       activeTimerCount: 0,
       inFlightThreadCount: 0,
       pendingRerunThreadCount: 0,
-      isStopped: true
+      isStopped: true,
     });
   });
 
@@ -325,7 +325,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
       async () => {
         runCount += 1;
         await checkGate;
-      }
+      },
     );
 
     let unhandledRejectionCount = 0;
@@ -357,7 +357,7 @@ describe("PushDispatchConcurrencyCoordinator", () => {
         activeTimerCount: 0,
         inFlightThreadCount: 0,
         pendingRerunThreadCount: 0,
-        isStopped: false
+        isStopped: false,
       });
     } finally {
       process.off("unhandledRejection", onUnhandledRejection);

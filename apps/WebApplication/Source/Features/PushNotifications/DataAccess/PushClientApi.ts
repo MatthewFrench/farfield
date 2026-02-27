@@ -1,3 +1,4 @@
+import { PushClientStateManager } from "@/Features/PushNotifications/DataAccess/PushClientStateManager";
 import type {
   PushClientState,
   PushNotificationDisableResult,
@@ -6,9 +7,8 @@ import type {
   PushNotificationSettingsUpdateResult,
   PushRecoveryResult,
   PushSubscriptionReconcileInput,
-  PushSubscriptionReconcileResult
+  PushSubscriptionReconcileResult,
 } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
-import { PushClientStateManager } from "@/Features/PushNotifications/DataAccess/PushClientStateManager";
 
 const defaultPushClientStateManager = new PushClientStateManager();
 
@@ -17,13 +17,13 @@ export async function getPushClientState(): Promise<PushClientState> {
 }
 
 export async function enablePushNotifications(
-  input: PushNotificationPreferenceInput
+  input: PushNotificationPreferenceInput,
 ): Promise<PushNotificationEnableResult> {
   return defaultPushClientStateManager.enablePushNotifications(input);
 }
 
 export async function updatePushSettings(
-  input: PushNotificationPreferenceInput
+  input: PushNotificationPreferenceInput,
 ): Promise<PushNotificationSettingsUpdateResult> {
   return defaultPushClientStateManager.updatePushSettings(input);
 }
@@ -33,13 +33,13 @@ export async function disablePushNotifications(): Promise<PushNotificationDisabl
 }
 
 export async function reconcilePushSubscription(
-  input?: PushSubscriptionReconcileInput
+  input?: PushSubscriptionReconcileInput,
 ): Promise<PushSubscriptionReconcileResult> {
   return defaultPushClientStateManager.reconcilePushSubscription(input);
 }
 
 export async function recoverPushNotifications(
-  input: PushNotificationPreferenceInput
+  input: PushNotificationPreferenceInput,
 ): Promise<PushRecoveryResult> {
   return defaultPushClientStateManager.recoverPushNotifications(input);
 }

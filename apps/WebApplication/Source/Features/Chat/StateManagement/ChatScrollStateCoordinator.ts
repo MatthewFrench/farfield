@@ -19,13 +19,16 @@ export class ChatScrollStateCoordinator {
 
   public constructor(bottomThresholdPx: number) {
     if (!Number.isFinite(bottomThresholdPx) || bottomThresholdPx < 0) {
-      throw new Error("ChatScrollStateCoordinator requires a non-negative finite bottomThresholdPx");
+      throw new Error(
+        "ChatScrollStateCoordinator requires a non-negative finite bottomThresholdPx",
+      );
     }
     this.bottomThresholdPx = bottomThresholdPx;
   }
 
   public readDistanceFromBottom(scrollElement: ChatScrollElementLike): number {
-    const distanceFromBottom = scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight;
+    const distanceFromBottom =
+      scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight;
     return distanceFromBottom > 0 ? distanceFromBottom : 0;
   }
 
@@ -34,12 +37,12 @@ export class ChatScrollStateCoordinator {
   }
 
   public synchronizeBottomState(
-    input: ChatBottomStateSynchronizationInput
+    input: ChatBottomStateSynchronizationInput,
   ): ChatBottomStateSynchronizationResult {
     const nextIsAtBottom = this.readIsAtBottom(input.scrollElement);
     return {
       nextIsAtBottom,
-      changed: nextIsAtBottom !== input.previousIsAtBottom
+      changed: nextIsAtBottom !== input.previousIsAtBottom,
     };
   }
 

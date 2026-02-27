@@ -1,8 +1,9 @@
+import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import {
   type ApiInterruptThreadInput,
   type ApiLiveStateResponse,
-  type ApiReadThreadOptions,
   type ApiReadStreamEventsOptions,
+  type ApiReadThreadOptions,
   type ApiReadThreadResponse,
   type ApiSendMessageInput,
   type ApiSetCollaborationModeInput,
@@ -14,9 +15,8 @@ import {
   readThread,
   sendMessage,
   setCollaborationMode,
-  submitUserInput
+  submitUserInput,
 } from "./ChatApi";
-import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 
 export type ChatReadThreadOptions = ApiReadThreadOptions;
 export type ChatReadStreamEventsOptions = ApiReadStreamEventsOptions;
@@ -35,43 +35,49 @@ export type ChatInterruptThreadInput = ApiInterruptThreadInput;
 export class ChatServerClient {
   public async readThread(
     threadId: string,
-    options?: ChatReadThreadOptions
+    options?: ChatReadThreadOptions,
   ): Promise<ChatReadThreadResponse> {
     return readThread(threadId, options);
   }
 
-  public async readLiveState(threadId: string, options?: ApiRequestOptions): Promise<ChatLiveStateResponse> {
+  public async readLiveState(
+    threadId: string,
+    options?: ApiRequestOptions,
+  ): Promise<ChatLiveStateResponse> {
     return getLiveState(threadId, options);
   }
 
   public async readStreamEvents(
     threadId: string,
-    options?: ChatReadStreamEventsOptions
+    options?: ChatReadStreamEventsOptions,
   ): Promise<ChatStreamEventsResponse> {
     return getStreamEvents(threadId, options);
   }
 
-  public async sendMessage(input: ChatSendMessageInput, options?: ApiRequestOptions): Promise<void> {
+  public async sendMessage(
+    input: ChatSendMessageInput,
+    options?: ApiRequestOptions,
+  ): Promise<void> {
     return sendMessage(input, options);
   }
 
   public async setCollaborationMode(
     input: ChatSetCollaborationModeInput,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<void> {
     return setCollaborationMode(input, options);
   }
 
   public async submitUserInput(
     input: ChatSubmitUserInputInput,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<void> {
     return submitUserInput(input, options);
   }
 
   public async interruptThread(
     input: ChatInterruptThreadInput,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions,
   ): Promise<void> {
     return interruptThread(input, options);
   }

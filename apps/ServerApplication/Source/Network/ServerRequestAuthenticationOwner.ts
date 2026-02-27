@@ -32,8 +32,8 @@ export class ServerRequestAuthenticationOwner {
       return true;
     }
     if (
-      !pathname.startsWith(RequestPathnameByName.apiPrefix)
-      && pathname !== RequestPathnameByName.events
+      !pathname.startsWith(RequestPathnameByName.apiPrefix) &&
+      pathname !== RequestPathnameByName.events
     ) {
       return true;
     }
@@ -41,7 +41,7 @@ export class ServerRequestAuthenticationOwner {
     if (!this.isAuthenticatedRequest(req)) {
       this.deps.jsonResponse(res, STATUS_CODE_UNAUTHORIZED, {
         ok: false,
-        error: `Unauthorized: missing or invalid ${this.deps.apiTokenResponseHeader}`
+        error: `Unauthorized: missing or invalid ${this.deps.apiTokenResponseHeader}`,
       });
       return false;
     }
@@ -54,7 +54,7 @@ export class ServerRequestAuthenticationOwner {
       return true;
     }
     const session = this.deps.browserSessionAuthOwner.readSession(
-      this.deps.readHeader(req, COOKIE_HEADER_NAME)
+      this.deps.readHeader(req, COOKIE_HEADER_NAME),
     );
     if (session.authenticated) {
       return true;

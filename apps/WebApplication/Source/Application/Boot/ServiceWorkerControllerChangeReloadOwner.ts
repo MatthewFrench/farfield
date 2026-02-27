@@ -23,32 +23,32 @@ export interface ServiceWorkerControllerChangeReloadDecision {
   reason: ServiceWorkerControllerChangeReloadDecisionReason;
 }
 
-const SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_AWAITING_FIRST_CONTROLLER_ADOPTION:
-  ServiceWorkerControllerChangeReloadLifecyclePhase = "awaiting-first-controller-adoption";
-const SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_READY_FOR_CONTROLLER_CHANGE_RELOAD:
-  ServiceWorkerControllerChangeReloadLifecyclePhase = "ready-for-controller-change-reload";
-const SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_ALREADY_REQUESTED:
-  ServiceWorkerControllerChangeReloadLifecyclePhase = "reload-already-requested";
+const SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_AWAITING_FIRST_CONTROLLER_ADOPTION: ServiceWorkerControllerChangeReloadLifecyclePhase =
+  "awaiting-first-controller-adoption";
+const SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_READY_FOR_CONTROLLER_CHANGE_RELOAD: ServiceWorkerControllerChangeReloadLifecyclePhase =
+  "ready-for-controller-change-reload";
+const SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_ALREADY_REQUESTED: ServiceWorkerControllerChangeReloadLifecyclePhase =
+  "reload-already-requested";
 
-const SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_FIRST_ADOPTION:
-  ServiceWorkerControllerChangeReloadDecision = {
+const SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_FIRST_ADOPTION: ServiceWorkerControllerChangeReloadDecision =
+  {
     shouldReload: false,
-    reason: "first-controller-adoption"
+    reason: "first-controller-adoption",
   };
-const SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_SUPPRESSED:
-  ServiceWorkerControllerChangeReloadDecision = {
+const SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_SUPPRESSED: ServiceWorkerControllerChangeReloadDecision =
+  {
     shouldReload: false,
-    reason: "reload-suppressed"
+    reason: "reload-suppressed",
   };
-const SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_ALREADY_REQUESTED:
-  ServiceWorkerControllerChangeReloadDecision = {
+const SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_ALREADY_REQUESTED: ServiceWorkerControllerChangeReloadDecision =
+  {
     shouldReload: false,
-    reason: "reload-already-requested"
+    reason: "reload-already-requested",
   };
-const SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_TRIGGER_RELOAD:
-  ServiceWorkerControllerChangeReloadDecision = {
+const SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_TRIGGER_RELOAD: ServiceWorkerControllerChangeReloadDecision =
+  {
     shouldReload: true,
-    reason: "reload-required"
+    reason: "reload-required",
   };
 
 export class ServiceWorkerControllerChangeReloadOwner {
@@ -61,13 +61,14 @@ export class ServiceWorkerControllerChangeReloadOwner {
   }
 
   public readDecision(
-    input: ServiceWorkerControllerChangeReloadDecisionInput
+    input: ServiceWorkerControllerChangeReloadDecisionInput,
   ): ServiceWorkerControllerChangeReloadDecision {
     if (
-      this.lifecyclePhase
-      === SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_AWAITING_FIRST_CONTROLLER_ADOPTION
+      this.lifecyclePhase ===
+      SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_AWAITING_FIRST_CONTROLLER_ADOPTION
     ) {
-      this.lifecyclePhase = SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_READY_FOR_CONTROLLER_CHANGE_RELOAD;
+      this.lifecyclePhase =
+        SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_READY_FOR_CONTROLLER_CHANGE_RELOAD;
       return SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_FIRST_ADOPTION;
     }
 
@@ -75,10 +76,7 @@ export class ServiceWorkerControllerChangeReloadOwner {
       return SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_SUPPRESSED;
     }
 
-    if (
-      this.lifecyclePhase
-      === SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_ALREADY_REQUESTED
-    ) {
+    if (this.lifecyclePhase === SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_ALREADY_REQUESTED) {
       return SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_ALREADY_REQUESTED;
     }
 

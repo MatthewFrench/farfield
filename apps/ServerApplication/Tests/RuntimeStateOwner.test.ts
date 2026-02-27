@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   RuntimeStateOwner,
-  type RuntimeStateReadModel
+  type RuntimeStateReadModel,
 } from "../Source/Application/StateManagement/RuntimeStateOwner.js";
 
-function createRuntimeStateReadModel(overrides: Partial<RuntimeStateReadModel> = {}): RuntimeStateReadModel {
+function createRuntimeStateReadModel(
+  overrides: Partial<RuntimeStateReadModel> = {},
+): RuntimeStateReadModel {
   return {
     appExecutable: "codex",
     socketPath: "/tmp/ipc.sock",
@@ -16,7 +18,7 @@ function createRuntimeStateReadModel(overrides: Partial<RuntimeStateReadModel> =
         ipcConnected: true,
         ipcInitialized: true,
         codexAvailable: true,
-        lastError: null
+        lastError: null,
       };
     },
     readHistoryCount: () => 1,
@@ -26,7 +28,7 @@ function createRuntimeStateReadModel(overrides: Partial<RuntimeStateReadModel> =
     readPushReceiptCount: () => 0,
     readClientErrorCount: () => 0,
     readActiveTraceSummary: () => null,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -42,11 +44,11 @@ describe("RuntimeStateOwner", () => {
             ipcConnected: true,
             ipcInitialized: true,
             codexAvailable: true,
-            lastError: null
+            lastError: null,
           };
-        }
+        },
       }),
-      250
+      250,
     );
 
     const firstSnapshot = owner.readSnapshot(1_000);
@@ -67,11 +69,11 @@ describe("RuntimeStateOwner", () => {
             ipcConnected: true,
             ipcInitialized: true,
             codexAvailable: true,
-            lastError: "from-codex"
+            lastError: "from-codex",
           };
-        }
+        },
       }),
-      250
+      250,
     );
 
     const firstSnapshot = owner.readSnapshot(1_000);
@@ -95,11 +97,11 @@ describe("RuntimeStateOwner", () => {
             ipcConnected: true,
             ipcInitialized: true,
             codexAvailable: true,
-            lastError: null
+            lastError: null,
           };
-        }
+        },
       }),
-      250
+      250,
     );
 
     owner.readSnapshot(1_000);

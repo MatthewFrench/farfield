@@ -1,10 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type {
-  MappedThreadListItem,
-  OpenCodeCreateSessionInput
-} from "@farfield/opencode-api";
+import type { MappedThreadListItem, OpenCodeCreateSessionInput } from "@farfield/opencode-api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OpenCodeAgentAdapter } from "../Source/Agents/Adapters/OpenCodeAgentAdapter.js";
 import type { AgentListThreadsInput } from "../Source/Agents/Types.js";
@@ -47,8 +44,8 @@ const openCodeApiMock = vi.hoisted(() => {
         preview: "thread_create_session preview",
         createdAt: 1,
         updatedAt: 2,
-        source: "opencode"
-      }
+        source: "opencode",
+      },
     };
   }
 
@@ -62,7 +59,7 @@ const openCodeApiMock = vi.hoisted(() => {
       listSessionsCalls: [],
       sendMessageCalls: [],
       createSessionCalls: [],
-      createSessionResult: createDefaultCreateSessionResult()
+      createSessionResult: createDefaultCreateSessionResult(),
     };
   }
 
@@ -91,16 +88,18 @@ const openCodeApiMock = vi.hoisted(() => {
   class OpenCodeMonitorServiceMock {
     public constructor(_connection: OpenCodeConnectionMock) {}
 
-    public async listSessions(input?: { directory?: string }): Promise<{ data: MappedThreadListItem[] }> {
+    public async listSessions(input?: {
+      directory?: string;
+    }): Promise<{ data: MappedThreadListItem[] }> {
       if (input?.directory !== undefined) {
         state.listSessionsCalls.push({ directory: input.directory });
         return {
-          data: state.listSessionsByDirectory.get(input.directory) ?? []
+          data: state.listSessionsByDirectory.get(input.directory) ?? [],
         };
       }
       state.listSessionsCalls.push({});
       return {
-        data: state.unscopedSessions
+        data: state.unscopedSessions,
       };
     }
 
@@ -117,7 +116,7 @@ const openCodeApiMock = vi.hoisted(() => {
     }
 
     public async createSession(
-      input?: OpenCodeCreateSessionInput
+      input?: OpenCodeCreateSessionInput,
     ): Promise<OpenCodeCreateSessionResult> {
       state.createSessionCalls.push(input ?? {});
       return state.createSessionResult;
@@ -140,14 +139,14 @@ const openCodeApiMock = vi.hoisted(() => {
       state = createState();
     },
     OpenCodeConnectionMock,
-    OpenCodeMonitorServiceMock
+    OpenCodeMonitorServiceMock,
   };
 });
 
 vi.mock("@farfield/opencode-api", () => {
   return {
     OpenCodeConnection: openCodeApiMock.OpenCodeConnectionMock,
-    OpenCodeMonitorService: openCodeApiMock.OpenCodeMonitorServiceMock
+    OpenCodeMonitorService: openCodeApiMock.OpenCodeMonitorServiceMock,
   };
 });
 
@@ -171,11 +170,13 @@ function createThreadListItem(input: {
     createdAt: input.createdAt ?? 1,
     updatedAt: input.updatedAt ?? 2,
     ...(input.cwd ? { cwd: input.cwd } : {}),
-    source: "opencode"
+    source: "opencode",
   };
 }
 
-function createListThreadsInput(overrides: Partial<AgentListThreadsInput> = {}): AgentListThreadsInput {
+function createListThreadsInput(
+  overrides: Partial<AgentListThreadsInput> = {},
+): AgentListThreadsInput {
   return {
     limit: 20,
     archived: false,
@@ -184,7 +185,7 @@ function createListThreadsInput(overrides: Partial<AgentListThreadsInput> = {}):
     cursor: null,
     sortKey: "updated_at",
     cwd: null,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -206,15 +207,15 @@ describe("OpenCodeAgentAdapter", () => {
 
     const result = await adapter.listThreads(
       createListThreadsInput({
-        archived: true
-      })
+        archived: true,
+      }),
     );
 
     expect(result).toEqual({
       data: [],
       nextCursor: null,
       pages: 0,
-      truncated: false
+      truncated: false,
     });
     expect(openCodeApiMock.getState().listSessionsCalls).toEqual([]);
   });
@@ -225,8 +226,8 @@ describe("OpenCodeAgentAdapter", () => {
     state.projectDirectories = [];
     state.unscopedSessions = [
       createThreadListItem({
-        id: "thread_unscoped"
-      })
+        id: "thread_unscoped",
+      }),
     ];
 
     const result = await adapter.listThreads(createListThreadsInput());
@@ -247,27 +248,27 @@ describe("OpenCodeAgentAdapter", () => {
     state.listSessionsByDirectory.set(projectDirectory, [
       createThreadListItem({
         id: "thread_cached_directory",
-        cwd: `  ${threadDirectory}  `
-      })
+        cwd: `  ${threadDirectory}  `,
+      }),
     ]);
 
     await adapter.listThreads(createListThreadsInput());
     await adapter.sendMessage({
       threadId: "thread_cached_directory",
-      text: "hello world"
+      text: "hello world",
     });
 
     expect(state.listSessionsCalls).toEqual([
       {
-        directory: projectDirectory
-      }
+        directory: projectDirectory,
+      },
     ]);
     expect(state.sendMessageCalls).toEqual([
       {
         sessionId: "thread_cached_directory",
         text: "hello world",
-        directory: threadDirectory
-      }
+        directory: threadDirectory,
+      },
     ]);
   });
 
@@ -276,8 +277,8 @@ describe("OpenCodeAgentAdapter", () => {
 
     await expect(
       adapter.createThread({
-        cwd: ""
-      })
+        cwd: "",
+      }),
     ).rejects.toThrow(DIRECTORY_REQUIRED_ERROR_MESSAGE);
   });
 
@@ -286,13 +287,13 @@ describe("OpenCodeAgentAdapter", () => {
     const state = openCodeApiMock.getState();
 
     const result = await adapter.createThread({
-      model: ""
+      model: "",
     });
 
     expect(state.createSessionCalls).toEqual([
       {
-        title: ""
-      }
+        title: "",
+      },
     ]);
     expect(result.threadId).toBe("thread_create_session");
   });
@@ -309,8 +310,8 @@ describe("OpenCodeAgentAdapter", () => {
     state.listSessionsByDirectory.set(projectDirectory, [
       createThreadListItem({
         id: "thread_cached_directory_explicit_empty_cwd",
-        cwd: `  ${threadDirectory}  `
-      })
+        cwd: `  ${threadDirectory}  `,
+      }),
     ]);
 
     await adapter.listThreads(createListThreadsInput());
@@ -318,8 +319,8 @@ describe("OpenCodeAgentAdapter", () => {
       adapter.sendMessage({
         threadId: "thread_cached_directory_explicit_empty_cwd",
         text: "hello world",
-        cwd: ""
-      })
+        cwd: "",
+      }),
     ).rejects.toThrow(DIRECTORY_REQUIRED_ERROR_MESSAGE);
     expect(state.sendMessageCalls).toEqual([]);
   });

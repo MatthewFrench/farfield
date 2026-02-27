@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import {
-  CollaborationModeActionCoordinator,
   type CollaborationModeActionChatClient,
-  type CollaborationModeActionModeOption
+  CollaborationModeActionCoordinator,
+  type CollaborationModeActionModeOption,
 } from "../Source/Features/Chat/StateManagement/CollaborationModeActionCoordinator";
 
 const modeSelectionStateResolver = new ModeSelectionStateResolver();
@@ -14,22 +14,22 @@ const FAILED_THREAD_ID = "thread-3";
 const DEFAULT_MODE_OPTIONS: CollaborationModeActionModeOption[] = [
   {
     mode: "default",
-    developer_instructions: "Use explicit reasoning."
-  }
+    developer_instructions: "Use explicit reasoning.",
+  },
 ];
 const PLAN_MODE_OPTIONS: CollaborationModeActionModeOption[] = [
   {
     mode: "plan",
-    developer_instructions: null
-  }
+    developer_instructions: null,
+  },
 ];
 
 const buildActionRequestOptions = (actionName: string) => ({
   actionId: `action-${actionName}`,
   requestOptions: {
     actionId: `action-${actionName}`,
-    actionName
-  }
+    actionName,
+  },
 });
 
 function createCoordinator(): CollaborationModeActionCoordinator {
@@ -37,10 +37,10 @@ function createCoordinator(): CollaborationModeActionCoordinator {
 }
 
 function createChatClient(
-  setCollaborationModeImplementation?: () => Promise<void>
+  setCollaborationModeImplementation?: () => Promise<void>,
 ): CollaborationModeActionChatClient {
   return {
-    setCollaborationMode: vi.fn(setCollaborationModeImplementation ?? (async () => {}))
+    setCollaborationMode: vi.fn(setCollaborationModeImplementation ?? (async () => {})),
   };
 }
 
@@ -57,7 +57,7 @@ describe("CollaborationModeActionCoordinator", () => {
       draft: {
         modeKey: "default",
         modelId: "",
-        reasoningEffort: ""
+        reasoningEffort: "",
       },
       selectedThreadId: null,
       modes: [],
@@ -70,7 +70,7 @@ describe("CollaborationModeActionCoordinator", () => {
       onSetModeSyncing,
       chatClient,
       onReloadSelectedThread,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(onSetModeSyncing).not.toHaveBeenCalled();
@@ -91,14 +91,14 @@ describe("CollaborationModeActionCoordinator", () => {
       draft: {
         modeKey: "missing",
         modelId: "",
-        reasoningEffort: ""
+        reasoningEffort: "",
       },
       selectedThreadId: DEFAULT_THREAD_ID,
       modes: [
         {
           mode: "default",
-          developer_instructions: null
-        }
+          developer_instructions: null,
+        },
       ],
       isModeSyncing: false,
       readLastAppliedModeSignature: () => modeSignature,
@@ -109,7 +109,7 @@ describe("CollaborationModeActionCoordinator", () => {
       onSetModeSyncing,
       chatClient,
       onReloadSelectedThread,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(onSetModeSyncing).not.toHaveBeenCalled();
@@ -120,7 +120,11 @@ describe("CollaborationModeActionCoordinator", () => {
 
   it("does not submit mode update when signature is already applied and not syncing", async () => {
     const coordinator = createCoordinator();
-    const modeSignature = modeSelectionStateResolver.buildModeSignature("default", "gpt-5", "medium");
+    const modeSignature = modeSelectionStateResolver.buildModeSignature(
+      "default",
+      "gpt-5",
+      "medium",
+    );
     const onSetModeSyncing = vi.fn();
     const chatClient = createChatClient();
     const onReloadSelectedThread = vi.fn(async () => {});
@@ -130,14 +134,14 @@ describe("CollaborationModeActionCoordinator", () => {
       draft: {
         modeKey: "default",
         modelId: "gpt-5",
-        reasoningEffort: "medium"
+        reasoningEffort: "medium",
       },
       selectedThreadId: DEFAULT_THREAD_ID,
       modes: [
         {
           mode: "default",
-          developer_instructions: "Use short answers."
-        }
+          developer_instructions: "Use short answers.",
+        },
       ],
       isModeSyncing: false,
       readLastAppliedModeSignature: () => modeSignature,
@@ -146,7 +150,7 @@ describe("CollaborationModeActionCoordinator", () => {
       onSetModeSyncing,
       chatClient,
       onReloadSelectedThread,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(onSetModeSyncing).not.toHaveBeenCalled();
@@ -157,7 +161,11 @@ describe("CollaborationModeActionCoordinator", () => {
 
   it("submits mode update while mode sync confirmation is still in progress", async () => {
     const coordinator = createCoordinator();
-    const modeSignature = modeSelectionStateResolver.buildModeSignature("default", "gpt-5", "medium");
+    const modeSignature = modeSelectionStateResolver.buildModeSignature(
+      "default",
+      "gpt-5",
+      "medium",
+    );
     const onSetModeSyncing = vi.fn();
     const chatClient = createChatClient();
     const onReloadSelectedThread = vi.fn(async () => {});
@@ -167,7 +175,7 @@ describe("CollaborationModeActionCoordinator", () => {
       draft: {
         modeKey: "default",
         modelId: "gpt-5",
-        reasoningEffort: "medium"
+        reasoningEffort: "medium",
       },
       selectedThreadId: DEFAULT_THREAD_ID,
       modes: DEFAULT_MODE_OPTIONS,
@@ -178,7 +186,7 @@ describe("CollaborationModeActionCoordinator", () => {
       onSetModeSyncing,
       chatClient,
       onReloadSelectedThread,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(chatClient.setCollaborationMode).toHaveBeenCalledTimes(1);
@@ -200,7 +208,7 @@ describe("CollaborationModeActionCoordinator", () => {
       draft: {
         modeKey: "default",
         modelId: "",
-        reasoningEffort: "high"
+        reasoningEffort: "high",
       },
       selectedThreadId: APPLY_THREAD_ID,
       modes: DEFAULT_MODE_OPTIONS,
@@ -216,7 +224,7 @@ describe("CollaborationModeActionCoordinator", () => {
       },
       chatClient,
       onReloadSelectedThread,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(chatClient.setCollaborationMode).toHaveBeenCalledWith(
@@ -227,19 +235,19 @@ describe("CollaborationModeActionCoordinator", () => {
           settings: {
             model: null,
             reasoning_effort: "high",
-            developer_instructions: "Use explicit reasoning."
-          }
-        }
+            developer_instructions: "Use explicit reasoning.",
+          },
+        },
       },
       {
         actionId: "action-set-collaboration-mode",
-        actionName: "set-collaboration-mode"
-      }
+        actionName: "set-collaboration-mode",
+      },
     );
     expect(onReloadSelectedThread).toHaveBeenCalledWith(APPLY_THREAD_ID);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(modeSignatureUpdates).toEqual([
-      modeSelectionStateResolver.buildModeSignature("default", "", "high")
+      modeSelectionStateResolver.buildModeSignature("default", "", "high"),
     ]);
     expect(modeSyncingStates).toEqual([true, false]);
   });
@@ -254,7 +262,7 @@ describe("CollaborationModeActionCoordinator", () => {
       draft: {
         modeKey: "plan",
         modelId: "",
-        reasoningEffort: ""
+        reasoningEffort: "",
       },
       selectedThreadId: DEFAULT_THREAD_ID,
       modes: PLAN_MODE_OPTIONS,
@@ -265,7 +273,7 @@ describe("CollaborationModeActionCoordinator", () => {
       onSetModeSyncing: vi.fn(),
       chatClient,
       onReloadSelectedThread,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(chatClient.setCollaborationMode).toHaveBeenCalledWith(
@@ -276,14 +284,14 @@ describe("CollaborationModeActionCoordinator", () => {
           settings: {
             model: null,
             reasoning_effort: null,
-            developer_instructions: null
-          }
-        }
+            developer_instructions: null,
+          },
+        },
       },
       {
         actionId: "action-set-collaboration-mode",
-        actionName: "set-collaboration-mode"
-      }
+        actionName: "set-collaboration-mode",
+      },
     );
     expect(onReloadSelectedThread).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
@@ -304,7 +312,7 @@ describe("CollaborationModeActionCoordinator", () => {
       draft: {
         modeKey: "plan",
         modelId: "gpt-5",
-        reasoningEffort: "medium"
+        reasoningEffort: "medium",
       },
       selectedThreadId: FAILED_THREAD_ID,
       modes: PLAN_MODE_OPTIONS,
@@ -320,7 +328,7 @@ describe("CollaborationModeActionCoordinator", () => {
       },
       chatClient,
       onReloadSelectedThread,
-      reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError,
     });
 
     expect(onReloadSelectedThread).not.toHaveBeenCalled();
@@ -330,13 +338,13 @@ describe("CollaborationModeActionCoordinator", () => {
       threadId: FAILED_THREAD_ID,
       error: "set mode failed",
       details: {
-        modeKey: "plan"
-      }
+        modeKey: "plan",
+      },
     });
     expect(modeSignature).toBe("stable-signature");
     expect(modeSignatureUpdates).toEqual([
       modeSelectionStateResolver.buildModeSignature("plan", "gpt-5", "medium"),
-      "stable-signature"
+      "stable-signature",
     ]);
     expect(modeSyncingStates).toEqual([true, false]);
   });

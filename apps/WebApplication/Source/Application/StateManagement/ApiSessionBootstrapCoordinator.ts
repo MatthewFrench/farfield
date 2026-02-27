@@ -20,23 +20,21 @@ const INVALID_EXPIRES_AT_ERROR_MESSAGE =
   "ApiSessionBootstrapCoordinator received an invalid expiresAt value";
 const READY_DECISION: ApiSessionBootstrapDecision = {
   isReady: true,
-  requiresApiToken: false
+  requiresApiToken: false,
 };
 const API_TOKEN_REQUIRED_DECISION: ApiSessionBootstrapDecision = {
   isReady: false,
-  requiresApiToken: true
+  requiresApiToken: true,
 };
 const BOOTSTRAP_PENDING_DECISION: ApiSessionBootstrapDecision = {
   isReady: false,
-  requiresApiToken: false
+  requiresApiToken: false,
 };
 
-function cloneDecision(
-  template: ApiSessionBootstrapDecision
-): ApiSessionBootstrapDecision {
+function cloneDecision(template: ApiSessionBootstrapDecision): ApiSessionBootstrapDecision {
   return {
     isReady: template.isReady,
-    requiresApiToken: template.requiresApiToken
+    requiresApiToken: template.requiresApiToken,
   };
 }
 
@@ -55,7 +53,9 @@ export class ApiSessionBootstrapCoordinator {
 
   public constructor(refreshLeadTimeMs: number = DEFAULT_REFRESH_LEAD_TIME_MS) {
     if (!Number.isInteger(refreshLeadTimeMs) || refreshLeadTimeMs < 0) {
-      throw new Error("ApiSessionBootstrapCoordinator requires a non-negative integer refreshLeadTimeMs");
+      throw new Error(
+        "ApiSessionBootstrapCoordinator requires a non-negative integer refreshLeadTimeMs",
+      );
     }
     this.refreshLeadTimeMs = refreshLeadTimeMs;
     this.inFlightBootstrapDecision = null;
@@ -74,12 +74,12 @@ export class ApiSessionBootstrapCoordinator {
 
   public async ensureSession(
     loadSession: () => Promise<ApiSessionBootstrapResponse>,
-    nowEpochMs: number = Date.now()
+    nowEpochMs: number = Date.now(),
   ): Promise<ApiSessionBootstrapDecision> {
     const sessionReadinessSnapshot = this.readSessionReadinessSnapshot(nowEpochMs);
     if (
-      sessionReadinessSnapshot.decision.isReady
-      || sessionReadinessSnapshot.decision.requiresApiToken
+      sessionReadinessSnapshot.decision.isReady ||
+      sessionReadinessSnapshot.decision.requiresApiToken
     ) {
       return cloneDecision(sessionReadinessSnapshot.decision);
     }
@@ -96,20 +96,18 @@ export class ApiSessionBootstrapCoordinator {
 
   public async submitApiToken(
     apiToken: string,
-    loadSessionWithApiToken: (apiToken: string) => Promise<ApiSessionBootstrapResponse>
+    loadSessionWithApiToken: (apiToken: string) => Promise<ApiSessionBootstrapResponse>,
   ): Promise<ApiSessionBootstrapDecision> {
     const normalizedApiToken = apiToken.trim();
     if (normalizedApiToken.length === 0) {
       throw new Error(EMPTY_API_TOKEN_ERROR_MESSAGE);
     }
     this.clearApiTokenRequired();
-    return this.executeBootstrapRequest(
-      () => loadSessionWithApiToken(normalizedApiToken)
-    );
+    return this.executeBootstrapRequest(() => loadSessionWithApiToken(normalizedApiToken));
   }
 
   private async executeBootstrapRequest(
-    loadSession: () => Promise<ApiSessionBootstrapResponse>
+    loadSession: () => Promise<ApiSessionBootstrapResponse>,
   ): Promise<ApiSessionBootstrapDecision> {
     if (this.inFlightBootstrapDecision) {
       return this.inFlightBootstrapDecision;
@@ -147,20 +145,18 @@ export class ApiSessionBootstrapCoordinator {
     this.sessionExpiresAtEpochMs = this.readExpiresAtEpochMs(session.expiresAt);
   }
 
-  private readSessionReadinessSnapshot(
-    nowEpochMs: number
-  ): ApiSessionReadinessSnapshot {
+  private readSessionReadinessSnapshot(nowEpochMs: number): ApiSessionReadinessSnapshot {
     if (this.authRequired === false) {
       return {
         decision: READY_DECISION,
-        shouldRefreshInBackground: false
+        shouldRefreshInBackground: false,
       };
     }
 
     if (this.isApiTokenRequired) {
       return {
         decision: API_TOKEN_REQUIRED_DECISION,
-        shouldRefreshInBackground: false
+        shouldRefreshInBackground: false,
       };
     }
 
@@ -168,7 +164,7 @@ export class ApiSessionBootstrapCoordinator {
       if (this.sessionExpiresAtEpochMs === null) {
         return {
           decision: BOOTSTRAP_PENDING_DECISION,
-          shouldRefreshInBackground: false
+          shouldRefreshInBackground: false,
         };
       }
 
@@ -177,20 +173,20 @@ export class ApiSessionBootstrapCoordinator {
       if (sessionShouldStayReady) {
         return {
           decision: READY_DECISION,
-          shouldRefreshInBackground: false
+          shouldRefreshInBackground: false,
         };
       }
 
       const hasUnexpiredSession = nowEpochMs < this.sessionExpiresAtEpochMs;
       return {
         decision: BOOTSTRAP_PENDING_DECISION,
-        shouldRefreshInBackground: hasUnexpiredSession
+        shouldRefreshInBackground: hasUnexpiredSession,
       };
     }
 
     return {
       decision: BOOTSTRAP_PENDING_DECISION,
-      shouldRefreshInBackground: false
+      shouldRefreshInBackground: false,
     };
   }
 
@@ -206,9 +202,7 @@ export class ApiSessionBootstrapCoordinator {
     return expiresAtEpochMs;
   }
 
-  private runBackgroundRefresh(
-    loadSession: () => Promise<ApiSessionBootstrapResponse>
-  ): void {
+  private runBackgroundRefresh(loadSession: () => Promise<ApiSessionBootstrapResponse>): void {
     void this.executeBootstrapRequest(loadSession).catch(() => {
       // Refresh errors are consumed because session use remains valid until expiry.
       return undefined;

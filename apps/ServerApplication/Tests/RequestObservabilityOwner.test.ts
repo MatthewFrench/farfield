@@ -12,7 +12,7 @@ describe("RequestObservabilityOwner", () => {
       method: "GET",
       pathname: "/api/threads/thread_123",
       startedAt: "2026-02-25T00:00:00.000Z",
-      queueDelayMs: 2
+      queueDelayMs: 2,
     });
     owner.recordRequestCompleted({
       requestId: "request_1",
@@ -24,7 +24,7 @@ describe("RequestObservabilityOwner", () => {
       statusCode: 200,
       durationMs: 32,
       queueDelayMs: 2,
-      completedAt: "2026-02-25T00:00:00.000Z"
+      completedAt: "2026-02-25T00:00:00.000Z",
     });
 
     owner.recordRequestStarted({
@@ -34,7 +34,7 @@ describe("RequestObservabilityOwner", () => {
       method: "GET",
       pathname: "/api/threads/thread_123",
       startedAt: "2026-02-25T00:00:01.000Z",
-      queueDelayMs: 5
+      queueDelayMs: 5,
     });
     owner.recordRequestCompleted({
       requestId: "request_2",
@@ -46,7 +46,7 @@ describe("RequestObservabilityOwner", () => {
       statusCode: 503,
       durationMs: 78,
       queueDelayMs: 5,
-      completedAt: "2026-02-25T00:00:01.000Z"
+      completedAt: "2026-02-25T00:00:01.000Z",
     });
 
     const snapshot = owner.readSnapshot();
@@ -63,7 +63,7 @@ describe("RequestObservabilityOwner", () => {
       phase: "completed",
       requestId: "request_2",
       outcome: "error",
-      statusCode: 503
+      statusCode: 503,
     });
   });
 
@@ -76,7 +76,7 @@ describe("RequestObservabilityOwner", () => {
       method: "GET",
       pathname: "/api/health",
       startedAt: "2026-02-25T00:00:00.000Z",
-      queueDelayMs: 1
+      queueDelayMs: 1,
     });
     owner.recordRequestCompleted({
       requestId: "request_1",
@@ -88,7 +88,7 @@ describe("RequestObservabilityOwner", () => {
       statusCode: 200,
       durationMs: 5,
       queueDelayMs: 1,
-      completedAt: "2026-02-25T00:00:00.005Z"
+      completedAt: "2026-02-25T00:00:00.005Z",
     });
     owner.recordRequestStarted({
       requestId: "request_2",
@@ -97,7 +97,7 @@ describe("RequestObservabilityOwner", () => {
       method: "GET",
       pathname: "/api/health",
       startedAt: "2026-02-25T00:00:01.000Z",
-      queueDelayMs: 0
+      queueDelayMs: 0,
     });
     owner.recordRequestCompleted({
       requestId: "request_2",
@@ -109,23 +109,23 @@ describe("RequestObservabilityOwner", () => {
       statusCode: 200,
       durationMs: 4,
       queueDelayMs: 0,
-      completedAt: "2026-02-25T00:00:01.004Z"
+      completedAt: "2026-02-25T00:00:01.004Z",
     });
 
     const snapshot = owner.readSnapshot();
     expect(snapshot.requestLifecycleEvents).toEqual([
       expect.objectContaining({
         phase: "completed",
-        requestId: "request_1"
+        requestId: "request_1",
       }),
       expect.objectContaining({
         phase: "started",
-        requestId: "request_2"
+        requestId: "request_2",
       }),
       expect.objectContaining({
         phase: "completed",
-        requestId: "request_2"
-      })
+        requestId: "request_2",
+      }),
     ]);
   });
 
@@ -136,38 +136,38 @@ describe("RequestObservabilityOwner", () => {
         requestId: "request_1",
         method: "GET",
         pathname: "/api/debug/client-errors/session-log",
-        durationMs: 10
+        durationMs: 10,
       },
       {
         requestId: "request_2",
         method: "GET",
         pathname: "/api/debug/client-errors/error_identifier",
-        durationMs: 11
+        durationMs: 11,
       },
       {
         requestId: "request_3",
         method: "GET",
         pathname: "/api/debug/history/history_entry_1",
-        durationMs: 12
+        durationMs: 12,
       },
       {
         requestId: "request_4",
         method: "GET",
         pathname: "/api/debug/trace/1700000000000-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/download",
-        durationMs: 13
+        durationMs: 13,
       },
       {
         requestId: "request_5",
         method: "POST",
         pathname: "/api/threads/thread_123/messages",
-        durationMs: 14
+        durationMs: 14,
       },
       {
         requestId: "request_6",
         method: "GET",
         pathname: "/api/debug/replay/0123456789abcdef",
-        durationMs: 15
-      }
+        durationMs: 15,
+      },
     ];
 
     for (const observation of observations) {
@@ -178,7 +178,7 @@ describe("RequestObservabilityOwner", () => {
         method: observation.method,
         pathname: observation.pathname,
         startedAt: "2026-02-25T00:00:00.000Z",
-        queueDelayMs: 0
+        queueDelayMs: 0,
       });
       owner.recordRequestCompleted({
         requestId: observation.requestId,
@@ -190,7 +190,7 @@ describe("RequestObservabilityOwner", () => {
         statusCode: 200,
         durationMs: observation.durationMs,
         queueDelayMs: 0,
-        completedAt: "2026-02-25T00:00:00.001Z"
+        completedAt: "2026-02-25T00:00:00.001Z",
       });
     }
 
@@ -198,15 +198,25 @@ describe("RequestObservabilityOwner", () => {
     const routeTimingByMethodAndRoute = new Map(
       snapshot.routeTimings.map((routeTiming) => [
         `${routeTiming.method} ${routeTiming.route}`,
-        routeTiming
-      ])
+        routeTiming,
+      ]),
     );
 
-    expect(routeTimingByMethodAndRoute.get("GET /api/debug/client-errors/session-log")?.requestCount).toBe(1);
-    expect(routeTimingByMethodAndRoute.get("GET /api/debug/client-errors/:clientErrorId")?.requestCount).toBe(1);
-    expect(routeTimingByMethodAndRoute.get("GET /api/debug/history/:historyEntryId")?.requestCount).toBe(1);
-    expect(routeTimingByMethodAndRoute.get("GET /api/debug/trace/:traceId/download")?.requestCount).toBe(1);
-    expect(routeTimingByMethodAndRoute.get("POST /api/threads/:threadId/messages")?.requestCount).toBe(1);
+    expect(
+      routeTimingByMethodAndRoute.get("GET /api/debug/client-errors/session-log")?.requestCount,
+    ).toBe(1);
+    expect(
+      routeTimingByMethodAndRoute.get("GET /api/debug/client-errors/:clientErrorId")?.requestCount,
+    ).toBe(1);
+    expect(
+      routeTimingByMethodAndRoute.get("GET /api/debug/history/:historyEntryId")?.requestCount,
+    ).toBe(1);
+    expect(
+      routeTimingByMethodAndRoute.get("GET /api/debug/trace/:traceId/download")?.requestCount,
+    ).toBe(1);
+    expect(
+      routeTimingByMethodAndRoute.get("POST /api/threads/:threadId/messages")?.requestCount,
+    ).toBe(1);
     expect(routeTimingByMethodAndRoute.get("GET /api/debug/replay/:id")?.requestCount).toBe(1);
   });
 
@@ -221,7 +231,7 @@ describe("RequestObservabilityOwner", () => {
       method: "POST",
       pathname: rawPathname,
       startedAt: "2026-02-25T00:00:00.000Z",
-      queueDelayMs: 1
+      queueDelayMs: 1,
     });
     owner.recordRequestCompleted({
       requestId: "request_1",
@@ -233,18 +243,18 @@ describe("RequestObservabilityOwner", () => {
       statusCode: 200,
       durationMs: 12,
       queueDelayMs: 1,
-      completedAt: "2026-02-25T00:00:00.012Z"
+      completedAt: "2026-02-25T00:00:00.012Z",
     });
 
     const snapshot = owner.readSnapshot();
     expect(snapshot.requestLifecycleEvents[0]).toMatchObject({
       phase: "started",
-      pathname: "/api/threads/thread_123/messages"
+      pathname: "/api/threads/thread_123/messages",
     });
     expect(snapshot.requestLifecycleEvents[1]).toMatchObject({
       phase: "completed",
       pathname: "/api/threads/thread_123/messages",
-      outcome: "success"
+      outcome: "success",
     });
     expect(snapshot.routeTimings[0]?.route).toBe("/api/threads/:threadId/messages");
   });
@@ -255,23 +265,23 @@ describe("RequestObservabilityOwner", () => {
       {
         requestId: "request_a1",
         pathname: "/route-a",
-        durationMs: 10
+        durationMs: 10,
       },
       {
         requestId: "request_b1",
         pathname: "/route-b",
-        durationMs: 11
+        durationMs: 11,
       },
       {
         requestId: "request_a2",
         pathname: "/route-a",
-        durationMs: 12
+        durationMs: 12,
       },
       {
         requestId: "request_c1",
         pathname: "/route-c",
-        durationMs: 13
-      }
+        durationMs: 13,
+      },
     ];
 
     for (const routeObservation of routeObservations) {
@@ -282,7 +292,7 @@ describe("RequestObservabilityOwner", () => {
         method: "GET",
         pathname: routeObservation.pathname,
         startedAt: "2026-02-25T00:00:00.000Z",
-        queueDelayMs: 0
+        queueDelayMs: 0,
       });
       owner.recordRequestCompleted({
         requestId: routeObservation.requestId,
@@ -294,13 +304,13 @@ describe("RequestObservabilityOwner", () => {
         statusCode: 200,
         durationMs: routeObservation.durationMs,
         queueDelayMs: 0,
-        completedAt: "2026-02-25T00:00:00.001Z"
+        completedAt: "2026-02-25T00:00:00.001Z",
       });
     }
 
     const snapshot = owner.readSnapshot();
     const routeTimingByRoute = new Map(
-      snapshot.routeTimings.map((routeTiming) => [routeTiming.route, routeTiming])
+      snapshot.routeTimings.map((routeTiming) => [routeTiming.route, routeTiming]),
     );
 
     expect(snapshot.routeTimings).toHaveLength(2);
@@ -317,23 +327,23 @@ describe("RequestObservabilityOwner", () => {
       {
         requestId: "request_1",
         durationMs: 10,
-        queueDelayMs: 1
+        queueDelayMs: 1,
       },
       {
         requestId: "request_2",
         durationMs: 20,
-        queueDelayMs: 2
+        queueDelayMs: 2,
       },
       {
         requestId: "request_3",
         durationMs: 30,
-        queueDelayMs: 3
+        queueDelayMs: 3,
       },
       {
         requestId: "request_4",
         durationMs: 40,
-        queueDelayMs: 4
-      }
+        queueDelayMs: 4,
+      },
     ];
 
     for (const routeObservation of routeObservations) {
@@ -344,7 +354,7 @@ describe("RequestObservabilityOwner", () => {
         method: "GET",
         pathname: "/api/health",
         startedAt: "2026-02-25T00:00:00.000Z",
-        queueDelayMs: routeObservation.queueDelayMs
+        queueDelayMs: routeObservation.queueDelayMs,
       });
       owner.recordRequestCompleted({
         requestId: routeObservation.requestId,
@@ -356,7 +366,7 @@ describe("RequestObservabilityOwner", () => {
         statusCode: 200,
         durationMs: routeObservation.durationMs,
         queueDelayMs: routeObservation.queueDelayMs,
-        completedAt: "2026-02-25T00:00:00.001Z"
+        completedAt: "2026-02-25T00:00:00.001Z",
       });
     }
 
@@ -370,7 +380,7 @@ describe("RequestObservabilityOwner", () => {
       p99DurationMs: 40,
       lastQueueDelayMs: 4,
       p95QueueDelayMs: 4,
-      maxQueueDelayMs: 4
+      maxQueueDelayMs: 4,
     });
   });
 
@@ -380,23 +390,23 @@ describe("RequestObservabilityOwner", () => {
       {
         requestId: "request_slow_1",
         pathname: "/slow-route",
-        durationMs: 60
+        durationMs: 60,
       },
       {
         requestId: "request_tied_high_1",
         pathname: "/tied-high-volume-route",
-        durationMs: 40
+        durationMs: 40,
       },
       {
         requestId: "request_tied_high_2",
         pathname: "/tied-high-volume-route",
-        durationMs: 40
+        durationMs: 40,
       },
       {
         requestId: "request_tied_low_1",
         pathname: "/tied-low-volume-route",
-        durationMs: 40
-      }
+        durationMs: 40,
+      },
     ];
 
     for (const routeObservation of routeObservations) {
@@ -407,7 +417,7 @@ describe("RequestObservabilityOwner", () => {
         method: "GET",
         pathname: routeObservation.pathname,
         startedAt: "2026-02-25T00:00:00.000Z",
-        queueDelayMs: 0
+        queueDelayMs: 0,
       });
       owner.recordRequestCompleted({
         requestId: routeObservation.requestId,
@@ -419,7 +429,7 @@ describe("RequestObservabilityOwner", () => {
         statusCode: 200,
         durationMs: routeObservation.durationMs,
         queueDelayMs: 0,
-        completedAt: "2026-02-25T00:00:00.001Z"
+        completedAt: "2026-02-25T00:00:00.001Z",
       });
     }
 
@@ -427,13 +437,13 @@ describe("RequestObservabilityOwner", () => {
     expect(snapshot.routeTimings.map((routeTiming) => routeTiming.route)).toEqual([
       "/slow-route",
       "/tied-high-volume-route",
-      "/tied-low-volume-route"
+      "/tied-low-volume-route",
     ]);
   });
 
   it("rejects non-positive route timing entry limits", () => {
     expect(() => new RequestObservabilityOwner(8, 8, 16, 0)).toThrowError(
-      "RequestObservabilityOwner requires positive integer maxRouteTimingEntries"
+      "RequestObservabilityOwner requires positive integer maxRouteTimingEntries",
     );
   });
 });

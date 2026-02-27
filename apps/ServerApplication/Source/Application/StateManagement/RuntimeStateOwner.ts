@@ -48,7 +48,7 @@ export class RuntimeStateOwner {
 
   public constructor(
     readModel: RuntimeStateReadModel,
-    snapshotCacheTimeToLiveMs = DEFAULT_SNAPSHOT_CACHE_TIME_TO_LIVE_MILLISECONDS
+    snapshotCacheTimeToLiveMs = DEFAULT_SNAPSHOT_CACHE_TIME_TO_LIVE_MILLISECONDS,
   ) {
     if (!Number.isInteger(snapshotCacheTimeToLiveMs) || snapshotCacheTimeToLiveMs < 0) {
       throw new Error("RuntimeStateOwner requires non-negative integer snapshotCacheTimeToLiveMs");
@@ -77,9 +77,9 @@ export class RuntimeStateOwner {
 
     const cacheAgeMilliseconds = nowEpochMs - this.cachedSnapshotAtEpochMs;
     if (
-      this.cachedSnapshot
-      && cacheAgeMilliseconds >= 0
-      && cacheAgeMilliseconds <= this.snapshotCacheTimeToLiveMs
+      this.cachedSnapshot &&
+      cacheAgeMilliseconds >= 0 &&
+      cacheAgeMilliseconds <= this.snapshotCacheTimeToLiveMs
     ) {
       return this.cachedSnapshot;
     }
@@ -101,7 +101,7 @@ export class RuntimeStateOwner {
       pushSubscriptionCount: this.readModel.readPushSubscriptionCount(),
       pushReceiptCount: this.readModel.readPushReceiptCount(),
       clientErrorCount: this.readModel.readClientErrorCount(),
-      activeTrace: this.readModel.readActiveTraceSummary()
+      activeTrace: this.readModel.readActiveTraceSummary(),
     };
 
     this.cachedSnapshot = snapshot;

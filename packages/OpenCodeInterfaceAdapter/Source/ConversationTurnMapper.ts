@@ -1,9 +1,5 @@
+import type { MappedTurn, MappedTurnItem, MappedTurnStatus } from "./MapperContracts.js";
 import type { OpenCodeMessage, OpenCodePart } from "./Schemas.js";
-import type {
-  MappedTurn,
-  MappedTurnItem,
-  MappedTurnStatus
-} from "./MapperContracts.js";
 import { isTextPart, partToTurnItem } from "./TurnItemMapper.js";
 
 const COMPLETED_ASSISTANT_FINISH_REASONS = new Set<string>(["stop", "length"]);
@@ -16,7 +12,7 @@ const COMPLETED_ASSISTANT_FINISH_REASONS = new Set<string>(["stop", "length"]);
  */
 export function messagesToTurns(
   messages: OpenCodeMessage[],
-  partsByMessage: Map<string, OpenCodePart[]>
+  partsByMessage: Map<string, OpenCodePart[]>,
 ): MappedTurn[] {
   const turns: MappedTurn[] = [];
   const assistantByParent = new Map<string, OpenCodeMessage>();
@@ -46,7 +42,7 @@ export function messagesToTurns(
       items.push({
         id: `${userMsg.id}-input`,
         type: "userMessage",
-        content: userTextParts.map((part) => ({ type: "text" as const, text: part.text }))
+        content: userTextParts.map((part) => ({ type: "text" as const, text: part.text })),
       });
     }
 
@@ -68,7 +64,7 @@ export function messagesToTurns(
       finalAssistantStartedAtMs: assistantMsg?.time.created ?? null,
       error: assistantMsg?.error ?? null,
       diff: null,
-      items
+      items,
     });
   }
 
@@ -81,7 +77,7 @@ export function messagesToTurns(
  */
 function shouldPreferAssistantMessage(
   candidate: OpenCodeMessage,
-  existing: OpenCodeMessage
+  existing: OpenCodeMessage,
 ): boolean {
   if (candidate.time.created !== existing.time.created) {
     return candidate.time.created > existing.time.created;

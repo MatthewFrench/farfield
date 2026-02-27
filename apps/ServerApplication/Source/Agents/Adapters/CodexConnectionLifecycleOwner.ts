@@ -1,8 +1,8 @@
 import {
   AppServerClient,
   AppServerTransportError,
+  type DesktopIpcClient,
   type ListThreadsOptions,
-  type DesktopIpcClient
 } from "@farfield/api";
 import { logger } from "../../Shared/Logging/Logger.js";
 import type { CodexAgentRuntimeState } from "./CodexAgentAdapter.js";
@@ -20,26 +20,23 @@ export interface CodexConnectionLifecycleOwnerOptions {
   onStateChange?: (() => void) | null;
 }
 
-const CODEX_UNAVAILABLE_ERROR_PATTERNS = [
-  /\bENOENT\b/i,
-  /\bnot\s+found\b/i
-];
+const CODEX_UNAVAILABLE_ERROR_PATTERNS = [/\bENOENT\b/i, /\bnot\s+found\b/i];
 const CODEX_UNAVAILABLE_LOG_EVENT = "codex-not-found";
 const CONNECTION_ERROR_MESSAGES = {
   codexUnavailable: "Codex backend is not available",
-  ipcNotConnected: "Desktop IPC is not connected"
+  ipcNotConnected: "Desktop IPC is not connected",
 } as const;
 const APP_SERVER_BOOTSTRAP_LIST_THREADS_OPTIONS: ListThreadsOptions = {
   limit: 1,
   archived: false,
-  sortKey: "updated_at"
+  sortKey: "updated_at",
 };
 const INITIAL_RUNTIME_STATE: CodexAgentRuntimeState = {
   appReady: false,
   ipcConnected: false,
   ipcInitialized: false,
   codexAvailable: true,
-  lastError: null
+  lastError: null,
 };
 
 /**
@@ -100,7 +97,7 @@ export class CodexConnectionLifecycleOwner {
   public handleIpcConnectionState(state: DesktopIpcConnectionStateSnapshot): void {
     const statePatch: Partial<CodexAgentRuntimeState> = {
       ipcConnected: state.connected,
-      ipcInitialized: state.connected ? this.runtimeState.ipcInitialized : false
+      ipcInitialized: state.connected ? this.runtimeState.ipcInitialized : false,
     };
     if (state.reason !== null && state.reason !== undefined && state.reason.length > 0) {
       statePatch.lastError = state.reason;
@@ -127,18 +124,20 @@ export class CodexConnectionLifecycleOwner {
     }
   }
 
-  public async runAppServerCall<ValueType>(operation: () => Promise<ValueType>): Promise<ValueType> {
+  public async runAppServerCall<ValueType>(
+    operation: () => Promise<ValueType>,
+  ): Promise<ValueType> {
     try {
       const result = await operation();
       this.patchRuntimeState({
         appReady: true,
-        lastError: null
+        lastError: null,
       });
       return result;
     } catch (error) {
       this.patchRuntimeState({
         appReady: !(error instanceof AppServerTransportError),
-        lastError: toErrorMessage(error)
+        lastError: toErrorMessage(error),
       });
       throw error;
     }
@@ -171,7 +170,7 @@ export class CodexConnectionLifecycleOwner {
   private async bootstrapAppServerReadiness(): Promise<void> {
     try {
       await this.runAppServerCall(() =>
-        this.appClient.listThreads(APP_SERVER_BOOTSTRAP_LIST_THREADS_OPTIONS)
+        this.appClient.listThreads(APP_SERVER_BOOTSTRAP_LIST_THREADS_OPTIONS),
       );
     } catch (error) {
       const message = toErrorMessage(error);
@@ -184,7 +183,7 @@ export class CodexConnectionLifecycleOwner {
   private markCodexUnavailable(message: string): void {
     this.patchRuntimeState({
       codexAvailable: false,
-      lastError: message
+      lastError: message,
     });
     logger.warn({ error: message }, CODEX_UNAVAILABLE_LOG_EVENT);
   }
@@ -193,18 +192,18 @@ export class CodexConnectionLifecycleOwner {
     try {
       await this.connectIpcIfNeeded();
       this.patchRuntimeState({
-        ipcConnected: true
+        ipcConnected: true,
       });
 
       await this.ipcClient.initialize(this.label);
       this.patchRuntimeState({
-        ipcInitialized: true
+        ipcInitialized: true,
       });
     } catch (error) {
       this.patchRuntimeState({
         ipcInitialized: false,
         ipcConnected: this.ipcClient.isConnected(),
-        lastError: toErrorMessage(error)
+        lastError: toErrorMessage(error),
       });
       this.scheduleIpcReconnect();
     }
@@ -231,9 +230,7 @@ export class CodexConnectionLifecycleOwner {
   }
 
   private shouldScheduleIpcReconnect(): boolean {
-    return this.reconnectTimer === null
-      && this.runtimeState.codexAvailable
-      && this.started;
+    return this.reconnectTimer === null && this.runtimeState.codexAvailable && this.started;
   }
 
   private notifyStateChanged(): void {
@@ -254,7 +251,7 @@ export class CodexConnectionLifecycleOwner {
   private patchRuntimeState(patch: Partial<CodexAgentRuntimeState>): void {
     this.setRuntimeState({
       ...this.runtimeState,
-      ...patch
+      ...patch,
     });
   }
 }
@@ -271,13 +268,15 @@ function toErrorMessage<ErrorType>(error: ErrorType): string {
 
 function isSameRuntimeState(
   current: CodexAgentRuntimeState,
-  next: CodexAgentRuntimeState
+  next: CodexAgentRuntimeState,
 ): boolean {
-  return current.appReady === next.appReady
-    && current.ipcConnected === next.ipcConnected
-    && current.ipcInitialized === next.ipcInitialized
-    && current.codexAvailable === next.codexAvailable
-    && current.lastError === next.lastError;
+  return (
+    current.appReady === next.appReady &&
+    current.ipcConnected === next.ipcConnected &&
+    current.ipcInitialized === next.ipcInitialized &&
+    current.codexAvailable === next.codexAvailable &&
+    current.lastError === next.lastError
+  );
 }
 
 export function isCodexUnavailableBootstrapErrorMessage(message: string): boolean {

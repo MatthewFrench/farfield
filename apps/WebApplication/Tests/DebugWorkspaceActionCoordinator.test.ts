@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DebugHistoryDetailResponse } from "../Source/Features/Debugging/DataAccess/DebugServerClient";
 import { DebugWorkspaceActionCoordinator } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceActionCoordinator";
+
 type HistoryDetail = DebugHistoryDetailResponse;
 
 function buildHistoryDetail(id: string): HistoryDetail {
@@ -12,15 +13,15 @@ function buildHistoryDetail(id: string): HistoryDetail {
       source: "app",
       direction: "in",
       payload: {
-        kind: "request"
+        kind: "request",
       },
       meta: {
-        method: "thread.read"
-      }
+        method: "thread.read",
+      },
     },
     fullPayload: {
-      entryId: id
-    }
+      entryId: id,
+    },
   };
 }
 
@@ -29,7 +30,7 @@ function buildClearClientErrorsResponse() {
     ok: true as const,
     clearedCount: 0,
     sessionId: "session-1",
-    sessionLogPath: "/tmp/session.ndjson"
+    sessionLogPath: "/tmp/session.ndjson",
   };
 }
 
@@ -42,14 +43,14 @@ describe("DebugWorkspaceActionCoordinator", () => {
       replayHistoryEntry: vi.fn(async () => ({})),
       startTrace: vi.fn(async () => {}),
       markTrace: vi.fn(async () => {}),
-      stopTrace: vi.fn(async () => {})
+      stopTrace: vi.fn(async () => {}),
     };
     const onHistoryDetailLoaded = vi.fn();
 
     await coordinator.loadHistoryDetail({
       historyEntryId: "",
       debugClient,
-      onHistoryDetailLoaded
+      onHistoryDetailLoaded,
     });
 
     expect(debugClient.readHistoryEntry).not.toHaveBeenCalled();
@@ -64,14 +65,14 @@ describe("DebugWorkspaceActionCoordinator", () => {
       replayHistoryEntry: vi.fn(async () => ({})),
       startTrace: vi.fn(async () => {}),
       markTrace: vi.fn(async () => {}),
-      stopTrace: vi.fn(async () => {})
+      stopTrace: vi.fn(async () => {}),
     };
     const onHistoryDetailLoaded = vi.fn();
 
     await coordinator.loadHistoryDetail({
       historyEntryId: "   ",
       debugClient,
-      onHistoryDetailLoaded
+      onHistoryDetailLoaded,
     });
 
     expect(debugClient.readHistoryEntry).not.toHaveBeenCalled();
@@ -87,14 +88,14 @@ describe("DebugWorkspaceActionCoordinator", () => {
       replayHistoryEntry: vi.fn(async () => ({})),
       startTrace: vi.fn(async () => {}),
       markTrace: vi.fn(async () => {}),
-      stopTrace: vi.fn(async () => {})
+      stopTrace: vi.fn(async () => {}),
     };
     const onHistoryDetailLoaded = vi.fn();
 
     await coordinator.loadHistoryDetail({
       historyEntryId: "entry-9",
       debugClient,
-      onHistoryDetailLoaded
+      onHistoryDetailLoaded,
     });
 
     expect(debugClient.readHistoryEntry).toHaveBeenCalledWith("entry-9");
@@ -107,26 +108,26 @@ describe("DebugWorkspaceActionCoordinator", () => {
       readHistoryEntry: vi.fn(async () => buildHistoryDetail("entry-1")),
       clearClientErrors: vi.fn(async () => buildClearClientErrorsResponse()),
       replayHistoryEntry: vi.fn(async () => ({
-        ok: true
+        ok: true,
       })),
       startTrace: vi.fn(async () => {}),
       markTrace: vi.fn(async () => {}),
-      stopTrace: vi.fn(async () => {})
+      stopTrace: vi.fn(async () => {}),
     };
     const refreshCoreData = vi.fn(async () => {});
 
     await coordinator.replayHistoryEntry({
       replayRequest: {
         entryId: "entry-1",
-        waitForResponse: true
+        waitForResponse: true,
       },
       debugClient,
-      refreshCoreData
+      refreshCoreData,
     });
 
     expect(debugClient.replayHistoryEntry).toHaveBeenCalledWith({
       entryId: "entry-1",
-      waitForResponse: true
+      waitForResponse: true,
     });
     expect(refreshCoreData).toHaveBeenCalledTimes(1);
   });
@@ -139,19 +140,19 @@ describe("DebugWorkspaceActionCoordinator", () => {
       replayHistoryEntry: vi.fn(async () => ({})),
       startTrace: vi.fn(async () => {}),
       markTrace: vi.fn(async () => {}),
-      stopTrace: vi.fn(async () => {})
+      stopTrace: vi.fn(async () => {}),
     };
     const refreshCoreData = vi.fn(async () => {});
 
     await coordinator.startTrace({
       traceLabel: "Initial trace",
       debugClient,
-      refreshCoreData
+      refreshCoreData,
     });
     await coordinator.markTrace({
       traceNote: "after selected-thread load",
       debugClient,
-      refreshCoreData
+      refreshCoreData,
     });
 
     expect(debugClient.startTrace).toHaveBeenCalledWith("Initial trace");
@@ -167,13 +168,13 @@ describe("DebugWorkspaceActionCoordinator", () => {
       replayHistoryEntry: vi.fn(async () => ({})),
       startTrace: vi.fn(async () => {}),
       markTrace: vi.fn(async () => {}),
-      stopTrace: vi.fn(async () => {})
+      stopTrace: vi.fn(async () => {}),
     };
     const refreshCoreData = vi.fn(async () => {});
 
     await coordinator.stopTrace({
       debugClient,
-      refreshCoreData
+      refreshCoreData,
     });
 
     expect(debugClient.stopTrace).toHaveBeenCalledTimes(1);
@@ -188,18 +189,18 @@ describe("DebugWorkspaceActionCoordinator", () => {
         ok: true as const,
         clearedCount: 3,
         sessionId: "session-1",
-        sessionLogPath: "/tmp/session.ndjson"
+        sessionLogPath: "/tmp/session.ndjson",
       })),
       replayHistoryEntry: vi.fn(async () => ({})),
       startTrace: vi.fn(async () => {}),
       markTrace: vi.fn(async () => {}),
-      stopTrace: vi.fn(async () => {})
+      stopTrace: vi.fn(async () => {}),
     };
     const refreshCoreData = vi.fn(async () => {});
 
     await coordinator.clearClientErrors({
       debugClient,
-      refreshCoreData
+      refreshCoreData,
     });
 
     expect(debugClient.clearClientErrors).toHaveBeenCalledTimes(1);

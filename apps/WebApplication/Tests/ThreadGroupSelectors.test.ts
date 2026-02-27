@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
-import type { ThreadListItem, ThreadProjectGroup } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import type {
+  ThreadListItem,
+  ThreadProjectGroup,
+} from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 
 interface ThreadFixtureInput {
   id: string;
@@ -40,7 +43,7 @@ function buildThread(input: ThreadFixtureInput): ThreadListItem {
     projectRemoved: input.projectRemoved,
     projectState: input.projectState,
     isProjectRemoved: input.isProjectRemoved,
-    agentId: input.agentId ?? "codex"
+    agentId: input.agentId ?? "codex",
   };
 }
 
@@ -52,20 +55,24 @@ function buildProjectGroup(input: ProjectGroupFixtureInput): ThreadProjectGroup 
     projectCreatedAt: input.projectCreatedAt,
     latestUpdatedAt: input.latestUpdatedAt,
     threads: input.threads,
-    isRemoved: input.isRemoved
+    isRemoved: input.isRemoved,
   };
 }
 
 describe("ThreadGroupSelectors", () => {
   it("trims preview labels and falls back to a stable thread identifier prefix", () => {
-    const nonEmptyLabel = ThreadGroupSelectors.threadLabel(buildThread({
-      id: "thread-with-label",
-      preview: "  Thread Label  "
-    }));
-    const fallbackLabel = ThreadGroupSelectors.threadLabel(buildThread({
-      id: "1234567890abcdef",
-      preview: "   "
-    }));
+    const nonEmptyLabel = ThreadGroupSelectors.threadLabel(
+      buildThread({
+        id: "thread-with-label",
+        preview: "  Thread Label  ",
+      }),
+    );
+    const fallbackLabel = ThreadGroupSelectors.threadLabel(
+      buildThread({
+        id: "1234567890abcdef",
+        preview: "   ",
+      }),
+    );
 
     expect(nonEmptyLabel).toBe("Thread Label");
     expect(fallbackLabel).toBe("thread 12345678");
@@ -75,57 +82,57 @@ describe("ThreadGroupSelectors", () => {
     const nextUnreadThreadIdentifiers = ThreadGroupSelectors.computeUnreadThreadIdentifiers({
       previousUnreadThreadIdentifiers: {
         "thread-history-unread": true,
-        "thread-explicit-read": true
+        "thread-explicit-read": true,
       },
       previousThreadUpdatedAtByIdentifier: {
         "thread-history-update": 10,
         "thread-history-same": 20,
-        "thread-explicit-read": 5
+        "thread-explicit-read": 5,
       },
       selectedThreadIdentifier: "thread-selected",
       nextThreads: [
         buildThread({
           id: "thread-selected",
           updatedAt: 99,
-          hasUnreadTurn: true
+          hasUnreadTurn: true,
         }),
         buildThread({
           id: "thread-explicit-unread",
           updatedAt: 10,
-          hasUnreadTurn: true
+          hasUnreadTurn: true,
         }),
         buildThread({
           id: "thread-explicit-read",
           updatedAt: 11,
-          hasUnreadTurn: false
+          hasUnreadTurn: false,
         }),
         buildThread({
           id: "thread-history-unread",
           updatedAt: 10,
-          hasUnreadTurn: null
+          hasUnreadTurn: null,
         }),
         buildThread({
           id: "thread-history-update",
           updatedAt: 11,
-          hasUnreadTurn: null
+          hasUnreadTurn: null,
         }),
         buildThread({
           id: "thread-history-same",
           updatedAt: 20,
-          hasUnreadTurn: null
+          hasUnreadTurn: null,
         }),
         buildThread({
           id: "thread-no-history",
           updatedAt: 50,
-          hasUnreadTurn: null
-        })
-      ]
+          hasUnreadTurn: null,
+        }),
+      ],
     });
 
     expect(nextUnreadThreadIdentifiers).toEqual({
       "thread-explicit-unread": true,
       "thread-history-unread": true,
-      "thread-history-update": true
+      "thread-history-update": true,
     });
   });
 
@@ -135,28 +142,28 @@ describe("ThreadGroupSelectors", () => {
         id: "thread-alpha-older",
         cwd: "  C:\\workspace\\alpha\\\\  ",
         updatedAt: 10,
-        createdAt: 3
+        createdAt: 3,
       }),
       buildThread({
         id: "thread-alpha-newer",
         path: "C:/workspace/alpha////",
         updatedAt: 15,
         createdAt: 7,
-        projectState: "removed"
+        projectState: "removed",
       }),
       buildThread({
         id: "thread-beta",
         path: " /workspace/beta/// ",
         updatedAt: 20,
-        createdAt: 4
+        createdAt: 4,
       }),
       buildThread({
         id: "thread-no-project",
         cwd: "",
         path: null,
         updatedAt: 25,
-        createdAt: 9
-      })
+        createdAt: 9,
+      }),
     ]);
 
     const alphaGroup = groupedThreads.find((group) => group.key === "project:C:/workspace/alpha");
@@ -167,7 +174,7 @@ describe("ThreadGroupSelectors", () => {
     expect(alphaGroup?.isRemoved).toBe(true);
     expect(alphaGroup?.threads.map((thread) => thread.id)).toEqual([
       "thread-alpha-newer",
-      "thread-alpha-older"
+      "thread-alpha-older",
     ]);
 
     expect(unknownGroup?.label).toBe("No project");
@@ -187,15 +194,15 @@ describe("ThreadGroupSelectors", () => {
           threads: [
             buildThread({
               id: "thread-z",
-              updatedAt: 4
+              updatedAt: 4,
             }),
             buildThread({
               id: "thread-b",
-              updatedAt: 2
-            })
+              updatedAt: 2,
+            }),
           ],
-          isRemoved: false
-        })
+          isRemoved: false,
+        }),
       ],
       [
         buildProjectGroup({
@@ -207,14 +214,14 @@ describe("ThreadGroupSelectors", () => {
           threads: [
             buildThread({
               id: "thread-y",
-              updatedAt: 5
+              updatedAt: 5,
             }),
             buildThread({
               id: "thread-a",
-              updatedAt: 2
-            })
+              updatedAt: 2,
+            }),
           ],
-          isRemoved: true
+          isRemoved: true,
         }),
         buildProjectGroup({
           key: "project:unknown",
@@ -225,15 +232,17 @@ describe("ThreadGroupSelectors", () => {
           threads: [
             buildThread({
               id: "thread-no-project",
-              updatedAt: 8
-            })
+              updatedAt: 8,
+            }),
           ],
-          isRemoved: false
-        })
-      ]
+          isRemoved: false,
+        }),
+      ],
     );
 
-    const alphaGroup = mergedProjectGroups.find((group) => group.key === "project:/workspace/alpha");
+    const alphaGroup = mergedProjectGroups.find(
+      (group) => group.key === "project:/workspace/alpha",
+    );
 
     expect(alphaGroup?.projectCreatedAt).toBe(15);
     expect(alphaGroup?.latestUpdatedAt).toBe(25);
@@ -242,7 +251,7 @@ describe("ThreadGroupSelectors", () => {
       "thread-y",
       "thread-z",
       "thread-a",
-      "thread-b"
+      "thread-b",
     ]);
     expect(mergedProjectGroups[mergedProjectGroups.length - 1]?.key).toBe("project:unknown");
   });
@@ -255,10 +264,11 @@ describe("ThreadGroupSelectors", () => {
         createdAt: index,
         updatedAt: index * 2,
         cwd: `/workspace/project-${String(index % 30)}`,
-        hasUnreadTurn: index % 9 === 0 ? true : null
-      })
+        hasUnreadTurn: index % 9 === 0 ? true : null,
+      }),
     );
-    const previousThreadUpdatedAtByIdentifier = ThreadGroupSelectors.mapThreadUpdatedAtByIdentifier(generatedThreads);
+    const previousThreadUpdatedAtByIdentifier =
+      ThreadGroupSelectors.mapThreadUpdatedAtByIdentifier(generatedThreads);
 
     const startedAtMilliseconds = performance.now();
     const groupedThreads = ThreadGroupSelectors.groupThreadsByProject(generatedThreads);
@@ -266,7 +276,7 @@ describe("ThreadGroupSelectors", () => {
       previousUnreadThreadIdentifiers: {},
       previousThreadUpdatedAtByIdentifier,
       nextThreads: generatedThreads,
-      selectedThreadIdentifier: null
+      selectedThreadIdentifier: null,
     });
     const elapsedMilliseconds = performance.now() - startedAtMilliseconds;
 

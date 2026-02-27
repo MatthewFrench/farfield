@@ -1,51 +1,32 @@
-import {
-  useCallback,
-  useMemo
-} from "react";
+import { useCallback, useMemo } from "react";
 import { ApplicationRouteStateMapper } from "@/Application/DomainModel/ApplicationRouteStateMapper";
 import {
-  type ApplicationFormattingHelpers
-} from "@/Application/StateManagement/UseApplicationPresentationHelpers";
-import {
-  type ApplicationRuntimeRequestHandlers
-} from "@/Application/StateManagement/UseApplicationRuntimeRequestHandlers";
-import {
-  type ApplicationShellComposition,
-  useApplicationShellComposition
-} from "@/Application/StateManagement/UseApplicationShellComposition";
-import {
-  type ApplicationShellState
-} from "@/Application/StateManagement/UseApplicationShellState";
-import {
-  useApplicationSynchronizationEffects
-} from "@/Application/StateManagement/UseApplicationSynchronizationEffects";
-import { useApplicationRefreshEffects } from "@/Application/StateManagement/UseApplicationRefreshEffects";
-import { useApplicationPushFeatureComposition } from "@/Application/StateManagement/UseApplicationPushFeatureComposition";
+  type RuntimeRefreshMeasurement,
+  RuntimeRefreshObservabilityOwner,
+} from "@/Application/StateManagement/RuntimeRefreshObservabilityOwner";
 import { useApplicationChatFeatureComposition } from "@/Application/StateManagement/UseApplicationChatFeatureComposition";
 import { useApplicationDebugFeatureComposition } from "@/Application/StateManagement/UseApplicationDebugFeatureComposition";
-import { useViewportShellEffects } from "@/Application/StateManagement/UseViewportShellEffects";
-import { useEventStreamEffects } from "@/Application/StateManagement/UseEventStreamEffects";
 import { type ApplicationDerivedState } from "@/Application/StateManagement/UseApplicationDerivedStateContracts";
+import { type ApplicationOwnerDependencies } from "@/Application/StateManagement/UseApplicationOwnerDependencies";
+import { type ApplicationFormattingHelpers } from "@/Application/StateManagement/UseApplicationPresentationHelpers";
+import { useApplicationPushFeatureComposition } from "@/Application/StateManagement/UseApplicationPushFeatureComposition";
+import { useApplicationRefreshEffects } from "@/Application/StateManagement/UseApplicationRefreshEffects";
+import { type ApplicationRuntimeRequestHandlers } from "@/Application/StateManagement/UseApplicationRuntimeRequestHandlers";
 import {
-  type ApplicationOwnerDependencies
-} from "@/Application/StateManagement/UseApplicationOwnerDependencies";
+  type ApplicationShellComposition,
+  useApplicationShellComposition,
+} from "@/Application/StateManagement/UseApplicationShellComposition";
+import { type ApplicationShellState } from "@/Application/StateManagement/UseApplicationShellState";
+import { useApplicationSynchronizationEffects } from "@/Application/StateManagement/UseApplicationSynchronizationEffects";
 import {
   type CoreDataCapabilitySnapshot,
-  type CoreDataLoaders
+  type CoreDataLoaders,
 } from "@/Application/StateManagement/UseCoreDataLoaders";
-import {
-  RuntimeRefreshObservabilityOwner,
-  type RuntimeRefreshMeasurement
-} from "@/Application/StateManagement/RuntimeRefreshObservabilityOwner";
-import {
-  useModeAndPendingRequestEffects
-} from "@/Features/Chat/StateManagement/UseModeAndPendingRequestEffects";
-import {
-  useSelectedThreadLifecycleEffects
-} from "@/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects";
-import {
-  type SelectedThreadLoaders
-} from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
+import { useEventStreamEffects } from "@/Application/StateManagement/UseEventStreamEffects";
+import { useViewportShellEffects } from "@/Application/StateManagement/UseViewportShellEffects";
+import { useModeAndPendingRequestEffects } from "@/Features/Chat/StateManagement/UseModeAndPendingRequestEffects";
+import { useSelectedThreadLifecycleEffects } from "@/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects";
+import { type SelectedThreadLoaders } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 
 export interface UseApplicationRuntimeCompositionInput {
   theme: string;
@@ -84,7 +65,9 @@ const EMPTY_MODE_KEY = "";
 type CoreDataLoadFunction = CoreDataLoaders["loadCoreDataTracked"];
 type SelectedThreadLoadFunction = SelectedThreadLoaders["loadSelectedThreadTracked"];
 
-function resolveCoreDataLoadFunction(loadCoreDataFunction: CoreDataLoadFunction | null): CoreDataLoadFunction {
+function resolveCoreDataLoadFunction(
+  loadCoreDataFunction: CoreDataLoadFunction | null,
+): CoreDataLoadFunction {
   if (loadCoreDataFunction === null) {
     throw new Error(MISSING_CORE_DATA_LOADER_ERROR_MESSAGE);
   }
@@ -93,7 +76,7 @@ function resolveCoreDataLoadFunction(loadCoreDataFunction: CoreDataLoadFunction 
 
 async function refreshSelectedThreadIfPresent(
   selectedThreadIdentifier: string | null,
-  loadSelectedThreadFunction: SelectedThreadLoadFunction | null
+  loadSelectedThreadFunction: SelectedThreadLoadFunction | null,
 ): Promise<void> {
   if (selectedThreadIdentifier === null) {
     return;
@@ -107,7 +90,7 @@ async function refreshSelectedThreadIfPresent(
 function completeRuntimeRefreshMeasurement(
   runtimeRefreshObservabilityOwner: RuntimeRefreshObservabilityOwner,
   measurement: RuntimeRefreshMeasurement,
-  didCompleteRefresh: boolean
+  didCompleteRefresh: boolean,
 ): void {
   if (didCompleteRefresh) {
     runtimeRefreshObservabilityOwner.completeRefreshSuccess(measurement);
@@ -117,7 +100,7 @@ function completeRuntimeRefreshMeasurement(
 }
 
 export function useApplicationRuntimeComposition(
-  input: UseApplicationRuntimeCompositionInput
+  input: UseApplicationRuntimeCompositionInput,
 ): ApplicationRuntimeComposition {
   // Effect owners retain stable subscriptions and always read the latest loader refs from this runtime owner.
   const loadCoreDataTrackedRef = input.applicationShellState.loadCoreDataTrackedRef;
@@ -132,15 +115,14 @@ export function useApplicationRuntimeComposition(
       return;
     }
     await input.loadSelectedThreadTracked(selectedThreadIdentifier);
-  }, [
-    input.applicationShellState.selectedThreadIdRef,
-    input.loadSelectedThreadTracked
-  ]);
+  }, [input.applicationShellState.selectedThreadIdRef, input.loadSelectedThreadTracked]);
 
   const pushFeatureComposition = useApplicationPushFeatureComposition({
-    apiSessionBootstrapCoordinator: input.applicationOwnerDependencies.apiSessionBootstrapCoordinator,
+    apiSessionBootstrapCoordinator:
+      input.applicationOwnerDependencies.apiSessionBootstrapCoordinator,
     apiSessionTokenDraft: input.applicationShellState.apiSessionTokenDraft,
-    pushNotificationToolbarActionCoordinator: input.applicationOwnerDependencies.pushNotificationToolbarActionCoordinator,
+    pushNotificationToolbarActionCoordinator:
+      input.applicationOwnerDependencies.pushNotificationToolbarActionCoordinator,
     loadCoreDataTracked: input.coreDataLoaders.loadCoreDataTracked,
     loadSelectedThreadIfPresent: loadSelectedThreadIfPresentFromRuntimeState,
     setApiSessionTokenDraft: input.applicationShellState.setApiSessionTokenDraft,
@@ -149,12 +131,12 @@ export function useApplicationRuntimeComposition(
     setIsApiSessionBootstrapPending: input.applicationShellState.setIsApiSessionBootstrapPending,
     setIsEnablingPushNotifications: input.applicationShellState.setIsEnablingPushNotifications,
     setPushClientState: input.applicationShellState.setPushClientState,
-    setRequiresApiSessionToken: input.applicationShellState.setRequiresApiSessionToken
+    setRequiresApiSessionToken: input.applicationShellState.setRequiresApiSessionToken,
   });
 
   const runtimeRefreshObservabilityOwner = useMemo(
     () => new RuntimeRefreshObservabilityOwner(),
-    []
+    [],
   );
 
   // Keep refresh ordering and loading-state transitions consistent for startup
@@ -167,12 +149,12 @@ export function useApplicationRuntimeComposition(
     input.applicationShellState.setIsCoreLoading(true);
     try {
       const loadCoreDataFunction = resolveCoreDataLoadFunction(
-        input.applicationShellState.loadCoreDataTrackedRef.current
+        input.applicationShellState.loadCoreDataTrackedRef.current,
       );
       await loadCoreDataFunction();
       await refreshSelectedThreadIfPresent(
         input.applicationShellState.selectedThreadIdRef.current,
-        input.applicationShellState.loadSelectedThreadRef.current
+        input.applicationShellState.loadSelectedThreadRef.current,
       );
       didCompleteRefresh = true;
     } catch (error) {
@@ -181,7 +163,7 @@ export function useApplicationRuntimeComposition(
       completeRuntimeRefreshMeasurement(
         runtimeRefreshObservabilityOwner,
         measurement,
-        didCompleteRefresh
+        didCompleteRefresh,
       );
       input.applicationShellState.setIsCoreLoading(false);
     }
@@ -191,7 +173,7 @@ export function useApplicationRuntimeComposition(
     input.applicationShellState.loadSelectedThreadRef,
     input.applicationShellState.selectedThreadIdRef,
     input.applicationShellState.setIsCoreLoading,
-    runtimeRefreshObservabilityOwner
+    runtimeRefreshObservabilityOwner,
   ]);
 
   useViewportShellEffects({
@@ -202,9 +184,11 @@ export function useApplicationRuntimeComposition(
     viewportKeyboardStateRef: input.applicationShellState.viewportKeyboardStateRef,
     keyboardOpenScrollRafRef: input.applicationShellState.keyboardOpenScrollRafRef,
     setIsChatAtBottom: input.applicationShellState.setIsChatAtBottom,
-    runtimeViewportSizingCoordinator: input.applicationOwnerDependencies.runtimeViewportSizingCoordinator,
-    pageTouchOverscrollGuardCoordinator: input.applicationOwnerDependencies.pageTouchOverscrollGuardCoordinator,
-    chatScrollStateCoordinator: input.applicationOwnerDependencies.chatScrollStateCoordinator
+    runtimeViewportSizingCoordinator:
+      input.applicationOwnerDependencies.runtimeViewportSizingCoordinator,
+    pageTouchOverscrollGuardCoordinator:
+      input.applicationOwnerDependencies.pageTouchOverscrollGuardCoordinator,
+    chatScrollStateCoordinator: input.applicationOwnerDependencies.chatScrollStateCoordinator,
   });
 
   useApplicationRefreshEffects({
@@ -236,7 +220,7 @@ export function useApplicationRuntimeComposition(
     refreshPushClientState: pushFeatureComposition.refreshPushClientState,
     handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError,
     coreRefreshIntervalMs: input.coreRefreshIntervalMs,
-    coreRefreshConnectedMinIntervalMs: input.coreRefreshConnectedMinIntervalMs
+    coreRefreshConnectedMinIntervalMs: input.coreRefreshConnectedMinIntervalMs,
   });
 
   useSelectedThreadLifecycleEffects({
@@ -244,21 +228,24 @@ export function useApplicationRuntimeComposition(
     selectedThreadIdRef: input.applicationShellState.selectedThreadIdRef,
     selectedThreadLoadTokenRef: input.applicationShellState.selectedThreadLoadTokenRef,
     loadSelectedThreadRef: input.applicationShellState.loadSelectedThreadRef,
-    selectedThreadRefreshConcurrencyCoordinator: input.applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,
+    selectedThreadRefreshConcurrencyCoordinator:
+      input.applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,
     setLiveState: input.applicationShellState.setLiveState,
     setReadThreadState: input.applicationShellState.setReadThreadState,
     setStreamEvents: input.applicationShellState.setStreamEvents,
     setIsSelectedThreadLoading: input.applicationShellState.setIsSelectedThreadLoading,
     setSelectedThreadId: input.applicationShellState.setSelectedThreadId,
-    handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError
+    handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError,
   });
 
   useEventStreamEffects({
     debugHistoryLimit: input.debugHistoryLimit,
     debugErrorListLimit: input.debugErrorListLimit,
     eventRefreshScheduler: input.applicationOwnerDependencies.eventRefreshScheduler,
-    eventStreamConnectionCoordinator: input.applicationOwnerDependencies.eventStreamConnectionCoordinator,
-    eventStreamRefreshDecisionEngine: input.applicationOwnerDependencies.eventStreamRefreshDecisionEngine,
+    eventStreamConnectionCoordinator:
+      input.applicationOwnerDependencies.eventStreamConnectionCoordinator,
+    eventStreamRefreshDecisionEngine:
+      input.applicationOwnerDependencies.eventStreamRefreshDecisionEngine,
     activeTabRef: input.applicationShellState.activeTabRef,
     selectedThreadIdRef: input.applicationShellState.selectedThreadIdRef,
     loadCoreDataTrackedRef: input.applicationShellState.loadCoreDataTrackedRef,
@@ -272,7 +259,7 @@ export function useApplicationRuntimeComposition(
     setDebugErrorSessionId: input.applicationShellState.setDebugErrorSessionId,
     setDebugErrorSessionLogPath: input.applicationShellState.setDebugErrorSessionLogPath,
     applySelectedThreadStreamDelta: input.applySelectedThreadStreamDelta,
-    handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError
+    handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError,
   });
 
   useModeAndPendingRequestEffects({
@@ -295,17 +282,20 @@ export function useApplicationRuntimeComposition(
     setSelectedReasoningEffort: input.applicationShellState.setSelectedReasoningEffort,
     setHasHydratedModeFromLiveState: input.applicationShellState.setHasHydratedModeFromLiveState,
     setIsModeSyncing: input.applicationShellState.setIsModeSyncing,
-    selectedThreadId: input.applicationShellState.selectedThreadId
+    selectedThreadId: input.applicationShellState.selectedThreadId,
   });
 
   const readLastAppliedModeSignature = useCallback((): string => {
     return input.applicationShellState.lastAppliedModeSignatureRef.current;
   }, [input.applicationShellState.lastAppliedModeSignatureRef]);
 
-  const writeLastAppliedModeSignature = useCallback((nextModeSignature: string): void => {
-    const lastAppliedModeSignatureRef = input.applicationShellState.lastAppliedModeSignatureRef;
-    lastAppliedModeSignatureRef.current = nextModeSignature;
-  }, [input.applicationShellState.lastAppliedModeSignatureRef]);
+  const writeLastAppliedModeSignature = useCallback(
+    (nextModeSignature: string): void => {
+      const lastAppliedModeSignatureRef = input.applicationShellState.lastAppliedModeSignatureRef;
+      lastAppliedModeSignatureRef.current = nextModeSignature;
+    },
+    [input.applicationShellState.lastAppliedModeSignatureRef],
+  );
 
   const invalidateActiveThreadQuery = useCallback((): void => {
     input.applicationOwnerDependencies.threadListStateController.invalidateActiveThreadQuery();
@@ -323,7 +313,7 @@ export function useApplicationRuntimeComposition(
       isChatAtBottomRef: input.applicationShellState.isChatAtBottomRef,
       setIsChatAtBottom: input.applicationShellState.setIsChatAtBottom,
       setVisibleChatItemLimit: input.applicationShellState.setVisibleChatItemLimit,
-      chatScrollStateCoordinator: input.applicationOwnerDependencies.chatScrollStateCoordinator
+      chatScrollStateCoordinator: input.applicationOwnerDependencies.chatScrollStateCoordinator,
     },
     chatActionHandlersInput: {
       selectedThreadId: input.applicationShellState.selectedThreadId,
@@ -338,18 +328,21 @@ export function useApplicationRuntimeComposition(
       setIsModeSyncing: input.applicationShellState.setIsModeSyncing,
       setSelectedThreadId: input.applicationShellState.setSelectedThreadId,
       selectedThreadIdRef: input.applicationShellState.selectedThreadIdRef,
-      pendingThreadMaterializationCoordinator: input.applicationShellState.pendingThreadMaterializationCoordinator,
+      pendingThreadMaterializationCoordinator:
+        input.applicationShellState.pendingThreadMaterializationCoordinator,
       readLastAppliedModeSignature,
       writeLastAppliedModeSignature,
       chatRequestActionCoordinator: input.applicationOwnerDependencies.chatRequestActionCoordinator,
-      collaborationModeActionCoordinator: input.applicationOwnerDependencies.collaborationModeActionCoordinator,
+      collaborationModeActionCoordinator:
+        input.applicationOwnerDependencies.collaborationModeActionCoordinator,
       chatClient: input.applicationOwnerDependencies.chatServerClient,
       threadMutationClient: input.applicationOwnerDependencies.threadMutationServerClient,
-      pendingUserInputAnswerBuilder: input.applicationOwnerDependencies.pendingUserInputAnswerBuilder,
+      pendingUserInputAnswerBuilder:
+        input.applicationOwnerDependencies.pendingUserInputAnswerBuilder,
       onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
       loadCoreDataTracked: input.coreDataLoaders.loadCoreDataTracked,
       onReloadSelectedThread: input.loadSelectedThreadTracked,
-      reportTrackedUserInterfaceError: input.runtimeRequestHandlers.reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError: input.runtimeRequestHandlers.reportTrackedUserInterfaceError,
     },
     chatModeToolbarPropertiesInput: {
       canSetCollaborationMode: input.applicationDerivedState.canSetCollaborationMode,
@@ -365,18 +358,21 @@ export function useApplicationRuntimeComposition(
       selectedModelId: input.applicationShellState.selectedModelId,
       selectedReasoningEffort: input.applicationShellState.selectedReasoningEffort,
       selectedModeKey: input.applicationShellState.selectedModeKey,
-      modelOptionsWithoutAssumedDefault: input.applicationDerivedState.modelOptionsWithoutAssumedDefault,
-      effortOptionsWithoutAssumedDefault: input.applicationDerivedState.effortOptionsWithoutAssumedDefault,
+      modelOptionsWithoutAssumedDefault:
+        input.applicationDerivedState.modelOptionsWithoutAssumedDefault,
+      effortOptionsWithoutAssumedDefault:
+        input.applicationDerivedState.effortOptionsWithoutAssumedDefault,
       isModeSyncing: input.applicationShellState.isModeSyncing,
       pendingRequestCount: input.applicationDerivedState.pendingRequests.length,
       setSelectedModeKey: input.applicationShellState.setSelectedModeKey,
       setSelectedModelId: input.applicationShellState.setSelectedModelId,
-      setSelectedReasoningEffort: input.applicationShellState.setSelectedReasoningEffort
-    }
+      setSelectedReasoningEffort: input.applicationShellState.setSelectedReasoningEffort,
+    },
   });
 
   const debugFeatureComposition = useApplicationDebugFeatureComposition({
-    debugWorkspaceActionCoordinator: input.applicationOwnerDependencies.debugWorkspaceActionCoordinator,
+    debugWorkspaceActionCoordinator:
+      input.applicationOwnerDependencies.debugWorkspaceActionCoordinator,
     debugServerClient: input.applicationOwnerDependencies.debugServerClient,
     refreshCoreData: input.coreDataLoaders.loadCoreDataTracked,
     traceLabel: input.applicationShellState.traceLabel,
@@ -387,7 +383,7 @@ export function useApplicationRuntimeComposition(
     setDebugIssueSeverityFilter: input.applicationShellState.setDebugIssueSeverityFilter,
     setSelectedDebugIssueId: input.applicationShellState.setSelectedDebugIssueId,
     setDebugIssueFilterQuery: input.applicationShellState.setDebugIssueFilterQuery,
-    onHistoryDetailLoaded: input.applicationShellState.setHistoryDetail
+    onHistoryDetailLoaded: input.applicationShellState.setHistoryDetail,
   });
 
   useApplicationSynchronizationEffects({
@@ -397,7 +393,7 @@ export function useApplicationRuntimeComposition(
     loadSelectedThreadRef: input.applicationShellState.loadSelectedThreadRef,
     loadHistoryDetail: debugFeatureComposition.loadHistoryDetail,
     selectedHistoryId: input.applicationShellState.selectedHistoryId,
-    handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError
+    handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError,
   });
 
   const shellComposition = useApplicationShellComposition({
@@ -415,17 +411,19 @@ export function useApplicationRuntimeComposition(
     buildActionRequestOptions: input.runtimeRequestHandlers.buildActionRequestOptions,
     reportTrackedUserInterfaceError: input.runtimeRequestHandlers.reportTrackedUserInterfaceError,
     threadMutationServerClient: input.applicationOwnerDependencies.threadMutationServerClient,
-    threadMutationActionCoordinator: input.applicationOwnerDependencies.threadMutationActionCoordinator,
+    threadMutationActionCoordinator:
+      input.applicationOwnerDependencies.threadMutationActionCoordinator,
     threadListStateController: input.applicationOwnerDependencies.threadListStateController,
     mobileSidebarSwipeCoordinator: input.applicationOwnerDependencies.mobileSidebarSwipeCoordinator,
-    runtimeViewportSizingCoordinator: input.applicationOwnerDependencies.runtimeViewportSizingCoordinator,
+    runtimeViewportSizingCoordinator:
+      input.applicationOwnerDependencies.runtimeViewportSizingCoordinator,
     chatScrollStateCoordinator: input.applicationOwnerDependencies.chatScrollStateCoordinator,
     chatFeatureComposition,
     debugFeatureComposition,
-    pushFeatureComposition
+    pushFeatureComposition,
   });
 
   return {
-    shellComposition
+    shellComposition,
   };
 }

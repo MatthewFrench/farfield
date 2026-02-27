@@ -6,7 +6,7 @@ import {
   parseIpcFrame,
   parseThreadStreamStateChangedBroadcast,
   parseUserInputResponsePayload,
-  ThreadStreamStateChangedEventType
+  ThreadStreamStateChangedEventType,
 } from "../Source/Index.js";
 
 describe("codex-protocol ipc schemas", () => {
@@ -16,10 +16,10 @@ describe("codex-protocol ipc schemas", () => {
       requestId: "request-5",
       method: "thread-follower-start-turn",
       params: {
-        conversationId: "thread-123"
+        conversationId: "thread-123",
       },
       version: 1,
-      targetClientId: "client-1"
+      targetClientId: "client-1",
     });
 
     expect(parsed.type).toBe(IpcFrameType.request);
@@ -36,9 +36,9 @@ describe("codex-protocol ipc schemas", () => {
         version: 0,
         method: "ide-context",
         params: {
-          workspaceRoot: "/tmp/workspace"
-        }
-      }
+          workspaceRoot: "/tmp/workspace",
+        },
+      },
     });
 
     expect(parsed.type).toBe(IpcFrameType.clientDiscoveryRequest);
@@ -50,8 +50,8 @@ describe("codex-protocol ipc schemas", () => {
       requestId: "request-7",
       resultType: IpcResponseResultType.success,
       result: {
-        accepted: true
-      }
+        accepted: true,
+      },
     });
 
     expect(parsed.type).toBe(IpcFrameType.response);
@@ -64,12 +64,12 @@ describe("codex-protocol ipc schemas", () => {
         requestId: "request-7a",
         resultType: IpcResponseResultType.success,
         result: {
-          accepted: true
+          accepted: true,
         },
         error: {
-          reason: "must-not-be-present"
-        }
-      })
+          reason: "must-not-be-present",
+        },
+      }),
     );
 
     expect(error.metadata.context).toBe("IpcFrame");
@@ -81,8 +81,8 @@ describe("codex-protocol ipc schemas", () => {
       parseIpcFrame({
         type: IpcFrameType.response,
         requestId: "request-7b",
-        resultType: IpcResponseResultType.error
-      })
+        resultType: IpcResponseResultType.error,
+      }),
     );
 
     expect(error.metadata.context).toBe("IpcFrame");
@@ -94,8 +94,8 @@ describe("codex-protocol ipc schemas", () => {
       parseIpcFrame({
         type: "unsupported-frame",
         requestId: "request-6",
-        method: "thread/read"
-      })
+        method: "thread/read",
+      }),
     ).toThrowError(/IpcFrame did not match expected schema/);
   });
 
@@ -105,8 +105,8 @@ describe("codex-protocol ipc schemas", () => {
         type: IpcFrameType.response,
         requestId: "request-8",
         resultType: "partial",
-        result: {}
-      })
+        result: {},
+      }),
     );
 
     expect(error.metadata.context).toBe("IpcFrame");
@@ -125,10 +125,10 @@ describe("codex-protocol ipc schemas", () => {
           version: 4,
           change: {
             type: "patches",
-            patches: []
-          }
-        }
-      })
+            patches: [],
+          },
+        },
+      }),
     ).toThrowError(/sourceClientId/);
   });
 
@@ -145,10 +145,10 @@ describe("codex-protocol ipc schemas", () => {
           version: 4,
           change: {
             type: "patches",
-            patches: []
-          }
-        }
-      })
+            patches: [],
+          },
+        },
+      }),
     ).toThrowError(/method/);
   });
 
@@ -157,17 +157,15 @@ describe("codex-protocol ipc schemas", () => {
       parseUserInputResponsePayload({
         answers: {
           q: {
-            answers: [1]
-          }
-        }
-      })
+            answers: [1],
+          },
+        },
+      }),
     ).toThrowError(/Expected string, received number/);
   });
 });
 
-function captureIpcFrameParseError(
-  parseFrame: () => void
-): ProtocolValidationError {
+function captureIpcFrameParseError(parseFrame: () => void): ProtocolValidationError {
   try {
     parseFrame();
   } catch (error) {

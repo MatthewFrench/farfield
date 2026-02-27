@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { EventStreamRefreshDecisionEngine } from "../Source/Application/StateManagement/EventStreamRefreshDecisionEngine";
 
-const THREAD_ONLY_METHODS = ["thread-stream-state-changed", "thread-queued-followups-changed"] as const;
+const THREAD_ONLY_METHODS = [
+  "thread-stream-state-changed",
+  "thread-queued-followups-changed",
+] as const;
 
 function createEngine(): EventStreamRefreshDecisionEngine {
   return new EventStreamRefreshDecisionEngine(THREAD_ONLY_METHODS);
@@ -18,16 +21,16 @@ describe("EventStreamRefreshDecisionEngine", () => {
         sequence: 1,
         event: {
           type: "runtime-state-changed",
-          state: { connected: true }
-        }
-      })
+          state: { connected: true },
+        },
+      }),
     });
 
     expect(decision).toEqual({
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
-      threadStreamDelta: null
+      threadStreamDelta: null,
     });
   });
 
@@ -48,22 +51,22 @@ describe("EventStreamRefreshDecisionEngine", () => {
             direction: "out",
             payload: {
               type: "action",
-              action: "thread-queued-followups-changed"
+              action: "thread-queued-followups-changed",
             },
             meta: {
               method: "thread-queued-followups-changed",
-              threadId: "thread-1"
-            }
-          }
-        }
-      })
+              threadId: "thread-1",
+            },
+          },
+        },
+      }),
     });
 
     expect(decision).toEqual({
       refreshCore: false,
       refreshHistory: true,
       refreshSelectedThread: true,
-      threadStreamDelta: null
+      threadStreamDelta: null,
     });
   });
 
@@ -84,21 +87,21 @@ describe("EventStreamRefreshDecisionEngine", () => {
             direction: "out",
             payload: {
               type: "action",
-              action: "thread-created"
+              action: "thread-created",
             },
             meta: {
-              method: "thread-created"
-            }
-          }
-        }
-      })
+              method: "thread-created",
+            },
+          },
+        },
+      }),
     });
 
     expect(decision).toEqual({
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
-      threadStreamDelta: null
+      threadStreamDelta: null,
     });
   });
 
@@ -119,21 +122,21 @@ describe("EventStreamRefreshDecisionEngine", () => {
             direction: "out",
             payload: {
               type: "action",
-              action: "thread-created"
+              action: "thread-created",
             },
             meta: {
-              method: "thread-created"
-            }
-          }
-        }
-      })
+              method: "thread-created",
+            },
+          },
+        },
+      }),
     });
 
     expect(decision).toEqual({
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
-      threadStreamDelta: null
+      threadStreamDelta: null,
     });
   });
 
@@ -154,22 +157,22 @@ describe("EventStreamRefreshDecisionEngine", () => {
             direction: "out",
             payload: {
               type: "action",
-              action: "thread-stream-state-changed"
+              action: "thread-stream-state-changed",
             },
             meta: {
               method: "thread-stream-state-changed",
-              threadId: "thread-1"
-            }
-          }
-        }
-      })
+              threadId: "thread-1",
+            },
+          },
+        },
+      }),
     });
 
     expect(decision).toEqual({
       refreshCore: false,
       refreshHistory: true,
       refreshSelectedThread: false,
-      threadStreamDelta: null
+      threadStreamDelta: null,
     });
   });
 
@@ -190,22 +193,22 @@ describe("EventStreamRefreshDecisionEngine", () => {
             direction: "out",
             payload: {
               type: "action",
-              action: "thread-created"
+              action: "thread-created",
             },
             meta: {
               method: 77,
-              threadId: 42
-            }
-          }
-        }
-      })
+              threadId: 42,
+            },
+          },
+        },
+      }),
     });
 
     expect(decision).toEqual({
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
-      threadStreamDelta: null
+      threadStreamDelta: null,
     });
   });
 
@@ -226,7 +229,7 @@ describe("EventStreamRefreshDecisionEngine", () => {
               threadId: "thread-1",
               ownerClientId: "client-a",
               conversationState: null,
-              liveStateError: null
+              liveStateError: null,
             },
             streamEventsSnapshot: {
               ok: true,
@@ -235,12 +238,12 @@ describe("EventStreamRefreshDecisionEngine", () => {
               events: [],
               nextSequence: 11,
               firstAvailableSequence: 2,
-              resetRequired: false
+              resetRequired: false,
             },
-            streamEventsSinceSequenceUsed: 10
-          }
-        }
-      })
+            streamEventsSinceSequenceUsed: 10,
+          },
+        },
+      }),
     });
 
     expect(decision.refreshCore).toBe(false);
@@ -255,14 +258,14 @@ describe("EventStreamRefreshDecisionEngine", () => {
     const decision = engine.readDecision({
       activeTab: "chat",
       selectedThreadId: null,
-      eventData: "{not-json"
+      eventData: "{not-json",
     });
 
     expect(decision).toEqual({
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
-      threadStreamDelta: null
+      threadStreamDelta: null,
     });
   });
 });

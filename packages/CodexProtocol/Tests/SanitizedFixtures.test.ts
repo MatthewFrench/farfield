@@ -5,9 +5,9 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
   JsonValueSchema,
-  ThreadStreamStateChangedEventType,
   parseIpcFrame,
-  parseThreadStreamStateChangedBroadcast
+  parseThreadStreamStateChangedBroadcast,
+  ThreadStreamStateChangedEventType,
 } from "../Source/Index.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,14 +17,14 @@ const fixtureDir = path.join(__dirname, "fixtures", "sanitized");
 const bannedPatterns = [/\/Users\//i, /anshu/i, /OpenRLM/i, /codextemp/i];
 const FixtureLineSchema = z
   .object({
-    type: z.string().min(1)
+    type: z.string().min(1),
   })
   .passthrough();
 const HistoryLineSchema = z
   .object({
     type: z.literal("history"),
     source: z.string().optional(),
-    payload: JsonValueSchema
+    payload: JsonValueSchema,
   })
   .passthrough();
 
@@ -62,10 +62,7 @@ describe("sanitized fixtures", () => {
         const frame = parseIpcFrame(historyLine.payload);
         parsedIpcHistoryEntryCount += 1;
 
-        if (
-          frame.type === "broadcast" &&
-          frame.method === ThreadStreamStateChangedEventType
-        ) {
+        if (frame.type === "broadcast" && frame.method === ThreadStreamStateChangedEventType) {
           parseThreadStreamStateChangedBroadcast(historyLine.payload);
           parsedThreadStreamBroadcastCount += 1;
         }

@@ -27,7 +27,7 @@ function ScrollEffectsHarness(properties: ScrollEffectsHarnessProperties): React
   const [isChatAtBottom, setIsChatAtBottom] = useState<boolean>(properties.initialIsChatAtBottom);
   const isChatAtBottomRef = useRef<boolean>(properties.initialIsChatAtBottom);
   const [visibleChatItemLimit, setVisibleChatItemLimit] = useState<number>(
-    properties.initialVisibleChatItemCount + 7
+    properties.initialVisibleChatItemCount + 7,
   );
 
   useChatScrollEffects({
@@ -41,7 +41,7 @@ function ScrollEffectsHarness(properties: ScrollEffectsHarnessProperties): React
     isChatAtBottomRef,
     setIsChatAtBottom,
     setVisibleChatItemLimit,
-    chatScrollStateCoordinator: properties.chatScrollStateCoordinator
+    chatScrollStateCoordinator: properties.chatScrollStateCoordinator,
   });
 
   useEffect(() => {
@@ -54,7 +54,7 @@ function ScrollEffectsHarness(properties: ScrollEffectsHarnessProperties): React
     properties.onSnapshot({
       isChatAtBottom,
       visibleChatItemLimit,
-      scrollElement: scrollRef.current
+      scrollElement: scrollRef.current,
     });
   }, [isChatAtBottom, properties, visibleChatItemLimit]);
 
@@ -71,22 +71,22 @@ function setScrollMetrics(
     scrollHeight: number;
     scrollTop: number;
     clientHeight: number;
-  }
+  },
 ): void {
   Object.defineProperty(scrollElement, "scrollHeight", {
     configurable: true,
     writable: true,
-    value: input.scrollHeight
+    value: input.scrollHeight,
   });
   Object.defineProperty(scrollElement, "scrollTop", {
     configurable: true,
     writable: true,
-    value: input.scrollTop
+    value: input.scrollTop,
   });
   Object.defineProperty(scrollElement, "clientHeight", {
     configurable: true,
     writable: true,
-    value: input.clientHeight
+    value: input.clientHeight,
   });
 }
 
@@ -102,15 +102,20 @@ function readScrollSnapshot(snapshotReference: {
 
 describe("useChatScrollEffects", () => {
   beforeEach(() => {
-    vi.stubGlobal("ResizeObserver", class {
-      public observe(): void {}
-      public disconnect(): void {}
-      public unobserve(): void {}
-    });
-    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback: FrameRequestCallback) => {
-      callback(0);
-      return 1;
-    });
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        public observe(): void {}
+        public disconnect(): void {}
+        public unobserve(): void {}
+      },
+    );
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation(
+      (callback: FrameRequestCallback) => {
+        callback(0);
+        return 1;
+      },
+    );
     vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
   });
 
@@ -122,7 +127,7 @@ describe("useChatScrollEffects", () => {
 
   it("synchronizes bottom state from scroll events", async () => {
     const snapshotReference: { current: ScrollEffectsHarnessSnapshot | null } = {
-      current: null
+      current: null,
     };
     const coordinator = new ChatScrollStateCoordinator(20);
 
@@ -138,7 +143,7 @@ describe("useChatScrollEffects", () => {
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
-      />
+      />,
     );
 
     const scrollElement = screen.getByTestId("chat-scroll-shell");
@@ -148,7 +153,7 @@ describe("useChatScrollEffects", () => {
     setScrollMetrics(scrollElement, {
       scrollHeight: 600,
       scrollTop: 200,
-      clientHeight: 100
+      clientHeight: 100,
     });
 
     fireEvent.scroll(scrollElement);
@@ -160,7 +165,7 @@ describe("useChatScrollEffects", () => {
 
   it("pins the chat viewport when new items appear while already at the bottom", async () => {
     const snapshotReference: { current: ScrollEffectsHarnessSnapshot | null } = {
-      current: null
+      current: null,
     };
     const coordinator = new ChatScrollStateCoordinator(20);
     const pinToBottomSpy = vi.spyOn(coordinator, "pinToBottom");
@@ -177,7 +182,7 @@ describe("useChatScrollEffects", () => {
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -197,7 +202,7 @@ describe("useChatScrollEffects", () => {
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -207,7 +212,7 @@ describe("useChatScrollEffects", () => {
 
   it("resets bottom state and visible-limit state when thread selection changes", async () => {
     const snapshotReference: { current: ScrollEffectsHarnessSnapshot | null } = {
-      current: null
+      current: null,
     };
     const coordinator = new ChatScrollStateCoordinator(20);
     const pinToBottomSpy = vi.spyOn(coordinator, "pinToBottom");
@@ -224,7 +229,7 @@ describe("useChatScrollEffects", () => {
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
-      />
+      />,
     );
 
     rerender(
@@ -239,7 +244,7 @@ describe("useChatScrollEffects", () => {
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -253,7 +258,7 @@ describe("useChatScrollEffects", () => {
     setScrollMetrics(scrollElement, {
       scrollHeight: 600,
       scrollTop: 120,
-      clientHeight: 100
+      clientHeight: 100,
     });
 
     fireEvent.scroll(scrollElement);
@@ -274,13 +279,15 @@ describe("useChatScrollEffects", () => {
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
       expect(snapshotReference.current?.visibleChatItemLimit).toBe(40);
       expect(snapshotReference.current?.isChatAtBottom).toBe(true);
     });
-    expect(pinToBottomSpy.mock.calls.length).toBeGreaterThan(pinToBottomCallCountBeforeThreadChange);
+    expect(pinToBottomSpy.mock.calls.length).toBeGreaterThan(
+      pinToBottomCallCountBeforeThreadChange,
+    );
   });
 });

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { IpcFrame } from "@farfield/protocol";
+import { describe, expect, it } from "vitest";
 import type { CodexIpcFrameEvent } from "../Source/Agents/Adapters/CodexAgentAdapter.js";
 import { shouldScheduleThreadStreamStateChanged } from "../Source/Agents/AgentRuntimeOwner.js";
 import { THREAD_STREAM_STATE_CHANGED_METHOD } from "../Source/Agents/ThreadStreamStateChangedContract.js";
@@ -17,7 +17,7 @@ function createInboundFrame(method: string): IpcFrame {
     method,
     params: {},
     sourceClientId: SOURCE_CLIENT_IDENTIFIER,
-    version: 1
+    version: 1,
   };
 }
 
@@ -28,7 +28,7 @@ function createOutboundFrame(method: string): IpcFrame {
     method,
     params: {},
     targetClientId: TARGET_CLIENT_IDENTIFIER,
-    version: 1
+    version: 1,
   };
 }
 
@@ -42,7 +42,7 @@ function createCodexIpcFrameEvent(input: {
     direction: input.direction,
     frame: input.frame,
     method: input.method,
-    threadId: input.threadId
+    threadId: input.threadId,
   };
 }
 
@@ -52,7 +52,7 @@ describe("AgentRuntimeOwner", () => {
       direction: "in",
       frame: createInboundFrame(THREAD_STREAM_STATE_CHANGED_METHOD),
       method: THREAD_STREAM_STATE_CHANGED_METHOD,
-      threadId: DEFAULT_THREAD_IDENTIFIER
+      threadId: DEFAULT_THREAD_IDENTIFIER,
     });
 
     expect(shouldScheduleThreadStreamStateChanged(inboundStreamEvent)).toBe(true);
@@ -63,7 +63,7 @@ describe("AgentRuntimeOwner", () => {
       direction: "out",
       frame: createOutboundFrame(THREAD_STREAM_STATE_CHANGED_METHOD),
       method: THREAD_STREAM_STATE_CHANGED_METHOD,
-      threadId: DEFAULT_THREAD_IDENTIFIER
+      threadId: DEFAULT_THREAD_IDENTIFIER,
     });
 
     expect(shouldScheduleThreadStreamStateChanged(outboundPreviewEvent)).toBe(false);
@@ -74,7 +74,7 @@ describe("AgentRuntimeOwner", () => {
       direction: "in",
       frame: createInboundFrame(NON_STREAM_METHOD),
       method: NON_STREAM_METHOD,
-      threadId: DEFAULT_THREAD_IDENTIFIER
+      threadId: DEFAULT_THREAD_IDENTIFIER,
     });
 
     expect(shouldScheduleThreadStreamStateChanged(nonStreamEvent)).toBe(false);
@@ -85,10 +85,12 @@ describe("AgentRuntimeOwner", () => {
       direction: "in",
       frame: createInboundFrame(THREAD_STREAM_STATE_CHANGED_METHOD),
       method: THREAD_STREAM_STATE_CHANGED_METHOD,
-      threadId: null
+      threadId: null,
     });
 
-    expect(shouldScheduleThreadStreamStateChanged(inboundStreamEventWithoutThreadIdentifier)).toBe(false);
+    expect(shouldScheduleThreadStreamStateChanged(inboundStreamEventWithoutThreadIdentifier)).toBe(
+      false,
+    );
   });
 
   it("does not schedule completion checks when thread identifier is whitespace", () => {
@@ -96,10 +98,12 @@ describe("AgentRuntimeOwner", () => {
       direction: "in",
       frame: createInboundFrame(THREAD_STREAM_STATE_CHANGED_METHOD),
       method: THREAD_STREAM_STATE_CHANGED_METHOD,
-      threadId: "   "
+      threadId: "   ",
     });
 
-    expect(shouldScheduleThreadStreamStateChanged(inboundStreamEventWithWhitespaceIdentifier)).toBe(false);
+    expect(shouldScheduleThreadStreamStateChanged(inboundStreamEventWithWhitespaceIdentifier)).toBe(
+      false,
+    );
   });
 
   it("preserves non-whitespace thread identifier text for scheduled events", () => {
@@ -107,7 +111,7 @@ describe("AgentRuntimeOwner", () => {
       direction: "in",
       frame: createInboundFrame(THREAD_STREAM_STATE_CHANGED_METHOD),
       method: THREAD_STREAM_STATE_CHANGED_METHOD,
-      threadId: PADDED_THREAD_IDENTIFIER
+      threadId: PADDED_THREAD_IDENTIFIER,
     });
 
     if (!shouldScheduleThreadStreamStateChanged(inboundEventWithPaddedIdentifier)) {

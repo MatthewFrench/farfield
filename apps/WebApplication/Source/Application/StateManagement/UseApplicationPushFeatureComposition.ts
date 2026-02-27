@@ -1,21 +1,9 @@
-import {
-  useCallback,
-  type Dispatch,
-  type SetStateAction
-} from "react";
-import {
-  bootstrapEventsSession
-} from "@/Application/DataAccess/WebShellApi";
+import { type Dispatch, type SetStateAction, useCallback } from "react";
+import { bootstrapEventsSession } from "@/Application/DataAccess/WebShellApi";
 import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
-import {
-  toErrorMessage
-} from "@/Shared/Errors/ErrorMessage";
-import {
-  type PushClientState
-} from "@/Features/PushNotifications/DomainModel/PushClientContracts";
-import {
-  PushNotificationToolbarActionCoordinator
-} from "@/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";
+import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
+import { PushNotificationToolbarActionCoordinator } from "@/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";
+import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 
 const API_TOKEN_REQUIRED_ERROR_MESSAGE = "API token is required";
 const INVALID_API_TOKEN_ERROR_MESSAGE = "Invalid API token";
@@ -42,7 +30,7 @@ export interface ApplicationPushFeatureComposition {
 }
 
 export function useApplicationPushFeatureComposition(
-  input: UseApplicationPushFeatureCompositionInput
+  input: UseApplicationPushFeatureCompositionInput,
 ): ApplicationPushFeatureComposition {
   const submitApiSessionToken = useCallback(async (): Promise<void> => {
     const tokenValue = input.apiSessionTokenDraft.trim();
@@ -55,7 +43,7 @@ export function useApplicationPushFeatureComposition(
     try {
       const bootstrapDecision = await input.apiSessionBootstrapCoordinator.submitApiToken(
         tokenValue,
-        (apiToken) => bootstrapEventsSession({ apiToken })
+        (apiToken) => bootstrapEventsSession({ apiToken }),
       );
       if (!bootstrapDecision.isReady) {
         if (bootstrapDecision.requiresApiToken) {
@@ -84,12 +72,12 @@ export function useApplicationPushFeatureComposition(
     input.setApiSessionBootstrapErrorMessage,
     input.setApiSessionTokenDraft,
     input.setIsApiSessionBootstrapPending,
-    input.setRequiresApiSessionToken
+    input.setRequiresApiSessionToken,
   ]);
 
   const refreshPushClientState = useCallback(async (): Promise<void> => {
     await input.pushNotificationToolbarActionCoordinator.refreshPushClientState({
-      onPushClientStateRead: input.setPushClientState
+      onPushClientStateRead: input.setPushClientState,
     });
   }, [input.pushNotificationToolbarActionCoordinator, input.setPushClientState]);
 
@@ -97,18 +85,18 @@ export function useApplicationPushFeatureComposition(
     await input.pushNotificationToolbarActionCoordinator.enablePushNotificationsFromToolbar({
       onSetEnablingPushNotifications: input.setIsEnablingPushNotifications,
       onPushClientStateRead: input.setPushClientState,
-      onSetErrorMessage: input.setErrorMessage
+      onSetErrorMessage: input.setErrorMessage,
     });
   }, [
     input.pushNotificationToolbarActionCoordinator,
     input.setErrorMessage,
     input.setIsEnablingPushNotifications,
-    input.setPushClientState
+    input.setPushClientState,
   ]);
 
   return {
     submitApiSessionToken,
     refreshPushClientState,
-    enablePushNotificationsFromToolbar
+    enablePushNotificationsFromToolbar,
   };
 }

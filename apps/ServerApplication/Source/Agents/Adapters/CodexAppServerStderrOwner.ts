@@ -11,9 +11,8 @@ const APP_SERVER_STDERR_IGNORED_LOG_EVENT = "codex-app-server-stderr-ignored";
 const ROLLOUT_LIST_SCOPE_FRAGMENT = "codex_core::rollout::list";
 const ROLLOUT_PATH_MISSING_FRAGMENT = "state db missing rollout path for thread";
 const STATE_DATABASE_SCOPE_FRAGMENT = "codex_core::state_db";
-const STATE_DATABASE_DISCREPANCY_FRAGMENT = (
-  "state db record_discrepancy: find_thread_path_by_id_str_in_subdir"
-);
+const STATE_DATABASE_DISCREPANCY_FRAGMENT =
+  "state db record_discrepancy: find_thread_path_by_id_str_in_subdir";
 const STATE_DATABASE_RETRY_FRAGMENT = "falling_back";
 
 export class CodexAppServerStderrOwner {
@@ -43,15 +42,12 @@ export class CodexAppServerStderrOwner {
   }
 
   private isKnownBenignLine(line: string): boolean {
-    const isRolloutPathNotice = (
-      line.includes(ROLLOUT_LIST_SCOPE_FRAGMENT)
-      && line.includes(ROLLOUT_PATH_MISSING_FRAGMENT)
-    );
-    const isStateDatabasePathRetryNotice = (
-      line.includes(STATE_DATABASE_SCOPE_FRAGMENT)
-      && line.includes(STATE_DATABASE_DISCREPANCY_FRAGMENT)
-      && line.includes(STATE_DATABASE_RETRY_FRAGMENT)
-    );
+    const isRolloutPathNotice =
+      line.includes(ROLLOUT_LIST_SCOPE_FRAGMENT) && line.includes(ROLLOUT_PATH_MISSING_FRAGMENT);
+    const isStateDatabasePathRetryNotice =
+      line.includes(STATE_DATABASE_SCOPE_FRAGMENT) &&
+      line.includes(STATE_DATABASE_DISCREPANCY_FRAGMENT) &&
+      line.includes(STATE_DATABASE_RETRY_FRAGMENT);
 
     return isRolloutPathNotice || isStateDatabasePathRetryNotice;
   }

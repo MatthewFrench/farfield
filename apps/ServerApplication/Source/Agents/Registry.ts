@@ -41,9 +41,7 @@ export class AgentRegistry {
     return null;
   }
 
-  public resolveFirstWithCapability(
-    capability: keyof AgentCapabilities
-  ): AgentAdapter | null {
+  public resolveFirstWithCapability(capability: keyof AgentCapabilities): AgentAdapter | null {
     for (const adapter of this.ordered) {
       if (adapter.isEnabled() && adapter.isConnected() && adapter.capabilities[capability]) {
         return adapter;

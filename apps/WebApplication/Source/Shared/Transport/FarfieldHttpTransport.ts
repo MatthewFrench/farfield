@@ -5,29 +5,27 @@
 import { FarfieldApiErrorResponseSchema } from "@farfield/protocol";
 import { z } from "zod";
 import {
-  ApiRequestHeaderOptionsSchema,
   type ApiRequestHeaderOptions,
-  type ApiRequestOptions
+  ApiRequestHeaderOptionsSchema,
+  type ApiRequestOptions,
 } from "@/Shared/Contracts/ApiContracts";
+import { type FarfieldHttpRequestFailureDetails } from "@/Shared/Contracts/FarfieldHttpRequestFailureDetails";
 import {
   ACTION_ID_HEADER_NAME,
   ACTION_NAME_HEADER_NAME,
   REQUEST_ID_HEADER_NAME,
   REQUEST_ID_LABEL,
-  RequestIdentifierInMessagePattern
+  RequestIdentifierInMessagePattern,
 } from "@/Shared/Contracts/RequestMetadataContracts";
 import {
+  type StructuredDataValue,
   StructuredDataValueSchema,
-  type StructuredDataValue
 } from "@/Shared/Contracts/StructuredDataValue";
-import {
-  type FarfieldHttpRequestFailureDetails
-} from "@/Shared/Contracts/FarfieldHttpRequestFailureDetails";
 import { RequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
 
 const ApiEnvelopeSchema = z
   .object({
-    ok: z.boolean()
+    ok: z.boolean(),
   })
   .passthrough();
 type ApiEnvelope = z.infer<typeof ApiEnvelopeSchema>;
@@ -111,13 +109,13 @@ function normalizeRequestPath(path: string): string {
 function readValidatedRequestHeaderOptions(options: ApiRequestOptions): ApiRequestHeaderOptions {
   return ApiRequestHeaderOptionsSchema.parse({
     actionId: options.actionId,
-    actionName: options.actionName
+    actionName: options.actionName,
   });
 }
 
 function buildFailureMessage(
   baseMessage: string,
-  context: FarfieldHttpRequestFailureDetails
+  context: FarfieldHttpRequestFailureDetails,
 ): string {
   const statusTextValue = readNonEmptyTrimmedText(context.statusText);
   const statusText = statusTextValue === null ? "" : ` ${statusTextValue}`;
@@ -139,7 +137,7 @@ function createEmptyResponseTextSummary(): ResponseTextSummary {
   return {
     responseText: null,
     responseTextLength: null,
-    responseTextTruncated: false
+    responseTextTruncated: false,
   };
 }
 
@@ -153,14 +151,14 @@ function summarizeResponseText(rawText: string): ResponseTextSummary {
     return {
       responseText: normalized,
       responseTextLength: normalized.length,
-      responseTextTruncated: false
+      responseTextTruncated: false,
     };
   }
 
   return {
     responseText: trimRequestBody(normalized),
     responseTextLength: normalized.length,
-    responseTextTruncated: true
+    responseTextTruncated: true,
   };
 }
 
@@ -171,18 +169,18 @@ async function readResponseBody(response: Response): Promise<ResponseBodyReadRes
     if (rawText.trim().length === 0) {
       return {
         parseText: null,
-        responseTextSummary: createEmptyResponseTextSummary()
+        responseTextSummary: createEmptyResponseTextSummary(),
       };
     }
 
     return {
       parseText: rawText,
-      responseTextSummary: summarizeResponseText(rawText)
+      responseTextSummary: summarizeResponseText(rawText),
     };
   } catch {
     return {
       parseText: null,
-      responseTextSummary: createEmptyResponseTextSummary()
+      responseTextSummary: createEmptyResponseTextSummary(),
     };
   }
 }
@@ -194,17 +192,17 @@ function decodeStructuredDataValue(parseText: string): StructuredDataDecodeResul
     if (!parsedStructuredData.success) {
       return {
         kind: "failure",
-        reason: parsedStructuredData.error.message
+        reason: parsedStructuredData.error.message,
       };
     }
     return {
       kind: "success",
-      data: parsedStructuredData.data
+      data: parsedStructuredData.data,
     };
   } catch (error) {
     return {
       kind: "failure",
-      reason: error instanceof Error ? error.message : String(error)
+      reason: error instanceof Error ? error.message : String(error),
     };
   }
 }
@@ -214,12 +212,12 @@ function decodeApiEnvelope(data: StructuredDataValue): ApiEnvelopeDecodeResult {
   if (!parsedEnvelope.success) {
     return {
       kind: "failure",
-      reason: parsedEnvelope.error.message
+      reason: parsedEnvelope.error.message,
     };
   }
   return {
     kind: "success",
-    envelope: parsedEnvelope.data
+    envelope: parsedEnvelope.data,
   };
 }
 
@@ -236,7 +234,7 @@ function createRequestFailureError(
   requestId: string | null,
   response: Response | null,
   responseTextSummary: ResponseTextSummary,
-  baseMessage: string
+  baseMessage: string,
 ): FarfieldHttpRequestFailureError {
   const context: FarfieldHttpRequestFailureDetails = {
     path,
@@ -245,7 +243,7 @@ function createRequestFailureError(
     requestId,
     responseText: responseTextSummary.responseText,
     responseTextLength: responseTextSummary.responseTextLength,
-    responseTextTruncated: responseTextSummary.responseTextTruncated
+    responseTextTruncated: responseTextSummary.responseTextTruncated,
   };
   const message = buildFailureMessage(baseMessage, context);
   return new FarfieldHttpRequestFailureError(message, context);
@@ -309,7 +307,7 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
   let response: Response;
   const timeoutController = new AbortController();
   const timeoutState = {
-    didTimeout: false
+    didTimeout: false,
   };
   const timeoutHandle = setTimeout(() => {
     timeoutState.didTimeout = true;
@@ -330,7 +328,7 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
     response = await fetch(path, {
       ...init,
       headers,
-      signal: timeoutController.signal
+      signal: timeoutController.signal,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -345,7 +343,7 @@ async function performRequest(path: string, init?: RequestInit): Promise<Respons
       requestId,
       null,
       createEmptyResponseTextSummary(),
-      buildRequestFailureMessageWithReason(path, message)
+      buildRequestFailureMessageWithReason(path, message),
     );
   } finally {
     clearTimeout(timeoutHandle);
@@ -368,7 +366,7 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      buildInvalidJsonResponseMessage(normalizedPath, EMPTY_RESPONSE_REASON)
+      buildInvalidJsonResponseMessage(normalizedPath, EMPTY_RESPONSE_REASON),
     );
   }
 
@@ -379,7 +377,7 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      buildInvalidJsonResponseMessage(normalizedPath, decodedStructuredData.reason)
+      buildInvalidJsonResponseMessage(normalizedPath, decodedStructuredData.reason),
     );
   }
   const data = decodedStructuredData.data;
@@ -391,7 +389,7 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      buildInvalidApiEnvelopeMessage(normalizedPath, decodedEnvelope.reason)
+      buildInvalidApiEnvelopeMessage(normalizedPath, decodedEnvelope.reason),
     );
   }
   const envelope = decodedEnvelope.envelope;
@@ -402,7 +400,7 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      resolveFailureBaseMessage(normalizedPath, data)
+      resolveFailureBaseMessage(normalizedPath, data),
     );
   }
 
@@ -423,7 +421,7 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      buildRequestFailureMessageWithReason(normalizedPath, EMPTY_RESPONSE_REASON)
+      buildRequestFailureMessageWithReason(normalizedPath, EMPTY_RESPONSE_REASON),
     );
   }
 
@@ -434,7 +432,7 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
     responseRequestId,
     response,
     responseBody.responseTextSummary,
-    resolveFailureBaseMessage(normalizedPath, data)
+    resolveFailureBaseMessage(normalizedPath, data),
   );
 }
 
@@ -453,15 +451,15 @@ export function applyRequestOptions(init: RequestInit, options?: ApiRequestOptio
   }
 
   const nextInit: RequestInit = {
-    ...init
+    ...init,
   };
   if (options.signal) {
     nextInit.signal = options.signal;
   }
 
   const hasRequestOptionHeaders =
-    validatedRequestHeaderOptions.actionId !== undefined
-    || validatedRequestHeaderOptions.actionName !== undefined;
+    validatedRequestHeaderOptions.actionId !== undefined ||
+    validatedRequestHeaderOptions.actionName !== undefined;
   if (init.headers !== undefined || hasRequestOptionHeaders) {
     nextInit.headers = nextHeaders;
   }

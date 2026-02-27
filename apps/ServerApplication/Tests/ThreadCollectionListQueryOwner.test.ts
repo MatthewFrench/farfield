@@ -16,8 +16,8 @@ describe("ThreadCollectionListQueryOwner", () => {
         maxPages: 20,
         cursor: null,
         sortKey: null,
-        cwd: null
-      }
+        cwd: null,
+      },
     });
   });
 
@@ -25,9 +25,7 @@ describe("ThreadCollectionListQueryOwner", () => {
     const owner = new ThreadCollectionListQueryOwner();
 
     const parsedQuery = owner.parse(
-      new URL(
-        "http://localhost/api/threads?limit=&archived=&all=&maxPages=&cursor=&sortKey=&cwd="
-      )
+      new URL("http://localhost/api/threads?limit=&archived=&all=&maxPages=&cursor=&sortKey=&cwd="),
     );
 
     expect(parsedQuery).toEqual({
@@ -39,8 +37,8 @@ describe("ThreadCollectionListQueryOwner", () => {
         maxPages: 20,
         cursor: "",
         sortKey: null,
-        cwd: ""
-      }
+        cwd: "",
+      },
     });
   });
 
@@ -48,9 +46,7 @@ describe("ThreadCollectionListQueryOwner", () => {
     const owner = new ThreadCollectionListQueryOwner();
 
     const parsedQuery = owner.parse(
-      new URL(
-        "http://localhost/api/threads?limit=0&archived=1&all=yes&maxPages=0&sortKey=invalid"
-      )
+      new URL("http://localhost/api/threads?limit=0&archived=1&all=yes&maxPages=0&sortKey=invalid"),
     );
 
     expect(parsedQuery.ok).toBe(false);
@@ -61,20 +57,20 @@ describe("ThreadCollectionListQueryOwner", () => {
     expect(parsedQuery.issues).toHaveLength(5);
     expect(parsedQuery.issues).toMatchObject([
       {
-        path: "limit"
+        path: "limit",
       },
       {
-        path: "archived"
+        path: "archived",
       },
       {
-        path: "all"
+        path: "all",
       },
       {
-        path: "maxPages"
+        path: "maxPages",
       },
       {
-        path: "sortKey"
-      }
+        path: "sortKey",
+      },
     ]);
   });
 
@@ -86,7 +82,7 @@ describe("ThreadCollectionListQueryOwner", () => {
 
     expect(decodedCursor).toEqual({
       ok: true,
-      offset: 3
+      offset: 3,
     });
   });
 
@@ -95,9 +91,9 @@ describe("ThreadCollectionListQueryOwner", () => {
     const encodedCursor = Buffer.from(
       JSON.stringify({
         version: 1,
-        offset: -1
+        offset: -1,
       }),
-      "utf8"
+      "utf8",
     ).toString("base64url");
 
     const decodedCursor = owner.decodeCursor(encodedCursor);
@@ -108,8 +104,8 @@ describe("ThreadCollectionListQueryOwner", () => {
     }
     expect(decodedCursor.issues).toMatchObject([
       {
-        path: "cursor.offset"
-      }
+        path: "cursor.offset",
+      },
     ]);
   });
 });

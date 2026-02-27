@@ -21,7 +21,7 @@ const exampleDebugIssue: DebugIssue = {
   operation: "thread.read",
   name: "Error",
   stack: null,
-  detailsText: "{}"
+  detailsText: "{}",
 };
 
 function renderDebugIssuesPanel(input?: {
@@ -47,7 +47,7 @@ function renderDebugIssuesPanel(input?: {
       onSeverityFilterChange={input?.onSeverityFilterChange ?? (() => {})}
       onFilterQueryChange={input?.onFilterQueryChange ?? (() => {})}
       onClearIssues={() => {}}
-    />
+    />,
   );
 }
 
@@ -58,7 +58,7 @@ describe("DebugIssuesPanel", () => {
 
     renderDebugIssuesPanel({
       onIssueSelect,
-      onSeverityFilterChange
+      onSeverityFilterChange,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Errors" }));
@@ -75,7 +75,7 @@ describe("DebugIssuesPanel", () => {
     renderDebugIssuesPanel({ onFilterQueryChange });
 
     fireEvent.change(screen.getByPlaceholderText("Filter by action/request/error/thread/message"), {
-      target: { value: "request-1" }
+      target: { value: "request-1" },
     });
 
     expect(onFilterQueryChange).toHaveBeenCalledWith("request-1");
@@ -87,7 +87,7 @@ describe("DebugIssuesPanel", () => {
 
     renderDebugIssuesPanel({ debugErrorSessionLogPath: "/tmp/session.ndjson" });
     expect(screen.getByText("session log").getAttribute("href")).toBe(
-      "/api/debug/client-errors/session-log"
+      "/api/debug/client-errors/session-log",
     );
   });
 });

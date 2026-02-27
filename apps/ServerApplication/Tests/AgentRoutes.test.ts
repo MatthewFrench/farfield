@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
-import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import type {
   AgentAdapter,
@@ -15,21 +15,21 @@ import type {
   AgentListThreadsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
-  AgentSendMessageInput
+  AgentSendMessageInput,
 } from "../Source/Agents/Types.js";
 import { handleAgentRoutes } from "../Source/Network/Routes/AgentRoutes.js";
 import { logger } from "../Source/Shared/Logging/Logger.js";
 
 const AgentRoutePathnameByName = {
-  listAgents: "/api/agents"
+  listAgents: "/api/agents",
 } as const;
 
 const AgentRouteStatusCodeByName = {
-  successOk: 200
+  successOk: 200,
 } as const;
 
 const AgentRouteLogEventByName = {
-  projectDirectoryListFailed: "agent-project-directory-list-failed"
+  projectDirectoryListFailed: "agent-project-directory-list-failed",
 } as const;
 
 const AgentRouteMaximumLoggedErrorLength = 240;
@@ -44,7 +44,7 @@ const AgentCapabilitiesSchema = z
     canSetCollaborationMode: z.boolean(),
     canSubmitUserInput: z.boolean(),
     canReadLiveState: z.boolean(),
-    canReadStreamEvents: z.boolean()
+    canReadStreamEvents: z.boolean(),
   })
   .strict();
 
@@ -55,7 +55,7 @@ const AgentDescriptorSchema = z
     enabled: z.boolean(),
     connected: z.boolean(),
     capabilities: AgentCapabilitiesSchema,
-    projectDirectories: z.array(z.string())
+    projectDirectories: z.array(z.string()),
   })
   .strict();
 
@@ -63,14 +63,14 @@ const AgentListResponseSchema = z
   .object({
     ok: z.literal(true),
     agents: z.array(AgentDescriptorSchema),
-    defaultAgentId: AgentIdentifierSchema
+    defaultAgentId: AgentIdentifierSchema,
   })
   .strict();
 
 const AgentRouteWarningContextSchema = z
   .object({
     agentId: AgentIdentifierSchema,
-    error: z.string().max(300)
+    error: z.string().max(300),
   })
   .strict();
 
@@ -101,7 +101,7 @@ function createMockRequestResponsePair(): { request: IncomingMessage; response: 
   const response = new ServerResponse(request);
   return {
     request,
-    response
+    response,
   };
 }
 
@@ -113,7 +113,7 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canSubmitUserInput: false,
     canReadLiveState: false,
     canReadStreamEvents: false,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -133,7 +133,7 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
     async listThreads(_input: AgentListThreadsInput): Promise<AgentListThreadsResult> {
       return {
         data: [],
-        nextCursor: null
+        nextCursor: null,
       };
     },
     async createThread(_input: AgentCreateThreadInput): Promise<AgentCreateThreadResult> {
@@ -147,7 +147,7 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
     },
     async interrupt(_input: AgentInterruptInput): Promise<void> {
       throw new Error("Not used in AgentRoutes tests");
-    }
+    },
   };
 
   if (options.listProjectDirectories) {
@@ -157,14 +157,17 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
   return adapter;
 }
 
-function buildAgentDescriptor(adapter: AgentAdapter, projectDirectories: string[]): AgentDescriptor {
+function buildAgentDescriptor(
+  adapter: AgentAdapter,
+  projectDirectories: string[],
+): AgentDescriptor {
   return {
     id: adapter.id,
     label: adapter.label,
     enabled: adapter.isEnabled(),
     connected: adapter.isConnected(),
     capabilities: adapter.capabilities,
-    projectDirectories
+    projectDirectories,
   };
 }
 
@@ -179,7 +182,9 @@ function parseAgentListResponse(result: AgentRouteExecutionResult) {
   return AgentListResponseSchema.parse(readRouteBody(result));
 }
 
-async function executeAgentRoute(input: ExecuteAgentRouteInput): Promise<AgentRouteExecutionResult> {
+async function executeAgentRoute(
+  input: ExecuteAgentRouteInput,
+): Promise<AgentRouteExecutionResult> {
   const { request, response } = createMockRequestResponsePair();
   request.method = input.method ?? "GET";
 
@@ -196,13 +201,13 @@ async function executeAgentRoute(input: ExecuteAgentRouteInput): Promise<AgentRo
     jsonResponse: (_response, nextStatusCode, nextBody) => {
       statusCode = nextStatusCode;
       body = nextBody;
-    }
+    },
   });
 
   return {
     handled,
     statusCode,
-    body
+    body,
   };
 }
 
@@ -210,7 +215,7 @@ describe("handleAgentRoutes", () => {
   it("returns false when list-agents route method does not match", async () => {
     const result = await executeAgentRoute({
       method: "POST",
-      pathname: AgentRoutePathnameByName.listAgents
+      pathname: AgentRoutePathnameByName.listAgents,
     });
 
     expect(result.handled).toBe(false);
@@ -224,20 +229,20 @@ describe("handleAgentRoutes", () => {
       enabled: true,
       connected: true,
       capabilities: {
-        canListModels: true
+        canListModels: true,
       },
-      listProjectDirectories: async () => ["/workspace/codex", "/workspace/shared"]
+      listProjectDirectories: async () => ["/workspace/codex", "/workspace/shared"],
     });
     const opencodeAdapter = createMockAgentAdapter({
       id: "opencode",
       enabled: false,
-      connected: false
+      connected: false,
     });
 
     const result = await executeAgentRoute({
       pathname: AgentRoutePathnameByName.listAgents,
       adapters: [codexAdapter, opencodeAdapter],
-      configuredAgentIds: ["opencode"]
+      configuredAgentIds: ["opencode"],
     });
 
     expect(result.handled).toBe(true);
@@ -257,9 +262,9 @@ describe("handleAgentRoutes", () => {
             canSetCollaborationMode: false,
             canSubmitUserInput: false,
             canReadLiveState: false,
-            canReadStreamEvents: false
+            canReadStreamEvents: false,
           },
-          projectDirectories: ["/workspace/codex", "/workspace/shared"]
+          projectDirectories: ["/workspace/codex", "/workspace/shared"],
         },
         {
           id: "opencode",
@@ -272,29 +277,29 @@ describe("handleAgentRoutes", () => {
             canSetCollaborationMode: false,
             canSubmitUserInput: false,
             canReadLiveState: false,
-            canReadStreamEvents: false
+            canReadStreamEvents: false,
           },
-          projectDirectories: []
-        }
+          projectDirectories: [],
+        },
       ],
-      defaultAgentId: "codex"
+      defaultAgentId: "codex",
     });
   });
 
   it("returns configured default when no enabled agent exists and configured id is listed", async () => {
     const codexAdapter = createMockAgentAdapter({
       id: "codex",
-      enabled: false
+      enabled: false,
     });
     const opencodeAdapter = createMockAgentAdapter({
       id: "opencode",
-      enabled: false
+      enabled: false,
     });
 
     const result = await executeAgentRoute({
       pathname: AgentRoutePathnameByName.listAgents,
       adapters: [codexAdapter, opencodeAdapter],
-      configuredAgentIds: ["opencode"]
+      configuredAgentIds: ["opencode"],
     });
 
     expect(result.handled).toBe(true);
@@ -306,13 +311,13 @@ describe("handleAgentRoutes", () => {
   it("uses first listed descriptor as default when configured id is not listed", async () => {
     const codexAdapter = createMockAgentAdapter({
       id: "codex",
-      enabled: false
+      enabled: false,
     });
 
     const result = await executeAgentRoute({
       pathname: AgentRoutePathnameByName.listAgents,
       adapters: [codexAdapter],
-      configuredAgentIds: ["opencode"]
+      configuredAgentIds: ["opencode"],
     });
 
     expect(result.handled).toBe(true);
@@ -325,7 +330,7 @@ describe("handleAgentRoutes", () => {
     const result = await executeAgentRoute({
       pathname: AgentRoutePathnameByName.listAgents,
       adapters: [],
-      configuredAgentIds: ["opencode"]
+      configuredAgentIds: ["opencode"],
     });
 
     expect(result.handled).toBe(true);
@@ -340,10 +345,10 @@ describe("handleAgentRoutes", () => {
       executeAgentRoute({
         pathname: AgentRoutePathnameByName.listAgents,
         adapters: [],
-        configuredAgentIds: []
-      })
+        configuredAgentIds: [],
+      }),
     ).rejects.toThrow(
-      "Agent route cannot resolve a default agent identifier from enabled, configured, or listed agents."
+      "Agent route cannot resolve a default agent identifier from enabled, configured, or listed agents.",
     );
   });
 
@@ -352,14 +357,14 @@ describe("handleAgentRoutes", () => {
     const codexAdapter = createMockAgentAdapter({
       id: "codex",
       connected: false,
-      listProjectDirectories
+      listProjectDirectories,
     });
     const warningSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
 
     try {
       const result = await executeAgentRoute({
         pathname: AgentRoutePathnameByName.listAgents,
-        adapters: [codexAdapter]
+        adapters: [codexAdapter],
       });
 
       expect(result.handled).toBe(true);
@@ -381,7 +386,7 @@ describe("handleAgentRoutes", () => {
       connected: true,
       listProjectDirectories: async () => {
         throw new Error(longErrorMessage);
-      }
+      },
     });
 
     const warningSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
@@ -389,7 +394,7 @@ describe("handleAgentRoutes", () => {
       const result = await executeAgentRoute({
         pathname: AgentRoutePathnameByName.listAgents,
         adapters: [codexAdapter],
-        configuredAgentIds: ["codex"]
+        configuredAgentIds: ["codex"],
       });
 
       expect(result.handled).toBe(true);
@@ -407,7 +412,7 @@ describe("handleAgentRoutes", () => {
       expect(warningContext.agentId).toBe("codex");
       expect(warningContext.error.length).toBeLessThan(longErrorMessage.length);
       expect(warningContext.error.length).toBe(
-        AgentRouteMaximumLoggedErrorLength + AgentRouteTruncatedErrorSuffix.length
+        AgentRouteMaximumLoggedErrorLength + AgentRouteTruncatedErrorSuffix.length,
       );
       expect(warningContext.error.endsWith(AgentRouteTruncatedErrorSuffix)).toBe(true);
     } finally {

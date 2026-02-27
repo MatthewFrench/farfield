@@ -2,14 +2,10 @@ import http from "node:http";
 import {
   FarfieldHealthStateSchema,
   FarfieldPushTestBodySchema,
-  type JsonValue
+  type JsonValue,
 } from "@farfield/protocol";
-import { configureLogger, logger } from "../Shared/Logging/Logger.js";
-import {
-  parseServerCliOptions,
-  formatServerHelpText
-} from "../Agents/CliOptions.js";
 import { AgentRuntimeOwner } from "../Agents/AgentRuntimeOwner.js";
+import { formatServerHelpText, parseServerCliOptions } from "../Agents/CliOptions.js";
 import { ThreadAdapterResolver } from "../Agents/ThreadAdapterResolver.js";
 import { ThreadIndex } from "../Agents/ThreadIndex.js";
 import { ActivityHistoryService } from "../Modules/Activity/ActivityHistoryService.js";
@@ -20,31 +16,32 @@ import { PushSendStore } from "../Modules/PushNotifications/PushSendStore.js";
 import { PushService } from "../Modules/PushNotifications/PushService.js";
 import { PushStore } from "../Modules/PushNotifications/PushStore.js";
 import { ThreadCompletionNotificationService } from "../Modules/Threads/ThreadCompletionNotificationService.js";
-import { readServerRuntimeConfigurationFromCurrentProcessEnvironment } from "./Configuration/ServerRuntimeConfiguration.js";
-import { ServerLifecycleCoordinator } from "./Bootstrap/ServerLifecycleCoordinator.js";
+import { BrowserSessionAuthOwner } from "../Network/BrowserSessionAuthOwner.js";
 import type { HistoryEntry } from "../Network/DebugContracts.js";
-import { EventStreamClientRegistry } from "../Network/EventStreamClientRegistry.js";
 import { EventLoopLagObservabilityOwner } from "../Network/EventLoopLagObservabilityOwner.js";
+import { EventStreamClientRegistry } from "../Network/EventStreamClientRegistry.js";
 import { PushDispatchConcurrencyCoordinator } from "../Network/PushDispatchConcurrencyCoordinator.js";
+import { PushMutationConcurrencyCoordinator } from "../Network/PushMutationConcurrencyCoordinator.js";
+import { PushTestPayloadOwner } from "../Network/PushTestPayloadOwner.js";
 import { RequestObservabilityOwner } from "../Network/RequestObservabilityOwner.js";
 import { ServerErrorEventRecorder } from "../Network/ServerErrorEventRecorder.js";
 import { ServerObservabilitySnapshotOwner } from "../Network/ServerObservabilitySnapshotOwner.js";
-import { PushTestPayloadOwner } from "../Network/PushTestPayloadOwner.js";
-import { ServerRequestUtilityOwner } from "../Network/ServerRequestUtilityOwner.js";
 import { ServerRequestHandler } from "../Network/ServerRequestHandler.js";
-import { BrowserSessionAuthOwner } from "../Network/BrowserSessionAuthOwner.js";
-import { ThreadListAggregationCache } from "../Network/ThreadListAggregationCache.js";
+import { ServerRequestUtilityOwner } from "../Network/ServerRequestUtilityOwner.js";
 import { ThreadConcurrencyCoordinator } from "../Network/ThreadConcurrencyCoordinator.js";
-import { RuntimeStateOwner } from "./StateManagement/RuntimeStateOwner.js";
-import { ServerBootstrapUtilityOwner } from "./Bootstrap/ServerBootstrapUtilityOwner.js";
-import { PushMutationConcurrencyCoordinator } from "../Network/PushMutationConcurrencyCoordinator.js";
-import { ThreadListCacheInvalidationOwner } from "./Bootstrap/ThreadListCacheInvalidationOwner.js";
+import { ThreadListAggregationCache } from "../Network/ThreadListAggregationCache.js";
 import { ThreadStreamDeltaEventPublisher } from "../Network/ThreadStreamDeltaEventPublisher.js";
+import { configureLogger, logger } from "../Shared/Logging/Logger.js";
+import { ServerBootstrapUtilityOwner } from "./Bootstrap/ServerBootstrapUtilityOwner.js";
+import { ServerLifecycleCoordinator } from "./Bootstrap/ServerLifecycleCoordinator.js";
+import { ThreadListCacheInvalidationOwner } from "./Bootstrap/ThreadListCacheInvalidationOwner.js";
+import { readServerRuntimeConfigurationFromCurrentProcessEnvironment } from "./Configuration/ServerRuntimeConfiguration.js";
+import { RuntimeStateOwner } from "./StateManagement/RuntimeStateOwner.js";
 import {
   THREAD_STREAM_STATE_CHANGED_BATCH_EVENT_TYPE,
   THREAD_STREAM_STATE_CHANGED_METHOD,
   type ThreadStreamStateChangedBatchSummary,
-  ThreadStreamStateChangedHistoryBatchOwner
+  ThreadStreamStateChangedHistoryBatchOwner,
 } from "./ThreadStreamStateChangedHistoryBatchOwner.js";
 
 const PushTestBodySchema = FarfieldPushTestBodySchema;
@@ -52,22 +49,22 @@ const runtimeConfiguration = readServerRuntimeConfigurationFromCurrentProcessEnv
 configureLogger(runtimeConfiguration.logLevel);
 const serverBootstrapUtilityOwner = new ServerBootstrapUtilityOwner();
 const BootstrapCliMessages = Object.freeze({
-  invalidArgumentsGuidance: "Run with --help to see valid arguments."
+  invalidArgumentsGuidance: "Run with --help to see valid arguments.",
 });
 const BootstrapDurationMilliseconds = Object.freeze({
   day: 24 * 60 * 60 * 1000,
   // Keepalive cadence balances prompt stale-connection detection with low idle network overhead.
   eventStreamKeepaliveInterval: 15_000,
   // Summarize bursty stream-state events once per second to preserve readable activity history.
-  threadStreamHistorySummaryFlushInterval: 1_000
+  threadStreamHistorySummaryFlushInterval: 1_000,
 });
 const BootstrapHistoryEventContract = Object.freeze({
   runtimeStateChangedType: "runtime-state-changed",
   ipcTransport: "ipc",
-  ipcInboundDirection: "in"
+  ipcInboundDirection: "in",
 });
 const BootstrapLifecycleMessages = Object.freeze({
-  monitorServerFailedToStart: "Monitor server failed to start"
+  monitorServerFailedToStart: "Monitor server failed to start",
 });
 
 function ensureTraceDirectory(): void {
@@ -111,7 +108,7 @@ pushStore.load();
 const pushReceiptStore = new PushReceiptStore(
   pushReceiptsPath,
   runtimeConfiguration.pushReceiptsMaxCount,
-  runtimeConfiguration.pushReceiptsMaxAgeDays * BootstrapDurationMilliseconds.day
+  runtimeConfiguration.pushReceiptsMaxAgeDays * BootstrapDurationMilliseconds.day,
 );
 pushReceiptStore.load();
 const pushSendStore = new PushSendStore(pushSendsPath);
@@ -120,7 +117,7 @@ const pushService = new PushService({
   enabled: runtimeConfiguration.pushEnabled,
   vapidPublicKey: pushVapidPublicKey,
   vapidPrivateKey: pushVapidPrivateKey,
-  vapidSubject: pushVapidSubject
+  vapidSubject: pushVapidSubject,
 });
 const clientErrorSessionId = runtimeConfiguration.clientErrorSessionId;
 const clientErrorLogPath = runtimeConfiguration.clientErrorLogPath;
@@ -128,7 +125,7 @@ const clientErrorMaxEntries = runtimeConfiguration.clientErrorMaxEntries;
 const clientErrorStore = new ClientErrorStore(
   clientErrorLogPath,
   clientErrorSessionId,
-  clientErrorMaxEntries
+  clientErrorMaxEntries,
 );
 const serverErrorEventRecorder = new ServerErrorEventRecorder(clientErrorStore);
 let agentRuntimeOwner: AgentRuntimeOwner | null = null;
@@ -137,7 +134,7 @@ function readCodexAdapter() {
 }
 
 const eventStreamClientRegistry = new EventStreamClientRegistry(
-  BootstrapDurationMilliseconds.eventStreamKeepaliveInterval
+  BootstrapDurationMilliseconds.eventStreamKeepaliveInterval,
 );
 const eventLoopLagObservabilityOwner = new EventLoopLagObservabilityOwner();
 eventLoopLagObservabilityOwner.start();
@@ -148,11 +145,11 @@ const requestObservabilityOwner = new RequestObservabilityOwner();
 const activityHistoryService = new ActivityHistoryService(
   runtimeConfiguration.historyLimit,
   eventStreamClientRegistry,
-  runtimeConfiguration.historyPayloadSummaryMaximumBytes
+  runtimeConfiguration.historyPayloadSummaryMaximumBytes,
 );
 
 function emitThreadStreamStateChangedHistorySummary(
-  summary: ThreadStreamStateChangedBatchSummary
+  summary: ThreadStreamStateChangedBatchSummary,
 ): void {
   activityHistoryService.pushHistory(
     BootstrapHistoryEventContract.ipcTransport,
@@ -161,49 +158,52 @@ function emitThreadStreamStateChangedHistorySummary(
       type: THREAD_STREAM_STATE_CHANGED_BATCH_EVENT_TYPE,
       count: summary.count,
       spanMs: summary.spanMs,
-      latestThreadId: summary.latestThreadId
+      latestThreadId: summary.latestThreadId,
     },
     {
       method: THREAD_STREAM_STATE_CHANGED_METHOD,
       threadId: summary.latestThreadId,
       summarized: true,
       count: summary.count,
-      spanMs: summary.spanMs
-    }
+      spanMs: summary.spanMs,
+    },
   );
 }
 
 const threadStreamStateChangedHistoryBatchOwner = new ThreadStreamStateChangedHistoryBatchOwner({
   flushIntervalMs: BootstrapDurationMilliseconds.threadStreamHistorySummaryFlushInterval,
-  emitSummary: emitThreadStreamStateChangedHistorySummary
+  emitSummary: emitThreadStreamStateChangedHistorySummary,
 });
 const threadIndex = new ThreadIndex();
 const threadListAggregationCache = new ThreadListAggregationCache(
   runtimeConfiguration.threadListAggregationCacheTimeToLiveMs,
-  runtimeConfiguration.threadListAggregationCacheMaximumEntries
+  runtimeConfiguration.threadListAggregationCacheMaximumEntries,
 );
 const threadConcurrencyCoordinator = new ThreadConcurrencyCoordinator();
 const browserSessionAuthOwner = new BrowserSessionAuthOwner({
   cookieName: runtimeConfiguration.apiSessionCookieName,
   sessionTimeToLiveMs: runtimeConfiguration.apiSessionTimeToLiveMs,
   signingSecret: runtimeConfiguration.apiSessionSigningSecret,
-  secureCookie: runtimeConfiguration.apiSessionSecureCookie
+  secureCookie: runtimeConfiguration.apiSessionSecureCookie,
 });
 
-const runtimeStateOwner = new RuntimeStateOwner({
-  appExecutable: codexExecutable,
-  socketPath: ipcSocketPath,
-  workspaceDir: runtimeConfiguration.defaultWorkspacePath,
-  gitCommit,
-  readCodexRuntimeState: () => readCodexAdapter()?.getRuntimeState() ?? null,
-  readHistoryCount: () => activityHistoryService.readHistoryCount(),
-  readThreadOwnerCount: () => readCodexAdapter()?.getThreadOwnerCount() ?? 0,
-  readPushEnabled: () => pushService.isEnabled(),
-  readPushSubscriptionCount: () => pushStore.getSubscriptionCount(),
-  readPushReceiptCount: () => pushReceiptStore.getCount(),
-  readClientErrorCount: () => clientErrorStore.getCount(),
-  readActiveTraceSummary: () => activityHistoryService.readActiveTraceSummary()
-}, runtimeConfiguration.runtimeStateSnapshotCacheTimeToLiveMs);
+const runtimeStateOwner = new RuntimeStateOwner(
+  {
+    appExecutable: codexExecutable,
+    socketPath: ipcSocketPath,
+    workspaceDir: runtimeConfiguration.defaultWorkspacePath,
+    gitCommit,
+    readCodexRuntimeState: () => readCodexAdapter()?.getRuntimeState() ?? null,
+    readHistoryCount: () => activityHistoryService.readHistoryCount(),
+    readThreadOwnerCount: () => readCodexAdapter()?.getThreadOwnerCount() ?? 0,
+    readPushEnabled: () => pushService.isEnabled(),
+    readPushSubscriptionCount: () => pushStore.getSubscriptionCount(),
+    readPushReceiptCount: () => pushReceiptStore.getCount(),
+    readClientErrorCount: () => clientErrorStore.getCount(),
+    readActiveTraceSummary: () => activityHistoryService.readActiveTraceSummary(),
+  },
+  runtimeConfiguration.runtimeStateSnapshotCacheTimeToLiveMs,
+);
 const ntfyNotifier = new NtfyNotifier(runtimeConfiguration.ntfyConfiguration);
 const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
 const threadCompletionNotificationService = new ThreadCompletionNotificationService({
@@ -216,7 +216,7 @@ const threadCompletionNotificationService = new ThreadCompletionNotificationServ
   pushSendStore,
   pushSystem: (message, details = {}) => {
     activityHistoryService.pushSystem(message, details);
-  }
+  },
 });
 const pushDispatchConcurrencyCoordinator = new PushDispatchConcurrencyCoordinator(
   runtimeConfiguration.ntfyCompletionDebounceMs,
@@ -225,7 +225,7 @@ const pushDispatchConcurrencyCoordinator = new PushDispatchConcurrencyCoordinato
   },
   async (threadId: string) => {
     await threadCompletionNotificationService.checkAndNotifyThreadCompletion(threadId);
-  }
+  },
 );
 const threadStreamDeltaEventPublisher = new ThreadStreamDeltaEventPublisher({
   eventStreamClientRegistry,
@@ -235,7 +235,7 @@ const threadStreamDeltaEventPublisher = new ThreadStreamDeltaEventPublisher({
       return {
         ownerClientId: null,
         conversationState: null,
-        liveStateError: null
+        liveStateError: null,
       };
     }
     return codexAdapter.readLiveState(threadId);
@@ -248,14 +248,14 @@ const threadStreamDeltaEventPublisher = new ThreadStreamDeltaEventPublisher({
         events: [],
         nextSequence: 0,
         firstAvailableSequence: 0,
-        resetRequired: false
+        resetRequired: false,
       };
     }
     return codexAdapter.readStreamEvents(threadId, {
       limit,
-      sinceSequence
+      sinceSequence,
     });
-  }
+  },
 });
 
 function pushSystem(message: string, details: HistoryEntry["meta"] = {}): void {
@@ -263,12 +263,12 @@ function pushSystem(message: string, details: HistoryEntry["meta"] = {}): void {
 }
 
 const threadListCacheInvalidationOwner = new ThreadListCacheInvalidationOwner(
-  threadListAggregationCache
+  threadListAggregationCache,
 );
 
 function invalidateThreadListAggregationCache(
   reason: string,
-  details: Record<string, JsonValue> = {}
+  details: Record<string, JsonValue> = {},
 ): void {
   threadListCacheInvalidationOwner.invalidate(reason, details);
 }
@@ -300,17 +300,17 @@ agentRuntimeOwner = new AgentRuntimeOwner({
       event.frame as JsonValue,
       {
         method: event.method,
-        threadId: event.threadId
-      }
+        threadId: event.threadId,
+      },
     );
   },
   onThreadStreamStateChanged: (threadId) => {
     invalidateThreadListAggregationCache(THREAD_STREAM_STATE_CHANGED_METHOD, {
-      threadId
+      threadId,
     });
     pushDispatchConcurrencyCoordinator.schedule(threadId);
     threadStreamDeltaEventPublisher.schedulePublish(threadId);
-  }
+  },
 });
 const registry = agentRuntimeOwner.readRegistry();
 const threadAdapterResolver = new ThreadAdapterResolver(registry, threadIndex);
@@ -322,14 +322,14 @@ const serverObservabilitySnapshotOwner = new ServerObservabilitySnapshotOwner({
   eventStreamClientRegistry,
   threadAdapterResolver,
   requestObservabilityOwner,
-  eventLoopLagObservabilityOwner
+  eventLoopLagObservabilityOwner,
 });
 
 function broadcastRuntimeState(): void {
   const runtimeStateSnapshot = FarfieldHealthStateSchema.parse(runtimeStateOwner.readSnapshot());
   eventStreamClientRegistry.broadcast({
     type: BootstrapHistoryEventContract.runtimeStateChangedType,
-    state: runtimeStateSnapshot
+    state: runtimeStateSnapshot,
   });
 }
 
@@ -427,7 +427,7 @@ const serverRequestHandler = new ServerRequestHandler({
   },
   recordServerErrorEvent: (input) => {
     serverErrorEventRecorder.record(input);
-  }
+  },
 });
 
 const server = http.createServer((req, res) => {
@@ -464,7 +464,7 @@ serverLifecycleCoordinator = new ServerLifecycleCoordinator({
   pushSystem: (message, details = {}) => {
     pushSystem(message, details);
   },
-  broadcastRuntimeState
+  broadcastRuntimeState,
 });
 
 serverLifecycleCoordinator.installSignalHandlers();

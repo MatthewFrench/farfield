@@ -7,7 +7,7 @@ import type { ThreadConcurrencyCoordinator } from "../ThreadConcurrencyCoordinat
 
 export const ThreadMemberRouteMethodByName = {
   get: "GET",
-  post: "POST"
+  post: "POST",
 } as const;
 
 export const ThreadMemberRouteSegmentByName = {
@@ -20,17 +20,17 @@ export const ThreadMemberRouteSegmentByName = {
   unarchive: "unarchive",
   collaborationMode: "collaboration-mode",
   userInput: "user-input",
-  interrupt: "interrupt"
+  interrupt: "interrupt",
 } as const;
 
 export const ThreadMemberRouteSegmentIndexByName = {
   threadIdentifier: 2,
-  threadSubresource: 3
+  threadSubresource: 3,
 } as const;
 
 export const ThreadMemberRouteSegmentCountByName = {
   threadRead: 3,
-  threadSubresource: 4
+  threadSubresource: 4,
 } as const;
 
 export const ThreadMemberMutationActionByName = {
@@ -39,7 +39,7 @@ export const ThreadMemberMutationActionByName = {
   threadUnarchive: "thread-unarchive",
   collaborationMode: ThreadMemberRouteSegmentByName.collaborationMode,
   userInput: ThreadMemberRouteSegmentByName.userInput,
-  interrupt: ThreadMemberRouteSegmentByName.interrupt
+  interrupt: ThreadMemberRouteSegmentByName.interrupt,
 } as const;
 
 const ThreadMemberSubresourceRouteSegmentSchema = z.enum([
@@ -50,7 +50,7 @@ const ThreadMemberSubresourceRouteSegmentSchema = z.enum([
   ThreadMemberRouteSegmentByName.unarchive,
   ThreadMemberRouteSegmentByName.collaborationMode,
   ThreadMemberRouteSegmentByName.userInput,
-  ThreadMemberRouteSegmentByName.interrupt
+  ThreadMemberRouteSegmentByName.interrupt,
 ]);
 
 type ThreadMemberSubresourceRouteSegment =
@@ -63,13 +63,12 @@ type ThreadMemberSubresourceRouteSegment =
   | typeof ThreadMemberRouteSegmentByName.userInput
   | typeof ThreadMemberRouteSegmentByName.interrupt;
 
-const ThreadMemberSubresourceRouteSegmentsSchema = z
-  .tuple([
-    z.literal(ThreadMemberRouteSegmentByName.api),
-    z.literal(ThreadMemberRouteSegmentByName.threads),
-    z.string().min(1),
-    ThreadMemberSubresourceRouteSegmentSchema
-  ]);
+const ThreadMemberSubresourceRouteSegmentsSchema = z.tuple([
+  z.literal(ThreadMemberRouteSegmentByName.api),
+  z.literal(ThreadMemberRouteSegmentByName.threads),
+  z.string().min(1),
+  ThreadMemberSubresourceRouteSegmentSchema,
+]);
 
 export type ResolvedThreadAdapterResult =
   | { ok: true; adapter: AgentAdapter; agentId: AgentId }
@@ -87,16 +86,19 @@ export interface ThreadMemberRouteDependencies {
   resolveAdapterForThread: (threadId: string) => Promise<ResolvedThreadAdapterResult>;
   readJsonBody: (req: IncomingMessage) => Promise<JsonValue>;
   jsonResponse: (res: ServerResponse, statusCode: number, body: object) => void;
-  invalidateThreadListAggregationCache: (reason: string, details?: Record<string, JsonValue>) => void;
+  invalidateThreadListAggregationCache: (
+    reason: string,
+    details?: Record<string, JsonValue>,
+  ) => void;
   pushActionEventWithRequestContext: (
     action: string,
     stage: "attempt" | "success" | "error",
-    details: Record<string, JsonValue>
+    details: Record<string, JsonValue>,
   ) => void;
   pushActionErrorWithRequestContext: <ErrorType>(
     action: string,
     error: ErrorType,
-    details: Record<string, JsonValue>
+    details: Record<string, JsonValue>,
   ) => string;
 }
 
@@ -109,7 +111,7 @@ export interface ThreadMemberResolvedRouteContext {
 // Canonical thread-member subresource matching keeps nested paths from mutating unrelated routes.
 export function isThreadMemberSubresourceRoute(
   segments: readonly string[],
-  subresource: ThreadMemberSubresourceRouteSegment
+  subresource: ThreadMemberSubresourceRouteSegment,
 ): boolean {
   const parsedSegments = ThreadMemberSubresourceRouteSegmentsSchema.safeParse(segments);
   if (!parsedSegments.success) {

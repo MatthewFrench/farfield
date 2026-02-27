@@ -1,17 +1,12 @@
-import {
-  startTransition,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction
-} from "react";
+import { type Dispatch, type MutableRefObject, type SetStateAction, startTransition } from "react";
+import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import {
   type ChatLiveStateResponse,
   type ChatReadThreadResponse,
-  type ChatStreamEventsResponse
+  type ChatStreamEventsResponse,
 } from "../DataAccess/ChatServerClient";
 import { ConversationSyncSignatureBuilder } from "../DomainModel/ConversationSyncSignatureBuilder";
 import { resolveNextStreamEventsState } from "../DomainModel/SelectedThreadStreamEventStateResolver";
-import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { ReadThreadStateMerger } from "./ReadThreadStateMerger";
 
 type LiveStateResponse = ChatLiveStateResponse;
@@ -48,11 +43,11 @@ export interface SelectedThreadSnapshotStateOwnerDependencies {
 
 function hasTurnsInSelectedThreadSnapshots(
   liveStateSnapshot: LiveStateResponse,
-  readThreadSnapshot: ReadThreadResponse | null
+  readThreadSnapshot: ReadThreadResponse | null,
 ): boolean {
   return (
-    (liveStateSnapshot.conversationState?.turns.length ?? 0) > 0
-    || (readThreadSnapshot?.thread.turns.length ?? 0) > 0
+    (liveStateSnapshot.conversationState?.turns.length ?? 0) > 0 ||
+    (readThreadSnapshot?.thread.turns.length ?? 0) > 0
   );
 }
 
@@ -83,7 +78,7 @@ export class SelectedThreadSnapshotStateOwner {
   public applySnapshots(snapshotInput: ApplySnapshotsToStateInput): void {
     const containsAnyTurns = hasTurnsInSelectedThreadSnapshots(
       snapshotInput.liveStateSnapshot,
-      snapshotInput.readThreadSnapshot
+      snapshotInput.readThreadSnapshot,
     );
     if (containsAnyTurns) {
       this.deps.pendingThreadMaterializationCoordinator.clearPending(snapshotInput.threadId);
@@ -91,7 +86,7 @@ export class SelectedThreadSnapshotStateOwner {
 
     this.nextStreamSequenceByThreadId.set(
       snapshotInput.threadId,
-      snapshotInput.streamEventsSnapshot.nextSequence
+      snapshotInput.streamEventsSnapshot.nextSequence,
     );
 
     startTransition(() => {
@@ -100,12 +95,12 @@ export class SelectedThreadSnapshotStateOwner {
           this.deps.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
             previousLiveState,
             this.deps.appDefaultModel,
-            this.deps.appDefaultReasoningEffort
-          )
-          === this.deps.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
+            this.deps.appDefaultReasoningEffort,
+          ) ===
+          this.deps.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
             snapshotInput.liveStateSnapshot,
             this.deps.appDefaultModel,
-            this.deps.appDefaultReasoningEffort
+            this.deps.appDefaultReasoningEffort,
           )
         ) {
           return previousLiveState;
@@ -119,19 +114,19 @@ export class SelectedThreadSnapshotStateOwner {
           const mergedReadThread = this.deps.readThreadStateMerger.merge<ReadThreadResponse>({
             previous: previousReadThreadState,
             incoming: readThreadSnapshot,
-            includeTurns: snapshotInput.includeTurnsUsedForRead
+            includeTurns: snapshotInput.includeTurnsUsedForRead,
           });
 
           if (
             this.deps.conversationSyncSignatureBuilder.buildReadThreadSyncSignature(
               previousReadThreadState,
               this.deps.appDefaultModel,
-              this.deps.appDefaultReasoningEffort
-            )
-            === this.deps.conversationSyncSignatureBuilder.buildReadThreadSyncSignature(
+              this.deps.appDefaultReasoningEffort,
+            ) ===
+            this.deps.conversationSyncSignatureBuilder.buildReadThreadSyncSignature(
               mergedReadThread,
               this.deps.appDefaultModel,
-              this.deps.appDefaultReasoningEffort
+              this.deps.appDefaultReasoningEffort,
             )
           ) {
             return previousReadThreadState;
@@ -141,16 +136,18 @@ export class SelectedThreadSnapshotStateOwner {
         });
       }
 
-      this.deps.setStreamEvents((previousStreamEvents) => resolveNextStreamEventsState({
-        previousStreamEvents,
-        streamEventsSnapshot: snapshotInput.streamEventsSnapshot,
-        streamEventsSinceSequenceUsed: snapshotInput.streamEventsSinceSequenceUsed
-      }));
+      this.deps.setStreamEvents((previousStreamEvents) =>
+        resolveNextStreamEventsState({
+          previousStreamEvents,
+          streamEventsSnapshot: snapshotInput.streamEventsSnapshot,
+          streamEventsSinceSequenceUsed: snapshotInput.streamEventsSinceSequenceUsed,
+        }),
+      );
     });
   }
 
   public applySelectedThreadStreamDelta(
-    streamDeltaInput: ApplySelectedThreadStreamDeltaInput
+    streamDeltaInput: ApplySelectedThreadStreamDeltaInput,
   ): void {
     if (this.deps.selectedThreadIdRef.current !== streamDeltaInput.threadId) {
       return;
@@ -162,7 +159,7 @@ export class SelectedThreadSnapshotStateOwner {
       streamEventsSnapshot: streamDeltaInput.streamEventsSnapshot,
       streamEventsSinceSequenceUsed: streamDeltaInput.streamEventsSinceSequenceUsed,
       readThreadSnapshot: null,
-      includeTurnsUsedForRead: false
+      includeTurnsUsedForRead: false,
     });
   }
 }

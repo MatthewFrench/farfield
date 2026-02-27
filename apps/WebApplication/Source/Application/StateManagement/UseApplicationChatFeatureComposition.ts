@@ -1,15 +1,13 @@
 import {
   type ChatActionHandlers,
   type UseChatActionHandlersInput,
-  useChatActionHandlers
+  useChatActionHandlers,
 } from "@/Features/Chat/StateManagement/UseChatActionHandlers";
+import { useChatModeToolbarProperties } from "@/Features/Chat/StateManagement/UseChatModeToolbarProperties";
 import {
   type UseChatScrollEffectsInput,
-  useChatScrollEffects
+  useChatScrollEffects,
 } from "@/Features/Chat/StateManagement/UseChatScrollEffects";
-import {
-  useChatModeToolbarProperties
-} from "@/Features/Chat/StateManagement/UseChatModeToolbarProperties";
 import { type ChatModeToolbarProps } from "@/Features/Chat/UserInterface/ChatModeToolbar";
 
 interface PlanModeOption {
@@ -55,13 +53,9 @@ export interface ApplicationChatFeatureComposition extends ChatActionHandlers {
 }
 
 export function useApplicationChatFeatureComposition(
-  input: UseApplicationChatFeatureCompositionInput
+  input: UseApplicationChatFeatureCompositionInput,
 ): ApplicationChatFeatureComposition {
-  const {
-    chatScrollEffectsInput,
-    chatActionHandlersInput,
-    chatModeToolbarPropertiesInput
-  } = input;
+  const { chatScrollEffectsInput, chatActionHandlersInput, chatModeToolbarPropertiesInput } = input;
 
   useChatScrollEffects(chatScrollEffectsInput);
 
@@ -80,18 +74,20 @@ export function useApplicationChatFeatureComposition(
     selectedModelId: chatModeToolbarPropertiesInput.selectedModelId,
     selectedReasoningEffort: chatModeToolbarPropertiesInput.selectedReasoningEffort,
     selectedModeKey: chatModeToolbarPropertiesInput.selectedModeKey,
-    modelOptionsWithoutAssumedDefault: chatModeToolbarPropertiesInput.modelOptionsWithoutAssumedDefault,
-    effortOptionsWithoutAssumedDefault: chatModeToolbarPropertiesInput.effortOptionsWithoutAssumedDefault,
+    modelOptionsWithoutAssumedDefault:
+      chatModeToolbarPropertiesInput.modelOptionsWithoutAssumedDefault,
+    effortOptionsWithoutAssumedDefault:
+      chatModeToolbarPropertiesInput.effortOptionsWithoutAssumedDefault,
     isModeSyncing: chatModeToolbarPropertiesInput.isModeSyncing,
     pendingRequestCount: chatModeToolbarPropertiesInput.pendingRequestCount,
     setSelectedModeKey: chatModeToolbarPropertiesInput.setSelectedModeKey,
     setSelectedModelId: chatModeToolbarPropertiesInput.setSelectedModelId,
     setSelectedReasoningEffort: chatModeToolbarPropertiesInput.setSelectedReasoningEffort,
-    applyModeDraft: chatActionHandlers.applyModeDraft
+    applyModeDraft: chatActionHandlers.applyModeDraft,
   });
 
   return {
     ...chatActionHandlers,
-    chatModeToolbarProperties
+    chatModeToolbarProperties,
   };
 }

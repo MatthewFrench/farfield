@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  type ThemePreference,
   ThemePreferenceStore,
-  type ThemePreference
 } from "@/Features/Theme/DataAccess/ThemePreferenceStore";
 
 const SYSTEM_DARK_MODE_MEDIA_QUERY = "(prefers-color-scheme: dark)";

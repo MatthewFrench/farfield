@@ -1,27 +1,29 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { z } from "zod";
 import {
-  parseThreadConversationState,
   type PushNotificationPayload,
-  type StoredPushSubscription
+  parseThreadConversationState,
+  type StoredPushSubscription,
 } from "@farfield/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import type { CodexAgentAdapter } from "../Source/Agents/Adapters/CodexAgentAdapter.js";
-import { logger } from "../Source/Shared/Logging/Logger.js";
 import { NtfyNotifier } from "../Source/Modules/PushNotifications/NtfyNotifier.js";
 import { PushSendStore } from "../Source/Modules/PushNotifications/PushSendStore.js";
 import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
 import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
 import { ThreadCompletionNotificationService } from "../Source/Modules/Threads/ThreadCompletionNotificationService.js";
-import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 import { PushMutationConcurrencyCoordinator } from "../Source/Network/PushMutationConcurrencyCoordinator.js";
+import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
+import { logger } from "../Source/Shared/Logging/Logger.js";
 
 const temporaryDirectoryPaths: string[] = [];
 
 function createTemporaryDirectory(): string {
-  const temporaryDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-completion-service-"));
+  const temporaryDirectoryPath = fs.mkdtempSync(
+    path.join(os.tmpdir(), "farfield-completion-service-"),
+  );
   temporaryDirectoryPaths.push(temporaryDirectoryPath);
   return temporaryDirectoryPath;
 }
@@ -45,7 +47,7 @@ class RecordingPushService extends PushService {
       enabled: false,
       vapidPublicKey: "",
       vapidPrivateKey: "",
-      vapidSubject: ""
+      vapidSubject: "",
     });
   }
 
@@ -55,22 +57,22 @@ class RecordingPushService extends PushService {
 
   public override async sendToSubscriptions(
     subscriptions: StoredPushSubscription[],
-    payload: PushNotificationPayload
+    payload: PushNotificationPayload,
   ): Promise<{
-      attempted: number;
-      delivered: number;
-      failures: Array<{ endpoint: string; statusCode: number | null; message: string }>;
-      prunedEndpoints: string[];
-    }> {
+    attempted: number;
+    delivered: number;
+    failures: Array<{ endpoint: string; statusCode: number | null; message: string }>;
+    prunedEndpoints: string[];
+  }> {
     this.calls.push({
       subscriptions,
-      payload
+      payload,
     });
     return {
       attempted: subscriptions.length,
       delivered: subscriptions.length,
       failures: [],
-      prunedEndpoints: []
+      prunedEndpoints: [],
     };
   }
 }
@@ -81,7 +83,7 @@ class FailingPushService extends PushService {
       enabled: false,
       vapidPublicKey: "",
       vapidPrivateKey: "",
-      vapidSubject: ""
+      vapidSubject: "",
     });
   }
 
@@ -91,22 +93,22 @@ class FailingPushService extends PushService {
 
   public override async sendToSubscriptions(
     subscriptions: StoredPushSubscription[],
-    _payload: PushNotificationPayload
+    _payload: PushNotificationPayload,
   ): Promise<{
-      attempted: number;
-      delivered: number;
-      failures: Array<{ endpoint: string; statusCode: number | null; message: string }>;
-      prunedEndpoints: string[];
-    }> {
+    attempted: number;
+    delivered: number;
+    failures: Array<{ endpoint: string; statusCode: number | null; message: string }>;
+    prunedEndpoints: string[];
+  }> {
     return {
       attempted: subscriptions.length,
       delivered: 0,
       failures: subscriptions.map((subscription) => ({
         endpoint: subscription.subscription.endpoint,
         statusCode: 503,
-        message: "Service unavailable"
+        message: "Service unavailable",
       })),
-      prunedEndpoints: []
+      prunedEndpoints: [],
     };
   }
 }
@@ -115,12 +117,16 @@ const PushCompletionFailureLogSchema = z
   .object({
     threadId: z.string(),
     failureCount: z.number().int().nonnegative(),
-    failureSamples: z.array(z.object({
-      endpoint: z.string(),
-      statusCode: z.union([z.number().int(), z.null()]),
-      message: z.string()
-    }).strict()),
-    omittedFailureCount: z.number().int().nonnegative()
+    failureSamples: z.array(
+      z
+        .object({
+          endpoint: z.string(),
+          statusCode: z.union([z.number().int(), z.null()]),
+          message: z.string(),
+        })
+        .strict(),
+    ),
+    omittedFailureCount: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -136,14 +142,14 @@ describe("ThreadCompletionNotificationService", () => {
       enabled: false,
       vapidPublicKey: "",
       vapidPrivateKey: "",
-      vapidSubject: ""
+      vapidSubject: "",
     });
     const ntfyNotifier = new NtfyNotifier({
       enabled: false,
       topic: null,
       baseUrl: "https://ntfy.sh",
       bearerToken: null,
-      priority: "3"
+      priority: "3",
     });
 
     const pushSystemEvents: string[] = [];
@@ -157,7 +163,7 @@ describe("ThreadCompletionNotificationService", () => {
       pushSendStore,
       pushSystem: (message) => {
         pushSystemEvents.push(message);
-      }
+      },
     });
 
     expect(service.shouldScheduleCompletionCheck()).toBe(false);
@@ -176,14 +182,14 @@ describe("ThreadCompletionNotificationService", () => {
       enabled: false,
       vapidPublicKey: "",
       vapidPrivateKey: "",
-      vapidSubject: ""
+      vapidSubject: "",
     });
     const ntfyNotifier = new NtfyNotifier({
       enabled: true,
       topic: "farfield-tests",
       baseUrl: "https://ntfy.sh",
       bearerToken: null,
-      priority: "3"
+      priority: "3",
     });
 
     const service = new ThreadCompletionNotificationService({
@@ -194,7 +200,7 @@ describe("ThreadCompletionNotificationService", () => {
       pushService,
       pushStore,
       pushSendStore,
-      pushSystem: () => {}
+      pushSystem: () => {},
     });
 
     expect(service.shouldScheduleCompletionCheck()).toBe(true);
@@ -213,24 +219,24 @@ describe("ThreadCompletionNotificationService", () => {
         endpoint: "https://push.example.test/subscriptions/private",
         keys: {
           p256dh: "private_key",
-          auth: "private_auth"
-        }
+          auth: "private_auth",
+        },
       },
       {
-        privateMode: true
-      }
+        privateMode: true,
+      },
     );
     await pushStore.upsertSubscription(
       {
         endpoint: "https://push.example.test/subscriptions/detailed",
         keys: {
           p256dh: "detailed_key",
-          auth: "detailed_auth"
-        }
+          auth: "detailed_auth",
+        },
       },
       {
-        privateMode: false
-      }
+        privateMode: false,
+      },
     );
 
     const conversationState = parseThreadConversationState({
@@ -244,20 +250,20 @@ describe("ThreadCompletionNotificationService", () => {
             {
               id: "item_agent_1",
               type: "agentMessage",
-              text: "Detailed completion text for subscribers"
-            }
-          ]
-        }
+              text: "Detailed completion text for subscribers",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const codexAdapter = {
       readLiveState: async (_threadId: string) => ({
         ownerClientId: null,
         conversationState,
-        liveStateError: null
-      })
+        liveStateError: null,
+      }),
     } as CodexAgentAdapter;
 
     const recordingPushService = new RecordingPushService();
@@ -266,7 +272,7 @@ describe("ThreadCompletionNotificationService", () => {
       topic: null,
       baseUrl: "https://ntfy.sh",
       bearerToken: null,
-      priority: "3"
+      priority: "3",
     });
 
     const pushSystemEvents: string[] = [];
@@ -280,17 +286,17 @@ describe("ThreadCompletionNotificationService", () => {
       pushSendStore,
       pushSystem: (message) => {
         pushSystemEvents.push(message);
-      }
+      },
     });
 
     await service.checkAndNotifyThreadCompletion("thread_1");
 
     expect(recordingPushService.calls).toHaveLength(2);
     const privateCall = recordingPushService.calls.find((call) =>
-      call.subscriptions.every((subscription) => subscription.settings.privateMode)
+      call.subscriptions.every((subscription) => subscription.settings.privateMode),
     );
     const detailedCall = recordingPushService.calls.find((call) =>
-      call.subscriptions.every((subscription) => !subscription.settings.privateMode)
+      call.subscriptions.every((subscription) => !subscription.settings.privateMode),
     );
     expect(privateCall).toBeDefined();
     expect(detailedCall).toBeDefined();
@@ -331,12 +337,12 @@ describe("ThreadCompletionNotificationService", () => {
           endpoint: `https://push.example.test/subscriptions/fail_${String(index)}`,
           keys: {
             p256dh: `key_${String(index)}`,
-            auth: `auth_${String(index)}`
-          }
+            auth: `auth_${String(index)}`,
+          },
         },
         {
-          privateMode: false
-        }
+          privateMode: false,
+        },
       );
     }
 
@@ -351,20 +357,20 @@ describe("ThreadCompletionNotificationService", () => {
             {
               id: "item_agent_many_failures",
               type: "agentMessage",
-              text: "failure body"
-            }
-          ]
-        }
+              text: "failure body",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const codexAdapter = {
       readLiveState: async (_threadId: string) => ({
         ownerClientId: null,
         conversationState,
-        liveStateError: null
-      })
+        liveStateError: null,
+      }),
     } as CodexAgentAdapter;
 
     const warningSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
@@ -378,18 +384,18 @@ describe("ThreadCompletionNotificationService", () => {
           topic: null,
           baseUrl: "https://ntfy.sh",
           bearerToken: null,
-          priority: "3"
+          priority: "3",
         }),
         pushService: new FailingPushService(),
         pushStore,
         pushSendStore,
-        pushSystem: () => {}
+        pushSystem: () => {},
       });
 
       await service.checkAndNotifyThreadCompletion("thread_many_failures");
 
       const boundedFailureWarning = warningSpy.mock.calls.find(
-        (call) => call[1] === "push-completion-send-failed"
+        (call) => call[1] === "push-completion-send-failed",
       );
       expect(boundedFailureWarning).toBeDefined();
       if (!boundedFailureWarning) {
@@ -418,12 +424,12 @@ describe("ThreadCompletionNotificationService", () => {
         endpoint: "https://push.example.test/subscriptions/fail_only",
         keys: {
           p256dh: "fail_only_key",
-          auth: "fail_only_auth"
-        }
+          auth: "fail_only_auth",
+        },
       },
       {
-        privateMode: false
-      }
+        privateMode: false,
+      },
     );
 
     const conversationState = parseThreadConversationState({
@@ -437,20 +443,20 @@ describe("ThreadCompletionNotificationService", () => {
             {
               id: "item_agent_no_delivery",
               type: "agentMessage",
-              text: "No channel delivers this completion"
-            }
-          ]
-        }
+              text: "No channel delivers this completion",
+            },
+          ],
+        },
       ],
-      requests: []
+      requests: [],
     });
 
     const codexAdapter = {
       readLiveState: async (_threadId: string) => ({
         ownerClientId: null,
         conversationState,
-        liveStateError: null
-      })
+        liveStateError: null,
+      }),
     } as CodexAgentAdapter;
 
     const pushSystemEvents: string[] = [];
@@ -463,14 +469,14 @@ describe("ThreadCompletionNotificationService", () => {
         topic: null,
         baseUrl: "https://ntfy.sh",
         bearerToken: null,
-        priority: "3"
+        priority: "3",
       }),
       pushService: new FailingPushService(),
       pushStore,
       pushSendStore,
       pushSystem: (message) => {
         pushSystemEvents.push(message);
-      }
+      },
     });
 
     await service.checkAndNotifyThreadCompletion("thread_no_delivery");

@@ -41,11 +41,7 @@ const components: Components = {
     const isBlock = isCodeBlock(code, className);
 
     if (!isBlock) {
-      return (
-        <code className={INLINE_CODE_CLASS_NAME}>
-          {code}
-        </code>
-      );
+      return <code className={INLINE_CODE_CLASS_NAME}>{code}</code>;
     }
 
     return (
@@ -54,7 +50,7 @@ const components: Components = {
         language={detectLanguage(className)}
       />
     );
-  }
+  },
 };
 
 function MarkdownTextComponent({ text }: MarkdownTextProps): React.JSX.Element {

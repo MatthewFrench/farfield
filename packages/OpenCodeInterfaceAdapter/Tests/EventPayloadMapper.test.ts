@@ -1,14 +1,14 @@
-import { describe, expect, it } from "vitest";
 import type {
   EventMessagePartUpdated,
   EventMessageUpdated,
   EventPermissionUpdated,
   EventSessionStatus,
-  EventSessionUpdated
+  EventSessionUpdated,
 } from "@opencode-ai/sdk";
+import { describe, expect, it } from "vitest";
 import {
   mapOpenCodeEventToSsePayload,
-  OpenCodeEventPayloadMappingError
+  OpenCodeEventPayloadMappingError,
 } from "../Source/EventPayloadMapper.js";
 import type { OpenCodeStructuredDataValue } from "../Source/Schemas.js";
 
@@ -24,16 +24,16 @@ function makeEventMessageUpdated(sessionId: string): EventMessageUpdated {
         agent: "codex",
         model: {
           providerID: "openai",
-          modelID: "gpt-4.1"
-        }
-      }
-    }
+          modelID: "gpt-4.1",
+        },
+      },
+    },
   };
 }
 
 function makeEventMessagePartUpdated(
   sessionId: string,
-  options: { delta?: OpenCodeStructuredDataValue } = {}
+  options: { delta?: OpenCodeStructuredDataValue } = {},
 ): EventMessagePartUpdated {
   return {
     type: "message.part.updated",
@@ -43,10 +43,10 @@ function makeEventMessagePartUpdated(
         sessionID: sessionId,
         messageID: "message-1",
         type: "text",
-        text: "hello"
+        text: "hello",
       },
-      ...(options.delta !== undefined ? { delta: options.delta } : {})
-    }
+      ...(options.delta !== undefined ? { delta: options.delta } : {}),
+    },
   };
 }
 
@@ -62,10 +62,10 @@ function makeEventSessionUpdated(sessionId: string): EventSessionUpdated {
         version: "1",
         time: {
           created: 1_700_000_000,
-          updated: 1_700_000_500
-        }
-      }
-    }
+          updated: 1_700_000_500,
+        },
+      },
+    },
   };
 }
 
@@ -75,9 +75,9 @@ function makeEventSessionStatus(sessionId: string): EventSessionStatus {
     properties: {
       sessionID: sessionId,
       status: {
-        type: "busy"
-      }
-    }
+        type: "busy",
+      },
+    },
   };
 }
 
@@ -92,9 +92,9 @@ function makeEventPermissionUpdated(sessionId: string): EventPermissionUpdated {
       title: "Run command",
       metadata: {},
       time: {
-        created: 1_700_000_200
-      }
-    }
+        created: 1_700_000_200,
+      },
+    },
   };
 }
 
@@ -120,7 +120,7 @@ describe("mapOpenCodeEventToSsePayload", () => {
     expect(payload).toEqual({
       type: "opencode-message-updated",
       sessionId: "sess-1",
-      message: event.properties.info
+      message: event.properties.info,
     });
   });
 
@@ -133,14 +133,14 @@ describe("mapOpenCodeEventToSsePayload", () => {
       type: "opencode-part-updated",
       sessionId: "sess-1",
       part: event.properties.part,
-      delta: null
+      delta: null,
     });
   });
 
   it("maps message.part.updated and preserves provided delta values", () => {
     const delta: OpenCodeStructuredDataValue = {
       text: "delta",
-      index: 3
+      index: 3,
     };
     const event = makeEventMessagePartUpdated("sess-1", { delta });
 
@@ -150,7 +150,7 @@ describe("mapOpenCodeEventToSsePayload", () => {
       type: "opencode-part-updated",
       sessionId: "sess-1",
       part: event.properties.part,
-      delta
+      delta,
     });
   });
 
@@ -162,7 +162,7 @@ describe("mapOpenCodeEventToSsePayload", () => {
     expect(payload).toEqual({
       type: "opencode-session-updated",
       sessionId: "sess-1",
-      session: event.properties.info
+      session: event.properties.info,
     });
   });
 
@@ -174,7 +174,7 @@ describe("mapOpenCodeEventToSsePayload", () => {
     expect(payload).toEqual({
       type: "opencode-session-status",
       sessionId: "sess-1",
-      status: event.properties.status
+      status: event.properties.status,
     });
   });
 
@@ -186,7 +186,7 @@ describe("mapOpenCodeEventToSsePayload", () => {
     expect(payload).toEqual({
       type: "opencode-permission-request",
       sessionId: "sess-1",
-      permission: event.properties
+      permission: event.properties,
     });
   });
 
@@ -206,7 +206,7 @@ describe("mapOpenCodeEventToSsePayload", () => {
     expect(payload).toEqual({
       type: "opencode-session-status",
       sessionId: "sess-1",
-      status: event.properties.status
+      status: event.properties.status,
     });
   });
 

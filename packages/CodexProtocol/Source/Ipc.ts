@@ -1,13 +1,13 @@
 import { z } from "zod";
 import {
+  type JsonValue,
   JsonValueSchema,
   NonEmptyStringSchema,
   NonNegativeIntSchema,
-  type JsonValue
 } from "./Common.js";
 import {
   ThreadStreamStateChangedEventType,
-  ThreadStreamStateChangedParamsSchema
+  ThreadStreamStateChangedParamsSchema,
 } from "./Contracts/Thread/StreamStateContracts.js";
 import { parseSchemaOrThrow } from "./ProtocolSchemaParsers.js";
 
@@ -20,17 +20,17 @@ export const IpcFrameType = {
   response: "response",
   broadcast: "broadcast",
   clientDiscoveryRequest: "client-discovery-request",
-  clientDiscoveryResponse: "client-discovery-response"
+  clientDiscoveryResponse: "client-discovery-response",
 } as const;
 
 export const IpcResponseResultType = {
   success: "success",
-  error: "error"
+  error: "error",
 } as const;
 
 export const IpcResponseResultTypeSchema = z.enum([
   IpcResponseResultType.success,
-  IpcResponseResultType.error
+  IpcResponseResultType.error,
 ]);
 
 export const IpcRequestIdSchema = NonEmptyStringSchema;
@@ -43,35 +43,34 @@ export const IpcRequestFrameSchema = z
     params: JsonValueSchema.optional(),
     targetClientId: NonEmptyStringSchema.optional(),
     sourceClientId: NonEmptyStringSchema.optional(),
-    version: NonNegativeIntSchema.optional()
+    version: NonNegativeIntSchema.optional(),
   })
   .passthrough();
 
-export const IpcResponseFrameSchema = z
-  .discriminatedUnion("resultType", [
-    z
-      .object({
-        type: z.literal(IpcFrameType.response),
-        requestId: IpcRequestIdSchema,
-        method: NonEmptyStringSchema.optional(),
-        handledByClientId: NonEmptyStringSchema.optional(),
-        resultType: z.literal(IpcResponseResultType.success),
-        result: JsonValueSchema.optional(),
-        error: z.never().optional()
-      })
-      .passthrough(),
-    z
-      .object({
-        type: z.literal(IpcFrameType.response),
-        requestId: IpcRequestIdSchema,
-        method: NonEmptyStringSchema.optional(),
-        handledByClientId: NonEmptyStringSchema.optional(),
-        resultType: z.literal(IpcResponseResultType.error),
-        error: JsonValueSchema,
-        result: z.never().optional()
-      })
-      .passthrough()
-  ]);
+export const IpcResponseFrameSchema = z.discriminatedUnion("resultType", [
+  z
+    .object({
+      type: z.literal(IpcFrameType.response),
+      requestId: IpcRequestIdSchema,
+      method: NonEmptyStringSchema.optional(),
+      handledByClientId: NonEmptyStringSchema.optional(),
+      resultType: z.literal(IpcResponseResultType.success),
+      result: JsonValueSchema.optional(),
+      error: z.never().optional(),
+    })
+    .passthrough(),
+  z
+    .object({
+      type: z.literal(IpcFrameType.response),
+      requestId: IpcRequestIdSchema,
+      method: NonEmptyStringSchema.optional(),
+      handledByClientId: NonEmptyStringSchema.optional(),
+      resultType: z.literal(IpcResponseResultType.error),
+      error: JsonValueSchema,
+      result: z.never().optional(),
+    })
+    .passthrough(),
+]);
 
 export const IpcBroadcastFrameSchema = z
   .object({
@@ -80,7 +79,7 @@ export const IpcBroadcastFrameSchema = z
     params: JsonValueSchema.optional(),
     sourceClientId: NonEmptyStringSchema.optional(),
     targetClientId: NonEmptyStringSchema.optional(),
-    version: NonNegativeIntSchema.optional()
+    version: NonNegativeIntSchema.optional(),
   })
   .passthrough();
 
@@ -88,7 +87,7 @@ export const IpcClientDiscoveryRequestFrameSchema = z
   .object({
     type: z.literal(IpcFrameType.clientDiscoveryRequest),
     requestId: IpcRequestIdSchema,
-    request: IpcRequestFrameSchema
+    request: IpcRequestFrameSchema,
   })
   .passthrough();
 
@@ -98,9 +97,9 @@ export const IpcClientDiscoveryResponseFrameSchema = z
     requestId: IpcRequestIdSchema,
     response: z
       .object({
-        canHandle: z.boolean()
+        canHandle: z.boolean(),
       })
-      .passthrough()
+      .passthrough(),
   })
   .passthrough();
 
@@ -112,7 +111,7 @@ export const IpcFrameSchema = z.union([
   IpcResponseFrameSchema.options[1],
   IpcBroadcastFrameSchema,
   IpcClientDiscoveryRequestFrameSchema,
-  IpcClientDiscoveryResponseFrameSchema
+  IpcClientDiscoveryResponseFrameSchema,
 ]);
 
 export const ThreadStreamStateChangedBroadcastSchema: z.ZodObject<
@@ -131,7 +130,7 @@ export const ThreadStreamStateChangedBroadcastSchema: z.ZodObject<
     method: z.literal(ThreadStreamStateChangedEventType),
     sourceClientId: NonEmptyStringSchema,
     params: ThreadStreamStateChangedParamsSchema,
-    version: NonNegativeIntSchema
+    version: NonNegativeIntSchema,
   })
   .passthrough();
 
@@ -146,7 +145,7 @@ export type ThreadStreamStateChangedBroadcast = z.infer<
 >;
 const ParseContext = {
   ipcFrame: "IpcFrame",
-  threadStreamStateChangedBroadcast: "ThreadStreamStateChangedBroadcast"
+  threadStreamStateChangedBroadcast: "ThreadStreamStateChangedBroadcast",
 } as const;
 
 export function parseIpcFrame(value: JsonValue): IpcFrame {
@@ -154,11 +153,11 @@ export function parseIpcFrame(value: JsonValue): IpcFrame {
 }
 
 export function parseThreadStreamStateChangedBroadcast(
-  value: JsonValue
+  value: JsonValue,
 ): ThreadStreamStateChangedBroadcast {
   return parseSchemaOrThrow(
     ThreadStreamStateChangedBroadcastSchema,
     value,
-    ParseContext.threadStreamStateChangedBroadcast
+    ParseContext.threadStreamStateChangedBroadcast,
   );
 }

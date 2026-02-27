@@ -35,38 +35,38 @@ const OpenCodeIgnoredPartTypeValues = [
   "agent",
   "retry",
   "compaction",
-  "subtask"
+  "subtask",
 ] as const;
 
 const OpenCodeStructuredDataPrimitiveSchema = z.union([
   z.string(),
   z.number(),
   z.boolean(),
-  z.null()
+  z.null(),
 ]);
-export const OpenCodeStructuredDataValueSchema: z.ZodType<OpenCodeStructuredDataValue> =
-  z.lazy(() =>
+export const OpenCodeStructuredDataValueSchema: z.ZodType<OpenCodeStructuredDataValue> = z.lazy(
+  () =>
     z.union([
       OpenCodeStructuredDataPrimitiveSchema,
       z.array(OpenCodeStructuredDataValueSchema),
-      z.record(OpenCodeStructuredDataValueSchema)
-    ])
+      z.record(OpenCodeStructuredDataValueSchema),
+    ]),
 );
 const OpenCodeStructuredDataRecordSchema = z.record(OpenCodeStructuredDataValueSchema);
 const OpenCodeTimeCreatedSchema = z
   .object({
-    created: OpenCodeNonNegativeIntegerSchema
+    created: OpenCodeNonNegativeIntegerSchema,
   })
   .passthrough();
 const OpenCodeToolStartTimeSchema = z
   .object({
-    start: OpenCodeNonNegativeIntegerSchema
+    start: OpenCodeNonNegativeIntegerSchema,
   })
   .passthrough();
 const OpenCodeToolCompletedTimeSchema = z
   .object({
     start: OpenCodeNonNegativeIntegerSchema,
-    end: OpenCodeNonNegativeIntegerSchema
+    end: OpenCodeNonNegativeIntegerSchema,
   })
   .passthrough();
 
@@ -78,9 +78,9 @@ export const OpenCodeSessionSchema = z
     time: z
       .object({
         created: OpenCodeNonNegativeIntegerSchema,
-        updated: OpenCodeNonNegativeIntegerSchema
+        updated: OpenCodeNonNegativeIntegerSchema,
       })
-      .strict()
+      .strict(),
   })
   .passthrough();
 
@@ -88,7 +88,7 @@ export type OpenCodeSession = z.infer<typeof OpenCodeSessionSchema>;
 
 export const OpenCodeProjectSchema = z
   .object({
-    worktree: OpenCodeNonEmptyStringSchema
+    worktree: OpenCodeNonEmptyStringSchema,
   })
   .passthrough();
 
@@ -105,40 +105,39 @@ export const OpenCodeMessageSchema = z
     providerID: OpenCodeOptionalStringSchema,
     modelID: OpenCodeOptionalStringSchema,
     finish: OpenCodeOptionalStringSchema,
-    error: OpenCodeStructuredDataValueSchema.optional()
+    error: OpenCodeStructuredDataValueSchema.optional(),
   })
   .passthrough();
 
 export type OpenCodeMessage = z.infer<typeof OpenCodeMessageSchema>;
 
-const OpenCodeToolStateSchema = z
-  .discriminatedUnion(OpenCodeToolStatusDiscriminatorKey, [
-    z
-      .object({
-        status: z.literal(OpenCodeToolRunningStatus),
-        input: OpenCodeStructuredDataRecordSchema,
-        time: OpenCodeToolStartTimeSchema
-      })
-      .passthrough(),
-    z
-      .object({
-        status: z.literal(OpenCodeToolCompletedStatus),
-        input: OpenCodeStructuredDataRecordSchema,
-        output: z.string(),
-        metadata: OpenCodeStructuredDataRecordSchema.optional(),
-        time: OpenCodeToolCompletedTimeSchema
-      })
-      .passthrough(),
-    z
-      .object({
-        status: z.literal(OpenCodeToolErrorStatus),
-        input: OpenCodeStructuredDataRecordSchema,
-        error: z.string(),
-        metadata: OpenCodeStructuredDataRecordSchema.optional(),
-        time: OpenCodeToolCompletedTimeSchema
-      })
-      .passthrough()
-  ]);
+const OpenCodeToolStateSchema = z.discriminatedUnion(OpenCodeToolStatusDiscriminatorKey, [
+  z
+    .object({
+      status: z.literal(OpenCodeToolRunningStatus),
+      input: OpenCodeStructuredDataRecordSchema,
+      time: OpenCodeToolStartTimeSchema,
+    })
+    .passthrough(),
+  z
+    .object({
+      status: z.literal(OpenCodeToolCompletedStatus),
+      input: OpenCodeStructuredDataRecordSchema,
+      output: z.string(),
+      metadata: OpenCodeStructuredDataRecordSchema.optional(),
+      time: OpenCodeToolCompletedTimeSchema,
+    })
+    .passthrough(),
+  z
+    .object({
+      status: z.literal(OpenCodeToolErrorStatus),
+      input: OpenCodeStructuredDataRecordSchema,
+      error: z.string(),
+      metadata: OpenCodeStructuredDataRecordSchema.optional(),
+      time: OpenCodeToolCompletedTimeSchema,
+    })
+    .passthrough(),
+]);
 
 export type OpenCodeToolState = z.infer<typeof OpenCodeToolStateSchema>;
 
@@ -149,7 +148,7 @@ export const OpenCodeTextPartSchema = z
     text: z.string(),
     synthetic: z.boolean().optional(),
     ignored: z.boolean().optional(),
-    sessionID: OpenCodeOptionalStringSchema
+    sessionID: OpenCodeOptionalStringSchema,
   })
   .passthrough();
 
@@ -158,7 +157,7 @@ export const OpenCodeReasoningPartSchema = z
     id: OpenCodeNonEmptyStringSchema,
     type: z.literal(OpenCodeReasoningPartType),
     text: z.string(),
-    sessionID: OpenCodeOptionalStringSchema
+    sessionID: OpenCodeOptionalStringSchema,
   })
   .passthrough();
 
@@ -168,7 +167,7 @@ export const OpenCodeToolPartSchema = z
     type: z.literal(OpenCodeToolPartType),
     tool: OpenCodeNonEmptyStringSchema,
     state: OpenCodeToolStateSchema,
-    sessionID: OpenCodeOptionalStringSchema
+    sessionID: OpenCodeOptionalStringSchema,
   })
   .passthrough();
 
@@ -177,7 +176,7 @@ export const OpenCodeFilePartSchema = z
     id: OpenCodeNonEmptyStringSchema,
     type: z.literal(OpenCodeFilePartType),
     url: OpenCodeNonEmptyStringSchema,
-    sessionID: OpenCodeOptionalStringSchema
+    sessionID: OpenCodeOptionalStringSchema,
   })
   .passthrough();
 
@@ -185,7 +184,7 @@ export const OpenCodeIgnoredPartSchema = z
   .object({
     id: OpenCodeNonEmptyStringSchema,
     type: z.enum(OpenCodeIgnoredPartTypeValues),
-    sessionID: OpenCodeOptionalStringSchema
+    sessionID: OpenCodeOptionalStringSchema,
   })
   .passthrough();
 
@@ -194,7 +193,7 @@ export const OpenCodePartSchema = z.discriminatedUnion(OpenCodePartDiscriminator
   OpenCodeReasoningPartSchema,
   OpenCodeToolPartSchema,
   OpenCodeFilePartSchema,
-  OpenCodeIgnoredPartSchema
+  OpenCodeIgnoredPartSchema,
 ]);
 
 export type OpenCodeTextPart = z.infer<typeof OpenCodeTextPartSchema>;
@@ -207,7 +206,7 @@ export type OpenCodePart = z.infer<typeof OpenCodePartSchema>;
 const OpenCodeSessionMessageEntrySchema = z
   .object({
     info: OpenCodeMessageSchema,
-    parts: z.array(OpenCodePartSchema)
+    parts: z.array(OpenCodePartSchema),
   })
   .strict();
 
@@ -217,15 +216,11 @@ const OpenCodeSessionListSchema = z.array(OpenCodeSessionSchema);
 const OpenCodeProjectListSchema = z.array(OpenCodeProjectSchema);
 const OpenCodeSessionMessageEntryListSchema = z.array(OpenCodeSessionMessageEntrySchema);
 
-export function parseOpenCodeSessionList(
-  value: OpenCodeStructuredDataValue
-): OpenCodeSession[] {
+export function parseOpenCodeSessionList(value: OpenCodeStructuredDataValue): OpenCodeSession[] {
   return OpenCodeSessionListSchema.parse(value);
 }
 
-export function parseOpenCodeProjectList(
-  value: OpenCodeStructuredDataValue
-): OpenCodeProject[] {
+export function parseOpenCodeProjectList(value: OpenCodeStructuredDataValue): OpenCodeProject[] {
   return OpenCodeProjectListSchema.parse(value);
 }
 
@@ -234,7 +229,7 @@ export function parseOpenCodeSession(value: OpenCodeStructuredDataValue): OpenCo
 }
 
 export function parseOpenCodeSessionMessages(
-  value: OpenCodeStructuredDataValue
+  value: OpenCodeStructuredDataValue,
 ): OpenCodeSessionMessageEntry[] {
   return OpenCodeSessionMessageEntryListSchema.parse(value);
 }

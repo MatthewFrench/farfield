@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import {
   ModeSelectionSyncCoordinator,
-  type ModeSelectionSyncInput
+  type ModeSelectionSyncInput,
 } from "../Source/Features/Chat/StateManagement/ModeSelectionSyncCoordinator";
 
 const APP_DEFAULT_MODEL = "gpt-5.3-codex";
@@ -36,7 +36,7 @@ function createBaseInput(): ModeSelectionSyncInput {
     selectedReasoningEffort: "",
     hasHydratedModeFromLiveState: false,
     isModeSyncing: false,
-    lastAppliedModeSignature: ""
+    lastAppliedModeSignature: "",
   };
 }
 
@@ -46,9 +46,9 @@ function createRemoteConversationState(modeKey: string): RemoteConversationState
       mode: modeKey,
       settings: {
         model: REMOTE_MODEL,
-        reasoning_effort: REMOTE_REASONING_EFFORT
-      }
-    }
+        reasoning_effort: REMOTE_REASONING_EFFORT,
+      },
+    },
   };
 }
 
@@ -69,7 +69,7 @@ describe("ModeSelectionSyncCoordinator", () => {
       ...createBaseInput(),
       selectedModeKey: "plan",
       selectedModelId: REMOTE_MODEL,
-      selectedReasoningEffort: REMOTE_REASONING_EFFORT
+      selectedReasoningEffort: REMOTE_REASONING_EFFORT,
     });
 
     expect(transition.kind).toBe("noConversationState");
@@ -82,7 +82,7 @@ describe("ModeSelectionSyncCoordinator", () => {
     const coordinator = createCoordinator();
     const transition = coordinator.readTransition({
       ...createBaseInput(),
-      conversationState: createRemoteConversationState("plan")
+      conversationState: createRemoteConversationState("plan"),
     });
 
     expect(transition).toEqual({
@@ -92,7 +92,7 @@ describe("ModeSelectionSyncCoordinator", () => {
       nextSelectedReasoningEffort: REMOTE_REASONING_EFFORT,
       nextHasHydratedModeFromLiveState: true,
       nextIsModeSyncing: false,
-      nextLastAppliedModeSignature: "plan|gpt-5.4-codex|high"
+      nextLastAppliedModeSignature: "plan|gpt-5.4-codex|high",
     });
   });
 
@@ -106,10 +106,10 @@ describe("ModeSelectionSyncCoordinator", () => {
           mode: "",
           settings: {
             model: APP_DEFAULT_MODEL,
-            reasoning_effort: APP_DEFAULT_REASONING_EFFORT
-          }
-        }
-      }
+            reasoning_effort: APP_DEFAULT_REASONING_EFFORT,
+          },
+        },
+      },
     });
 
     expect(transition.kind).toBe("hydrateFromRemote");
@@ -128,7 +128,7 @@ describe("ModeSelectionSyncCoordinator", () => {
       isModeSyncing: true,
       selectedModeKey: "default",
       selectedModelId: REMOTE_MODEL,
-      selectedReasoningEffort: REMOTE_REASONING_EFFORT
+      selectedReasoningEffort: REMOTE_REASONING_EFFORT,
     });
 
     expect(transition.kind).toBe("confirmSynchronized");
@@ -146,7 +146,7 @@ describe("ModeSelectionSyncCoordinator", () => {
       selectedModeKey: "default",
       selectedModelId: REMOTE_MODEL,
       selectedReasoningEffort: REMOTE_REASONING_EFFORT,
-      lastAppliedModeSignature: "default|gpt-5.4-codex|high"
+      lastAppliedModeSignature: "default|gpt-5.4-codex|high",
     });
 
     expect(transition.kind).toBe("holdLocalSyncingState");
@@ -163,7 +163,7 @@ describe("ModeSelectionSyncCoordinator", () => {
       isModeSyncing: false,
       selectedModeKey: "default",
       selectedModelId: "",
-      selectedReasoningEffort: ""
+      selectedReasoningEffort: "",
     });
 
     expect(transition).toEqual({
@@ -173,7 +173,7 @@ describe("ModeSelectionSyncCoordinator", () => {
       nextSelectedReasoningEffort: REMOTE_REASONING_EFFORT,
       nextHasHydratedModeFromLiveState: true,
       nextIsModeSyncing: false,
-      nextLastAppliedModeSignature: "plan|gpt-5.4-codex|high"
+      nextLastAppliedModeSignature: "plan|gpt-5.4-codex|high",
     });
   });
 
@@ -186,14 +186,14 @@ describe("ModeSelectionSyncCoordinator", () => {
           mode: "",
           settings: {
             model: REMOTE_MODEL,
-            reasoning_effort: REMOTE_REASONING_EFFORT
-          }
-        }
+            reasoning_effort: REMOTE_REASONING_EFFORT,
+          },
+        },
       },
       hasHydratedModeFromLiveState: true,
       selectedModeKey: "plan",
       selectedModelId: "",
-      selectedReasoningEffort: ""
+      selectedReasoningEffort: "",
     });
 
     expect(transition.kind).toBe("applyRemote");

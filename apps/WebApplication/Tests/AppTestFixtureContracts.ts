@@ -143,9 +143,7 @@ type ThreadConversationStructuredValue = {
   [key: string]: StructuredDataValue;
 };
 
-type ThreadConversationPayload =
-  | ConversationStateFixture
-  | ThreadConversationStructuredValue;
+type ThreadConversationPayload = ConversationStateFixture | ThreadConversationStructuredValue;
 
 export interface ReadThreadFixture {
   ok: true;
@@ -163,7 +161,7 @@ export interface LiveStateFixture {
 
 export type ReadThreadResolver = (
   threadId: string,
-  includeTurns: boolean
+  includeTurns: boolean,
 ) => ReadThreadFixture | Promise<ReadThreadFixture | null> | null;
 export type LiveStateResolver = (threadId: string) => LiveStateFixture;
 
@@ -197,7 +195,7 @@ export const CODEX_CAPABILITIES: CapabilityFixture = {
   canSetCollaborationMode: true,
   canSubmitUserInput: true,
   canReadLiveState: true,
-  canReadStreamEvents: true
+  canReadStreamEvents: true,
 };
 
 export const OPENCODE_CAPABILITIES: CapabilityFixture = {
@@ -206,18 +204,21 @@ export const OPENCODE_CAPABILITIES: CapabilityFixture = {
   canSetCollaborationMode: false,
   canSubmitUserInput: false,
   canReadLiveState: false,
-  canReadStreamEvents: false
+  canReadStreamEvents: false,
 };
 
-export function buildConversationStateFixture(threadId: string, modelId: string): ConversationStateFixture {
+export function buildConversationStateFixture(
+  threadId: string,
+  modelId: string,
+): ConversationStateFixture {
   return {
     id: threadId,
     turns: [
       {
         id: "turn-1",
         status: "completed",
-        items: []
-      }
+        items: [],
+      },
     ],
     requests: [],
     updatedAt: 1700000000,
@@ -228,8 +229,8 @@ export function buildConversationStateFixture(threadId: string, modelId: string)
       settings: {
         model: modelId,
         reasoning_effort: "medium",
-        developer_instructions: null
-      }
-    }
+        developer_instructions: null,
+      },
+    },
   };
 }

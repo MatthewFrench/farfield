@@ -1,33 +1,35 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizePathnameForRequestMetrics,
+  normalizeRequestMethodForRequestMetrics,
+  parseRequestUrlPathname,
   RequestPathnameByName,
   RequestUrlPathnameParseStatusByName,
-  normalizeRequestMethodForRequestMetrics,
-  normalizePathnameForRequestMetrics,
-  parseRequestUrlPathname,
+  readPathnameForRequestMetricsFromRequestUrl,
   readPathSegmentsFromPathname,
-  readPathnameForRequestMetricsFromRequestUrl
 } from "../Source/Network/RequestPathContracts.js";
 
 describe("RequestPathContracts", () => {
   it("normalizes pathnames for request metrics from path and absolute url inputs", () => {
     expect(normalizePathnameForRequestMetrics("/api/threads/thread_123?include=events")).toBe(
-      "/api/threads/thread_123"
+      "/api/threads/thread_123",
     );
     expect(
-      normalizePathnameForRequestMetrics("https://example.test/api/debug/history/entry_1?limit=5#frag")
+      normalizePathnameForRequestMetrics(
+        "https://example.test/api/debug/history/entry_1?limit=5#frag",
+      ),
     ).toBe("/api/debug/history/entry_1");
     expect(normalizePathnameForRequestMetrics("/api/debug/history/entry_1#frag?ignored")).toBe(
-      "/api/debug/history/entry_1"
+      "/api/debug/history/entry_1",
     );
     expect(normalizePathnameForRequestMetrics("/api/debug/history/http://entry_1?limit=5")).toBe(
-      "/api/debug/history/http://entry_1"
+      "/api/debug/history/http://entry_1",
     );
     expect(normalizePathnameForRequestMetrics("api/debug/client-errors/session-log")).toBe(
-      "/api/debug/client-errors/session-log"
+      "/api/debug/client-errors/session-log",
     );
     expect(normalizePathnameForRequestMetrics("https://[invalid")).toBe(
-      RequestPathnameByName.malformedRequestUrl
+      RequestPathnameByName.malformedRequestUrl,
     );
   });
 
@@ -40,18 +42,18 @@ describe("RequestPathContracts", () => {
 
   it("reads normalized metrics pathname from incoming request url values", () => {
     expect(readPathnameForRequestMetricsFromRequestUrl(undefined)).toBe(
-      RequestPathnameByName.missingRequestUrl
+      RequestPathnameByName.missingRequestUrl,
     );
     expect(readPathnameForRequestMetricsFromRequestUrl("")).toBe(RequestPathnameByName.root);
     expect(readPathnameForRequestMetricsFromRequestUrl("   ")).toBe(RequestPathnameByName.root);
     expect(readPathnameForRequestMetricsFromRequestUrl("/api/events/session?token=abc")).toBe(
-      "/api/events/session"
+      "/api/events/session",
     );
     expect(readPathnameForRequestMetricsFromRequestUrl("http://[invalid")).toBe(
-      RequestPathnameByName.malformedRequestUrl
+      RequestPathnameByName.malformedRequestUrl,
     );
     expect(readPathnameForRequestMetricsFromRequestUrl("https://[invalid")).toBe(
-      RequestPathnameByName.malformedRequestUrl
+      RequestPathnameByName.malformedRequestUrl,
     );
   });
 
@@ -60,7 +62,7 @@ describe("RequestPathContracts", () => {
       "api",
       "debug",
       "client-errors",
-      "session-log"
+      "session-log",
     ]);
     expect(readPathSegmentsFromPathname("https://[invalid")).toEqual(["malformed-request-url"]);
     expect(readPathSegmentsFromPathname(RequestPathnameByName.root)).toEqual([]);
@@ -76,7 +78,7 @@ describe("RequestPathContracts", () => {
     const resolvedResult = parseRequestUrlPathname({
       requestUrl: "/api/events/session?token=abc#fragment",
       host: "localhost",
-      port: 4311
+      port: 4311,
     });
     expect(resolvedResult.status).toBe(RequestUrlPathnameParseStatusByName.resolved);
     if (resolvedResult.status !== RequestUrlPathnameParseStatusByName.resolved) {
@@ -89,7 +91,7 @@ describe("RequestPathContracts", () => {
     const rootResolvedResult = parseRequestUrlPathname({
       requestUrl: "?healthy=true",
       host: "localhost",
-      port: 4311
+      port: 4311,
     });
     expect(rootResolvedResult.status).toBe(RequestUrlPathnameParseStatusByName.resolved);
     if (rootResolvedResult.status !== RequestUrlPathnameParseStatusByName.resolved) {
@@ -101,18 +103,16 @@ describe("RequestPathContracts", () => {
     const malformedResult = parseRequestUrlPathname({
       requestUrl: "http://[invalid",
       host: "localhost",
-      port: 4311
+      port: 4311,
     });
-    expect(malformedResult.status).toBe(
-      RequestUrlPathnameParseStatusByName.malformedRequestUrl
-    );
+    expect(malformedResult.status).toBe(RequestUrlPathnameParseStatusByName.malformedRequestUrl);
   });
 
   it("parses absolute request urls into deterministic normalized route segments", () => {
     const resolvedAbsoluteResult = parseRequestUrlPathname({
       requestUrl: "https://example.test/api/debug/history/entry_1?limit=5#fragment",
       host: "localhost",
-      port: 4311
+      port: 4311,
     });
     expect(resolvedAbsoluteResult.status).toBe(RequestUrlPathnameParseStatusByName.resolved);
     if (resolvedAbsoluteResult.status !== RequestUrlPathnameParseStatusByName.resolved) {
@@ -120,12 +120,7 @@ describe("RequestPathContracts", () => {
     }
 
     expect(resolvedAbsoluteResult.pathname).toBe("/api/debug/history/entry_1");
-    expect(resolvedAbsoluteResult.pathSegments).toEqual([
-      "api",
-      "debug",
-      "history",
-      "entry_1"
-    ]);
+    expect(resolvedAbsoluteResult.pathSegments).toEqual(["api", "debug", "history", "entry_1"]);
     expect(resolvedAbsoluteResult.url.pathname).toBe("/api/debug/history/entry_1");
   });
 
@@ -133,28 +128,28 @@ describe("RequestPathContracts", () => {
     const malformedHostResult = parseRequestUrlPathname({
       requestUrl: "/api/events/session",
       host: "",
-      port: 4311
+      port: 4311,
     });
     expect(malformedHostResult.status).toBe(
-      RequestUrlPathnameParseStatusByName.malformedRequestUrl
+      RequestUrlPathnameParseStatusByName.malformedRequestUrl,
     );
 
     const malformedPortRangeResult = parseRequestUrlPathname({
       requestUrl: "/api/events/session",
       host: "localhost",
-      port: 70_000
+      port: 70_000,
     });
     expect(malformedPortRangeResult.status).toBe(
-      RequestUrlPathnameParseStatusByName.malformedRequestUrl
+      RequestUrlPathnameParseStatusByName.malformedRequestUrl,
     );
 
     const malformedPortNumberResult = parseRequestUrlPathname({
       requestUrl: "/api/events/session",
       host: "localhost",
-      port: Number.NaN
+      port: Number.NaN,
     });
     expect(malformedPortNumberResult.status).toBe(
-      RequestUrlPathnameParseStatusByName.malformedRequestUrl
+      RequestUrlPathnameParseStatusByName.malformedRequestUrl,
     );
   });
 });

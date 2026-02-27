@@ -1,17 +1,13 @@
-import {
-  describe,
-  expect,
-  it
-} from "vitest";
-import type { CoreDataModesResponse } from "@/Application/StateManagement/CoreDataSnapshotContracts";
+import { describe, expect, it } from "vitest";
 import { readInitialModeKeyFromModes } from "@/App";
+import type { CoreDataModesResponse } from "@/Application/StateManagement/CoreDataSnapshotContracts";
 
 type ModeOption = CoreDataModesResponse["data"][number];
 
 function createModeOption(mode: "plan" | "default" | null, name: string): ModeOption {
   return {
     mode,
-    name
+    name,
   };
 }
 
@@ -19,7 +15,7 @@ describe("App initial mode key selection", () => {
   it("uses the first non-plan mode when plan mode appears first", () => {
     const modes: CoreDataModesResponse["data"] = [
       createModeOption("plan", "Plan"),
-      createModeOption("default", "Chat")
+      createModeOption("default", "Chat"),
     ];
 
     expect(readInitialModeKeyFromModes(modes)).toBe("default");
@@ -28,7 +24,7 @@ describe("App initial mode key selection", () => {
   it("uses the first mode when no non-plan mode exists", () => {
     const modes: CoreDataModesResponse["data"] = [
       createModeOption("plan", "Plan"),
-      createModeOption("plan", "Planning")
+      createModeOption("plan", "Planning"),
     ];
 
     expect(readInitialModeKeyFromModes(modes)).toBe("plan");

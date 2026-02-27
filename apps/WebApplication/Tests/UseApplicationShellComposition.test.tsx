@@ -2,45 +2,43 @@ import { cleanup, render } from "@testing-library/react";
 import { useMemo } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApplicationRouteStateMapper } from "../Source/Application/DomainModel/ApplicationRouteStateMapper";
+import { MobileSidebarSwipeCoordinator } from "../Source/Application/StateManagement/MobileSidebarSwipeCoordinator";
+import { RuntimeViewportSizingCoordinator } from "../Source/Application/StateManagement/RuntimeViewportSizingCoordinator";
+import { type ApplicationChatFeatureComposition } from "../Source/Application/StateManagement/UseApplicationChatFeatureComposition";
 import { useApplicationDerivedState } from "../Source/Application/StateManagement/UseApplicationDerivedState";
 import { type ApplicationDerivedState } from "../Source/Application/StateManagement/UseApplicationDerivedStateContracts";
-import { type ApplicationChatFeatureComposition } from "../Source/Application/StateManagement/UseApplicationChatFeatureComposition";
 import { type ApplicationPushFeatureComposition } from "../Source/Application/StateManagement/UseApplicationPushFeatureComposition";
 import {
   type ApplicationShellComposition,
-  useApplicationShellComposition
+  useApplicationShellComposition,
 } from "../Source/Application/StateManagement/UseApplicationShellComposition";
 import {
   type ApplicationShellState,
-  useApplicationShellState
+  useApplicationShellState,
 } from "../Source/Application/StateManagement/UseApplicationShellState";
-import * as MobileSidebarTouchHandlersModule from "../Source/Application/StateManagement/UseMobileSidebarTouchHandlers";
 import * as ApplicationShellViewPropertiesModule from "../Source/Application/StateManagement/UseApplicationShellViewProperties";
-import { RuntimeViewportSizingCoordinator } from "../Source/Application/StateManagement/RuntimeViewportSizingCoordinator";
-import { MobileSidebarSwipeCoordinator } from "../Source/Application/StateManagement/MobileSidebarSwipeCoordinator";
+import * as MobileSidebarTouchHandlersModule from "../Source/Application/StateManagement/UseMobileSidebarTouchHandlers";
+import { ConversationItemFlattener } from "../Source/Features/Chat/DomainModel/ConversationItemFlattener";
+import { ConversationSyncSignatureBuilder } from "../Source/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
+import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
+import { PendingUserInputRequestSelector } from "../Source/Features/Chat/DomainModel/PendingUserInputRequestSelector";
+import { ChatScrollStateCoordinator } from "../Source/Features/Chat/StateManagement/ChatScrollStateCoordinator";
+import { type ChatModeToolbarProps } from "../Source/Features/Chat/UserInterface/ChatModeToolbar";
+import { DebugIssueStateResolver } from "../Source/Features/Debugging/DomainModel/DebugIssueStateResolver";
+import { type DebugActionHandlers } from "../Source/Features/Debugging/StateManagement/UseDebugActionHandlers";
+import { type PushClientState } from "../Source/Features/PushNotifications/DomainModel/PushClientContracts";
+import { ThreadMutationServerClient } from "../Source/Features/Threads/DataAccess/ThreadMutationServerClient";
 import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
-import { ThreadMutationServerClient } from "../Source/Features/Threads/DataAccess/ThreadMutationServerClient";
 import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
+import { ThreadListStateController } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
 import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement/ThreadListStateStore";
 import { ThreadMutationActionCoordinator } from "../Source/Features/Threads/StateManagement/ThreadMutationActionCoordinator";
-import { ThreadListStateController } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
 import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
+import * as ThreadActionHandlersModule from "../Source/Features/Threads/StateManagement/UseThreadActionHandlers";
+import { type ThreadActionHandlers } from "../Source/Features/Threads/StateManagement/UseThreadActionHandlers";
 import * as ThreadListPanePropertiesModule from "../Source/Features/Threads/StateManagement/UseThreadListPaneProperties";
 import { type ThreadListPaneProperties } from "../Source/Features/Threads/UserInterface/ThreadListPaneContracts";
-import {
-  type ThreadActionHandlers
-} from "../Source/Features/Threads/StateManagement/UseThreadActionHandlers";
-import * as ThreadActionHandlersModule from "../Source/Features/Threads/StateManagement/UseThreadActionHandlers";
-import { ChatScrollStateCoordinator } from "../Source/Features/Chat/StateManagement/ChatScrollStateCoordinator";
-import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
-import { ConversationSyncSignatureBuilder } from "../Source/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
-import { ConversationItemFlattener } from "../Source/Features/Chat/DomainModel/ConversationItemFlattener";
-import { PendingUserInputRequestSelector } from "../Source/Features/Chat/DomainModel/PendingUserInputRequestSelector";
-import { type ChatModeToolbarProps } from "../Source/Features/Chat/UserInterface/ChatModeToolbar";
-import { type DebugActionHandlers } from "../Source/Features/Debugging/StateManagement/UseDebugActionHandlers";
-import { DebugIssueStateResolver } from "../Source/Features/Debugging/DomainModel/DebugIssueStateResolver";
-import { type PushClientState } from "../Source/Features/PushNotifications/DomainModel/PushClientContracts";
 
 const THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS = 60_000;
 const THREAD_QUERY_CACHE_MAXIMUM_ENTRIES = 25;
@@ -59,7 +57,11 @@ interface ShellCompositionFixture {
   toggleTheme: () => void;
   visibleChatItemsStep: number;
   streamEventCards: React.JSX.Element[];
-  renderAgentFavicon: (agentId: "codex" | "opencode", label: string, className: string) => React.ReactNode;
+  renderAgentFavicon: (
+    agentId: "codex" | "opencode",
+    label: string,
+    className: string,
+  ) => React.ReactNode;
   formatDateValue: (value: number | string | null | undefined) => string;
   loadCoreDataTracked: () => Promise<void>;
   loadSelectedThreadTracked: (threadId: string) => Promise<void>;
@@ -99,11 +101,11 @@ function createThreadListStateController(): ThreadListStateController {
     threadServerClient: new ThreadServerClient(),
     threadQueryCache: new ThreadQueryCache(
       THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS,
-      THREAD_QUERY_CACHE_MAXIMUM_ENTRIES
+      THREAD_QUERY_CACHE_MAXIMUM_ENTRIES,
     ),
     threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
     threadListStateStore: new ThreadListStateStore(),
-    threadListPresentationStateResolver: new ThreadListPresentationStateResolver()
+    threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
   });
 }
 
@@ -112,7 +114,7 @@ function createUnsupportedPushClientState(): PushClientState {
     supported: false,
     serviceWorkerRegistered: false,
     permission: "unsupported",
-    subscribed: false
+    subscribed: false,
   };
 }
 
@@ -136,7 +138,7 @@ function createChatModeToolbarPropertiesFixture(): ChatModeToolbarProps {
     pendingRequestCount: 0,
     onTogglePlanMode: (): void => {},
     onModelChange: (): void => {},
-    onReasoningEffortChange: (): void => {}
+    onReasoningEffortChange: (): void => {},
   };
 }
 
@@ -148,7 +150,7 @@ function createChatFeatureCompositionFixture(): ApplicationChatFeatureCompositio
     skipPendingRequest: vi.fn(async (): Promise<void> => {}),
     runInterrupt: vi.fn(async (): Promise<void> => {}),
     handleAnswerChange: vi.fn((): void => {}),
-    chatModeToolbarProperties: createChatModeToolbarPropertiesFixture()
+    chatModeToolbarProperties: createChatModeToolbarPropertiesFixture(),
   };
 }
 
@@ -160,7 +162,7 @@ function createDebugFeatureCompositionFixture(): DebugActionHandlers {
     startTraceFromDebugPanel: vi.fn((): void => {}),
     markTraceFromDebugPanel: vi.fn((): void => {}),
     stopTraceFromDebugPanel: vi.fn((): void => {}),
-    openDebugFromErrorBanner: vi.fn((): void => {})
+    openDebugFromErrorBanner: vi.fn((): void => {}),
   };
 }
 
@@ -168,7 +170,7 @@ function createPushFeatureCompositionFixture(): ApplicationPushFeatureCompositio
   return {
     submitApiSessionToken: vi.fn(async (): Promise<void> => {}),
     refreshPushClientState: vi.fn(async (): Promise<void> => {}),
-    enablePushNotificationsFromToolbar: vi.fn(async (): Promise<void> => {})
+    enablePushNotificationsFromToolbar: vi.fn(async (): Promise<void> => {}),
   };
 }
 
@@ -177,7 +179,7 @@ function createThreadActionHandlersFixture(): ThreadActionHandlers {
     createNewThread: vi.fn(async (): Promise<void> => {}),
     createThreadForSingleAgent: vi.fn((): void => {}),
     runArchiveThread: vi.fn(async (): Promise<void> => {}),
-    runUnarchiveThread: vi.fn(async (): Promise<void> => {})
+    runUnarchiveThread: vi.fn(async (): Promise<void> => {}),
   };
 }
 
@@ -196,8 +198,8 @@ function createShellCompositionFixture(): ShellCompositionFixture {
     buildActionRequestOptions: vi.fn((actionName: string) => ({
       actionId: `action-${actionName}`,
       requestOptions: {
-        actionName
-      }
+        actionName,
+      },
     })),
     reportTrackedUserInterfaceError: vi.fn(async (): Promise<void> => {}),
     threadMutationServerClient: new ThreadMutationServerClient(),
@@ -208,15 +210,15 @@ function createShellCompositionFixture(): ShellCompositionFixture {
       sidebarSwipeEdgePx: MOBILE_SIDEBAR_SWIPE_EDGE_PX,
       sidebarSwipeTriggerPx: MOBILE_SIDEBAR_SWIPE_TRIGGER_PX,
       sidebarSwipeMaximumVerticalDriftPx: MOBILE_SIDEBAR_SWIPE_MAXIMUM_VERTICAL_DRIFT_PX,
-      sidebarSwipeCancelNegativePx: MOBILE_SIDEBAR_SWIPE_CANCEL_NEGATIVE_PX
+      sidebarSwipeCancelNegativePx: MOBILE_SIDEBAR_SWIPE_CANCEL_NEGATIVE_PX,
     }),
     runtimeViewportSizingCoordinator: new RuntimeViewportSizingCoordinator(
-      MOBILE_VISUAL_VIEWPORT_KEYBOARD_OPEN_DELTA_PX
+      MOBILE_VISUAL_VIEWPORT_KEYBOARD_OPEN_DELTA_PX,
     ),
     chatScrollStateCoordinator: new ChatScrollStateCoordinator(CHAT_SCROLL_BOTTOM_THRESHOLD_PX),
     chatFeatureComposition: createChatFeatureCompositionFixture(),
     debugFeatureComposition: createDebugFeatureCompositionFixture(),
-    pushFeatureComposition: createPushFeatureCompositionFixture()
+    pushFeatureComposition: createPushFeatureCompositionFixture(),
   };
 }
 
@@ -234,35 +236,23 @@ function readLatestRuntimeHarnessSnapshot(): RuntimeHarnessSnapshot {
 function RuntimeHarness(properties: RuntimeHarnessProperties): React.JSX.Element {
   const initialUiState = useMemo(
     () => new ApplicationRouteStateMapper().parseFromPathname("/"),
-    []
+    [],
   );
 
   const applicationShellState = useApplicationShellState({
     initialUiState,
     unsupportedPushClientState: createUnsupportedPushClientState(),
-    initialVisibleChatItems: INITIAL_VISIBLE_CHAT_ITEMS
+    initialVisibleChatItems: INITIAL_VISIBLE_CHAT_ITEMS,
   });
 
-  const modeSelectionStateResolver = useMemo(
-    () => new ModeSelectionStateResolver(),
-    []
-  );
+  const modeSelectionStateResolver = useMemo(() => new ModeSelectionStateResolver(), []);
   const conversationSyncSignatureBuilder = useMemo(
     () => new ConversationSyncSignatureBuilder(modeSelectionStateResolver),
-    [modeSelectionStateResolver]
+    [modeSelectionStateResolver],
   );
-  const pendingUserInputRequestSelector = useMemo(
-    () => new PendingUserInputRequestSelector(),
-    []
-  );
-  const conversationItemFlattener = useMemo(
-    () => new ConversationItemFlattener(),
-    []
-  );
-  const debugIssueStateResolver = useMemo(
-    () => new DebugIssueStateResolver(),
-    []
-  );
+  const pendingUserInputRequestSelector = useMemo(() => new PendingUserInputRequestSelector(), []);
+  const conversationItemFlattener = useMemo(() => new ConversationItemFlattener(), []);
+  const debugIssueStateResolver = useMemo(() => new DebugIssueStateResolver(), []);
 
   const applicationDerivedState = useApplicationDerivedState({
     threads: applicationShellState.threads,
@@ -299,7 +289,7 @@ function RuntimeHarness(properties: RuntimeHarnessProperties): React.JSX.Element
     pendingUserInputRequestSelector,
     conversationItemFlattener,
     debugIssueStateResolver,
-    threadListStateController: properties.fixture.threadListStateController
+    threadListStateController: properties.fixture.threadListStateController,
   });
 
   const shellComposition = useApplicationShellComposition({
@@ -324,13 +314,13 @@ function RuntimeHarness(properties: RuntimeHarnessProperties): React.JSX.Element
     chatScrollStateCoordinator: properties.fixture.chatScrollStateCoordinator,
     chatFeatureComposition: properties.fixture.chatFeatureComposition,
     debugFeatureComposition: properties.fixture.debugFeatureComposition,
-    pushFeatureComposition: properties.fixture.pushFeatureComposition
+    pushFeatureComposition: properties.fixture.pushFeatureComposition,
   });
 
   latestRuntimeHarnessSnapshot = {
     applicationShellState,
     applicationDerivedState,
-    shellComposition
+    shellComposition,
   };
 
   return <div data-testid="use-application-shell-composition-harness" />;
@@ -347,26 +337,23 @@ describe("useApplicationShellComposition", () => {
     const fixture = createShellCompositionFixture();
     const threadActionHandlersFixture = createThreadActionHandlersFixture();
 
-    const useThreadActionHandlersSpy = vi.spyOn(
-      ThreadActionHandlersModule,
-      "useThreadActionHandlers"
-    ).mockReturnValue(threadActionHandlersFixture);
+    const useThreadActionHandlersSpy = vi
+      .spyOn(ThreadActionHandlersModule, "useThreadActionHandlers")
+      .mockReturnValue(threadActionHandlersFixture);
     const useMobileSidebarTouchHandlersSpy = vi.spyOn(
       MobileSidebarTouchHandlersModule,
-      "useMobileSidebarTouchHandlers"
+      "useMobileSidebarTouchHandlers",
     );
     const useThreadListPanePropertiesSpy = vi.spyOn(
       ThreadListPanePropertiesModule,
-      "useThreadListPaneProperties"
+      "useThreadListPaneProperties",
     );
     const useApplicationShellViewPropertiesSpy = vi.spyOn(
       ApplicationShellViewPropertiesModule,
-      "useApplicationShellViewProperties"
+      "useApplicationShellViewProperties",
     );
 
-    render(
-      <RuntimeHarness fixture={fixture} />
-    );
+    render(<RuntimeHarness fixture={fixture} />);
 
     const runtimeHarnessSnapshot = readLatestRuntimeHarnessSnapshot();
     const threadActionHandlersInput = useThreadActionHandlersSpy.mock.calls[0]?.[0];
@@ -382,13 +369,14 @@ describe("useApplicationShellComposition", () => {
       setSelectedThreadId: runtimeHarnessSnapshot.applicationShellState.setSelectedThreadId,
       setMobileSidebarOpen: runtimeHarnessSnapshot.applicationShellState.setMobileSidebarOpen,
       selectedThreadIdRef: runtimeHarnessSnapshot.applicationShellState.selectedThreadIdRef,
-      pendingThreadMaterializationCoordinator: runtimeHarnessSnapshot.applicationShellState.pendingThreadMaterializationCoordinator,
+      pendingThreadMaterializationCoordinator:
+        runtimeHarnessSnapshot.applicationShellState.pendingThreadMaterializationCoordinator,
       threadMutationActionCoordinator: fixture.threadMutationActionCoordinator,
       threadMutationServerClient: fixture.threadMutationServerClient,
       threadListStateController: fixture.threadListStateController,
       loadCoreDataTracked: fixture.loadCoreDataTracked,
       loadSelectedThreadTracked: fixture.loadSelectedThreadTracked,
-      reportTrackedUserInterfaceError: fixture.reportTrackedUserInterfaceError
+      reportTrackedUserInterfaceError: fixture.reportTrackedUserInterfaceError,
     });
 
     const mobileSidebarTouchHandlersInput = useMobileSidebarTouchHandlersSpy.mock.calls[0]?.[0];
@@ -399,84 +387,92 @@ describe("useApplicationShellComposition", () => {
       mobileSidebarOpen: runtimeHarnessSnapshot.applicationShellState.mobileSidebarOpen,
       setMobileSidebarOpen: runtimeHarnessSnapshot.applicationShellState.setMobileSidebarOpen,
       mobileSidebarSwipeCoordinator: fixture.mobileSidebarSwipeCoordinator,
-      runtimeViewportSizingCoordinator: fixture.runtimeViewportSizingCoordinator
+      runtimeViewportSizingCoordinator: fixture.runtimeViewportSizingCoordinator,
     });
 
     const threadListPanePropertiesInput = useThreadListPanePropertiesSpy.mock.calls[0]?.[0];
     if (!threadListPanePropertiesInput) {
       throw new Error("Expected useThreadListPaneProperties input");
     }
-    expect(threadListPanePropertiesInput).toEqual(expect.objectContaining({
-      createNewThread: threadActionHandlersFixture.createNewThread,
-      createThreadForSingleAgent: threadActionHandlersFixture.createThreadForSingleAgent,
-      archiveThread: threadActionHandlersFixture.runArchiveThread,
-      unarchiveThread: threadActionHandlersFixture.runUnarchiveThread,
-      formatDate: fixture.formatDateValue,
-      renderAgentFavicon: fixture.renderAgentFavicon
-    }));
+    expect(threadListPanePropertiesInput).toEqual(
+      expect.objectContaining({
+        createNewThread: threadActionHandlersFixture.createNewThread,
+        createThreadForSingleAgent: threadActionHandlersFixture.createThreadForSingleAgent,
+        archiveThread: threadActionHandlersFixture.runArchiveThread,
+        unarchiveThread: threadActionHandlersFixture.runUnarchiveThread,
+        formatDate: fixture.formatDateValue,
+        renderAgentFavicon: fixture.renderAgentFavicon,
+      }),
+    );
 
     const shellViewPropertiesInput = useApplicationShellViewPropertiesSpy.mock.calls[0]?.[0];
     if (!shellViewPropertiesInput) {
       throw new Error("Expected useApplicationShellViewProperties input");
     }
-    expect(shellViewPropertiesInput).toEqual(expect.objectContaining({
-      theme: fixture.theme,
-      visibleChatItemsStep: fixture.visibleChatItemsStep,
-      enablePushNotificationsFromToolbar: fixture.pushFeatureComposition.enablePushNotificationsFromToolbar,
-      submitApiSessionToken: fixture.pushFeatureComposition.submitApiSessionToken,
-      handleAnswerChange: fixture.chatFeatureComposition.handleAnswerChange,
-      submitPendingRequest: fixture.chatFeatureComposition.submitPendingRequest,
-      submitMessage: fixture.chatFeatureComposition.submitMessage,
-      runInterrupt: fixture.chatFeatureComposition.runInterrupt,
-      openDebugFromErrorBanner: fixture.debugFeatureComposition.openDebugFromErrorBanner,
-      clearDebugIssuesFromDebugPanel: fixture.debugFeatureComposition.clearDebugIssuesFromPanel,
-      replayHistoryEntryFromDetail: fixture.debugFeatureComposition.replayHistoryEntryFromDetail,
-      streamEventCards: fixture.streamEventCards
-    }));
+    expect(shellViewPropertiesInput).toEqual(
+      expect.objectContaining({
+        theme: fixture.theme,
+        visibleChatItemsStep: fixture.visibleChatItemsStep,
+        enablePushNotificationsFromToolbar:
+          fixture.pushFeatureComposition.enablePushNotificationsFromToolbar,
+        submitApiSessionToken: fixture.pushFeatureComposition.submitApiSessionToken,
+        handleAnswerChange: fixture.chatFeatureComposition.handleAnswerChange,
+        submitPendingRequest: fixture.chatFeatureComposition.submitPendingRequest,
+        submitMessage: fixture.chatFeatureComposition.submitMessage,
+        runInterrupt: fixture.chatFeatureComposition.runInterrupt,
+        openDebugFromErrorBanner: fixture.debugFeatureComposition.openDebugFromErrorBanner,
+        clearDebugIssuesFromDebugPanel: fixture.debugFeatureComposition.clearDebugIssuesFromPanel,
+        replayHistoryEntryFromDetail: fixture.debugFeatureComposition.replayHistoryEntryFromDetail,
+        streamEventCards: fixture.streamEventCards,
+      }),
+    );
 
-    const mobileSidebarTouchHandlersResult = (
-      useMobileSidebarTouchHandlersSpy.mock.results[0]?.value
-    ) as MobileSidebarTouchHandlersModule.MobileSidebarTouchHandlers | undefined;
+    const mobileSidebarTouchHandlersResult = useMobileSidebarTouchHandlersSpy.mock.results[0]
+      ?.value as MobileSidebarTouchHandlersModule.MobileSidebarTouchHandlers | undefined;
     if (mobileSidebarTouchHandlersResult === undefined) {
       throw new Error("Expected useMobileSidebarTouchHandlers result");
     }
 
-    const threadListPanePropertiesResult = (
-      useThreadListPanePropertiesSpy.mock.results[0]?.value
-    ) as ThreadListPaneProperties | undefined;
+    const threadListPanePropertiesResult = useThreadListPanePropertiesSpy.mock.results[0]?.value as
+      | ThreadListPaneProperties
+      | undefined;
     if (threadListPanePropertiesResult === undefined) {
       throw new Error("Expected useThreadListPaneProperties result");
     }
 
     expect(runtimeHarnessSnapshot.shellComposition.endSidebarSwipeTracking).toBe(
-      mobileSidebarTouchHandlersResult.endSidebarSwipeTracking
+      mobileSidebarTouchHandlersResult.endSidebarSwipeTracking,
     );
     expect(runtimeHarnessSnapshot.shellComposition.handleAppShellTouchStart).toBe(
-      mobileSidebarTouchHandlersResult.handleAppShellTouchStart
+      mobileSidebarTouchHandlersResult.handleAppShellTouchStart,
     );
     expect(runtimeHarnessSnapshot.shellComposition.handleAppShellTouchMove).toBe(
-      mobileSidebarTouchHandlersResult.handleAppShellTouchMove
+      mobileSidebarTouchHandlersResult.handleAppShellTouchMove,
     );
     expect(runtimeHarnessSnapshot.shellComposition.threadListPaneProperties).toBe(
-      threadListPanePropertiesResult
+      threadListPanePropertiesResult,
     );
 
     runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onCreateThreadForSingleAgent(
-      "/workspace/example"
+      "/workspace/example",
     );
     runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onCreateNewThread(
       "/workspace/example",
-      "codex"
+      "codex",
     );
-    runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onArchiveThread("thread-archive");
-    runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onUnarchiveThread("thread-unarchive");
+    runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onArchiveThread(
+      "thread-archive",
+    );
+    runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onUnarchiveThread(
+      "thread-unarchive",
+    );
 
     expect(threadActionHandlersFixture.createThreadForSingleAgent).toHaveBeenCalledWith(
-      "/workspace/example"
+      "/workspace/example",
     );
     expect(threadActionHandlersFixture.createNewThread).toHaveBeenCalledWith(
       "/workspace/example",
-      "codex"
+      "codex",
     );
     expect(threadActionHandlersFixture.runArchiveThread).toHaveBeenCalledWith("thread-archive");
     expect(threadActionHandlersFixture.runUnarchiveThread).toHaveBeenCalledWith("thread-unarchive");

@@ -9,7 +9,8 @@ interface ThreadQueryCacheDependencies {
   readCurrentEpochMilliseconds?: () => number;
 }
 
-const INVALID_CACHE_TIME_TO_LIVE_MESSAGE = "ThreadQueryCache requires a positive timeToLiveMs value";
+const INVALID_CACHE_TIME_TO_LIVE_MESSAGE =
+  "ThreadQueryCache requires a positive timeToLiveMs value";
 const INVALID_CACHE_MAXIMUM_ENTRIES_MESSAGE =
   "ThreadQueryCache requires a positive integer maximumEntries value";
 
@@ -27,7 +28,7 @@ export class ThreadQueryCache {
   public constructor(
     timeToLiveMs: number,
     maximumEntries: number,
-    dependencies?: ThreadQueryCacheDependencies
+    dependencies?: ThreadQueryCacheDependencies,
   ) {
     if (!Number.isFinite(timeToLiveMs) || timeToLiveMs <= 0) {
       throw new Error(INVALID_CACHE_TIME_TO_LIVE_MESSAGE);
@@ -62,7 +63,7 @@ export class ThreadQueryCache {
     }
     this.entryByKey.set(cacheKey, {
       response,
-      expiresAtEpochMs: this.readCurrentEpochMilliseconds() + this.timeToLiveMs
+      expiresAtEpochMs: this.readCurrentEpochMilliseconds() + this.timeToLiveMs,
     });
     this.evictUntilWithinBounds();
   }

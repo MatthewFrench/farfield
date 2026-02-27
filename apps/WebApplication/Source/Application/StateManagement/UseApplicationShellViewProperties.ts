@@ -4,15 +4,13 @@ import { type ApplicationHeaderBarProps } from "@/Application/UserInterface/Appl
 import { type CapabilityHealthResponse } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { type ChatWorkspacePaneProps } from "@/Features/Chat/UserInterface/ChatWorkspacePane";
-import { type DebugHistoryEntryListItem } from "@/Features/Debugging/UserInterface/DebugHistoryPanel";
-import { type DebugTraceSummary } from "@/Features/Debugging/UserInterface/DebugTracePanel";
-import { type DebugStatusBannersProps } from "@/Features/Debugging/UserInterface/DebugStatusBanners";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
-import {
-  type DebugWorkspacePaneProps
-} from "@/Features/Debugging/UserInterface/DebugWorkspacePane";
-import { type ThreadSidebarPanelHealthState } from "@/Features/Threads/UserInterface/ThreadSidebarPanel";
+import { type DebugHistoryEntryListItem } from "@/Features/Debugging/UserInterface/DebugHistoryPanel";
+import { type DebugStatusBannersProps } from "@/Features/Debugging/UserInterface/DebugStatusBanners";
+import { type DebugTraceSummary } from "@/Features/Debugging/UserInterface/DebugTracePanel";
+import { type DebugWorkspacePaneProps } from "@/Features/Debugging/UserInterface/DebugWorkspacePane";
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
+import { type ThreadSidebarPanelHealthState } from "@/Features/Threads/UserInterface/ThreadSidebarPanel";
 
 export interface UseApplicationShellViewPropertiesInput {
   health: CapabilityHealthResponse | null;
@@ -132,14 +130,14 @@ function invokeAsyncOwnerAction(action: AsyncOwnerAction): void {
 
 function openSidebarWithChatTab(
   setActiveTab: UseApplicationShellViewPropertiesInput["setActiveTab"],
-  setSidebarOpen: (nextOpen: boolean) => void
+  setSidebarOpen: (nextOpen: boolean) => void,
 ): void {
   setActiveTab(CHAT_TAB);
   setSidebarOpen(SIDEBAR_OPEN_STATE);
 }
 
 function getNextActiveTabWhenTogglingDebug(
-  activeTab: ApplicationHeaderBarProps["activeTab"]
+  activeTab: ApplicationHeaderBarProps["activeTab"],
 ): ApplicationHeaderBarProps["activeTab"] {
   return activeTab === DEBUG_TAB ? CHAT_TAB : DEBUG_TAB;
 }
@@ -147,18 +145,15 @@ function getNextActiveTabWhenTogglingDebug(
 function getNextVisibleChatItemLimit(
   currentVisibleChatItemLimit: number,
   conversationItemCount: number,
-  visibleChatItemsStep: number
+  visibleChatItemsStep: number,
 ): number {
-  return Math.min(
-    conversationItemCount,
-    currentVisibleChatItemLimit + visibleChatItemsStep
-  );
+  return Math.min(conversationItemCount, currentVisibleChatItemLimit + visibleChatItemsStep);
 }
 
 function pinChatToBottomIfScrollElementExists(
   scrollReference: ChatWorkspacePaneProps["scrollRef"],
   chatScrollStateCoordinator: ChatScrollStateCoordinator,
-  setIsChatAtBottom: (nextIsAtBottom: boolean) => void
+  setIsChatAtBottom: (nextIsAtBottom: boolean) => void,
 ): void {
   const scrollElement = scrollReference.current;
   if (!scrollElement) {
@@ -170,7 +165,7 @@ function pinChatToBottomIfScrollElementExists(
 }
 
 function buildThreadSidebarHealthState(
-  health: CapabilityHealthResponse | null
+  health: CapabilityHealthResponse | null,
 ): ThreadSidebarPanelHealthState | null {
   if (!health) {
     return null;
@@ -180,19 +175,17 @@ function buildThreadSidebarHealthState(
     appReady: health.state.appReady,
     ipcConnected: health.state.ipcConnected,
     ipcInitialized: health.state.ipcInitialized,
-    lastError: health.state.lastError
+    lastError: health.state.lastError,
   };
 }
 
-function clearErrorMessage(
-  setErrorMessage: (nextErrorMessage: string) => void
-): void {
+function clearErrorMessage(setErrorMessage: (nextErrorMessage: string) => void): void {
   setErrorMessage(EMPTY_ERROR_MESSAGE);
 }
 
 function clearApiSessionBootstrapErrorIfPresent(
   apiSessionBootstrapError: string,
-  setApiSessionBootstrapError: (nextErrorMessage: string) => void
+  setApiSessionBootstrapError: (nextErrorMessage: string) => void,
 ): void {
   if (apiSessionBootstrapError.length === MINIMUM_ERROR_LENGTH) {
     return;
@@ -202,7 +195,7 @@ function clearApiSessionBootstrapErrorIfPresent(
 }
 
 function buildApplicationHeaderBarProperties(
-  input: UseApplicationShellViewPropertiesInput
+  input: UseApplicationShellViewPropertiesInput,
 ): ApplicationHeaderBarProps {
   return {
     activeTab: input.activeTab,
@@ -232,12 +225,12 @@ function buildApplicationHeaderBarProperties(
       input.setActiveTab(getNextActiveTabWhenTogglingDebug(input.activeTab));
     },
     onToggleTheme: input.toggleTheme,
-    renderAgentFavicon: input.renderAgentFavicon
+    renderAgentFavicon: input.renderAgentFavicon,
   };
 }
 
 function buildDebugStatusBannersProperties(
-  input: UseApplicationShellViewPropertiesInput
+  input: UseApplicationShellViewPropertiesInput,
 ): DebugStatusBannersProps {
   return {
     activeTab: input.activeTab,
@@ -250,12 +243,12 @@ function buildDebugStatusBannersProperties(
     onDismissErrorBanner: () => {
       clearErrorMessage(input.setErrorMessage);
     },
-    liveStateReductionError: input.liveStateReductionError
+    liveStateReductionError: input.liveStateReductionError,
   };
 }
 
 function buildChatWorkspacePaneProperties(
-  input: UseApplicationShellViewPropertiesInput
+  input: UseApplicationShellViewPropertiesInput,
 ): ChatWorkspacePaneProps {
   return {
     chatSurfaceState: input.chatSurfaceState,
@@ -268,20 +261,16 @@ function buildChatWorkspacePaneProperties(
     hasHiddenChatItems: input.hasHiddenChatItems,
     firstVisibleChatItemIndex: input.firstVisibleChatItemIndex,
     onShowOlderMessages: () => {
-      input.setVisibleChatItemLimit((limit) => (
-        getNextVisibleChatItemLimit(
-          limit,
-          input.conversationItemCount,
-          input.visibleChatItemsStep
-        )
-      ));
+      input.setVisibleChatItemLimit((limit) =>
+        getNextVisibleChatItemLimit(limit, input.conversationItemCount, input.visibleChatItemsStep),
+      );
     },
     isChatAtBottom: input.isChatAtBottom,
     onJumpToBottom: () => {
       pinChatToBottomIfScrollElementExists(
         input.scrollRef,
         input.chatScrollStateCoordinator,
-        input.setIsChatAtBottom
+        input.setIsChatAtBottom,
       );
     },
     activeRequest: input.activeRequest,
@@ -300,12 +289,12 @@ function buildChatWorkspacePaneProperties(
     selectedAgentLabel: input.selectedAgentLabel,
     onInterrupt: input.runInterrupt,
     onSendMessage: input.submitMessage,
-    chatModeToolbarProperties: input.chatModeToolbarProperties
+    chatModeToolbarProperties: input.chatModeToolbarProperties,
   };
 }
 
 function buildDebugWorkspacePaneProperties(
-  input: UseApplicationShellViewPropertiesInput
+  input: UseApplicationShellViewPropertiesInput,
 ): DebugWorkspacePaneProps {
   return {
     debugWorkspaceSection: input.debugWorkspaceSection,
@@ -341,12 +330,12 @@ function buildDebugWorkspacePaneProperties(
     onStartTrace: input.startTraceFromDebugPanel,
     onMarkTrace: input.markTraceFromDebugPanel,
     onStopTrace: input.stopTraceFromDebugPanel,
-    recentTraceSummaries: input.recentTraceSummaries
+    recentTraceSummaries: input.recentTraceSummaries,
   };
 }
 
 function buildApiSessionBootstrapOverlayProperties(
-  input: UseApplicationShellViewPropertiesInput
+  input: UseApplicationShellViewPropertiesInput,
 ): ApiSessionBootstrapOverlayProperties {
   return {
     apiTokenDraft: input.apiSessionTokenDraft,
@@ -354,23 +343,23 @@ function buildApiSessionBootstrapOverlayProperties(
       input.setApiSessionTokenDraft(nextTokenValue);
       clearApiSessionBootstrapErrorIfPresent(
         input.apiSessionBootstrapError,
-        input.setApiSessionBootstrapError
+        input.setApiSessionBootstrapError,
       );
     },
     onSubmitApiToken: () => {
       invokeAsyncOwnerAction(input.submitApiSessionToken);
     },
     isSubmitting: input.isApiSessionBootstrapPending,
-    errorMessage: input.apiSessionBootstrapError
+    errorMessage: input.apiSessionBootstrapError,
   };
 }
 
 export function useApplicationShellViewProperties(
-  input: UseApplicationShellViewPropertiesInput
+  input: UseApplicationShellViewPropertiesInput,
 ): ApplicationShellViewProperties {
   const threadSidebarHealthState = useMemo<ThreadSidebarPanelHealthState | null>(
     () => buildThreadSidebarHealthState(input.health),
-    [input.health]
+    [input.health],
   );
 
   const applicationHeaderBarProperties = buildApplicationHeaderBarProperties(input);
@@ -385,6 +374,6 @@ export function useApplicationShellViewProperties(
     debugStatusBannersProperties,
     chatWorkspacePaneProperties,
     debugWorkspacePaneProperties,
-    apiSessionBootstrapOverlayProperties
+    apiSessionBootstrapOverlayProperties,
   };
 }

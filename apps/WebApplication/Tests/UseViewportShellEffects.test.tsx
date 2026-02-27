@@ -1,23 +1,17 @@
 import { cleanup, render } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PageTouchOverscrollGuardCoordinator } from "../Source/Application/StateManagement/PageTouchOverscrollGuardCoordinator";
 import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi
-} from "vitest";
-import { useViewportShellEffects, type UseViewportShellEffectsInput } from "../Source/Application/StateManagement/UseViewportShellEffects";
-import {
-  PageTouchOverscrollGuardCoordinator
-} from "../Source/Application/StateManagement/PageTouchOverscrollGuardCoordinator";
-import {
+  type RuntimeViewportMetrics,
   RuntimeViewportSizingCoordinator,
-  type RuntimeViewportMetrics
 } from "../Source/Application/StateManagement/RuntimeViewportSizingCoordinator";
 import {
+  type UseViewportShellEffectsInput,
+  useViewportShellEffects,
+} from "../Source/Application/StateManagement/UseViewportShellEffects";
+import {
+  type ChatScrollElementLike,
   ChatScrollStateCoordinator,
-  type ChatScrollElementLike
 } from "../Source/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 
 interface HarnessProperties {
@@ -81,7 +75,7 @@ function createRuntimeViewportMetrics(keyboardOpen: boolean): RuntimeViewportMet
     layoutViewportHeight: 800,
     keyboardDelta: keyboardOpen ? 160 : 0,
     keyboardOpen,
-    safeAreaInsetBottom: 0
+    safeAreaInsetBottom: 0,
   };
 }
 
@@ -94,7 +88,7 @@ function createMediaQueryList(matches: boolean, media: string): MediaQueryList {
     removeEventListener: () => {},
     addListener: () => {},
     removeListener: () => {},
-    dispatchEvent: () => false
+    dispatchEvent: () => false,
   };
 }
 
@@ -124,19 +118,19 @@ describe("useViewportShellEffects", () => {
         animationFrameIdentifier += 1;
         queuedAnimationFrames.set(animationFrameIdentifier, callback);
         return animationFrameIdentifier;
-      }
+      },
     });
     Object.defineProperty(window, "cancelAnimationFrame", {
       configurable: true,
       writable: true,
       value: (identifier: number): void => {
         queuedAnimationFrames.delete(identifier);
-      }
+      },
     });
     Object.defineProperty(window, "scrollTo", {
       configurable: true,
       writable: true,
-      value: vi.fn()
+      value: vi.fn(),
     });
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
@@ -146,7 +140,7 @@ describe("useViewportShellEffects", () => {
           return createMediaQueryList(true, query);
         }
         return createMediaQueryList(false, query);
-      }
+      },
     });
   });
 
@@ -155,28 +149,28 @@ describe("useViewportShellEffects", () => {
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       writable: true,
-      value: originalMatchMedia
+      value: originalMatchMedia,
     });
     Object.defineProperty(window, "requestAnimationFrame", {
       configurable: true,
       writable: true,
-      value: originalRequestAnimationFrame
+      value: originalRequestAnimationFrame,
     });
     Object.defineProperty(window, "cancelAnimationFrame", {
       configurable: true,
       writable: true,
-      value: originalCancelAnimationFrame
+      value: originalCancelAnimationFrame,
     });
     Object.defineProperty(window, "scrollTo", {
       configurable: true,
       writable: true,
-      value: originalScrollTo
+      value: originalScrollTo,
     });
   });
 
   it("installs the overscroll guard owner and clears viewport variables on cleanup", () => {
     const runtimeViewportSizingCoordinator = new TestRuntimeViewportSizingCoordinator(
-      createRuntimeViewportMetrics(false)
+      createRuntimeViewportMetrics(false),
     );
     const pageTouchOverscrollGuardCoordinator = new TestPageTouchOverscrollGuardCoordinator();
     const chatScrollStateCoordinator = new TestChatScrollStateCoordinator();
@@ -194,13 +188,15 @@ describe("useViewportShellEffects", () => {
       setIsChatAtBottom: vi.fn(),
       runtimeViewportSizingCoordinator,
       pageTouchOverscrollGuardCoordinator,
-      chatScrollStateCoordinator
+      chatScrollStateCoordinator,
     };
 
     const { unmount } = render(<Harness input={input} />);
     flushQueuedAnimationFrames();
 
-    expect(pageTouchOverscrollGuardCoordinator.installCallElements).toEqual([applicationShellElement]);
+    expect(pageTouchOverscrollGuardCoordinator.installCallElements).toEqual([
+      applicationShellElement,
+    ]);
     unmount();
 
     expect(pageTouchOverscrollGuardCoordinator.cleanupCallCount).toBe(1);
@@ -209,7 +205,7 @@ describe("useViewportShellEffects", () => {
 
   it("pins chat to bottom when keyboard opens on coarse pointers in chat tab", () => {
     const runtimeViewportSizingCoordinator = new TestRuntimeViewportSizingCoordinator(
-      createRuntimeViewportMetrics(true)
+      createRuntimeViewportMetrics(true),
     );
     const pageTouchOverscrollGuardCoordinator = new TestPageTouchOverscrollGuardCoordinator();
     const chatScrollStateCoordinator = new TestChatScrollStateCoordinator();
@@ -218,7 +214,11 @@ describe("useViewportShellEffects", () => {
     const scrollElement = document.createElement("div");
     Object.defineProperty(scrollElement, "scrollHeight", { configurable: true, value: 400 });
     Object.defineProperty(scrollElement, "clientHeight", { configurable: true, value: 160 });
-    Object.defineProperty(scrollElement, "scrollTop", { configurable: true, value: 0, writable: true });
+    Object.defineProperty(scrollElement, "scrollTop", {
+      configurable: true,
+      value: 0,
+      writable: true,
+    });
 
     const setIsChatAtBottom = vi.fn();
     const isChatAtBottomRef = { current: false };
@@ -234,7 +234,7 @@ describe("useViewportShellEffects", () => {
       setIsChatAtBottom,
       runtimeViewportSizingCoordinator,
       pageTouchOverscrollGuardCoordinator,
-      chatScrollStateCoordinator
+      chatScrollStateCoordinator,
     };
 
     render(<Harness input={input} />);

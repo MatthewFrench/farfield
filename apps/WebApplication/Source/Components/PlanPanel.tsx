@@ -6,7 +6,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from "@/Components/UserInterface/Select";
 
 export interface PlanPanelModeOption {
@@ -61,7 +61,7 @@ export function PlanPanel({
   onApply,
   isBusy,
   hasThread,
-  hasMode
+  hasMode,
 }: PlanPanelProps): React.JSX.Element {
   return (
     <motion.div
@@ -77,10 +77,7 @@ export function PlanPanel({
         {/* Mode */}
         <div className="space-y-2">
           <Label htmlFor="plan-mode">Mode</Label>
-          <Select
-            value={selectedModeKey}
-            onValueChange={onModeChange}
-          >
+          <Select value={selectedModeKey} onValueChange={onModeChange}>
             <SelectTrigger id="plan-mode" className="w-full">
               <SelectValue placeholder={MODE_PLACEHOLDER_LABEL} />
             </SelectTrigger>
@@ -99,9 +96,7 @@ export function PlanPanel({
           <Label htmlFor="plan-model">Model</Label>
           <Select
             value={readSelectValue(selectedModelId)}
-            onValueChange={(value) =>
-              onModelChange(readDomainValue(value))
-            }
+            onValueChange={(value) => onModelChange(readDomainValue(value))}
           >
             <SelectTrigger id="plan-model" className="w-full">
               <SelectValue placeholder={APP_DEFAULT_LABEL} />
@@ -122,9 +117,7 @@ export function PlanPanel({
           <Label htmlFor="plan-effort">Effort</Label>
           <Select
             value={readSelectValue(selectedReasoningEffort)}
-            onValueChange={(value) =>
-              onEffortChange(readDomainValue(value))
-            }
+            onValueChange={(value) => onEffortChange(readDomainValue(value))}
           >
             <SelectTrigger id="plan-effort" className="w-full">
               <SelectValue placeholder={APP_DEFAULT_LABEL} />

@@ -23,7 +23,7 @@ class ServerResponseRecorder {
 
   public writeHead(
     statusCode: number,
-    headers: Record<string, number | string | readonly string[]>
+    headers: Record<string, number | string | readonly string[]>,
   ): void {
     this.statusCode = statusCode;
     this.headers = headers;
@@ -44,7 +44,7 @@ describe("ServerBootstrapUtilityOwner", () => {
     const recorder = new ServerResponseRecorder();
     const body = {
       ok: true,
-      message: "ready"
+      message: "ready",
     };
 
     owner.jsonResponse(recorder.asServerResponse(), 200, body);
@@ -57,7 +57,7 @@ describe("ServerBootstrapUtilityOwner", () => {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers":
         "content-type, x-farfield-token, x-farfield-request-id, x-farfield-action-id, x-farfield-action-name",
-      "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS"
+      "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
     });
     expect(recorder.body).toEqual(encodedBody);
   });
@@ -74,9 +74,9 @@ describe("ServerBootstrapUtilityOwner", () => {
     const owner = new ServerBootstrapUtilityOwner();
     const request = new IncomingMessageStub([
       Buffer.from("{", "utf8"),
-      "\"payload\":",
-      "{\"enabled\":true,\"count\":3}",
-      "}"
+      '"payload":',
+      '{"enabled":true,"count":3}',
+      "}",
     ]);
 
     const parsed = await owner.readJsonBody(request);
@@ -84,8 +84,8 @@ describe("ServerBootstrapUtilityOwner", () => {
     expect(parsed).toEqual({
       payload: {
         enabled: true,
-        count: 3
-      }
+        count: 3,
+      },
     });
   });
 
@@ -103,27 +103,25 @@ describe("ServerBootstrapUtilityOwner", () => {
 
   it("throws an explicit error when request payload is malformed JSON", async () => {
     const owner = new ServerBootstrapUtilityOwner();
-    const request = new IncomingMessageStub(["{ \"payload\":"]);
+    const request = new IncomingMessageStub(['{ "payload":']);
 
-    await expect(owner.readJsonBody(request)).rejects.toThrow(
-      "Request body must be valid JSON."
-    );
+    await expect(owner.readJsonBody(request)).rejects.toThrow("Request body must be valid JSON.");
   });
 
   it("throws an explicit error when request payload is a non-object JSON value", async () => {
     const owner = new ServerBootstrapUtilityOwner();
 
-    await expect(owner.readJsonBody(new IncomingMessageStub(["\"value\""]))).rejects.toThrow(
-      "Request body must be a JSON object."
+    await expect(owner.readJsonBody(new IncomingMessageStub(['"value"']))).rejects.toThrow(
+      "Request body must be a JSON object.",
     );
     await expect(owner.readJsonBody(new IncomingMessageStub(["42"]))).rejects.toThrow(
-      "Request body must be a JSON object."
+      "Request body must be a JSON object.",
     );
     await expect(owner.readJsonBody(new IncomingMessageStub(["[1,2,3]"]))).rejects.toThrow(
-      "Request body must be a JSON object."
+      "Request body must be a JSON object.",
     );
     await expect(owner.readJsonBody(new IncomingMessageStub(["null"]))).rejects.toThrow(
-      "Request body must be a JSON object."
+      "Request body must be a JSON object.",
     );
   });
 
@@ -140,7 +138,7 @@ describe("ServerBootstrapUtilityOwner", () => {
   it("creates directories and remains idempotent", () => {
     const owner = new ServerBootstrapUtilityOwner();
     const temporaryDirectoryPath = fs.mkdtempSync(
-      path.join(os.tmpdir(), "farfield-server-bootstrap-owner-")
+      path.join(os.tmpdir(), "farfield-server-bootstrap-owner-"),
     );
     const nestedDirectoryPath = path.join(temporaryDirectoryPath, "traces", "events");
 
@@ -160,10 +158,10 @@ describe("ServerBootstrapUtilityOwner", () => {
     const owner = new ServerBootstrapUtilityOwner();
 
     expect(() => owner.ensureDirectoryExists("")).toThrow(
-      "Directory path must contain at least one non-whitespace character."
+      "Directory path must contain at least one non-whitespace character.",
     );
     expect(() => owner.ensureDirectoryExists("   ")).toThrow(
-      "Directory path must contain at least one non-whitespace character."
+      "Directory path must contain at least one non-whitespace character.",
     );
   });
 });

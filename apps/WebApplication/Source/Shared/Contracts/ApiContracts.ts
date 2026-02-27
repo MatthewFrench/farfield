@@ -14,7 +14,7 @@ export type ApiRequestActionName = z.infer<typeof ApiRequestActionNameSchema>;
 export const ApiRequestHeaderOptionsSchema = z
   .object({
     actionId: ApiRequestActionIdentifierSchema.optional(),
-    actionName: ApiRequestActionNameSchema.optional()
+    actionName: ApiRequestActionNameSchema.optional(),
   })
   .strict();
 

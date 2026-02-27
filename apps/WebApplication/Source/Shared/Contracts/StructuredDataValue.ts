@@ -15,19 +15,19 @@ export const StructuredDataPrimitiveSchema = z.union([
   z.string(),
   z.number(),
   z.boolean(),
-  z.null()
+  z.null(),
 ]);
 
 const StructuredDataValueSchemaOwner: z.ZodType<StructuredDataValue> = z.lazy(() =>
   z.union([
     StructuredDataPrimitiveSchema,
     z.array(StructuredDataValueSchemaOwner),
-    z.record(z.string(), StructuredDataValueSchemaOwner)
-  ])
+    z.record(z.string(), StructuredDataValueSchemaOwner),
+  ]),
 );
 
 export const StructuredDataValueSchema = StructuredDataValueSchemaOwner;
 export const StructuredDataObjectSchema: z.ZodType<StructuredDataObject> = z.record(
   z.string(),
-  StructuredDataValueSchemaOwner
+  StructuredDataValueSchemaOwner,
 );

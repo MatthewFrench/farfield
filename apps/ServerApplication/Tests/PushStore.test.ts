@@ -38,12 +38,12 @@ describe("PushStore", () => {
         endpoint: "https://example.push.service/subscription-id",
         keys: {
           p256dh: "BElidedKeyMaterial_123",
-          auth: "CAuthValue_456"
-        }
+          auth: "CAuthValue_456",
+        },
       },
       {
-        privateMode: true
-      }
+        privateMode: true,
+      },
     );
     await store.setCompletionWatermark("thread_1", "thread_1:turn_1:item_1");
 
@@ -63,16 +63,16 @@ describe("PushStore", () => {
         endpoint: "https://example.push.service/subscription-id",
         keys: {
           p256dh: "BElidedKeyMaterial_123",
-          auth: "CAuthValue_456"
-        }
+          auth: "CAuthValue_456",
+        },
       },
       {
-        privateMode: true
-      }
+        privateMode: true,
+      },
     );
 
     const removed = await store.removeSubscriptionByEndpoint(
-      "https://example.push.service/subscription-id"
+      "https://example.push.service/subscription-id",
     );
     expect(removed).toBe(true);
     expect(store.getSubscriptionCount()).toBe(0);
@@ -87,24 +87,24 @@ describe("PushStore", () => {
         endpoint: "https://example.push.service/subscription-id",
         keys: {
           p256dh: "P256DhInitial",
-          auth: "AuthInitial"
-        }
+          auth: "AuthInitial",
+        },
       },
       {
-        privateMode: true
-      }
+        privateMode: true,
+      },
     );
     const updatedSubscription = await store.upsertSubscription(
       {
         endpoint: "https://example.push.service/subscription-id",
         keys: {
           p256dh: "P256DhUpdated",
-          auth: "AuthUpdated"
-        }
+          auth: "AuthUpdated",
+        },
       },
       {
-        privateMode: false
-      }
+        privateMode: false,
+      },
     );
 
     expect(store.getSubscriptionCount()).toBe(1);
@@ -113,16 +113,16 @@ describe("PushStore", () => {
       expect.objectContaining({
         id: createdSubscription.id,
         settings: {
-          privateMode: false
+          privateMode: false,
         },
         subscription: {
           endpoint: "https://example.push.service/subscription-id",
           keys: {
             p256dh: "P256DhUpdated",
-            auth: "AuthUpdated"
-          }
-        }
-      })
+            auth: "AuthUpdated",
+          },
+        },
+      }),
     );
   });
 
@@ -131,7 +131,7 @@ describe("PushStore", () => {
     store.load();
 
     const removed = await store.removeSubscriptionByEndpoint(
-      "https://example.push.service/unknown-subscription"
+      "https://example.push.service/unknown-subscription",
     );
 
     expect(removed).toBe(false);

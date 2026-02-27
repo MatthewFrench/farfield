@@ -1,4 +1,4 @@
-import { memo, type CSSProperties } from "react";
+import { type CSSProperties, memo } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useTheme } from "@/Features/Theme/StateManagement/UseTheme";
@@ -10,7 +10,7 @@ const CODE_SNIPPET_STYLE: CSSProperties = {
   padding: "0.75rem",
   borderRadius: "0.5rem",
   fontSize: "0.75rem",
-  lineHeight: "1.4"
+  lineHeight: "1.4",
 };
 
 export interface CodeSnippetProps {
@@ -29,7 +29,7 @@ function CodeSnippetComponent({
   code,
   language,
   wrapLongLines = true,
-  className
+  className,
 }: CodeSnippetProps): React.JSX.Element {
   const { theme } = useTheme();
 

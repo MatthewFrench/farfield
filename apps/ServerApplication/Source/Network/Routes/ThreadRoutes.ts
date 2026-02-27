@@ -1,14 +1,15 @@
 import {
   handleThreadCollectionRoutes,
-  type ThreadCollectionRouteDependencies
+  type ThreadCollectionRouteDependencies,
 } from "./ThreadCollectionRoutes.js";
 import {
   handleThreadMemberRoutes,
-  type ThreadMemberRouteDependencies
+  type ThreadMemberRouteDependencies,
 } from "./ThreadMemberRoutes.js";
 
 export interface ThreadRouteDependencies
-  extends ThreadCollectionRouteDependencies, ThreadMemberRouteDependencies {}
+  extends ThreadCollectionRouteDependencies,
+    ThreadMemberRouteDependencies {}
 
 export async function handleThreadRoutes(dependencies: ThreadRouteDependencies): Promise<boolean> {
   // Keep collection routing first so canonical `/api/threads` ownership is decided

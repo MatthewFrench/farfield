@@ -49,15 +49,22 @@ export class ThreadGroupSelectors {
     return previousSignature.every((value, index) => value === nextSignature[index]);
   }
 
-  public static mapThreadUpdatedAtByIdentifier(threads: ThreadListItem[]): ThreadUpdatedAtByIdentifier {
+  public static mapThreadUpdatedAtByIdentifier(
+    threads: ThreadListItem[],
+  ): ThreadUpdatedAtByIdentifier {
     const threadUpdatedAtEntries: Array<readonly [string, number]> = [];
     for (const thread of threads) {
-      threadUpdatedAtEntries.push([thread.id, ThreadGroupSelectors.readThreadUpdatedAtTimestamp(thread)]);
+      threadUpdatedAtEntries.push([
+        thread.id,
+        ThreadGroupSelectors.readThreadUpdatedAtTimestamp(thread),
+      ]);
     }
     return Object.fromEntries(threadUpdatedAtEntries);
   }
 
-  public static computeUnreadThreadIdentifiers(input: ComputeUnreadThreadIdentifiersInput): UnreadThreadIdentifierMap {
+  public static computeUnreadThreadIdentifiers(
+    input: ComputeUnreadThreadIdentifiersInput,
+  ): UnreadThreadIdentifierMap {
     const unreadThreadIdentifierEntries: Array<readonly [string, true]> = [];
     for (const thread of input.nextThreads) {
       if (thread.id === input.selectedThreadIdentifier) {
@@ -74,11 +81,13 @@ export class ThreadGroupSelectors {
         continue;
       }
 
-      if (ThreadGroupSelectors.shouldMarkThreadUnreadFromHistory({
-        previousUnreadThreadIdentifiers: input.previousUnreadThreadIdentifiers,
-        previousThreadUpdatedAtByIdentifier: input.previousThreadUpdatedAtByIdentifier,
-        thread
-      })) {
+      if (
+        ThreadGroupSelectors.shouldMarkThreadUnreadFromHistory({
+          previousUnreadThreadIdentifiers: input.previousUnreadThreadIdentifiers,
+          previousThreadUpdatedAtByIdentifier: input.previousThreadUpdatedAtByIdentifier,
+          thread,
+        })
+      ) {
         unreadThreadIdentifierEntries.push([thread.id, true]);
       }
     }
@@ -87,7 +96,7 @@ export class ThreadGroupSelectors {
 
   public static unreadThreadIdentifierMapsMatch(
     previousUnreadThreadIdentifiers: UnreadThreadIdentifierMap,
-    nextUnreadThreadIdentifiers: UnreadThreadIdentifierMap
+    nextUnreadThreadIdentifiers: UnreadThreadIdentifierMap,
   ): boolean {
     const previousKeys = Object.keys(previousUnreadThreadIdentifiers);
     const nextKeys = Object.keys(nextUnreadThreadIdentifiers);
@@ -119,7 +128,7 @@ export class ThreadGroupSelectors {
           projectCreatedAt: Math.max(existingGroup.projectCreatedAt, threadCreatedAt),
           latestUpdatedAt: Math.max(existingGroup.latestUpdatedAt, threadUpdatedAt),
           threads: [...existingGroup.threads, thread],
-          isRemoved: existingGroup.isRemoved || projectMarkedRemoved
+          isRemoved: existingGroup.isRemoved || projectMarkedRemoved,
         });
         continue;
       }
@@ -131,7 +140,7 @@ export class ThreadGroupSelectors {
         projectCreatedAt: threadCreatedAt,
         latestUpdatedAt: threadUpdatedAt,
         threads: [thread],
-        isRemoved: projectMarkedRemoved
+        isRemoved: projectMarkedRemoved,
       });
     }
 
@@ -139,17 +148,17 @@ export class ThreadGroupSelectors {
       .map((group) => ({
         ...group,
         threads: [...group.threads].sort((leftThread, rightThread) =>
-          ThreadGroupSelectors.sortThreadsByUpdatedAt(leftThread, rightThread)
-        )
+          ThreadGroupSelectors.sortThreadsByUpdatedAt(leftThread, rightThread),
+        ),
       }))
       .sort((leftGroup, rightGroup) =>
-        ThreadGroupSelectors.sortProjectGroups(leftGroup, rightGroup)
+        ThreadGroupSelectors.sortProjectGroups(leftGroup, rightGroup),
       );
   }
 
   public static mergeProjectGroups(
     primaryGroups: ThreadProjectGroup[],
-    secondaryGroups: ThreadProjectGroup[]
+    secondaryGroups: ThreadProjectGroup[],
   ): ThreadProjectGroup[] {
     const mergedGroupByKey = new Map<string, ThreadProjectGroup>();
 
@@ -164,11 +173,11 @@ export class ThreadGroupSelectors {
       .map((group) => ({
         ...group,
         threads: [...group.threads].sort((leftThread, rightThread) =>
-          ThreadGroupSelectors.sortThreadsByUpdatedAt(leftThread, rightThread)
-        )
+          ThreadGroupSelectors.sortThreadsByUpdatedAt(leftThread, rightThread),
+        ),
       }))
       .sort((leftGroup, rightGroup) =>
-        ThreadGroupSelectors.sortProjectGroups(leftGroup, rightGroup)
+        ThreadGroupSelectors.sortProjectGroups(leftGroup, rightGroup),
       );
   }
 
@@ -176,14 +185,19 @@ export class ThreadGroupSelectors {
     return thread.updatedAt;
   }
 
-  private static shouldMarkThreadUnreadFromHistory(input: ComputeUnreadThreadFromHistoryInput): boolean {
+  private static shouldMarkThreadUnreadFromHistory(
+    input: ComputeUnreadThreadFromHistoryInput,
+  ): boolean {
     const wasUnread = input.previousUnreadThreadIdentifiers[input.thread.id] === true;
     const previousUpdatedAt = input.previousThreadUpdatedAtByIdentifier[input.thread.id];
     if (previousUpdatedAt === undefined) {
       return wasUnread;
     }
 
-    return wasUnread || ThreadGroupSelectors.readThreadUpdatedAtTimestamp(input.thread) > previousUpdatedAt;
+    return (
+      wasUnread ||
+      ThreadGroupSelectors.readThreadUpdatedAtTimestamp(input.thread) > previousUpdatedAt
+    );
   }
 
   private static normalizeProjectPath(value: string): string {
@@ -192,8 +206,14 @@ export class ThreadGroupSelectors {
       return EMPTY_TEXT;
     }
 
-    const normalizedPathSeparators = trimmed.replaceAll(WINDOWS_PATH_SEPARATOR, PROJECT_PATH_SEPARATOR);
-    const normalized = normalizedPathSeparators.replace(TRAILING_PROJECT_PATH_SEPARATOR_PATTERN, EMPTY_TEXT);
+    const normalizedPathSeparators = trimmed.replaceAll(
+      WINDOWS_PATH_SEPARATOR,
+      PROJECT_PATH_SEPARATOR,
+    );
+    const normalized = normalizedPathSeparators.replace(
+      TRAILING_PROJECT_PATH_SEPARATOR_PATTERN,
+      EMPTY_TEXT,
+    );
     // Preserve root-like paths such as "/" after trailing separator trimming.
     return normalized.length > 0 ? normalized : normalizedPathSeparators;
   }
@@ -228,14 +248,14 @@ export class ThreadGroupSelectors {
     }
 
     return (
-      thread.projectRemoved === true
-      || thread.removed === true
-      || thread.projectState === REMOVED_PROJECT_STATE
+      thread.projectRemoved === true ||
+      thread.removed === true ||
+      thread.projectState === REMOVED_PROJECT_STATE
     );
   }
 
   private static readThreadHasUnreadTurnSignal(
-    thread: Pick<ThreadListItem, "hasUnreadTurn">
+    thread: Pick<ThreadListItem, "hasUnreadTurn">,
   ): boolean | null {
     return thread.hasUnreadTurn ?? UNKNOWN_UNREAD_SIGNAL;
   }
@@ -261,7 +281,10 @@ export class ThreadGroupSelectors {
     return ThreadGroupSelectors.projectLabelFromPath(projectPath);
   }
 
-  private static sortThreadsByUpdatedAt(leftThread: ThreadListItem, rightThread: ThreadListItem): number {
+  private static sortThreadsByUpdatedAt(
+    leftThread: ThreadListItem,
+    rightThread: ThreadListItem,
+  ): number {
     const leftUpdatedAt = ThreadGroupSelectors.readThreadUpdatedAtTimestamp(leftThread);
     const rightUpdatedAt = ThreadGroupSelectors.readThreadUpdatedAtTimestamp(rightThread);
     if (leftUpdatedAt !== rightUpdatedAt) {
@@ -270,7 +293,10 @@ export class ThreadGroupSelectors {
     return leftThread.id.localeCompare(rightThread.id);
   }
 
-  private static sortProjectGroups(leftGroup: ThreadProjectGroup, rightGroup: ThreadProjectGroup): number {
+  private static sortProjectGroups(
+    leftGroup: ThreadProjectGroup,
+    rightGroup: ThreadProjectGroup,
+  ): number {
     const leftIsNoProjectGroup = leftGroup.projectPath === null;
     const rightIsNoProjectGroup = rightGroup.projectPath === null;
     if (leftIsNoProjectGroup !== rightIsNoProjectGroup) {
@@ -287,7 +313,7 @@ export class ThreadGroupSelectors {
 
   private static mergeProjectGroupIntoMap(
     mergedGroupByKey: Map<string, ThreadProjectGroup>,
-    sourceGroup: ThreadProjectGroup
+    sourceGroup: ThreadProjectGroup,
   ): void {
     const existingGroup = mergedGroupByKey.get(sourceGroup.key);
     if (!existingGroup) {
@@ -298,7 +324,7 @@ export class ThreadGroupSelectors {
         projectCreatedAt: sourceGroup.projectCreatedAt,
         latestUpdatedAt: sourceGroup.latestUpdatedAt,
         threads: [...sourceGroup.threads],
-        isRemoved: sourceGroup.isRemoved
+        isRemoved: sourceGroup.isRemoved,
       });
       return;
     }
@@ -308,7 +334,7 @@ export class ThreadGroupSelectors {
       projectCreatedAt: Math.max(existingGroup.projectCreatedAt, sourceGroup.projectCreatedAt),
       latestUpdatedAt: Math.max(existingGroup.latestUpdatedAt, sourceGroup.latestUpdatedAt),
       threads: [...existingGroup.threads, ...sourceGroup.threads],
-      isRemoved: existingGroup.isRemoved || sourceGroup.isRemoved
+      isRemoved: existingGroup.isRemoved || sourceGroup.isRemoved,
     });
   }
 }

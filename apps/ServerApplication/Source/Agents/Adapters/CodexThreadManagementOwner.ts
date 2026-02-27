@@ -2,14 +2,14 @@ import {
   AppServerClient,
   type ListThreadsAllOptions,
   type ListThreadsOptions,
-  type StartThreadOptions
+  type StartThreadOptions,
 } from "@farfield/api";
 import type {
   AppServerCollaborationModeListResponse,
   AppServerConfigReadResponse,
   AppServerListModelsResponse,
   AppServerListThreadsResponse,
-  AppServerStartThreadResponse
+  AppServerStartThreadResponse,
 } from "@farfield/protocol";
 import type {
   AgentArchiveThreadInput,
@@ -20,12 +20,12 @@ import type {
   AgentListThreadsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
-  AgentUnarchiveThreadInput
+  AgentUnarchiveThreadInput,
 } from "../Types.js";
 
 const CREATE_THREAD_REQUIRES_WORKING_DIRECTORY_ERROR = "Codex thread creation requires cwd";
 const READ_CONFIG_DEFAULTS_OPTIONS = {
-  includeLayers: false
+  includeLayers: false,
 };
 
 function buildListThreadsOptions(input: AgentListThreadsInput): ListThreadsOptions {
@@ -34,20 +34,20 @@ function buildListThreadsOptions(input: AgentListThreadsInput): ListThreadsOptio
     archived: input.archived,
     sortKey: input.sortKey,
     ...(input.cursor !== null ? { cursor: input.cursor } : {}),
-    ...(input.cwd !== null ? { cwd: input.cwd } : {})
+    ...(input.cwd !== null ? { cwd: input.cwd } : {}),
   };
 }
 
 function buildListThreadsAllOptions(input: AgentListThreadsInput): ListThreadsAllOptions {
   return {
     ...buildListThreadsOptions(input),
-    maxPages: input.maxPages
+    maxPages: input.maxPages,
   };
 }
 
 function buildListThreadsOperation(
   appClient: AppServerClient,
-  input: AgentListThreadsInput
+  input: AgentListThreadsInput,
 ): () => Promise<AppServerListThreadsResponse> {
   if (input.all) {
     return () => appClient.listThreadsAll(buildListThreadsAllOptions(input));
@@ -59,7 +59,7 @@ function buildListThreadsOperation(
 function mapListThreadsResult(result: AppServerListThreadsResponse): AgentListThreadsResult {
   const mappedResult: AgentListThreadsResult = {
     data: result.data,
-    nextCursor: result.nextCursor ?? null
+    nextCursor: result.nextCursor ?? null,
   };
 
   if (result.pages !== undefined) {
@@ -84,7 +84,7 @@ function readRequiredWorkingDirectory(input: AgentCreateThreadInput): string {
 
 function buildStartThreadOptions(
   input: AgentCreateThreadInput,
-  workingDirectory: string
+  workingDirectory: string,
 ): StartThreadOptions {
   return {
     cwd: workingDirectory,
@@ -93,7 +93,7 @@ function buildStartThreadOptions(
     ...(input.personality !== undefined ? { personality: input.personality } : {}),
     ...(input.sandbox !== undefined ? { sandbox: input.sandbox } : {}),
     ...(input.approvalPolicy !== undefined ? { approvalPolicy: input.approvalPolicy } : {}),
-    ...(input.ephemeral !== undefined ? { ephemeral: input.ephemeral } : {})
+    ...(input.ephemeral !== undefined ? { ephemeral: input.ephemeral } : {}),
   };
 }
 
@@ -106,12 +106,12 @@ function mapCreateThreadResult(result: AppServerStartThreadResponse): AgentCreat
     cwd: result.cwd,
     approvalPolicy: result.approvalPolicy,
     sandbox: result.sandbox,
-    reasoningEffort: result.reasoningEffort
+    reasoningEffort: result.reasoningEffort,
   };
 }
 
 function readActiveConfigProfile(
-  config: AppServerConfigReadResponse["config"]
+  config: AppServerConfigReadResponse["config"],
 ): AppServerConfigReadResponse["config"]["profiles"][string] | null {
   if (config.profile === null || config.profile.length === 0) {
     return null;
@@ -126,7 +126,7 @@ function mapConfigDefaults(configResponse: AppServerConfigReadResponse): AgentCo
   return {
     model: activeProfile?.model ?? configResponse.config.model ?? null,
     reasoningEffort:
-      activeProfile?.model_reasoning_effort ?? configResponse.config.model_reasoning_effort ?? null
+      activeProfile?.model_reasoning_effort ?? configResponse.config.model_reasoning_effort ?? null,
   };
 }
 
@@ -142,7 +142,9 @@ export interface CodexThreadManagementOwnerOptions {
  */
 export class CodexThreadManagementOwner {
   private readonly appClient: AppServerClient;
-  private readonly runAppServerCall: <ValueType>(operation: () => Promise<ValueType>) => Promise<ValueType>;
+  private readonly runAppServerCall: <ValueType>(
+    operation: () => Promise<ValueType>,
+  ) => Promise<ValueType>;
   private readonly ensureCodexAvailable: () => void;
 
   public constructor(options: CodexThreadManagementOwnerOptions) {
@@ -165,7 +167,7 @@ export class CodexThreadManagementOwner {
     const workingDirectory = readRequiredWorkingDirectory(input);
 
     const result = await this.runAppServerCall(() =>
-      this.appClient.startThread(buildStartThreadOptions(input, workingDirectory))
+      this.appClient.startThread(buildStartThreadOptions(input, workingDirectory)),
     );
 
     return mapCreateThreadResult(result);
@@ -174,10 +176,10 @@ export class CodexThreadManagementOwner {
   public async readThread(input: AgentReadThreadInput): Promise<AgentReadThreadResult> {
     this.ensureCodexAvailable();
     const result = await this.runAppServerCall(() =>
-      this.appClient.readThread(input.threadId, input.includeTurns)
+      this.appClient.readThread(input.threadId, input.includeTurns),
     );
     return {
-      thread: result.thread
+      thread: result.thread,
     };
   }
 
@@ -203,7 +205,9 @@ export class CodexThreadManagementOwner {
 
   public async readConfigDefaults(): Promise<AgentConfigDefaults> {
     this.ensureCodexAvailable();
-    const config = await this.runAppServerCall(() => this.appClient.readConfig(READ_CONFIG_DEFAULTS_OPTIONS));
+    const config = await this.runAppServerCall(() =>
+      this.appClient.readConfig(READ_CONFIG_DEFAULTS_OPTIONS),
+    );
     return mapConfigDefaults(config);
   }
 }

@@ -41,13 +41,7 @@ describe("ServerRequestUtilityOwner", () => {
   it("wraps promises with timeout behavior", async () => {
     const owner = new ServerRequestUtilityOwner();
 
-    await expect(
-      owner.withTimeout(
-        Promise.resolve("ok"),
-        100,
-        "fast"
-      )
-    ).resolves.toBe("ok");
+    await expect(owner.withTimeout(Promise.resolve("ok"), 100, "fast")).resolves.toBe("ok");
 
     await expect(
       owner.withTimeout(
@@ -57,8 +51,8 @@ describe("ServerRequestUtilityOwner", () => {
           }, 60);
         }),
         10,
-        "slow"
-      )
+        "slow",
+      ),
     ).rejects.toThrow("slow timed out after 10ms");
   });
 
@@ -66,11 +60,7 @@ describe("ServerRequestUtilityOwner", () => {
     const owner = new ServerRequestUtilityOwner();
 
     expect(() => owner.parseInteger("5", 0)).toThrow();
-    await expect(
-      owner.withTimeout(Promise.resolve("ok"), 0, "invalid")
-    ).rejects.toThrow();
-    await expect(
-      owner.withTimeout(Promise.resolve("ok"), 10, "   ")
-    ).rejects.toThrow();
+    await expect(owner.withTimeout(Promise.resolve("ok"), 0, "invalid")).rejects.toThrow();
+    await expect(owner.withTimeout(Promise.resolve("ok"), 10, "   ")).rejects.toThrow();
   });
 });

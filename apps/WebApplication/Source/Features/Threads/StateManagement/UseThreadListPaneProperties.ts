@@ -1,10 +1,13 @@
 import { type Dispatch, type SetStateAction, useMemo } from "react";
-import { type AgentId } from "@/Shared/Contracts/ApiContracts";
-import { type ThreadListItem, type ThreadProjectGroup } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import {
+  type ThreadListItem,
+  type ThreadProjectGroup,
+} from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import {
   type ThreadListPaneAgentDescriptor,
-  type ThreadListPaneProperties
+  type ThreadListPaneProperties,
 } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
+import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 
 export interface UseThreadListPanePropertiesInput {
   threadListState: ThreadListPaneProperties["threadListState"];
@@ -42,7 +45,7 @@ export interface UseThreadListPanePropertiesInput {
 }
 
 export function useThreadListPaneProperties(
-  input: UseThreadListPanePropertiesInput
+  input: UseThreadListPanePropertiesInput,
 ): ThreadListPaneProperties {
   const {
     threadListState,
@@ -76,7 +79,7 @@ export function useThreadListPaneProperties(
     setCollapsedArchivedProjectGroups,
     unarchiveThread,
     formatDate,
-    renderAgentFavicon
+    renderAgentFavicon,
   } = input;
 
   return useMemo<ThreadListPaneProperties>(
@@ -97,7 +100,7 @@ export function useThreadListPaneProperties(
       onToggleThreadProjectGroup: (groupKey, nextCollapsed) => {
         setCollapsedThreadProjectGroups((previous) => ({
           ...previous,
-          [groupKey]: nextCollapsed
+          [groupKey]: nextCollapsed,
         }));
       },
       onCreateThreadForSingleAgent: (projectPath) => {
@@ -127,14 +130,14 @@ export function useThreadListPaneProperties(
       onToggleArchivedProjectGroup: (groupKey, nextCollapsed) => {
         setCollapsedArchivedProjectGroups((previous) => ({
           ...previous,
-          [groupKey]: nextCollapsed
+          [groupKey]: nextCollapsed,
         }));
       },
       onUnarchiveThread: (threadId) => {
         void unarchiveThread(threadId);
       },
       formatDate,
-      renderAgentFavicon
+      renderAgentFavicon,
     }),
     [
       activeProjectGroups,
@@ -168,7 +171,7 @@ export function useThreadListPaneProperties(
       threadListState,
       threads,
       unarchiveThread,
-      unreadThreadIds
-    ]
+      unreadThreadIds,
+    ],
   );
 }

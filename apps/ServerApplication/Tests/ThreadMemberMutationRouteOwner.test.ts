@@ -14,15 +14,15 @@ import type {
   AgentSetCollaborationModeInput,
   AgentSetCollaborationModeResult,
   AgentSubmitUserInputInput,
-  AgentSubmitUserInputResult
+  AgentSubmitUserInputResult,
 } from "../Source/Agents/Types.js";
-import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 import { ThreadMemberMutationRouteOwner } from "../Source/Network/Routes/ThreadMemberMutationRouteOwner.js";
 import {
   ThreadMemberMutationActionByName,
+  type ThreadMemberResolvedRouteContext,
   type ThreadMemberRouteDependencies,
-  type ThreadMemberResolvedRouteContext
 } from "../Source/Network/Routes/ThreadMemberRouteContracts.js";
+import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 
 function createMockRequestResponsePair(): { request: IncomingMessage; response: ServerResponse } {
   const socket = new Socket();
@@ -30,18 +30,16 @@ function createMockRequestResponsePair(): { request: IncomingMessage; response: 
   const response = new ServerResponse(request);
   return {
     request,
-    response
+    response,
   };
 }
 
 function createAgentAdapter(input: {
   sendMessage?: (value: AgentSendMessageInput) => Promise<void>;
   setCollaborationMode?: (
-    value: AgentSetCollaborationModeInput
+    value: AgentSetCollaborationModeInput,
   ) => Promise<AgentSetCollaborationModeResult>;
-  submitUserInput?: (
-    value: AgentSubmitUserInputInput
-  ) => Promise<AgentSubmitUserInputResult>;
+  submitUserInput?: (value: AgentSubmitUserInputInput) => Promise<AgentSubmitUserInputResult>;
   interrupt?: (value: AgentInterruptInput) => Promise<void>;
 }): AgentAdapter {
   return {
@@ -53,7 +51,7 @@ function createAgentAdapter(input: {
       canSetCollaborationMode: input.setCollaborationMode !== undefined,
       canSubmitUserInput: input.submitUserInput !== undefined,
       canReadLiveState: false,
-      canReadStreamEvents: false
+      canReadStreamEvents: false,
     },
     async start(): Promise<void> {},
     async stop(): Promise<void> {},
@@ -79,7 +77,7 @@ function createAgentAdapter(input: {
       await input.sendMessage(inputValue);
     },
     async setCollaborationMode(
-      inputValue: AgentSetCollaborationModeInput
+      inputValue: AgentSetCollaborationModeInput,
     ): Promise<AgentSetCollaborationModeResult> {
       if (!input.setCollaborationMode) {
         throw new Error("Not used in mutation route-owner tests");
@@ -87,7 +85,7 @@ function createAgentAdapter(input: {
       return input.setCollaborationMode(inputValue);
     },
     async submitUserInput(
-      inputValue: AgentSubmitUserInputInput
+      inputValue: AgentSubmitUserInputInput,
     ): Promise<AgentSubmitUserInputResult> {
       if (!input.submitUserInput) {
         throw new Error("Not used in mutation route-owner tests");
@@ -99,7 +97,7 @@ function createAgentAdapter(input: {
         throw new Error("Not used in mutation route-owner tests");
       }
       await input.interrupt(inputValue);
-    }
+    },
   };
 }
 
@@ -134,7 +132,7 @@ function createDependencies(input: {
     resolveAdapterForThread: async () => ({
       ok: false,
       status: 404,
-      error: "Not used in mutation route-owner tests"
+      error: "Not used in mutation route-owner tests",
     }),
     readJsonBody: input.readJsonBody,
     jsonResponse: (_res, statusCode, body) => {
@@ -142,7 +140,7 @@ function createDependencies(input: {
     },
     invalidateThreadListAggregationCache: () => {},
     pushActionEventWithRequestContext: input.pushActionEventWithRequestContext,
-    pushActionErrorWithRequestContext: () => "action-error-id"
+    pushActionErrorWithRequestContext: () => "action-error-id",
   };
 }
 
@@ -150,7 +148,7 @@ function createContext(adapter: AgentAdapter): ThreadMemberResolvedRouteContext 
   return {
     threadId: "thread-1",
     adapter,
-    agentId: "codex"
+    agentId: "codex",
   };
 }
 
@@ -163,7 +161,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
     const adapter = createAgentAdapter({
       sendMessage: async (value) => {
         sentMessages.push(value);
-      }
+      },
     });
 
     const actionEvents: Array<{
@@ -179,7 +177,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
         response,
         segments: ["api", "threads", "thread-1", "messages"],
         readJsonBody: async () => ({
-          text: "hello"
+          text: "hello",
         }),
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
@@ -187,9 +185,9 @@ describe("ThreadMemberMutationRouteOwner", () => {
         },
         pushActionEventWithRequestContext: (action, stage) => {
           actionEvents.push({ action, stage });
-        }
+        },
       }),
-      context: createContext(adapter)
+      context: createContext(adapter),
     });
 
     const handled = await owner.handle();
@@ -198,23 +196,23 @@ describe("ThreadMemberMutationRouteOwner", () => {
     expect(sentMessages).toEqual([
       {
         threadId: "thread-1",
-        text: "hello"
-      }
+        text: "hello",
+      },
     ]);
     expect(actionEvents).toEqual([
       {
         action: ThreadMemberMutationActionByName.messages,
-        stage: "attempt"
+        stage: "attempt",
       },
       {
         action: ThreadMemberMutationActionByName.messages,
-        stage: "success"
-      }
+        stage: "success",
+      },
     ]);
     expect(capturedStatusCode).toBe(200);
     expect(capturedBody).toEqual({
       ok: true,
-      threadId: "thread-1"
+      threadId: "thread-1",
     });
   });
 
@@ -226,7 +224,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
     const adapter = createAgentAdapter({
       sendMessage: async (value) => {
         sentMessages.push(value);
-      }
+      },
     });
 
     const owner = new ThreadMemberMutationRouteOwner({
@@ -237,12 +235,12 @@ describe("ThreadMemberMutationRouteOwner", () => {
         readJsonBody: async () => ({
           text: "hello",
           ownerClientId: "",
-          cwd: ""
+          cwd: "",
         }),
         onJsonResponse: () => {},
-        pushActionEventWithRequestContext: () => {}
+        pushActionEventWithRequestContext: () => {},
       }),
-      context: createContext(adapter)
+      context: createContext(adapter),
     });
 
     const handled = await owner.handle();
@@ -253,8 +251,8 @@ describe("ThreadMemberMutationRouteOwner", () => {
         threadId: "thread-1",
         text: "hello",
         ownerClientId: "",
-        cwd: ""
-      }
+        cwd: "",
+      },
     ]);
   });
 
@@ -267,9 +265,9 @@ describe("ThreadMemberMutationRouteOwner", () => {
       setCollaborationMode: async (value) => {
         setCollaborationModeCalls.push(value);
         return {
-          ownerClientId: ""
+          ownerClientId: "",
         };
-      }
+      },
     });
 
     const owner = new ThreadMemberMutationRouteOwner({
@@ -281,13 +279,13 @@ describe("ThreadMemberMutationRouteOwner", () => {
           ownerClientId: "",
           collaborationMode: {
             mode: "default",
-            settings: {}
-          }
+            settings: {},
+          },
         }),
         onJsonResponse: () => {},
-        pushActionEventWithRequestContext: () => {}
+        pushActionEventWithRequestContext: () => {},
       }),
-      context: createContext(adapter)
+      context: createContext(adapter),
     });
 
     const handled = await owner.handle();
@@ -299,9 +297,9 @@ describe("ThreadMemberMutationRouteOwner", () => {
         ownerClientId: "",
         collaborationMode: {
           mode: "default",
-          settings: {}
-        }
-      }
+          settings: {},
+        },
+      },
     ]);
   });
 
@@ -315,9 +313,9 @@ describe("ThreadMemberMutationRouteOwner", () => {
         submitUserInputCalls.push(value);
         return {
           ownerClientId: "",
-          requestId: value.requestId
+          requestId: value.requestId,
         };
-      }
+      },
     });
 
     const owner = new ThreadMemberMutationRouteOwner({
@@ -331,15 +329,15 @@ describe("ThreadMemberMutationRouteOwner", () => {
           response: {
             answers: {
               question_1: {
-                answers: ["answer"]
-              }
-            }
-          }
+                answers: ["answer"],
+              },
+            },
+          },
         }),
         onJsonResponse: () => {},
-        pushActionEventWithRequestContext: () => {}
+        pushActionEventWithRequestContext: () => {},
       }),
-      context: createContext(adapter)
+      context: createContext(adapter),
     });
 
     const handled = await owner.handle();
@@ -353,11 +351,11 @@ describe("ThreadMemberMutationRouteOwner", () => {
         response: {
           answers: {
             question_1: {
-              answers: ["answer"]
-            }
-          }
-        }
-      }
+              answers: ["answer"],
+            },
+          },
+        },
+      },
     ]);
   });
 
@@ -369,7 +367,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
     const adapter = createAgentAdapter({
       interrupt: async (value) => {
         interruptCalls.push(value);
-      }
+      },
     });
 
     const owner = new ThreadMemberMutationRouteOwner({
@@ -378,12 +376,12 @@ describe("ThreadMemberMutationRouteOwner", () => {
         response,
         segments: ["api", "threads", "thread-1", "interrupt"],
         readJsonBody: async () => ({
-          ownerClientId: ""
+          ownerClientId: "",
         }),
         onJsonResponse: () => {},
-        pushActionEventWithRequestContext: () => {}
+        pushActionEventWithRequestContext: () => {},
       }),
-      context: createContext(adapter)
+      context: createContext(adapter),
     });
 
     const handled = await owner.handle();
@@ -392,8 +390,8 @@ describe("ThreadMemberMutationRouteOwner", () => {
     expect(interruptCalls).toEqual([
       {
         threadId: "thread-1",
-        ownerClientId: ""
-      }
+        ownerClientId: "",
+      },
     ]);
   });
 
@@ -402,7 +400,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
     request.method = "POST";
 
     const adapter = createAgentAdapter({
-      sendMessage: async () => {}
+      sendMessage: async () => {},
     });
 
     const jsonResponse = vi.fn<(statusCode: number, body: object) => void>();
@@ -412,14 +410,14 @@ describe("ThreadMemberMutationRouteOwner", () => {
         response,
         segments: ["api", "threads", "thread-1", "unsupported"],
         readJsonBody: async () => ({
-          text: "hello"
+          text: "hello",
         }),
         onJsonResponse: (statusCode, body) => {
           jsonResponse(statusCode, body);
         },
-        pushActionEventWithRequestContext: () => {}
+        pushActionEventWithRequestContext: () => {},
       }),
-      context: createContext(adapter)
+      context: createContext(adapter),
     });
 
     const handled = await owner.handle();
@@ -433,7 +431,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
     request.method = "POST";
 
     const adapter = createAgentAdapter({
-      sendMessage: async () => {}
+      sendMessage: async () => {},
     });
 
     const jsonResponse = vi.fn<(statusCode: number, body: object) => void>();
@@ -446,9 +444,9 @@ describe("ThreadMemberMutationRouteOwner", () => {
         onJsonResponse: (statusCode, body) => {
           jsonResponse(statusCode, body);
         },
-        pushActionEventWithRequestContext: () => {}
+        pushActionEventWithRequestContext: () => {},
       }),
-      context: createContext(adapter)
+      context: createContext(adapter),
     });
 
     const handled = await owner.handle();
@@ -462,7 +460,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
     request.method = "POST";
 
     const adapter = createAgentAdapter({
-      sendMessage: async () => {}
+      sendMessage: async () => {},
     });
 
     const jsonResponse = vi.fn<(statusCode: number, body: object) => void>();
@@ -472,14 +470,14 @@ describe("ThreadMemberMutationRouteOwner", () => {
         response,
         segments: ["api", "threads", "thread-1", "interrupt", "extra"],
         readJsonBody: async () => ({
-          ownerClientId: "client-1"
+          ownerClientId: "client-1",
         }),
         onJsonResponse: (statusCode, body) => {
           jsonResponse(statusCode, body);
         },
-        pushActionEventWithRequestContext: () => {}
+        pushActionEventWithRequestContext: () => {},
       }),
-      context: createContext(adapter)
+      context: createContext(adapter),
     });
 
     const handled = await owner.handle();
@@ -494,7 +492,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
 
     const sendMessage = vi.fn<(value: AgentSendMessageInput) => Promise<void>>(async () => {});
     const adapter = createAgentAdapter({
-      sendMessage
+      sendMessage,
     });
 
     const owner = new ThreadMemberMutationRouteOwner({
@@ -503,12 +501,12 @@ describe("ThreadMemberMutationRouteOwner", () => {
         response,
         segments: ["api", "threads", "thread-1", "messages"],
         readJsonBody: async () => ({
-          text: ""
+          text: "",
         }),
         onJsonResponse: () => {},
-        pushActionEventWithRequestContext: () => {}
+        pushActionEventWithRequestContext: () => {},
       }),
-      context: createContext(adapter)
+      context: createContext(adapter),
     });
 
     await expect(owner.handle()).rejects.toThrowError();

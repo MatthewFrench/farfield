@@ -1,5 +1,5 @@
-import { listThreads, type ApiListThreadsOptions } from "./ThreadApi";
 import type { ThreadListLoadOptions, ThreadListResponse } from "../DomainModel/ThreadGroupTypes";
+import { type ApiListThreadsOptions, listThreads } from "./ThreadApi";
 
 const LIST_ALL_THREADS_REQUEST_FLAG = true;
 
@@ -18,7 +18,7 @@ export class ThreadServerClient {
       archived: options.archived,
       all: LIST_ALL_THREADS_REQUEST_FLAG,
       maxPages: options.maxPages,
-      sortKey: options.sortKey
+      sortKey: options.sortKey,
     };
     if (options.cwd !== undefined && options.cwd.length > 0) {
       requestOptions.cwd = options.cwd;

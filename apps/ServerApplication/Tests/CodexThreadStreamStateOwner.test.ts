@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
+import { type IpcFrame, parseThreadStreamStateChangedBroadcast } from "@farfield/protocol";
 import { describe, expect, it } from "vitest";
-import { parseThreadStreamStateChangedBroadcast, type IpcFrame } from "@farfield/protocol";
 import { CodexThreadStreamStateOwner } from "../Source/Agents/Adapters/CodexThreadStreamStateOwner.js";
 import { THREAD_STREAM_STATE_CHANGED_METHOD } from "../Source/Agents/ThreadStreamStateChangedContract.js";
 
@@ -26,16 +26,16 @@ function createSnapshotEvent(): IpcFrame {
               params: {
                 threadId: "thread-1",
                 input: [{ type: "text", text: "hello" }],
-                attachments: []
+                attachments: [],
               },
               status: "completed",
-              items: []
-            }
+              items: [],
+            },
           ],
-          requests: []
-        }
-      }
-    }
+          requests: [],
+        },
+      },
+    },
   });
 }
 
@@ -73,18 +73,18 @@ function createPatchEvent(): IpcFrame {
                       options: [
                         {
                           label: "A",
-                          description: "A desc"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-        ]
-      }
-    }
+                          description: "A desc",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      },
+    },
   });
 }
 
@@ -106,12 +106,12 @@ function createInvalidPatchEvent(): IpcFrame {
             path: ["turns", 0, "items", 0],
             value: {
               id: "item-2",
-              type: "newUnknownItemType"
-            }
-          }
-        ]
-      }
-    }
+              type: "newUnknownItemType",
+            },
+          },
+        ],
+      },
+    },
   });
 }
 
@@ -124,8 +124,8 @@ describe("CodexThreadStreamStateOwner", () => {
       method: "thread-read",
       params: {
         conversationId: " thread-1 ",
-        threadId: "thread-2"
-      }
+        threadId: "thread-2",
+      },
     };
 
     const frameDescription = owner.describeFrame(requestFrame);
@@ -138,10 +138,12 @@ describe("CodexThreadStreamStateOwner", () => {
     expect(owner.getThreadOwnerCount()).toBe(1);
     expect(owner.resolveKnownOwnerClientId("thread-1", null)).toBe("client-a");
     expect(owner.resolveRequiredOwnerClientId("thread-1", null)).toBe("client-a");
-    expect(owner.readStreamEvents("thread-1", {
-      limit: 1,
-      sinceSequence: null
-    }).events.length).toBe(1);
+    expect(
+      owner.readStreamEvents("thread-1", {
+        limit: 1,
+        sinceSequence: null,
+      }).events.length,
+    ).toBe(1);
     expect(owner.readLiveState("thread-1").conversationState?.requests.length).toBe(1);
   });
 
@@ -150,7 +152,7 @@ describe("CodexThreadStreamStateOwner", () => {
     const responseFrame: IpcFrame = {
       type: "response",
       requestId: "request-1",
-      resultType: "success"
+      resultType: "success",
     };
     const discoveryRequestFrame: IpcFrame = {
       type: "client-discovery-request",
@@ -158,8 +160,8 @@ describe("CodexThreadStreamStateOwner", () => {
       request: {
         type: "request",
         requestId: "request-3",
-        method: "thread-read"
-      }
+        method: "thread-read",
+      },
     };
 
     expect(owner.describeFrame(responseFrame).method).toBe("response");
@@ -168,36 +170,38 @@ describe("CodexThreadStreamStateOwner", () => {
 
   it("stores reduction errors when patch application fails", () => {
     const owner = new CodexThreadStreamStateOwner();
-    owner.ingestInboundFrame(parseThreadStreamStateChangedBroadcast({
-      type: "broadcast",
-      method: THREAD_STREAM_STATE_CHANGED_METHOD,
-      sourceClientId: "client-a",
-      version: 4,
-      params: {
-        conversationId: "thread-1",
-        type: THREAD_STREAM_STATE_CHANGED_METHOD,
+    owner.ingestInboundFrame(
+      parseThreadStreamStateChangedBroadcast({
+        type: "broadcast",
+        method: THREAD_STREAM_STATE_CHANGED_METHOD,
+        sourceClientId: "client-a",
         version: 4,
-        change: {
-          type: "snapshot",
-          conversationState: {
-            id: "thread-1",
-            turns: [
-              {
-                status: "completed",
-                items: [
-                  {
-                    id: "item-1",
-                    type: "userMessage",
-                    content: [{ type: "text", text: "hello" }]
-                  }
-                ]
-              }
-            ],
-            requests: []
-          }
-        }
-      }
-    }));
+        params: {
+          conversationId: "thread-1",
+          type: THREAD_STREAM_STATE_CHANGED_METHOD,
+          version: 4,
+          change: {
+            type: "snapshot",
+            conversationState: {
+              id: "thread-1",
+              turns: [
+                {
+                  status: "completed",
+                  items: [
+                    {
+                      id: "item-1",
+                      type: "userMessage",
+                      content: [{ type: "text", text: "hello" }],
+                    },
+                  ],
+                },
+              ],
+              requests: [],
+            },
+          },
+        },
+      }),
+    );
 
     owner.ingestInboundFrame(createInvalidPatchEvent());
     const projectedState = owner.readLiveState("thread-1");
@@ -240,7 +244,7 @@ describe("CodexThreadStreamStateOwner", () => {
 
     const fullSlice = owner.readStreamEvents("thread-1", {
       limit: 80,
-      sinceSequence: null
+      sinceSequence: null,
     });
     expect(fullSlice.resetRequired).toBe(false);
     expect(fullSlice.firstAvailableSequence).toBe(0);
@@ -249,14 +253,14 @@ describe("CodexThreadStreamStateOwner", () => {
 
     const incrementalSlice = owner.readStreamEvents("thread-1", {
       limit: 80,
-      sinceSequence: 0
+      sinceSequence: 0,
     });
     expect(incrementalSlice.resetRequired).toBe(false);
     expect(incrementalSlice.events.length).toBe(1);
 
     const noChangeSlice = owner.readStreamEvents("thread-1", {
       limit: 80,
-      sinceSequence: 1
+      sinceSequence: 1,
     });
     expect(noChangeSlice.resetRequired).toBe(false);
     expect(noChangeSlice.events.length).toBe(0);
@@ -264,7 +268,7 @@ describe("CodexThreadStreamStateOwner", () => {
 
   it("marks stream reads for reset when cursor history has been evicted", () => {
     const owner = new CodexThreadStreamStateOwner({
-      streamEventLimit: 40
+      streamEventLimit: 40,
     });
     owner.ingestInboundFrame(createSnapshotEvent());
     for (let eventIndex = 0; eventIndex < 50; eventIndex += 1) {
@@ -273,7 +277,7 @@ describe("CodexThreadStreamStateOwner", () => {
 
     const staleCursorSlice = owner.readStreamEvents("thread-1", {
       limit: 20,
-      sinceSequence: 0
+      sinceSequence: 0,
     });
     expect(staleCursorSlice.resetRequired).toBe(true);
     expect(staleCursorSlice.firstAvailableSequence).toBeGreaterThan(0);
@@ -286,7 +290,7 @@ describe("CodexThreadStreamStateOwner", () => {
     const snapshotSequenceCount = 1;
     const expectedFailureEventIndex = snapshotSequenceCount + patchEventCountBeforeFailure;
     const owner = new CodexThreadStreamStateOwner({
-      streamEventLimit
+      streamEventLimit,
     });
     owner.ingestInboundFrame(createSnapshotEvent());
     for (let eventIndex = 0; eventIndex < patchEventCountBeforeFailure; eventIndex += 1) {
@@ -304,7 +308,7 @@ describe("CodexThreadStreamStateOwner", () => {
     const logDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "codex-stream-owner-test-"));
     const invalidStreamEventsLogPath = path.join(logDirectory, "invalid-stream-events.ndjson");
     const owner = new CodexThreadStreamStateOwner({
-      invalidStreamEventsLogPath
+      invalidStreamEventsLogPath,
     });
 
     const malformedFrame: IpcFrame = {
@@ -312,7 +316,7 @@ describe("CodexThreadStreamStateOwner", () => {
       method: THREAD_STREAM_STATE_CHANGED_METHOD,
       sourceClientId: "client-a",
       version: 4,
-      params: {}
+      params: {},
     };
     owner.ingestInboundFrame(malformedFrame);
 
@@ -320,15 +324,20 @@ describe("CodexThreadStreamStateOwner", () => {
     const content = fs.readFileSync(invalidStreamEventsLogPath, "utf8").trim();
     expect(content.length > 0).toBe(true);
     expect(content.includes(`"${THREAD_STREAM_STATE_CHANGED_METHOD}"`)).toBe(true);
-    expect(content.includes("\"threadId\"")).toBe(true);
-    expect(content.includes("\"error\"")).toBe(true);
+    expect(content.includes('"threadId"')).toBe(true);
+    expect(content.includes('"error"')).toBe(true);
   });
 
   it("creates missing parent directories for invalid-event detail logs", () => {
     const logDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "codex-stream-owner-nested-test-"));
-    const invalidStreamEventsLogPath = path.join(logDirectory, "nested", "logs", "invalid-stream-events.ndjson");
+    const invalidStreamEventsLogPath = path.join(
+      logDirectory,
+      "nested",
+      "logs",
+      "invalid-stream-events.ndjson",
+    );
     const owner = new CodexThreadStreamStateOwner({
-      invalidStreamEventsLogPath
+      invalidStreamEventsLogPath,
     });
 
     const malformedFrame: IpcFrame = {
@@ -336,7 +345,7 @@ describe("CodexThreadStreamStateOwner", () => {
       method: THREAD_STREAM_STATE_CHANGED_METHOD,
       sourceClientId: "client-a",
       version: 4,
-      params: {}
+      params: {},
     };
     owner.ingestInboundFrame(malformedFrame);
 
@@ -361,8 +370,11 @@ describe("CodexThreadStreamStateOwner", () => {
   });
 
   it("rejects non-positive stream event limits", () => {
-    expect(() => new CodexThreadStreamStateOwner({
-      streamEventLimit: 0
-    })).toThrow("streamEventLimit must be a positive integer");
+    expect(
+      () =>
+        new CodexThreadStreamStateOwner({
+          streamEventLimit: 0,
+        }),
+    ).toThrow("streamEventLimit must be a positive integer");
   });
 });

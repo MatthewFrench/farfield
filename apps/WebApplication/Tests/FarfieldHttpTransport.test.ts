@@ -1,26 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { type StructuredDataValue } from "../Source/Shared/Contracts/StructuredDataValue";
+import { RequestCanceledError } from "../Source/Shared/Errors/RequestCanceledError";
 import {
   applyRequestOptions,
   FarfieldHttpRequestFailureError,
   request,
-  requestNoContent
+  requestNoContent,
 } from "../Source/Shared/Transport/FarfieldHttpTransport";
-import { RequestCanceledError } from "../Source/Shared/Errors/RequestCanceledError";
-import { type StructuredDataValue } from "../Source/Shared/Contracts/StructuredDataValue";
 
 function createJsonResponse(body: StructuredDataValue, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      "Content-Type": "application/json"
-    }
+      "Content-Type": "application/json",
+    },
   });
 }
 
 function createLargeEnvelope(payloadLength: number): StructuredDataValue {
   return {
     ok: true,
-    data: "x".repeat(payloadLength)
+    data: "x".repeat(payloadLength),
   };
 }
 
@@ -65,9 +65,9 @@ describe("FarfieldHttpTransport", () => {
       new Response(brokenJson, {
         status: 200,
         headers: {
-          "Content-Type": "application/json"
-        }
-      })
+          "Content-Type": "application/json",
+        },
+      }),
     );
 
     let requestFailureError: FarfieldHttpRequestFailureError | null = null;
@@ -96,10 +96,10 @@ describe("FarfieldHttpTransport", () => {
       createJsonResponse(
         {
           ok: false,
-          error: "Nope"
+          error: "Nope",
         },
-        500
-      )
+        500,
+      ),
     );
 
     await expect(requestNoContent("/api/no-content")).rejects.toThrow("Nope");
@@ -108,12 +108,12 @@ describe("FarfieldHttpTransport", () => {
   it("rejects responses that do not satisfy the api envelope contract", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
-        data: "missing-ok-field"
-      })
+        data: "missing-ok-field",
+      }),
     );
 
     await expect(request("/api/missing-envelope")).rejects.toThrow(
-      "Invalid API envelope from /api/missing-envelope"
+      "Invalid API envelope from /api/missing-envelope",
     );
   });
 
@@ -123,10 +123,10 @@ describe("FarfieldHttpTransport", () => {
         {
           ok: false,
           error: "Nope",
-          details: "unexpected-extra-field"
+          details: "unexpected-extra-field",
         },
-        500
-      )
+        500,
+      ),
     );
 
     let requestFailureError: FarfieldHttpRequestFailureError | null = null;
@@ -145,7 +145,7 @@ describe("FarfieldHttpTransport", () => {
       return;
     }
     expect(requestFailureError.message).toContain(
-      "Request failed for /api/no-content-strict-error-envelope"
+      "Request failed for /api/no-content-strict-error-envelope",
     );
     expect(requestFailureError.message).not.toContain("Nope");
   });
@@ -154,14 +154,14 @@ describe("FarfieldHttpTransport", () => {
     const abortController = new AbortController();
     const init: RequestInit = {
       headers: {
-        "X-Custom": "custom-value"
-      }
+        "X-Custom": "custom-value",
+      },
     };
 
     const nextInit = applyRequestOptions(init, {
       actionId: "  action_1  ",
       actionName: "  send-message  ",
-      signal: abortController.signal
+      signal: abortController.signal,
     });
     const nextHeaders = new Headers(nextInit.headers);
 
@@ -173,27 +173,33 @@ describe("FarfieldHttpTransport", () => {
 
   it("rejects blank action metadata values", () => {
     expect(() =>
-      applyRequestOptions({}, {
-        actionId: "   ",
-        actionName: "   "
-      })
+      applyRequestOptions(
+        {},
+        {
+          actionId: "   ",
+          actionName: "   ",
+        },
+      ),
     ).toThrow("Request metadata values must not be blank");
   });
 
   it("rejects non-token action metadata values", () => {
     expect(() =>
-      applyRequestOptions({}, {
-        actionId: "action value",
-        actionName: "send message"
-      })
+      applyRequestOptions(
+        {},
+        {
+          actionId: "action value",
+          actionName: "send message",
+        },
+      ),
     ).toThrow("Request metadata values may contain only letters");
   });
 
   it("rejects request calls when the path is blank", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
-        ok: true
-      })
+        ok: true,
+      }),
     );
 
     await expect(request("   ")).rejects.toThrow("Request path must not be blank");
@@ -211,7 +217,7 @@ describe("FarfieldHttpTransport", () => {
           () => {
             reject(createAbortError());
           },
-          { once: true }
+          { once: true },
         );
       });
     });
@@ -219,7 +225,7 @@ describe("FarfieldHttpTransport", () => {
     try {
       const requestPromise = request("/api/slow");
       const rejectionExpectation = expect(requestPromise).rejects.toThrow(
-        "Request timed out for /api/slow after 120000ms requestId req_1700000000000_1dcd6500"
+        "Request timed out for /api/slow after 120000ms requestId req_1700000000000_1dcd6500",
       );
       await vi.advanceTimersByTimeAsync(120_000);
       await rejectionExpectation;
@@ -240,7 +246,7 @@ describe("FarfieldHttpTransport", () => {
           () => {
             reject(createAbortError());
           },
-          { once: true }
+          { once: true },
         );
       });
     });

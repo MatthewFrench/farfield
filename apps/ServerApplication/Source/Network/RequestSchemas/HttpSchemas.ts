@@ -1,7 +1,7 @@
 import {
   CollaborationModeSchema,
+  type JsonValue,
   UserInputResponsePayloadSchema,
-  type JsonValue
 } from "@farfield/protocol";
 import { z } from "zod";
 
@@ -20,15 +20,15 @@ const RequestBodySchemaNameByParser = {
   traceStart: "TraceStartBody",
   traceMark: "TraceMarkBody",
   replay: "ReplayBody",
-  generic: "GenericRequestBody"
+  generic: "GenericRequestBody",
 } as const;
 
 export const HttpBodyParseErrorTypeByName = {
-  invalidHttpRequestBody: "invalid-http-request-body"
+  invalidHttpRequestBody: "invalid-http-request-body",
 } as const;
 
 export type HttpBodyParseErrorType =
-  typeof HttpBodyParseErrorTypeByName[keyof typeof HttpBodyParseErrorTypeByName];
+  (typeof HttpBodyParseErrorTypeByName)[keyof typeof HttpBodyParseErrorTypeByName];
 
 export interface HttpBodyParseIssue {
   path: string;
@@ -49,7 +49,7 @@ export interface HttpBodyParseErrorDetails {
 export const SetModeBodySchema = z
   .object({
     ownerClientId: z.string().optional(),
-    collaborationMode: CollaborationModeSchema
+    collaborationMode: CollaborationModeSchema,
   })
   .strict();
 
@@ -62,7 +62,7 @@ export const StartThreadBodySchema = z
     personality: z.string().optional(),
     sandbox: z.string().optional(),
     approvalPolicy: z.string().optional(),
-    ephemeral: z.boolean().optional()
+    ephemeral: z.boolean().optional(),
   })
   .strict();
 
@@ -71,7 +71,7 @@ export const SendMessageBodySchema = z
     ownerClientId: z.string().optional(),
     text: z.string().min(1),
     cwd: z.string().optional(),
-    isSteering: z.boolean().optional()
+    isSteering: z.boolean().optional(),
   })
   .strict();
 
@@ -79,33 +79,33 @@ export const SubmitUserInputBodySchema = z
   .object({
     ownerClientId: z.string().optional(),
     requestId: z.number().int().nonnegative(),
-    response: UserInputResponsePayloadSchema
+    response: UserInputResponsePayloadSchema,
   })
   .strict();
 
 export const InterruptBodySchema = z
   .object({
-    ownerClientId: z.string().optional()
+    ownerClientId: z.string().optional(),
   })
   .strict();
 
 export const TraceStartBodySchema = z
   .object({
     // Limit keeps trace labels concise enough for list and activity surfaces.
-    label: z.string().min(1).max(TRACE_LABEL_MAXIMUM_LENGTH)
+    label: z.string().min(1).max(TRACE_LABEL_MAXIMUM_LENGTH),
   })
   .strict();
 
 export const TraceMarkBodySchema = z
   .object({
-    note: z.string().max(TRACE_MARK_NOTE_MAXIMUM_LENGTH)
+    note: z.string().max(TRACE_MARK_NOTE_MAXIMUM_LENGTH),
   })
   .strict();
 
 export const ReplayBodySchema = z
   .object({
     entryId: z.string().min(1),
-    waitForResponse: z.boolean().optional()
+    waitForResponse: z.boolean().optional(),
   })
   .strict();
 
@@ -149,7 +149,7 @@ function mapHttpBodyParseIssues(issues: ReadonlyArray<z.ZodIssue>): HttpBodyPars
   return issues.map((issue) => ({
     path: buildRequestBodyIssuePath(issue.path),
     issueCode: issue.code,
-    message: issue.message
+    message: issue.message,
   }));
 }
 
@@ -166,7 +166,7 @@ function buildRequestBodyIssuePath(pathSegments: ReadonlyArray<string | number>)
 function parseOwnedRequestBody<Schema extends z.ZodTypeAny>(
   schema: Schema,
   value: JsonValue,
-  schemaName: string
+  schemaName: string,
 ): z.infer<Schema> {
   const parsedRequestBodyResult = schema.safeParse(value);
   if (!parsedRequestBodyResult.success) {
@@ -174,9 +174,9 @@ function parseOwnedRequestBody<Schema extends z.ZodTypeAny>(
       {
         errorType: HttpBodyParseErrorTypeByName.invalidHttpRequestBody,
         schemaName,
-        issues: mapHttpBodyParseIssues(parsedRequestBodyResult.error.issues)
+        issues: mapHttpBodyParseIssues(parsedRequestBodyResult.error.issues),
       },
-      parsedRequestBodyResult.error.issues
+      parsedRequestBodyResult.error.issues,
     );
   }
 
@@ -191,7 +191,7 @@ export function parseStartThreadBody(value: JsonValue): StartThreadBody {
   return parseOwnedRequestBody(
     StartThreadBodySchema,
     value,
-    RequestBodySchemaNameByParser.startThread
+    RequestBodySchemaNameByParser.startThread,
   );
 }
 
@@ -199,7 +199,7 @@ export function parseSendMessageBody(value: JsonValue): SendMessageBody {
   return parseOwnedRequestBody(
     SendMessageBodySchema,
     value,
-    RequestBodySchemaNameByParser.sendMessage
+    RequestBodySchemaNameByParser.sendMessage,
   );
 }
 
@@ -207,7 +207,7 @@ export function parseSubmitUserInputBody(value: JsonValue): SubmitUserInputBody 
   return parseOwnedRequestBody(
     SubmitUserInputBodySchema,
     value,
-    RequestBodySchemaNameByParser.submitUserInput
+    RequestBodySchemaNameByParser.submitUserInput,
   );
 }
 
@@ -219,7 +219,7 @@ export function parseTraceStartBody(value: JsonValue): TraceStartBody {
   return parseOwnedRequestBody(
     TraceStartBodySchema,
     value,
-    RequestBodySchemaNameByParser.traceStart
+    RequestBodySchemaNameByParser.traceStart,
   );
 }
 
@@ -233,7 +233,7 @@ export function parseReplayBody(value: JsonValue): ReplayBody {
 
 export function parseBody<Schema extends z.ZodTypeAny>(
   schema: Schema,
-  value: JsonValue
+  value: JsonValue,
 ): z.infer<Schema> {
   return parseOwnedRequestBody(schema, value, RequestBodySchemaNameByParser.generic);
 }

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  type EventRefreshFlags,
   EventRefreshScheduler,
-  type EventRefreshFlags
 } from "../Source/Application/StateManagement/EventRefreshScheduler";
 
 const REFRESH_DELAY_MS = 20;
@@ -14,7 +14,7 @@ function createRefreshFlags(input: {
   return {
     refreshCore: input.refreshCore,
     refreshHistory: input.refreshHistory,
-    refreshSelectedThread: input.refreshSelectedThread
+    refreshSelectedThread: input.refreshSelectedThread,
   };
 }
 
@@ -32,21 +32,21 @@ describe("EventRefreshScheduler", () => {
       createRefreshFlags({
         refreshCore: true,
         refreshHistory: false,
-        refreshSelectedThread: false
+        refreshSelectedThread: false,
       }),
       async (refreshFlags) => {
         executedRefreshFlags.push(refreshFlags);
-      }
+      },
     );
     scheduler.enqueueRefresh(
       createRefreshFlags({
         refreshCore: false,
         refreshHistory: true,
-        refreshSelectedThread: true
+        refreshSelectedThread: true,
       }),
       async (refreshFlags) => {
         executedRefreshFlags.push(refreshFlags);
-      }
+      },
     );
 
     await vi.advanceTimersByTimeAsync(REFRESH_DELAY_MS);
@@ -55,8 +55,8 @@ describe("EventRefreshScheduler", () => {
       createRefreshFlags({
         refreshCore: true,
         refreshHistory: true,
-        refreshSelectedThread: true
-      })
+        refreshSelectedThread: true,
+      }),
     ]);
   });
 
@@ -69,11 +69,11 @@ describe("EventRefreshScheduler", () => {
       createRefreshFlags({
         refreshCore: true,
         refreshHistory: false,
-        refreshSelectedThread: false
+        refreshSelectedThread: false,
       }),
       async () => {
         executedRefreshCount += 1;
-      }
+      },
     );
 
     scheduler.dispose();
@@ -91,11 +91,11 @@ describe("EventRefreshScheduler", () => {
       createRefreshFlags({
         refreshCore: false,
         refreshHistory: false,
-        refreshSelectedThread: false
+        refreshSelectedThread: false,
       }),
       async () => {
         executedRefreshCount += 1;
-      }
+      },
     );
 
     await vi.advanceTimersByTimeAsync(REFRESH_DELAY_MS);

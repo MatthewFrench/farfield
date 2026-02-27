@@ -13,7 +13,7 @@ function normalizeOwnerClientId(value: string | undefined): string | null {
 export function resolveOwnerClientId(
   threadOwnerById: ReadonlyMap<string, string>,
   threadId: string,
-  override?: string
+  override?: string,
 ): string {
   const mappedOwnerClientId = normalizeOwnerClientId(threadOwnerById.get(threadId));
   if (mappedOwnerClientId !== null) {

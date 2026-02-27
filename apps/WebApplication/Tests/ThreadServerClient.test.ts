@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ApiThreadListResponse } from "@/Features/Threads/DataAccess/ThreadApi";
 import * as ThreadApi from "@/Features/Threads/DataAccess/ThreadApi";
 import { ThreadServerClient } from "@/Features/Threads/DataAccess/ThreadServerClient";
-import type { ApiThreadListResponse } from "@/Features/Threads/DataAccess/ThreadApi";
 
 function buildThreadListResponse(): ApiThreadListResponse {
   return {
@@ -15,10 +15,10 @@ function buildThreadListResponse(): ApiThreadListResponse {
         path: "/tmp/thread-server-client",
         agentId: "codex",
         hasUnreadTurn: null,
-        isProjectRemoved: false
-      }
+        isProjectRemoved: false,
+      },
     ],
-    nextCursor: null
+    nextCursor: null,
   };
 }
 
@@ -41,7 +41,7 @@ describe("ThreadServerClient", () => {
       cwd: "/tmp/workspace",
       signal: abortController.signal,
       actionId: "action-load-archived-threads",
-      actionName: "load-archived-threads"
+      actionName: "load-archived-threads",
     });
 
     expect(result).toEqual(response);
@@ -55,7 +55,7 @@ describe("ThreadServerClient", () => {
       cwd: "/tmp/workspace",
       signal: abortController.signal,
       actionId: "action-load-archived-threads",
-      actionName: "load-archived-threads"
+      actionName: "load-archived-threads",
     });
   });
 
@@ -68,7 +68,7 @@ describe("ThreadServerClient", () => {
       archived: false,
       limit: 80,
       maxPages: 20,
-      sortKey: "created_at"
+      sortKey: "created_at",
     });
 
     const callArguments = listThreadsSpy.mock.calls[0];
@@ -82,7 +82,7 @@ describe("ThreadServerClient", () => {
       limit: 80,
       maxPages: 20,
       all: true,
-      sortKey: "created_at"
+      sortKey: "created_at",
     });
   });
 });

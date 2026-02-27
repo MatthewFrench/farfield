@@ -11,8 +11,8 @@ describe("UserInterfaceActionRequestBuilder", () => {
       actionId: "action_test_123",
       requestOptions: {
         actionId: "action_test_123",
-        actionName: "send-message"
-      }
+        actionName: "send-message",
+      },
     });
   });
 

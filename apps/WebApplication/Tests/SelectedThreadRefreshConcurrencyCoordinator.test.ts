@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   SelectedThreadRefreshConcurrencyCoordinator,
-  type SelectedThreadRefreshRequest
+  type SelectedThreadRefreshRequest,
 } from "../Source/Features/Chat/StateManagement/SelectedThreadRefreshConcurrencyCoordinator";
 
 class TestCanceledRefreshError extends Error {
@@ -23,7 +23,7 @@ function createRefreshRequest(input: {
   return {
     threadId: input.threadId,
     includeTurns: input.includeTurns,
-    includeReadThread: input.includeReadThread
+    includeReadThread: input.includeReadThread,
   };
 }
 
@@ -42,7 +42,7 @@ describe("SelectedThreadRefreshConcurrencyCoordinator", () => {
       request: createRefreshRequest({
         threadId: "thread-1",
         includeTurns: false,
-        includeReadThread: false
+        includeReadThread: false,
       }),
       executeRefresh: async (request) => {
         executedRequests.push(request);
@@ -50,18 +50,18 @@ describe("SelectedThreadRefreshConcurrencyCoordinator", () => {
           await firstRefreshSettled;
         }
       },
-      isCanceledError: isCanceledRefreshError
+      isCanceledError: isCanceledRefreshError,
     });
     const secondRun = coordinator.run({
       request: createRefreshRequest({
         threadId: "thread-1",
         includeTurns: true,
-        includeReadThread: true
+        includeReadThread: true,
       }),
       executeRefresh: async (request) => {
         executedRequests.push(request);
       },
-      isCanceledError: isCanceledRefreshError
+      isCanceledError: isCanceledRefreshError,
     });
 
     await Promise.resolve();
@@ -73,13 +73,13 @@ describe("SelectedThreadRefreshConcurrencyCoordinator", () => {
       createRefreshRequest({
         threadId: "thread-1",
         includeTurns: false,
-        includeReadThread: false
+        includeReadThread: false,
       }),
       createRefreshRequest({
         threadId: "thread-1",
         includeTurns: true,
-        includeReadThread: true
-      })
+        includeReadThread: true,
+      }),
     ]);
   });
 
@@ -91,30 +91,34 @@ describe("SelectedThreadRefreshConcurrencyCoordinator", () => {
       request: createRefreshRequest({
         threadId: "thread-1",
         includeTurns: false,
-        includeReadThread: true
+        includeReadThread: true,
       }),
       executeRefresh: async (request, signal) => {
         executedRequests.push(request);
         await new Promise<void>((resolve, reject) => {
-          signal.addEventListener("abort", () => {
-            reject(new TestCanceledRefreshError("refresh canceled"));
-          }, { once: true });
+          signal.addEventListener(
+            "abort",
+            () => {
+              reject(new TestCanceledRefreshError("refresh canceled"));
+            },
+            { once: true },
+          );
           window.setTimeout(resolve, 50);
         });
       },
-      isCanceledError: isCanceledRefreshError
+      isCanceledError: isCanceledRefreshError,
     });
 
     const secondRun = coordinator.run({
       request: createRefreshRequest({
         threadId: "thread-2",
         includeTurns: true,
-        includeReadThread: true
+        includeReadThread: true,
       }),
       executeRefresh: async (request) => {
         executedRequests.push(request);
       },
-      isCanceledError: isCanceledRefreshError
+      isCanceledError: isCanceledRefreshError,
     });
 
     await Promise.all([firstRun, secondRun]);
@@ -123,13 +127,13 @@ describe("SelectedThreadRefreshConcurrencyCoordinator", () => {
       createRefreshRequest({
         threadId: "thread-1",
         includeTurns: false,
-        includeReadThread: true
+        includeReadThread: true,
       }),
       createRefreshRequest({
         threadId: "thread-2",
         includeTurns: true,
-        includeReadThread: true
-      })
+        includeReadThread: true,
+      }),
     ]);
   });
 
@@ -141,12 +145,12 @@ describe("SelectedThreadRefreshConcurrencyCoordinator", () => {
         request: createRefreshRequest({
           threadId: "thread-1",
           includeTurns: true,
-          includeReadThread: true
+          includeReadThread: true,
         }),
         executeRefresh: async () => {
           throw "refresh failed";
         },
-        isCanceledError: isCanceledRefreshError
+        isCanceledError: isCanceledRefreshError,
       });
       throw new Error("Expected coordinator.run to throw");
     } catch (error) {

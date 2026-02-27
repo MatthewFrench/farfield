@@ -4,8 +4,7 @@ import { IpcFrameBufferAccumulator } from "../Source/IpcFrameBufferAccumulator.j
 const FRAME_HEADER_BYTES = 4;
 const FRAME_LENGTH_MAXIMUM_BYTES = 0xffff_ffff;
 const BUFFER_COMPACTION_MINIMUM_CONSUMED_BYTES = 64 * 1024;
-const INVALID_MAX_FRAME_SIZE_ERROR_MESSAGE =
-  `IPC max frame size must be an integer between 0 and ${String(FRAME_LENGTH_MAXIMUM_BYTES)} bytes`;
+const INVALID_MAX_FRAME_SIZE_ERROR_MESSAGE = `IPC max frame size must be an integer between 0 and ${String(FRAME_LENGTH_MAXIMUM_BYTES)} bytes`;
 
 function encodePayloadFrame(payloadText: string): Buffer {
   const payload = Buffer.from(payloadText, "utf8");
@@ -45,10 +44,7 @@ describe("IpcFrameBufferAccumulator", () => {
 
   it("reads multiple frames in-order from a single chunk", () => {
     const accumulator = new IpcFrameBufferAccumulator();
-    const combined = Buffer.concat([
-      encodePayloadFrame("first"),
-      encodePayloadFrame("second")
-    ]);
+    const combined = Buffer.concat([encodePayloadFrame("first"), encodePayloadFrame("second")]);
 
     accumulator.appendChunk(combined);
 
@@ -105,11 +101,11 @@ describe("IpcFrameBufferAccumulator", () => {
 
     expect(accumulator.readNextPayload(128)).toEqual({
       type: "frame-too-large",
-      size: 129
+      size: 129,
     });
     expect(accumulator.readNextPayload(128)).toEqual({
       type: "frame-too-large",
-      size: 129
+      size: 129,
     });
   });
 
@@ -122,21 +118,19 @@ describe("IpcFrameBufferAccumulator", () => {
       1.25,
       Number.NaN,
       Number.POSITIVE_INFINITY,
-      FRAME_LENGTH_MAXIMUM_BYTES + 1
+      FRAME_LENGTH_MAXIMUM_BYTES + 1,
     ];
 
     for (const invalidMaxFrameSize of invalidMaxFrameSizes) {
       expect(() => accumulator.readNextPayload(invalidMaxFrameSize)).toThrow(
-        INVALID_MAX_FRAME_SIZE_ERROR_MESSAGE
+        INVALID_MAX_FRAME_SIZE_ERROR_MESSAGE,
       );
     }
   });
 
   it("compacts unread bytes when consumed data reaches half the buffer", () => {
     const accumulator = new IpcFrameBufferAccumulator();
-    accumulator.appendChunk(
-      Buffer.concat([encodePayloadFrame("abc"), encodePayloadFrame("def")])
-    );
+    accumulator.appendChunk(Buffer.concat([encodePayloadFrame("abc"), encodePayloadFrame("def")]));
 
     const bufferFromSpy = vi.spyOn(Buffer, "from");
     bufferFromSpy.mockClear();
@@ -162,7 +156,10 @@ describe("IpcFrameBufferAccumulator", () => {
     const firstPayload = Buffer.alloc(BUFFER_COMPACTION_MINIMUM_CONSUMED_BYTES, 65);
     const secondPayload = Buffer.alloc(BUFFER_COMPACTION_MINIMUM_CONSUMED_BYTES + 1, 66);
     accumulator.appendChunk(
-      Buffer.concat([encodeBinaryPayloadFrame(firstPayload), encodeBinaryPayloadFrame(secondPayload)])
+      Buffer.concat([
+        encodeBinaryPayloadFrame(firstPayload),
+        encodeBinaryPayloadFrame(secondPayload),
+      ]),
     );
 
     const bufferFromSpy = vi.spyOn(Buffer, "from");
@@ -189,7 +186,10 @@ describe("IpcFrameBufferAccumulator", () => {
     const firstPayload = Buffer.from("tiny", "utf8");
     const secondPayload = Buffer.alloc(BUFFER_COMPACTION_MINIMUM_CONSUMED_BYTES, 67);
     accumulator.appendChunk(
-      Buffer.concat([encodeBinaryPayloadFrame(firstPayload), encodeBinaryPayloadFrame(secondPayload)])
+      Buffer.concat([
+        encodeBinaryPayloadFrame(firstPayload),
+        encodeBinaryPayloadFrame(secondPayload),
+      ]),
     );
 
     const bufferFromSpy = vi.spyOn(Buffer, "from");
