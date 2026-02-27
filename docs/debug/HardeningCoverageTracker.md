@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 02:50:41Z
+Last Updated (UTC): 2026-02-27 02:57:21Z
 
 ## Scope Model
 
@@ -193,6 +193,24 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-15)
+
+The current in-progress wave applies package-layer event-mapper owner separation for OpenCode stream payload mapping:
+
+1. Split mapper event/type and payload contracts into `EventPayloadMapperContracts`.
+2. Split mapper field-name literal ownership into `EventPayloadMapperFieldNames`.
+3. Split mapper boundary schemas into `EventPayloadMapperSchemas`.
+4. Split mapper parse/error helper ownership into `EventPayloadMapperParsing`.
+5. Reduced `EventPayloadMapper` to event-branch orchestration over these owner modules while preserving public exports and behavior.
+
+Files touched in this continuation segment:
+
+1. `packages/OpenCodeInterfaceAdapter/Source/EventPayloadMapper.ts`
+2. `packages/OpenCodeInterfaceAdapter/Source/EventPayloadMapperContracts.ts`
+3. `packages/OpenCodeInterfaceAdapter/Source/EventPayloadMapperFieldNames.ts`
+4. `packages/OpenCodeInterfaceAdapter/Source/EventPayloadMapperSchemas.ts`
+5. `packages/OpenCodeInterfaceAdapter/Source/EventPayloadMapperParsing.ts`
 
 ## Latest Continuation Commit Wave (Current-14)
 

@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 02:50:41Z
+Last Updated (UTC): 2026-02-27 02:57:21Z
 
 ## Purpose
 
@@ -115,6 +115,15 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 3. [`SessionMessageProjection.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/SessionMessageProjection.ts)
    - owns: session message projection for ordered message arrays plus part lookup map.
    - query APIs: `projectSessionMessages`.
+4. [`EventPayloadMapperContracts.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/EventPayloadMapperContracts.ts)
+   - owns: OpenCode inbound event constants, mapped payload contracts, and mapper error detail contracts.
+5. [`EventPayloadMapperFieldNames.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/EventPayloadMapperFieldNames.ts)
+   - owns: event payload field-name literals for schema construction.
+6. [`EventPayloadMapperSchemas.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/EventPayloadMapperSchemas.ts)
+   - owns: strict Zod mapper schemas for event payload contract parsing.
+7. [`EventPayloadMapperParsing.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/EventPayloadMapperParsing.ts)
+   - owns: mapper parsing helpers and deterministic typed error construction for schema failures.
+   - query APIs: `parseMapperSchemaOrThrow`, `parseRequestedSessionIdentifierOrThrow`.
 
 ## Codex Interface Adapter Package Group
 
