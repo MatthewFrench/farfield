@@ -54,6 +54,20 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
    - owns: stream event append/reset merge policy and retention bounds.
    - query APIs: `resolveNextStreamEventsState`.
 
+## Web Shared Transport Group
+
+1. [`FarfieldHttpTransportRequestExecutionOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransportRequestExecutionOwner.ts)
+   - owns: request dispatch timeout policy, caller-abort versus timeout-abort semantics, and request-id assignment.
+   - query APIs: `performRequest`.
+2. [`FarfieldHttpTransportResponseOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransportResponseOwner.ts)
+   - owns: response-body parsing, envelope/error contract decoding, and request-failure message shaping.
+   - query APIs: `readResponseBody`, `decodeStructuredDataValue`, `decodeApiEnvelope`, `resolveFailureBaseMessage`, `readResponseRequestId`.
+   - mutation APIs: `createRequestFailureError` (error-context construction).
+3. [`FarfieldHttpTransportRequestOptionsOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransportRequestOptionsOwner.ts)
+   - owns: request metadata header normalization and request-init option shaping.
+   - query APIs: `requestInitWithOptions`.
+   - mutation APIs: `applyRequestOptions`.
+
 ## Boundary Rules to Enforce in Reviews
 
 1. Non-owner modules must not mutate owner-managed mutable state directly.

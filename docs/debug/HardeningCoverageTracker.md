@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-26 23:57:44Z
+Last Updated (UTC): 2026-02-27 01:13:11Z
 
 ## Scope Model
 
@@ -193,6 +193,23 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-4)
+
+The current in-progress wave applies group-level ownership separation for the web shared transport boundary:
+
+1. Split request-execution ownership from response parsing and request option shaping in `Shared/Transport`.
+2. Preserved `FarfieldHttpTransport` as the public boundary API while moving implementation concerns to dedicated owner modules.
+3. Added explicit shared-transport owner entries to the owner API boundary registry.
+
+Files touched in this continuation segment:
+
+1. `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransport.ts`
+2. `apps/WebApplication/Source/Shared/Transport/FarfieldHttpRequestFailureError.ts`
+3. `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransportRequestExecutionOwner.ts`
+4. `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransportResponseOwner.ts`
+5. `apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransportRequestOptionsOwner.ts`
+6. `docs/debug/OwnerApiBoundaryRegistry.md`
 
 ## Latest Continuation Commit Wave (Current-3)
 
