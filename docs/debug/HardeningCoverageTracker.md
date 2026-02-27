@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 04:54:04Z
+Last Updated (UTC): 2026-02-27 05:13:39Z
 
 ## Scope Model
 
@@ -214,6 +214,37 @@ Files touched in this continuation segment:
 5. `packages/CodexProtocol/Tests/ProtocolThreadCoreSchemas.test.ts`
 6. `apps/WebApplication/Source/Features/Chat/DomainModel/PendingUserInputRequestSelector.ts`
 7. `apps/WebApplication/Tests/PendingUserInputRequestSelector.test.ts`
+
+## Latest Continuation Commit Wave (Current-26)
+
+This continuation wave adds protocol replay compatibility guards and runtime error triage visibility:
+
+1. Added a sanitized protocol compatibility fixture sourced from real app-server payload shape characteristics (snapshot + patch sequence).
+2. Added a deterministic replay guard test that parses the fixture payload sequence and asserts known request-method compatibility tokens.
+3. Added CI gate coverage for the replay guard test via `test:ci:mocked:protocol:critical`, wired into `test:ci:mocked:critical`.
+4. Added runtime-request-error operation metrics derivation in debug issue state ownership, including request-path extraction for cases where operation labels are generic.
+5. Exposed runtime-request-error operation counts in the debug issues panel so regressions surface immediately during triage.
+6. Ran an isolated fresh dev-session smoke sequence against `/api/threads/:id/live-state` and `/api/threads/:id/stream-events`; invalid stream event log count remained zero (`INVALID_EVENT_COUNT=0`).
+
+Files touched in this continuation segment:
+
+1. `packages/CodexProtocol/Tests/fixtures/compatibility/ThreadStreamStateChangedBroadcast.command-approval.json`
+2. `packages/CodexProtocol/Tests/ProtocolThreadStreamCompatibilityReplay.test.ts`
+3. `apps/WebApplication/Source/Features/Debugging/DomainModel/DebugIssueContracts.ts`
+4. `apps/WebApplication/Source/Features/Debugging/DomainModel/DebugIssueStateResolver.ts`
+5. `apps/WebApplication/Source/Application/StateManagement/UseApplicationDebugIssueDerivedState.ts`
+6. `apps/WebApplication/Source/Application/StateManagement/UseApplicationDerivedStateContracts.ts`
+7. `apps/WebApplication/Source/Application/StateManagement/UseApplicationDerivedState.ts`
+8. `apps/WebApplication/Source/Application/StateManagement/UseApplicationShellViewProperties.ts`
+9. `apps/WebApplication/Source/Application/StateManagement/UseApplicationShellComposition.ts`
+10. `apps/WebApplication/Source/Features/Debugging/UserInterface/DebugWorkspacePane.tsx`
+11. `apps/WebApplication/Source/Features/Debugging/UserInterface/DebugIssuesPanel.tsx`
+12. `apps/WebApplication/Tests/DebugIssueStateResolver.test.ts`
+13. `apps/WebApplication/Tests/DebugIssuesPanel.test.tsx`
+14. `apps/WebApplication/Tests/DebugWorkspacePane.test.tsx`
+15. `apps/WebApplication/Tests/UseApplicationDerivedState.test.tsx`
+16. `apps/WebApplication/Tests/UseApplicationShellViewProperties.test.ts`
+17. `package.json`
 
 ## Latest Continuation Commit Wave (Current-24)
 

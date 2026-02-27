@@ -4,6 +4,7 @@ import { type ApplicationHeaderBarProps } from "@/Application/UserInterface/Appl
 import { type CapabilityHealthResponse } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { type ChatWorkspacePaneProps } from "@/Features/Chat/UserInterface/ChatWorkspacePane";
+import { type RuntimeRequestErrorOperationMetric } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import { type DebugHistoryEntryListItem } from "@/Features/Debugging/UserInterface/DebugHistoryPanel";
 import { type DebugStatusBannersProps } from "@/Features/Debugging/UserInterface/DebugStatusBanners";
@@ -68,6 +69,7 @@ export interface UseApplicationShellViewPropertiesInput {
   setDebugWorkspaceSection: DebugWorkspacePaneProps["onDebugWorkspaceSectionChange"];
   debugErrorIssueCount: number;
   debugWarningIssueCount: number;
+  runtimeRequestErrorOperationMetrics: RuntimeRequestErrorOperationMetric[];
   filteredDebugIssues: DebugWorkspacePaneProps["filteredDebugIssues"];
   selectedDebugIssue: DebugWorkspacePaneProps["selectedDebugIssue"];
   selectedDebugIssueId: string;
@@ -301,6 +303,7 @@ function buildDebugWorkspacePaneProperties(
     onDebugWorkspaceSectionChange: input.setDebugWorkspaceSection,
     debugErrorIssueCount: input.debugErrorIssueCount,
     debugWarningIssueCount: input.debugWarningIssueCount,
+    runtimeRequestErrorOperationMetrics: input.runtimeRequestErrorOperationMetrics,
     filteredDebugIssues: input.filteredDebugIssues,
     selectedDebugIssue: input.selectedDebugIssue,
     selectedDebugIssueId: input.selectedDebugIssueId,

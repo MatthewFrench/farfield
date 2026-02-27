@@ -2,7 +2,10 @@ import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/Components/UserInterface/Badge";
 import { Button } from "@/Components/UserInterface/Button";
 import { Input } from "@/Components/UserInterface/Input";
-import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
+import {
+  type DebugIssue,
+  type RuntimeRequestErrorOperationMetric,
+} from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import {
   DEBUG_ISSUE_SEVERITY_FILTER_ALL,
   DEBUG_ISSUE_SEVERITY_FILTER_ERROR,
@@ -11,6 +14,7 @@ import {
 } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 
 const WARNING_BADGE_CLASS_NAME = "border-amber-300 bg-amber-50 text-amber-700";
+const MAXIMUM_RUNTIME_REQUEST_OPERATION_ROWS = 5;
 
 interface DebugIssueSeverityFilterOption {
   value: DebugIssueSeverityFilter;
@@ -27,6 +31,7 @@ interface DebugIssuesPanelProps {
   issues: readonly DebugIssue[];
   selectedIssue: DebugIssue | null;
   selectedIssueId: string;
+  runtimeRequestErrorOperationMetrics: readonly RuntimeRequestErrorOperationMetric[];
   severityFilter: DebugIssueSeverityFilter;
   filterQuery: string;
   debugErrorSessionId: string;
@@ -41,6 +46,7 @@ export function DebugIssuesPanel({
   issues,
   selectedIssue,
   selectedIssueId,
+  runtimeRequestErrorOperationMetrics,
   severityFilter,
   filterQuery,
   debugErrorSessionId,
@@ -104,6 +110,28 @@ export function DebugIssuesPanel({
             placeholder="Filter by action/request/error/thread/message"
             className="h-8 text-xs"
           />
+          {runtimeRequestErrorOperationMetrics.length > 0 && (
+            <div className="rounded border border-border bg-muted/30 px-2 py-1.5">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                runtime-request-error by operation
+              </div>
+              <div className="mt-1 space-y-0.5">
+                {runtimeRequestErrorOperationMetrics
+                  .slice(0, MAXIMUM_RUNTIME_REQUEST_OPERATION_ROWS)
+                  .map((operationMetric) => (
+                    <div
+                      key={operationMetric.operation}
+                      className="flex items-center justify-between gap-2 font-mono text-[10px]"
+                    >
+                      <span className="truncate text-muted-foreground">
+                        {operationMetric.operation}
+                      </span>
+                      <span className="text-foreground">{operationMetric.count}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto">

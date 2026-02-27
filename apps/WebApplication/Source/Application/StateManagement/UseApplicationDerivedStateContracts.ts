@@ -29,6 +29,7 @@ import {
 import {
   type DebugIssue,
   type ErrorBannerDetails,
+  type RuntimeRequestErrorOperationMetric,
 } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import {
   type DebugIssueSeverityFilter,
@@ -205,6 +206,7 @@ export interface ApplicationDerivedState {
   debugErrorIssues: DebugIssue[];
   debugWarningIssues: DebugIssue[];
   debugIssues: DebugIssue[];
+  runtimeRequestErrorOperationMetrics: RuntimeRequestErrorOperationMetric[];
   filteredDebugIssues: DebugIssue[];
   selectedDebugIssue: DebugIssue | null;
   flatConversationItems: FlattenedConversationItem[];

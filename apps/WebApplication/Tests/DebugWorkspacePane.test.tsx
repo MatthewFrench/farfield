@@ -32,6 +32,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onDebugWorkspaceSectionChange: () => {},
   debugErrorIssueCount: 2,
   debugWarningIssueCount: 1,
+  runtimeRequestErrorOperationMetrics: [],
   filteredDebugIssues: [exampleDebugIssue],
   selectedDebugIssue: exampleDebugIssue,
   selectedDebugIssueId: exampleDebugIssue.id,

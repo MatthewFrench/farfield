@@ -71,4 +71,9 @@ export interface DebugWarningIssue extends DebugIssueBase {
   payloadText: string;
 }
 
+export interface RuntimeRequestErrorOperationMetric {
+  operation: string;
+  count: number;
+}
+
 export type DebugIssue = DebugErrorIssue | DebugWarningIssue;

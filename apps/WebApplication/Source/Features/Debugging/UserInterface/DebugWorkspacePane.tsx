@@ -2,7 +2,10 @@ import { Bug } from "lucide-react";
 import { Tabs } from "@/Components/UserInterface/Tabs";
 import { TabsList } from "@/Components/UserInterface/TabsList";
 import { TabsTrigger } from "@/Components/UserInterface/TabsTrigger";
-import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
+import {
+  type DebugIssue,
+  type RuntimeRequestErrorOperationMetric,
+} from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { type DebugIssueSeverityFilter } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import {
   type DebugWorkspaceSection,
@@ -19,6 +22,7 @@ export interface DebugWorkspacePaneProps {
   onDebugWorkspaceSectionChange: (nextSection: DebugWorkspaceSection) => void;
   debugErrorIssueCount: number;
   debugWarningIssueCount: number;
+  runtimeRequestErrorOperationMetrics: readonly RuntimeRequestErrorOperationMetric[];
   filteredDebugIssues: readonly DebugIssue[];
   selectedDebugIssue: DebugIssue | null;
   selectedDebugIssueId: string;
@@ -56,6 +60,7 @@ export function DebugWorkspacePane({
   onDebugWorkspaceSectionChange,
   debugErrorIssueCount,
   debugWarningIssueCount,
+  runtimeRequestErrorOperationMetrics,
   filteredDebugIssues,
   selectedDebugIssue,
   selectedDebugIssueId,
@@ -129,6 +134,7 @@ export function DebugWorkspacePane({
             issues={filteredDebugIssues}
             selectedIssue={selectedDebugIssue}
             selectedIssueId={selectedDebugIssueId}
+            runtimeRequestErrorOperationMetrics={runtimeRequestErrorOperationMetrics}
             severityFilter={debugIssueSeverityFilter}
             filterQuery={debugIssueFilterQuery}
             debugErrorSessionId={debugErrorSessionId}

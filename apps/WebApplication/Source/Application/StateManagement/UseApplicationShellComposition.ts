@@ -223,6 +223,8 @@ function buildApplicationShellViewPropertiesInput(
     setDebugWorkspaceSection: applicationShellState.setDebugWorkspaceSection,
     debugErrorIssueCount: applicationDerivedState.debugErrorIssues.length,
     debugWarningIssueCount: applicationDerivedState.debugWarningIssues.length,
+    runtimeRequestErrorOperationMetrics:
+      applicationDerivedState.runtimeRequestErrorOperationMetrics,
     filteredDebugIssues: applicationDerivedState.filteredDebugIssues,
     selectedDebugIssue: applicationDerivedState.selectedDebugIssue,
     selectedDebugIssueId: applicationShellState.selectedDebugIssueId,

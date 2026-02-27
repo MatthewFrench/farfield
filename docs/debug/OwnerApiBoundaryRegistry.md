@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 04:54:04Z
+Last Updated (UTC): 2026-02-27 05:13:39Z
 
 ## Purpose
 
@@ -157,6 +157,9 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 2. [`DebugErrorEnvelopeContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Debugging/DataAccess/DebugErrorEnvelopeContracts.ts)
    - owns: debug-error envelope wire parsing and projection into strict app-owned error contracts.
    - query APIs: `DebugErrorListEnvelopeSchema`, `DebugErrorDetailEnvelopeSchema`.
+3. [`DebugIssueStateResolver.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Debugging/DomainModel/DebugIssueStateResolver.ts)
+   - owns: deterministic debug issue derivation/filtering/selection and runtime-request-error operation metric aggregation.
+   - query APIs: `readDebugErrorIssues`, `readDebugWarningIssues`, `readRuntimeRequestErrorOperationMetrics`, `readCombinedDebugIssues`, `readFilteredDebugIssues`, `readSelectedDebugIssue`, `readNextSelectedDebugIssueIdentifier`.
 
 ## Web Features Threads Group
 

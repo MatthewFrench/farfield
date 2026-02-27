@@ -304,6 +304,7 @@ export function useApplicationDerivedState(
     debugErrorIssues,
     debugWarningIssues,
     debugIssues,
+    runtimeRequestErrorOperationMetrics,
     filteredDebugIssues,
     selectedDebugIssue,
   } = useApplicationDebugIssueDerivedState({
@@ -390,6 +391,7 @@ export function useApplicationDerivedState(
     debugErrorIssues,
     debugWarningIssues,
     debugIssues,
+    runtimeRequestErrorOperationMetrics,
     filteredDebugIssues,
     selectedDebugIssue,
     flatConversationItems,

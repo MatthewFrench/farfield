@@ -17,6 +17,7 @@ export interface ApplicationDebugIssueDerivedState {
   debugErrorIssues: ApplicationDerivedState["debugErrorIssues"];
   debugWarningIssues: ApplicationDerivedState["debugWarningIssues"];
   debugIssues: ApplicationDerivedState["debugIssues"];
+  runtimeRequestErrorOperationMetrics: ApplicationDerivedState["runtimeRequestErrorOperationMetrics"];
   filteredDebugIssues: ApplicationDerivedState["filteredDebugIssues"];
   selectedDebugIssue: ApplicationDerivedState["selectedDebugIssue"];
 }
@@ -32,6 +33,11 @@ export function useApplicationDebugIssueDerivedState(
   const debugWarningIssues = useMemo(
     () => input.debugIssueStateResolver.readDebugWarningIssues(input.history),
     [input.debugIssueStateResolver, input.history],
+  );
+
+  const runtimeRequestErrorOperationMetrics = useMemo(
+    () => input.debugIssueStateResolver.readRuntimeRequestErrorOperationMetrics(input.debugErrors),
+    [input.debugErrors, input.debugIssueStateResolver],
   );
 
   const debugIssues = useMemo(
@@ -71,6 +77,7 @@ export function useApplicationDebugIssueDerivedState(
     debugErrorIssues,
     debugWarningIssues,
     debugIssues,
+    runtimeRequestErrorOperationMetrics,
     filteredDebugIssues,
     selectedDebugIssue,
   };

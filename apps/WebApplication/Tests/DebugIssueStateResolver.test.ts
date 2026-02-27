@@ -180,4 +180,56 @@ describe("DebugIssueStateResolver", () => {
     expect(nextSelectedDebugIssueIdentifierWhenMissing).toBe("error:error-first");
     expect(nextSelectedDebugIssueIdentifierWhenEmpty).toBe("");
   });
+
+  it("derives runtime-request-error operation counts from action names and request paths", () => {
+    const resolver = new DebugIssueStateResolver();
+    const runtimeRequestErrorMetrics = resolver.readRuntimeRequestErrorOperationMetrics([
+      {
+        ...buildDebugError({
+          errorId: "runtime-1",
+          operation: "runtime-request-error",
+          message: "Request failed for /api/threads",
+          occurredAt: "2025-01-01T12:00:00.000Z",
+        }),
+        details: {
+          actionName: "startup-critical.threads.active",
+        },
+      },
+      {
+        ...buildDebugError({
+          errorId: "runtime-2",
+          operation: "runtime-request-error",
+          message: "Request failed for /api/threads",
+          occurredAt: "2025-01-01T12:01:00.000Z",
+        }),
+        details: {},
+      },
+      {
+        ...buildDebugError({
+          errorId: "runtime-3",
+          operation: "runtime-request-error",
+          message: "Request failed for /api/threads",
+          occurredAt: "2025-01-01T12:02:00.000Z",
+        }),
+        details: {},
+      },
+      buildDebugError({
+        errorId: "runtime-ignored",
+        operation: "thread.read",
+        message: "Read failed",
+        occurredAt: "2025-01-01T12:03:00.000Z",
+      }),
+    ]);
+
+    expect(runtimeRequestErrorMetrics).toEqual([
+      {
+        operation: "request-path:/api/threads",
+        count: 2,
+      },
+      {
+        operation: "startup-critical.threads.active",
+        count: 1,
+      },
+    ]);
+  });
 });

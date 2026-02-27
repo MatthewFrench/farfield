@@ -1,6 +1,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { type DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
+import {
+  type DebugIssue,
+  type RuntimeRequestErrorOperationMetric,
+} from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { DebugIssuesPanel } from "@/Features/Debugging/UserInterface/DebugIssuesPanel";
 
 const exampleDebugIssue: DebugIssue = {
@@ -28,6 +31,7 @@ function renderDebugIssuesPanel(input?: {
   issues?: readonly DebugIssue[];
   selectedIssue?: DebugIssue | null;
   selectedIssueId?: string;
+  runtimeRequestErrorOperationMetrics?: readonly RuntimeRequestErrorOperationMetric[];
   debugErrorSessionLogPath?: string;
   onIssueSelect?: (issueId: string) => void;
   onSeverityFilterChange?: (severity: "all" | "error" | "warning") => void;
@@ -39,6 +43,7 @@ function renderDebugIssuesPanel(input?: {
       issues={input?.issues ?? [exampleDebugIssue]}
       selectedIssue={input?.selectedIssue ?? exampleDebugIssue}
       selectedIssueId={input?.selectedIssueId ?? exampleDebugIssue.id}
+      runtimeRequestErrorOperationMetrics={input?.runtimeRequestErrorOperationMetrics ?? []}
       severityFilter="all"
       filterQuery=""
       debugErrorSessionId="session-1"
@@ -89,5 +94,20 @@ describe("DebugIssuesPanel", () => {
     expect(screen.getByText("session log").getAttribute("href")).toBe(
       "/api/debug/client-errors/session-log",
     );
+  });
+
+  it("renders runtime-request-error operation counts when present", () => {
+    renderDebugIssuesPanel({
+      runtimeRequestErrorOperationMetrics: [
+        {
+          operation: "startup-critical.threads.active",
+          count: 3,
+        },
+      ],
+    });
+
+    expect(screen.getByText("runtime-request-error by operation")).toBeDefined();
+    expect(screen.getByText("startup-critical.threads.active")).toBeDefined();
+    expect(screen.getByText("3")).toBeDefined();
   });
 });

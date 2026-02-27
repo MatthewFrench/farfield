@@ -210,6 +210,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     setDebugWorkspaceSection: setDebugWorkspaceSectionSpy,
     debugErrorIssueCount: 0,
     debugWarningIssueCount: 0,
+    runtimeRequestErrorOperationMetrics: [],
     filteredDebugIssues: [],
     selectedDebugIssue: null,
     selectedDebugIssueId: "",

@@ -125,6 +125,35 @@ function buildReadThreadSnapshot(input: ConversationStateInput): ChatReadThreadR
   };
 }
 
+function buildDebugErrorRecord(input: {
+  errorId: string;
+  operation: string;
+  message: string;
+  actionName?: string;
+}): NonNullable<UseApplicationDerivedStateInput["debugErrors"]>[number] {
+  return {
+    errorId: input.errorId,
+    sessionId: "session-1",
+    origin: "client",
+    source: "farfield-web",
+    operation: input.operation,
+    message: input.message,
+    severity: "error",
+    name: null,
+    stack: null,
+    requestId: null,
+    threadId: null,
+    url: "/",
+    occurredAt: "2025-01-01T10:00:00.000Z",
+    recordedAt: "2025-01-01T10:00:00.000Z",
+    details: input.actionName
+      ? {
+          actionName: input.actionName,
+        }
+      : {},
+  };
+}
+
 function buildAgentDescriptorsFixture(): CapabilityAgentsResponse["agents"] {
   return [
     {
@@ -391,6 +420,43 @@ describe("useApplicationDerivedState", () => {
     expect(derivedState.visibleConversationItems.map((item) => item.key)).toEqual([
       "item-turn-1",
       "item-turn-2",
+    ]);
+  });
+
+  it("derives runtime-request-error operation metrics from debug errors", () => {
+    const input: UseApplicationDerivedStateInput = {
+      ...createBaseInput(),
+      debugErrors: [
+        buildDebugErrorRecord({
+          errorId: "error-1",
+          operation: "runtime-request-error",
+          message: "Request failed for /api/threads",
+        }),
+        buildDebugErrorRecord({
+          errorId: "error-2",
+          operation: "runtime-request-error",
+          message: "Request failed for /api/threads",
+        }),
+        buildDebugErrorRecord({
+          errorId: "error-3",
+          operation: "runtime-request-error",
+          message: "Unexpected response",
+          actionName: "startup-critical.threads.active",
+        }),
+      ],
+    };
+
+    const derivedState = renderDerivedState(input);
+
+    expect(derivedState.runtimeRequestErrorOperationMetrics).toEqual([
+      {
+        operation: "request-path:/api/threads",
+        count: 2,
+      },
+      {
+        operation: "startup-critical.threads.active",
+        count: 1,
+      },
     ]);
   });
 });

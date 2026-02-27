@@ -1,0 +1,93 @@
+{
+  "description": "Sanitized app-server thread-stream-state-changed payloads covering command approval requests and structured error info.",
+  "events": [
+    {
+      "type": "broadcast",
+      "method": "thread-stream-state-changed",
+      "sourceClientId": "client-compatibility",
+      "version": 4,
+      "params": {
+        "conversationId": "thread-compatibility",
+        "type": "thread-stream-state-changed",
+        "version": 4,
+        "change": {
+          "type": "snapshot",
+          "conversationState": {
+            "id": "thread-compatibility",
+            "turns": [
+              {
+                "id": "turn-1",
+                "status": "failed",
+                "items": [
+                  {
+                    "id": "error-1",
+                    "type": "error",
+                    "message": "stream disconnected",
+                    "errorInfo": {
+                      "responseStreamDisconnected": {
+                        "httpStatusCode": 503
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "requests": [
+              {
+                "method": "item/commandExecution/requestApproval",
+                "id": 9,
+                "params": {
+                  "callId": "call-9",
+                  "command": "echo hello",
+                  "cwd": "/workspace"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "broadcast",
+      "method": "thread-stream-state-changed",
+      "sourceClientId": "client-compatibility",
+      "version": 4,
+      "params": {
+        "conversationId": "thread-compatibility",
+        "type": "thread-stream-state-changed",
+        "version": 4,
+        "change": {
+          "type": "patches",
+          "patches": [
+            {
+              "op": "add",
+              "path": ["requests", 1],
+              "value": {
+                "method": "item/tool/requestUserInput",
+                "id": 10,
+                "params": {
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-1",
+                  "itemId": "item-1",
+                  "questions": [
+                    {
+                      "id": "question-1",
+                      "header": "Scope",
+                      "question": "Proceed?",
+                      "options": [
+                        {
+                          "label": "Yes",
+                          "description": "Continue"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
