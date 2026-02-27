@@ -236,7 +236,7 @@ export class ServerRequestRouteDispatchOwner {
         url: input.url,
         traceDirectoryPath: this.deps.traceDirectoryPath,
         activityHistoryService: this.deps.activityHistoryService,
-        codexAdapter: this.deps.codexAdapter,
+        replayAdapter: this.deps.codexAdapter,
         clientErrorStore: this.deps.clientErrorStore,
         readObservabilitySnapshot: this.deps.readObservabilitySnapshot,
         parseInteger: this.deps.parseInteger,

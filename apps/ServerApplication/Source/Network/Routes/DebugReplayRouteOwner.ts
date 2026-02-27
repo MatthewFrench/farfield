@@ -19,7 +19,7 @@ const DebugReplayRouteStatusCodeByName = {
 } as const;
 
 const DebugReplayRouteErrorMessageByName = {
-  codexAdapterNotEnabled: "Codex adapter is not enabled",
+  replayAdapterNotEnabled: "Replay adapter is not enabled",
   desktopIpcNotConnected: "Desktop IPC is not connected",
   historyEntryNotFound: "History entry not found",
   historyPayloadNotFound: "History payload not found",
@@ -38,7 +38,7 @@ export class DebugReplayRouteOwner {
     const {
       req,
       pathname,
-      codexAdapter,
+      replayAdapter,
       jsonResponse,
       res,
       readJsonBody,
@@ -53,19 +53,19 @@ export class DebugReplayRouteOwner {
       return false;
     }
 
-    if (!codexAdapter) {
+    if (!replayAdapter) {
       jsonResponse(res, DebugReplayRouteStatusCodeByName.serverErrorServiceUnavailable, {
         ok: false,
-        error: DebugReplayRouteErrorMessageByName.codexAdapterNotEnabled,
+        error: DebugReplayRouteErrorMessageByName.replayAdapterNotEnabled,
       });
       return true;
     }
 
-    if (!codexAdapter.isIpcReady()) {
+    if (!replayAdapter.isIpcReady()) {
       jsonResponse(res, DebugReplayRouteStatusCodeByName.serverErrorServiceUnavailable, {
         ok: false,
         error:
-          codexAdapter.getRuntimeState().lastError ??
+          replayAdapter.getRuntimeState().lastError ??
           DebugReplayRouteErrorMessageByName.desktopIpcNotConnected,
       });
       return true;
@@ -111,7 +111,7 @@ export class DebugReplayRouteOwner {
     const options: SendRequestOptions = buildSendRequestOptions(frame);
 
     if (frame.type === DebugReplayFrameTypeByName.request) {
-      const replayPromise = codexAdapter.replayRequest(frame.method, frame.params, options);
+      const replayPromise = replayAdapter.replayRequest(frame.method, frame.params, options);
 
       if (body.waitForResponse === true) {
         const response = await replayPromise;
@@ -138,7 +138,7 @@ export class DebugReplayRouteOwner {
       return true;
     }
 
-    codexAdapter.replayBroadcast(frame.method, frame.params, options);
+    replayAdapter.replayBroadcast(frame.method, frame.params, options);
     jsonResponse(res, DebugReplayRouteStatusCodeByName.successOk, {
       ok: true,
       replayed: true,

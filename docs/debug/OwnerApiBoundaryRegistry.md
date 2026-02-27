@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 01:35:07Z
+Last Updated (UTC): 2026-02-27 01:38:21Z
 
 ## Purpose
 
@@ -18,6 +18,9 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 3. [`ServerRequestRouteDispatchOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ServerRequestRouteDispatchOwner.ts)
    - owns: route dispatch order and route dependency wiring.
    - query APIs: `dispatch`.
+4. [`DebugRouteContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/DebugRouteContracts.ts)
+   - owns: debug replay adapter boundary contract and debug route replay frame contracts.
+   - query APIs: `buildSendRequestOptions`.
 
 ## Server Agents Group
 

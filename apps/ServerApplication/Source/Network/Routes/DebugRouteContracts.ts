@@ -5,9 +5,9 @@ import {
   type DebugErrorEvent,
   type DebugErrorSeverity,
   type IpcRequestFrame,
+  type IpcResponseFrame,
   type JsonValue,
 } from "@farfield/protocol";
-import type { CodexAgentAdapter } from "../../Agents/Adapters/CodexAgentAdapter.js";
 import type { ActivityHistoryService } from "../../Modules/Activity/ActivityHistoryService.js";
 import type { ClientErrorStore } from "../../Modules/Debugging/ClientErrorStore.js";
 import type { ServerObservabilitySnapshot } from "../ServerObservabilitySnapshotOwner.js";
@@ -114,6 +114,25 @@ export class DebugReplayFrameParseError extends Error {
   }
 }
 
+export interface DebugReplayAdapterRuntimeState {
+  lastError: string | null;
+}
+
+export interface DebugReplayAdapter {
+  isIpcReady(): boolean;
+  getRuntimeState(): DebugReplayAdapterRuntimeState;
+  replayRequest(
+    method: string,
+    params: IpcRequestFrame["params"],
+    options: SendRequestOptions,
+  ): Promise<IpcResponseFrame["result"]>;
+  replayBroadcast(
+    method: string,
+    params: IpcRequestFrame["params"],
+    options: SendRequestOptions,
+  ): void;
+}
+
 export interface DebugRouteDependencies {
   req: IncomingMessage;
   res: ServerResponse;
@@ -122,7 +141,7 @@ export interface DebugRouteDependencies {
   url: URL;
   traceDirectoryPath: string;
   activityHistoryService: ActivityHistoryService;
-  codexAdapter: CodexAgentAdapter | null;
+  replayAdapter: DebugReplayAdapter | null;
   clientErrorStore: ClientErrorStore;
   readObservabilitySnapshot: () => ServerObservabilitySnapshot;
   parseInteger: (value: string | null, defaultValue: number) => number;

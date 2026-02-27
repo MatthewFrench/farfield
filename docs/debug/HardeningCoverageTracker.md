@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 01:35:07Z
+Last Updated (UTC): 2026-02-27 01:38:21Z
 
 ## Scope Model
 
@@ -193,6 +193,22 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-8)
+
+The current in-progress wave applies route-boundary decoupling in server debug replay routing:
+
+1. Replaced concrete `CodexAgentAdapter` dependency in debug route contracts with a typed replay-adapter owner interface.
+2. Updated `DebugReplayRouteOwner` to consume the replay-adapter contract instead of adapter-specific concrete type usage.
+3. Updated route dispatch wiring to pass the adapter through the replay-adapter boundary contract.
+4. Added owner-registry coverage for debug route contracts under the server network group.
+
+Files touched in this continuation segment:
+
+1. `apps/ServerApplication/Source/Network/Routes/DebugRouteContracts.ts`
+2. `apps/ServerApplication/Source/Network/Routes/DebugReplayRouteOwner.ts`
+3. `apps/ServerApplication/Source/Network/ServerRequestRouteDispatchOwner.ts`
+4. `docs/debug/OwnerApiBoundaryRegistry.md`
 
 ## Latest Continuation Commit Wave (Current-7)
 
