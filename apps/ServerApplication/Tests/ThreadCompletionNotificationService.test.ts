@@ -8,7 +8,6 @@ import {
 } from "@farfield/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { CodexAgentAdapter } from "../Source/Agents/Adapters/CodexAgentAdapter.js";
 import { NtfyNotifier } from "../Source/Modules/PushNotifications/NtfyNotifier.js";
 import { PushSendStore } from "../Source/Modules/PushNotifications/PushSendStore.js";
 import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
@@ -162,7 +161,7 @@ describe("ThreadCompletionNotificationService", () => {
 
     const pushSystemEvents: string[] = [];
     const service = new ThreadCompletionNotificationService({
-      readCodexAdapter: () => null,
+      readThreadLiveState: async () => null,
       threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
       pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
       ntfyNotifier,
@@ -201,7 +200,7 @@ describe("ThreadCompletionNotificationService", () => {
     });
 
     const service = new ThreadCompletionNotificationService({
-      readCodexAdapter: () => null,
+      readThreadLiveState: async () => null,
       threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
       pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
       ntfyNotifier,
@@ -266,13 +265,11 @@ describe("ThreadCompletionNotificationService", () => {
       requests: [],
     });
 
-    const codexAdapter = {
-      readLiveState: async (_threadId: string) => ({
-        ownerClientId: null,
-        conversationState,
-        liveStateError: null,
-      }),
-    } as CodexAgentAdapter;
+    const readThreadLiveState = async (_threadId: string) => ({
+      ownerClientId: null,
+      conversationState,
+      liveStateError: null,
+    });
 
     const recordingPushService = new RecordingPushService();
     const ntfyNotifier = new NtfyNotifier({
@@ -285,7 +282,7 @@ describe("ThreadCompletionNotificationService", () => {
 
     const pushSystemEvents: string[] = [];
     const service = new ThreadCompletionNotificationService({
-      readCodexAdapter: () => codexAdapter,
+      readThreadLiveState,
       threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
       pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
       ntfyNotifier,
@@ -373,18 +370,16 @@ describe("ThreadCompletionNotificationService", () => {
       requests: [],
     });
 
-    const codexAdapter = {
-      readLiveState: async (_threadId: string) => ({
-        ownerClientId: null,
-        conversationState,
-        liveStateError: null,
-      }),
-    } as CodexAgentAdapter;
+    const readThreadLiveState = async (_threadId: string) => ({
+      ownerClientId: null,
+      conversationState,
+      liveStateError: null,
+    });
 
     const warningSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     try {
       const service = new ThreadCompletionNotificationService({
-        readCodexAdapter: () => codexAdapter,
+        readThreadLiveState,
         threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
         pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
         ntfyNotifier: new NtfyNotifier({
@@ -459,17 +454,15 @@ describe("ThreadCompletionNotificationService", () => {
       requests: [],
     });
 
-    const codexAdapter = {
-      readLiveState: async (_threadId: string) => ({
-        ownerClientId: null,
-        conversationState,
-        liveStateError: null,
-      }),
-    } as CodexAgentAdapter;
+    const readThreadLiveState = async (_threadId: string) => ({
+      ownerClientId: null,
+      conversationState,
+      liveStateError: null,
+    });
 
     const pushSystemEvents: string[] = [];
     const service = new ThreadCompletionNotificationService({
-      readCodexAdapter: () => codexAdapter,
+      readThreadLiveState,
       threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
       pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
       ntfyNotifier: new NtfyNotifier({

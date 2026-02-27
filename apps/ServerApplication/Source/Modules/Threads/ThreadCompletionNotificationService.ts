@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { PushNotificationPayload, StoredPushSubscription } from "@farfield/protocol";
 import { z } from "zod";
-import type { CodexAgentAdapter } from "../../Agents/Adapters/CodexAgentAdapter.js";
 import type { AgentThreadLiveState } from "../../Agents/Types.js";
 import type { PushMutationConcurrencyCoordinator } from "../../Network/PushMutationConcurrencyCoordinator.js";
 import type { ThreadConcurrencyCoordinator } from "../../Network/ThreadConcurrencyCoordinator.js";
@@ -50,8 +49,12 @@ const ThreadNotificationContextSchema = z
   })
   .passthrough();
 
+export type ThreadCompletionLiveStateReader = (
+  threadId: string,
+) => Promise<AgentThreadLiveState | null>;
+
 export interface ThreadCompletionNotificationServiceDependencies {
-  readCodexAdapter: () => CodexAgentAdapter | null;
+  readThreadLiveState: ThreadCompletionLiveStateReader;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   pushMutationConcurrencyCoordinator: PushMutationConcurrencyCoordinator;
   ntfyNotifier: NtfyNotifier;
@@ -120,7 +123,7 @@ const DEFAULT_COMPLETION_NOTIFICATION_CONTEXT: CompletionNotificationContext = {
 // Owns completion notification fan-out and watermark commits.
 // Debounced scheduler reruns are expected; commit only advances after delivery succeeds.
 export class ThreadCompletionNotificationService {
-  private readonly readCodexAdapter: () => CodexAgentAdapter | null;
+  private readonly readThreadLiveState: ThreadCompletionLiveStateReader;
   private readonly threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   private readonly pushMutationConcurrencyCoordinator: PushMutationConcurrencyCoordinator;
   private readonly ntfyNotifier: NtfyNotifier;
@@ -134,7 +137,7 @@ export class ThreadCompletionNotificationService {
   private readonly completionDetector: CompletionDetector;
 
   public constructor(deps: ThreadCompletionNotificationServiceDependencies) {
-    this.readCodexAdapter = deps.readCodexAdapter;
+    this.readThreadLiveState = deps.readThreadLiveState;
     this.threadConcurrencyCoordinator = deps.threadConcurrencyCoordinator;
     this.pushMutationConcurrencyCoordinator = deps.pushMutationConcurrencyCoordinator;
     this.ntfyNotifier = deps.ntfyNotifier;
@@ -166,13 +169,12 @@ export class ThreadCompletionNotificationService {
   }
 
   private async checkAndNotifyThreadCompletionUnderThreadLock(threadId: string): Promise<void> {
-    const codexAdapter = this.readCodexAdapter();
-    if (!codexAdapter) {
+    const liveState = await this.readThreadLiveState(threadId);
+    if (liveState === null) {
       return;
     }
 
     try {
-      const liveState = await codexAdapter.readLiveState(threadId);
       // Debounced scheduler reruns may re-check the same completion marker.
       // CompletionDetector keeps this path idempotent until commit advances the marker.
       const completionCandidate = this.completionDetector.detect(

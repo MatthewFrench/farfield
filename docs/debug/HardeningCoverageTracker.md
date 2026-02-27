@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 01:43:55Z
+Last Updated (UTC): 2026-02-27 02:12:17Z
 
 ## Scope Model
 
@@ -193,6 +193,21 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-10)
+
+The current in-progress wave applies module-level owner boundary cleanup for thread completion notification orchestration:
+
+1. Replaced concrete codex adapter dependency in `ThreadCompletionNotificationService` with an explicit live-state reader owner contract (`readThreadLiveState`).
+2. Updated server bootstrap composition wiring to provide the live-state reader contract while preserving deterministic no-reader behavior (`null` response).
+3. Updated thread completion notification service tests to consume the new owner contract directly, removing adapter concrete-type coupling from tests.
+
+Files touched in this continuation segment:
+
+1. `apps/ServerApplication/Source/Modules/Threads/ThreadCompletionNotificationService.ts`
+2. `apps/ServerApplication/Source/Application/ServerBootstrap.ts`
+3. `apps/ServerApplication/Tests/ThreadCompletionNotificationService.test.ts`
+4. `apps/ServerApplication/Tests/ThreadCompletionNotificationServiceContext.test.ts`
 
 ## Latest Continuation Commit Wave (Current-9)
 

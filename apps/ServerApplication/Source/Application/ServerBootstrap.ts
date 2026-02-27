@@ -207,7 +207,17 @@ const runtimeStateOwner = new RuntimeStateOwner(
 const ntfyNotifier = new NtfyNotifier(runtimeConfiguration.ntfyConfiguration);
 const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
 const threadCompletionNotificationService = new ThreadCompletionNotificationService({
-  readCodexAdapter,
+  readThreadLiveState: async (threadId) => {
+    const codexAdapter = readCodexAdapter();
+    if (
+      !codexAdapter ||
+      !codexAdapter.capabilities.canReadLiveState ||
+      !codexAdapter.readLiveState
+    ) {
+      return null;
+    }
+    return codexAdapter.readLiveState(threadId);
+  },
   threadConcurrencyCoordinator,
   pushMutationConcurrencyCoordinator,
   ntfyNotifier,

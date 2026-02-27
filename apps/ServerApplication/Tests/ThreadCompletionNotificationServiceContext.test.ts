@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { parseThreadConversationState } from "@farfield/protocol";
 import { afterEach, describe, expect, it } from "vitest";
-import type { CodexAgentAdapter } from "../Source/Agents/Adapters/CodexAgentAdapter.js";
 import {
   NtfyNotifier,
   type NtfyThreadCompletedPayload,
@@ -87,17 +86,15 @@ describe("ThreadCompletionNotificationServiceContext", () => {
       requests: [],
     });
 
-    const codexAdapter = {
-      readLiveState: async (_threadId: string) => ({
-        ownerClientId: null,
-        conversationState,
-        liveStateError: null,
-      }),
-    } as CodexAgentAdapter;
+    const readThreadLiveState = async (_threadId: string) => ({
+      ownerClientId: null,
+      conversationState,
+      liveStateError: null,
+    });
 
     const pushSystemEvents: string[] = [];
     const service = new ThreadCompletionNotificationService({
-      readCodexAdapter: () => codexAdapter,
+      readThreadLiveState,
       threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
       pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
       ntfyNotifier: new NtfyNotifier({
@@ -155,17 +152,15 @@ describe("ThreadCompletionNotificationServiceContext", () => {
       requests: [],
     });
 
-    const codexAdapter = {
-      readLiveState: async (_threadId: string) => ({
-        ownerClientId: null,
-        conversationState,
-        liveStateError: null,
-      }),
-    } as CodexAgentAdapter;
+    const readThreadLiveState = async (_threadId: string) => ({
+      ownerClientId: null,
+      conversationState,
+      liveStateError: null,
+    });
 
     const recordingNtfyNotifier = new RecordingNtfyNotifier();
     const service = new ThreadCompletionNotificationService({
-      readCodexAdapter: () => codexAdapter,
+      readThreadLiveState,
       threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
       pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
       ntfyNotifier: recordingNtfyNotifier,
@@ -220,17 +215,15 @@ describe("ThreadCompletionNotificationServiceContext", () => {
       requests: [],
     });
 
-    const codexAdapter = {
-      readLiveState: async (_threadId: string) => ({
-        ownerClientId: null,
-        conversationState,
-        liveStateError: null,
-      }),
-    } as CodexAgentAdapter;
+    const readThreadLiveState = async (_threadId: string) => ({
+      ownerClientId: null,
+      conversationState,
+      liveStateError: null,
+    });
 
     const recordingNtfyNotifier = new RecordingNtfyNotifier();
     const service = new ThreadCompletionNotificationService({
-      readCodexAdapter: () => codexAdapter,
+      readThreadLiveState,
       threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
       pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
       ntfyNotifier: recordingNtfyNotifier,

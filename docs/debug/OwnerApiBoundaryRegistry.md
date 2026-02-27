@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 01:38:21Z
+Last Updated (UTC): 2026-02-27 02:12:35Z
 
 ## Purpose
 
@@ -34,6 +34,14 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 3. [`OpenCodeThreadCursorContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/OpenCodeThreadCursorContracts.ts)
    - owns: cursor boundary contract encoding/decoding and schema enforcement.
    - query APIs: `encodeOpenCodeThreadCursor`, `decodeOpenCodeThreadCursor`.
+
+## Server Modules Group
+
+1. [`ThreadCompletionNotificationService.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Modules/Threads/ThreadCompletionNotificationService.ts)
+   - owns: thread-completion notification fan-out scheduling, completion watermark progress, and push send orchestration under thread/push coordinators.
+   - query APIs: `scheduleThreadCompletionCheck`.
+   - mutation APIs: `checkAndNotifyThreadCompletion`.
+   - dependency boundary: consumes `readThreadLiveState` reader contract and does not depend on concrete adapter types.
 
 ## Web Application State Group
 
