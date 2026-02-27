@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 02:40:41Z
+Last Updated (UTC): 2026-02-27 02:50:41Z
 
 ## Purpose
 
@@ -129,6 +129,18 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
    - query APIs: `parseAppServerIncomingLine`.
 4. [`AppServerTransportConstants.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerTransportConstants.ts)
    - owns: shared app-server transport literals consumed by transport owner modules.
+5. [`IpcClientConstants.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/IpcClientConstants.ts)
+   - owns: desktop IPC transport constants and initialize-result boundary schema.
+6. [`IpcFrameCodec.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/IpcFrameCodec.ts)
+   - owns: IPC frame byte encoding and inbound payload parsing boundaries.
+   - query APIs: `encodeIpcFrame`, `parseIpcPayloadBuffer`.
+7. [`IpcPendingRequestOwner.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/IpcPendingRequestOwner.ts)
+   - owns: IPC pending request lifecycle (register, claim, reject-one, reject-all, timeout cleanup).
+   - query APIs: `createPendingRequestPromise`, `claimPendingRequest`.
+   - mutation APIs: `rejectPendingRequest`, `rejectAllPendingRequests`.
+8. [`IpcErrorMessageFormatter.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/IpcErrorMessageFormatter.ts)
+   - owns: deterministic transport/runtime error value message formatting.
+   - query APIs: `formatIpcErrorMessage`.
 
 ## Boundary Rules to Enforce in Reviews
 

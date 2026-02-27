@@ -10,19 +10,25 @@ import {
   type IpcResponseFrame,
   IpcResponseFrameSchema,
   type JsonValue,
-  JsonValueSchema,
   parseIpcFrame,
 } from "@farfield/protocol";
-import { z } from "zod";
 import { DesktopIpcError } from "./Errors.js";
+import {
+  IPC_CLIENT,
+  IPC_DEFAULTS,
+  IPC_ERROR_MESSAGES,
+  IPC_EVENTS,
+  IPC_FRAME_BOUNDARY,
+  IPC_FRAME_TYPES,
+  IPC_INITIALIZE_RESULT_SCHEMA,
+  IPC_METHODS,
+  IPC_PROTOCOL_ERRORS,
+  IPC_RESULT_TYPES,
+} from "./IpcClientConstants.js";
+import { formatIpcErrorMessage } from "./IpcErrorMessageFormatter.js";
 import { IpcFrameBufferAccumulator } from "./IpcFrameBufferAccumulator.js";
-
-interface PendingRequest {
-  method: string;
-  timer: NodeJS.Timeout;
-  resolve: (value: IpcResponseFrame) => void;
-  reject: (error: Error) => void;
-}
+import { encodeIpcFrame, parseIpcPayloadBuffer } from "./IpcFrameCodec.js";
+import { IpcPendingRequestOwner } from "./IpcPendingRequestOwner.js";
 
 export interface SendRequestOptions {
   targetClientId?: string;
@@ -42,84 +48,6 @@ export interface IpcConnectionState {
 }
 export type IpcConnectionListener = (state: IpcConnectionState) => void;
 
-const IPC_FRAME_BOUNDARY = {
-  maxFrameSizeBytes: 256 * 1024 * 1024,
-  headerSizeBytes: 4,
-  headerLengthOffsetBytes: 0,
-  payloadEncoding: "utf8",
-} as const;
-const IPC_DEFAULTS = {
-  requestTimeoutMilliseconds: 20_000,
-  protocolVersion: 1,
-} as const;
-const IPC_CLIENT = {
-  initializingClientId: "initializing-client",
-  clientType: "farfield",
-} as const;
-const IPC_EVENTS = {
-  frame: "frame",
-  connectionState: "connection-state",
-  socketConnect: "connect",
-  socketData: "data",
-  socketClose: "close",
-  socketError: "error",
-} as const;
-const IPC_FRAME_TYPES = {
-  broadcast: "broadcast",
-  request: "request",
-  response: "response",
-  clientDiscoveryRequest: "client-discovery-request",
-  clientDiscoveryResponse: "client-discovery-response",
-} as const;
-const IPC_RESULT_TYPES = {
-  error: "error",
-} as const;
-const IPC_METHODS = {
-  initialize: "initialize",
-} as const;
-const IPC_PROTOCOL_ERRORS = {
-  noHandlerForRequest: "no-handler-for-request",
-} as const;
-const IPC_ERROR_MESSAGES = {
-  alreadyConnected: "IPC client is already connected",
-  socketClosed: "IPC socket closed",
-  socketErrorPrefix: "IPC socket error",
-  clientDisconnected: "IPC client disconnected",
-  socketNotConnected: "IPC socket is not connected",
-  frameTooLargePrefix: "IPC frame exceeded limit",
-  invalidJsonFrame: "IPC frame contained invalid JSON",
-  schemaValidationFailurePrefix: "IPC frame schema validation failed",
-  requestTimeoutPrefix: "IPC request timed out",
-  requestWriteFailurePrefix: "IPC request write failed for",
-  initializeTimeout: "IPC initialize request timed out",
-  initializeWriteFailure: "IPC initialize write failed",
-} as const;
-const InitializeResultSchema = z
-  .object({
-    clientId: z.string().min(1),
-  })
-  .passthrough();
-
-function toErrorMessage<ValueType>(value: ValueType): string {
-  if (value instanceof Error) {
-    return value.message;
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-
-  const parsedStructuredValue = JsonValueSchema.safeParse(value);
-  if (!parsedStructuredValue.success) {
-    return String(value);
-  }
-
-  if (typeof parsedStructuredValue.data === "string") {
-    return parsedStructuredValue.data;
-  }
-
-  return JSON.stringify(parsedStructuredValue.data);
-}
-
 /**
  * Owns raw desktop IPC socket lifecycle and framed request/response delivery.
  * Higher-level thread/message behavior is implemented by service/coordinator owners.
@@ -130,7 +58,7 @@ export class DesktopIpcClient {
   private socket: net.Socket | null = null;
   private readonly frameBuffer = new IpcFrameBufferAccumulator();
   private clientId: string | null = null;
-  private readonly pending = new Map<string, PendingRequest>();
+  private readonly pendingRequestOwner = new IpcPendingRequestOwner();
   private readonly events = new EventEmitter();
 
   public constructor(options: DesktopIpcClientOptions) {
@@ -186,11 +114,7 @@ export class DesktopIpcClient {
   }
 
   private rejectAll(error: Error): void {
-    for (const request of this.pending.values()) {
-      clearTimeout(request.timer);
-      request.reject(error);
-    }
-    this.pending.clear();
+    this.pendingRequestOwner.rejectAllPendingRequests(error);
   }
 
   private ensureSocket(): net.Socket {
@@ -248,18 +172,11 @@ export class DesktopIpcClient {
     timeoutMs: number,
     timeoutErrorMessage: string,
   ): Promise<IpcResponseFrame> {
-    return new Promise<IpcResponseFrame>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(requestId);
-        reject(new DesktopIpcError(timeoutErrorMessage));
-      }, timeoutMs);
-
-      this.pending.set(requestId, {
-        method,
-        timer,
-        resolve,
-        reject,
-      });
+    return this.pendingRequestOwner.createPendingRequestPromise({
+      requestId,
+      method,
+      timeoutMilliseconds: timeoutMs,
+      timeoutErrorMessage,
     });
   }
 
@@ -271,30 +188,16 @@ export class DesktopIpcClient {
     try {
       this.writeFrame(frame);
     } catch (error) {
-      this.rejectPendingRequestById(
+      this.pendingRequestOwner.rejectPendingRequest(
         requestId,
-        new DesktopIpcError(`${writeFailureMessagePrefix}: ${toErrorMessage(error)}`),
+        new DesktopIpcError(`${writeFailureMessagePrefix}: ${formatIpcErrorMessage(error)}`),
       );
     }
   }
 
   private writeFrame(frame: IpcFrame): void {
     const socket = this.ensureSocket();
-    const encoded = Buffer.from(JSON.stringify(frame), IPC_FRAME_BOUNDARY.payloadEncoding);
-    const header = Buffer.alloc(IPC_FRAME_BOUNDARY.headerSizeBytes);
-    header.writeUInt32LE(encoded.length, IPC_FRAME_BOUNDARY.headerLengthOffsetBytes);
-    socket.write(Buffer.concat([header, encoded]));
-  }
-
-  private rejectPendingRequestById(requestId: string, error: Error): void {
-    const pending = this.pending.get(requestId);
-    if (!pending) {
-      return;
-    }
-
-    clearTimeout(pending.timer);
-    this.pending.delete(requestId);
-    pending.reject(error);
+    socket.write(encodeIpcFrame(frame));
   }
 
   private respondClientDiscovery(requestId: string): void {
@@ -320,15 +223,6 @@ export class DesktopIpcClient {
     this.writeFrame(response);
   }
 
-  private parseInboundPayload(payloadBuffer: Buffer): JsonValue {
-    const payloadText = payloadBuffer.toString(IPC_FRAME_BOUNDARY.payloadEncoding);
-    return JsonValueSchema.parse(JSON.parse(payloadText));
-  }
-
-  private parseInboundFrame(rawPayload: JsonValue): IpcFrame {
-    return parseIpcFrame(rawPayload);
-  }
-
   private handleInboundFrame(frame: IpcFrame): void {
     this.emitFrame(frame);
 
@@ -350,23 +244,22 @@ export class DesktopIpcClient {
   }
 
   private handleInboundResponseFrame(frame: IpcResponseFrame): void {
-    const pending = this.pending.get(frame.requestId);
-    if (!pending) {
+    const pendingRequest = this.pendingRequestOwner.claimPendingRequest(frame.requestId);
+    if (!pendingRequest) {
       return;
     }
 
-    this.pending.delete(frame.requestId);
-    clearTimeout(pending.timer);
-
     if (frame.resultType === IPC_RESULT_TYPES.error) {
-      pending.reject(
-        new DesktopIpcError(`IPC ${pending.method} failed: ${toErrorMessage(frame.error)}`),
+      pendingRequest.reject(
+        new DesktopIpcError(
+          `IPC ${pendingRequest.method} failed: ${formatIpcErrorMessage(frame.error)}`,
+        ),
       );
       return;
     }
 
     this.captureInitializeClientIdentifier(frame);
-    pending.resolve(IpcResponseFrameSchema.parse(frame));
+    pendingRequest.resolve(IpcResponseFrameSchema.parse(frame));
   }
 
   private captureInitializeClientIdentifier(frame: IpcResponseFrame): void {
@@ -375,7 +268,7 @@ export class DesktopIpcClient {
     }
 
     // Some hosts append extra initialize fields. We only adopt a validated client identifier.
-    const parsedInitializeResult = InitializeResultSchema.safeParse(frame.result);
+    const parsedInitializeResult = IPC_INITIALIZE_RESULT_SCHEMA.safeParse(frame.result);
     if (parsedInitializeResult.success) {
       this.clientId = parsedInitializeResult.data.clientId;
     }
@@ -408,7 +301,7 @@ export class DesktopIpcClient {
 
       let raw: JsonValue;
       try {
-        raw = this.parseInboundPayload(readResult.payload);
+        raw = parseIpcPayloadBuffer(readResult.payload);
       } catch {
         this.rejectAll(new DesktopIpcError(IPC_ERROR_MESSAGES.invalidJsonFrame));
         return;
@@ -416,11 +309,11 @@ export class DesktopIpcClient {
 
       let frame: IpcFrame;
       try {
-        frame = this.parseInboundFrame(raw);
+        frame = parseIpcFrame(raw);
       } catch (error) {
         this.rejectAll(
           new DesktopIpcError(
-            `${IPC_ERROR_MESSAGES.schemaValidationFailurePrefix}: ${toErrorMessage(error)}`,
+            `${IPC_ERROR_MESSAGES.schemaValidationFailurePrefix}: ${formatIpcErrorMessage(error)}`,
           ),
         );
         this.socket?.destroy();

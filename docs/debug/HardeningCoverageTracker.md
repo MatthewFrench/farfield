@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 02:40:41Z
+Last Updated (UTC): 2026-02-27 02:50:41Z
 
 ## Scope Model
 
@@ -193,6 +193,24 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-14)
+
+The current in-progress wave applies package-layer IPC owner separation for desktop socket transport:
+
+1. Split IPC protocol constants and initialize result schema ownership into `IpcClientConstants`.
+2. Split frame encoding and inbound payload parsing ownership into `IpcFrameCodec`.
+3. Split pending request lifecycle ownership into `IpcPendingRequestOwner`.
+4. Split transport error-value formatting ownership into `IpcErrorMessageFormatter`.
+5. Reduced `IpcClient` to socket lifecycle and request/response orchestration over these owner modules while preserving the public API.
+
+Files touched in this continuation segment:
+
+1. `packages/CodexInterfaceAdapter/Source/IpcClient.ts`
+2. `packages/CodexInterfaceAdapter/Source/IpcClientConstants.ts`
+3. `packages/CodexInterfaceAdapter/Source/IpcFrameCodec.ts`
+4. `packages/CodexInterfaceAdapter/Source/IpcPendingRequestOwner.ts`
+5. `packages/CodexInterfaceAdapter/Source/IpcErrorMessageFormatter.ts`
 
 ## Latest Continuation Commit Wave (Current-13)
 
