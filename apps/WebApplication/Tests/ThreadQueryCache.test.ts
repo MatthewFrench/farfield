@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ThreadQueryCache } from "@/Features/Threads/DataAccess/ThreadQueryCache";
 import type { ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { ThreadListCacheKeyByName } from "@/Features/Threads/StateManagement/ThreadListCacheKeyContracts";
 
 function buildThreadListResponse(threadIdentifier: string): ThreadListResponse {
   return {
@@ -26,13 +27,13 @@ describe("ThreadQueryCache", () => {
       readCurrentEpochMilliseconds: () => currentEpochMilliseconds,
     });
 
-    cache.write("threads:active", buildThreadListResponse("thread-active"));
+    cache.write(ThreadListCacheKeyByName.activeThreads, buildThreadListResponse("thread-active"));
 
     currentEpochMilliseconds = 1_049;
-    expect(cache.readFresh("threads:active")).not.toBeNull();
+    expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).not.toBeNull();
 
     currentEpochMilliseconds = 1_050;
-    expect(cache.readFresh("threads:active")).toBeNull();
+    expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).toBeNull();
   });
 
   it("evicts least-recently-used keys while preserving recently read entries", () => {
@@ -44,16 +45,16 @@ describe("ThreadQueryCache", () => {
     const archivedResponse = buildThreadListResponse("thread-archived");
     const removedResponse = buildThreadListResponse("thread-removed");
 
-    cache.write("threads:active", activeResponse);
-    cache.write("threads:archived", archivedResponse);
+    cache.write(ThreadListCacheKeyByName.activeThreads, activeResponse);
+    cache.write(ThreadListCacheKeyByName.archivedThreads, archivedResponse);
 
     // Re-read active to keep it at the end of the LRU order before the next write.
-    expect(cache.readFresh("threads:active")).toEqual(activeResponse);
+    expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).toEqual(activeResponse);
 
     cache.write("threads:removed", removedResponse);
 
-    expect(cache.readFresh("threads:active")).toEqual(activeResponse);
-    expect(cache.readFresh("threads:archived")).toBeNull();
+    expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).toEqual(activeResponse);
+    expect(cache.readFresh(ThreadListCacheKeyByName.archivedThreads)).toBeNull();
     expect(cache.readFresh("threads:removed")).toEqual(removedResponse);
   });
 });

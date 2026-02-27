@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { ThreadListCacheKeyByName } from "@/Features/Threads/StateManagement/ThreadListCacheKeyContracts";
 import { ThreadRefreshConcurrencyCoordinator } from "@/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
 
 function buildThreadListResponse(threadIdentifier: string): ThreadListResponse {
@@ -34,8 +35,8 @@ describe("ThreadRefreshConcurrencyCoordinator", () => {
     };
 
     const [firstResult, secondResult] = await Promise.all([
-      coordinator.runSingleFlight("threads:active", task),
-      coordinator.runSingleFlight("threads:active", task),
+      coordinator.runSingleFlight(ThreadListCacheKeyByName.activeThreads, task),
+      coordinator.runSingleFlight(ThreadListCacheKeyByName.activeThreads, task),
     ]);
 
     expect(invocationCount).toBe(1);
@@ -56,11 +57,14 @@ describe("ThreadRefreshConcurrencyCoordinator", () => {
       return successfulResponse;
     };
 
-    await expect(coordinator.runSingleFlight("threads:archived", task)).rejects.toThrow(
-      "request failed",
-    );
+    await expect(
+      coordinator.runSingleFlight(ThreadListCacheKeyByName.archivedThreads, task),
+    ).rejects.toThrow("request failed");
 
-    const retryResult = await coordinator.runSingleFlight("threads:archived", task);
+    const retryResult = await coordinator.runSingleFlight(
+      ThreadListCacheKeyByName.archivedThreads,
+      task,
+    );
     expect(retryResult).toEqual(successfulResponse);
     expect(invocationCount).toBe(2);
   });

@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 01:29:34Z
+Last Updated (UTC): 2026-02-27 01:35:07Z
 
 ## Scope Model
 
@@ -193,6 +193,24 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-7)
+
+The current in-progress wave applies folder-level ownership hardening for thread list cache key contracts:
+
+1. Extracted canonical thread-list cache keys into an owned contract module (`ThreadListCacheKeyContracts`).
+2. Updated `ThreadListStateController` to consume cache key contracts instead of inline literals.
+3. Updated thread cache and concurrency tests to consume the same owner contracts, removing duplicated string literals.
+4. Extended owner registry coverage with explicit Threads-group ownership entries.
+
+Files touched in this continuation segment:
+
+1. `apps/WebApplication/Source/Features/Threads/StateManagement/ThreadListCacheKeyContracts.ts`
+2. `apps/WebApplication/Source/Features/Threads/StateManagement/ThreadListStateController.ts`
+3. `apps/WebApplication/Tests/ThreadQueryCache.test.ts`
+4. `apps/WebApplication/Tests/ThreadRefreshConcurrencyCoordinator.test.ts`
+5. `apps/WebApplication/Tests/ThreadOwnership.test.ts`
+6. `docs/debug/OwnerApiBoundaryRegistry.md`
 
 ## Latest Continuation Commit Wave (Current-6)
 

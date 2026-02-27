@@ -6,6 +6,7 @@ import type {
   ThreadListLoadOptions,
   ThreadListResponse,
 } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { ThreadListCacheKeyByName } from "@/Features/Threads/StateManagement/ThreadListCacheKeyContracts";
 import { ThreadListPresentationStateResolver } from "@/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import { ThreadListStateStore } from "@/Features/Threads/StateManagement/ThreadListStateStore";
@@ -88,11 +89,11 @@ describe("Thread ownership modules", () => {
       threadTwoUpdatedAt: 1_700_000_001,
     });
 
-    expect(cache.readFresh("threads:active")).toBeNull();
-    cache.write("threads:active", response);
-    expect(cache.readFresh("threads:active")).toEqual(response);
-    cache.invalidate("threads:active");
-    expect(cache.readFresh("threads:active")).toBeNull();
+    expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).toBeNull();
+    cache.write(ThreadListCacheKeyByName.activeThreads, response);
+    expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).toEqual(response);
+    cache.invalidate(ThreadListCacheKeyByName.activeThreads);
+    expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).toBeNull();
   });
 
   it("ThreadQueryCache enforces maximum entries with least-recently-used eviction", () => {
@@ -102,14 +103,14 @@ describe("Thread ownership modules", () => {
       threadTwoUpdatedAt: 1_700_000_001,
     });
 
-    cache.write("threads:active", response);
-    cache.write("threads:archived", response);
-    expect(cache.readFresh("threads:active")).toEqual(response);
+    cache.write(ThreadListCacheKeyByName.activeThreads, response);
+    cache.write(ThreadListCacheKeyByName.archivedThreads, response);
+    expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).toEqual(response);
 
     cache.write("threads:removed-projects", response);
 
-    expect(cache.readFresh("threads:active")).toEqual(response);
-    expect(cache.readFresh("threads:archived")).toBeNull();
+    expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).toEqual(response);
+    expect(cache.readFresh(ThreadListCacheKeyByName.archivedThreads)).toBeNull();
     expect(cache.readFresh("threads:removed-projects")).toEqual(response);
   });
 
@@ -129,8 +130,8 @@ describe("Thread ownership modules", () => {
     };
 
     const [first, second] = await Promise.all([
-      coordinator.runSingleFlight("threads:active", task),
-      coordinator.runSingleFlight("threads:active", task),
+      coordinator.runSingleFlight(ThreadListCacheKeyByName.activeThreads, task),
+      coordinator.runSingleFlight(ThreadListCacheKeyByName.activeThreads, task),
     ]);
 
     expect(callCount).toBe(1);

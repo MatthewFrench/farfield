@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 01:29:34Z
+Last Updated (UTC): 2026-02-27 01:35:07Z
 
 ## Purpose
 
@@ -59,6 +59,16 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 3. [`SelectedThreadStreamEventStateResolver.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/DomainModel/SelectedThreadStreamEventStateResolver.ts)
    - owns: stream event append/reset merge policy and retention bounds.
    - query APIs: `resolveNextStreamEventsState`.
+
+## Web Features Threads Group
+
+1. [`ThreadListStateController.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Threads/StateManagement/ThreadListStateController.ts)
+   - owns: active/archived thread list read orchestration, cache invalidation boundaries, and presentation/state-store composition.
+   - query APIs: `loadActiveThreadState`, `loadArchivedThreadState`, `readThreadListPresentationState`.
+   - mutation APIs: `invalidateActiveThreadQuery`, `invalidateArchivedThreadQuery`, `invalidateThreadQueries`, `resetState`.
+2. [`ThreadListCacheKeyContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Threads/StateManagement/ThreadListCacheKeyContracts.ts)
+   - owns: canonical cache key contracts for active and archived thread list query surfaces.
+   - query APIs: `readThreadListCacheKeyForArchiveState`.
 
 ## Web Shared Transport Group
 

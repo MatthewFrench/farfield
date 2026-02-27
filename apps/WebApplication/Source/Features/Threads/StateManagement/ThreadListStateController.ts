@@ -2,6 +2,10 @@ import { ThreadQueryCache } from "../DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "../DataAccess/ThreadServerClient";
 import type { ThreadListLoadOptions, ThreadListResponse } from "../DomainModel/ThreadGroupTypes";
 import {
+  readThreadListCacheKeyForArchiveState,
+  ThreadListCacheKeyByName,
+} from "./ThreadListCacheKeyContracts";
+import {
   type ThreadListPresentationStateInput,
   ThreadListPresentationStateResolver,
   type ThreadListPresentationStateResult,
@@ -13,8 +17,6 @@ import {
 } from "./ThreadListStateStore";
 import { ThreadRefreshConcurrencyCoordinator } from "./ThreadRefreshConcurrencyCoordinator";
 
-const ACTIVE_THREADS_CACHE_KEY = "threads:active";
-const ARCHIVED_THREADS_CACHE_KEY = "threads:archived";
 const THREAD_LIST_RESPONSE_NOT_TRUNCATED = false;
 
 export interface LoadActiveThreadStateInput {
@@ -169,11 +171,11 @@ export class ThreadListStateController {
   }
 
   public invalidateActiveThreadQuery(): void {
-    this.threadQueryCache.invalidate(ACTIVE_THREADS_CACHE_KEY);
+    this.threadQueryCache.invalidate(ThreadListCacheKeyByName.activeThreads);
   }
 
   public invalidateArchivedThreadQuery(): void {
-    this.threadQueryCache.invalidate(ARCHIVED_THREADS_CACHE_KEY);
+    this.threadQueryCache.invalidate(ThreadListCacheKeyByName.archivedThreads);
   }
 
   public invalidateThreadQueries(): void {
@@ -238,15 +240,10 @@ export class ThreadListStateController {
       ...this.buildThreadListActionMetadata(input.actionId, input.actionName),
     });
     return this.loadThreadList(
-      this.readThreadListCacheKey(input.archived),
+      readThreadListCacheKeyForArchiveState(input.archived),
       loadOptions,
       input.readFromCache,
     );
-  }
-
-  private readThreadListCacheKey(archived: boolean): string {
-    // Active and archived collections have independent mutation/invalidation boundaries.
-    return archived ? ARCHIVED_THREADS_CACHE_KEY : ACTIVE_THREADS_CACHE_KEY;
   }
 
   private buildThreadListActionMetadata(
