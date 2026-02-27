@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 06:19:21Z
+Last Updated (UTC): 2026-02-27 06:26:16Z
 
 ## Purpose
 
@@ -302,14 +302,68 @@ Some Farfield features are implemented through Desktop inter-process communicati
 3. `interrupt`
 4. Live stream state projection and stream-event reads
 
+## Deep-Dive Research: `sendUserMessage` vs `turn/start`
+
+Upstream evidence summary:
+
+1. `sendUserMessage` is in the upstream deprecated request section.
+2. `turn/start` is in the current v2 request section.
+3. Both server handlers submit user input into core thread execution, but `turn/start` adds richer v2 behavior.
+
+Behavioral differences verified from upstream source:
+
+1. `sendUserMessage`
+   - Uses v1 `SendUserMessageParams` (`conversation_id`, `items`).
+   - Submits `Op::UserInput` and returns empty response (`{}`).
+   - Does not expose per-turn override controls in request shape.
+2. `turn/start`
+   - Uses v2 `TurnStartParams` (`thread_id`, `input`) with optional per-turn overrides (`cwd`, `approval_policy`, `sandbox_policy`, `model`, `effort`, `summary`, `personality`, `output_schema`, optional collaboration mode).
+   - Returns `TurnStartResponse` with `turn`.
+   - Emits `turn/started` notification and full item lifecycle notifications.
+
+Farfield implication:
+
+1. Current Farfield app-server path uses `sendUserMessage` only for the non-Desktop inter-process communication message send route.
+2. Migrating to `turn/start` improves alignment with non-deprecated upstream API and provides richer controls.
+3. Farfield currently ignores app-server notifications in transport ownership, so moving to `turn/start` alone does not automatically unlock streamed progress in this path.
+
+Idiomatically correct migration path (research outcome):
+
+1. Phase 1: Add request-owner support for `turn/start` and switch non-Desktop inter-process communication message-send path from `sendUserMessage` to `turn/start`.
+2. Phase 2: Add optional app-server notification consumption in transport ownership for `turn/*` and `item/*` when needed by product flows.
+3. Phase 3: Add server-request envelope support (`item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`) if product policies require this path.
+4. Phase 4: Remove or isolate deprecated v1 send-path dependence after parity checks.
+
+## Drift-Detection Research Outcome
+
+Source-of-truth method extraction point:
+
+1. Upstream file: `codex-rs/app-server-protocol/src/protocol/common.rs`
+2. Macro block: `client_request_definitions!`
+3. Parse target: request method wire names in entries like `Variant => "method/name" { ... }`
+
+Research-validated automation design:
+
+1. Fetch upstream `common.rs` at pinned commit and at latest `main`.
+2. Extract request method list from `client_request_definitions!`.
+3. Compare extracted list with tracked Farfield upstream snapshot artifact.
+4. Fail CI when upstream list changes and snapshot is not intentionally updated.
+5. Emit deterministic diff output (`added`, `removed`, counts) for review.
+
+Recommended tracked artifacts:
+
+1. `docs/debug/AppServerUpstreamClientRequestMethods.snapshot.txt`
+2. `docs/debug/AppServerFarfieldClientRequestMethods.snapshot.txt`
+3. `scripts/verify-app-server-method-drift.sh` (or TypeScript equivalent)
+
 ## Research Backlog Status
 
 | ID | Task | Status |
 | --- | --- | --- |
 | `APP-SERVER-RESEARCH-001` | Build authoritative upstream method inventory from external source and pin snapshot | Completed |
 | `APP-SERVER-RESEARCH-002` | Map each non-intersection method to product decision (`not needed now`, `planned`, `deprecated`) | Completed |
-| `APP-SERVER-RESEARCH-003` | Evaluate migration from legacy `sendUserMessage` path to current upstream turn lifecycle methods | In Progress |
-| `APP-SERVER-RESEARCH-004` | Add automated drift check against upstream method inventory | Pending |
+| `APP-SERVER-RESEARCH-003` | Evaluate migration from legacy `sendUserMessage` path to current upstream turn lifecycle methods | Completed (research); implementation remains |
+| `APP-SERVER-RESEARCH-004` | Add automated drift check against upstream method inventory | Completed (research design); implementation remains |
 
 ## Current Conclusion
 
