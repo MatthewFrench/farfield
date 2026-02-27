@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 03:26:16Z
+Last Updated (UTC): 2026-02-27 03:31:44Z
 
 ## Scope Model
 
@@ -193,6 +193,22 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-18)
+
+The current in-progress wave applies network-layer owner separation for request observability telemetry:
+
+1. Split request-metrics route classification and route-normalization ownership into `RequestMetricsRouteClassificationContracts`.
+2. Split bounded sample-window and nearest-rank percentile ownership into `RequestTimingSampleWindow`.
+3. Split startup action label/description ownership into `StartupRequestActionContracts`.
+4. Reduced `RequestObservabilityOwner` to request lifecycle and aggregate orchestration over these owner modules while preserving class API and behavior.
+
+Files touched in this continuation segment:
+
+1. `apps/ServerApplication/Source/Network/RequestObservabilityOwner.ts`
+2. `apps/ServerApplication/Source/Network/RequestMetricsRouteClassificationContracts.ts`
+3. `apps/ServerApplication/Source/Network/RequestTimingSampleWindow.ts`
+4. `apps/ServerApplication/Source/Network/StartupRequestActionContracts.ts`
 
 ## Latest Continuation Commit Wave (Current-17)
 

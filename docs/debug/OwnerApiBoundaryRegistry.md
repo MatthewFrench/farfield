@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 03:26:16Z
+Last Updated (UTC): 2026-02-27 03:31:44Z
 
 ## Purpose
 
@@ -21,6 +21,15 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 4. [`DebugRouteContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/DebugRouteContracts.ts)
    - owns: debug replay adapter boundary contract and debug route replay frame contracts.
    - query APIs: `buildSendRequestOptions`.
+5. [`RequestMetricsRouteClassificationContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/RequestMetricsRouteClassificationContracts.ts)
+   - owns: request metrics route-classification contracts and pathname normalization for bounded route cardinality.
+   - query APIs: `normalizeMetricsRoutePathname`.
+6. [`RequestTimingSampleWindow.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/RequestTimingSampleWindow.ts)
+   - owns: request timing sample-window mutation and percentile/max calculation ownership.
+   - query APIs: `appendSampleWindowValue`, `readNearestRankPercentile`, `readSampleWindowMaximum`.
+7. [`StartupRequestActionContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/StartupRequestActionContracts.ts)
+   - owns: startup action identification and description mapping contracts for request timing summaries.
+   - query APIs: `isStartupActionName`, `readStartupActionDescription`.
 
 ## Server Agents Group
 
