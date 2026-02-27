@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 02:12:35Z
+Last Updated (UTC): 2026-02-27 02:22:52Z
 
 ## Purpose
 
@@ -70,6 +70,15 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 3. [`SelectedThreadStreamEventStateResolver.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/DomainModel/SelectedThreadStreamEventStateResolver.ts)
    - owns: stream event append/reset merge policy and retention bounds.
    - query APIs: `resolveNextStreamEventsState`.
+
+## Web Features Debugging Group
+
+1. [`DebugApiRequestContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Debugging/DataAccess/DebugApiRequestContracts.ts)
+   - owns: debug endpoint tokens, request-init builders, and path/input request contract validation.
+   - query APIs: `buildListRequestPath`, `buildMemberRequestPath`, `buildJsonPostRequestInit`, `buildDeleteRequestInit`, `parseTraceStartLabel`, `parseTraceMarkNote`.
+2. [`DebugErrorEnvelopeContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Debugging/DataAccess/DebugErrorEnvelopeContracts.ts)
+   - owns: debug-error envelope wire parsing and projection into strict app-owned error contracts.
+   - query APIs: `DebugErrorListEnvelopeSchema`, `DebugErrorDetailEnvelopeSchema`.
 
 ## Web Features Threads Group
 

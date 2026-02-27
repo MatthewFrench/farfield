@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 02:12:17Z
+Last Updated (UTC): 2026-02-27 02:22:52Z
 
 ## Scope Model
 
@@ -193,6 +193,20 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-11)
+
+The current in-progress wave applies feature data-access owner separation for debugging boundary contracts:
+
+1. Split debug request tokens/builders into a dedicated owner contract module (`DebugApiRequestContracts`).
+2. Split debug-error envelope mapping and strict wire-to-contract parsing into a dedicated owner module (`DebugErrorEnvelopeContracts`).
+3. Reduced `DebugApi` to orchestration-only boundary behavior while preserving existing public exports and runtime behavior.
+
+Files touched in this continuation segment:
+
+1. `apps/WebApplication/Source/Features/Debugging/DataAccess/DebugApi.ts`
+2. `apps/WebApplication/Source/Features/Debugging/DataAccess/DebugApiRequestContracts.ts`
+3. `apps/WebApplication/Source/Features/Debugging/DataAccess/DebugErrorEnvelopeContracts.ts`
 
 ## Latest Continuation Commit Wave (Current-10)
 
