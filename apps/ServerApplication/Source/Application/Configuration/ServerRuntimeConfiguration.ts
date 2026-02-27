@@ -1,18 +1,12 @@
-// biome-ignore lint/nursery/noExcessiveLinesPerFile: runtime configuration contracts remain centralized while configuration owners are being split.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
-import {
-  type NtfyConfig,
-  parseNtfyConfigFromEnv,
-} from "../../Modules/PushNotifications/NtfyNotifier.js";
-import {
-  type PushStatePathResolution,
-  resolvePushStatePath,
-} from "../../Modules/PushNotifications/PushStatePath.js";
-import { type LoggerLevel, LoggerLevelSchema } from "../../Shared/Logging/Logger.js";
+import { parseNtfyConfigFromEnv } from "../../Modules/PushNotifications/NtfyNotifier.js";
+import { resolvePushStatePath } from "../../Modules/PushNotifications/PushStatePath.js";
+import { LoggerLevelSchema } from "../../Shared/Logging/Logger.js";
+import type { ServerRuntimeConfiguration } from "./ServerRuntimeConfigurationContracts.js";
 
 // Owner note: this module is the single startup boundary for server environment
 // parsing, including key ownership, defaults, and precedence decisions.
@@ -324,62 +318,7 @@ function resolvePushLocalCaSourcePath(env: NodeJS.ProcessEnv): string {
   return path.join(xdgDataHome, "caddy", "pki", "authorities", "local", "root.crt");
 }
 
-export interface ServerRuntimeConfiguration {
-  logLevel: LoggerLevel;
-  host: string;
-  port: number;
-  historyLimit: number;
-  historyPayloadSummaryMaximumBytes: number;
-  userAgent: string;
-  runtimeStateSnapshotCacheTimeToLiveMs: number;
-  ipcReconnectDelayMs: number;
-  ntfyCompletionDebounceMs: number;
-  capabilityListTimeoutMs: number;
-  threadListAdapterTimeoutMs: number;
-  pushTestSendTimeoutMs: number;
-  traceDirectoryPath: string;
-  defaultWorkspacePath: string;
-  apiTokenHeaderName: string;
-  apiTokenResponseHeader: string;
-  apiSessionCookieName: string;
-  apiSessionTimeToLiveMs: number;
-  apiSessionSigningSecret: string;
-  apiSessionSecureCookie: boolean;
-  clientRequestIdHeaderName: string;
-  clientRequestIdResponseHeader: string;
-  clientActionIdHeaderName: string;
-  clientActionIdResponseHeader: string;
-  clientActionNameHeaderName: string;
-  clientActionNameResponseHeader: string;
-  apiToken: string;
-  apiAuthRequired: boolean;
-  pushEnabled: boolean;
-  pushPrivateModeDefault: boolean;
-  pushReceiptsMaxCount: number;
-  pushReceiptsMaxAgeDays: number;
-  threadListAggregationCacheTimeToLiveMs: number;
-  threadListAggregationCacheMaximumEntries: number;
-  webHealthBuildId: string;
-  webHealthServiceWorkerVersion: string | null;
-  appServerBaseEnvironment: NodeJS.ProcessEnv;
-  codexExecutablePath: string;
-  ipcSocketPath: string;
-  gitCommit: string | null;
-  pushStatePathResolution: PushStatePathResolution;
-  pushReceiptsPath: string;
-  pushSendsPath: string;
-  pushLocalCaSourcePath: string;
-  pushVapidPublicKey: string;
-  pushVapidPrivateKey: string;
-  pushVapidSubject: string;
-  clientErrorSessionStartedAt: string;
-  clientErrorSessionTimestamp: string;
-  clientErrorSessionId: string;
-  clientErrorLogPath: string;
-  clientErrorMaxEntries: number;
-  invalidThreadStreamEventsLogPath: string;
-  ntfyConfiguration: NtfyConfig;
-}
+export type { ServerRuntimeConfiguration } from "./ServerRuntimeConfigurationContracts.js";
 
 export function readServerRuntimeConfigurationFromCurrentProcessEnvironment(): ServerRuntimeConfiguration {
   return readServerRuntimeConfiguration(process.env);
