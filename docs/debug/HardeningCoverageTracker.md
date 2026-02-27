@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 04:22:20Z
+Last Updated (UTC): 2026-02-27 04:37:24Z
 
 ## Scope Model
 
@@ -193,6 +193,61 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-24)
+
+The current in-progress wave applies owner-boundary hardening across server agent composition and activity module ownership:
+
+1. Split `CodexAgentAdapter` constants/error-classification/runtime contracts into `CodexAgentAdapterContracts`.
+2. Split adapter owner/dependency composition into `CodexAgentAdapterOwnerFactory`.
+3. Split adapter IPC ingress wiring into `CodexAgentAdapterIpcIngressWiring`.
+4. Split `ActivityHistoryService` into dedicated owner modules:
+   - bounded history store ownership: `ActivityHistoryStoreOwner`
+   - trace lifecycle ownership: `ActivityTraceLifecycleOwner`
+   - payload/detail projection ownership: `ActivityHistoryPayloadProjection`
+5. Added focused tests for extracted Codex thread-stream owners:
+   - `CodexThreadStreamEventHistoryOwner.test.ts`
+   - `CodexThreadStreamFrameDescriptionContracts.test.ts`
+   - `CodexThreadLiveStateProjectionOwner.test.ts`
+   - `CodexInvalidThreadStreamEventLogOwner.test.ts`
+
+Files touched in this continuation segment:
+
+1. `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts`
+2. `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapterContracts.ts`
+3. `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapterOwnerFactory.ts`
+4. `apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapterIpcIngressWiring.ts`
+5. `apps/ServerApplication/Source/Modules/Activity/ActivityHistoryService.ts`
+6. `apps/ServerApplication/Source/Modules/Activity/ActivityHistoryStoreOwner.ts`
+7. `apps/ServerApplication/Source/Modules/Activity/ActivityTraceLifecycleOwner.ts`
+8. `apps/ServerApplication/Source/Modules/Activity/ActivityHistoryPayloadProjection.ts`
+9. `apps/ServerApplication/Tests/CodexThreadStreamEventHistoryOwner.test.ts`
+10. `apps/ServerApplication/Tests/CodexThreadStreamFrameDescriptionContracts.test.ts`
+11. `apps/ServerApplication/Tests/CodexThreadLiveStateProjectionOwner.test.ts`
+12. `apps/ServerApplication/Tests/CodexInvalidThreadStreamEventLogOwner.test.ts`
+
+## Latest Continuation Commit Wave (Current-23)
+
+The current in-progress wave applies server-agent stream-owner separation for Codex thread stream handling:
+
+1. Split thread identifier normalization into `CodexThreadIdentifierNormalization`.
+2. Split frame method/thread-id description and stream-method classification into `CodexThreadStreamFrameDescriptionContracts`.
+3. Split stream event retention/cursor behavior into `CodexThreadStreamEventHistoryOwner`.
+4. Split live-state snapshot/patch projection behavior into `CodexThreadLiveStateProjectionOwner`.
+5. Split invalid stream event log persistence into `CodexInvalidThreadStreamEventLogOwner`.
+6. Reduced `CodexThreadStreamStateOwner` to ingress orchestration over these dedicated owners.
+
+Files touched in this continuation segment:
+
+1. `apps/ServerApplication/Source/Agents/Adapters/CodexThreadStreamStateOwner.ts`
+2. `apps/ServerApplication/Source/Agents/Adapters/CodexThreadIdentifierNormalization.ts`
+3. `apps/ServerApplication/Source/Agents/Adapters/CodexThreadStreamFrameDescriptionContracts.ts`
+4. `apps/ServerApplication/Source/Agents/Adapters/CodexThreadStreamEventHistoryOwner.ts`
+5. `apps/ServerApplication/Source/Agents/Adapters/CodexThreadLiveStateProjectionOwner.ts`
+6. `apps/ServerApplication/Source/Agents/Adapters/CodexInvalidThreadStreamEventLogOwner.ts`
+7. `apps/ServerApplication/Source/Application/Bootstrap/ThreadListCacheInvalidationOwner.ts`
+8. `apps/ServerApplication/Source/Agents/Adapters/CodexAppServerStderrOwner.ts`
+9. `apps/ServerApplication/Source/Modules/Activity/ActivityHistoryService.ts`
 
 ## Latest Continuation Commit Wave (Current-22)
 

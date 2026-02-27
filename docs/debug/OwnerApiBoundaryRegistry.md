@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 04:22:20Z
+Last Updated (UTC): 2026-02-27 04:37:24Z
 
 ## Purpose
 
@@ -54,6 +54,29 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 3. [`OpenCodeThreadCursorContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/OpenCodeThreadCursorContracts.ts)
    - owns: cursor boundary contract encoding/decoding and schema enforcement.
    - query APIs: `encodeOpenCodeThreadCursor`, `decodeOpenCodeThreadCursor`.
+4. [`CodexThreadStreamFrameDescriptionContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexThreadStreamFrameDescriptionContracts.ts)
+   - owns: Codex IPC frame method/thread-id description contracts and stream-event method classification.
+   - query APIs: `describeCodexIpcFrame`, `extractThreadIdFromCodexIpcFrame`, `isThreadStreamStateChangedFrame`.
+5. [`CodexThreadStreamEventHistoryOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexThreadStreamEventHistoryOwner.ts)
+   - owns: per-thread stream event retention, monotonic sequence indexes, and cursor reset-required behavior.
+   - query APIs: `readStreamEvents`.
+   - mutation APIs: `appendStreamEvent`.
+6. [`CodexThreadLiveStateProjectionOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexThreadLiveStateProjectionOwner.ts)
+   - owns: snapshot/patch live-state projection and reduction-failure localization contracts.
+   - query APIs: `readProjectedConversationState`, `readLiveState`.
+   - mutation APIs: `projectEvent`.
+7. [`CodexInvalidThreadStreamEventLogOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexInvalidThreadStreamEventLogOwner.ts)
+   - owns: malformed Codex stream event persistence for replay/debug diagnosis.
+   - mutation APIs: `recordInvalidThreadStreamEvent`.
+8. [`CodexAgentAdapterContracts.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapterContracts.ts)
+   - owns: Codex adapter identity/capability contracts and invalid-request error classification rules.
+   - query APIs: `isInvalidRequestErrorMatchingMessageFragment`.
+9. [`CodexAgentAdapterOwnerFactory.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapterOwnerFactory.ts)
+   - owns: Codex adapter owner dependency composition for message, thread-management, and thread-interaction owners.
+   - query APIs: `createCodexAgentAdapterOwners`.
+10. [`CodexAgentAdapterIpcIngressWiring.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapterIpcIngressWiring.ts)
+   - owns: inbound IPC connection/frame wiring from transport ingress to stream-state and connection lifecycle owners.
+   - query APIs: `wireCodexAgentAdapterIpcIngress`.
 
 ## Server Modules Group
 
@@ -62,6 +85,17 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
    - query APIs: `scheduleThreadCompletionCheck`.
    - mutation APIs: `checkAndNotifyThreadCompletion`.
    - dependency boundary: consumes `readThreadLiveState` reader contract and does not depend on concrete adapter types.
+2. [`ActivityHistoryStoreOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Modules/Activity/ActivityHistoryStoreOwner.ts)
+   - owns: bounded activity history retention and full payload lookup by history entry identifier.
+   - query APIs: `readHistoryEntries`, `readHistoryById`, `readHistoryCount`.
+   - mutation APIs: `appendHistoryEntry`.
+3. [`ActivityTraceLifecycleOwner.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Modules/Activity/ActivityTraceLifecycleOwner.ts)
+   - owns: active trace stream lifecycle, marker writes, and bounded recent-trace retention.
+   - query APIs: `readRecentTraces`, `readTraceById`, `readActiveTraceSummary`.
+   - mutation APIs: `startTrace`, `markTrace`, `stopTrace`, `closeActiveTraceIfPresent`, `appendTraceRecordIfActive`.
+4. [`ActivityHistoryPayloadProjection.ts`](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Modules/Activity/ActivityHistoryPayloadProjection.ts)
+   - owns: action metadata summarization and payload size-projection contracts for history list views.
+   - query APIs: `summarizeActionDetails`, `summarizePayloadForHistory`.
 
 ## Web Application State Group
 

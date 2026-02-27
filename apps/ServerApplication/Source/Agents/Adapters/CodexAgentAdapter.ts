@@ -1,6 +1,5 @@
 import {
   AppServerClient,
-  AppServerRpcError,
   CodexMonitorService,
   DesktopIpcClient,
   type SendRequestOptions,
@@ -8,7 +7,6 @@ import {
 import type {
   AppServerCollaborationModeListResponse,
   AppServerListModelsResponse,
-  IpcFrame,
   IpcRequestFrame,
   IpcResponseFrame,
 } from "@farfield/protocol";
@@ -30,6 +28,18 @@ import type {
   AgentThreadLiveState,
   AgentThreadStreamEvents,
 } from "../Types.js";
+import {
+  APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT,
+  CODEX_AGENT_CAPABILITIES,
+  CODEX_AGENT_IDENTIFIER,
+  CODEX_AGENT_LABEL,
+  type CodexAgentRuntimeState,
+  type CodexIpcFrameEvent,
+  isInvalidRequestErrorMatchingMessageFragment,
+  STEERING_UNSUPPORTED_ENDPOINT_ERROR,
+} from "./CodexAgentAdapterContracts.js";
+import { wireCodexAgentAdapterIpcIngress } from "./CodexAgentAdapterIpcIngressWiring.js";
+import { createCodexAgentAdapterOwners } from "./CodexAgentAdapterOwnerFactory.js";
 import { CodexAppServerStderrOwner } from "./CodexAppServerStderrOwner.js";
 import { CodexConnectionLifecycleOwner } from "./CodexConnectionLifecycleOwner.js";
 import { CodexMessageDispatchOwner } from "./CodexMessageDispatchOwner.js";
@@ -37,39 +47,7 @@ import { CodexThreadInteractionOwner } from "./CodexThreadInteractionOwner.js";
 import { CodexThreadManagementOwner } from "./CodexThreadManagementOwner.js";
 import { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
 
-const CODEX_AGENT_IDENTIFIER = "codex";
-const CODEX_AGENT_LABEL = "Codex";
-const APP_SERVER_INVALID_REQUEST_ERROR_CODE = -32600;
-const APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT = {
-  threadNotLoaded: "thread not loaded",
-  conversationNotFound: "conversation not found",
-} as const;
-const STEERING_UNSUPPORTED_ENDPOINT_ERROR = "Steering messages are not supported on this endpoint.";
-
-export interface CodexAgentRuntimeState {
-  appReady: boolean;
-  ipcConnected: boolean;
-  ipcInitialized: boolean;
-  codexAvailable: boolean;
-  lastError: string | null;
-}
-
-export interface CodexIpcFrameEvent {
-  direction: "in" | "out";
-  frame: IpcFrame;
-  method: string;
-  threadId: string | null;
-}
-
-const INBOUND_IPC_FRAME_DIRECTION: CodexIpcFrameEvent["direction"] = "in";
-const CODEX_AGENT_CAPABILITIES: AgentCapabilities = {
-  canListModels: true,
-  canListCollaborationModes: true,
-  canSetCollaborationMode: true,
-  canSubmitUserInput: true,
-  canReadLiveState: true,
-  canReadStreamEvents: true,
-};
+export type { CodexAgentRuntimeState, CodexIpcFrameEvent } from "./CodexAgentAdapterContracts.js";
 
 export interface CodexAgentOptions {
   appExecutable: string;
@@ -80,21 +58,6 @@ export interface CodexAgentOptions {
   userAgent: string;
   reconnectDelayMs: number;
   onStateChange?: () => void;
-}
-
-function isInvalidRequestErrorMatchingMessageFragment<ErrorType>(
-  error: ErrorType,
-  messageFragment: string,
-): boolean {
-  if (!(error instanceof AppServerRpcError)) {
-    return false;
-  }
-
-  if (error.code !== APP_SERVER_INVALID_REQUEST_ERROR_CODE) {
-    return false;
-  }
-
-  return error.message.includes(messageFragment);
 }
 
 /**
@@ -147,56 +110,36 @@ export class CodexAgentAdapter implements AgentAdapter {
       reconnectDelayMs: options.reconnectDelayMs,
       onStateChange: options.onStateChange ?? null,
     });
-    const runAppServerCall = async <ValueType>(
-      operation: () => Promise<ValueType>,
-    ): Promise<ValueType> => {
-      return this.connectionLifecycleOwner.runAppServerCall(operation);
-    };
-    this.messageDispatchOwner = new CodexMessageDispatchOwner({
+    const owners = createCodexAgentAdapterOwners({
       appClient: this.appClient,
-      service: this.service,
-      threadStreamStateOwner: this.threadStreamStateOwner,
-      runAppServerCall,
-      isConversationNotFoundError: <ErrorType>(error: ErrorType): boolean => {
-        return this.isConversationNotFoundError(error);
-      },
-    });
-    this.threadManagementOwner = new CodexThreadManagementOwner({
-      appClient: this.appClient,
-      runAppServerCall,
-      ensureCodexAvailable: () => {
-        this.ensureCodexAvailable();
-      },
-    });
-    this.threadInteractionOwner = new CodexThreadInteractionOwner({
-      service: this.service,
       ipcClient: this.ipcClient,
+      service: this.service,
       threadStreamStateOwner: this.threadStreamStateOwner,
+      connectionLifecycleOwner: this.connectionLifecycleOwner,
+      emitIpcFrame: (event) => {
+        this.emitIpcFrame(event);
+      },
       ensureCodexAvailable: () => {
         this.ensureCodexAvailable();
       },
       ensureIpcReady: () => {
         this.ensureIpcReady();
       },
+      isConversationNotFoundError: <ErrorType>(error: ErrorType): boolean => {
+        return this.isConversationNotFoundError(error);
+      },
+    });
+    this.messageDispatchOwner = owners.messageDispatchOwner;
+    this.threadManagementOwner = owners.threadManagementOwner;
+    this.threadInteractionOwner = owners.threadInteractionOwner;
+
+    wireCodexAgentAdapterIpcIngress({
+      ipcClient: this.ipcClient,
+      connectionLifecycleOwner: this.connectionLifecycleOwner,
+      threadStreamStateOwner: this.threadStreamStateOwner,
       emitIpcFrame: (event) => {
         this.emitIpcFrame(event);
       },
-    });
-
-    this.ipcClient.onConnectionState((state) => {
-      this.connectionLifecycleOwner.handleIpcConnectionState(state);
-    });
-
-    this.ipcClient.onFrame((frame) => {
-      const frameDescription = this.threadStreamStateOwner.describeFrame(frame);
-
-      this.emitIpcFrame({
-        direction: INBOUND_IPC_FRAME_DIRECTION,
-        frame,
-        method: frameDescription.method,
-        threadId: frameDescription.threadId,
-      });
-      this.threadStreamStateOwner.ingestInboundFrame(frame);
     });
   }
 
