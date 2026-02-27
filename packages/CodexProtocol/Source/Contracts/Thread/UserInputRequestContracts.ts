@@ -1,6 +1,14 @@
 import { z } from "zod";
-import { JsonValueSchema, NonEmptyStringSchema, NonNegativeIntSchema } from "../../Common.js";
-import { ToolRequestUserInputResponseSchema } from "../../Generated/app-server/index.js";
+import { JsonValueSchema, NonNegativeIntSchema } from "../../Common.js";
+import {
+  CommandExecutionRequestApprovalParamsSchema,
+  CommandExecutionRequestApprovalResponseSchema,
+  DynamicToolCallParamsSchema,
+  DynamicToolCallResponseSchema,
+  FileChangeRequestApprovalParamsSchema,
+  FileChangeRequestApprovalResponseSchema,
+  ToolRequestUserInputResponseSchema,
+} from "../../Generated/app-server/index.js";
 
 export const UserInputRequestMethod = "item/tool/requestUserInput";
 export const CommandExecutionApprovalRequestMethod = "item/commandExecution/requestApproval";
@@ -20,6 +28,13 @@ export const ThreadConversationRequestMethodValues = [
   ExecuteCommandApprovalRequestMethod,
 ] as const;
 
+const ServerRequestBaseSchema = z
+  .object({
+    id: NonNegativeIntSchema,
+    completed: z.boolean().optional(),
+  })
+  .passthrough();
+
 export const UserInputOptionSchema = z
   .object({
     label: z.string(),
@@ -29,7 +44,7 @@ export const UserInputOptionSchema = z
 
 export const UserInputQuestionSchema = z
   .object({
-    id: NonEmptyStringSchema,
+    id: z.string().min(1),
     header: z.string(),
     question: z.string(),
     isOther: z.boolean(),
@@ -40,52 +55,46 @@ export const UserInputQuestionSchema = z
 
 export const UserInputRequestParamsSchema = z
   .object({
-    threadId: NonEmptyStringSchema,
-    turnId: NonEmptyStringSchema,
-    itemId: NonEmptyStringSchema,
+    threadId: z.string().min(1),
+    turnId: z.string().min(1),
+    itemId: z.string().min(1),
     questions: z.array(UserInputQuestionSchema),
   })
   .passthrough();
 
-export const UserInputRequestSchema = z
-  .object({
-    method: z.literal(UserInputRequestMethod),
-    id: NonNegativeIntSchema,
-    params: UserInputRequestParamsSchema,
-    completed: z.boolean().optional(),
-  })
-  .passthrough();
-
-const ServerRequestBaseSchema = z
-  .object({
-    id: NonNegativeIntSchema,
-    params: JsonValueSchema,
-    completed: z.boolean().optional(),
-  })
-  .passthrough();
+export const UserInputRequestSchema = ServerRequestBaseSchema.extend({
+  method: z.literal(UserInputRequestMethod),
+  params: UserInputRequestParamsSchema,
+}).passthrough();
 
 const CommandExecutionApprovalRequestSchema = ServerRequestBaseSchema.extend({
   method: z.literal(CommandExecutionApprovalRequestMethod),
+  params: CommandExecutionRequestApprovalParamsSchema.passthrough(),
 }).passthrough();
 
 const FileChangeApprovalRequestSchema = ServerRequestBaseSchema.extend({
   method: z.literal(FileChangeApprovalRequestMethod),
+  params: FileChangeRequestApprovalParamsSchema.passthrough(),
 }).passthrough();
 
 const ToolCallRequestSchema = ServerRequestBaseSchema.extend({
   method: z.literal(ToolCallRequestMethod),
+  params: DynamicToolCallParamsSchema.passthrough(),
 }).passthrough();
 
 const ChatGptAuthTokensRefreshRequestSchema = ServerRequestBaseSchema.extend({
   method: z.literal(ChatGptAuthTokensRefreshRequestMethod),
+  params: JsonValueSchema,
 }).passthrough();
 
 const ApplyPatchApprovalRequestSchema = ServerRequestBaseSchema.extend({
   method: z.literal(ApplyPatchApprovalRequestMethod),
+  params: JsonValueSchema,
 }).passthrough();
 
 const ExecuteCommandApprovalRequestSchema = ServerRequestBaseSchema.extend({
   method: z.literal(ExecuteCommandApprovalRequestMethod),
+  params: JsonValueSchema,
 }).passthrough();
 
 type ThreadConversationRequestSchemaTuple = [
@@ -113,14 +122,65 @@ export const ThreadConversationRequestSchema: z.ZodDiscriminatedUnion<
   ThreadConversationRequestSchemaTuple
 > = z.discriminatedUnion("method", ThreadConversationRequestVariantSchemas);
 
-export const UserInputAnswerSchema = z
-  .object({
-    answers: z.array(z.string()),
-  })
-  .passthrough();
-
 export const UserInputResponsePayloadSchema = ToolRequestUserInputResponseSchema.passthrough();
+export const CommandExecutionApprovalResponsePayloadSchema =
+  CommandExecutionRequestApprovalResponseSchema.passthrough();
+export const FileChangeApprovalResponsePayloadSchema =
+  FileChangeRequestApprovalResponseSchema.passthrough();
+export const ToolCallResponsePayloadSchema = DynamicToolCallResponseSchema.passthrough();
+
+export const ThreadConversationResponseMethodValues = [
+  CommandExecutionApprovalRequestMethod,
+  FileChangeApprovalRequestMethod,
+  UserInputRequestMethod,
+  ToolCallRequestMethod,
+] as const;
+
+const ThreadConversationRequestResponseVariantSchemas = [
+  z
+    .object({
+      method: z.literal(CommandExecutionApprovalRequestMethod),
+      payload: CommandExecutionApprovalResponsePayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      method: z.literal(FileChangeApprovalRequestMethod),
+      payload: FileChangeApprovalResponsePayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      method: z.literal(UserInputRequestMethod),
+      payload: UserInputResponsePayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      method: z.literal(ToolCallRequestMethod),
+      payload: ToolCallResponsePayloadSchema,
+    })
+    .strict(),
+] as const;
+
+export const ThreadConversationRequestResponseSchema = z.discriminatedUnion(
+  "method",
+  ThreadConversationRequestResponseVariantSchemas,
+);
 
 export type UserInputRequest = z.infer<typeof UserInputRequestSchema>;
 export type ThreadConversationRequest = z.infer<typeof ThreadConversationRequestSchema>;
 export type UserInputResponsePayload = z.infer<typeof UserInputResponsePayloadSchema>;
+export type CommandExecutionApprovalResponsePayload = z.infer<
+  typeof CommandExecutionApprovalResponsePayloadSchema
+>;
+export type FileChangeApprovalResponsePayload = z.infer<
+  typeof FileChangeApprovalResponsePayloadSchema
+>;
+export type ToolCallResponsePayload = z.infer<typeof ToolCallResponsePayloadSchema>;
+export type ThreadConversationRequestResponse = z.infer<
+  typeof ThreadConversationRequestResponseSchema
+>;
+export type ThreadConversationRequestResponsePayload = ThreadConversationRequestResponse["payload"];
+export type ThreadConversationResponseMethod =
+  (typeof ThreadConversationResponseMethodValues)[number];

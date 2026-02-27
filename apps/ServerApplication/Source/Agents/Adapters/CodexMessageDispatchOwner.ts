@@ -10,6 +10,7 @@ import type { AgentSendMessageInput } from "../Types.js";
 import type { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
 
 const RESUME_WITH_EXTENDED_HISTORY = true;
+const APP_SERVER_OWNER_CLIENT_IDENTIFIER = "app-server";
 const IPC_SEND_MESSAGE_FAILURE_LOG_EVENT = "codex-ipc-send-message-failed";
 const TURN_START_TEMPLATE_UNAVAILABLE_LOG_EVENT = "codex-turn-start-template-unavailable";
 
@@ -75,7 +76,7 @@ export class CodexMessageDispatchOwner {
     }
 
     try {
-      await this.runAppServerCall(() => this.appClient.sendUserMessage(input.threadId, input.text));
+      await this.sendMessageThroughAppServer(input);
       return;
     } catch (error) {
       if (!this.isConversationNotFoundError(error)) {
@@ -88,7 +89,22 @@ export class CodexMessageDispatchOwner {
         persistExtendedHistory: RESUME_WITH_EXTENDED_HISTORY,
       }),
     );
-    await this.runAppServerCall(() => this.appClient.sendUserMessage(input.threadId, input.text));
+    await this.sendMessageThroughAppServer(input);
+  }
+
+  private async sendMessageThroughAppServer(input: AgentSendMessageInput): Promise<void> {
+    const turnStartTemplate = await this.readTurnStartTemplate(
+      input.threadId,
+      APP_SERVER_OWNER_CLIENT_IDENTIFIER,
+    );
+    await this.runAppServerCall(() =>
+      this.appClient.startTurn({
+        threadId: input.threadId,
+        text: input.text,
+        ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
+        ...(turnStartTemplate !== null ? { turnStartTemplate } : {}),
+      }),
+    );
   }
 
   private async readTurnStartTemplate(

@@ -1,6 +1,6 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-02-27 07:06:08.465Z
+Last Updated (UTC): 2026-02-27 09:14:29Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
 
@@ -54,10 +54,10 @@ This ledger records recommended disposition for upstream app-server event and ca
 | `account/chatgptAuthTokens/refresh` | server-to-client request | Not handled | Not now | Adopt only with explicit auth/integration requirement. |
 | `applyPatchApproval` | server-to-client request | Not handled | Do not adopt | Deprecated server-request path. |
 | `execCommandApproval` | server-to-client request | Not handled | Do not adopt | Deprecated server-request path. |
-| `item/commandExecution/requestApproval` | server-to-client request | Not handled | Plan candidate | Needed only if app-server path must complete client-side approval or user-input request loops. |
-| `item/fileChange/requestApproval` | server-to-client request | Not handled | Plan candidate | Needed only if app-server path must complete client-side approval or user-input request loops. |
-| `item/tool/call` | server-to-client request | Not handled | Plan candidate | Needed only if app-server path must complete client-side approval or user-input request loops. |
-| `item/tool/requestUserInput` | server-to-client request | Not handled | Plan candidate | Needed only if app-server path must complete client-side approval or user-input request loops. |
+| `item/commandExecution/requestApproval` | server-to-client request | Used now | Keep | Farfield stores this request and validates typed response submission through app-server transport. |
+| `item/fileChange/requestApproval` | server-to-client request | Used now | Keep | Farfield stores this request and validates typed response submission through app-server transport. |
+| `item/tool/call` | server-to-client request | Used now | Keep | Farfield stores this request and validates typed response submission through app-server transport. |
+| `item/tool/requestUserInput` | server-to-client request | Used now | Keep | Farfield stores this request and validates typed response submission through app-server transport. |
 | `initialized` | client-to-server notification | Used now | Keep | Required protocol acknowledgement after initialize. |
 
 Server notifications: 45

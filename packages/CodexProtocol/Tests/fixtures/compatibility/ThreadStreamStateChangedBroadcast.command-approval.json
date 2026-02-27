@@ -37,7 +37,9 @@
                 "method": "item/commandExecution/requestApproval",
                 "id": 9,
                 "params": {
-                  "callId": "call-9",
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-1",
+                  "itemId": "item-command-9",
                   "command": "echo hello",
                   "cwd": "/workspace"
                 }
@@ -46,8 +48,10 @@
                 "method": "item/fileChange/requestApproval",
                 "id": 10,
                 "params": {
-                  "callId": "call-10",
-                  "path": "README.md"
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-1",
+                  "itemId": "item-file-10",
+                  "reason": "apply requested update"
                 }
               },
               {
@@ -78,7 +82,11 @@
                 "method": "item/tool/call",
                 "id": 12,
                 "params": {
-                  "toolName": "search"
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-1",
+                  "callId": "call-tool-12",
+                  "tool": "search",
+                  "arguments": {}
                 }
               },
               {
@@ -124,7 +132,9 @@
                 "method": "item/commandExecution/requestApproval",
                 "id": 21,
                 "params": {
-                  "callId": "call-21",
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-2",
+                  "itemId": "item-command-21",
                   "command": "echo patched",
                   "cwd": "/workspace"
                 }
@@ -137,8 +147,10 @@
                 "method": "item/fileChange/requestApproval",
                 "id": 22,
                 "params": {
-                  "callId": "call-22",
-                  "path": "AGENTS.md"
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-2",
+                  "itemId": "item-file-22",
+                  "reason": "apply patch update"
                 }
               }
             },
@@ -177,7 +189,13 @@
                 "method": "item/tool/call",
                 "id": 24,
                 "params": {
-                  "toolName": "fetch"
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-2",
+                  "callId": "call-tool-24",
+                  "tool": "fetch",
+                  "arguments": {
+                    "query": "latest"
+                  }
                 }
               }
             },

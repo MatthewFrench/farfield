@@ -166,4 +166,22 @@ describe("parseAppServerIncomingLine", () => {
     expect(parsed.message.value.id).toBe(1);
     expect(parsed.message.value.result).toEqual({});
   });
+
+  it("returns parsed server-request messages for JSON-RPC request envelopes", () => {
+    const parsed = parseAppServerIncomingLine(
+      '{"jsonrpc":"2.0","id":2,"method":"item/tool/requestUserInput","params":{"threadId":"thread-1","turnId":"turn-1","itemId":"item-1","questions":[]}}',
+    );
+    expect(parsed.kind).toBe("message");
+    if (parsed.kind !== "message") {
+      return;
+    }
+
+    expect(parsed.message.kind).toBe("request");
+    if (parsed.message.kind !== "request") {
+      return;
+    }
+
+    expect(parsed.message.value.id).toBe(2);
+    expect(parsed.message.value.method).toBe("item/tool/requestUserInput");
+  });
 });

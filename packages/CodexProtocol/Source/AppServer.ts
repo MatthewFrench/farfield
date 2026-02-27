@@ -2,6 +2,7 @@ import { z } from "zod";
 import { JsonValueSchema, NonEmptyStringSchema, NullableStringSchema } from "./Common.js";
 import { CollaborationModeSchema } from "./Contracts/Thread/CollaborationModeContracts.js";
 import { ThreadConversationStateSchema } from "./Contracts/Thread/ConversationStateContracts.js";
+import { TurnStartParamsSchema } from "./Contracts/Thread/TurnInputContracts.js";
 import {
   CollaborationModeListResponseSchema as GeneratedCollaborationModeListResponseSchema,
   ModelListResponseSchema as GeneratedModelListResponseSchema,
@@ -19,6 +20,7 @@ const AppServerModelListResponseBaseSchema = GeneratedModelListResponseSchema.pa
 const AppServerCollaborationModeListResponseBaseSchema =
   GeneratedCollaborationModeListResponseSchema.passthrough();
 const AppServerStartThreadRequestBaseSchema = GeneratedThreadStartParamsSchema.passthrough();
+const AppServerTurnStartRequestBaseSchema = TurnStartParamsSchema.passthrough();
 const AppServerSendUserMessageRequestBaseSchema =
   GeneratedSendUserMessageParamsSchema.passthrough();
 const AppServerSendUserMessageResponseBaseSchema = GeneratedSendUserMessageResponseSchema;
@@ -86,6 +88,7 @@ export const AppServerCollaborationModeListResponseSchema =
   AppServerCollaborationModeListResponseBaseSchema;
 
 export const AppServerStartThreadRequestSchema = AppServerStartThreadRequestBaseSchema;
+export const AppServerTurnStartRequestSchema = AppServerTurnStartRequestBaseSchema;
 
 export const AppServerStartThreadResponseSchema = z
   .object({
@@ -96,6 +99,16 @@ export const AppServerStartThreadResponseSchema = z
     approvalPolicy: z.string().optional(),
     sandbox: JsonValueSchema.optional(),
     reasoningEffort: OptionalNullableStringSchema,
+  })
+  .passthrough();
+
+export const AppServerTurnStartResponseSchema = z
+  .object({
+    turn: z
+      .object({
+        id: NonEmptyStringSchema,
+      })
+      .passthrough(),
   })
   .passthrough();
 
@@ -212,6 +225,7 @@ export type AppServerCollaborationModeListResponse = z.infer<
   typeof AppServerCollaborationModeListResponseSchema
 >;
 export type AppServerStartThreadResponse = z.infer<typeof AppServerStartThreadResponseSchema>;
+export type AppServerTurnStartResponse = z.infer<typeof AppServerTurnStartResponseSchema>;
 export type AppServerConfigReadResponse = z.infer<typeof AppServerConfigReadResponseSchema>;
 export type CreateDebugClientErrorBody = z.infer<typeof CreateDebugClientErrorBodySchema>;
 export type DebugErrorSeverity = z.infer<typeof DebugErrorSeveritySchema>;

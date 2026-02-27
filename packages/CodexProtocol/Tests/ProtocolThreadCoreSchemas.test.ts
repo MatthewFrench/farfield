@@ -157,7 +157,9 @@ describe("codex-protocol thread core schemas", () => {
                 method: "item/commandExecution/requestApproval",
                 id: 7,
                 params: {
-                  callId: "call-7",
+                  threadId: "thread-123",
+                  turnId: "turn-7",
+                  itemId: "item-7",
                   command: "echo hello",
                   cwd: "/tmp",
                 },

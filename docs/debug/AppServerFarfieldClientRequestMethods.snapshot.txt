@@ -2,10 +2,10 @@ collaborationMode/list
 config/read
 initialize
 model/list
-sendUserMessage
 thread/archive
 thread/list
 thread/read
 thread/resume
 thread/start
 thread/unarchive
+turn/start

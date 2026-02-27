@@ -354,14 +354,8 @@ export const ThreadStartResponseSchema = z.object({
                               .default([]),
                             type: z.literal("text"),
                           }),
-                          z.object({
-                            type: z.literal("image"),
-                            url: z.string(),
-                          }),
-                          z.object({
-                            path: z.string(),
-                            type: z.literal("localImage"),
-                          }),
+                          z.object({ type: z.literal("image"), url: z.string() }),
+                          z.object({ path: z.string(), type: z.literal("localImage") }),
                           z.object({
                             name: z.string(),
                             path: z.string(),
@@ -393,17 +387,9 @@ export const ThreadStartResponseSchema = z.object({
                     id: z.string(),
                     type: z.literal("userMessage"),
                   }),
-                  z.object({
-                    id: z.string(),
-                    text: z.string(),
-                    type: z.literal("agentMessage"),
-                  }),
+                  z.object({ id: z.string(), text: z.string(), type: z.literal("agentMessage") }),
                   z
-                    .object({
-                      id: z.string(),
-                      text: z.string(),
-                      type: z.literal("plan"),
-                    })
+                    .object({ id: z.string(), text: z.string(), type: z.literal("plan") })
                     .describe(
                       "EXPERIMENTAL - proposed plan item content. The completed plan item is authoritative and may not match the concatenation of `PlanDelta` text.",
                     ),
@@ -447,10 +433,7 @@ export const ThreadStartResponseSchema = z.object({
                               query: z.union([z.string(), z.null()]).optional(),
                               type: z.literal("search"),
                             }),
-                            z.object({
-                              command: z.string(),
-                              type: z.literal("unknown"),
-                            }),
+                            z.object({ command: z.string(), type: z.literal("unknown") }),
                           ];
                           const errors = schemas.reduce<z.ZodError[]>(
                             (errors, schema) =>
@@ -661,11 +644,7 @@ export const ThreadStartResponseSchema = z.object({
                     query: z.string(),
                     type: z.literal("webSearch"),
                   }),
-                  z.object({
-                    id: z.string(),
-                    path: z.string(),
-                    type: z.literal("imageView"),
-                  }),
+                  z.object({ id: z.string(), path: z.string(), type: z.literal("imageView") }),
                   z.object({
                     id: z.string(),
                     review: z.string(),
@@ -676,10 +655,7 @@ export const ThreadStartResponseSchema = z.object({
                     review: z.string(),
                     type: z.literal("exitedReviewMode"),
                   }),
-                  z.object({
-                    id: z.string(),
-                    type: z.literal("contextCompaction"),
-                  }),
+                  z.object({ id: z.string(), type: z.literal("contextCompaction") }),
                 ];
                 const errors = schemas.reduce<z.ZodError[]>(
                   (errors, schema) =>

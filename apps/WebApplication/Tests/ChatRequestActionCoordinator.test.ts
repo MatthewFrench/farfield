@@ -1,3 +1,4 @@
+import { UserInputRequestMethod } from "@farfield/protocol";
 import { describe, expect, it, vi } from "vitest";
 import {
   type ChatRequestActionChatClient,
@@ -207,7 +208,10 @@ describe("ChatRequestActionCoordinator", () => {
         threadId: DEFAULT_THREAD_ID,
         requestId: 12,
         response: {
-          answers,
+          method: UserInputRequestMethod,
+          payload: {
+            answers,
+          },
         },
       },
       {
@@ -252,7 +256,12 @@ describe("ChatRequestActionCoordinator", () => {
       {
         threadId: "thread-2",
         requestId: SKIP_REQUEST_ID,
-        response: { answers: {} },
+        response: {
+          method: UserInputRequestMethod,
+          payload: {
+            answers: {},
+          },
+        },
       },
       {
         actionId: "action-skip-user-input",

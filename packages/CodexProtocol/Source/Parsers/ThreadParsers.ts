@@ -8,6 +8,10 @@ import {
   ThreadStreamStateChangedParamsSchema,
 } from "../Contracts/Thread/StreamStateContracts.js";
 import {
+  type ThreadConversationRequest,
+  type ThreadConversationRequestResponse,
+  ThreadConversationRequestResponseSchema,
+  ThreadConversationRequestSchema,
   type UserInputResponsePayload,
   UserInputResponsePayloadSchema,
 } from "../Contracts/Thread/UserInputRequestContracts.js";
@@ -15,6 +19,8 @@ import { parseSchemaOrThrow } from "../ProtocolSchemaParsers.js";
 
 const ParseContext = {
   threadConversationState: "ThreadConversationState",
+  threadConversationRequest: "ThreadConversationRequest",
+  threadConversationRequestResponse: "ThreadConversationRequestResponse",
   threadStreamStateChangedParams: "ThreadStreamStateChangedParams",
   userInputResponsePayload: "UserInputResponsePayload",
 } as const;
@@ -34,6 +40,24 @@ export function parseThreadStreamStateChangedParams(
     ThreadStreamStateChangedParamsSchema,
     value,
     ParseContext.threadStreamStateChangedParams,
+  );
+}
+
+export function parseThreadConversationRequest(value: JsonValue): ThreadConversationRequest {
+  return parseSchemaOrThrow(
+    ThreadConversationRequestSchema,
+    value,
+    ParseContext.threadConversationRequest,
+  );
+}
+
+export function parseThreadConversationRequestResponse(
+  value: JsonValue,
+): ThreadConversationRequestResponse {
+  return parseSchemaOrThrow(
+    ThreadConversationRequestResponseSchema,
+    value,
+    ParseContext.threadConversationRequestResponse,
   );
 }
 

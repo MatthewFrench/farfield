@@ -7,6 +7,7 @@ import {
   type TurnStartParams,
   type UserInputResponsePayload,
 } from "@farfield/protocol";
+import { buildTurnStartMessageParameters } from "./TurnStartMessageParametersBuilder.js";
 
 const THREAD_FOLLOWER_START_TURN_METHOD = "thread-follower-start-turn";
 const THREAD_FOLLOWER_SET_COLLABORATION_MODE_METHOD = "thread-follower-set-collaboration-mode";
@@ -14,7 +15,6 @@ const THREAD_FOLLOWER_SUBMIT_USER_INPUT_METHOD = "thread-follower-submit-user-in
 const THREAD_FOLLOWER_INTERRUPT_TURN_METHOD = "thread-follower-interrupt-turn";
 const THREAD_FOLLOWER_PROTOCOL_VERSION = 1;
 const MESSAGE_TEXT_REQUIRED_ERROR_MESSAGE = "Message text is required";
-const TURN_START_TEXT_INPUT_PART_TYPE = "text" as const;
 
 /**
  * Normalizes optional and class-backed values into strict structured data.
@@ -103,45 +103,6 @@ type ThreadFollowerRequestParameters =
   | ThreadFollowerSubmitUserInputRequestParameters
   | ThreadFollowerInterruptRequestParameters;
 
-function buildTurnStartParams(input: SendMessageInput, trimmedText: string): TurnStartParams {
-  const textInput = [{ type: TURN_START_TEXT_INPUT_PART_TYPE, text: trimmedText }];
-  const template = input.turnStartTemplate;
-  const turnStartParams: TurnStartParams = template
-    ? {
-        ...template,
-        threadId: input.threadId,
-        input: textInput,
-        cwd: input.cwd ?? template.cwd,
-        attachments: template.attachments ?? [],
-      }
-    : {
-        threadId: input.threadId,
-        input: textInput,
-        ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
-        attachments: [],
-      };
-
-  return applyTurnStartOverrides(turnStartParams, input);
-}
-
-/**
- * Optional overrides are applied only when provided by the typed service API.
- * Omitted fields intentionally preserve template values.
- */
-function applyTurnStartOverrides(
-  turnStartParams: TurnStartParams,
-  input: SendMessageInput,
-): TurnStartParams {
-  return {
-    ...turnStartParams,
-    ...(input.model !== undefined ? { model: input.model } : {}),
-    ...(input.effort !== undefined ? { effort: input.effort } : {}),
-    ...(input.collaborationMode !== undefined
-      ? { collaborationMode: input.collaborationMode }
-      : {}),
-  };
-}
-
 /**
  * Owns Codex thread-level command payload construction over desktop IPC.
  * IPC transport delivery remains in the owned IPC client implementation.
@@ -161,7 +122,19 @@ export class CodexMonitorService {
 
     const requestParameters: ThreadFollowerStartTurnRequestParameters = {
       conversationId: input.threadId,
-      turnStartParams: buildTurnStartParams(input, trimmedText),
+      turnStartParams: buildTurnStartMessageParameters({
+        threadId: input.threadId,
+        text: trimmedText,
+        ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
+        ...(input.turnStartTemplate !== undefined
+          ? { turnStartTemplate: input.turnStartTemplate }
+          : {}),
+        ...(input.model !== undefined ? { model: input.model } : {}),
+        ...(input.effort !== undefined ? { effort: input.effort } : {}),
+        ...(input.collaborationMode !== undefined
+          ? { collaborationMode: input.collaborationMode }
+          : {}),
+      }),
       isSteering: Boolean(input.isSteering),
     };
 

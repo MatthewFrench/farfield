@@ -159,6 +159,11 @@ describe("CodexMonitorService", () => {
           effort: "medium",
           collaborationMode: {
             mode: "plan",
+            settings: {
+              model: null,
+              reasoning_effort: null,
+              developer_instructions: null,
+            },
           },
         }),
       ),
@@ -193,6 +198,11 @@ describe("CodexMonitorService", () => {
           effort: "medium",
           collaborationMode: {
             mode: "plan",
+            settings: {
+              model: null,
+              reasoning_effort: null,
+              developer_instructions: null,
+            },
           },
         }),
       ),
@@ -244,7 +254,7 @@ describe("CodexMonitorService", () => {
     );
   });
 
-  it("preserves an explicit empty cwd when no template is available", async () => {
+  it("omits an explicit empty cwd when no template is available", async () => {
     const serviceIpcClientDouble = createServiceIpcClientDouble();
     const service = new CodexMonitorService(serviceIpcClientDouble.ipcClient);
 
@@ -261,6 +271,14 @@ describe("CodexMonitorService", () => {
         conversationId: "thread-1",
         turnStartParams: expect.objectContaining({
           threadId: "thread-1",
+        }),
+      }),
+      expect.any(Object),
+    );
+    expect(serviceIpcClientDouble.sendRequestAndWait).toHaveBeenCalledWith(
+      "thread-follower-start-turn",
+      expect.objectContaining({
+        turnStartParams: expect.not.objectContaining({
           cwd: "",
         }),
       }),
@@ -292,6 +310,11 @@ describe("CodexMonitorService", () => {
       ownerClientId: "client-1",
       collaborationMode: {
         mode: "plan",
+        settings: {
+          model: null,
+          reasoning_effort: null,
+          developer_instructions: null,
+        },
       },
     });
 

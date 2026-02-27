@@ -57,6 +57,8 @@ class TestCodexMonitorService extends CodexMonitorService {
 
 class TestAppServerTransport implements AppServerTransport {
   public readonly requestCalls: AppServerRequestCall[] = [];
+  private readonly responseByMethod = new Map<string, JsonValue>();
+  private readonly errorsByMethod = new Map<string, Error[]>();
 
   public async request(method: string, params: object, timeoutMs?: number): Promise<JsonValue> {
     this.requestCalls.push({
@@ -64,6 +66,20 @@ class TestAppServerTransport implements AppServerTransport {
       params,
       timeoutMs,
     });
+
+    const queuedErrors = this.errorsByMethod.get(method);
+    if (queuedErrors && queuedErrors.length > 0) {
+      const nextError = queuedErrors.shift();
+      if (nextError) {
+        throw nextError;
+      }
+    }
+
+    const configuredResponse = this.responseByMethod.get(method);
+    if (configuredResponse !== undefined) {
+      return configuredResponse;
+    }
+
     return {
       thread: {
         id: "unused-thread-id",
@@ -71,6 +87,16 @@ class TestAppServerTransport implements AppServerTransport {
         requests: [],
       },
     };
+  }
+
+  public setResponse(method: string, response: JsonValue): void {
+    this.responseByMethod.set(method, response);
+  }
+
+  public queueError(method: string, error: Error): void {
+    const queuedErrors = this.errorsByMethod.get(method) ?? [];
+    queuedErrors.push(error);
+    this.errorsByMethod.set(method, queuedErrors);
   }
 
   public async close(): Promise<void> {}
@@ -115,7 +141,13 @@ function createThreadStreamStateOwner(
   return threadStreamStateOwner;
 }
 
-function createOwnerTestContext(threadId: string, ownerClientId: string): OwnerTestContext {
+function createOwnerTestContext(
+  threadId: string,
+  ownerClientId: string,
+  options?: {
+    isConversationNotFoundError?: <ErrorType>(error: ErrorType) => boolean;
+  },
+): OwnerTestContext {
   const appServerTransport = new TestAppServerTransport();
   const appClient = new AppServerClient(appServerTransport);
   const service = new TestCodexMonitorService();
@@ -132,7 +164,8 @@ function createOwnerTestContext(threadId: string, ownerClientId: string): OwnerT
       runAppServerCallCount += 1;
       return operation();
     },
-    isConversationNotFoundError: <ErrorType>(_error: ErrorType): boolean => false,
+    isConversationNotFoundError:
+      options?.isConversationNotFoundError ?? (<ErrorType>(_error: ErrorType): boolean => false),
   });
 
   return {
@@ -195,5 +228,114 @@ describe("CodexMessageDispatchOwner", () => {
     expect("cwd" in sendCall).toBe(false);
     expect(context.readRunAppServerCallCount()).toBe(0);
     expect(context.appServerTransport.requestCalls).toHaveLength(0);
+  });
+
+  it("uses turn/start for app-server sends when IPC is unavailable", async () => {
+    const threadId = "thread-3";
+    const ownerClientId = "owner-client-3";
+    const context = createOwnerTestContext(threadId, ownerClientId);
+    context.appServerTransport.setResponse("turn/start", {
+      turn: {
+        id: "turn-1",
+      },
+    });
+
+    await context.owner.sendMessage(
+      {
+        threadId,
+        text: "hello from app-server",
+      },
+      false,
+    );
+
+    expect(context.service.sendMessageCalls).toHaveLength(0);
+    expect(context.readRunAppServerCallCount()).toBe(1);
+    expect(context.appServerTransport.requestCalls).toEqual([
+      {
+        method: "turn/start",
+        params: {
+          threadId,
+          input: [
+            {
+              type: "text",
+              text: "hello from app-server",
+            },
+          ],
+          attachments: [],
+        },
+        timeoutMs: undefined,
+      },
+    ]);
+  });
+
+  it("resumes the thread and retries turn/start after conversation-not-found errors", async () => {
+    const threadId = "thread-4";
+    const ownerClientId = "owner-client-4";
+    const context = createOwnerTestContext(threadId, ownerClientId, {
+      isConversationNotFoundError: <ErrorType>(error: ErrorType): boolean => {
+        return error instanceof Error && error.message.includes("conversation not found");
+      },
+    });
+    context.appServerTransport.setResponse("thread/resume", {
+      thread: {
+        id: threadId,
+        turns: [],
+        requests: [],
+      },
+    });
+    context.appServerTransport.setResponse("turn/start", {
+      turn: {
+        id: "turn-2",
+      },
+    });
+    context.appServerTransport.queueError("turn/start", new Error("conversation not found"));
+
+    await context.owner.sendMessage(
+      {
+        threadId,
+        text: "retry turn start",
+      },
+      false,
+    );
+
+    expect(context.readRunAppServerCallCount()).toBe(3);
+    expect(context.appServerTransport.requestCalls).toEqual([
+      {
+        method: "turn/start",
+        params: {
+          threadId,
+          input: [
+            {
+              type: "text",
+              text: "retry turn start",
+            },
+          ],
+          attachments: [],
+        },
+        timeoutMs: undefined,
+      },
+      {
+        method: "thread/resume",
+        params: {
+          threadId,
+          persistExtendedHistory: true,
+        },
+        timeoutMs: undefined,
+      },
+      {
+        method: "turn/start",
+        params: {
+          threadId,
+          input: [
+            {
+              type: "text",
+              text: "retry turn start",
+            },
+          ],
+          attachments: [],
+        },
+        timeoutMs: undefined,
+      },
+    ]);
   });
 });

@@ -5,12 +5,12 @@ import path from "node:path";
 import { z } from "zod";
 
 /**
- * Enforces app-server method governance by comparing:
- * 1) upstream protocol method extraction against a tracked upstream snapshot, and
- * 2) Farfield owned method extraction against a tracked Farfield snapshot.
+ * Enforces app-server governance by comparing:
+ * 1) upstream protocol extraction against tracked upstream snapshots, and
+ * 2) Farfield owner extraction against tracked Farfield snapshots.
  *
- * CI should fail when upstream adds/removes request methods until the snapshot
- * and tracker are intentionally updated.
+ * CI should fail when upstream adds/removes methods until snapshots and ledgers
+ * are intentionally updated.
  */
 const UpstreamClientRequestMethodSnapshotPath = path.join(
   process.cwd(),
@@ -20,13 +20,30 @@ const FarfieldClientRequestMethodSnapshotPath = path.join(
   process.cwd(),
   "docs/debug/AppServerFarfieldClientRequestMethods.snapshot.txt",
 );
-const FarfieldMethodConstantsPath = path.join(
+const UpstreamServerNotificationMethodSnapshotPath = path.join(
+  process.cwd(),
+  "docs/debug/AppServerUpstreamServerNotificationMethods.snapshot.txt",
+);
+const UpstreamServerRequestMethodSnapshotPath = path.join(
+  process.cwd(),
+  "docs/debug/AppServerUpstreamServerRequestMethods.snapshot.txt",
+);
+const FarfieldServerRequestMethodSnapshotPath = path.join(
+  process.cwd(),
+  "docs/debug/AppServerFarfieldServerRequestMethods.snapshot.txt",
+);
+
+const FarfieldClientMethodConstantsPath = path.join(
   process.cwd(),
   "packages/CodexInterfaceAdapter/Source/AppServerClientMethodConstants.ts",
 );
 const FarfieldTransportConstantsPath = path.join(
   process.cwd(),
   "packages/CodexInterfaceAdapter/Source/AppServerTransportConstants.ts",
+);
+const FarfieldServerRequestMethodConstantsPath = path.join(
+  process.cwd(),
+  "packages/CodexInterfaceAdapter/Source/AppServerServerRequestMethodConstants.ts",
 );
 
 const UpstreamCommonSourceDefaultUrl =
@@ -36,12 +53,18 @@ const UpstreamCommonSourcePathEnvironmentVariableName =
 const UpstreamCommonSourceUrlEnvironmentVariableName =
   "APP_SERVER_METHOD_DRIFT_UPSTREAM_COMMON_RS_URL";
 
-const ClientRequestMacroBlockStart = "client_request_definitions! {";
-const ClientRequestMacroBlockEnd = "/// Generates an `enum ServerRequest`";
+const ClientRequestMacroInvocationStart = "client_request_definitions! {";
+const ServerRequestMacroInvocationStart = "server_request_definitions! {";
+const ServerNotificationMacroInvocationStart = "server_notification_definitions! {";
 const MethodConstantsBlockPattern = /APP_SERVER_CLIENT_METHODS\s*=\s*\{([\s\S]*?)\}\s*as const/;
+const HandledServerRequestMethodConstantsBlockPattern =
+  /APP_SERVER_HANDLED_SERVER_REQUEST_METHODS\s*=\s*\{([\s\S]*?)\}\s*as const/;
 const MethodStringPattern = /:\s*"([^"]+)"/g;
 const InitializeMethodPattern = /APP_SERVER_INITIALIZE_METHOD\s*=\s*"([^"]+)"/;
-const MacroVariantPattern = /^\s*([A-Za-z][A-Za-z0-9_]*)\s*(?:=>\s*"([^"]+)")?\s*\{/gm;
+const ExplicitMethodPattern = /^([A-Za-z][A-Za-z0-9_]*)\s*=>\s*"([^"]+)"/;
+const ImplicitMethodPattern = /^([A-Za-z][A-Za-z0-9_]*)\s*(?:\(|\{)/;
+const SerdeRenameAttributePattern = /^#\[\s*serde\(\s*rename\s*=\s*"([^"]+)"\s*\)\s*\]/;
+const StrumSerializeAttributePattern = /^#\[\s*strum\(\s*serialize\s*=\s*"([^"]+)"\s*\)\s*\]/;
 
 const MethodNameSchema = z.string().trim().min(1);
 const MethodNameListSchema = z.array(MethodNameSchema);
@@ -80,35 +103,104 @@ function readSnapshotMethods(snapshotPath, description) {
   return toSortedUniqueMethodList(methods);
 }
 
-function extractClientRequestMacroBlock(commonSourceText) {
-  const startIndex = commonSourceText.indexOf(ClientRequestMacroBlockStart);
-  if (startIndex < 0) {
-    fail(`Missing upstream macro block start marker: ${ClientRequestMacroBlockStart}`);
+function extractMacroInvocationBody(sourceText, invocationStart) {
+  const invocationStartIndex = sourceText.indexOf(invocationStart);
+  if (invocationStartIndex < 0) {
+    fail(`Missing upstream macro invocation start marker: ${invocationStart}`);
   }
 
-  const endIndex = commonSourceText.indexOf(ClientRequestMacroBlockEnd, startIndex);
-  if (endIndex < 0) {
-    fail(`Missing upstream macro block end marker: ${ClientRequestMacroBlockEnd}`);
+  const blockStartIndex = sourceText.indexOf("{", invocationStartIndex);
+  if (blockStartIndex < 0) {
+    fail(`Missing upstream macro invocation body start: ${invocationStart}`);
   }
 
-  return commonSourceText.slice(startIndex, endIndex);
+  let depth = 0;
+  for (let index = blockStartIndex; index < sourceText.length; index += 1) {
+    const character = sourceText[index];
+    if (character === "{") {
+      depth += 1;
+      continue;
+    }
+
+    if (character !== "}") {
+      continue;
+    }
+
+    depth -= 1;
+    if (depth === 0) {
+      return sourceText.slice(blockStartIndex + 1, index);
+    }
+  }
+
+  fail(`Unterminated macro invocation body: ${invocationStart}`);
 }
 
-function parseUpstreamClientRequestMethods(commonSourceText) {
-  const macroBlock = extractClientRequestMacroBlock(commonSourceText);
+function parseMacroInvocationMethods(macroBody) {
   const methods = [];
+  let pendingAttributeMethod = null;
 
-  for (const match of macroBlock.matchAll(MacroVariantPattern)) {
-    const variantName = MethodNameSchema.parse(match[1]);
-    const explicitWireMethod = match[2];
+  for (const rawLine of macroBody.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line.length === 0 || line.startsWith("///") || line.startsWith("//")) {
+      continue;
+    }
+
+    const serdeRenameMatch = line.match(SerdeRenameAttributePattern);
+    if (serdeRenameMatch && serdeRenameMatch[1] !== undefined) {
+      pendingAttributeMethod = MethodNameSchema.parse(serdeRenameMatch[1]);
+      continue;
+    }
+
+    const strumSerializeMatch = line.match(StrumSerializeAttributePattern);
+    if (strumSerializeMatch && strumSerializeMatch[1] !== undefined) {
+      pendingAttributeMethod = MethodNameSchema.parse(strumSerializeMatch[1]);
+      continue;
+    }
+
+    if (line.startsWith("#[") || line.startsWith("#(")) {
+      continue;
+    }
+
+    const explicitMethodMatch = line.match(ExplicitMethodPattern);
+    if (explicitMethodMatch && explicitMethodMatch[2] !== undefined) {
+      methods.push(MethodNameSchema.parse(explicitMethodMatch[2]));
+      pendingAttributeMethod = null;
+      continue;
+    }
+
+    const implicitMethodMatch = line.match(ImplicitMethodPattern);
+    if (!implicitMethodMatch || implicitMethodMatch[1] === undefined) {
+      continue;
+    }
+
+    const variantName = MethodNameSchema.parse(implicitMethodMatch[1]);
     methods.push(
-      explicitWireMethod !== undefined
-        ? MethodNameSchema.parse(explicitWireMethod)
+      pendingAttributeMethod !== null
+        ? MethodNameSchema.parse(pendingAttributeMethod)
         : toLowerCamelCaseFromPascalCase(variantName),
     );
+    pendingAttributeMethod = null;
   }
 
   return toSortedUniqueMethodList(methods);
+}
+
+function parseUpstreamClientRequestMethods(commonSourceText) {
+  return parseMacroInvocationMethods(
+    extractMacroInvocationBody(commonSourceText, ClientRequestMacroInvocationStart),
+  );
+}
+
+function parseUpstreamServerRequestMethods(commonSourceText) {
+  return parseMacroInvocationMethods(
+    extractMacroInvocationBody(commonSourceText, ServerRequestMacroInvocationStart),
+  );
+}
+
+function parseUpstreamServerNotificationMethods(commonSourceText) {
+  return parseMacroInvocationMethods(
+    extractMacroInvocationBody(commonSourceText, ServerNotificationMacroInvocationStart),
+  );
 }
 
 function parseFarfieldClientRequestMethods(methodConstantsSource, transportConstantsSource) {
@@ -127,6 +219,24 @@ function parseFarfieldClientRequestMethods(methodConstantsSource, transportConst
     fail("Unable to parse APP_SERVER_INITIALIZE_METHOD from Farfield transport constants");
   }
   methods.push(MethodNameSchema.parse(initializeMethodMatch[1]));
+
+  return toSortedUniqueMethodList(methods);
+}
+
+function parseFarfieldServerRequestMethods(methodConstantsSource) {
+  const methodConstantsMatch = methodConstantsSource.match(
+    HandledServerRequestMethodConstantsBlockPattern,
+  );
+  if (!methodConstantsMatch || methodConstantsMatch[1] === undefined) {
+    fail(
+      "Unable to parse APP_SERVER_HANDLED_SERVER_REQUEST_METHODS block from Farfield server-request method constants",
+    );
+  }
+
+  const methods = [];
+  for (const match of methodConstantsMatch[1].matchAll(MethodStringPattern)) {
+    methods.push(MethodNameSchema.parse(match[1]));
+  }
 
   return toSortedUniqueMethodList(methods);
 }
@@ -203,54 +313,107 @@ async function readUpstreamCommonSource() {
 }
 
 async function main() {
-  const upstreamSnapshotMethods = readSnapshotMethods(
+  const upstreamClientRequestSnapshotMethods = readSnapshotMethods(
     UpstreamClientRequestMethodSnapshotPath,
-    "upstream app-server method snapshot",
+    "upstream app-server client-request method snapshot",
   );
-  const farfieldSnapshotMethods = readSnapshotMethods(
+  const farfieldClientRequestSnapshotMethods = readSnapshotMethods(
     FarfieldClientRequestMethodSnapshotPath,
-    "Farfield app-server method snapshot",
+    "Farfield app-server client-request method snapshot",
+  );
+  const upstreamServerNotificationSnapshotMethods = readSnapshotMethods(
+    UpstreamServerNotificationMethodSnapshotPath,
+    "upstream app-server server-notification method snapshot",
+  );
+  const upstreamServerRequestSnapshotMethods = readSnapshotMethods(
+    UpstreamServerRequestMethodSnapshotPath,
+    "upstream app-server server-request method snapshot",
+  );
+  const farfieldServerRequestSnapshotMethods = readSnapshotMethods(
+    FarfieldServerRequestMethodSnapshotPath,
+    "Farfield app-server server-request method snapshot",
   );
 
   const { sourceText: upstreamCommonSourceText, sourceLabel: upstreamSourceLabel } =
     await readUpstreamCommonSource();
-  const upstreamExtractedMethods = parseUpstreamClientRequestMethods(upstreamCommonSourceText);
+  const upstreamExtractedClientRequestMethods = parseUpstreamClientRequestMethods(
+    upstreamCommonSourceText,
+  );
+  const upstreamExtractedServerNotificationMethods = parseUpstreamServerNotificationMethods(
+    upstreamCommonSourceText,
+  );
+  const upstreamExtractedServerRequestMethods = parseUpstreamServerRequestMethods(
+    upstreamCommonSourceText,
+  );
 
-  const farfieldMethodConstantsSource = readTextOrFail(
-    FarfieldMethodConstantsPath,
-    "Farfield app-server method constants",
+  const farfieldClientMethodConstantsSource = readTextOrFail(
+    FarfieldClientMethodConstantsPath,
+    "Farfield app-server client-request method constants",
   );
   const farfieldTransportConstantsSource = readTextOrFail(
     FarfieldTransportConstantsPath,
     "Farfield app-server transport constants",
   );
-  const farfieldExtractedMethods = parseFarfieldClientRequestMethods(
-    farfieldMethodConstantsSource,
+  const farfieldServerRequestMethodConstantsSource = readTextOrFail(
+    FarfieldServerRequestMethodConstantsPath,
+    "Farfield app-server server-request method constants",
+  );
+
+  const farfieldExtractedClientRequestMethods = parseFarfieldClientRequestMethods(
+    farfieldClientMethodConstantsSource,
     farfieldTransportConstantsSource,
+  );
+  const farfieldExtractedServerRequestMethods = parseFarfieldServerRequestMethods(
+    farfieldServerRequestMethodConstantsSource,
   );
 
   assertMethodListsEqual(
-    "Upstream app-server method snapshot drift",
-    upstreamSnapshotMethods,
-    upstreamExtractedMethods,
+    "Upstream app-server client-request method snapshot drift",
+    upstreamClientRequestSnapshotMethods,
+    upstreamExtractedClientRequestMethods,
   );
   assertMethodListsEqual(
-    "Farfield app-server method snapshot drift",
-    farfieldSnapshotMethods,
-    farfieldExtractedMethods,
+    "Farfield app-server client-request method snapshot drift",
+    farfieldClientRequestSnapshotMethods,
+    farfieldExtractedClientRequestMethods,
   );
   assertSubset(
-    "Farfield method snapshot contains methods not present upstream",
-    farfieldSnapshotMethods,
-    upstreamSnapshotMethods,
+    "Farfield client-request method snapshot contains methods not present upstream",
+    farfieldClientRequestSnapshotMethods,
+    upstreamClientRequestSnapshotMethods,
+  );
+
+  assertMethodListsEqual(
+    "Upstream app-server server-notification method snapshot drift",
+    upstreamServerNotificationSnapshotMethods,
+    upstreamExtractedServerNotificationMethods,
+  );
+  assertMethodListsEqual(
+    "Upstream app-server server-request method snapshot drift",
+    upstreamServerRequestSnapshotMethods,
+    upstreamExtractedServerRequestMethods,
+  );
+
+  assertMethodListsEqual(
+    "Farfield app-server server-request method snapshot drift",
+    farfieldServerRequestSnapshotMethods,
+    farfieldExtractedServerRequestMethods,
+  );
+  assertSubset(
+    "Farfield server-request method snapshot contains methods not present upstream",
+    farfieldServerRequestSnapshotMethods,
+    upstreamServerRequestSnapshotMethods,
   );
 
   process.stdout.write(
     [
       "[app-server-method-drift] Method snapshots verified",
       `- upstream source: ${upstreamSourceLabel}`,
-      `- upstream methods: ${String(upstreamSnapshotMethods.length)}`,
-      `- farfield methods: ${String(farfieldSnapshotMethods.length)}`,
+      `- upstream client-request methods: ${String(upstreamClientRequestSnapshotMethods.length)}`,
+      `- Farfield client-request methods: ${String(farfieldClientRequestSnapshotMethods.length)}`,
+      `- upstream server-notification methods: ${String(upstreamServerNotificationSnapshotMethods.length)}`,
+      `- upstream server-request methods: ${String(upstreamServerRequestSnapshotMethods.length)}`,
+      `- Farfield server-request methods: ${String(farfieldServerRequestSnapshotMethods.length)}`,
     ].join("\n") + "\n",
   );
 }

@@ -1,3 +1,4 @@
+import { UserInputRequestMethod } from "@farfield/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getLiveState,
@@ -260,9 +261,12 @@ describe("ChatApi", () => {
         threadId: "thread_1",
         requestId: -1,
         response: {
-          answers: {
-            question_1: {
-              answers: ["answer"],
+          method: UserInputRequestMethod,
+          payload: {
+            answers: {
+              question_1: {
+                answers: ["answer"],
+              },
             },
           },
         },

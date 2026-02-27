@@ -9,10 +9,15 @@ import {
   AppServerListThreadsResponseSchema,
   type AppServerReadThreadResponse,
   AppServerReadThreadResponseSchema,
-  AppServerSendUserMessageResponseSchema,
   type AppServerStartThreadResponse,
   AppServerStartThreadResponseSchema,
   AppServerThreadListItemSchema,
+  AppServerTurnStartResponseSchema,
+  type CollaborationMode,
+  JsonValueSchema,
+  parseThreadConversationRequestResponse,
+  type ThreadConversationRequestResponse,
+  type TurnStartParams,
 } from "@farfield/protocol";
 import { z } from "zod";
 import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
@@ -24,8 +29,8 @@ import {
   buildReadConfigRequestParameters,
   buildReadThreadRequestParameters,
   buildResumeThreadRequest,
-  buildSendUserMessageRequest,
   buildStartThreadRequest,
+  buildStartTurnRequest,
   buildUnarchiveThreadRequest,
   resolveReadThreadRequestTimeoutMilliseconds,
 } from "./AppServerClientRequestBuilders.js";
@@ -34,11 +39,15 @@ import {
   parseAppServerResponse,
 } from "./AppServerClientResponseParser.js";
 import {
+  type AppServerPendingServerRequest,
+  type AppServerReadNotificationEventsInput,
+  type AppServerReadNotificationEventsResult,
   type AppServerTransport,
   ChildProcessAppServerTransport,
   type ChildProcessAppServerTransportOptions,
   isChildProcessAppServerTransportOptions,
 } from "./AppServerTransport.js";
+import { AppServerTransportError } from "./Errors.js";
 
 export interface ListThreadsOptions {
   limit: number;
@@ -73,6 +82,16 @@ export interface ReadConfigOptions {
 
 export interface ResumeThreadOptions {
   persistExtendedHistory?: boolean;
+}
+
+export interface StartTurnOptions {
+  threadId: string;
+  text: string;
+  cwd?: string;
+  turnStartTemplate?: TurnStartParams | null;
+  model?: string | null;
+  effort?: string | null;
+  collaborationMode?: CollaborationMode | null;
 }
 
 const AppServerArchiveThreadResponseSchema = z.object({}).passthrough();
@@ -218,14 +237,52 @@ export class AppServerClient {
     );
   }
 
-  public async sendUserMessage(threadId: string, text: string): Promise<void> {
-    const request = buildSendUserMessageRequest(threadId, text);
-    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.sendUserMessage, request);
+  public async startTurn(options: StartTurnOptions): Promise<void> {
+    const request = buildStartTurnRequest(options);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.startTurn, request);
     parseAppServerResponse(
-      AppServerSendUserMessageResponseSchema,
+      AppServerTurnStartResponseSchema,
       result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.sendUserMessage,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.startTurn,
     );
+  }
+
+  public async submitServerRequestResponse(
+    requestId: number,
+    responsePayload: ThreadConversationRequestResponse,
+  ): Promise<void> {
+    if (!this.transport.respond) {
+      throw new AppServerTransportError(
+        "App-server transport does not support server-request responses.",
+      );
+    }
+
+    const parsedResponsePayload = parseThreadConversationRequestResponse(
+      JsonValueSchema.parse(responsePayload),
+    );
+    await this.transport.respond(requestId, parsedResponsePayload);
+  }
+
+  public readNotificationEvents(
+    input: AppServerReadNotificationEventsInput,
+  ): AppServerReadNotificationEventsResult {
+    if (!this.transport.readNotificationEvents) {
+      throw new AppServerTransportError(
+        "App-server transport does not support notification event reads.",
+      );
+    }
+
+    return this.transport.readNotificationEvents(input);
+  }
+
+  public readPendingServerRequests(): AppServerPendingServerRequest[] {
+    if (!this.transport.readPendingServerRequests) {
+      throw new AppServerTransportError(
+        "App-server transport does not expose pending server requests.",
+      );
+    }
+
+    return this.transport.readPendingServerRequests();
   }
 
   public async resumeThread(

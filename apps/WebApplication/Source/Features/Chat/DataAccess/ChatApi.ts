@@ -8,7 +8,7 @@ import {
   FarfieldThreadLiveStateSnapshotSchema,
   type FarfieldThreadStreamEventsSnapshot,
   FarfieldThreadStreamEventsSnapshotSchema,
-  UserInputResponsePayloadSchema,
+  ThreadConversationRequestResponseSchema,
 } from "@farfield/protocol";
 import { z } from "zod";
 import {
@@ -87,7 +87,7 @@ const SubmitUserInputInputSchema = z
     threadId: ThreadIdentifierSchema,
     ownerClientId: z.string().optional(),
     requestId: z.number().int().nonnegative(),
-    response: UserInputResponsePayloadSchema,
+    response: ThreadConversationRequestResponseSchema,
   })
   .strict();
 export type ApiSubmitUserInputInput = z.infer<typeof SubmitUserInputInputSchema>;

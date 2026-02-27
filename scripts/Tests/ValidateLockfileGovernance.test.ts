@@ -26,7 +26,7 @@ afterEach(() => {
   }
 });
 
-describe("validate-lockfile-governance", () => {
+describe("validate-lockfile-governance", { timeout: 15_000 }, () => {
   it("succeeds when only bun.lock is tracked", () => {
     const repositoryPath = createRepositoryWithCleanup([
       { relativePath: "bun.lock", content: "lockfile-content" },

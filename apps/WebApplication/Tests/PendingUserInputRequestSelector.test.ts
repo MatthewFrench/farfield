@@ -52,7 +52,9 @@ function createCommandExecutionApprovalRequest(input: {
     id: input.id,
     completed: input.completed,
     params: {
-      callId: `call-${String(input.id)}`,
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: `item-${String(input.id)}`,
       command: "echo hello",
       cwd: "/tmp",
     },

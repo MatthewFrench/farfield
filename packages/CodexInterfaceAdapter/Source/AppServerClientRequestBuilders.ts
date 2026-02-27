@@ -1,6 +1,6 @@
 import {
-  AppServerSendUserMessageRequestSchema,
   AppServerStartThreadRequestSchema,
+  AppServerTurnStartRequestSchema,
 } from "@farfield/protocol";
 import { z } from "zod";
 import type {
@@ -9,7 +9,9 @@ import type {
   ReadConfigOptions,
   ResumeThreadOptions,
   StartThreadOptions,
+  StartTurnOptions,
 } from "./AppServerClient.js";
+import { buildTurnStartMessageParameters } from "./TurnStartMessageParametersBuilder.js";
 
 const AppServerResumeThreadRequestSchema = z
   .object({
@@ -100,21 +102,23 @@ export function buildStartThreadRequest(
   return AppServerStartThreadRequestSchema.parse(options);
 }
 
-export function buildSendUserMessageRequest(
-  threadId: string,
-  text: string,
-): z.infer<typeof AppServerSendUserMessageRequestSchema> {
-  return AppServerSendUserMessageRequestSchema.parse({
-    conversationId: threadId,
-    items: [
-      {
-        type: "text",
-        data: {
-          text,
-        },
-      },
-    ],
+export function buildStartTurnRequest(
+  options: StartTurnOptions,
+): z.infer<typeof AppServerTurnStartRequestSchema> {
+  const turnStartParameters = buildTurnStartMessageParameters({
+    threadId: options.threadId,
+    text: options.text,
+    ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
+    ...(options.turnStartTemplate !== undefined
+      ? { turnStartTemplate: options.turnStartTemplate }
+      : {}),
+    ...(options.model !== undefined ? { model: options.model } : {}),
+    ...(options.effort !== undefined ? { effort: options.effort } : {}),
+    ...(options.collaborationMode !== undefined
+      ? { collaborationMode: options.collaborationMode }
+      : {}),
   });
+  return AppServerTurnStartRequestSchema.parse(turnStartParameters);
 }
 
 export function buildResumeThreadRequest(

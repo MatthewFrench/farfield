@@ -29,22 +29,49 @@ afterEach(() => {
   }
 });
 
-function createRepositoryFiles(upstreamSnapshotText: string, farfieldSnapshotText: string) {
+function createRepositoryFiles(input: {
+  upstreamClientRequestSnapshotText: string;
+  farfieldClientRequestSnapshotText: string;
+  upstreamServerNotificationSnapshotText: string;
+  upstreamServerRequestSnapshotText: string;
+  farfieldServerRequestSnapshotText: string;
+}) {
   return [
     {
       relativePath: "docs/debug/AppServerUpstreamClientRequestMethods.snapshot.txt",
-      content: upstreamSnapshotText,
+      content: input.upstreamClientRequestSnapshotText,
     },
     {
       relativePath: "docs/debug/AppServerFarfieldClientRequestMethods.snapshot.txt",
-      content: farfieldSnapshotText,
+      content: input.farfieldClientRequestSnapshotText,
+    },
+    {
+      relativePath: "docs/debug/AppServerUpstreamServerNotificationMethods.snapshot.txt",
+      content: input.upstreamServerNotificationSnapshotText,
+    },
+    {
+      relativePath: "docs/debug/AppServerUpstreamServerRequestMethods.snapshot.txt",
+      content: input.upstreamServerRequestSnapshotText,
+    },
+    {
+      relativePath: "docs/debug/AppServerFarfieldServerRequestMethods.snapshot.txt",
+      content: input.farfieldServerRequestSnapshotText,
     },
     {
       relativePath: "packages/CodexInterfaceAdapter/Source/AppServerClientMethodConstants.ts",
       content: [
         "export const APP_SERVER_CLIENT_METHODS = {",
         '  listThreads: "thread/list",',
-        '  sendUserMessage: "sendUserMessage",',
+        '  startTurn: "turn/start",',
+        "} as const;",
+        "",
+      ].join("\n"),
+    },
+    {
+      relativePath: "packages/CodexInterfaceAdapter/Source/AppServerServerRequestMethodConstants.ts",
+      content: [
+        "export const APP_SERVER_HANDLED_SERVER_REQUEST_METHODS = {",
+        '  toolRequestUserInput: "item/tool/requestUserInput",',
         "} as const;",
         "",
       ].join("\n"),
@@ -65,12 +92,27 @@ function createRepositoryFiles(upstreamSnapshotText: string, farfieldSnapshotTex
         "        params: v2::ThreadListParams,",
         "        response: v2::ThreadListResponse,",
         "    },",
-        "    SendUserMessage {",
-        "        params: v1::SendUserMessageParams,",
-        "        response: v1::SendUserMessageResponse,",
+        '    TurnStart => "turn/start" {',
+        "        params: v2::TurnStartParams,",
+        "        response: v2::TurnStartResponse,",
         "    },",
         "}",
-        "/// Generates an `enum ServerRequest`",
+        "",
+        "server_request_definitions! {",
+        '    ToolRequestUserInput => "item/tool/requestUserInput" {',
+        "        params: v2::ToolRequestUserInputParams,",
+        "        response: v2::ToolRequestUserInputResponse,",
+        "    },",
+        "}",
+        "",
+        "server_notification_definitions! {",
+        '    ThreadStarted => "thread/started" (v2::ThreadStartedNotification),',
+        '    TurnStarted => "turn/started" (v2::TurnStartedNotification),',
+        "    #[serde(rename = \"account/login/completed\")]",
+        "    #[ts(rename = \"account/login/completed\")]",
+        "    #[strum(serialize = \"account/login/completed\")]",
+        "    AccountLoginCompleted(v2::AccountLoginCompletedNotification),",
+        "}",
         "",
       ].join("\n"),
     },
@@ -86,13 +128,17 @@ function runGovernanceScript(
   });
 }
 
-describe("validate-app-server-method-drift-governance", () => {
+describe("validate-app-server-method-drift-governance", { timeout: 15_000 }, () => {
   it("succeeds when snapshots match extracted upstream and Farfield methods", () => {
     const repositoryPath = createRepositoryWithCleanup(
-      createRepositoryFiles(
-        "initialize\nsendUserMessage\nthread/list\n",
-        "initialize\nsendUserMessage\nthread/list\n",
-      ),
+      createRepositoryFiles({
+        upstreamClientRequestSnapshotText: "initialize\nthread/list\nturn/start\n",
+        farfieldClientRequestSnapshotText: "initialize\nthread/list\nturn/start\n",
+        upstreamServerNotificationSnapshotText:
+          "account/login/completed\nthread/started\nturn/started\n",
+        upstreamServerRequestSnapshotText: "item/tool/requestUserInput\n",
+        farfieldServerRequestSnapshotText: "item/tool/requestUserInput\n",
+      }),
     );
     const upstreamCommonSourcePath = path.join(repositoryPath, "fixtures/upstream-common.rs");
 
@@ -103,35 +149,64 @@ describe("validate-app-server-method-drift-governance", () => {
     expect(result.stderr).toBe("");
   });
 
-  it("fails when upstream snapshot drifts from extracted upstream methods", () => {
+  it("fails when upstream client-request snapshot drifts from extracted methods", () => {
     const repositoryPath = createRepositoryWithCleanup(
-      createRepositoryFiles(
-        "initialize\nthread/list\n",
-        "initialize\nsendUserMessage\nthread/list\n",
-      ),
+      createRepositoryFiles({
+        upstreamClientRequestSnapshotText: "initialize\nthread/list\n",
+        farfieldClientRequestSnapshotText: "initialize\nthread/list\nturn/start\n",
+        upstreamServerNotificationSnapshotText:
+          "account/login/completed\nthread/started\nturn/started\n",
+        upstreamServerRequestSnapshotText: "item/tool/requestUserInput\n",
+        farfieldServerRequestSnapshotText: "item/tool/requestUserInput\n",
+      }),
     );
     const upstreamCommonSourcePath = path.join(repositoryPath, "fixtures/upstream-common.rs");
 
     const result = runGovernanceScript(repositoryPath, upstreamCommonSourcePath);
 
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("Upstream app-server method snapshot drift mismatch");
-    expect(result.stderr).toContain("+ sendUserMessage");
+    expect(result.stderr).toContain("Upstream app-server client-request method snapshot drift mismatch");
+    expect(result.stderr).toContain("+ turn/start");
   });
 
-  it("fails when Farfield snapshot drifts from extracted Farfield methods", () => {
+  it("fails when upstream server-notification snapshot drifts from extracted methods", () => {
     const repositoryPath = createRepositoryWithCleanup(
-      createRepositoryFiles(
-        "initialize\nsendUserMessage\nthread/list\n",
-        "initialize\nsendUserMessage\nthread/list\nthread/read\n",
-      ),
+      createRepositoryFiles({
+        upstreamClientRequestSnapshotText: "initialize\nthread/list\nturn/start\n",
+        farfieldClientRequestSnapshotText: "initialize\nthread/list\nturn/start\n",
+        upstreamServerNotificationSnapshotText: "thread/started\nturn/started\n",
+        upstreamServerRequestSnapshotText: "item/tool/requestUserInput\n",
+        farfieldServerRequestSnapshotText: "item/tool/requestUserInput\n",
+      }),
     );
     const upstreamCommonSourcePath = path.join(repositoryPath, "fixtures/upstream-common.rs");
 
     const result = runGovernanceScript(repositoryPath, upstreamCommonSourcePath);
 
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("Farfield app-server method snapshot drift mismatch");
-    expect(result.stderr).toContain("- thread/read");
+    expect(result.stderr).toContain(
+      "Upstream app-server server-notification method snapshot drift mismatch",
+    );
+    expect(result.stderr).toContain("+ account/login/completed");
+  });
+
+  it("fails when Farfield server-request snapshot drifts from extracted methods", () => {
+    const repositoryPath = createRepositoryWithCleanup(
+      createRepositoryFiles({
+        upstreamClientRequestSnapshotText: "initialize\nthread/list\nturn/start\n",
+        farfieldClientRequestSnapshotText: "initialize\nthread/list\nturn/start\n",
+        upstreamServerNotificationSnapshotText:
+          "account/login/completed\nthread/started\nturn/started\n",
+        upstreamServerRequestSnapshotText: "item/tool/requestUserInput\n",
+        farfieldServerRequestSnapshotText: "item/tool/requestUserInput\nitem/tool/call\n",
+      }),
+    );
+    const upstreamCommonSourcePath = path.join(repositoryPath, "fixtures/upstream-common.rs");
+
+    const result = runGovernanceScript(repositoryPath, upstreamCommonSourcePath);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("Farfield app-server server-request method snapshot drift mismatch");
+    expect(result.stderr).toContain("- item/tool/call");
   });
 });

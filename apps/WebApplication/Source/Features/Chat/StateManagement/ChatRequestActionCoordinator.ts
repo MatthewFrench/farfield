@@ -1,3 +1,4 @@
+import { UserInputRequestMethod } from "@farfield/protocol";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 
@@ -32,7 +33,10 @@ export interface ChatRequestActionChatClient {
       threadId: string;
       requestId: number;
       response: {
-        answers: Record<string, { answers: string[] }>;
+        method: typeof UserInputRequestMethod;
+        payload: {
+          answers: Record<string, { answers: string[] }>;
+        };
       };
     },
     options?: ApiRequestOptions,
@@ -162,7 +166,10 @@ export class ChatRequestActionCoordinator {
           threadId: input.selectedThreadId,
           requestId: input.requestId,
           response: {
-            answers: input.answers,
+            method: UserInputRequestMethod,
+            payload: {
+              answers: input.answers,
+            },
           },
         },
         requestOptions,
@@ -199,7 +206,10 @@ export class ChatRequestActionCoordinator {
           threadId: input.selectedThreadId,
           requestId: input.requestId,
           response: {
-            answers: {},
+            method: UserInputRequestMethod,
+            payload: {
+              answers: {},
+            },
           },
         },
         requestOptions,

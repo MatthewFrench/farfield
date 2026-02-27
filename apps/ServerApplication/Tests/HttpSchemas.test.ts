@@ -61,7 +61,12 @@ describe("server request schemas", () => {
     const parseError = parseInvalidBodyAndReadError(() =>
       parseSubmitUserInputBody({
         requestId: "bad",
-        response: {},
+        response: {
+          method: "item/tool/requestUserInput",
+          payload: {
+            answers: {},
+          },
+        },
       }),
     );
 

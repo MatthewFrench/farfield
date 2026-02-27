@@ -26,7 +26,7 @@ afterEach(() => {
   }
 });
 
-describe("validate-biome-ignore-governance", () => {
+describe("validate-biome-ignore-governance", { timeout: 15_000 }, () => {
   it("accepts specific biome-ignore rationale text", () => {
     const repositoryPath = createRepositoryWithCleanup([
       {

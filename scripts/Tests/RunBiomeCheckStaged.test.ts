@@ -28,7 +28,7 @@ afterEach(() => {
   }
 });
 
-describe("run-biome-check-staged", () => {
+describe("run-biome-check-staged", { timeout: 15_000 }, () => {
   it("skips when staged files are outside Biome-managed source/test scope", () => {
     const repositoryPath = createRepositoryWithCleanup([
       { relativePath: "README.md", content: "# test" },

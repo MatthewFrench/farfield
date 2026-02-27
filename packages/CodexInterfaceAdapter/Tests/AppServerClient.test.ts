@@ -1,7 +1,15 @@
-import { type JsonValue, ProtocolValidationError } from "@farfield/protocol";
+import {
+  type JsonValue,
+  ProtocolValidationError,
+  type ThreadConversationRequestResponse,
+} from "@farfield/protocol";
 import { describe, expect, it, type Mock, vi } from "vitest";
 import { AppServerClient } from "../Source/AppServerClient.js";
-import type { AppServerTransport } from "../Source/AppServerTransport.js";
+import type {
+  AppServerReadNotificationEventsInput,
+  AppServerReadNotificationEventsResult,
+  AppServerTransport,
+} from "../Source/AppServerTransport.js";
 
 type AppServerRequestFunction = (
   method: string,
@@ -9,30 +17,68 @@ type AppServerRequestFunction = (
   timeoutMs?: number,
 ) => Promise<JsonValue>;
 type AppServerCloseFunction = () => Promise<void>;
+type AppServerRespondFunction = (
+  requestId: number,
+  response: ThreadConversationRequestResponse,
+) => Promise<void>;
+type AppServerReadNotificationEventsFunction = (
+  input: AppServerReadNotificationEventsInput,
+) => AppServerReadNotificationEventsResult;
+type AppServerReadPendingServerRequestsFunction = () => {
+  requestId: number;
+  method: string;
+  params: JsonValue | null;
+  receivedAtMilliseconds: number;
+}[];
 type AppServerRequestMock = Mock<AppServerRequestFunction>;
 type AppServerCloseMock = Mock<AppServerCloseFunction>;
+type AppServerRespondMock = Mock<AppServerRespondFunction>;
+type AppServerReadNotificationEventsMock = Mock<AppServerReadNotificationEventsFunction>;
+type AppServerReadPendingServerRequestsMock = Mock<AppServerReadPendingServerRequestsFunction>;
 
 interface AppServerTransportDouble {
   transport: AppServerTransport;
   request: AppServerRequestMock;
+  respond: AppServerRespondMock;
+  readNotificationEvents: AppServerReadNotificationEventsMock;
+  readPendingServerRequests: AppServerReadPendingServerRequestsMock;
   close: AppServerCloseMock;
 }
 
 function createTransportDouble(): AppServerTransportDouble {
   const request: AppServerRequestMock = vi.fn<AppServerRequestFunction>();
   request.mockResolvedValue({});
+  const respond: AppServerRespondMock = vi.fn<AppServerRespondFunction>();
+  respond.mockResolvedValue(undefined);
+  const readNotificationEvents: AppServerReadNotificationEventsMock =
+    vi.fn<AppServerReadNotificationEventsFunction>();
+  readNotificationEvents.mockReturnValue({
+    events: [],
+    nextSequence: 0,
+    firstAvailableSequence: 0,
+    resetRequired: false,
+  });
+  const readPendingServerRequests: AppServerReadPendingServerRequestsMock =
+    vi.fn<AppServerReadPendingServerRequestsFunction>();
+  readPendingServerRequests.mockReturnValue([]);
 
   const close: AppServerCloseMock = vi.fn<AppServerCloseFunction>();
   close.mockResolvedValue(undefined);
 
   const transport: AppServerTransport = {
     request,
+    respond,
+    readNotificationEvents,
+    readPendingServerRequests,
     close,
   };
 
   return {
     transport,
     request,
+    respond,
+    readNotificationEvents,
+    readPendingServerRequests,
     close,
   };
 }
@@ -58,33 +104,158 @@ function createThreadListItem(threadId: string): JsonValue {
   };
 }
 
-describe("AppServerClient.sendUserMessage", () => {
-  it("sends the expected request payload", async () => {
+describe("AppServerClient.startTurn", () => {
+  it("sends turn/start payload with normalized text input and thread id", async () => {
     const transportDouble = createTransportDouble();
-    const client = new AppServerClient(transportDouble.transport);
-    await client.sendUserMessage("thread-1", "hello");
+    transportDouble.request.mockResolvedValue({
+      turn: {
+        id: "turn-1",
+      },
+    });
 
-    expect(transportDouble.request).toHaveBeenCalledWith("sendUserMessage", {
-      conversationId: "thread-1",
-      items: [
+    const client = new AppServerClient(transportDouble.transport);
+    await client.startTurn({
+      threadId: "thread-1",
+      text: "hello",
+      cwd: "/tmp/project",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("turn/start", {
+      threadId: "thread-1",
+      input: [
         {
           type: "text",
-          data: {
-            text: "hello",
-          },
+          text: "hello",
         },
       ],
+      cwd: "/tmp/project",
+      attachments: [],
     });
   });
 
-  it("accepts response when server adds extra keys", async () => {
+  it("inherits template model and effort when overrides are omitted", async () => {
     const transportDouble = createTransportDouble();
     transportDouble.request.mockResolvedValue({
-      ok: true,
+      turn: {
+        id: "turn-2",
+      },
     });
 
     const client = new AppServerClient(transportDouble.transport);
-    await expect(client.sendUserMessage("thread-1", "hello")).resolves.toBeUndefined();
+    await client.startTurn({
+      threadId: "thread-1",
+      text: "hello",
+      turnStartTemplate: {
+        threadId: "thread-1",
+        input: [
+          {
+            type: "text",
+            text: "existing",
+          },
+        ],
+        attachments: [],
+        model: "gpt-5",
+        effort: "medium",
+      },
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith(
+      "turn/start",
+      expect.objectContaining({
+        model: "gpt-5",
+        effort: "medium",
+      }),
+    );
+  });
+});
+
+describe("AppServerClient.submitServerRequestResponse", () => {
+  it("forwards parsed response payload through transport.respond", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await client.submitServerRequestResponse(17, {
+      method: "item/tool/requestUserInput",
+      payload: {
+        answers: {
+          choice: {
+            answers: ["A"],
+          },
+        },
+      },
+    });
+
+    expect(transportDouble.respond).toHaveBeenCalledWith(17, {
+      method: "item/tool/requestUserInput",
+      payload: {
+        answers: {
+          choice: {
+            answers: ["A"],
+          },
+        },
+      },
+    });
+  });
+});
+
+describe("AppServerClient.notification and server-request reads", () => {
+  it("delegates readNotificationEvents to transport owner", () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.readNotificationEvents.mockReturnValue({
+      events: [
+        {
+          sequence: 2,
+          method: "turn/started",
+          params: {
+            threadId: "thread-1",
+          },
+          receivedAtMilliseconds: 123,
+        },
+      ],
+      nextSequence: 3,
+      firstAvailableSequence: 0,
+      resetRequired: false,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = client.readNotificationEvents({
+      limit: 20,
+      sinceSequence: 1,
+    });
+
+    expect(result.nextSequence).toBe(3);
+    expect(transportDouble.readNotificationEvents).toHaveBeenCalledWith({
+      limit: 20,
+      sinceSequence: 1,
+    });
+  });
+
+  it("delegates readPendingServerRequests to transport owner", () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.readPendingServerRequests.mockReturnValue([
+      {
+        requestId: 44,
+        method: "item/tool/requestUserInput",
+        params: {
+          threadId: "thread-1",
+        },
+        receivedAtMilliseconds: 200,
+      },
+    ]);
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = client.readPendingServerRequests();
+
+    expect(result).toEqual([
+      {
+        requestId: 44,
+        method: "item/tool/requestUserInput",
+        params: {
+          threadId: "thread-1",
+        },
+        receivedAtMilliseconds: 200,
+      },
+    ]);
   });
 });
 

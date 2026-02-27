@@ -1,0 +1,4 @@
+item/commandExecution/requestApproval
+item/fileChange/requestApproval
+item/tool/call
+item/tool/requestUserInput

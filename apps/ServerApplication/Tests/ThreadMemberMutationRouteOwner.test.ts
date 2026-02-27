@@ -329,9 +329,12 @@ describe("ThreadMemberMutationRouteOwner", () => {
           ownerClientId: "",
           requestId: 13,
           response: {
-            answers: {
-              question_1: {
-                answers: ["answer"],
+            method: "item/tool/requestUserInput",
+            payload: {
+              answers: {
+                question_1: {
+                  answers: ["answer"],
+                },
               },
             },
           },
@@ -351,9 +354,12 @@ describe("ThreadMemberMutationRouteOwner", () => {
         ownerClientId: "",
         requestId: 13,
         response: {
-          answers: {
-            question_1: {
-              answers: ["answer"],
+          method: "item/tool/requestUserInput",
+          payload: {
+            answers: {
+              question_1: {
+                answers: ["answer"],
+              },
             },
           },
         },

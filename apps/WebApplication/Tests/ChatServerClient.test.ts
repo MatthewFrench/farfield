@@ -1,3 +1,4 @@
+import { UserInputRequestMethod } from "@farfield/protocol";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../Source/Features/Chat/DataAccess/ChatApi", () => ({
@@ -127,9 +128,12 @@ describe("ChatServerClient", () => {
       threadId: "thread-1",
       requestId: 12,
       response: {
-        answers: {
-          "question-1": {
-            answers: ["option-1"],
+        method: UserInputRequestMethod,
+        payload: {
+          answers: {
+            "question-1": {
+              answers: ["option-1"],
+            },
           },
         },
       },

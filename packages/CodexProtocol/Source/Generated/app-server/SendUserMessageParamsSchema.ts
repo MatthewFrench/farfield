@@ -53,14 +53,8 @@ export const SendUserMessageParamsSchema = z.object({
           }),
           type: z.literal("text"),
         }),
-        z.object({
-          data: z.object({ image_url: z.string() }),
-          type: z.literal("image"),
-        }),
-        z.object({
-          data: z.object({ path: z.string() }),
-          type: z.literal("localImage"),
-        }),
+        z.object({ data: z.object({ image_url: z.string() }), type: z.literal("image") }),
+        z.object({ data: z.object({ path: z.string() }), type: z.literal("localImage") }),
       ];
       const errors = schemas.reduce<z.ZodError[]>(
         (errors, schema) =>

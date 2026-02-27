@@ -6,7 +6,7 @@ import type {
   AppServerStartThreadResponse,
   CollaborationMode,
   IpcFrame,
-  UserInputResponsePayload,
+  ThreadConversationRequestResponse,
 } from "@farfield/protocol";
 
 /**
@@ -129,7 +129,7 @@ export interface AgentSubmitUserInputInput {
   threadId: string;
   ownerClientId?: string;
   requestId: number;
-  response: UserInputResponsePayload;
+  response: ThreadConversationRequestResponse;
 }
 
 export interface AgentInterruptInput {

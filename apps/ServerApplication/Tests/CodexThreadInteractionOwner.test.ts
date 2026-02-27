@@ -1,6 +1,8 @@
 import os from "node:os";
 import path from "node:path";
 import {
+  AppServerClient,
+  type AppServerTransport,
   type CodexMonitorIpcClient,
   CodexMonitorService,
   DesktopIpcClient,
@@ -9,7 +11,14 @@ import {
   type SetModeInput,
   type SubmitUserInputInput,
 } from "@farfield/api";
-import type { IpcFrame, IpcRequestFrame, IpcResponseFrame } from "@farfield/protocol";
+import type {
+  IpcFrame,
+  IpcRequestFrame,
+  IpcResponseFrame,
+  JsonValue,
+  ThreadConversationRequestResponse,
+} from "@farfield/protocol";
+import { CommandExecutionApprovalRequestMethod, UserInputRequestMethod } from "@farfield/protocol";
 import { describe, expect, it } from "vitest";
 import type { CodexIpcFrameEvent } from "../Source/Agents/Adapters/CodexAgentAdapter.js";
 import { CodexThreadInteractionOwner } from "../Source/Agents/Adapters/CodexThreadInteractionOwner.js";
@@ -69,8 +78,20 @@ interface IpcCall {
   options: SendRequestOptions;
 }
 
+interface AppServerRespondCall {
+  requestId: number;
+  response: ThreadConversationRequestResponse;
+}
+
+interface AppServerNotificationReadCall {
+  limit: number;
+  sinceSequence: number | null;
+}
+
 interface OwnerTestContext {
   owner: CodexThreadInteractionOwner;
+  appClient: AppServerClient;
+  appServerTransport: TestAppServerTransport;
   service: TestCodexMonitorService;
   ipcClient: TestDesktopIpcClient;
   threadStreamStateOwner: TestThreadStreamStateOwner;
@@ -145,6 +166,80 @@ class TestDesktopIpcClient extends DesktopIpcClient {
       options,
     });
   }
+}
+
+class TestAppServerTransport implements AppServerTransport {
+  public readonly requestCalls: Array<{ method: string; params: object; timeoutMs?: number }> = [];
+  public readonly respondCalls: AppServerRespondCall[] = [];
+  public readonly readNotificationEventsCalls: AppServerNotificationReadCall[] = [];
+  private readonly notificationEventsResult = {
+    events: [],
+    nextSequence: 0,
+    firstAvailableSequence: 0,
+    resetRequired: false,
+  };
+
+  public async request(method: string, params: object, timeoutMs?: number): Promise<JsonValue> {
+    this.requestCalls.push({
+      method,
+      params,
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    });
+    return {};
+  }
+
+  public async respond(
+    requestId: number,
+    response: ThreadConversationRequestResponse,
+  ): Promise<void> {
+    this.respondCalls.push({
+      requestId,
+      response,
+    });
+  }
+
+  public readNotificationEvents(input: AppServerNotificationReadCall): {
+    events: Array<{
+      sequence: number;
+      method: string;
+      params: JsonValue | null;
+      receivedAtMilliseconds: number;
+    }>;
+    nextSequence: number;
+    firstAvailableSequence: number;
+    resetRequired: boolean;
+  } {
+    this.readNotificationEventsCalls.push(input);
+    return this.notificationEventsResult;
+  }
+
+  public setNotificationEventsResult(input: {
+    events: Array<{
+      sequence: number;
+      method: string;
+      params: JsonValue | null;
+      receivedAtMilliseconds: number;
+    }>;
+    nextSequence: number;
+    firstAvailableSequence: number;
+    resetRequired: boolean;
+  }): void {
+    this.notificationEventsResult.events = input.events;
+    this.notificationEventsResult.nextSequence = input.nextSequence;
+    this.notificationEventsResult.firstAvailableSequence = input.firstAvailableSequence;
+    this.notificationEventsResult.resetRequired = input.resetRequired;
+  }
+
+  public readPendingServerRequests(): Array<{
+    requestId: number;
+    method: string;
+    params: JsonValue | null;
+    receivedAtMilliseconds: number;
+  }> {
+    return [];
+  }
+
+  public async close(): Promise<void> {}
 }
 
 class TestThreadStreamStateOwner extends CodexThreadStreamStateOwner {
@@ -228,7 +323,10 @@ function createOwnerTestContext(input?: {
   responseFrame?: IpcResponseFrame;
   liveState?: AgentThreadLiveState;
   streamEvents?: AgentThreadStreamEvents;
+  ipcReady?: boolean;
 }): OwnerTestContext {
+  const appServerTransport = new TestAppServerTransport();
+  const appClient = new AppServerClient(appServerTransport);
   const service = new TestCodexMonitorService();
   const ipcClient = new TestDesktopIpcClient(input?.responseFrame);
   const threadStreamStateOwner = new TestThreadStreamStateOwner({
@@ -240,8 +338,10 @@ function createOwnerTestContext(input?: {
   const emittedFrames: CodexIpcFrameEvent[] = [];
   let codexAvailabilityChecks = 0;
   let ipcReadinessChecks = 0;
+  const ipcReady = input?.ipcReady ?? true;
 
   const owner = new CodexThreadInteractionOwner({
+    appClient,
     service,
     ipcClient,
     threadStreamStateOwner,
@@ -251,6 +351,9 @@ function createOwnerTestContext(input?: {
     ensureIpcReady: () => {
       ipcReadinessChecks += 1;
     },
+    isIpcReady: () => {
+      return ipcReady;
+    },
     emitIpcFrame: (event) => {
       emittedFrames.push(event);
     },
@@ -258,6 +361,8 @@ function createOwnerTestContext(input?: {
 
   return {
     owner,
+    appClient,
+    appServerTransport,
     service,
     ipcClient,
     threadStreamStateOwner,
@@ -349,9 +454,12 @@ describe("CodexThreadInteractionOwner", () => {
       ownerClientId: "override-client",
       requestId: 42,
       response: {
-        answers: {
-          questionOne: {
-            answers: ["A"],
+        method: UserInputRequestMethod,
+        payload: {
+          answers: {
+            questionOne: {
+              answers: ["A"],
+            },
           },
         },
       },
@@ -379,6 +487,110 @@ describe("CodexThreadInteractionOwner", () => {
       codexAvailabilityChecks: 1,
       ipcReadinessChecks: 1,
     });
+  });
+
+  it("submits user input through app-server transport when IPC is not ready", async () => {
+    const context = createOwnerTestContext({
+      ipcReady: false,
+    });
+
+    const result = await context.owner.submitUserInput({
+      threadId: "thread-3",
+      ownerClientId: "ignored-override-client",
+      requestId: 77,
+      response: {
+        method: UserInputRequestMethod,
+        payload: {
+          answers: {
+            questionOne: {
+              answers: ["A"],
+            },
+          },
+        },
+      },
+    });
+
+    expect(result).toEqual({
+      ownerClientId: "app-server",
+      requestId: 77,
+    });
+    expect(context.service.submitUserInputCalls).toEqual([]);
+    expect(context.appServerTransport.respondCalls).toEqual([
+      {
+        requestId: 77,
+        response: {
+          method: UserInputRequestMethod,
+          payload: {
+            answers: {
+              questionOne: {
+                answers: ["A"],
+              },
+            },
+          },
+        },
+      },
+    ]);
+    expect(context.readReadinessCounters()).toEqual({
+      codexAvailabilityChecks: 1,
+      ipcReadinessChecks: 0,
+    });
+  });
+
+  it("rejects non-user-input request responses on the IPC submit path", async () => {
+    const context = createOwnerTestContext({
+      ipcReady: true,
+    });
+
+    await expect(
+      context.owner.submitUserInput({
+        threadId: "thread-3",
+        requestId: 91,
+        response: {
+          method: CommandExecutionApprovalRequestMethod,
+          payload: {
+            decision: "accept",
+          },
+        },
+      }),
+    ).rejects.toThrowError(
+      `IPC submit-user-input only supports ${UserInputRequestMethod} responses.`,
+    );
+
+    expect(context.service.submitUserInputCalls).toEqual([]);
+    expect(context.appServerTransport.respondCalls).toEqual([]);
+  });
+
+  it("forwards command-approval responses through app-server transport when IPC is not ready", async () => {
+    const context = createOwnerTestContext({
+      ipcReady: false,
+    });
+
+    const result = await context.owner.submitUserInput({
+      threadId: "thread-3",
+      requestId: 92,
+      response: {
+        method: CommandExecutionApprovalRequestMethod,
+        payload: {
+          decision: "acceptForSession",
+        },
+      },
+    });
+
+    expect(result).toEqual({
+      ownerClientId: "app-server",
+      requestId: 92,
+    });
+    expect(context.appServerTransport.respondCalls).toEqual([
+      {
+        requestId: 92,
+        response: {
+          method: CommandExecutionApprovalRequestMethod,
+          payload: {
+            decision: "acceptForSession",
+          },
+        },
+      },
+    ]);
   });
 
   it("delegates live-state and stream-event reads without readiness checks", async () => {
@@ -421,6 +633,68 @@ describe("CodexThreadInteractionOwner", () => {
       codexAvailabilityChecks: 0,
       ipcReadinessChecks: 0,
     });
+  });
+
+  it("returns app-server notification stream events when IPC is not ready", async () => {
+    const context = createOwnerTestContext({
+      ipcReady: false,
+    });
+    context.appServerTransport.setNotificationEventsResult({
+      events: [
+        {
+          sequence: 10,
+          method: "turn/started",
+          params: {
+            threadId: "thread-live",
+            status: "inProgress",
+          },
+          receivedAtMilliseconds: 100,
+        },
+        {
+          sequence: 11,
+          method: "turn/completed",
+          params: {
+            threadId: "other-thread",
+          },
+          receivedAtMilliseconds: 101,
+        },
+      ],
+      nextSequence: 12,
+      firstAvailableSequence: 5,
+      resetRequired: false,
+    });
+
+    const streamEvents = await context.owner.readStreamEvents("thread-live", {
+      limit: 25,
+      sinceSequence: 8,
+    });
+
+    expect(streamEvents.ownerClientId).toBe("app-server");
+    expect(streamEvents.nextSequence).toBe(12);
+    expect(streamEvents.firstAvailableSequence).toBe(5);
+    expect(streamEvents.events).toEqual([
+      {
+        type: "broadcast",
+        method: "app-server-notification",
+        sourceClientId: "app-server",
+        version: 1,
+        params: {
+          method: "turn/started",
+          sequence: 10,
+          receivedAtMilliseconds: 100,
+          payload: {
+            threadId: "thread-live",
+            status: "inProgress",
+          },
+        },
+      },
+    ]);
+    expect(context.appServerTransport.readNotificationEventsCalls).toEqual([
+      {
+        limit: 25,
+        sinceSequence: 8,
+      },
+    ]);
   });
 
   it("emits outbound preview request frames before replay request completion", async () => {

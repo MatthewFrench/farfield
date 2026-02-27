@@ -11,7 +11,7 @@ export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   listCollaborationModes: "AppServerCollaborationModeListResponse",
   readConfig: "AppServerConfigReadResponse",
   startThread: "AppServerStartThreadResponse",
-  sendUserMessage: "AppServerSendUserMessageResponse",
+  startTurn: "AppServerTurnStartResponse",
   resumeThread: "AppServerResumeThreadResponse",
   archiveThread: "AppServerArchiveThreadResponse",
   unarchiveThread: "AppServerUnarchiveThreadResponse",

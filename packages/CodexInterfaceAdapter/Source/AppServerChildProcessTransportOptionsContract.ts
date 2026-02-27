@@ -8,6 +8,7 @@ export interface ChildProcessAppServerTransportOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   requestTimeoutMs?: number;
+  notificationEventLimit?: number;
   onStderr?: (line: string) => void;
 }
 
@@ -19,6 +20,7 @@ const ChildProcessAppServerTransportOptionsSchema = z
     cwd: z.string().min(1).optional(),
     env: ProcessEnvironmentSchema.optional(),
     requestTimeoutMs: z.number().int().positive().optional(),
+    notificationEventLimit: z.number().int().positive().optional(),
     onStderr: z.function().args(z.string()).returns(z.void()).optional(),
   })
   .strict();
@@ -40,6 +42,9 @@ export function parseChildProcessAppServerTransportOptions(
     ...(parsedOptions.env !== undefined ? { env: parsedOptions.env } : {}),
     ...(parsedOptions.requestTimeoutMs !== undefined
       ? { requestTimeoutMs: parsedOptions.requestTimeoutMs }
+      : {}),
+    ...(parsedOptions.notificationEventLimit !== undefined
+      ? { notificationEventLimit: parsedOptions.notificationEventLimit }
       : {}),
     ...(parsedOptions.onStderr !== undefined ? { onStderr: parsedOptions.onStderr } : {}),
   };

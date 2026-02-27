@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-02-27 07:06:08.463Z
+Last Updated (UTC): 2026-02-27 09:14:29Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -51,7 +51,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `removeConversationListener` | Not used | Do not adopt | Deprecated upstream request family. |
 | `resumeConversation` | Not used | Do not adopt | Deprecated upstream request family. |
 | `review/start` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
-| `sendUserMessage` | Used now | Migrate path to turn/start | Works today but sits in legacy request family upstream. |
+| `sendUserMessage` | Not used | Do not adopt | Legacy request family upstream; replaced by turn/start in Farfield send path. |
 | `sendUserTurn` | Not used | Do not adopt | Deprecated upstream request family. |
 | `setDefaultModel` | Not used | Do not adopt | Deprecated upstream request family. |
 | `skills/config/write` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
@@ -76,7 +76,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `thread/unarchive` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `thread/unsubscribe` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
 | `turn/interrupt` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
-| `turn/start` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
+| `turn/start` | Used now | Keep | Canonical send path for app-server mode in Farfield. |
 | `turn/steer` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
 | `userInfo` | Not used | Do not adopt | Deprecated upstream request family. |
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |

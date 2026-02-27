@@ -59,6 +59,48 @@ const schemaTargets = [
     exportName: "ToolRequestUserInputResponseSchema"
   },
   {
+    id: "tool-request-user-input-params",
+    source: path.join(vendorRoot, "stable", "json", "ToolRequestUserInputParams.json"),
+    fileName: "ToolRequestUserInputParamsSchema.ts",
+    exportName: "ToolRequestUserInputParamsSchema"
+  },
+  {
+    id: "command-execution-request-approval-params",
+    source: path.join(vendorRoot, "stable", "json", "CommandExecutionRequestApprovalParams.json"),
+    fileName: "CommandExecutionRequestApprovalParamsSchema.ts",
+    exportName: "CommandExecutionRequestApprovalParamsSchema"
+  },
+  {
+    id: "file-change-request-approval-params",
+    source: path.join(vendorRoot, "stable", "json", "FileChangeRequestApprovalParams.json"),
+    fileName: "FileChangeRequestApprovalParamsSchema.ts",
+    exportName: "FileChangeRequestApprovalParamsSchema"
+  },
+  {
+    id: "dynamic-tool-call-params",
+    source: path.join(vendorRoot, "stable", "json", "DynamicToolCallParams.json"),
+    fileName: "DynamicToolCallParamsSchema.ts",
+    exportName: "DynamicToolCallParamsSchema"
+  },
+  {
+    id: "command-execution-request-approval-response",
+    source: path.join(vendorRoot, "stable", "json", "CommandExecutionRequestApprovalResponse.json"),
+    fileName: "CommandExecutionRequestApprovalResponseSchema.ts",
+    exportName: "CommandExecutionRequestApprovalResponseSchema"
+  },
+  {
+    id: "file-change-request-approval-response",
+    source: path.join(vendorRoot, "stable", "json", "FileChangeRequestApprovalResponse.json"),
+    fileName: "FileChangeRequestApprovalResponseSchema.ts",
+    exportName: "FileChangeRequestApprovalResponseSchema"
+  },
+  {
+    id: "dynamic-tool-call-response",
+    source: path.join(vendorRoot, "stable", "json", "DynamicToolCallResponse.json"),
+    fileName: "DynamicToolCallResponseSchema.ts",
+    exportName: "DynamicToolCallResponseSchema"
+  },
+  {
     id: "collaboration-mode-list-response",
     source: path.join(vendorRoot, "experimental", "json", "v2", "CollaborationModeListResponse.json"),
     fileName: "CollaborationModeListResponseSchema.ts",

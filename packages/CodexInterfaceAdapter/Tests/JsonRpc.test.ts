@@ -81,7 +81,7 @@ describe("parseJsonRpcIncomingMessage", () => {
     }
   });
 
-  it("rejects request-shaped payloads with method and id", () => {
+  it("accepts request-shaped payloads with method and id", () => {
     const requestShapedPayload = {
       jsonrpc: "2.0",
       id: 11,
@@ -91,12 +91,14 @@ describe("parseJsonRpcIncomingMessage", () => {
       },
     };
 
-    expect(() => parseJsonRpcIncomingMessage(requestShapedPayload)).toThrow();
-    expect(() => parseJsonRpcIncomingMessage(requestShapedPayload)).toThrowError(
-      /JsonRpcIncomingMessage did not match expected schema/i,
-    );
-    expect(() => parseJsonRpcIncomingMessage(requestShapedPayload)).toThrowError(
-      /id: Expected never, received number/i,
-    );
+    const parsed = parseJsonRpcIncomingMessage(requestShapedPayload);
+    expect(parsed.kind).toBe("request");
+    if (parsed.kind === "request") {
+      expect(parsed.value.id).toBe(11);
+      expect(parsed.value.method).toBe("thread/read");
+      expect(parsed.value.params).toEqual({
+        threadId: "thread-1",
+      });
+    }
   });
 });

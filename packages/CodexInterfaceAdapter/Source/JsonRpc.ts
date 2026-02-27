@@ -103,9 +103,23 @@ export const JsonRpcNotificationSchema = z
 
 export type JsonRpcNotification = z.infer<typeof JsonRpcNotificationSchema>;
 
+export const JsonRpcIncomingRequestSchema = z
+  .object({
+    jsonrpc: z.literal(JSON_RPC_VERSION).optional(),
+    id: z.number().int().nonnegative(),
+    method: z.string().min(1),
+    params: JsonValueSchema.optional(),
+    result: z.never().optional(),
+    error: z.never().optional(),
+  })
+  .passthrough();
+
+export type JsonRpcIncomingRequest = z.infer<typeof JsonRpcIncomingRequestSchema>;
+
 export type JsonRpcIncomingMessage =
   | { kind: "response"; value: JsonRpcResponse }
-  | { kind: "notification"; value: JsonRpcNotification };
+  | { kind: "notification"; value: JsonRpcNotification }
+  | { kind: "request"; value: JsonRpcIncomingRequest };
 
 export function parseJsonRpcIncomingMessage(value: JsonValue): JsonRpcIncomingMessage {
   const parsedResponse = JsonRpcResponseSchema.safeParse(value);
@@ -124,9 +138,20 @@ export function parseJsonRpcIncomingMessage(value: JsonValue): JsonRpcIncomingMe
     };
   }
 
+  const parsedRequest = JsonRpcIncomingRequestSchema.safeParse(value);
+  if (parsedRequest.success) {
+    return {
+      kind: "request",
+      value: parsedRequest.data,
+    };
+  }
+
   const combinedError = buildIncomingMessageCombinedError(
     parsedResponse.error,
     parsedNotification.error,
   );
+  for (const issue of parsedRequest.error.issues) {
+    combinedError.addIssue(issue);
+  }
   throw ProtocolValidationError.fromZod(JSON_RPC_INCOMING_MESSAGE_PARSE_CONTEXT, combinedError);
 }

@@ -1,7 +1,7 @@
 import {
   CollaborationModeSchema,
   type JsonValue,
-  UserInputResponsePayloadSchema,
+  ThreadConversationRequestResponseSchema,
 } from "@farfield/protocol";
 import { z } from "zod";
 
@@ -79,7 +79,7 @@ export const SubmitUserInputBodySchema = z
   .object({
     ownerClientId: z.string().optional(),
     requestId: z.number().int().nonnegative(),
-    response: UserInputResponsePayloadSchema,
+    response: ThreadConversationRequestResponseSchema,
   })
   .strict();
 

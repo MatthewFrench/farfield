@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseThreadConversationState, UserInputRequestMethod } from "../Source/Index.js";
+import {
+  parseThreadConversationRequestResponse,
+  parseThreadConversationState,
+  UserInputRequestMethod,
+} from "../Source/Index.js";
 
 describe("codex-protocol thread contract hardening", () => {
   it("defaults requests to an empty list when omitted", () => {
@@ -239,7 +243,9 @@ describe("codex-protocol thread contract hardening", () => {
           method: "item/commandExecution/requestApproval",
           id: 9,
           params: {
-            callId: "call-1",
+            threadId: "thread-123",
+            turnId: "turn-123",
+            itemId: "item-9",
             command: "echo hello",
             cwd: "/tmp",
           },
@@ -248,5 +254,47 @@ describe("codex-protocol thread contract hardening", () => {
     });
 
     expect(parsed.requests[0]?.method).toBe("item/commandExecution/requestApproval");
+  });
+
+  it("accepts typed thread request-response envelopes for approval and tool-call methods", () => {
+    const commandResponse = parseThreadConversationRequestResponse({
+      method: "item/commandExecution/requestApproval",
+      payload: {
+        decision: "acceptForSession",
+      },
+    });
+    const fileChangeResponse = parseThreadConversationRequestResponse({
+      method: "item/fileChange/requestApproval",
+      payload: {
+        decision: "decline",
+      },
+    });
+    const toolCallResponse = parseThreadConversationRequestResponse({
+      method: "item/tool/call",
+      payload: {
+        contentItems: [
+          {
+            type: "inputText",
+            text: "result",
+          },
+        ],
+        success: true,
+      },
+    });
+
+    expect(commandResponse.method).toBe("item/commandExecution/requestApproval");
+    expect(fileChangeResponse.method).toBe("item/fileChange/requestApproval");
+    expect(toolCallResponse.method).toBe("item/tool/call");
+  });
+
+  it("rejects thread request-response envelopes when payload does not match method schema", () => {
+    expect(() =>
+      parseThreadConversationRequestResponse({
+        method: "item/fileChange/requestApproval",
+        payload: {
+          answers: {},
+        },
+      }),
+    ).toThrowError(/ThreadConversationRequestResponse did not match expected schema/);
   });
 });

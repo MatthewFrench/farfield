@@ -8,7 +8,7 @@ export const APP_SERVER_CLIENT_METHODS = {
   listCollaborationModes: "collaborationMode/list",
   readConfig: "config/read",
   startThread: "thread/start",
-  sendUserMessage: "sendUserMessage",
+  startTurn: "turn/start",
   resumeThread: "thread/resume",
   archiveThread: "thread/archive",
   unarchiveThread: "thread/unarchive",

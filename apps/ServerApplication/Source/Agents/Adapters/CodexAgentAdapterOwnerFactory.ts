@@ -54,11 +54,15 @@ export function createCodexAgentAdapterOwners(
     ensureCodexAvailable: input.ensureCodexAvailable,
   });
   const threadInteractionOwner = new CodexThreadInteractionOwner({
+    appClient: input.appClient,
     service: input.service,
     ipcClient: input.ipcClient,
     threadStreamStateOwner: input.threadStreamStateOwner,
     ensureCodexAvailable: input.ensureCodexAvailable,
     ensureIpcReady: input.ensureIpcReady,
+    isIpcReady: () => {
+      return input.connectionLifecycleOwner.isIpcReady();
+    },
     emitIpcFrame: input.emitIpcFrame,
   });
 

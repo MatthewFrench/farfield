@@ -7,9 +7,14 @@ export type {
   ListThreadsAllOptions,
   ListThreadsOptions,
   StartThreadOptions,
+  StartTurnOptions,
 } from "./AppServerClient.js";
 export { AppServerClient } from "./AppServerClient.js";
 export type {
+  AppServerNotificationEvent,
+  AppServerPendingServerRequest,
+  AppServerReadNotificationEventsInput,
+  AppServerReadNotificationEventsResult,
   AppServerTransport,
   BuildAppServerSpawnEnvironmentInput,
   ChildProcessAppServerTransportOptions,
