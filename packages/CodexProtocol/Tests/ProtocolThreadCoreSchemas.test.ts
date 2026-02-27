@@ -137,6 +137,80 @@ describe("codex-protocol thread core schemas", () => {
     expect(parsed.params.change.type).toBe("snapshot");
   });
 
+  it("parses snapshot broadcast when conversation requests include command approvals", () => {
+    const parsed = parseThreadStreamStateChangedBroadcast({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "client-123",
+      version: 4,
+      params: {
+        conversationId: "thread-123",
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "snapshot",
+          conversationState: {
+            id: "thread-123",
+            turns: [],
+            requests: [
+              {
+                method: "item/commandExecution/requestApproval",
+                id: 7,
+                params: {
+                  callId: "call-7",
+                  command: "echo hello",
+                  cwd: "/tmp",
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(parsed.params.change.type).toBe("snapshot");
+  });
+
+  it("parses snapshot broadcast when error item errorInfo is structured data", () => {
+    const parsed = parseThreadStreamStateChangedBroadcast({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "client-123",
+      version: 4,
+      params: {
+        conversationId: "thread-123",
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "snapshot",
+          conversationState: {
+            id: "thread-123",
+            turns: [
+              {
+                status: "failed",
+                items: [
+                  {
+                    id: "err-2",
+                    type: "error",
+                    message: "stream disconnected",
+                    errorInfo: {
+                      responseStreamDisconnected: {
+                        httpStatusCode: 503,
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+            requests: [],
+          },
+        },
+      },
+    });
+
+    expect(parsed.params.change.type).toBe("snapshot");
+  });
+
   it("rejects invalid patch value for remove operation", () => {
     expect(() =>
       parseThreadStreamStateChangedBroadcast({

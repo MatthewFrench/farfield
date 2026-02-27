@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 04:37:24Z
+Last Updated (UTC): 2026-02-27 04:54:04Z
 
 ## Purpose
 
@@ -244,6 +244,18 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 11. [`AppServerClientResponseParser.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerClientResponseParser.ts)
    - owns: app-server response parse context labels and protocol-validation error mapping ownership.
    - query APIs: `parseAppServerResponse`.
+
+## Codex Protocol Package Group
+
+1. [`UserInputRequestContracts.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexProtocol/Source/Contracts/Thread/UserInputRequestContracts.ts)
+   - owns: thread conversation server-request method contracts, user-input request contract shape, and request-method discriminated union ownership.
+   - query APIs: `ThreadConversationRequestSchema`, `UserInputRequestSchema`.
+2. [`ConversationStateContracts.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexProtocol/Source/Contracts/Thread/ConversationStateContracts.ts)
+   - owns: thread conversation state contract composition and request-list contract ownership for stream/read surfaces.
+   - query APIs: `ThreadConversationStateSchema`.
+3. [`TurnItemContracts.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexProtocol/Source/Contracts/Thread/TurnItemContracts.ts)
+   - owns: thread turn item discriminated contracts, including structured error-item metadata contract ownership.
+   - query APIs: `TurnItemSchema`.
 
 ## Boundary Rules to Enforce in Reviews
 

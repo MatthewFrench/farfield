@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 04:37:24Z
+Last Updated (UTC): 2026-02-27 04:54:04Z
 
 ## Scope Model
 
@@ -193,6 +193,27 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-25)
+
+The current in-progress wave applies root-cause protocol contract fixes for invalid thread stream snapshots:
+
+1. Expanded conversation request contracts from user-input-only to explicit app-server server-request method variants.
+2. Updated conversation-state request typing to consume the new server-request union while preserving strict method contracts.
+3. Updated error-item `errorInfo` contract to accept structured JSON payloads (not string-only) used by modern Codex error details.
+4. Updated pending-user-input selector behavior to explicitly return only pending `item/tool/requestUserInput` requests when other request methods are present.
+5. Added focused protocol and selector tests that lock the regression scenarios (command approval requests in snapshots and structured `errorInfo`).
+6. Verified historical invalid stream payload artifacts now parse successfully (`168/168`, `0` failures).
+
+Files touched in this continuation segment:
+
+1. `packages/CodexProtocol/Source/Contracts/Thread/UserInputRequestContracts.ts`
+2. `packages/CodexProtocol/Source/Contracts/Thread/ConversationStateContracts.ts`
+3. `packages/CodexProtocol/Source/Contracts/Thread/TurnItemContracts.ts`
+4. `packages/CodexProtocol/Tests/ProtocolThreadContractHardening.test.ts`
+5. `packages/CodexProtocol/Tests/ProtocolThreadCoreSchemas.test.ts`
+6. `apps/WebApplication/Source/Features/Chat/DomainModel/PendingUserInputRequestSelector.ts`
+7. `apps/WebApplication/Tests/PendingUserInputRequestSelector.test.ts`
 
 ## Latest Continuation Commit Wave (Current-24)
 

@@ -108,7 +108,7 @@ export const ErrorItemSchema = z
     type: z.literal(TurnItemTypeValues.error),
     message: z.string(),
     willRetry: z.boolean().optional(),
-    errorInfo: OptionalNullableStringSchema,
+    errorInfo: OptionalNullableJsonValueSchema,
     additionalDetails: OptionalNullableJsonValueSchema,
   })
   .passthrough();

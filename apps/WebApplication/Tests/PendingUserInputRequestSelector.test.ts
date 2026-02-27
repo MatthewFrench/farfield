@@ -43,6 +43,22 @@ function createConversationState(
   };
 }
 
+function createCommandExecutionApprovalRequest(input: {
+  id: number;
+  completed?: boolean;
+}): ThreadConversationState["requests"][number] {
+  return {
+    method: "item/commandExecution/requestApproval",
+    id: input.id,
+    completed: input.completed,
+    params: {
+      callId: `call-${String(input.id)}`,
+      command: "echo hello",
+      cwd: "/tmp",
+    },
+  };
+}
+
 describe("PendingUserInputRequestSelector", () => {
   it("returns an empty list when no conversation state is available", () => {
     const selector = new PendingUserInputRequestSelector();
@@ -63,5 +79,19 @@ describe("PendingUserInputRequestSelector", () => {
     const pendingRequests = selector.readPendingUserInputRequests(conversationState);
 
     expect(pendingRequests.map((request) => request.id)).toEqual([1, 2]);
+  });
+
+  it("ignores non-user-input requests while preserving pending user-input entries", () => {
+    const selector = new PendingUserInputRequestSelector();
+    const conversationState = createConversationState([
+      createCommandExecutionApprovalRequest({ id: 7 }),
+      createRequest({ id: 8 }),
+      createCommandExecutionApprovalRequest({ id: 9, completed: false }),
+      createRequest({ id: 10, completed: true }),
+    ]);
+
+    const pendingRequests = selector.readPendingUserInputRequests(conversationState);
+
+    expect(pendingRequests.map((request) => request.id)).toEqual([8]);
   });
 });

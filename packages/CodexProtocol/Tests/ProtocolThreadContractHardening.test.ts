@@ -229,4 +229,24 @@ describe("codex-protocol thread contract hardening", () => {
 
     expect(parsed.requests[0]?.method).toBe(UserInputRequestMethod);
   });
+
+  it("accepts command execution approval requests in conversation requests", () => {
+    const parsed = parseThreadConversationState({
+      id: "thread-123",
+      turns: [],
+      requests: [
+        {
+          method: "item/commandExecution/requestApproval",
+          id: 9,
+          params: {
+            callId: "call-1",
+            command: "echo hello",
+            cwd: "/tmp",
+          },
+        },
+      ],
+    });
+
+    expect(parsed.requests[0]?.method).toBe("item/commandExecution/requestApproval");
+  });
 });

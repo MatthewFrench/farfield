@@ -1,8 +1,24 @@
 import { z } from "zod";
-import { NonEmptyStringSchema, NonNegativeIntSchema } from "../../Common.js";
+import { JsonValueSchema, NonEmptyStringSchema, NonNegativeIntSchema } from "../../Common.js";
 import { ToolRequestUserInputResponseSchema } from "../../Generated/app-server/index.js";
 
 export const UserInputRequestMethod = "item/tool/requestUserInput";
+export const CommandExecutionApprovalRequestMethod = "item/commandExecution/requestApproval";
+export const FileChangeApprovalRequestMethod = "item/fileChange/requestApproval";
+export const ToolCallRequestMethod = "item/tool/call";
+export const ChatGptAuthTokensRefreshRequestMethod = "account/chatgptAuthTokens/refresh";
+export const ApplyPatchApprovalRequestMethod = "applyPatchApproval";
+export const ExecuteCommandApprovalRequestMethod = "execCommandApproval";
+
+export const ThreadConversationRequestMethodValues = [
+  CommandExecutionApprovalRequestMethod,
+  FileChangeApprovalRequestMethod,
+  UserInputRequestMethod,
+  ToolCallRequestMethod,
+  ChatGptAuthTokensRefreshRequestMethod,
+  ApplyPatchApprovalRequestMethod,
+  ExecuteCommandApprovalRequestMethod,
+] as const;
 
 export const UserInputOptionSchema = z
   .object({
@@ -40,6 +56,63 @@ export const UserInputRequestSchema = z
   })
   .passthrough();
 
+const ServerRequestBaseSchema = z
+  .object({
+    id: NonNegativeIntSchema,
+    params: JsonValueSchema,
+    completed: z.boolean().optional(),
+  })
+  .passthrough();
+
+const CommandExecutionApprovalRequestSchema = ServerRequestBaseSchema.extend({
+  method: z.literal(CommandExecutionApprovalRequestMethod),
+}).passthrough();
+
+const FileChangeApprovalRequestSchema = ServerRequestBaseSchema.extend({
+  method: z.literal(FileChangeApprovalRequestMethod),
+}).passthrough();
+
+const ToolCallRequestSchema = ServerRequestBaseSchema.extend({
+  method: z.literal(ToolCallRequestMethod),
+}).passthrough();
+
+const ChatGptAuthTokensRefreshRequestSchema = ServerRequestBaseSchema.extend({
+  method: z.literal(ChatGptAuthTokensRefreshRequestMethod),
+}).passthrough();
+
+const ApplyPatchApprovalRequestSchema = ServerRequestBaseSchema.extend({
+  method: z.literal(ApplyPatchApprovalRequestMethod),
+}).passthrough();
+
+const ExecuteCommandApprovalRequestSchema = ServerRequestBaseSchema.extend({
+  method: z.literal(ExecuteCommandApprovalRequestMethod),
+}).passthrough();
+
+type ThreadConversationRequestSchemaTuple = [
+  typeof CommandExecutionApprovalRequestSchema,
+  typeof FileChangeApprovalRequestSchema,
+  typeof UserInputRequestSchema,
+  typeof ToolCallRequestSchema,
+  typeof ChatGptAuthTokensRefreshRequestSchema,
+  typeof ApplyPatchApprovalRequestSchema,
+  typeof ExecuteCommandApprovalRequestSchema,
+];
+
+const ThreadConversationRequestVariantSchemas: ThreadConversationRequestSchemaTuple = [
+  CommandExecutionApprovalRequestSchema,
+  FileChangeApprovalRequestSchema,
+  UserInputRequestSchema,
+  ToolCallRequestSchema,
+  ChatGptAuthTokensRefreshRequestSchema,
+  ApplyPatchApprovalRequestSchema,
+  ExecuteCommandApprovalRequestSchema,
+];
+
+export const ThreadConversationRequestSchema: z.ZodDiscriminatedUnion<
+  "method",
+  ThreadConversationRequestSchemaTuple
+> = z.discriminatedUnion("method", ThreadConversationRequestVariantSchemas);
+
 export const UserInputAnswerSchema = z
   .object({
     answers: z.array(z.string()),
@@ -49,4 +122,5 @@ export const UserInputAnswerSchema = z
 export const UserInputResponsePayloadSchema = ToolRequestUserInputResponseSchema.passthrough();
 
 export type UserInputRequest = z.infer<typeof UserInputRequestSchema>;
+export type ThreadConversationRequest = z.infer<typeof ThreadConversationRequestSchema>;
 export type UserInputResponsePayload = z.infer<typeof UserInputResponsePayloadSchema>;

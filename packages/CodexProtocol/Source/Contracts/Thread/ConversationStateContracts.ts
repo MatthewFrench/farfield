@@ -9,7 +9,7 @@ import {
 import { CollaborationModeSchema } from "./CollaborationModeContracts.js";
 import { TurnStartParamsSchema } from "./TurnInputContracts.js";
 import { TurnItemSchema } from "./TurnItemContracts.js";
-import { UserInputRequestSchema } from "./UserInputRequestContracts.js";
+import { ThreadConversationRequestSchema } from "./UserInputRequestContracts.js";
 
 const OptionalNullableTurnIdentifierSchema = NullableNonEmptyStringSchema.optional();
 const OptionalNullableJsonValueSchema = z.union([JsonValueSchema, z.null()]).optional();
@@ -35,7 +35,7 @@ export const ThreadConversationStateSchema = z
   .object({
     id: NonEmptyStringSchema,
     turns: z.array(ThreadTurnSchema),
-    requests: z.array(UserInputRequestSchema).default([]),
+    requests: z.array(ThreadConversationRequestSchema).default([]),
     createdAt: NonNegativeIntSchema.optional(),
     updatedAt: NonNegativeIntSchema.optional(),
     title: NullableStringSchema.optional(),

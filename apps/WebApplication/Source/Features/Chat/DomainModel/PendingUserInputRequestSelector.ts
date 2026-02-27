@@ -1,4 +1,9 @@
-import type { ThreadConversationState, UserInputRequest } from "@farfield/protocol";
+import {
+  type ThreadConversationRequest,
+  type ThreadConversationState,
+  type UserInputRequest,
+  UserInputRequestMethod,
+} from "@farfield/protocol";
 
 export type PendingUserInputRequest = UserInputRequest;
 
@@ -10,6 +15,12 @@ export class PendingUserInputRequestSelector {
       return [];
     }
 
-    return conversationState.requests.filter((request) => request.completed !== true);
+    return conversationState.requests.filter((request) => this.isPendingUserInputRequest(request));
+  }
+
+  private isPendingUserInputRequest(
+    request: ThreadConversationRequest,
+  ): request is PendingUserInputRequest {
+    return request.method === UserInputRequestMethod && request.completed !== true;
   }
 }
