@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 01:13:11Z
+Last Updated (UTC): 2026-02-27 01:23:55Z
 
 ## Scope Model
 
@@ -193,6 +193,25 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-5)
+
+The current in-progress wave applies owner-boundary decoupling in server thread-member read routing:
+
+1. Removed concrete `CodexAgentAdapter` dependency from thread-member route dependency contracts.
+2. Moved thread-not-loaded classification to the generic adapter owner API (`AgentAdapter.isThreadNotLoadedError`).
+3. Updated route dispatch wiring and route owner tests to enforce adapter-owned classification semantics.
+
+Files touched in this continuation segment:
+
+1. `apps/ServerApplication/Source/Agents/Types.ts`
+2. `apps/ServerApplication/Source/Network/Routes/ThreadMemberReadRouteOwner.ts`
+3. `apps/ServerApplication/Source/Network/Routes/ThreadMemberRouteContracts.ts`
+4. `apps/ServerApplication/Source/Network/ServerRequestRouteDispatchOwner.ts`
+5. `apps/ServerApplication/Tests/ThreadMemberReadRouteOwner.test.ts`
+6. `apps/ServerApplication/Tests/ThreadMemberMutationRouteOwner.test.ts`
+7. `apps/ServerApplication/Tests/ThreadMemberRoutes.integration.test.ts`
+8. `apps/ServerApplication/Tests/ThreadRoutes.test.ts`
 
 ## Latest Continuation Commit Wave (Current-4)
 

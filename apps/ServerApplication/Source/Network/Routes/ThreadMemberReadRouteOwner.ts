@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { AgentIdentifierByName } from "../../Agents/Types.js";
 import {
   isThreadMemberSubresourceRoute,
   type ThreadMemberResolvedRouteContext,
@@ -145,7 +144,7 @@ export class ThreadMemberReadRouteOwner {
   }
 
   private tryWriteThreadNotLoadedResponse(error: Error): boolean {
-    if (!this.isCodexThreadNotLoadedError(error)) {
+    if (!this.isThreadNotLoadedError(error)) {
       return false;
     }
     const { res, jsonResponse } = this.dependencies;
@@ -158,14 +157,13 @@ export class ThreadMemberReadRouteOwner {
     return true;
   }
 
-  // Keep codex "thread not loaded" normalization centralized so read/live/stream contracts stay aligned.
-  private isCodexThreadNotLoadedError(error: Error): boolean {
-    const { codexAdapter } = this.dependencies;
-    return (
-      this.context.agentId === AgentIdentifierByName.codex &&
-      codexAdapter !== null &&
-      codexAdapter.isThreadNotLoadedError(error)
-    );
+  // Keep "thread not loaded" normalization centralized so read/live/stream contracts stay aligned.
+  private isThreadNotLoadedError(error: Error): boolean {
+    const classifyThreadNotLoadedError = this.context.adapter.isThreadNotLoadedError;
+    if (!classifyThreadNotLoadedError) {
+      return false;
+    }
+    return classifyThreadNotLoadedError(error);
   }
 
   private writeUnsupportedCapabilityResponse(capability: string): boolean {

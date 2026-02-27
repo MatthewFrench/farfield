@@ -231,6 +231,7 @@ export interface AgentAdapter {
     threadId: string,
     input: AgentReadStreamEventsInput,
   ): Promise<AgentThreadStreamEvents>;
+  isThreadNotLoadedError?(error: Error): boolean;
   listProjectDirectories?(): Promise<string[]>;
   readConfigDefaults?(): Promise<AgentConfigDefaults>;
 }

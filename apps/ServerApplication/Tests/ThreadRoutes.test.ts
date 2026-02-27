@@ -78,7 +78,6 @@ function createThreadRouteDependencies(input: {
     segments: input.segments,
     url: input.url,
     defaultWorkspace: "/tmp/workspace",
-    codexAdapter: null,
     threadListAggregationCache: new ThreadListAggregationCache(1_000, 4),
     listEnabledAdapters: () => [],
     registerThreadAdapterOwnership: () => {},

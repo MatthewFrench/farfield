@@ -127,7 +127,6 @@ describe("ThreadMemberReadRouteOwner", () => {
       res: response,
       segments: ["api", "threads", "thread-1", "stream-events"],
       url: new URL("http://localhost/api/threads/thread-1/stream-events?limit=50&sinceSequence=14"),
-      codexAdapter: null,
       parseInteger: () => {
         throw new Error("Not used in stream-events route-owner test");
       },
@@ -212,7 +211,6 @@ describe("ThreadMemberReadRouteOwner", () => {
       res: response,
       segments: ["api", "threads", "thread-1", "stream-events"],
       url: new URL("http://localhost/api/threads/thread-1/stream-events?sinceSequence=-1"),
-      codexAdapter: null,
       parseInteger: () => {
         throw new Error("Not used in stream-events route-owner test");
       },
@@ -285,7 +283,6 @@ describe("ThreadMemberReadRouteOwner", () => {
       res: response,
       segments: ["api", "threads", "thread-1", "stream-events"],
       url: new URL("http://localhost/api/threads/thread-1/stream-events?limit=999"),
-      codexAdapter: null,
       parseInteger: () => {
         throw new Error("Not used in stream-events route-owner test");
       },
@@ -356,7 +353,6 @@ describe("ThreadMemberReadRouteOwner", () => {
       res: response,
       segments: ["api", "threads", "thread-1", "live-state", "extra"],
       url: new URL("http://localhost/api/threads/thread-1/live-state/extra"),
-      codexAdapter: null,
       parseInteger: () => {
         throw new Error("Not used in live-state route-owner test");
       },
@@ -392,5 +388,68 @@ describe("ThreadMemberReadRouteOwner", () => {
     expect(readLiveState).not.toHaveBeenCalled();
     expect(capturedStatusCode).toBeNull();
     expect(capturedResponseBody).toBeNull();
+  });
+
+  it("maps adapter-owned thread-not-loaded errors to a 404 thread response", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "GET";
+
+    const threadNotLoadedError = new Error("thread-not-loaded");
+    const adapter: AgentAdapter = {
+      ...createUnsupportedAgentAdapter(),
+      async readThread(): Promise<AgentReadThreadResult> {
+        throw threadNotLoadedError;
+      },
+      isThreadNotLoadedError: (error) => {
+        return error === threadNotLoadedError;
+      },
+    };
+
+    let capturedStatusCode: number | null = null;
+    let capturedResponseBody: object | null = null;
+
+    const dependencies: ThreadMemberRouteDependencies = {
+      req: request,
+      res: response,
+      segments: ["api", "threads", "thread-404"],
+      url: new URL("http://localhost/api/threads/thread-404"),
+      parseInteger: () => {
+        throw new Error("Not used in thread-read route-owner test");
+      },
+      parseBoolean: () => true,
+      threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
+      resolveAdapterForThread: async () => ({
+        ok: true,
+        adapter,
+        agentId: "codex",
+      }),
+      readJsonBody: async () => ({}),
+      jsonResponse: (_res, statusCode, body) => {
+        capturedStatusCode = statusCode;
+        capturedResponseBody = body;
+      },
+      invalidateThreadListAggregationCache: () => {},
+      pushActionEventWithRequestContext: () => {},
+      pushActionErrorWithRequestContext: () => "action-error-id",
+    };
+    const context: ThreadMemberResolvedRouteContext = {
+      threadId: "thread-404",
+      adapter,
+      agentId: "codex",
+    };
+
+    const owner = new ThreadMemberReadRouteOwner({
+      dependencies,
+      context,
+    });
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(404);
+    expect(capturedResponseBody).toEqual({
+      ok: false,
+      error: "Thread not loaded in app-server: thread-404",
+      threadId: "thread-404",
+    });
   });
 });

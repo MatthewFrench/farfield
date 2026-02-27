@@ -1,7 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { type JsonValue } from "@farfield/protocol";
 import { z } from "zod";
-import type { CodexAgentAdapter } from "../../Agents/Adapters/CodexAgentAdapter.js";
 import type { AgentAdapter, AgentId } from "../../Agents/Types.js";
 import type { ThreadConcurrencyCoordinator } from "../ThreadConcurrencyCoordinator.js";
 
@@ -79,7 +78,6 @@ export interface ThreadMemberRouteDependencies {
   res: ServerResponse;
   segments: string[];
   url: URL;
-  codexAdapter: CodexAgentAdapter | null;
   parseInteger: (value: string | null, defaultValue: number) => number;
   parseBoolean: (value: string | null, defaultValue: boolean) => boolean;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;

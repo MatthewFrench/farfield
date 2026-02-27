@@ -159,7 +159,6 @@ export class ServerRequestRouteDispatchOwner {
         segments: input.segments,
         url: input.url,
         defaultWorkspace: this.deps.defaultWorkspace,
-        codexAdapter: this.deps.codexAdapter,
         threadListAggregationCache: this.deps.threadListAggregationCache,
         threadConcurrencyCoordinator: this.deps.threadConcurrencyCoordinator,
         listEnabledAdapters: () => this.deps.registry.listEnabled(),

@@ -209,7 +209,6 @@ function createThreadMemberRouteDependencies(
     res: response,
     segments,
     url,
-    codexAdapter: null,
     parseInteger: parseIntegerRequestQuery,
     parseBoolean: parseBooleanRequestQuery,
     threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),

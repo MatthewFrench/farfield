@@ -117,7 +117,6 @@ function createDependencies(input: {
     res: input.response,
     segments: input.segments,
     url: new URL("http://localhost/api/threads/thread-1"),
-    codexAdapter: null,
     parseInteger: (value, defaultValue) => {
       if (!value) {
         return defaultValue;
