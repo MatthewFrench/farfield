@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 03:18:30Z
+Last Updated (UTC): 2026-02-27 03:26:16Z
 
 ## Scope Model
 
@@ -193,6 +193,22 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-17)
+
+The current in-progress wave applies package-layer connection owner separation for OpenCode SDK client wiring:
+
+1. Split connection option parsing/default ownership into `OpenCodeConnectionOptions`.
+2. Split SDK response-envelope mapping ownership into `OpenCodeEnvelopeResultMapper`.
+3. Split default runtime dependency wiring ownership into `OpenCodeDefaultConnectionDependencyFactory`.
+4. Reduced `Client` (`OpenCodeConnection`) to connection lifecycle orchestration over these owner modules while preserving exported API/types and behavior.
+
+Files touched in this continuation segment:
+
+1. `packages/OpenCodeInterfaceAdapter/Source/Client.ts`
+2. `packages/OpenCodeInterfaceAdapter/Source/OpenCodeConnectionOptions.ts`
+3. `packages/OpenCodeInterfaceAdapter/Source/OpenCodeEnvelopeResultMapper.ts`
+4. `packages/OpenCodeInterfaceAdapter/Source/OpenCodeDefaultConnectionDependencyFactory.ts`
 
 ## Latest Continuation Commit Wave (Current-16)
 

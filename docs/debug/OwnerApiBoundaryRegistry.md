@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 03:18:30Z
+Last Updated (UTC): 2026-02-27 03:26:16Z
 
 ## Purpose
 
@@ -124,6 +124,14 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 7. [`EventPayloadMapperParsing.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/EventPayloadMapperParsing.ts)
    - owns: mapper parsing helpers and deterministic typed error construction for schema failures.
    - query APIs: `parseMapperSchemaOrThrow`, `parseRequestedSessionIdentifierOrThrow`.
+8. [`OpenCodeConnectionOptions.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/OpenCodeConnectionOptions.ts)
+   - owns: OpenCode connection option parsing and startup default strategy ownership.
+   - query APIs: `parseOpenCodeClientOptions`, `parseOpenCodeBaseUrl`, `buildOpenCodeServerStartOptions`.
+9. [`OpenCodeEnvelopeResultMapper.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/OpenCodeEnvelopeResultMapper.ts)
+   - owns: SDK response envelope normalization into package-owned response contracts.
+   - query APIs: `mapOpenCodeSdkResponsePromise`.
+10. [`OpenCodeDefaultConnectionDependencyFactory.ts`](/Users/matthewfrench/GitHub/farfield/packages/OpenCodeInterfaceAdapter/Source/OpenCodeDefaultConnectionDependencyFactory.ts)
+   - owns: default runtime dependency wiring for OpenCode server/client creation.
 
 ## Codex Interface Adapter Package Group
 
