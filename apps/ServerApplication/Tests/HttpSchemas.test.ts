@@ -5,6 +5,7 @@ import {
   HttpBodyParseErrorTypeByName,
   parseBody,
   parseReplayBody,
+  parseRollbackThreadBody,
   parseSendMessageBody,
   parseSetModeBody,
   parseStartThreadBody,
@@ -86,6 +87,30 @@ describe("server request schemas", () => {
     });
 
     expect(parsed.waitForResponse).toBe(true);
+  });
+
+  it("validates rollback-thread body", () => {
+    const parsed = parseRollbackThreadBody({
+      numTurns: 2,
+    });
+
+    expect(parsed.numTurns).toBe(2);
+  });
+
+  it("rejects rollback-thread body when numTurns is less than one", () => {
+    const parseError = parseInvalidBodyAndReadError(() =>
+      parseRollbackThreadBody({
+        numTurns: 0,
+      }),
+    );
+
+    expect(parseError.details.errorType).toBe(HttpBodyParseErrorTypeByName.invalidHttpRequestBody);
+    expect(parseError.details.schemaName).toBe("RollbackThreadBody");
+    expect(parseError.details.issues).toContainEqual({
+      path: "body.numTurns",
+      issueCode: "too_small",
+      message: expect.any(String),
+    });
   });
 
   it("validates start thread body with agentId", () => {

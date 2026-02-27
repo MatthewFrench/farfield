@@ -1,6 +1,9 @@
 import { ThreadMemberArchiveMutationRouteOwner } from "./ThreadMemberArchiveMutationRouteOwner.js";
+import { ThreadMemberForkMutationRouteOwner } from "./ThreadMemberForkMutationRouteOwner.js";
 import { ThreadMemberInteractionMutationRouteOwner } from "./ThreadMemberInteractionMutationRouteOwner.js";
 import { ThreadMemberMessageMutationRouteOwner } from "./ThreadMemberMessageMutationRouteOwner.js";
+import { ThreadMemberNameMutationRouteOwner } from "./ThreadMemberNameMutationRouteOwner.js";
+import { ThreadMemberRollbackMutationRouteOwner } from "./ThreadMemberRollbackMutationRouteOwner.js";
 import {
   isThreadMemberSubresourceRoute,
   type ThreadMemberResolvedRouteContext,
@@ -18,6 +21,9 @@ const ThreadMemberMutationRouteOwnerNameByName = {
   message: "message",
   archive: "archive",
   interaction: "interaction",
+  fork: "fork",
+  name: "name",
+  rollback: "rollback",
 } as const;
 
 type ThreadMemberMutationRouteOwnerName =
@@ -27,6 +33,9 @@ type ThreadMemberMutationSubresource =
   | typeof ThreadMemberRouteSegmentByName.messages
   | typeof ThreadMemberRouteSegmentByName.archive
   | typeof ThreadMemberRouteSegmentByName.unarchive
+  | typeof ThreadMemberRouteSegmentByName.fork
+  | typeof ThreadMemberRouteSegmentByName.name
+  | typeof ThreadMemberRouteSegmentByName.rollback
   | typeof ThreadMemberRouteSegmentByName.collaborationMode
   | typeof ThreadMemberRouteSegmentByName.userInput
   | typeof ThreadMemberRouteSegmentByName.interrupt;
@@ -55,6 +64,18 @@ const ThreadMemberMutationDispatchDescriptors: readonly ThreadMemberMutationDisp
     ownerName: ThreadMemberMutationRouteOwnerNameByName.archive,
   },
   {
+    subresource: ThreadMemberRouteSegmentByName.fork,
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.fork,
+  },
+  {
+    subresource: ThreadMemberRouteSegmentByName.name,
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.name,
+  },
+  {
+    subresource: ThreadMemberRouteSegmentByName.rollback,
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.rollback,
+  },
+  {
     subresource: ThreadMemberRouteSegmentByName.collaborationMode,
     ownerName: ThreadMemberMutationRouteOwnerNameByName.interaction,
   },
@@ -78,6 +99,12 @@ const ThreadMemberMutationHandlerFactoryByOwnerName: Record<
     new ThreadMemberArchiveMutationRouteOwner(options),
   [ThreadMemberMutationRouteOwnerNameByName.interaction]: (options) =>
     new ThreadMemberInteractionMutationRouteOwner(options),
+  [ThreadMemberMutationRouteOwnerNameByName.fork]: (options) =>
+    new ThreadMemberForkMutationRouteOwner(options),
+  [ThreadMemberMutationRouteOwnerNameByName.name]: (options) =>
+    new ThreadMemberNameMutationRouteOwner(options),
+  [ThreadMemberMutationRouteOwnerNameByName.rollback]: (options) =>
+    new ThreadMemberRollbackMutationRouteOwner(options),
 };
 
 export class ThreadMemberMutationRouteOwner {

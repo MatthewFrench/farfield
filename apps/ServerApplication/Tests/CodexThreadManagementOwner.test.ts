@@ -1,6 +1,7 @@
 import {
   AppServerClient,
   type AppServerTransport,
+  type ForkThreadOptions,
   type ListThreadsAllOptions,
   type ListThreadsOptions,
   type ReadConfigOptions,
@@ -9,6 +10,7 @@ import {
 import type {
   AppServerConfigReadResponse,
   AppServerListThreadsResponse,
+  AppServerReadThreadResponse,
   AppServerStartThreadResponse,
   JsonValue,
 } from "@farfield/protocol";
@@ -54,23 +56,35 @@ class TestAppServerClient extends AppServerClient {
   public readonly listThreadsCalls: ListThreadsOptions[] = [];
   public readonly listThreadsAllCalls: ListThreadsAllOptions[] = [];
   public readonly startThreadCalls: StartThreadOptions[] = [];
+  public readonly forkThreadCalls: Array<{ threadId: string; options?: ForkThreadOptions }> = [];
+  public readonly setThreadNameCalls: Array<{ threadId: string; name: string }> = [];
+  public readonly rollbackThreadCalls: Array<{ threadId: string; numTurns: number }> = [];
   public readonly readConfigCalls: Array<ReadConfigOptions | undefined> = [];
 
   private readonly listThreadsResult: AppServerListThreadsResponse;
   private readonly listThreadsAllResult: AppServerListThreadsResponse;
   private readonly startThreadResult: AppServerStartThreadResponse;
+  private readonly rollbackThreadResult: AppServerReadThreadResponse;
   private readonly readConfigResult: AppServerConfigReadResponse;
 
   public constructor(input?: {
     listThreadsResult?: AppServerListThreadsResponse;
     listThreadsAllResult?: AppServerListThreadsResponse;
     startThreadResult?: AppServerStartThreadResponse;
+    rollbackThreadResult?: AppServerReadThreadResponse;
     readConfigResult?: AppServerConfigReadResponse;
   }) {
     super(NOOP_TRANSPORT);
     this.listThreadsResult = input?.listThreadsResult ?? EMPTY_LIST_THREADS_RESPONSE;
     this.listThreadsAllResult = input?.listThreadsAllResult ?? EMPTY_LIST_THREADS_RESPONSE;
     this.startThreadResult = input?.startThreadResult ?? START_THREAD_RESPONSE;
+    this.rollbackThreadResult = input?.rollbackThreadResult ?? {
+      thread: {
+        id: "thread-1",
+        turns: [],
+        requests: [],
+      },
+    };
     this.readConfigResult = input?.readConfigResult ?? EMPTY_READ_CONFIG_RESPONSE;
   }
 
@@ -93,6 +107,35 @@ class TestAppServerClient extends AppServerClient {
   ): Promise<AppServerStartThreadResponse> {
     this.startThreadCalls.push(options);
     return this.startThreadResult;
+  }
+
+  public override async forkThread(
+    threadId: string,
+    options?: ForkThreadOptions,
+  ): Promise<AppServerStartThreadResponse> {
+    this.forkThreadCalls.push({
+      threadId,
+      ...(options !== undefined ? { options } : {}),
+    });
+    return this.startThreadResult;
+  }
+
+  public override async setThreadName(threadId: string, name: string): Promise<void> {
+    this.setThreadNameCalls.push({
+      threadId,
+      name,
+    });
+  }
+
+  public override async rollbackThread(
+    threadId: string,
+    numTurns: number,
+  ): Promise<AppServerReadThreadResponse> {
+    this.rollbackThreadCalls.push({
+      threadId,
+      numTurns,
+    });
+    return this.rollbackThreadResult;
   }
 
   public override async readConfig(
@@ -334,6 +377,74 @@ describe("CodexThreadManagementOwner", () => {
       approvalPolicy: "never",
       sandbox: "workspace-write",
       reasoningEffort: "medium",
+    });
+  });
+
+  it("forks a thread with extended-history persistence and maps create-thread metadata", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    const result = await owner.forkThread({
+      threadId: "thread-9",
+    });
+
+    expect(appClient.forkThreadCalls).toEqual([
+      {
+        threadId: "thread-9",
+        options: {
+          persistExtendedHistory: true,
+        },
+      },
+    ]);
+    expect(result.threadId).toBe("thread-1");
+  });
+
+  it("sets thread name using the codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    await owner.setThreadName({
+      threadId: "thread-7",
+      name: "new-name",
+    });
+
+    expect(appClient.setThreadNameCalls).toEqual([
+      {
+        threadId: "thread-7",
+        name: "new-name",
+      },
+    ]);
+  });
+
+  it("rolls back thread turns through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      rollbackThreadResult: {
+        thread: {
+          id: "thread-7",
+          turns: [],
+          requests: [],
+        },
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.rollbackThread({
+      threadId: "thread-7",
+      numTurns: 2,
+    });
+
+    expect(appClient.rollbackThreadCalls).toEqual([
+      {
+        threadId: "thread-7",
+        numTurns: 2,
+      },
+    ]);
+    expect(result).toEqual({
+      thread: {
+        id: "thread-7",
+        turns: [],
+        requests: [],
+      },
     });
   });
 

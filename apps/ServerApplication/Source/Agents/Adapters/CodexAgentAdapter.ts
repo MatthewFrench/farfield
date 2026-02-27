@@ -223,6 +223,21 @@ export class CodexAgentAdapter implements AgentAdapter {
     await this.threadInteractionOwner.interrupt(input);
   }
 
+  public async forkThread(input: { threadId: string }): Promise<AgentCreateThreadResult> {
+    return this.threadManagementOwner.forkThread(input);
+  }
+
+  public async setThreadName(input: { threadId: string; name: string }): Promise<void> {
+    await this.threadManagementOwner.setThreadName(input);
+  }
+
+  public async rollbackThread(input: {
+    threadId: string;
+    numTurns: number;
+  }): Promise<AgentReadThreadResult> {
+    return this.threadManagementOwner.rollbackThread(input);
+  }
+
   public async archiveThread(input: { threadId: string }): Promise<void> {
     await this.threadManagementOwner.archiveThread(input);
   }

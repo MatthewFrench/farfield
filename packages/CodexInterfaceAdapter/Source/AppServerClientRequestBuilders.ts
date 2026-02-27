@@ -4,6 +4,7 @@ import {
 } from "@farfield/protocol";
 import { z } from "zod";
 import type {
+  ForkThreadOptions,
   ListThreadsAllOptions,
   ListThreadsOptions,
   ReadConfigOptions,
@@ -29,6 +30,30 @@ const AppServerUnarchiveThreadRequestSchema = z
     threadId: z.string().min(1),
   })
   .passthrough();
+const AppServerForkThreadRequestSchema = z
+  .object({
+    threadId: z.string().min(1),
+    persistExtendedHistory: z.boolean(),
+  })
+  .passthrough();
+const AppServerSetThreadNameRequestSchema = z
+  .object({
+    threadId: z.string().min(1),
+    name: z.string().trim().min(1),
+  })
+  .passthrough();
+const AppServerRollbackThreadRequestSchema = z
+  .object({
+    threadId: z.string().min(1),
+    numTurns: z.number().int().min(1),
+  })
+  .passthrough();
+const AppServerTurnInterruptRequestSchema = z
+  .object({
+    threadId: z.string().min(1),
+    turnId: z.string().min(1),
+  })
+  .passthrough();
 
 /**
  * Centralized request defaults for AppServerClient methods.
@@ -36,6 +61,7 @@ const AppServerUnarchiveThreadRequestSchema = z
 export const APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT = 100;
 export const APP_SERVER_CLIENT_DEFAULT_READ_CONFIG_INCLUDE_LAYERS = false;
 export const APP_SERVER_CLIENT_DEFAULT_RESUME_THREAD_PERSIST_EXTENDED_HISTORY = true;
+export const APP_SERVER_CLIENT_DEFAULT_FORK_THREAD_PERSIST_EXTENDED_HISTORY = true;
 // Reading turns can include full conversation history and is expected to take longer than lightweight reads.
 export const APP_SERVER_CLIENT_READ_THREAD_WITH_TURNS_TIMEOUT_MILLISECONDS = 90_000;
 
@@ -141,10 +167,52 @@ export function buildArchiveThreadRequest(
   });
 }
 
+export function buildForkThreadRequest(
+  threadId: string,
+  options?: ForkThreadOptions,
+): z.infer<typeof AppServerForkThreadRequestSchema> {
+  return AppServerForkThreadRequestSchema.parse({
+    threadId,
+    persistExtendedHistory:
+      options?.persistExtendedHistory ??
+      APP_SERVER_CLIENT_DEFAULT_FORK_THREAD_PERSIST_EXTENDED_HISTORY,
+  });
+}
+
+export function buildSetThreadNameRequest(
+  threadId: string,
+  name: string,
+): z.infer<typeof AppServerSetThreadNameRequestSchema> {
+  return AppServerSetThreadNameRequestSchema.parse({
+    threadId,
+    name,
+  });
+}
+
+export function buildRollbackThreadRequest(
+  threadId: string,
+  numTurns: number,
+): z.infer<typeof AppServerRollbackThreadRequestSchema> {
+  return AppServerRollbackThreadRequestSchema.parse({
+    threadId,
+    numTurns,
+  });
+}
+
 export function buildUnarchiveThreadRequest(
   threadId: string,
 ): z.infer<typeof AppServerUnarchiveThreadRequestSchema> {
   return AppServerUnarchiveThreadRequestSchema.parse({
     threadId,
+  });
+}
+
+export function buildTurnInterruptRequest(
+  threadId: string,
+  turnId: string,
+): z.infer<typeof AppServerTurnInterruptRequestSchema> {
+  return AppServerTurnInterruptRequestSchema.parse({
+    threadId,
+    turnId,
   });
 }

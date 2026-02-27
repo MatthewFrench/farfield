@@ -24,13 +24,17 @@ import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
 import {
   APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT,
   buildArchiveThreadRequest,
+  buildForkThreadRequest,
   buildListThreadsAllPageOptions,
   buildListThreadsRequestParameters,
   buildReadConfigRequestParameters,
   buildReadThreadRequestParameters,
   buildResumeThreadRequest,
+  buildRollbackThreadRequest,
+  buildSetThreadNameRequest,
   buildStartThreadRequest,
   buildStartTurnRequest,
+  buildTurnInterruptRequest,
   buildUnarchiveThreadRequest,
   resolveReadThreadRequestTimeoutMilliseconds,
 } from "./AppServerClientRequestBuilders.js";
@@ -84,6 +88,10 @@ export interface ResumeThreadOptions {
   persistExtendedHistory?: boolean;
 }
 
+export interface ForkThreadOptions {
+  persistExtendedHistory?: boolean;
+}
+
 export interface StartTurnOptions {
   threadId: string;
   text: string;
@@ -95,6 +103,8 @@ export interface StartTurnOptions {
 }
 
 const AppServerArchiveThreadResponseSchema = z.object({}).passthrough();
+const AppServerSetThreadNameResponseSchema = z.object({}).passthrough();
+const AppServerTurnInterruptResponseSchema = z.object({}).passthrough();
 const AppServerUnarchiveThreadResponseSchema = z
   .object({
     thread: AppServerThreadListItemSchema,
@@ -133,6 +143,21 @@ export class AppServerClient {
       AppServerListThreadsResponseSchema,
       result,
       APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listThreads,
+    );
+  }
+
+  public async forkThread(
+    threadId: string,
+    options?: ForkThreadOptions,
+  ): Promise<AppServerStartThreadResponse> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.forkThread,
+      buildForkThreadRequest(threadId, options),
+    );
+    return parseAppServerResponse(
+      AppServerStartThreadResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.forkThread,
     );
   }
 
@@ -237,6 +262,29 @@ export class AppServerClient {
     );
   }
 
+  public async setThreadName(threadId: string, name: string): Promise<void> {
+    const request = buildSetThreadNameRequest(threadId, name);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.setThreadName, request);
+    parseAppServerResponse(
+      AppServerSetThreadNameResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.setThreadName,
+    );
+  }
+
+  public async rollbackThread(
+    threadId: string,
+    numTurns: number,
+  ): Promise<AppServerReadThreadResponse> {
+    const request = buildRollbackThreadRequest(threadId, numTurns);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.rollbackThread, request);
+    return parseAppServerResponse(
+      AppServerReadThreadResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.rollbackThread,
+    );
+  }
+
   public async startTurn(options: StartTurnOptions): Promise<void> {
     const request = buildStartTurnRequest(options);
     const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.startTurn, request);
@@ -244,6 +292,16 @@ export class AppServerClient {
       AppServerTurnStartResponseSchema,
       result,
       APP_SERVER_CLIENT_RESPONSE_CONTEXTS.startTurn,
+    );
+  }
+
+  public async interruptTurn(threadId: string, turnId: string): Promise<void> {
+    const request = buildTurnInterruptRequest(threadId, turnId);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.interruptTurn, request);
+    parseAppServerResponse(
+      AppServerTurnInterruptResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.interruptTurn,
     );
   }
 

@@ -179,6 +179,9 @@ function createThreadActionHandlersFixture(): ThreadActionHandlers {
     createNewThread: vi.fn(async (): Promise<void> => {}),
     createThreadForSingleAgent: vi.fn((): void => {}),
     runArchiveThread: vi.fn(async (): Promise<void> => {}),
+    runForkThread: vi.fn(async (): Promise<void> => {}),
+    runRollbackThread: vi.fn(async (): Promise<void> => {}),
+    runSetThreadName: vi.fn(async (): Promise<void> => {}),
     runUnarchiveThread: vi.fn(async (): Promise<void> => {}),
   };
 }
@@ -399,6 +402,9 @@ describe("useApplicationShellComposition", () => {
         createNewThread: threadActionHandlersFixture.createNewThread,
         createThreadForSingleAgent: threadActionHandlersFixture.createThreadForSingleAgent,
         archiveThread: threadActionHandlersFixture.runArchiveThread,
+        forkThread: threadActionHandlersFixture.runForkThread,
+        rollbackThread: threadActionHandlersFixture.runRollbackThread,
+        setThreadName: threadActionHandlersFixture.runSetThreadName,
         unarchiveThread: threadActionHandlersFixture.runUnarchiveThread,
         formatDate: fixture.formatDateValue,
         renderAgentFavicon: fixture.renderAgentFavicon,
@@ -463,6 +469,14 @@ describe("useApplicationShellComposition", () => {
     runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onArchiveThread(
       "thread-archive",
     );
+    runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onForkThread("thread-fork");
+    runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onRollbackThread(
+      "thread-rollback",
+    );
+    runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onSetThreadName(
+      "thread-name",
+      "New title",
+    );
     runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onUnarchiveThread(
       "thread-unarchive",
     );
@@ -475,6 +489,12 @@ describe("useApplicationShellComposition", () => {
       "codex",
     );
     expect(threadActionHandlersFixture.runArchiveThread).toHaveBeenCalledWith("thread-archive");
+    expect(threadActionHandlersFixture.runForkThread).toHaveBeenCalledWith("thread-fork");
+    expect(threadActionHandlersFixture.runRollbackThread).toHaveBeenCalledWith("thread-rollback");
+    expect(threadActionHandlersFixture.runSetThreadName).toHaveBeenCalledWith(
+      "thread-name",
+      "New title",
+    );
     expect(threadActionHandlersFixture.runUnarchiveThread).toHaveBeenCalledWith("thread-unarchive");
   });
 });

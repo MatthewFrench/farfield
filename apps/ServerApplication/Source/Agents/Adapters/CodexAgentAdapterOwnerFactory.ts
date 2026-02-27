@@ -58,6 +58,7 @@ export function createCodexAgentAdapterOwners(
     service: input.service,
     ipcClient: input.ipcClient,
     threadStreamStateOwner: input.threadStreamStateOwner,
+    runAppServerCall,
     ensureCodexAvailable: input.ensureCodexAvailable,
     ensureIpcReady: input.ensureIpcReady,
     isIpcReady: () => {

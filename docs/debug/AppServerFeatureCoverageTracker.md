@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 09:14:29Z
+Last Updated (UTC): 2026-02-27 10:52:02Z
 
 ## Purpose
 
@@ -49,9 +49,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `10 / 74` request methods (`13.5%`).
+1. Farfield app-server method coverage at request-owner layer: `14 / 74` request methods (`18.9%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `11 / 74` (`14.9%`).
+3. Effective request-method usage including transport-owned `initialize`: `15 / 74` (`20.3%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -77,7 +77,11 @@ As of the upstream snapshot above:
 | `thread/list` | Thread list loading, refresh, bootstrap readiness check | High | Owned route and adapter layering, strict parsing, explicit merge/cache owners | Keep current path |
 | `thread/read` | Open-thread hydration and selected-thread refresh | High | Contract parsing at boundary and owner-controlled read flow | Keep current path |
 | `thread/start` | Thread creation | High | Clear create ownership with strict request shaping | Keep current path |
+| `thread/fork` | Fork existing thread from row action menu | High | Owner-routed mutation with strict request parsing and scoped cache invalidation | Keep current path |
+| `thread/name/set` | Rename thread from row action menu | High | Owner-routed mutation with strict request parsing and scoped cache invalidation | Keep current path |
+| `thread/rollback` | Undo latest turn from row action menu | High | Owner-routed mutation with strict request parsing and selected-thread refresh ownership | Keep current path |
 | `turn/start` | Message send path in Codex message dispatch owner when IPC is unavailable | High | Canonical v2 turn lifecycle method with strict typed mapping in owner path | Keep current path |
+| `turn/interrupt` | Interrupt in-progress turn when IPC send path is unavailable | High | Canonical v2 lifecycle path with strict turn-id contract mapping | Keep current path |
 | `thread/resume` | Recover missing conversation before retry send | Medium-high | Correct recovery behavior, but paired with legacy send method | Keep behavior; migrate with send-path modernization |
 | `thread/archive` | Archive thread action | High | Clean mutation ownership and scoped cache invalidation | Keep current path |
 | `thread/unarchive` | Unarchive thread action | High | Clean mutation ownership and scoped cache invalidation | Keep current path |
@@ -98,7 +102,11 @@ As of the upstream snapshot above:
 | `thread/list` | Active and archived thread list, bootstrap readiness check | `/api/threads` GET -> `ThreadCollectionRoutes` -> `CodexThreadManagementOwner.listThreads` -> `AppServerClient.listThreads` |
 | `thread/read` | Open thread and selected-thread refresh | `/api/threads/:threadId` GET -> `ThreadMemberReadRouteOwner` -> `CodexThreadManagementOwner.readThread` -> `AppServerClient.readThread` |
 | `thread/start` | Create thread | `/api/threads` POST -> `ThreadCollectionRoutes` -> `CodexThreadManagementOwner.createThread` -> `AppServerClient.startThread` |
+| `thread/fork` | Fork thread | `/api/threads/:threadId/fork` POST -> `ThreadMemberForkMutationRouteOwner` -> `CodexThreadManagementOwner.forkThread` -> `AppServerClient.forkThread` |
+| `thread/name/set` | Rename thread | `/api/threads/:threadId/name` POST -> `ThreadMemberNameMutationRouteOwner` -> `CodexThreadManagementOwner.setThreadName` -> `AppServerClient.setThreadName` |
+| `thread/rollback` | Roll back recent turns | `/api/threads/:threadId/rollback` POST -> `ThreadMemberRollbackMutationRouteOwner` -> `CodexThreadManagementOwner.rollbackThread` -> `AppServerClient.rollbackThread` |
 | `turn/start` | Message send path when Desktop inter-process communication send path is not used | `/api/threads/:threadId/messages` POST -> `ThreadMemberMessageMutationRouteOwner` -> `CodexMessageDispatchOwner.sendMessage` -> `AppServerClient.startTurn` |
+| `turn/interrupt` | Interrupt path when Desktop inter-process communication path is not used | `/api/threads/:threadId/interrupt` POST -> `ThreadMemberInteractionMutationRouteOwner` -> `CodexThreadInteractionOwner.interrupt` -> `AppServerClient.interruptTurn` |
 | `thread/resume` | Recover conversation-not-found before retrying send | `CodexMessageDispatchOwner.sendMessage` -> `AppServerClient.resumeThread` |
 | `thread/archive` | Archive thread | `/api/threads/:threadId/archive` POST -> `ThreadMemberArchiveMutationRouteOwner` -> `CodexThreadManagementOwner.archiveThread` -> `AppServerClient.archiveThread` |
 | `thread/unarchive` | Unarchive thread | `/api/threads/:threadId/unarchive` POST -> `ThreadMemberArchiveMutationRouteOwner` -> `CodexThreadManagementOwner.unarchiveThread` -> `AppServerClient.unarchiveThread` |
@@ -108,7 +116,7 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`64` request methods are not used by Farfield’s app-server client path:
+`60` request methods are not used by Farfield’s app-server client path:
 
 ```text
 account/login/cancel
@@ -161,16 +169,12 @@ skills/remote/export
 skills/remote/list
 thread/backgroundTerminals/clean
 thread/compact/start
-thread/fork
 thread/loaded/list
-thread/name/set
 thread/realtime/appendAudio
 thread/realtime/appendText
 thread/realtime/start
 thread/realtime/stop
-thread/rollback
 thread/unsubscribe
-turn/interrupt
 sendUserMessage
 turn/steer
 userInfo
@@ -245,17 +249,13 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 1. `review/start`
 2. `thread/backgroundTerminals/clean`
 3. `thread/compact/start`
-4. `thread/fork`
-5. `thread/loaded/list`
-6. `thread/name/set`
-7. `thread/realtime/appendAudio`
-8. `thread/realtime/appendText`
-9. `thread/realtime/start`
-10. `thread/realtime/stop`
-11. `thread/rollback`
-12. `thread/unsubscribe`
-13. `turn/interrupt`
-14. `turn/steer`
+4. `thread/loaded/list`
+5. `thread/realtime/appendAudio`
+6. `thread/realtime/appendText`
+7. `thread/realtime/start`
+8. `thread/realtime/stop`
+9. `thread/unsubscribe`
+10. `turn/steer`
 
 ### Category G: Experimental and Test-only Surfaces Not Intended for Production Flow
 
@@ -276,8 +276,8 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `64`
-2. Total methods listed across Category A-I: `64`
+1. Total non-intersection methods: `60`
+2. Total methods listed across Category A-I: `60`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

@@ -169,6 +169,121 @@ describe("AppServerClient.startTurn", () => {
   });
 });
 
+describe("AppServerClient.forkThread", () => {
+  it("sends thread/fork payload with default persistExtendedHistory=true", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      thread: createThreadListItem("thread-2"),
+      model: "gpt-5",
+      modelProvider: "openai",
+      cwd: "/tmp/workspace",
+      approvalPolicy: "on-request",
+      sandbox: "workspace-write",
+      reasoningEffort: null,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.forkThread("thread-1");
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/fork", {
+      threadId: "thread-1",
+      persistExtendedHistory: true,
+    });
+  });
+
+  it("respects explicit persistExtendedHistory=false on thread/fork", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      thread: createThreadListItem("thread-2"),
+      model: "gpt-5",
+      modelProvider: "openai",
+      cwd: "/tmp/workspace",
+      approvalPolicy: "on-request",
+      sandbox: "workspace-write",
+      reasoningEffort: null,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.forkThread("thread-1", {
+      persistExtendedHistory: false,
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/fork", {
+      threadId: "thread-1",
+      persistExtendedHistory: false,
+    });
+  });
+});
+
+describe("AppServerClient.setThreadName", () => {
+  it("sends thread/name/set payload with thread id and trimmed name", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.setThreadName("thread-1", "  Better name  ");
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/name/set", {
+      threadId: "thread-1",
+      name: "Better name",
+    });
+  });
+
+  it("rejects empty thread names before transport request", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await expect(client.setThreadName("thread-1", "   ")).rejects.toThrowError();
+    expect(transportDouble.request).not.toHaveBeenCalled();
+  });
+});
+
+describe("AppServerClient.rollbackThread", () => {
+  it("sends thread/rollback payload with required turn count", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue(createThreadConversationResponse("thread-1"));
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.rollbackThread("thread-1", 2);
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/rollback", {
+      threadId: "thread-1",
+      numTurns: 2,
+    });
+  });
+
+  it("rejects invalid numTurns before transport request", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await expect(client.rollbackThread("thread-1", 0)).rejects.toThrowError();
+    expect(transportDouble.request).not.toHaveBeenCalled();
+  });
+});
+
+describe("AppServerClient.interruptTurn", () => {
+  it("sends turn/interrupt payload with thread and turn identifiers", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.interruptTurn("thread-1", "turn-1");
+
+    expect(transportDouble.request).toHaveBeenCalledWith("turn/interrupt", {
+      threadId: "thread-1",
+      turnId: "turn-1",
+    });
+  });
+
+  it("validates turn identifiers before transport request", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await expect(client.interruptTurn("thread-1", "")).rejects.toThrowError();
+    expect(transportDouble.request).not.toHaveBeenCalled();
+  });
+});
+
 describe("AppServerClient.submitServerRequestResponse", () => {
   it("forwards parsed response payload through transport.respond", async () => {
     const transportDouble = createTransportDouble();

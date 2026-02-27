@@ -25,6 +25,7 @@ import { CodexThreadInteractionOwner } from "../Source/Agents/Adapters/CodexThre
 import { CodexThreadStreamStateOwner } from "../Source/Agents/Adapters/CodexThreadStreamStateOwner.js";
 import type {
   AgentReadStreamEventsInput,
+  AgentThreadConversationState,
   AgentThreadLiveState,
   AgentThreadStreamEvents,
 } from "../Source/Agents/Types.js";
@@ -247,16 +248,19 @@ class TestThreadStreamStateOwner extends CodexThreadStreamStateOwner {
   public readonly describedFrames: IpcFrame[] = [];
   public readonly readLiveStateCalls: string[] = [];
   public readonly readStreamEventsCalls: StreamEventsReadCall[] = [];
+  public readonly projectedConversationStateReadCalls: string[] = [];
   private readonly resolvedOwnerClientId: string;
   private readonly describedThreadId: string | null;
   private readonly liveState: AgentThreadLiveState;
   private readonly streamEvents: AgentThreadStreamEvents;
+  private readonly projectedConversationState: AgentThreadConversationState | null;
 
   public constructor(input?: {
     resolvedOwnerClientId?: string;
     describedThreadId?: string | null;
     liveState?: AgentThreadLiveState;
     streamEvents?: AgentThreadStreamEvents;
+    projectedConversationState?: AgentThreadConversationState | null;
   }) {
     super({
       invalidStreamEventsLogPath: STREAM_STATE_TEST_LOG_PATH,
@@ -265,6 +269,7 @@ class TestThreadStreamStateOwner extends CodexThreadStreamStateOwner {
     this.describedThreadId = input?.describedThreadId ?? "described-thread-id";
     this.liveState = input?.liveState ?? DEFAULT_LIVE_STATE;
     this.streamEvents = input?.streamEvents ?? DEFAULT_STREAM_EVENTS;
+    this.projectedConversationState = input?.projectedConversationState ?? null;
   }
 
   public override resolveRequiredOwnerClientId(
@@ -315,6 +320,13 @@ class TestThreadStreamStateOwner extends CodexThreadStreamStateOwner {
     });
     return this.streamEvents;
   }
+
+  public override getProjectedConversationState(
+    threadId: string,
+  ): AgentThreadLiveState["conversationState"] | null {
+    this.projectedConversationStateReadCalls.push(threadId);
+    return this.projectedConversationState;
+  }
 }
 
 function createOwnerTestContext(input?: {
@@ -323,6 +335,7 @@ function createOwnerTestContext(input?: {
   responseFrame?: IpcResponseFrame;
   liveState?: AgentThreadLiveState;
   streamEvents?: AgentThreadStreamEvents;
+  projectedConversationState?: AgentThreadConversationState | null;
   ipcReady?: boolean;
 }): OwnerTestContext {
   const appServerTransport = new TestAppServerTransport();
@@ -334,6 +347,7 @@ function createOwnerTestContext(input?: {
     resolvedOwnerClientId: input?.resolvedOwnerClientId,
     liveState: input?.liveState,
     streamEvents: input?.streamEvents,
+    projectedConversationState: input?.projectedConversationState,
   });
   const emittedFrames: CodexIpcFrameEvent[] = [];
   let codexAvailabilityChecks = 0;
@@ -345,6 +359,11 @@ function createOwnerTestContext(input?: {
     service,
     ipcClient,
     threadStreamStateOwner,
+    runAppServerCall: async <ValueType>(
+      operation: () => Promise<ValueType>,
+    ): Promise<ValueType> => {
+      return operation();
+    },
     ensureCodexAvailable: () => {
       codexAvailabilityChecks += 1;
     },
@@ -400,6 +419,48 @@ describe("CodexThreadInteractionOwner", () => {
     expect(context.readReadinessCounters()).toEqual({
       codexAvailabilityChecks: 1,
       ipcReadinessChecks: 1,
+    });
+  });
+
+  it("interrupts through app-server transport when IPC is not ready", async () => {
+    const projectedConversationState: AgentThreadConversationState = {
+      id: "thread-1",
+      turns: [
+        {
+          turnId: "turn-1",
+          status: "inProgress",
+          items: [],
+        },
+      ],
+      requests: [],
+    };
+    const context = createOwnerTestContext({
+      ipcReady: false,
+      projectedConversationState,
+    });
+
+    await context.owner.interrupt({
+      threadId: "thread-1",
+      ownerClientId: "ignored-override-client",
+    });
+
+    expect(context.service.interruptCalls).toEqual([]);
+    expect(context.threadStreamStateOwner.ownerClientIdResolutionCalls).toEqual([]);
+    expect(context.threadStreamStateOwner.projectedConversationStateReadCalls).toEqual([
+      "thread-1",
+    ]);
+    expect(context.appServerTransport.requestCalls).toEqual([
+      {
+        method: "turn/interrupt",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+        },
+      },
+    ]);
+    expect(context.readReadinessCounters()).toEqual({
+      codexAvailabilityChecks: 1,
+      ipcReadinessChecks: 0,
     });
   });
 
@@ -645,21 +706,33 @@ describe("CodexThreadInteractionOwner", () => {
           sequence: 10,
           method: "turn/started",
           params: {
-            threadId: "thread-live",
+            conversationId: "thread-live",
             status: "inProgress",
+            turnId: "turn-1",
           },
           receivedAtMilliseconds: 100,
         },
         {
           sequence: 11,
+          method: "turn/updated",
+          params: {
+            thread: {
+              id: "thread-live",
+            },
+            turn_id: "turn-1",
+          },
+          receivedAtMilliseconds: 101,
+        },
+        {
+          sequence: 12,
           method: "turn/completed",
           params: {
             threadId: "other-thread",
           },
-          receivedAtMilliseconds: 101,
+          receivedAtMilliseconds: 102,
         },
       ],
-      nextSequence: 12,
+      nextSequence: 13,
       firstAvailableSequence: 5,
       resetRequired: false,
     });
@@ -670,21 +743,41 @@ describe("CodexThreadInteractionOwner", () => {
     });
 
     expect(streamEvents.ownerClientId).toBe("app-server");
-    expect(streamEvents.nextSequence).toBe(12);
+    expect(streamEvents.nextSequence).toBe(13);
     expect(streamEvents.firstAvailableSequence).toBe(5);
     expect(streamEvents.events).toEqual([
       {
         type: "broadcast",
-        method: "app-server-notification",
+        method: "turn/started",
         sourceClientId: "app-server",
         version: 1,
         params: {
-          method: "turn/started",
           sequence: 10,
           receivedAtMilliseconds: 100,
+          threadId: "thread-live",
+          turnId: "turn-1",
           payload: {
-            threadId: "thread-live",
+            conversationId: "thread-live",
             status: "inProgress",
+            turnId: "turn-1",
+          },
+        },
+      },
+      {
+        type: "broadcast",
+        method: "turn/updated",
+        sourceClientId: "app-server",
+        version: 1,
+        params: {
+          sequence: 11,
+          receivedAtMilliseconds: 101,
+          threadId: "thread-live",
+          turnId: "turn-1",
+          payload: {
+            thread: {
+              id: "thread-live",
+            },
+            turn_id: "turn-1",
           },
         },
       },

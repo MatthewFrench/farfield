@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-02-27 09:14:29Z
+Last Updated (UTC): 2026-02-27 10:52:02Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -61,26 +61,26 @@ This ledger records recommended disposition for every upstream app-server client
 | `thread/archive` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `thread/backgroundTerminals/clean` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 | `thread/compact/start` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
-| `thread/fork` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
+| `thread/fork` | Used now | Keep | Thread fork action is routed through strict owner boundaries and typed app-server mapping. |
 | `thread/list` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `thread/loaded/list` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
-| `thread/name/set` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
+| `thread/name/set` | Used now | Keep | Thread rename action is routed through strict owner boundaries and typed app-server mapping. |
 | `thread/read` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `thread/realtime/appendAudio` | Not used | Not now | Adopt only if realtime conversation feature is a planned product objective. |
 | `thread/realtime/appendText` | Not used | Not now | Adopt only if realtime conversation feature is a planned product objective. |
 | `thread/realtime/start` | Not used | Not now | Adopt only if realtime conversation feature is a planned product objective. |
 | `thread/realtime/stop` | Not used | Not now | Adopt only if realtime conversation feature is a planned product objective. |
 | `thread/resume` | Used now | Keep | Current ownership and contracts align with present product behavior. |
-| `thread/rollback` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
+| `thread/rollback` | Used now | Keep | Thread rollback action is routed through strict owner boundaries and typed app-server mapping. |
 | `thread/start` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `thread/unarchive` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `thread/unsubscribe` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
-| `turn/interrupt` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
+| `turn/interrupt` | Used now | Keep | Interrupt fallback path is routed through strict owner boundaries and typed turn-id mapping. |
 | `turn/start` | Used now | Keep | Canonical send path for app-server mode in Farfield. |
 | `turn/steer` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
 | `userInfo` | Not used | Do not adopt | Deprecated upstream request family. |
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 11
-Not used: 63
+Used now: 15
+Not used: 59

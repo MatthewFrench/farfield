@@ -1,5 +1,6 @@
 import {
   AppServerClient,
+  type AppServerNotificationEvent,
   CodexMonitorService,
   DesktopIpcClient,
   type SendRequestOptions,
@@ -20,6 +21,7 @@ import type {
   AgentReadStreamEventsInput,
   AgentSetCollaborationModeInput,
   AgentSubmitUserInputInput,
+  AgentThreadConversationState,
   AgentThreadLiveState,
   AgentThreadStreamEvents,
 } from "../Types.js";
@@ -29,11 +31,25 @@ import type { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.
 const MONITOR_PREVIEW_REQUEST_IDENTIFIER = "monitor-preview-request-id";
 const OUTBOUND_IPC_FRAME_DIRECTION: CodexIpcFrameEvent["direction"] = "out";
 const APP_SERVER_OWNER_CLIENT_IDENTIFIER = "app-server";
-const APP_SERVER_NOTIFICATION_EVENT_METHOD = "app-server-notification";
 const APP_SERVER_NOTIFICATION_ENVELOPE_VERSION = 1;
-const AppServerNotificationThreadIdentifierSchema = z
+const TURN_IN_PROGRESS_STATUS = "inProgress";
+const TURN_IN_PROGRESS_UNDERSCORE_STATUS = "in_progress";
+const INTERRUPT_TURN_IDENTIFIER_UNAVAILABLE_ERROR =
+  "Cannot interrupt because there is no in-progress turn for this thread.";
+const AppServerNotificationEnvelopeSchema = z
   .object({
-    threadId: z.string().min(1),
+    threadId: z.string().min(1).optional(),
+    thread_id: z.string().min(1).optional(),
+    conversationId: z.string().min(1).optional(),
+    conversation_id: z.string().min(1).optional(),
+    turnId: z.string().min(1).optional(),
+    turn_id: z.string().min(1).optional(),
+    thread: z
+      .object({
+        id: z.string().min(1),
+      })
+      .passthrough()
+      .optional(),
   })
   .passthrough();
 
@@ -73,6 +89,7 @@ export interface CodexThreadInteractionOwnerOptions {
   service: CodexMonitorService;
   ipcClient: DesktopIpcClient;
   threadStreamStateOwner: CodexThreadStreamStateOwner;
+  runAppServerCall: <ValueType>(operation: () => Promise<ValueType>) => Promise<ValueType>;
   ensureCodexAvailable: () => void;
   ensureIpcReady: () => void;
   isIpcReady: () => boolean;
@@ -88,6 +105,9 @@ export class CodexThreadInteractionOwner {
   private readonly service: CodexMonitorService;
   private readonly ipcClient: DesktopIpcClient;
   private readonly threadStreamStateOwner: CodexThreadStreamStateOwner;
+  private readonly runAppServerCall: <ValueType>(
+    operation: () => Promise<ValueType>,
+  ) => Promise<ValueType>;
   private readonly ensureCodexAvailable: () => void;
   private readonly ensureIpcReady: () => void;
   private readonly isIpcReady: () => boolean;
@@ -98,6 +118,7 @@ export class CodexThreadInteractionOwner {
     this.service = options.service;
     this.ipcClient = options.ipcClient;
     this.threadStreamStateOwner = options.threadStreamStateOwner;
+    this.runAppServerCall = options.runAppServerCall;
     this.ensureCodexAvailable = options.ensureCodexAvailable;
     this.ensureIpcReady = options.ensureIpcReady;
     this.isIpcReady = options.isIpcReady;
@@ -105,13 +126,19 @@ export class CodexThreadInteractionOwner {
   }
 
   public async interrupt(input: AgentInterruptInput): Promise<void> {
-    this.ensureInteractionReady();
-    const ownerClientId = this.resolveRequiredOwnerClientId(input.threadId, input.ownerClientId);
+    if (this.isIpcReady()) {
+      this.ensureInteractionReady();
+      const ownerClientId = this.resolveRequiredOwnerClientId(input.threadId, input.ownerClientId);
+      await this.service.interrupt({
+        threadId: input.threadId,
+        ownerClientId,
+      });
+      return;
+    }
 
-    await this.service.interrupt({
-      threadId: input.threadId,
-      ownerClientId,
-    });
+    this.ensureCodexAvailable();
+    const turnId = await this.readInterruptTurnIdentifier(input.threadId);
+    await this.runAppServerCall(() => this.appClient.interruptTurn(input.threadId, turnId));
   }
 
   public async setCollaborationMode(
@@ -185,21 +212,15 @@ export class CodexThreadInteractionOwner {
       return {
         ownerClientId: APP_SERVER_OWNER_CLIENT_IDENTIFIER,
         events: notificationBatch.events
-          .filter((event) => resolveAppServerEventThreadId(event.params) === threadId)
-          .map((event) =>
-            parseIpcFrame({
-              type: "broadcast",
-              method: APP_SERVER_NOTIFICATION_EVENT_METHOD,
-              sourceClientId: APP_SERVER_OWNER_CLIENT_IDENTIFIER,
-              version: APP_SERVER_NOTIFICATION_ENVELOPE_VERSION,
-              params: {
-                method: event.method,
-                sequence: event.sequence,
-                receivedAtMilliseconds: event.receivedAtMilliseconds,
-                payload: event.params,
-              },
-            }),
-          ),
+          .map((event) => {
+            const identity = readAppServerNotificationIdentity(event.params);
+            return {
+              event,
+              identity,
+            };
+          })
+          .filter((entry) => entry.identity.threadId === threadId)
+          .map((entry) => createAppServerNotificationStreamFrame(entry.event, entry.identity)),
         nextSequence: notificationBatch.nextSequence,
         firstAvailableSequence: notificationBatch.firstAvailableSequence,
         resetRequired: notificationBatch.resetRequired,
@@ -262,17 +283,108 @@ export class CodexThreadInteractionOwner {
       threadId: frameDescription.threadId,
     });
   }
+
+  private async readInterruptTurnIdentifier(threadId: string): Promise<string> {
+    const projectedConversationState =
+      this.threadStreamStateOwner.getProjectedConversationState(threadId);
+    const projectedTurnIdentifier =
+      projectedConversationState === null
+        ? null
+        : readLatestInterruptibleTurnIdentifier(projectedConversationState);
+    if (projectedTurnIdentifier !== null) {
+      return projectedTurnIdentifier;
+    }
+
+    const readThreadResponse = await this.runAppServerCall(() =>
+      this.appClient.readThread(threadId, true),
+    );
+    const readThreadTurnIdentifier = readLatestInterruptibleTurnIdentifier(
+      readThreadResponse.thread,
+    );
+    if (readThreadTurnIdentifier !== null) {
+      return readThreadTurnIdentifier;
+    }
+
+    throw new Error(INTERRUPT_TURN_IDENTIFIER_UNAVAILABLE_ERROR);
+  }
 }
 
-function resolveAppServerEventThreadId(params: JsonValue | null): string | null {
+interface AppServerNotificationIdentity {
+  threadId: string | null;
+  turnId: string | null;
+}
+
+function readAppServerNotificationIdentity(
+  params: JsonValue | null,
+): AppServerNotificationIdentity {
   if (params === null) {
-    return null;
+    return {
+      threadId: null,
+      turnId: null,
+    };
   }
 
-  const parsedThreadIdentifier = AppServerNotificationThreadIdentifierSchema.safeParse(params);
-  if (!parsedThreadIdentifier.success) {
-    return null;
+  const parsedNotificationEnvelope = AppServerNotificationEnvelopeSchema.safeParse(params);
+  if (!parsedNotificationEnvelope.success) {
+    return {
+      threadId: null,
+      turnId: null,
+    };
   }
 
-  return parsedThreadIdentifier.data.threadId;
+  const parsedEnvelope = parsedNotificationEnvelope.data;
+  return {
+    threadId:
+      parsedEnvelope.threadId ??
+      parsedEnvelope.thread_id ??
+      parsedEnvelope.conversationId ??
+      parsedEnvelope.conversation_id ??
+      parsedEnvelope.thread?.id ??
+      null,
+    turnId: parsedEnvelope.turnId ?? parsedEnvelope.turn_id ?? null,
+  };
+}
+
+function createAppServerNotificationStreamFrame(
+  event: AppServerNotificationEvent,
+  identity: AppServerNotificationIdentity,
+): IpcFrame {
+  return parseIpcFrame({
+    type: "broadcast",
+    method: event.method,
+    sourceClientId: APP_SERVER_OWNER_CLIENT_IDENTIFIER,
+    version: APP_SERVER_NOTIFICATION_ENVELOPE_VERSION,
+    params: {
+      sequence: event.sequence,
+      receivedAtMilliseconds: event.receivedAtMilliseconds,
+      ...(identity.threadId !== null ? { threadId: identity.threadId } : {}),
+      ...(identity.turnId !== null ? { turnId: identity.turnId } : {}),
+      payload: event.params,
+    },
+  });
+}
+
+function readLatestInterruptibleTurnIdentifier(
+  conversationState: AgentThreadConversationState,
+): string | null {
+  for (let turnIndex = conversationState.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
+    const turn = conversationState.turns[turnIndex];
+    if (turn === undefined) {
+      continue;
+    }
+
+    const turnIdentifier = turn.turnId ?? turn.id ?? null;
+    if (turnIdentifier === null) {
+      continue;
+    }
+
+    if (
+      turn.status === TURN_IN_PROGRESS_STATUS ||
+      turn.status === TURN_IN_PROGRESS_UNDERSCORE_STATUS
+    ) {
+      return turnIdentifier;
+    }
+  }
+
+  return null;
 }

@@ -3,9 +3,13 @@ config/read
 initialize
 model/list
 thread/archive
+thread/fork
 thread/list
+thread/name/set
 thread/read
 thread/resume
+thread/rollback
 thread/start
 thread/unarchive
+turn/interrupt
 turn/start

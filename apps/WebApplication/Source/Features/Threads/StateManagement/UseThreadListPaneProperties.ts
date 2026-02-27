@@ -29,6 +29,9 @@ export interface UseThreadListPanePropertiesInput {
   setSelectedThreadId: (threadId: string) => void;
   setMobileSidebarOpen: (nextOpen: boolean) => void;
   archiveThread: (threadId: string) => void | Promise<void>;
+  forkThread: (threadId: string) => void | Promise<void>;
+  rollbackThread: (threadId: string) => void | Promise<void>;
+  setThreadName: (threadId: string, name: string) => void | Promise<void>;
   isArchivedThreadsOpen: boolean;
   setIsArchivedThreadsOpen: (nextOpen: boolean) => void;
   isArchivedThreadsLoading: boolean;
@@ -67,6 +70,9 @@ export function useThreadListPaneProperties(
     setSelectedThreadId,
     setMobileSidebarOpen,
     archiveThread,
+    forkThread,
+    rollbackThread,
+    setThreadName,
     isArchivedThreadsOpen,
     setIsArchivedThreadsOpen,
     isArchivedThreadsLoading,
@@ -116,6 +122,15 @@ export function useThreadListPaneProperties(
       onArchiveThread: (threadId) => {
         void archiveThread(threadId);
       },
+      onForkThread: (threadId) => {
+        void forkThread(threadId);
+      },
+      onRollbackThread: (threadId) => {
+        void rollbackThread(threadId);
+      },
+      onSetThreadName: (threadId, name) => {
+        void setThreadName(threadId, name);
+      },
       isArchivedThreadsOpen,
       onToggleArchivedThreads: (nextOpen) => {
         setIsArchivedThreadsOpen(nextOpen);
@@ -143,6 +158,8 @@ export function useThreadListPaneProperties(
       activeProjectGroups,
       agentsById,
       archiveThread,
+      forkThread,
+      rollbackThread,
       archivedProjectGroups,
       archivedSectionThreadCount,
       archivedThreadIds,
@@ -163,6 +180,7 @@ export function useThreadListPaneProperties(
       selectedAgentDescriptor,
       selectedAgentLabel,
       selectedThreadId,
+      setThreadName,
       setCollapsedArchivedProjectGroups,
       setCollapsedThreadProjectGroups,
       setIsArchivedThreadsOpen,

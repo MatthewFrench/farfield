@@ -24,6 +24,9 @@ describe("ThreadMutationActionCoordinator", () => {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      setThreadName: vi.fn(async () => {}),
     };
 
     await coordinator.createThread({
@@ -62,6 +65,9 @@ describe("ThreadMutationActionCoordinator", () => {
       createThread: vi.fn(async () => ({ threadId: "thread-55" })),
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      setThreadName: vi.fn(async () => {}),
     };
 
     await coordinator.createThread({
@@ -120,6 +126,9 @@ describe("ThreadMutationActionCoordinator", () => {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      setThreadName: vi.fn(async () => {}),
     };
 
     await coordinator.archiveThread({
@@ -166,6 +175,9 @@ describe("ThreadMutationActionCoordinator", () => {
         throw new Error("archive failed");
       }),
       unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      setThreadName: vi.fn(async () => {}),
     };
 
     await coordinator.archiveThread({
@@ -208,6 +220,9 @@ describe("ThreadMutationActionCoordinator", () => {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      setThreadName: vi.fn(async () => {}),
     };
 
     await coordinator.unarchiveThread({
@@ -258,6 +273,9 @@ describe("ThreadMutationActionCoordinator", () => {
       }),
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      setThreadName: vi.fn(async () => {}),
     };
 
     await coordinator.createThread({
@@ -303,6 +321,9 @@ describe("ThreadMutationActionCoordinator", () => {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      setThreadName: vi.fn(async () => {}),
     };
 
     await coordinator.archiveThread({
@@ -326,5 +347,188 @@ describe("ThreadMutationActionCoordinator", () => {
     expect(onInvalidateArchivedThreadQuery).toHaveBeenCalledTimes(1);
     expect(loadCoreData).toHaveBeenCalledTimes(1);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+  });
+
+  it("forks thread, selects forked thread, and refreshes forked data", async () => {
+    const coordinator = new ThreadMutationActionCoordinator();
+    const busyStates: boolean[] = [];
+    const markedThreadIdentifiers: string[] = [];
+    const selectedThreadIdentifiers: string[] = [];
+    const mobileSidebarOpenStates: boolean[] = [];
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onRefreshCreatedThreadData = vi.fn(async (_threadId: string) => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const threadMutationClient = {
+      createThread: vi.fn(async () => ({ threadId: "thread-1" })),
+      archiveThread: vi.fn(async () => {}),
+      unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-8", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      setThreadName: vi.fn(async () => {}),
+    };
+
+    await coordinator.forkThread({
+      threadId: "thread-1",
+      buildActionRequestOptions,
+      onSetBusy: (isBusy) => {
+        busyStates.push(isBusy);
+      },
+      onMarkThreadPendingMaterialization: (threadId) => {
+        markedThreadIdentifiers.push(threadId);
+      },
+      onThreadSelected: (threadId) => {
+        selectedThreadIdentifiers.push(threadId);
+      },
+      onSetMobileSidebarOpen: (isOpen) => {
+        mobileSidebarOpenStates.push(isOpen);
+      },
+      onInvalidateActiveThreadQuery,
+      onRefreshCreatedThreadData,
+      threadMutationClient,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(threadMutationClient.forkThread).toHaveBeenCalledWith("thread-1", {
+      actionId: "action-fork-thread",
+      actionName: "fork-thread",
+    });
+    expect(markedThreadIdentifiers).toEqual(["thread-8"]);
+    expect(selectedThreadIdentifiers).toEqual(["thread-8"]);
+    expect(mobileSidebarOpenStates).toEqual([false]);
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onRefreshCreatedThreadData).toHaveBeenCalledWith("thread-8");
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
+  });
+
+  it("rolls back selected thread and refreshes selected thread data", async () => {
+    const coordinator = new ThreadMutationActionCoordinator();
+    const busyStates: boolean[] = [];
+    const onSetErrorMessage = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const loadCoreData = vi.fn(async () => {});
+    const onRefreshRolledBackThreadData = vi.fn(async (_threadId: string) => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const threadMutationClient = {
+      createThread: vi.fn(async () => ({ threadId: "thread-1" })),
+      archiveThread: vi.fn(async () => {}),
+      unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      setThreadName: vi.fn(async () => {}),
+    };
+
+    await coordinator.rollbackThread({
+      threadId: "thread-1",
+      numTurns: 1,
+      selectedThreadId: "thread-1",
+      buildActionRequestOptions,
+      onSetBusy: (isBusy) => {
+        busyStates.push(isBusy);
+      },
+      onSetErrorMessage,
+      onInvalidateActiveThreadQuery,
+      loadCoreData,
+      onRefreshRolledBackThreadData,
+      threadMutationClient,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(threadMutationClient.rollbackThread).toHaveBeenCalledWith("thread-1", 1, {
+      actionId: "action-rollback-thread",
+      actionName: "rollback-thread",
+    });
+    expect(onSetErrorMessage).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onRefreshRolledBackThreadData).toHaveBeenCalledWith("thread-1");
+    expect(loadCoreData).not.toHaveBeenCalled();
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
+  });
+
+  it("rejects rollback when turn count is invalid", async () => {
+    const coordinator = new ThreadMutationActionCoordinator();
+    const onSetBusy = vi.fn();
+    const onSetErrorMessage = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const loadCoreData = vi.fn(async () => {});
+    const onRefreshRolledBackThreadData = vi.fn(async (_threadId: string) => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const threadMutationClient = {
+      createThread: vi.fn(async () => ({ threadId: "thread-1" })),
+      archiveThread: vi.fn(async () => {}),
+      unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      setThreadName: vi.fn(async () => {}),
+    };
+
+    await coordinator.rollbackThread({
+      threadId: "thread-1",
+      numTurns: 0,
+      selectedThreadId: "thread-1",
+      buildActionRequestOptions,
+      onSetBusy,
+      onSetErrorMessage,
+      onInvalidateActiveThreadQuery,
+      loadCoreData,
+      onRefreshRolledBackThreadData,
+      threadMutationClient,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(onSetErrorMessage).toHaveBeenCalledWith(
+      "Cannot rollback thread: numTurns must be greater than zero",
+    );
+    expect(onSetBusy).not.toHaveBeenCalled();
+    expect(threadMutationClient.rollbackThread).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
+    expect(onRefreshRolledBackThreadData).not.toHaveBeenCalled();
+    expect(loadCoreData).not.toHaveBeenCalled();
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+  });
+
+  it("sets thread name, invalidates thread queries, and reloads core data", async () => {
+    const coordinator = new ThreadMutationActionCoordinator();
+    const busyStates: boolean[] = [];
+    const onSetErrorMessage = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onInvalidateArchivedThreadQuery = vi.fn();
+    const loadCoreData = vi.fn(async () => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const threadMutationClient = {
+      createThread: vi.fn(async () => ({ threadId: "thread-1" })),
+      archiveThread: vi.fn(async () => {}),
+      unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      setThreadName: vi.fn(async () => {}),
+    };
+
+    await coordinator.setThreadName({
+      threadId: "thread-1",
+      name: "  New title  ",
+      buildActionRequestOptions,
+      onSetBusy: (isBusy) => {
+        busyStates.push(isBusy);
+      },
+      onSetErrorMessage,
+      onInvalidateActiveThreadQuery,
+      onInvalidateArchivedThreadQuery,
+      loadCoreData,
+      threadMutationClient,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(threadMutationClient.setThreadName).toHaveBeenCalledWith("thread-1", "New title", {
+      actionId: "action-set-thread-name",
+      actionName: "set-thread-name",
+    });
+    expect(onSetErrorMessage).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onInvalidateArchivedThreadQuery).toHaveBeenCalledTimes(1);
+    expect(loadCoreData).toHaveBeenCalledTimes(1);
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
   });
 });

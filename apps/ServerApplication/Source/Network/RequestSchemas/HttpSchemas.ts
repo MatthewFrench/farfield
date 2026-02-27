@@ -7,6 +7,7 @@ import { z } from "zod";
 
 const TRACE_LABEL_MAXIMUM_LENGTH = 120;
 const TRACE_MARK_NOTE_MAXIMUM_LENGTH = 500;
+const THREAD_NAME_MAXIMUM_LENGTH = 120;
 const REQUEST_BODY_ISSUE_PATH_PREFIX = "body";
 const REQUEST_BODY_ISSUE_PATH_SEPARATOR = ".";
 const HTTP_BODY_PARSE_ERROR_PREFIX = "Invalid HTTP request body";
@@ -17,6 +18,9 @@ const RequestBodySchemaNameByParser = {
   sendMessage: "SendMessageBody",
   submitUserInput: "SubmitUserInputBody",
   interrupt: "InterruptBody",
+  forkThread: "ForkThreadBody",
+  setThreadName: "SetThreadNameBody",
+  rollbackThread: "RollbackThreadBody",
   traceStart: "TraceStartBody",
   traceMark: "TraceMarkBody",
   replay: "ReplayBody",
@@ -89,6 +93,20 @@ export const InterruptBodySchema = z
   })
   .strict();
 
+export const ForkThreadBodySchema = z.object({}).strict();
+
+export const SetThreadNameBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(THREAD_NAME_MAXIMUM_LENGTH),
+  })
+  .strict();
+
+export const RollbackThreadBodySchema = z
+  .object({
+    numTurns: z.number().int().min(1),
+  })
+  .strict();
+
 export const TraceStartBodySchema = z
   .object({
     // Limit keeps trace labels concise enough for list and activity surfaces.
@@ -114,6 +132,9 @@ export type StartThreadBody = z.infer<typeof StartThreadBodySchema>;
 export type SendMessageBody = z.infer<typeof SendMessageBodySchema>;
 export type SubmitUserInputBody = z.infer<typeof SubmitUserInputBodySchema>;
 export type InterruptBody = z.infer<typeof InterruptBodySchema>;
+export type ForkThreadBody = z.infer<typeof ForkThreadBodySchema>;
+export type SetThreadNameBody = z.infer<typeof SetThreadNameBodySchema>;
+export type RollbackThreadBody = z.infer<typeof RollbackThreadBodySchema>;
 export type TraceStartBody = z.infer<typeof TraceStartBodySchema>;
 export type TraceMarkBody = z.infer<typeof TraceMarkBodySchema>;
 export type ReplayBody = z.infer<typeof ReplayBodySchema>;
@@ -213,6 +234,30 @@ export function parseSubmitUserInputBody(value: JsonValue): SubmitUserInputBody 
 
 export function parseInterruptBody(value: JsonValue): InterruptBody {
   return parseOwnedRequestBody(InterruptBodySchema, value, RequestBodySchemaNameByParser.interrupt);
+}
+
+export function parseForkThreadBody(value: JsonValue): ForkThreadBody {
+  return parseOwnedRequestBody(
+    ForkThreadBodySchema,
+    value,
+    RequestBodySchemaNameByParser.forkThread,
+  );
+}
+
+export function parseSetThreadNameBody(value: JsonValue): SetThreadNameBody {
+  return parseOwnedRequestBody(
+    SetThreadNameBodySchema,
+    value,
+    RequestBodySchemaNameByParser.setThreadName,
+  );
+}
+
+export function parseRollbackThreadBody(value: JsonValue): RollbackThreadBody {
+  return parseOwnedRequestBody(
+    RollbackThreadBodySchema,
+    value,
+    RequestBodySchemaNameByParser.rollbackThread,
+  );
 }
 
 export function parseTraceStartBody(value: JsonValue): TraceStartBody {

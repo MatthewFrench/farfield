@@ -4,6 +4,7 @@
  */
 
 export type {
+  ForkThreadOptions,
   ListThreadsAllOptions,
   ListThreadsOptions,
   StartThreadOptions,

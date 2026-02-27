@@ -36,6 +36,9 @@ export interface ThreadActionHandlers {
   createNewThread: (projectPath: string, agentId?: AgentId) => Promise<void>;
   createThreadForSingleAgent: (projectPath: string) => void;
   runArchiveThread: (threadId: string) => Promise<void>;
+  runForkThread: (threadId: string) => Promise<void>;
+  runRollbackThread: (threadId: string) => Promise<void>;
+  runSetThreadName: (threadId: string, name: string) => Promise<void>;
   runUnarchiveThread: (threadId: string) => Promise<void>;
 }
 
@@ -179,10 +182,113 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     ],
   );
 
+  const runForkThread = useCallback(
+    async (threadId: string) => {
+      await input.threadMutationActionCoordinator.forkThread({
+        threadId,
+        buildActionRequestOptions: input.buildActionRequestOptions,
+        onSetBusy: input.setIsBusy,
+        onMarkThreadPendingMaterialization: (nextThreadId) => {
+          input.pendingThreadMaterializationCoordinator.markPending(nextThreadId);
+        },
+        onThreadSelected: (nextThreadId) => {
+          input.setSelectedThreadId(nextThreadId);
+          selectedThreadIdRef.current = nextThreadId;
+        },
+        onSetMobileSidebarOpen: input.setMobileSidebarOpen,
+        onInvalidateActiveThreadQuery: () => {
+          input.threadListStateController.invalidateActiveThreadQuery();
+        },
+        onRefreshCreatedThreadData: refreshCreatedThreadData,
+        threadMutationClient: input.threadMutationServerClient,
+        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+      });
+    },
+    [
+      input.buildActionRequestOptions,
+      input.pendingThreadMaterializationCoordinator,
+      input.reportTrackedUserInterfaceError,
+      refreshCreatedThreadData,
+      selectedThreadIdRef,
+      input.setIsBusy,
+      input.setMobileSidebarOpen,
+      input.setSelectedThreadId,
+      input.threadListStateController,
+      input.threadMutationActionCoordinator,
+      input.threadMutationServerClient,
+    ],
+  );
+
+  const runSetThreadName = useCallback(
+    async (threadId: string, name: string) => {
+      await input.threadMutationActionCoordinator.setThreadName({
+        threadId,
+        name,
+        buildActionRequestOptions: input.buildActionRequestOptions,
+        onSetBusy: input.setIsBusy,
+        onSetErrorMessage: input.setError,
+        onInvalidateActiveThreadQuery: () => {
+          input.threadListStateController.invalidateActiveThreadQuery();
+        },
+        onInvalidateArchivedThreadQuery: () => {
+          input.threadListStateController.invalidateArchivedThreadQuery();
+        },
+        loadCoreData: input.loadCoreDataTracked,
+        threadMutationClient: input.threadMutationServerClient,
+        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+      });
+    },
+    [
+      input.buildActionRequestOptions,
+      input.loadCoreDataTracked,
+      input.reportTrackedUserInterfaceError,
+      input.setError,
+      input.setIsBusy,
+      input.threadListStateController,
+      input.threadMutationActionCoordinator,
+      input.threadMutationServerClient,
+    ],
+  );
+
+  const runRollbackThread = useCallback(
+    async (threadId: string) => {
+      await input.threadMutationActionCoordinator.rollbackThread({
+        threadId,
+        numTurns: 1,
+        selectedThreadId: selectedThreadIdRef.current,
+        buildActionRequestOptions: input.buildActionRequestOptions,
+        onSetBusy: input.setIsBusy,
+        onSetErrorMessage: input.setError,
+        onInvalidateActiveThreadQuery: () => {
+          input.threadListStateController.invalidateActiveThreadQuery();
+        },
+        loadCoreData: input.loadCoreDataTracked,
+        onRefreshRolledBackThreadData: refreshCreatedThreadData,
+        threadMutationClient: input.threadMutationServerClient,
+        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+      });
+    },
+    [
+      input.buildActionRequestOptions,
+      input.loadCoreDataTracked,
+      input.reportTrackedUserInterfaceError,
+      refreshCreatedThreadData,
+      selectedThreadIdRef,
+      input.setError,
+      input.setIsBusy,
+      input.threadListStateController,
+      input.threadMutationActionCoordinator,
+      input.threadMutationServerClient,
+    ],
+  );
+
   return {
     createNewThread,
     createThreadForSingleAgent,
     runArchiveThread,
+    runForkThread,
+    runRollbackThread,
+    runSetThreadName,
     runUnarchiveThread,
   };
 }

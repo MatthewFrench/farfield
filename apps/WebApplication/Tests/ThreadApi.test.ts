@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   archiveThread,
   listThreads,
+  rollbackThread,
   unarchiveThread,
 } from "@/Features/Threads/DataAccess/ThreadApi";
 import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
@@ -215,5 +216,27 @@ describe("ThreadApi", () => {
     const secondRequestInit = fetchMock.mock.calls[1]?.[1];
     expect(firstRequestInit?.method).toBe("POST");
     expect(secondRequestInit?.method).toBe("POST");
+  });
+
+  it("posts rollback mutations with strict turn-count payload", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        threadId: "thread_123",
+      }),
+    );
+
+    await rollbackThread({
+      threadId: "thread 123/with slash",
+      numTurns: 2,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
+    expect(requestUrl).toBe("/api/threads/thread%20123%2Fwith%20slash/rollback");
+
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    expect(requestInit?.method).toBe("POST");
+    expect(requestInit?.body).toBe(JSON.stringify({ numTurns: 2 }));
   });
 });

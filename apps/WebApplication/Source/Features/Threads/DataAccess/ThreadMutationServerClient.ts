@@ -5,11 +5,18 @@ import {
   type ApiCreateThreadResponse,
   archiveThread,
   createThread,
+  forkThread,
+  rollbackThread,
+  setThreadName,
   unarchiveThread,
 } from "./ThreadApi";
 
 export type ThreadMutationCreateThreadInput = ApiCreateThreadInput;
 export type ThreadMutationCreateThreadResponse = ApiCreateThreadResponse;
+export type ThreadMutationForkThreadResponse = {
+  threadId: string;
+  sourceThreadId: string;
+};
 
 const ThreadIdentifierSchema = z.string().trim().min(1);
 const INVALID_THREAD_IDENTIFIER_MESSAGE =
@@ -29,6 +36,41 @@ export class ThreadMutationServerClient {
 
   public async archiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {
     return archiveThread(readThreadIdentifier(threadId), options);
+  }
+
+  public async forkThread(
+    threadId: string,
+    options?: ApiRequestOptions,
+  ): Promise<ThreadMutationForkThreadResponse> {
+    return forkThread(readThreadIdentifier(threadId), options);
+  }
+
+  public async setThreadName(
+    threadId: string,
+    name: string,
+    options?: ApiRequestOptions,
+  ): Promise<void> {
+    return setThreadName(
+      {
+        threadId: readThreadIdentifier(threadId),
+        name,
+      },
+      options,
+    );
+  }
+
+  public async rollbackThread(
+    threadId: string,
+    numTurns: number,
+    options?: ApiRequestOptions,
+  ): Promise<void> {
+    return rollbackThread(
+      {
+        threadId: readThreadIdentifier(threadId),
+        numTurns,
+      },
+      options,
+    );
   }
 
   public async unarchiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {

@@ -33,10 +33,14 @@ const THREAD_PROJECT_STATE_ACTIVE = "active";
 const THREAD_PROJECT_STATE_REMOVED = "removed";
 const THREAD_ARCHIVE_ROUTE_SEGMENT = "archive";
 const THREAD_UNARCHIVE_ROUTE_SEGMENT = "unarchive";
+const THREAD_FORK_ROUTE_SEGMENT = "fork";
+const THREAD_NAME_ROUTE_SEGMENT = "name";
+const THREAD_ROLLBACK_ROUTE_SEGMENT = "rollback";
 const HTTP_POST_METHOD = "POST";
 const APPLICATION_JSON_CONTENT_TYPE_HEADER_NAME = "Content-Type";
 const APPLICATION_JSON_CONTENT_TYPE = "application/json";
 const NO_UNREAD_TURN_SIGNAL = null;
+const THREAD_NAME_MAXIMUM_LENGTH = 120;
 
 const ThreadProjectStateSchema = z.enum([
   THREAD_PROJECT_STATE_ACTIVE,
@@ -182,6 +186,39 @@ const ThreadMutationResponseSchema = z
   })
   .strict();
 
+const ForkThreadResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1),
+    sourceThreadId: z.string().min(1),
+  })
+  .strict()
+  .transform(({ ok: _ok, ...forkThreadResponse }) => forkThreadResponse);
+
+const SetThreadNameInputSchema = z
+  .object({
+    threadId: z.string().min(1),
+    name: z.string().trim().min(1).max(THREAD_NAME_MAXIMUM_LENGTH),
+  })
+  .strict();
+type SetThreadNameInput = z.infer<typeof SetThreadNameInputSchema>;
+const SetThreadNameRequestBodySchema = SetThreadNameInputSchema.omit({
+  threadId: true,
+}).strict();
+type SetThreadNameRequestBody = z.infer<typeof SetThreadNameRequestBodySchema>;
+
+const RollbackThreadInputSchema = z
+  .object({
+    threadId: z.string().min(1),
+    numTurns: z.number().int().min(1),
+  })
+  .strict();
+type RollbackThreadInput = z.infer<typeof RollbackThreadInputSchema>;
+const RollbackThreadRequestBodySchema = RollbackThreadInputSchema.omit({
+  threadId: true,
+}).strict();
+type RollbackThreadRequestBody = z.infer<typeof RollbackThreadRequestBodySchema>;
+
 export interface ApiCreateThreadInput {
   agentId?: AgentId;
   cwd?: string;
@@ -195,7 +232,10 @@ export interface ApiCreateThreadInput {
 
 type ThreadMutationRouteSegment =
   | typeof THREAD_ARCHIVE_ROUTE_SEGMENT
-  | typeof THREAD_UNARCHIVE_ROUTE_SEGMENT;
+  | typeof THREAD_UNARCHIVE_ROUTE_SEGMENT
+  | typeof THREAD_FORK_ROUTE_SEGMENT
+  | typeof THREAD_NAME_ROUTE_SEGMENT
+  | typeof THREAD_ROLLBACK_ROUTE_SEGMENT;
 
 function readBooleanQueryValue(value: boolean): string {
   return value ? BOOLEAN_TRUE_QUERY_VALUE : BOOLEAN_FALSE_QUERY_VALUE;
@@ -239,6 +279,22 @@ function buildThreadMutationRequestInit(options?: ApiRequestOptions): RequestIni
   return applyRequestOptions(
     {
       method: HTTP_POST_METHOD,
+    },
+    options,
+  );
+}
+
+function buildThreadMutationJsonRequestInit(
+  body: object,
+  options?: ApiRequestOptions,
+): RequestInit {
+  return applyRequestOptions(
+    {
+      method: HTTP_POST_METHOD,
+      headers: {
+        [APPLICATION_JSON_CONTENT_TYPE_HEADER_NAME]: APPLICATION_JSON_CONTENT_TYPE,
+      },
+      body: JSON.stringify(body),
     },
     options,
   );
@@ -320,4 +376,52 @@ export async function unarchiveThread(
   options?: ApiRequestOptions,
 ): Promise<void> {
   await runThreadMutation(threadId, THREAD_UNARCHIVE_ROUTE_SEGMENT, options);
+}
+
+export interface ApiForkThreadResponse {
+  threadId: string;
+  sourceThreadId: string;
+}
+
+export async function forkThread(
+  threadId: string,
+  options?: ApiRequestOptions,
+): Promise<ApiForkThreadResponse> {
+  const data = await request(
+    buildThreadMutationRequestPath(threadId, THREAD_FORK_ROUTE_SEGMENT),
+    buildThreadMutationRequestInit(options),
+  );
+  return ForkThreadResponseSchema.parse(data);
+}
+
+export async function setThreadName(
+  input: SetThreadNameInput,
+  options?: ApiRequestOptions,
+): Promise<void> {
+  const parsedInput = SetThreadNameInputSchema.parse(input);
+  const parsedRequestBody: SetThreadNameRequestBody = SetThreadNameRequestBodySchema.parse({
+    name: parsedInput.name,
+  });
+
+  const data = await request(
+    buildThreadMutationRequestPath(parsedInput.threadId, THREAD_NAME_ROUTE_SEGMENT),
+    buildThreadMutationJsonRequestInit(parsedRequestBody, options),
+  );
+  ThreadMutationResponseSchema.parse(data);
+}
+
+export async function rollbackThread(
+  input: RollbackThreadInput,
+  options?: ApiRequestOptions,
+): Promise<void> {
+  const parsedInput = RollbackThreadInputSchema.parse(input);
+  const parsedRequestBody: RollbackThreadRequestBody = RollbackThreadRequestBodySchema.parse({
+    numTurns: parsedInput.numTurns,
+  });
+
+  const data = await request(
+    buildThreadMutationRequestPath(parsedInput.threadId, THREAD_ROLLBACK_ROUTE_SEGMENT),
+    buildThreadMutationJsonRequestInit(parsedRequestBody, options),
+  );
+  ThreadMutationResponseSchema.parse(data);
 }

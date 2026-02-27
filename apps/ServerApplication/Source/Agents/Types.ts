@@ -137,6 +137,20 @@ export interface AgentInterruptInput {
   ownerClientId?: string;
 }
 
+export interface AgentForkThreadInput {
+  threadId: string;
+}
+
+export interface AgentSetThreadNameInput {
+  threadId: string;
+  name: string;
+}
+
+export interface AgentRollbackThreadInput {
+  threadId: string;
+  numTurns: number;
+}
+
 export interface AgentArchiveThreadInput {
   threadId: string;
 }
@@ -217,6 +231,9 @@ export interface AgentAdapter {
   readThread(input: AgentReadThreadInput): Promise<AgentReadThreadResult>;
   sendMessage(input: AgentSendMessageInput): Promise<void>;
   interrupt(input: AgentInterruptInput): Promise<void>;
+  forkThread?(input: AgentForkThreadInput): Promise<AgentCreateThreadResult>;
+  setThreadName?(input: AgentSetThreadNameInput): Promise<void>;
+  rollbackThread?(input: AgentRollbackThreadInput): Promise<AgentReadThreadResult>;
   archiveThread?(input: AgentArchiveThreadInput): Promise<void>;
   unarchiveThread?(input: AgentUnarchiveThreadInput): Promise<void>;
 

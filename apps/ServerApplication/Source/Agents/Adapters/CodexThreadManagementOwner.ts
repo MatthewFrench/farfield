@@ -16,14 +16,18 @@ import type {
   AgentConfigDefaults,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
+  AgentForkThreadInput,
   AgentListThreadsInput,
   AgentListThreadsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
+  AgentRollbackThreadInput,
+  AgentSetThreadNameInput,
   AgentUnarchiveThreadInput,
 } from "../Types.js";
 
 const CREATE_THREAD_REQUIRES_WORKING_DIRECTORY_ERROR = "Codex thread creation requires cwd";
+const FORK_WITH_EXTENDED_HISTORY = true;
 const READ_CONFIG_DEFAULTS_OPTIONS = {
   includeLayers: false,
 };
@@ -186,6 +190,32 @@ export class CodexThreadManagementOwner {
   public async archiveThread(input: AgentArchiveThreadInput): Promise<void> {
     this.ensureCodexAvailable();
     await this.runAppServerCall(() => this.appClient.archiveThread(input.threadId));
+  }
+
+  public async forkThread(input: AgentForkThreadInput): Promise<AgentCreateThreadResult> {
+    this.ensureCodexAvailable();
+    const result = await this.runAppServerCall(() =>
+      this.appClient.forkThread(input.threadId, {
+        persistExtendedHistory: FORK_WITH_EXTENDED_HISTORY,
+      }),
+    );
+
+    return mapCreateThreadResult(result);
+  }
+
+  public async setThreadName(input: AgentSetThreadNameInput): Promise<void> {
+    this.ensureCodexAvailable();
+    await this.runAppServerCall(() => this.appClient.setThreadName(input.threadId, input.name));
+  }
+
+  public async rollbackThread(input: AgentRollbackThreadInput): Promise<AgentReadThreadResult> {
+    this.ensureCodexAvailable();
+    const result = await this.runAppServerCall(() =>
+      this.appClient.rollbackThread(input.threadId, input.numTurns),
+    );
+    return {
+      thread: result.thread,
+    };
   }
 
   public async unarchiveThread(input: AgentUnarchiveThreadInput): Promise<void> {

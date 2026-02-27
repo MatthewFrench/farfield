@@ -5,14 +5,17 @@ import type {
   AgentAdapter,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
+  AgentForkThreadInput,
   AgentInterruptInput,
   AgentListThreadsInput,
   AgentListThreadsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
+  AgentRollbackThreadInput,
   AgentSendMessageInput,
   AgentSetCollaborationModeInput,
   AgentSetCollaborationModeResult,
+  AgentSetThreadNameInput,
   AgentSubmitUserInputInput,
   AgentSubmitUserInputResult,
 } from "../Source/Agents/Types.js";
@@ -44,6 +47,9 @@ function createAgentAdapter(input: {
   ) => Promise<AgentSetCollaborationModeResult>;
   submitUserInput?: (value: AgentSubmitUserInputInput) => Promise<AgentSubmitUserInputResult>;
   interrupt?: (value: AgentInterruptInput) => Promise<void>;
+  forkThread?: (value: AgentForkThreadInput) => Promise<AgentCreateThreadResult>;
+  setThreadName?: (value: AgentSetThreadNameInput) => Promise<void>;
+  rollbackThread?: (value: AgentRollbackThreadInput) => Promise<AgentReadThreadResult>;
 }): AgentAdapter {
   return {
     id: "codex",
@@ -100,6 +106,24 @@ function createAgentAdapter(input: {
         throw new Error("Not used in mutation route-owner tests");
       }
       await input.interrupt(inputValue);
+    },
+    async forkThread(inputValue: AgentForkThreadInput): Promise<AgentCreateThreadResult> {
+      if (!input.forkThread) {
+        throw new Error("Not used in mutation route-owner tests");
+      }
+      return input.forkThread(inputValue);
+    },
+    async setThreadName(inputValue: AgentSetThreadNameInput): Promise<void> {
+      if (!input.setThreadName) {
+        throw new Error("Not used in mutation route-owner tests");
+      }
+      await input.setThreadName(inputValue);
+    },
+    async rollbackThread(inputValue: AgentRollbackThreadInput): Promise<AgentReadThreadResult> {
+      if (!input.rollbackThread) {
+        throw new Error("Not used in mutation route-owner tests");
+      }
+      return input.rollbackThread(inputValue);
     },
   };
 }
@@ -401,6 +425,151 @@ describe("ThreadMemberMutationRouteOwner", () => {
         ownerClientId: "",
       },
     ]);
+  });
+
+  it("handles thread-fork mutations and returns the forked thread identifier", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const forkCalls: AgentForkThreadInput[] = [];
+    const adapter = createAgentAdapter({
+      forkThread: async (value) => {
+        forkCalls.push(value);
+        return {
+          threadId: "thread-2",
+          thread: {
+            id: "thread-2",
+            preview: "Forked",
+            createdAt: 1,
+            updatedAt: 2,
+            source: "opencode",
+          },
+        };
+      },
+    });
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "fork"],
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(forkCalls).toEqual([
+      {
+        threadId: "thread-1",
+      },
+    ]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-2",
+      sourceThreadId: "thread-1",
+    });
+  });
+
+  it("handles thread-name mutations and forwards normalized name payload", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const setThreadNameCalls: AgentSetThreadNameInput[] = [];
+    const adapter = createAgentAdapter({
+      setThreadName: async (value) => {
+        setThreadNameCalls.push(value);
+      },
+    });
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "name"],
+        readJsonBody: async () => ({
+          name: "  Better title  ",
+        }),
+        onJsonResponse: () => {},
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(setThreadNameCalls).toEqual([
+      {
+        threadId: "thread-1",
+        name: "Better title",
+      },
+    ]);
+  });
+
+  it("handles thread-rollback mutations and forwards turn-count payload", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const rollbackCalls: AgentRollbackThreadInput[] = [];
+    const adapter = createAgentAdapter({
+      rollbackThread: async (value) => {
+        rollbackCalls.push(value);
+        return {
+          thread: {
+            id: "thread-1",
+            turns: [],
+            requests: [],
+          },
+        };
+      },
+    });
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "rollback"],
+        readJsonBody: async () => ({
+          numTurns: 2,
+        }),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(rollbackCalls).toEqual([
+      {
+        threadId: "thread-1",
+        numTurns: 2,
+      },
+    ]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
+    });
   });
 
   it("returns false for unmatched thread-member mutation routes", async () => {
