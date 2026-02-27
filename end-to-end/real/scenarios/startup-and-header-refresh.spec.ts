@@ -1,22 +1,21 @@
+import { expect, test } from "../fixtures/real-app.fixture";
+import { openAppHome, triggerHeaderRefresh } from "../helpers/app-actions";
 import {
-  openAppHome,
-  triggerHeaderRefresh
-} from "../helpers/app-actions";
-import {
+  captureRuntimeRequestErrorOperationCounts,
   expectChatSurfaceSettled,
   expectNoErrorBanner,
   expectNoFailedApiResponses,
   expectNoLoadFailedText,
   expectNoUnexpectedClientErrors,
   expectNoUnexpectedWarningsOrErrors,
-  expectThreadListSettled
+  expectRuntimeRequestErrorOperationSpikeBudget,
+  expectThreadListSettled,
 } from "../helpers/app-assertions";
-import {
-  expect,
-  test
-} from "../fixtures/real-app.fixture";
 
 test("startup and header refresh behavior", async ({ page, sentinel }) => {
+  const baselineRuntimeRequestErrorOperationCounts =
+    await captureRuntimeRequestErrorOperationCounts(page);
+
   await openAppHome(page);
 
   await expectThreadListSettled(page, sentinel);
@@ -36,4 +35,12 @@ test("startup and header refresh behavior", async ({ page, sentinel }) => {
   await expectNoUnexpectedClientErrors(sentinel);
   await expectNoFailedApiResponses(sentinel);
   await expectNoUnexpectedWarningsOrErrors(sentinel);
+
+  const currentRuntimeRequestErrorOperationCounts =
+    await captureRuntimeRequestErrorOperationCounts(page);
+  expectRuntimeRequestErrorOperationSpikeBudget({
+    baselineOperationCounts: baselineRuntimeRequestErrorOperationCounts,
+    currentOperationCounts: currentRuntimeRequestErrorOperationCounts,
+    maximumIncreasePerOperation: 0,
+  });
 });

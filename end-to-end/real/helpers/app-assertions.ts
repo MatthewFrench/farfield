@@ -1,4 +1,6 @@
+import { DebugErrorListResponseSchema } from "@farfield/protocol";
 import { expect, type Page } from "@playwright/test";
+import { z } from "zod";
 import type { ErrorSentinel } from "./error-sentinel";
 
 interface SettleOptions {
@@ -6,6 +8,96 @@ interface SettleOptions {
 }
 
 const DEFAULT_SETTLE_TIMEOUT_MS = 90_000;
+const DEBUG_ERROR_LIST_LIMIT = 200;
+const RUNTIME_REQUEST_ERROR_OPERATION = "runtime-request-error";
+const REQUEST_PATH_IN_MESSAGE_PATTERN = /\/api\/[a-z0-9/_-]+/i;
+const RUNTIME_REQUEST_PATH_OPERATION_PREFIX = "request-path";
+
+const RuntimeRequestErrorDetailsSchema = z
+  .object({
+    actionName: z.string().trim().min(1).optional(),
+  })
+  .passthrough();
+
+const DebugErrorListEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+  })
+  .merge(DebugErrorListResponseSchema)
+  .strict();
+
+export interface RuntimeRequestErrorOperationCountSnapshot {
+  readonly [operation: string]: number;
+}
+
+export interface RuntimeRequestErrorOperationSpikeAssertionInput {
+  baselineOperationCounts: RuntimeRequestErrorOperationCountSnapshot;
+  currentOperationCounts: RuntimeRequestErrorOperationCountSnapshot;
+  maximumIncreasePerOperation: number;
+}
+
+function readRuntimeRequestOperationLabel(
+  debugError: z.infer<typeof DebugErrorListResponseSchema.shape.data.element>,
+): string {
+  const parsedDetails = RuntimeRequestErrorDetailsSchema.parse(debugError.details);
+  if (
+    parsedDetails.actionName !== undefined &&
+    parsedDetails.actionName.toLowerCase() !== RUNTIME_REQUEST_ERROR_OPERATION
+  ) {
+    return parsedDetails.actionName;
+  }
+
+  const requestPath = debugError.message.match(REQUEST_PATH_IN_MESSAGE_PATTERN)?.[0] ?? null;
+  if (requestPath !== null) {
+    return `${RUNTIME_REQUEST_PATH_OPERATION_PREFIX}:${requestPath}`;
+  }
+
+  return RUNTIME_REQUEST_ERROR_OPERATION;
+}
+
+function readRuntimeRequestErrorOperationCountSnapshot(
+  debugErrors: z.infer<typeof DebugErrorListResponseSchema.shape.data>,
+): RuntimeRequestErrorOperationCountSnapshot {
+  const operationCounts = new Map<string, number>();
+
+  for (const debugError of debugErrors) {
+    if (debugError.operation !== RUNTIME_REQUEST_ERROR_OPERATION) {
+      continue;
+    }
+    const operationLabel = readRuntimeRequestOperationLabel(debugError);
+    operationCounts.set(operationLabel, (operationCounts.get(operationLabel) ?? 0) + 1);
+  }
+
+  return [...operationCounts.entries()]
+    .sort((left, right) => left[0].localeCompare(right[0]))
+    .reduce<Record<string, number>>((snapshot, [operation, count]) => {
+      snapshot[operation] = count;
+      return snapshot;
+    }, {});
+}
+
+function readOperationIncreaseDetails(
+  input: RuntimeRequestErrorOperationSpikeAssertionInput,
+): string[] {
+  const operations = new Set<string>([
+    ...Object.keys(input.baselineOperationCounts),
+    ...Object.keys(input.currentOperationCounts),
+  ]);
+
+  const operationIncreaseDetails: string[] = [];
+  for (const operation of operations) {
+    const baselineCount = input.baselineOperationCounts[operation] ?? 0;
+    const currentCount = input.currentOperationCounts[operation] ?? 0;
+    const increase = currentCount - baselineCount;
+    if (increase > input.maximumIncreasePerOperation) {
+      operationIncreaseDetails.push(
+        `${operation}: baseline=${String(baselineCount)} current=${String(currentCount)} increase=${String(increase)}`,
+      );
+    }
+  }
+
+  return operationIncreaseDetails;
+}
 
 async function waitForState(
   page: Page,
@@ -13,7 +105,7 @@ async function waitForState(
   disallowedState: string,
   surface: string,
   sentinel: ErrorSentinel,
-  timeoutMs: number
+  timeoutMs: number,
 ): Promise<void> {
   const readVisibleState = async (): Promise<string> => {
     const stateLocators = page.getByTestId(testId);
@@ -31,13 +123,13 @@ async function waitForState(
     await expect
       .poll(readVisibleState, {
         timeout: timeoutMs,
-        message: `${surface} did not become visible within ${String(timeoutMs)}ms`
+        message: `${surface} did not become visible within ${String(timeoutMs)}ms`,
       })
       .not.toBe("__hidden__");
     await expect
       .poll(readVisibleState, {
         timeout: timeoutMs,
-        message: `${surface} did not settle within ${String(timeoutMs)}ms`
+        message: `${surface} did not settle within ${String(timeoutMs)}ms`,
       })
       .not.toBe(disallowedState);
   } catch (error) {
@@ -45,7 +137,7 @@ async function waitForState(
     sentinel.recordLoadingTimeoutBreach({
       surface,
       timeoutMs,
-      observedState
+      observedState,
     });
     throw error;
   }
@@ -62,7 +154,7 @@ export async function expectNoLoadFailedText(page: Page): Promise<void> {
 export async function expectThreadListSettled(
   page: Page,
   sentinel: ErrorSentinel,
-  options?: SettleOptions
+  options?: SettleOptions,
 ): Promise<void> {
   const timeoutMs = options?.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   await waitForState(page, "thread-list-status", "loading", "thread-list", sentinel, timeoutMs);
@@ -71,7 +163,7 @@ export async function expectThreadListSettled(
 export async function expectChatSurfaceSettled(
   page: Page,
   sentinel: ErrorSentinel,
-  options?: SettleOptions
+  options?: SettleOptions,
 ): Promise<void> {
   const timeoutMs = options?.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   const readVisibleState = async (): Promise<string> => {
@@ -90,24 +182,27 @@ export async function expectChatSurfaceSettled(
     await expect
       .poll(readVisibleState, {
         timeout: timeoutMs,
-        message: `chat-surface did not become visible within ${String(timeoutMs)}ms`
+        message: `chat-surface did not become visible within ${String(timeoutMs)}ms`,
       })
       .not.toBe("__hidden__");
     await expect
-      .poll(async () => {
-        const state = await readVisibleState();
-        return state === "loading-threads" || state === "loading-thread";
-      }, {
-        timeout: timeoutMs,
-        message: `chat-surface did not settle within ${String(timeoutMs)}ms`
-      })
+      .poll(
+        async () => {
+          const state = await readVisibleState();
+          return state === "loading-threads" || state === "loading-thread";
+        },
+        {
+          timeout: timeoutMs,
+          message: `chat-surface did not settle within ${String(timeoutMs)}ms`,
+        },
+      )
       .toBe(false);
   } catch (error) {
     const observedState = await readVisibleState();
     sentinel.recordLoadingTimeoutBreach({
       surface: "chat-surface",
       timeoutMs,
-      observedState
+      observedState,
     });
     throw error;
   }
@@ -123,4 +218,27 @@ export async function expectNoFailedApiResponses(sentinel: ErrorSentinel): Promi
 
 export async function expectNoUnexpectedWarningsOrErrors(sentinel: ErrorSentinel): Promise<void> {
   await sentinel.assertNoUnexpectedWarningsOrErrors();
+}
+
+export async function captureRuntimeRequestErrorOperationCounts(
+  page: Page,
+): Promise<RuntimeRequestErrorOperationCountSnapshot> {
+  const response = await page.request.get(
+    `/api/debug/client-errors?limit=${String(DEBUG_ERROR_LIST_LIMIT)}`,
+  );
+  expect(response.ok()).toBe(true);
+
+  const payload = await response.json();
+  const parsedEnvelope = DebugErrorListEnvelopeSchema.parse(payload);
+  return readRuntimeRequestErrorOperationCountSnapshot(parsedEnvelope.data);
+}
+
+export function expectRuntimeRequestErrorOperationSpikeBudget(
+  input: RuntimeRequestErrorOperationSpikeAssertionInput,
+): void {
+  const operationIncreaseDetails = readOperationIncreaseDetails(input);
+  expect(
+    operationIncreaseDetails,
+    `runtime-request-error operation increases exceeded budget ${String(input.maximumIncreasePerOperation)}:\n${operationIncreaseDetails.join("\n")}`,
+  ).toEqual([]);
 }

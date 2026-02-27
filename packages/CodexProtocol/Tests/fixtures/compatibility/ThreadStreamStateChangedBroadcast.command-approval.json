@@ -1,5 +1,5 @@
 {
-  "description": "Sanitized app-server thread-stream-state-changed payloads covering command approval requests and structured error info.",
+  "description": "Sanitized app-server thread-stream-state-changed payloads covering all known conversation request method variants and structured error info.",
   "events": [
     {
       "type": "broadcast",
@@ -41,6 +41,64 @@
                   "command": "echo hello",
                   "cwd": "/workspace"
                 }
+              },
+              {
+                "method": "item/fileChange/requestApproval",
+                "id": 10,
+                "params": {
+                  "callId": "call-10",
+                  "path": "README.md"
+                }
+              },
+              {
+                "method": "item/tool/requestUserInput",
+                "id": 11,
+                "params": {
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-1",
+                  "itemId": "item-1",
+                  "questions": [
+                    {
+                      "id": "question-1",
+                      "header": "Scope",
+                      "question": "Proceed?",
+                      "options": [
+                        {
+                          "label": "Yes",
+                          "description": "Continue"
+                        }
+                      ],
+                      "isOther": false,
+                      "isSecret": false
+                    }
+                  ]
+                }
+              },
+              {
+                "method": "item/tool/call",
+                "id": 12,
+                "params": {
+                  "toolName": "search"
+                }
+              },
+              {
+                "method": "account/chatgptAuthTokens/refresh",
+                "id": 13,
+                "params": {}
+              },
+              {
+                "method": "applyPatchApproval",
+                "id": 14,
+                "params": {
+                  "callId": "call-14"
+                }
+              },
+              {
+                "method": "execCommandApproval",
+                "id": 15,
+                "params": {
+                  "callId": "call-15"
+                }
               }
             ]
           }
@@ -61,27 +119,96 @@
           "patches": [
             {
               "op": "add",
+              "path": ["requests", 0],
+              "value": {
+                "method": "item/commandExecution/requestApproval",
+                "id": 21,
+                "params": {
+                  "callId": "call-21",
+                  "command": "echo patched",
+                  "cwd": "/workspace"
+                }
+              }
+            },
+            {
+              "op": "add",
               "path": ["requests", 1],
               "value": {
+                "method": "item/fileChange/requestApproval",
+                "id": 22,
+                "params": {
+                  "callId": "call-22",
+                  "path": "AGENTS.md"
+                }
+              }
+            },
+            {
+              "op": "add",
+              "path": ["requests", 2],
+              "value": {
                 "method": "item/tool/requestUserInput",
-                "id": 10,
+                "id": 23,
                 "params": {
                   "threadId": "thread-compatibility",
-                  "turnId": "turn-1",
-                  "itemId": "item-1",
+                  "turnId": "turn-2",
+                  "itemId": "item-2",
                   "questions": [
                     {
-                      "id": "question-1",
-                      "header": "Scope",
-                      "question": "Proceed?",
+                      "id": "question-2",
+                      "header": "Decision",
+                      "question": "Continue?",
                       "options": [
                         {
-                          "label": "Yes",
-                          "description": "Continue"
+                          "label": "Continue",
+                          "description": "Keep processing"
                         }
-                      ]
+                      ],
+                      "isOther": false,
+                      "isSecret": false
                     }
                   ]
+                }
+              }
+            },
+            {
+              "op": "add",
+              "path": ["requests", 3],
+              "value": {
+                "method": "item/tool/call",
+                "id": 24,
+                "params": {
+                  "toolName": "fetch"
+                }
+              }
+            },
+            {
+              "op": "add",
+              "path": ["requests", 4],
+              "value": {
+                "method": "account/chatgptAuthTokens/refresh",
+                "id": 25,
+                "params": {}
+              }
+            },
+            {
+              "op": "add",
+              "path": ["requests", 5],
+              "value": {
+                "method": "applyPatchApproval",
+                "id": 26,
+                "params": {
+                  "callId": "call-26"
+                }
+              }
+            },
+            {
+              "op": "add",
+              "path": ["requests", 6],
+              "value": {
+                "method": "execCommandApproval",
+                "id": 27,
+                "params": {
+                  "callId": "call-27"
                 }
               }
             }

@@ -3,7 +3,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { JsonValueSchema, parseThreadStreamStateChangedBroadcast } from "../Source/Index.js";
+import {
+  JsonValueSchema,
+  parseThreadStreamStateChangedBroadcast,
+  ThreadConversationRequestMethodValues,
+} from "../Source/Index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,9 +27,11 @@ const CompatibilityFixtureEnvelopeSchema = z
   .strict();
 const RequestPatchValueMethodSchema = z
   .object({
-    method: z.string().trim().min(1),
+    method: z.enum(ThreadConversationRequestMethodValues),
   })
   .passthrough();
+
+const EXPECTED_REQUEST_METHODS = ThreadConversationRequestMethodValues;
 
 function readFixtureEvents(): z.infer<typeof CompatibilityFixtureEnvelopeSchema>["events"] {
   const fixtureText = fs.readFileSync(compatibilityFixtureFilePath, "utf8");
@@ -78,7 +84,9 @@ describe("codex-protocol thread stream compatibility replay", () => {
       return patchMethods;
     });
 
-    expect(requestMethodsFromSnapshots).toContain("item/commandExecution/requestApproval");
-    expect(requestMethodsFromPatches).toContain("item/tool/requestUserInput");
+    for (const expectedMethod of EXPECTED_REQUEST_METHODS) {
+      expect(requestMethodsFromSnapshots).toContain(expectedMethod);
+      expect(requestMethodsFromPatches).toContain(expectedMethod);
+    }
   });
 });
