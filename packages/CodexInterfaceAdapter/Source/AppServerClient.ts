@@ -9,66 +9,36 @@ import {
   AppServerListThreadsResponseSchema,
   type AppServerReadThreadResponse,
   AppServerReadThreadResponseSchema,
-  AppServerSendUserMessageRequestSchema,
   AppServerSendUserMessageResponseSchema,
-  AppServerStartThreadRequestSchema,
   type AppServerStartThreadResponse,
   AppServerStartThreadResponseSchema,
   AppServerThreadListItemSchema,
-  type JsonValue,
-  ProtocolValidationError,
 } from "@farfield/protocol";
 import { z } from "zod";
+import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
+import {
+  APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT,
+  buildArchiveThreadRequest,
+  buildListThreadsAllPageOptions,
+  buildListThreadsRequestParameters,
+  buildReadConfigRequestParameters,
+  buildReadThreadRequestParameters,
+  buildResumeThreadRequest,
+  buildSendUserMessageRequest,
+  buildStartThreadRequest,
+  buildUnarchiveThreadRequest,
+  resolveReadThreadRequestTimeoutMilliseconds,
+} from "./AppServerClientRequestBuilders.js";
+import {
+  APP_SERVER_CLIENT_RESPONSE_CONTEXTS,
+  parseAppServerResponse,
+} from "./AppServerClientResponseParser.js";
 import {
   type AppServerTransport,
   ChildProcessAppServerTransport,
   type ChildProcessAppServerTransportOptions,
   isChildProcessAppServerTransportOptions,
 } from "./AppServerTransport.js";
-
-const AppServerMethod = {
-  listThreads: "thread/list",
-  readThread: "thread/read",
-  listModels: "model/list",
-  listCollaborationModes: "collaborationMode/list",
-  readConfig: "config/read",
-  startThread: "thread/start",
-  sendUserMessage: "sendUserMessage",
-  resumeThread: "thread/resume",
-  archiveThread: "thread/archive",
-  unarchiveThread: "thread/unarchive",
-} as const;
-
-const AppServerResponseContext = {
-  listThreads: "AppServerListThreadsResponse",
-  readThread: "AppServerReadThreadResponse",
-  listModels: "AppServerListModelsResponse",
-  listCollaborationModes: "AppServerCollaborationModeListResponse",
-  readConfig: "AppServerConfigReadResponse",
-  startThread: "AppServerStartThreadResponse",
-  sendUserMessage: "AppServerSendUserMessageResponse",
-  resumeThread: "AppServerResumeThreadResponse",
-  archiveThread: "AppServerArchiveThreadResponse",
-  unarchiveThread: "AppServerUnarchiveThreadResponse",
-} as const;
-
-const DEFAULT_LIST_MODELS_LIMIT = 100;
-const DEFAULT_READ_CONFIG_INCLUDE_LAYERS = false;
-const DEFAULT_RESUME_THREAD_PERSIST_EXTENDED_HISTORY = true;
-// Reading turns can include full conversation history and is expected to take longer than lightweight reads.
-const READ_THREAD_WITH_TURNS_TIMEOUT_MS = 90_000;
-
-function parseWithSchema<SchemaType extends z.ZodTypeAny>(
-  schema: SchemaType,
-  value: JsonValue,
-  context: string,
-): z.infer<SchemaType> {
-  const parsed = schema.safeParse(value);
-  if (!parsed.success) {
-    throw ProtocolValidationError.fromZod(context, parsed.error);
-  }
-  return parsed.data;
-}
 
 export interface ListThreadsOptions {
   limit: number;
@@ -105,56 +75,7 @@ export interface ResumeThreadOptions {
   persistExtendedHistory?: boolean;
 }
 
-interface ListThreadsRequestParameters {
-  limit: number;
-  archived: boolean;
-  cursor: string | null;
-  sortKey?: "created_at" | "updated_at";
-  cwd?: string;
-}
-
-function buildListThreadsRequestParameters(
-  options: Pick<ListThreadsOptions, "limit" | "archived" | "cursor" | "sortKey" | "cwd">,
-): ListThreadsRequestParameters {
-  return {
-    limit: options.limit,
-    archived: options.archived,
-    cursor: options.cursor ?? null,
-    ...(options.sortKey !== undefined ? { sortKey: options.sortKey } : {}),
-    ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
-  };
-}
-
-function buildListThreadsAllPageOptions(
-  options: ListThreadsAllOptions,
-  cursor: string | undefined,
-): ListThreadsOptions {
-  return {
-    limit: options.limit,
-    archived: options.archived,
-    ...(cursor !== undefined ? { cursor } : {}),
-    ...(options.sortKey !== undefined ? { sortKey: options.sortKey } : {}),
-    ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
-  };
-}
-
-const AppServerResumeThreadRequestSchema = z
-  .object({
-    threadId: z.string().min(1),
-    persistExtendedHistory: z.boolean(),
-  })
-  .passthrough();
-const AppServerArchiveThreadRequestSchema = z
-  .object({
-    threadId: z.string().min(1),
-  })
-  .passthrough();
 const AppServerArchiveThreadResponseSchema = z.object({}).passthrough();
-const AppServerUnarchiveThreadRequestSchema = z
-  .object({
-    threadId: z.string().min(1),
-  })
-  .passthrough();
 const AppServerUnarchiveThreadResponseSchema = z
   .object({
     thread: AppServerThreadListItemSchema,
@@ -185,14 +106,14 @@ export class AppServerClient {
 
   public async listThreads(options: ListThreadsOptions): Promise<AppServerListThreadsResponse> {
     const result = await this.transport.request(
-      AppServerMethod.listThreads,
+      APP_SERVER_CLIENT_METHODS.listThreads,
       buildListThreadsRequestParameters(options),
     );
 
-    return parseWithSchema(
+    return parseAppServerResponse(
       AppServerListThreadsResponseSchema,
       result,
-      AppServerResponseContext.listThreads,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listThreads,
     );
   }
 
@@ -236,81 +157,74 @@ export class AppServerClient {
     threadId: string,
     includeTurns = true,
   ): Promise<AppServerReadThreadResponse> {
-    const timeoutMilliseconds = includeTurns ? READ_THREAD_WITH_TURNS_TIMEOUT_MS : undefined;
+    const timeoutMilliseconds = resolveReadThreadRequestTimeoutMilliseconds(includeTurns);
     const result = await this.transport.request(
-      AppServerMethod.readThread,
-      {
-        threadId,
-        includeTurns,
-      },
+      APP_SERVER_CLIENT_METHODS.readThread,
+      buildReadThreadRequestParameters(threadId, includeTurns),
       timeoutMilliseconds,
     );
 
-    return parseWithSchema(
+    return parseAppServerResponse(
       AppServerReadThreadResponseSchema,
       result,
-      AppServerResponseContext.readThread,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readThread,
     );
   }
 
-  public async listModels(limit = DEFAULT_LIST_MODELS_LIMIT): Promise<AppServerListModelsResponse> {
-    const result = await this.transport.request(AppServerMethod.listModels, {
+  public async listModels(
+    limit = APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT,
+  ): Promise<AppServerListModelsResponse> {
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.listModels, {
       limit,
     });
-    return parseWithSchema(
+    return parseAppServerResponse(
       AppServerListModelsResponseSchema,
       result,
-      AppServerResponseContext.listModels,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listModels,
     );
   }
 
   public async listCollaborationModes(): Promise<AppServerCollaborationModeListResponse> {
-    const result = await this.transport.request(AppServerMethod.listCollaborationModes, {});
-    return parseWithSchema(
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.listCollaborationModes,
+      {},
+    );
+    return parseAppServerResponse(
       AppServerCollaborationModeListResponseSchema,
       result,
-      AppServerResponseContext.listCollaborationModes,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listCollaborationModes,
     );
   }
 
   public async readConfig(options?: ReadConfigOptions): Promise<AppServerConfigReadResponse> {
-    const result = await this.transport.request(AppServerMethod.readConfig, {
-      includeLayers: options?.includeLayers ?? DEFAULT_READ_CONFIG_INCLUDE_LAYERS,
-    });
-    return parseWithSchema(
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.readConfig,
+      buildReadConfigRequestParameters(options),
+    );
+    return parseAppServerResponse(
       AppServerConfigReadResponseSchema,
       result,
-      AppServerResponseContext.readConfig,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readConfig,
     );
   }
 
   public async startThread(options: StartThreadOptions): Promise<AppServerStartThreadResponse> {
-    const request = AppServerStartThreadRequestSchema.parse(options);
-    const result = await this.transport.request(AppServerMethod.startThread, request);
-    return parseWithSchema(
+    const request = buildStartThreadRequest(options);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.startThread, request);
+    return parseAppServerResponse(
       AppServerStartThreadResponseSchema,
       result,
-      AppServerResponseContext.startThread,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.startThread,
     );
   }
 
   public async sendUserMessage(threadId: string, text: string): Promise<void> {
-    const request = AppServerSendUserMessageRequestSchema.parse({
-      conversationId: threadId,
-      items: [
-        {
-          type: "text",
-          data: {
-            text,
-          },
-        },
-      ],
-    });
-    const result = await this.transport.request(AppServerMethod.sendUserMessage, request);
-    parseWithSchema(
+    const request = buildSendUserMessageRequest(threadId, text);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.sendUserMessage, request);
+    parseAppServerResponse(
       AppServerSendUserMessageResponseSchema,
       result,
-      AppServerResponseContext.sendUserMessage,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.sendUserMessage,
     );
   }
 
@@ -318,40 +232,32 @@ export class AppServerClient {
     threadId: string,
     options?: ResumeThreadOptions,
   ): Promise<AppServerReadThreadResponse> {
-    const request = AppServerResumeThreadRequestSchema.parse({
-      threadId,
-      persistExtendedHistory:
-        options?.persistExtendedHistory ?? DEFAULT_RESUME_THREAD_PERSIST_EXTENDED_HISTORY,
-    });
-    const result = await this.transport.request(AppServerMethod.resumeThread, request);
-    return parseWithSchema(
+    const request = buildResumeThreadRequest(threadId, options);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.resumeThread, request);
+    return parseAppServerResponse(
       AppServerReadThreadResponseSchema,
       result,
-      AppServerResponseContext.resumeThread,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.resumeThread,
     );
   }
 
   public async archiveThread(threadId: string): Promise<void> {
-    const request = AppServerArchiveThreadRequestSchema.parse({
-      threadId,
-    });
-    const result = await this.transport.request(AppServerMethod.archiveThread, request);
-    parseWithSchema(
+    const request = buildArchiveThreadRequest(threadId);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.archiveThread, request);
+    parseAppServerResponse(
       AppServerArchiveThreadResponseSchema,
       result,
-      AppServerResponseContext.archiveThread,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.archiveThread,
     );
   }
 
   public async unarchiveThread(threadId: string): Promise<AppServerStartThreadResponse["thread"]> {
-    const request = AppServerUnarchiveThreadRequestSchema.parse({
-      threadId,
-    });
-    const result = await this.transport.request(AppServerMethod.unarchiveThread, request);
-    const parsed = parseWithSchema(
+    const request = buildUnarchiveThreadRequest(threadId);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.unarchiveThread, request);
+    const parsed = parseAppServerResponse(
       AppServerUnarchiveThreadResponseSchema,
       result,
-      AppServerResponseContext.unarchiveThread,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.unarchiveThread,
     );
     return parsed.thread;
   }

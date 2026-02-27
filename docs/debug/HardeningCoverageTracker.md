@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 02:57:21Z
+Last Updated (UTC): 2026-02-27 03:18:30Z
 
 ## Scope Model
 
@@ -193,6 +193,22 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-16)
+
+The current in-progress wave applies package-layer owner separation for Codex app-server client orchestration:
+
+1. Split app-server RPC method literal ownership into `AppServerClientMethodConstants`.
+2. Split request/default/request-timeout ownership into `AppServerClientRequestBuilders`.
+3. Split response schema parse/context ownership into `AppServerClientResponseParser`.
+4. Reduced `AppServerClient` to request/response orchestration over these owner modules while preserving the public API and method signatures.
+
+Files touched in this continuation segment:
+
+1. `packages/CodexInterfaceAdapter/Source/AppServerClient.ts`
+2. `packages/CodexInterfaceAdapter/Source/AppServerClientMethodConstants.ts`
+3. `packages/CodexInterfaceAdapter/Source/AppServerClientRequestBuilders.ts`
+4. `packages/CodexInterfaceAdapter/Source/AppServerClientResponseParser.ts`
 
 ## Latest Continuation Commit Wave (Current-15)
 

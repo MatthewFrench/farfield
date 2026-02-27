@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-27 02:57:21Z
+Last Updated (UTC): 2026-02-27 03:18:30Z
 
 ## Purpose
 
@@ -150,6 +150,14 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 8. [`IpcErrorMessageFormatter.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/IpcErrorMessageFormatter.ts)
    - owns: deterministic transport/runtime error value message formatting.
    - query APIs: `formatIpcErrorMessage`.
+9. [`AppServerClientMethodConstants.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerClientMethodConstants.ts)
+   - owns: app-server client RPC method literal contracts.
+10. [`AppServerClientRequestBuilders.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerClientRequestBuilders.ts)
+   - owns: app-server client request payload/default construction and request-side Zod parsing.
+   - query APIs: `buildListThreadsRequestParameters`, `buildListThreadsAllPageOptions`, `buildReadThreadRequestParameters`, `resolveReadThreadRequestTimeoutMilliseconds`, `buildReadConfigRequestParameters`, `buildStartThreadRequest`, `buildSendUserMessageRequest`, `buildResumeThreadRequest`, `buildArchiveThreadRequest`, `buildUnarchiveThreadRequest`.
+11. [`AppServerClientResponseParser.ts`](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerClientResponseParser.ts)
+   - owns: app-server response parse context labels and protocol-validation error mapping ownership.
+   - query APIs: `parseAppServerResponse`.
 
 ## Boundary Rules to Enforce in Reviews
 
