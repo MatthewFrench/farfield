@@ -72,9 +72,9 @@ jobs:
           grep -nE "\\{\\{SITE_ADDRESS\\}\\}" operations/caddy/Caddyfile.local.template
           grep -nE "\\{\\{DOMAIN_HOST\\}\\}" operations/caddy/Caddyfile.domain.template
           grep -nE "^https://.+\\{$" operations/caddy/Caddyfile.local
-          grep -nE "header_up X-Farfield-Token \\{env.API_TOKEN\\}" operations/caddy/Caddyfile.local
+          grep -nE "header_up X-Farfield-Token \\{farfield_api_token\\}" operations/caddy/Caddyfile.local
           grep -nE "^[-*.A-Za-z0-9]+(:[0-9]+)? \\{$" operations/caddy/Caddyfile.domain
-          grep -nE "header_up X-Farfield-Token \\{env.API_TOKEN\\}" operations/caddy/Caddyfile.domain
+          grep -nE "header_up X-Farfield-Token \\{farfield_api_token\\}" operations/caddy/Caddyfile.domain
 
       - name: Verify env autoload helper
         run: node scripts/tooling/with-env.mjs "node -e \"if (!process.env.API_TOKEN) { process.exit(1); }\""
