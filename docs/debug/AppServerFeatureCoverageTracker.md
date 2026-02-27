@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 06:26:16Z
+Last Updated (UTC): 2026-02-27 07:07:10Z
 
 ## Purpose
 
@@ -54,6 +54,16 @@ As of the upstream snapshot above:
 3. Effective request-method usage including transport-owned `initialize`: `11 / 74` (`14.9%`).
 4. Farfield does not currently consume app-server notification streams directly.
 5. Farfield does not currently implement app-server server-request handling.
+
+## Canonical Coverage Artifacts
+
+1. Full request-method decision ledger: `docs/debug/AppServerRequestMethodDecisionLedger.md`
+2. Full event-surface decision ledger: `docs/debug/AppServerEventSurfaceDecisionLedger.md`
+3. Upstream request-method snapshot: `docs/debug/AppServerUpstreamClientRequestMethods.snapshot.txt`
+4. Farfield request-method snapshot: `docs/debug/AppServerFarfieldClientRequestMethods.snapshot.txt`
+5. Drift-governance script: `scripts/tooling/validate-app-server-method-drift-governance.mjs`
+6. Drift-governance tests: `scripts/Tests/ValidateAppServerMethodDriftGovernance.test.ts`
+7. CI entrypoint: `package.json` script `ci:targeted:governance`
 
 ## Intersection: Features and Idiomatic Usage
 
@@ -350,11 +360,11 @@ Research-validated automation design:
 4. Fail CI when upstream list changes and snapshot is not intentionally updated.
 5. Emit deterministic diff output (`added`, `removed`, counts) for review.
 
-Recommended tracked artifacts:
+Implemented tracked artifacts:
 
 1. `docs/debug/AppServerUpstreamClientRequestMethods.snapshot.txt`
 2. `docs/debug/AppServerFarfieldClientRequestMethods.snapshot.txt`
-3. `scripts/verify-app-server-method-drift.sh` (or TypeScript equivalent)
+3. `scripts/tooling/validate-app-server-method-drift-governance.mjs`
 
 ## Research Backlog Status
 
@@ -363,7 +373,7 @@ Recommended tracked artifacts:
 | `APP-SERVER-RESEARCH-001` | Build authoritative upstream method inventory from external source and pin snapshot | Completed |
 | `APP-SERVER-RESEARCH-002` | Map each non-intersection method to product decision (`not needed now`, `planned`, `deprecated`) | Completed |
 | `APP-SERVER-RESEARCH-003` | Evaluate migration from legacy `sendUserMessage` path to current upstream turn lifecycle methods | Completed (research); implementation remains |
-| `APP-SERVER-RESEARCH-004` | Add automated drift check against upstream method inventory | Completed (research design); implementation remains |
+| `APP-SERVER-RESEARCH-004` | Add automated drift check against upstream method inventory | Completed |
 
 ## Current Conclusion
 
