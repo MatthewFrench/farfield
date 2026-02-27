@@ -106,6 +106,7 @@ Mandatory rules:
 68. Stream-owner tests must include large-state small-delta scenarios to prevent regressions that scale work by total state size.
 69. Data-model tests must assert explicit boundary-payload to internal-owner-model mapping stability when payloads include passthrough or extra fields.
 70. Performance-sensitive unit tests must prefer deterministic side-effect counters over wall-clock timing assertions; duration budgets belong in integration and smoke performance tests.
+71. In frontend code, avoid deleting and recreating UI elements when an in-place state update can preserve identity and behavior; prefer owner-managed state transitions over remount-style replacement.
 
 Before finalizing a change, agents must confirm:
 
@@ -148,6 +149,7 @@ Before finalizing a change, agents must confirm:
 37. Hot-path deterministic side-effect budget tests exist (parse, serialize, and log calls are bounded).
 38. Large-state small-delta regression tests exist for modified high-frequency stream or subscription owners.
 39. Cursor replay/drop/resync tests exist and assert deterministic reset signaling and merge behavior.
+40. Frontend updates preserve element identity where possible and avoid unnecessary delete/recreate remount patterns.
 
 ## Runtime Safety, Complexity, and Maintainability Playbook
 
