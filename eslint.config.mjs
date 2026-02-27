@@ -25,10 +25,38 @@ const webDataAccessBoundaryImportPatterns = [
     message: "User-interface modules must consume owner/state APIs instead of application data-access modules."
   }
 ];
+const webDomainModelBoundaryImportPatterns = [
+  {
+    group: ["@/Features/*/DataAccess/*"],
+    message: "Domain-model modules must not depend on feature data-access modules."
+  },
+  {
+    group: ["@/Application/DataAccess/*"],
+    message: "Domain-model modules must not depend on application data-access modules."
+  },
+  {
+    group: ["@/Application/StateManagement/*"],
+    message: "Domain-model modules must not depend on application state owners."
+  },
+  {
+    group: ["@/Features/*/StateManagement/*"],
+    message: "Domain-model modules must not depend on feature state owners."
+  }
+];
 const serverNetworkRouteApplicationImportPattern = {
   group: ["**/Application/**"],
   message: "Network route modules must not import application composition or state owners."
 };
+const serverAgentBoundaryImportPatterns = [
+  {
+    group: ["**/Network/**"],
+    message: "Agent owners must not depend on server network ingress or route modules."
+  },
+  {
+    group: ["**/Application/**"],
+    message: "Agent owners must not depend on server application bootstrap/composition modules."
+  }
+];
 const serverNetworkApplicationImportPattern = {
   group: ["**/Application/**"],
   message: "Network modules must depend on explicit network contracts instead of application owners."
@@ -374,6 +402,39 @@ export default tseslint.config(
             noInternalIndexBarrelImportPattern,
             webTransportBoundaryImportPattern,
             ...webDataAccessBoundaryImportPatterns
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: [
+      "apps/WebApplication/Source/Features/**/DomainModel/**/*.ts",
+      "apps/WebApplication/Source/Features/**/DomainModel/**/*.tsx"
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            noInternalIndexBarrelImportPattern,
+            ...webDomainModelBoundaryImportPatterns
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: [
+      "apps/ServerApplication/Source/Agents/**/*.ts"
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            noInternalIndexBarrelImportPattern,
+            ...serverAgentBoundaryImportPatterns
           ]
         }
       ]

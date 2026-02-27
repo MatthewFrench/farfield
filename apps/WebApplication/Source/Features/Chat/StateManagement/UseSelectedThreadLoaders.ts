@@ -1,5 +1,4 @@
 import {
-  startTransition,
   useCallback,
   useRef,
   type Dispatch,
@@ -22,6 +21,9 @@ import {
   type ChatStreamEventsResponse
 } from "../DataAccess/ChatServerClient";
 import { ConversationSyncSignatureBuilder } from "../DomainModel/ConversationSyncSignatureBuilder";
+import {
+  resolveReadCapabilitiesForThread
+} from "../DomainModel/SelectedThreadReadCapabilitiesResolver";
 import { ReadThreadStateMerger } from "./ReadThreadStateMerger";
 import {
   SelectedThreadDataRefreshCoordinator
@@ -30,33 +32,26 @@ import {
   SelectedThreadRefreshConcurrencyCoordinator,
   type SelectedThreadRefreshRequest
 } from "./SelectedThreadRefreshConcurrencyCoordinator";
+import {
+  type ApplySelectedThreadStreamDeltaInput as SelectedThreadStreamDeltaInput,
+  SelectedThreadSnapshotStateOwner,
+  type SelectedThreadSnapshotStateOwnerDependencies
+} from "./SelectedThreadSnapshotStateOwner";
 
 export interface LoadSelectedThreadOptions {
   includeTurns?: boolean;
   includeReadThread?: boolean;
 }
 
-export interface ApplySelectedThreadStreamDeltaInput {
-  threadId: string;
-  liveStateSnapshot: LiveStateResponse;
-  streamEventsSnapshot: StreamEventsResponse;
-  streamEventsSinceSequenceUsed: number | null;
-}
-
-interface ApplySnapshotsToStateInput {
-  threadId: string;
-  liveStateSnapshot: LiveStateResponse;
-  streamEventsSnapshot: StreamEventsResponse;
-  streamEventsSinceSequenceUsed: number | null;
-  readThreadSnapshot: ReadThreadResponse | null;
-  includeTurnsUsedForRead: boolean;
-}
+export type ApplySelectedThreadStreamDeltaInput = SelectedThreadStreamDeltaInput;
 
 type LiveStateResponse = ChatLiveStateResponse;
 type StreamEventsResponse = ChatStreamEventsResponse;
 type ReadThreadResponse = ChatReadThreadResponse;
 type AgentDescriptor = CapabilityAgentsResponse["agents"][number];
 type Thread = ThreadListItem;
+
+const DEFAULT_INCLUDE_READ_THREAD = true;
 
 export interface UseSelectedThreadLoadersInput {
   threads: Thread[];
@@ -86,94 +81,50 @@ export interface SelectedThreadLoaders {
   applySelectedThreadStreamDelta: (input: ApplySelectedThreadStreamDeltaInput) => void;
 }
 
-// Bounds client-owned stream history to avoid unbounded growth during long-lived sessions.
-const STREAM_EVENT_RETENTION_LIMIT = 400;
-const DEFAULT_STREAM_READ_CAPABLE_AGENT_ID: AgentId = "codex";
-const DEFAULT_INCLUDE_READ_THREAD = true;
+function createSnapshotStateOwnerDependencies(
+  input: UseSelectedThreadLoadersInput
+): SelectedThreadSnapshotStateOwnerDependencies {
+  return {
+    appDefaultModel: input.appDefaultModel,
+    appDefaultReasoningEffort: input.appDefaultReasoningEffort,
+    selectedThreadIdRef: input.selectedThreadIdRef,
+    pendingThreadMaterializationCoordinator: input.pendingThreadMaterializationCoordinator,
+    conversationSyncSignatureBuilder: input.conversationSyncSignatureBuilder,
+    readThreadStateMerger: input.readThreadStateMerger,
+    setLiveState: input.setLiveState,
+    setReadThreadState: input.setReadThreadState,
+    setStreamEvents: input.setStreamEvents
+  };
+}
 
+function resolveIncludeTurnsForThreadRead(
+  includeTurns: boolean | undefined,
+  threadId: string,
+  pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator
+): boolean {
+  return includeTurns ?? !pendingThreadMaterializationCoordinator.isPending(threadId);
+}
+
+function resolveIncludeReadThreadForThreadRead(includeReadThread: boolean | undefined): boolean {
+  return includeReadThread ?? DEFAULT_INCLUDE_READ_THREAD;
+}
+
+/**
+ * Thin composition hook for selected-thread loading orchestration.
+ * Mutable state updates and cursor tracking are owned by SelectedThreadSnapshotStateOwner.
+ */
 export function useSelectedThreadLoaders(
   input: UseSelectedThreadLoadersInput
 ): SelectedThreadLoaders {
-  // Tracks the per-thread stream cursor so readStreamEvents can request only unseen events.
-  const nextStreamSequenceByThreadIdReference = useRef<Map<string, number>>(new Map());
-
-  const applySnapshotsToState = useCallback((snapshotInput: ApplySnapshotsToStateInput) => {
-    const containsAnyTurns = hasTurnsInSelectedThreadSnapshots(
-      snapshotInput.liveStateSnapshot,
-      snapshotInput.readThreadSnapshot
+  const snapshotStateOwnerReference = useRef<SelectedThreadSnapshotStateOwner | null>(null);
+  if (snapshotStateOwnerReference.current === null) {
+    snapshotStateOwnerReference.current = new SelectedThreadSnapshotStateOwner(
+      createSnapshotStateOwnerDependencies(input)
     );
-    if (containsAnyTurns) {
-      input.pendingThreadMaterializationCoordinator.clearPending(snapshotInput.threadId);
-    }
-
-    nextStreamSequenceByThreadIdReference.current.set(
-      snapshotInput.threadId,
-      snapshotInput.streamEventsSnapshot.nextSequence
-    );
-
-    startTransition(() => {
-      input.setLiveState((previousLiveState) => {
-        if (
-          input.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
-            previousLiveState,
-            input.appDefaultModel,
-            input.appDefaultReasoningEffort
-          )
-          === input.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
-            snapshotInput.liveStateSnapshot,
-            input.appDefaultModel,
-            input.appDefaultReasoningEffort
-          )
-        ) {
-          return previousLiveState;
-        }
-        return snapshotInput.liveStateSnapshot;
-      });
-
-      const readThreadSnapshot = snapshotInput.readThreadSnapshot;
-      if (readThreadSnapshot) {
-        input.setReadThreadState((previousReadThreadState) => {
-          const mergedReadThread = input.readThreadStateMerger.merge<ReadThreadResponse>({
-            previous: previousReadThreadState,
-            incoming: readThreadSnapshot,
-            includeTurns: snapshotInput.includeTurnsUsedForRead
-          });
-
-          if (
-            input.conversationSyncSignatureBuilder.buildReadThreadSyncSignature(
-              previousReadThreadState,
-              input.appDefaultModel,
-              input.appDefaultReasoningEffort
-            )
-            === input.conversationSyncSignatureBuilder.buildReadThreadSyncSignature(
-              mergedReadThread,
-              input.appDefaultModel,
-              input.appDefaultReasoningEffort
-            )
-          ) {
-            return previousReadThreadState;
-          }
-
-          return mergedReadThread;
-        });
-      }
-
-      input.setStreamEvents((previousStreamEvents) => resolveNextStreamEventsState({
-        previousStreamEvents,
-        streamEventsSnapshot: snapshotInput.streamEventsSnapshot,
-        streamEventsSinceSequenceUsed: snapshotInput.streamEventsSinceSequenceUsed
-      }));
-    });
-  }, [
-    input.appDefaultModel,
-    input.appDefaultReasoningEffort,
-    input.conversationSyncSignatureBuilder,
-    input.pendingThreadMaterializationCoordinator,
-    input.readThreadStateMerger,
-    input.setLiveState,
-    input.setReadThreadState,
-    input.setStreamEvents
-  ]);
+  } else {
+    snapshotStateOwnerReference.current.updateDependencies(createSnapshotStateOwnerDependencies(input));
+  }
+  const snapshotStateOwner = snapshotStateOwnerReference.current;
 
   const loadSelectedThread = useCallback(async (
     threadId: string,
@@ -192,28 +143,26 @@ export function useSelectedThreadLoaders(
       selectedAgentId: input.selectedAgentId,
       agentsById: input.agentsById
     });
-    const canReadLiveState = readCapabilities.canReadLiveState;
-    const canReadStreamEvents = readCapabilities.canReadStreamEvents;
-    const streamEventsSinceSequence = canReadStreamEvents
-      ? (nextStreamSequenceByThreadIdReference.current.get(threadId) ?? null)
+    const streamEventsSinceSequence = readCapabilities.canReadStreamEvents
+      ? snapshotStateOwner.readNextStreamSequence(threadId)
       : null;
 
     const snapshot = await input.selectedThreadDataRefreshCoordinator.readSnapshot({
       threadId,
       includeTurns,
       includeReadThread,
-      canReadLiveState,
-      canReadStreamEvents,
+      canReadLiveState: readCapabilities.canReadLiveState,
+      canReadStreamEvents: readCapabilities.canReadStreamEvents,
       streamEventsSinceSequence,
       chatClient: input.chatServerClient,
       ...(signal ? { signal } : {})
     });
 
-    if (shouldSkipSelectedThreadSnapshotApply(threadId, input.selectedThreadIdRef, signal)) {
+    if (snapshotStateOwner.shouldSkipSnapshotApply(threadId, signal)) {
       return;
     }
 
-    applySnapshotsToState({
+    snapshotStateOwner.applySnapshots({
       threadId,
       liveStateSnapshot: snapshot.liveStateSnapshot,
       streamEventsSnapshot: snapshot.streamEventsSnapshot,
@@ -222,14 +171,13 @@ export function useSelectedThreadLoaders(
       includeTurnsUsedForRead: snapshot.includeTurnsUsedForRead
     });
   }, [
-    applySnapshotsToState,
     input.agentsById,
     input.chatServerClient,
     input.pendingThreadMaterializationCoordinator,
     input.selectedAgentId,
     input.selectedThreadDataRefreshCoordinator,
-    input.selectedThreadIdRef,
-    input.threads
+    input.threads,
+    snapshotStateOwner
   ]);
 
   const loadSelectedThreadTracked = useCallback(async (threadId: string, options?: LoadSelectedThreadOptions) => {
@@ -264,121 +212,12 @@ export function useSelectedThreadLoaders(
   ]);
 
   const applySelectedThreadStreamDelta = useCallback((streamDeltaInput: ApplySelectedThreadStreamDeltaInput) => {
-    if (input.selectedThreadIdRef.current !== streamDeltaInput.threadId) {
-      return;
-    }
-
-    applySnapshotsToState({
-      threadId: streamDeltaInput.threadId,
-      liveStateSnapshot: streamDeltaInput.liveStateSnapshot,
-      streamEventsSnapshot: streamDeltaInput.streamEventsSnapshot,
-      streamEventsSinceSequenceUsed: streamDeltaInput.streamEventsSinceSequenceUsed,
-      readThreadSnapshot: null,
-      includeTurnsUsedForRead: false
-    });
-  }, [
-    applySnapshotsToState,
-    input.selectedThreadIdRef
-  ]);
+    snapshotStateOwner.applySelectedThreadStreamDelta(streamDeltaInput);
+  }, [snapshotStateOwner]);
 
   return {
     loadSelectedThread,
     loadSelectedThreadTracked,
     applySelectedThreadStreamDelta
-  };
-}
-
-interface ResolveNextStreamEventsStateInput {
-  previousStreamEvents: StreamEventsResponse["events"];
-  streamEventsSnapshot: StreamEventsResponse;
-  streamEventsSinceSequenceUsed: number | null;
-}
-
-function resolveNextStreamEventsState(input: ResolveNextStreamEventsStateInput): StreamEventsResponse["events"] {
-  if (input.streamEventsSnapshot.resetRequired) {
-    if (matchesStreamEventTail(input.previousStreamEvents, input.streamEventsSnapshot.events)) {
-      return input.previousStreamEvents;
-    }
-    return input.streamEventsSnapshot.events;
-  }
-
-  if (input.streamEventsSinceSequenceUsed !== null) {
-    if (input.streamEventsSnapshot.events.length === 0) {
-      return input.previousStreamEvents;
-    }
-
-    // Cursor-scoped reads include only unseen events, so append order is deterministic.
-    const mergedEvents = input.previousStreamEvents.concat(input.streamEventsSnapshot.events);
-    return mergedEvents.length > STREAM_EVENT_RETENTION_LIMIT
-      ? mergedEvents.slice(-STREAM_EVENT_RETENTION_LIMIT)
-      : mergedEvents;
-  }
-
-  if (matchesStreamEventTail(input.previousStreamEvents, input.streamEventsSnapshot.events)) {
-    return input.previousStreamEvents;
-  }
-  return input.streamEventsSnapshot.events;
-}
-
-function matchesStreamEventTail(previousEvents: StreamEventsResponse["events"], nextEvents: StreamEventsResponse["events"]): boolean {
-  const previousLastEvent = previousEvents[previousEvents.length - 1];
-  const nextLastEvent = nextEvents[nextEvents.length - 1];
-  const previousLastSignature = previousLastEvent ? JSON.stringify(previousLastEvent) : "";
-  const nextLastSignature = nextLastEvent ? JSON.stringify(nextLastEvent) : "";
-  // Deliberately coarse guard: when lengths and trailing signatures match, treat snapshots as equivalent.
-  return previousEvents.length === nextEvents.length && previousLastSignature === nextLastSignature;
-}
-
-function hasTurnsInSelectedThreadSnapshots(
-  liveStateSnapshot: LiveStateResponse,
-  readThreadSnapshot: ReadThreadResponse | null
-): boolean {
-  return (
-    (liveStateSnapshot.conversationState?.turns.length ?? 0) > 0
-    || (readThreadSnapshot?.thread.turns.length ?? 0) > 0
-  );
-}
-
-function resolveIncludeTurnsForThreadRead(
-  includeTurns: boolean | undefined,
-  threadId: string,
-  pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator
-): boolean {
-  return includeTurns ?? !pendingThreadMaterializationCoordinator.isPending(threadId);
-}
-
-function resolveIncludeReadThreadForThreadRead(includeReadThread: boolean | undefined): boolean {
-  return includeReadThread ?? DEFAULT_INCLUDE_READ_THREAD;
-}
-
-function shouldSkipSelectedThreadSnapshotApply(
-  threadId: string,
-  selectedThreadIdRef: MutableRefObject<string | null>,
-  signal?: AbortSignal
-): boolean {
-  return Boolean(signal?.aborted) || selectedThreadIdRef.current !== threadId;
-}
-
-interface ReadCapabilities {
-  canReadLiveState: boolean;
-  canReadStreamEvents: boolean;
-}
-
-interface ResolveReadCapabilitiesInput {
-  threadId: string;
-  threads: Thread[];
-  selectedAgentId: AgentId;
-  agentsById: Partial<Record<AgentId, AgentDescriptor>>;
-}
-
-function resolveReadCapabilitiesForThread(input: ResolveReadCapabilitiesInput): ReadCapabilities {
-  const thread = input.threads.find((entry) => entry.id === input.threadId) ?? null;
-  const threadAgentId = thread?.agentId ?? input.selectedAgentId;
-  const descriptor = input.agentsById[threadAgentId];
-  const defaultReadCapability = threadAgentId === DEFAULT_STREAM_READ_CAPABLE_AGENT_ID;
-
-  return {
-    canReadLiveState: descriptor?.capabilities.canReadLiveState ?? defaultReadCapability,
-    canReadStreamEvents: descriptor?.capabilities.canReadStreamEvents ?? defaultReadCapability
   };
 }

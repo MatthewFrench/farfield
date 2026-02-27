@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-26 23:33:07Z
+Last Updated (UTC): 2026-02-26 23:57:44Z
 
 ## Scope Model
 
@@ -14,7 +14,9 @@ Last Updated (UTC): 2026-02-26 23:33:07Z
    - [Subagent Prompt Index](/Users/matthewfrench/GitHub/farfield/docs/debug/SubagentPrompts/Index.md)
 2. Shared context:
    - [Shared Context Prompt](/Users/matthewfrench/GitHub/farfield/docs/debug/SubagentPrompts/SharedContextPrompt.md)
-3. Layer prompts:
+3. Owner API registry:
+   - [Owner API Boundary Registry](/Users/matthewfrench/GitHub/farfield/docs/debug/OwnerApiBoundaryRegistry.md)
+4. Layer prompts:
    - [Group Layer Prompt](/Users/matthewfrench/GitHub/farfield/docs/debug/SubagentPrompts/GroupLayerPrompt.md)
    - [Folder Layer Prompt](/Users/matthewfrench/GitHub/farfield/docs/debug/SubagentPrompts/FolderLayerPrompt.md)
    - [Concern Layer Prompt](/Users/matthewfrench/GitHub/farfield/docs/debug/SubagentPrompts/ConcernLayerPrompt.md)
@@ -191,6 +193,16 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-3)
+
+The current in-progress wave applies ownership separation and API boundary hardening for agents and web feature state orchestration:
+
+1. OpenCode adapter split into explicit owners for directory normalization/cache ownership, cursor contract parsing, and thread list pagination ownership.
+2. Selected-thread loader hook reduced to composition; snapshot mutation and stream cursor ownership moved to a dedicated state owner.
+3. Feature domain logic split into explicit resolvers for read-capability resolution and stream-event merge policy.
+4. Added focused tests for cursor contract parsing and new web domain resolvers.
+5. Added owner boundary registry doc for group-level owner API governance.
 
 ## Latest Continuation Commit Wave
 
