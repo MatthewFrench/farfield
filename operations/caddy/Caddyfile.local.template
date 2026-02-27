@@ -1,16 +1,39 @@
 {{SITE_ADDRESS}} {
   tls internal
 
-  @api path /api/*
-  reverse_proxy @api 127.0.0.1:4311 {
-    header_up X-Farfield-Token {env.API_TOKEN}
+  map "{env.API_TOKEN}" {farfield_api_token} {
+    default "{env.API_TOKEN}"
+    "" "{env.PUSH_API_TOKEN}"
   }
 
-  @events path /events
-  reverse_proxy @events 127.0.0.1:4311 {
-    header_up X-Farfield-Token {env.API_TOKEN}
+  @trusted_api {
+    path /api/*
+    expression `{http.request.header.Origin} == "" || {http.request.header.Origin} == "https://" + {http.request.host} || {http.request.header.Origin} == "http://" + {http.request.host}`
+  }
+  reverse_proxy @trusted_api 127.0.0.1:4311 {
+    header_up X-Farfield-Token {farfield_api_token}
+  }
+
+  @untrusted_api {
+    path /api/*
+    not expression `{http.request.header.Origin} == "" || {http.request.header.Origin} == "https://" + {http.request.host} || {http.request.header.Origin} == "http://" + {http.request.host}`
+  }
+  respond @untrusted_api 403
+
+  @trusted_events {
+    path /events
+    expression `{http.request.header.Origin} == "" || {http.request.header.Origin} == "https://" + {http.request.host} || {http.request.header.Origin} == "http://" + {http.request.host}`
+  }
+  reverse_proxy @trusted_events 127.0.0.1:4311 {
+    header_up X-Farfield-Token {farfield_api_token}
     flush_interval -1
   }
+
+  @untrusted_events {
+    path /events
+    not expression `{http.request.header.Origin} == "" || {http.request.header.Origin} == "https://" + {http.request.host} || {http.request.header.Origin} == "http://" + {http.request.host}`
+  }
+  respond @untrusted_events 403
 
   @healthz path /healthz
   reverse_proxy @healthz 127.0.0.1:4311

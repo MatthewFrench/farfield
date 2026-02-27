@@ -127,8 +127,8 @@ const inheritedEnvironment = buildInheritedEnvironment(process.env);
 const child = spawn(commandText, {
   cwd,
   env: {
-    ...loadedEnvironment,
-    ...inheritedEnvironment
+    ...inheritedEnvironment,
+    ...loadedEnvironment
   },
   shell: true,
   stdio: "inherit"

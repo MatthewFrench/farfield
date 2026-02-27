@@ -108,6 +108,22 @@ describe("RequestPathContracts", () => {
     expect(malformedResult.status).toBe(RequestUrlPathnameParseStatusByName.malformedRequestUrl);
   });
 
+  it("parses request urls when runtime host is an IPv6 literal", () => {
+    const resolvedResult = parseRequestUrlPathname({
+      requestUrl: "/api/health",
+      host: "::1",
+      port: 4311,
+    });
+
+    expect(resolvedResult.status).toBe(RequestUrlPathnameParseStatusByName.resolved);
+    if (resolvedResult.status !== RequestUrlPathnameParseStatusByName.resolved) {
+      throw new Error("Expected IPv6 host path parsing to resolve");
+    }
+
+    expect(resolvedResult.pathname).toBe("/api/health");
+    expect(resolvedResult.url.pathname).toBe("/api/health");
+  });
+
   it("parses absolute request urls into deterministic normalized route segments", () => {
     const resolvedAbsoluteResult = parseRequestUrlPathname({
       requestUrl: "https://example.test/api/debug/history/entry_1?limit=5#fragment",

@@ -252,6 +252,48 @@ describe("EventStreamRefreshDecisionEngine", () => {
     expect(decision.threadStreamDelta?.threadId).toBe("thread-1");
   });
 
+  it("refreshes core state for thread-stream deltas from non-selected threads", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "chat",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 5,
+        event: {
+          type: "thread-stream-delta",
+          delta: {
+            threadId: "thread-2",
+            liveStateSnapshot: {
+              ok: true,
+              threadId: "thread-2",
+              ownerClientId: "client-a",
+              conversationState: null,
+              liveStateError: null,
+            },
+            streamEventsSnapshot: {
+              ok: true,
+              threadId: "thread-2",
+              ownerClientId: "client-a",
+              events: [],
+              nextSequence: 11,
+              firstAvailableSequence: 2,
+              resetRequired: false,
+            },
+            streamEventsSinceSequenceUsed: 10,
+          },
+        },
+      }),
+    });
+
+    expect(decision).toEqual({
+      refreshCore: true,
+      refreshHistory: false,
+      refreshSelectedThread: false,
+      threadStreamDelta: null,
+    });
+  });
+
   it("refreshes core when event payload is invalid", () => {
     const engine = createEngine();
 

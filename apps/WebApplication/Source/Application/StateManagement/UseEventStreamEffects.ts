@@ -56,6 +56,7 @@ function shouldRefreshDebugWorkspace(
 export interface UseEventStreamEffectsInput {
   debugHistoryLimit: number;
   debugErrorListLimit: number;
+  ensureApiSessionBootstrapped: () => Promise<boolean>;
   eventRefreshScheduler: EventRefreshScheduler;
   eventStreamConnectionCoordinator: EventStreamConnectionCoordinator;
   eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionEngine;
@@ -79,105 +80,128 @@ export interface UseEventStreamEffectsInput {
 
 export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
   useEffect(() => {
-    input.eventStreamConnectionCoordinator.start({
-      eventRefreshScheduler: input.eventRefreshScheduler,
-      eventStreamRefreshDecisionEngine: input.eventStreamRefreshDecisionEngine,
-      readSnapshot: () => ({
-        activeTab: input.activeTabRef.current,
-        selectedThreadId: input.selectedThreadIdRef.current,
-      }),
-      executeScheduledRefresh: async (flags) => {
-        if (!isScheduledRefreshDocumentVisible()) {
+    let shouldStopConnectionStart = false;
+    const startEventStreamConnection = async (): Promise<void> => {
+      try {
+        const hasApiSession = await input.ensureApiSessionBootstrapped();
+        if (!hasApiSession || shouldStopConnectionStart) {
           return;
         }
 
-        try {
-          // Freeze mutable refs once so each scheduled refresh run applies one consistent snapshot.
-          const scheduledRefreshSnapshot = readScheduledRefreshExecutionSnapshot(
-            input.activeTabRef,
-            input.selectedThreadIdRef,
-          );
-          const loadCoreDataFunction = input.loadCoreDataTrackedRef.current;
-          const loadSelectedThreadFunction = input.loadSelectedThreadRef.current;
-          const refreshOperations: Array<Promise<void>> = [];
-
-          if (flags.refreshCore) {
-            if (loadCoreDataFunction) {
-              refreshOperations.push(loadCoreDataFunction());
+        input.eventStreamConnectionCoordinator.start({
+          eventRefreshScheduler: input.eventRefreshScheduler,
+          eventStreamRefreshDecisionEngine: input.eventStreamRefreshDecisionEngine,
+          readSnapshot: () => ({
+            activeTab: input.activeTabRef.current,
+            selectedThreadId: input.selectedThreadIdRef.current,
+          }),
+          executeScheduledRefresh: async (flags) => {
+            if (!isScheduledRefreshDocumentVisible()) {
+              return;
             }
-          } else if (shouldRefreshDebugWorkspace(flags, scheduledRefreshSnapshot.activeTab)) {
-            const debugWorkspaceSnapshot = await input.debugWorkspaceDataReader.readSnapshot(
-              input.debugHistoryLimit,
-              input.debugErrorListLimit,
-            );
 
-            startTransition(() => {
-              input.setHistory((previousHistory) =>
-                input.debugWorkspaceStateStore.readNextHistory(
-                  previousHistory,
-                  debugWorkspaceSnapshot.history,
-                ),
+            try {
+              // Freeze mutable refs once so each scheduled refresh run applies one consistent snapshot.
+              const scheduledRefreshSnapshot = readScheduledRefreshExecutionSnapshot(
+                input.activeTabRef,
+                input.selectedThreadIdRef,
               );
+              const loadCoreDataFunction = input.loadCoreDataTrackedRef.current;
+              const loadSelectedThreadFunction = input.loadSelectedThreadRef.current;
+              const refreshOperations: Array<Promise<void>> = [];
 
-              if (
-                input.debugWorkspaceStateStore.shouldApplyDebugErrors(
-                  input.debugErrorsSignatureRef.current,
-                  debugWorkspaceSnapshot.debugErrorsSignature,
-                )
-              ) {
-                const debugErrorsSignatureRef = input.debugErrorsSignatureRef;
-                debugErrorsSignatureRef.current = debugWorkspaceSnapshot.debugErrorsSignature;
-                input.setDebugErrors(debugWorkspaceSnapshot.debugErrors);
+              if (flags.refreshCore) {
+                if (loadCoreDataFunction) {
+                  refreshOperations.push(loadCoreDataFunction());
+                }
+              } else if (shouldRefreshDebugWorkspace(flags, scheduledRefreshSnapshot.activeTab)) {
+                const debugWorkspaceSnapshot = await input.debugWorkspaceDataReader.readSnapshot(
+                  input.debugHistoryLimit,
+                  input.debugErrorListLimit,
+                );
+
+                startTransition(() => {
+                  input.setHistory((previousHistory) =>
+                    input.debugWorkspaceStateStore.readNextHistory(
+                      previousHistory,
+                      debugWorkspaceSnapshot.history,
+                    ),
+                  );
+
+                  if (
+                    input.debugWorkspaceStateStore.shouldApplyDebugErrors(
+                      input.debugErrorsSignatureRef.current,
+                      debugWorkspaceSnapshot.debugErrorsSignature,
+                    )
+                  ) {
+                    const debugErrorsSignatureRef = input.debugErrorsSignatureRef;
+                    debugErrorsSignatureRef.current = debugWorkspaceSnapshot.debugErrorsSignature;
+                    input.setDebugErrors(debugWorkspaceSnapshot.debugErrors);
+                  }
+
+                  input.setDebugErrorSessionId(debugWorkspaceSnapshot.debugErrorSessionId);
+                  input.setDebugErrorSessionLogPath(
+                    debugWorkspaceSnapshot.debugErrorSessionLogPath,
+                  );
+                });
               }
 
-              input.setDebugErrorSessionId(debugWorkspaceSnapshot.debugErrorSessionId);
-              input.setDebugErrorSessionLogPath(debugWorkspaceSnapshot.debugErrorSessionLogPath);
+              if (
+                flags.refreshSelectedThread &&
+                scheduledRefreshSnapshot.selectedThreadId !== null &&
+                scheduledRefreshSnapshot.selectedThreadId.length > 0 &&
+                loadSelectedThreadFunction
+              ) {
+                refreshOperations.push(
+                  loadSelectedThreadFunction(
+                    scheduledRefreshSnapshot.selectedThreadId,
+                    SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS,
+                  ),
+                );
+              }
+
+              if (refreshOperations.length > 0) {
+                await Promise.all(refreshOperations);
+              }
+            } catch (error) {
+              if (error instanceof Error && isRequestCanceledError(error)) {
+                return;
+              }
+              input.handleRuntimeRequestError(error);
+            }
+          },
+          applyThreadStreamDelta: (threadStreamDelta) => {
+            input.applySelectedThreadStreamDelta({
+              threadId: threadStreamDelta.threadId,
+              liveStateSnapshot: threadStreamDelta.liveStateSnapshot,
+              streamEventsSnapshot: threadStreamDelta.streamEventsSnapshot,
+              streamEventsSinceSequenceUsed: threadStreamDelta.streamEventsSinceSequenceUsed,
             });
-          }
-
-          if (
-            flags.refreshSelectedThread &&
-            scheduledRefreshSnapshot.selectedThreadId !== null &&
-            scheduledRefreshSnapshot.selectedThreadId.length > 0 &&
-            loadSelectedThreadFunction
-          ) {
-            refreshOperations.push(
-              loadSelectedThreadFunction(
-                scheduledRefreshSnapshot.selectedThreadId,
-                SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS,
-              ),
-            );
-          }
-
-          if (refreshOperations.length > 0) {
-            await Promise.all(refreshOperations);
-          }
-        } catch (error) {
-          if (error instanceof Error && isRequestCanceledError(error)) {
-            return;
-          }
-          input.handleRuntimeRequestError(error);
-        }
-      },
-      applyThreadStreamDelta: (threadStreamDelta) => {
-        input.applySelectedThreadStreamDelta({
-          threadId: threadStreamDelta.threadId,
-          liveStateSnapshot: threadStreamDelta.liveStateSnapshot,
-          streamEventsSnapshot: threadStreamDelta.streamEventsSnapshot,
-          streamEventsSinceSequenceUsed: threadStreamDelta.streamEventsSinceSequenceUsed,
+          },
+          onConnectionStatusChange: (connected) => {
+            const eventsConnectedRef = input.eventsConnectedRef;
+            eventsConnectedRef.current = connected;
+          },
         });
-      },
-      onConnectionStatusChange: (connected) => {
-        const eventsConnectedRef = input.eventsConnectedRef;
-        eventsConnectedRef.current = connected;
-      },
-    });
+      } catch (error) {
+        if (shouldStopConnectionStart) {
+          return;
+        }
+        if (error instanceof Error && isRequestCanceledError(error)) {
+          return;
+        }
+        input.handleRuntimeRequestError(error);
+      }
+    };
+    void startEventStreamConnection();
 
     return () => {
+      shouldStopConnectionStart = true;
       input.eventStreamConnectionCoordinator.stop();
     };
   }, [
     input.activeTabRef,
+    input.ensureApiSessionBootstrapped,
     input.debugErrorListLimit,
     input.debugErrorsSignatureRef,
     input.debugHistoryLimit,

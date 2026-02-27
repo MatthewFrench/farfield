@@ -167,6 +167,7 @@ export function buildEventStreamEffectsInput(
   return {
     debugHistoryLimit: input.debugHistoryLimit,
     debugErrorListLimit: input.debugErrorListLimit,
+    ensureApiSessionBootstrapped: runtimeRequestHandlers.ensureApiSessionBootstrapped,
     eventRefreshScheduler: applicationOwnerDependencies.eventRefreshScheduler,
     eventStreamConnectionCoordinator: applicationOwnerDependencies.eventStreamConnectionCoordinator,
     eventStreamRefreshDecisionEngine: applicationOwnerDependencies.eventStreamRefreshDecisionEngine,

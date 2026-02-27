@@ -102,4 +102,44 @@ describe("EventRefreshScheduler", () => {
 
     expect(executedRefreshCount).toBe(0);
   });
+
+  it("keeps the first scheduled timer window while merging later refresh flags", async () => {
+    vi.useFakeTimers();
+    const scheduler = new EventRefreshScheduler(REFRESH_DELAY_MS);
+    const executedRefreshFlags: EventRefreshFlags[] = [];
+
+    scheduler.enqueueRefresh(
+      createRefreshFlags({
+        refreshCore: true,
+        refreshHistory: false,
+        refreshSelectedThread: false,
+      }),
+      async (refreshFlags) => {
+        executedRefreshFlags.push(refreshFlags);
+      },
+    );
+
+    await vi.advanceTimersByTimeAsync(REFRESH_DELAY_MS / 2);
+
+    scheduler.enqueueRefresh(
+      createRefreshFlags({
+        refreshCore: false,
+        refreshHistory: true,
+        refreshSelectedThread: false,
+      }),
+      async (refreshFlags) => {
+        executedRefreshFlags.push(refreshFlags);
+      },
+    );
+
+    await vi.advanceTimersByTimeAsync(REFRESH_DELAY_MS / 2);
+
+    expect(executedRefreshFlags).toEqual([
+      createRefreshFlags({
+        refreshCore: true,
+        refreshHistory: true,
+        refreshSelectedThread: false,
+      }),
+    ]);
+  });
 });

@@ -61,7 +61,10 @@ export class EventRefreshScheduler {
       return;
     }
 
-    this.clearRefreshTimer();
+    if (this.refreshTimer !== null) {
+      return;
+    }
+
     this.refreshTimer = window.setTimeout(() => {
       this.refreshTimer = null;
       const nextRefreshFlags = this.pendingRefreshFlags;

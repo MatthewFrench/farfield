@@ -108,6 +108,84 @@ describe("CompletionDetector", () => {
     expect(candidate).toBeNull();
   });
 
+  it("detects the most recent completed turn even when the latest turn is still running", () => {
+    const detector = new CompletionDetector(new Map());
+    const state = parseThreadConversationState({
+      id: "thread_1",
+      turns: [
+        {
+          turnId: "turn_1",
+          status: "completed",
+          items: [
+            {
+              id: "item_agent_1",
+              type: "agentMessage",
+              text: "done",
+            },
+          ],
+        },
+        {
+          turnId: "turn_2",
+          status: "in_progress",
+          items: [
+            {
+              id: "item_agent_2",
+              type: "agentMessage",
+              text: "working",
+            },
+          ],
+        },
+      ],
+      requests: [],
+    });
+
+    const candidate = detector.detect("thread_1", state);
+    expect(candidate?.turnId).toBe("turn_1");
+    expect(candidate?.agentMessageId).toBe("item_agent_1");
+  });
+
+  it("does not emit older completed turns when the newest completed turn is already committed", () => {
+    const detector = new CompletionDetector(
+      new Map([["thread_1", "thread_1:turn_2:item_agent_2"]]),
+    );
+    const state = parseThreadConversationState({
+      id: "thread_1",
+      turns: [
+        {
+          turnId: "turn_1",
+          status: "completed",
+          items: [
+            {
+              id: "item_agent_1",
+              type: "agentMessage",
+              text: "older",
+            },
+          ],
+        },
+        {
+          turnId: "turn_2",
+          status: "completed",
+          items: [
+            {
+              id: "item_agent_2",
+              type: "agentMessage",
+              text: "newer",
+            },
+          ],
+        },
+        {
+          turnId: "turn_3",
+          status: "in_progress",
+          items: [],
+        },
+      ],
+      requests: [],
+    });
+
+    const candidate = detector.detect("thread_1", state);
+    expect(candidate).toBeNull();
+  });
+
   it("accepts completed status values regardless of case", () => {
     const detector = new CompletionDetector(new Map());
     const state = parseThreadConversationState({

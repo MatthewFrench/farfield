@@ -95,6 +95,8 @@ export class EventStreamRefreshDecisionEngine {
           parseResult.data.event.delta.threadId === input.selectedThreadId
         ) {
           threadStreamDelta = parseResult.data.event.delta;
+        } else {
+          refreshCore = true;
         }
       }
     } catch {

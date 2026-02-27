@@ -26,7 +26,10 @@ export interface ClientErrorSessionMetadata {
 export function resolveApiTokenFromEnvironment(env: NodeJS.ProcessEnv): string {
   const apiTokenValue = readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.apiToken);
   if (apiTokenValue !== null) {
-    return apiTokenValue.trim();
+    const normalizedApiTokenValue = apiTokenValue.trim();
+    if (normalizedApiTokenValue.length > 0) {
+      return normalizedApiTokenValue;
+    }
   }
 
   return readTrimmedEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.pushApiToken);

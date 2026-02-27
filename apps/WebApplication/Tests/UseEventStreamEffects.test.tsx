@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, waitFor } from "@testing-library/react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -171,6 +171,7 @@ function createBaseInput(
   return {
     debugHistoryLimit: DEBUG_HISTORY_LIMIT,
     debugErrorListLimit: DEBUG_ERROR_LIST_LIMIT,
+    ensureApiSessionBootstrapped: vi.fn(async () => true),
     eventRefreshScheduler: new EventRefreshScheduler(IMMEDIATE_EVENT_REFRESH_DELAY_MILLISECONDS),
     eventStreamConnectionCoordinator,
     eventStreamRefreshDecisionEngine: new EventStreamRefreshDecisionEngine(["history"]),
@@ -193,9 +194,12 @@ function createBaseInput(
   };
 }
 
-function readStartInputOrThrow(
+async function readStartInputOrThrow(
   eventStreamConnectionCoordinator: TestEventStreamConnectionCoordinator,
-): EventStreamConnectionCoordinatorStartInput {
+): Promise<EventStreamConnectionCoordinatorStartInput> {
+  await waitFor(() => {
+    expect(eventStreamConnectionCoordinator.startInput).not.toBeNull();
+  });
   if (!eventStreamConnectionCoordinator.startInput) {
     throw new Error("Expected event-stream start input");
   }
@@ -252,7 +256,7 @@ describe("useEventStreamEffects", () => {
     }
   });
 
-  it("wires lifecycle start/stop through the event-stream connection coordinator", () => {
+  it("wires lifecycle start/stop through the event-stream connection coordinator", async () => {
     const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
     const input = createBaseInput(
       eventStreamConnectionCoordinator,
@@ -261,7 +265,7 @@ describe("useEventStreamEffects", () => {
 
     const { unmount } = render(<Harness input={input} />);
 
-    expect(eventStreamConnectionCoordinator.startInput).not.toBeNull();
+    await readStartInputOrThrow(eventStreamConnectionCoordinator);
     unmount();
     expect(eventStreamConnectionCoordinator.stopCallCount).toBe(1);
   });
@@ -276,7 +280,7 @@ describe("useEventStreamEffects", () => {
     );
     render(<Harness input={input} />);
 
-    const startInput = readStartInputOrThrow(eventStreamConnectionCoordinator);
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
     await startInput.executeScheduledRefresh(CORE_AND_SELECTED_THREAD_REFRESH_FLAGS);
 
     expect(input.loadCoreDataTrackedRef.current).not.toHaveBeenCalled();
@@ -293,7 +297,7 @@ describe("useEventStreamEffects", () => {
     );
     render(<Harness input={input} />);
 
-    const startInput = readStartInputOrThrow(eventStreamConnectionCoordinator);
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
     await startInput.executeScheduledRefresh(SELECTED_THREAD_ONLY_REFRESH_FLAGS);
 
     expect(input.loadSelectedThreadRef.current).toHaveBeenCalledTimes(1);
@@ -318,7 +322,7 @@ describe("useEventStreamEffects", () => {
     input.selectedThreadIdRef = selectedThreadReadCountRefResult.selectedThreadIdRef;
     render(<Harness input={input} />);
 
-    const startInput = readStartInputOrThrow(eventStreamConnectionCoordinator);
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
     await startInput.executeScheduledRefresh(SELECTED_THREAD_ONLY_REFRESH_FLAGS);
 
     expect(selectedThreadReadCountRefResult.selectedThreadIdReadCountRef.current).toBe(1);
@@ -337,7 +341,7 @@ describe("useEventStreamEffects", () => {
     input.activeTabRef.current = "debug";
     render(<Harness input={input} />);
 
-    const startInput = readStartInputOrThrow(eventStreamConnectionCoordinator);
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
     await startInput.executeScheduledRefresh(DEBUG_HISTORY_ONLY_REFRESH_FLAGS);
 
     expect(debugWorkspaceDataReader.readSnapshotCallCount).toBe(1);
@@ -363,7 +367,7 @@ describe("useEventStreamEffects", () => {
     input.activeTabRef.current = "debug";
     render(<Harness input={input} />);
 
-    const startInput = readStartInputOrThrow(eventStreamConnectionCoordinator);
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
     await startInput.executeScheduledRefresh(CORE_AND_HISTORY_REFRESH_FLAGS);
 
     expect(input.loadCoreDataTrackedRef.current).toHaveBeenCalledTimes(1);
@@ -383,9 +387,27 @@ describe("useEventStreamEffects", () => {
     });
     render(<Harness input={input} />);
 
-    const startInput = readStartInputOrThrow(eventStreamConnectionCoordinator);
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
     await startInput.executeScheduledRefresh(CORE_ONLY_REFRESH_FLAGS);
 
+    expect(input.handleRuntimeRequestError).not.toHaveBeenCalled();
+  });
+
+  it("delays event-stream startup when API session bootstrap does not report readiness", async () => {
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    input.ensureApiSessionBootstrapped = vi.fn(async () => false);
+
+    render(<Harness input={input} />);
+
+    await waitFor(() => {
+      expect(input.ensureApiSessionBootstrapped).toHaveBeenCalledTimes(1);
+    });
+
+    expect(eventStreamConnectionCoordinator.startInput).toBeNull();
     expect(input.handleRuntimeRequestError).not.toHaveBeenCalled();
   });
 });

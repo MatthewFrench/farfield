@@ -54,7 +54,7 @@ if (pushEnabled) {
 if (!loopbackHosts.has(host)) {
   check(
     "API token",
-    true,
+    apiToken.length > 0,
     apiToken.length > 0
       ? "present"
       : "missing (recommended for non-loopback HOST; set API_TOKEN to enforce /api auth)"

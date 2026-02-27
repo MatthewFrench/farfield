@@ -31,14 +31,21 @@ function isAgentMessageItem(item: ThreadItem): item is AgentMessageTurnItem {
   return item.type === "agentMessage";
 }
 
-function readLastTurn(conversationState: ThreadConversationState): ThreadTurn | null {
-  const turnCount = conversationState.turns.length;
-  if (turnCount === 0) {
-    return null;
+function readMostRecentCompletedTurn(
+  conversationState: ThreadConversationState,
+): ThreadTurn | null {
+  for (let index = conversationState.turns.length - 1; index >= 0; index -= 1) {
+    const turn = conversationState.turns[index];
+    if (!turn) {
+      continue;
+    }
+    if (!isCompletedStatus(turn.status)) {
+      continue;
+    }
+    return turn;
   }
 
-  const lastTurn = conversationState.turns[turnCount - 1];
-  return lastTurn ?? null;
+  return null;
 }
 
 function readCompletionTurnId(turn: ThreadTurn): string | null {
@@ -77,21 +84,17 @@ export class CompletionDetector {
       return null;
     }
 
-    const lastTurn = readLastTurn(conversationState);
-    if (!lastTurn) {
+    const mostRecentCompletedTurn = readMostRecentCompletedTurn(conversationState);
+    if (!mostRecentCompletedTurn) {
       return null;
     }
 
-    if (!isCompletedStatus(lastTurn.status)) {
-      return null;
-    }
-
-    const turnId = readCompletionTurnId(lastTurn);
+    const turnId = readCompletionTurnId(mostRecentCompletedTurn);
     if (turnId === null || turnId.length === 0) {
       return null;
     }
 
-    const lastAgentMessage = readLastAgentMessage(lastTurn);
+    const lastAgentMessage = readLastAgentMessage(mostRecentCompletedTurn);
     if (!lastAgentMessage) {
       return null;
     }

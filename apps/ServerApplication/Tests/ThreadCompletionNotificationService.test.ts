@@ -120,6 +120,64 @@ class FailingPushService extends PushService {
   }
 }
 
+class GateablePushService extends PushService {
+  private resolveSendStarted: (() => void) | null = null;
+  private readonly sendStartedPromise: Promise<void>;
+  private resolveSendRelease: (() => void) | null = null;
+  private readonly sendReleasePromise: Promise<void>;
+
+  public constructor() {
+    super({
+      enabled: false,
+      vapidPublicKey: "",
+      vapidPrivateKey: "",
+      vapidSubject: "",
+    });
+
+    this.sendStartedPromise = new Promise<void>((resolve) => {
+      this.resolveSendStarted = resolve;
+    });
+    this.sendReleasePromise = new Promise<void>((resolve) => {
+      this.resolveSendRelease = resolve;
+    });
+  }
+
+  public override isEnabled(): boolean {
+    return true;
+  }
+
+  public async waitForSendStarted(): Promise<void> {
+    await this.sendStartedPromise;
+  }
+
+  public releaseSend(): void {
+    this.resolveSendRelease?.();
+  }
+
+  public override async sendToSubscriptions(
+    subscriptions: StoredPushSubscription[],
+    _payload: PushNotificationPayload,
+  ): Promise<{
+    attempted: number;
+    delivered: number;
+    failures: Array<{
+      endpoint: string;
+      statusCode: number | null;
+      message: string;
+    }>;
+    prunedEndpoints: string[];
+  }> {
+    this.resolveSendStarted?.();
+    await this.sendReleasePromise;
+    return {
+      attempted: subscriptions.length,
+      delivered: subscriptions.length,
+      failures: [],
+      prunedEndpoints: [],
+    };
+  }
+}
+
 const PushCompletionFailureLogSchema = z
   .object({
     threadId: z.string(),
@@ -484,5 +542,77 @@ describe("ThreadCompletionNotificationService", () => {
 
     expect(pushStore.getCompletionWatermark("thread_no_delivery")).toBeNull();
     expect(pushSystemEvents).toHaveLength(0);
+  });
+
+  it("does not hold thread-mutation exclusivity while push delivery is in flight", async () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const pushStore = new PushStore(path.join(temporaryDirectoryPath, "push-state.json"));
+    const pushSendStore = new PushSendStore(path.join(temporaryDirectoryPath, "push-send.json"));
+    pushStore.load();
+    pushSendStore.load();
+
+    await pushStore.upsertSubscription(
+      {
+        endpoint: "https://push.example.test/subscriptions/queued",
+        keys: {
+          p256dh: "queued_key",
+          auth: "queued_auth",
+        },
+      },
+      {
+        privateMode: false,
+      },
+    );
+
+    const threadConcurrencyCoordinator = new ThreadConcurrencyCoordinator();
+    const gateablePushService = new GateablePushService();
+    const service = new ThreadCompletionNotificationService({
+      readThreadLiveState: async () => ({
+        ownerClientId: null,
+        conversationState: parseThreadConversationState({
+          id: "thread_1",
+          turns: [
+            {
+              turnId: "turn_1",
+              status: "completed",
+              items: [
+                {
+                  id: "item_agent_1",
+                  type: "agentMessage",
+                  text: "done",
+                },
+              ],
+            },
+          ],
+          requests: [],
+        }),
+        liveStateError: null,
+      }),
+      threadConcurrencyCoordinator,
+      pushMutationConcurrencyCoordinator: new PushMutationConcurrencyCoordinator(),
+      ntfyNotifier: new NtfyNotifier({
+        enabled: false,
+        topic: null,
+        baseUrl: "https://ntfy.sh",
+        bearerToken: null,
+        priority: "3",
+      }),
+      pushService: gateablePushService,
+      pushStore,
+      pushSendStore,
+      pushSystem: () => {},
+    });
+
+    const completionCheckPromise = service.checkAndNotifyThreadCompletion("thread_1");
+    await gateablePushService.waitForSendStarted();
+
+    let mutationLaneExecuted = false;
+    await threadConcurrencyCoordinator.runExclusive("thread_1", async () => {
+      mutationLaneExecuted = true;
+    });
+
+    expect(mutationLaneExecuted).toBe(true);
+    gateablePushService.releaseSend();
+    await completionCheckPromise;
   });
 });

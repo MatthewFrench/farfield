@@ -11,6 +11,8 @@ const SpawnEnvironmentVariableSchema = z.string().min(1).optional();
 const AppServerSpawnEnvironmentShape = {
   HOME: SpawnEnvironmentVariableSchema,
   PATH: SpawnEnvironmentVariableSchema,
+  Path: SpawnEnvironmentVariableSchema,
+  PATHEXT: SpawnEnvironmentVariableSchema,
   SHELL: SpawnEnvironmentVariableSchema,
   USER: SpawnEnvironmentVariableSchema,
   USERNAME: SpawnEnvironmentVariableSchema,

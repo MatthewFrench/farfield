@@ -129,7 +129,7 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.apiAuthRequired).toBe(true);
   });
 
-  it("treats an explicitly empty API_TOKEN as authoritative over PUSH_API_TOKEN", () => {
+  it("treats an explicitly empty API_TOKEN as unset and falls back to PUSH_API_TOKEN", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
     const configuration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
@@ -137,8 +137,8 @@ describe("readServerRuntimeConfiguration", () => {
       PUSH_API_TOKEN: "secondary_token",
     });
 
-    expect(configuration.apiToken).toBe("");
-    expect(configuration.apiAuthRequired).toBe(false);
+    expect(configuration.apiToken).toBe("secondary_token");
+    expect(configuration.apiAuthRequired).toBe(true);
   });
 
   it("uses WEB_BUILD_ID nullish precedence before VITE_APP_BUILD_ID", () => {

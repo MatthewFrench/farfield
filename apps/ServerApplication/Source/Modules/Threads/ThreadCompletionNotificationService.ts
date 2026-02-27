@@ -92,6 +92,11 @@ interface CompletionDispatchTargets {
   subscriptions: StoredPushSubscription[];
 }
 
+interface CompletionDispatchPlan {
+  completionCandidate: CompletionCandidate;
+  context: CompletionNotificationContext;
+}
+
 interface NtfyCompletionDispatchResult {
   delivered: boolean;
   messageId: string | null;
@@ -161,27 +166,14 @@ export class ThreadCompletionNotificationService {
   }
 
   public async checkAndNotifyThreadCompletion(threadId: string): Promise<void> {
-    // Completion reads must share the same per-thread ownership lane as thread
-    // mutation routes to prevent notification checks from observing half-applied state.
-    await this.threadConcurrencyCoordinator.runExclusive(threadId, async () => {
-      await this.checkAndNotifyThreadCompletionUnderThreadLock(threadId);
-    });
-  }
-
-  private async checkAndNotifyThreadCompletionUnderThreadLock(threadId: string): Promise<void> {
-    const liveState = await this.readThreadLiveState(threadId);
-    if (liveState === null) {
-      return;
-    }
-
     try {
-      // Debounced scheduler reruns may re-check the same completion marker.
-      // CompletionDetector keeps this path idempotent until commit advances the marker.
-      const completionCandidate = this.completionDetector.detect(
+      // Completion reads must share the same per-thread ownership lane as thread
+      // mutation routes to prevent notification checks from observing half-applied state.
+      const completionDispatchPlan = await this.threadConcurrencyCoordinator.runExclusive(
         threadId,
-        liveState.conversationState,
+        async () => this.readCompletionDispatchPlanUnderThreadLock(threadId),
       );
-      if (!completionCandidate) {
+      if (completionDispatchPlan === null) {
         return;
       }
 
@@ -190,21 +182,19 @@ export class ThreadCompletionNotificationService {
         return;
       }
 
-      const context = this.readThreadNotificationContext(threadId, liveState.conversationState);
-
       const ntfyDispatchResult = dispatchTargets.hasNtfyTarget
         ? await this.publishNtfyCompletionNotification({
-            threadId,
-            completionCandidate,
-            context,
+            threadId: completionDispatchPlan.completionCandidate.threadId,
+            completionCandidate: completionDispatchPlan.completionCandidate,
+            context: completionDispatchPlan.context,
           })
         : NO_NTFY_COMPLETION_DISPATCH_RESULT;
 
       const webPushDispatchResult = dispatchTargets.hasWebPushTarget
         ? await this.dispatchWebPushCompletionNotifications({
-            threadId,
-            completionCandidate,
-            context,
+            threadId: completionDispatchPlan.completionCandidate.threadId,
+            completionCandidate: completionDispatchPlan.completionCandidate,
+            context: completionDispatchPlan.context,
             subscriptions: dispatchTargets.subscriptions,
           })
         : EMPTY_WEB_PUSH_COMPLETION_DISPATCH_RESULT;
@@ -221,11 +211,17 @@ export class ThreadCompletionNotificationService {
       }
 
       await this.pushMutationConcurrencyCoordinator.runExclusive(async () => {
-        await this.pushStore.setCompletionWatermark(threadId, completionCandidate.marker);
+        await this.pushStore.setCompletionWatermark(
+          completionDispatchPlan.completionCandidate.threadId,
+          completionDispatchPlan.completionCandidate.marker,
+        );
       });
-      this.completionDetector.commit(threadId, completionCandidate.marker);
+      this.completionDetector.commit(
+        completionDispatchPlan.completionCandidate.threadId,
+        completionDispatchPlan.completionCandidate.marker,
+      );
       this.pushSystem(THREAD_COMPLETION_PUSH_SYSTEM_OPERATION_NAME, {
-        threadId,
+        threadId: completionDispatchPlan.completionCandidate.threadId,
         ntfyDelivered: ntfyDispatchResult.delivered,
         ...(ntfyDispatchResult.messageId !== null
           ? { ntfyMessageId: ntfyDispatchResult.messageId }
@@ -243,6 +239,32 @@ export class ThreadCompletionNotificationService {
         CompletionNotificationLogEventName.completionNotificationCheckFailed,
       );
     }
+  }
+
+  private async readCompletionDispatchPlanUnderThreadLock(
+    threadId: string,
+  ): Promise<CompletionDispatchPlan | null> {
+    // Hold the per-thread lane only while reading deterministic completion state.
+    // Network delivery runs outside this lock to avoid blocking thread mutations.
+    const liveState = await this.readThreadLiveState(threadId);
+    if (liveState === null) {
+      return null;
+    }
+
+    // Debounced scheduler reruns may re-check the same completion marker.
+    // CompletionDetector keeps this path idempotent until commit advances the marker.
+    const completionCandidate = this.completionDetector.detect(
+      threadId,
+      liveState.conversationState,
+    );
+    if (!completionCandidate) {
+      return null;
+    }
+
+    return {
+      completionCandidate,
+      context: this.readThreadNotificationContext(threadId, liveState.conversationState),
+    };
   }
 
   private async readCompletionDispatchTargets(): Promise<CompletionDispatchTargets> {

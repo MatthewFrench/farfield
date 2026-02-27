@@ -7,6 +7,9 @@ const ROOT_ONLY_PATHNAME_PATTERN = /^\/+$/u;
 const REQUEST_BASE_URL_PROTOCOL = "http";
 const REQUEST_BASE_URL_PROTOCOL_SEPARATOR = "://";
 const REQUEST_BASE_URL_PORT_SEPARATOR = ":";
+const IPV6_HOST_SEGMENT_SEPARATOR = ":";
+const IPV6_HOST_BRACKET_PREFIX = "[";
+const IPV6_HOST_BRACKET_SUFFIX = "]";
 const REQUEST_PORT_MINIMUM = 0;
 const REQUEST_PORT_MAXIMUM = 65_535;
 
@@ -239,5 +242,18 @@ function readUrlFromRequestPathnameParseInput(input: RequestUrlPathnameParseInpu
 }
 
 function readRequestBaseUrl(host: string, port: number): string {
-  return `${REQUEST_BASE_URL_PROTOCOL}${REQUEST_BASE_URL_PROTOCOL_SEPARATOR}${host}${REQUEST_BASE_URL_PORT_SEPARATOR}${String(port)}`;
+  const requestBaseUrlHost = normalizeHostForRequestBaseUrl(host);
+  return `${REQUEST_BASE_URL_PROTOCOL}${REQUEST_BASE_URL_PROTOCOL_SEPARATOR}${requestBaseUrlHost}${REQUEST_BASE_URL_PORT_SEPARATOR}${String(port)}`;
+}
+
+function normalizeHostForRequestBaseUrl(host: string): string {
+  if (host.startsWith(IPV6_HOST_BRACKET_PREFIX) && host.endsWith(IPV6_HOST_BRACKET_SUFFIX)) {
+    return host;
+  }
+
+  if (host.includes(IPV6_HOST_SEGMENT_SEPARATOR)) {
+    return `${IPV6_HOST_BRACKET_PREFIX}${host}${IPV6_HOST_BRACKET_SUFFIX}`;
+  }
+
+  return host;
 }

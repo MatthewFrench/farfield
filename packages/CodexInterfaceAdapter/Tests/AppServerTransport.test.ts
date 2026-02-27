@@ -49,6 +49,24 @@ describe("buildAppServerSpawnEnvironment", () => {
     });
   });
 
+  it("preserves Windows Path/PATHEXT keys when PATH is not present", () => {
+    const environment = buildAppServerSpawnEnvironment({
+      baseEnvironment: {
+        Path: "C:\\Windows\\System32",
+        PATHEXT: ".COM;.EXE",
+      },
+      userAgent: "farfield-tests",
+      clientId: "client-2b",
+    });
+
+    expect(environment).toEqual({
+      Path: "C:\\Windows\\System32",
+      PATHEXT: ".COM;.EXE",
+      CODEX_USER_AGENT: "farfield-tests",
+      CODEX_CLIENT_ID: "client-2b",
+    });
+  });
+
   it("throws when overrides contain unapproved keys", () => {
     expect(() =>
       buildAppServerSpawnEnvironment({
