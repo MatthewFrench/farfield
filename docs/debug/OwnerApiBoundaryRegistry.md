@@ -1,6 +1,6 @@
 # Owner API Boundary Registry
 
-Last Updated (UTC): 2026-02-26 23:57:44Z
+Last Updated (UTC): 2026-02-27 01:29:34Z
 
 ## Purpose
 
@@ -40,6 +40,12 @@ Track explicit owner surfaces by group, the mutable state each owner controls, a
 2. [`ArchivedThreadLoader.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/ArchivedThreadLoader.ts)
    - owns: archived thread list hydration orchestration.
    - query APIs: `loadArchivedThreads`.
+
+## Web Application Data Access Group
+
+1. [`WebShellSessionBootstrapClient.ts`](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/DataAccess/WebShellSessionBootstrapClient.ts)
+   - owns: web-shell events session bootstrap transport calls for runtime and push composition owners.
+   - query APIs: `bootstrapWithRequestOptions`, `bootstrapWithApiToken`.
 
 ## Web Features Chat Group
 

@@ -120,6 +120,8 @@ export function useApplicationRuntimeComposition(
   const pushFeatureComposition = useApplicationPushFeatureComposition({
     apiSessionBootstrapCoordinator:
       input.applicationOwnerDependencies.apiSessionBootstrapCoordinator,
+    webShellSessionBootstrapClient:
+      input.applicationOwnerDependencies.webShellSessionBootstrapClient,
     apiSessionTokenDraft: input.applicationShellState.apiSessionTokenDraft,
     pushNotificationToolbarActionCoordinator:
       input.applicationOwnerDependencies.pushNotificationToolbarActionCoordinator,

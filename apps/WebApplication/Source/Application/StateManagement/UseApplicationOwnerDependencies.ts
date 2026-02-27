@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { WebShellSessionBootstrapClient } from "@/Application/DataAccess/WebShellSessionBootstrapClient";
 import { ApiAuthenticationErrorClassifier } from "@/Application/DomainModel/ApiAuthenticationErrorClassifier";
 import { DateValueFormatter } from "@/Application/DomainModel/DateValueFormatter";
 import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
@@ -72,6 +73,7 @@ export interface ApplicationOwnerDependencies<
   apiAuthenticationErrorClassifier: ApiAuthenticationErrorClassifier;
   dateValueFormatter: DateValueFormatter;
   capabilityServerClient: CapabilityServerClient;
+  webShellSessionBootstrapClient: WebShellSessionBootstrapClient;
   apiSessionBootstrapCoordinator: ApiSessionBootstrapCoordinator;
   coreDataRefreshConcurrencyCoordinator: CoreDataRefreshConcurrencyCoordinator;
   eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionEngine;
@@ -203,6 +205,7 @@ export function useApplicationOwnerDependencies<
   );
   const dateValueFormatter = useStableOwner(() => new DateValueFormatter());
   const capabilityServerClient = useStableOwner(() => new CapabilityServerClient());
+  const webShellSessionBootstrapClient = useStableOwner(() => new WebShellSessionBootstrapClient());
   const apiSessionBootstrapCoordinator = useStableOwner(() => new ApiSessionBootstrapCoordinator());
   const coreDataRefreshConcurrencyCoordinator = useStableOwner(
     () => new CoreDataRefreshConcurrencyCoordinator(),
@@ -332,6 +335,7 @@ export function useApplicationOwnerDependencies<
     apiAuthenticationErrorClassifier,
     dateValueFormatter,
     capabilityServerClient,
+    webShellSessionBootstrapClient,
     apiSessionBootstrapCoordinator,
     coreDataRefreshConcurrencyCoordinator,
     eventStreamRefreshDecisionEngine,

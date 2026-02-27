@@ -1,5 +1,5 @@
 import { type Dispatch, type SetStateAction, useCallback } from "react";
-import { bootstrapEventsSession } from "@/Application/DataAccess/WebShellApi";
+import { WebShellSessionBootstrapClient } from "@/Application/DataAccess/WebShellSessionBootstrapClient";
 import { ApiAuthenticationErrorClassifier } from "@/Application/DomainModel/ApiAuthenticationErrorClassifier";
 import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
 import { STARTUP_CRITICAL_EVENTS_SESSION_OPERATION } from "@/Application/StateManagement/CoreDataStartupRequestProfile";
@@ -80,6 +80,7 @@ function createRuntimeRequestErrorReportContract(
 export interface UseApplicationRuntimeRequestHandlersInput {
   trackedUserInterfaceErrorReporter: TrackedUserInterfaceErrorReporter;
   userInterfaceActionRequestBuilder: UserInterfaceActionRequestBuilder;
+  webShellSessionBootstrapClient: WebShellSessionBootstrapClient;
   apiAuthenticationErrorClassifier: ApiAuthenticationErrorClassifier;
   apiSessionBootstrapCoordinator: ApiSessionBootstrapCoordinator;
   requiresApiSessionToken: boolean;
@@ -156,7 +157,9 @@ export function useApplicationRuntimeRequestHandlers(
       const actionRequest = input.userInterfaceActionRequestBuilder.create(
         STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
       );
-      return bootstrapEventsSession(undefined, actionRequest.requestOptions);
+      return input.webShellSessionBootstrapClient.bootstrapWithRequestOptions(
+        actionRequest.requestOptions,
+      );
     });
 
     if (bootstrapDecision.isReady) {
@@ -181,6 +184,7 @@ export function useApplicationRuntimeRequestHandlers(
     input.apiSessionBootstrapErrorMessage.length,
     input.requiresApiSessionToken,
     input.userInterfaceActionRequestBuilder,
+    input.webShellSessionBootstrapClient,
     input.setApiSessionBootstrapErrorMessage,
     input.setRequiresApiSessionToken,
   ]);

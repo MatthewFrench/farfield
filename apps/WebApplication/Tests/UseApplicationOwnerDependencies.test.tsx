@@ -79,6 +79,9 @@ function expectSingletonOwnersStable(
   );
   expect(nextDependencies.dateValueFormatter).toBe(previousDependencies.dateValueFormatter);
   expect(nextDependencies.capabilityServerClient).toBe(previousDependencies.capabilityServerClient);
+  expect(nextDependencies.webShellSessionBootstrapClient).toBe(
+    previousDependencies.webShellSessionBootstrapClient,
+  );
   expect(nextDependencies.apiSessionBootstrapCoordinator).toBe(
     previousDependencies.apiSessionBootstrapCoordinator,
   );

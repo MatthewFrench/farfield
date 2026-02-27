@@ -1,6 +1,6 @@
 # Hardening Coverage Tracker
 
-Last Updated (UTC): 2026-02-27 01:23:55Z
+Last Updated (UTC): 2026-02-27 01:29:34Z
 
 ## Scope Model
 
@@ -193,6 +193,29 @@ Focus order for upcoming waves:
 5. `packages/CodexInterfaceAdapter` and `packages/OpenCodeInterfaceAdapter`
    - Confirm mapping and transport boundaries remain strict, deterministic, and contract-owned.
    - Validate options/cursor semantics remain explicit from caller contract to wire request.
+
+## Latest Continuation Commit Wave (Current-6)
+
+The current in-progress wave strengthens application-layer boundary ownership for web-shell session bootstrap:
+
+1. Introduced a dedicated data-access owner (`WebShellSessionBootstrapClient`) for events-session bootstrap calls.
+2. Updated runtime-request and push feature composition owners to consume the client API instead of direct transport function imports.
+3. Updated owner dependency wiring and runtime composition inputs so API calls cross boundaries through owned APIs only.
+4. Added focused hook tests for push token submission behavior and updated runtime/owner tests for the new boundary.
+
+Files touched in this continuation segment:
+
+1. `apps/WebApplication/Source/Application/DataAccess/WebShellSessionBootstrapClient.ts`
+2. `apps/WebApplication/Source/Application/StateManagement/UseApplicationOwnerDependencies.ts`
+3. `apps/WebApplication/Source/Application/StateManagement/UseApplicationRuntimeRequestHandlers.ts`
+4. `apps/WebApplication/Source/Application/StateManagement/UseApplicationPushFeatureComposition.ts`
+5. `apps/WebApplication/Source/Application/StateManagement/UseApplicationRuntimeComposition.ts`
+6. `apps/WebApplication/Source/App.tsx`
+7. `apps/WebApplication/Tests/UseApplicationRuntimeRequestHandlers.test.tsx`
+8. `apps/WebApplication/Tests/UseApplicationPushFeatureComposition.test.tsx`
+9. `apps/WebApplication/Tests/UseApplicationOwnerDependencies.test.tsx`
+10. `apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx`
+11. `docs/debug/OwnerApiBoundaryRegistry.md`
 
 ## Latest Continuation Commit Wave (Current-5)
 

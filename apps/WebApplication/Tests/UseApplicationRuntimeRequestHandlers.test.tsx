@@ -1,10 +1,8 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { type SetStateAction, useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  type ApiEventsSessionBootstrapResponse,
-  bootstrapEventsSession,
-} from "@/Application/DataAccess/WebShellApi";
+import type { ApiEventsSessionBootstrapResponse } from "../Source/Application/DataAccess/WebShellApi";
+import { WebShellSessionBootstrapClient } from "../Source/Application/DataAccess/WebShellSessionBootstrapClient";
 import { ApiAuthenticationErrorClassifier } from "../Source/Application/DomainModel/ApiAuthenticationErrorClassifier";
 import { ApiSessionBootstrapCoordinator } from "../Source/Application/StateManagement/ApiSessionBootstrapCoordinator";
 import { STARTUP_CRITICAL_EVENTS_SESSION_OPERATION } from "../Source/Application/StateManagement/CoreDataStartupRequestProfile";
@@ -17,10 +15,6 @@ import { UserInterfaceActionRequestBuilder } from "../Source/Application/StateMa
 import { TrackedUserInterfaceErrorReporter } from "../Source/Features/Debugging/StateManagement/TrackedUserInterfaceErrorReporter";
 import { resolveRuntimeRequestErrorDescriptor } from "../Source/Shared/Errors/RuntimeRequestErrorDescriptor";
 
-vi.mock("@/Application/DataAccess/WebShellApi", () => ({
-  bootstrapEventsSession: vi.fn(),
-}));
-
 interface RuntimeRequestHandlersHarnessProperties {
   input: UseApplicationRuntimeRequestHandlersInput;
   onSnapshot: (snapshot: ApplicationRuntimeRequestHandlers) => void;
@@ -31,7 +25,6 @@ const RUNTIME_REQUEST_ERROR_HANDLER_NAME =
   "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError";
 const API_TOKEN_AUTHENTICATION_ERROR_MESSAGE = "Unauthorized: missing or invalid X-Farfield-Token";
 const FUTURE_BOOTSTRAP_EXPIRY_ISO8601 = "2099-01-01T00:00:00.000Z";
-const bootstrapEventsSessionMock = vi.mocked(bootstrapEventsSession);
 
 function RuntimeRequestHandlersHarness(
   properties: RuntimeRequestHandlersHarnessProperties,
@@ -112,10 +105,21 @@ function createRuntimeRequestHandlersHarness(overrides?: {
 
   const apiSessionBootstrapCoordinator = new ApiSessionBootstrapCoordinator();
   const markApiTokenRequiredSpy = vi.spyOn(apiSessionBootstrapCoordinator, "markApiTokenRequired");
+  const webShellSessionBootstrapClient = new WebShellSessionBootstrapClient();
+  const bootstrapWithRequestOptionsSpy = vi
+    .spyOn(webShellSessionBootstrapClient, "bootstrapWithRequestOptions")
+    .mockResolvedValue(
+      createBootstrapResponse({
+        authRequired: true,
+        bootstrapped: true,
+        expiresAt: FUTURE_BOOTSTRAP_EXPIRY_ISO8601,
+      }),
+    );
 
   const input: UseApplicationRuntimeRequestHandlersInput = {
     trackedUserInterfaceErrorReporter,
     userInterfaceActionRequestBuilder,
+    webShellSessionBootstrapClient,
     apiAuthenticationErrorClassifier: new ApiAuthenticationErrorClassifier(),
     apiSessionBootstrapCoordinator,
     requiresApiSessionToken: overrides?.requiresApiSessionToken ?? false,
@@ -128,6 +132,7 @@ function createRuntimeRequestHandlersHarness(overrides?: {
   return {
     input,
     markApiTokenRequiredSpy,
+    bootstrapWithRequestOptionsSpy,
     buildActionRequestSpy,
     reportTrackedUserInterfaceErrorSpy,
     setRequiresApiSessionToken,
@@ -139,7 +144,6 @@ function createRuntimeRequestHandlersHarness(overrides?: {
 describe("useApplicationRuntimeRequestHandlers", () => {
   afterEach(() => {
     cleanup();
-    bootstrapEventsSessionMock.mockReset();
     vi.restoreAllMocks();
   });
 
@@ -213,18 +217,17 @@ describe("useApplicationRuntimeRequestHandlers", () => {
   });
 
   it("clears token-required and bootstrap-error state after a ready bootstrap decision", async () => {
-    bootstrapEventsSessionMock.mockResolvedValue(
+    const harness = createRuntimeRequestHandlersHarness({
+      requiresApiSessionToken: true,
+      apiSessionBootstrapErrorMessage: "invalid API token",
+    });
+    harness.bootstrapWithRequestOptionsSpy.mockResolvedValue(
       createBootstrapResponse({
         authRequired: true,
         bootstrapped: true,
         expiresAt: FUTURE_BOOTSTRAP_EXPIRY_ISO8601,
       }),
     );
-
-    const harness = createRuntimeRequestHandlersHarness({
-      requiresApiSessionToken: true,
-      apiSessionBootstrapErrorMessage: "invalid API token",
-    });
     const runtimeRequestHandlers = mountRuntimeRequestHandlers(harness.input);
 
     let bootstrapReady = false;
@@ -233,7 +236,7 @@ describe("useApplicationRuntimeRequestHandlers", () => {
     });
 
     expect(bootstrapReady).toBe(true);
-    expect(bootstrapEventsSessionMock).toHaveBeenCalledWith(undefined, {
+    expect(harness.bootstrapWithRequestOptionsSpy).toHaveBeenCalledWith({
       actionId: "action-1",
       actionName: STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
     });
@@ -253,17 +256,16 @@ describe("useApplicationRuntimeRequestHandlers", () => {
   });
 
   it("activates token-required bootstrap state when the bootstrap decision still requires a token", async () => {
-    bootstrapEventsSessionMock.mockResolvedValue(
+    const harness = createRuntimeRequestHandlersHarness({
+      apiSessionBootstrapErrorMessage: "stale bootstrap error",
+    });
+    harness.bootstrapWithRequestOptionsSpy.mockResolvedValue(
       createBootstrapResponse({
         authRequired: true,
         bootstrapped: false,
         expiresAt: null,
       }),
     );
-
-    const harness = createRuntimeRequestHandlersHarness({
-      apiSessionBootstrapErrorMessage: "stale bootstrap error",
-    });
     const runtimeRequestHandlers = mountRuntimeRequestHandlers(harness.input);
 
     let bootstrapReady = true;
@@ -272,7 +274,7 @@ describe("useApplicationRuntimeRequestHandlers", () => {
     });
 
     expect(bootstrapReady).toBe(false);
-    expect(bootstrapEventsSessionMock).toHaveBeenCalledWith(undefined, {
+    expect(harness.bootstrapWithRequestOptionsSpy).toHaveBeenCalledWith({
       actionId: "action-1",
       actionName: STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
     });

@@ -1,5 +1,5 @@
 import { type Dispatch, type SetStateAction, useCallback } from "react";
-import { bootstrapEventsSession } from "@/Application/DataAccess/WebShellApi";
+import { WebShellSessionBootstrapClient } from "@/Application/DataAccess/WebShellSessionBootstrapClient";
 import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { PushNotificationToolbarActionCoordinator } from "@/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";
@@ -10,6 +10,7 @@ const INVALID_API_TOKEN_ERROR_MESSAGE = "Invalid API token";
 
 export interface UseApplicationPushFeatureCompositionInput {
   apiSessionBootstrapCoordinator: ApiSessionBootstrapCoordinator;
+  webShellSessionBootstrapClient: WebShellSessionBootstrapClient;
   apiSessionTokenDraft: string;
   pushNotificationToolbarActionCoordinator: PushNotificationToolbarActionCoordinator;
   loadCoreDataTracked: () => Promise<void>;
@@ -43,7 +44,7 @@ export function useApplicationPushFeatureComposition(
     try {
       const bootstrapDecision = await input.apiSessionBootstrapCoordinator.submitApiToken(
         tokenValue,
-        (apiToken) => bootstrapEventsSession({ apiToken }),
+        (apiToken) => input.webShellSessionBootstrapClient.bootstrapWithApiToken(apiToken),
       );
       if (!bootstrapDecision.isReady) {
         if (bootstrapDecision.requiresApiToken) {
@@ -69,6 +70,7 @@ export function useApplicationPushFeatureComposition(
     input.apiSessionTokenDraft,
     input.loadCoreDataTracked,
     input.loadSelectedThreadIfPresent,
+    input.webShellSessionBootstrapClient,
     input.setApiSessionBootstrapErrorMessage,
     input.setApiSessionTokenDraft,
     input.setIsApiSessionBootstrapPending,

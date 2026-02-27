@@ -157,6 +157,7 @@ export function App(): React.JSX.Element {
       applicationOwnerDependencies.trackedUserInterfaceErrorReporter,
     userInterfaceActionRequestBuilder:
       applicationOwnerDependencies.userInterfaceActionRequestBuilder,
+    webShellSessionBootstrapClient: applicationOwnerDependencies.webShellSessionBootstrapClient,
     apiAuthenticationErrorClassifier: applicationOwnerDependencies.apiAuthenticationErrorClassifier,
     apiSessionBootstrapCoordinator: applicationOwnerDependencies.apiSessionBootstrapCoordinator,
     requiresApiSessionToken: applicationShellState.requiresApiSessionToken,
