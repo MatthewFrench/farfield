@@ -63,6 +63,10 @@ import {
   parseAppServerResponse,
 } from "./AppServerClientResponseParser.js";
 import {
+  buildExportRemoteSkillRequestParameters,
+  buildListRemoteSkillsRequestParameters,
+} from "./AppServerClientSkillsRemoteRequestBuilders.js";
+import {
   type AppServerPendingServerRequest,
   type AppServerReadNotificationEventsInput,
   type AppServerReadNotificationEventsResult,
@@ -374,6 +378,34 @@ export interface WriteSkillsConfigResult {
   effectiveEnabled: boolean;
 }
 
+export type RemoteSkillsHazelnutScope = "example" | "workspace-shared" | "all-shared" | "personal";
+export type RemoteSkillsProductSurface = "chatgpt" | "codex" | "api" | "atlas";
+
+export interface ListRemoteSkillsOptions {
+  hazelnutScope: RemoteSkillsHazelnutScope;
+  productSurface: RemoteSkillsProductSurface;
+  enabled: boolean;
+}
+
+export interface RemoteSkillSummary {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface ListRemoteSkillsResult {
+  data: RemoteSkillSummary[];
+}
+
+export interface ExportRemoteSkillOptions {
+  hazelnutId: string;
+}
+
+export interface ExportRemoteSkillResult {
+  id: string;
+  path: string;
+}
+
 export interface ResumeThreadOptions {
   persistExtendedHistory?: boolean;
 }
@@ -658,6 +690,25 @@ const AppServerMcpServerOauthLoginResponseSchema = z
 const AppServerSkillsConfigWriteResponseSchema = z
   .object({
     effectiveEnabled: z.boolean(),
+  })
+  .passthrough();
+const AppServerSkillsRemoteListResponseSchema = z
+  .object({
+    data: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          name: z.string().min(1),
+          description: z.string(),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+const AppServerSkillsRemoteExportResponseSchema = z
+  .object({
+    id: z.string().min(1),
+    path: z.string().min(1),
   })
   .passthrough();
 const AppServerThreadUnsubscribeResponseSchema = z
@@ -1171,6 +1222,43 @@ export class AppServerClient {
     );
     return {
       effectiveEnabled: parsed.effectiveEnabled,
+    };
+  }
+
+  public async listRemoteSkills(options: ListRemoteSkillsOptions): Promise<ListRemoteSkillsResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.listRemoteSkills,
+      buildListRemoteSkillsRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerSkillsRemoteListResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listRemoteSkills,
+    );
+    return {
+      data: parsed.data.map((skill) => ({
+        id: skill.id,
+        name: skill.name,
+        description: skill.description,
+      })),
+    };
+  }
+
+  public async exportRemoteSkill(
+    options: ExportRemoteSkillOptions,
+  ): Promise<ExportRemoteSkillResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.exportRemoteSkill,
+      buildExportRemoteSkillRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerSkillsRemoteExportResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.exportRemoteSkill,
+    );
+    return {
+      id: parsed.id,
+      path: parsed.path,
     };
   }
 

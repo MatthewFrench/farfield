@@ -19,6 +19,7 @@ export interface DebugAppServerCoveragePanelProps {
   onReloadMcpServerConfig: () => void;
   onStartMcpServerOauthLogin: (serverName: string) => void;
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
+  onExportRemoteSkill: (hazelnutId: string) => void;
 }
 
 function renderListValues(values: string[] | null): string {
@@ -46,6 +47,7 @@ export function DebugAppServerCoveragePanel({
   onReloadMcpServerConfig,
   onStartMcpServerOauthLogin,
   onWriteSkillsConfig,
+  onExportRemoteSkill,
 }: DebugAppServerCoveragePanelProps): React.JSX.Element {
   return (
     <div data-testid="debug-coverage-panel" className="flex-1 min-h-0 overflow-auto p-4 space-y-3">
@@ -54,7 +56,7 @@ export function DebugAppServerCoveragePanel({
           <h3 className="text-sm font-semibold">App-Server Coverage Diagnostics</h3>
           <p className="text-xs text-muted-foreground">
             Skills, apps, experimental features, MCP status, config requirements, and account
-            diagnostics.
+            diagnostics plus remote skills import coverage.
           </p>
         </div>
         <Button
@@ -99,10 +101,16 @@ export function DebugAppServerCoveragePanel({
 
       {coverageDiagnosticsSnapshot !== null && (
         <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-7">
             <div className="rounded-md border border-border bg-card p-3">
               <p className="text-xs text-muted-foreground">Skills</p>
               <p className="text-lg font-semibold">{coverageDiagnosticsSnapshot.skills.length}</p>
+            </div>
+            <div className="rounded-md border border-border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Remote Skills</p>
+              <p className="text-lg font-semibold">
+                {coverageDiagnosticsSnapshot.remoteSkills.length}
+              </p>
             </div>
             <div className="rounded-md border border-border bg-card p-3">
               <p className="text-xs text-muted-foreground">Apps</p>
@@ -358,6 +366,44 @@ export function DebugAppServerCoveragePanel({
                       <p className="text-muted-foreground break-all">{skill.path}</p>
                     </div>
                   ))}
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="rounded-md border border-border bg-card p-3 space-y-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Remote Skills
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              Surface: personal scope, codex product, enabled only.
+            </p>
+            {coverageDiagnosticsSnapshot.remoteSkills.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No remote skills reported.</p>
+            ) : (
+              coverageDiagnosticsSnapshot.remoteSkills.map((skill) => (
+                <div
+                  key={skill.id}
+                  className="rounded border border-border/70 p-2 space-y-1"
+                  data-testid={`debug-coverage-remote-skill-${skill.id}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{skill.name}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-testid={`debug-coverage-remote-skill-export-${skill.id}`}
+                      disabled={isRunningCoverageAction}
+                      onClick={() => {
+                        onExportRemoteSkill(skill.id);
+                      }}
+                    >
+                      Export
+                    </Button>
+                  </div>
+                  <p className="text-muted-foreground">{skill.description}</p>
+                  <p className="text-muted-foreground break-all">{skill.id}</p>
                 </div>
               ))
             )}

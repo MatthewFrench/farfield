@@ -8,6 +8,7 @@ import type {
   CapabilityConfigRequirementsResponse,
   CapabilityExperimentalFeaturesResponse,
   CapabilityMcpServersResponse,
+  CapabilityRemoteSkillsListResponse,
   CapabilityServerClient,
   CapabilitySkillsResponse,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
@@ -19,6 +20,7 @@ import {
   type DebugAppServerCoverageMcpServerSummary,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageRateLimitSnapshot,
+  type DebugAppServerCoverageRemoteSkillSummary,
   type DebugAppServerCoverageRequirements,
   type DebugAppServerCoverageSkillEntry,
   type DebugAppServerCoverageSnapshot,
@@ -31,6 +33,9 @@ const COVERAGE_REQUEST_OPERATION_NAME = "debug-coverage-refresh";
 const COVERAGE_MUTATION_OPERATION_NAME = "debug-coverage-action";
 const COVERAGE_ERROR_PREFIX = "Unable to load app-server coverage diagnostics: ";
 const COVERAGE_ACTION_ERROR_PREFIX = "Unable to run coverage action: ";
+const COVERAGE_REMOTE_SKILLS_HAZELNUT_SCOPE = "personal";
+const COVERAGE_REMOTE_SKILLS_PRODUCT_SURFACE = "codex";
+const COVERAGE_REMOTE_SKILLS_ENABLED = true;
 
 export interface UseDebugAppServerCoverageDiagnosticsInput {
   debugWorkspaceSection: DebugWorkspaceSection;
@@ -51,6 +56,7 @@ export interface DebugAppServerCoverageDiagnostics {
   reloadMcpServerConfig: () => void;
   startMcpServerOauthLogin: (serverName: string) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
+  exportRemoteSkill: (hazelnutId: string) => void;
 }
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {
@@ -184,6 +190,16 @@ function mapSkills(data: CapabilitySkillsResponse["data"]): DebugAppServerCovera
   }));
 }
 
+function mapRemoteSkills(
+  data: CapabilityRemoteSkillsListResponse["data"],
+): DebugAppServerCoverageRemoteSkillSummary[] {
+  return data.map((skill) => ({
+    id: skill.id,
+    name: skill.name,
+    description: skill.description,
+  }));
+}
+
 /**
  * Owns read cadence for app-server coverage diagnostics rendered in Debug Workspace.
  * Request concurrency is sequenced with request serials so stale responses cannot overwrite fresh state.
@@ -217,6 +233,7 @@ export function useDebugAppServerCoverageDiagnostics(
           mcpServersResponse,
           appsResponse,
           skillsResponse,
+          remoteSkillsResponse,
         ] = await Promise.all([
           input.capabilityServerClient.readConfigRequirements({
             actionName: COVERAGE_REQUEST_OPERATION_NAME,
@@ -242,6 +259,12 @@ export function useDebugAppServerCoverageDiagnostics(
           input.capabilityServerClient.listSkills({
             actionName: COVERAGE_REQUEST_OPERATION_NAME,
           }),
+          input.capabilityServerClient.listRemoteSkills({
+            actionName: COVERAGE_REQUEST_OPERATION_NAME,
+            hazelnutScope: COVERAGE_REMOTE_SKILLS_HAZELNUT_SCOPE,
+            productSurface: COVERAGE_REMOTE_SKILLS_PRODUCT_SURFACE,
+            enabled: COVERAGE_REMOTE_SKILLS_ENABLED,
+          }),
         ]);
 
         if (requestSerialRef.current !== nextRequestSerial) {
@@ -257,6 +280,7 @@ export function useDebugAppServerCoverageDiagnostics(
           mcpServers: mapMcpServers(mcpServersResponse.data),
           apps: mapApps(appsResponse.data),
           skills: mapSkills(skillsResponse.data),
+          remoteSkills: mapRemoteSkills(remoteSkillsResponse.data),
           refreshedAtIso8601: new Date().toISOString(),
         });
         if (accountResponse.account !== null) {
@@ -428,6 +452,34 @@ export function useDebugAppServerCoverageDiagnostics(
     [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics],
   );
 
+  const exportRemoteSkill = useCallback(
+    (hazelnutId: string) => {
+      if (isRunningCoverageAction) {
+        return;
+      }
+      if (hazelnutId.trim().length === 0) {
+        return;
+      }
+      setIsRunningCoverageAction(true);
+      setCoverageActionErrorMessage("");
+
+      void (async () => {
+        try {
+          await input.capabilityServerClient.exportRemoteSkill({
+            actionName: COVERAGE_MUTATION_OPERATION_NAME,
+            hazelnutId,
+          });
+          refreshCoverageDiagnostics();
+        } catch (error) {
+          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
+        } finally {
+          setIsRunningCoverageAction(false);
+        }
+      })();
+    },
+    [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics],
+  );
+
   useEffect(() => {
     if (input.debugWorkspaceSection !== COVERAGE_WORKSPACE_SECTION) {
       return;
@@ -457,5 +509,6 @@ export function useDebugAppServerCoverageDiagnostics(
     reloadMcpServerConfig,
     startMcpServerOauthLogin,
     writeSkillsConfig,
+    exportRemoteSkill,
   };
 }

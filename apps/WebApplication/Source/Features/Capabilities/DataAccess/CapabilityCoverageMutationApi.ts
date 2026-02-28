@@ -4,6 +4,8 @@ import { request, requestInitWithOptions } from "@/Shared/Transport/FarfieldHttp
 
 const MCP_SERVER_OAUTH_LOGIN_ENDPOINT = "/api/mcp-servers/oauth/login";
 const SKILLS_CONFIG_WRITE_ENDPOINT = "/api/skills/config/write";
+const SKILLS_REMOTE_LIST_ENDPOINT = "/api/skills/remote/list";
+const SKILLS_REMOTE_EXPORT_ENDPOINT = "/api/skills/remote/export";
 
 export interface ApiMcpServerOauthLoginOptions extends ApiRequestOptions {
   agentId?: AgentId;
@@ -16,6 +18,29 @@ export interface ApiSkillsConfigWriteOptions extends ApiRequestOptions {
   agentId?: AgentId;
   path: string;
   enabled: boolean;
+}
+
+const RemoteSkillsHazelnutScopeSchema = z.enum([
+  "example",
+  "workspace-shared",
+  "all-shared",
+  "personal",
+]);
+export type ApiRemoteSkillsHazelnutScope = z.infer<typeof RemoteSkillsHazelnutScopeSchema>;
+
+const RemoteSkillsProductSurfaceSchema = z.enum(["chatgpt", "codex", "api", "atlas"]);
+export type ApiRemoteSkillsProductSurface = z.infer<typeof RemoteSkillsProductSurfaceSchema>;
+
+export interface ApiListRemoteSkillsOptions extends ApiRequestOptions {
+  agentId?: AgentId;
+  hazelnutScope: ApiRemoteSkillsHazelnutScope;
+  productSurface: ApiRemoteSkillsProductSurface;
+  enabled: boolean;
+}
+
+export interface ApiExportRemoteSkillOptions extends ApiRequestOptions {
+  agentId?: AgentId;
+  hazelnutId: string;
 }
 
 const McpServerOauthLoginResponseSchema = z
@@ -33,6 +58,32 @@ const SkillsConfigWriteResponseSchema = z
   })
   .strict();
 export type ApiSkillsConfigWriteResponse = z.infer<typeof SkillsConfigWriteResponseSchema>;
+
+const RemoteSkillSummarySchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string(),
+  })
+  .strict();
+export type ApiRemoteSkillSummary = z.infer<typeof RemoteSkillSummarySchema>;
+
+const RemoteSkillsListResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    data: z.array(RemoteSkillSummarySchema),
+  })
+  .strict();
+export type ApiRemoteSkillsListResponse = z.infer<typeof RemoteSkillsListResponseSchema>;
+
+const RemoteSkillExportResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    id: z.string().min(1),
+    path: z.string().min(1),
+  })
+  .strict();
+export type ApiRemoteSkillExportResponse = z.infer<typeof RemoteSkillExportResponseSchema>;
 
 function readMcpServerOauthLoginPath(options: ApiMcpServerOauthLoginOptions): string {
   const params = new URLSearchParams();
@@ -59,6 +110,26 @@ function readSkillsConfigWritePath(options: ApiSkillsConfigWriteOptions): string
   return `${SKILLS_CONFIG_WRITE_ENDPOINT}?${params.toString()}`;
 }
 
+function readRemoteSkillsListPath(options: ApiListRemoteSkillsOptions): string {
+  const params = new URLSearchParams();
+  params.set("hazelnutScope", options.hazelnutScope);
+  params.set("productSurface", options.productSurface);
+  params.set("enabled", options.enabled ? "true" : "false");
+  if (options.agentId !== undefined) {
+    params.set("agentId", options.agentId);
+  }
+  return `${SKILLS_REMOTE_LIST_ENDPOINT}?${params.toString()}`;
+}
+
+function readRemoteSkillExportPath(options: ApiExportRemoteSkillOptions): string {
+  const params = new URLSearchParams();
+  params.set("hazelnutId", options.hazelnutId);
+  if (options.agentId !== undefined) {
+    params.set("agentId", options.agentId);
+  }
+  return `${SKILLS_REMOTE_EXPORT_ENDPOINT}?${params.toString()}`;
+}
+
 export async function startMcpServerOauthLogin(
   options: ApiMcpServerOauthLoginOptions,
 ): Promise<ApiMcpServerOauthLoginResponse> {
@@ -75,6 +146,25 @@ export async function writeSkillsConfig(
 ): Promise<ApiSkillsConfigWriteResponse> {
   return SkillsConfigWriteResponseSchema.parse(
     await request(readSkillsConfigWritePath(options), {
+      ...requestInitWithOptions(options),
+      method: "POST",
+    }),
+  );
+}
+
+export async function listRemoteSkills(
+  options: ApiListRemoteSkillsOptions,
+): Promise<ApiRemoteSkillsListResponse> {
+  return RemoteSkillsListResponseSchema.parse(
+    await request(readRemoteSkillsListPath(options), requestInitWithOptions(options)),
+  );
+}
+
+export async function exportRemoteSkill(
+  options: ApiExportRemoteSkillOptions,
+): Promise<ApiRemoteSkillExportResponse> {
+  return RemoteSkillExportResponseSchema.parse(
+    await request(readRemoteSkillExportPath(options), {
       ...requestInitWithOptions(options),
       method: "POST",
     }),

@@ -3,6 +3,8 @@ import {
   type AppServerTransport,
   type CancelAccountLoginOptions,
   type CancelAccountLoginResult,
+  type ExportRemoteSkillOptions,
+  type ExportRemoteSkillResult,
   type ForkThreadOptions,
   type ListAppsOptions,
   type ListAppsResult,
@@ -12,6 +14,8 @@ import {
   type ListLoadedThreadsResult,
   type ListMcpServerStatusesOptions,
   type ListMcpServerStatusesResult,
+  type ListRemoteSkillsOptions,
+  type ListRemoteSkillsResult,
   type ListSkillsOptions,
   type ListSkillsResult,
   type ListThreadsAllOptions,
@@ -98,6 +102,8 @@ class TestAppServerClient extends AppServerClient {
   public readonly listMcpServerStatusesCalls: Array<ListMcpServerStatusesOptions | undefined> = [];
   public readonly listAppsCalls: Array<ListAppsOptions | undefined> = [];
   public readonly listSkillsCalls: Array<ListSkillsOptions | undefined> = [];
+  public readonly listRemoteSkillsCalls: ListRemoteSkillsOptions[] = [];
+  public readonly exportRemoteSkillCalls: ExportRemoteSkillOptions[] = [];
   public readonly readAccountCalls: Array<ReadAccountOptions | undefined> = [];
   public readonly readAccountRateLimitsCalls: Array<undefined> = [];
   public readonly startAccountLoginCalls: LoginAccountOptions[] = [];
@@ -120,6 +126,8 @@ class TestAppServerClient extends AppServerClient {
   private readonly listMcpServerStatusesResult: ListMcpServerStatusesResult;
   private readonly listAppsResult: ListAppsResult;
   private readonly listSkillsResult: ListSkillsResult;
+  private readonly listRemoteSkillsResult: ListRemoteSkillsResult;
+  private readonly exportRemoteSkillResult: ExportRemoteSkillResult;
   private readonly readAccountResult: ReadAccountResult;
   private readonly readAccountRateLimitsResult: ReadAccountRateLimitsResult;
   private readonly startAccountLoginResult: LoginAccountResult;
@@ -141,6 +149,8 @@ class TestAppServerClient extends AppServerClient {
     listMcpServerStatusesResult?: ListMcpServerStatusesResult;
     listAppsResult?: ListAppsResult;
     listSkillsResult?: ListSkillsResult;
+    listRemoteSkillsResult?: ListRemoteSkillsResult;
+    exportRemoteSkillResult?: ExportRemoteSkillResult;
     readAccountResult?: ReadAccountResult;
     readAccountRateLimitsResult?: ReadAccountRateLimitsResult;
     startAccountLoginResult?: LoginAccountResult;
@@ -186,6 +196,13 @@ class TestAppServerClient extends AppServerClient {
     };
     this.listSkillsResult = input?.listSkillsResult ?? {
       data: [],
+    };
+    this.listRemoteSkillsResult = input?.listRemoteSkillsResult ?? {
+      data: [],
+    };
+    this.exportRemoteSkillResult = input?.exportRemoteSkillResult ?? {
+      id: "remote-skill-1",
+      path: "/tmp/workspace/.codex/skills/remote-skill-1/SKILL.md",
     };
     this.readAccountResult = input?.readAccountResult ?? {
       account: null,
@@ -329,6 +346,20 @@ class TestAppServerClient extends AppServerClient {
   public override async listSkills(options?: ListSkillsOptions): Promise<ListSkillsResult> {
     this.listSkillsCalls.push(options);
     return this.listSkillsResult;
+  }
+
+  public override async listRemoteSkills(
+    options: ListRemoteSkillsOptions,
+  ): Promise<ListRemoteSkillsResult> {
+    this.listRemoteSkillsCalls.push(options);
+    return this.listRemoteSkillsResult;
+  }
+
+  public override async exportRemoteSkill(
+    options: ExportRemoteSkillOptions,
+  ): Promise<ExportRemoteSkillResult> {
+    this.exportRemoteSkillCalls.push(options);
+    return this.exportRemoteSkillResult;
   }
 
   public override async readAccount(options?: ReadAccountOptions): Promise<ReadAccountResult> {
@@ -1174,6 +1205,68 @@ describe("CodexThreadManagementOwner", () => {
       },
     ]);
     expect(result.effectiveEnabled).toBe(false);
+  });
+
+  it("lists remote skills through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      listRemoteSkillsResult: {
+        data: [
+          {
+            id: "remote-skill-1",
+            name: "Repository checks",
+            description: "Run repository checks",
+          },
+        ],
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.listRemoteSkills({
+      hazelnutScope: "personal",
+      productSurface: "codex",
+      enabled: true,
+    });
+
+    expect(appClient.listRemoteSkillsCalls).toEqual([
+      {
+        hazelnutScope: "personal",
+        productSurface: "codex",
+        enabled: true,
+      },
+    ]);
+    expect(result).toEqual({
+      data: [
+        {
+          id: "remote-skill-1",
+          name: "Repository checks",
+          description: "Run repository checks",
+        },
+      ],
+    });
+  });
+
+  it("exports remote skill through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      exportRemoteSkillResult: {
+        id: "remote-skill-1",
+        path: "/tmp/workspace/.codex/skills/repository-checks/SKILL.md",
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.exportRemoteSkill({
+      hazelnutId: "remote-skill-1",
+    });
+
+    expect(appClient.exportRemoteSkillCalls).toEqual([
+      {
+        hazelnutId: "remote-skill-1",
+      },
+    ]);
+    expect(result).toEqual({
+      id: "remote-skill-1",
+      path: "/tmp/workspace/.codex/skills/repository-checks/SKILL.md",
+    });
   });
 
   it("prefers active profile config defaults and requests config without layers", async () => {

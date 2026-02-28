@@ -19,11 +19,15 @@ import type {
   AgentConfigDefaults,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
+  AgentExportRemoteSkillInput,
+  AgentExportRemoteSkillResult,
   AgentId,
   AgentInterruptInput,
   AgentListAppsResult,
   AgentListExperimentalFeaturesResult,
   AgentListMcpServerStatusesResult,
+  AgentListRemoteSkillsInput,
+  AgentListRemoteSkillsResult,
   AgentListSkillsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
@@ -179,6 +183,27 @@ const CapabilitySkillsConfigWriteEnvelopeSchema = z
   })
   .strict();
 
+const CapabilitySkillsRemoteListEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    data: z.array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        description: z.string(),
+      }),
+    ),
+  })
+  .strict();
+
+const CapabilitySkillsRemoteExportEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    id: z.string().min(1),
+    path: z.string().min(1),
+  })
+  .strict();
+
 const CapabilityExperimentalFeaturesEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -285,6 +310,8 @@ interface MockAgentAdapterOptions {
     input: AgentStartMcpServerOauthLoginInput,
   ) => Promise<AgentStartMcpServerOauthLoginResult>;
   writeSkillsConfig?: (input: AgentWriteSkillsConfigInput) => Promise<AgentWriteSkillsConfigResult>;
+  listRemoteSkills?: (input: AgentListRemoteSkillsInput) => Promise<AgentListRemoteSkillsResult>;
+  exportRemoteSkill?: (input: AgentExportRemoteSkillInput) => Promise<AgentExportRemoteSkillResult>;
   listExperimentalFeatures?: () => Promise<AgentListExperimentalFeaturesResult>;
   listMcpServerStatuses?: () => Promise<AgentListMcpServerStatusesResult>;
   listApps?: () => Promise<AgentListAppsResult>;
@@ -418,6 +445,14 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.writeSkillsConfig) {
     adapter.writeSkillsConfig = options.writeSkillsConfig;
+  }
+
+  if (options.listRemoteSkills) {
+    adapter.listRemoteSkills = options.listRemoteSkills;
+  }
+
+  if (options.exportRemoteSkill) {
+    adapter.exportRemoteSkill = options.exportRemoteSkill;
   }
 
   if (options.listExperimentalFeatures) {
@@ -963,6 +998,120 @@ describe("handleCapabilityRoutes", () => {
     expect(parsedEnvelope).toEqual({
       ok: true,
       effectiveEnabled: false,
+    });
+  });
+
+  it("returns 400 when remote skill list omits hazelnutScope", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/skills/remote/list",
+      url: new URL("http://localhost/api/skills/remote/list?productSurface=codex&enabled=true"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing hazelnutScope query parameter.",
+    });
+  });
+
+  it("lists remote skills when adapter supports the skills capability", async () => {
+    const listRemoteSkillsSpy = vi.fn(
+      async (): Promise<AgentListRemoteSkillsResult> => ({
+        data: [
+          {
+            id: "remote-skill-1",
+            name: "Repository checks",
+            description: "Run repository checks before review",
+          },
+        ],
+      }),
+    );
+    const result = await executeCapabilityRoute({
+      pathname: "/api/skills/remote/list",
+      url: new URL(
+        "http://localhost/api/skills/remote/list?hazelnutScope=personal&productSurface=codex&enabled=1",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canListSkills: true,
+          },
+          listRemoteSkills: listRemoteSkillsSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(listRemoteSkillsSpy).toHaveBeenCalledWith({
+      hazelnutScope: "personal",
+      productSurface: "codex",
+      enabled: true,
+    });
+    const parsedEnvelope = CapabilitySkillsRemoteListEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      data: [
+        {
+          id: "remote-skill-1",
+          name: "Repository checks",
+          description: "Run repository checks before review",
+        },
+      ],
+    });
+  });
+
+  it("returns 400 when remote skill export omits hazelnutId", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/skills/remote/export",
+      url: new URL("http://localhost/api/skills/remote/export"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing hazelnutId query parameter.",
+    });
+  });
+
+  it("exports remote skills when adapter supports skills-config writes", async () => {
+    const exportRemoteSkillSpy = vi.fn(
+      async (): Promise<AgentExportRemoteSkillResult> => ({
+        id: "remote-skill-1",
+        path: "/tmp/workspace/.codex/skills/repository-checks/SKILL.md",
+      }),
+    );
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/skills/remote/export",
+      url: new URL("http://localhost/api/skills/remote/export?hazelnutId=remote-skill-1"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canWriteSkillsConfig: true,
+          },
+          exportRemoteSkill: exportRemoteSkillSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(exportRemoteSkillSpy).toHaveBeenCalledWith({
+      hazelnutId: "remote-skill-1",
+    });
+    const parsedEnvelope = CapabilitySkillsRemoteExportEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      id: "remote-skill-1",
+      path: "/tmp/workspace/.codex/skills/repository-checks/SKILL.md",
     });
   });
 

@@ -90,6 +90,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onReloadMcpServerConfig: () => {},
   onStartMcpServerOauthLogin: () => {},
   onWriteSkillsConfig: () => {},
+  onExportRemoteSkill: () => {},
 };
 
 function renderDebugWorkspacePane(properties: DebugWorkspacePaneProps): void {
@@ -152,6 +153,7 @@ describe("DebugWorkspacePane", () => {
         mcpServers: [],
         apps: [],
         skills: [],
+        remoteSkills: [],
         refreshedAtIso8601: "2026-02-28T20:00:00.000Z",
       },
     });

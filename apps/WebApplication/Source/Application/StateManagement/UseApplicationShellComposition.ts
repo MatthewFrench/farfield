@@ -320,6 +320,7 @@ function buildApplicationShellViewPropertiesInput(
     reloadMcpServerConfig: debugCoverageDiagnostics.reloadMcpServerConfig,
     startMcpServerOauthLogin: debugCoverageDiagnostics.startMcpServerOauthLogin,
     writeSkillsConfig: debugCoverageDiagnostics.writeSkillsConfig,
+    exportRemoteSkill: debugCoverageDiagnostics.exportRemoteSkill,
     apiSessionTokenDraft: applicationShellState.apiSessionTokenDraft,
     setApiSessionTokenDraft: applicationShellState.setApiSessionTokenDraft,
     apiSessionBootstrapError: applicationShellState.apiSessionBootstrapError,

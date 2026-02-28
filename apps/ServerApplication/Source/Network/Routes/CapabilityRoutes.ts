@@ -12,14 +12,18 @@ import type { AgentRegistry } from "../../Agents/Registry.js";
 import type {
   AgentCancelAccountLoginResult,
   AgentConfigDefaults,
+  AgentExportRemoteSkillResult,
   AgentId,
   AgentListAppsResult,
   AgentListExperimentalFeaturesResult,
   AgentListMcpServerStatusesResult,
+  AgentListRemoteSkillsResult,
   AgentListSkillsResult,
   AgentReadAccountRateLimitsResult,
   AgentReadAccountResult,
   AgentReadConfigRequirementsResult,
+  AgentRemoteSkillsHazelnutScope,
+  AgentRemoteSkillsProductSurface,
   AgentStartAccountLoginResult,
   AgentStartMcpServerOauthLoginResult,
   AgentWriteSkillsConfigResult,
@@ -42,6 +46,8 @@ const CapabilityRoutePathnameByName = {
   accountLogout: "/api/account/logout",
   mcpServerOauthLogin: "/api/mcp-servers/oauth/login",
   skillsConfigWrite: "/api/skills/config/write",
+  skillsRemoteList: "/api/skills/remote/list",
+  skillsRemoteExport: "/api/skills/remote/export",
   models: "/api/models",
   collaborationModes: "/api/collaboration-modes",
   experimentalFeatures: "/api/experimental-features",
@@ -68,6 +74,9 @@ const CapabilityRouteQueryParameterByName = {
   name: "name",
   path: "path",
   enabled: "enabled",
+  hazelnutScope: "hazelnutScope",
+  productSurface: "productSurface",
+  hazelnutId: "hazelnutId",
   scopes: "scopes",
   timeoutSeconds: "timeoutSeconds",
 } as const;
@@ -84,6 +93,8 @@ const CapabilityRouteLogEventByName = {
   configMcpServerReloadFailed: "config-mcp-server-reload-failed",
   mcpServerOauthLoginFailed: "mcp-server-oauth-login-failed",
   skillsConfigWriteFailed: "skills-config-write-failed",
+  skillsRemoteListFailed: "skills-remote-list-failed",
+  skillsRemoteExportFailed: "skills-remote-export-failed",
   modelsListTimeout: "models-list-timeout",
   collaborationModesListTimeout: "collaboration-modes-list-timeout",
   experimentalFeaturesListTimeout: "experimental-features-list-timeout",
@@ -109,6 +120,17 @@ const CapabilityRouteErrorMessagePrefixByName = {
   missingSkillEnabled: "Missing enabled query parameter.",
   invalidSkillEnabled: "Invalid enabled query parameter. Expected true/false or 1/0.",
   failedToWriteSkillsConfig: "Failed to write skills config: ",
+  missingRemoteSkillsHazelnutScope: "Missing hazelnutScope query parameter.",
+  invalidRemoteSkillsHazelnutScope:
+    "Invalid hazelnutScope query parameter. Expected example, workspace-shared, all-shared, or personal.",
+  missingRemoteSkillsProductSurface: "Missing productSurface query parameter.",
+  invalidRemoteSkillsProductSurface:
+    "Invalid productSurface query parameter. Expected chatgpt, codex, api, or atlas.",
+  missingRemoteSkillsEnabled: "Missing enabled query parameter.",
+  invalidRemoteSkillsEnabled: "Invalid enabled query parameter. Expected true/false or 1/0.",
+  failedToListRemoteSkills: "Failed to list remote skills: ",
+  missingRemoteSkillHazelnutId: "Missing hazelnutId query parameter.",
+  failedToExportRemoteSkill: "Failed to export remote skill: ",
   failedToListModels: "Failed to list models: ",
   failedToListCollaborationModes: "Failed to list collaboration modes: ",
   failedToListExperimentalFeatures: "Failed to list experimental features: ",
@@ -127,6 +149,8 @@ const CapabilityRouteTimeoutLabelByName = {
   configMcpServerReload: "config mcp server reload",
   mcpServerOauthLogin: "mcp server oauth login",
   skillsConfigWrite: "skills config write",
+  skillsRemoteList: "skills remote listing",
+  skillsRemoteExport: "skills remote export",
   modelsList: "models listing",
   collaborationModesList: "collaboration modes listing",
   experimentalFeaturesList: "experimental features listing",
@@ -210,6 +234,14 @@ type CapabilityAppsResponseBody = AgentListAppsResult & {
 };
 
 type CapabilitySkillsResponseBody = AgentListSkillsResult & {
+  ok: true;
+};
+
+type CapabilitySkillsRemoteListResponseBody = AgentListRemoteSkillsResult & {
+  ok: true;
+};
+
+type CapabilitySkillsRemoteExportResponseBody = AgentExportRemoteSkillResult & {
   ok: true;
 };
 
@@ -333,6 +365,50 @@ function parseOptionalScopesQueryValue(value: string | null): string[] | null {
   return scopes.length > 0 ? scopes : null;
 }
 
+function parseRemoteSkillsHazelnutScopeQueryValue(
+  value: string | null,
+): AgentRemoteSkillsHazelnutScope | null {
+  if (value === null) {
+    return null;
+  }
+  const normalized = value.trim();
+  if (normalized === "example") {
+    return "example";
+  }
+  if (normalized === "workspace-shared") {
+    return "workspace-shared";
+  }
+  if (normalized === "all-shared") {
+    return "all-shared";
+  }
+  if (normalized === "personal") {
+    return "personal";
+  }
+  return null;
+}
+
+function parseRemoteSkillsProductSurfaceQueryValue(
+  value: string | null,
+): AgentRemoteSkillsProductSurface | null {
+  if (value === null) {
+    return null;
+  }
+  const normalized = value.trim();
+  if (normalized === "chatgpt") {
+    return "chatgpt";
+  }
+  if (normalized === "codex") {
+    return "codex";
+  }
+  if (normalized === "api") {
+    return "api";
+  }
+  if (normalized === "atlas") {
+    return "atlas";
+  }
+  return null;
+}
+
 function mapConfigRequirementsResponse(
   result: AgentReadConfigRequirementsResult,
 ): CapabilityConfigRequirementsResponseBody {
@@ -429,6 +505,24 @@ function mapAppsResponse(result: AgentListAppsResult): CapabilityAppsResponseBod
 }
 
 function mapSkillsResponse(result: AgentListSkillsResult): CapabilitySkillsResponseBody {
+  return {
+    ok: true,
+    ...result,
+  };
+}
+
+function mapSkillsRemoteListResponse(
+  result: AgentListRemoteSkillsResult,
+): CapabilitySkillsRemoteListResponseBody {
+  return {
+    ok: true,
+    ...result,
+  };
+}
+
+function mapSkillsRemoteExportResponse(
+  result: AgentExportRemoteSkillResult,
+): CapabilitySkillsRemoteExportResponseBody {
   return {
     ok: true,
     ...result,
@@ -1314,6 +1408,231 @@ async function handleSkillsConfigWriteRoute(deps: CapabilityRouteDependencies): 
   return true;
 }
 
+async function handleSkillsRemoteListRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.get,
+      CapabilityRoutePathnameByName.skillsRemoteList,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const hazelnutScopeRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.hazelnutScope);
+  if (hazelnutScopeRaw === null || hazelnutScopeRaw.trim().length === 0) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingRemoteSkillsHazelnutScope,
+    });
+    return true;
+  }
+  const hazelnutScope = parseRemoteSkillsHazelnutScopeQueryValue(hazelnutScopeRaw);
+  if (hazelnutScope === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidRemoteSkillsHazelnutScope,
+    });
+    return true;
+  }
+
+  const productSurfaceRaw = url.searchParams.get(
+    CapabilityRouteQueryParameterByName.productSurface,
+  );
+  if (productSurfaceRaw === null || productSurfaceRaw.trim().length === 0) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingRemoteSkillsProductSurface,
+    });
+    return true;
+  }
+  const productSurface = parseRemoteSkillsProductSurfaceQueryValue(productSurfaceRaw);
+  if (productSurface === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidRemoteSkillsProductSurface,
+    });
+    return true;
+  }
+
+  const enabledRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.enabled);
+  if (enabledRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingRemoteSkillsEnabled,
+    });
+    return true;
+  }
+  const enabled = parseBooleanQueryValueStrict(enabledRaw);
+  if (enabled === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidRemoteSkillsEnabled,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canListSkills ||
+    !adapter.listRemoteSkills
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToListRemoteSkills}Remote skills list is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.listRemoteSkills({
+        hazelnutScope,
+        productSurface,
+        enabled,
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.skillsRemoteList,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapSkillsRemoteListResponse(result));
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        hazelnutScope,
+        productSurface,
+        enabled,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.skillsRemoteListFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToListRemoteSkills}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleSkillsRemoteExportRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.skillsRemoteExport,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const hazelnutIdRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.hazelnutId);
+  if (hazelnutIdRaw === null || hazelnutIdRaw.trim().length === 0) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingRemoteSkillHazelnutId,
+    });
+    return true;
+  }
+  const hazelnutId = hazelnutIdRaw.trim();
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canWriteSkillsConfig ||
+    !adapter.exportRemoteSkill
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToExportRemoteSkill}Remote skill export is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.exportRemoteSkill({
+        hazelnutId,
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.skillsRemoteExport,
+    );
+    jsonResponse(
+      res,
+      CapabilityRouteStatusCodeByName.success,
+      mapSkillsRemoteExportResponse(result),
+    );
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        hazelnutId,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.skillsRemoteExportFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToExportRemoteSkill}${message}`,
+    });
+  }
+
+  return true;
+}
+
 async function handleModelsRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
   const {
     req,
@@ -1696,7 +2015,8 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
  * Owns capability route dispatch (`/api/config/defaults`, `/api/config-requirements`,
  * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/rate-limits`,
  * `/api/account/login/start`, `/api/account/login/cancel`, `/api/account/logout`,
- * `/api/mcp-servers/oauth/login`, `/api/skills/config/write`, `/api/models`,
+ * `/api/mcp-servers/oauth/login`, `/api/skills/config/write`,
+ * `/api/skills/remote/list`, `/api/skills/remote/export`, `/api/models`,
  * `/api/collaboration-modes`, `/api/experimental-features`,
  * `/api/mcp-servers`, `/api/apps`, `/api/skills`)
  * route dispatch with explicit adapter-to-response mapping.
@@ -1730,6 +2050,12 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleSkillsConfigWriteRoute(deps)) {
+    return true;
+  }
+  if (await handleSkillsRemoteListRoute(deps)) {
+    return true;
+  }
+  if (await handleSkillsRemoteExportRoute(deps)) {
     return true;
   }
   if (await handleModelsRoute(deps)) {

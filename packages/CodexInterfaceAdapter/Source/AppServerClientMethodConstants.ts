@@ -22,6 +22,8 @@ export const APP_SERVER_CLIENT_METHODS = {
   reloadMcpServerConfig: "config/mcpServer/reload",
   startMcpServerOauthLogin: "mcpServer/oauth/login",
   writeSkillsConfig: "skills/config/write",
+  listRemoteSkills: "skills/remote/list",
+  exportRemoteSkill: "skills/remote/export",
   startThread: "thread/start",
   setThreadName: "thread/name/set",
   rollbackThread: "thread/rollback",

@@ -150,6 +150,7 @@ export interface UseApplicationShellViewPropertiesInput {
   reloadMcpServerConfig: () => void;
   startMcpServerOauthLogin: (serverName: string) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
+  exportRemoteSkill: (hazelnutId: string) => void;
   apiSessionTokenDraft: string;
   setApiSessionTokenDraft: (nextTokenValue: string) => void;
   apiSessionBootstrapError: string;
@@ -397,6 +398,7 @@ function buildDebugWorkspacePaneProperties(
     onReloadMcpServerConfig: input.reloadMcpServerConfig,
     onStartMcpServerOauthLogin: input.startMcpServerOauthLogin,
     onWriteSkillsConfig: input.writeSkillsConfig,
+    onExportRemoteSkill: input.exportRemoteSkill,
   };
 }
 
@@ -593,6 +595,9 @@ export function useApplicationShellViewProperties(
       input.cancelAccountLogin,
       input.logoutAccount,
       input.reloadMcpServerConfig,
+      input.startMcpServerOauthLogin,
+      input.writeSkillsConfig,
+      input.exportRemoteSkill,
       input.replayHistoryEntryFromDetail,
       input.runtimeRequestErrorOperationMetrics,
       input.isEnablingPushNotifications,

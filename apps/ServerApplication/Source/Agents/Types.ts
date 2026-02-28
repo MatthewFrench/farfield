@@ -541,6 +541,38 @@ export interface AgentWriteSkillsConfigResult {
   effectiveEnabled: boolean;
 }
 
+export type AgentRemoteSkillsHazelnutScope =
+  | "example"
+  | "workspace-shared"
+  | "all-shared"
+  | "personal";
+export type AgentRemoteSkillsProductSurface = "chatgpt" | "codex" | "api" | "atlas";
+
+export interface AgentListRemoteSkillsInput {
+  hazelnutScope: AgentRemoteSkillsHazelnutScope;
+  productSurface: AgentRemoteSkillsProductSurface;
+  enabled: boolean;
+}
+
+export interface AgentRemoteSkillSummary {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface AgentListRemoteSkillsResult {
+  data: AgentRemoteSkillSummary[];
+}
+
+export interface AgentExportRemoteSkillInput {
+  hazelnutId: string;
+}
+
+export interface AgentExportRemoteSkillResult {
+  id: string;
+  path: string;
+}
+
 export interface AgentSetCollaborationModeResult {
   ownerClientId: string;
 }
@@ -598,6 +630,8 @@ export interface AgentAdapter {
     input: AgentStartMcpServerOauthLoginInput,
   ): Promise<AgentStartMcpServerOauthLoginResult>;
   writeSkillsConfig?(input: AgentWriteSkillsConfigInput): Promise<AgentWriteSkillsConfigResult>;
+  listRemoteSkills?(input: AgentListRemoteSkillsInput): Promise<AgentListRemoteSkillsResult>;
+  exportRemoteSkill?(input: AgentExportRemoteSkillInput): Promise<AgentExportRemoteSkillResult>;
 
   listModels?(limit: number): Promise<AppServerListModelsResponse>;
   listCollaborationModes?(): Promise<AppServerCollaborationModeListResponse>;

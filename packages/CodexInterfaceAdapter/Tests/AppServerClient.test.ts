@@ -1166,6 +1166,66 @@ describe("AppServerClient.writeSkillsConfig", () => {
   });
 });
 
+describe("AppServerClient.listRemoteSkills", () => {
+  it("sends skills/remote/list payload and returns remote skill summaries", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      data: [
+        {
+          id: "remote-skill-1",
+          name: "Repository checks",
+          description: "Run checks before review",
+        },
+      ],
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.listRemoteSkills({
+      hazelnutScope: "personal",
+      productSurface: "codex",
+      enabled: true,
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("skills/remote/list", {
+      hazelnutScope: "personal",
+      productSurface: "codex",
+      enabled: true,
+    });
+    expect(result).toEqual({
+      data: [
+        {
+          id: "remote-skill-1",
+          name: "Repository checks",
+          description: "Run checks before review",
+        },
+      ],
+    });
+  });
+});
+
+describe("AppServerClient.exportRemoteSkill", () => {
+  it("sends skills/remote/export payload and returns exported local path", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      id: "remote-skill-1",
+      path: "/tmp/workspace/.codex/skills/repository-checks/SKILL.md",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.exportRemoteSkill({
+      hazelnutId: "remote-skill-1",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("skills/remote/export", {
+      hazelnutId: "remote-skill-1",
+    });
+    expect(result).toEqual({
+      id: "remote-skill-1",
+      path: "/tmp/workspace/.codex/skills/repository-checks/SKILL.md",
+    });
+  });
+});
+
 describe("AppServerClient.listThreadsAll", () => {
   it("starts pagination from an explicit initial cursor", async () => {
     const transportDouble = createTransportDouble();

@@ -20,6 +20,8 @@ import type {
   AgentConfigDefaults,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
+  AgentExportRemoteSkillInput,
+  AgentExportRemoteSkillResult,
   AgentInterruptInput,
   AgentListAppsInput,
   AgentListAppsResult,
@@ -28,6 +30,8 @@ import type {
   AgentListLoadedThreadsResult,
   AgentListMcpServerStatusesInput,
   AgentListMcpServerStatusesResult,
+  AgentListRemoteSkillsInput,
+  AgentListRemoteSkillsResult,
   AgentListSkillsInput,
   AgentListSkillsResult,
   AgentListThreadsInput,
@@ -371,6 +375,18 @@ export class CodexAgentAdapter implements AgentAdapter {
     input: AgentWriteSkillsConfigInput,
   ): Promise<AgentWriteSkillsConfigResult> {
     return this.threadManagementOwner.writeSkillsConfig(input);
+  }
+
+  public async listRemoteSkills(
+    input: AgentListRemoteSkillsInput,
+  ): Promise<AgentListRemoteSkillsResult> {
+    return this.threadManagementOwner.listRemoteSkills(input);
+  }
+
+  public async exportRemoteSkill(
+    input: AgentExportRemoteSkillInput,
+  ): Promise<AgentExportRemoteSkillResult> {
+    return this.threadManagementOwner.exportRemoteSkill(input);
   }
 
   public async readConfigDefaults(): Promise<AgentConfigDefaults> {

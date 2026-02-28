@@ -71,6 +71,7 @@ export interface DebugWorkspacePaneProps {
   onReloadMcpServerConfig: () => void;
   onStartMcpServerOauthLogin: (serverName: string) => void;
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
+  onExportRemoteSkill: (hazelnutId: string) => void;
 }
 
 export function DebugWorkspacePane({
@@ -122,6 +123,7 @@ export function DebugWorkspacePane({
   onReloadMcpServerConfig,
   onStartMcpServerOauthLogin,
   onWriteSkillsConfig,
+  onExportRemoteSkill,
 }: DebugWorkspacePaneProps): React.JSX.Element {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -229,6 +231,7 @@ export function DebugWorkspacePane({
             onReloadMcpServerConfig={onReloadMcpServerConfig}
             onStartMcpServerOauthLogin={onStartMcpServerOauthLogin}
             onWriteSkillsConfig={onWriteSkillsConfig}
+            onExportRemoteSkill={onExportRemoteSkill}
           />
         )}
       </Tabs>

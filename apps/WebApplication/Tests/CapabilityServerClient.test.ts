@@ -20,6 +20,8 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityApi", () => ({
 }));
 
 vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi", () => ({
+  exportRemoteSkill: vi.fn(),
+  listRemoteSkills: vi.fn(),
   startMcpServerOauthLogin: vi.fn(),
   writeSkillsConfig: vi.fn(),
 }));
@@ -43,6 +45,8 @@ import {
   startAccountLogin,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
 import {
+  exportRemoteSkill,
+  listRemoteSkills,
   startMcpServerOauthLogin,
   writeSkillsConfig,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi";
@@ -62,6 +66,8 @@ import {
   type CapabilityMcpServersResponse,
   type CapabilityModelsResponse,
   type CapabilityMutationSuccessResponse,
+  type CapabilityRemoteSkillExportResponse,
+  type CapabilityRemoteSkillsListResponse,
   CapabilityServerClient,
   type CapabilitySkillsConfigWriteResponse,
   type CapabilitySkillsResponse,
@@ -219,6 +225,23 @@ const SKILLS_CONFIG_WRITE_RESPONSE: CapabilitySkillsConfigWriteResponse = {
   effectiveEnabled: false,
 };
 
+const REMOTE_SKILLS_LIST_RESPONSE: CapabilityRemoteSkillsListResponse = {
+  ok: true,
+  data: [
+    {
+      id: "remote-skill-1",
+      name: "Repository checks",
+      description: "Run repository checks before review",
+    },
+  ],
+};
+
+const REMOTE_SKILL_EXPORT_RESPONSE: CapabilityRemoteSkillExportResponse = {
+  ok: true,
+  id: "remote-skill-1",
+  path: "/tmp/project/.codex/skills/repository-checks/SKILL.md",
+};
+
 const EXPERIMENTAL_FEATURES_RESPONSE: CapabilityExperimentalFeaturesResponse = {
   ok: true,
   data: [
@@ -303,6 +326,8 @@ describe("CapabilityServerClient", () => {
     vi.mocked(reloadMcpServerConfig).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
     vi.mocked(startMcpServerOauthLogin).mockResolvedValue(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
     vi.mocked(writeSkillsConfig).mockResolvedValue(SKILLS_CONFIG_WRITE_RESPONSE);
+    vi.mocked(listRemoteSkills).mockResolvedValue(REMOTE_SKILLS_LIST_RESPONSE);
+    vi.mocked(exportRemoteSkill).mockResolvedValue(REMOTE_SKILL_EXPORT_RESPONSE);
     vi.mocked(listExperimentalFeatures).mockResolvedValue(EXPERIMENTAL_FEATURES_RESPONSE);
     vi.mocked(listMcpServers).mockResolvedValue(MCP_SERVERS_RESPONSE);
     vi.mocked(listApps).mockResolvedValue(APPS_RESPONSE);
@@ -375,6 +400,18 @@ describe("CapabilityServerClient", () => {
       path: "/tmp/project/.codex/skills/checks/SKILL.md",
       enabled: false,
     };
+    const listRemoteSkillsOptions = {
+      actionId: "action-remote-skills-list",
+      actionName: "list-remote-skills",
+      hazelnutScope: "personal" as const,
+      productSurface: "codex" as const,
+      enabled: true,
+    };
+    const exportRemoteSkillOptions = {
+      actionId: "action-remote-skill-export",
+      actionName: "export-remote-skill",
+      hazelnutId: "remote-skill-1",
+    };
     const experimentalFeatureOptions = {
       actionId: "action-experimental-features",
       actionName: "list-experimental-features",
@@ -421,6 +458,10 @@ describe("CapabilityServerClient", () => {
     );
     const skillsConfigWriteResponse =
       await capabilityServerClient.writeSkillsConfig(skillsConfigWriteOptions);
+    const remoteSkillsListResponse =
+      await capabilityServerClient.listRemoteSkills(listRemoteSkillsOptions);
+    const remoteSkillExportResponse =
+      await capabilityServerClient.exportRemoteSkill(exportRemoteSkillOptions);
     const experimentalFeaturesResponse = await capabilityServerClient.listExperimentalFeatures(
       experimentalFeatureOptions,
     );
@@ -442,6 +483,8 @@ describe("CapabilityServerClient", () => {
     expect(reloadMcpServerConfig).toHaveBeenCalledWith(reloadMcpServerConfigOptions);
     expect(startMcpServerOauthLogin).toHaveBeenCalledWith(mcpServerOauthLoginOptions);
     expect(writeSkillsConfig).toHaveBeenCalledWith(skillsConfigWriteOptions);
+    expect(listRemoteSkills).toHaveBeenCalledWith(listRemoteSkillsOptions);
+    expect(exportRemoteSkill).toHaveBeenCalledWith(exportRemoteSkillOptions);
     expect(listExperimentalFeatures).toHaveBeenCalledWith(experimentalFeatureOptions);
     expect(listMcpServers).toHaveBeenCalledWith(mcpServerOptions);
     expect(listApps).toHaveBeenCalledWith(appOptions);
@@ -460,6 +503,8 @@ describe("CapabilityServerClient", () => {
     expect(reloadMcpServerConfigResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
     expect(mcpServerOauthLoginResponse).toEqual(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
     expect(skillsConfigWriteResponse).toEqual(SKILLS_CONFIG_WRITE_RESPONSE);
+    expect(remoteSkillsListResponse).toEqual(REMOTE_SKILLS_LIST_RESPONSE);
+    expect(remoteSkillExportResponse).toEqual(REMOTE_SKILL_EXPORT_RESPONSE);
     expect(experimentalFeaturesResponse).toEqual(EXPERIMENTAL_FEATURES_RESPONSE);
     expect(mcpServersResponse).toEqual(MCP_SERVERS_RESPONSE);
     expect(appsResponse).toEqual(APPS_RESPONSE);

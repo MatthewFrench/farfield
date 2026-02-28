@@ -2,6 +2,8 @@ import {
   AppServerClient,
   type CancelAccountLoginOptions,
   type CancelAccountLoginResult,
+  type ExportRemoteSkillOptions,
+  type ExportRemoteSkillResult,
   type ListAppsOptions,
   type ListAppsResult,
   type ListExperimentalFeaturesOptions,
@@ -9,6 +11,8 @@ import {
   type ListLoadedThreadsResult,
   type ListMcpServerStatusesOptions,
   type ListMcpServerStatusesResult,
+  type ListRemoteSkillsOptions,
+  type ListRemoteSkillsResult,
   type ListSkillsOptions,
   type ListSkillsResult,
   type ListThreadsAllOptions,
@@ -43,6 +47,8 @@ import type {
   AgentConfigDefaults,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
+  AgentExportRemoteSkillInput,
+  AgentExportRemoteSkillResult,
   AgentForkThreadInput,
   AgentListAppsInput,
   AgentListAppsResult,
@@ -51,6 +57,8 @@ import type {
   AgentListLoadedThreadsResult,
   AgentListMcpServerStatusesInput,
   AgentListMcpServerStatusesResult,
+  AgentListRemoteSkillsInput,
+  AgentListRemoteSkillsResult,
   AgentListSkillsInput,
   AgentListSkillsResult,
   AgentListThreadsInput,
@@ -286,6 +294,22 @@ function buildWriteSkillsConfigOptions(
   return {
     path: input.path,
     enabled: input.enabled,
+  };
+}
+
+function buildListRemoteSkillsOptions(input: AgentListRemoteSkillsInput): ListRemoteSkillsOptions {
+  return {
+    hazelnutScope: input.hazelnutScope,
+    productSurface: input.productSurface,
+    enabled: input.enabled,
+  };
+}
+
+function buildExportRemoteSkillOptions(
+  input: AgentExportRemoteSkillInput,
+): ExportRemoteSkillOptions {
+  return {
+    hazelnutId: input.hazelnutId,
   };
 }
 
@@ -598,6 +622,26 @@ export class CodexThreadManagementOwner {
     this.ensureCodexAvailable();
     const result: WriteSkillsConfigResult = await this.runAppServerCall(() =>
       this.appClient.writeSkillsConfig(buildWriteSkillsConfigOptions(input)),
+    );
+    return result;
+  }
+
+  public async listRemoteSkills(
+    input: AgentListRemoteSkillsInput,
+  ): Promise<AgentListRemoteSkillsResult> {
+    this.ensureCodexAvailable();
+    const result: ListRemoteSkillsResult = await this.runAppServerCall(() =>
+      this.appClient.listRemoteSkills(buildListRemoteSkillsOptions(input)),
+    );
+    return result;
+  }
+
+  public async exportRemoteSkill(
+    input: AgentExportRemoteSkillInput,
+  ): Promise<AgentExportRemoteSkillResult> {
+    this.ensureCodexAvailable();
+    const result: ExportRemoteSkillResult = await this.runAppServerCall(() =>
+      this.appClient.exportRemoteSkill(buildExportRemoteSkillOptions(input)),
     );
     return result;
   }

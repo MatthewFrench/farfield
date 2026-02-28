@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-02-28 22:42:21Z
+Last Updated (UTC): 2026-02-28 23:04:09Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -56,8 +56,8 @@ This ledger records recommended disposition for every upstream app-server client
 | `setDefaultModel` | Not used | Do not adopt | Deprecated upstream request family. |
 | `skills/config/write` | Used now | Keep | Exposed through capability ownership and debug workspace skill enable or disable actions. |
 | `skills/list` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
-| `skills/remote/export` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
-| `skills/remote/list` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
+| `skills/remote/export` | Used now | Keep | Exposed through capability ownership and debug workspace remote-skill export actions. |
+| `skills/remote/list` | Used now | Keep | Exposed through capability ownership and debug workspace remote-skill diagnostics. |
 | `thread/archive` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `thread/backgroundTerminals/clean` | Used now | Keep | Background terminal cleanup now routes through strict owner boundaries and typed mutation contracts. |
 | `thread/compact/start` | Used now | Keep | Context compaction action now routes through strict owner boundaries and typed mutation contracts. |
@@ -82,5 +82,5 @@ This ledger records recommended disposition for every upstream app-server client
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 34
-Not used: 40
+Used now: 36
+Not used: 38

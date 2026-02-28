@@ -16,6 +16,8 @@ model/list
 review/start
 skills/config/write
 skills/list
+skills/remote/export
+skills/remote/list
 thread/archive
 thread/backgroundTerminals/clean
 thread/compact/start

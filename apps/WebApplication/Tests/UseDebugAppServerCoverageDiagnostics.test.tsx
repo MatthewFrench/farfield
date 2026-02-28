@@ -71,6 +71,12 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       ok: true,
       data: [],
     });
+    const listRemoteSkills = vi
+      .spyOn(capabilityServerClient, "listRemoteSkills")
+      .mockResolvedValue({
+        ok: true,
+        data: [],
+      });
 
     const latestDiagnostics: { current: DebugAppServerCoverageDiagnostics | null } = {
       current: null,
@@ -97,6 +103,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     expect(listMcpServers).toHaveBeenCalledTimes(1);
     expect(listApps).toHaveBeenCalledTimes(1);
     expect(listSkills).toHaveBeenCalledTimes(1);
+    expect(listRemoteSkills).toHaveBeenCalledTimes(1);
   });
 
   it("runs account and mcp coverage actions through capability client owners", async () => {
@@ -135,6 +142,10 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       ok: true,
       data: [],
     });
+    vi.spyOn(capabilityServerClient, "listRemoteSkills").mockResolvedValue({
+      ok: true,
+      data: [],
+    });
     const startAccountLogin = vi
       .spyOn(capabilityServerClient, "startAccountLogin")
       .mockResolvedValue({
@@ -168,6 +179,13 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       .mockResolvedValue({
         ok: true,
         effectiveEnabled: false,
+      });
+    const exportRemoteSkill = vi
+      .spyOn(capabilityServerClient, "exportRemoteSkill")
+      .mockResolvedValue({
+        ok: true,
+        id: "remote-skill-1",
+        path: "/tmp/project/.codex/skills/repository-checks/SKILL.md",
       });
 
     const latestDiagnostics: { current: DebugAppServerCoverageDiagnostics | null } = {
@@ -206,6 +224,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       "/tmp/project/.codex/skills/checks/SKILL.md",
       false,
     );
+    latestDiagnostics.current?.exportRemoteSkill("remote-skill-1");
     await waitFor(() => {
       expect(logoutAccount).toHaveBeenCalledTimes(1);
       expect(reloadMcpServerConfig).toHaveBeenCalledTimes(1);
@@ -217,6 +236,10 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         path: "/tmp/project/.codex/skills/checks/SKILL.md",
         enabled: false,
+      });
+      expect(exportRemoteSkill).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        hazelnutId: "remote-skill-1",
       });
       expect(openWindow).toHaveBeenCalledWith(
         "https://example.com/oauth/mcp/github",

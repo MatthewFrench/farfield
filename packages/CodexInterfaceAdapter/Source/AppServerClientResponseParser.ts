@@ -25,6 +25,8 @@ export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   reloadMcpServerConfig: "AppServerMcpServerRefreshResponse",
   startMcpServerOauthLogin: "AppServerMcpServerOauthLoginResponse",
   writeSkillsConfig: "AppServerSkillsConfigWriteResponse",
+  listRemoteSkills: "AppServerSkillsRemoteListResponse",
+  exportRemoteSkill: "AppServerSkillsRemoteExportResponse",
   startThread: "AppServerStartThreadResponse",
   setThreadName: "AppServerThreadSetNameResponse",
   rollbackThread: "AppServerThreadRollbackResponse",

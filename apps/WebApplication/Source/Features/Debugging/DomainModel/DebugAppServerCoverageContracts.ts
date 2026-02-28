@@ -63,6 +63,12 @@ export interface DebugAppServerCoverageSkillEntry {
   errorCount: number;
 }
 
+export interface DebugAppServerCoverageRemoteSkillSummary {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"
@@ -123,5 +129,6 @@ export interface DebugAppServerCoverageSnapshot {
   mcpServers: DebugAppServerCoverageMcpServerSummary[];
   apps: DebugAppServerCoverageAppSummary[];
   skills: DebugAppServerCoverageSkillEntry[];
+  remoteSkills: DebugAppServerCoverageRemoteSkillSummary[];
   refreshedAtIso8601: string;
 }

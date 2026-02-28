@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-02-28 22:42:21Z
+Last Updated (UTC): 2026-02-28 23:04:09Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `33 / 74` request methods (`44.6%`).
+1. Farfield app-server method coverage at request-owner layer: `35 / 74` request methods (`47.3%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `34 / 74` (`45.9%`).
+3. Effective request-method usage including transport-owned `initialize`: `36 / 74` (`48.6%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -111,6 +111,8 @@ As of the upstream snapshot above:
 | `app/list` | App list diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed thread-scoped query mapping | Keep current path |
 | `skills/list` | Skills diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed refresh query mapping | Keep current path |
 | `skills/config/write` | Skills enable or disable actions in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic write-result mapping for skill-state mutations | Keep current path |
+| `skills/remote/list` | Remote skills diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed remote-skill query mapping for integration diagnostics | Keep current path |
+| `skills/remote/export` | Remote skill export action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic export-result mapping for remote skill import workflows | Keep current path |
 
 ### Transport-owned request method
 
@@ -155,10 +157,12 @@ As of the upstream snapshot above:
 | `app/list` | App list diagnostics | `/api/apps` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listApps` -> `AppServerClient.listApps` |
 | `skills/list` | Skills diagnostics | `/api/skills` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listSkills` -> `AppServerClient.listSkills` |
 | `skills/config/write` | Skills enable or disable diagnostics action | `/api/skills/config/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeSkillsConfig` -> `AppServerClient.writeSkillsConfig` |
+| `skills/remote/list` | Remote skills diagnostics | `/api/skills/remote/list` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listRemoteSkills` -> `AppServerClient.listRemoteSkills` |
+| `skills/remote/export` | Remote skill export diagnostics action | `/api/skills/remote/export` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.exportRemoteSkill` -> `AppServerClient.exportRemoteSkill` |
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`41` request methods are not used by Farfield’s app-server client path:
+`39` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
@@ -193,8 +197,6 @@ removeConversationListener
 resumeConversation
 sendUserTurn
 setDefaultModel
-skills/remote/export
-skills/remote/list
 thread/realtime/appendAudio
 thread/realtime/appendText
 thread/realtime/start
@@ -247,8 +249,7 @@ No remaining methods in this category for the current upstream snapshot.
 
 ### Category D: Skills, Apps, and Feature-Discovery Surfaces Not Yet Wired
 
-1. `skills/remote/export`
-2. `skills/remote/list`
+No remaining methods in this category for the current upstream snapshot.
 
 ### Category E: MCP and Integration Surfaces Not Yet Wired
 
@@ -282,8 +283,8 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `41`
-2. Total methods listed across Category A-I: `41`
+1. Total non-intersection methods: `39`
+2. Total methods listed across Category A-I: `39`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

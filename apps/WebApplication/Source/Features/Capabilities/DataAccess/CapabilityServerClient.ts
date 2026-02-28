@@ -44,10 +44,16 @@ import {
   startAccountLogin,
 } from "./CapabilityApi";
 import {
+  type ApiExportRemoteSkillOptions,
+  type ApiListRemoteSkillsOptions,
   type ApiMcpServerOauthLoginOptions,
   type ApiMcpServerOauthLoginResponse,
+  type ApiRemoteSkillExportResponse,
+  type ApiRemoteSkillsListResponse,
   type ApiSkillsConfigWriteOptions,
   type ApiSkillsConfigWriteResponse,
+  exportRemoteSkill,
+  listRemoteSkills,
   startMcpServerOauthLogin,
   writeSkillsConfig,
 } from "./CapabilityCoverageMutationApi";
@@ -76,6 +82,10 @@ export type CapabilityExperimentalFeaturesResponse = ApiExperimentalFeaturesResp
 export type CapabilityMcpServersResponse = ApiMcpServersResponse;
 export type CapabilityMcpServerOauthLoginOptions = ApiMcpServerOauthLoginOptions;
 export type CapabilityMcpServerOauthLoginResponse = ApiMcpServerOauthLoginResponse;
+export type CapabilityListRemoteSkillsOptions = ApiListRemoteSkillsOptions;
+export type CapabilityRemoteSkillsListResponse = ApiRemoteSkillsListResponse;
+export type CapabilityExportRemoteSkillOptions = ApiExportRemoteSkillOptions;
+export type CapabilityRemoteSkillExportResponse = ApiRemoteSkillExportResponse;
 export type CapabilityListAppsOptions = ApiListAppsOptions;
 export type CapabilityAppsResponse = ApiAppsResponse;
 export type CapabilityListSkillsOptions = ApiListSkillsOptions;
@@ -165,6 +175,18 @@ export class CapabilityServerClient {
     input: CapabilitySkillsConfigWriteOptions,
   ): Promise<CapabilitySkillsConfigWriteResponse> {
     return writeSkillsConfig(input);
+  }
+
+  public async listRemoteSkills(
+    input: CapabilityListRemoteSkillsOptions,
+  ): Promise<CapabilityRemoteSkillsListResponse> {
+    return listRemoteSkills(input);
+  }
+
+  public async exportRemoteSkill(
+    input: CapabilityExportRemoteSkillOptions,
+  ): Promise<CapabilityRemoteSkillExportResponse> {
+    return exportRemoteSkill(input);
   }
 
   public async listExperimentalFeatures(
