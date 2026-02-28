@@ -36,7 +36,10 @@ import {
   UNSUPPORTED_PUSH_CLIENT_STATE,
   VISIBLE_CHAT_ITEMS_STEP,
 } from "@/Application/Configuration/ApplicationBehaviorConfiguration";
-import { ApplicationRouteStateMapper } from "@/Application/DomainModel/ApplicationRouteStateMapper";
+import {
+  type ApplicationRouteState,
+  ApplicationRouteStateMapper,
+} from "@/Application/DomainModel/ApplicationRouteStateMapper";
 import type { CoreDataModesResponse } from "@/Application/StateManagement/CoreDataSnapshotContracts";
 import { useApplicationDerivedState } from "@/Application/StateManagement/UseApplicationDerivedState";
 import { useApplicationOwnerDependencies } from "@/Application/StateManagement/UseApplicationOwnerDependencies";
@@ -57,6 +60,7 @@ import { ConversationSyncSignatureBuilder } from "@/Features/Chat/DomainModel/Co
 import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import { useSelectedThreadLoaders } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import { useTheme } from "@/Features/Theme/StateManagement/UseTheme";
+import { LastViewedThreadPreferenceStore } from "@/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
 
 const modeSelectionStateResolver = new ModeSelectionStateResolver();
 const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
@@ -65,6 +69,29 @@ const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
 const applicationRouteStateMapper = new ApplicationRouteStateMapper();
 const APPLICATION_SHELL_TOOLTIP_DELAY_MILLISECONDS = 120;
 const THREAD_ONLY_HISTORY_METHOD_IDENTIFIERS = Array.from(THREAD_ONLY_HISTORY_METHOD_NAMES);
+const APPLICATION_CHAT_HOME_PATH = "/";
+
+function shouldRestoreLastViewedThreadIdentifierFromPath(
+  pathname: string,
+  routeState: ApplicationRouteState,
+): boolean {
+  return pathname === APPLICATION_CHAT_HOME_PATH && routeState.threadId === null;
+}
+
+function readPersistedThreadIdentifierOrNull(
+  lastViewedThreadPreferenceStore: LastViewedThreadPreferenceStore,
+): string | null {
+  try {
+    return lastViewedThreadPreferenceStore.readLastViewedThreadIdentifier();
+  } catch {
+    try {
+      lastViewedThreadPreferenceStore.clearLastViewedThreadIdentifier();
+    } catch {
+      // Ignore storage cleanup errors so startup navigation state remains deterministic.
+    }
+    return null;
+  }
+}
 
 /**
  * Select the initial startup mode key, preferring a non-plan option when available.
@@ -79,10 +106,24 @@ export function readInitialModeKeyFromModes(availableModes: CoreDataModesRespons
 
 export function App(): React.JSX.Element {
   const { theme, toggle: toggleTheme } = useTheme();
-  const initialUiState = useMemo(
-    () => applicationRouteStateMapper.parseFromPathname(window.location.pathname),
-    [],
-  );
+  const lastViewedThreadPreferenceStore = useMemo(() => new LastViewedThreadPreferenceStore(), []);
+  const initialUiState = useMemo(() => {
+    const pathname = window.location.pathname;
+    const routeState = applicationRouteStateMapper.parseFromPathname(pathname);
+    if (!shouldRestoreLastViewedThreadIdentifierFromPath(pathname, routeState)) {
+      return routeState;
+    }
+    const persistedThreadIdentifier = readPersistedThreadIdentifierOrNull(
+      lastViewedThreadPreferenceStore,
+    );
+    if (persistedThreadIdentifier === null) {
+      return routeState;
+    }
+    return {
+      threadId: persistedThreadIdentifier,
+      tab: routeState.tab,
+    };
+  }, [lastViewedThreadPreferenceStore]);
 
   const applicationShellState = useApplicationShellState({
     initialUiState,
@@ -94,6 +135,7 @@ export function App(): React.JSX.Element {
     setErrorMessage: applicationShellState.setError,
     modeSelectionStateResolver,
     unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
+    lastViewedThreadPreferenceStore,
     threadOnlyHistoryMethods: THREAD_ONLY_HISTORY_METHOD_IDENTIFIERS,
     eventStreamRefreshDecisionExecutionMode: EVENT_STREAM_REFRESH_DECISION_EXECUTION_MODE,
     eventRefreshScheduleDelayMilliseconds: EVENT_REFRESH_SCHEDULE_DELAY_MS,

@@ -41,6 +41,7 @@ import { TrackedUserInterfaceErrorReporter } from "@/Features/Debugging/StateMan
 import { PushClientStateManager } from "@/Features/PushNotifications/DataAccess/PushClientStateManager";
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { PushNotificationToolbarActionCoordinator } from "@/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";
+import { LastViewedThreadPreferenceStore } from "@/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
 import { ThreadMutationServerClient } from "@/Features/Threads/DataAccess/ThreadMutationServerClient";
 import { ThreadQueryCache } from "@/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "@/Features/Threads/DataAccess/ThreadServerClient";
@@ -54,6 +55,7 @@ export interface UseApplicationOwnerDependenciesInput {
   setErrorMessage: (errorMessage: string) => void;
   modeSelectionStateResolver: ModeSelectionStateResolver;
   unsupportedPushClientState: PushClientState;
+  lastViewedThreadPreferenceStore: LastViewedThreadPreferenceStore;
   threadOnlyHistoryMethods: readonly string[];
   eventStreamRefreshDecisionExecutionMode?: "worker" | "in-thread";
   eventRefreshScheduleDelayMilliseconds: number;
@@ -109,6 +111,7 @@ export interface ApplicationOwnerDependencies<
   threadMutationServerClient: ThreadMutationServerClient;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
   threadListStateController: ThreadListStateController;
+  lastViewedThreadPreferenceStore: LastViewedThreadPreferenceStore;
   pushClientStateManager: PushClientStateManager;
   pushNotificationToolbarActionCoordinator: PushNotificationToolbarActionCoordinator;
 }
@@ -188,6 +191,7 @@ export function useApplicationOwnerDependencies<
     setErrorMessage,
     modeSelectionStateResolver,
     unsupportedPushClientState,
+    lastViewedThreadPreferenceStore,
     threadOnlyHistoryMethods,
     eventStreamRefreshDecisionExecutionMode = "in-thread",
     eventRefreshScheduleDelayMilliseconds,
@@ -380,6 +384,7 @@ export function useApplicationOwnerDependencies<
     threadMutationServerClient,
     threadMutationActionCoordinator,
     threadListStateController,
+    lastViewedThreadPreferenceStore,
     pushClientStateManager,
     pushNotificationToolbarActionCoordinator,
   };

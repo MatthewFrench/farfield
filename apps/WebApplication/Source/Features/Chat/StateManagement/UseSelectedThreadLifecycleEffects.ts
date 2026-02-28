@@ -1,4 +1,10 @@
-import { type Dispatch, type MutableRefObject, type SetStateAction, useEffect } from "react";
+import {
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+  useEffect,
+  useRef,
+} from "react";
 import { isThreadNotLoadedReadError } from "@/Features/Chat/DomainModel/ReadThreadErrorClassifier";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
@@ -12,6 +18,9 @@ import type { LoadSelectedThreadOptions } from "./UseSelectedThreadLoaders";
 
 export interface UseSelectedThreadLifecycleEffectsInput {
   selectedThreadId: string | null;
+  readNextSelectedThreadIdentifierAfterLoadFailure: (
+    failedThreadIdentifier: string,
+  ) => string | null;
   selectedThreadIdRef: MutableRefObject<string | null>;
   selectedThreadLoadTokenRef: MutableRefObject<number>;
   loadSelectedThreadRef: MutableRefObject<
@@ -29,6 +38,15 @@ export interface UseSelectedThreadLifecycleEffectsInput {
 export function useSelectedThreadLifecycleEffects(
   input: UseSelectedThreadLifecycleEffectsInput,
 ): void {
+  const readNextSelectedThreadIdentifierAfterLoadFailureRef = useRef(
+    input.readNextSelectedThreadIdentifierAfterLoadFailure,
+  );
+
+  useEffect(() => {
+    readNextSelectedThreadIdentifierAfterLoadFailureRef.current =
+      input.readNextSelectedThreadIdentifierAfterLoadFailure;
+  }, [input.readNextSelectedThreadIdentifierAfterLoadFailure]);
+
   useEffect(() => {
     return () => {
       input.selectedThreadRefreshConcurrencyCoordinator.cancelActiveRefresh();
@@ -49,6 +67,7 @@ export function useSelectedThreadLifecycleEffects(
       input.setIsSelectedThreadLoading(false);
       return;
     }
+    const selectedThreadIdentifier = input.selectedThreadId;
 
     input.setLiveState(null);
     input.setReadThreadState(null);
@@ -61,7 +80,7 @@ export function useSelectedThreadLifecycleEffects(
       return;
     }
 
-    void loadSelectedThreadFunction(input.selectedThreadId)
+    void loadSelectedThreadFunction(selectedThreadIdentifier)
       .catch((error) => {
         if (input.selectedThreadLoadTokenRef.current !== loadToken) {
           return;
@@ -71,8 +90,10 @@ export function useSelectedThreadLifecycleEffects(
         }
         const message = toErrorMessage(error);
         if (isThreadNotLoadedReadError(message)) {
-          input.setSelectedThreadId(null);
-          selectedThreadIdRef.current = null;
+          const nextSelectedThreadIdentifier =
+            readNextSelectedThreadIdentifierAfterLoadFailureRef.current(selectedThreadIdentifier);
+          input.setSelectedThreadId(nextSelectedThreadIdentifier);
+          selectedThreadIdRef.current = nextSelectedThreadIdentifier;
           return;
         }
         input.handleRuntimeRequestError(error);

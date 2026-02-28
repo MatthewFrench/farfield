@@ -127,6 +127,7 @@ export function buildApplicationRefreshEffectsInput(
     setActiveTab: applicationShellState.setActiveTab,
     setSelectedDebugIssueId: applicationShellState.setSelectedDebugIssueId,
     threadListStateController: applicationOwnerDependencies.threadListStateController,
+    lastViewedThreadPreferenceStore: applicationOwnerDependencies.lastViewedThreadPreferenceStore,
     debugIssueStateResolver: applicationOwnerDependencies.debugIssueStateResolver,
     applicationRouteStateMapper: input.applicationRouteStateMapper,
     loadCoreDataTracked: coreDataLoaders.loadCoreDataTracked,
@@ -145,6 +146,12 @@ export function buildSelectedThreadLifecycleEffectsInput(
   const { applicationShellState, applicationOwnerDependencies, runtimeRequestHandlers } = context;
   return {
     selectedThreadId: applicationShellState.selectedThreadId,
+    readNextSelectedThreadIdentifierAfterLoadFailure: (failedThreadIdentifier) => {
+      const nextActiveThread = applicationShellState.threads.find(
+        (thread) => thread.id !== failedThreadIdentifier,
+      );
+      return nextActiveThread?.id ?? null;
+    },
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
     selectedThreadLoadTokenRef: applicationShellState.selectedThreadLoadTokenRef,
     loadSelectedThreadRef: applicationShellState.loadSelectedThreadRef,

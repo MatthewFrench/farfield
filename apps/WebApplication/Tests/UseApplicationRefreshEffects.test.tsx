@@ -7,6 +7,7 @@ import {
   useApplicationRefreshEffects,
 } from "../Source/Application/StateManagement/UseApplicationRefreshEffects";
 import { DebugIssueStateResolver } from "../Source/Features/Debugging/DomainModel/DebugIssueStateResolver";
+import { LastViewedThreadPreferenceStore } from "../Source/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
 import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
 import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
@@ -19,6 +20,9 @@ const THREAD_QUERY_CACHE_MAXIMUM_ENTRY_COUNT = 100;
 const DISCONNECTED_CORE_REFRESH_INTERVAL_MILLISECONDS = 60_000;
 const CONNECTED_CORE_REFRESH_MINIMUM_INTERVAL_MILLISECONDS = 300_000;
 const CONNECTED_REFRESH_SUPPRESSION_OFFSET_MILLISECONDS = 1;
+const TEST_LAST_VIEWED_THREAD_STORAGE_KEY = "test.last-viewed-thread.preference";
+const LAST_VIEWED_THREAD_WRITE_OPERATION = "last-viewed-thread:write";
+const LAST_VIEWED_THREAD_CLEAR_OPERATION = "last-viewed-thread:clear";
 
 interface HarnessProperties {
   input: UseApplicationRefreshEffectsInput;
@@ -68,6 +72,9 @@ function createBaseInput(): UseApplicationRefreshEffectsInput {
     setActiveTab: createDispatchSpy<"chat" | "debug">(),
     setSelectedDebugIssueId: createDispatchSpy<string>(),
     threadListStateController: createThreadListStateController(),
+    lastViewedThreadPreferenceStore: new LastViewedThreadPreferenceStore(
+      TEST_LAST_VIEWED_THREAD_STORAGE_KEY,
+    ),
     debugIssueStateResolver: new DebugIssueStateResolver(),
     applicationRouteStateMapper: new ApplicationRouteStateMapper(),
     loadCoreDataTracked: vi.fn(async (): Promise<void> => {}),
@@ -98,6 +105,101 @@ describe("useApplicationRefreshEffects", () => {
     await Promise.resolve();
 
     expect(input.handleRuntimeRequestError).toHaveBeenCalledWith(expectedError);
+  });
+
+  it("stores the selected thread identifier for future startup restoration", () => {
+    const input = createBaseInput();
+    input.selectedThreadId = "thread-persist";
+    const writeLastViewedThreadIdentifierSpy = vi
+      .spyOn(input.lastViewedThreadPreferenceStore, "writeLastViewedThreadIdentifier")
+      .mockImplementation(() => {});
+
+    render(<Harness input={input} />);
+
+    expect(writeLastViewedThreadIdentifierSpy).toHaveBeenCalledWith("thread-persist");
+  });
+
+  it("does not clear the persisted thread identifier on initial no-selection render", () => {
+    const input = createBaseInput();
+    const clearLastViewedThreadIdentifierSpy = vi
+      .spyOn(input.lastViewedThreadPreferenceStore, "clearLastViewedThreadIdentifier")
+      .mockImplementation(() => {});
+
+    render(<Harness input={input} />);
+
+    expect(clearLastViewedThreadIdentifierSpy).not.toHaveBeenCalled();
+  });
+
+  it("clears the persisted thread identifier when selection transitions to no thread", () => {
+    const input = createBaseInput();
+    input.selectedThreadId = "thread-to-clear";
+    const writeLastViewedThreadIdentifierSpy = vi
+      .spyOn(input.lastViewedThreadPreferenceStore, "writeLastViewedThreadIdentifier")
+      .mockImplementation(() => {});
+    const clearLastViewedThreadIdentifierSpy = vi
+      .spyOn(input.lastViewedThreadPreferenceStore, "clearLastViewedThreadIdentifier")
+      .mockImplementation(() => {});
+
+    const { rerender } = render(<Harness input={input} />);
+    const nextInput: UseApplicationRefreshEffectsInput = {
+      ...input,
+      selectedThreadId: null,
+    };
+    rerender(<Harness input={nextInput} />);
+
+    expect(writeLastViewedThreadIdentifierSpy).toHaveBeenCalledWith("thread-to-clear");
+    expect(clearLastViewedThreadIdentifierSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports persistence write failures through runtime request error ownership", () => {
+    const expectedStorageError = new Error("write-failed");
+    const input = createBaseInput();
+    const handleRuntimeRequestError = vi.fn();
+    input.handleRuntimeRequestError = handleRuntimeRequestError;
+    input.selectedThreadId = "thread-persist";
+    vi.spyOn(
+      input.lastViewedThreadPreferenceStore,
+      "writeLastViewedThreadIdentifier",
+    ).mockImplementation(() => {
+      throw expectedStorageError;
+    });
+
+    render(<Harness input={input} />);
+
+    expect(handleRuntimeRequestError).toHaveBeenCalledTimes(1);
+    const runtimeError = handleRuntimeRequestError.mock.calls[0]?.[0];
+    expect(String(runtimeError)).toContain(LAST_VIEWED_THREAD_WRITE_OPERATION);
+    expect(String(runtimeError)).toContain("write-failed");
+  });
+
+  it("reports persistence clear failures through runtime request error ownership", () => {
+    const expectedStorageError = new Error("clear-failed");
+    const input = createBaseInput();
+    const handleRuntimeRequestError = vi.fn();
+    input.handleRuntimeRequestError = handleRuntimeRequestError;
+    input.selectedThreadId = "thread-to-clear";
+    vi.spyOn(
+      input.lastViewedThreadPreferenceStore,
+      "writeLastViewedThreadIdentifier",
+    ).mockImplementation(() => {});
+    vi.spyOn(
+      input.lastViewedThreadPreferenceStore,
+      "clearLastViewedThreadIdentifier",
+    ).mockImplementation(() => {
+      throw expectedStorageError;
+    });
+
+    const { rerender } = render(<Harness input={input} />);
+    const nextInput: UseApplicationRefreshEffectsInput = {
+      ...input,
+      selectedThreadId: null,
+    };
+    rerender(<Harness input={nextInput} />);
+
+    expect(handleRuntimeRequestError).toHaveBeenCalledTimes(1);
+    const runtimeError = handleRuntimeRequestError.mock.calls[0]?.[0];
+    expect(String(runtimeError)).toContain(LAST_VIEWED_THREAD_CLEAR_OPERATION);
+    expect(String(runtimeError)).toContain("clear-failed");
   });
 
   it("routes archived-thread load failures to runtime request error ownership", async () => {

@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { DEFAULT_LAST_VIEWED_THREAD_STORAGE_KEY } from "../Source/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
 import { OPENCODE_CAPABILITIES, registerAppTestEnvironment } from "./AppTestEnvironment";
 import { type ReadThreadFixture } from "./AppTestFixtureContracts";
 
@@ -81,6 +82,73 @@ describe("App", () => {
     });
 
     expect(await screen.findByTestId("chat-empty-no-messages")).toBeTruthy();
+  });
+
+  it("restores the last-viewed thread from browser storage when route thread selection is missing", async () => {
+    const threadId = "thread-from-storage";
+    environment.setThreadsFixture({
+      ok: true,
+      data: [
+        {
+          id: threadId,
+          preview: "restored thread preview",
+          createdAt: 1700000000,
+          updatedAt: 1700000000,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+        },
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false,
+    });
+    window.localStorage.setItem(DEFAULT_LAST_VIEWED_THREAD_STORAGE_KEY, threadId);
+
+    environment.renderApp();
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe(`/threads/${threadId}`);
+    });
+  });
+
+  it("does not restore the last-viewed thread for debug root route selection", async () => {
+    const persistedThreadId = "thread-from-storage";
+    const firstThreadId = "thread-first";
+    environment.setPathname("/debug");
+    environment.setThreadsFixture({
+      ok: true,
+      data: [
+        {
+          id: firstThreadId,
+          preview: "first thread preview",
+          createdAt: 1700000000,
+          updatedAt: 1700000000,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+        },
+        {
+          id: persistedThreadId,
+          preview: "persisted thread preview",
+          createdAt: 1700000001,
+          updatedAt: 1700000001,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+        },
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false,
+    });
+    window.localStorage.setItem(DEFAULT_LAST_VIEWED_THREAD_STORAGE_KEY, persistedThreadId);
+
+    environment.renderApp();
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe(`/threads/${firstThreadId}/debug`);
+    });
   });
 
   it("hides mode controls when capability is disabled", async () => {

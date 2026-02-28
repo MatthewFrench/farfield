@@ -55,6 +55,12 @@ interface ApplicationSynchronizationEffectsCapture {
   loadHistoryDetail: (historyEntryId: string) => Promise<void>;
 }
 
+interface SelectedThreadLifecycleEffectsCapture {
+  readNextSelectedThreadIdentifierAfterLoadFailure: (
+    failedThreadIdentifier: string,
+  ) => string | null;
+}
+
 interface ApplicationShellCompositionCapture {
   chatFeatureComposition: ChatFeatureCompositionMock;
   debugFeatureComposition: DebugFeatureCompositionMock;
@@ -174,6 +180,7 @@ import {
   type SelectedThreadLoaders,
   useSelectedThreadLoaders,
 } from "../Source/Features/Chat/StateManagement/UseSelectedThreadLoaders";
+import { LastViewedThreadPreferenceStore } from "../Source/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
 
 interface RuntimeHarnessSnapshot {
   applicationShellState: ApplicationShellState;
@@ -187,6 +194,7 @@ let latestRuntimeHarnessSnapshot: RuntimeHarnessSnapshot | null = null;
 let applicationRefreshEffectsCapture: ApplicationRefreshEffectsCapture | null = null;
 let applicationSynchronizationEffectsCapture: ApplicationSynchronizationEffectsCapture | null =
   null;
+let selectedThreadLifecycleEffectsCapture: SelectedThreadLifecycleEffectsCapture | null = null;
 let applicationShellCompositionCapture: ApplicationShellCompositionCapture | null = null;
 
 let pushFeatureCompositionMock: PushFeatureCompositionMock;
@@ -198,6 +206,9 @@ const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
   modeSelectionStateResolver,
 );
 const applicationRouteStateMapper = new ApplicationRouteStateMapper();
+const runtimeHarnessLastViewedThreadPreferenceStore = new LastViewedThreadPreferenceStore(
+  "test.runtime.last-viewed-thread.preference",
+);
 
 function createPushFeatureCompositionMock(): PushFeatureCompositionMock {
   return {
@@ -246,6 +257,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     setErrorMessage: applicationShellState.setError,
     modeSelectionStateResolver,
     unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
+    lastViewedThreadPreferenceStore: runtimeHarnessLastViewedThreadPreferenceStore,
     threadOnlyHistoryMethods: Array.from(THREAD_ONLY_HISTORY_METHOD_NAMES),
     eventRefreshScheduleDelayMilliseconds: EVENT_REFRESH_SCHEDULE_DELAY_MS,
     mobileVisualViewportKeyboardOpenDeltaPx: MOBILE_VISUAL_VIEWPORT_KEYBOARD_OPEN_DELTA_PX,
@@ -444,6 +456,7 @@ describe("useApplicationRuntimeComposition", () => {
     latestRuntimeHarnessSnapshot = null;
     applicationRefreshEffectsCapture = null;
     applicationSynchronizationEffectsCapture = null;
+    selectedThreadLifecycleEffectsCapture = null;
     applicationShellCompositionCapture = null;
 
     pushFeatureCompositionMock = createPushFeatureCompositionMock();
@@ -455,7 +468,11 @@ describe("useApplicationRuntimeComposition", () => {
     hookMocks.useApplicationDebugFeatureComposition.mockReturnValue(debugFeatureCompositionMock);
 
     hookMocks.useViewportShellEffects.mockImplementation((): void => {});
-    hookMocks.useSelectedThreadLifecycleEffects.mockImplementation((): void => {});
+    hookMocks.useSelectedThreadLifecycleEffects.mockImplementation(
+      (input: SelectedThreadLifecycleEffectsCapture): void => {
+        selectedThreadLifecycleEffectsCapture = input;
+      },
+    );
     hookMocks.useEventStreamEffects.mockImplementation((): void => {});
     hookMocks.useModeAndPendingRequestEffects.mockImplementation((): void => {});
 
@@ -554,6 +571,50 @@ describe("useApplicationRuntimeComposition", () => {
     );
     expect(synchronizationEffectsInput.loadHistoryDetail).toBe(
       debugFeatureCompositionMock.loadHistoryDetail,
+    );
+  });
+
+  it("wires selected-thread load-failure recovery to choose the next available thread", () => {
+    render(<RuntimeCompositionHarness />);
+    const harnessSnapshot = latestRuntimeHarnessSnapshot;
+    if (!harnessSnapshot) {
+      throw new Error("Expected runtime harness snapshot to be captured");
+    }
+
+    act(() => {
+      harnessSnapshot.applicationShellState.setThreads([
+        {
+          id: "thread-2",
+          preview: "second",
+          createdAt: 2,
+          updatedAt: 2,
+          agentId: "codex",
+          source: "opencode",
+        },
+        {
+          id: "thread-1",
+          preview: "first",
+          createdAt: 1,
+          updatedAt: 1,
+          agentId: "codex",
+          source: "opencode",
+        },
+      ]);
+    });
+
+    const lifecycleEffectsInput = selectedThreadLifecycleEffectsCapture;
+    if (!lifecycleEffectsInput) {
+      throw new Error("Expected selected-thread lifecycle input to be captured");
+    }
+
+    expect(lifecycleEffectsInput.readNextSelectedThreadIdentifierAfterLoadFailure("thread-2")).toBe(
+      "thread-1",
+    );
+    expect(lifecycleEffectsInput.readNextSelectedThreadIdentifierAfterLoadFailure("thread-1")).toBe(
+      "thread-2",
+    );
+    expect(lifecycleEffectsInput.readNextSelectedThreadIdentifierAfterLoadFailure("missing")).toBe(
+      "thread-2",
     );
   });
 

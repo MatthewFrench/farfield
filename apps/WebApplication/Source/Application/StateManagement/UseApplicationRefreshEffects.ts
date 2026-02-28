@@ -1,11 +1,21 @@
-import { type Dispatch, type MutableRefObject, type SetStateAction, useEffect } from "react";
+import {
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+  useEffect,
+  useRef,
+} from "react";
 import { ApplicationRouteStateMapper } from "@/Application/DomainModel/ApplicationRouteStateMapper";
 import type { DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { DebugIssueStateResolver } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
+import { LastViewedThreadPreferenceStore } from "@/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
+import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 
 const DEBUG_APPLICATION_TAB = "debug";
 const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
+const LAST_VIEWED_THREAD_WRITE_OPERATION = "last-viewed-thread:write";
+const LAST_VIEWED_THREAD_CLEAR_OPERATION = "last-viewed-thread:clear";
 
 function readNextWatchdogDelayMilliseconds(
   eventsConnected: boolean,
@@ -37,6 +47,13 @@ function shouldRefreshCoreDataForWatchdogCycle(input: WatchdogRefreshDecisionInp
   return elapsedSinceLastCoreRefreshMilliseconds >= input.connectedMinimumIntervalMilliseconds;
 }
 
+function createLastViewedThreadPreferenceError<ErrorType>(
+  operation: string,
+  error: ErrorType,
+): Error {
+  return new Error(`${operation}: ${toErrorMessage(error).trim()}`);
+}
+
 export interface UseApplicationRefreshEffectsInput {
   selectedThreadId: string | null;
   activeTab: "chat" | "debug";
@@ -58,6 +75,7 @@ export interface UseApplicationRefreshEffectsInput {
   setActiveTab: Dispatch<SetStateAction<"chat" | "debug">>;
   setSelectedDebugIssueId: Dispatch<SetStateAction<string>>;
   threadListStateController: ThreadListStateController;
+  lastViewedThreadPreferenceStore: LastViewedThreadPreferenceStore;
   debugIssueStateResolver: DebugIssueStateResolver;
   applicationRouteStateMapper: ApplicationRouteStateMapper;
   loadCoreDataTracked: () => Promise<void>;
@@ -70,11 +88,34 @@ export interface UseApplicationRefreshEffectsInput {
 }
 
 export function useApplicationRefreshEffects(input: UseApplicationRefreshEffectsInput): void {
+  const previousSelectedThreadIdentifierRef = useRef<string | null>(input.selectedThreadId);
+
   useEffect(() => {
+    const previousSelectedThreadIdentifier = previousSelectedThreadIdentifierRef.current;
+    previousSelectedThreadIdentifierRef.current = input.selectedThreadId;
     const selectedThreadIdRef = input.selectedThreadIdRef;
     selectedThreadIdRef.current = input.selectedThreadId;
     if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
+      if (
+        previousSelectedThreadIdentifier !== null &&
+        previousSelectedThreadIdentifier.length > 0
+      ) {
+        try {
+          input.lastViewedThreadPreferenceStore.clearLastViewedThreadIdentifier();
+        } catch (error) {
+          input.handleRuntimeRequestError(
+            createLastViewedThreadPreferenceError(LAST_VIEWED_THREAD_CLEAR_OPERATION, error),
+          );
+        }
+      }
       return;
+    }
+    try {
+      input.lastViewedThreadPreferenceStore.writeLastViewedThreadIdentifier(input.selectedThreadId);
+    } catch (error) {
+      input.handleRuntimeRequestError(
+        createLastViewedThreadPreferenceError(LAST_VIEWED_THREAD_WRITE_OPERATION, error),
+      );
     }
 
     input.setUnreadThreadIds((previousUnreadThreadIdentifiers) =>
@@ -86,7 +127,9 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   }, [
     input.selectedThreadId,
     input.selectedThreadIdRef,
+    input.handleRuntimeRequestError,
     input.setUnreadThreadIds,
+    input.lastViewedThreadPreferenceStore,
     input.threadListStateController,
   ]);
 

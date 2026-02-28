@@ -8,6 +8,7 @@ import {
 import { type CapabilitySnapshotRecord } from "../Source/Features/Capabilities/DataAccess/CapabilitySnapshotCache";
 import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import { type PushClientState } from "../Source/Features/PushNotifications/DomainModel/PushClientContracts";
+import { LastViewedThreadPreferenceStore } from "../Source/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
 
 interface HarnessProperties {
   input: UseApplicationOwnerDependenciesInput;
@@ -52,6 +53,9 @@ function createBaseInput(): UseApplicationOwnerDependenciesInput {
     setErrorMessage: vi.fn(),
     modeSelectionStateResolver: new ModeSelectionStateResolver(),
     unsupportedPushClientState: createUnsupportedPushClientState(),
+    lastViewedThreadPreferenceStore: new LastViewedThreadPreferenceStore(
+      "test.last-viewed-thread.preference",
+    ),
     threadOnlyHistoryMethods: ["read-thread"],
     eventRefreshScheduleDelayMilliseconds: 250,
     mobileVisualViewportKeyboardOpenDeltaPx: 80,
@@ -132,6 +136,9 @@ function expectSingletonOwnersStable(
   );
   expect(nextDependencies.threadMutationActionCoordinator).toBe(
     previousDependencies.threadMutationActionCoordinator,
+  );
+  expect(nextDependencies.lastViewedThreadPreferenceStore).toBe(
+    previousDependencies.lastViewedThreadPreferenceStore,
   );
   expect(nextDependencies.pushClientStateManager).toBe(previousDependencies.pushClientStateManager);
 }
