@@ -44,9 +44,11 @@ import { PushClientStateManager } from "@/Features/PushNotifications/DataAccess/
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { PushNotificationToolbarActionCoordinator } from "@/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";
 import { LastViewedThreadPreferenceStore } from "@/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
+import { ThreadDisplayNamePreferenceStore } from "@/Features/Threads/DataAccess/ThreadDisplayNamePreferenceStore";
 import { ThreadMutationServerClient } from "@/Features/Threads/DataAccess/ThreadMutationServerClient";
 import { ThreadQueryCache } from "@/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "@/Features/Threads/DataAccess/ThreadServerClient";
+import { ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import { ThreadListPresentationStateResolver } from "@/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import { ThreadListPresentationWorkerOwner } from "@/Features/Threads/StateManagement/ThreadListPresentationWorkerOwner";
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
@@ -59,6 +61,7 @@ export interface UseApplicationOwnerDependenciesInput {
   modeSelectionStateResolver: ModeSelectionStateResolver;
   unsupportedPushClientState: PushClientState;
   lastViewedThreadPreferenceStore: LastViewedThreadPreferenceStore;
+  threadDisplayNamePreferenceStore: ThreadDisplayNamePreferenceStore;
   threadOnlyHistoryMethods: readonly string[];
   eventStreamRefreshDecisionExecutionMode?: "worker" | "in-thread";
   threadListPresentationExecutionMode?: "worker" | "in-thread";
@@ -119,6 +122,7 @@ export interface ApplicationOwnerDependencies<
   conversationItemFlatteningWorkerOwner: ConversationItemFlatteningWorkerOwner | null;
   threadMutationServerClient: ThreadMutationServerClient;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
+  threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
   threadListStateController: ThreadListStateController;
   lastViewedThreadPreferenceStore: LastViewedThreadPreferenceStore;
   pushClientStateManager: PushClientStateManager;
@@ -142,6 +146,7 @@ interface SelectedThreadRetryConfiguration {
 interface ThreadListStateControllerConfiguration {
   threadQueryCacheTimeToLiveMilliseconds: number;
   threadQueryCacheMaximumEntries: number;
+  threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
 }
 
 // These owner instances retain mutable runtime state and must remain stable across rerenders.
@@ -188,6 +193,7 @@ function createThreadListStateController(
     threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
     threadListStateStore: new ThreadListStateStore(),
     threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
+    threadDisplayNameStateOwner: configuration.threadDisplayNameStateOwner,
   });
 }
 
@@ -201,6 +207,7 @@ export function useApplicationOwnerDependencies<
     modeSelectionStateResolver,
     unsupportedPushClientState,
     lastViewedThreadPreferenceStore,
+    threadDisplayNamePreferenceStore,
     threadOnlyHistoryMethods,
     eventStreamRefreshDecisionExecutionMode = "in-thread",
     threadListPresentationExecutionMode = "in-thread",
@@ -379,13 +386,25 @@ export function useApplicationOwnerDependencies<
   const threadMutationActionCoordinator = useStableOwner(
     () => new ThreadMutationActionCoordinator(),
   );
+  const threadDisplayNameStateOwner = useMemo(
+    () =>
+      new ThreadDisplayNameStateOwner({
+        threadDisplayNamePreferenceStore,
+      }),
+    [threadDisplayNamePreferenceStore],
+  );
   const threadListStateController = useMemo(
     () =>
       createThreadListStateController({
         threadQueryCacheTimeToLiveMilliseconds,
         threadQueryCacheMaximumEntries,
+        threadDisplayNameStateOwner,
       }),
-    [threadQueryCacheMaximumEntries, threadQueryCacheTimeToLiveMilliseconds],
+    [
+      threadDisplayNameStateOwner,
+      threadQueryCacheMaximumEntries,
+      threadQueryCacheTimeToLiveMilliseconds,
+    ],
   );
   const threadListPresentationWorkerOwner = useMemo(() => {
     if (threadListPresentationExecutionMode === "worker") {
@@ -451,6 +470,7 @@ export function useApplicationOwnerDependencies<
     conversationItemFlatteningWorkerOwner,
     threadMutationServerClient,
     threadMutationActionCoordinator,
+    threadDisplayNameStateOwner,
     threadListStateController,
     lastViewedThreadPreferenceStore,
     pushClientStateManager,

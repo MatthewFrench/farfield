@@ -15,6 +15,7 @@ import {
 import { type ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { type DebugActionHandlers } from "@/Features/Debugging/StateManagement/UseDebugActionHandlers";
 import { type ThreadMutationServerClient } from "@/Features/Threads/DataAccess/ThreadMutationServerClient";
+import { type ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import { type ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import {
   type ThreadMutationActionCoordinator,
@@ -53,6 +54,7 @@ export interface UseApplicationShellCompositionInput {
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
   threadMutationServerClient: ThreadMutationServerClient;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
+  threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
   threadListStateController: ThreadListStateController;
   mobileSidebarSwipeCoordinator: MobileSidebarSwipeCoordinator;
   runtimeViewportSizingCoordinator: RuntimeViewportSizingCoordinator;
@@ -102,6 +104,7 @@ function buildThreadActionHandlersInput(
       applicationShellState.pendingThreadMaterializationCoordinator,
     threadMutationActionCoordinator: input.threadMutationActionCoordinator,
     threadMutationServerClient: input.threadMutationServerClient,
+    threadDisplayNameStateOwner: input.threadDisplayNameStateOwner,
     threadListStateController: input.threadListStateController,
     loadCoreDataTracked: input.loadCoreDataTracked,
     loadSelectedThreadTracked: input.loadSelectedThreadTracked,

@@ -1,5 +1,6 @@
 import { type Dispatch, type MutableRefObject, type SetStateAction, startTransition } from "react";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
+import { type ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import {
   type ChatLiveStateResponse,
   type ChatReadThreadResponse,
@@ -36,9 +37,35 @@ export interface SelectedThreadSnapshotStateOwnerDependencies {
   pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator;
   conversationSyncSignatureBuilder: ConversationSyncSignatureBuilder;
   readThreadStateMerger: ReadThreadStateMerger;
+  threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
   setLiveState: Dispatch<SetStateAction<LiveStateResponse | null>>;
   setReadThreadState: Dispatch<SetStateAction<ReadThreadResponse | null>>;
   setStreamEvents: Dispatch<SetStateAction<StreamEventsResponse["events"]>>;
+}
+
+function normalizeOptionalThreadDisplayName(value: string | null | undefined): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const trimmedValue = value.trim();
+  if (trimmedValue.length === 0) {
+    return undefined;
+  }
+  return trimmedValue;
+}
+
+function readThreadDisplayNameFromSnapshots(
+  snapshotInput: ApplySnapshotsToStateInput,
+): string | undefined {
+  const parsedReadThreadDisplayName = normalizeOptionalThreadDisplayName(
+    snapshotInput.readThreadSnapshot?.thread.title,
+  );
+  if (parsedReadThreadDisplayName !== undefined) {
+    return parsedReadThreadDisplayName;
+  }
+  return normalizeOptionalThreadDisplayName(
+    snapshotInput.liveStateSnapshot.conversationState?.title,
+  );
 }
 
 function hasTurnsInSelectedThreadSnapshots(
@@ -82,6 +109,13 @@ export class SelectedThreadSnapshotStateOwner {
       snapshotInput.liveStateSnapshot,
       snapshotInput.readThreadSnapshot,
     );
+    const threadDisplayName = readThreadDisplayNameFromSnapshots(snapshotInput);
+    if (threadDisplayName !== undefined) {
+      this.deps.threadDisplayNameStateOwner.writeThreadDisplayName(
+        snapshotInput.threadId,
+        threadDisplayName,
+      );
+    }
     if (containsAnyTurns) {
       this.deps.pendingThreadMaterializationCoordinator.clearPending(snapshotInput.threadId);
     }

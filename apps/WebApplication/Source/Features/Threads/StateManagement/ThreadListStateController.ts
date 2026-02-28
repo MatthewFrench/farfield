@@ -1,6 +1,7 @@
 import { ThreadQueryCache } from "../DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "../DataAccess/ThreadServerClient";
 import type { ThreadListLoadOptions, ThreadListResponse } from "../DomainModel/ThreadGroupTypes";
+import { ThreadDisplayNameStateOwner } from "./ThreadDisplayNameStateOwner";
 import {
   readThreadListCacheKeyForArchiveState,
   ThreadListCacheKeyByName,
@@ -19,6 +20,20 @@ import {
 import { ThreadRefreshConcurrencyCoordinator } from "./ThreadRefreshConcurrencyCoordinator";
 
 const THREAD_LIST_RESPONSE_NOT_TRUNCATED = false;
+
+class InMemoryThreadDisplayNamePreferenceStore {
+  public readThreadDisplayName(_threadIdentifier: string): string | null {
+    return null;
+  }
+
+  public writeThreadDisplayName(_threadIdentifier: string, _threadDisplayName: string): void {
+    // Non-browser construction paths keep display names in owner memory only.
+  }
+
+  public clearThreadDisplayName(_threadIdentifier: string): void {
+    // Non-browser construction paths keep display names in owner memory only.
+  }
+}
 
 export interface LoadActiveThreadStateInput {
   limit: number;
@@ -102,6 +117,7 @@ interface ThreadListStateControllerDependencies {
   threadRefreshConcurrencyCoordinator: ThreadRefreshConcurrencyCoordinator;
   threadListStateStore: ThreadListStateStore;
   threadListPresentationStateResolver: ThreadListPresentationStateResolver;
+  threadDisplayNameStateOwner?: ThreadDisplayNameStateOwner;
 }
 
 export class ThreadListStateController {
@@ -110,6 +126,7 @@ export class ThreadListStateController {
   private readonly threadRefreshConcurrencyCoordinator: ThreadRefreshConcurrencyCoordinator;
   private readonly threadListStateStore: ThreadListStateStore;
   private readonly threadListPresentationStateResolver: ThreadListPresentationStateResolver;
+  private readonly threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
 
   /**
    * Owns active and archived thread list loading policy, including cache keys and
@@ -121,6 +138,11 @@ export class ThreadListStateController {
     this.threadRefreshConcurrencyCoordinator = dependencies.threadRefreshConcurrencyCoordinator;
     this.threadListStateStore = dependencies.threadListStateStore;
     this.threadListPresentationStateResolver = dependencies.threadListPresentationStateResolver;
+    this.threadDisplayNameStateOwner =
+      dependencies.threadDisplayNameStateOwner ??
+      new ThreadDisplayNameStateOwner({
+        threadDisplayNamePreferenceStore: new InMemoryThreadDisplayNamePreferenceStore(),
+      });
   }
 
   public async loadActiveThreadState(
@@ -275,8 +297,13 @@ export class ThreadListStateController {
     if (readFromCache) {
       const cachedResponse = this.threadQueryCache.readFresh(cacheKey);
       if (cachedResponse) {
+        const cachedResponseWithDisplayNames =
+          this.applyDisplayNamesToThreadListResponse(cachedResponse);
+        if (cachedResponseWithDisplayNames !== cachedResponse) {
+          this.threadQueryCache.write(cacheKey, cachedResponseWithDisplayNames);
+        }
         return {
-          response: cachedResponse,
+          response: cachedResponseWithDisplayNames,
           loadedFromCache: true,
         };
       }
@@ -286,14 +313,28 @@ export class ThreadListStateController {
       cacheKey,
       async () => {
         const nextResponse = await this.threadServerClient.listThreads(loadOptions);
-        this.threadQueryCache.write(cacheKey, nextResponse);
-        return nextResponse;
+        const responseWithDisplayNames = this.applyDisplayNamesToThreadListResponse(nextResponse);
+        this.threadQueryCache.write(cacheKey, responseWithDisplayNames);
+        return responseWithDisplayNames;
       },
     );
 
     return {
       response,
       loadedFromCache: false,
+    };
+  }
+
+  private applyDisplayNamesToThreadListResponse(response: ThreadListResponse): ThreadListResponse {
+    const nextThreadListItems = this.threadDisplayNameStateOwner.applyDisplayNamesToThreadList(
+      response.data,
+    );
+    if (nextThreadListItems === response.data) {
+      return response;
+    }
+    return {
+      ...response,
+      data: nextThreadListItems,
     };
   }
 }

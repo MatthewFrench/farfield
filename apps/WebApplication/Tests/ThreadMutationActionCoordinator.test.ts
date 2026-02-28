@@ -494,6 +494,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const onSetErrorMessage = vi.fn();
     const onInvalidateActiveThreadQuery = vi.fn();
     const onInvalidateArchivedThreadQuery = vi.fn();
+    const onThreadNameUpdated = vi.fn();
     const loadCoreData = vi.fn(async () => {});
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
@@ -515,6 +516,7 @@ describe("ThreadMutationActionCoordinator", () => {
       onSetErrorMessage,
       onInvalidateActiveThreadQuery,
       onInvalidateArchivedThreadQuery,
+      onThreadNameUpdated,
       loadCoreData,
       threadMutationClient,
       reportTrackedUserInterfaceError,
@@ -525,6 +527,7 @@ describe("ThreadMutationActionCoordinator", () => {
       actionName: "set-thread-name",
     });
     expect(onSetErrorMessage).not.toHaveBeenCalled();
+    expect(onThreadNameUpdated).toHaveBeenCalledWith("thread-1", "New title");
     expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
     expect(onInvalidateArchivedThreadQuery).toHaveBeenCalledTimes(1);
     expect(loadCoreData).toHaveBeenCalledTimes(1);

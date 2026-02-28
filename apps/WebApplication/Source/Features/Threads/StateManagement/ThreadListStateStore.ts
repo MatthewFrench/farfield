@@ -175,6 +175,7 @@ export class ThreadListStateStore {
     return [
       thread.id,
       String(thread.updatedAt),
+      thread.displayName ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
       thread.preview,
       thread.agentId,
       thread.cwd ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,

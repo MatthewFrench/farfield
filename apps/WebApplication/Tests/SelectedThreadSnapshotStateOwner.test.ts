@@ -1,6 +1,6 @@
 import type { IpcFrame } from "@farfield/protocol";
 import { type Dispatch, type MutableRefObject, type SetStateAction } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   type ChatLiveStateResponse,
   type ChatReadThreadResponse,
@@ -13,12 +13,43 @@ import {
   type ApplySnapshotsToStateInput,
   SelectedThreadSnapshotStateOwner,
 } from "@/Features/Chat/StateManagement/SelectedThreadSnapshotStateOwner";
+import { ThreadDisplayNamePreferenceStore } from "@/Features/Threads/DataAccess/ThreadDisplayNamePreferenceStore";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
+import { ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 
 interface SnapshotOwnerHarness {
   owner: SelectedThreadSnapshotStateOwner;
   selectedThreadIdRef: MutableRefObject<string | null>;
   readStreamEvents: () => ChatStreamEventsResponse["events"];
+  readPersistedThreadDisplayName: () => string | null;
+}
+
+const originalLocalStorage = window.localStorage;
+
+function createStorageMock(): Storage {
+  const storageValues = new Map<string, string>();
+
+  return {
+    get length() {
+      return storageValues.size;
+    },
+    clear() {
+      storageValues.clear();
+    },
+    getItem(key: string): string | null {
+      const value = storageValues.get(key);
+      return value === undefined ? null : value;
+    },
+    key(index: number): string | null {
+      return Array.from(storageValues.keys())[index] ?? null;
+    },
+    removeItem(key: string): void {
+      storageValues.delete(key);
+    },
+    setItem(key: string, value: string): void {
+      storageValues.set(key, value);
+    },
+  };
 }
 
 function buildBroadcastEvent(method: string): IpcFrame {
@@ -31,11 +62,13 @@ function buildBroadcastEvent(method: string): IpcFrame {
 
 function buildConversationState(
   threadId: string,
+  title?: string,
 ): NonNullable<ChatLiveStateResponse["conversationState"]> {
   return {
     id: threadId,
     turns: [],
     requests: [],
+    title,
     updatedAt: 1_700_000_000,
     latestModel: "gpt-5.3-codex",
     latestReasoningEffort: "medium",
@@ -50,12 +83,12 @@ function buildConversationState(
   };
 }
 
-function buildLiveStateSnapshot(threadId: string): ChatLiveStateResponse {
+function buildLiveStateSnapshot(threadId: string, title?: string): ChatLiveStateResponse {
   return {
     ok: true,
     threadId,
     ownerClientId: null,
-    conversationState: buildConversationState(threadId),
+    conversationState: buildConversationState(threadId, title),
     liveStateError: null,
   };
 }
@@ -120,6 +153,10 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
   let readThreadState: ChatReadThreadResponse | null = null;
   let streamEvents: ChatStreamEventsResponse["events"] = [];
 
+  const threadDisplayNamePreferenceStore = new ThreadDisplayNamePreferenceStore(
+    `test.selected-thread-snapshot.display-name.${initialSelectedThreadId}`,
+  );
+
   const owner = new SelectedThreadSnapshotStateOwner({
     appDefaultModel: "gpt-5.3-codex",
     appDefaultReasoningEffort: "medium",
@@ -129,6 +166,9 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
       new ModeSelectionStateResolver(),
     ),
     readThreadStateMerger: new ReadThreadStateMerger(),
+    threadDisplayNameStateOwner: new ThreadDisplayNameStateOwner({
+      threadDisplayNamePreferenceStore,
+    }),
     setLiveState: createStateSetter(
       () => liveState,
       (nextState) => {
@@ -153,10 +193,26 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
     owner,
     selectedThreadIdRef,
     readStreamEvents: () => streamEvents,
+    readPersistedThreadDisplayName: () =>
+      threadDisplayNamePreferenceStore.readThreadDisplayName(initialSelectedThreadId),
   };
 }
 
 describe("SelectedThreadSnapshotStateOwner", () => {
+  beforeEach(() => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: createStorageMock(),
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: originalLocalStorage,
+    });
+  });
+
   it("forces a full stream read cursor when switching to another thread", () => {
     const harness = createHarness("thread-1");
     harness.owner.applySnapshots(
@@ -221,5 +277,28 @@ describe("SelectedThreadSnapshotStateOwner", () => {
 
     expect(harness.readStreamEvents()).toEqual([buildBroadcastEvent("event-1")]);
     expect(harness.owner.readStreamEventsSinceSequence("thread-1")).toBe(1);
+  });
+
+  it("writes thread display name from snapshot titles", () => {
+    const harness = createHarness("thread-1");
+
+    harness.owner.applySnapshots({
+      threadId: "thread-1",
+      liveStateSnapshot: buildLiveStateSnapshot(
+        "thread-1",
+        "  Configure Caddy for Farfield site  ",
+      ),
+      streamEventsSnapshot: buildStreamEventsSnapshot({
+        threadId: "thread-1",
+        events: [],
+        nextSequence: 0,
+        resetRequired: false,
+      }),
+      streamEventsSinceSequenceUsed: null,
+      readThreadSnapshot: null,
+      includeTurnsUsedForRead: false,
+    });
+
+    expect(harness.readPersistedThreadDisplayName()).toBe("Configure Caddy for Farfield site");
   });
 });

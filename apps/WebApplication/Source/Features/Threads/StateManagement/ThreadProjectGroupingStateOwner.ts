@@ -161,6 +161,7 @@ function readThreadSignatureValue(thread: ThreadListItem): string {
     thread.id,
     String(thread.updatedAt),
     String(thread.createdAt),
+    thread.displayName ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
     thread.preview,
     thread.agentId,
     thread.source ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,

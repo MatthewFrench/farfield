@@ -181,6 +181,7 @@ import {
   useSelectedThreadLoaders,
 } from "../Source/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import { LastViewedThreadPreferenceStore } from "../Source/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
+import { ThreadDisplayNamePreferenceStore } from "../Source/Features/Threads/DataAccess/ThreadDisplayNamePreferenceStore";
 
 interface RuntimeHarnessSnapshot {
   applicationShellState: ApplicationShellState;
@@ -208,6 +209,9 @@ const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
 const applicationRouteStateMapper = new ApplicationRouteStateMapper();
 const runtimeHarnessLastViewedThreadPreferenceStore = new LastViewedThreadPreferenceStore(
   "test.runtime.last-viewed-thread.preference",
+);
+const runtimeHarnessThreadDisplayNamePreferenceStore = new ThreadDisplayNamePreferenceStore(
+  "test.runtime.thread-display-name.preference",
 );
 
 function createPushFeatureCompositionMock(): PushFeatureCompositionMock {
@@ -258,6 +262,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     modeSelectionStateResolver,
     unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
     lastViewedThreadPreferenceStore: runtimeHarnessLastViewedThreadPreferenceStore,
+    threadDisplayNamePreferenceStore: runtimeHarnessThreadDisplayNamePreferenceStore,
     threadOnlyHistoryMethods: Array.from(THREAD_ONLY_HISTORY_METHOD_NAMES),
     eventRefreshScheduleDelayMilliseconds: EVENT_REFRESH_SCHEDULE_DELAY_MS,
     mobileVisualViewportKeyboardOpenDeltaPx: MOBILE_VISUAL_VIEWPORT_KEYBOARD_OPEN_DELTA_PX,
@@ -406,6 +411,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
       applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,
     readThreadStateMerger: applicationOwnerDependencies.readThreadStateMerger,
     chatServerClient: applicationOwnerDependencies.chatServerClient,
+    threadDisplayNameStateOwner: applicationOwnerDependencies.threadDisplayNameStateOwner,
     setLiveState: applicationShellState.setLiveState,
     setReadThreadState: applicationShellState.setReadThreadState,
     setStreamEvents: applicationShellState.setStreamEvents,

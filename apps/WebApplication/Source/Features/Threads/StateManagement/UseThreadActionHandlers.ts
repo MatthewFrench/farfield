@@ -3,6 +3,7 @@ import type { AgentId } from "@/Shared/Contracts/ApiContracts";
 import { type ThreadMutationServerClient } from "../DataAccess/ThreadMutationServerClient";
 import { type ThreadListItem } from "../DomainModel/ThreadGroupTypes";
 import { PendingThreadMaterializationCoordinator } from "./PendingThreadMaterializationCoordinator";
+import { type ThreadDisplayNameStateOwner } from "./ThreadDisplayNameStateOwner";
 import { ThreadListStateController } from "./ThreadListStateController";
 import {
   type CreateThreadActionInput,
@@ -26,6 +27,7 @@ export interface UseThreadActionHandlersInput {
   pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
   threadMutationServerClient: ThreadMutationServerClient;
+  threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
   threadListStateController: ThreadListStateController;
   loadCoreDataTracked: () => Promise<void>;
   loadSelectedThreadTracked: (threadId: string) => Promise<void>;
@@ -233,6 +235,12 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         onInvalidateArchivedThreadQuery: () => {
           input.threadListStateController.invalidateArchivedThreadQuery();
         },
+        onThreadNameUpdated: (updatedThreadIdentifier, threadName) => {
+          input.threadDisplayNameStateOwner.writeThreadDisplayName(
+            updatedThreadIdentifier,
+            threadName,
+          );
+        },
         loadCoreData: input.loadCoreDataTracked,
         threadMutationClient: input.threadMutationServerClient,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
@@ -244,6 +252,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       input.reportTrackedUserInterfaceError,
       input.setError,
       input.setIsBusy,
+      input.threadDisplayNameStateOwner,
       input.threadListStateController,
       input.threadMutationActionCoordinator,
       input.threadMutationServerClient,

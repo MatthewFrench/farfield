@@ -27,9 +27,11 @@ import { type ChatModeToolbarProps } from "../Source/Features/Chat/UserInterface
 import { DebugIssueStateResolver } from "../Source/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugActionHandlers } from "../Source/Features/Debugging/StateManagement/UseDebugActionHandlers";
 import { type PushClientState } from "../Source/Features/PushNotifications/DomainModel/PushClientContracts";
+import { ThreadDisplayNamePreferenceStore } from "../Source/Features/Threads/DataAccess/ThreadDisplayNamePreferenceStore";
 import { ThreadMutationServerClient } from "../Source/Features/Threads/DataAccess/ThreadMutationServerClient";
 import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
+import { ThreadDisplayNameStateOwner } from "../Source/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import { ThreadListStateController } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
 import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement/ThreadListStateStore";
@@ -75,6 +77,7 @@ interface ShellCompositionFixture {
   reportTrackedUserInterfaceError: () => Promise<void>;
   threadMutationServerClient: ThreadMutationServerClient;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
+  threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
   threadListStateController: ThreadListStateController;
   mobileSidebarSwipeCoordinator: MobileSidebarSwipeCoordinator;
   runtimeViewportSizingCoordinator: RuntimeViewportSizingCoordinator;
@@ -207,6 +210,11 @@ function createShellCompositionFixture(): ShellCompositionFixture {
     reportTrackedUserInterfaceError: vi.fn(async (): Promise<void> => {}),
     threadMutationServerClient: new ThreadMutationServerClient(),
     threadMutationActionCoordinator: new ThreadMutationActionCoordinator(),
+    threadDisplayNameStateOwner: new ThreadDisplayNameStateOwner({
+      threadDisplayNamePreferenceStore: new ThreadDisplayNamePreferenceStore(
+        "test.use-application-shell-composition.display-name",
+      ),
+    }),
     threadListStateController,
     mobileSidebarSwipeCoordinator: new MobileSidebarSwipeCoordinator({
       mobileLayoutMaximumWidthPx: MOBILE_LAYOUT_MAXIMUM_WIDTH_PX,
@@ -311,6 +319,7 @@ function RuntimeHarness(properties: RuntimeHarnessProperties): React.JSX.Element
     reportTrackedUserInterfaceError: properties.fixture.reportTrackedUserInterfaceError,
     threadMutationServerClient: properties.fixture.threadMutationServerClient,
     threadMutationActionCoordinator: properties.fixture.threadMutationActionCoordinator,
+    threadDisplayNameStateOwner: properties.fixture.threadDisplayNameStateOwner,
     threadListStateController: properties.fixture.threadListStateController,
     mobileSidebarSwipeCoordinator: properties.fixture.mobileSidebarSwipeCoordinator,
     runtimeViewportSizingCoordinator: properties.fixture.runtimeViewportSizingCoordinator,
@@ -376,6 +385,7 @@ describe("useApplicationShellComposition", () => {
         runtimeHarnessSnapshot.applicationShellState.pendingThreadMaterializationCoordinator,
       threadMutationActionCoordinator: fixture.threadMutationActionCoordinator,
       threadMutationServerClient: fixture.threadMutationServerClient,
+      threadDisplayNameStateOwner: fixture.threadDisplayNameStateOwner,
       threadListStateController: fixture.threadListStateController,
       loadCoreDataTracked: fixture.loadCoreDataTracked,
       loadSelectedThreadTracked: fixture.loadSelectedThreadTracked,

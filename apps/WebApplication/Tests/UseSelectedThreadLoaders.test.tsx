@@ -21,8 +21,10 @@ import {
   type SelectedThreadLoaders,
   useSelectedThreadLoaders,
 } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
+import { ThreadDisplayNamePreferenceStore } from "@/Features/Threads/DataAccess/ThreadDisplayNamePreferenceStore";
 import type { ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
+import { ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import type { AgentId } from "@/Shared/Contracts/ApiContracts";
 
 interface SelectedThreadLoadersHarnessSnapshot {
@@ -44,6 +46,7 @@ interface SelectedThreadLoadersHarnessProperties {
   selectedThreadRefreshConcurrencyCoordinator: SelectedThreadRefreshConcurrencyCoordinator;
   readThreadStateMerger: ReadThreadStateMerger;
   chatServerClient: ChatServerClient;
+  threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
   onSnapshot: (snapshot: SelectedThreadLoadersHarnessSnapshot) => void;
 }
 
@@ -90,6 +93,7 @@ function SelectedThreadLoadersHarness(
       properties.selectedThreadRefreshConcurrencyCoordinator,
     readThreadStateMerger: properties.readThreadStateMerger,
     chatServerClient: properties.chatServerClient,
+    threadDisplayNameStateOwner: properties.threadDisplayNameStateOwner,
     setLiveState,
     setReadThreadState,
     setStreamEvents,
@@ -115,6 +119,12 @@ function buildThreadListItem(threadId: string): ThreadListItem {
     updatedAt: 1_700_000_000,
     agentId: "codex",
   };
+}
+
+function createThreadDisplayNameStateOwner(storageKeyPrefix: string): ThreadDisplayNameStateOwner {
+  return new ThreadDisplayNameStateOwner({
+    threadDisplayNamePreferenceStore: new ThreadDisplayNamePreferenceStore(storageKeyPrefix),
+  });
 }
 
 function buildBroadcastEvent(method: string): IpcFrame {
@@ -258,6 +268,9 @@ describe("useSelectedThreadLoaders", () => {
         selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
         readThreadStateMerger={new ReadThreadStateMerger()}
         chatServerClient={new ChatServerClient()}
+        threadDisplayNameStateOwner={createThreadDisplayNameStateOwner(
+          "test.use-selected-thread-loaders.display-name.append",
+        )}
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
@@ -339,6 +352,9 @@ describe("useSelectedThreadLoaders", () => {
         selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
         readThreadStateMerger={new ReadThreadStateMerger()}
         chatServerClient={new ChatServerClient()}
+        threadDisplayNameStateOwner={createThreadDisplayNameStateOwner(
+          "test.use-selected-thread-loaders.display-name.defaults",
+        )}
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
@@ -386,6 +402,9 @@ describe("useSelectedThreadLoaders", () => {
         selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
         readThreadStateMerger={new ReadThreadStateMerger()}
         chatServerClient={new ChatServerClient()}
+        threadDisplayNameStateOwner={createThreadDisplayNameStateOwner(
+          "test.use-selected-thread-loaders.display-name.stream-delta",
+        )}
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}
@@ -478,6 +497,9 @@ describe("useSelectedThreadLoaders", () => {
         selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
         readThreadStateMerger={new ReadThreadStateMerger()}
         chatServerClient={new ChatServerClient()}
+        threadDisplayNameStateOwner={createThreadDisplayNameStateOwner(
+          "test.use-selected-thread-loaders.display-name.materialization",
+        )}
         onSnapshot={(snapshot) => {
           snapshotReference.current = snapshot;
         }}

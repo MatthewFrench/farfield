@@ -382,6 +382,7 @@ export function buildApplicationShellCompositionInput(
     reportTrackedUserInterfaceError: runtimeRequestHandlers.reportTrackedUserInterfaceError,
     threadMutationServerClient: applicationOwnerDependencies.threadMutationServerClient,
     threadMutationActionCoordinator: applicationOwnerDependencies.threadMutationActionCoordinator,
+    threadDisplayNameStateOwner: applicationOwnerDependencies.threadDisplayNameStateOwner,
     threadListStateController: applicationOwnerDependencies.threadListStateController,
     mobileSidebarSwipeCoordinator: applicationOwnerDependencies.mobileSidebarSwipeCoordinator,
     runtimeViewportSizingCoordinator: applicationOwnerDependencies.runtimeViewportSizingCoordinator,

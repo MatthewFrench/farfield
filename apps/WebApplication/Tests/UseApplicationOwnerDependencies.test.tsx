@@ -9,6 +9,7 @@ import { type CapabilitySnapshotRecord } from "../Source/Features/Capabilities/D
 import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import { type PushClientState } from "../Source/Features/PushNotifications/DomainModel/PushClientContracts";
 import { LastViewedThreadPreferenceStore } from "../Source/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
+import { ThreadDisplayNamePreferenceStore } from "../Source/Features/Threads/DataAccess/ThreadDisplayNamePreferenceStore";
 
 interface HarnessProperties {
   input: UseApplicationOwnerDependenciesInput;
@@ -55,6 +56,9 @@ function createBaseInput(): UseApplicationOwnerDependenciesInput {
     unsupportedPushClientState: createUnsupportedPushClientState(),
     lastViewedThreadPreferenceStore: new LastViewedThreadPreferenceStore(
       "test.last-viewed-thread.preference",
+    ),
+    threadDisplayNamePreferenceStore: new ThreadDisplayNamePreferenceStore(
+      "test.thread-display-name.preference",
     ),
     threadOnlyHistoryMethods: ["read-thread"],
     eventRefreshScheduleDelayMilliseconds: 250,
@@ -136,6 +140,9 @@ function expectSingletonOwnersStable(
   );
   expect(nextDependencies.threadMutationActionCoordinator).toBe(
     previousDependencies.threadMutationActionCoordinator,
+  );
+  expect(nextDependencies.threadDisplayNameStateOwner).toBe(
+    previousDependencies.threadDisplayNameStateOwner,
   );
   expect(nextDependencies.lastViewedThreadPreferenceStore).toBe(
     previousDependencies.lastViewedThreadPreferenceStore,

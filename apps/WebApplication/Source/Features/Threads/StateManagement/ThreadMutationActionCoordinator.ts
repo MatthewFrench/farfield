@@ -128,6 +128,7 @@ export interface SetThreadNameActionInput {
   onSetErrorMessage: (errorMessage: string) => void;
   onInvalidateActiveThreadQuery: () => void;
   onInvalidateArchivedThreadQuery: () => void;
+  onThreadNameUpdated?: (threadId: string, threadName: string) => void;
   loadCoreData: () => Promise<void>;
   threadMutationClient: ThreadMutationActionClient;
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
@@ -278,6 +279,7 @@ export class ThreadMutationActionCoordinator {
     input.onSetBusy(true);
     try {
       await input.threadMutationClient.setThreadName(input.threadId, trimmedName, requestOptions);
+      input.onThreadNameUpdated?.(input.threadId, trimmedName);
       input.onInvalidateActiveThreadQuery();
       input.onInvalidateArchivedThreadQuery();
       await input.loadCoreData();

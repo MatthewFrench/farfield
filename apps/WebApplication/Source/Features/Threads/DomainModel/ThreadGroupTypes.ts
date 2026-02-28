@@ -4,6 +4,7 @@ import { type AgentId, AgentIdSchema } from "@/Shared/Contracts/ApiContracts";
 export interface ThreadListItem {
   id: string;
   preview: string;
+  displayName?: string | undefined;
   createdAt: number;
   updatedAt: number;
   cwd?: string | undefined;
@@ -21,6 +22,7 @@ export const ThreadListItemSchema = z
   .object({
     id: z.string().min(1),
     preview: z.string(),
+    displayName: z.string().optional(),
     createdAt: z.number().int().nonnegative(),
     updatedAt: z.number().int().nonnegative(),
     cwd: z.string().optional(),

@@ -8,6 +8,7 @@ import type {
 interface ThreadFixtureInput {
   id: string;
   preview?: string;
+  displayName?: string;
   createdAt?: number;
   updatedAt?: number;
   cwd?: string;
@@ -34,6 +35,7 @@ function buildThread(input: ThreadFixtureInput): ThreadListItem {
   return {
     id: input.id,
     preview: input.preview ?? `preview-${input.id}`,
+    displayName: input.displayName,
     createdAt: input.createdAt ?? 100,
     updatedAt: input.updatedAt ?? 100,
     cwd: input.cwd,
@@ -60,22 +62,30 @@ function buildProjectGroup(input: ProjectGroupFixtureInput): ThreadProjectGroup 
 }
 
 describe("ThreadGroupSelectors", () => {
-  it("trims preview labels and falls back to a stable thread identifier prefix", () => {
+  it("prefers display names, trims preview labels, and falls back to a stable identifier prefix", () => {
+    const displayNameLabel = ThreadGroupSelectors.threadLabel(
+      buildThread({
+        id: "thread-with-display-name",
+        preview: "ignored-preview",
+        displayName: "  Configure Caddy for Farfield site  ",
+      }),
+    );
     const nonEmptyLabel = ThreadGroupSelectors.threadLabel(
       buildThread({
         id: "thread-with-label",
         preview: "  Thread Label  ",
       }),
     );
-    const fallbackLabel = ThreadGroupSelectors.threadLabel(
+    const identifierLabel = ThreadGroupSelectors.threadLabel(
       buildThread({
         id: "1234567890abcdef",
         preview: "   ",
       }),
     );
 
+    expect(displayNameLabel).toBe("Configure Caddy for Farfield site");
     expect(nonEmptyLabel).toBe("Thread Label");
-    expect(fallbackLabel).toBe("thread 12345678");
+    expect(identifierLabel).toBe("thread 12345678");
   });
 
   it("applies explicit unread signals before history-based unread heuristics", () => {

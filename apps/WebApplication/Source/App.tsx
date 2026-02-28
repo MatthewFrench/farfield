@@ -64,6 +64,7 @@ import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSele
 import { useSelectedThreadLoaders } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import { useTheme } from "@/Features/Theme/StateManagement/UseTheme";
 import { LastViewedThreadPreferenceStore } from "@/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
+import { ThreadDisplayNamePreferenceStore } from "@/Features/Threads/DataAccess/ThreadDisplayNamePreferenceStore";
 
 const modeSelectionStateResolver = new ModeSelectionStateResolver();
 const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
@@ -110,6 +111,10 @@ export function readInitialModeKeyFromModes(availableModes: CoreDataModesRespons
 export function App(): React.JSX.Element {
   const { theme, toggle: toggleTheme } = useTheme();
   const lastViewedThreadPreferenceStore = useMemo(() => new LastViewedThreadPreferenceStore(), []);
+  const threadDisplayNamePreferenceStore = useMemo(
+    () => new ThreadDisplayNamePreferenceStore(),
+    [],
+  );
   const initialUiState = useMemo(() => {
     const pathname = window.location.pathname;
     const routeState = applicationRouteStateMapper.parseFromPathname(pathname);
@@ -139,6 +144,7 @@ export function App(): React.JSX.Element {
     modeSelectionStateResolver,
     unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
     lastViewedThreadPreferenceStore,
+    threadDisplayNamePreferenceStore,
     threadOnlyHistoryMethods: THREAD_ONLY_HISTORY_METHOD_IDENTIFIERS,
     eventStreamRefreshDecisionExecutionMode: EVENT_STREAM_REFRESH_DECISION_EXECUTION_MODE,
     threadListPresentationExecutionMode: THREAD_LIST_PRESENTATION_EXECUTION_MODE,
@@ -295,6 +301,7 @@ export function App(): React.JSX.Element {
       applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,
     readThreadStateMerger: applicationOwnerDependencies.readThreadStateMerger,
     chatServerClient: applicationOwnerDependencies.chatServerClient,
+    threadDisplayNameStateOwner: applicationOwnerDependencies.threadDisplayNameStateOwner,
     setLiveState: applicationShellState.setLiveState,
     setReadThreadState: applicationShellState.setReadThreadState,
     setStreamEvents: applicationShellState.setStreamEvents,

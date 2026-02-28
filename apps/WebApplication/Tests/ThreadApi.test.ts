@@ -55,6 +55,42 @@ describe("ThreadApi", () => {
     expect(result.data[0]?.isProjectRemoved).toBe(true);
   });
 
+  it("maps threadName and title wire fields to displayName", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        data: [
+          {
+            id: "thread_name_field",
+            preview: "preview one",
+            threadName: "  Name from threadName  ",
+            createdAt: 123,
+            updatedAt: 124,
+            cwd: "/tmp/workspace",
+            source: "opencode",
+            agentId: "codex",
+          },
+          {
+            id: "thread_title_field",
+            preview: "preview two",
+            title: "  Name from title  ",
+            createdAt: 125,
+            updatedAt: 126,
+            cwd: "/tmp/workspace",
+            source: "opencode",
+            agentId: "codex",
+          },
+        ],
+        nextCursor: null,
+      }),
+    );
+
+    const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
+
+    expect(result.data[0]?.displayName).toBe("Name from threadName");
+    expect(result.data[1]?.displayName).toBe("Name from title");
+  });
+
   it("rejects thread list payloads when hasUnreadTurn is not a boolean", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({

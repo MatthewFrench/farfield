@@ -50,6 +50,7 @@ const OptionalThreadListCursorSchema = z
   .union([z.string(), z.null(), z.undefined()])
   .transform((value) => value ?? null);
 const OptionalThreadListItemPathSchema = z.union([z.string(), z.null(), z.undefined()]);
+const OptionalThreadDisplayNameSchema = z.union([z.string(), z.null(), z.undefined()]);
 
 // Thread-list responses come from heterogeneous adapters; parse permissive wire payloads once,
 // then immediately normalize to a strict app-owned contract used by thread state owners.
@@ -62,6 +63,9 @@ const ThreadListItemWireSchema = AppServerListThreadsResponseSchema.shape.data.e
       projectRemoved: z.boolean().optional(),
       projectState: ThreadProjectStateSchema.optional(),
       hasUnreadTurn: z.boolean().optional(),
+      title: z.union([z.string(), z.null()]).optional(),
+      threadName: z.union([z.string(), z.null()]).optional(),
+      name: z.union([z.string(), z.null()]).optional(),
     })
     .passthrough(),
 );
@@ -70,6 +74,7 @@ const ThreadListItemContractSchema = z
   .object({
     id: z.string().min(1),
     preview: z.string(),
+    displayName: z.string().optional(),
     createdAt: z.number().int().nonnegative(),
     updatedAt: z.number().int().nonnegative(),
     cwd: z.string().optional(),
@@ -87,6 +92,30 @@ function readThreadHasUnreadTurnSignal(value: boolean | undefined): boolean | nu
   return value ?? NO_UNREAD_TURN_SIGNAL;
 }
 
+function normalizeOptionalThreadDisplayName(value: string | null | undefined): string | undefined {
+  const parsedValue = OptionalThreadDisplayNameSchema.parse(value);
+  if (parsedValue === undefined || parsedValue === null) {
+    return undefined;
+  }
+  const trimmedValue = parsedValue.trim();
+  if (trimmedValue.length === 0) {
+    return undefined;
+  }
+  return trimmedValue;
+}
+
+function readThreadDisplayName(value: ThreadListItemWire): string | undefined {
+  const parsedThreadName = normalizeOptionalThreadDisplayName(value.threadName);
+  if (parsedThreadName !== undefined) {
+    return parsedThreadName;
+  }
+  const parsedTitle = normalizeOptionalThreadDisplayName(value.title);
+  if (parsedTitle !== undefined) {
+    return parsedTitle;
+  }
+  return normalizeOptionalThreadDisplayName(value.name);
+}
+
 // Legacy adapters expose project removal with multiple fields; treat any explicit removal signal as removed.
 function readThreadProjectRemovedState(value: ThreadListItemWire): boolean {
   return (
@@ -100,6 +129,7 @@ function mapThreadListItemWireToContract(value: ThreadListItemWire): ThreadListI
   return {
     id: value.id,
     preview: value.preview,
+    displayName: readThreadDisplayName(value),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     cwd: value.cwd,

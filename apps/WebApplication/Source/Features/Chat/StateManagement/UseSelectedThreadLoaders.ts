@@ -8,6 +8,7 @@ import {
 import { type CapabilityAgentsResponse } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
+import { type ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import type { AgentId } from "@/Shared/Contracts/ApiContracts";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
 import {
@@ -58,6 +59,7 @@ export interface UseSelectedThreadLoadersInput {
   selectedThreadRefreshConcurrencyCoordinator: SelectedThreadRefreshConcurrencyCoordinator;
   readThreadStateMerger: ReadThreadStateMerger;
   chatServerClient: ChatServerClient;
+  threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
   setLiveState: Dispatch<SetStateAction<LiveStateResponse | null>>;
   setReadThreadState: Dispatch<SetStateAction<ReadThreadResponse | null>>;
   setStreamEvents: Dispatch<SetStateAction<StreamEventsResponse["events"]>>;
@@ -86,6 +88,7 @@ function createSnapshotStateOwnerDependencies(
     pendingThreadMaterializationCoordinator: input.pendingThreadMaterializationCoordinator,
     conversationSyncSignatureBuilder: input.conversationSyncSignatureBuilder,
     readThreadStateMerger: input.readThreadStateMerger,
+    threadDisplayNameStateOwner: input.threadDisplayNameStateOwner,
     setLiveState: input.setLiveState,
     setReadThreadState: input.setReadThreadState,
     setStreamEvents: input.setStreamEvents,

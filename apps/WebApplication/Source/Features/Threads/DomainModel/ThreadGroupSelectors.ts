@@ -34,8 +34,10 @@ const TRAILING_PROJECT_PATH_SEPARATOR_PATTERN = /\/+$/;
  * stay deterministic across active and archived thread surfaces.
  */
 export class ThreadGroupSelectors {
-  public static threadLabel(thread: Pick<ThreadListItem, "id" | "preview">): string {
-    const text = thread.preview.trim();
+  public static threadLabel(
+    thread: Pick<ThreadListItem, "id" | "preview" | "displayName">,
+  ): string {
+    const text = (thread.displayName ?? thread.preview).trim();
     if (text.length === 0) {
       return `${THREAD_LABEL_PREFIX}${thread.id.slice(0, THREAD_LABEL_IDENTIFIER_LENGTH)}`;
     }
