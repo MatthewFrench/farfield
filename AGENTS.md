@@ -108,6 +108,17 @@ Mandatory rules:
 70. Performance-sensitive unit tests must prefer deterministic side-effect counters over wall-clock timing assertions; duration budgets belong in integration and smoke performance tests.
 71. In frontend code, avoid deleting and recreating UI elements when an in-place state update can preserve identity and behavior; prefer owner-managed state transitions over remount-style replacement.
 
+## DOM Rendering Policy (Non-Negotiable)
+
+1. Create once and update in place for persistent Farfield interface records (for example thread rows keyed by thread id, conversation entries keyed by item id, and stream event cards keyed by stable event identity).
+2. Do not use rebuild-driven rendering loops for routine refreshes (for example create new node, insert, then remove old node) in owner-managed user interface surfaces; use explicit patch/update paths instead.
+3. Preserve element identity for media and expensive descendants (`img`, previews, progress indicators, code/render surfaces); do not reset `src` or equivalent properties unless the resolved value changed.
+4. Do not require cloning for normal transitions; use class toggles, transform/opacity transitions, and layout-safe animation on existing nodes.
+5. For rendering-logic changes, add or update unit tests asserting node identity stability across updates, and add at least one Playwright check for the changed interaction path with no visible flicker regression.
+6. For Farfield-owned user interface subtrees, do not use descendant selector lookup (`querySelector*`, `getElement*`, class token scans, id lookups) to find owned descendants.
+7. Selector lookup exceptions are limited to explicit bootstrap/composition owners discovering root containers or non-owned external/native elements.
+8. Owner modules must expose stable refs and typed patch/update APIs for owned descendants and must not depend on implicit class-name contracts for owned-element mutation.
+
 Before finalizing a change, agents must confirm:
 
 1. Imports follow allowed dependency direction.
@@ -150,6 +161,7 @@ Before finalizing a change, agents must confirm:
 38. Large-state small-delta regression tests exist for modified high-frequency stream or subscription owners.
 39. Cursor replay/drop/resync tests exist and assert deterministic reset signaling and merge behavior.
 40. Frontend updates preserve element identity where possible and avoid unnecessary delete/recreate remount patterns.
+41. Frontend rendering changes follow the DOM Rendering Policy section above, including identity-stability tests and a Playwright flicker check for the modified path.
 
 ## Runtime Safety, Complexity, and Maintainability Playbook
 
