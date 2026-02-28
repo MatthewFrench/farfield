@@ -8,7 +8,10 @@ import {
   EventStreamConnectionCoordinator,
   type EventStreamConnectionSnapshot,
 } from "../Source/Application/StateManagement/EventStreamConnectionCoordinator";
-import { EventStreamRefreshDecisionEngine } from "../Source/Application/StateManagement/EventStreamRefreshDecisionEngine";
+import {
+  EventStreamRefreshDecisionEngine,
+  type EventStreamRefreshDecisionReader,
+} from "../Source/Application/StateManagement/EventStreamRefreshDecisionEngine";
 
 const THREAD_ONLY_METHODS = [
   "thread-stream-state-changed",
@@ -269,6 +272,59 @@ describe("EventStreamConnectionCoordinator", () => {
 
     expect(appliedDeltaThreadIds).toEqual(["thread-1"]);
     expect(executedRefreshes).toEqual([]);
+
+    coordinator.stop();
+  });
+
+  it("schedules a hard refresh when decision reading rejects for an event message", async () => {
+    vi.useFakeTimers();
+    const createdSources: TestEventSource[] = [];
+    const coordinator = createCoordinator({ createdSources });
+    const scheduler = new EventRefreshScheduler(20);
+    const executedRefreshes: EventRefreshFlags[] = [];
+    const rejectingDecisionReader: EventStreamRefreshDecisionReader = {
+      readDecision: async () => {
+        throw new Error("decision-read-failed");
+      },
+    };
+
+    coordinator.start({
+      eventRefreshScheduler: scheduler,
+      eventStreamRefreshDecisionEngine: rejectingDecisionReader,
+      readSnapshot: () => ({
+        activeTab: "debug",
+        selectedThreadId: "thread-1",
+      }),
+      executeScheduledRefresh: async (refreshFlags) => {
+        executedRefreshes.push(refreshFlags);
+      },
+      applyThreadStreamDelta: () => {},
+      onConnectionStatusChange: () => {},
+    });
+
+    const source = createdSources[0];
+    if (!source) {
+      throw new Error("Expected event source instance");
+    }
+
+    source.onopen?.(new Event(EVENT_NAME_OPEN));
+    await vi.advanceTimersByTimeAsync(20);
+    executedRefreshes.length = 0;
+
+    source.onmessage?.(
+      new MessageEvent<string>(EVENT_NAME_MESSAGE, {
+        data: createThreadStreamDeltaMessageData(),
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(executedRefreshes).toEqual([
+      {
+        refreshCore: true,
+        refreshHistory: true,
+        refreshSelectedThread: false,
+      },
+    ]);
 
     coordinator.stop();
   });

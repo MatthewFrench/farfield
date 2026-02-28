@@ -168,8 +168,11 @@ const CreateThreadResponseWireSchema = z
     agentId: AgentIdSchema,
   })
   .merge(AppServerStartThreadResponseSchema)
-  .passthrough();
-type CreateThreadResponseWire = z.infer<typeof CreateThreadResponseWireSchema>;
+  .passthrough()
+  .transform((response) => ({
+    threadId: response.threadId,
+    agentId: response.agentId,
+  }));
 
 const CreateThreadResponseSchema = z
   .object({
@@ -316,15 +319,6 @@ function buildCreateThreadRequestInit(
   );
 }
 
-function mapCreateThreadWireToContract(
-  response: CreateThreadResponseWire,
-): ApiCreateThreadResponse {
-  return {
-    threadId: response.threadId,
-    agentId: response.agentId,
-  };
-}
-
 async function runThreadMutation(
   threadId: string,
   mutationRouteSegment: ThreadMutationRouteSegment,
@@ -363,8 +357,7 @@ export async function createThread(
   options?: ApiRequestOptions,
 ): Promise<ApiCreateThreadResponse> {
   const data = await request(THREADS_ROUTE_PATH, buildCreateThreadRequestInit(input, options));
-  const parsedWireResponse = CreateThreadResponseWireSchema.parse(data);
-  return CreateThreadResponseSchema.parse(mapCreateThreadWireToContract(parsedWireResponse));
+  return CreateThreadResponseSchema.parse(CreateThreadResponseWireSchema.parse(data));
 }
 
 export async function archiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {

@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type StructuredDataValue } from "../Source/Shared/Contracts/StructuredDataValue";
+import {
+  type StructuredDataValue,
+  StructuredDataValueSchema,
+} from "../Source/Shared/Contracts/StructuredDataValue";
 import { RequestCanceledError } from "../Source/Shared/Errors/RequestCanceledError";
 import {
   applyRequestOptions,
@@ -41,6 +44,19 @@ describe("FarfieldHttpTransport", () => {
 
     const result = await request("/api/large-payload");
     expect(result).toEqual(payload);
+  });
+
+  it("decodes successful payloads with one JSON parse and one structured-data validation pass", async () => {
+    const payload = createLargeEnvelope(2_000);
+    const jsonParseSpy = vi.spyOn(JSON, "parse");
+    const structuredDataSafeParseSpy = vi.spyOn(StructuredDataValueSchema, "safeParse");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(createJsonResponse(payload));
+
+    const result = await request("/api/single-parse-budget");
+
+    expect(result).toEqual(payload);
+    expect(jsonParseSpy).toHaveBeenCalledTimes(1);
+    expect(structuredDataSafeParseSpy).toHaveBeenCalledTimes(1);
   });
 
   it("parses 20k JSON payloads without truncating parse input", async () => {

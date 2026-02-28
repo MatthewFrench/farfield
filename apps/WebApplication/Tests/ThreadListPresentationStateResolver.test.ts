@@ -22,6 +22,29 @@ function buildThread(input: {
   };
 }
 
+function buildLargeThreadCollection(
+  projectCount: number,
+  threadsPerProject: number,
+): ThreadListItem[] {
+  const threads: ThreadListItem[] = [];
+  for (let projectIndex = 0; projectIndex < projectCount; projectIndex += 1) {
+    for (let threadIndex = 0; threadIndex < threadsPerProject; threadIndex += 1) {
+      const threadId = `thread-${String(projectIndex)}-${String(threadIndex)}`;
+      const updatedAt = projectCount * threadsPerProject - threads.length;
+      threads.push(
+        buildThread({
+          id: threadId,
+          preview: `preview-${threadId}`,
+          cwd: `/workspace/project-${String(projectIndex)}`,
+          createdAt: updatedAt - 10,
+          updatedAt,
+        }),
+      );
+    }
+  }
+  return threads;
+}
+
 describe("ThreadListPresentationStateResolver", () => {
   it("reads grouped project state and merged archived section counts", () => {
     const resolver = new ThreadListPresentationStateResolver();
@@ -81,5 +104,41 @@ describe("ThreadListPresentationStateResolver", () => {
     expect(result.activeProjectGroups).toEqual([]);
     expect(result.archivedProjectGroups).toEqual([]);
     expect(result.archivedSectionThreadCount).toBe(0);
+  });
+
+  it("uses incremental group patching for large-state small-delta updates", () => {
+    const resolver = new ThreadListPresentationStateResolver();
+    const initialThreads = buildLargeThreadCollection(20, 30);
+
+    resolver.readState({
+      threads: initialThreads,
+      archivedThreads: [],
+      selectedThreadIdentifier: initialThreads[0]?.id ?? null,
+    });
+
+    const updatedThreads = initialThreads.map((thread) => {
+      if (thread.id === "thread-4-9") {
+        return {
+          ...thread,
+          preview: `${thread.preview}-updated`,
+          updatedAt: thread.updatedAt + 100,
+        };
+      }
+      return thread;
+    });
+
+    resolver.readState({
+      threads: updatedThreads,
+      archivedThreads: [],
+      selectedThreadIdentifier: initialThreads[0]?.id ?? null,
+    });
+
+    const computationStats = resolver.readComputationStatsSnapshot();
+    expect(computationStats.active.totalThreadCount).toBe(initialThreads.length);
+    expect(computationStats.active.changedThreadCount).toBe(1);
+    expect(computationStats.active.addedThreadCount).toBe(0);
+    expect(computationStats.active.removedThreadCount).toBe(0);
+    expect(computationStats.active.usedIncrementalUpdate).toBe(true);
+    expect(computationStats.active.rebuiltGroupCount).toBeLessThanOrEqual(2);
   });
 });

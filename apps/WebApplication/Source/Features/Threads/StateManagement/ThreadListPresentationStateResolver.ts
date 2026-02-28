@@ -1,5 +1,9 @@
 import { ThreadGroupSelectors } from "../DomainModel/ThreadGroupSelectors";
 import type { ThreadListItem, ThreadProjectGroup } from "../DomainModel/ThreadGroupTypes";
+import {
+  type ThreadProjectGroupingComputationStats,
+  ThreadProjectGroupingStateOwner,
+} from "./ThreadProjectGroupingStateOwner";
 
 export interface ThreadListPresentationStateInput {
   threads: ThreadListItem[];
@@ -15,18 +19,32 @@ export interface ThreadListPresentationStateResult {
   archivedSectionThreadCount: number;
 }
 
+export interface ThreadListPresentationComputationStatsSnapshot {
+  active: ThreadProjectGroupingComputationStats;
+  archived: ThreadProjectGroupingComputationStats;
+}
+
 /**
  * Owns presentational projections for active and archived thread list sections.
  * Grouping and merged archived counts are computed once here so UI owners consume a strict shape.
  */
 export class ThreadListPresentationStateResolver {
+  private readonly activeThreadProjectGroupingStateOwner: ThreadProjectGroupingStateOwner;
+  private readonly archivedThreadProjectGroupingStateOwner: ThreadProjectGroupingStateOwner;
+
+  public constructor() {
+    this.activeThreadProjectGroupingStateOwner = new ThreadProjectGroupingStateOwner();
+    this.archivedThreadProjectGroupingStateOwner = new ThreadProjectGroupingStateOwner();
+  }
+
   public readState(input: ThreadListPresentationStateInput): ThreadListPresentationStateResult {
     const selectedThread =
       input.threads.find((thread) => thread.id === input.selectedThreadIdentifier) ?? null;
-    const groupedThreadsByProject = ThreadGroupSelectors.groupThreadsByProject(input.threads);
-    const groupedArchivedThreadsByProject = ThreadGroupSelectors.groupThreadsByProject(
-      input.archivedThreads,
+    const groupedThreadsByProject = this.activeThreadProjectGroupingStateOwner.readProjectGroups(
+      input.threads,
     );
+    const groupedArchivedThreadsByProject =
+      this.archivedThreadProjectGroupingStateOwner.readProjectGroups(input.archivedThreads);
     const activeProjectGroups = groupedThreadsByProject.filter((group) => !group.isRemoved);
     const removedProjectGroups = groupedThreadsByProject.filter((group) => group.isRemoved);
     const archivedProjectGroups = ThreadGroupSelectors.mergeProjectGroups(
@@ -44,6 +62,13 @@ export class ThreadListPresentationStateResolver {
       archivedProjectGroups,
       archivedThreadIdentifiers,
       archivedSectionThreadCount: archivedSectionThreadIdentifiers.size,
+    };
+  }
+
+  public readComputationStatsSnapshot(): ThreadListPresentationComputationStatsSnapshot {
+    return {
+      active: this.activeThreadProjectGroupingStateOwner.readLastComputationStats(),
+      archived: this.archivedThreadProjectGroupingStateOwner.readLastComputationStats(),
     };
   }
 

@@ -104,7 +104,7 @@ export function ThreadListArchivedSection({
                         <div
                           key={thread.id}
                           data-testid="archived-thread-list-item"
-                          className="w-full min-w-0 rounded-xl border border-border/60 bg-muted/20 px-2 py-1.5 text-[12px] text-muted-foreground"
+                          className="w-full min-w-0 rounded-xl border border-border/60 bg-muted/20 px-2 py-1.5 text-[12px] text-muted-foreground [content-visibility:auto] [contain-intrinsic-size:40px]"
                         >
                           <div className="flex items-center gap-1.5">
                             <span className="min-w-0 flex-1 truncate">

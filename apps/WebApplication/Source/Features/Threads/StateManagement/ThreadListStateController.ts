@@ -6,6 +6,7 @@ import {
   ThreadListCacheKeyByName,
 } from "./ThreadListCacheKeyContracts";
 import {
+  type ThreadListPresentationComputationStatsSnapshot,
   type ThreadListPresentationStateInput,
   ThreadListPresentationStateResolver,
   type ThreadListPresentationStateResult,
@@ -92,6 +93,8 @@ export interface ComputeUnreadThreadIdentifiersAfterSelectionChangeInput
 
 export interface ReadThreadListPresentationStateInput extends ThreadListPresentationStateInput {}
 export interface ReadThreadListPresentationStateResult extends ThreadListPresentationStateResult {}
+export interface ReadThreadListPresentationComputationStatsSnapshot
+  extends ThreadListPresentationComputationStatsSnapshot {}
 
 interface ThreadListStateControllerDependencies {
   threadServerClient: ThreadServerClient;
@@ -199,6 +202,10 @@ export class ThreadListStateController {
     input: ReadThreadListPresentationStateInput,
   ): ReadThreadListPresentationStateResult {
     return this.threadListPresentationStateResolver.readState(input);
+  }
+
+  public readThreadListPresentationComputationStats(): ReadThreadListPresentationComputationStatsSnapshot {
+    return this.threadListPresentationStateResolver.readComputationStatsSnapshot();
   }
 
   public resetState(): void {

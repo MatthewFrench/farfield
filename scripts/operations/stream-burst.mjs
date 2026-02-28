@@ -70,6 +70,9 @@ const ThreadsResponseSchema = z
         id: z.string().min(1),
       }),
     ),
+    nextCursor: z.string().nullable(),
+    pages: z.number().int().nonnegative(),
+    truncated: z.boolean(),
   })
   .strict();
 
@@ -92,6 +95,9 @@ const StreamEventsResponseSchema = z
     threadId: z.string().min(1),
     ownerClientId: z.string().nullable(),
     events: z.array(z.unknown()),
+    nextSequence: z.number().int().nonnegative(),
+    firstAvailableSequence: z.number().int().nonnegative(),
+    resetRequired: z.boolean(),
   })
   .strict();
 

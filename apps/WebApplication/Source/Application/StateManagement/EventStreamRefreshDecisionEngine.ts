@@ -79,11 +79,17 @@ export interface EventStreamRefreshDecision {
   threadStreamDelta: FarfieldThreadStreamDelta | null;
 }
 
+export interface EventStreamRefreshDecisionReader {
+  readDecision(
+    input: EventStreamRefreshDecisionInput,
+  ): EventStreamRefreshDecision | Promise<EventStreamRefreshDecision>;
+}
+
 /**
  * Parses event-stream payloads and decides the smallest refresh scope that keeps UI state coherent.
  * History refresh is intentionally debug-tab-only because history data powers the debug workspace.
  */
-export class EventStreamRefreshDecisionEngine {
+export class EventStreamRefreshDecisionEngine implements EventStreamRefreshDecisionReader {
   private readonly threadOnlyHistoryMethods: Set<string>;
 
   public constructor(threadOnlyHistoryMethods: readonly string[]) {

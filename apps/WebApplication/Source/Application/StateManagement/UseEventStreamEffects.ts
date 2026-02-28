@@ -15,7 +15,7 @@ import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/D
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
 import { type EventRefreshFlags, EventRefreshScheduler } from "./EventRefreshScheduler";
 import { EventStreamConnectionCoordinator } from "./EventStreamConnectionCoordinator";
-import { EventStreamRefreshDecisionEngine } from "./EventStreamRefreshDecisionEngine";
+import { type EventStreamRefreshDecisionReader } from "./EventStreamRefreshDecisionEngine";
 import type { SelectedThreadLoaderOptions } from "./UseCoreDataLoaders";
 
 const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
@@ -59,7 +59,7 @@ export interface UseEventStreamEffectsInput {
   ensureApiSessionBootstrapped: () => Promise<boolean>;
   eventRefreshScheduler: EventRefreshScheduler;
   eventStreamConnectionCoordinator: EventStreamConnectionCoordinator;
-  eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionEngine;
+  eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionReader;
   activeTabRef: MutableRefObject<"chat" | "debug">;
   selectedThreadIdRef: MutableRefObject<string | null>;
   loadCoreDataTrackedRef: MutableRefObject<(() => Promise<void>) | null>;

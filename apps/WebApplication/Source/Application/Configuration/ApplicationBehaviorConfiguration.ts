@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 
 const DEFAULT_THREAD_LIST_MAXIMUM_PAGES = 20;
@@ -27,6 +28,15 @@ export const ARCHIVED_THREAD_LIST_MAX_PAGES = DEFAULT_THREAD_LIST_MAXIMUM_PAGES;
 export const THREAD_QUERY_CACHE_TIME_TO_LIVE_MS = 1_500;
 export const THREAD_QUERY_CACHE_MAXIMUM_ENTRIES = 16;
 export const EVENT_REFRESH_SCHEDULE_DELAY_MS = 200;
+
+const EventStreamRefreshDecisionExecutionModeSchema = z.enum(["worker", "in-thread"]);
+const defaultEventStreamRefreshDecisionExecutionMode =
+  import.meta.env.MODE === "test" ? "in-thread" : "worker";
+export const EVENT_STREAM_REFRESH_DECISION_EXECUTION_MODE =
+  EventStreamRefreshDecisionExecutionModeSchema.parse(
+    defaultEventStreamRefreshDecisionExecutionMode,
+  );
+
 export const MOBILE_LAYOUT_MAXIMUM_WIDTH_PX = 768;
 export const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32;
 export const MOBILE_SIDEBAR_SWIPE_TRIGGER_PX = 56;

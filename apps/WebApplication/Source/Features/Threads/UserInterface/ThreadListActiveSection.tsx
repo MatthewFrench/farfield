@@ -145,7 +145,10 @@ export function ThreadListActiveSection({
                         thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
                       const isRenamingThread = renamedThreadIdentifier === thread.id;
                       return (
-                        <div key={thread.id} className="flex items-stretch gap-1">
+                        <div
+                          key={thread.id}
+                          className="flex items-stretch gap-1 [content-visibility:auto] [contain-intrinsic-size:40px]"
+                        >
                           {isRenamingThread ? (
                             <div
                               className={`min-w-0 flex-1 h-auto flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-left text-[13px] tracking-tight font-normal ${

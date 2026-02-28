@@ -153,7 +153,7 @@ All phases require explicit performance and correctness evidence before merge.
 2. Add replay-equivalence and interaction smoke tests before enabling each phase by default.
 3. Roll out by phase with explicit before/after performance evidence per phase.
 
-## Implementation Update (2026-02-28)
+## Implementation Update (2026-02-27)
 
 Completed in repository:
 
@@ -186,6 +186,57 @@ Completed in repository:
    - added queue-delay budget checks and summary readouts for:
      - `GET /api/threads/:threadId/stream-events`
      - `GET /api/health`
+
+7. Phase 1 completion:
+   - removed the remaining web thread-creation double-parse path in `ThreadApi.createThread`
+   - preserved strict boundary contract parsing while reducing repeated parse work
+   - added deterministic parse-budget coverage in `FarfieldHttpTransport.test.ts` asserting one `JSON.parse` and one `StructuredDataValueSchema.safeParse` call for successful payloads
+
+8. Phase 2 completion:
+   - added explicit worker decision contracts:
+     - `EventStreamRefreshDecisionWorkerRequestSchema`
+     - `EventStreamRefreshDecisionWorkerResponseSchema`
+   - added `EventStreamRefreshDecisionWorkerOwner` and `EventStreamRefreshDecisionWorkerRuntime`
+   - updated `EventStreamConnectionCoordinator` to process event messages through an ordered async chain
+   - added deterministic hard-refresh behavior when worker decision reads fail
+   - wired execution mode through `ApplicationBehaviorConfiguration` and `App.tsx`:
+     - test mode: `"in-thread"`
+     - runtime mode: `"worker"`
+   - added replay-equivalence, out-of-order correlation, and dispose-rejection tests for worker-owner behavior
+   - added coordinator test coverage for decision-read rejection and hard-refresh scheduling
+
+9. Phase 3 completion:
+   - added `ThreadProjectGroupingStateOwner` as an explicit mutable owner keyed by stable thread identifiers
+   - implemented incremental group patching for small deltas with controlled full rebuild for large deltas
+   - wired incremental grouping into `ThreadListPresentationStateResolver` and exposed computation stats through `ThreadListStateController`
+   - added large-state small-delta regression coverage in `ThreadListPresentationStateResolver.test.ts`
+   - added row-level render containment in:
+     - `ThreadListActiveSection.tsx`
+     - `ThreadListArchivedSection.tsx`
+   - preserved existing pointer and keyboard interactions by keeping row identity and interaction handlers unchanged
+
+10. Stream burst contract and evidence closure:
+    - aligned strict burst-script schemas to current server route contracts:
+      - `GET /api/threads` includes `nextCursor`, `pages`, `truncated`
+      - `GET /api/threads/:threadId/stream-events` includes `nextSequence`, `firstAvailableSequence`, `resetRequired`
+    - captured successful burst evidence:
+      - `streamRequests=51919`
+      - `streamFailures=0`
+      - `healthProbes=30`
+      - `healthFailures=0`
+      - `healthNotReady=0`
+      - `healthP95=16ms`
+      - `healthMax=20ms`
+      - `streamRouteP95=2.667ms`
+      - `streamRouteP95QueueDelay=6ms`
+      - `streamRouteMaxQueueDelay=6ms`
+      - `healthRouteP95QueueDelay=15ms`
+      - `healthRouteMaxQueueDelay=24ms`
+
+11. Verification gate completion:
+    - targeted web tests for transport, stream decisioning, stream coordinator, thread-list projection, and related owners passed
+    - repository lint and typecheck passed
+    - real end-to-end verification passed through `bun run verify:end-to-end:real` (9 Playwright scenarios)
 
 ## Owners
 

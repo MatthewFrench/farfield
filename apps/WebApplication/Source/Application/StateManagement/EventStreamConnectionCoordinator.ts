@@ -6,7 +6,7 @@ import {
 } from "./EventRefreshScheduler";
 import {
   type EventStreamRefreshDecision,
-  EventStreamRefreshDecisionEngine,
+  type EventStreamRefreshDecisionReader,
 } from "./EventStreamRefreshDecisionEngine";
 
 export interface EventSourceLike {
@@ -23,7 +23,7 @@ export interface EventStreamConnectionSnapshot {
 
 export interface EventStreamConnectionCoordinatorStartInput {
   eventRefreshScheduler: EventRefreshScheduler;
-  eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionEngine;
+  eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionReader;
   readSnapshot: () => EventStreamConnectionSnapshot;
   executeScheduledRefresh: (refreshFlags: EventRefreshFlags) => Promise<void>;
   applyThreadStreamDelta: (threadStreamDelta: FarfieldThreadStreamDelta) => void;
@@ -33,7 +33,7 @@ export interface EventStreamConnectionCoordinatorStartInput {
 
 interface EventStreamConnectionCoordinatorContext {
   eventRefreshScheduler: EventRefreshScheduler;
-  eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionEngine;
+  eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionReader;
   readSnapshot: () => EventStreamConnectionSnapshot;
   executeScheduledRefresh: (refreshFlags: EventRefreshFlags) => Promise<void>;
   applyThreadStreamDelta: (threadStreamDelta: FarfieldThreadStreamDelta) => void;
@@ -81,6 +81,16 @@ function readRefreshFlagsFromDecision(decision: EventStreamRefreshDecision): Eve
   };
 }
 
+function readRefreshFlagsFromDecisionFailure(
+  snapshot: EventStreamConnectionSnapshot,
+): EventRefreshFlags {
+  return {
+    refreshCore: true,
+    refreshHistory: snapshot.activeTab === DEBUG_ACTIVE_TAB,
+    refreshSelectedThread: false,
+  };
+}
+
 function readValidatedReconnectDelayMilliseconds(
   delayMilliseconds: number | undefined,
   defaultDelayMilliseconds: number,
@@ -105,6 +115,7 @@ export class EventStreamConnectionCoordinator {
   private readonly maximumReconnectDelayMs: number;
   private reconnectDelayMs: number;
   private reconnectTimerId: number | null;
+  private pendingEventMessageExecution: Promise<void>;
   private source: EventSourceLike | null;
   private context: EventStreamConnectionCoordinatorContext | null;
   private disposed: boolean;
@@ -134,6 +145,7 @@ export class EventStreamConnectionCoordinator {
     this.maximumReconnectDelayMs = maximumReconnectDelayMilliseconds;
     this.reconnectDelayMs = this.initialReconnectDelayMs;
     this.reconnectTimerId = null;
+    this.pendingEventMessageExecution = Promise.resolve();
     this.source = null;
     this.context = null;
     this.disposed = true;
@@ -152,6 +164,7 @@ export class EventStreamConnectionCoordinator {
       eventsUrl: input.eventsUrl ?? DEFAULT_EVENTS_URL,
     };
     this.reconnectDelayMs = this.initialReconnectDelayMs;
+    this.pendingEventMessageExecution = Promise.resolve();
     this.disposed = false;
     this.connectEvents();
   }
@@ -169,6 +182,7 @@ export class EventStreamConnectionCoordinator {
     }
     this.context = null;
     this.reconnectDelayMs = this.initialReconnectDelayMs;
+    this.pendingEventMessageExecution = Promise.resolve();
   }
 
   private connectEvents(): void {
@@ -200,19 +214,33 @@ export class EventStreamConnectionCoordinator {
   }
 
   private handleEventSourceMessage(event: MessageEvent<string>): void {
+    this.pendingEventMessageExecution = this.pendingEventMessageExecution
+      .then(async () => {
+        await this.executeEventSourceMessage(event);
+      })
+      .catch(() => {
+        // Message-specific failures are handled in executeEventSourceMessage.
+      });
+  }
+
+  private async executeEventSourceMessage(event: MessageEvent<string>): Promise<void> {
     if (!this.context) {
       return;
     }
 
     const snapshot = this.context.readSnapshot();
-    const refreshDecision = this.context.eventStreamRefreshDecisionEngine.readDecision({
-      activeTab: snapshot.activeTab,
-      selectedThreadId: snapshot.selectedThreadId,
-      eventData: event.data,
-    });
-    this.scheduleRefresh(readRefreshFlagsFromDecision(refreshDecision));
-    if (refreshDecision.threadStreamDelta) {
-      this.context.applyThreadStreamDelta(refreshDecision.threadStreamDelta);
+    try {
+      const refreshDecision = await this.context.eventStreamRefreshDecisionEngine.readDecision({
+        activeTab: snapshot.activeTab,
+        selectedThreadId: snapshot.selectedThreadId,
+        eventData: event.data,
+      });
+      this.scheduleRefresh(readRefreshFlagsFromDecision(refreshDecision));
+      if (refreshDecision.threadStreamDelta) {
+        this.context.applyThreadStreamDelta(refreshDecision.threadStreamDelta);
+      }
+    } catch {
+      this.scheduleRefresh(readRefreshFlagsFromDecisionFailure(snapshot));
     }
   }
 

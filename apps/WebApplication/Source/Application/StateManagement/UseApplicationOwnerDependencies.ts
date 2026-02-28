@@ -6,7 +6,11 @@ import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/Ap
 import { CoreDataRefreshConcurrencyCoordinator } from "@/Application/StateManagement/CoreDataRefreshConcurrencyCoordinator";
 import { EventRefreshScheduler } from "@/Application/StateManagement/EventRefreshScheduler";
 import { EventStreamConnectionCoordinator } from "@/Application/StateManagement/EventStreamConnectionCoordinator";
-import { EventStreamRefreshDecisionEngine } from "@/Application/StateManagement/EventStreamRefreshDecisionEngine";
+import {
+  EventStreamRefreshDecisionEngine,
+  type EventStreamRefreshDecisionReader,
+} from "@/Application/StateManagement/EventStreamRefreshDecisionEngine";
+import { EventStreamRefreshDecisionWorkerOwner } from "@/Application/StateManagement/EventStreamRefreshDecisionWorkerOwner";
 import { MobileSidebarSwipeCoordinator } from "@/Application/StateManagement/MobileSidebarSwipeCoordinator";
 import { PageTouchOverscrollGuardCoordinator } from "@/Application/StateManagement/PageTouchOverscrollGuardCoordinator";
 import { RuntimeViewportSizingCoordinator } from "@/Application/StateManagement/RuntimeViewportSizingCoordinator";
@@ -51,6 +55,7 @@ export interface UseApplicationOwnerDependenciesInput {
   modeSelectionStateResolver: ModeSelectionStateResolver;
   unsupportedPushClientState: PushClientState;
   threadOnlyHistoryMethods: readonly string[];
+  eventStreamRefreshDecisionExecutionMode?: "worker" | "in-thread";
   eventRefreshScheduleDelayMilliseconds: number;
   mobileVisualViewportKeyboardOpenDeltaPx: number;
   mobileLayoutMaximumWidthPx: number;
@@ -76,7 +81,7 @@ export interface ApplicationOwnerDependencies<
   webShellSessionBootstrapClient: WebShellSessionBootstrapClient;
   apiSessionBootstrapCoordinator: ApiSessionBootstrapCoordinator;
   coreDataRefreshConcurrencyCoordinator: CoreDataRefreshConcurrencyCoordinator;
-  eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionEngine;
+  eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionReader;
   eventRefreshScheduler: EventRefreshScheduler;
   eventStreamConnectionCoordinator: EventStreamConnectionCoordinator;
   runtimeViewportSizingCoordinator: RuntimeViewportSizingCoordinator;
@@ -184,6 +189,7 @@ export function useApplicationOwnerDependencies<
     modeSelectionStateResolver,
     unsupportedPushClientState,
     threadOnlyHistoryMethods,
+    eventStreamRefreshDecisionExecutionMode = "in-thread",
     eventRefreshScheduleDelayMilliseconds,
     mobileVisualViewportKeyboardOpenDeltaPx,
     mobileLayoutMaximumWidthPx,
@@ -210,10 +216,18 @@ export function useApplicationOwnerDependencies<
   const coreDataRefreshConcurrencyCoordinator = useStableOwner(
     () => new CoreDataRefreshConcurrencyCoordinator(),
   );
-  const eventStreamRefreshDecisionEngine = useMemo(
-    () => new EventStreamRefreshDecisionEngine(Array.from(threadOnlyHistoryMethods)),
-    [threadOnlyHistoryMethods],
-  );
+  const eventStreamRefreshDecisionEngine = useMemo<EventStreamRefreshDecisionReader>(() => {
+    if (eventStreamRefreshDecisionExecutionMode === "worker") {
+      return new EventStreamRefreshDecisionWorkerOwner({
+        threadOnlyHistoryMethods,
+        createWorker: () =>
+          new Worker(new URL("./EventStreamRefreshDecisionWorkerRuntime.ts", import.meta.url), {
+            type: "module",
+          }),
+      });
+    }
+    return new EventStreamRefreshDecisionEngine(Array.from(threadOnlyHistoryMethods));
+  }, [eventStreamRefreshDecisionExecutionMode, threadOnlyHistoryMethods]);
   const eventRefreshScheduler = useMemo(
     () => new EventRefreshScheduler(eventRefreshScheduleDelayMilliseconds),
     [eventRefreshScheduleDelayMilliseconds],
