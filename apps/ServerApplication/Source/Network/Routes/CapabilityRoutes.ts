@@ -21,6 +21,8 @@ import type {
   AgentReadAccountResult,
   AgentReadConfigRequirementsResult,
   AgentStartAccountLoginResult,
+  AgentStartMcpServerOauthLoginResult,
+  AgentWriteSkillsConfigResult,
 } from "../../Agents/Types.js";
 import { logger } from "../../Shared/Logging/Logger.js";
 
@@ -38,6 +40,8 @@ const CapabilityRoutePathnameByName = {
   accountLoginStart: "/api/account/login/start",
   accountLoginCancel: "/api/account/login/cancel",
   accountLogout: "/api/account/logout",
+  mcpServerOauthLogin: "/api/mcp-servers/oauth/login",
+  skillsConfigWrite: "/api/skills/config/write",
   models: "/api/models",
   collaborationModes: "/api/collaboration-modes",
   experimentalFeatures: "/api/experimental-features",
@@ -61,6 +65,11 @@ const CapabilityRouteQueryParameterByName = {
   forceReload: "forceReload",
   refreshToken: "refreshToken",
   loginId: "loginId",
+  name: "name",
+  path: "path",
+  enabled: "enabled",
+  scopes: "scopes",
+  timeoutSeconds: "timeoutSeconds",
 } as const;
 
 const CapabilityRouteLogEventByName = {
@@ -73,6 +82,8 @@ const CapabilityRouteLogEventByName = {
   accountLoginCancelFailed: "account-login-cancel-failed",
   accountLogoutFailed: "account-logout-failed",
   configMcpServerReloadFailed: "config-mcp-server-reload-failed",
+  mcpServerOauthLoginFailed: "mcp-server-oauth-login-failed",
+  skillsConfigWriteFailed: "skills-config-write-failed",
   modelsListTimeout: "models-list-timeout",
   collaborationModesListTimeout: "collaboration-modes-list-timeout",
   experimentalFeaturesListTimeout: "experimental-features-list-timeout",
@@ -91,6 +102,13 @@ const CapabilityRouteErrorMessagePrefixByName = {
   failedToLogoutAccount: "Failed to logout account: ",
   failedToReloadMcpServerConfig: "Failed to reload MCP server config: ",
   missingLoginId: "Missing loginId query parameter.",
+  missingMcpServerName: "Missing name query parameter.",
+  invalidTimeoutSeconds: "Invalid timeoutSeconds query parameter.",
+  failedToStartMcpServerOauthLogin: "Failed to start MCP server oauth login: ",
+  missingSkillPath: "Missing path query parameter.",
+  missingSkillEnabled: "Missing enabled query parameter.",
+  invalidSkillEnabled: "Invalid enabled query parameter. Expected true/false or 1/0.",
+  failedToWriteSkillsConfig: "Failed to write skills config: ",
   failedToListModels: "Failed to list models: ",
   failedToListCollaborationModes: "Failed to list collaboration modes: ",
   failedToListExperimentalFeatures: "Failed to list experimental features: ",
@@ -107,6 +125,8 @@ const CapabilityRouteTimeoutLabelByName = {
   accountLoginCancel: "account login cancel",
   accountLogout: "account logout",
   configMcpServerReload: "config mcp server reload",
+  mcpServerOauthLogin: "mcp server oauth login",
+  skillsConfigWrite: "skills config write",
   modelsList: "models listing",
   collaborationModesList: "collaboration modes listing",
   experimentalFeaturesList: "experimental features listing",
@@ -165,6 +185,16 @@ type CapabilityAccountLoginCancelResponseBody = AgentCancelAccountLoginResult & 
 
 interface CapabilityMutationResponseBody {
   ok: true;
+}
+
+interface CapabilityMcpServerOauthLoginResponseBody {
+  ok: true;
+  authorizationUrl: string;
+}
+
+interface CapabilitySkillsConfigWriteResponseBody {
+  ok: true;
+  effectiveEnabled: boolean;
 }
 
 type CapabilityExperimentalFeaturesResponseBody = AgentListExperimentalFeaturesResult & {
@@ -267,6 +297,42 @@ function parseBooleanQueryValue(value: string | null): boolean {
   return normalized === "1" || normalized === "true";
 }
 
+function parseBooleanQueryValueStrict(value: string | null): boolean | null {
+  if (value === null) {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "1" || normalized === "true") {
+    return true;
+  }
+  if (normalized === "0" || normalized === "false") {
+    return false;
+  }
+  return null;
+}
+
+function parseOptionalPositiveIntegerQueryValue(value: string | null): number | null {
+  if (value === null) {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function parseOptionalScopesQueryValue(value: string | null): string[] | null {
+  if (value === null) {
+    return null;
+  }
+  const scopes = value
+    .split(",")
+    .map((scope) => scope.trim())
+    .filter((scope) => scope.length > 0);
+  return scopes.length > 0 ? scopes : null;
+}
+
 function mapConfigRequirementsResponse(
   result: AgentReadConfigRequirementsResult,
 ): CapabilityConfigRequirementsResponseBody {
@@ -313,6 +379,24 @@ function mapCancelAccountLoginResponse(
 function mapMutationSuccessResponse(): CapabilityMutationResponseBody {
   return {
     ok: true,
+  };
+}
+
+function mapMcpServerOauthLoginResponse(
+  result: AgentStartMcpServerOauthLoginResult,
+): CapabilityMcpServerOauthLoginResponseBody {
+  return {
+    ok: true,
+    authorizationUrl: result.authorizationUrl,
+  };
+}
+
+function mapSkillsConfigWriteResponse(
+  result: AgentWriteSkillsConfigResult,
+): CapabilitySkillsConfigWriteResponseBody {
+  return {
+    ok: true,
+    effectiveEnabled: result.effectiveEnabled,
   };
 }
 
@@ -1011,6 +1095,225 @@ async function handleConfigMcpServerReloadRoute(
   return true;
 }
 
+async function handleMcpServerOauthLoginRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.mcpServerOauthLogin,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const name = url.searchParams.get(CapabilityRouteQueryParameterByName.name);
+  if (name === null || name.trim().length === 0) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingMcpServerName,
+    });
+    return true;
+  }
+  const normalizedName = name.trim();
+
+  const timeoutSecondsRaw = url.searchParams.get(
+    CapabilityRouteQueryParameterByName.timeoutSeconds,
+  );
+  const timeoutSeconds = parseOptionalPositiveIntegerQueryValue(timeoutSecondsRaw);
+  if (timeoutSecondsRaw !== null && timeoutSeconds === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidTimeoutSeconds,
+    });
+    return true;
+  }
+
+  const scopes = parseOptionalScopesQueryValue(
+    url.searchParams.get(CapabilityRouteQueryParameterByName.scopes),
+  );
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canStartMcpServerOauthLogin ||
+    !adapter.startMcpServerOauthLogin
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToStartMcpServerOauthLogin}MCP server oauth login is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.startMcpServerOauthLogin({
+        name: normalizedName,
+        ...(scopes !== null ? { scopes } : {}),
+        ...(timeoutSeconds !== null ? { timeoutSeconds } : {}),
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.mcpServerOauthLogin,
+    );
+    jsonResponse(
+      res,
+      CapabilityRouteStatusCodeByName.success,
+      mapMcpServerOauthLoginResponse(result),
+    );
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        name: normalizedName,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.mcpServerOauthLoginFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToStartMcpServerOauthLogin}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleSkillsConfigWriteRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.skillsConfigWrite,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const path = url.searchParams.get(CapabilityRouteQueryParameterByName.path);
+  if (path === null || path.trim().length === 0) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingSkillPath,
+    });
+    return true;
+  }
+  const normalizedPath = path.trim();
+
+  const enabledRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.enabled);
+  if (enabledRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingSkillEnabled,
+    });
+    return true;
+  }
+  const enabled = parseBooleanQueryValueStrict(enabledRaw);
+  if (enabled === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidSkillEnabled,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canWriteSkillsConfig ||
+    !adapter.writeSkillsConfig
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToWriteSkillsConfig}Skills config write is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.writeSkillsConfig({
+        path: normalizedPath,
+        enabled,
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.skillsConfigWrite,
+    );
+    jsonResponse(
+      res,
+      CapabilityRouteStatusCodeByName.success,
+      mapSkillsConfigWriteResponse(result),
+    );
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        path: normalizedPath,
+        enabled,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.skillsConfigWriteFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToWriteSkillsConfig}${message}`,
+    });
+  }
+
+  return true;
+}
+
 async function handleModelsRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
   const {
     req,
@@ -1392,7 +1695,8 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
 /**
  * Owns capability route dispatch (`/api/config/defaults`, `/api/config-requirements`,
  * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/rate-limits`,
- * `/api/account/login/start`, `/api/account/login/cancel`, `/api/account/logout`, `/api/models`,
+ * `/api/account/login/start`, `/api/account/login/cancel`, `/api/account/logout`,
+ * `/api/mcp-servers/oauth/login`, `/api/skills/config/write`, `/api/models`,
  * `/api/collaboration-modes`, `/api/experimental-features`,
  * `/api/mcp-servers`, `/api/apps`, `/api/skills`)
  * route dispatch with explicit adapter-to-response mapping.
@@ -1420,6 +1724,12 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleConfigMcpServerReloadRoute(deps)) {
+    return true;
+  }
+  if (await handleMcpServerOauthLoginRoute(deps)) {
+    return true;
+  }
+  if (await handleSkillsConfigWriteRoute(deps)) {
     return true;
   }
   if (await handleModelsRoute(deps)) {

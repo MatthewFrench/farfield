@@ -52,6 +52,8 @@ const AgentCapabilitiesSchema = z
     canCancelAccountLogin: z.boolean(),
     canLogoutAccount: z.boolean(),
     canReloadMcpServerConfig: z.boolean(),
+    canStartMcpServerOauthLogin: z.boolean(),
+    canWriteSkillsConfig: z.boolean(),
     canSetCollaborationMode: z.boolean(),
     canSubmitUserInput: z.boolean(),
     canReadLiveState: z.boolean(),
@@ -88,13 +90,9 @@ const ConfigDefaultsResponseSchema = z
   .strict();
 export type ApiConfigDefaultsResponse = z.infer<typeof ConfigDefaultsResponseSchema>;
 
-export interface ApiConfigDefaultsOptions extends ApiRequestOptions {
-  agentId?: AgentId;
-}
+export type ApiConfigDefaultsOptions = ApiRequestOptions & { agentId?: AgentId };
 
-export interface ApiConfigRequirementsOptions extends ApiRequestOptions {
-  agentId?: AgentId;
-}
+export type ApiConfigRequirementsOptions = ApiRequestOptions & { agentId?: AgentId };
 
 export interface ApiAccountOptions extends ApiRequestOptions {
   agentId?: AgentId;

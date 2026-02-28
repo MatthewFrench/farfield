@@ -24,10 +24,14 @@ import {
   type ReadConfigOptions,
   type ReadConfigRequirementsOptions,
   type ReadConfigRequirementsResult,
+  type StartMcpServerOauthLoginOptions,
+  type StartMcpServerOauthLoginResult,
   type StartReviewOptions,
   type StartReviewResult,
   type StartThreadOptions,
   type UnsubscribeThreadStatus,
+  type WriteSkillsConfigOptions,
+  type WriteSkillsConfigResult,
 } from "@farfield/api";
 import type {
   AppServerConfigReadResponse,
@@ -100,6 +104,8 @@ class TestAppServerClient extends AppServerClient {
   public readonly cancelAccountLoginCalls: CancelAccountLoginOptions[] = [];
   public readonly logoutAccountCalls: Array<undefined> = [];
   public readonly reloadMcpServerConfigCalls: Array<undefined> = [];
+  public readonly startMcpServerOauthLoginCalls: StartMcpServerOauthLoginOptions[] = [];
+  public readonly writeSkillsConfigCalls: WriteSkillsConfigOptions[] = [];
   public readonly readConfigCalls: Array<ReadConfigOptions | undefined> = [];
 
   private readonly listThreadsResult: AppServerListThreadsResponse;
@@ -118,6 +124,8 @@ class TestAppServerClient extends AppServerClient {
   private readonly readAccountRateLimitsResult: ReadAccountRateLimitsResult;
   private readonly startAccountLoginResult: LoginAccountResult;
   private readonly cancelAccountLoginResult: CancelAccountLoginResult;
+  private readonly startMcpServerOauthLoginResult: StartMcpServerOauthLoginResult;
+  private readonly writeSkillsConfigResult: WriteSkillsConfigResult;
   private readonly readConfigResult: AppServerConfigReadResponse;
 
   public constructor(input?: {
@@ -137,6 +145,8 @@ class TestAppServerClient extends AppServerClient {
     readAccountRateLimitsResult?: ReadAccountRateLimitsResult;
     startAccountLoginResult?: LoginAccountResult;
     cancelAccountLoginResult?: CancelAccountLoginResult;
+    startMcpServerOauthLoginResult?: StartMcpServerOauthLoginResult;
+    writeSkillsConfigResult?: WriteSkillsConfigResult;
     readConfigResult?: AppServerConfigReadResponse;
   }) {
     super(NOOP_TRANSPORT);
@@ -199,6 +209,12 @@ class TestAppServerClient extends AppServerClient {
     };
     this.cancelAccountLoginResult = input?.cancelAccountLoginResult ?? {
       status: "canceled",
+    };
+    this.startMcpServerOauthLoginResult = input?.startMcpServerOauthLoginResult ?? {
+      authorizationUrl: "https://example.com/oauth/mcp",
+    };
+    this.writeSkillsConfigResult = input?.writeSkillsConfigResult ?? {
+      effectiveEnabled: true,
     };
     this.readConfigResult = input?.readConfigResult ?? EMPTY_READ_CONFIG_RESPONSE;
   }
@@ -345,6 +361,20 @@ class TestAppServerClient extends AppServerClient {
 
   public override async reloadMcpServerConfig(): Promise<void> {
     this.reloadMcpServerConfigCalls.push(undefined);
+  }
+
+  public override async startMcpServerOauthLogin(
+    options: StartMcpServerOauthLoginOptions,
+  ): Promise<StartMcpServerOauthLoginResult> {
+    this.startMcpServerOauthLoginCalls.push(options);
+    return this.startMcpServerOauthLoginResult;
+  }
+
+  public override async writeSkillsConfig(
+    options: WriteSkillsConfigOptions,
+  ): Promise<WriteSkillsConfigResult> {
+    this.writeSkillsConfigCalls.push(options);
+    return this.writeSkillsConfigResult;
   }
 
   public override async readConfig(
@@ -1098,6 +1128,52 @@ describe("CodexThreadManagementOwner", () => {
     await owner.reloadMcpServerConfig();
 
     expect(appClient.reloadMcpServerConfigCalls).toEqual([undefined]);
+  });
+
+  it("starts mcp oauth login through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      startMcpServerOauthLoginResult: {
+        authorizationUrl: "https://example.com/oauth/github",
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.startMcpServerOauthLogin({
+      name: "github",
+      scopes: ["read:org"],
+      timeoutSeconds: 90,
+    });
+
+    expect(appClient.startMcpServerOauthLoginCalls).toEqual([
+      {
+        name: "github",
+        scopes: ["read:org"],
+        timeoutSeconds: 90,
+      },
+    ]);
+    expect(result.authorizationUrl).toBe("https://example.com/oauth/github");
+  });
+
+  it("writes skills config through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      writeSkillsConfigResult: {
+        effectiveEnabled: false,
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.writeSkillsConfig({
+      path: "/tmp/workspace/.codex/skills/checks/SKILL.md",
+      enabled: false,
+    });
+
+    expect(appClient.writeSkillsConfigCalls).toEqual([
+      {
+        path: "/tmp/workspace/.codex/skills/checks/SKILL.md",
+        enabled: false,
+      },
+    ]);
+    expect(result.effectiveEnabled).toBe(false);
   });
 
   it("prefers active profile config defaults and requests config without layers", async () => {

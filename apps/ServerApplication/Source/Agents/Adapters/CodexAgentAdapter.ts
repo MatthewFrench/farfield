@@ -45,6 +45,8 @@ import type {
   AgentSetCollaborationModeInput,
   AgentStartAccountLoginInput,
   AgentStartAccountLoginResult,
+  AgentStartMcpServerOauthLoginInput,
+  AgentStartMcpServerOauthLoginResult,
   AgentStartThreadReviewInput,
   AgentStartThreadReviewResult,
   AgentSubmitUserInputInput,
@@ -52,6 +54,8 @@ import type {
   AgentThreadStreamEvents,
   AgentUnsubscribeThreadInput,
   AgentUnsubscribeThreadStatus,
+  AgentWriteSkillsConfigInput,
+  AgentWriteSkillsConfigResult,
 } from "../Types.js";
 import {
   APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT,
@@ -355,6 +359,18 @@ export class CodexAgentAdapter implements AgentAdapter {
 
   public async reloadMcpServerConfig(): Promise<void> {
     await this.threadManagementOwner.reloadMcpServerConfig();
+  }
+
+  public async startMcpServerOauthLogin(
+    input: AgentStartMcpServerOauthLoginInput,
+  ): Promise<AgentStartMcpServerOauthLoginResult> {
+    return this.threadManagementOwner.startMcpServerOauthLogin(input);
+  }
+
+  public async writeSkillsConfig(
+    input: AgentWriteSkillsConfigInput,
+  ): Promise<AgentWriteSkillsConfigResult> {
+    return this.threadManagementOwner.writeSkillsConfig(input);
   }
 
   public async readConfigDefaults(): Promise<AgentConfigDefaults> {

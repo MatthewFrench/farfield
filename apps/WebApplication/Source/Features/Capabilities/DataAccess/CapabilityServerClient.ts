@@ -43,6 +43,14 @@ import {
   reloadMcpServerConfig,
   startAccountLogin,
 } from "./CapabilityApi";
+import {
+  type ApiMcpServerOauthLoginOptions,
+  type ApiMcpServerOauthLoginResponse,
+  type ApiSkillsConfigWriteOptions,
+  type ApiSkillsConfigWriteResponse,
+  startMcpServerOauthLogin,
+  writeSkillsConfig,
+} from "./CapabilityCoverageMutationApi";
 
 export type CapabilityRequestOptions = ApiRequestOptions;
 export type CapabilityHealthResponse = ApiHealthResponse;
@@ -66,10 +74,14 @@ export type CapabilityConfigRequirementsResponse = ApiConfigRequirementsResponse
 export type CapabilityListPageOptions = ApiListPageOptions;
 export type CapabilityExperimentalFeaturesResponse = ApiExperimentalFeaturesResponse;
 export type CapabilityMcpServersResponse = ApiMcpServersResponse;
+export type CapabilityMcpServerOauthLoginOptions = ApiMcpServerOauthLoginOptions;
+export type CapabilityMcpServerOauthLoginResponse = ApiMcpServerOauthLoginResponse;
 export type CapabilityListAppsOptions = ApiListAppsOptions;
 export type CapabilityAppsResponse = ApiAppsResponse;
 export type CapabilityListSkillsOptions = ApiListSkillsOptions;
 export type CapabilitySkillsResponse = ApiSkillsResponse;
+export type CapabilitySkillsConfigWriteOptions = ApiSkillsConfigWriteOptions;
+export type CapabilitySkillsConfigWriteResponse = ApiSkillsConfigWriteResponse;
 export type CapabilityMutationSuccessResponse = ApiMutationSuccessResponse;
 
 /**
@@ -141,6 +153,18 @@ export class CapabilityServerClient {
     input?: CapabilityConfigMcpServerReloadOptions,
   ): Promise<CapabilityMutationSuccessResponse> {
     return reloadMcpServerConfig(input);
+  }
+
+  public async startMcpServerOauthLogin(
+    input: CapabilityMcpServerOauthLoginOptions,
+  ): Promise<CapabilityMcpServerOauthLoginResponse> {
+    return startMcpServerOauthLogin(input);
+  }
+
+  public async writeSkillsConfig(
+    input: CapabilitySkillsConfigWriteOptions,
+  ): Promise<CapabilitySkillsConfigWriteResponse> {
+    return writeSkillsConfig(input);
   }
 
   public async listExperimentalFeatures(

@@ -20,6 +20,8 @@ export const APP_SERVER_CLIENT_METHODS = {
   cancelAccountLogin: "account/login/cancel",
   logoutAccount: "account/logout",
   reloadMcpServerConfig: "config/mcpServer/reload",
+  startMcpServerOauthLogin: "mcpServer/oauth/login",
+  writeSkillsConfig: "skills/config/write",
   startThread: "thread/start",
   setThreadName: "thread/name/set",
   rollbackThread: "thread/rollback",

@@ -35,6 +35,10 @@ import type {
   AgentSendMessageInput,
   AgentStartAccountLoginInput,
   AgentStartAccountLoginResult,
+  AgentStartMcpServerOauthLoginInput,
+  AgentStartMcpServerOauthLoginResult,
+  AgentWriteSkillsConfigInput,
+  AgentWriteSkillsConfigResult,
 } from "../Source/Agents/Types.js";
 import { handleCapabilityRoutes } from "../Source/Network/Routes/CapabilityRoutes.js";
 
@@ -161,6 +165,20 @@ const CapabilityMutationSuccessEnvelopeSchema = z
   })
   .strict();
 
+const CapabilityMcpServerOauthLoginEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    authorizationUrl: z.string().min(1),
+  })
+  .strict();
+
+const CapabilitySkillsConfigWriteEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    effectiveEnabled: z.boolean(),
+  })
+  .strict();
+
 const CapabilityExperimentalFeaturesEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -263,6 +281,10 @@ interface MockAgentAdapterOptions {
   ) => Promise<AgentCancelAccountLoginResult>;
   logoutAccount?: () => Promise<void>;
   reloadMcpServerConfig?: () => Promise<void>;
+  startMcpServerOauthLogin?: (
+    input: AgentStartMcpServerOauthLoginInput,
+  ) => Promise<AgentStartMcpServerOauthLoginResult>;
+  writeSkillsConfig?: (input: AgentWriteSkillsConfigInput) => Promise<AgentWriteSkillsConfigResult>;
   listExperimentalFeatures?: () => Promise<AgentListExperimentalFeaturesResult>;
   listMcpServerStatuses?: () => Promise<AgentListMcpServerStatusesResult>;
   listApps?: () => Promise<AgentListAppsResult>;
@@ -307,6 +329,8 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canCancelAccountLogin: false,
     canLogoutAccount: false,
     canReloadMcpServerConfig: false,
+    canStartMcpServerOauthLogin: false,
+    canWriteSkillsConfig: false,
     canSetCollaborationMode: false,
     canSubmitUserInput: false,
     canReadLiveState: false,
@@ -386,6 +410,14 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.reloadMcpServerConfig) {
     adapter.reloadMcpServerConfig = options.reloadMcpServerConfig;
+  }
+
+  if (options.startMcpServerOauthLogin) {
+    adapter.startMcpServerOauthLogin = options.startMcpServerOauthLogin;
+  }
+
+  if (options.writeSkillsConfig) {
+    adapter.writeSkillsConfig = options.writeSkillsConfig;
   }
 
   if (options.listExperimentalFeatures) {
@@ -824,6 +856,113 @@ describe("handleCapabilityRoutes", () => {
     const parsedEnvelope = CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result));
     expect(parsedEnvelope).toEqual({
       ok: true,
+    });
+  });
+
+  it("returns 400 when mcp oauth login omits server name", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/mcp-servers/oauth/login",
+      url: new URL("http://localhost/api/mcp-servers/oauth/login"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing name query parameter.",
+    });
+  });
+
+  it("starts mcp oauth login when adapter supports oauth login", async () => {
+    const startMcpServerOauthLoginSpy = vi.fn(
+      async (): Promise<AgentStartMcpServerOauthLoginResult> => ({
+        authorizationUrl: "https://example.com/oauth/mcp/github",
+      }),
+    );
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/mcp-servers/oauth/login",
+      url: new URL(
+        "http://localhost/api/mcp-servers/oauth/login?name=github&scopes=read%3Aorg%2Crepo&timeoutSeconds=120",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canStartMcpServerOauthLogin: true,
+          },
+          startMcpServerOauthLogin: startMcpServerOauthLoginSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(startMcpServerOauthLoginSpy).toHaveBeenCalledWith({
+      name: "github",
+      scopes: ["read:org", "repo"],
+      timeoutSeconds: 120,
+    });
+    const parsedEnvelope = CapabilityMcpServerOauthLoginEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      authorizationUrl: "https://example.com/oauth/mcp/github",
+    });
+  });
+
+  it("returns 400 when skills config write has invalid enabled query value", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/skills/config/write",
+      url: new URL(
+        "http://localhost/api/skills/config/write?path=/tmp/checks/SKILL.md&enabled=maybe",
+      ),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Invalid enabled query parameter. Expected true/false or 1/0.",
+    });
+  });
+
+  it("writes skills config when adapter supports config writes", async () => {
+    const writeSkillsConfigSpy = vi.fn(
+      async (): Promise<AgentWriteSkillsConfigResult> => ({
+        effectiveEnabled: false,
+      }),
+    );
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/skills/config/write",
+      url: new URL(
+        "http://localhost/api/skills/config/write?path=/tmp/workspace/.codex/skills/checks/SKILL.md&enabled=0",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canWriteSkillsConfig: true,
+          },
+          writeSkillsConfig: writeSkillsConfigSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(writeSkillsConfigSpy).toHaveBeenCalledWith({
+      path: "/tmp/workspace/.codex/skills/checks/SKILL.md",
+      enabled: false,
+    });
+    const parsedEnvelope = CapabilitySkillsConfigWriteEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      effectiveEnabled: false,
     });
   });
 

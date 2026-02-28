@@ -101,6 +101,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
 
   it("runs account and mcp coverage actions through capability client owners", async () => {
     const capabilityServerClient = new CapabilityServerClient();
+    const openWindow = vi.spyOn(window, "open").mockImplementation(() => null);
     vi.spyOn(capabilityServerClient, "readConfigRequirements").mockResolvedValue({
       ok: true,
       requirements: null,
@@ -156,6 +157,18 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       .mockResolvedValue({
         ok: true,
       });
+    const startMcpServerOauthLogin = vi
+      .spyOn(capabilityServerClient, "startMcpServerOauthLogin")
+      .mockResolvedValue({
+        ok: true,
+        authorizationUrl: "https://example.com/oauth/mcp/github",
+      });
+    const writeSkillsConfig = vi
+      .spyOn(capabilityServerClient, "writeSkillsConfig")
+      .mockResolvedValue({
+        ok: true,
+        effectiveEnabled: false,
+      });
 
     const latestDiagnostics: { current: DebugAppServerCoverageDiagnostics | null } = {
       current: null,
@@ -188,9 +201,30 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
 
     latestDiagnostics.current?.logoutAccount();
     latestDiagnostics.current?.reloadMcpServerConfig();
+    latestDiagnostics.current?.startMcpServerOauthLogin("github");
+    latestDiagnostics.current?.writeSkillsConfig(
+      "/tmp/project/.codex/skills/checks/SKILL.md",
+      false,
+    );
     await waitFor(() => {
       expect(logoutAccount).toHaveBeenCalledTimes(1);
       expect(reloadMcpServerConfig).toHaveBeenCalledTimes(1);
+      expect(startMcpServerOauthLogin).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        name: "github",
+      });
+      expect(writeSkillsConfig).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        path: "/tmp/project/.codex/skills/checks/SKILL.md",
+        enabled: false,
+      });
+      expect(openWindow).toHaveBeenCalledWith(
+        "https://example.com/oauth/mcp/github",
+        "_blank",
+        "noopener,noreferrer",
+      );
     });
+
+    openWindow.mockRestore();
   });
 });

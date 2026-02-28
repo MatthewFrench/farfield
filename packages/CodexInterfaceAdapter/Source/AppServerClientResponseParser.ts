@@ -23,6 +23,8 @@ export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   cancelAccountLogin: "AppServerCancelLoginAccountResponse",
   logoutAccount: "AppServerLogoutAccountResponse",
   reloadMcpServerConfig: "AppServerMcpServerRefreshResponse",
+  startMcpServerOauthLogin: "AppServerMcpServerOauthLoginResponse",
+  writeSkillsConfig: "AppServerSkillsConfigWriteResponse",
   startThread: "AppServerStartThreadResponse",
   setThreadName: "AppServerThreadSetNameResponse",
   rollbackThread: "AppServerThreadRollbackResponse",

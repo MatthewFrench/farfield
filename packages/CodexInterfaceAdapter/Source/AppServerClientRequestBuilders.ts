@@ -18,9 +18,11 @@ import type {
   ReadConfigOptions,
   ReadConfigRequirementsOptions,
   ResumeThreadOptions,
+  StartMcpServerOauthLoginOptions,
   StartReviewOptions,
   StartThreadOptions,
   StartTurnOptions,
+  WriteSkillsConfigOptions,
 } from "./AppServerClient.js";
 import { buildTurnStartMessageParameters } from "./TurnStartMessageParametersBuilder.js";
 
@@ -74,6 +76,13 @@ const AppServerAccountLoginCancelRequestSchema = z
   .passthrough();
 const AppServerAccountLogoutRequestSchema = z.object({}).passthrough();
 const AppServerConfigMcpServerReloadRequestSchema = z.object({}).passthrough();
+const AppServerMcpServerOauthLoginRequestSchema = z
+  .object({
+    name: z.string().min(1),
+    scopes: z.array(z.string().min(1)).nullable().optional(),
+    timeoutSecs: z.number().int().nonnegative().nullable().optional(),
+  })
+  .passthrough();
 const AppServerExperimentalFeatureListRequestSchema = z
   .object({
     cursor: z.union([z.string(), z.null()]).optional(),
@@ -107,6 +116,12 @@ const AppServerSkillsListRequestSchema = z
     perCwdExtraUserRoots: z
       .union([z.array(AppServerSkillsListExtraRootsForCwdRequestSchema), z.null()])
       .optional(),
+  })
+  .passthrough();
+const AppServerSkillsConfigWriteRequestSchema = z
+  .object({
+    path: z.string().min(1),
+    enabled: z.boolean(),
   })
   .passthrough();
 const AppServerThreadUnsubscribeRequestSchema = z
@@ -259,6 +274,17 @@ interface ListSkillsRequestParameters {
   perCwdExtraUserRoots?: ListSkillsExtraRootsForCwdRequestParameters[] | null | undefined;
 }
 
+interface StartMcpServerOauthLoginRequestParameters {
+  name: string;
+  scopes?: string[] | null | undefined;
+  timeoutSecs?: number | null | undefined;
+}
+
+interface WriteSkillsConfigRequestParameters {
+  path: string;
+  enabled: boolean;
+}
+
 interface ReadAccountRequestParameters {
   refreshToken?: boolean | undefined;
 }
@@ -338,6 +364,25 @@ export function buildLogoutAccountRequestParameters(): LogoutAccountRequestParam
 
 export function buildReloadMcpServerConfigRequestParameters(): ReloadMcpServerConfigRequestParameters {
   return AppServerConfigMcpServerReloadRequestSchema.parse({});
+}
+
+export function buildStartMcpServerOauthLoginRequestParameters(
+  options: StartMcpServerOauthLoginOptions,
+): StartMcpServerOauthLoginRequestParameters {
+  return AppServerMcpServerOauthLoginRequestSchema.parse({
+    name: options.name,
+    ...(options.scopes !== undefined ? { scopes: options.scopes } : {}),
+    ...(options.timeoutSeconds !== undefined ? { timeoutSecs: options.timeoutSeconds } : {}),
+  });
+}
+
+export function buildWriteSkillsConfigRequestParameters(
+  options: WriteSkillsConfigOptions,
+): WriteSkillsConfigRequestParameters {
+  return AppServerSkillsConfigWriteRequestSchema.parse({
+    path: options.path,
+    enabled: options.enabled,
+  });
 }
 
 export function buildListExperimentalFeaturesRequestParameters(

@@ -50,6 +50,8 @@ describe("CodexAgentAdapter", () => {
       canCancelAccountLogin: true,
       canLogoutAccount: true,
       canReloadMcpServerConfig: true,
+      canStartMcpServerOauthLogin: true,
+      canWriteSkillsConfig: true,
       canSetCollaborationMode: true,
       canSubmitUserInput: true,
       canReadLiveState: true,

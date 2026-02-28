@@ -1118,6 +1118,54 @@ describe("AppServerClient.reloadMcpServerConfig", () => {
   });
 });
 
+describe("AppServerClient.startMcpServerOauthLogin", () => {
+  it("sends mcpServer/oauth/login payload and returns authorization url", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      authorizationUrl: "https://example.com/oauth/mcp",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.startMcpServerOauthLogin({
+      name: "github",
+      scopes: ["read:org"],
+      timeoutSeconds: 120,
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("mcpServer/oauth/login", {
+      name: "github",
+      scopes: ["read:org"],
+      timeoutSecs: 120,
+    });
+    expect(result).toEqual({
+      authorizationUrl: "https://example.com/oauth/mcp",
+    });
+  });
+});
+
+describe("AppServerClient.writeSkillsConfig", () => {
+  it("sends skills/config/write payload and returns effective enabled state", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      effectiveEnabled: true,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.writeSkillsConfig({
+      path: "/tmp/workspace/.codex/skills/checks/SKILL.md",
+      enabled: true,
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("skills/config/write", {
+      path: "/tmp/workspace/.codex/skills/checks/SKILL.md",
+      enabled: true,
+    });
+    expect(result).toEqual({
+      effectiveEnabled: true,
+    });
+  });
+});
+
 describe("AppServerClient.listThreadsAll", () => {
   it("starts pagination from an explicit initial cursor", async () => {
     const transportDouble = createTransportDouble();

@@ -88,6 +88,8 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onCancelAccountLogin: () => {},
   onLogoutAccount: () => {},
   onReloadMcpServerConfig: () => {},
+  onStartMcpServerOauthLogin: () => {},
+  onWriteSkillsConfig: () => {},
 };
 
 function renderDebugWorkspacePane(properties: DebugWorkspacePaneProps): void {

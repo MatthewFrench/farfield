@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-02-28 18:45:20Z
+Last Updated (UTC): 2026-02-28 22:42:21Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -43,7 +43,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `loginApiKey` | Not used | Do not adopt | Deprecated upstream request family. |
 | `loginChatGpt` | Not used | Do not adopt | Deprecated upstream request family. |
 | `logoutChatGpt` | Not used | Do not adopt | Deprecated upstream request family. |
-| `mcpServer/oauth/login` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
+| `mcpServer/oauth/login` | Used now | Keep | Exposed through capability ownership and debug workspace MCP oauth actions. |
 | `mcpServerStatus/list` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
 | `mock/experimentalMethod` | Not used | Do not adopt for production | Experimental or test-focused surface. |
 | `model/list` | Used now | Keep | Current ownership and contracts align with present product behavior. |
@@ -54,7 +54,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `sendUserMessage` | Not used | Do not adopt | Legacy request family upstream; replaced by turn/start in Farfield send path. |
 | `sendUserTurn` | Not used | Do not adopt | Deprecated upstream request family. |
 | `setDefaultModel` | Not used | Do not adopt | Deprecated upstream request family. |
-| `skills/config/write` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
+| `skills/config/write` | Used now | Keep | Exposed through capability ownership and debug workspace skill enable or disable actions. |
 | `skills/list` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
 | `skills/remote/export` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
 | `skills/remote/list` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
@@ -82,5 +82,5 @@ This ledger records recommended disposition for every upstream app-server client
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 32
-Not used: 42
+Used now: 34
+Not used: 40

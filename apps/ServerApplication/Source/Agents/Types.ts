@@ -60,6 +60,8 @@ export interface AgentCapabilities {
   canCancelAccountLogin: boolean;
   canLogoutAccount: boolean;
   canReloadMcpServerConfig: boolean;
+  canStartMcpServerOauthLogin: boolean;
+  canWriteSkillsConfig: boolean;
   canSetCollaborationMode: boolean;
   canSubmitUserInput: boolean;
   canReadLiveState: boolean;
@@ -520,6 +522,25 @@ export interface AgentCancelAccountLoginResult {
   status: AgentCancelAccountLoginStatus;
 }
 
+export interface AgentStartMcpServerOauthLoginInput {
+  name: string;
+  scopes?: string[] | null;
+  timeoutSeconds?: number | null;
+}
+
+export interface AgentStartMcpServerOauthLoginResult {
+  authorizationUrl: string;
+}
+
+export interface AgentWriteSkillsConfigInput {
+  path: string;
+  enabled: boolean;
+}
+
+export interface AgentWriteSkillsConfigResult {
+  effectiveEnabled: boolean;
+}
+
 export interface AgentSetCollaborationModeResult {
   ownerClientId: string;
 }
@@ -573,6 +594,10 @@ export interface AgentAdapter {
   cancelAccountLogin?(input: AgentCancelAccountLoginInput): Promise<AgentCancelAccountLoginResult>;
   logoutAccount?(): Promise<void>;
   reloadMcpServerConfig?(): Promise<void>;
+  startMcpServerOauthLogin?(
+    input: AgentStartMcpServerOauthLoginInput,
+  ): Promise<AgentStartMcpServerOauthLoginResult>;
+  writeSkillsConfig?(input: AgentWriteSkillsConfigInput): Promise<AgentWriteSkillsConfigResult>;
 
   listModels?(limit: number): Promise<AppServerListModelsResponse>;
   listCollaborationModes?(): Promise<AppServerCollaborationModeListResponse>;

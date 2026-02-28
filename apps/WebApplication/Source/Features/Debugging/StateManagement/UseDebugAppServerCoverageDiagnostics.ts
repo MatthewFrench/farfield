@@ -49,6 +49,8 @@ export interface DebugAppServerCoverageDiagnostics {
   cancelAccountLogin: () => void;
   logoutAccount: () => void;
   reloadMcpServerConfig: () => void;
+  startMcpServerOauthLogin: (serverName: string) => void;
+  writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
 }
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {
@@ -174,6 +176,7 @@ function mapSkills(data: CapabilitySkillsResponse["data"]): DebugAppServerCovera
     skills: entry.skills.map((skill) => ({
       name: skill.name,
       description: skill.description,
+      path: skill.path,
       scope: skill.scope,
       enabled: skill.enabled,
     })),
@@ -365,6 +368,66 @@ export function useDebugAppServerCoverageDiagnostics(
     })();
   }, [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics]);
 
+  const startMcpServerOauthLogin = useCallback(
+    (serverName: string) => {
+      if (isRunningCoverageAction) {
+        return;
+      }
+      if (serverName.trim().length === 0) {
+        return;
+      }
+      setIsRunningCoverageAction(true);
+      setCoverageActionErrorMessage("");
+
+      void (async () => {
+        try {
+          const response = await input.capabilityServerClient.startMcpServerOauthLogin({
+            actionName: COVERAGE_MUTATION_OPERATION_NAME,
+            name: serverName,
+          });
+          if (typeof window.open === "function") {
+            window.open(response.authorizationUrl, "_blank", "noopener,noreferrer");
+          }
+          refreshCoverageDiagnostics();
+        } catch (error) {
+          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
+        } finally {
+          setIsRunningCoverageAction(false);
+        }
+      })();
+    },
+    [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics],
+  );
+
+  const writeSkillsConfig = useCallback(
+    (skillPath: string, enabled: boolean) => {
+      if (isRunningCoverageAction) {
+        return;
+      }
+      if (skillPath.trim().length === 0) {
+        return;
+      }
+      setIsRunningCoverageAction(true);
+      setCoverageActionErrorMessage("");
+
+      void (async () => {
+        try {
+          await input.capabilityServerClient.writeSkillsConfig({
+            actionName: COVERAGE_MUTATION_OPERATION_NAME,
+            path: skillPath,
+            enabled,
+          });
+          refreshCoverageDiagnostics();
+        } catch (error) {
+          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
+        } finally {
+          setIsRunningCoverageAction(false);
+        }
+      })();
+    },
+    [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics],
+  );
+
   useEffect(() => {
     if (input.debugWorkspaceSection !== COVERAGE_WORKSPACE_SECTION) {
       return;
@@ -392,5 +455,7 @@ export function useDebugAppServerCoverageDiagnostics(
     cancelAccountLogin,
     logoutAccount,
     reloadMcpServerConfig,
+    startMcpServerOauthLogin,
+    writeSkillsConfig,
   };
 }

@@ -10,9 +10,11 @@ config/read
 configRequirements/read
 experimentalFeature/list
 initialize
+mcpServer/oauth/login
 mcpServerStatus/list
 model/list
 review/start
+skills/config/write
 skills/list
 thread/archive
 thread/backgroundTerminals/clean

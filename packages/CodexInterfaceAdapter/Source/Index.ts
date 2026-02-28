@@ -51,12 +51,16 @@ export type {
   SkillSummary,
   SkillsListEntrySummary,
   SkillsListExtraRootsForCwdOptions,
+  StartMcpServerOauthLoginOptions,
+  StartMcpServerOauthLoginResult,
   StartReviewOptions,
   StartReviewResult,
   StartReviewTarget,
   StartThreadOptions,
   StartTurnOptions,
   UnsubscribeThreadStatus,
+  WriteSkillsConfigOptions,
+  WriteSkillsConfigResult,
 } from "./AppServerClient.js";
 export { AppServerClient } from "./AppServerClient.js";
 export type {

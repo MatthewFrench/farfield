@@ -41,6 +41,8 @@ export const CODEX_AGENT_CAPABILITIES: AgentCapabilities = {
   canCancelAccountLogin: true,
   canLogoutAccount: true,
   canReloadMcpServerConfig: true,
+  canStartMcpServerOauthLogin: true,
+  canWriteSkillsConfig: true,
   canSetCollaborationMode: true,
   canSubmitUserInput: true,
   canReadLiveState: true,

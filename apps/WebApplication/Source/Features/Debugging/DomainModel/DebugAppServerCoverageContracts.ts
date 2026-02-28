@@ -52,6 +52,7 @@ export interface DebugAppServerCoverageAppSummary {
 export interface DebugAppServerCoverageSkillSummary {
   name: string;
   description: string;
+  path: string;
   scope: "user" | "repo" | "system" | "admin";
   enabled: boolean;
 }

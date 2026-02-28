@@ -148,6 +148,8 @@ export interface UseApplicationShellViewPropertiesInput {
   cancelAccountLogin: () => void;
   logoutAccount: () => void;
   reloadMcpServerConfig: () => void;
+  startMcpServerOauthLogin: (serverName: string) => void;
+  writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   apiSessionTokenDraft: string;
   setApiSessionTokenDraft: (nextTokenValue: string) => void;
   apiSessionBootstrapError: string;
@@ -393,6 +395,8 @@ function buildDebugWorkspacePaneProperties(
     onCancelAccountLogin: input.cancelAccountLogin,
     onLogoutAccount: input.logoutAccount,
     onReloadMcpServerConfig: input.reloadMcpServerConfig,
+    onStartMcpServerOauthLogin: input.startMcpServerOauthLogin,
+    onWriteSkillsConfig: input.writeSkillsConfig,
   };
 }
 

@@ -17,6 +17,8 @@ export interface DebugAppServerCoveragePanelProps {
   onCancelAccountLogin: () => void;
   onLogoutAccount: () => void;
   onReloadMcpServerConfig: () => void;
+  onStartMcpServerOauthLogin: (serverName: string) => void;
+  onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
 }
 
 function renderListValues(values: string[] | null): string {
@@ -42,6 +44,8 @@ export function DebugAppServerCoveragePanel({
   onCancelAccountLogin,
   onLogoutAccount,
   onReloadMcpServerConfig,
+  onStartMcpServerOauthLogin,
+  onWriteSkillsConfig,
 }: DebugAppServerCoveragePanelProps): React.JSX.Element {
   return (
     <div data-testid="debug-coverage-panel" className="flex-1 min-h-0 overflow-auto p-4 space-y-3">
@@ -287,13 +291,29 @@ export function DebugAppServerCoveragePanel({
               coverageDiagnosticsSnapshot.mcpServers.map((server) => (
                 <div
                   key={server.name}
-                  className="flex items-center justify-between gap-2 text-xs"
+                  className="space-y-1 text-xs"
                   data-testid={`debug-coverage-mcp-${server.name}`}
                 >
-                  <span>{server.name}</span>
-                  <span className="text-muted-foreground">
-                    {server.toolCount} tools • {server.authStatus}
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{server.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">
+                        {server.toolCount} tools • {server.authStatus}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        data-testid={`debug-coverage-mcp-oauth-${server.name}`}
+                        disabled={isRunningCoverageAction}
+                        onClick={() => {
+                          onStartMcpServerOauthLogin(server.name);
+                        }}
+                      >
+                        Start OAuth
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               ))
             )}
@@ -309,13 +329,35 @@ export function DebugAppServerCoveragePanel({
               coverageDiagnosticsSnapshot.skills.map((entry) => (
                 <div
                   key={entry.cwd}
-                  className="text-xs"
+                  className="space-y-2 text-xs"
                   data-testid={`debug-coverage-skills-${entry.cwd}`}
                 >
                   <p className="font-medium">{entry.cwd}</p>
                   <p className="text-muted-foreground">
                     {entry.skills.length} skills • {entry.errorCount} errors
                   </p>
+                  {entry.skills.map((skill) => (
+                    <div key={skill.path} className="rounded border border-border/70 p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span>
+                          {skill.name} ({skill.scope})
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          data-testid={`debug-coverage-skill-toggle-${skill.name}`}
+                          disabled={isRunningCoverageAction}
+                          onClick={() => {
+                            onWriteSkillsConfig(skill.path, !skill.enabled);
+                          }}
+                        >
+                          {skill.enabled ? "Disable" : "Enable"}
+                        </Button>
+                      </div>
+                      <p className="text-muted-foreground break-all">{skill.path}</p>
+                    </div>
+                  ))}
                 </div>
               ))
             )}

@@ -69,6 +69,8 @@ export interface DebugWorkspacePaneProps {
   onCancelAccountLogin: () => void;
   onLogoutAccount: () => void;
   onReloadMcpServerConfig: () => void;
+  onStartMcpServerOauthLogin: (serverName: string) => void;
+  onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
 }
 
 export function DebugWorkspacePane({
@@ -118,6 +120,8 @@ export function DebugWorkspacePane({
   onCancelAccountLogin,
   onLogoutAccount,
   onReloadMcpServerConfig,
+  onStartMcpServerOauthLogin,
+  onWriteSkillsConfig,
 }: DebugWorkspacePaneProps): React.JSX.Element {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -223,6 +227,8 @@ export function DebugWorkspacePane({
             onCancelAccountLogin={onCancelAccountLogin}
             onLogoutAccount={onLogoutAccount}
             onReloadMcpServerConfig={onReloadMcpServerConfig}
+            onStartMcpServerOauthLogin={onStartMcpServerOauthLogin}
+            onWriteSkillsConfig={onWriteSkillsConfig}
           />
         )}
       </Tabs>

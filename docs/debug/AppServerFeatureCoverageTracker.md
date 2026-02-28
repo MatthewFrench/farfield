@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-02-28 18:45:20Z
+Last Updated (UTC): 2026-02-28 22:42:21Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `31 / 74` request methods (`41.9%`).
+1. Farfield app-server method coverage at request-owner layer: `33 / 74` request methods (`44.6%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `32 / 74` (`43.2%`).
+3. Effective request-method usage including transport-owned `initialize`: `34 / 74` (`45.9%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -100,6 +100,7 @@ As of the upstream snapshot above:
 | `config/read` | Config defaults resolution for model and reasoning effort | High | Normalized default resolution through typed owner mapping | Keep current path |
 | `configRequirements/read` | Config requirements diagnostics and workspace readiness signals | Medium-high | Strict capability route ownership with typed payload mapping into debug coverage diagnostics | Keep current path |
 | `config/mcpServer/reload` | MCP server configuration reload action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic mutation path for diagnostics flows | Keep current path |
+| `mcpServer/oauth/login` | MCP server oauth-login start action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic oauth-url response mapping for integration diagnostics | Keep current path |
 | `account/read` | Account diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed account-contract mapping | Keep current path |
 | `account/rateLimits/read` | Account rate-limit diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed rate-limit contract mapping | Keep current path |
 | `account/login/start` | Account auth start action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed login-response mapping and pending-login state | Keep current path |
@@ -109,6 +110,7 @@ As of the upstream snapshot above:
 | `mcpServerStatus/list` | MCP server status diagnostics in debug workspace | Medium-high | Strict capability route ownership with typed list pagination contracts | Keep current path |
 | `app/list` | App list diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed thread-scoped query mapping | Keep current path |
 | `skills/list` | Skills diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed refresh query mapping | Keep current path |
+| `skills/config/write` | Skills enable or disable actions in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic write-result mapping for skill-state mutations | Keep current path |
 
 ### Transport-owned request method
 
@@ -142,6 +144,7 @@ As of the upstream snapshot above:
 | `config/read` | Config defaults (`model`, `reasoningEffort`) | `/api/config/defaults` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigDefaults` -> `AppServerClient.readConfig` |
 | `configRequirements/read` | Config requirements diagnostics | `/api/config-requirements` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigRequirements` -> `AppServerClient.readConfigRequirements` |
 | `config/mcpServer/reload` | MCP server config reload diagnostics action | `/api/config/mcp-server/reload` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.reloadMcpServerConfig` -> `AppServerClient.reloadMcpServerConfig` |
+| `mcpServer/oauth/login` | MCP server oauth login diagnostics action | `/api/mcp-servers/oauth/login` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.startMcpServerOauthLogin` -> `AppServerClient.startMcpServerOauthLogin` |
 | `account/read` | Account diagnostics | `/api/account` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readAccount` -> `AppServerClient.readAccount` |
 | `account/rateLimits/read` | Account rate-limit diagnostics | `/api/account/rate-limits` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readAccountRateLimits` -> `AppServerClient.readAccountRateLimits` |
 | `account/login/start` | Account login start action | `/api/account/login/start` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.startAccountLogin` -> `AppServerClient.startAccountLogin` |
@@ -151,10 +154,11 @@ As of the upstream snapshot above:
 | `mcpServerStatus/list` | MCP server status diagnostics | `/api/mcp-servers` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listMcpServerStatuses` -> `AppServerClient.listMcpServerStatuses` |
 | `app/list` | App list diagnostics | `/api/apps` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listApps` -> `AppServerClient.listApps` |
 | `skills/list` | Skills diagnostics | `/api/skills` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listSkills` -> `AppServerClient.listSkills` |
+| `skills/config/write` | Skills enable or disable diagnostics action | `/api/skills/config/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeSkillsConfig` -> `AppServerClient.writeSkillsConfig` |
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`43` request methods are not used by Farfield’s app-server client path:
+`41` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
@@ -183,14 +187,12 @@ listConversations
 loginApiKey
 loginChatGpt
 logoutChatGpt
-mcpServer/oauth/login
 mock/experimentalMethod
 newConversation
 removeConversationListener
 resumeConversation
 sendUserTurn
 setDefaultModel
-skills/config/write
 skills/remote/export
 skills/remote/list
 thread/realtime/appendAudio
@@ -245,13 +247,12 @@ No remaining methods in this category for the current upstream snapshot.
 
 ### Category D: Skills, Apps, and Feature-Discovery Surfaces Not Yet Wired
 
-1. `skills/config/write`
-2. `skills/remote/export`
-3. `skills/remote/list`
+1. `skills/remote/export`
+2. `skills/remote/list`
 
 ### Category E: MCP and Integration Surfaces Not Yet Wired
 
-1. `mcpServer/oauth/login`
+No remaining methods in this category for the current upstream snapshot.
 
 ### Category F: Thread and Turn v2 Lifecycle Surfaces Not Yet Wired
 
@@ -281,8 +282,8 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `43`
-2. Total methods listed across Category A-I: `43`
+1. Total non-intersection methods: `41`
+2. Total methods listed across Category A-I: `41`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

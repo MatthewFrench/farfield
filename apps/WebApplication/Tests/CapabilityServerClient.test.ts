@@ -19,6 +19,11 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityApi", () => ({
   startAccountLogin: vi.fn(),
 }));
 
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi", () => ({
+  startMcpServerOauthLogin: vi.fn(),
+  writeSkillsConfig: vi.fn(),
+}));
+
 import {
   cancelAccountLogin,
   getAccount,
@@ -38,6 +43,10 @@ import {
   startAccountLogin,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
 import {
+  startMcpServerOauthLogin,
+  writeSkillsConfig,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi";
+import {
   type CapabilityAccountLoginCancelResponse,
   type CapabilityAccountLoginStartResponse,
   type CapabilityAccountRateLimitsResponse,
@@ -49,10 +58,12 @@ import {
   type CapabilityConfigRequirementsResponse,
   type CapabilityExperimentalFeaturesResponse,
   type CapabilityHealthResponse,
+  type CapabilityMcpServerOauthLoginResponse,
   type CapabilityMcpServersResponse,
   type CapabilityModelsResponse,
   type CapabilityMutationSuccessResponse,
   CapabilityServerClient,
+  type CapabilitySkillsConfigWriteResponse,
   type CapabilitySkillsResponse,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
 
@@ -90,6 +101,8 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canCancelAccountLogin: true,
         canLogoutAccount: true,
         canReloadMcpServerConfig: true,
+        canStartMcpServerOauthLogin: true,
+        canWriteSkillsConfig: true,
         canSetCollaborationMode: true,
         canSubmitUserInput: true,
         canReadLiveState: true,
@@ -196,6 +209,16 @@ const MUTATION_SUCCESS_RESPONSE: CapabilityMutationSuccessResponse = {
   ok: true,
 };
 
+const MCP_SERVER_OAUTH_LOGIN_RESPONSE: CapabilityMcpServerOauthLoginResponse = {
+  ok: true,
+  authorizationUrl: "https://example.com/oauth/mcp/github",
+};
+
+const SKILLS_CONFIG_WRITE_RESPONSE: CapabilitySkillsConfigWriteResponse = {
+  ok: true,
+  effectiveEnabled: false,
+};
+
 const EXPERIMENTAL_FEATURES_RESPONSE: CapabilityExperimentalFeaturesResponse = {
   ok: true,
   data: [
@@ -278,6 +301,8 @@ describe("CapabilityServerClient", () => {
     vi.mocked(cancelAccountLogin).mockResolvedValue(ACCOUNT_LOGIN_CANCEL_RESPONSE);
     vi.mocked(logoutAccount).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
     vi.mocked(reloadMcpServerConfig).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
+    vi.mocked(startMcpServerOauthLogin).mockResolvedValue(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
+    vi.mocked(writeSkillsConfig).mockResolvedValue(SKILLS_CONFIG_WRITE_RESPONSE);
     vi.mocked(listExperimentalFeatures).mockResolvedValue(EXPERIMENTAL_FEATURES_RESPONSE);
     vi.mocked(listMcpServers).mockResolvedValue(MCP_SERVERS_RESPONSE);
     vi.mocked(listApps).mockResolvedValue(APPS_RESPONSE);
@@ -337,6 +362,19 @@ describe("CapabilityServerClient", () => {
       actionId: "action-reload-mcp-server-config",
       actionName: "reload-mcp-server-config",
     };
+    const mcpServerOauthLoginOptions = {
+      actionId: "action-mcp-oauth-login",
+      actionName: "start-mcp-oauth-login",
+      name: "github",
+      scopes: ["read:org", "repo"],
+      timeoutSeconds: 180,
+    };
+    const skillsConfigWriteOptions = {
+      actionId: "action-skills-config-write",
+      actionName: "write-skills-config",
+      path: "/tmp/project/.codex/skills/checks/SKILL.md",
+      enabled: false,
+    };
     const experimentalFeatureOptions = {
       actionId: "action-experimental-features",
       actionName: "list-experimental-features",
@@ -378,6 +416,11 @@ describe("CapabilityServerClient", () => {
     const reloadMcpServerConfigResponse = await capabilityServerClient.reloadMcpServerConfig(
       reloadMcpServerConfigOptions,
     );
+    const mcpServerOauthLoginResponse = await capabilityServerClient.startMcpServerOauthLogin(
+      mcpServerOauthLoginOptions,
+    );
+    const skillsConfigWriteResponse =
+      await capabilityServerClient.writeSkillsConfig(skillsConfigWriteOptions);
     const experimentalFeaturesResponse = await capabilityServerClient.listExperimentalFeatures(
       experimentalFeatureOptions,
     );
@@ -397,6 +440,8 @@ describe("CapabilityServerClient", () => {
     expect(cancelAccountLogin).toHaveBeenCalledWith(accountLoginCancelOptions);
     expect(logoutAccount).toHaveBeenCalledWith(accountLogoutOptions);
     expect(reloadMcpServerConfig).toHaveBeenCalledWith(reloadMcpServerConfigOptions);
+    expect(startMcpServerOauthLogin).toHaveBeenCalledWith(mcpServerOauthLoginOptions);
+    expect(writeSkillsConfig).toHaveBeenCalledWith(skillsConfigWriteOptions);
     expect(listExperimentalFeatures).toHaveBeenCalledWith(experimentalFeatureOptions);
     expect(listMcpServers).toHaveBeenCalledWith(mcpServerOptions);
     expect(listApps).toHaveBeenCalledWith(appOptions);
@@ -413,6 +458,8 @@ describe("CapabilityServerClient", () => {
     expect(accountLoginCancelResponse).toEqual(ACCOUNT_LOGIN_CANCEL_RESPONSE);
     expect(accountLogoutResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
     expect(reloadMcpServerConfigResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
+    expect(mcpServerOauthLoginResponse).toEqual(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
+    expect(skillsConfigWriteResponse).toEqual(SKILLS_CONFIG_WRITE_RESPONSE);
     expect(experimentalFeaturesResponse).toEqual(EXPERIMENTAL_FEATURES_RESPONSE);
     expect(mcpServersResponse).toEqual(MCP_SERVERS_RESPONSE);
     expect(appsResponse).toEqual(APPS_RESPONSE);

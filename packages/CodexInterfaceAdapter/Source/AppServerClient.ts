@@ -45,6 +45,7 @@ import {
   buildRollbackThreadRequest,
   buildSetThreadNameRequest,
   buildStartAccountLoginRequestParameters,
+  buildStartMcpServerOauthLoginRequestParameters,
   buildStartReviewRequest,
   buildStartThreadRequest,
   buildStartTurnRequest,
@@ -54,6 +55,7 @@ import {
   buildTurnInterruptRequest,
   buildUnarchiveThreadRequest,
   buildUnsubscribeThreadRequest,
+  buildWriteSkillsConfigRequestParameters,
   resolveReadThreadRequestTimeoutMilliseconds,
 } from "./AppServerClientRequestBuilders.js";
 import {
@@ -353,6 +355,25 @@ export interface CancelAccountLoginResult {
   status: CancelAccountLoginStatus;
 }
 
+export interface StartMcpServerOauthLoginOptions {
+  name: string;
+  scopes?: string[] | null;
+  timeoutSeconds?: number | null;
+}
+
+export interface StartMcpServerOauthLoginResult {
+  authorizationUrl: string;
+}
+
+export interface WriteSkillsConfigOptions {
+  path: string;
+  enabled: boolean;
+}
+
+export interface WriteSkillsConfigResult {
+  effectiveEnabled: boolean;
+}
+
 export interface ResumeThreadOptions {
   persistExtendedHistory?: boolean;
 }
@@ -629,6 +650,16 @@ const AppServerCancelLoginAccountResponseSchema = z
   .passthrough();
 const AppServerLogoutAccountResponseSchema = z.object({}).passthrough();
 const AppServerMcpServerRefreshResponseSchema = z.object({}).passthrough();
+const AppServerMcpServerOauthLoginResponseSchema = z
+  .object({
+    authorizationUrl: z.string().min(1),
+  })
+  .passthrough();
+const AppServerSkillsConfigWriteResponseSchema = z
+  .object({
+    effectiveEnabled: z.boolean(),
+  })
+  .passthrough();
 const AppServerThreadUnsubscribeResponseSchema = z
   .object({
     status: z.enum(["notLoaded", "notSubscribed", "unsubscribed"]),
@@ -1107,6 +1138,40 @@ export class AppServerClient {
       result,
       APP_SERVER_CLIENT_RESPONSE_CONTEXTS.reloadMcpServerConfig,
     );
+  }
+
+  public async startMcpServerOauthLogin(
+    options: StartMcpServerOauthLoginOptions,
+  ): Promise<StartMcpServerOauthLoginResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.startMcpServerOauthLogin,
+      buildStartMcpServerOauthLoginRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerMcpServerOauthLoginResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.startMcpServerOauthLogin,
+    );
+    return {
+      authorizationUrl: parsed.authorizationUrl,
+    };
+  }
+
+  public async writeSkillsConfig(
+    options: WriteSkillsConfigOptions,
+  ): Promise<WriteSkillsConfigResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.writeSkillsConfig,
+      buildWriteSkillsConfigRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerSkillsConfigWriteResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.writeSkillsConfig,
+    );
+    return {
+      effectiveEnabled: parsed.effectiveEnabled,
+    };
   }
 
   public async startThread(options: StartThreadOptions): Promise<AppServerStartThreadResponse> {

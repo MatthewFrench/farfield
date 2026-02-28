@@ -74,6 +74,8 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canCancelAccountLogin: true,
         canLogoutAccount: true,
         canReloadMcpServerConfig: true,
+        canStartMcpServerOauthLogin: true,
+        canWriteSkillsConfig: true,
         canSetCollaborationMode: true,
         canSubmitUserInput: true,
         canReadLiveState: true,

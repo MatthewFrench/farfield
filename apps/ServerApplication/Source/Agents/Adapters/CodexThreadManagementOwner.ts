@@ -20,8 +20,12 @@ import {
   type ReadAccountResult,
   type ReadConfigRequirementsOptions,
   type ReadConfigRequirementsResult,
+  type StartMcpServerOauthLoginOptions,
+  type StartMcpServerOauthLoginResult,
   type StartReviewOptions,
   type StartThreadOptions,
+  type WriteSkillsConfigOptions,
+  type WriteSkillsConfigResult,
 } from "@farfield/api";
 import type {
   AppServerCollaborationModeListResponse,
@@ -63,11 +67,15 @@ import type {
   AgentSetThreadNameInput,
   AgentStartAccountLoginInput,
   AgentStartAccountLoginResult,
+  AgentStartMcpServerOauthLoginInput,
+  AgentStartMcpServerOauthLoginResult,
   AgentStartThreadReviewInput,
   AgentStartThreadReviewResult,
   AgentUnarchiveThreadInput,
   AgentUnsubscribeThreadInput,
   AgentUnsubscribeThreadStatus,
+  AgentWriteSkillsConfigInput,
+  AgentWriteSkillsConfigResult,
 } from "../Types.js";
 
 const CREATE_THREAD_REQUIRES_WORKING_DIRECTORY_ERROR = "Codex thread creation requires cwd";
@@ -259,6 +267,25 @@ function buildCancelAccountLoginOptions(
 ): CancelAccountLoginOptions {
   return {
     loginId: input.loginId,
+  };
+}
+
+function buildStartMcpServerOauthLoginOptions(
+  input: AgentStartMcpServerOauthLoginInput,
+): StartMcpServerOauthLoginOptions {
+  return {
+    name: input.name,
+    ...(input.scopes !== undefined ? { scopes: input.scopes } : {}),
+    ...(input.timeoutSeconds !== undefined ? { timeoutSeconds: input.timeoutSeconds } : {}),
+  };
+}
+
+function buildWriteSkillsConfigOptions(
+  input: AgentWriteSkillsConfigInput,
+): WriteSkillsConfigOptions {
+  return {
+    path: input.path,
+    enabled: input.enabled,
   };
 }
 
@@ -553,6 +580,26 @@ export class CodexThreadManagementOwner {
   public async reloadMcpServerConfig(): Promise<void> {
     this.ensureCodexAvailable();
     await this.runAppServerCall(() => this.appClient.reloadMcpServerConfig());
+  }
+
+  public async startMcpServerOauthLogin(
+    input: AgentStartMcpServerOauthLoginInput,
+  ): Promise<AgentStartMcpServerOauthLoginResult> {
+    this.ensureCodexAvailable();
+    const result: StartMcpServerOauthLoginResult = await this.runAppServerCall(() =>
+      this.appClient.startMcpServerOauthLogin(buildStartMcpServerOauthLoginOptions(input)),
+    );
+    return result;
+  }
+
+  public async writeSkillsConfig(
+    input: AgentWriteSkillsConfigInput,
+  ): Promise<AgentWriteSkillsConfigResult> {
+    this.ensureCodexAvailable();
+    const result: WriteSkillsConfigResult = await this.runAppServerCall(() =>
+      this.appClient.writeSkillsConfig(buildWriteSkillsConfigOptions(input)),
+    );
+    return result;
   }
 
   public async readConfigDefaults(): Promise<AgentConfigDefaults> {

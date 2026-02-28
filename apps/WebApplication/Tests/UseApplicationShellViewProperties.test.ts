@@ -146,6 +146,8 @@ function createUseApplicationShellViewPropertiesFixture() {
   const cancelAccountLoginSpy = vi.fn((): void => {});
   const logoutAccountSpy = vi.fn((): void => {});
   const reloadMcpServerConfigSpy = vi.fn((): void => {});
+  const startMcpServerOauthLoginSpy = vi.fn((_serverName: string): void => {});
+  const writeSkillsConfigSpy = vi.fn((_skillPath: string, _enabled: boolean): void => {});
   const setApiSessionTokenDraftSpy = vi.fn((): void => {});
   const setApiSessionBootstrapErrorSpy = vi.fn((): void => {});
   const submitApiSessionTokenSpy = vi.fn(async (): Promise<void> => {});
@@ -278,6 +280,8 @@ function createUseApplicationShellViewPropertiesFixture() {
     cancelAccountLogin: cancelAccountLoginSpy,
     logoutAccount: logoutAccountSpy,
     reloadMcpServerConfig: reloadMcpServerConfigSpy,
+    startMcpServerOauthLogin: startMcpServerOauthLoginSpy,
+    writeSkillsConfig: writeSkillsConfigSpy,
     apiSessionTokenDraft: "",
     setApiSessionTokenDraft: setApiSessionTokenDraftSpy,
     apiSessionBootstrapError: "invalid-token",

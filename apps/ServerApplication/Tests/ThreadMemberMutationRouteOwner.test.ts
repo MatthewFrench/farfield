@@ -80,6 +80,8 @@ function createAgentAdapter(input: {
       canCancelAccountLogin: false,
       canLogoutAccount: false,
       canReloadMcpServerConfig: false,
+      canStartMcpServerOauthLogin: false,
+      canWriteSkillsConfig: false,
       canSetCollaborationMode: input.setCollaborationMode !== undefined,
       canSubmitUserInput: input.submitUserInput !== undefined,
       canReadLiveState: false,
