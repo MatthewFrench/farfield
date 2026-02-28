@@ -592,6 +592,7 @@ These are candidate improvements prioritized by estimated practical return on va
 
 1. Auto end-to-end failure diagnostics attachments (sentinel + health snapshot on fail): `90%`
 2. Debug UI runtime counters (health + queue/rate-limit visibility): `80%`
-3. `smoke:app` latency budgets (warn/fail modes): `72%`
-4. Server integration tests for queue/rate-limit/observability fields: `68%`
-5. Stream-burst stress command for thread/event pressure: `58%`
+3. Browser telemetry for `LongTask`, `INP`, and event-loop delay with sustained-regression alerts: `76%`
+4. `smoke:app` latency budgets (warn/fail modes): `72%`
+5. Server integration tests for queue/rate-limit/observability fields: `68%`
+6. Stream-burst stress command for thread/event pressure: `58%`
