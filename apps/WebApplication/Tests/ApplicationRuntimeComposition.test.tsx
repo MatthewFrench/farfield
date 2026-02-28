@@ -301,8 +301,12 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     threadListStateController: applicationOwnerDependencies.threadListStateController,
   });
 
+  const shouldRenderStreamEventCards =
+    applicationShellState.activeTab === "debug" &&
+    applicationShellState.debugWorkspaceSection === "stream";
   const streamEventCards = useStreamEventCards({
     streamEvents: applicationShellState.streamEvents,
+    streamEventCardsEnabled: shouldRenderStreamEventCards,
   });
 
   const runtimeRequestHandlers = useApplicationRuntimeRequestHandlers({

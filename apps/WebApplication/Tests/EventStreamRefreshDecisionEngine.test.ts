@@ -294,6 +294,31 @@ describe("EventStreamRefreshDecisionEngine", () => {
     });
   });
 
+  it("refreshes core for non-selected thread deltas without requiring full delta snapshot payloads", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "chat",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 6,
+        event: {
+          type: "thread-stream-delta",
+          delta: {
+            threadId: "thread-2",
+          },
+        },
+      }),
+    });
+
+    expect(decision).toEqual({
+      refreshCore: true,
+      refreshHistory: false,
+      refreshSelectedThread: false,
+      threadStreamDelta: null,
+    });
+  });
+
   it("refreshes core when event payload is invalid", () => {
     const engine = createEngine();
 
@@ -306,6 +331,31 @@ describe("EventStreamRefreshDecisionEngine", () => {
     expect(decision).toEqual({
       refreshCore: true,
       refreshHistory: false,
+      refreshSelectedThread: false,
+      threadStreamDelta: null,
+    });
+  });
+
+  it("refreshes core and history for invalid thread-stream envelopes on the debug tab", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "debug",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 12,
+        event: {
+          type: "thread-stream-delta",
+          delta: {
+            invalidThreadIdentifier: "thread-1",
+          },
+        },
+      }),
+    });
+
+    expect(decision).toEqual({
+      refreshCore: true,
+      refreshHistory: true,
       refreshSelectedThread: false,
       threadStreamDelta: null,
     });

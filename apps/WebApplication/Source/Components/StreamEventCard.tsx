@@ -1,6 +1,6 @@
 import { FileChangeEntrySchema, type IpcFrame, IpcFrameType } from "@farfield/protocol";
 import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { z } from "zod";
 import { DiffBlock } from "@/Components/DiffBlock";
 import { Button } from "@/Components/UserInterface/Button";
@@ -45,14 +45,28 @@ function readEventBodyText(event: IpcFrame): string {
   return JSON.stringify(event, null, EVENT_BODY_JSON_INDENT_SPACES);
 }
 
-export function StreamEventCard({ event }: StreamEventCardProps): React.JSX.Element {
+function isDiffPayloadEvent(event: IpcFrame): boolean {
+  return event.type === IpcFrameType.request || event.type === IpcFrameType.broadcast;
+}
+
+export const StreamEventCard = memo(function StreamEventCard({
+  event,
+}: StreamEventCardProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const label = readEventLabel(event);
-  const changes = readDiffChanges(event);
+  const label = useMemo(() => readEventLabel(event), [event]);
+  const changes = useMemo(() => {
+    if (!open || !isDiffPayloadEvent(event)) {
+      return null;
+    }
+    return readDiffChanges(event);
+  }, [event, open]);
   const isFileChange = changes !== null;
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
+    <div
+      data-testid="stream-event-card"
+      className="rounded-lg border border-border overflow-hidden"
+    >
       <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -78,4 +92,6 @@ export function StreamEventCard({ event }: StreamEventCardProps): React.JSX.Elem
       )}
     </div>
   );
-}
+});
+
+StreamEventCard.displayName = "StreamEventCard";

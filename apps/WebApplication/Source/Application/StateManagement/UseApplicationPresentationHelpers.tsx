@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { DateValueFormatter } from "@/Application/DomainModel/DateValueFormatter";
 import { AgentFavicon } from "@/Application/UserInterface/AgentFavicon";
 import { StreamEventCard } from "@/Components/StreamEventCard";
@@ -7,45 +7,72 @@ import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 
 export interface UseStreamEventCardsInput {
   streamEvents: ChatStreamEventsResponse["events"];
+  streamEventCardsEnabled: boolean;
 }
 
 interface IndexedStreamEvent {
   streamEvent: ChatStreamEventsResponse["events"][number];
-  stableIndex: number;
+  stableEventKey: string;
 }
 
 const STREAM_EVENT_CARD_KEY_PREFIX = "stream-event-";
 
-function buildStreamEventCardKey(stableIndex: number): string {
-  return `${STREAM_EVENT_CARD_KEY_PREFIX}${String(stableIndex)}`;
+function buildStreamEventCardKey(keyNumber: number): string {
+  return `${STREAM_EVENT_CARD_KEY_PREFIX}${String(keyNumber)}`;
 }
 
-function indexStreamEvents(streamEvents: ChatStreamEventsResponse["events"]): IndexedStreamEvent[] {
-  return streamEvents.map<IndexedStreamEvent>((streamEvent, stableIndex) => ({
+function indexStreamEvents(
+  streamEvents: ChatStreamEventsResponse["events"],
+  readStreamEventCardKey: (streamEvent: ChatStreamEventsResponse["events"][number]) => string,
+): IndexedStreamEvent[] {
+  return streamEvents.map<IndexedStreamEvent>((streamEvent) => ({
     streamEvent,
-    stableIndex,
+    stableEventKey: readStreamEventCardKey(streamEvent),
   }));
 }
 
 function buildStreamEventCard(indexedStreamEvent: IndexedStreamEvent): React.JSX.Element {
   return (
     <StreamEventCard
-      key={buildStreamEventCardKey(indexedStreamEvent.stableIndex)}
+      key={indexedStreamEvent.stableEventKey}
       event={indexedStreamEvent.streamEvent}
     />
   );
 }
 
 export function useStreamEventCards(input: UseStreamEventCardsInput): React.JSX.Element[] {
-  return useMemo<React.JSX.Element[]>(
-    () =>
-      indexStreamEvents(input.streamEvents)
-        // Preserve each event's original index as a stable key seed so appends do not
-        // remount every existing card (which would reset local expand/collapse state).
-        .reverse()
-        .map(buildStreamEventCard),
-    [input.streamEvents],
+  const streamEventCardKeyByReference = useRef<
+    WeakMap<ChatStreamEventsResponse["events"][number], string>
+  >(new WeakMap<ChatStreamEventsResponse["events"][number], string>());
+  const nextStreamEventCardKeyNumber = useRef(0);
+
+  const readStreamEventCardKey = useCallback(
+    (streamEvent: ChatStreamEventsResponse["events"][number]): string => {
+      const existingKey = streamEventCardKeyByReference.current.get(streamEvent);
+      if (existingKey !== undefined) {
+        return existingKey;
+      }
+
+      const nextKey = buildStreamEventCardKey(nextStreamEventCardKeyNumber.current);
+      nextStreamEventCardKeyNumber.current += 1;
+      streamEventCardKeyByReference.current.set(streamEvent, nextKey);
+      return nextKey;
+    },
+    [],
   );
+
+  return useMemo<React.JSX.Element[]>(() => {
+    if (!input.streamEventCardsEnabled) {
+      return [];
+    }
+
+    return (
+      indexStreamEvents(input.streamEvents, readStreamEventCardKey)
+        // Preserve event-owned key identity so retention-window shifts do not remount retained cards.
+        .reverse()
+        .map(buildStreamEventCard)
+    );
+  }, [input.streamEventCardsEnabled, input.streamEvents, readStreamEventCardKey]);
 }
 
 export interface UseApplicationFormattingHelpersInput {

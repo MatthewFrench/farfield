@@ -153,6 +153,30 @@ All phases require explicit performance and correctness evidence before merge.
 2. Add replay-equivalence and interaction smoke tests before enabling each phase by default.
 3. Roll out by phase with explicit before/after performance evidence per phase.
 
+## Implementation Update (2026-02-28)
+
+Completed in repository:
+
+1. Phase 4 partial:
+   - gated stream-event card derivation to active debug stream view only
+   - introduced stable stream-event card keys backed by event-reference ownership to prevent remount churn when retention windows shift
+   - added unit coverage asserting retained card node identity stability
+
+2. Stream debug rendering hot-path reduction:
+   - memoized `StreamEventCard`
+   - deferred diff-payload schema parsing until a card is expanded
+
+3. Phase 2 partial:
+   - introduced staged event-stream decision parsing:
+     - type envelope parse first
+     - activity and thread-id scoped parse second
+     - full strict delta parse only when selected-thread delta must be applied
+   - preserved existing refresh decision semantics and invalid-payload hard-refresh behavior
+   - added focused decision-engine tests for staged parsing paths
+
+4. Verification additions:
+   - added Playwright scenario coverage for debug stream card node identity stability during retention-window shifts
+
 ## Owners
 
 1. Web application runtime ownership

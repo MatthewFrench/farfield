@@ -15,6 +15,18 @@ interface ResolveNextStreamEventsStateInput {
 
 // Bounds client-owned stream history to avoid unbounded growth during long-lived sessions.
 const STREAM_EVENT_RETENTION_LIMIT = 400;
+const STREAM_EVENT_SERIALIZATION_CACHE = new WeakMap<IpcFrame, string>();
+
+function readSerializedStreamEvent(streamEvent: IpcFrame): string {
+  const cachedSerialization = STREAM_EVENT_SERIALIZATION_CACHE.get(streamEvent);
+  if (cachedSerialization !== undefined) {
+    return cachedSerialization;
+  }
+
+  const nextSerialization = JSON.stringify(streamEvent);
+  STREAM_EVENT_SERIALIZATION_CACHE.set(streamEvent, nextSerialization);
+  return nextSerialization;
+}
 
 function areStreamEventsEqual(previousEvents: IpcFrame[], nextEvents: IpcFrame[]): boolean {
   if (previousEvents.length !== nextEvents.length) {
@@ -24,7 +36,13 @@ function areStreamEventsEqual(previousEvents: IpcFrame[], nextEvents: IpcFrame[]
   for (let index = 0; index < previousEvents.length; index += 1) {
     const previousEvent = previousEvents[index];
     const nextEvent = nextEvents[index];
-    if (JSON.stringify(previousEvent) !== JSON.stringify(nextEvent)) {
+    if (previousEvent === undefined || nextEvent === undefined) {
+      return false;
+    }
+    if (previousEvent === nextEvent) {
+      continue;
+    }
+    if (readSerializedStreamEvent(previousEvent) !== readSerializedStreamEvent(nextEvent)) {
       return false;
     }
   }
