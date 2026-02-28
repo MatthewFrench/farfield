@@ -17,6 +17,7 @@ describe("ThreadCollectionListQueryOwner", () => {
         cursor: null,
         sortKey: null,
         cwd: null,
+        sinceUpdatedAt: null,
       },
     });
   });
@@ -38,6 +39,27 @@ describe("ThreadCollectionListQueryOwner", () => {
         cursor: "",
         sortKey: null,
         cwd: "",
+        sinceUpdatedAt: null,
+      },
+    });
+  });
+
+  it("parses sinceUpdatedAt as a non-negative integer", () => {
+    const owner = new ThreadCollectionListQueryOwner();
+
+    const parsedQuery = owner.parse(new URL("http://localhost/api/threads?sinceUpdatedAt=1700"));
+
+    expect(parsedQuery).toEqual({
+      ok: true,
+      query: {
+        limit: 80,
+        archived: false,
+        all: false,
+        maxPages: 20,
+        cursor: null,
+        sortKey: null,
+        cwd: null,
+        sinceUpdatedAt: 1700,
       },
     });
   });

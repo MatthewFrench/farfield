@@ -26,6 +26,7 @@ const LIST_THREADS_ALL_QUERY_KEY = "all";
 const LIST_THREADS_MAX_PAGES_QUERY_KEY = "maxPages";
 const LIST_THREADS_SORT_KEY_QUERY_KEY = "sortKey";
 const LIST_THREADS_CURRENT_WORKING_DIRECTORY_QUERY_KEY = "cwd";
+const LIST_THREADS_SINCE_UPDATED_AT_QUERY_KEY = "sinceUpdatedAt";
 const READ_THREAD_INCLUDE_TURNS_QUERY_KEY = "includeTurns";
 const BOOLEAN_TRUE_QUERY_VALUE = "true";
 const BOOLEAN_FALSE_QUERY_VALUE = "false";
@@ -51,6 +52,9 @@ const OptionalThreadListCursorSchema = z
   .transform((value) => value ?? null);
 const OptionalThreadListItemPathSchema = z.union([z.string(), z.null(), z.undefined()]);
 const OptionalThreadDisplayNameSchema = z.union([z.string(), z.null(), z.undefined()]);
+const OptionalThreadListSinceUpdatedAtSchema = z
+  .union([z.number().int().nonnegative(), z.undefined()])
+  .transform((value) => value ?? undefined);
 
 // Thread-list responses come from heterogeneous adapters; parse permissive wire payloads once,
 // then immediately normalize to a strict app-owned contract used by thread state owners.
@@ -145,12 +149,22 @@ const ThreadListItemSchema = ThreadListItemWireSchema.transform(
   mapThreadListItemWireToContract,
 ).pipe(ThreadListItemContractSchema);
 
+const ThreadListSyncMetadataSchema = z
+  .object({
+    mode: z.enum(["full", "delta"]),
+    sinceUpdatedAt: z.number().int().nonnegative().nullable(),
+    snapshotUpdatedAt: z.number().int().nonnegative(),
+  })
+  .strict();
+
 const ThreadListResponseSchema = z
   .object({
     data: z.array(ThreadListItemSchema),
     nextCursor: OptionalThreadListCursorSchema,
     pages: z.number().int().nonnegative().optional(),
     truncated: z.boolean().optional(),
+    orderedThreadIds: z.array(z.string().min(1)).optional(),
+    sync: ThreadListSyncMetadataSchema.optional(),
   })
   .strict();
 export type ApiThreadListResponse = z.infer<typeof ThreadListResponseSchema>;
@@ -162,6 +176,7 @@ export interface ApiListThreadsOptions extends ApiRequestOptions {
   maxPages: number;
   sortKey?: "created_at" | "updated_at";
   cwd?: string;
+  sinceUpdatedAt?: number;
 }
 
 export type ApiThreadListItem = ApiThreadListResponse["data"][number];
@@ -297,6 +312,10 @@ function buildThreadListSearchParameters(options: ApiListThreadsOptions): URLSea
   }
   if (options.cwd !== undefined && options.cwd.length > 0) {
     parameters.set(LIST_THREADS_CURRENT_WORKING_DIRECTORY_QUERY_KEY, options.cwd);
+  }
+  const parsedSinceUpdatedAt = OptionalThreadListSinceUpdatedAtSchema.parse(options.sinceUpdatedAt);
+  if (parsedSinceUpdatedAt !== undefined) {
+    parameters.set(LIST_THREADS_SINCE_UPDATED_AT_QUERY_KEY, String(parsedSinceUpdatedAt));
   }
 
   return parameters;

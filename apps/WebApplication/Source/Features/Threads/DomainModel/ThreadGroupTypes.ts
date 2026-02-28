@@ -37,12 +37,26 @@ export const ThreadListItemSchema = z
   })
   .strict();
 
-export interface ThreadListResponse {
-  data: ThreadListItem[];
-  nextCursor: string | null;
-  pages?: number | undefined;
-  truncated?: boolean | undefined;
-}
+export const ThreadListSyncMetadataSchema = z
+  .object({
+    mode: z.enum(["full", "delta"]),
+    sinceUpdatedAt: z.number().int().nonnegative().nullable(),
+    snapshotUpdatedAt: z.number().int().nonnegative(),
+  })
+  .strict();
+export type ThreadListSyncMetadata = z.infer<typeof ThreadListSyncMetadataSchema>;
+
+export const ThreadListResponseSchema = z
+  .object({
+    data: z.array(ThreadListItemSchema),
+    nextCursor: z.string().nullable(),
+    pages: z.number().int().nonnegative().optional(),
+    truncated: z.boolean().optional(),
+    orderedThreadIds: z.array(z.string().min(1)).optional(),
+    sync: ThreadListSyncMetadataSchema.optional(),
+  })
+  .strict();
+export type ThreadListResponse = z.infer<typeof ThreadListResponseSchema>;
 
 export interface ThreadProjectGroup {
   key: string;
@@ -73,6 +87,7 @@ export interface ThreadListLoadOptions {
   maxPages: number;
   archived: boolean;
   sortKey: ThreadListSortKey;
+  sinceUpdatedAt?: number;
   cwd?: string;
   signal?: AbortSignal;
   actionId?: string;

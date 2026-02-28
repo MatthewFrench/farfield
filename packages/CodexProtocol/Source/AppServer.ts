@@ -49,12 +49,22 @@ export const AppServerThreadListItemSchema = z.union([
   OpenCodeThreadListItemSchema,
 ]);
 
+const AppServerThreadListSyncMetadataSchema = z
+  .object({
+    mode: z.enum(["full", "delta"]),
+    sinceUpdatedAt: z.number().int().nonnegative().nullable(),
+    snapshotUpdatedAt: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const AppServerListThreadsResponseSchema = z
   .object({
     data: z.array(AppServerThreadListItemSchema),
     nextCursor: OptionalNullableStringSchema,
     pages: z.number().int().nonnegative().optional(),
     truncated: z.boolean().optional(),
+    orderedThreadIds: z.array(NonEmptyStringSchema).optional(),
+    sync: AppServerThreadListSyncMetadataSchema.optional(),
   })
   .passthrough();
 

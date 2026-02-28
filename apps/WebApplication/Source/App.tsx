@@ -301,6 +301,7 @@ export function App(): React.JSX.Element {
       applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,
     readThreadStateMerger: applicationOwnerDependencies.readThreadStateMerger,
     chatServerClient: applicationOwnerDependencies.chatServerClient,
+    selectedThreadSnapshotCacheStore: applicationOwnerDependencies.selectedThreadSnapshotCacheStore,
     threadDisplayNameStateOwner: applicationOwnerDependencies.threadDisplayNameStateOwner,
     setLiveState: applicationShellState.setLiveState,
     setReadThreadState: applicationShellState.setReadThreadState,

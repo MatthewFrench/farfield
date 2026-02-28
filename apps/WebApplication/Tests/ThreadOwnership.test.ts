@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { type ThreadListSnapshotPersistenceStore } from "@/Features/Threads/DataAccess/ThreadListSnapshotIndexedDatabaseStore";
 import { ThreadQueryCache } from "@/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "@/Features/Threads/DataAccess/ThreadServerClient";
 import type {
@@ -126,6 +127,49 @@ class TestThreadDisplayNamePreferenceStore implements ThreadDisplayNamePersisten
 
   public readPruneCalls(): string[][] {
     return this.pruneCalls.map((call) => [...call]);
+  }
+}
+
+class TestThreadListSnapshotPersistenceStore implements ThreadListSnapshotPersistenceStore {
+  private readonly snapshotByCacheKey = new Map<string, ThreadListResponse>();
+
+  public async readThreadListSnapshot(cacheKey: string): Promise<ThreadListResponse | null> {
+    return this.snapshotByCacheKey.get(cacheKey) ?? null;
+  }
+
+  public async writeThreadListSnapshot(
+    cacheKey: string,
+    response: ThreadListResponse,
+  ): Promise<void> {
+    this.snapshotByCacheKey.set(cacheKey, response);
+  }
+
+  public async clearThreadListSnapshot(cacheKey: string): Promise<void> {
+    this.snapshotByCacheKey.delete(cacheKey);
+  }
+}
+
+class SequencedThreadServerClient extends ThreadServerClient {
+  private readonly queuedResponses: ThreadListResponse[];
+  private readonly listRequestOptions: ThreadListLoadOptions[];
+
+  public constructor(queuedResponses: ThreadListResponse[]) {
+    super();
+    this.queuedResponses = [...queuedResponses];
+    this.listRequestOptions = [];
+  }
+
+  public readListRequestOptions(): ThreadListLoadOptions[] {
+    return [...this.listRequestOptions];
+  }
+
+  public override async listThreads(options: ThreadListLoadOptions): Promise<ThreadListResponse> {
+    this.listRequestOptions.push({ ...options });
+    const nextResponse = this.queuedResponses.shift();
+    if (!nextResponse) {
+      throw new Error("Expected queued thread-list response");
+    }
+    return nextResponse;
   }
 }
 
@@ -401,6 +445,142 @@ describe("Thread ownership modules", () => {
     expect(firstRead.loadedFromCache).toBe(false);
     expect(secondRead.loadedFromCache).toBe(true);
     expect(serverClient.getListRequestCount()).toBe(1);
+  });
+
+  it("ThreadListStateController hydrates active threads from persisted snapshots", async () => {
+    const active = buildThreadListResponse({
+      threadOneUpdatedAt: 1_700_000_000,
+      threadTwoUpdatedAt: 1_700_000_001,
+    });
+    const archived = buildThreadListResponse({
+      threadOneUpdatedAt: 1_600_000_000,
+      threadTwoUpdatedAt: 1_600_000_001,
+    });
+    const persistedSnapshotStore = new TestThreadListSnapshotPersistenceStore();
+    await persistedSnapshotStore.writeThreadListSnapshot(
+      ThreadListCacheKeyByName.activeThreads,
+      active,
+    );
+    const serverClient = new TestThreadServerClient({ active, archived });
+    const controller = new ThreadListStateController({
+      threadServerClient: serverClient,
+      threadQueryCache: new ThreadQueryCache(10_000, 8),
+      threadListSnapshotPersistenceStore: persistedSnapshotStore,
+      threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
+      threadListStateStore: new ThreadListStateStore(),
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
+    });
+
+    const cachedRead = await controller.loadActiveThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: "thread-1",
+      readFromCache: true,
+    });
+
+    expect(cachedRead.loadedFromCache).toBe(true);
+    expect(cachedRead.nextThreads).toEqual(active.data);
+    expect(serverClient.getListRequestCount()).toBe(0);
+  });
+
+  it("ThreadListStateController requests delta updates and merges by ordered thread identifiers", async () => {
+    const baselineResponse: ThreadListResponse = {
+      data: [
+        {
+          id: "thread-1",
+          preview: "Thread one",
+          createdAt: 1_700_000_000,
+          updatedAt: 90,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+        },
+        {
+          id: "thread-2",
+          preview: "Thread two",
+          createdAt: 1_700_000_010,
+          updatedAt: 80,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+        },
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false,
+      sync: {
+        mode: "full",
+        sinceUpdatedAt: null,
+        snapshotUpdatedAt: 90,
+      },
+    };
+    const deltaResponse: ThreadListResponse = {
+      data: [
+        {
+          id: "thread-2",
+          preview: "Thread two",
+          createdAt: 1_700_000_010,
+          updatedAt: 95,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+        },
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false,
+      orderedThreadIds: ["thread-2", "thread-1"],
+      sync: {
+        mode: "delta",
+        sinceUpdatedAt: 90,
+        snapshotUpdatedAt: 95,
+      },
+    };
+    const serverClient = new SequencedThreadServerClient([baselineResponse, deltaResponse]);
+    const controller = new ThreadListStateController({
+      threadServerClient: serverClient,
+      threadQueryCache: new ThreadQueryCache(10_000, 8),
+      threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
+      threadListStateStore: new ThreadListStateStore(),
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
+    });
+
+    await controller.loadActiveThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: null,
+      readFromCache: false,
+    });
+    const secondRead = await controller.loadActiveThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: null,
+      readFromCache: false,
+    });
+
+    expect(secondRead.nextThreads.map((thread) => thread.id)).toEqual(["thread-2", "thread-1"]);
+    expect(secondRead.nextThreads[0]?.updatedAt).toBe(95);
+    expect(serverClient.readListRequestOptions()).toEqual([
+      {
+        archived: false,
+        limit: 80,
+        maxPages: 20,
+        sortKey: "updated_at",
+      },
+      {
+        archived: false,
+        limit: 80,
+        maxPages: 20,
+        sortKey: "updated_at",
+        sinceUpdatedAt: 90,
+      },
+    ]);
   });
 
   it("ThreadListStateController isolates active and archived cache reads", async () => {

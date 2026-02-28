@@ -6,6 +6,7 @@ import {
   useRef,
 } from "react";
 import { type CapabilityAgentsResponse } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
+import { type SelectedThreadSnapshotCacheStore } from "@/Features/Chat/DataAccess/SelectedThreadSnapshotIndexedDatabaseStore";
 import { type ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
@@ -59,6 +60,7 @@ export interface UseSelectedThreadLoadersInput {
   selectedThreadRefreshConcurrencyCoordinator: SelectedThreadRefreshConcurrencyCoordinator;
   readThreadStateMerger: ReadThreadStateMerger;
   chatServerClient: ChatServerClient;
+  selectedThreadSnapshotCacheStore: SelectedThreadSnapshotCacheStore;
   threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
   setLiveState: Dispatch<SetStateAction<LiveStateResponse | null>>;
   setReadThreadState: Dispatch<SetStateAction<ReadThreadResponse | null>>;
@@ -143,8 +145,7 @@ export function useSelectedThreadLoaders(
       const streamEventsSinceSequence = readCapabilities.canReadStreamEvents
         ? snapshotStateOwner.readStreamEventsSinceSequence(threadId)
         : null;
-
-      const snapshot = await input.selectedThreadDataRefreshCoordinator.readSnapshot({
+      const snapshotPromise = input.selectedThreadDataRefreshCoordinator.readSnapshot({
         threadId,
         includeTurns,
         includeReadThread,
@@ -154,6 +155,25 @@ export function useSelectedThreadLoaders(
         chatClient: input.chatServerClient,
         ...(signal ? { signal } : {}),
       });
+      const persistedSnapshotPromise =
+        input.selectedThreadSnapshotCacheStore.readSnapshot(threadId);
+
+      const persistedSnapshot = await persistedSnapshotPromise;
+      if (
+        persistedSnapshot !== null &&
+        !snapshotStateOwner.shouldSkipSnapshotApply(threadId, signal)
+      ) {
+        snapshotStateOwner.applySnapshots({
+          threadId: persistedSnapshot.threadId,
+          liveStateSnapshot: persistedSnapshot.liveStateSnapshot,
+          streamEventsSnapshot: persistedSnapshot.streamEventsSnapshot,
+          streamEventsSinceSequenceUsed: persistedSnapshot.streamEventsSinceSequenceUsed,
+          readThreadSnapshot: persistedSnapshot.readThreadSnapshot,
+          includeTurnsUsedForRead: persistedSnapshot.includeTurnsUsedForRead,
+        });
+      }
+
+      const snapshot = await snapshotPromise;
 
       if (snapshotStateOwner.shouldSkipSnapshotApply(threadId, signal)) {
         return;
@@ -167,6 +187,18 @@ export function useSelectedThreadLoaders(
         readThreadSnapshot: snapshot.readThreadSnapshot,
         includeTurnsUsedForRead: snapshot.includeTurnsUsedForRead,
       });
+      void input.selectedThreadSnapshotCacheStore
+        .writeSnapshot({
+          threadId,
+          liveStateSnapshot: snapshot.liveStateSnapshot,
+          streamEventsSnapshot: snapshot.streamEventsSnapshot,
+          streamEventsSinceSequenceUsed: snapshot.streamEventsSinceSequenceUsed,
+          readThreadSnapshot: snapshot.readThreadSnapshot,
+          includeTurnsUsedForRead: snapshot.includeTurnsUsedForRead,
+        })
+        .catch(() => {
+          // Keep snapshot writes non-blocking for selected-thread rendering.
+        });
     },
     [
       input.agentsById,
@@ -174,6 +206,7 @@ export function useSelectedThreadLoaders(
       input.pendingThreadMaterializationCoordinator,
       input.selectedAgentId,
       input.selectedThreadDataRefreshCoordinator,
+      input.selectedThreadSnapshotCacheStore,
       input.threads,
       snapshotStateOwner,
     ],

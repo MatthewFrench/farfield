@@ -59,6 +59,11 @@ const ThreadNamePayloadSchema = z
 
 const ThreadCollectionRouteDefaultSortKey: ThreadListSortKey = "updated_at";
 const ThreadCollectionRouteListThreadsTimeoutLabelPrefix = "list-threads:";
+const ThreadListResponseSyncModeByName = {
+  full: "full",
+  delta: "delta",
+} as const;
+const THREAD_LIST_RESPONSE_SNAPSHOT_UPDATED_AT_EMPTY_VALUE = 0;
 
 const threadCollectionListQueryOwner = new ThreadCollectionListQueryOwner();
 
@@ -244,6 +249,7 @@ async function handleThreadCollectionListRoute(
     cursor,
     sortKey: requestedSortKey,
     cwd: rawCwd,
+    sinceUpdatedAt,
   } = parsedThreadListQuery.query;
 
   const decodedCursor = threadCollectionListQueryOwner.decodeCursor(cursor);
@@ -257,6 +263,19 @@ async function handleThreadCollectionListRoute(
   }
 
   const sortKey = requestedSortKey ?? ThreadCollectionRouteDefaultSortKey;
+  if (sinceUpdatedAt !== null && sortKey !== "updated_at") {
+    jsonResponse(res, ThreadCollectionRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: ThreadCollectionRouteErrorByName.invalidThreadListQuery,
+      issues: [
+        {
+          path: "sinceUpdatedAt",
+          message: "sinceUpdatedAt requires sortKey=updated_at",
+        },
+      ],
+    });
+    return;
+  }
   const cwd = normalizeOptionalString(rawCwd);
   const enabledAdapterList = listEnabledAdapters();
   const adapterListThreadsInput = buildAdapterListThreadsInput({
@@ -309,13 +328,28 @@ async function handleThreadCollectionListRoute(
     maxPages,
     all,
   });
+  const snapshotUpdatedAt = readThreadListSnapshotUpdatedAt(threadListPage.pageData);
+  const responseData =
+    sinceUpdatedAt === null
+      ? threadListPage.pageData
+      : readThreadListDeltaPageData(threadListPage.pageData, sinceUpdatedAt);
 
   jsonResponse(res, ThreadCollectionRouteStatusCodeByName.ok, {
     ok: true,
-    data: threadListPage.pageData,
+    data: responseData,
     nextCursor: threadListPage.nextCursor,
     pages: threadListPage.pages,
     truncated: cacheReadResult.snapshot.combinedTruncated || threadListPage.hasMoreData,
+    orderedThreadIds:
+      sinceUpdatedAt === null ? undefined : threadListPage.pageData.map((thread) => thread.id),
+    sync: {
+      mode:
+        sinceUpdatedAt === null
+          ? ThreadListResponseSyncModeByName.full
+          : ThreadListResponseSyncModeByName.delta,
+      sinceUpdatedAt,
+      snapshotUpdatedAt,
+    },
   });
 }
 
@@ -464,6 +498,24 @@ function buildThreadListPage(input: {
     pages,
     hasMoreData,
   };
+}
+
+function readThreadListDeltaPageData(
+  pageData: ThreadListItemWithAgentId[],
+  sinceUpdatedAt: number,
+): ThreadListItemWithAgentId[] {
+  return pageData.filter((thread) => thread.updatedAt >= sinceUpdatedAt);
+}
+
+function readThreadListSnapshotUpdatedAt(pageData: ThreadListItemWithAgentId[]): number {
+  if (pageData.length === 0) {
+    return THREAD_LIST_RESPONSE_SNAPSHOT_UPDATED_AT_EMPTY_VALUE;
+  }
+  let snapshotUpdatedAt = THREAD_LIST_RESPONSE_SNAPSHOT_UPDATED_AT_EMPTY_VALUE;
+  for (const thread of pageData) {
+    snapshotUpdatedAt = Math.max(snapshotUpdatedAt, thread.updatedAt);
+  }
+  return snapshotUpdatedAt;
 }
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {

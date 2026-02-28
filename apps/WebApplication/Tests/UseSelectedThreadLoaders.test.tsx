@@ -8,6 +8,10 @@ import {
   ChatServerClient,
   type ChatStreamEventsResponse,
 } from "@/Features/Chat/DataAccess/ChatServerClient";
+import {
+  type SelectedThreadSnapshotCacheRecord,
+  type SelectedThreadSnapshotCacheStore,
+} from "@/Features/Chat/DataAccess/SelectedThreadSnapshotIndexedDatabaseStore";
 import { ConversationSyncSignatureBuilder } from "@/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
 import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import { ReadThreadStateMerger } from "@/Features/Chat/StateManagement/ReadThreadStateMerger";
@@ -46,6 +50,7 @@ interface SelectedThreadLoadersHarnessProperties {
   selectedThreadRefreshConcurrencyCoordinator: SelectedThreadRefreshConcurrencyCoordinator;
   readThreadStateMerger: ReadThreadStateMerger;
   chatServerClient: ChatServerClient;
+  selectedThreadSnapshotCacheStore: SelectedThreadSnapshotCacheStore;
   threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
   onSnapshot: (snapshot: SelectedThreadLoadersHarnessSnapshot) => void;
 }
@@ -53,22 +58,48 @@ interface SelectedThreadLoadersHarnessProperties {
 class TestSelectedThreadDataRefreshCoordinator extends SelectedThreadDataRefreshCoordinator {
   public readonly readSnapshotCalls: SelectedThreadDataRefreshInput[];
   private readonly queuedResults: SelectedThreadDataRefreshResult[];
+  private readonly delayMilliseconds: number;
 
-  public constructor(initialResults: SelectedThreadDataRefreshResult[]) {
+  public constructor(initialResults: SelectedThreadDataRefreshResult[], delayMilliseconds = 0) {
     super();
     this.readSnapshotCalls = [];
     this.queuedResults = [...initialResults];
+    this.delayMilliseconds = delayMilliseconds;
   }
 
   public override async readSnapshot(
     input: SelectedThreadDataRefreshInput,
   ): Promise<SelectedThreadDataRefreshResult> {
     this.readSnapshotCalls.push(input);
+    if (this.delayMilliseconds > 0) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, this.delayMilliseconds);
+      });
+    }
     const nextResult = this.queuedResults.shift();
     if (!nextResult) {
       throw new Error("Expected a queued snapshot result");
     }
     return nextResult;
+  }
+}
+
+class InMemorySelectedThreadSnapshotCacheStore implements SelectedThreadSnapshotCacheStore {
+  private readonly snapshotByThreadIdentifier = new Map<
+    string,
+    SelectedThreadSnapshotCacheRecord
+  >();
+
+  public async readSnapshot(threadId: string): Promise<SelectedThreadSnapshotCacheRecord | null> {
+    return this.snapshotByThreadIdentifier.get(threadId) ?? null;
+  }
+
+  public async writeSnapshot(snapshot: SelectedThreadSnapshotCacheRecord): Promise<void> {
+    this.snapshotByThreadIdentifier.set(snapshot.threadId, snapshot);
+  }
+
+  public async clearSnapshot(threadId: string): Promise<void> {
+    this.snapshotByThreadIdentifier.delete(threadId);
   }
 }
 
@@ -93,6 +124,7 @@ function SelectedThreadLoadersHarness(
       properties.selectedThreadRefreshConcurrencyCoordinator,
     readThreadStateMerger: properties.readThreadStateMerger,
     chatServerClient: properties.chatServerClient,
+    selectedThreadSnapshotCacheStore: properties.selectedThreadSnapshotCacheStore,
     threadDisplayNameStateOwner: properties.threadDisplayNameStateOwner,
     setLiveState,
     setReadThreadState,
@@ -125,6 +157,10 @@ function createThreadDisplayNameStateOwner(storageKeyPrefix: string): ThreadDisp
   return new ThreadDisplayNameStateOwner({
     threadDisplayNamePreferenceStore: new ThreadDisplayNamePreferenceStore(storageKeyPrefix),
   });
+}
+
+function createSelectedThreadSnapshotCacheStore(): SelectedThreadSnapshotCacheStore {
+  return new InMemorySelectedThreadSnapshotCacheStore();
 }
 
 function buildBroadcastEvent(method: string): IpcFrame {
@@ -268,6 +304,7 @@ describe("useSelectedThreadLoaders", () => {
         selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
         readThreadStateMerger={new ReadThreadStateMerger()}
         chatServerClient={new ChatServerClient()}
+        selectedThreadSnapshotCacheStore={createSelectedThreadSnapshotCacheStore()}
         threadDisplayNameStateOwner={createThreadDisplayNameStateOwner(
           "test.use-selected-thread-loaders.display-name.append",
         )}
@@ -308,6 +345,95 @@ describe("useSelectedThreadLoaders", () => {
     expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls[1]?.includeReadThread).toBe(
       false,
     );
+  });
+
+  it("applies persisted selected-thread snapshots before network refresh snapshots", async () => {
+    const selectedThreadDataRefreshCoordinator = new TestSelectedThreadDataRefreshCoordinator(
+      [
+        {
+          liveStateSnapshot: buildLiveStateSnapshot("thread-1", ["fresh-turn-1"]),
+          streamEventsSnapshot: buildStreamEventsSnapshot({
+            threadId: "thread-1",
+            events: [buildBroadcastEvent("fresh-event-1")],
+            nextSequence: 2,
+            resetRequired: false,
+          }),
+          streamEventsSinceSequenceUsed: null,
+          readThreadSnapshot: buildReadThreadSnapshot("thread-1", ["fresh-turn-1"]),
+          includeTurnsUsedForRead: true,
+          containsAnyTurns: true,
+        },
+      ],
+      25,
+    );
+    const selectedThreadSnapshotCacheStore = createSelectedThreadSnapshotCacheStore();
+    await selectedThreadSnapshotCacheStore.writeSnapshot({
+      threadId: "thread-1",
+      liveStateSnapshot: buildLiveStateSnapshot("thread-1", ["cached-turn-1"]),
+      streamEventsSnapshot: buildStreamEventsSnapshot({
+        threadId: "thread-1",
+        events: [buildBroadcastEvent("cached-event-1")],
+        nextSequence: 1,
+        resetRequired: false,
+      }),
+      streamEventsSinceSequenceUsed: null,
+      readThreadSnapshot: buildReadThreadSnapshot("thread-1", ["cached-turn-1"]),
+      includeTurnsUsedForRead: true,
+    });
+    const selectedThreadIdRef = { current: "thread-1" };
+    const modeSelectionStateResolver = new ModeSelectionStateResolver();
+    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
+      modeSelectionStateResolver,
+    );
+    const selectedThreadRefreshConcurrencyCoordinator =
+      new SelectedThreadRefreshConcurrencyCoordinator();
+    const snapshotReference: {
+      current: SelectedThreadLoadersHarnessSnapshot | null;
+    } = {
+      current: null,
+    };
+
+    render(
+      <SelectedThreadLoadersHarness
+        threads={[buildThreadListItem("thread-1")]}
+        selectedAgentId="codex"
+        appDefaultModel="gpt-5.3-codex"
+        appDefaultReasoningEffort="medium"
+        selectedThreadIdRef={selectedThreadIdRef}
+        pendingThreadMaterializationCoordinator={new PendingThreadMaterializationCoordinator()}
+        conversationSyncSignatureBuilder={conversationSyncSignatureBuilder}
+        selectedThreadDataRefreshCoordinator={selectedThreadDataRefreshCoordinator}
+        selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
+        readThreadStateMerger={new ReadThreadStateMerger()}
+        chatServerClient={new ChatServerClient()}
+        selectedThreadSnapshotCacheStore={selectedThreadSnapshotCacheStore}
+        threadDisplayNameStateOwner={createThreadDisplayNameStateOwner(
+          "test.use-selected-thread-loaders.display-name.cached-first",
+        )}
+        onSnapshot={(snapshot) => {
+          snapshotReference.current = snapshot;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(snapshotReference.current).not.toBeNull();
+    });
+    const loadersSnapshot = readLoadersSnapshot(snapshotReference);
+
+    await loadersSnapshot.loaders.loadSelectedThread("thread-1");
+
+    await waitFor(() => {
+      expect(snapshotReference.current?.streamEvents).toEqual([
+        buildBroadcastEvent("cached-event-1"),
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(snapshotReference.current?.streamEvents).toEqual([
+        buildBroadcastEvent("fresh-event-1"),
+      ]);
+    });
   });
 
   it("defaults includeReadThread to true when no options are provided", async () => {
@@ -352,6 +478,7 @@ describe("useSelectedThreadLoaders", () => {
         selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
         readThreadStateMerger={new ReadThreadStateMerger()}
         chatServerClient={new ChatServerClient()}
+        selectedThreadSnapshotCacheStore={createSelectedThreadSnapshotCacheStore()}
         threadDisplayNameStateOwner={createThreadDisplayNameStateOwner(
           "test.use-selected-thread-loaders.display-name.defaults",
         )}
@@ -402,6 +529,7 @@ describe("useSelectedThreadLoaders", () => {
         selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
         readThreadStateMerger={new ReadThreadStateMerger()}
         chatServerClient={new ChatServerClient()}
+        selectedThreadSnapshotCacheStore={createSelectedThreadSnapshotCacheStore()}
         threadDisplayNameStateOwner={createThreadDisplayNameStateOwner(
           "test.use-selected-thread-loaders.display-name.stream-delta",
         )}
@@ -497,6 +625,7 @@ describe("useSelectedThreadLoaders", () => {
         selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
         readThreadStateMerger={new ReadThreadStateMerger()}
         chatServerClient={new ChatServerClient()}
+        selectedThreadSnapshotCacheStore={createSelectedThreadSnapshotCacheStore()}
         threadDisplayNameStateOwner={createThreadDisplayNameStateOwner(
           "test.use-selected-thread-loaders.display-name.materialization",
         )}

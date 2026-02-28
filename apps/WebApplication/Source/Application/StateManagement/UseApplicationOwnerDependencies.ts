@@ -21,6 +21,10 @@ import {
   type CapabilitySnapshotRecord,
 } from "@/Features/Capabilities/DataAccess/CapabilitySnapshotCache";
 import { ChatServerClient } from "@/Features/Chat/DataAccess/ChatServerClient";
+import {
+  type SelectedThreadSnapshotCacheStore,
+  SelectedThreadSnapshotIndexedDatabaseStore,
+} from "@/Features/Chat/DataAccess/SelectedThreadSnapshotIndexedDatabaseStore";
 import { ConversationItemFlattener } from "@/Features/Chat/DomainModel/ConversationItemFlattener";
 import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import { PendingUserInputAnswerBuilder } from "@/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
@@ -45,6 +49,10 @@ import { type PushClientState } from "@/Features/PushNotifications/DomainModel/P
 import { PushNotificationToolbarActionCoordinator } from "@/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";
 import { LastViewedThreadPreferenceStore } from "@/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
 import { ThreadDisplayNamePreferenceStore } from "@/Features/Threads/DataAccess/ThreadDisplayNamePreferenceStore";
+import {
+  ThreadListSnapshotIndexedDatabaseStore,
+  type ThreadListSnapshotPersistenceStore,
+} from "@/Features/Threads/DataAccess/ThreadListSnapshotIndexedDatabaseStore";
 import { ThreadMutationServerClient } from "@/Features/Threads/DataAccess/ThreadMutationServerClient";
 import { ThreadQueryCache } from "@/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "@/Features/Threads/DataAccess/ThreadServerClient";
@@ -100,6 +108,7 @@ export interface ApplicationOwnerDependencies<
   mobileSidebarSwipeCoordinator: MobileSidebarSwipeCoordinator;
   capabilitySnapshotCache: CapabilitySnapshotCache<CapabilitySnapshotType>;
   chatServerClient: ChatServerClient;
+  selectedThreadSnapshotCacheStore: SelectedThreadSnapshotCacheStore;
   selectedThreadRefreshConcurrencyCoordinator: SelectedThreadRefreshConcurrencyCoordinator;
   readThreadStateMerger: ReadThreadStateMerger;
   pendingUserInputRequestSelector: PendingUserInputRequestSelector;
@@ -146,6 +155,7 @@ interface SelectedThreadRetryConfiguration {
 interface ThreadListStateControllerConfiguration {
   threadQueryCacheTimeToLiveMilliseconds: number;
   threadQueryCacheMaximumEntries: number;
+  threadListSnapshotPersistenceStore: ThreadListSnapshotPersistenceStore;
   threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
 }
 
@@ -190,6 +200,7 @@ function createThreadListStateController(
       configuration.threadQueryCacheTimeToLiveMilliseconds,
       configuration.threadQueryCacheMaximumEntries,
     ),
+    threadListSnapshotPersistenceStore: configuration.threadListSnapshotPersistenceStore,
     threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
     threadListStateStore: new ThreadListStateStore(),
     threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
@@ -290,6 +301,9 @@ export function useApplicationOwnerDependencies<
     [capabilitySnapshotRefreshIntervalMilliseconds],
   );
   const chatServerClient = useStableOwner(() => new ChatServerClient());
+  const selectedThreadSnapshotCacheStore = useStableOwner(
+    () => new SelectedThreadSnapshotIndexedDatabaseStore(),
+  );
   const selectedThreadRefreshConcurrencyCoordinator = useStableOwner(
     () => new SelectedThreadRefreshConcurrencyCoordinator(),
   );
@@ -393,14 +407,19 @@ export function useApplicationOwnerDependencies<
       }),
     [threadDisplayNamePreferenceStore],
   );
+  const threadListSnapshotPersistenceStore = useStableOwner(
+    () => new ThreadListSnapshotIndexedDatabaseStore(),
+  );
   const threadListStateController = useMemo(
     () =>
       createThreadListStateController({
         threadQueryCacheTimeToLiveMilliseconds,
         threadQueryCacheMaximumEntries,
+        threadListSnapshotPersistenceStore,
         threadDisplayNameStateOwner,
       }),
     [
+      threadListSnapshotPersistenceStore,
       threadDisplayNameStateOwner,
       threadQueryCacheMaximumEntries,
       threadQueryCacheTimeToLiveMilliseconds,
@@ -448,6 +467,7 @@ export function useApplicationOwnerDependencies<
     mobileSidebarSwipeCoordinator,
     capabilitySnapshotCache,
     chatServerClient,
+    selectedThreadSnapshotCacheStore,
     selectedThreadRefreshConcurrencyCoordinator,
     readThreadStateMerger,
     pendingUserInputRequestSelector,

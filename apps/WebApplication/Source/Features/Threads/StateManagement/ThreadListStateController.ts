@@ -1,3 +1,4 @@
+import { type ThreadListSnapshotPersistenceStore } from "../DataAccess/ThreadListSnapshotIndexedDatabaseStore";
 import { ThreadQueryCache } from "../DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "../DataAccess/ThreadServerClient";
 import type { ThreadListLoadOptions, ThreadListResponse } from "../DomainModel/ThreadGroupTypes";
@@ -20,6 +21,10 @@ import {
 import { ThreadRefreshConcurrencyCoordinator } from "./ThreadRefreshConcurrencyCoordinator";
 
 const THREAD_LIST_RESPONSE_NOT_TRUNCATED = false;
+const THREAD_LIST_UPDATED_AT_SORT_KEY = "updated_at";
+const THREAD_LIST_SYNC_MODE_DELTA = "delta";
+const THREAD_LIST_SYNC_MODE_FULL = "full";
+const THREAD_LIST_UPDATED_AT_EMPTY_VALUE = 0;
 
 class InMemoryThreadDisplayNamePreferenceStore {
   public readThreadDisplayName(_threadIdentifier: string): string | null {
@@ -39,6 +44,25 @@ class InMemoryThreadDisplayNamePreferenceStore {
   }
 }
 
+class InMemoryThreadListSnapshotPersistenceStore implements ThreadListSnapshotPersistenceStore {
+  private readonly snapshotByCacheKey = new Map<string, ThreadListResponse>();
+
+  public async readThreadListSnapshot(cacheKey: string): Promise<ThreadListResponse | null> {
+    return this.snapshotByCacheKey.get(cacheKey) ?? null;
+  }
+
+  public async writeThreadListSnapshot(
+    cacheKey: string,
+    response: ThreadListResponse,
+  ): Promise<void> {
+    this.snapshotByCacheKey.set(cacheKey, response);
+  }
+
+  public async clearThreadListSnapshot(cacheKey: string): Promise<void> {
+    this.snapshotByCacheKey.delete(cacheKey);
+  }
+}
+
 export interface LoadActiveThreadStateInput {
   limit: number;
   maxPages: number;
@@ -54,7 +78,7 @@ export interface LoadActiveThreadStateResult {
   didChangeThreads: boolean;
   nextThreads: ThreadListResponse["data"];
   nextUnreadThreadIdentifiers: Record<string, true>;
-  // Indicates the read was served from the in-memory query cache.
+  // Indicates the read was served from cached state (in-memory or persisted snapshot storage).
   loadedFromCache: boolean;
 }
 
@@ -71,7 +95,7 @@ export interface LoadArchivedThreadStateResult {
   didChangeArchivedThreads: boolean;
   nextArchivedThreads: ThreadListResponse["data"];
   isTruncated: boolean;
-  // Indicates the read was served from the in-memory query cache.
+  // Indicates the read was served from cached state (in-memory or persisted snapshot storage).
   loadedFromCache: boolean;
 }
 
@@ -118,6 +142,7 @@ export interface ReadThreadListPresentationComputationStatsSnapshot
 interface ThreadListStateControllerDependencies {
   threadServerClient: ThreadServerClient;
   threadQueryCache: ThreadQueryCache;
+  threadListSnapshotPersistenceStore?: ThreadListSnapshotPersistenceStore;
   threadRefreshConcurrencyCoordinator: ThreadRefreshConcurrencyCoordinator;
   threadListStateStore: ThreadListStateStore;
   threadListPresentationStateResolver: ThreadListPresentationStateResolver;
@@ -127,6 +152,7 @@ interface ThreadListStateControllerDependencies {
 export class ThreadListStateController {
   private readonly threadServerClient: ThreadServerClient;
   private readonly threadQueryCache: ThreadQueryCache;
+  private readonly threadListSnapshotPersistenceStore: ThreadListSnapshotPersistenceStore;
   private readonly threadRefreshConcurrencyCoordinator: ThreadRefreshConcurrencyCoordinator;
   private readonly threadListStateStore: ThreadListStateStore;
   private readonly threadListPresentationStateResolver: ThreadListPresentationStateResolver;
@@ -143,6 +169,9 @@ export class ThreadListStateController {
   public constructor(dependencies: ThreadListStateControllerDependencies) {
     this.threadServerClient = dependencies.threadServerClient;
     this.threadQueryCache = dependencies.threadQueryCache;
+    this.threadListSnapshotPersistenceStore =
+      dependencies.threadListSnapshotPersistenceStore ??
+      new InMemoryThreadListSnapshotPersistenceStore();
     this.threadRefreshConcurrencyCoordinator = dependencies.threadRefreshConcurrencyCoordinator;
     this.threadListStateStore = dependencies.threadListStateStore;
     this.threadListPresentationStateResolver = dependencies.threadListPresentationStateResolver;
@@ -211,10 +240,20 @@ export class ThreadListStateController {
 
   public invalidateActiveThreadQuery(): void {
     this.threadQueryCache.invalidate(ThreadListCacheKeyByName.activeThreads);
+    void this.threadListSnapshotPersistenceStore
+      .clearThreadListSnapshot(ThreadListCacheKeyByName.activeThreads)
+      .catch(() => {
+        // Keep cache invalidation non-blocking for user actions.
+      });
   }
 
   public invalidateArchivedThreadQuery(): void {
     this.threadQueryCache.invalidate(ThreadListCacheKeyByName.archivedThreads);
+    void this.threadListSnapshotPersistenceStore
+      .clearThreadListSnapshot(ThreadListCacheKeyByName.archivedThreads)
+      .catch(() => {
+        // Keep cache invalidation non-blocking for user actions.
+      });
   }
 
   public invalidateThreadQueries(): void {
@@ -313,15 +352,18 @@ export class ThreadListStateController {
     readFromCache: boolean,
   ): Promise<LoadThreadListResult> {
     if (readFromCache) {
-      const cachedResponse = this.threadQueryCache.readFresh(cacheKey);
-      if (cachedResponse) {
-        const cachedResponseWithDisplayNames =
-          this.applyDisplayNamesToThreadListResponse(cachedResponse);
-        if (cachedResponseWithDisplayNames !== cachedResponse) {
-          this.threadQueryCache.write(cacheKey, cachedResponseWithDisplayNames);
-        }
+      const inMemoryCachedResponse = this.readThreadListFromInMemoryCache(cacheKey);
+      if (inMemoryCachedResponse !== null) {
         return {
-          response: cachedResponseWithDisplayNames,
+          response: inMemoryCachedResponse,
+          loadedFromCache: true,
+        };
+      }
+
+      const persistedCachedResponse = await this.readThreadListFromPersistentCache(cacheKey);
+      if (persistedCachedResponse !== null) {
+        return {
+          response: persistedCachedResponse,
           loadedFromCache: true,
         };
       }
@@ -329,18 +371,167 @@ export class ThreadListStateController {
 
     const response = await this.threadRefreshConcurrencyCoordinator.runSingleFlight(
       cacheKey,
-      async () => {
-        const nextResponse = await this.threadServerClient.listThreads(loadOptions);
-        const responseWithDisplayNames = this.applyDisplayNamesToThreadListResponse(nextResponse);
-        this.threadQueryCache.write(cacheKey, responseWithDisplayNames);
-        return responseWithDisplayNames;
-      },
+      async () => await this.loadThreadListFromNetwork(cacheKey, loadOptions),
     );
 
     return {
       response,
       loadedFromCache: false,
     };
+  }
+
+  private readThreadListFromInMemoryCache(cacheKey: string): ThreadListResponse | null {
+    const cachedResponse = this.threadQueryCache.readFresh(cacheKey);
+    if (cachedResponse === null) {
+      return null;
+    }
+
+    const cachedResponseWithDisplayNames =
+      this.applyDisplayNamesToThreadListResponse(cachedResponse);
+    if (cachedResponseWithDisplayNames !== cachedResponse) {
+      this.threadQueryCache.write(cacheKey, cachedResponseWithDisplayNames);
+      void this.threadListSnapshotPersistenceStore
+        .writeThreadListSnapshot(cacheKey, cachedResponseWithDisplayNames)
+        .catch(() => {
+          // Keep cache writes non-blocking for user actions.
+        });
+    }
+    return cachedResponseWithDisplayNames;
+  }
+
+  private async readThreadListFromPersistentCache(
+    cacheKey: string,
+  ): Promise<ThreadListResponse | null> {
+    const persistedResponse =
+      await this.threadListSnapshotPersistenceStore.readThreadListSnapshot(cacheKey);
+    if (persistedResponse === null) {
+      return null;
+    }
+
+    const persistedResponseWithDisplayNames =
+      this.applyDisplayNamesToThreadListResponse(persistedResponse);
+    this.threadQueryCache.write(cacheKey, persistedResponseWithDisplayNames);
+    if (persistedResponseWithDisplayNames !== persistedResponse) {
+      void this.threadListSnapshotPersistenceStore
+        .writeThreadListSnapshot(cacheKey, persistedResponseWithDisplayNames)
+        .catch(() => {
+          // Keep cache writes non-blocking for user actions.
+        });
+    }
+    return persistedResponseWithDisplayNames;
+  }
+
+  private async loadThreadListFromNetwork(
+    cacheKey: string,
+    loadOptions: ThreadListLoadOptions,
+  ): Promise<ThreadListResponse> {
+    const baselineResponse = this.threadQueryCache.readFresh(cacheKey);
+    const serverResponse = await this.readThreadListFromServerWithDelta(
+      loadOptions,
+      baselineResponse,
+    );
+    const responseWithDisplayNames = this.applyDisplayNamesToThreadListResponse(serverResponse);
+    this.threadQueryCache.write(cacheKey, responseWithDisplayNames);
+    void this.threadListSnapshotPersistenceStore
+      .writeThreadListSnapshot(cacheKey, responseWithDisplayNames)
+      .catch(() => {
+        // Keep cache writes non-blocking for user actions.
+      });
+    return responseWithDisplayNames;
+  }
+
+  private async readThreadListFromServerWithDelta(
+    loadOptions: ThreadListLoadOptions,
+    baselineResponse: ThreadListResponse | null,
+  ): Promise<ThreadListResponse> {
+    if (!this.shouldReadThreadListDelta(loadOptions, baselineResponse)) {
+      return this.threadServerClient.listThreads(loadOptions);
+    }
+
+    const sinceUpdatedAt = this.readThreadListSnapshotUpdatedAt(baselineResponse);
+    const deltaResponse = await this.threadServerClient.listThreads({
+      ...loadOptions,
+      sinceUpdatedAt,
+    });
+    if (deltaResponse.sync?.mode !== THREAD_LIST_SYNC_MODE_DELTA) {
+      return deltaResponse;
+    }
+
+    const mergedDeltaResponse = this.mergeDeltaThreadListResponse(deltaResponse, baselineResponse);
+    if (mergedDeltaResponse !== null) {
+      return mergedDeltaResponse;
+    }
+
+    return this.threadServerClient.listThreads(loadOptions);
+  }
+
+  private shouldReadThreadListDelta(
+    loadOptions: ThreadListLoadOptions,
+    baselineResponse: ThreadListResponse | null,
+  ): baselineResponse is ThreadListResponse {
+    return (
+      loadOptions.sortKey === THREAD_LIST_UPDATED_AT_SORT_KEY &&
+      baselineResponse !== null &&
+      baselineResponse.data.length > 0
+    );
+  }
+
+  private mergeDeltaThreadListResponse(
+    deltaResponse: ThreadListResponse,
+    baselineResponse: ThreadListResponse,
+  ): ThreadListResponse | null {
+    const orderedThreadIds = deltaResponse.orderedThreadIds;
+    if (orderedThreadIds === undefined) {
+      return null;
+    }
+
+    const threadByIdentifier = new Map<string, ThreadListResponse["data"][number]>();
+    for (const thread of baselineResponse.data) {
+      threadByIdentifier.set(thread.id, thread);
+    }
+    for (const thread of deltaResponse.data) {
+      threadByIdentifier.set(thread.id, thread);
+    }
+
+    const mergedData: ThreadListResponse["data"] = [];
+    for (const threadIdentifier of orderedThreadIds) {
+      const thread = threadByIdentifier.get(threadIdentifier);
+      if (thread === undefined) {
+        return null;
+      }
+      mergedData.push(thread);
+    }
+
+    const snapshotUpdatedAt =
+      deltaResponse.sync?.snapshotUpdatedAt ??
+      this.readThreadListSnapshotUpdatedAtFromItems(mergedData);
+
+    return {
+      ...deltaResponse,
+      data: mergedData,
+      orderedThreadIds: undefined,
+      sync: {
+        mode: THREAD_LIST_SYNC_MODE_FULL,
+        sinceUpdatedAt: null,
+        snapshotUpdatedAt,
+      },
+    };
+  }
+
+  private readThreadListSnapshotUpdatedAt(response: ThreadListResponse): number {
+    return this.readThreadListSnapshotUpdatedAtFromItems(response.data);
+  }
+
+  private readThreadListSnapshotUpdatedAtFromItems(threads: ThreadListResponse["data"]): number {
+    if (threads.length === 0) {
+      return THREAD_LIST_UPDATED_AT_EMPTY_VALUE;
+    }
+
+    let snapshotUpdatedAt = THREAD_LIST_UPDATED_AT_EMPTY_VALUE;
+    for (const thread of threads) {
+      snapshotUpdatedAt = Math.max(snapshotUpdatedAt, thread.updatedAt);
+    }
+    return snapshotUpdatedAt;
   }
 
   private applyDisplayNamesToThreadListResponse(response: ThreadListResponse): ThreadListResponse {

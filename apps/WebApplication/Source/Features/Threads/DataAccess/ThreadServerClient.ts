@@ -32,6 +32,9 @@ export class ThreadServerClient {
     if (options.actionName !== undefined && options.actionName.length > 0) {
       requestOptions.actionName = options.actionName;
     }
+    if (options.sinceUpdatedAt !== undefined) {
+      requestOptions.sinceUpdatedAt = options.sinceUpdatedAt;
+    }
     return requestOptions;
   }
 }

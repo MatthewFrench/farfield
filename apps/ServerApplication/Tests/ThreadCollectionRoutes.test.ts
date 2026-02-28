@@ -448,6 +448,102 @@ describe("handleThreadCollectionRoutes", () => {
     });
   });
 
+  it("returns 400 when sinceUpdatedAt is provided with non-updated sort keys", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const listThreads = vi.fn(
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [],
+        nextCursor: null,
+      }),
+    );
+    const adapter = createMockAgentAdapter("codex", listThreads);
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        url: buildThreadCollectionRouteUrl("?sinceUpdatedAt=1700&sortKey=created_at"),
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+      }),
+    );
+
+    expect(handled).toBe(true);
+    expect(listThreads).not.toHaveBeenCalled();
+    expect(capturedStatusCode).toBe(400);
+    expect(capturedBody).toMatchObject({
+      ok: false,
+      error: "Invalid thread list query parameters",
+      issues: [{ path: "sinceUpdatedAt" }],
+    });
+  });
+
+  it("returns ordered thread identifiers and delta data when sinceUpdatedAt is provided", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const listThreads = vi.fn(
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [
+          {
+            id: "thread_3",
+            preview: "third",
+            createdAt: 3,
+            updatedAt: 30,
+          },
+          {
+            id: "thread_2",
+            preview: "second",
+            createdAt: 2,
+            updatedAt: 20,
+          },
+          {
+            id: "thread_1",
+            preview: "first",
+            createdAt: 1,
+            updatedAt: 10,
+          },
+        ],
+        nextCursor: null,
+      }),
+    );
+    const adapter = createMockAgentAdapter("codex", listThreads);
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        url: buildThreadCollectionRouteUrl("?sinceUpdatedAt=20&sortKey=updated_at&limit=10"),
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+      }),
+    );
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toMatchObject({
+      ok: true,
+      data: [
+        {
+          id: "thread_3",
+          updatedAt: 30,
+        },
+        {
+          id: "thread_2",
+          updatedAt: 20,
+        },
+      ],
+      orderedThreadIds: ["thread_3", "thread_2", "thread_1"],
+      sync: {
+        mode: "delta",
+        sinceUpdatedAt: 20,
+        snapshotUpdatedAt: 30,
+      },
+    });
+  });
+
   it("returns canonical threadName values in list payloads", async () => {
     let capturedBody: object | null = null;
     const firstThread = {

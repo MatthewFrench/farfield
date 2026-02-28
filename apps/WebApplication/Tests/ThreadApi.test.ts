@@ -175,6 +175,44 @@ describe("ThreadApi", () => {
     expect(result.nextCursor).toBeNull();
   });
 
+  it("parses delta sync metadata and ordered thread identifiers", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        data: [
+          {
+            id: "thread_1",
+            preview: "hello",
+            createdAt: 123,
+            updatedAt: 124,
+            cwd: "/tmp/workspace",
+            source: "opencode",
+            agentId: "codex",
+          },
+        ],
+        nextCursor: null,
+        orderedThreadIds: ["thread_1", "thread_2"],
+        sync: {
+          mode: "delta",
+          sinceUpdatedAt: 120,
+          snapshotUpdatedAt: 124,
+        },
+      }),
+    );
+
+    const result = await listThreads({
+      ...DEFAULT_LIST_THREADS_OPTIONS,
+      sinceUpdatedAt: 120,
+    });
+
+    expect(result.orderedThreadIds).toEqual(["thread_1", "thread_2"]);
+    expect(result.sync).toEqual({
+      mode: "delta",
+      sinceUpdatedAt: 120,
+      snapshotUpdatedAt: 124,
+    });
+  });
+
   it("treats removed and projectRemoved wire flags as project-removal signals", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({

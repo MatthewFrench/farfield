@@ -521,6 +521,8 @@ This document defines the target folder/file structure and end-state ownership m
 | --- | --- | --- | --- |
 | Web capability snapshot cache | `CapabilitySnapshotCache` | `apps/WebApplication/Source/Features/Capabilities/DataAccess/CapabilitySnapshotCache.ts` | short-lived modes/models/defaults snapshot cache with freshness window and single-flight refresh |
 | Web thread query cache | `ThreadQueryCache` | `apps/WebApplication/Source/Features/Threads/DataAccess/ThreadQueryCache.ts` | typed key/value, TTL + explicit invalidation |
+| Web thread list persisted snapshot cache | `ThreadListSnapshotIndexedDatabaseStore` | `apps/WebApplication/Source/Features/Threads/DataAccess/ThreadListSnapshotIndexedDatabaseStore.ts` | bounded IndexedDB snapshot cache keyed by thread-list cache key with explicit per-key invalidation |
+| Web selected-thread persisted snapshot cache | `SelectedThreadSnapshotIndexedDatabaseStore` | `apps/WebApplication/Source/Features/Chat/DataAccess/SelectedThreadSnapshotIndexedDatabaseStore.ts` | bounded IndexedDB snapshot cache keyed by thread identifier for startup hydration |
 | Web push preference storage | `PushPreferenceStore` | `apps/WebApplication/Source/Features/PushNotifications/DataAccess/PushPreferenceStore.ts` | typed browser storage adapter + key ownership |
 | Web theme preference storage | `ThemePreferenceStore` | `apps/WebApplication/Source/Features/Theme/DataAccess/ThemePreferenceStore.ts` | typed browser storage adapter + key ownership |
 | Server thread list aggregation cache | `ThreadListAggregationCache` | `apps/ServerApplication/Source/Network/ThreadListAggregationCache.ts` | bounded in-memory merged-thread cache with explicit invalidation and single-flight loads |
@@ -562,8 +564,8 @@ This document defines the target folder/file structure and end-state ownership m
 
 | Surface | Owner | Immediate Path | Non-Blocking Update Path | Persistence Tier |
 | --- | --- | --- | --- | --- |
-| Thread list query results | `ThreadQueryCache` | Render from in-memory cache when available | `ThreadRefreshConcurrencyCoordinator` performs background refresh and applies diff-only state updates | process memory |
-| Thread conversation live state | `UseApplicationShellState` + `SelectedThreadDataRefreshCoordinator` | Render latest owner state snapshot | event-stream processing and selected-thread refresh coordinators update state incrementally | process memory |
+| Thread list query results | `ThreadListStateController` + `ThreadQueryCache` + `ThreadListSnapshotIndexedDatabaseStore` | Render in-memory cache first, then hydrate from persisted snapshot when memory is empty | `ThreadRefreshConcurrencyCoordinator` performs background refresh and applies delta-or-full state updates | process memory + browser indexed storage |
+| Thread conversation live state | `UseApplicationShellState` + `SelectedThreadDataRefreshCoordinator` + `SelectedThreadSnapshotIndexedDatabaseStore` | Render latest owner state snapshot and hydrate selected-thread snapshot cache on thread selection | event-stream processing and selected-thread refresh coordinators update state incrementally and persist refreshed snapshots asynchronously | process memory + browser indexed storage |
 | Thread stream-event timeline state | `UseSelectedThreadLoaders` + `SelectedThreadDataRefreshCoordinator` | Reuse in-memory event timeline and cursor for immediate render | cursor-based `stream-events` reads append unseen deltas and issue full reset only when `resetRequired` is returned | process memory |
 | Models, collaboration modes, and defaults | `CapabilitySnapshotCache` with `CapabilityServerClient` | Reuse short-lived in-memory capability snapshot | periodic background revalidation with single-flight per capability query | process memory |
 | API session bootstrap state | `ApiSessionBootstrapCoordinator` | Reuse in-memory auth/session bootstrap decision snapshot | refresh bootstrap only when session freshness threshold is reached or token challenge is resolved | process memory |
@@ -576,7 +578,7 @@ Rules for this strategy:
 1. Caches return immediately when fresh, then owners may revalidate asynchronously when user experience benefits from freshness.
 2. Background refresh work must be single-flight per key and cancelable when user intent changes.
 3. Optimistic updates are allowed for user-triggered mutations when owner modules can reconcile server truth without data corruption.
-4. Persistent storage is reserved for durable preferences and offline-required metadata, not high-churn conversation payloads.
+4. Persistent storage is reserved for durable preferences, offline-required metadata, and bounded snapshot records that improve startup hydration.
 5. Owner modules must document stale-duration assumptions and invalidation triggers for each surface.
 
 ## Data Lifecycle Model (End-State)

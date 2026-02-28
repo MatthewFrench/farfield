@@ -12,6 +12,7 @@ interface RawThreadCollectionListQuery {
   cursor: string | null;
   sortKey: string | null;
   cwd: string | null;
+  sinceUpdatedAt: string | null;
 }
 
 const ThreadSortKeyParamSchema = z.enum(["created_at", "updated_at"]);
@@ -23,6 +24,7 @@ const ThreadListQueryParameterByName = {
   cursor: "cursor",
   sortKey: "sortKey",
   cwd: "cwd",
+  sinceUpdatedAt: "sinceUpdatedAt",
 } as const;
 const ThreadListCursorVersion = 1;
 const ThreadListCursorEncoding = "base64url";
@@ -50,6 +52,7 @@ const RawThreadListQuerySchema = z
     [ThreadListQueryParameterByName.cursor]: z.string().nullable(),
     [ThreadListQueryParameterByName.sortKey]: z.string().nullable(),
     [ThreadListQueryParameterByName.cwd]: z.string().nullable(),
+    [ThreadListQueryParameterByName.sinceUpdatedAt]: z.string().nullable(),
   })
   .strict();
 const ThreadListLimitQueryValueSchema = z.coerce
@@ -62,6 +65,7 @@ const ThreadListMaxPagesQueryValueSchema = z.coerce
   .int()
   .positive()
   .max(ThreadListMaxPagesMaximum);
+const ThreadListSinceUpdatedAtQueryValueSchema = z.coerce.number().int().nonnegative();
 const BooleanQueryValueSchema = z.enum(["true", "false"]).transform((value) => value === "true");
 
 export interface ThreadCollectionListQueryIssue {
@@ -77,6 +81,7 @@ export interface ThreadCollectionListQuery {
   cursor: string | null;
   sortKey: ThreadListSortKey | null;
   cwd: string | null;
+  sinceUpdatedAt: number | null;
 }
 
 export type ParseThreadCollectionListQueryResult =
@@ -196,6 +201,7 @@ export class ThreadCollectionListQueryOwner {
       cursor: url.searchParams.get(ThreadListQueryParameterByName.cursor),
       sortKey: url.searchParams.get(ThreadListQueryParameterByName.sortKey),
       cwd: url.searchParams.get(ThreadListQueryParameterByName.cwd),
+      sinceUpdatedAt: url.searchParams.get(ThreadListQueryParameterByName.sinceUpdatedAt),
     };
   }
 
@@ -224,6 +230,7 @@ export class ThreadCollectionListQueryOwner {
       cursor: rawQuery.cursor,
       sortKey: this.parseSortKey(rawQuery.sortKey, issues),
       cwd: rawQuery.cwd,
+      sinceUpdatedAt: this.parseSinceUpdatedAt(rawQuery.sinceUpdatedAt, issues),
     };
 
     if (issues.length > 0) {
@@ -305,6 +312,26 @@ export class ThreadCollectionListQueryOwner {
     }
     this.appendIssuesForPath(
       ThreadListQueryParameterByName.sortKey,
+      parsedValue.error.issues,
+      issues,
+    );
+    return null;
+  }
+
+  private parseSinceUpdatedAt(
+    value: string | null,
+    issues: ThreadCollectionListQueryIssue[],
+  ): number | null {
+    if (value === null || value.length === 0) {
+      return null;
+    }
+
+    const parsedValue = ThreadListSinceUpdatedAtQueryValueSchema.safeParse(value);
+    if (parsedValue.success) {
+      return parsedValue.data;
+    }
+    this.appendIssuesForPath(
+      ThreadListQueryParameterByName.sinceUpdatedAt,
       parsedValue.error.issues,
       issues,
     );
