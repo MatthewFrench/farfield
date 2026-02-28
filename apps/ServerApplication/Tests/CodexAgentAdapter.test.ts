@@ -76,18 +76,6 @@ describe("CodexAgentAdapter", () => {
     expect(adapter.isConversationNotFoundError(new Error("conversation not found"))).toBe(false);
   });
 
-  it("rejects steering-message sends on the unsupported endpoint", async () => {
-    const adapter = createAdapter();
-
-    await expect(
-      adapter.sendMessage({
-        threadId: "thread_1",
-        text: "hello",
-        isSteering: true,
-      }),
-    ).rejects.toThrowError("Steering messages are not supported on this endpoint.");
-  });
-
   it("returns the adapter workspace as the project directory list", async () => {
     const adapter = createAdapter({
       workspaceDir: "/tmp/custom-workspace",

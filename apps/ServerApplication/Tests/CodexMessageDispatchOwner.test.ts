@@ -105,6 +105,10 @@ class TestAppServerTransport implements AppServerTransport {
 function createThreadStreamStateOwner(
   threadId: string,
   ownerClientId: string,
+  options?: {
+    turnStatus?: "completed" | "inProgress" | "in_progress";
+    turnId?: string;
+  },
 ): CodexThreadStreamStateOwner {
   const threadStreamStateOwner = new CodexThreadStreamStateOwner();
   threadStreamStateOwner.ingestInboundFrame(
@@ -123,12 +127,13 @@ function createThreadStreamStateOwner(
             id: threadId,
             turns: [
               {
+                ...(options?.turnId !== undefined ? { turnId: options.turnId } : {}),
                 params: {
                   threadId,
                   input: [{ type: "text", text: "existing input" }],
                   attachments: [],
                 },
-                status: "completed",
+                status: options?.turnStatus ?? "completed",
                 items: [],
               },
             ],
@@ -146,12 +151,17 @@ function createOwnerTestContext(
   ownerClientId: string,
   options?: {
     isConversationNotFoundError?: <ErrorType>(error: ErrorType) => boolean;
+    initialTurnStatus?: "completed" | "inProgress" | "in_progress";
+    initialTurnId?: string;
   },
 ): OwnerTestContext {
   const appServerTransport = new TestAppServerTransport();
   const appClient = new AppServerClient(appServerTransport);
   const service = new TestCodexMonitorService();
-  const threadStreamStateOwner = createThreadStreamStateOwner(threadId, ownerClientId);
+  const threadStreamStateOwner = createThreadStreamStateOwner(threadId, ownerClientId, {
+    turnStatus: options?.initialTurnStatus,
+    turnId: options?.initialTurnId,
+  });
   let runAppServerCallCount = 0;
 
   const owner = new CodexMessageDispatchOwner({
@@ -335,6 +345,77 @@ describe("CodexMessageDispatchOwner", () => {
           attachments: [],
         },
         timeoutMs: undefined,
+      },
+    ]);
+  });
+
+  it("uses turn/steer for steering sends when IPC is unavailable", async () => {
+    const threadId = "thread-5";
+    const ownerClientId = "owner-client-5";
+    const context = createOwnerTestContext(threadId, ownerClientId, {
+      initialTurnStatus: "inProgress",
+      initialTurnId: "turn-in-progress",
+    });
+    context.appServerTransport.setResponse("turn/steer", {
+      turnId: "turn-in-progress",
+    });
+
+    await context.owner.sendMessage(
+      {
+        threadId,
+        text: "steer this turn",
+        isSteering: true,
+      },
+      false,
+    );
+
+    expect(context.service.sendMessageCalls).toHaveLength(0);
+    expect(context.readRunAppServerCallCount()).toBe(1);
+    expect(context.appServerTransport.requestCalls).toEqual([
+      {
+        method: "turn/steer",
+        params: {
+          threadId,
+          expectedTurnId: "turn-in-progress",
+          input: [
+            {
+              type: "text",
+              text: "steer this turn",
+            },
+          ],
+        },
+        timeoutMs: undefined,
+      },
+    ]);
+  });
+
+  it("fails steering sends when no in-progress turn identifier can be resolved", async () => {
+    const threadId = "thread-6";
+    const ownerClientId = "owner-client-6";
+    const context = createOwnerTestContext(threadId, ownerClientId, {
+      initialTurnStatus: "completed",
+      initialTurnId: "turn-completed",
+    });
+
+    await expect(
+      context.owner.sendMessage(
+        {
+          threadId,
+          text: "steer this turn",
+          isSteering: true,
+        },
+        false,
+      ),
+    ).rejects.toThrowError("Cannot steer because there is no in-progress turn for this thread.");
+
+    expect(context.appServerTransport.requestCalls).toEqual([
+      {
+        method: "thread/read",
+        params: {
+          threadId,
+          includeTurns: true,
+        },
+        timeoutMs: 90_000,
       },
     ]);
   });

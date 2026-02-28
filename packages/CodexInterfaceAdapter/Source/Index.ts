@@ -7,6 +7,9 @@ export type {
   ForkThreadOptions,
   ListThreadsAllOptions,
   ListThreadsOptions,
+  StartReviewOptions,
+  StartReviewResult,
+  StartReviewTarget,
   StartThreadOptions,
   StartTurnOptions,
 } from "./AppServerClient.js";

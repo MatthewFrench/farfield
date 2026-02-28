@@ -93,6 +93,7 @@ export interface UseApplicationShellViewPropertiesInput {
   skipPendingRequest: () => void | Promise<void>;
   selectedAgentLabel: string;
   runInterrupt: ChatWorkspacePaneProps["onInterrupt"];
+  steerMessage: ChatWorkspacePaneProps["onSteerMessage"];
   submitMessage: ChatWorkspacePaneProps["onSendMessage"];
   chatModeToolbarProperties: ChatWorkspacePaneProps["chatModeToolbarProperties"];
   debugWorkspaceSection: DebugWorkspaceSection;
@@ -315,6 +316,7 @@ function buildChatWorkspacePaneProperties(
     activeAgentLabel: input.activeAgentLabel,
     selectedAgentLabel: input.selectedAgentLabel,
     onInterrupt: input.runInterrupt,
+    onSteerMessage: input.steerMessage,
     onSendMessage: input.submitMessage,
     chatModeToolbarProperties: input.chatModeToolbarProperties,
   };
@@ -517,6 +519,7 @@ export function useApplicationShellViewProperties(
       input.setIsChatAtBottom,
       input.setVisibleChatItemLimit,
       input.skipPendingRequest,
+      input.steerMessage,
       input.submitMessage,
       input.submitPendingRequest,
       input.turnCount,

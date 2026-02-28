@@ -5,6 +5,7 @@ vi.mock("../Source/Features/Threads/DataAccess/ThreadApi", () => ({
   createThread: vi.fn(),
   forkThread: vi.fn(),
   rollbackThread: vi.fn(),
+  startThreadReview: vi.fn(),
   setThreadName: vi.fn(),
   unarchiveThread: vi.fn(),
 }));
@@ -15,6 +16,7 @@ import {
   forkThread,
   rollbackThread,
   setThreadName,
+  startThreadReview,
   unarchiveThread,
 } from "../Source/Features/Threads/DataAccess/ThreadApi";
 import { ThreadMutationServerClient } from "../Source/Features/Threads/DataAccess/ThreadMutationServerClient";
@@ -32,6 +34,10 @@ describe("ThreadMutationServerClient", () => {
       sourceThreadId: "thread-1",
     });
     vi.mocked(rollbackThread).mockResolvedValue();
+    vi.mocked(startThreadReview).mockResolvedValue({
+      reviewThreadId: "thread-review-1",
+      reviewTurnId: "turn-review-1",
+    });
     vi.mocked(setThreadName).mockResolvedValue();
     vi.mocked(unarchiveThread).mockResolvedValue();
   });
@@ -85,6 +91,10 @@ describe("ThreadMutationServerClient", () => {
       actionId: "action-rollback-thread",
       actionName: "rollback-thread",
     });
+    await threadMutationServerClient.startThreadReview("  thread-5  ", {
+      actionId: "action-start-thread-review",
+      actionName: "start-thread-review",
+    });
     await threadMutationServerClient.setThreadName(
       "  thread-4  ",
       "  Better title  ",
@@ -104,6 +114,10 @@ describe("ThreadMutationServerClient", () => {
         actionName: "rollback-thread",
       },
     );
+    expect(startThreadReview).toHaveBeenCalledWith("thread-5", {
+      actionId: "action-start-thread-review",
+      actionName: "start-thread-review",
+    });
     expect(setThreadName).toHaveBeenCalledWith(
       {
         threadId: "thread-4",
@@ -128,6 +142,9 @@ describe("ThreadMutationServerClient", () => {
     await expect(threadMutationServerClient.rollbackThread("\n\t", 1)).rejects.toThrowError(
       "ThreadMutationServerClient requires threadId to be a non-empty string",
     );
+    await expect(threadMutationServerClient.startThreadReview("\n\t")).rejects.toThrowError(
+      "ThreadMutationServerClient requires threadId to be a non-empty string",
+    );
     await expect(threadMutationServerClient.setThreadName("", "name")).rejects.toThrowError(
       "ThreadMutationServerClient requires threadId to be a non-empty string",
     );
@@ -135,6 +152,7 @@ describe("ThreadMutationServerClient", () => {
     expect(unarchiveThread).not.toHaveBeenCalled();
     expect(forkThread).not.toHaveBeenCalled();
     expect(rollbackThread).not.toHaveBeenCalled();
+    expect(startThreadReview).not.toHaveBeenCalled();
     expect(setThreadName).not.toHaveBeenCalled();
   });
 });

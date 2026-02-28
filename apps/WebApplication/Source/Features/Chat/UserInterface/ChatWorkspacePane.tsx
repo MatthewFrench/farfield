@@ -111,6 +111,7 @@ export interface ChatWorkspacePaneProps {
   activeAgentLabel: string;
   selectedAgentLabel: string;
   onInterrupt: () => void | Promise<void>;
+  onSteerMessage: (text: string) => void | Promise<void>;
   onSendMessage: (text: string) => void | Promise<void>;
   chatModeToolbarProperties: ChatModeToolbarProps;
 }
@@ -139,6 +140,7 @@ export function ChatWorkspacePane({
   activeAgentLabel,
   selectedAgentLabel,
   onInterrupt,
+  onSteerMessage,
   onSendMessage,
   chatModeToolbarProperties,
 }: ChatWorkspacePaneProps): React.JSX.Element {
@@ -318,6 +320,7 @@ export function ChatWorkspacePane({
               isGenerating={isGenerating}
               placeholder={composerPlaceholder}
               onInterrupt={onInterrupt}
+              onSteer={onSteerMessage}
               onSend={onSendMessage}
             />
 

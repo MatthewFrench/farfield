@@ -91,6 +91,7 @@ export interface UseChatActionHandlersInput {
 
 export interface ChatActionHandlers {
   submitMessage: (draft: string) => Promise<void>;
+  steerMessage: (draft: string) => Promise<void>;
   applyModeDraft: (draft: ChatActionModeDraft) => Promise<void>;
   submitPendingRequest: () => Promise<void>;
   skipPendingRequest: () => Promise<void>;
@@ -201,6 +202,31 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     ],
   );
 
+  const steerMessage = useCallback(
+    async (draft: string) => {
+      await input.chatRequestActionCoordinator.steerMessage({
+        draft,
+        selectedThreadId: input.selectedThreadId,
+        buildActionRequestOptions: input.buildActionRequestOptions,
+        onSetBusy: input.setIsBusy,
+        chatClient: input.chatClient,
+        onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
+        onRefreshThreadData: refreshThreadData,
+        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+      });
+    },
+    [
+      input.buildActionRequestOptions,
+      input.chatClient,
+      input.chatRequestActionCoordinator,
+      input.onInvalidateActiveThreadQuery,
+      refreshThreadData,
+      input.reportTrackedUserInterfaceError,
+      input.selectedThreadId,
+      input.setIsBusy,
+    ],
+  );
+
   const submitPendingRequest = useCallback(async () => {
     if (!input.activeRequest) {
       return;
@@ -297,6 +323,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
 
   return {
     submitMessage,
+    steerMessage,
     applyModeDraft,
     submitPendingRequest,
     skipPendingRequest,

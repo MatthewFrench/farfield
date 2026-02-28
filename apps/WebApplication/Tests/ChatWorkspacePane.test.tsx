@@ -30,6 +30,7 @@ const baseChatWorkspacePaneProperties: ChatWorkspacePaneProps = {
   activeAgentLabel: "Codex",
   selectedAgentLabel: "Codex",
   onInterrupt: () => {},
+  onSteerMessage: () => {},
   onSendMessage: () => {},
   chatModeToolbarProperties: {
     canSetCollaborationMode: false,

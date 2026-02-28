@@ -32,8 +32,10 @@ import {
   buildResumeThreadRequest,
   buildRollbackThreadRequest,
   buildSetThreadNameRequest,
+  buildStartReviewRequest,
   buildStartThreadRequest,
   buildStartTurnRequest,
+  buildSteerTurnRequest,
   buildTurnInterruptRequest,
   buildUnarchiveThreadRequest,
   resolveReadThreadRequestTimeoutMilliseconds,
@@ -102,9 +104,63 @@ export interface StartTurnOptions {
   collaborationMode?: CollaborationMode | null;
 }
 
+export type ReviewDelivery = "inline" | "detached";
+
+export interface ReviewUncommittedChangesTarget {
+  type: "uncommittedChanges";
+}
+
+export interface ReviewBaseBranchTarget {
+  type: "baseBranch";
+  branch: string;
+}
+
+export interface ReviewCommitTarget {
+  type: "commit";
+  sha: string;
+  title?: string | null | undefined;
+}
+
+export interface ReviewCustomTarget {
+  type: "custom";
+  instructions: string;
+}
+
+export type StartReviewTarget =
+  | ReviewUncommittedChangesTarget
+  | ReviewBaseBranchTarget
+  | ReviewCommitTarget
+  | ReviewCustomTarget;
+
+export interface StartReviewOptions {
+  threadId: string;
+  target: StartReviewTarget;
+  delivery?: ReviewDelivery | null;
+}
+
+export interface StartReviewResult {
+  reviewThreadId: string;
+  turnId: string;
+}
+
 const AppServerArchiveThreadResponseSchema = z.object({}).passthrough();
 const AppServerSetThreadNameResponseSchema = z.object({}).passthrough();
+const AppServerTurnSteerResponseSchema = z
+  .object({
+    turnId: z.string().min(1),
+  })
+  .passthrough();
 const AppServerTurnInterruptResponseSchema = z.object({}).passthrough();
+const AppServerReviewStartResponseSchema = z
+  .object({
+    reviewThreadId: z.string().min(1),
+    turn: z
+      .object({
+        id: z.string().min(1),
+      })
+      .passthrough(),
+  })
+  .passthrough();
 const AppServerUnarchiveThreadResponseSchema = z
   .object({
     thread: AppServerThreadListItemSchema,
@@ -285,6 +341,20 @@ export class AppServerClient {
     );
   }
 
+  public async startReview(options: StartReviewOptions): Promise<StartReviewResult> {
+    const request = buildStartReviewRequest(options);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.startReview, request);
+    const parsed = parseAppServerResponse(
+      AppServerReviewStartResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.startReview,
+    );
+    return {
+      reviewThreadId: parsed.reviewThreadId,
+      turnId: parsed.turn.id,
+    };
+  }
+
   public async startTurn(options: StartTurnOptions): Promise<void> {
     const request = buildStartTurnRequest(options);
     const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.startTurn, request);
@@ -293,6 +363,17 @@ export class AppServerClient {
       result,
       APP_SERVER_CLIENT_RESPONSE_CONTEXTS.startTurn,
     );
+  }
+
+  public async steerTurn(threadId: string, expectedTurnId: string, text: string): Promise<string> {
+    const request = buildSteerTurnRequest(threadId, expectedTurnId, text);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.steerTurn, request);
+    const parsedResponse = parseAppServerResponse(
+      AppServerTurnSteerResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.steerTurn,
+    );
+    return parsedResponse.turnId;
   }
 
   public async interruptTurn(threadId: string, turnId: string): Promise<void> {

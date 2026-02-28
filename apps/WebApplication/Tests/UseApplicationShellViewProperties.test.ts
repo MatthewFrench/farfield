@@ -125,6 +125,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const submitPendingRequestSpy = vi.fn(async (): Promise<void> => {});
   const skipPendingRequestSpy = vi.fn(async (): Promise<void> => {});
   const runInterruptSpy = vi.fn(async (): Promise<void> => {});
+  const steerMessageSpy = vi.fn(async (): Promise<void> => {});
   const submitMessageSpy = vi.fn(async (): Promise<void> => {});
   const setDebugWorkspaceSectionSpy = vi.fn((): void => {});
   const setSelectedDebugIssueIdSpy = vi.fn((): void => {});
@@ -220,6 +221,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     skipPendingRequest: skipPendingRequestSpy,
     selectedAgentLabel: "Codex",
     runInterrupt: runInterruptSpy,
+    steerMessage: steerMessageSpy,
     submitMessage: submitMessageSpy,
     chatModeToolbarProperties: createChatModeToolbarPropertiesFixture(),
     debugWorkspaceSection: "issues",

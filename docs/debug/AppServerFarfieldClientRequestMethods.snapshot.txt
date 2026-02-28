@@ -2,6 +2,7 @@ collaborationMode/list
 config/read
 initialize
 model/list
+review/start
 thread/archive
 thread/fork
 thread/list
@@ -13,3 +14,4 @@ thread/start
 thread/unarchive
 turn/interrupt
 turn/start
+turn/steer

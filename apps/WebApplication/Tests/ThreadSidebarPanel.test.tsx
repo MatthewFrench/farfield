@@ -25,6 +25,7 @@ const BASE_THREAD_LIST_PANE_PROPERTIES: ThreadListPaneProperties = {
   onArchiveThread: () => {},
   onForkThread: () => {},
   onRollbackThread: () => {},
+  onStartThreadReview: () => {},
   onSetThreadName: () => {},
   isArchivedThreadsOpen: false,
   onToggleArchivedThreads: () => {},

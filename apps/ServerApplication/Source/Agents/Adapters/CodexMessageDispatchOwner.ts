@@ -6,13 +6,17 @@ import {
 } from "@farfield/api";
 import type { TurnStartParams } from "@farfield/protocol";
 import { logger } from "../../Shared/Logging/Logger.js";
-import type { AgentSendMessageInput } from "../Types.js";
+import type { AgentSendMessageInput, AgentThreadConversationState } from "../Types.js";
 import type { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
 
 const RESUME_WITH_EXTENDED_HISTORY = true;
 const APP_SERVER_OWNER_CLIENT_IDENTIFIER = "app-server";
 const IPC_SEND_MESSAGE_FAILURE_LOG_EVENT = "codex-ipc-send-message-failed";
 const TURN_START_TEMPLATE_UNAVAILABLE_LOG_EVENT = "codex-turn-start-template-unavailable";
+const TURN_IN_PROGRESS_STATUS = "inProgress";
+const TURN_IN_PROGRESS_UNDERSCORE_STATUS = "in_progress";
+const STEER_TURN_IDENTIFIER_UNAVAILABLE_ERROR =
+  "Cannot steer because there is no in-progress turn for this thread.";
 
 export interface CodexMessageDispatchOwnerOptions {
   appClient: AppServerClient;
@@ -93,6 +97,14 @@ export class CodexMessageDispatchOwner {
   }
 
   private async sendMessageThroughAppServer(input: AgentSendMessageInput): Promise<void> {
+    if (input.isSteering === true) {
+      const expectedTurnId = await this.readSteerExpectedTurnIdentifier(input.threadId);
+      await this.runAppServerCall(() =>
+        this.appClient.steerTurn(input.threadId, expectedTurnId, input.text),
+      );
+      return;
+    }
+
     const turnStartTemplate = await this.readTurnStartTemplate(
       input.threadId,
       APP_SERVER_OWNER_CLIENT_IDENTIFIER,
@@ -105,6 +117,28 @@ export class CodexMessageDispatchOwner {
         ...(turnStartTemplate !== null ? { turnStartTemplate } : {}),
       }),
     );
+  }
+
+  private async readSteerExpectedTurnIdentifier(threadId: string): Promise<string> {
+    const projectedConversationState =
+      this.threadStreamStateOwner.getProjectedConversationState(threadId);
+    const projectedTurnIdentifier =
+      projectedConversationState === null
+        ? null
+        : readLatestInProgressTurnIdentifier(projectedConversationState);
+    if (projectedTurnIdentifier !== null) {
+      return projectedTurnIdentifier;
+    }
+
+    const readThreadResponse = await this.runAppServerCall(() =>
+      this.appClient.readThread(threadId, true),
+    );
+    const readThreadTurnIdentifier = readLatestInProgressTurnIdentifier(readThreadResponse.thread);
+    if (readThreadTurnIdentifier !== null) {
+      return readThreadTurnIdentifier;
+    }
+
+    throw new Error(STEER_TURN_IDENTIFIER_UNAVAILABLE_ERROR);
   }
 
   private async readTurnStartTemplate(
@@ -154,4 +188,29 @@ function toErrorMessage<ErrorType>(error: ErrorType): string {
     return error;
   }
   return String(error);
+}
+
+function readLatestInProgressTurnIdentifier(
+  conversationState: AgentThreadConversationState,
+): string | null {
+  for (let turnIndex = conversationState.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
+    const turn = conversationState.turns[turnIndex];
+    if (turn === undefined) {
+      continue;
+    }
+
+    const turnIdentifier = turn.turnId ?? turn.id ?? null;
+    if (turnIdentifier === null) {
+      continue;
+    }
+
+    if (
+      turn.status === TURN_IN_PROGRESS_STATUS ||
+      turn.status === TURN_IN_PROGRESS_UNDERSCORE_STATUS
+    ) {
+      return turnIdentifier;
+    }
+  }
+
+  return null;
 }

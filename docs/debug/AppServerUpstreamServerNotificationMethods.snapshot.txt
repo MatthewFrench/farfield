@@ -23,6 +23,7 @@ loginChatGptComplete
 mcpServer/oauthLogin/completed
 model/rerouted
 rawResponseItem/completed
+serverRequest/resolved
 sessionConfigured
 thread/archived
 thread/closed

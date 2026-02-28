@@ -3,6 +3,7 @@ import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 
 const SEND_MESSAGE_ACTION_NAME = "send-message";
+const STEER_MESSAGE_ACTION_NAME = "steer-message";
 const SUBMIT_USER_INPUT_ACTION_NAME = "submit-user-input";
 const SKIP_USER_INPUT_ACTION_NAME = "skip-user-input";
 const INTERRUPT_THREAD_ACTION_NAME = "interrupt-thread";
@@ -25,6 +26,7 @@ export interface ChatRequestActionChatClient {
     input: {
       threadId: string;
       text: string;
+      isSteering?: boolean;
     },
     options?: ApiRequestOptions,
   ): Promise<void>;
@@ -88,6 +90,17 @@ export interface SubmitPendingUserInputActionInput {
   reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
 }
 
+export interface SteerMessageActionInput {
+  draft: string;
+  selectedThreadId: string | null;
+  buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
+  onSetBusy: (isBusy: boolean) => void;
+  chatClient: ChatRequestActionChatClient;
+  onInvalidateActiveThreadQuery: () => void;
+  onRefreshThreadData: (threadId: string) => Promise<void>;
+  reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
+}
+
 export interface SkipPendingUserInputActionInput {
   selectedThreadId: string | null;
   requestId: number;
@@ -141,6 +154,44 @@ export class ChatRequestActionCoordinator {
         operation: SEND_MESSAGE_ACTION_NAME,
         actionId,
         threadId,
+        error: toErrorMessage(error),
+        details: {
+          draftLength: trimmedDraft.length,
+        },
+      });
+    } finally {
+      input.onSetBusy(false);
+    }
+  }
+
+  public async steerMessage(input: SteerMessageActionInput): Promise<void> {
+    const trimmedDraft = input.draft.trim();
+    if (
+      input.selectedThreadId === null ||
+      input.selectedThreadId.length === 0 ||
+      trimmedDraft.length === 0
+    ) {
+      return;
+    }
+
+    const { actionId, requestOptions } = input.buildActionRequestOptions(STEER_MESSAGE_ACTION_NAME);
+    input.onSetBusy(true);
+    try {
+      await input.chatClient.sendMessage(
+        {
+          threadId: input.selectedThreadId,
+          text: input.draft,
+          isSteering: true,
+        },
+        requestOptions,
+      );
+      input.onInvalidateActiveThreadQuery();
+      await input.onRefreshThreadData(input.selectedThreadId);
+    } catch (error) {
+      await input.reportTrackedUserInterfaceError({
+        operation: STEER_MESSAGE_ACTION_NAME,
+        actionId,
+        threadId: input.selectedThreadId,
         error: toErrorMessage(error),
         details: {
           draftLength: trimmedDraft.length,

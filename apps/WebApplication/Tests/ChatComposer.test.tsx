@@ -7,6 +7,7 @@ function renderChatComposer(input?: {
   isBusy?: boolean;
   isGenerating?: boolean;
   onInterrupt?: () => void | Promise<void>;
+  onSteer?: (text: string) => void | Promise<void>;
   onSend?: (text: string) => void | Promise<void>;
 }): void {
   cleanup();
@@ -16,6 +17,7 @@ function renderChatComposer(input?: {
       isBusy={input?.isBusy ?? false}
       isGenerating={input?.isGenerating ?? false}
       onInterrupt={input?.onInterrupt ?? (() => {})}
+      onSteer={input?.onSteer ?? (() => {})}
       onSend={input?.onSend ?? (() => {})}
     />,
   );
@@ -85,5 +87,32 @@ describe("ChatComposer", () => {
       expect(onInterrupt).toHaveBeenCalledTimes(1);
     });
     expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it("submits steering text while generation is active", async () => {
+    const onInterrupt = vi.fn();
+    const onSteer = vi.fn();
+    const onSend = vi.fn();
+    renderChatComposer({
+      isGenerating: true,
+      onInterrupt,
+      onSteer,
+      onSend,
+    });
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "nudge the active turn" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Steer" }));
+
+    await waitFor(() => {
+      expect(onSteer).toHaveBeenCalledTimes(1);
+    });
+    expect(onSteer).toHaveBeenCalledWith("nudge the active turn");
+    expect(onInterrupt).not.toHaveBeenCalled();
+    expect(onSend).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.queryByDisplayValue("nudge the active turn")).toBeNull();
+    });
   });
 });

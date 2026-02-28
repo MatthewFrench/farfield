@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-02-27 10:52:02Z
+Last Updated (UTC): 2026-02-28 13:58:31Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -50,7 +50,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `newConversation` | Not used | Do not adopt | Deprecated upstream request family. |
 | `removeConversationListener` | Not used | Do not adopt | Deprecated upstream request family. |
 | `resumeConversation` | Not used | Do not adopt | Deprecated upstream request family. |
-| `review/start` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
+| `review/start` | Used now | Keep | Thread review action now routes through strict owner boundaries with typed target and delivery contracts. |
 | `sendUserMessage` | Not used | Do not adopt | Legacy request family upstream; replaced by turn/start in Farfield send path. |
 | `sendUserTurn` | Not used | Do not adopt | Deprecated upstream request family. |
 | `setDefaultModel` | Not used | Do not adopt | Deprecated upstream request family. |
@@ -77,10 +77,10 @@ This ledger records recommended disposition for every upstream app-server client
 | `thread/unsubscribe` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
 | `turn/interrupt` | Used now | Keep | Interrupt fallback path is routed through strict owner boundaries and typed turn-id mapping. |
 | `turn/start` | Used now | Keep | Canonical send path for app-server mode in Farfield. |
-| `turn/steer` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
+| `turn/steer` | Used now | Keep | Steering path now routes through strict owner boundaries with explicit in-progress turn precondition mapping. |
 | `userInfo` | Not used | Do not adopt | Deprecated upstream request family. |
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 15
-Not used: 59
+Used now: 17
+Not used: 57

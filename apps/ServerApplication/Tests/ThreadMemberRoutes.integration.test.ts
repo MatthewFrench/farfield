@@ -23,6 +23,8 @@ import type {
   AgentReadThreadInput,
   AgentReadThreadResult,
   AgentSendMessageInput,
+  AgentStartThreadReviewInput,
+  AgentStartThreadReviewResult,
   AgentThreadLiveState,
   AgentThreadStreamEvents,
 } from "../Source/Agents/Types.js";
@@ -45,6 +47,7 @@ const NestedMessagesPathThreadIdentifier = "thread_nested_messages_path";
 const MessageMutationThreadIdentifier = "thread_message_mutation";
 const ArchiveMutationThreadIdentifier = "thread_archive_mutation";
 const InterruptMutationThreadIdentifier = "thread_interrupt_mutation";
+const ReviewMutationThreadIdentifier = "thread_review_mutation";
 const InvalidThreadIdentifierSegment = "%E0%A4%A";
 const ActionErrorIdentifier = "action-error-id";
 const MessageBodyText = "hello";
@@ -96,6 +99,15 @@ const MutationRouteSuccessResponseSchema = z
   .object({
     ok: z.literal(true),
     threadId: z.string().min(1),
+  })
+  .strict();
+
+const ReviewMutationRouteSuccessResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1),
+    reviewThreadId: z.string().min(1),
+    reviewTurnId: z.string().min(1),
   })
   .strict();
 
@@ -228,6 +240,7 @@ interface ThreadMemberRouteTestAdapterOptions {
   sendMessage?: (input: AgentSendMessageInput) => Promise<void>;
   interrupt?: (input: AgentInterruptInput) => Promise<void>;
   archiveThread?: (input: AgentArchiveThreadInput) => Promise<void>;
+  startThreadReview?: (input: AgentStartThreadReviewInput) => Promise<AgentStartThreadReviewResult>;
   readLiveState?: (threadId: string) => Promise<AgentThreadLiveState>;
   readStreamEvents?: (
     threadId: string,
@@ -273,6 +286,15 @@ function createAdapter(options: ThreadMemberRouteTestAdapterOptions): AgentAdapt
       ? {
           async archiveThread(input: AgentArchiveThreadInput): Promise<void> {
             await options.archiveThread(input);
+          },
+        }
+      : {}),
+    ...(options.startThreadReview
+      ? {
+          async startThreadReview(
+            input: AgentStartThreadReviewInput,
+          ): Promise<AgentStartThreadReviewResult> {
+            return options.startThreadReview(input);
           },
         }
       : {}),
@@ -777,6 +799,68 @@ describe("ThreadMemberRoutes integration", () => {
     expect(MutationRouteSuccessResponseSchema.parse(capturedResponse.body)).toEqual({
       ok: true,
       threadId: InterruptMutationThreadIdentifier,
+    });
+  });
+
+  it("routes canonical review mutations through review-owner dispatch", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = ThreadMemberRouteMethodByName.post;
+
+    const startThreadReview = vi.fn<
+      (input: AgentStartThreadReviewInput) => Promise<AgentStartThreadReviewResult>
+    >(async () => ({
+      reviewThreadId: "thread-review-1",
+      turnId: "turn-review-1",
+    }));
+    const readJsonBody = vi.fn<ThreadMemberRouteDependencies["readJsonBody"]>(async () => ({
+      target: {
+        type: "uncommittedChanges",
+      },
+    }));
+
+    const codexAdapter = createAdapter({
+      id: "codex",
+      readThread: async () => {
+        throw new Error("not used in this test");
+      },
+      startThreadReview,
+    });
+    const resolveAdapterForThread = vi.fn<ThreadMemberRouteDependencies["resolveAdapterForThread"]>(
+      async () => ({
+        ok: true,
+        adapter: codexAdapter,
+        agentId: "codex",
+      }),
+    );
+
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(ReviewMutationThreadIdentifier, ThreadMemberRouteSegmentByName.review),
+      createThreadRouteUrl(ReviewMutationThreadIdentifier, ThreadMemberRouteSegmentByName.review),
+      resolveAdapterForThread,
+      readJsonBody,
+      capturedResponse,
+    );
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+
+    expect(handled).toBe(true);
+    expect(startThreadReview).toHaveBeenCalledTimes(1);
+    expect(startThreadReview).toHaveBeenCalledWith({
+      threadId: ReviewMutationThreadIdentifier,
+      target: {
+        type: "uncommittedChanges",
+      },
+    });
+    expect(readJsonBody).toHaveBeenCalledTimes(1);
+    expect(capturedResponse.statusCode).toBe(200);
+    expect(ReviewMutationRouteSuccessResponseSchema.parse(capturedResponse.body)).toEqual({
+      ok: true,
+      threadId: ReviewMutationThreadIdentifier,
+      reviewThreadId: "thread-review-1",
+      reviewTurnId: "turn-review-1",
     });
   });
 });

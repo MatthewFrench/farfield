@@ -148,6 +148,7 @@ function createChatModeToolbarPropertiesFixture(): ChatModeToolbarProps {
 function createChatFeatureCompositionFixture(): ApplicationChatFeatureComposition {
   return {
     submitMessage: vi.fn(async (_draft: string): Promise<void> => {}),
+    steerMessage: vi.fn(async (_draft: string): Promise<void> => {}),
     applyModeDraft: vi.fn(async (): Promise<void> => {}),
     submitPendingRequest: vi.fn(async (): Promise<void> => {}),
     skipPendingRequest: vi.fn(async (): Promise<void> => {}),
@@ -187,6 +188,7 @@ function createThreadActionHandlersFixture(): ThreadActionHandlers {
     runArchiveThread: vi.fn(async (): Promise<void> => {}),
     runForkThread: vi.fn(async (): Promise<void> => {}),
     runRollbackThread: vi.fn(async (): Promise<void> => {}),
+    runStartThreadReview: vi.fn(async (): Promise<void> => {}),
     runSetThreadName: vi.fn(async (): Promise<void> => {}),
     runUnarchiveThread: vi.fn(async (): Promise<void> => {}),
   };
@@ -417,6 +419,7 @@ describe("useApplicationShellComposition", () => {
         archiveThread: threadActionHandlersFixture.runArchiveThread,
         forkThread: threadActionHandlersFixture.runForkThread,
         rollbackThread: threadActionHandlersFixture.runRollbackThread,
+        startThreadReview: threadActionHandlersFixture.runStartThreadReview,
         setThreadName: threadActionHandlersFixture.runSetThreadName,
         unarchiveThread: threadActionHandlersFixture.runUnarchiveThread,
         formatDate: fixture.formatDateValue,
@@ -442,6 +445,7 @@ describe("useApplicationShellComposition", () => {
         handleAnswerChange: fixture.chatFeatureComposition.handleAnswerChange,
         submitPendingRequest: fixture.chatFeatureComposition.submitPendingRequest,
         submitMessage: fixture.chatFeatureComposition.submitMessage,
+        steerMessage: fixture.chatFeatureComposition.steerMessage,
         runInterrupt: fixture.chatFeatureComposition.runInterrupt,
         openDebugFromErrorBanner: fixture.debugFeatureComposition.openDebugFromErrorBanner,
         clearDebugIssuesFromDebugPanel: fixture.debugFeatureComposition.clearDebugIssuesFromPanel,
@@ -490,6 +494,9 @@ describe("useApplicationShellComposition", () => {
     runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onRollbackThread(
       "thread-rollback",
     );
+    runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onStartThreadReview(
+      "thread-review",
+    );
     runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onSetThreadName(
       "thread-name",
       "New title",
@@ -508,6 +515,7 @@ describe("useApplicationShellComposition", () => {
     expect(threadActionHandlersFixture.runArchiveThread).toHaveBeenCalledWith("thread-archive");
     expect(threadActionHandlersFixture.runForkThread).toHaveBeenCalledWith("thread-fork");
     expect(threadActionHandlersFixture.runRollbackThread).toHaveBeenCalledWith("thread-rollback");
+    expect(threadActionHandlersFixture.runStartThreadReview).toHaveBeenCalledWith("thread-review");
     expect(threadActionHandlersFixture.runSetThreadName).toHaveBeenCalledWith(
       "thread-name",
       "New title",

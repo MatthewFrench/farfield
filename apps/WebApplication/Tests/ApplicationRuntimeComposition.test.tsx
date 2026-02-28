@@ -15,6 +15,7 @@ interface PushFeatureCompositionMock {
 
 interface ChatFeatureCompositionMock {
   submitMessage: (draft: string) => Promise<void>;
+  steerMessage: (draft: string) => Promise<void>;
   applyModeDraft: (draft: {
     modeKey: string;
     modelId: string;
@@ -236,6 +237,7 @@ function createPushFeatureCompositionMock(): PushFeatureCompositionMock {
 function createChatFeatureCompositionMock(): ChatFeatureCompositionMock {
   return {
     submitMessage: vi.fn(async (_draft: string): Promise<void> => {}),
+    steerMessage: vi.fn(async (_draft: string): Promise<void> => {}),
     applyModeDraft: vi.fn(async (_draft): Promise<void> => {}),
     submitPendingRequest: vi.fn(async (): Promise<void> => {}),
     skipPendingRequest: vi.fn(async (): Promise<void> => {}),

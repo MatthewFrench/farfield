@@ -3,6 +3,7 @@ import { ThreadMemberForkMutationRouteOwner } from "./ThreadMemberForkMutationRo
 import { ThreadMemberInteractionMutationRouteOwner } from "./ThreadMemberInteractionMutationRouteOwner.js";
 import { ThreadMemberMessageMutationRouteOwner } from "./ThreadMemberMessageMutationRouteOwner.js";
 import { ThreadMemberNameMutationRouteOwner } from "./ThreadMemberNameMutationRouteOwner.js";
+import { ThreadMemberReviewMutationRouteOwner } from "./ThreadMemberReviewMutationRouteOwner.js";
 import { ThreadMemberRollbackMutationRouteOwner } from "./ThreadMemberRollbackMutationRouteOwner.js";
 import {
   isThreadMemberSubresourceRoute,
@@ -23,6 +24,7 @@ const ThreadMemberMutationRouteOwnerNameByName = {
   interaction: "interaction",
   fork: "fork",
   name: "name",
+  review: "review",
   rollback: "rollback",
 } as const;
 
@@ -35,6 +37,7 @@ type ThreadMemberMutationSubresource =
   | typeof ThreadMemberRouteSegmentByName.unarchive
   | typeof ThreadMemberRouteSegmentByName.fork
   | typeof ThreadMemberRouteSegmentByName.name
+  | typeof ThreadMemberRouteSegmentByName.review
   | typeof ThreadMemberRouteSegmentByName.rollback
   | typeof ThreadMemberRouteSegmentByName.collaborationMode
   | typeof ThreadMemberRouteSegmentByName.userInput
@@ -72,6 +75,10 @@ const ThreadMemberMutationDispatchDescriptors: readonly ThreadMemberMutationDisp
     ownerName: ThreadMemberMutationRouteOwnerNameByName.name,
   },
   {
+    subresource: ThreadMemberRouteSegmentByName.review,
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.review,
+  },
+  {
     subresource: ThreadMemberRouteSegmentByName.rollback,
     ownerName: ThreadMemberMutationRouteOwnerNameByName.rollback,
   },
@@ -103,6 +110,8 @@ const ThreadMemberMutationHandlerFactoryByOwnerName: Record<
     new ThreadMemberForkMutationRouteOwner(options),
   [ThreadMemberMutationRouteOwnerNameByName.name]: (options) =>
     new ThreadMemberNameMutationRouteOwner(options),
+  [ThreadMemberMutationRouteOwnerNameByName.review]: (options) =>
+    new ThreadMemberReviewMutationRouteOwner(options),
   [ThreadMemberMutationRouteOwnerNameByName.rollback]: (options) =>
     new ThreadMemberRollbackMutationRouteOwner(options),
 };

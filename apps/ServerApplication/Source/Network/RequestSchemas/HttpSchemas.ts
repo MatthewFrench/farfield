@@ -15,6 +15,7 @@ const HTTP_BODY_PARSE_ERROR_PREFIX = "Invalid HTTP request body";
 const RequestBodySchemaNameByParser = {
   setMode: "SetModeBody",
   startThread: "StartThreadBody",
+  startThreadReview: "StartThreadReviewBody",
   sendMessage: "SendMessageBody",
   submitUserInput: "SubmitUserInputBody",
   interrupt: "InterruptBody",
@@ -107,6 +108,42 @@ export const RollbackThreadBodySchema = z
   })
   .strict();
 
+export const ThreadReviewDeliverySchema = z.enum(["inline", "detached"]);
+
+export const ThreadReviewTargetSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("uncommittedChanges"),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("baseBranch"),
+      branch: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("commit"),
+      sha: z.string().min(1),
+      title: z.union([z.string(), z.null()]).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("custom"),
+      instructions: z.string().min(1),
+    })
+    .strict(),
+]);
+
+export const StartThreadReviewBodySchema = z
+  .object({
+    delivery: ThreadReviewDeliverySchema.nullable().optional(),
+    target: ThreadReviewTargetSchema.optional(),
+  })
+  .strict();
+
 export const TraceStartBodySchema = z
   .object({
     // Limit keeps trace labels concise enough for list and activity surfaces.
@@ -135,6 +172,7 @@ export type InterruptBody = z.infer<typeof InterruptBodySchema>;
 export type ForkThreadBody = z.infer<typeof ForkThreadBodySchema>;
 export type SetThreadNameBody = z.infer<typeof SetThreadNameBodySchema>;
 export type RollbackThreadBody = z.infer<typeof RollbackThreadBodySchema>;
+export type StartThreadReviewBody = z.infer<typeof StartThreadReviewBodySchema>;
 export type TraceStartBody = z.infer<typeof TraceStartBodySchema>;
 export type TraceMarkBody = z.infer<typeof TraceMarkBodySchema>;
 export type ReplayBody = z.infer<typeof ReplayBodySchema>;
@@ -257,6 +295,14 @@ export function parseRollbackThreadBody(value: JsonValue): RollbackThreadBody {
     RollbackThreadBodySchema,
     value,
     RequestBodySchemaNameByParser.rollbackThread,
+  );
+}
+
+export function parseStartThreadReviewBody(value: JsonValue): StartThreadReviewBody {
+  return parseOwnedRequestBody(
+    StartThreadReviewBodySchema,
+    value,
+    RequestBodySchemaNameByParser.startThreadReview,
   );
 }
 

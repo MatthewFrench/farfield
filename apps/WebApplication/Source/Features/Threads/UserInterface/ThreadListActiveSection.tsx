@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Search,
   Undo2,
   X,
 } from "lucide-react";
@@ -143,6 +144,8 @@ export function ThreadListActiveSection({
                         thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
                       const canRollback =
                         thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
+                      const canStartReview =
+                        thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
                       const isRenamingThread = renamedThreadIdentifier === thread.id;
                       return (
                         <div
@@ -269,6 +272,17 @@ export function ThreadListActiveSection({
                               >
                                 <Pencil size={13} />
                                 Rename thread
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  if (canStartReview) {
+                                    properties.onStartThreadReview(thread.id);
+                                  }
+                                }}
+                                disabled={properties.isBusy || !canStartReview}
+                              >
+                                <Search size={13} />
+                                Start code review
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onSelect={() => {

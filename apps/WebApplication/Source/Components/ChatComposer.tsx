@@ -1,4 +1,4 @@
-import { ArrowUp, Loader2, Square } from "lucide-react";
+import { ArrowUp, CornerUpRight, Loader2, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/Components/UserInterface/Button";
 import { Textarea } from "@/Components/UserInterface/Textarea";
@@ -9,6 +9,7 @@ type ChatComposerProps = {
   isGenerating: boolean;
   placeholder?: string;
   onInterrupt: () => void | Promise<void>;
+  onSteer: (text: string) => void | Promise<void>;
   onSend: (text: string) => void | Promise<void>;
 };
 
@@ -17,6 +18,7 @@ const MAX_TEXTAREA_HEIGHT_PIXELS = 200;
 const SUBMIT_DRAFT_KEY = "Enter";
 const SEND_ACTION_LABEL = "Send";
 const STOP_ACTION_LABEL = "Stop";
+const STEER_ACTION_LABEL = "Steer";
 
 type DraftSubmissionState = {
   canSend: boolean;
@@ -38,6 +40,7 @@ export function ChatComposer({
   isGenerating,
   placeholder = DEFAULT_PLACEHOLDER_TEXT,
   onInterrupt,
+  onSteer,
   onSend,
 }: ChatComposerProps): React.JSX.Element {
   const [draft, setDraft] = useState("");
@@ -109,8 +112,19 @@ export function ChatComposer({
     previousHeightRef.current = 0;
   }, [canSend, draft, isBusy, isGenerating, onInterrupt, onSend]);
 
+  const steerDraft = useCallback(async () => {
+    if (!canSubmitDraft({ canSend, isBusy, draft })) {
+      return;
+    }
+
+    await onSteer(draft);
+    setDraft("");
+    previousHeightRef.current = 0;
+  }, [canSend, draft, isBusy, onSteer]);
+
   const canSubmitCurrentDraft = canSubmitDraft({ canSend, isBusy, draft });
   const disableSend = isGenerating ? !canSend || isBusy : !canSubmitCurrentDraft;
+  const disableSteer = !canSubmitCurrentDraft;
   const sendActionLabel = isGenerating ? STOP_ACTION_LABEL : SEND_ACTION_LABEL;
 
   return (
@@ -125,6 +139,10 @@ export function ChatComposer({
         onKeyDown={(e) => {
           if (isSubmitShortcutPressed(e)) {
             e.preventDefault();
+            if (isGenerating && canSubmitCurrentDraft) {
+              void steerDraft();
+              return;
+            }
             void sendDraft();
           }
         }}
@@ -133,29 +151,46 @@ export function ChatComposer({
         style={{ maxHeight: `${MAX_TEXTAREA_HEIGHT_PIXELS}px` }}
         className="flex-1 min-h-9 resize-none overflow-y-auto border-0 bg-transparent px-0 py-2 text-base leading-5 shadow-none transition-[height] duration-90 ease-out focus-visible:ring-0 md:text-sm"
       />
-      <Button
-        type="button"
-        onClick={() => {
-          void sendDraft();
-        }}
-        disabled={disableSend}
-        title={sendActionLabel}
-        aria-label={sendActionLabel}
-        size="icon"
-        className={`h-9 w-9 shrink-0 self-end rounded-full disabled:opacity-30 ${
-          isGenerating
-            ? "bg-destructive text-destructive-foreground hover:bg-destructive/85"
-            : "bg-foreground text-background hover:bg-foreground/80"
-        }`}
-      >
-        {isGenerating ? (
-          <Square size={11} />
-        ) : isBusy ? (
-          <Loader2 size={13} className="animate-spin" />
-        ) : (
-          <ArrowUp size={13} />
+      <div className="flex items-center gap-1.5 self-end">
+        {isGenerating && (
+          <Button
+            type="button"
+            onClick={() => {
+              void steerDraft();
+            }}
+            disabled={disableSteer}
+            title={STEER_ACTION_LABEL}
+            aria-label={STEER_ACTION_LABEL}
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-full border border-border bg-card text-foreground hover:bg-muted disabled:opacity-30"
+          >
+            <CornerUpRight size={13} />
+          </Button>
         )}
-      </Button>
+        <Button
+          type="button"
+          onClick={() => {
+            void sendDraft();
+          }}
+          disabled={disableSend}
+          title={sendActionLabel}
+          aria-label={sendActionLabel}
+          size="icon"
+          className={`h-9 w-9 shrink-0 rounded-full disabled:opacity-30 ${
+            isGenerating
+              ? "bg-destructive text-destructive-foreground hover:bg-destructive/85"
+              : "bg-foreground text-background hover:bg-foreground/80"
+          }`}
+        >
+          {isGenerating ? (
+            <Square size={11} />
+          ) : isBusy ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <ArrowUp size={13} />
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

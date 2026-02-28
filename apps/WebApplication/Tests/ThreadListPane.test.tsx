@@ -64,7 +64,9 @@ const ARCHIVED_PROJECT_GROUPS: ThreadProjectGroup[] = [
   },
 ];
 
-function createThreadListPaneProperties(): ThreadListPaneProperties {
+function createThreadListPaneProperties(
+  overrides: Partial<ThreadListPaneProperties> = {},
+): ThreadListPaneProperties {
   return {
     threadListState: "ready",
     threads: ACTIVE_THREAD_ITEMS,
@@ -94,6 +96,7 @@ function createThreadListPaneProperties(): ThreadListPaneProperties {
     onArchiveThread: () => {},
     onForkThread: () => {},
     onRollbackThread: () => {},
+    onStartThreadReview: () => {},
     onSetThreadName: () => {},
     isArchivedThreadsOpen: true,
     onToggleArchivedThreads: () => {},
@@ -108,6 +111,7 @@ function createThreadListPaneProperties(): ThreadListPaneProperties {
     onUnarchiveThread: () => {},
     formatDate: () => "",
     renderAgentFavicon: () => null,
+    ...overrides,
   };
 }
 

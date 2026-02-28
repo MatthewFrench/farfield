@@ -167,6 +167,28 @@ describe("ChatApi", () => {
     );
   });
 
+  it("includes steering flag in send-message payloads when requested", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 200,
+      }),
+    );
+
+    await sendMessage({
+      threadId: "thread_1",
+      text: "adjust active turn",
+      isSteering: true,
+    });
+
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    expect(String(requestInit?.body)).toBe(
+      JSON.stringify({
+        text: "adjust active turn",
+        isSteering: true,
+      }),
+    );
+  });
+
   it("posts collaboration-mode requests through the collaboration-mode route", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, {

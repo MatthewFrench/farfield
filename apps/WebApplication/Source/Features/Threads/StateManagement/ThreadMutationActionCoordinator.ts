@@ -8,6 +8,7 @@ const UNARCHIVE_THREAD_OPERATION_NAME = "unarchive-thread";
 const FORK_THREAD_OPERATION_NAME = "fork-thread";
 const SET_THREAD_NAME_OPERATION_NAME = "set-thread-name";
 const ROLLBACK_THREAD_OPERATION_NAME = "rollback-thread";
+const START_THREAD_REVIEW_OPERATION_NAME = "start-thread-review";
 const MISSING_PROJECT_PATH_MESSAGE = "Cannot create thread: missing project path";
 const MISSING_THREAD_NAME_MESSAGE = "Cannot rename thread: missing name";
 const INVALID_ROLLBACK_TURN_COUNT_MESSAGE =
@@ -19,7 +20,8 @@ export type ThreadMutationOperationName =
   | typeof UNARCHIVE_THREAD_OPERATION_NAME
   | typeof FORK_THREAD_OPERATION_NAME
   | typeof SET_THREAD_NAME_OPERATION_NAME
-  | typeof ROLLBACK_THREAD_OPERATION_NAME;
+  | typeof ROLLBACK_THREAD_OPERATION_NAME
+  | typeof START_THREAD_REVIEW_OPERATION_NAME;
 
 export interface ThreadMutationActionRequestOptions {
   actionId: string;
@@ -44,6 +46,10 @@ export interface ThreadMutationActionClient {
     threadId: string,
     options?: ApiRequestOptions,
   ): Promise<{ threadId: string; sourceThreadId: string }>;
+  startThreadReview(
+    threadId: string,
+    options?: ApiRequestOptions,
+  ): Promise<{ reviewThreadId: string; reviewTurnId: string }>;
   setThreadName(threadId: string, name: string, options?: ApiRequestOptions): Promise<void>;
   rollbackThread(threadId: string, numTurns: number, options?: ApiRequestOptions): Promise<void>;
   unarchiveThread(threadId: string, options?: ApiRequestOptions): Promise<void>;
@@ -146,6 +152,20 @@ export interface RollbackThreadActionInput {
   onInvalidateActiveThreadQuery: () => void;
   loadCoreData: () => Promise<void>;
   onRefreshRolledBackThreadData: (threadId: string) => Promise<void>;
+  threadMutationClient: ThreadMutationActionClient;
+  reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
+}
+
+export interface StartThreadReviewActionInput {
+  threadId: string;
+  buildActionRequestOptions: (
+    actionName: ThreadMutationOperationName,
+  ) => ThreadMutationActionRequestOptions;
+  onSetBusy: (isBusy: boolean) => void;
+  onThreadSelected: (threadId: string) => void;
+  onSetMobileSidebarOpen: (isOpen: boolean) => void;
+  onInvalidateActiveThreadQuery: () => void;
+  onRefreshReviewThreadData: (threadId: string) => Promise<void>;
   threadMutationClient: ThreadMutationActionClient;
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
 }
@@ -329,6 +349,32 @@ export class ThreadMutationActionCoordinator {
         details: {
           numTurns: input.numTurns,
         },
+      });
+    } finally {
+      input.onSetBusy(false);
+    }
+  }
+
+  public async startThreadReview(input: StartThreadReviewActionInput): Promise<void> {
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      START_THREAD_REVIEW_OPERATION_NAME,
+    );
+    input.onSetBusy(true);
+    try {
+      const reviewResult = await input.threadMutationClient.startThreadReview(
+        input.threadId,
+        requestOptions,
+      );
+      input.onThreadSelected(reviewResult.reviewThreadId);
+      input.onSetMobileSidebarOpen(false);
+      input.onInvalidateActiveThreadQuery();
+      await input.onRefreshReviewThreadData(reviewResult.reviewThreadId);
+    } catch (error) {
+      await input.reportTrackedUserInterfaceError({
+        operation: START_THREAD_REVIEW_OPERATION_NAME,
+        actionId,
+        threadId: input.threadId,
+        error: toErrorMessage(error),
       });
     } finally {
       input.onSetBusy(false);

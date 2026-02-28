@@ -151,6 +151,45 @@ export interface AgentRollbackThreadInput {
   numTurns: number;
 }
 
+export type AgentThreadReviewDelivery = "inline" | "detached";
+
+export interface AgentThreadReviewUncommittedChangesTarget {
+  type: "uncommittedChanges";
+}
+
+export interface AgentThreadReviewBaseBranchTarget {
+  type: "baseBranch";
+  branch: string;
+}
+
+export interface AgentThreadReviewCommitTarget {
+  type: "commit";
+  sha: string;
+  title?: string | null | undefined;
+}
+
+export interface AgentThreadReviewCustomTarget {
+  type: "custom";
+  instructions: string;
+}
+
+export type AgentThreadReviewTarget =
+  | AgentThreadReviewUncommittedChangesTarget
+  | AgentThreadReviewBaseBranchTarget
+  | AgentThreadReviewCommitTarget
+  | AgentThreadReviewCustomTarget;
+
+export interface AgentStartThreadReviewInput {
+  threadId: string;
+  target: AgentThreadReviewTarget;
+  delivery?: AgentThreadReviewDelivery | null;
+}
+
+export interface AgentStartThreadReviewResult {
+  reviewThreadId: string;
+  turnId: string;
+}
+
 export interface AgentArchiveThreadInput {
   threadId: string;
 }
@@ -234,6 +273,7 @@ export interface AgentAdapter {
   forkThread?(input: AgentForkThreadInput): Promise<AgentCreateThreadResult>;
   setThreadName?(input: AgentSetThreadNameInput): Promise<void>;
   rollbackThread?(input: AgentRollbackThreadInput): Promise<AgentReadThreadResult>;
+  startThreadReview?(input: AgentStartThreadReviewInput): Promise<AgentStartThreadReviewResult>;
   archiveThread?(input: AgentArchiveThreadInput): Promise<void>;
   unarchiveThread?(input: AgentUnarchiveThreadInput): Promise<void>;
 

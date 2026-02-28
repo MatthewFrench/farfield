@@ -3,6 +3,7 @@ import {
   archiveThread,
   listThreads,
   rollbackThread,
+  startThreadReview,
   unarchiveThread,
 } from "@/Features/Threads/DataAccess/ThreadApi";
 import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
@@ -312,5 +313,29 @@ describe("ThreadApi", () => {
     const requestInit = fetchMock.mock.calls[0]?.[1];
     expect(requestInit?.method).toBe("POST");
     expect(requestInit?.body).toBe(JSON.stringify({ numTurns: 2 }));
+  });
+
+  it("posts start-review mutations and parses returned review identifiers", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        threadId: "thread_123",
+        reviewThreadId: "thread_review_123",
+        reviewTurnId: "turn_review_123",
+      }),
+    );
+
+    const result = await startThreadReview("thread 123/with slash");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
+    expect(requestUrl).toBe("/api/threads/thread%20123%2Fwith%20slash/review");
+
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    expect(requestInit?.method).toBe("POST");
+    expect(result).toEqual({
+      reviewThreadId: "thread_review_123",
+      reviewTurnId: "turn_review_123",
+    });
   });
 });

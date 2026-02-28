@@ -37,6 +37,7 @@ const THREAD_UNARCHIVE_ROUTE_SEGMENT = "unarchive";
 const THREAD_FORK_ROUTE_SEGMENT = "fork";
 const THREAD_NAME_ROUTE_SEGMENT = "name";
 const THREAD_ROLLBACK_ROUTE_SEGMENT = "rollback";
+const THREAD_REVIEW_ROUTE_SEGMENT = "review";
 const HTTP_POST_METHOD = "POST";
 const APPLICATION_JSON_CONTENT_TYPE_HEADER_NAME = "Content-Type";
 const APPLICATION_JSON_CONTENT_TYPE = "application/json";
@@ -243,6 +244,16 @@ const ForkThreadResponseSchema = z
   .strict()
   .transform(({ ok: _ok, ...forkThreadResponse }) => forkThreadResponse);
 
+const StartThreadReviewResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1),
+    reviewThreadId: z.string().min(1),
+    reviewTurnId: z.string().min(1),
+  })
+  .strict()
+  .transform(({ ok: _ok, threadId: _threadId, ...reviewResponse }) => reviewResponse);
+
 const SetThreadNameInputSchema = z
   .object({
     threadId: z.string().min(1),
@@ -283,7 +294,8 @@ type ThreadMutationRouteSegment =
   | typeof THREAD_UNARCHIVE_ROUTE_SEGMENT
   | typeof THREAD_FORK_ROUTE_SEGMENT
   | typeof THREAD_NAME_ROUTE_SEGMENT
-  | typeof THREAD_ROLLBACK_ROUTE_SEGMENT;
+  | typeof THREAD_ROLLBACK_ROUTE_SEGMENT
+  | typeof THREAD_REVIEW_ROUTE_SEGMENT;
 
 function readBooleanQueryValue(value: boolean): string {
   return value ? BOOLEAN_TRUE_QUERY_VALUE : BOOLEAN_FALSE_QUERY_VALUE;
@@ -425,6 +437,11 @@ export interface ApiForkThreadResponse {
   sourceThreadId: string;
 }
 
+export interface ApiStartThreadReviewResponse {
+  reviewThreadId: string;
+  reviewTurnId: string;
+}
+
 export async function forkThread(
   threadId: string,
   options?: ApiRequestOptions,
@@ -466,4 +483,15 @@ export async function rollbackThread(
     buildThreadMutationJsonRequestInit(parsedRequestBody, options),
   );
   ThreadMutationResponseSchema.parse(data);
+}
+
+export async function startThreadReview(
+  threadId: string,
+  options?: ApiRequestOptions,
+): Promise<ApiStartThreadReviewResponse> {
+  const data = await request(
+    buildThreadMutationRequestPath(threadId, THREAD_REVIEW_ROUTE_SEGMENT),
+    buildThreadMutationRequestInit(options),
+  );
+  return StartThreadReviewResponseSchema.parse(data);
 }

@@ -1,6 +1,6 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-02-27 09:14:29Z
+Last Updated (UTC): 2026-02-28 13:34:20Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
 
@@ -31,6 +31,7 @@ This ledger records recommended disposition for upstream app-server event and ca
 | `mcpServer/oauthLogin/completed` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `model/rerouted` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `rawResponseItem/completed` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
+| `serverRequest/resolved` | server-to-client notification | Not consumed | Not now | Adopt when explicit server-request lifecycle feedback is required in product surfaces. |
 | `sessionConfigured` | server-to-client notification | Not consumed | Do not adopt | Deprecated notification surface. |
 | `thread/archived` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `thread/closed` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
@@ -60,6 +61,6 @@ This ledger records recommended disposition for upstream app-server event and ca
 | `item/tool/requestUserInput` | server-to-client request | Used now | Keep | Farfield stores this request and validates typed response submission through app-server transport. |
 | `initialized` | client-to-server notification | Used now | Keep | Required protocol acknowledgement after initialize. |
 
-Server notifications: 45
+Server notifications: 46
 Server requests: 7
 Client notifications: 1

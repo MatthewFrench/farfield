@@ -9,6 +9,7 @@ import type {
   ListThreadsOptions,
   ReadConfigOptions,
   ResumeThreadOptions,
+  StartReviewOptions,
   StartThreadOptions,
   StartTurnOptions,
 } from "./AppServerClient.js";
@@ -52,6 +53,53 @@ const AppServerTurnInterruptRequestSchema = z
   .object({
     threadId: z.string().min(1),
     turnId: z.string().min(1),
+  })
+  .passthrough();
+const AppServerTurnSteerTextInputSchema = z
+  .object({
+    type: z.literal("text"),
+    text: z.string(),
+  })
+  .passthrough();
+const AppServerTurnSteerRequestSchema = z
+  .object({
+    threadId: z.string().min(1),
+    expectedTurnId: z.string().min(1),
+    input: z.array(AppServerTurnSteerTextInputSchema).min(1),
+  })
+  .passthrough();
+const AppServerReviewDeliverySchema = z.enum(["inline", "detached"]);
+const AppServerReviewTargetSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("uncommittedChanges"),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("baseBranch"),
+      branch: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("commit"),
+      sha: z.string().min(1),
+      title: z.string().nullable().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("custom"),
+      instructions: z.string().min(1),
+    })
+    .strict(),
+]);
+const AppServerReviewStartRequestSchema = z
+  .object({
+    threadId: z.string().min(1),
+    target: AppServerReviewTargetSchema,
+    delivery: AppServerReviewDeliverySchema.nullable().optional(),
   })
   .passthrough();
 
@@ -214,5 +262,32 @@ export function buildTurnInterruptRequest(
   return AppServerTurnInterruptRequestSchema.parse({
     threadId,
     turnId,
+  });
+}
+
+export function buildSteerTurnRequest(
+  threadId: string,
+  expectedTurnId: string,
+  text: string,
+): z.infer<typeof AppServerTurnSteerRequestSchema> {
+  return AppServerTurnSteerRequestSchema.parse({
+    threadId,
+    expectedTurnId,
+    input: [
+      {
+        type: "text",
+        text,
+      },
+    ],
+  });
+}
+
+export function buildStartReviewRequest(
+  options: StartReviewOptions,
+): z.infer<typeof AppServerReviewStartRequestSchema> {
+  return AppServerReviewStartRequestSchema.parse({
+    threadId: options.threadId,
+    target: options.target,
+    ...(options.delivery !== undefined ? { delivery: options.delivery } : {}),
   });
 }

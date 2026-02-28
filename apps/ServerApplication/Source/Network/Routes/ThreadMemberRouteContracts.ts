@@ -20,6 +20,7 @@ export const ThreadMemberRouteSegmentByName = {
   fork: "fork",
   name: "name",
   rollback: "rollback",
+  review: "review",
   collaborationMode: "collaboration-mode",
   userInput: "user-input",
   interrupt: "interrupt",
@@ -42,6 +43,7 @@ export const ThreadMemberMutationActionByName = {
   threadFork: "thread-fork",
   threadSetName: "thread-set-name",
   threadRollback: "thread-rollback",
+  threadReviewStart: "thread-review-start",
   collaborationMode: ThreadMemberRouteSegmentByName.collaborationMode,
   userInput: ThreadMemberRouteSegmentByName.userInput,
   interrupt: ThreadMemberRouteSegmentByName.interrupt,
@@ -56,6 +58,7 @@ const ThreadMemberSubresourceRouteSegmentSchema = z.enum([
   ThreadMemberRouteSegmentByName.fork,
   ThreadMemberRouteSegmentByName.name,
   ThreadMemberRouteSegmentByName.rollback,
+  ThreadMemberRouteSegmentByName.review,
   ThreadMemberRouteSegmentByName.collaborationMode,
   ThreadMemberRouteSegmentByName.userInput,
   ThreadMemberRouteSegmentByName.interrupt,
@@ -70,6 +73,7 @@ type ThreadMemberSubresourceRouteSegment =
   | typeof ThreadMemberRouteSegmentByName.fork
   | typeof ThreadMemberRouteSegmentByName.name
   | typeof ThreadMemberRouteSegmentByName.rollback
+  | typeof ThreadMemberRouteSegmentByName.review
   | typeof ThreadMemberRouteSegmentByName.collaborationMode
   | typeof ThreadMemberRouteSegmentByName.userInput
   | typeof ThreadMemberRouteSegmentByName.interrupt;

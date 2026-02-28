@@ -169,6 +169,37 @@ describe("AppServerClient.startTurn", () => {
   });
 });
 
+describe("AppServerClient.steerTurn", () => {
+  it("sends turn/steer payload with thread and expected turn identifiers", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      turnId: "turn-2",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.steerTurn("thread-1", "turn-1", "update direction");
+
+    expect(transportDouble.request).toHaveBeenCalledWith("turn/steer", {
+      threadId: "thread-1",
+      expectedTurnId: "turn-1",
+      input: [
+        {
+          type: "text",
+          text: "update direction",
+        },
+      ],
+    });
+  });
+
+  it("validates steer identifiers before transport request", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await expect(client.steerTurn("thread-1", "", "update direction")).rejects.toThrowError();
+    expect(transportDouble.request).not.toHaveBeenCalled();
+  });
+});
+
 describe("AppServerClient.forkThread", () => {
   it("sends thread/fork payload with default persistExtendedHistory=true", async () => {
     const transportDouble = createTransportDouble();
@@ -257,6 +288,57 @@ describe("AppServerClient.rollbackThread", () => {
     const client = new AppServerClient(transportDouble.transport);
 
     await expect(client.rollbackThread("thread-1", 0)).rejects.toThrowError();
+    expect(transportDouble.request).not.toHaveBeenCalled();
+  });
+});
+
+describe("AppServerClient.startReview", () => {
+  it("sends review/start payload with explicit target and delivery", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      reviewThreadId: "thread-review-1",
+      turn: {
+        id: "turn-review-1",
+      },
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.startReview({
+      threadId: "thread-1",
+      target: {
+        type: "baseBranch",
+        branch: "main",
+      },
+      delivery: "detached",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("review/start", {
+      threadId: "thread-1",
+      target: {
+        type: "baseBranch",
+        branch: "main",
+      },
+      delivery: "detached",
+    });
+    expect(result).toEqual({
+      reviewThreadId: "thread-review-1",
+      turnId: "turn-review-1",
+    });
+  });
+
+  it("validates review target payload before transport request", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await expect(
+      client.startReview({
+        threadId: "thread-1",
+        target: {
+          type: "custom",
+          instructions: "",
+        },
+      }),
+    ).rejects.toThrowError();
     expect(transportDouble.request).not.toHaveBeenCalled();
   });
 });

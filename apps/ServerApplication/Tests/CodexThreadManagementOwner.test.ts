@@ -5,6 +5,8 @@ import {
   type ListThreadsAllOptions,
   type ListThreadsOptions,
   type ReadConfigOptions,
+  type StartReviewOptions,
+  type StartReviewResult,
   type StartThreadOptions,
 } from "@farfield/api";
 import type {
@@ -59,12 +61,14 @@ class TestAppServerClient extends AppServerClient {
   public readonly forkThreadCalls: Array<{ threadId: string; options?: ForkThreadOptions }> = [];
   public readonly setThreadNameCalls: Array<{ threadId: string; name: string }> = [];
   public readonly rollbackThreadCalls: Array<{ threadId: string; numTurns: number }> = [];
+  public readonly startReviewCalls: StartReviewOptions[] = [];
   public readonly readConfigCalls: Array<ReadConfigOptions | undefined> = [];
 
   private readonly listThreadsResult: AppServerListThreadsResponse;
   private readonly listThreadsAllResult: AppServerListThreadsResponse;
   private readonly startThreadResult: AppServerStartThreadResponse;
   private readonly rollbackThreadResult: AppServerReadThreadResponse;
+  private readonly startReviewResult: StartReviewResult;
   private readonly readConfigResult: AppServerConfigReadResponse;
 
   public constructor(input?: {
@@ -72,6 +76,7 @@ class TestAppServerClient extends AppServerClient {
     listThreadsAllResult?: AppServerListThreadsResponse;
     startThreadResult?: AppServerStartThreadResponse;
     rollbackThreadResult?: AppServerReadThreadResponse;
+    startReviewResult?: StartReviewResult;
     readConfigResult?: AppServerConfigReadResponse;
   }) {
     super(NOOP_TRANSPORT);
@@ -84,6 +89,10 @@ class TestAppServerClient extends AppServerClient {
         turns: [],
         requests: [],
       },
+    };
+    this.startReviewResult = input?.startReviewResult ?? {
+      reviewThreadId: "thread-1",
+      turnId: "turn-review-1",
     };
     this.readConfigResult = input?.readConfigResult ?? EMPTY_READ_CONFIG_RESPONSE;
   }
@@ -136,6 +145,11 @@ class TestAppServerClient extends AppServerClient {
       numTurns,
     });
     return this.rollbackThreadResult;
+  }
+
+  public override async startReview(options: StartReviewOptions): Promise<StartReviewResult> {
+    this.startReviewCalls.push(options);
+    return this.startReviewResult;
   }
 
   public override async readConfig(
@@ -501,6 +515,40 @@ describe("CodexThreadManagementOwner", () => {
         turns: [],
         requests: [],
       },
+    });
+  });
+
+  it("starts thread review with strict target and delivery contracts", async () => {
+    const appClient = new TestAppServerClient({
+      startReviewResult: {
+        reviewThreadId: "thread-review-9",
+        turnId: "turn-review-9",
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.startThreadReview({
+      threadId: "thread-7",
+      target: {
+        type: "custom",
+        instructions: "Review performance-sensitive reducer changes.",
+      },
+      delivery: "detached",
+    });
+
+    expect(appClient.startReviewCalls).toEqual([
+      {
+        threadId: "thread-7",
+        target: {
+          type: "custom",
+          instructions: "Review performance-sensitive reducer changes.",
+        },
+        delivery: "detached",
+      },
+    ]);
+    expect(result).toEqual({
+      reviewThreadId: "thread-review-9",
+      turnId: "turn-review-9",
     });
   });
 

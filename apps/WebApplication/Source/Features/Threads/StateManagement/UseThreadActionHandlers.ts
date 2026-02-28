@@ -40,6 +40,7 @@ export interface ThreadActionHandlers {
   runArchiveThread: (threadId: string) => Promise<void>;
   runForkThread: (threadId: string) => Promise<void>;
   runRollbackThread: (threadId: string) => Promise<void>;
+  runStartThreadReview: (threadId: string) => Promise<void>;
   runSetThreadName: (threadId: string, name: string) => Promise<void>;
   runUnarchiveThread: (threadId: string) => Promise<void>;
 }
@@ -291,12 +292,46 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     ],
   );
 
+  const runStartThreadReview = useCallback(
+    async (threadId: string) => {
+      await input.threadMutationActionCoordinator.startThreadReview({
+        threadId,
+        buildActionRequestOptions: input.buildActionRequestOptions,
+        onSetBusy: input.setIsBusy,
+        onThreadSelected: (nextThreadId) => {
+          input.setSelectedThreadId(nextThreadId);
+          selectedThreadIdRef.current = nextThreadId;
+        },
+        onSetMobileSidebarOpen: input.setMobileSidebarOpen,
+        onInvalidateActiveThreadQuery: () => {
+          input.threadListStateController.invalidateActiveThreadQuery();
+        },
+        onRefreshReviewThreadData: refreshCreatedThreadData,
+        threadMutationClient: input.threadMutationServerClient,
+        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+      });
+    },
+    [
+      input.buildActionRequestOptions,
+      input.reportTrackedUserInterfaceError,
+      refreshCreatedThreadData,
+      selectedThreadIdRef,
+      input.setIsBusy,
+      input.setMobileSidebarOpen,
+      input.setSelectedThreadId,
+      input.threadListStateController,
+      input.threadMutationActionCoordinator,
+      input.threadMutationServerClient,
+    ],
+  );
+
   return {
     createNewThread,
     createThreadForSingleAgent,
     runArchiveThread,
     runForkThread,
     runRollbackThread,
+    runStartThreadReview,
     runSetThreadName,
     runUnarchiveThread,
   };

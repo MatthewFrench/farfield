@@ -24,6 +24,8 @@ import type {
   AgentReadThreadResult,
   AgentSendMessageInput,
   AgentSetCollaborationModeInput,
+  AgentStartThreadReviewInput,
+  AgentStartThreadReviewResult,
   AgentSubmitUserInputInput,
   AgentThreadLiveState,
   AgentThreadStreamEvents,
@@ -36,7 +38,6 @@ import {
   type CodexAgentRuntimeState,
   type CodexIpcFrameEvent,
   isInvalidRequestErrorMatchingMessageFragment,
-  STEERING_UNSUPPORTED_ENDPOINT_ERROR,
 } from "./CodexAgentAdapterContracts.js";
 import { wireCodexAgentAdapterIpcIngress } from "./CodexAgentAdapterIpcIngressWiring.js";
 import { createCodexAgentAdapterOwners } from "./CodexAgentAdapterOwnerFactory.js";
@@ -213,9 +214,6 @@ export class CodexAgentAdapter implements AgentAdapter {
 
   public async sendMessage(input: AgentSendMessageInput): Promise<void> {
     this.ensureCodexAvailable();
-    if (input.isSteering === true) {
-      throw new Error(STEERING_UNSUPPORTED_ENDPOINT_ERROR);
-    }
     await this.messageDispatchOwner.sendMessage(input, this.isIpcReady());
   }
 
@@ -236,6 +234,12 @@ export class CodexAgentAdapter implements AgentAdapter {
     numTurns: number;
   }): Promise<AgentReadThreadResult> {
     return this.threadManagementOwner.rollbackThread(input);
+  }
+
+  public async startThreadReview(
+    input: AgentStartThreadReviewInput,
+  ): Promise<AgentStartThreadReviewResult> {
+    return this.threadManagementOwner.startThreadReview(input);
   }
 
   public async archiveThread(input: { threadId: string }): Promise<void> {

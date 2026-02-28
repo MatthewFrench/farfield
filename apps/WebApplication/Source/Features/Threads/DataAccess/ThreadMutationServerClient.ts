@@ -8,6 +8,7 @@ import {
   forkThread,
   rollbackThread,
   setThreadName,
+  startThreadReview,
   unarchiveThread,
 } from "./ThreadApi";
 
@@ -16,6 +17,10 @@ export type ThreadMutationCreateThreadResponse = ApiCreateThreadResponse;
 export type ThreadMutationForkThreadResponse = {
   threadId: string;
   sourceThreadId: string;
+};
+export type ThreadMutationStartThreadReviewResponse = {
+  reviewThreadId: string;
+  reviewTurnId: string;
 };
 
 const ThreadIdentifierSchema = z.string().trim().min(1);
@@ -71,6 +76,13 @@ export class ThreadMutationServerClient {
       },
       options,
     );
+  }
+
+  public async startThreadReview(
+    threadId: string,
+    options?: ApiRequestOptions,
+  ): Promise<ThreadMutationStartThreadReviewResponse> {
+    return startThreadReview(readThreadIdentifier(threadId), options);
   }
 
   public async unarchiveThread(threadId: string, options?: ApiRequestOptions): Promise<void> {

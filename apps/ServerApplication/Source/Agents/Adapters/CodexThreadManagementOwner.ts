@@ -2,6 +2,7 @@ import {
   AppServerClient,
   type ListThreadsAllOptions,
   type ListThreadsOptions,
+  type StartReviewOptions,
   type StartThreadOptions,
 } from "@farfield/api";
 import type {
@@ -23,6 +24,8 @@ import type {
   AgentReadThreadResult,
   AgentRollbackThreadInput,
   AgentSetThreadNameInput,
+  AgentStartThreadReviewInput,
+  AgentStartThreadReviewResult,
   AgentUnarchiveThreadInput,
 } from "../Types.js";
 
@@ -121,6 +124,14 @@ function buildStartThreadOptions(
     ...(input.sandbox !== undefined ? { sandbox: input.sandbox } : {}),
     ...(input.approvalPolicy !== undefined ? { approvalPolicy: input.approvalPolicy } : {}),
     ...(input.ephemeral !== undefined ? { ephemeral: input.ephemeral } : {}),
+  };
+}
+
+function buildStartReviewOptions(input: AgentStartThreadReviewInput): StartReviewOptions {
+  return {
+    threadId: input.threadId,
+    target: input.target,
+    ...(input.delivery !== undefined ? { delivery: input.delivery } : {}),
   };
 }
 
@@ -242,6 +253,13 @@ export class CodexThreadManagementOwner {
     return {
       thread: result.thread,
     };
+  }
+
+  public async startThreadReview(
+    input: AgentStartThreadReviewInput,
+  ): Promise<AgentStartThreadReviewResult> {
+    this.ensureCodexAvailable();
+    return this.runAppServerCall(() => this.appClient.startReview(buildStartReviewOptions(input)));
   }
 
   public async unarchiveThread(input: AgentUnarchiveThreadInput): Promise<void> {

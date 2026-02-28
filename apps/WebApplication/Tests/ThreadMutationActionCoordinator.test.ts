@@ -26,6 +26,10 @@ describe("ThreadMutationActionCoordinator", () => {
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
       rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
       setThreadName: vi.fn(async () => {}),
     };
 
@@ -67,6 +71,10 @@ describe("ThreadMutationActionCoordinator", () => {
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
       rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
       setThreadName: vi.fn(async () => {}),
     };
 
@@ -128,6 +136,10 @@ describe("ThreadMutationActionCoordinator", () => {
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
       rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
       setThreadName: vi.fn(async () => {}),
     };
 
@@ -177,6 +189,10 @@ describe("ThreadMutationActionCoordinator", () => {
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
       rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
       setThreadName: vi.fn(async () => {}),
     };
 
@@ -222,6 +238,10 @@ describe("ThreadMutationActionCoordinator", () => {
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
       rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
       setThreadName: vi.fn(async () => {}),
     };
 
@@ -275,6 +295,10 @@ describe("ThreadMutationActionCoordinator", () => {
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
       rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
       setThreadName: vi.fn(async () => {}),
     };
 
@@ -323,6 +347,10 @@ describe("ThreadMutationActionCoordinator", () => {
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
       rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
       setThreadName: vi.fn(async () => {}),
     };
 
@@ -364,6 +392,10 @@ describe("ThreadMutationActionCoordinator", () => {
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-8", sourceThreadId: "thread-1" })),
       rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
       setThreadName: vi.fn(async () => {}),
     };
 
@@ -415,6 +447,10 @@ describe("ThreadMutationActionCoordinator", () => {
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
       rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
       setThreadName: vi.fn(async () => {}),
     };
 
@@ -460,6 +496,10 @@ describe("ThreadMutationActionCoordinator", () => {
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
       rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
       setThreadName: vi.fn(async () => {}),
     };
 
@@ -503,6 +543,10 @@ describe("ThreadMutationActionCoordinator", () => {
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
       rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
       setThreadName: vi.fn(async () => {}),
     };
 
@@ -533,5 +577,101 @@ describe("ThreadMutationActionCoordinator", () => {
     expect(loadCoreData).toHaveBeenCalledTimes(1);
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(busyStates).toEqual([true, false]);
+  });
+
+  it("starts thread review, selects the review thread, and refreshes review data", async () => {
+    const coordinator = new ThreadMutationActionCoordinator();
+    const busyStates: boolean[] = [];
+    const selectedThreadIdentifiers: string[] = [];
+    const mobileSidebarOpenStates: boolean[] = [];
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onRefreshReviewThreadData = vi.fn(async (_threadId: string) => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const threadMutationClient = {
+      createThread: vi.fn(async () => ({ threadId: "thread-1" })),
+      archiveThread: vi.fn(async () => {}),
+      unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-9",
+        reviewTurnId: "turn-review-9",
+      })),
+      setThreadName: vi.fn(async () => {}),
+    };
+
+    await coordinator.startThreadReview({
+      threadId: "thread-1",
+      buildActionRequestOptions,
+      onSetBusy: (isBusy) => {
+        busyStates.push(isBusy);
+      },
+      onThreadSelected: (threadId) => {
+        selectedThreadIdentifiers.push(threadId);
+      },
+      onSetMobileSidebarOpen: (isOpen) => {
+        mobileSidebarOpenStates.push(isOpen);
+      },
+      onInvalidateActiveThreadQuery,
+      onRefreshReviewThreadData,
+      threadMutationClient,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(threadMutationClient.startThreadReview).toHaveBeenCalledWith("thread-1", {
+      actionId: "action-start-thread-review",
+      actionName: "start-thread-review",
+    });
+    expect(selectedThreadIdentifiers).toEqual(["thread-review-9"]);
+    expect(mobileSidebarOpenStates).toEqual([false]);
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onRefreshReviewThreadData).toHaveBeenCalledWith("thread-review-9");
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
+  });
+
+  it("reports start-review failures and resets busy state", async () => {
+    const coordinator = new ThreadMutationActionCoordinator();
+    const onSetBusy = vi.fn();
+    const onThreadSelected = vi.fn();
+    const onSetMobileSidebarOpen = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onRefreshReviewThreadData = vi.fn(async (_threadId: string) => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const threadMutationClient = {
+      createThread: vi.fn(async () => ({ threadId: "thread-1" })),
+      archiveThread: vi.fn(async () => {}),
+      unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      rollbackThread: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => {
+        throw new Error("review failed");
+      }),
+      setThreadName: vi.fn(async () => {}),
+    };
+
+    await coordinator.startThreadReview({
+      threadId: "thread-1",
+      buildActionRequestOptions,
+      onSetBusy,
+      onThreadSelected,
+      onSetMobileSidebarOpen,
+      onInvalidateActiveThreadQuery,
+      onRefreshReviewThreadData,
+      threadMutationClient,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(onSetBusy.mock.calls).toEqual([[true], [false]]);
+    expect(onThreadSelected).not.toHaveBeenCalled();
+    expect(onSetMobileSidebarOpen).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
+    expect(onRefreshReviewThreadData).not.toHaveBeenCalled();
+    expect(reportTrackedUserInterfaceError).toHaveBeenCalledWith({
+      operation: "start-thread-review",
+      actionId: "action-start-thread-review",
+      threadId: "thread-1",
+      error: "review failed",
+    });
   });
 });

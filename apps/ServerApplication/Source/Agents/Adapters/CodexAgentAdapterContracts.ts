@@ -9,8 +9,6 @@ export const APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT = {
   threadNotLoaded: "thread not loaded",
   conversationNotFound: "conversation not found",
 } as const;
-export const STEERING_UNSUPPORTED_ENDPOINT_ERROR =
-  "Steering messages are not supported on this endpoint.";
 
 export interface CodexAgentRuntimeState {
   appReady: boolean;

@@ -61,6 +61,7 @@ const SendMessageInputSchema = z
     ownerClientId: z.string().optional(),
     text: z.string().min(1),
     cwd: z.string().optional(),
+    isSteering: z.boolean().optional(),
   })
   .strict();
 export type ApiSendMessageInput = z.infer<typeof SendMessageInputSchema>;
@@ -230,6 +231,7 @@ export async function sendMessage(
     ownerClientId: parsedInput.ownerClientId,
     text: parsedInput.text,
     cwd: parsedInput.cwd,
+    isSteering: parsedInput.isSteering,
   });
 
   await postThreadMutation(

@@ -16,6 +16,8 @@ import type {
   AgentSetCollaborationModeInput,
   AgentSetCollaborationModeResult,
   AgentSetThreadNameInput,
+  AgentStartThreadReviewInput,
+  AgentStartThreadReviewResult,
   AgentSubmitUserInputInput,
   AgentSubmitUserInputResult,
 } from "../Source/Agents/Types.js";
@@ -50,6 +52,7 @@ function createAgentAdapter(input: {
   forkThread?: (value: AgentForkThreadInput) => Promise<AgentCreateThreadResult>;
   setThreadName?: (value: AgentSetThreadNameInput) => Promise<void>;
   rollbackThread?: (value: AgentRollbackThreadInput) => Promise<AgentReadThreadResult>;
+  startThreadReview?: (value: AgentStartThreadReviewInput) => Promise<AgentStartThreadReviewResult>;
 }): AgentAdapter {
   return {
     id: "codex",
@@ -124,6 +127,14 @@ function createAgentAdapter(input: {
         throw new Error("Not used in mutation route-owner tests");
       }
       return input.rollbackThread(inputValue);
+    },
+    async startThreadReview(
+      inputValue: AgentStartThreadReviewInput,
+    ): Promise<AgentStartThreadReviewResult> {
+      if (!input.startThreadReview) {
+        throw new Error("Not used in mutation route-owner tests");
+      }
+      return input.startThreadReview(inputValue);
     },
   };
 }
@@ -242,7 +253,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
     });
   });
 
-  it("forwards explicit empty-string ownerClientId and cwd for send-message mutations", async () => {
+  it("forwards explicit empty-string ownerClientId, cwd, and steering flag for send-message mutations", async () => {
     const { request, response } = createMockRequestResponsePair();
     request.method = "POST";
 
@@ -262,6 +273,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
           text: "hello",
           ownerClientId: "",
           cwd: "",
+          isSteering: true,
         }),
         onJsonResponse: () => {},
         pushActionEventWithRequestContext: () => {},
@@ -278,6 +290,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
         text: "hello",
         ownerClientId: "",
         cwd: "",
+        isSteering: true,
       },
     ]);
   });
@@ -569,6 +582,67 @@ describe("ThreadMemberMutationRouteOwner", () => {
     expect(capturedBody).toEqual({
       ok: true,
       threadId: "thread-1",
+    });
+  });
+
+  it("handles thread-review mutations and returns review identifiers", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const reviewCalls: AgentStartThreadReviewInput[] = [];
+    const adapter = createAgentAdapter({
+      startThreadReview: async (value) => {
+        reviewCalls.push(value);
+        return {
+          reviewThreadId: "thread-review-1",
+          turnId: "turn-review-1",
+        };
+      },
+    });
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "review"],
+        readJsonBody: async () => ({
+          target: {
+            type: "baseBranch",
+            branch: "main",
+          },
+          delivery: "detached",
+        }),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(reviewCalls).toEqual([
+      {
+        threadId: "thread-1",
+        target: {
+          type: "baseBranch",
+          branch: "main",
+        },
+        delivery: "detached",
+      },
+    ]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
+      reviewThreadId: "thread-review-1",
+      reviewTurnId: "turn-review-1",
     });
   });
 

@@ -148,6 +148,72 @@ describe("ChatRequestActionCoordinator", () => {
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
   });
 
+  it("sends steering messages for existing threads", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const {
+      busyStates,
+      onSetBusy,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    } = createActionCallbacks();
+    const chatClient = createChatClient();
+
+    await coordinator.steerMessage({
+      draft: "adjust the active turn",
+      selectedThreadId: EXISTING_THREAD_ID,
+      buildActionRequestOptions,
+      onSetBusy,
+      chatClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(chatClient.sendMessage).toHaveBeenCalledWith(
+      {
+        threadId: EXISTING_THREAD_ID,
+        text: "adjust the active turn",
+        isSteering: true,
+      },
+      {
+        actionId: "action-steer-message",
+        actionName: "steer-message",
+      },
+    );
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onRefreshThreadData).toHaveBeenCalledWith(EXISTING_THREAD_ID);
+    expect(onRefreshThreadData).toHaveBeenCalledTimes(1);
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
+  });
+
+  it("skips steering when no selected thread exists", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const onSetBusy = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onRefreshThreadData = vi.fn(async (_threadId: string) => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const chatClient = createChatClient();
+
+    await coordinator.steerMessage({
+      draft: "adjust the active turn",
+      selectedThreadId: null,
+      buildActionRequestOptions,
+      onSetBusy,
+      chatClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(onSetBusy).not.toHaveBeenCalled();
+    expect(chatClient.sendMessage).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
+    expect(onRefreshThreadData).not.toHaveBeenCalled();
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+  });
+
   it("skips submit-user-input when no selected thread exists", async () => {
     const coordinator = new ChatRequestActionCoordinator();
     const chatClient = createChatClient();
