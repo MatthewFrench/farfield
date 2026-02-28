@@ -206,15 +206,12 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
     const lastCoreRefreshAtRef = input.lastCoreRefreshAtRef;
     await input.coreDataRefreshConcurrencyCoordinator.run(async () => {
       await loadCoreData();
-      if (input.isArchivedThreadsOpenRef.current || input.hasLoadedArchivedThreadsRef.current) {
-        await loadArchivedThreads();
-      }
+      // Keep project ordering deterministic on first render by preloading archived-thread metadata.
+      await loadArchivedThreads();
       lastCoreRefreshAtRef.current = Date.now();
     });
   }, [
     input.coreDataRefreshConcurrencyCoordinator,
-    input.hasLoadedArchivedThreadsRef,
-    input.isArchivedThreadsOpenRef,
     input.lastCoreRefreshAtRef,
     loadArchivedThreads,
     loadCoreData,

@@ -125,7 +125,7 @@ export class ThreadGroupSelectors {
       if (existingGroup) {
         groupByKey.set(groupKey, {
           ...existingGroup,
-          projectCreatedAt: Math.max(existingGroup.projectCreatedAt, threadCreatedAt),
+          projectCreatedAt: Math.min(existingGroup.projectCreatedAt, threadCreatedAt),
           latestUpdatedAt: Math.max(existingGroup.latestUpdatedAt, threadUpdatedAt),
           threads: [...existingGroup.threads, thread],
           isRemoved: existingGroup.isRemoved || projectMarkedRemoved,
@@ -331,7 +331,7 @@ export class ThreadGroupSelectors {
 
     mergedGroupByKey.set(sourceGroup.key, {
       ...existingGroup,
-      projectCreatedAt: Math.max(existingGroup.projectCreatedAt, sourceGroup.projectCreatedAt),
+      projectCreatedAt: Math.min(existingGroup.projectCreatedAt, sourceGroup.projectCreatedAt),
       latestUpdatedAt: Math.max(existingGroup.latestUpdatedAt, sourceGroup.latestUpdatedAt),
       threads: [...existingGroup.threads, ...sourceGroup.threads],
       isRemoved: existingGroup.isRemoved || sourceGroup.isRemoved,

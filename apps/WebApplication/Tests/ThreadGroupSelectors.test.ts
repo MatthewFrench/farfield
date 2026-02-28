@@ -171,6 +171,8 @@ describe("ThreadGroupSelectors", () => {
 
     expect(alphaGroup?.label).toBe("alpha");
     expect(alphaGroup?.projectPath).toBe("C:/workspace/alpha");
+    expect(alphaGroup?.projectCreatedAt).toBe(3);
+    expect(alphaGroup?.latestUpdatedAt).toBe(15);
     expect(alphaGroup?.isRemoved).toBe(true);
     expect(alphaGroup?.threads.map((thread) => thread.id)).toEqual([
       "thread-alpha-newer",
@@ -244,7 +246,7 @@ describe("ThreadGroupSelectors", () => {
       (group) => group.key === "project:/workspace/alpha",
     );
 
-    expect(alphaGroup?.projectCreatedAt).toBe(15);
+    expect(alphaGroup?.projectCreatedAt).toBe(10);
     expect(alphaGroup?.latestUpdatedAt).toBe(25);
     expect(alphaGroup?.isRemoved).toBe(true);
     expect(alphaGroup?.threads.map((thread) => thread.id)).toEqual([

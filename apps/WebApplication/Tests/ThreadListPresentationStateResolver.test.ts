@@ -106,6 +106,155 @@ describe("ThreadListPresentationStateResolver", () => {
     expect(result.archivedSectionThreadCount).toBe(0);
   });
 
+  it("orders active project groups by project first-created timestamp descending", () => {
+    const resolver = new ThreadListPresentationStateResolver();
+    const result = resolver.readState({
+      threads: [
+        buildThread({
+          id: "thread-farfield",
+          preview: "farfield preview",
+          cwd: "/Users/example/GitHub/farfield",
+          createdAt: 10,
+          updatedAt: 10,
+        }),
+        buildThread({
+          id: "thread-vladimir-new",
+          preview: "vladimir new preview",
+          cwd: "/Users/example/Documents/League of Legends/Vladimir",
+          createdAt: 20,
+          updatedAt: 20,
+        }),
+        buildThread({
+          id: "thread-vladimir-old",
+          preview: "vladimir old preview",
+          cwd: "/Users/example/Documents/League of Legends/Vladimir",
+          createdAt: 5,
+          updatedAt: 25,
+        }),
+        buildThread({
+          id: "thread-caddy",
+          preview: "caddy preview",
+          cwd: "/Users/example/caddy",
+          createdAt: 30,
+          updatedAt: 30,
+        }),
+      ],
+      archivedThreads: [],
+      selectedThreadIdentifier: null,
+    });
+
+    expect(result.activeProjectGroups.map((group) => group.label)).toEqual([
+      "caddy",
+      "farfield",
+      "Vladimir",
+    ]);
+  });
+
+  it("updates project ordering when incremental updates add older threads", () => {
+    const resolver = new ThreadListPresentationStateResolver();
+    const initialThreads: ThreadListItem[] = [
+      buildThread({
+        id: "thread-farfield",
+        preview: "farfield preview",
+        cwd: "/Users/example/GitHub/farfield",
+        createdAt: 10,
+        updatedAt: 10,
+      }),
+      buildThread({
+        id: "thread-vladimir-new",
+        preview: "vladimir new preview",
+        cwd: "/Users/example/Documents/League of Legends/Vladimir",
+        createdAt: 20,
+        updatedAt: 20,
+      }),
+      buildThread({
+        id: "thread-caddy",
+        preview: "caddy preview",
+        cwd: "/Users/example/caddy",
+        createdAt: 30,
+        updatedAt: 30,
+      }),
+    ];
+
+    const initialState = resolver.readState({
+      threads: initialThreads,
+      archivedThreads: [],
+      selectedThreadIdentifier: null,
+    });
+    expect(initialState.activeProjectGroups.map((group) => group.label)).toEqual([
+      "caddy",
+      "Vladimir",
+      "farfield",
+    ]);
+
+    const updatedState = resolver.readState({
+      threads: [
+        ...initialThreads,
+        buildThread({
+          id: "thread-vladimir-old",
+          preview: "vladimir old preview",
+          cwd: "/Users/example/Documents/League of Legends/Vladimir",
+          createdAt: 5,
+          updatedAt: 35,
+        }),
+      ],
+      archivedThreads: [],
+      selectedThreadIdentifier: null,
+    });
+
+    expect(updatedState.activeProjectGroups.map((group) => group.label)).toEqual([
+      "caddy",
+      "farfield",
+      "Vladimir",
+    ]);
+
+    const computationStats = resolver.readComputationStatsSnapshot();
+    expect(computationStats.active.usedIncrementalUpdate).toBe(true);
+    expect(computationStats.active.addedThreadCount).toBe(1);
+    expect(computationStats.active.changedThreadCount).toBe(0);
+    expect(computationStats.active.removedThreadCount).toBe(0);
+  });
+
+  it("orders active projects using combined active and archived project metadata", () => {
+    const resolver = new ThreadListPresentationStateResolver();
+    const activeThreads: ThreadListItem[] = [
+      buildThread({
+        id: "thread-crunchy-active",
+        preview: "crunchy active",
+        cwd: "/Users/example/GitHub/Crunchy-Watchlist",
+        createdAt: 200,
+        updatedAt: 200,
+      }),
+      buildThread({
+        id: "thread-caddy-active",
+        preview: "caddy active",
+        cwd: "/Users/example/caddy",
+        createdAt: 100,
+        updatedAt: 100,
+      }),
+    ];
+    const archivedThreads: ThreadListItem[] = [
+      buildThread({
+        id: "thread-crunchy-archived-old",
+        preview: "crunchy archived old",
+        cwd: "/Users/example/GitHub/Crunchy-Watchlist",
+        createdAt: 50,
+        updatedAt: 210,
+      }),
+    ];
+
+    const result = resolver.readState({
+      threads: activeThreads,
+      archivedThreads,
+      selectedThreadIdentifier: null,
+    });
+
+    expect(result.activeProjectGroups.map((group) => group.label)).toEqual([
+      "caddy",
+      "Crunchy-Watchlist",
+    ]);
+  });
+
   it("uses incremental group patching for large-state small-delta updates", () => {
     const resolver = new ThreadListPresentationStateResolver();
     const initialThreads = buildLargeThreadCollection(20, 30);

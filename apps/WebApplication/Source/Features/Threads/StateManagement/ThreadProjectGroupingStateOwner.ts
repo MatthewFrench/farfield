@@ -427,7 +427,7 @@ export class ThreadProjectGroupingStateOwner {
       return compareThreadRecordsByUpdatedAt(leftThreadRecord, rightThreadRecord);
     });
 
-    let nextProjectCreatedAt = Number.NEGATIVE_INFINITY;
+    let nextProjectCreatedAt = Number.POSITIVE_INFINITY;
     let nextLatestUpdatedAt = Number.NEGATIVE_INFINITY;
     let nextIsRemoved = false;
     const nextThreads: ThreadListItem[] = [];
@@ -436,7 +436,7 @@ export class ThreadProjectGroupingStateOwner {
       if (!threadRecord) {
         continue;
       }
-      nextProjectCreatedAt = Math.max(nextProjectCreatedAt, threadRecord.createdAt);
+      nextProjectCreatedAt = Math.min(nextProjectCreatedAt, threadRecord.createdAt);
       nextLatestUpdatedAt = Math.max(nextLatestUpdatedAt, threadRecord.updatedAt);
       nextIsRemoved = nextIsRemoved || threadRecord.isRemoved;
       nextThreads.push(threadRecord.thread);
