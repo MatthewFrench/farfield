@@ -70,6 +70,7 @@ const ThreadListItemWireSchema = AppServerListThreadsResponseSchema.shape.data.e
       projectRemoved: z.boolean().optional(),
       projectState: ThreadProjectStateSchema.optional(),
       hasUnreadTurn: z.boolean().optional(),
+      isLoadedInMemory: z.boolean().optional(),
       title: z.union([z.string(), z.null()]).optional(),
       threadName: z.union([z.string(), z.null()]).optional(),
       name: z.union([z.string(), z.null()]).optional(),
@@ -89,6 +90,7 @@ const ThreadListItemContractSchema = z
     agentId: AgentIdSchema,
     source: z.string().optional(),
     hasUnreadTurn: z.union([z.boolean(), z.null()]),
+    isLoadedInMemory: z.boolean().optional(),
     isProjectRemoved: z.boolean(),
   })
   .strict();
@@ -144,6 +146,7 @@ function mapThreadListItemWireToContract(value: ThreadListItemWire): ThreadListI
     agentId: value.agentId,
     source: value.source,
     hasUnreadTurn: readThreadHasUnreadTurnSignal(value.hasUnreadTurn),
+    isLoadedInMemory: value.isLoadedInMemory,
     isProjectRemoved: readThreadProjectRemovedState(value),
   };
 }

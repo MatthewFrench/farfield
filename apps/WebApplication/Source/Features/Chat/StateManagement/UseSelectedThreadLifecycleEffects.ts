@@ -32,6 +32,7 @@ export interface UseSelectedThreadLifecycleEffectsInput {
   setStreamEvents: Dispatch<SetStateAction<ChatStreamEventsResponse["events"]>>;
   setIsSelectedThreadLoading: Dispatch<SetStateAction<boolean>>;
   setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
+  unsubscribeThread: (threadId: string) => Promise<void>;
   handleRuntimeRequestError: <ErrorType>(error: ErrorType) => void;
 }
 
@@ -41,6 +42,7 @@ export function useSelectedThreadLifecycleEffects(
   const readNextSelectedThreadIdentifierAfterLoadFailureRef = useRef(
     input.readNextSelectedThreadIdentifierAfterLoadFailure,
   );
+  const previousSelectedThreadIdentifierRef = useRef<string | null>(input.selectedThreadId);
 
   useEffect(() => {
     readNextSelectedThreadIdentifierAfterLoadFailureRef.current =
@@ -49,9 +51,41 @@ export function useSelectedThreadLifecycleEffects(
 
   useEffect(() => {
     return () => {
+      const selectedThreadIdentifier = input.selectedThreadIdRef.current;
+      if (selectedThreadIdentifier !== null && selectedThreadIdentifier.length > 0) {
+        void input.unsubscribeThread(selectedThreadIdentifier).catch(() => {
+          // Unmount teardown should not surface unsubscribe failures to interactive error banners.
+        });
+      }
       input.selectedThreadRefreshConcurrencyCoordinator.cancelActiveRefresh();
     };
-  }, [input.selectedThreadRefreshConcurrencyCoordinator]);
+  }, [
+    input.selectedThreadIdRef,
+    input.selectedThreadRefreshConcurrencyCoordinator,
+    input.unsubscribeThread,
+  ]);
+
+  useEffect(() => {
+    const previousSelectedThreadIdentifier = previousSelectedThreadIdentifierRef.current;
+    const nextSelectedThreadIdentifier = input.selectedThreadId;
+    if (
+      previousSelectedThreadIdentifier !== null &&
+      previousSelectedThreadIdentifier !== nextSelectedThreadIdentifier
+    ) {
+      void input.unsubscribeThread(previousSelectedThreadIdentifier).catch((error) => {
+        if (error instanceof Error && isRequestCanceledError(error)) {
+          return;
+        }
+        const message = toErrorMessage(error);
+        if (isThreadNotLoadedReadError(message)) {
+          return;
+        }
+        input.handleRuntimeRequestError(error);
+      });
+    }
+
+    previousSelectedThreadIdentifierRef.current = nextSelectedThreadIdentifier;
+  }, [input.handleRuntimeRequestError, input.selectedThreadId, input.unsubscribeThread]);
 
   useEffect(() => {
     const selectedThreadLoadTokenRef = input.selectedThreadLoadTokenRef;

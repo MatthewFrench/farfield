@@ -7,6 +7,7 @@ import {
   sendMessage,
   setCollaborationMode,
   submitUserInput,
+  unsubscribeThread,
 } from "@/Features/Chat/DataAccess/ChatApi";
 import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
 
@@ -269,6 +270,25 @@ describe("ChatApi", () => {
     expect(requestInit?.method).toBe("POST");
     expect(new Headers(requestInit?.headers).get("Content-Type")).toBe("application/json");
     expect(String(requestInit?.body)).toBe("{}");
+  });
+
+  it("posts thread unsubscribe requests and parses unsubscribe status", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        threadId: "thread_1",
+        status: "unsubscribed",
+      }),
+    );
+
+    const result = await unsubscribeThread("thread_1");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    expect(requestUrl).toContain("/api/threads/thread_1/unsubscribe");
+    expect(requestInit?.method).toBe("POST");
+    expect(result).toBe("unsubscribed");
   });
 
   it("rejects user-input submission when requestId is negative", async () => {

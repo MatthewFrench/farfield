@@ -4,7 +4,10 @@ import { type ApplicationHeaderBarProps } from "@/Application/UserInterface/Appl
 import { type CapabilityHealthResponse } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { type ChatWorkspacePaneProps } from "@/Features/Chat/UserInterface/ChatWorkspacePane";
-import { type RuntimeRequestErrorOperationMetric } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
+import {
+  type RuntimeRequestErrorOperationMetric,
+  type SuccessBannerDetails,
+} from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import { type DebugHistoryEntryListItem } from "@/Features/Debugging/UserInterface/DebugHistoryPanel";
 import { type DebugStatusBannersProps } from "@/Features/Debugging/UserInterface/DebugStatusBanners";
@@ -65,8 +68,10 @@ export interface UseApplicationShellViewPropertiesInput {
   renderAgentFavicon: ApplicationHeaderBarProps["renderAgentFavicon"];
   errorMessage: string;
   errorBannerDetails: DebugStatusBannersProps["errorBannerDetails"];
+  successBannerDetails: SuccessBannerDetails | null;
   openDebugFromErrorBanner: () => void;
   setErrorMessage: (nextErrorMessage: string) => void;
+  setSuccessBannerDetails: Dispatch<SetStateAction<SuccessBannerDetails | null>>;
   liveStateReductionError: DebugStatusBannersProps["liveStateReductionError"];
   chatSurfaceState: ChatWorkspacePaneProps["chatSurfaceState"];
   selectedThreadId: string | null;
@@ -264,12 +269,16 @@ function buildDebugStatusBannersProperties(
     activeTab: input.activeTab,
     errorMessage: input.errorMessage,
     errorBannerDetails: input.errorBannerDetails,
+    successBannerDetails: input.successBannerDetails,
     onOpenDebugFromErrorBanner: () => {
       input.openDebugFromErrorBanner();
       clearErrorMessage(input.setErrorMessage);
     },
     onDismissErrorBanner: () => {
       clearErrorMessage(input.setErrorMessage);
+    },
+    onDismissSuccessBanner: () => {
+      input.setSuccessBannerDetails(null);
     },
     liveStateReductionError: input.liveStateReductionError,
   };

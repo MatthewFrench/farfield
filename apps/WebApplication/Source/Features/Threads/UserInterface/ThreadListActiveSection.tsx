@@ -226,6 +226,14 @@ export function ThreadListActiveSection({
                                 {ThreadGroupSelectors.threadLabel(thread)}
                               </span>
                               <span className="shrink-0 flex items-center gap-1.5">
+                                {thread.isLoadedInMemory === true && (
+                                  <span
+                                    data-testid={`thread-loaded-indicator-${thread.id}`}
+                                    aria-label="Loaded in memory"
+                                    title="Loaded in memory"
+                                    className="h-2 w-2 rounded-full bg-emerald-500"
+                                  />
+                                )}
                                 {hasUnread && (
                                   <span
                                     data-testid={`thread-unread-indicator-${thread.id}`}

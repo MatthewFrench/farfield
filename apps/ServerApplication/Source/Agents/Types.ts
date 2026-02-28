@@ -159,6 +159,12 @@ export interface AgentCleanThreadBackgroundTerminalsInput {
   threadId: string;
 }
 
+export interface AgentUnsubscribeThreadInput {
+  threadId: string;
+}
+
+export type AgentUnsubscribeThreadStatus = "notLoaded" | "notSubscribed" | "unsubscribed";
+
 export type AgentThreadReviewDelivery = "inline" | "detached";
 
 export interface AgentThreadReviewUncommittedChangesTarget {
@@ -254,6 +260,11 @@ export interface AgentConfigDefaults {
   reasoningEffort: string | null;
 }
 
+export interface AgentListLoadedThreadsResult {
+  data: string[];
+  nextCursor: string | null;
+}
+
 export interface AgentSetCollaborationModeResult {
   ownerClientId: string;
 }
@@ -283,9 +294,11 @@ export interface AgentAdapter {
   rollbackThread?(input: AgentRollbackThreadInput): Promise<AgentReadThreadResult>;
   compactThread?(input: AgentCompactThreadInput): Promise<void>;
   cleanThreadBackgroundTerminals?(input: AgentCleanThreadBackgroundTerminalsInput): Promise<void>;
+  unsubscribeThread?(input: AgentUnsubscribeThreadInput): Promise<AgentUnsubscribeThreadStatus>;
   startThreadReview?(input: AgentStartThreadReviewInput): Promise<AgentStartThreadReviewResult>;
   archiveThread?(input: AgentArchiveThreadInput): Promise<void>;
   unarchiveThread?(input: AgentUnarchiveThreadInput): Promise<void>;
+  listLoadedThreads?(): Promise<AgentListLoadedThreadsResult>;
 
   listModels?(limit: number): Promise<AppServerListModelsResponse>;
   listCollaborationModes?(): Promise<AppServerCollaborationModeListResponse>;

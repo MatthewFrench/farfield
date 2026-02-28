@@ -49,3 +49,18 @@ export async function selectFirstThreadIfAny(
     ...(threadId ? { threadId } : {})
   };
 }
+
+export async function openThreadRowMenu(page: Page, threadId: string): Promise<void> {
+  await page
+    .locator(`[data-testid="thread-row-menu-trigger"][data-thread-id="${threadId}"]`)
+    .click();
+}
+
+export async function clickThreadRowMenuAction(
+  page: Page,
+  threadId: string,
+  actionLabel: string
+): Promise<void> {
+  await openThreadRowMenu(page, threadId);
+  await page.getByRole("menuitem", { name: actionLabel }).click();
+}

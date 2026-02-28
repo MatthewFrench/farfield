@@ -1,5 +1,6 @@
 import {
   AppServerClient,
+  type ListLoadedThreadsResult,
   type ListThreadsAllOptions,
   type ListThreadsOptions,
   type StartReviewOptions,
@@ -20,6 +21,7 @@ import type {
   AgentCreateThreadInput,
   AgentCreateThreadResult,
   AgentForkThreadInput,
+  AgentListLoadedThreadsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
   AgentReadThreadInput,
@@ -29,6 +31,8 @@ import type {
   AgentStartThreadReviewInput,
   AgentStartThreadReviewResult,
   AgentUnarchiveThreadInput,
+  AgentUnsubscribeThreadInput,
+  AgentUnsubscribeThreadStatus,
 } from "../Types.js";
 
 const CREATE_THREAD_REQUIRES_WORKING_DIRECTORY_ERROR = "Codex thread creation requires cwd";
@@ -36,6 +40,8 @@ const FORK_WITH_EXTENDED_HISTORY = true;
 const READ_CONFIG_DEFAULTS_OPTIONS = {
   includeLayers: false,
 };
+const LIST_LOADED_THREADS_PAGE_LIMIT = 200;
+const LIST_LOADED_THREADS_MAXIMUM_PAGES = 25;
 const PROJECTED_UNREAD_SIGNAL_UNAVAILABLE = null;
 
 function buildListThreadsOptions(input: AgentListThreadsInput): ListThreadsOptions {
@@ -170,6 +176,15 @@ function mapConfigDefaults(configResponse: AppServerConfigReadResponse): AgentCo
   };
 }
 
+function mergeLoadedThreadIdentifiers(
+  accumulator: Set<string>,
+  loadedThreadsResult: ListLoadedThreadsResult,
+): void {
+  for (const threadId of loadedThreadsResult.data) {
+    accumulator.add(threadId);
+  }
+}
+
 export interface CodexThreadManagementOwnerOptions {
   appClient: AppServerClient;
   runAppServerCall: <ValueType>(operation: () => Promise<ValueType>) => Promise<ValueType>;
@@ -226,6 +241,38 @@ export class CodexThreadManagementOwner {
     };
   }
 
+  public async listLoadedThreads(): Promise<AgentListLoadedThreadsResult> {
+    this.ensureCodexAvailable();
+
+    const loadedThreadIdentifierSet = new Set<string>();
+    let cursor: string | null = null;
+
+    for (let pageIndex = 0; pageIndex < LIST_LOADED_THREADS_MAXIMUM_PAGES; pageIndex += 1) {
+      const loadedThreadsResult = await this.runAppServerCall(() =>
+        this.appClient.listLoadedThreads({
+          cursor,
+          limit: LIST_LOADED_THREADS_PAGE_LIMIT,
+        }),
+      );
+      mergeLoadedThreadIdentifiers(loadedThreadIdentifierSet, loadedThreadsResult);
+
+      const nextCursor = loadedThreadsResult.nextCursor;
+      if (nextCursor === null || nextCursor.length === 0 || nextCursor === cursor) {
+        return {
+          data: [...loadedThreadIdentifierSet],
+          nextCursor: null,
+        };
+      }
+
+      cursor = nextCursor;
+    }
+
+    return {
+      data: [...loadedThreadIdentifierSet],
+      nextCursor: cursor,
+    };
+  }
+
   public async archiveThread(input: AgentArchiveThreadInput): Promise<void> {
     this.ensureCodexAvailable();
     await this.runAppServerCall(() => this.appClient.archiveThread(input.threadId));
@@ -269,6 +316,13 @@ export class CodexThreadManagementOwner {
     await this.runAppServerCall(() =>
       this.appClient.cleanThreadBackgroundTerminals(input.threadId),
     );
+  }
+
+  public async unsubscribeThread(
+    input: AgentUnsubscribeThreadInput,
+  ): Promise<AgentUnsubscribeThreadStatus> {
+    this.ensureCodexAvailable();
+    return this.runAppServerCall(() => this.appClient.unsubscribeThread(input.threadId));
   }
 
   public async startThreadReview(

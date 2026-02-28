@@ -2,12 +2,15 @@ import {
   AppServerClient,
   type AppServerTransport,
   type ForkThreadOptions,
+  type ListLoadedThreadsOptions,
+  type ListLoadedThreadsResult,
   type ListThreadsAllOptions,
   type ListThreadsOptions,
   type ReadConfigOptions,
   type StartReviewOptions,
   type StartReviewResult,
   type StartThreadOptions,
+  type UnsubscribeThreadStatus,
 } from "@farfield/api";
 import type {
   AppServerConfigReadResponse,
@@ -63,6 +66,8 @@ class TestAppServerClient extends AppServerClient {
   public readonly rollbackThreadCalls: Array<{ threadId: string; numTurns: number }> = [];
   public readonly compactThreadCalls: Array<{ threadId: string }> = [];
   public readonly cleanThreadBackgroundTerminalsCalls: Array<{ threadId: string }> = [];
+  public readonly listLoadedThreadsCalls: Array<ListLoadedThreadsOptions | undefined> = [];
+  public readonly unsubscribeThreadCalls: Array<{ threadId: string }> = [];
   public readonly startReviewCalls: StartReviewOptions[] = [];
   public readonly readConfigCalls: Array<ReadConfigOptions | undefined> = [];
 
@@ -70,6 +75,8 @@ class TestAppServerClient extends AppServerClient {
   private readonly listThreadsAllResult: AppServerListThreadsResponse;
   private readonly startThreadResult: AppServerStartThreadResponse;
   private readonly rollbackThreadResult: AppServerReadThreadResponse;
+  private readonly listLoadedThreadsResult: ListLoadedThreadsResult;
+  private readonly unsubscribeThreadResult: UnsubscribeThreadStatus;
   private readonly startReviewResult: StartReviewResult;
   private readonly readConfigResult: AppServerConfigReadResponse;
 
@@ -78,6 +85,8 @@ class TestAppServerClient extends AppServerClient {
     listThreadsAllResult?: AppServerListThreadsResponse;
     startThreadResult?: AppServerStartThreadResponse;
     rollbackThreadResult?: AppServerReadThreadResponse;
+    listLoadedThreadsResult?: ListLoadedThreadsResult;
+    unsubscribeThreadResult?: UnsubscribeThreadStatus;
     startReviewResult?: StartReviewResult;
     readConfigResult?: AppServerConfigReadResponse;
   }) {
@@ -92,6 +101,11 @@ class TestAppServerClient extends AppServerClient {
         requests: [],
       },
     };
+    this.listLoadedThreadsResult = input?.listLoadedThreadsResult ?? {
+      data: [],
+      nextCursor: null,
+    };
+    this.unsubscribeThreadResult = input?.unsubscribeThreadResult ?? "notSubscribed";
     this.startReviewResult = input?.startReviewResult ?? {
       reviewThreadId: "thread-1",
       turnId: "turn-review-1",
@@ -159,6 +173,20 @@ class TestAppServerClient extends AppServerClient {
     this.cleanThreadBackgroundTerminalsCalls.push({
       threadId,
     });
+  }
+
+  public override async listLoadedThreads(
+    options?: ListLoadedThreadsOptions,
+  ): Promise<ListLoadedThreadsResult> {
+    this.listLoadedThreadsCalls.push(options);
+    return this.listLoadedThreadsResult;
+  }
+
+  public override async unsubscribeThread(threadId: string): Promise<UnsubscribeThreadStatus> {
+    this.unsubscribeThreadCalls.push({
+      threadId,
+    });
+    return this.unsubscribeThreadResult;
   }
 
   public override async startReview(options: StartReviewOptions): Promise<StartReviewResult> {
@@ -560,6 +588,47 @@ describe("CodexThreadManagementOwner", () => {
         threadId: "thread-clean-7",
       },
     ]);
+  });
+
+  it("lists loaded threads with bounded pagination through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      listLoadedThreadsResult: {
+        data: ["thread-loaded-1", "thread-loaded-2"],
+        nextCursor: null,
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.listLoadedThreads();
+
+    expect(appClient.listLoadedThreadsCalls).toEqual([
+      {
+        cursor: null,
+        limit: 200,
+      },
+    ]);
+    expect(result).toEqual({
+      data: ["thread-loaded-1", "thread-loaded-2"],
+      nextCursor: null,
+    });
+  });
+
+  it("unsubscribes threads through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      unsubscribeThreadResult: "unsubscribed",
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.unsubscribeThread({
+      threadId: "thread-sub-7",
+    });
+
+    expect(appClient.unsubscribeThreadCalls).toEqual([
+      {
+        threadId: "thread-sub-7",
+      },
+    ]);
+    expect(result).toBe("unsubscribed");
   });
 
   it("starts thread review with strict target and delivery contracts", async () => {

@@ -65,6 +65,7 @@ function createLifecycleInput(selectedThreadId: string | null) {
     vi.fn<(value: SetStateAction<ChatStreamEventsResponse["events"]>) => void>();
   const setIsSelectedThreadLoading = vi.fn<(value: SetStateAction<boolean>) => void>();
   const setSelectedThreadId = vi.fn<(value: SetStateAction<string | null>) => void>();
+  const unsubscribeThread = vi.fn(async (_threadId: string): Promise<void> => {});
   const readNextSelectedThreadIdentifierAfterLoadFailure = vi.fn(
     (_failedThreadIdentifier: string): string | null => null,
   );
@@ -83,6 +84,7 @@ function createLifecycleInput(selectedThreadId: string | null) {
       setStreamEvents,
       setIsSelectedThreadLoading,
       setSelectedThreadId,
+      unsubscribeThread,
       handleRuntimeRequestError,
     },
     selectedThreadIdRef,
@@ -94,6 +96,7 @@ function createLifecycleInput(selectedThreadId: string | null) {
     setStreamEvents,
     setIsSelectedThreadLoading,
     setSelectedThreadId,
+    unsubscribeThread,
     readNextSelectedThreadIdentifierAfterLoadFailure,
     handleRuntimeRequestError,
   };
@@ -180,5 +183,38 @@ describe("useSelectedThreadLifecycleEffects", () => {
 
     expect(lifecycle.setSelectedThreadId).not.toHaveBeenCalledWith(null);
     expect(lifecycle.handleRuntimeRequestError).not.toHaveBeenCalled();
+  });
+
+  it("unsubscribes the previously selected thread when selection changes", async () => {
+    const lifecycle = createLifecycleInput("thread-1");
+    lifecycle.loadSelectedThreadRef.current = vi.fn(async () => {});
+
+    const { rerender } = render(<LifecycleHarness input={lifecycle.input} />);
+
+    lifecycle.selectedThreadIdRef.current = "thread-2";
+    rerender(
+      <LifecycleHarness
+        input={{
+          ...lifecycle.input,
+          selectedThreadId: "thread-2",
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(lifecycle.unsubscribeThread).toHaveBeenCalledWith("thread-1");
+    });
+  });
+
+  it("unsubscribes selected thread during unmount cleanup", async () => {
+    const lifecycle = createLifecycleInput("thread-cleanup");
+    lifecycle.loadSelectedThreadRef.current = vi.fn(async () => {});
+
+    const rendered = render(<LifecycleHarness input={lifecycle.input} />);
+    rendered.unmount();
+
+    await waitFor(() => {
+      expect(lifecycle.unsubscribeThread).toHaveBeenCalledWith("thread-cleanup");
+    });
   });
 });

@@ -1,6 +1,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { type ErrorBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
+import type {
+  ErrorBannerDetails,
+  SuccessBannerDetails,
+} from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { DebugStatusBanners } from "@/Features/Debugging/UserInterface/DebugStatusBanners";
 
 const BASE_ERROR_BANNER_DETAILS: ErrorBannerDetails = {
@@ -15,8 +18,10 @@ function renderDebugStatusBanners(input: {
   activeTab?: "chat" | "debug";
   errorMessage?: string;
   errorBannerDetails?: ErrorBannerDetails;
+  successBannerDetails?: SuccessBannerDetails | null;
   onOpenDebugFromErrorBanner?: () => void;
   onDismissErrorBanner?: () => void;
+  onDismissSuccessBanner?: () => void;
   liveStateReductionError?: {
     eventIndex: number | null;
     patchIndex: number | null;
@@ -28,8 +33,10 @@ function renderDebugStatusBanners(input: {
       activeTab={input.activeTab ?? "chat"}
       errorMessage={input.errorMessage ?? ""}
       errorBannerDetails={input.errorBannerDetails ?? BASE_ERROR_BANNER_DETAILS}
+      successBannerDetails={input.successBannerDetails ?? null}
       onOpenDebugFromErrorBanner={input.onOpenDebugFromErrorBanner ?? (() => {})}
       onDismissErrorBanner={input.onDismissErrorBanner ?? (() => {})}
+      onDismissSuccessBanner={input.onDismissSuccessBanner ?? (() => {})}
       liveStateReductionError={input.liveStateReductionError ?? null}
     />,
   );
@@ -106,5 +113,27 @@ describe("DebugStatusBanners", () => {
     });
 
     expect(screen.queryByText(/Live updates failed for this thread/i)).toBeNull();
+  });
+
+  it("renders success banner and invokes success dismiss action", () => {
+    const onDismissSuccessBanner = vi.fn();
+
+    renderDebugStatusBanners({
+      successBannerDetails: {
+        operation: "compact-thread",
+        message: "Compaction started.",
+        actionId: "action-compact-1",
+      },
+      onDismissSuccessBanner,
+    });
+
+    expect(screen.getByTestId("success-banner")).toBeTruthy();
+    expect(screen.getByTestId("success-banner-operation").textContent).toContain("compact-thread");
+    expect(screen.getByTestId("success-banner-message").textContent).toContain(
+      "Compaction started.",
+    );
+
+    fireEvent.click(screen.getByTestId("success-banner-dismiss"));
+    expect(onDismissSuccessBanner).toHaveBeenCalledTimes(1);
   });
 });

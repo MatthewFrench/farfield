@@ -6,6 +6,7 @@ import { z } from "zod";
  */
 export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   listThreads: "AppServerListThreadsResponse",
+  listLoadedThreads: "AppServerThreadLoadedListResponse",
   forkThread: "AppServerThreadForkResponse",
   readThread: "AppServerReadThreadResponse",
   listModels: "AppServerListModelsResponse",
@@ -21,6 +22,7 @@ export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   steerTurn: "AppServerTurnSteerResponse",
   interruptTurn: "AppServerTurnInterruptResponse",
   resumeThread: "AppServerResumeThreadResponse",
+  unsubscribeThread: "AppServerThreadUnsubscribeResponse",
   archiveThread: "AppServerArchiveThreadResponse",
   unarchiveThread: "AppServerUnarchiveThreadResponse",
 } as const;

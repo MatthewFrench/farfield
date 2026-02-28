@@ -9,6 +9,7 @@ vi.mock("../Source/Features/Chat/DataAccess/ChatApi", () => ({
   sendMessage: vi.fn(),
   setCollaborationMode: vi.fn(),
   submitUserInput: vi.fn(),
+  unsubscribeThread: vi.fn(),
 }));
 
 import {
@@ -19,6 +20,7 @@ import {
   sendMessage,
   setCollaborationMode,
   submitUserInput,
+  unsubscribeThread,
 } from "../Source/Features/Chat/DataAccess/ChatApi";
 import {
   type ChatLiveStateResponse,
@@ -82,6 +84,7 @@ describe("ChatServerClient", () => {
     vi.mocked(setCollaborationMode).mockResolvedValue();
     vi.mocked(submitUserInput).mockResolvedValue();
     vi.mocked(interruptThread).mockResolvedValue();
+    vi.mocked(unsubscribeThread).mockResolvedValue("notSubscribed");
   });
 
   it("delegates read calls to ChatApi and returns typed snapshots", async () => {
@@ -141,10 +144,12 @@ describe("ChatServerClient", () => {
     await chatServerClient.interruptThread({
       threadId: "thread-1",
     });
+    await chatServerClient.unsubscribeThread("thread-1");
 
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(setCollaborationMode).toHaveBeenCalledTimes(1);
     expect(submitUserInput).toHaveBeenCalledTimes(1);
     expect(interruptThread).toHaveBeenCalledTimes(1);
+    expect(unsubscribeThread).toHaveBeenCalledTimes(1);
   });
 });

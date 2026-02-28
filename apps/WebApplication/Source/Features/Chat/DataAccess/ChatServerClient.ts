@@ -9,6 +9,7 @@ import {
   type ApiSetCollaborationModeInput,
   type ApiStreamEventsResponse,
   type ApiSubmitUserInputInput,
+  type ApiUnsubscribeThreadStatus,
   getLiveState,
   getStreamEvents,
   interruptThread,
@@ -16,6 +17,7 @@ import {
   sendMessage,
   setCollaborationMode,
   submitUserInput,
+  unsubscribeThread,
 } from "./ChatApi";
 
 export type ChatReadThreadOptions = ApiReadThreadOptions;
@@ -27,6 +29,7 @@ export type ChatSendMessageInput = ApiSendMessageInput;
 export type ChatSetCollaborationModeInput = ApiSetCollaborationModeInput;
 export type ChatSubmitUserInputInput = ApiSubmitUserInputInput;
 export type ChatInterruptThreadInput = ApiInterruptThreadInput;
+export type ChatUnsubscribeThreadStatus = ApiUnsubscribeThreadStatus;
 
 /**
  * Owns chat endpoint calls.
@@ -80,5 +83,12 @@ export class ChatServerClient {
     options?: ApiRequestOptions,
   ): Promise<void> {
     return interruptThread(input, options);
+  }
+
+  public async unsubscribeThread(
+    threadId: string,
+    options?: ApiRequestOptions,
+  ): Promise<ChatUnsubscribeThreadStatus> {
+    return unsubscribeThread(threadId, options);
   }
 }

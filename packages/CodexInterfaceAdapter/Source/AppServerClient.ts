@@ -25,6 +25,7 @@ import {
   APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT,
   buildArchiveThreadRequest,
   buildForkThreadRequest,
+  buildListLoadedThreadsRequestParameters,
   buildListThreadsAllPageOptions,
   buildListThreadsRequestParameters,
   buildReadConfigRequestParameters,
@@ -40,6 +41,7 @@ import {
   buildThreadCompactStartRequest,
   buildTurnInterruptRequest,
   buildUnarchiveThreadRequest,
+  buildUnsubscribeThreadRequest,
   resolveReadThreadRequestTimeoutMilliseconds,
 } from "./AppServerClientRequestBuilders.js";
 import {
@@ -74,6 +76,16 @@ export interface ListThreadsAllOptions {
   cwd?: string;
 }
 
+export interface ListLoadedThreadsOptions {
+  limit?: number | null;
+  cursor?: string | null;
+}
+
+export interface ListLoadedThreadsResult {
+  data: string[];
+  nextCursor: string | null;
+}
+
 export interface StartThreadOptions {
   cwd: string;
   model?: string;
@@ -105,6 +117,8 @@ export interface StartTurnOptions {
   effort?: string | null;
   collaborationMode?: CollaborationMode | null;
 }
+
+export type UnsubscribeThreadStatus = "notLoaded" | "notSubscribed" | "unsubscribed";
 
 export type ReviewDelivery = "inline" | "detached";
 
@@ -155,6 +169,17 @@ const AppServerTurnSteerResponseSchema = z
 const AppServerTurnInterruptResponseSchema = z.object({}).passthrough();
 const AppServerThreadCompactStartResponseSchema = z.object({}).passthrough();
 const AppServerThreadBackgroundTerminalsCleanResponseSchema = z.object({}).passthrough();
+const AppServerThreadLoadedListResponseSchema = z
+  .object({
+    data: z.array(z.string().min(1)),
+    nextCursor: z.string().nullable(),
+  })
+  .passthrough();
+const AppServerThreadUnsubscribeResponseSchema = z
+  .object({
+    status: z.enum(["notLoaded", "notSubscribed", "unsubscribed"]),
+  })
+  .passthrough();
 const AppServerReviewStartResponseSchema = z
   .object({
     reviewThreadId: z.string().min(1),
@@ -204,6 +229,24 @@ export class AppServerClient {
       result,
       APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listThreads,
     );
+  }
+
+  public async listLoadedThreads(
+    options?: ListLoadedThreadsOptions,
+  ): Promise<ListLoadedThreadsResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.listLoadedThreads,
+      buildListLoadedThreadsRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerThreadLoadedListResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listLoadedThreads,
+    );
+    return {
+      data: parsed.data,
+      nextCursor: parsed.nextCursor,
+    };
   }
 
   public async forkThread(
@@ -462,6 +505,20 @@ export class AppServerClient {
       result,
       APP_SERVER_CLIENT_RESPONSE_CONTEXTS.resumeThread,
     );
+  }
+
+  public async unsubscribeThread(threadId: string): Promise<UnsubscribeThreadStatus> {
+    const request = buildUnsubscribeThreadRequest(threadId);
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.unsubscribeThread,
+      request,
+    );
+    const parsed = parseAppServerResponse(
+      AppServerThreadUnsubscribeResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.unsubscribeThread,
+    );
+    return parsed.status;
   }
 
   public async archiveThread(threadId: string): Promise<void> {

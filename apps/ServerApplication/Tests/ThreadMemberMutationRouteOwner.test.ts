@@ -22,6 +22,8 @@ import type {
   AgentStartThreadReviewResult,
   AgentSubmitUserInputInput,
   AgentSubmitUserInputResult,
+  AgentUnsubscribeThreadInput,
+  AgentUnsubscribeThreadStatus,
 } from "../Source/Agents/Types.js";
 import { ThreadMemberMutationRouteOwner } from "../Source/Network/Routes/ThreadMemberMutationRouteOwner.js";
 import {
@@ -58,6 +60,7 @@ function createAgentAdapter(input: {
   cleanThreadBackgroundTerminals?: (
     value: AgentCleanThreadBackgroundTerminalsInput,
   ) => Promise<void>;
+  unsubscribeThread?: (value: AgentUnsubscribeThreadInput) => Promise<AgentUnsubscribeThreadStatus>;
   startThreadReview?: (value: AgentStartThreadReviewInput) => Promise<AgentStartThreadReviewResult>;
 }): AgentAdapter {
   return {
@@ -147,6 +150,14 @@ function createAgentAdapter(input: {
         throw new Error("Not used in mutation route-owner tests");
       }
       await input.cleanThreadBackgroundTerminals(inputValue);
+    },
+    async unsubscribeThread(
+      inputValue: AgentUnsubscribeThreadInput,
+    ): Promise<AgentUnsubscribeThreadStatus> {
+      if (!input.unsubscribeThread) {
+        throw new Error("Not used in mutation route-owner tests");
+      }
+      return input.unsubscribeThread(inputValue);
     },
     async startThreadReview(
       inputValue: AgentStartThreadReviewInput,
@@ -783,6 +794,65 @@ describe("ThreadMemberMutationRouteOwner", () => {
 
     expect(handled).toBe(false);
     expect(jsonResponse).not.toHaveBeenCalled();
+  });
+
+  it("handles unsubscribe mutations and returns unsubscribe status", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const unsubscribeCalls: AgentUnsubscribeThreadInput[] = [];
+    const adapter = createAgentAdapter({
+      sendMessage: async () => {},
+      unsubscribeThread: async (value) => {
+        unsubscribeCalls.push(value);
+        return "unsubscribed";
+      },
+    });
+
+    const actionEvents: Array<{
+      action: string;
+      stage: "attempt" | "success" | "error";
+    }> = [];
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "unsubscribe"],
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: (action, stage) => {
+          actionEvents.push({ action, stage });
+        },
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(unsubscribeCalls).toEqual([{ threadId: "thread-1" }]);
+    expect(actionEvents).toEqual([
+      {
+        action: ThreadMemberMutationActionByName.threadUnsubscribe,
+        stage: "attempt",
+      },
+      {
+        action: ThreadMemberMutationActionByName.threadUnsubscribe,
+        stage: "success",
+      },
+    ]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
+      status: "unsubscribed",
+    });
   });
 
   it("returns false for nested archive paths to enforce canonical mutation routes", async () => {

@@ -1,4 +1,5 @@
 import { type Dispatch, type MutableRefObject, type SetStateAction, useCallback } from "react";
+import { type SuccessBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import type { AgentId } from "@/Shared/Contracts/ApiContracts";
 import { type ThreadMutationServerClient } from "../DataAccess/ThreadMutationServerClient";
 import { type ThreadListItem } from "../DomainModel/ThreadGroupTypes";
@@ -21,6 +22,7 @@ export interface UseThreadActionHandlersInput {
   ) => ThreadMutationActionRequestOptions;
   setIsBusy: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string>>;
+  setSuccessBannerDetails: Dispatch<SetStateAction<SuccessBannerDetails | null>>;
   setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
   setMobileSidebarOpen: Dispatch<SetStateAction<boolean>>;
   selectedThreadIdRef: MutableRefObject<string | null>;
@@ -47,16 +49,19 @@ export interface ThreadActionHandlers {
   runUnarchiveThread: (threadId: string) => Promise<void>;
 }
 
+async function refreshCreatedThreadData(
+  loadCoreDataTracked: () => Promise<void>,
+  loadSelectedThreadTracked: (threadId: string) => Promise<void>,
+  threadId: string,
+): Promise<void> {
+  await loadCoreDataTracked();
+  await loadSelectedThreadTracked(threadId);
+}
+
 export function useThreadActionHandlers(input: UseThreadActionHandlersInput): ThreadActionHandlers {
   const selectedThreadIdRef = input.selectedThreadIdRef;
-
-  const refreshCreatedThreadData = useCallback(
-    async (threadId: string): Promise<void> => {
-      await input.loadCoreDataTracked();
-      await input.loadSelectedThreadTracked(threadId);
-    },
-    [input.loadCoreDataTracked, input.loadSelectedThreadTracked],
-  );
+  const refreshCreatedThreadDataForThread = (threadId: string): Promise<void> =>
+    refreshCreatedThreadData(input.loadCoreDataTracked, input.loadSelectedThreadTracked, threadId);
 
   const createNewThread = useCallback(
     async (projectPath: string, agentId?: AgentId) => {
@@ -77,7 +82,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
           input.threadListStateController.invalidateActiveThreadQuery();
         },
         threadMutationClient: input.threadMutationServerClient,
-        onRefreshCreatedThreadData: refreshCreatedThreadData,
+        onRefreshCreatedThreadData: refreshCreatedThreadDataForThread,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
       };
       if (agentId !== undefined) {
@@ -91,7 +96,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       input.loadSelectedThreadTracked,
       input.pendingThreadMaterializationCoordinator,
       input.reportTrackedUserInterfaceError,
-      refreshCreatedThreadData,
+      refreshCreatedThreadDataForThread,
       selectedThreadIdRef,
       input.setError,
       input.setIsBusy,
@@ -204,7 +209,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         onInvalidateActiveThreadQuery: () => {
           input.threadListStateController.invalidateActiveThreadQuery();
         },
-        onRefreshCreatedThreadData: refreshCreatedThreadData,
+        onRefreshCreatedThreadData: refreshCreatedThreadDataForThread,
         threadMutationClient: input.threadMutationServerClient,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
       });
@@ -213,7 +218,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       input.buildActionRequestOptions,
       input.pendingThreadMaterializationCoordinator,
       input.reportTrackedUserInterfaceError,
-      refreshCreatedThreadData,
+      refreshCreatedThreadDataForThread,
       selectedThreadIdRef,
       input.setIsBusy,
       input.setMobileSidebarOpen,
@@ -275,7 +280,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
           input.threadListStateController.invalidateActiveThreadQuery();
         },
         loadCoreData: input.loadCoreDataTracked,
-        onRefreshRolledBackThreadData: refreshCreatedThreadData,
+        onRefreshRolledBackThreadData: refreshCreatedThreadDataForThread,
         threadMutationClient: input.threadMutationServerClient,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
       });
@@ -284,7 +289,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       input.buildActionRequestOptions,
       input.loadCoreDataTracked,
       input.reportTrackedUserInterfaceError,
-      refreshCreatedThreadData,
+      refreshCreatedThreadDataForThread,
       selectedThreadIdRef,
       input.setError,
       input.setIsBusy,
@@ -305,16 +310,23 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
           input.threadListStateController.invalidateActiveThreadQuery();
         },
         loadCoreData: input.loadCoreDataTracked,
-        onRefreshCompactedThreadData: refreshCreatedThreadData,
+        onRefreshCompactedThreadData: refreshCreatedThreadDataForThread,
         threadMutationClient: input.threadMutationServerClient,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+        onReportSuccess: ({ actionId }) => {
+          input.setSuccessBannerDetails({
+            operation: "compact-thread",
+            message: "Compaction started.",
+            actionId,
+          });
+        },
       });
     },
     [
       input.buildActionRequestOptions,
       input.loadCoreDataTracked,
       input.reportTrackedUserInterfaceError,
-      refreshCreatedThreadData,
+      refreshCreatedThreadDataForThread,
       selectedThreadIdRef,
       input.setIsBusy,
       input.threadListStateController,
@@ -334,16 +346,23 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
           input.threadListStateController.invalidateActiveThreadQuery();
         },
         loadCoreData: input.loadCoreDataTracked,
-        onRefreshCleanedThreadData: refreshCreatedThreadData,
+        onRefreshCleanedThreadData: refreshCreatedThreadDataForThread,
         threadMutationClient: input.threadMutationServerClient,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+        onReportSuccess: ({ actionId }) => {
+          input.setSuccessBannerDetails({
+            operation: "clean-thread-background-terminals",
+            message: "Background terminals cleaned.",
+            actionId,
+          });
+        },
       });
     },
     [
       input.buildActionRequestOptions,
       input.loadCoreDataTracked,
       input.reportTrackedUserInterfaceError,
-      refreshCreatedThreadData,
+      refreshCreatedThreadDataForThread,
       selectedThreadIdRef,
       input.setIsBusy,
       input.threadListStateController,
@@ -366,7 +385,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         onInvalidateActiveThreadQuery: () => {
           input.threadListStateController.invalidateActiveThreadQuery();
         },
-        onRefreshReviewThreadData: refreshCreatedThreadData,
+        onRefreshReviewThreadData: refreshCreatedThreadDataForThread,
         threadMutationClient: input.threadMutationServerClient,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
       });
@@ -374,7 +393,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     [
       input.buildActionRequestOptions,
       input.reportTrackedUserInterfaceError,
-      refreshCreatedThreadData,
+      refreshCreatedThreadDataForThread,
       selectedThreadIdRef,
       input.setIsBusy,
       input.setMobileSidebarOpen,

@@ -121,6 +121,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const toggleThemeSpy = vi.fn((): void => {});
   const openDebugFromErrorBannerSpy = vi.fn((): void => {});
   const setErrorMessageSpy = vi.fn((): void => {});
+  const setSuccessBannerDetailsSpy = vi.fn((): void => {});
   const setIsChatAtBottomSpy = vi.fn((): void => {});
   const submitPendingRequestSpy = vi.fn(async (): Promise<void> => {});
   const skipPendingRequestSpy = vi.fn(async (): Promise<void> => {});
@@ -193,8 +194,10 @@ function createUseApplicationShellViewPropertiesFixture() {
       requestId: "request-123",
       errorId: "error-123",
     },
+    successBannerDetails: null,
     openDebugFromErrorBanner: openDebugFromErrorBannerSpy,
     setErrorMessage: setErrorMessageSpy,
+    setSuccessBannerDetails: setSuccessBannerDetailsSpy,
     liveStateReductionError: null,
     chatSurfaceState: "ready",
     selectedThreadId: "thread-001",

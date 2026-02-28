@@ -40,6 +40,12 @@ export interface ThreadMutationActionErrorReportInput {
   details?: Record<string, string | number | boolean | null>;
 }
 
+export interface ThreadMutationActionSuccessReportInput {
+  operation: ThreadMutationOperationName;
+  actionId: string;
+  threadId: string;
+}
+
 export interface ThreadMutationActionClient {
   createThread(
     input?: ThreadMutationCreateThreadInput,
@@ -188,6 +194,7 @@ export interface CompactThreadActionInput {
   onRefreshCompactedThreadData: (threadId: string) => Promise<void>;
   threadMutationClient: ThreadMutationActionClient;
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
+  onReportSuccess?: (input: ThreadMutationActionSuccessReportInput) => void;
 }
 
 export interface CleanThreadBackgroundTerminalsActionInput {
@@ -202,6 +209,7 @@ export interface CleanThreadBackgroundTerminalsActionInput {
   onRefreshCleanedThreadData: (threadId: string) => Promise<void>;
   threadMutationClient: ThreadMutationActionClient;
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
+  onReportSuccess?: (input: ThreadMutationActionSuccessReportInput) => void;
 }
 
 export class ThreadMutationActionCoordinator {
@@ -402,6 +410,11 @@ export class ThreadMutationActionCoordinator {
       } else {
         await input.loadCoreData();
       }
+      input.onReportSuccess?.({
+        operation: COMPACT_THREAD_OPERATION_NAME,
+        actionId,
+        threadId: input.threadId,
+      });
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
         operation: COMPACT_THREAD_OPERATION_NAME,
@@ -432,6 +445,11 @@ export class ThreadMutationActionCoordinator {
       } else {
         await input.loadCoreData();
       }
+      input.onReportSuccess?.({
+        operation: CLEAN_THREAD_BACKGROUND_TERMINALS_OPERATION_NAME,
+        actionId,
+        threadId: input.threadId,
+      });
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
         operation: CLEAN_THREAD_BACKGROUND_TERMINALS_OPERATION_NAME,

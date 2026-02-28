@@ -3,6 +3,7 @@ import type {
   AgentAdapter,
   AgentCreateThreadInput,
   AgentId,
+  AgentListLoadedThreadsResult,
   AgentListThreadsInput,
 } from "../../Agents/Types.js";
 import { logger } from "../../Shared/Logging/Logger.js";
@@ -45,6 +46,7 @@ const ThreadCollectionRouteCacheInvalidationReasonByName = {
 
 const ThreadCollectionRouteLogEventByName = {
   agentListThreadsFailed: "agent-list-threads-failed",
+  agentListLoadedThreadsFailed: "agent-list-loaded-threads-failed",
   threadListAggregationCacheRead: "thread-list-aggregation-cache-read",
 } as const;
 const OptionalThreadNameSourceSchema = z.union([z.string(), z.null(), z.undefined()]);
@@ -59,6 +61,7 @@ const ThreadNamePayloadSchema = z
 
 const ThreadCollectionRouteDefaultSortKey: ThreadListSortKey = "updated_at";
 const ThreadCollectionRouteListThreadsTimeoutLabelPrefix = "list-threads:";
+const ThreadCollectionRouteListLoadedThreadsTimeoutLabelPrefix = "list-loaded-threads:";
 const ThreadListResponseSyncModeByName = {
   full: "full",
   delta: "delta",
@@ -390,6 +393,11 @@ async function loadThreadListSnapshot(input: {
   const adapterResults = await Promise.all(
     input.enabledAdapterList.map(async (adapter) => {
       try {
+        const loadedThreadIdentifierSet = await loadAdapterLoadedThreadIdentifierSet({
+          adapter,
+          listThreadsTimeoutMs: input.listThreadsTimeoutMs,
+          withTimeout: input.withTimeout,
+        });
         const boundedResult = await input.withTimeout(
           adapter.listThreads(input.adapterListThreadsInput),
           input.listThreadsTimeoutMs,
@@ -400,6 +408,7 @@ async function loadThreadListSnapshot(input: {
           ok: true as const,
           adapter,
           result: boundedResult,
+          loadedThreadIdentifierSet,
         };
       } catch (error) {
         logger.warn(
@@ -426,9 +435,14 @@ async function loadThreadListSnapshot(input: {
     combinedTruncated = combinedTruncated || (adapterResult.result.truncated ?? false);
     for (const thread of adapterResult.result.data) {
       input.registerThreadAdapterOwnership(thread.id, adapterResult.adapter.id);
+      const isLoadedInMemory =
+        adapterResult.loadedThreadIdentifierSet !== null
+          ? adapterResult.loadedThreadIdentifierSet.has(thread.id)
+          : undefined;
       const threadWithAgentId: ThreadListItemWithAgentId = {
         ...thread,
         agentId: adapterResult.adapter.id,
+        ...(isLoadedInMemory !== undefined ? { isLoadedInMemory } : {}),
       };
       mergedData.push({
         ...threadWithAgentId,
@@ -449,6 +463,43 @@ async function loadThreadListSnapshot(input: {
 
 function buildListThreadsTimeoutLabel(agentId: AgentId): string {
   return `${ThreadCollectionRouteListThreadsTimeoutLabelPrefix}${agentId}`;
+}
+
+function buildListLoadedThreadsTimeoutLabel(agentId: AgentId): string {
+  return `${ThreadCollectionRouteListLoadedThreadsTimeoutLabelPrefix}${agentId}`;
+}
+
+async function loadAdapterLoadedThreadIdentifierSet(input: {
+  adapter: AgentAdapter;
+  listThreadsTimeoutMs: number;
+  withTimeout: ThreadCollectionRouteWithTimeout;
+}): Promise<Set<string> | null> {
+  const listLoadedThreads = input.adapter.listLoadedThreads;
+  if (listLoadedThreads === undefined) {
+    return null;
+  }
+
+  try {
+    const loadedThreads = await input.withTimeout(
+      listLoadedThreads(),
+      input.listThreadsTimeoutMs,
+      buildListLoadedThreadsTimeoutLabel(input.adapter.id),
+    );
+    return mapLoadedThreadIdentifierSet(loadedThreads);
+  } catch (error) {
+    logger.warn(
+      {
+        agentId: input.adapter.id,
+        error: toErrorMessage(error),
+      },
+      ThreadCollectionRouteLogEventByName.agentListLoadedThreadsFailed,
+    );
+    return null;
+  }
+}
+
+function mapLoadedThreadIdentifierSet(loadedThreads: AgentListLoadedThreadsResult): Set<string> {
+  return new Set(loadedThreads.data);
 }
 
 function normalizeOptionalThreadName(value: string | null | undefined): string | undefined {

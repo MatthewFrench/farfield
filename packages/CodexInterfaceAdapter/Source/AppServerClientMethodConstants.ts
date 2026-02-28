@@ -3,6 +3,7 @@
  */
 export const APP_SERVER_CLIENT_METHODS = {
   listThreads: "thread/list",
+  listLoadedThreads: "thread/loaded/list",
   forkThread: "thread/fork",
   readThread: "thread/read",
   listModels: "model/list",
@@ -18,6 +19,7 @@ export const APP_SERVER_CLIENT_METHODS = {
   steerTurn: "turn/steer",
   interruptTurn: "turn/interrupt",
   resumeThread: "thread/resume",
+  unsubscribeThread: "thread/unsubscribe",
   archiveThread: "thread/archive",
   unarchiveThread: "thread/unarchive",
 } as const;

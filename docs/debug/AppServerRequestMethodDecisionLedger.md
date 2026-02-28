@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-02-28 14:21:20Z
+Last Updated (UTC): 2026-02-28 20:14:00Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -63,7 +63,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `thread/compact/start` | Used now | Keep | Context compaction action now routes through strict owner boundaries and typed mutation contracts. |
 | `thread/fork` | Used now | Keep | Thread fork action is routed through strict owner boundaries and typed app-server mapping. |
 | `thread/list` | Used now | Keep | Current ownership and contracts align with present product behavior. |
-| `thread/loaded/list` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
+| `thread/loaded/list` | Used now | Keep | Enables loaded-thread projection for list surfaces through strict owner boundaries. |
 | `thread/name/set` | Used now | Keep | Thread rename action is routed through strict owner boundaries and typed app-server mapping. |
 | `thread/read` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `thread/realtime/appendAudio` | Not used | Not now | Adopt only if realtime conversation feature is a planned product objective. |
@@ -74,7 +74,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `thread/rollback` | Used now | Keep | Thread rollback action is routed through strict owner boundaries and typed app-server mapping. |
 | `thread/start` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `thread/unarchive` | Used now | Keep | Current ownership and contracts align with present product behavior. |
-| `thread/unsubscribe` | Not used | Plan candidate | Modern v2 thread/turn lifecycle surface with product value. |
+| `thread/unsubscribe` | Used now | Keep | Canonical unsubscribe lifecycle path is now exposed through strict owner routing. |
 | `turn/interrupt` | Used now | Keep | Interrupt fallback path is routed through strict owner boundaries and typed turn-id mapping. |
 | `turn/start` | Used now | Keep | Canonical send path for app-server mode in Farfield. |
 | `turn/steer` | Used now | Keep | Steering path now routes through strict owner boundaries with explicit in-progress turn precondition mapping. |
@@ -82,5 +82,5 @@ This ledger records recommended disposition for every upstream app-server client
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 19
-Not used: 55
+Used now: 21
+Not used: 53

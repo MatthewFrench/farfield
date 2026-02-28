@@ -17,6 +17,7 @@ import {
   type DebugHistoryResponse,
   type DebugTraceStatusResponse,
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
+import { type SuccessBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { type DebugIssueSeverityFilter } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import {
@@ -159,6 +160,9 @@ export function useApplicationShellState(
   const routeSeededShellState = readRouteSeededShellState(input);
 
   const [error, setError] = useState(INITIAL_TEXT_VALUE);
+  const [successBannerDetails, setSuccessBannerDetails] = useState<SuccessBannerDetails | null>(
+    null,
+  );
   const [health, setHealth] = useState<CapabilityHealthResponse | null>(null);
   const [configDefaults, setConfigDefaults] = useState<CapabilityConfigDefaultsResponse | null>(
     null,
@@ -283,6 +287,8 @@ export function useApplicationShellState(
   return {
     error,
     setError,
+    successBannerDetails,
+    setSuccessBannerDetails,
     health,
     setHealth,
     configDefaults,

@@ -45,6 +45,7 @@ describe("ThreadApi", () => {
             source: "opencode",
             agentId: "codex",
             hasUnreadTurn: true,
+            isLoadedInMemory: true,
             projectState: "removed",
           },
         ],
@@ -55,6 +56,7 @@ describe("ThreadApi", () => {
     const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
 
     expect(result.data[0]?.hasUnreadTurn).toBe(true);
+    expect(result.data[0]?.isLoadedInMemory).toBe(true);
     expect(result.data[0]?.isProjectRemoved).toBe(true);
   });
 
@@ -115,6 +117,29 @@ describe("ThreadApi", () => {
     );
 
     await expect(listThreads(DEFAULT_LIST_THREADS_OPTIONS)).rejects.toThrow(/hasUnreadTurn/);
+  });
+
+  it("rejects thread list payloads when isLoadedInMemory is not a boolean", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        data: [
+          {
+            id: "thread_1",
+            preview: "hello",
+            createdAt: 123,
+            updatedAt: 124,
+            cwd: "/tmp/workspace",
+            source: "opencode",
+            agentId: "codex",
+            isLoadedInMemory: "yes",
+          },
+        ],
+        nextCursor: null,
+      }),
+    );
+
+    await expect(listThreads(DEFAULT_LIST_THREADS_OPTIONS)).rejects.toThrow(/isLoadedInMemory/);
   });
 
   it("rejects thread list payloads when projectState is invalid", async () => {

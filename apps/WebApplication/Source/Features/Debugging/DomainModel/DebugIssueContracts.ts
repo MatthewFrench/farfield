@@ -75,6 +75,12 @@ export interface ErrorBannerDetails {
   errorId: string | null;
 }
 
+export interface SuccessBannerDetails {
+  operation: string;
+  message: string;
+  actionId: string | null;
+}
+
 export interface DebugIssueBase {
   id: string;
   kind: "debug-error" | "history-warning";

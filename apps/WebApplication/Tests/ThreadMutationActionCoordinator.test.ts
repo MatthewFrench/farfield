@@ -607,6 +607,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const onInvalidateActiveThreadQuery = vi.fn();
     const loadCoreData = vi.fn(async () => {});
     const onRefreshCompactedThreadData = vi.fn(async (_threadId: string) => {});
+    const onReportSuccess = vi.fn();
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
@@ -635,6 +636,7 @@ describe("ThreadMutationActionCoordinator", () => {
       onRefreshCompactedThreadData,
       threadMutationClient,
       reportTrackedUserInterfaceError,
+      onReportSuccess,
     });
 
     expect(threadMutationClient.compactThread).toHaveBeenCalledWith("thread-1", {
@@ -644,6 +646,11 @@ describe("ThreadMutationActionCoordinator", () => {
     expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
     expect(onRefreshCompactedThreadData).toHaveBeenCalledWith("thread-1");
     expect(onRefreshCompactedThreadData).toHaveBeenCalledTimes(1);
+    expect(onReportSuccess).toHaveBeenCalledWith({
+      operation: "compact-thread",
+      actionId: "action-compact-thread",
+      threadId: "thread-1",
+    });
     expect(loadCoreData).not.toHaveBeenCalled();
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(busyStates).toEqual([true, false]);
@@ -655,6 +662,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const onInvalidateActiveThreadQuery = vi.fn();
     const loadCoreData = vi.fn(async () => {});
     const onRefreshCompactedThreadData = vi.fn(async (_threadId: string) => {});
+    const onReportSuccess = vi.fn();
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
@@ -683,11 +691,13 @@ describe("ThreadMutationActionCoordinator", () => {
       onRefreshCompactedThreadData,
       threadMutationClient,
       reportTrackedUserInterfaceError,
+      onReportSuccess,
     });
 
     expect(onSetBusy.mock.calls).toEqual([[true], [false]]);
     expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
     expect(onRefreshCompactedThreadData).not.toHaveBeenCalled();
+    expect(onReportSuccess).not.toHaveBeenCalled();
     expect(loadCoreData).not.toHaveBeenCalled();
     expect(reportTrackedUserInterfaceError).toHaveBeenCalledWith({
       operation: "compact-thread",
@@ -703,6 +713,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const onInvalidateActiveThreadQuery = vi.fn();
     const loadCoreData = vi.fn(async () => {});
     const onRefreshCleanedThreadData = vi.fn(async (_threadId: string) => {});
+    const onReportSuccess = vi.fn();
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
@@ -731,6 +742,7 @@ describe("ThreadMutationActionCoordinator", () => {
       onRefreshCleanedThreadData,
       threadMutationClient,
       reportTrackedUserInterfaceError,
+      onReportSuccess,
     });
 
     expect(threadMutationClient.cleanThreadBackgroundTerminals).toHaveBeenCalledWith("thread-1", {
@@ -740,6 +752,11 @@ describe("ThreadMutationActionCoordinator", () => {
     expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
     expect(onRefreshCleanedThreadData).toHaveBeenCalledWith("thread-1");
     expect(onRefreshCleanedThreadData).toHaveBeenCalledTimes(1);
+    expect(onReportSuccess).toHaveBeenCalledWith({
+      operation: "clean-thread-background-terminals",
+      actionId: "action-clean-thread-background-terminals",
+      threadId: "thread-1",
+    });
     expect(loadCoreData).not.toHaveBeenCalled();
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(busyStates).toEqual([true, false]);
@@ -751,6 +768,7 @@ describe("ThreadMutationActionCoordinator", () => {
     const onInvalidateActiveThreadQuery = vi.fn();
     const loadCoreData = vi.fn(async () => {});
     const onRefreshCleanedThreadData = vi.fn(async (_threadId: string) => {});
+    const onReportSuccess = vi.fn();
     const reportTrackedUserInterfaceError = vi.fn(async () => {});
     const threadMutationClient = {
       createThread: vi.fn(async () => ({ threadId: "thread-1" })),
@@ -779,11 +797,13 @@ describe("ThreadMutationActionCoordinator", () => {
       onRefreshCleanedThreadData,
       threadMutationClient,
       reportTrackedUserInterfaceError,
+      onReportSuccess,
     });
 
     expect(onSetBusy.mock.calls).toEqual([[true], [false]]);
     expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
     expect(onRefreshCleanedThreadData).not.toHaveBeenCalled();
+    expect(onReportSuccess).not.toHaveBeenCalled();
     expect(loadCoreData).not.toHaveBeenCalled();
     expect(reportTrackedUserInterfaceError).toHaveBeenCalledWith({
       operation: "clean-thread-background-terminals",

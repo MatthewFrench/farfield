@@ -14,6 +14,7 @@ import {
   ThreadMemberRouteMethodByName,
   ThreadMemberRouteSegmentByName,
 } from "./ThreadMemberRouteContracts.js";
+import { ThreadMemberUnsubscribeMutationRouteOwner } from "./ThreadMemberUnsubscribeMutationRouteOwner.js";
 
 export interface ThreadMemberMutationRouteOwnerOptions {
   dependencies: ThreadMemberRouteDependencies;
@@ -23,6 +24,7 @@ export interface ThreadMemberMutationRouteOwnerOptions {
 const ThreadMemberMutationRouteOwnerNameByName = {
   message: "message",
   archive: "archive",
+  unsubscribe: "unsubscribe",
   interaction: "interaction",
   fork: "fork",
   name: "name",
@@ -39,6 +41,7 @@ type ThreadMemberMutationSubresource =
   | typeof ThreadMemberRouteSegmentByName.messages
   | typeof ThreadMemberRouteSegmentByName.archive
   | typeof ThreadMemberRouteSegmentByName.unarchive
+  | typeof ThreadMemberRouteSegmentByName.unsubscribe
   | typeof ThreadMemberRouteSegmentByName.fork
   | typeof ThreadMemberRouteSegmentByName.name
   | typeof ThreadMemberRouteSegmentByName.review
@@ -71,6 +74,10 @@ const ThreadMemberMutationDispatchDescriptors: readonly ThreadMemberMutationDisp
   {
     subresource: ThreadMemberRouteSegmentByName.unarchive,
     ownerName: ThreadMemberMutationRouteOwnerNameByName.archive,
+  },
+  {
+    subresource: ThreadMemberRouteSegmentByName.unsubscribe,
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.unsubscribe,
   },
   {
     subresource: ThreadMemberRouteSegmentByName.fork,
@@ -118,6 +125,8 @@ const ThreadMemberMutationHandlerFactoryByOwnerName: Record<
     new ThreadMemberMessageMutationRouteOwner(options),
   [ThreadMemberMutationRouteOwnerNameByName.archive]: (options) =>
     new ThreadMemberArchiveMutationRouteOwner(options),
+  [ThreadMemberMutationRouteOwnerNameByName.unsubscribe]: (options) =>
+    new ThreadMemberUnsubscribeMutationRouteOwner(options),
   [ThreadMemberMutationRouteOwnerNameByName.interaction]: (options) =>
     new ThreadMemberInteractionMutationRouteOwner(options),
   [ThreadMemberMutationRouteOwnerNameByName.fork]: (options) =>

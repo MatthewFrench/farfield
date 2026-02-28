@@ -5,6 +5,8 @@
 
 export type {
   ForkThreadOptions,
+  ListLoadedThreadsOptions,
+  ListLoadedThreadsResult,
   ListThreadsAllOptions,
   ListThreadsOptions,
   StartReviewOptions,
@@ -12,6 +14,7 @@ export type {
   StartReviewTarget,
   StartThreadOptions,
   StartTurnOptions,
+  UnsubscribeThreadStatus,
 } from "./AppServerClient.js";
 export { AppServerClient } from "./AppServerClient.js";
 export type {

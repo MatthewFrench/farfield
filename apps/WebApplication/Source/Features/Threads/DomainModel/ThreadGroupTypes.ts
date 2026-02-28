@@ -16,6 +16,7 @@ export interface ThreadListItem {
   projectState?: "active" | "removed" | undefined;
   isProjectRemoved?: boolean | undefined;
   hasUnreadTurn?: boolean | null | undefined;
+  isLoadedInMemory?: boolean | undefined;
 }
 
 export const ThreadListItemSchema = z
@@ -34,6 +35,7 @@ export const ThreadListItemSchema = z
     projectState: z.enum(["active", "removed"]).optional(),
     isProjectRemoved: z.boolean().optional(),
     hasUnreadTurn: z.boolean().nullable().optional(),
+    isLoadedInMemory: z.boolean().optional(),
   })
   .strict();
 

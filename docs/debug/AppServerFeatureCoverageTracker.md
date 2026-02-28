@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-02-28 14:21:20Z
+Last Updated (UTC): 2026-02-28 20:14:00Z
 
 ## Purpose
 
@@ -33,7 +33,8 @@ Local Farfield sources used for intersection:
 11. `apps/ServerApplication/Source/Network/Routes/ThreadMemberReviewMutationRouteOwner.ts`
 12. `apps/ServerApplication/Source/Network/Routes/ThreadMemberCompactMutationRouteOwner.ts`
 13. `apps/ServerApplication/Source/Network/Routes/ThreadMemberBackgroundTerminalsCleanMutationRouteOwner.ts`
-14. `apps/ServerApplication/Source/Network/Routes/CapabilityRoutes.ts`
+14. `apps/ServerApplication/Source/Network/Routes/ThreadMemberUnsubscribeMutationRouteOwner.ts`
+15. `apps/ServerApplication/Source/Network/Routes/CapabilityRoutes.ts`
 
 Upstream snapshot anchor:
 
@@ -52,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `18 / 74` request methods (`24.3%`).
+1. Farfield app-server method coverage at request-owner layer: `20 / 74` request methods (`27.0%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `19 / 74` (`25.7%`).
+3. Effective request-method usage including transport-owned `initialize`: `21 / 74` (`28.4%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -78,6 +79,7 @@ As of the upstream snapshot above:
 | Method | Farfield Feature Surface | Idiomatic Usage | Why | Recommendation |
 | --- | --- | --- | --- | --- |
 | `thread/list` | Thread list loading, refresh, bootstrap readiness check | High | Owned route and adapter layering, strict parsing, explicit merge/cache owners | Keep current path |
+| `thread/loaded/list` | Loaded-in-memory status projection on thread list surfaces | High | Canonical v2 lifecycle signal now mapped through strict owner boundaries into list contracts | Keep current path |
 | `thread/read` | Open-thread hydration and selected-thread refresh | High | Contract parsing at boundary and owner-controlled read flow | Keep current path |
 | `thread/start` | Thread creation | High | Clear create ownership with strict request shaping | Keep current path |
 | `thread/fork` | Fork existing thread from row action menu | High | Owner-routed mutation with strict request parsing and scoped cache invalidation | Keep current path |
@@ -92,6 +94,7 @@ As of the upstream snapshot above:
 | `thread/resume` | Recover missing conversation before retry send | Medium-high | Correct recovery behavior, but paired with legacy send method | Keep behavior; migrate with send-path modernization |
 | `thread/archive` | Archive thread action | High | Clean mutation ownership and scoped cache invalidation | Keep current path |
 | `thread/unarchive` | Unarchive thread action | High | Clean mutation ownership and scoped cache invalidation | Keep current path |
+| `thread/unsubscribe` | Stop app-server thread subscription when thread is deselected or closed | High | Canonical v2 lifecycle unsubscribe is now exposed through strict owner routing | Keep current path |
 | `model/list` | Model selector and capability snapshot | High | Explicit capability route ownership and strict envelope parsing | Keep current path |
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | High | Explicit capability ownership and strict envelope parsing | Keep current path |
 | `config/read` | Config defaults resolution for model and reasoning effort | High | Normalized default resolution through typed owner mapping | Keep current path |
@@ -107,6 +110,7 @@ As of the upstream snapshot above:
 | Method | Farfield Product Surface | Owner Path |
 | --- | --- | --- |
 | `thread/list` | Active and archived thread list, bootstrap readiness check | `/api/threads` GET -> `ThreadCollectionRoutes` -> `CodexThreadManagementOwner.listThreads` -> `AppServerClient.listThreads` |
+| `thread/loaded/list` | Loaded-in-memory status projection for thread rows | `/api/threads` GET -> `ThreadCollectionRoutes` -> `CodexThreadManagementOwner.listLoadedThreads` -> `AppServerClient.listLoadedThreads` |
 | `thread/read` | Open thread and selected-thread refresh | `/api/threads/:threadId` GET -> `ThreadMemberReadRouteOwner` -> `CodexThreadManagementOwner.readThread` -> `AppServerClient.readThread` |
 | `thread/start` | Create thread | `/api/threads` POST -> `ThreadCollectionRoutes` -> `CodexThreadManagementOwner.createThread` -> `AppServerClient.startThread` |
 | `thread/fork` | Fork thread | `/api/threads/:threadId/fork` POST -> `ThreadMemberForkMutationRouteOwner` -> `CodexThreadManagementOwner.forkThread` -> `AppServerClient.forkThread` |
@@ -121,13 +125,14 @@ As of the upstream snapshot above:
 | `thread/resume` | Recover conversation-not-found before retrying send | `CodexMessageDispatchOwner.sendMessage` -> `AppServerClient.resumeThread` |
 | `thread/archive` | Archive thread | `/api/threads/:threadId/archive` POST -> `ThreadMemberArchiveMutationRouteOwner` -> `CodexThreadManagementOwner.archiveThread` -> `AppServerClient.archiveThread` |
 | `thread/unarchive` | Unarchive thread | `/api/threads/:threadId/unarchive` POST -> `ThreadMemberArchiveMutationRouteOwner` -> `CodexThreadManagementOwner.unarchiveThread` -> `AppServerClient.unarchiveThread` |
+| `thread/unsubscribe` | Unsubscribe thread subscription on lifecycle transitions | `/api/threads/:threadId/unsubscribe` POST -> `ThreadMemberUnsubscribeMutationRouteOwner` -> `CodexThreadManagementOwner.unsubscribeThread` -> `AppServerClient.unsubscribeThread` |
 | `model/list` | Model selector and capability snapshot | `/api/models` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listModels` -> `AppServerClient.listModels` |
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | `/api/collaboration-modes` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listCollaborationModes` -> `AppServerClient.listCollaborationModes` |
 | `config/read` | Config defaults (`model`, `reasoningEffort`) | `/api/config/defaults` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigDefaults` -> `AppServerClient.readConfig` |
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`56` request methods are not used by Farfield’s app-server client path:
+`54` request methods are not used by Farfield’s app-server client path:
 
 ```text
 account/login/cancel
@@ -177,12 +182,10 @@ skills/config/write
 skills/list
 skills/remote/export
 skills/remote/list
-thread/loaded/list
 thread/realtime/appendAudio
 thread/realtime/appendText
 thread/realtime/start
 thread/realtime/stop
-thread/unsubscribe
 sendUserMessage
 userInfo
 windowsSandbox/setupStart
@@ -253,12 +256,10 @@ These are explicitly in the upstream deprecated request section and should not b
 
 These are idiomatic modern surfaces upstream; some should be considered future migration targets.
 
-1. `thread/loaded/list`
-2. `thread/realtime/appendAudio`
-3. `thread/realtime/appendText`
-4. `thread/realtime/start`
-5. `thread/realtime/stop`
-6. `thread/unsubscribe`
+1. `thread/realtime/appendAudio`
+2. `thread/realtime/appendText`
+3. `thread/realtime/start`
+4. `thread/realtime/stop`
 
 ### Category G: Experimental and Test-only Surfaces Not Intended for Production Flow
 
@@ -279,8 +280,8 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `56`
-2. Total methods listed across Category A-I: `56`
+1. Total non-intersection methods: `54`
+2. Total methods listed across Category A-I: `54`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

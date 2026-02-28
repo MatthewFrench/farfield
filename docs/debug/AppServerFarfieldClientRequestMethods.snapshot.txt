@@ -8,12 +8,14 @@ thread/backgroundTerminals/clean
 thread/compact/start
 thread/fork
 thread/list
+thread/loaded/list
 thread/name/set
 thread/read
 thread/resume
 thread/rollback
 thread/start
 thread/unarchive
+thread/unsubscribe
 turn/interrupt
 turn/start
 turn/steer

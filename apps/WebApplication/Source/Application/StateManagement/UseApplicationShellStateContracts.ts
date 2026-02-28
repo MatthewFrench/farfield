@@ -19,6 +19,7 @@ import {
   type DebugHistoryResponse,
   type DebugTraceStatusResponse,
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
+import { type SuccessBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { type DebugIssueSeverityFilter } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import {
@@ -61,6 +62,8 @@ export interface UseApplicationShellStateInput {
 export interface ApplicationShellState {
   error: string;
   setError: ApplicationShellStateSetter<string>;
+  successBannerDetails: SuccessBannerDetails | null;
+  setSuccessBannerDetails: ApplicationShellStateSetter<SuccessBannerDetails | null>;
   health: CapabilityHealthResponse | null;
   setHealth: ApplicationShellStateSetter<CapabilityHealthResponse | null>;
   configDefaults: CapabilityConfigDefaultsResponse | null;

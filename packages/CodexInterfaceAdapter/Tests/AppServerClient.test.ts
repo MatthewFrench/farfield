@@ -594,6 +594,80 @@ describe("AppServerClient.listThreads", () => {
   });
 });
 
+describe("AppServerClient.listLoadedThreads", () => {
+  it("sends thread/loaded/list with empty parameters by default", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      data: ["thread-1", "thread-2"],
+      nextCursor: null,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.listLoadedThreads();
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/loaded/list", {});
+    expect(result).toEqual({
+      data: ["thread-1", "thread-2"],
+      nextCursor: null,
+    });
+  });
+
+  it("preserves explicit cursor and nullable limit parameters", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      data: [],
+      nextCursor: "cursor-2",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.listLoadedThreads({
+      cursor: "",
+      limit: null,
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/loaded/list", {
+      cursor: "",
+      limit: null,
+    });
+  });
+
+  it("throws protocol validation errors when loaded-list response shape is invalid", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      data: [1, 2, 3],
+      nextCursor: null,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    await expect(client.listLoadedThreads()).rejects.toBeInstanceOf(ProtocolValidationError);
+  });
+});
+
+describe("AppServerClient.unsubscribeThread", () => {
+  it("sends thread/unsubscribe payload and returns unsubscribe status", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      status: "unsubscribed",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.unsubscribeThread("thread-1");
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/unsubscribe", {
+      threadId: "thread-1",
+    });
+    expect(result).toBe("unsubscribed");
+  });
+
+  it("validates thread id before transport request", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await expect(client.unsubscribeThread("")).rejects.toThrowError();
+    expect(transportDouble.request).not.toHaveBeenCalled();
+  });
+});
+
 describe("AppServerClient.listThreadsAll", () => {
   it("starts pagination from an explicit initial cursor", async () => {
     const transportDouble = createTransportDouble();

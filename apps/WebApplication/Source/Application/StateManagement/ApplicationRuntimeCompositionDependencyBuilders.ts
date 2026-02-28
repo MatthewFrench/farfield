@@ -177,6 +177,9 @@ export function buildSelectedThreadLifecycleEffectsInput(
     setStreamEvents: applicationShellState.setStreamEvents,
     setIsSelectedThreadLoading: applicationShellState.setIsSelectedThreadLoading,
     setSelectedThreadId: applicationShellState.setSelectedThreadId,
+    unsubscribeThread: async (threadId) => {
+      await applicationOwnerDependencies.chatServerClient.unsubscribeThread(threadId);
+    },
     handleRuntimeRequestError: runtimeRequestHandlers.handleRuntimeRequestError,
   };
 }

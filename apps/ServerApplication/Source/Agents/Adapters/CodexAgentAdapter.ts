@@ -19,6 +19,7 @@ import type {
   AgentCreateThreadInput,
   AgentCreateThreadResult,
   AgentInterruptInput,
+  AgentListLoadedThreadsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
   AgentReadStreamEventsInput,
@@ -31,6 +32,8 @@ import type {
   AgentSubmitUserInputInput,
   AgentThreadLiveState,
   AgentThreadStreamEvents,
+  AgentUnsubscribeThreadInput,
+  AgentUnsubscribeThreadStatus,
 } from "../Types.js";
 import {
   APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT,
@@ -214,6 +217,10 @@ export class CodexAgentAdapter implements AgentAdapter {
     return this.threadManagementOwner.readThread(input);
   }
 
+  public async listLoadedThreads(): Promise<AgentListLoadedThreadsResult> {
+    return this.threadManagementOwner.listLoadedThreads();
+  }
+
   public async sendMessage(input: AgentSendMessageInput): Promise<void> {
     this.ensureCodexAvailable();
     await this.messageDispatchOwner.sendMessage(input, this.isIpcReady());
@@ -246,6 +253,12 @@ export class CodexAgentAdapter implements AgentAdapter {
     input: AgentCleanThreadBackgroundTerminalsInput,
   ): Promise<void> {
     await this.threadManagementOwner.cleanThreadBackgroundTerminals(input);
+  }
+
+  public async unsubscribeThread(
+    input: AgentUnsubscribeThreadInput,
+  ): Promise<AgentUnsubscribeThreadStatus> {
+    return this.threadManagementOwner.unsubscribeThread(input);
   }
 
   public async startThreadReview(

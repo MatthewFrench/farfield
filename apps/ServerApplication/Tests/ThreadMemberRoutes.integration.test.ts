@@ -29,6 +29,8 @@ import type {
   AgentStartThreadReviewResult,
   AgentThreadLiveState,
   AgentThreadStreamEvents,
+  AgentUnsubscribeThreadInput,
+  AgentUnsubscribeThreadStatus,
 } from "../Source/Agents/Types.js";
 import {
   isThreadMemberSubresourceRoute,
@@ -51,6 +53,7 @@ const ArchiveMutationThreadIdentifier = "thread_archive_mutation";
 const InterruptMutationThreadIdentifier = "thread_interrupt_mutation";
 const CompactMutationThreadIdentifier = "thread_compact_mutation";
 const BackgroundTerminalsCleanMutationThreadIdentifier = "thread_background_terminals_clean";
+const UnsubscribeMutationThreadIdentifier = "thread_unsubscribe_mutation";
 const ReviewMutationThreadIdentifier = "thread_review_mutation";
 const InvalidThreadIdentifierSegment = "%E0%A4%A";
 const ActionErrorIdentifier = "action-error-id";
@@ -103,6 +106,14 @@ const MutationRouteSuccessResponseSchema = z
   .object({
     ok: z.literal(true),
     threadId: z.string().min(1),
+  })
+  .strict();
+
+const UnsubscribeMutationRouteSuccessResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1),
+    status: z.enum(["notLoaded", "notSubscribed", "unsubscribed"]),
   })
   .strict();
 
@@ -248,6 +259,7 @@ interface ThreadMemberRouteTestAdapterOptions {
   cleanThreadBackgroundTerminals?: (
     input: AgentCleanThreadBackgroundTerminalsInput,
   ) => Promise<void>;
+  unsubscribeThread?: (input: AgentUnsubscribeThreadInput) => Promise<AgentUnsubscribeThreadStatus>;
   startThreadReview?: (input: AgentStartThreadReviewInput) => Promise<AgentStartThreadReviewResult>;
   readLiveState?: (threadId: string) => Promise<AgentThreadLiveState>;
   readStreamEvents?: (
@@ -310,6 +322,15 @@ function createAdapter(options: ThreadMemberRouteTestAdapterOptions): AgentAdapt
             input: AgentCleanThreadBackgroundTerminalsInput,
           ): Promise<void> {
             await options.cleanThreadBackgroundTerminals(input);
+          },
+        }
+      : {}),
+    ...(options.unsubscribeThread
+      ? {
+          async unsubscribeThread(
+            input: AgentUnsubscribeThreadInput,
+          ): Promise<AgentUnsubscribeThreadStatus> {
+            return options.unsubscribeThread(input);
           },
         }
       : {}),
@@ -933,6 +954,63 @@ describe("ThreadMemberRoutes integration", () => {
     expect(MutationRouteSuccessResponseSchema.parse(capturedResponse.body)).toEqual({
       ok: true,
       threadId: CompactMutationThreadIdentifier,
+    });
+  });
+
+  it("routes canonical unsubscribe mutations through unsubscribe-owner dispatch", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = ThreadMemberRouteMethodByName.post;
+
+    const unsubscribeThread = vi.fn<
+      (input: AgentUnsubscribeThreadInput) => Promise<AgentUnsubscribeThreadStatus>
+    >(async () => "unsubscribed");
+    const readJsonBody = vi.fn<ThreadMemberRouteDependencies["readJsonBody"]>(async () => ({}));
+
+    const codexAdapter = createAdapter({
+      id: "codex",
+      readThread: async () => {
+        throw new Error("not used in this test");
+      },
+      unsubscribeThread,
+    });
+    const resolveAdapterForThread = vi.fn<ThreadMemberRouteDependencies["resolveAdapterForThread"]>(
+      async () => ({
+        ok: true,
+        adapter: codexAdapter,
+        agentId: "codex",
+      }),
+    );
+
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(
+        UnsubscribeMutationThreadIdentifier,
+        ThreadMemberRouteSegmentByName.unsubscribe,
+      ),
+      createThreadRouteUrl(
+        UnsubscribeMutationThreadIdentifier,
+        ThreadMemberRouteSegmentByName.unsubscribe,
+      ),
+      resolveAdapterForThread,
+      readJsonBody,
+      capturedResponse,
+    );
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+
+    expect(handled).toBe(true);
+    expect(unsubscribeThread).toHaveBeenCalledTimes(1);
+    expect(unsubscribeThread).toHaveBeenCalledWith({
+      threadId: UnsubscribeMutationThreadIdentifier,
+    });
+    expect(readJsonBody).not.toHaveBeenCalled();
+    expect(capturedResponse.statusCode).toBe(200);
+    expect(UnsubscribeMutationRouteSuccessResponseSchema.parse(capturedResponse.body)).toEqual({
+      ok: true,
+      threadId: UnsubscribeMutationThreadIdentifier,
+      status: "unsubscribed",
     });
   });
 

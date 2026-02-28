@@ -5,6 +5,7 @@ import {
 import { z } from "zod";
 import type {
   ForkThreadOptions,
+  ListLoadedThreadsOptions,
   ListThreadsAllOptions,
   ListThreadsOptions,
   ReadConfigOptions,
@@ -19,6 +20,17 @@ const AppServerResumeThreadRequestSchema = z
   .object({
     threadId: z.string().min(1),
     persistExtendedHistory: z.boolean(),
+  })
+  .passthrough();
+const AppServerThreadLoadedListRequestSchema = z
+  .object({
+    cursor: z.union([z.string(), z.null()]).optional(),
+    limit: z.union([z.number().int().min(1), z.null()]).optional(),
+  })
+  .passthrough();
+const AppServerThreadUnsubscribeRequestSchema = z
+  .object({
+    threadId: z.string().min(1),
   })
   .passthrough();
 const AppServerArchiveThreadRequestSchema = z
@@ -131,6 +143,20 @@ interface ListThreadsRequestParameters {
   cwd?: string;
 }
 
+interface ListLoadedThreadsRequestParameters {
+  cursor?: string | null | undefined;
+  limit?: number | null | undefined;
+}
+
+export function buildListLoadedThreadsRequestParameters(
+  options?: ListLoadedThreadsOptions,
+): ListLoadedThreadsRequestParameters {
+  return AppServerThreadLoadedListRequestSchema.parse({
+    ...(options?.cursor !== undefined ? { cursor: options.cursor } : {}),
+    ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+  });
+}
+
 export function buildListThreadsRequestParameters(
   options: ListThreadsOptions,
 ): ListThreadsRequestParameters {
@@ -214,6 +240,14 @@ export function buildResumeThreadRequest(
     persistExtendedHistory:
       options?.persistExtendedHistory ??
       APP_SERVER_CLIENT_DEFAULT_RESUME_THREAD_PERSIST_EXTENDED_HISTORY,
+  });
+}
+
+export function buildUnsubscribeThreadRequest(
+  threadId: string,
+): z.infer<typeof AppServerThreadUnsubscribeRequestSchema> {
+  return AppServerThreadUnsubscribeRequestSchema.parse({
+    threadId,
   });
 }
 

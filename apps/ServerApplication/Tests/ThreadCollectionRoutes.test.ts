@@ -8,6 +8,7 @@ import type {
   AgentCreateThreadResult,
   AgentId,
   AgentInterruptInput,
+  AgentListLoadedThreadsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
   AgentReadThreadInput,
@@ -53,6 +54,7 @@ function createMockAgentAdapter(
   agentId: "codex" | "opencode",
   listThreads: (input: AgentListThreadsInput) => Promise<AgentListThreadsResult>,
   createThread?: (input: AgentCreateThreadInput) => Promise<AgentCreateThreadResult>,
+  listLoadedThreads?: () => Promise<AgentListLoadedThreadsResult>,
 ): AgentAdapter {
   return {
     id: agentId,
@@ -89,6 +91,13 @@ function createMockAgentAdapter(
     async interrupt(_input: AgentInterruptInput): Promise<void> {
       throw new Error("Not used in thread collection route test");
     },
+    ...(listLoadedThreads !== undefined
+      ? {
+          async listLoadedThreads(): Promise<AgentListLoadedThreadsResult> {
+            return listLoadedThreads();
+          },
+        }
+      : {}),
   };
 }
 
@@ -682,6 +691,63 @@ describe("handleThreadCollectionRoutes", () => {
         },
       ],
       pages: 1,
+    });
+  });
+
+  it("projects loaded-thread membership into list response rows when adapter supports loaded-list", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const adapter = createMockAgentAdapter(
+      "codex",
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [
+          {
+            id: "thread_loaded",
+            preview: "loaded",
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          {
+            id: "thread_not_loaded",
+            preview: "not loaded",
+            createdAt: 3,
+            updatedAt: 4,
+          },
+        ],
+        nextCursor: null,
+      }),
+      undefined,
+      async (): Promise<AgentListLoadedThreadsResult> => ({
+        data: ["thread_loaded"],
+        nextCursor: null,
+      }),
+    );
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        url: buildThreadCollectionRouteUrl("?limit=10"),
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+      }),
+    );
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toMatchObject({
+      ok: true,
+      data: [
+        {
+          id: "thread_not_loaded",
+          isLoadedInMemory: false,
+        },
+        {
+          id: "thread_loaded",
+          isLoadedInMemory: true,
+        },
+      ],
     });
   });
 

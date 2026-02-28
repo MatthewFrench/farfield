@@ -385,6 +385,7 @@ describe("useApplicationShellComposition", () => {
       buildActionRequestOptions: fixture.buildActionRequestOptions,
       setIsBusy: runtimeHarnessSnapshot.applicationShellState.setIsBusy,
       setError: runtimeHarnessSnapshot.applicationShellState.setError,
+      setSuccessBannerDetails: runtimeHarnessSnapshot.applicationShellState.setSuccessBannerDetails,
       setSelectedThreadId: runtimeHarnessSnapshot.applicationShellState.setSelectedThreadId,
       setMobileSidebarOpen: runtimeHarnessSnapshot.applicationShellState.setMobileSidebarOpen,
       selectedThreadIdRef: runtimeHarnessSnapshot.applicationShellState.selectedThreadIdRef,

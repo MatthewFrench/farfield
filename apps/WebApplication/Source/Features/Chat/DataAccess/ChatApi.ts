@@ -32,6 +32,7 @@ const MESSAGES_ROUTE_SEGMENT = "messages";
 const COLLABORATION_MODE_ROUTE_SEGMENT = "collaboration-mode";
 const USER_INPUT_ROUTE_SEGMENT = "user-input";
 const INTERRUPT_ROUTE_SEGMENT = "interrupt";
+const UNSUBSCRIBE_ROUTE_SEGMENT = "unsubscribe";
 const STREAM_EVENTS_LIMIT_QUERY_KEY = "limit";
 const STREAM_EVENTS_LIMIT_QUERY_VALUE = "80";
 const STREAM_EVENTS_SINCE_SEQUENCE_QUERY_KEY = "sinceSequence";
@@ -108,6 +109,17 @@ const InterruptThreadRequestBodySchema = InterruptThreadInputSchema.omit({
   threadId: true,
 }).strict();
 type ApiInterruptThreadRequestBody = z.infer<typeof InterruptThreadRequestBodySchema>;
+const UnsubscribeThreadStatusSchema = z.enum(["notLoaded", "notSubscribed", "unsubscribed"]);
+
+const UnsubscribeThreadResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: ThreadIdentifierSchema,
+    status: UnsubscribeThreadStatusSchema,
+  })
+  .strict()
+  .transform((value) => value.status);
+export type ApiUnsubscribeThreadStatus = z.infer<typeof UnsubscribeThreadStatusSchema>;
 
 type ChatMutationRequestBody =
   | ApiSendMessageRequestBody
@@ -182,6 +194,15 @@ function createJsonPostRequestInit(bodyText: string, options?: ApiRequestOptions
         [REQUEST_CONTENT_TYPE_HEADER_NAME]: REQUEST_CONTENT_TYPE_HEADER_VALUE,
       },
       body: bodyText,
+    },
+    options,
+  );
+}
+
+function createPostRequestInit(options?: ApiRequestOptions): RequestInit {
+  return applyRequestOptions(
+    {
+      method: REQUEST_METHOD_POST,
     },
     options,
   );
@@ -294,4 +315,16 @@ export async function interruptThread(
     parsedRequestBody,
     options,
   );
+}
+
+export async function unsubscribeThread(
+  threadId: string,
+  options?: ApiRequestOptions,
+): Promise<ApiUnsubscribeThreadStatus> {
+  const parsedThreadIdentifier = ThreadIdentifierSchema.parse(threadId);
+  const data = await request(
+    buildThreadMemberRoutePath(parsedThreadIdentifier, UNSUBSCRIBE_ROUTE_SEGMENT),
+    createPostRequestInit(options),
+  );
+  return UnsubscribeThreadResponseSchema.parse(data);
 }
