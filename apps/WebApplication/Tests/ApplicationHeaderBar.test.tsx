@@ -8,18 +8,10 @@ interface RenderApplicationHeaderBarInput {
   desktopSidebarOpen?: boolean;
   isBusy?: boolean;
   onRefresh?: () => void;
-  onToggleDebugTab?: () => void;
-  onEnablePushNotifications?: () => void;
+  onToggleSettingsTab?: () => void;
   onOpenMobileSidebar?: () => void;
   onOpenDesktopSidebar?: () => void;
 }
-
-const DEFAULT_PUSH_CLIENT_STATE = {
-  supported: true,
-  serviceWorkerRegistered: true,
-  permission: "default" as const,
-  subscribed: false,
-};
 
 function renderApplicationHeaderBar(input?: RenderApplicationHeaderBarInput): void {
   cleanup();
@@ -33,15 +25,12 @@ function renderApplicationHeaderBar(input?: RenderApplicationHeaderBarInput): vo
         activeThreadAgentId="codex"
         activeAgentLabel="Codex"
         isGenerating={false}
-        pushClientState={DEFAULT_PUSH_CLIENT_STATE}
-        isEnablingPushNotifications={false}
         isBusy={input?.isBusy ?? false}
         theme="light"
         onOpenMobileSidebar={input?.onOpenMobileSidebar ?? (() => {})}
         onOpenDesktopSidebar={input?.onOpenDesktopSidebar ?? (() => {})}
-        onEnablePushNotifications={input?.onEnablePushNotifications ?? (() => {})}
         onRefresh={input?.onRefresh ?? (() => {})}
-        onToggleDebugTab={input?.onToggleDebugTab ?? (() => {})}
+        onToggleSettingsTab={input?.onToggleSettingsTab ?? (() => {})}
         onToggleTheme={() => {}}
         renderAgentFavicon={() => null}
       />
@@ -50,78 +39,67 @@ function renderApplicationHeaderBar(input?: RenderApplicationHeaderBarInput): vo
 }
 
 describe("ApplicationHeaderBar", () => {
-  it("invokes refresh and debug toggle actions", () => {
+  it("invokes refresh and settings toggle actions", () => {
     const onRefresh = vi.fn();
-    const onToggleDebugTab = vi.fn();
+    const onToggleSettingsTab = vi.fn();
 
     renderApplicationHeaderBar({
       onRefresh,
-      onToggleDebugTab,
+      onToggleSettingsTab,
     });
 
     fireEvent.click(screen.getByTestId("refresh-button"));
-    fireEvent.click(screen.getByTestId("tab-debug"));
+    fireEvent.click(screen.getByTestId("tab-settings"));
 
     expect(onRefresh).toHaveBeenCalledTimes(1);
-    expect(onToggleDebugTab).toHaveBeenCalledTimes(1);
-  });
-
-  it("invokes push enable action", () => {
-    const onEnablePushNotifications = vi.fn();
-
-    renderApplicationHeaderBar({
-      onEnablePushNotifications,
-    });
-
-    fireEvent.click(screen.getByTestId("enable-notifications-button"));
-    expect(onEnablePushNotifications).toHaveBeenCalledTimes(1);
+    expect(onToggleSettingsTab).toHaveBeenCalledTimes(1);
   });
 
   it("invokes mobile sidebar open action", () => {
     const onOpenMobileSidebar = vi.fn();
-    const onToggleDebugTab = vi.fn();
+    const onToggleSettingsTab = vi.fn();
 
     renderApplicationHeaderBar({
       onOpenMobileSidebar,
-      onToggleDebugTab,
+      onToggleSettingsTab,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Threads" }));
     expect(onOpenMobileSidebar).toHaveBeenCalledTimes(1);
-    expect(onToggleDebugTab).not.toHaveBeenCalled();
+    expect(onToggleSettingsTab).not.toHaveBeenCalled();
   });
 
-  it("closes debug tab when opening mobile sidebar from debug view", () => {
+  it("closes settings tab when opening mobile sidebar from settings view", () => {
     const onOpenMobileSidebar = vi.fn();
-    const onToggleDebugTab = vi.fn();
+    const onToggleSettingsTab = vi.fn();
 
     renderApplicationHeaderBar({
       activeTab: "debug",
       onOpenMobileSidebar,
-      onToggleDebugTab,
+      onToggleSettingsTab,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Threads" }));
 
     expect(onOpenMobileSidebar).toHaveBeenCalledTimes(1);
-    expect(onToggleDebugTab).toHaveBeenCalledTimes(1);
+    expect(onToggleSettingsTab).toHaveBeenCalledTimes(1);
   });
 
-  it("closes debug tab when opening desktop sidebar from debug view", () => {
+  it("closes settings tab when opening desktop sidebar from settings view", () => {
     const onOpenDesktopSidebar = vi.fn();
-    const onToggleDebugTab = vi.fn();
+    const onToggleSettingsTab = vi.fn();
 
     renderApplicationHeaderBar({
       activeTab: "debug",
       desktopSidebarOpen: false,
       onOpenDesktopSidebar,
-      onToggleDebugTab,
+      onToggleSettingsTab,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
 
     expect(onOpenDesktopSidebar).toHaveBeenCalledTimes(1);
-    expect(onToggleDebugTab).toHaveBeenCalledTimes(1);
+    expect(onToggleSettingsTab).toHaveBeenCalledTimes(1);
   });
 
   it("does not invoke refresh action while busy", () => {
@@ -137,20 +115,20 @@ describe("ApplicationHeaderBar", () => {
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it("opens desktop sidebar without toggling debug tab from chat view", () => {
+  it("opens desktop sidebar without toggling settings tab from chat view", () => {
     const onOpenDesktopSidebar = vi.fn();
-    const onToggleDebugTab = vi.fn();
+    const onToggleSettingsTab = vi.fn();
 
     renderApplicationHeaderBar({
       activeTab: "chat",
       desktopSidebarOpen: false,
       onOpenDesktopSidebar,
-      onToggleDebugTab,
+      onToggleSettingsTab,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
 
     expect(onOpenDesktopSidebar).toHaveBeenCalledTimes(1);
-    expect(onToggleDebugTab).not.toHaveBeenCalled();
+    expect(onToggleSettingsTab).not.toHaveBeenCalled();
   });
 });

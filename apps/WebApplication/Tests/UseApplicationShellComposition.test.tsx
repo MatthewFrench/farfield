@@ -173,7 +173,10 @@ function createPushFeatureCompositionFixture(): ApplicationPushFeatureCompositio
   return {
     submitApiSessionToken: vi.fn(async (): Promise<void> => {}),
     refreshPushClientState: vi.fn(async (): Promise<void> => {}),
+    ensureFreshPushSettingsDiagnostics: vi.fn(async (): Promise<void> => {}),
+    refreshPushSettingsDiagnostics: vi.fn(async (): Promise<void> => {}),
     enablePushNotificationsFromToolbar: vi.fn(async (): Promise<void> => {}),
+    sendPushTestNotificationFromSettings: vi.fn(async (): Promise<void> => {}),
   };
 }
 
@@ -431,6 +434,10 @@ describe("useApplicationShellComposition", () => {
         visibleChatItemsStep: fixture.visibleChatItemsStep,
         enablePushNotificationsFromToolbar:
           fixture.pushFeatureComposition.enablePushNotificationsFromToolbar,
+        refreshPushSettingsDiagnostics:
+          fixture.pushFeatureComposition.refreshPushSettingsDiagnostics,
+        sendPushTestNotificationFromSettings:
+          fixture.pushFeatureComposition.sendPushTestNotificationFromSettings,
         submitApiSessionToken: fixture.pushFeatureComposition.submitApiSessionToken,
         handleAnswerChange: fixture.chatFeatureComposition.handleAnswerChange,
         submitPendingRequest: fixture.chatFeatureComposition.submitPendingRequest,

@@ -8,11 +8,14 @@ import {
 import { ApplicationRouteStateMapper } from "@/Application/DomainModel/ApplicationRouteStateMapper";
 import type { DebugIssue } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
 import { DebugIssueStateResolver } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
+import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/SettingsWorkspaceSectionContracts";
 import { LastViewedThreadPreferenceStore } from "@/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 
 const DEBUG_APPLICATION_TAB = "debug";
+const DEBUG_SETTINGS_WORKSPACE_SECTION: SettingsWorkspaceSection = "debug";
+const NOTIFICATIONS_SETTINGS_WORKSPACE_SECTION: SettingsWorkspaceSection = "notifications";
 const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
 const LAST_VIEWED_THREAD_WRITE_OPERATION = "last-viewed-thread:write";
 const LAST_VIEWED_THREAD_CLEAR_OPERATION = "last-viewed-thread:clear";
@@ -57,6 +60,7 @@ function createLastViewedThreadPreferenceError<ErrorType>(
 export interface UseApplicationRefreshEffectsInput {
   selectedThreadId: string | null;
   activeTab: "chat" | "debug";
+  settingsWorkspaceSection: SettingsWorkspaceSection;
   unreadThreadIds: Record<string, true>;
   isArchivedThreadsOpen: boolean;
   hasLoadedArchivedThreads: boolean;
@@ -73,6 +77,7 @@ export interface UseApplicationRefreshEffectsInput {
   setUnreadThreadIds: Dispatch<SetStateAction<Record<string, true>>>;
   setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
   setActiveTab: Dispatch<SetStateAction<"chat" | "debug">>;
+  setSettingsWorkspaceSection: Dispatch<SetStateAction<SettingsWorkspaceSection>>;
   setSelectedDebugIssueId: Dispatch<SetStateAction<string>>;
   threadListStateController: ThreadListStateController;
   lastViewedThreadPreferenceStore: LastViewedThreadPreferenceStore;
@@ -82,6 +87,7 @@ export interface UseApplicationRefreshEffectsInput {
   loadArchivedThreads: () => Promise<void>;
   refreshCoreDataAndSelectedThread: () => Promise<void>;
   refreshPushClientState: () => Promise<void>;
+  ensureFreshPushSettingsDiagnostics: () => Promise<void>;
   handleRuntimeRequestError: <ErrorType>(error: ErrorType) => void;
   coreRefreshIntervalMs: number;
   coreRefreshConnectedMinIntervalMs: number;
@@ -144,14 +150,40 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   }, [input.activeTab, input.activeTabRef]);
 
   useEffect(() => {
-    if (input.activeTab !== DEBUG_APPLICATION_TAB) {
+    if (
+      input.activeTab !== DEBUG_APPLICATION_TAB ||
+      input.settingsWorkspaceSection !== DEBUG_SETTINGS_WORKSPACE_SECTION
+    ) {
       return;
     }
 
     void input.loadCoreDataTracked().catch((error) => {
       input.handleRuntimeRequestError(error);
     });
-  }, [input.activeTab, input.handleRuntimeRequestError, input.loadCoreDataTracked]);
+  }, [
+    input.activeTab,
+    input.settingsWorkspaceSection,
+    input.handleRuntimeRequestError,
+    input.loadCoreDataTracked,
+  ]);
+
+  useEffect(() => {
+    if (
+      input.activeTab !== DEBUG_APPLICATION_TAB ||
+      input.settingsWorkspaceSection !== NOTIFICATIONS_SETTINGS_WORKSPACE_SECTION
+    ) {
+      return;
+    }
+
+    void input.ensureFreshPushSettingsDiagnostics().catch((error) => {
+      input.handleRuntimeRequestError(error);
+    });
+  }, [
+    input.activeTab,
+    input.settingsWorkspaceSection,
+    input.ensureFreshPushSettingsDiagnostics,
+    input.handleRuntimeRequestError,
+  ]);
 
   useEffect(() => {
     const nextSelectedDebugIssueIdentifier =
@@ -182,29 +214,43 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
 
   useEffect(() => {
     const onPopState = () => {
-      const nextRouteState = input.applicationRouteStateMapper.parseFromPathname(
+      const nextRouteState = input.applicationRouteStateMapper.parseFromLocation(
         window.location.pathname,
+        window.location.search,
       );
       input.setSelectedThreadId(nextRouteState.threadId);
       input.setActiveTab(nextRouteState.tab);
+      input.setSettingsWorkspaceSection(nextRouteState.settingsWorkspaceSection);
     };
 
     window.addEventListener("popstate", onPopState);
     return () => {
       window.removeEventListener("popstate", onPopState);
     };
-  }, [input.applicationRouteStateMapper, input.setActiveTab, input.setSelectedThreadId]);
+  }, [
+    input.applicationRouteStateMapper,
+    input.setActiveTab,
+    input.setSelectedThreadId,
+    input.setSettingsWorkspaceSection,
+  ]);
 
   useEffect(() => {
     const nextPath = input.applicationRouteStateMapper.buildPath({
       threadId: input.selectedThreadId,
       tab: input.activeTab,
+      settingsWorkspaceSection: input.settingsWorkspaceSection,
     });
-    if (window.location.pathname === nextPath) {
+    const currentLocationPath = `${window.location.pathname}${window.location.search}`;
+    if (currentLocationPath === nextPath) {
       return;
     }
     window.history.replaceState(null, "", nextPath);
-  }, [input.activeTab, input.applicationRouteStateMapper, input.selectedThreadId]);
+  }, [
+    input.activeTab,
+    input.applicationRouteStateMapper,
+    input.selectedThreadId,
+    input.settingsWorkspaceSection,
+  ]);
 
   useEffect(() => {
     void input.refreshCoreDataAndSelectedThread().catch((error) => {

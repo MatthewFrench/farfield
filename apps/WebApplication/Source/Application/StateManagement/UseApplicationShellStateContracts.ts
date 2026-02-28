@@ -21,7 +21,15 @@ import {
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { type DebugIssueSeverityFilter } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
+import {
+  type PushLocalCertificateAuthorityStatusResponse,
+  type PushReceiptLatestResponse,
+  type PushSendLatestResponse,
+  type PushStatusResponse,
+  type PushTestResponse,
+} from "@/Features/PushNotifications/DataAccess/PushServerClient";
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
+import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/SettingsWorkspaceSectionContracts";
 import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
@@ -125,6 +133,22 @@ export interface ApplicationShellState {
   setSelectedAgentId: ApplicationShellStateSetter<AgentId>;
   pushClientState: PushClientState;
   setPushClientState: ApplicationShellStateSetter<PushClientState>;
+  pushStatus: PushStatusResponse | null;
+  setPushStatus: ApplicationShellStateSetter<PushStatusResponse | null>;
+  latestPushReceipt: PushReceiptLatestResponse | null;
+  setLatestPushReceipt: ApplicationShellStateSetter<PushReceiptLatestResponse | null>;
+  latestPushSend: PushSendLatestResponse | null;
+  setLatestPushSend: ApplicationShellStateSetter<PushSendLatestResponse | null>;
+  pushLocalCertificateAuthorityStatus: PushLocalCertificateAuthorityStatusResponse | null;
+  setPushLocalCertificateAuthorityStatus: ApplicationShellStateSetter<PushLocalCertificateAuthorityStatusResponse | null>;
+  pushSettingsErrorMessage: string;
+  setPushSettingsErrorMessage: ApplicationShellStateSetter<string>;
+  pushTestResult: PushTestResponse | null;
+  setPushTestResult: ApplicationShellStateSetter<PushTestResponse | null>;
+  isRefreshingPushSettings: boolean;
+  setIsRefreshingPushSettings: ApplicationShellStateSetter<boolean>;
+  isSendingPushTestNotification: boolean;
+  setIsSendingPushTestNotification: ApplicationShellStateSetter<boolean>;
   isEnablingPushNotifications: boolean;
   setIsEnablingPushNotifications: ApplicationShellStateSetter<boolean>;
   requiresApiSessionToken: boolean;
@@ -137,6 +161,8 @@ export interface ApplicationShellState {
   setIsApiSessionBootstrapPending: ApplicationShellStateSetter<boolean>;
   activeTab: ApplicationShellTab;
   setActiveTab: ApplicationShellStateSetter<ApplicationShellTab>;
+  settingsWorkspaceSection: SettingsWorkspaceSection;
+  setSettingsWorkspaceSection: ApplicationShellStateSetter<SettingsWorkspaceSection>;
   mobileSidebarOpen: boolean;
   setMobileSidebarOpen: ApplicationShellStateSetter<boolean>;
   desktopSidebarOpen: boolean;

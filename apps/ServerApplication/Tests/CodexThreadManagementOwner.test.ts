@@ -146,12 +146,16 @@ class TestAppServerClient extends AppServerClient {
   }
 }
 
-function createOwner(appClient: AppServerClient): CodexThreadManagementOwner {
+function createOwner(
+  appClient: AppServerClient,
+  readProjectedHasUnreadTurnSignal: (threadId: string) => boolean | null = () => null,
+): CodexThreadManagementOwner {
   return new CodexThreadManagementOwner({
     appClient,
     runAppServerCall: async <ValueType>(operation: () => Promise<ValueType>): Promise<ValueType> =>
       operation(),
     ensureCodexAvailable: () => {},
+    readProjectedHasUnreadTurnSignal,
   });
 }
 
@@ -212,6 +216,58 @@ describe("CodexThreadManagementOwner", () => {
     });
     expect(result).not.toHaveProperty("pages");
     expect(result).not.toHaveProperty("truncated");
+  });
+
+  it("applies projected unread signals to list-thread items when available", async () => {
+    const appClient = new TestAppServerClient({
+      listThreadsResult: {
+        data: [
+          {
+            id: "thread-1",
+            preview: "Thread one",
+            createdAt: 1,
+            updatedAt: 2,
+            source: "opencode",
+          },
+          {
+            id: "thread-2",
+            preview: "Thread two",
+            createdAt: 3,
+            updatedAt: 4,
+            source: "opencode",
+            hasUnreadTurn: true,
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    const owner = createOwner(appClient, (threadId) => {
+      if (threadId === "thread-1") {
+        return false;
+      }
+      return null;
+    });
+
+    const result = await owner.listThreads(createListThreadsInput());
+
+    expect(result.data).toEqual([
+      {
+        id: "thread-1",
+        preview: "Thread one",
+        createdAt: 1,
+        updatedAt: 2,
+        source: "opencode",
+        hasUnreadTurn: false,
+      },
+      {
+        id: "thread-2",
+        preview: "Thread two",
+        createdAt: 3,
+        updatedAt: 4,
+        source: "opencode",
+        hasUnreadTurn: true,
+      },
+    ]);
   });
 
   it("preserves explicit empty-string list-thread optional values", async () => {

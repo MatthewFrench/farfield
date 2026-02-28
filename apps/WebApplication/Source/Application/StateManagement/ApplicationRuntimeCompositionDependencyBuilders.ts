@@ -56,8 +56,10 @@ export function buildApplicationPushFeatureCompositionInput(
     apiSessionBootstrapCoordinator: applicationOwnerDependencies.apiSessionBootstrapCoordinator,
     webShellSessionBootstrapClient: applicationOwnerDependencies.webShellSessionBootstrapClient,
     apiSessionTokenDraft: applicationShellState.apiSessionTokenDraft,
+    pushServerClient: applicationOwnerDependencies.pushServerClient,
     pushNotificationToolbarActionCoordinator:
       applicationOwnerDependencies.pushNotificationToolbarActionCoordinator,
+    pushDiagnosticsRefreshStateOwner: applicationOwnerDependencies.pushDiagnosticsRefreshStateOwner,
     loadCoreDataTracked: coreDataLoaders.loadCoreDataTracked,
     loadSelectedThreadIfPresent: dependencies.loadSelectedThreadIfPresentFromRuntimeState,
     setApiSessionTokenDraft: applicationShellState.setApiSessionTokenDraft,
@@ -66,6 +68,15 @@ export function buildApplicationPushFeatureCompositionInput(
     setIsApiSessionBootstrapPending: applicationShellState.setIsApiSessionBootstrapPending,
     setIsEnablingPushNotifications: applicationShellState.setIsEnablingPushNotifications,
     setPushClientState: applicationShellState.setPushClientState,
+    setPushStatus: applicationShellState.setPushStatus,
+    setLatestPushReceipt: applicationShellState.setLatestPushReceipt,
+    setLatestPushSend: applicationShellState.setLatestPushSend,
+    setPushLocalCertificateAuthorityStatus:
+      applicationShellState.setPushLocalCertificateAuthorityStatus,
+    setPushSettingsErrorMessage: applicationShellState.setPushSettingsErrorMessage,
+    setPushTestResult: applicationShellState.setPushTestResult,
+    setIsRefreshingPushSettings: applicationShellState.setIsRefreshingPushSettings,
+    setIsSendingPushTestNotification: applicationShellState.setIsSendingPushTestNotification,
     setRequiresApiSessionToken: applicationShellState.setRequiresApiSessionToken,
   };
 }
@@ -92,6 +103,7 @@ export function buildViewportShellEffectsInput(
 interface BuildApplicationRefreshEffectsInputDependencies {
   refreshCoreDataAndSelectedThread: () => Promise<void>;
   refreshPushClientState: () => Promise<void>;
+  ensureFreshPushSettingsDiagnostics: () => Promise<void>;
 }
 
 export function buildApplicationRefreshEffectsInput(
@@ -109,6 +121,7 @@ export function buildApplicationRefreshEffectsInput(
   return {
     selectedThreadId: applicationShellState.selectedThreadId,
     activeTab: applicationShellState.activeTab,
+    settingsWorkspaceSection: applicationShellState.settingsWorkspaceSection,
     unreadThreadIds: applicationShellState.unreadThreadIds,
     isArchivedThreadsOpen: applicationShellState.isArchivedThreadsOpen,
     hasLoadedArchivedThreads: applicationShellState.hasLoadedArchivedThreads,
@@ -125,6 +138,7 @@ export function buildApplicationRefreshEffectsInput(
     setUnreadThreadIds: applicationShellState.setUnreadThreadIds,
     setSelectedThreadId: applicationShellState.setSelectedThreadId,
     setActiveTab: applicationShellState.setActiveTab,
+    setSettingsWorkspaceSection: applicationShellState.setSettingsWorkspaceSection,
     setSelectedDebugIssueId: applicationShellState.setSelectedDebugIssueId,
     threadListStateController: applicationOwnerDependencies.threadListStateController,
     lastViewedThreadPreferenceStore: applicationOwnerDependencies.lastViewedThreadPreferenceStore,
@@ -134,6 +148,7 @@ export function buildApplicationRefreshEffectsInput(
     loadArchivedThreads: coreDataLoaders.loadArchivedThreads,
     refreshCoreDataAndSelectedThread: dependencies.refreshCoreDataAndSelectedThread,
     refreshPushClientState: dependencies.refreshPushClientState,
+    ensureFreshPushSettingsDiagnostics: dependencies.ensureFreshPushSettingsDiagnostics,
     handleRuntimeRequestError: runtimeRequestHandlers.handleRuntimeRequestError,
     coreRefreshIntervalMs: input.coreRefreshIntervalMs,
     coreRefreshConnectedMinIntervalMs: input.coreRefreshConnectedMinIntervalMs,
@@ -326,6 +341,7 @@ export function buildApplicationDebugFeatureCompositionInput(
     traceNote: applicationShellState.traceNote,
     errorBannerDetails: applicationDerivedState.errorBannerDetails,
     setActiveTab: applicationShellState.setActiveTab,
+    setSettingsWorkspaceSection: applicationShellState.setSettingsWorkspaceSection,
     setDebugWorkspaceSection: applicationShellState.setDebugWorkspaceSection,
     setDebugIssueSeverityFilter: applicationShellState.setDebugIssueSeverityFilter,
     setSelectedDebugIssueId: applicationShellState.setSelectedDebugIssueId,

@@ -135,7 +135,7 @@ describe("ThreadListStateStore", () => {
         id: "thread-alpha",
         preview: "Alpha",
         updatedAt: 100,
-        agentId: "codex",
+        agentId: "opencode",
       }),
       buildThread({
         id: "thread-beta",
@@ -157,7 +157,7 @@ describe("ThreadListStateStore", () => {
         id: "thread-alpha",
         preview: "Alpha",
         updatedAt: 101,
-        agentId: "codex",
+        agentId: "opencode",
       }),
       buildThread({
         id: "thread-beta",
@@ -182,6 +182,44 @@ describe("ThreadListStateStore", () => {
       selectedThreadIdentifier: "thread-alpha",
     });
     expect(selectedUnreadThreadResult.nextUnreadThreadIdentifiers).toEqual({});
+  });
+
+  it("keeps codex threads read when unread signal is missing", () => {
+    const store = new ThreadListStateStore();
+    const initialThreads: ThreadListItem[] = [
+      buildThread({
+        id: "thread-codex",
+        preview: "Codex",
+        updatedAt: 100,
+        agentId: "codex",
+      }),
+    ];
+
+    const initialResult = store.computeActiveThreadState({
+      nextThreads: initialThreads,
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: null,
+    });
+    expect(initialResult.nextUnreadThreadIdentifiers).toEqual({});
+
+    const updatedThreads: ThreadListItem[] = [
+      buildThread({
+        id: "thread-codex",
+        preview: "Codex",
+        updatedAt: 101,
+        agentId: "codex",
+      }),
+    ];
+
+    const unreadUpdateResult = store.computeActiveThreadState({
+      nextThreads: updatedThreads,
+      previousUnreadThreadIdentifiers: {
+        "thread-codex": true,
+      },
+      selectedThreadIdentifier: null,
+    });
+
+    expect(unreadUpdateResult.nextUnreadThreadIdentifiers).toEqual({});
   });
 
   it("removes selected unread identifiers and reuses the unread map when no change is needed", () => {

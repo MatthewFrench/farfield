@@ -30,6 +30,11 @@ const DefaultDebugErrorSeverity = "error";
 
 const AppServerGeneratedThreadListItemSchema =
   AppServerThreadListResponseBaseSchema.shape.data.element;
+const AppServerThreadListItemUnreadSignalSchema = z
+  .object({
+    hasUnreadTurn: z.boolean().optional(),
+  })
+  .passthrough();
 
 // Thread list payloads are sourced from both app-server generated contracts and OpenCode sessions.
 // Keep both variants in one owner schema so thread list parsing stays centralized.
@@ -45,8 +50,8 @@ const OpenCodeThreadListItemSchema = z
   .passthrough();
 
 export const AppServerThreadListItemSchema = z.union([
-  AppServerGeneratedThreadListItemSchema,
-  OpenCodeThreadListItemSchema,
+  AppServerGeneratedThreadListItemSchema.and(AppServerThreadListItemUnreadSignalSchema),
+  OpenCodeThreadListItemSchema.and(AppServerThreadListItemUnreadSignalSchema),
 ]);
 
 const AppServerThreadListSyncMetadataSchema = z

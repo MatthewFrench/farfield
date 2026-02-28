@@ -112,7 +112,10 @@ function createScrollableElementFixture(
 function createUseApplicationShellViewPropertiesFixture() {
   const setMobileSidebarOpenSpy = vi.fn((): void => {});
   const setDesktopSidebarOpenSpy = vi.fn((): void => {});
+  const setSettingsWorkspaceSectionSpy = vi.fn((): void => {});
   const enablePushNotificationsFromToolbarSpy = vi.fn(async (): Promise<void> => {});
+  const refreshPushSettingsDiagnosticsSpy = vi.fn(async (): Promise<void> => {});
+  const sendPushTestNotificationFromSettingsSpy = vi.fn(async (): Promise<void> => {});
   const refreshCoreDataAndSelectedThreadSpy = vi.fn(async (): Promise<void> => {});
   const setActiveTabSpy = vi.fn((): void => {});
   const toggleThemeSpy = vi.fn((): void => {});
@@ -146,6 +149,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const input: UseApplicationShellViewPropertiesInput = {
     health: null,
     activeTab: "chat",
+    settingsWorkspaceSection: "notifications",
     desktopSidebarOpen: false,
     selectedThreadLabel: "Selected Thread",
     hasSelectedThread: true,
@@ -158,12 +162,24 @@ function createUseApplicationShellViewPropertiesFixture() {
       permission: "granted",
       subscribed: true,
     },
+    pushStatus: null,
+    latestPushReceipt: null,
+    latestPushSend: null,
+    pushLocalCertificateAuthorityStatus: null,
+    pushSettingsErrorMessage: "",
+    pushTestResult: null,
+    latestTurnId: null,
     isEnablingPushNotifications: false,
+    isRefreshingPushSettings: false,
+    isSendingPushTestNotification: false,
     isBusy: false,
     theme: "dark",
     setMobileSidebarOpen: setMobileSidebarOpenSpy,
     setDesktopSidebarOpen: setDesktopSidebarOpenSpy,
+    setSettingsWorkspaceSection: setSettingsWorkspaceSectionSpy,
     enablePushNotificationsFromToolbar: enablePushNotificationsFromToolbarSpy,
+    refreshPushSettingsDiagnostics: refreshPushSettingsDiagnosticsSpy,
+    sendPushTestNotificationFromSettings: sendPushTestNotificationFromSettingsSpy,
     refreshCoreDataAndSelectedThread: refreshCoreDataAndSelectedThreadSpy,
     setActiveTab: setActiveTabSpy,
     toggleTheme: toggleThemeSpy,
@@ -254,7 +270,10 @@ function createUseApplicationShellViewPropertiesFixture() {
     scrollReference,
     setMobileSidebarOpenSpy,
     setDesktopSidebarOpenSpy,
+    setSettingsWorkspaceSectionSpy,
     enablePushNotificationsFromToolbarSpy,
+    refreshPushSettingsDiagnosticsSpy,
+    sendPushTestNotificationFromSettingsSpy,
     refreshCoreDataAndSelectedThreadSpy,
     setActiveTabSpy,
     toggleThemeSpy,
@@ -379,25 +398,22 @@ describe("useApplicationShellViewProperties", () => {
     expect(fixture.setDesktopSidebarOpenSpy).toHaveBeenCalledWith(true);
     expect(fixture.setActiveTabSpy).toHaveBeenLastCalledWith("chat");
 
-    headerProperties.onEnablePushNotifications();
-    expect(fixture.enablePushNotificationsFromToolbarSpy).toHaveBeenCalledTimes(1);
-
     headerProperties.onRefresh();
     expect(fixture.refreshCoreDataAndSelectedThreadSpy).toHaveBeenCalledTimes(1);
 
     headerProperties.onToggleTheme();
     expect(fixture.toggleThemeSpy).toHaveBeenCalledTimes(1);
 
-    headerProperties.onToggleDebugTab();
+    headerProperties.onToggleSettingsTab();
     expect(fixture.setActiveTabSpy).toHaveBeenLastCalledWith("debug");
   });
 
-  it("toggles debug tab back to chat when debug tab is already active", () => {
+  it("toggles settings tab back to chat when settings tab is already active", () => {
     const fixture = createUseApplicationShellViewPropertiesFixture();
     fixture.input.activeTab = "debug";
     const viewProperties = renderViewProperties(fixture.input);
 
-    viewProperties.applicationHeaderBarProperties.onToggleDebugTab();
+    viewProperties.applicationHeaderBarProperties.onToggleSettingsTab();
 
     expect(fixture.setActiveTabSpy).toHaveBeenCalledWith("chat");
   });
@@ -497,8 +513,8 @@ describe("useApplicationShellViewProperties", () => {
     expect(nextProperties.chatWorkspacePaneProperties).toBe(
       initialProperties.chatWorkspacePaneProperties,
     );
-    expect(nextProperties.debugWorkspacePaneProperties).not.toBe(
-      initialProperties.debugWorkspacePaneProperties,
+    expect(nextProperties.settingsWorkspacePaneProperties).not.toBe(
+      initialProperties.settingsWorkspacePaneProperties,
     );
   });
 
@@ -519,8 +535,8 @@ describe("useApplicationShellViewProperties", () => {
     expect(nextProperties.chatWorkspacePaneProperties).toBe(
       initialProperties.chatWorkspacePaneProperties,
     );
-    expect(nextProperties.debugWorkspacePaneProperties).toBe(
-      initialProperties.debugWorkspacePaneProperties,
+    expect(nextProperties.settingsWorkspacePaneProperties).toBe(
+      initialProperties.settingsWorkspacePaneProperties,
     );
     expect(nextProperties.apiSessionBootstrapOverlayProperties).not.toBe(
       initialProperties.apiSessionBootstrapOverlayProperties,

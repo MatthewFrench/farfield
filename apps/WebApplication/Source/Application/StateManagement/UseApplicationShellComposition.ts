@@ -77,6 +77,24 @@ interface ApplicationShellCompositionContext {
   applicationDerivedState: ApplicationDerivedState;
 }
 
+function readLatestTurnIdentifier(lastTurn: ApplicationDerivedState["lastTurn"]): string | null {
+  if (lastTurn === undefined) {
+    return null;
+  }
+
+  const turnIdentifier = lastTurn.turnId;
+  if (turnIdentifier !== undefined && turnIdentifier !== null && turnIdentifier.length > 0) {
+    return turnIdentifier;
+  }
+
+  const legacyTurnIdentifier = lastTurn.id;
+  if (legacyTurnIdentifier !== undefined && legacyTurnIdentifier.length > 0) {
+    return legacyTurnIdentifier;
+  }
+
+  return null;
+}
+
 function createApplicationShellCompositionContext(
   input: UseApplicationShellCompositionInput,
 ): ApplicationShellCompositionContext {
@@ -175,6 +193,7 @@ function buildApplicationShellViewPropertiesInput(
   return {
     health: applicationShellState.health,
     activeTab: applicationShellState.activeTab,
+    settingsWorkspaceSection: applicationShellState.settingsWorkspaceSection,
     desktopSidebarOpen: applicationShellState.desktopSidebarOpen,
     selectedThreadLabel: applicationDerivedState.selectedThreadLabel,
     hasSelectedThread: applicationDerivedState.selectedThread !== null,
@@ -182,13 +201,26 @@ function buildApplicationShellViewPropertiesInput(
     activeAgentLabel: applicationDerivedState.activeAgentLabel,
     isGenerating: applicationDerivedState.isGenerating,
     pushClientState: applicationShellState.pushClientState,
+    pushStatus: applicationShellState.pushStatus,
+    latestPushReceipt: applicationShellState.latestPushReceipt,
+    latestPushSend: applicationShellState.latestPushSend,
+    pushLocalCertificateAuthorityStatus: applicationShellState.pushLocalCertificateAuthorityStatus,
+    pushSettingsErrorMessage: applicationShellState.pushSettingsErrorMessage,
+    pushTestResult: applicationShellState.pushTestResult,
+    latestTurnId: readLatestTurnIdentifier(applicationDerivedState.lastTurn),
     isEnablingPushNotifications: applicationShellState.isEnablingPushNotifications,
+    isRefreshingPushSettings: applicationShellState.isRefreshingPushSettings,
+    isSendingPushTestNotification: applicationShellState.isSendingPushTestNotification,
     isBusy: applicationShellState.isBusy,
     theme: input.theme,
     setMobileSidebarOpen: applicationShellState.setMobileSidebarOpen,
     setDesktopSidebarOpen: applicationShellState.setDesktopSidebarOpen,
+    setSettingsWorkspaceSection: applicationShellState.setSettingsWorkspaceSection,
     enablePushNotificationsFromToolbar:
       input.pushFeatureComposition.enablePushNotificationsFromToolbar,
+    refreshPushSettingsDiagnostics: input.pushFeatureComposition.refreshPushSettingsDiagnostics,
+    sendPushTestNotificationFromSettings:
+      input.pushFeatureComposition.sendPushTestNotificationFromSettings,
     refreshCoreDataAndSelectedThread: input.refreshCoreDataAndSelectedThread,
     setActiveTab: applicationShellState.setActiveTab,
     toggleTheme: input.toggleTheme,

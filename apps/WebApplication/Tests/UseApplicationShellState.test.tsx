@@ -67,6 +67,7 @@ describe("useApplicationShellState", () => {
       initialUiState: {
         threadId: "thread-123",
         tab: "debug",
+        settingsWorkspaceSection: "debug",
       },
       initialVisibleChatItems: 50,
     });
@@ -76,6 +77,7 @@ describe("useApplicationShellState", () => {
     expect(applicationShellState.isSelectedThreadLoading).toBe(true);
     expect(applicationShellState.activeTab).toBe("debug");
     expect(applicationShellState.activeTabRef.current).toBe("debug");
+    expect(applicationShellState.settingsWorkspaceSection).toBe("debug");
   });
 
   it("initializes empty-thread route state without selected-thread loading", () => {
@@ -83,6 +85,7 @@ describe("useApplicationShellState", () => {
       initialUiState: {
         threadId: null,
         tab: "chat",
+        settingsWorkspaceSection: "notifications",
       },
       initialVisibleChatItems: 50,
     });
@@ -92,6 +95,7 @@ describe("useApplicationShellState", () => {
     expect(applicationShellState.isSelectedThreadLoading).toBe(false);
     expect(applicationShellState.activeTab).toBe("chat");
     expect(applicationShellState.activeTabRef.current).toBe("chat");
+    expect(applicationShellState.settingsWorkspaceSection).toBe("notifications");
   });
 
   it("exposes stable owner defaults for shell state and refs", () => {
@@ -100,6 +104,7 @@ describe("useApplicationShellState", () => {
       initialUiState: {
         threadId: null,
         tab: "chat",
+        settingsWorkspaceSection: "notifications",
       },
       initialVisibleChatItems,
     });
@@ -110,6 +115,7 @@ describe("useApplicationShellState", () => {
     expect(applicationShellState.selectedModeKey).toBe("");
     expect(applicationShellState.selectedModelId).toBe("");
     expect(applicationShellState.selectedReasoningEffort).toBe("");
+    expect(applicationShellState.settingsWorkspaceSection).toBe("notifications");
     expect(applicationShellState.debugWorkspaceSection).toBe("issues");
     expect(applicationShellState.debugIssueSeverityFilter).toBe("all");
     expect(applicationShellState.debugIssueFilterQuery).toBe("");
@@ -143,6 +149,7 @@ describe("useApplicationShellState", () => {
       initialUiState: {
         threadId: "thread-123",
         tab: "debug",
+        settingsWorkspaceSection: "debug",
       },
       initialVisibleChatItems: 50,
     };

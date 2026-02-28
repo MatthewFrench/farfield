@@ -75,6 +75,7 @@ function createBaseInput(): UseApplicationOwnerDependenciesInput {
     readThreadRetryMaximumDelayMilliseconds: 2_000,
     threadQueryCacheTimeToLiveMilliseconds: 30_000,
     threadQueryCacheMaximumEntries: 200,
+    pushDiagnosticsRefreshTimeToLiveMilliseconds: 30_000,
   };
 }
 
@@ -147,6 +148,7 @@ function expectSingletonOwnersStable(
   expect(nextDependencies.lastViewedThreadPreferenceStore).toBe(
     previousDependencies.lastViewedThreadPreferenceStore,
   );
+  expect(nextDependencies.pushServerClient).toBe(previousDependencies.pushServerClient);
   expect(nextDependencies.pushClientStateManager).toBe(previousDependencies.pushClientStateManager);
 }
 
@@ -187,6 +189,9 @@ function expectConfiguredOwnersStable(
   );
   expect(nextDependencies.pushNotificationToolbarActionCoordinator).toBe(
     previousDependencies.pushNotificationToolbarActionCoordinator,
+  );
+  expect(nextDependencies.pushDiagnosticsRefreshStateOwner).toBe(
+    previousDependencies.pushDiagnosticsRefreshStateOwner,
   );
 }
 
@@ -229,6 +234,9 @@ function expectConfiguredOwnersRecreated(
   );
   expect(nextDependencies.pushNotificationToolbarActionCoordinator).not.toBe(
     previousDependencies.pushNotificationToolbarActionCoordinator,
+  );
+  expect(nextDependencies.pushDiagnosticsRefreshStateOwner).not.toBe(
+    previousDependencies.pushDiagnosticsRefreshStateOwner,
   );
 }
 
@@ -287,6 +295,8 @@ describe("useApplicationOwnerDependencies", () => {
         baseInput.readThreadRetryMaximumDelayMilliseconds + 1,
       threadQueryCacheTimeToLiveMilliseconds: baseInput.threadQueryCacheTimeToLiveMilliseconds + 1,
       threadQueryCacheMaximumEntries: baseInput.threadQueryCacheMaximumEntries + 1,
+      pushDiagnosticsRefreshTimeToLiveMilliseconds:
+        baseInput.pushDiagnosticsRefreshTimeToLiveMilliseconds + 1,
     };
 
     rerender(<Harness input={changedInput} />);

@@ -17,9 +17,9 @@ import {
   type DebugStatusBannersProps,
 } from "@/Features/Debugging/UserInterface/DebugStatusBanners";
 import {
-  DebugWorkspacePane,
-  type DebugWorkspacePaneProps,
-} from "@/Features/Debugging/UserInterface/DebugWorkspacePane";
+  SettingsWorkspacePane,
+  type SettingsWorkspacePaneProps,
+} from "@/Features/Settings/UserInterface/SettingsWorkspacePane";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPane";
 import {
   type ThreadSidebarAgentDescriptor,
@@ -49,7 +49,7 @@ export interface ApplicationShellLayoutProps {
   applicationHeaderBarProperties: ApplicationHeaderBarProps;
   debugStatusBannersProperties: DebugStatusBannersProps;
   chatWorkspacePaneProperties: ChatWorkspacePaneProps;
-  debugWorkspacePaneProperties: DebugWorkspacePaneProps;
+  settingsWorkspacePaneProperties: SettingsWorkspacePaneProps;
   showApiSessionBootstrapOverlay: boolean;
   apiSessionBootstrapOverlayProperties: ApiSessionBootstrapOverlayProperties;
 }
@@ -74,7 +74,7 @@ export function ApplicationShellLayout({
   applicationHeaderBarProperties,
   debugStatusBannersProperties,
   chatWorkspacePaneProperties,
-  debugWorkspacePaneProperties,
+  settingsWorkspacePaneProperties,
   showApiSessionBootstrapOverlay,
   apiSessionBootstrapOverlayProperties,
 }: ApplicationShellLayoutProps): React.JSX.Element {
@@ -137,7 +137,7 @@ export function ApplicationShellLayout({
 
         {activeTab === "chat" && <ChatWorkspacePane {...chatWorkspacePaneProperties} />}
 
-        {activeTab === "debug" && <DebugWorkspacePane {...debugWorkspacePaneProperties} />}
+        {activeTab === "debug" && <SettingsWorkspacePane {...settingsWorkspacePaneProperties} />}
 
         {showApiSessionBootstrapOverlay && (
           <ApiSessionBootstrapOverlay {...apiSessionBootstrapOverlayProperties} />

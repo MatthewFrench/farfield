@@ -45,7 +45,9 @@ import { DebugWorkspaceDataReader } from "@/Features/Debugging/StateManagement/D
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
 import { TrackedUserInterfaceErrorReporter } from "@/Features/Debugging/StateManagement/TrackedUserInterfaceErrorReporter";
 import { PushClientStateManager } from "@/Features/PushNotifications/DataAccess/PushClientStateManager";
+import { PushServerClient } from "@/Features/PushNotifications/DataAccess/PushServerClient";
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
+import { PushDiagnosticsRefreshStateOwner } from "@/Features/PushNotifications/StateManagement/PushDiagnosticsRefreshStateOwner";
 import { PushNotificationToolbarActionCoordinator } from "@/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";
 import { LastViewedThreadPreferenceStore } from "@/Features/Threads/DataAccess/LastViewedThreadPreferenceStore";
 import { ThreadDisplayNamePreferenceStore } from "@/Features/Threads/DataAccess/ThreadDisplayNamePreferenceStore";
@@ -89,6 +91,7 @@ export interface UseApplicationOwnerDependenciesInput {
   readThreadRetryMaximumDelayMilliseconds: number;
   threadQueryCacheTimeToLiveMilliseconds: number;
   threadQueryCacheMaximumEntries: number;
+  pushDiagnosticsRefreshTimeToLiveMilliseconds: number;
 }
 
 export interface ApplicationOwnerDependencies<
@@ -134,7 +137,9 @@ export interface ApplicationOwnerDependencies<
   threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
   threadListStateController: ThreadListStateController;
   lastViewedThreadPreferenceStore: LastViewedThreadPreferenceStore;
+  pushServerClient: PushServerClient;
   pushClientStateManager: PushClientStateManager;
+  pushDiagnosticsRefreshStateOwner: PushDiagnosticsRefreshStateOwner;
   pushNotificationToolbarActionCoordinator: PushNotificationToolbarActionCoordinator;
 }
 
@@ -238,6 +243,7 @@ export function useApplicationOwnerDependencies<
     readThreadRetryMaximumDelayMilliseconds,
     threadQueryCacheTimeToLiveMilliseconds,
     threadQueryCacheMaximumEntries,
+    pushDiagnosticsRefreshTimeToLiveMilliseconds,
   } = input;
 
   const apiAuthenticationErrorClassifier = useStableOwner(
@@ -442,7 +448,15 @@ export function useApplicationOwnerDependencies<
     }
     return null;
   }, [threadListPresentationExecutionMode]);
+  const pushServerClient = useStableOwner(() => new PushServerClient());
   const pushClientStateManager = useStableOwner(() => new PushClientStateManager());
+  const pushDiagnosticsRefreshStateOwner = useMemo(
+    () =>
+      new PushDiagnosticsRefreshStateOwner({
+        timeToLiveMilliseconds: pushDiagnosticsRefreshTimeToLiveMilliseconds,
+      }),
+    [pushDiagnosticsRefreshTimeToLiveMilliseconds],
+  );
   const pushNotificationToolbarActionCoordinator = useMemo(
     () =>
       new PushNotificationToolbarActionCoordinator({
@@ -493,7 +507,9 @@ export function useApplicationOwnerDependencies<
     threadDisplayNameStateOwner,
     threadListStateController,
     lastViewedThreadPreferenceStore,
+    pushServerClient,
     pushClientStateManager,
+    pushDiagnosticsRefreshStateOwner,
     pushNotificationToolbarActionCoordinator,
   };
 }

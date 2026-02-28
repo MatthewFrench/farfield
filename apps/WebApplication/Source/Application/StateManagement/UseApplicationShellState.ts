@@ -19,6 +19,14 @@ import {
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { type DebugIssueSeverityFilter } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
+import {
+  type PushLocalCertificateAuthorityStatusResponse,
+  type PushReceiptLatestResponse,
+  type PushSendLatestResponse,
+  type PushStatusResponse,
+  type PushTestResponse,
+} from "@/Features/PushNotifications/DataAccess/PushServerClient";
+import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/SettingsWorkspaceSectionContracts";
 import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
@@ -46,6 +54,8 @@ interface ShellInitialFlags {
   isChatAtBottom: boolean;
   hasHydratedModeFromLiveState: boolean;
   isModeSyncing: boolean;
+  isRefreshingPushSettings: boolean;
+  isSendingPushTestNotification: boolean;
   eventsConnected: boolean;
   hasHydratedAgentSelection: boolean;
 }
@@ -53,6 +63,7 @@ interface ShellInitialFlags {
 interface RouteSeededShellState {
   selectedThreadIdentifier: string | null;
   activeTab: ApplicationShellTab;
+  settingsWorkspaceSection: SettingsWorkspaceSection;
   isSelectedThreadLoading: boolean;
 }
 
@@ -72,6 +83,8 @@ const INITIAL_SHELL_FLAGS: ShellInitialFlags = {
   isChatAtBottom: true,
   hasHydratedModeFromLiveState: false,
   isModeSyncing: false,
+  isRefreshingPushSettings: false,
+  isSendingPushTestNotification: false,
   eventsConnected: false,
   hasHydratedAgentSelection: false,
 };
@@ -81,6 +94,7 @@ function readRouteSeededShellState(input: UseApplicationShellStateInput): RouteS
   return {
     selectedThreadIdentifier,
     activeTab: input.initialUiState.tab,
+    settingsWorkspaceSection: input.initialUiState.settingsWorkspaceSection,
     isSelectedThreadLoading: selectedThreadIdentifier !== null,
   };
 }
@@ -200,7 +214,24 @@ export function useApplicationShellState(
   const applicationPushState = useApplicationPushState({
     unsupportedPushClientState: input.unsupportedPushClientState,
   });
+  const [pushStatus, setPushStatus] = useState<PushStatusResponse | null>(null);
+  const [latestPushReceipt, setLatestPushReceipt] = useState<PushReceiptLatestResponse | null>(
+    null,
+  );
+  const [latestPushSend, setLatestPushSend] = useState<PushSendLatestResponse | null>(null);
+  const [pushLocalCertificateAuthorityStatus, setPushLocalCertificateAuthorityStatus] =
+    useState<PushLocalCertificateAuthorityStatusResponse | null>(null);
+  const [pushSettingsErrorMessage, setPushSettingsErrorMessage] = useState(INITIAL_TEXT_VALUE);
+  const [pushTestResult, setPushTestResult] = useState<PushTestResponse | null>(null);
+  const [isRefreshingPushSettings, setIsRefreshingPushSettings] = useState(
+    INITIAL_SHELL_FLAGS.isRefreshingPushSettings,
+  );
+  const [isSendingPushTestNotification, setIsSendingPushTestNotification] = useState(
+    INITIAL_SHELL_FLAGS.isSendingPushTestNotification,
+  );
   const [activeTab, setActiveTab] = useState<ApplicationShellTab>(routeSeededShellState.activeTab);
+  const [settingsWorkspaceSection, setSettingsWorkspaceSection] =
+    useState<SettingsWorkspaceSection>(routeSeededShellState.settingsWorkspaceSection);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(INITIAL_SHELL_FLAGS.mobileSidebarOpen);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(
     INITIAL_SHELL_FLAGS.desktopSidebarOpen,
@@ -314,8 +345,26 @@ export function useApplicationShellState(
     selectedAgentId,
     setSelectedAgentId,
     ...applicationPushState,
+    pushStatus,
+    setPushStatus,
+    latestPushReceipt,
+    setLatestPushReceipt,
+    latestPushSend,
+    setLatestPushSend,
+    pushLocalCertificateAuthorityStatus,
+    setPushLocalCertificateAuthorityStatus,
+    pushSettingsErrorMessage,
+    setPushSettingsErrorMessage,
+    pushTestResult,
+    setPushTestResult,
+    isRefreshingPushSettings,
+    setIsRefreshingPushSettings,
+    isSendingPushTestNotification,
+    setIsSendingPushTestNotification,
     activeTab,
     setActiveTab,
+    settingsWorkspaceSection,
+    setSettingsWorkspaceSection,
     mobileSidebarOpen,
     setMobileSidebarOpen,
     desktopSidebarOpen,

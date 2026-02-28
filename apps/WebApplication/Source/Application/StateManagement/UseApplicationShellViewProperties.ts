@@ -10,12 +10,28 @@ import { type DebugHistoryEntryListItem } from "@/Features/Debugging/UserInterfa
 import { type DebugStatusBannersProps } from "@/Features/Debugging/UserInterface/DebugStatusBanners";
 import { type DebugTraceSummary } from "@/Features/Debugging/UserInterface/DebugTracePanel";
 import { type DebugWorkspacePaneProps } from "@/Features/Debugging/UserInterface/DebugWorkspacePane";
+import {
+  type PushLocalCertificateAuthorityStatusResponse,
+  type PushReceiptLatestResponse,
+  type PushSendLatestResponse,
+  type PushStatusResponse,
+  type PushTestResponse,
+} from "@/Features/PushNotifications/DataAccess/PushServerClient";
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
+import { type PushNotificationsSettingsPaneProps } from "@/Features/PushNotifications/UserInterface/PushNotificationsSettingsPane";
+import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/SettingsWorkspaceSectionContracts";
+import { type SettingsWorkspacePaneProps } from "@/Features/Settings/UserInterface/SettingsWorkspacePane";
 import { type ThreadSidebarPanelHealthState } from "@/Features/Threads/UserInterface/ThreadSidebarPanel";
+
+interface SendPushTestNotificationFromSettingsInput {
+  threadId: string;
+  turnId: string;
+}
 
 export interface UseApplicationShellViewPropertiesInput {
   health: CapabilityHealthResponse | null;
   activeTab: ApplicationHeaderBarProps["activeTab"];
+  settingsWorkspaceSection: SettingsWorkspaceSection;
   desktopSidebarOpen: boolean;
   selectedThreadLabel: string;
   hasSelectedThread: boolean;
@@ -23,12 +39,26 @@ export interface UseApplicationShellViewPropertiesInput {
   activeAgentLabel: string;
   isGenerating: boolean;
   pushClientState: PushClientState;
+  pushStatus: PushStatusResponse | null;
+  latestPushReceipt: PushReceiptLatestResponse | null;
+  latestPushSend: PushSendLatestResponse | null;
+  pushLocalCertificateAuthorityStatus: PushLocalCertificateAuthorityStatusResponse | null;
+  pushSettingsErrorMessage: string;
+  pushTestResult: PushTestResponse | null;
+  latestTurnId: string | null;
   isEnablingPushNotifications: boolean;
+  isRefreshingPushSettings: boolean;
+  isSendingPushTestNotification: boolean;
   isBusy: boolean;
   theme: string;
   setMobileSidebarOpen: (nextOpen: boolean) => void;
   setDesktopSidebarOpen: (nextOpen: boolean) => void;
+  setSettingsWorkspaceSection: (nextSection: SettingsWorkspaceSection) => void;
   enablePushNotificationsFromToolbar: () => void | Promise<void>;
+  refreshPushSettingsDiagnostics: () => void | Promise<void>;
+  sendPushTestNotificationFromSettings: (
+    input: SendPushTestNotificationFromSettingsInput,
+  ) => void | Promise<void>;
   refreshCoreDataAndSelectedThread: () => void | Promise<void>;
   setActiveTab: (nextTab: ApplicationHeaderBarProps["activeTab"]) => void;
   toggleTheme: () => void;
@@ -113,14 +143,14 @@ export interface ApplicationShellViewProperties {
   applicationHeaderBarProperties: ApplicationHeaderBarProps;
   debugStatusBannersProperties: DebugStatusBannersProps;
   chatWorkspacePaneProperties: ChatWorkspacePaneProps;
-  debugWorkspacePaneProperties: DebugWorkspacePaneProps;
+  settingsWorkspacePaneProperties: SettingsWorkspacePaneProps;
   apiSessionBootstrapOverlayProperties: ApiSessionBootstrapOverlayProperties;
 }
 
 type AsyncOwnerAction = () => void | Promise<void>;
 
 const CHAT_TAB: ApplicationHeaderBarProps["activeTab"] = "chat";
-const DEBUG_TAB: ApplicationHeaderBarProps["activeTab"] = "debug";
+const SETTINGS_TAB: ApplicationHeaderBarProps["activeTab"] = "debug";
 const EMPTY_ERROR_MESSAGE = "";
 const SIDEBAR_OPEN_STATE = true;
 const CHAT_AT_BOTTOM_STATE = true;
@@ -138,10 +168,10 @@ function openSidebarWithChatTab(
   setSidebarOpen(SIDEBAR_OPEN_STATE);
 }
 
-function getNextActiveTabWhenTogglingDebug(
+function getNextActiveTabWhenTogglingSettings(
   activeTab: ApplicationHeaderBarProps["activeTab"],
 ): ApplicationHeaderBarProps["activeTab"] {
-  return activeTab === DEBUG_TAB ? CHAT_TAB : DEBUG_TAB;
+  return activeTab === SETTINGS_TAB ? CHAT_TAB : SETTINGS_TAB;
 }
 
 function getNextVisibleChatItemLimit(
@@ -207,8 +237,6 @@ function buildApplicationHeaderBarProperties(
     activeThreadAgentId: input.activeThreadAgentId,
     activeAgentLabel: input.activeAgentLabel,
     isGenerating: input.isGenerating,
-    pushClientState: input.pushClientState,
-    isEnablingPushNotifications: input.isEnablingPushNotifications,
     isBusy: input.isBusy,
     theme: input.theme,
     onOpenMobileSidebar: () => {
@@ -217,14 +245,11 @@ function buildApplicationHeaderBarProperties(
     onOpenDesktopSidebar: () => {
       openSidebarWithChatTab(input.setActiveTab, input.setDesktopSidebarOpen);
     },
-    onEnablePushNotifications: () => {
-      invokeAsyncOwnerAction(input.enablePushNotificationsFromToolbar);
-    },
     onRefresh: () => {
       invokeAsyncOwnerAction(input.refreshCoreDataAndSelectedThread);
     },
-    onToggleDebugTab: () => {
-      input.setActiveTab(getNextActiveTabWhenTogglingDebug(input.activeTab));
+    onToggleSettingsTab: () => {
+      input.setActiveTab(getNextActiveTabWhenTogglingSettings(input.activeTab));
     },
     onToggleTheme: input.toggleTheme,
     renderAgentFavicon: input.renderAgentFavicon,
@@ -337,6 +362,74 @@ function buildDebugWorkspacePaneProperties(
   };
 }
 
+function canSendPushTestNotification(
+  selectedThreadId: string | null,
+  latestTurnId: string | null,
+): boolean {
+  if (selectedThreadId === null || selectedThreadId.length === 0) {
+    return false;
+  }
+  return latestTurnId !== null && latestTurnId.length > 0;
+}
+
+function buildPushNotificationsSettingsPaneProperties(
+  input: UseApplicationShellViewPropertiesInput,
+): PushNotificationsSettingsPaneProps {
+  return {
+    pushClientState: input.pushClientState,
+    pushStatus: input.pushStatus,
+    latestPushReceipt: input.latestPushReceipt,
+    latestPushSend: input.latestPushSend,
+    pushLocalCertificateAuthorityStatus: input.pushLocalCertificateAuthorityStatus,
+    pushSettingsErrorMessage: input.pushSettingsErrorMessage,
+    pushTestResult: input.pushTestResult,
+    isRefreshingPushSettings: input.isRefreshingPushSettings,
+    isEnablingPushNotifications: input.isEnablingPushNotifications,
+    isSendingPushTestNotification: input.isSendingPushTestNotification,
+    canSendPushTestNotification: canSendPushTestNotification(
+      input.selectedThreadId,
+      input.latestTurnId,
+    ),
+    selectedThreadId: input.selectedThreadId,
+    latestTurnId: input.latestTurnId,
+    onRefreshPushSettings: () => {
+      invokeAsyncOwnerAction(input.refreshPushSettingsDiagnostics);
+    },
+    onEnablePushNotifications: () => {
+      invokeAsyncOwnerAction(input.enablePushNotificationsFromToolbar);
+    },
+    onSendPushTestNotification: () => {
+      if (
+        input.selectedThreadId === null ||
+        input.selectedThreadId.length === 0 ||
+        input.latestTurnId === null ||
+        input.latestTurnId.length === 0
+      ) {
+        return;
+      }
+      const selectedThreadIdentifier = input.selectedThreadId;
+      const latestTurnIdentifier = input.latestTurnId;
+      invokeAsyncOwnerAction(() =>
+        input.sendPushTestNotificationFromSettings({
+          threadId: selectedThreadIdentifier,
+          turnId: latestTurnIdentifier,
+        }),
+      );
+    },
+  };
+}
+
+function buildSettingsWorkspacePaneProperties(
+  input: UseApplicationShellViewPropertiesInput,
+): SettingsWorkspacePaneProps {
+  return {
+    settingsWorkspaceSection: input.settingsWorkspaceSection,
+    onSettingsWorkspaceSectionChange: input.setSettingsWorkspaceSection,
+    debugWorkspacePaneProperties: buildDebugWorkspacePaneProperties(input),
+    pushNotificationsSettingsPaneProperties: buildPushNotificationsSettingsPaneProperties(input),
+  };
+}
+
 function buildApiSessionBootstrapOverlayProperties(
   input: UseApplicationShellViewPropertiesInput,
 ): ApiSessionBootstrapOverlayProperties {
@@ -372,12 +465,9 @@ export function useApplicationShellViewProperties(
       input.activeTab,
       input.activeThreadAgentId,
       input.desktopSidebarOpen,
-      input.enablePushNotificationsFromToolbar,
       input.hasSelectedThread,
       input.isBusy,
-      input.isEnablingPushNotifications,
       input.isGenerating,
-      input.pushClientState,
       input.refreshCoreDataAndSelectedThread,
       input.renderAgentFavicon,
       input.selectedThreadLabel,
@@ -435,9 +525,10 @@ export function useApplicationShellViewProperties(
     ],
   );
 
-  const debugWorkspacePaneProperties = useMemo<DebugWorkspacePaneProps>(
-    () => buildDebugWorkspacePaneProperties(input),
+  const settingsWorkspacePaneProperties = useMemo<SettingsWorkspacePaneProps>(
+    () => buildSettingsWorkspacePaneProperties(input),
     [
+      input.enablePushNotificationsFromToolbar,
       input.clearDebugIssuesFromDebugPanel,
       input.debugErrorIssueCount,
       input.debugErrorSessionId,
@@ -454,10 +545,26 @@ export function useApplicationShellViewProperties(
       input.recentTraceSummaries,
       input.replayHistoryEntryFromDetail,
       input.runtimeRequestErrorOperationMetrics,
+      input.isEnablingPushNotifications,
+      input.isRefreshingPushSettings,
+      input.isSendingPushTestNotification,
       input.selectedDebugIssue,
       input.selectedDebugIssueId,
       input.selectedHistoryDetailId,
       input.selectedHistoryId,
+      input.selectedThreadId,
+      input.latestTurnId,
+      input.latestPushReceipt,
+      input.latestPushSend,
+      input.pushStatus,
+      input.pushLocalCertificateAuthorityStatus,
+      input.pushSettingsErrorMessage,
+      input.pushTestResult,
+      input.pushClientState,
+      input.refreshPushSettingsDiagnostics,
+      input.sendPushTestNotificationFromSettings,
+      input.settingsWorkspaceSection,
+      input.setSettingsWorkspaceSection,
       input.setDebugIssueFilterQuery,
       input.setDebugIssueSeverityFilter,
       input.setDebugWorkspaceSection,
@@ -494,7 +601,7 @@ export function useApplicationShellViewProperties(
       applicationHeaderBarProperties,
       debugStatusBannersProperties,
       chatWorkspacePaneProperties,
-      debugWorkspacePaneProperties,
+      settingsWorkspacePaneProperties,
       apiSessionBootstrapOverlayProperties,
     }),
     [
@@ -502,7 +609,7 @@ export function useApplicationShellViewProperties(
       applicationHeaderBarProperties,
       debugStatusBannersProperties,
       chatWorkspacePaneProperties,
-      debugWorkspacePaneProperties,
+      settingsWorkspacePaneProperties,
       apiSessionBootstrapOverlayProperties,
     ],
   );

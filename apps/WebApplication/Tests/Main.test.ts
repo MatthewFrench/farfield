@@ -66,9 +66,20 @@ const mainModuleMocks = vi.hoisted(() => {
       remove: (): void => {},
     }),
   );
-  const parseFromPathname = vi.fn((_pathname: string): { threadId: string | null } => ({
-    threadId: "thread-from-mapper",
-  }));
+  const parseFromLocation = vi.fn(
+    (
+      _pathname: string,
+      _search: string,
+    ): {
+      threadId: string | null;
+      tab: "chat" | "debug";
+      settingsWorkspaceSection: "notifications" | "debug";
+    } => ({
+      threadId: "thread-from-mapper",
+      tab: "chat",
+      settingsWorkspaceSection: "notifications",
+    }),
+  );
   const serviceWorkerControllerChangeReloadOwnerConstructorArguments: boolean[] = [];
   const readReloadDecision = vi.fn(
     (_input: ServiceWorkerControllerChangeReloadDecisionInput): { shouldReload: boolean } => ({
@@ -93,7 +104,7 @@ const mainModuleMocks = vi.hoisted(() => {
     createRoot,
     reconcilePushSubscription,
     installGlobalClientCrashReporter,
-    parseFromPathname,
+    parseFromLocation,
     serviceWorkerControllerChangeReloadOwnerConstructorArguments,
     readReloadDecision,
     MockServiceWorkerControllerChangeReloadOwner,
@@ -123,8 +134,15 @@ vi.mock("../Source/Application/Boot/ServiceWorkerControllerChangeReloadOwner", (
 
 vi.mock("../Source/Application/DomainModel/ApplicationRouteStateMapper", () => {
   class MockApplicationRouteStateMapper {
-    public parseFromPathname(pathname: string): { threadId: string | null } {
-      return mainModuleMocks.parseFromPathname(pathname);
+    public parseFromLocation(
+      pathname: string,
+      search: string,
+    ): {
+      threadId: string | null;
+      tab: "chat" | "debug";
+      settingsWorkspaceSection: "notifications" | "debug";
+    } {
+      return mainModuleMocks.parseFromLocation(pathname, search);
     }
   }
 
@@ -250,7 +268,10 @@ describe("Main bootstrap", () => {
     const crashReporterOptions = crashReporterCall[0];
     expect(crashReporterOptions.source).toBe("farfield-web");
     expect(crashReporterOptions.readThreadId?.()).toBe("thread-from-mapper");
-    expect(mainModuleMocks.parseFromPathname).toHaveBeenCalledWith("/threads/thread-123");
+    expect(mainModuleMocks.parseFromLocation).toHaveBeenCalledWith(
+      "/threads/thread-123",
+      "?view=chat",
+    );
     expect(crashReporterOptions.readUrl?.()).toBe("/threads/thread-123?view=chat");
 
     runNextAnimationFrame();

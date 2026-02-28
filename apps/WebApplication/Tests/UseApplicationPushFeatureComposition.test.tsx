@@ -10,7 +10,16 @@ import {
   useApplicationPushFeatureComposition,
 } from "../Source/Application/StateManagement/UseApplicationPushFeatureComposition";
 import { PushClientStateManager } from "../Source/Features/PushNotifications/DataAccess/PushClientStateManager";
+import {
+  type PushLocalCertificateAuthorityStatusResponse,
+  type PushReceiptLatestResponse,
+  type PushSendLatestResponse,
+  PushServerClient,
+  type PushStatusResponse,
+  type PushTestResponse,
+} from "../Source/Features/PushNotifications/DataAccess/PushServerClient";
 import { type PushClientState } from "../Source/Features/PushNotifications/DomainModel/PushClientContracts";
+import { PushDiagnosticsRefreshStateOwner } from "../Source/Features/PushNotifications/StateManagement/PushDiagnosticsRefreshStateOwner";
 import { PushNotificationToolbarActionCoordinator } from "../Source/Features/PushNotifications/StateManagement/PushNotificationToolbarActionCoordinator";
 
 const API_TOKEN_REQUIRED_ERROR_MESSAGE = "API token is required";
@@ -98,13 +107,27 @@ function createHarness(overrides?: { apiSessionTokenDraft?: string }) {
   const setIsApiSessionBootstrapPending = vi.fn<(value: SetStateAction<boolean>) => void>();
   const setIsEnablingPushNotifications = vi.fn<(value: SetStateAction<boolean>) => void>();
   const setPushClientState = vi.fn<(value: SetStateAction<PushClientState>) => void>();
+  const setPushStatus = vi.fn<(value: SetStateAction<PushStatusResponse | null>) => void>();
+  const setLatestPushReceipt =
+    vi.fn<(value: SetStateAction<PushReceiptLatestResponse | null>) => void>();
+  const setLatestPushSend = vi.fn<(value: SetStateAction<PushSendLatestResponse | null>) => void>();
+  const setPushLocalCertificateAuthorityStatus =
+    vi.fn<(value: SetStateAction<PushLocalCertificateAuthorityStatusResponse | null>) => void>();
+  const setPushSettingsErrorMessage = vi.fn<(value: SetStateAction<string>) => void>();
+  const setPushTestResult = vi.fn<(value: SetStateAction<PushTestResponse | null>) => void>();
+  const setIsRefreshingPushSettings = vi.fn<(value: SetStateAction<boolean>) => void>();
+  const setIsSendingPushTestNotification = vi.fn<(value: SetStateAction<boolean>) => void>();
   const setRequiresApiSessionToken = vi.fn<(value: SetStateAction<boolean>) => void>();
 
   const input: UseApplicationPushFeatureCompositionInput = {
     apiSessionBootstrapCoordinator,
     webShellSessionBootstrapClient,
     apiSessionTokenDraft: overrides?.apiSessionTokenDraft ?? "token-value",
+    pushServerClient: new PushServerClient(),
     pushNotificationToolbarActionCoordinator: createPushNotificationToolbarActionCoordinator(),
+    pushDiagnosticsRefreshStateOwner: new PushDiagnosticsRefreshStateOwner({
+      timeToLiveMilliseconds: 0,
+    }),
     loadCoreDataTracked,
     loadSelectedThreadIfPresent,
     setApiSessionTokenDraft,
@@ -113,6 +136,14 @@ function createHarness(overrides?: { apiSessionTokenDraft?: string }) {
     setIsApiSessionBootstrapPending,
     setIsEnablingPushNotifications,
     setPushClientState,
+    setPushStatus,
+    setLatestPushReceipt,
+    setLatestPushSend,
+    setPushLocalCertificateAuthorityStatus,
+    setPushSettingsErrorMessage,
+    setPushTestResult,
+    setIsRefreshingPushSettings,
+    setIsSendingPushTestNotification,
     setRequiresApiSessionToken,
   };
 

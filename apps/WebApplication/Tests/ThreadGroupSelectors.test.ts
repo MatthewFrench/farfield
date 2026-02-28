@@ -93,11 +93,13 @@ describe("ThreadGroupSelectors", () => {
       previousUnreadThreadIdentifiers: {
         "thread-history-unread": true,
         "thread-explicit-read": true,
+        "thread-codex-unknown-signal": true,
       },
       previousThreadUpdatedAtByIdentifier: {
         "thread-history-update": 10,
         "thread-history-same": 20,
         "thread-explicit-read": 5,
+        "thread-codex-unknown-signal": 20,
       },
       selectedThreadIdentifier: "thread-selected",
       nextThreads: [
@@ -120,21 +122,31 @@ describe("ThreadGroupSelectors", () => {
           id: "thread-history-unread",
           updatedAt: 10,
           hasUnreadTurn: null,
+          agentId: "opencode",
         }),
         buildThread({
           id: "thread-history-update",
           updatedAt: 11,
           hasUnreadTurn: null,
+          agentId: "opencode",
         }),
         buildThread({
           id: "thread-history-same",
           updatedAt: 20,
           hasUnreadTurn: null,
+          agentId: "opencode",
         }),
         buildThread({
           id: "thread-no-history",
           updatedAt: 50,
           hasUnreadTurn: null,
+          agentId: "opencode",
+        }),
+        buildThread({
+          id: "thread-codex-unknown-signal",
+          updatedAt: 30,
+          hasUnreadTurn: null,
+          agentId: "codex",
         }),
       ],
     });

@@ -54,6 +54,7 @@ function createBaseInput(): UseApplicationRefreshEffectsInput {
   return {
     selectedThreadId: null,
     activeTab: "chat",
+    settingsWorkspaceSection: "notifications",
     unreadThreadIds: {},
     isArchivedThreadsOpen: false,
     hasLoadedArchivedThreads: false,
@@ -70,6 +71,7 @@ function createBaseInput(): UseApplicationRefreshEffectsInput {
     setUnreadThreadIds: createDispatchSpy<Record<string, true>>(),
     setSelectedThreadId: createDispatchSpy<string | null>(),
     setActiveTab: createDispatchSpy<"chat" | "debug">(),
+    setSettingsWorkspaceSection: createDispatchSpy<"notifications" | "debug">(),
     setSelectedDebugIssueId: createDispatchSpy<string>(),
     threadListStateController: createThreadListStateController(),
     lastViewedThreadPreferenceStore: new LastViewedThreadPreferenceStore(
@@ -81,6 +83,7 @@ function createBaseInput(): UseApplicationRefreshEffectsInput {
     loadArchivedThreads: vi.fn(async (): Promise<void> => {}),
     refreshCoreDataAndSelectedThread: vi.fn(async (): Promise<void> => {}),
     refreshPushClientState: vi.fn(async (): Promise<void> => {}),
+    ensureFreshPushSettingsDiagnostics: vi.fn(async (): Promise<void> => {}),
     handleRuntimeRequestError: vi.fn(),
     coreRefreshIntervalMs: DISCONNECTED_CORE_REFRESH_INTERVAL_MILLISECONDS,
     coreRefreshConnectedMinIntervalMs: CONNECTED_CORE_REFRESH_MINIMUM_INTERVAL_MILLISECONDS,
@@ -98,6 +101,32 @@ describe("useApplicationRefreshEffects", () => {
     const expectedError = new Error("push-refresh-failed");
     const input = createBaseInput();
     input.refreshPushClientState = vi.fn(async (): Promise<void> => {
+      throw expectedError;
+    });
+
+    render(<Harness input={input} />);
+    await Promise.resolve();
+
+    expect(input.handleRuntimeRequestError).toHaveBeenCalledWith(expectedError);
+  });
+
+  it("refreshes push diagnostics when notifications settings become active", async () => {
+    const input = createBaseInput();
+    input.activeTab = "debug";
+    input.settingsWorkspaceSection = "notifications";
+
+    render(<Harness input={input} />);
+    await Promise.resolve();
+
+    expect(input.ensureFreshPushSettingsDiagnostics).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes notifications diagnostics refresh failures to runtime request error ownership", async () => {
+    const expectedError = new Error("push-diagnostics-refresh-failed");
+    const input = createBaseInput();
+    input.activeTab = "debug";
+    input.settingsWorkspaceSection = "notifications";
+    input.ensureFreshPushSettingsDiagnostics = vi.fn(async (): Promise<void> => {
       throw expectedError;
     });
 

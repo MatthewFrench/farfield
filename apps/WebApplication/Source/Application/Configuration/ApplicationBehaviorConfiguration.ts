@@ -28,6 +28,7 @@ export const ARCHIVED_THREAD_LIST_MAX_PAGES = DEFAULT_THREAD_LIST_MAXIMUM_PAGES;
 export const THREAD_QUERY_CACHE_TIME_TO_LIVE_MS = 1_500;
 export const THREAD_QUERY_CACHE_MAXIMUM_ENTRIES = 16;
 export const EVENT_REFRESH_SCHEDULE_DELAY_MS = 200;
+export const PUSH_DIAGNOSTICS_REFRESH_TIME_TO_LIVE_MS = 30_000;
 
 const EventStreamRefreshDecisionExecutionModeSchema = z.enum(["worker", "in-thread"]);
 const defaultEventStreamRefreshDecisionExecutionMode =

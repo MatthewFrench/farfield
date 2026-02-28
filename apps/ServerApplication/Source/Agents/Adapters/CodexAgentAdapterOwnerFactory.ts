@@ -52,6 +52,9 @@ export function createCodexAgentAdapterOwners(
     appClient: input.appClient,
     runAppServerCall,
     ensureCodexAvailable: input.ensureCodexAvailable,
+    readProjectedHasUnreadTurnSignal: (threadId) => {
+      return input.threadStreamStateOwner.readProjectedHasUnreadTurnSignal(threadId);
+    },
   });
   const threadInteractionOwner = new CodexThreadInteractionOwner({
     appClient: input.appClient,

@@ -61,6 +61,7 @@ export function useApplicationRuntimeComposition(
     buildApplicationRefreshEffectsInput(runtimeCompositionContext, {
       refreshCoreDataAndSelectedThread,
       refreshPushClientState: pushFeatureComposition.refreshPushClientState,
+      ensureFreshPushSettingsDiagnostics: pushFeatureComposition.ensureFreshPushSettingsDiagnostics,
     }),
   );
 

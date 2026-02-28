@@ -1,8 +1,6 @@
-import { Bug, Loader2, Menu, Moon, PanelLeft, RefreshCcw, Sun } from "lucide-react";
+import { Loader2, Menu, Moon, PanelLeft, RefreshCcw, Settings2, Sun } from "lucide-react";
 import { Button } from "@/Components/UserInterface/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/UserInterface/Tooltip";
-import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
-import { PushStatusButton } from "@/Features/PushNotifications/UserInterface/PushStatusButton";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 
 const DEBUG_TAB = "debug";
@@ -70,15 +68,12 @@ export interface ApplicationHeaderBarProps {
   activeThreadAgentId: AgentId;
   activeAgentLabel: string;
   isGenerating: boolean;
-  pushClientState: PushClientState;
-  isEnablingPushNotifications: boolean;
   isBusy: boolean;
   theme: string;
   onOpenMobileSidebar: () => void;
   onOpenDesktopSidebar: () => void;
-  onEnablePushNotifications: () => void;
   onRefresh: () => void;
-  onToggleDebugTab: () => void;
+  onToggleSettingsTab: () => void;
   onToggleTheme: () => void;
   renderAgentFavicon: (agentId: AgentId, label: string, className: string) => React.ReactNode;
 }
@@ -86,12 +81,12 @@ export interface ApplicationHeaderBarProps {
 function buildSidebarOpenHandler(
   onOpenSidebar: () => void,
   activeTab: ApplicationHeaderBarTab,
-  onToggleDebugTab: () => void,
+  onToggleSettingsTab: () => void,
 ): () => void {
   return () => {
     onOpenSidebar();
     if (activeTab === DEBUG_TAB) {
-      onToggleDebugTab();
+      onToggleSettingsTab();
     }
   };
 }
@@ -112,27 +107,24 @@ export function ApplicationHeaderBar({
   activeThreadAgentId,
   activeAgentLabel,
   isGenerating,
-  pushClientState,
-  isEnablingPushNotifications,
   isBusy,
   theme,
   onOpenMobileSidebar,
   onOpenDesktopSidebar,
-  onEnablePushNotifications,
   onRefresh,
-  onToggleDebugTab,
+  onToggleSettingsTab,
   onToggleTheme,
   renderAgentFavicon,
 }: ApplicationHeaderBarProps): React.JSX.Element {
   const handleOpenMobileSidebar = buildSidebarOpenHandler(
     onOpenMobileSidebar,
     activeTab,
-    onToggleDebugTab,
+    onToggleSettingsTab,
   );
   const handleOpenDesktopSidebar = buildSidebarOpenHandler(
     onOpenDesktopSidebar,
     activeTab,
-    onToggleDebugTab,
+    onToggleSettingsTab,
   );
 
   return (
@@ -180,11 +172,6 @@ export function ApplicationHeaderBar({
       </div>
 
       <div className="flex items-center gap-0.5 shrink-0">
-        <PushStatusButton
-          pushClientState={pushClientState}
-          isEnablingPushNotifications={isEnablingPushNotifications}
-          onEnablePushNotifications={onEnablePushNotifications}
-        />
         <HeaderIconButton
           onClick={onRefresh}
           disabled={isBusy}
@@ -194,12 +181,12 @@ export function ApplicationHeaderBar({
           <RefreshCcw size={14} className={isBusy ? "animate-spin" : ""} aria-hidden="true" />
         </HeaderIconButton>
         <HeaderIconButton
-          onClick={onToggleDebugTab}
+          onClick={onToggleSettingsTab}
           active={activeTab === DEBUG_TAB}
-          title="Debug"
-          testId="tab-debug"
+          title="Settings"
+          testId="tab-settings"
         >
-          <Bug size={14} aria-hidden="true" />
+          <Settings2 size={14} aria-hidden="true" />
         </HeaderIconButton>
         <HeaderIconButton onClick={onToggleTheme} title="Toggle theme">
           {theme === "dark" ? (

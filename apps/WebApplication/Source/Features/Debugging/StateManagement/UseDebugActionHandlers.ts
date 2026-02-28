@@ -1,5 +1,6 @@
 import { type Dispatch, type SetStateAction, useCallback } from "react";
 import type { ErrorBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
+import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/SettingsWorkspaceSectionContracts";
 import {
   type DebugHistoryDetailResponse,
   type DebugServerClient,
@@ -12,6 +13,7 @@ import { type ReplayHistoryEntryRequestInput } from "../UserInterface/DebugHisto
 import { DebugWorkspaceActionCoordinator } from "./DebugWorkspaceActionCoordinator";
 
 const DEBUG_APPLICATION_TAB = "debug";
+const DEBUG_SETTINGS_WORKSPACE_SECTION: SettingsWorkspaceSection = "debug";
 const DEBUG_ISSUES_WORKSPACE_SECTION: DebugWorkspaceSection = "issues";
 const EMPTY_DEBUG_ISSUE_FILTER_QUERY = "";
 
@@ -23,6 +25,7 @@ export interface UseDebugActionHandlersInput {
   traceNote: string;
   errorBannerDetails: ErrorBannerDetails;
   setActiveTab: Dispatch<SetStateAction<"chat" | "debug">>;
+  setSettingsWorkspaceSection: Dispatch<SetStateAction<SettingsWorkspaceSection>>;
   setDebugWorkspaceSection: Dispatch<SetStateAction<DebugWorkspaceSection>>;
   setDebugIssueSeverityFilter: Dispatch<SetStateAction<DebugIssueSeverityFilter>>;
   setSelectedDebugIssueId: Dispatch<SetStateAction<string>>;
@@ -124,6 +127,7 @@ export function useDebugActionHandlers(input: UseDebugActionHandlersInput): Debu
 
   const openDebugFromErrorBanner = useCallback(() => {
     input.setActiveTab(DEBUG_APPLICATION_TAB);
+    input.setSettingsWorkspaceSection(DEBUG_SETTINGS_WORKSPACE_SECTION);
     input.setDebugWorkspaceSection(DEBUG_ISSUES_WORKSPACE_SECTION);
     input.setDebugIssueSeverityFilter(DEBUG_ISSUE_SEVERITY_FILTER_ALL);
 
@@ -144,6 +148,7 @@ export function useDebugActionHandlers(input: UseDebugActionHandlersInput): Debu
     input.errorBannerDetails.operation,
     input.errorBannerDetails.requestId,
     input.setActiveTab,
+    input.setSettingsWorkspaceSection,
     input.setDebugIssueFilterQuery,
     input.setDebugIssueSeverityFilter,
     input.setDebugWorkspaceSection,

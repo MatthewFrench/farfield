@@ -118,6 +118,15 @@ export class CodexThreadStreamStateOwner {
     return this.liveStateProjectionOwner.readProjectedConversationState(threadId);
   }
 
+  public readProjectedHasUnreadTurnSignal(threadId: string): boolean | null {
+    const projectedConversationState = this.getProjectedConversationState(threadId);
+    if (projectedConversationState === null) {
+      return null;
+    }
+
+    return projectedConversationState.hasUnreadTurn ?? null;
+  }
+
   public readLiveState(threadId: string): AgentThreadLiveState {
     return this.liveStateProjectionOwner.readLiveState(threadId, this.readOwnerClientId(threadId));
   }

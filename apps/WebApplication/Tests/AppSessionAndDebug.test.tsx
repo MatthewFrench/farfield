@@ -118,8 +118,8 @@ describe("App", () => {
       }),
     );
 
+    environment.setPathname("/debug");
     environment.renderApp();
-    fireEvent.click(await screen.findByTestId("tab-debug"));
 
     expect(await screen.findByTestId("debug-issues-panel")).toBeTruthy();
     await waitFor(() => {
@@ -149,8 +149,8 @@ describe("App", () => {
       }),
     );
 
+    environment.setPathname("/debug");
     environment.renderApp();
-    fireEvent.click(await screen.findByTestId("tab-debug"));
 
     fireEvent.click(await screen.findByRole("button", { name: "Clear" }));
 

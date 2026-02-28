@@ -27,6 +27,7 @@ import {
   MOBILE_SIDEBAR_SWIPE_MAXIMUM_VERTICAL_DRIFT_PX,
   MOBILE_SIDEBAR_SWIPE_TRIGGER_PX,
   MOBILE_VISUAL_VIEWPORT_KEYBOARD_OPEN_DELTA_PX,
+  PUSH_DIAGNOSTICS_REFRESH_TIME_TO_LIVE_MS,
   READ_THREAD_RETRY_ATTEMPTS,
   READ_THREAD_RETRY_BASE_DELAY_MS,
   READ_THREAD_RETRY_MAX_DELAY_MS,
@@ -117,7 +118,10 @@ export function App(): React.JSX.Element {
   );
   const initialUiState = useMemo(() => {
     const pathname = window.location.pathname;
-    const routeState = applicationRouteStateMapper.parseFromPathname(pathname);
+    const routeState = applicationRouteStateMapper.parseFromLocation(
+      pathname,
+      window.location.search,
+    );
     if (!shouldRestoreLastViewedThreadIdentifierFromPath(pathname, routeState)) {
       return routeState;
     }
@@ -130,6 +134,7 @@ export function App(): React.JSX.Element {
     return {
       threadId: persistedThreadIdentifier,
       tab: routeState.tab,
+      settingsWorkspaceSection: routeState.settingsWorkspaceSection,
     };
   }, [lastViewedThreadPreferenceStore]);
 
@@ -164,6 +169,7 @@ export function App(): React.JSX.Element {
     readThreadRetryMaximumDelayMilliseconds: READ_THREAD_RETRY_MAX_DELAY_MS,
     threadQueryCacheTimeToLiveMilliseconds: THREAD_QUERY_CACHE_TIME_TO_LIVE_MS,
     threadQueryCacheMaximumEntries: THREAD_QUERY_CACHE_MAXIMUM_ENTRIES,
+    pushDiagnosticsRefreshTimeToLiveMilliseconds: PUSH_DIAGNOSTICS_REFRESH_TIME_TO_LIVE_MS,
   });
 
   const applicationDerivedState = useApplicationDerivedState({
@@ -211,6 +217,7 @@ export function App(): React.JSX.Element {
 
   const shouldRenderStreamEventCards =
     applicationShellState.activeTab === "debug" &&
+    applicationShellState.settingsWorkspaceSection === "debug" &&
     applicationShellState.debugWorkspaceSection === "stream";
   const streamEventCards = useStreamEventCards({
     streamEvents: applicationShellState.streamEvents,
@@ -362,7 +369,7 @@ export function App(): React.JSX.Element {
         applicationHeaderBarProperties={shellComposition.applicationHeaderBarProperties}
         debugStatusBannersProperties={shellComposition.debugStatusBannersProperties}
         chatWorkspacePaneProperties={shellComposition.chatWorkspacePaneProperties}
-        debugWorkspacePaneProperties={shellComposition.debugWorkspacePaneProperties}
+        settingsWorkspacePaneProperties={shellComposition.settingsWorkspacePaneProperties}
         showApiSessionBootstrapOverlay={applicationShellState.requiresApiSessionToken}
         apiSessionBootstrapOverlayProperties={shellComposition.apiSessionBootstrapOverlayProperties}
       />

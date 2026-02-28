@@ -24,6 +24,7 @@ const UNKNOWN_PROJECT_KEY = `${PROJECT_KEY_PREFIX}unknown`;
 const UNKNOWN_PROJECT_LABEL = "No project";
 const REMOVED_PROJECT_STATE = "removed";
 const UNKNOWN_UNREAD_SIGNAL = null;
+const CODEX_AGENT_IDENTIFIER = "codex";
 const WINDOWS_PATH_SEPARATOR = "\\";
 const PROJECT_PATH_SEPARATOR = "/";
 const TRAILING_PROJECT_PATH_SEPARATOR_PATTERN = /\/+$/;
@@ -194,6 +195,15 @@ export class ThreadGroupSelectors {
     const previousUpdatedAt = input.previousThreadUpdatedAtByIdentifier[input.thread.id];
     if (previousUpdatedAt === undefined) {
       return wasUnread;
+    }
+
+    if (input.thread.agentId === CODEX_AGENT_IDENTIFIER) {
+      // Codex list payloads may omit explicit unread state. When that signal is missing,
+      // avoid timestamp-only unread promotion so cross-surface replies do not get marked unread.
+      return (
+        wasUnread &&
+        ThreadGroupSelectors.readThreadUpdatedAtTimestamp(input.thread) === previousUpdatedAt
+      );
     }
 
     return (

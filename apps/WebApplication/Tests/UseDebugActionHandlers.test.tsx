@@ -11,6 +11,7 @@ import {
   type UseDebugActionHandlersInput,
   useDebugActionHandlers,
 } from "@/Features/Debugging/StateManagement/UseDebugActionHandlers";
+import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/SettingsWorkspaceSectionContracts";
 
 interface HandlerHarnessProps {
   input: UseDebugActionHandlersInput;
@@ -24,6 +25,9 @@ type ActiveTabSetterValue =
 type DebugWorkspaceSectionSetterValue =
   | DebugWorkspaceSection
   | ((previousValue: DebugWorkspaceSection) => DebugWorkspaceSection);
+type SettingsWorkspaceSectionSetterValue =
+  | SettingsWorkspaceSection
+  | ((previousValue: SettingsWorkspaceSection) => SettingsWorkspaceSection);
 type DebugIssueSeverityFilterSetterValue =
   | "all"
   | "error"
@@ -43,6 +47,7 @@ function HandlerHarness({ input, onHandlersReady }: HandlerHarnessProps): React.
 
 function buildTestInput(errorBannerDetails: ErrorBannerDetails) {
   const setActiveTab = vi.fn<(value: ActiveTabSetterValue) => void>();
+  const setSettingsWorkspaceSection = vi.fn<(value: SettingsWorkspaceSectionSetterValue) => void>();
   const setDebugWorkspaceSection = vi.fn<(value: DebugWorkspaceSectionSetterValue) => void>();
   const setDebugIssueSeverityFilter = vi.fn<(value: DebugIssueSeverityFilterSetterValue) => void>();
   const setSelectedDebugIssueId = vi.fn<(value: StringSetterValue) => void>();
@@ -56,6 +61,7 @@ function buildTestInput(errorBannerDetails: ErrorBannerDetails) {
     traceNote: "",
     errorBannerDetails,
     setActiveTab,
+    setSettingsWorkspaceSection,
     setDebugWorkspaceSection,
     setDebugIssueSeverityFilter,
     setSelectedDebugIssueId,
@@ -66,6 +72,7 @@ function buildTestInput(errorBannerDetails: ErrorBannerDetails) {
   return {
     input,
     setActiveTab,
+    setSettingsWorkspaceSection,
     setDebugWorkspaceSection,
     setDebugIssueSeverityFilter,
     setSelectedDebugIssueId,
@@ -79,6 +86,7 @@ describe("UseDebugActionHandlers", () => {
     const {
       input,
       setActiveTab,
+      setSettingsWorkspaceSection,
       setDebugWorkspaceSection,
       setDebugIssueSeverityFilter,
       setSelectedDebugIssueId,
@@ -114,6 +122,7 @@ describe("UseDebugActionHandlers", () => {
     handlers.openDebugFromErrorBanner();
 
     expect(setActiveTab).toHaveBeenCalledWith("debug");
+    expect(setSettingsWorkspaceSection).toHaveBeenCalledWith("debug");
     expect(setDebugWorkspaceSection).toHaveBeenCalledWith("issues");
     expect(setDebugIssueSeverityFilter).toHaveBeenCalledWith("all");
     expect(setSelectedDebugIssueId).toHaveBeenCalledWith(buildDebugErrorIssueIdentifier("error-1"));

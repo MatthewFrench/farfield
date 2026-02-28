@@ -31,6 +31,7 @@ const FORK_WITH_EXTENDED_HISTORY = true;
 const READ_CONFIG_DEFAULTS_OPTIONS = {
   includeLayers: false,
 };
+const PROJECTED_UNREAD_SIGNAL_UNAVAILABLE = null;
 
 function buildListThreadsOptions(input: AgentListThreadsInput): ListThreadsOptions {
   return {
@@ -60,9 +61,31 @@ function buildListThreadsOperation(
   return () => appClient.listThreads(buildListThreadsOptions(input));
 }
 
-function mapListThreadsResult(result: AppServerListThreadsResponse): AgentListThreadsResult {
+type ReadProjectedHasUnreadTurnSignal = (threadId: string) => boolean | null;
+
+function mapThreadListItemWithProjectedUnreadSignal(
+  thread: AppServerListThreadsResponse["data"][number],
+  readProjectedHasUnreadTurnSignal: ReadProjectedHasUnreadTurnSignal,
+): AppServerListThreadsResponse["data"][number] {
+  const projectedHasUnreadTurnSignal = readProjectedHasUnreadTurnSignal(thread.id);
+  if (projectedHasUnreadTurnSignal === PROJECTED_UNREAD_SIGNAL_UNAVAILABLE) {
+    return thread;
+  }
+
+  return {
+    ...thread,
+    hasUnreadTurn: projectedHasUnreadTurnSignal,
+  };
+}
+
+function mapListThreadsResult(
+  result: AppServerListThreadsResponse,
+  readProjectedHasUnreadTurnSignal: ReadProjectedHasUnreadTurnSignal,
+): AgentListThreadsResult {
   const mappedResult: AgentListThreadsResult = {
-    data: result.data,
+    data: result.data.map((thread) =>
+      mapThreadListItemWithProjectedUnreadSignal(thread, readProjectedHasUnreadTurnSignal),
+    ),
     nextCursor: result.nextCursor ?? null,
   };
 
@@ -138,6 +161,7 @@ export interface CodexThreadManagementOwnerOptions {
   appClient: AppServerClient;
   runAppServerCall: <ValueType>(operation: () => Promise<ValueType>) => Promise<ValueType>;
   ensureCodexAvailable: () => void;
+  readProjectedHasUnreadTurnSignal: ReadProjectedHasUnreadTurnSignal;
 }
 
 /**
@@ -150,11 +174,13 @@ export class CodexThreadManagementOwner {
     operation: () => Promise<ValueType>,
   ) => Promise<ValueType>;
   private readonly ensureCodexAvailable: () => void;
+  private readonly readProjectedHasUnreadTurnSignal: ReadProjectedHasUnreadTurnSignal;
 
   public constructor(options: CodexThreadManagementOwnerOptions) {
     this.appClient = options.appClient;
     this.runAppServerCall = options.runAppServerCall;
     this.ensureCodexAvailable = options.ensureCodexAvailable;
+    this.readProjectedHasUnreadTurnSignal = options.readProjectedHasUnreadTurnSignal;
   }
 
   public async listThreads(input: AgentListThreadsInput): Promise<AgentListThreadsResult> {
@@ -162,7 +188,7 @@ export class CodexThreadManagementOwner {
 
     const result = await this.runAppServerCall(buildListThreadsOperation(this.appClient, input));
 
-    return mapListThreadsResult(result);
+    return mapListThreadsResult(result, this.readProjectedHasUnreadTurnSignal);
   }
 
   public async createThread(input: AgentCreateThreadInput): Promise<AgentCreateThreadResult> {

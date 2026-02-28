@@ -148,7 +148,10 @@ function installBootstrapWindowOwners(): void {
   installGlobalClientCrashReporter({
     source: CLIENT_CRASH_REPORT_SOURCE,
     readThreadId: () =>
-      applicationRouteStateMapper.parseFromPathname(window.location.pathname).threadId,
+      applicationRouteStateMapper.parseFromLocation(
+        window.location.pathname,
+        window.location.search,
+      ).threadId,
     readUrl: () => window.location.pathname + window.location.search,
   });
 }

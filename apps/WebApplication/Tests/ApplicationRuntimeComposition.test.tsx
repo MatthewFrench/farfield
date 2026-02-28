@@ -4,7 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 interface PushFeatureCompositionMock {
   submitApiSessionToken: () => Promise<void>;
   refreshPushClientState: () => Promise<void>;
+  ensureFreshPushSettingsDiagnostics: () => Promise<void>;
+  refreshPushSettingsDiagnostics: () => Promise<void>;
   enablePushNotificationsFromToolbar: () => Promise<void>;
+  sendPushTestNotificationFromSettings: (input: {
+    threadId: string;
+    turnId: string;
+  }) => Promise<void>;
 }
 
 interface ChatFeatureCompositionMock {
@@ -39,6 +45,7 @@ interface DebugFeatureCompositionMock {
 
 interface ApplicationRefreshEffectsCapture {
   refreshPushClientState: () => Promise<void>;
+  ensureFreshPushSettingsDiagnostics: () => Promise<void>;
   loadCoreDataTracked: () => Promise<void>;
   refreshCoreDataAndSelectedThread: () => Promise<void>;
 }
@@ -142,6 +149,7 @@ import {
   MOBILE_SIDEBAR_SWIPE_MAXIMUM_VERTICAL_DRIFT_PX,
   MOBILE_SIDEBAR_SWIPE_TRIGGER_PX,
   MOBILE_VISUAL_VIEWPORT_KEYBOARD_OPEN_DELTA_PX,
+  PUSH_DIAGNOSTICS_REFRESH_TIME_TO_LIVE_MS,
   READ_THREAD_RETRY_ATTEMPTS,
   READ_THREAD_RETRY_BASE_DELAY_MS,
   READ_THREAD_RETRY_MAX_DELAY_MS,
@@ -218,7 +226,10 @@ function createPushFeatureCompositionMock(): PushFeatureCompositionMock {
   return {
     submitApiSessionToken: vi.fn(async (): Promise<void> => {}),
     refreshPushClientState: vi.fn(async (): Promise<void> => {}),
+    ensureFreshPushSettingsDiagnostics: vi.fn(async (): Promise<void> => {}),
+    refreshPushSettingsDiagnostics: vi.fn(async (): Promise<void> => {}),
     enablePushNotificationsFromToolbar: vi.fn(async (): Promise<void> => {}),
+    sendPushTestNotificationFromSettings: vi.fn(async (): Promise<void> => {}),
   };
 }
 
@@ -278,6 +289,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     readThreadRetryMaximumDelayMilliseconds: READ_THREAD_RETRY_MAX_DELAY_MS,
     threadQueryCacheTimeToLiveMilliseconds: THREAD_QUERY_CACHE_TIME_TO_LIVE_MS,
     threadQueryCacheMaximumEntries: THREAD_QUERY_CACHE_MAXIMUM_ENTRIES,
+    pushDiagnosticsRefreshTimeToLiveMilliseconds: PUSH_DIAGNOSTICS_REFRESH_TIME_TO_LIVE_MS,
   });
 
   const applicationDerivedState = useApplicationDerivedState({
@@ -320,6 +332,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
 
   const shouldRenderStreamEventCards =
     applicationShellState.activeTab === "debug" &&
+    applicationShellState.settingsWorkspaceSection === "debug" &&
     applicationShellState.debugWorkspaceSection === "stream";
   const streamEventCards = useStreamEventCards({
     streamEvents: applicationShellState.streamEvents,
@@ -555,6 +568,9 @@ describe("useApplicationRuntimeComposition", () => {
     );
     expect(refreshEffectsInput.refreshPushClientState).toBe(
       pushFeatureCompositionMock.refreshPushClientState,
+    );
+    expect(refreshEffectsInput.ensureFreshPushSettingsDiagnostics).toBe(
+      pushFeatureCompositionMock.ensureFreshPushSettingsDiagnostics,
     );
 
     const shellCompositionInput = applicationShellCompositionCapture;
