@@ -5,10 +5,15 @@ import {
 import { z } from "zod";
 import type {
   ForkThreadOptions,
+  ListAppsOptions,
+  ListExperimentalFeaturesOptions,
   ListLoadedThreadsOptions,
+  ListMcpServerStatusesOptions,
+  ListSkillsOptions,
   ListThreadsAllOptions,
   ListThreadsOptions,
   ReadConfigOptions,
+  ReadConfigRequirementsOptions,
   ResumeThreadOptions,
   StartReviewOptions,
   StartThreadOptions,
@@ -26,6 +31,42 @@ const AppServerThreadLoadedListRequestSchema = z
   .object({
     cursor: z.union([z.string(), z.null()]).optional(),
     limit: z.union([z.number().int().min(1), z.null()]).optional(),
+  })
+  .passthrough();
+const AppServerConfigRequirementsReadRequestSchema = z.object({}).passthrough();
+const AppServerExperimentalFeatureListRequestSchema = z
+  .object({
+    cursor: z.union([z.string(), z.null()]).optional(),
+    limit: z.union([z.number().int().min(1), z.null()]).optional(),
+  })
+  .passthrough();
+const AppServerMcpServerStatusListRequestSchema = z
+  .object({
+    cursor: z.union([z.string(), z.null()]).optional(),
+    limit: z.union([z.number().int().min(1), z.null()]).optional(),
+  })
+  .passthrough();
+const AppServerAppListRequestSchema = z
+  .object({
+    cursor: z.union([z.string(), z.null()]).optional(),
+    limit: z.union([z.number().int().min(1), z.null()]).optional(),
+    threadId: z.union([z.string().min(1), z.null()]).optional(),
+    forceRefetch: z.boolean().optional(),
+  })
+  .passthrough();
+const AppServerSkillsListExtraRootsForCwdRequestSchema = z
+  .object({
+    cwd: z.string().min(1),
+    extraUserRoots: z.array(z.string().min(1)),
+  })
+  .passthrough();
+const AppServerSkillsListRequestSchema = z
+  .object({
+    cwds: z.array(z.string().min(1)).optional(),
+    forceReload: z.boolean().optional(),
+    perCwdExtraUserRoots: z
+      .union([z.array(AppServerSkillsListExtraRootsForCwdRequestSchema), z.null()])
+      .optional(),
   })
   .passthrough();
 const AppServerThreadUnsubscribeRequestSchema = z
@@ -148,12 +189,89 @@ interface ListLoadedThreadsRequestParameters {
   limit?: number | null | undefined;
 }
 
+interface ReadConfigRequirementsRequestParameters {}
+
+interface ListExperimentalFeaturesRequestParameters {
+  cursor?: string | null | undefined;
+  limit?: number | null | undefined;
+}
+
+interface ListMcpServerStatusesRequestParameters {
+  cursor?: string | null | undefined;
+  limit?: number | null | undefined;
+}
+
+interface ListAppsRequestParameters {
+  cursor?: string | null | undefined;
+  limit?: number | null | undefined;
+  threadId?: string | null | undefined;
+  forceRefetch?: boolean | undefined;
+}
+
+interface ListSkillsExtraRootsForCwdRequestParameters {
+  cwd: string;
+  extraUserRoots: string[];
+}
+
+interface ListSkillsRequestParameters {
+  cwds?: string[] | undefined;
+  forceReload?: boolean | undefined;
+  perCwdExtraUserRoots?: ListSkillsExtraRootsForCwdRequestParameters[] | null | undefined;
+}
+
 export function buildListLoadedThreadsRequestParameters(
   options?: ListLoadedThreadsOptions,
 ): ListLoadedThreadsRequestParameters {
   return AppServerThreadLoadedListRequestSchema.parse({
     ...(options?.cursor !== undefined ? { cursor: options.cursor } : {}),
     ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+  });
+}
+
+export function buildReadConfigRequirementsRequestParameters(
+  _options?: ReadConfigRequirementsOptions,
+): ReadConfigRequirementsRequestParameters {
+  return AppServerConfigRequirementsReadRequestSchema.parse({});
+}
+
+export function buildListExperimentalFeaturesRequestParameters(
+  options?: ListExperimentalFeaturesOptions,
+): ListExperimentalFeaturesRequestParameters {
+  return AppServerExperimentalFeatureListRequestSchema.parse({
+    ...(options?.cursor !== undefined ? { cursor: options.cursor } : {}),
+    ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+  });
+}
+
+export function buildListMcpServerStatusesRequestParameters(
+  options?: ListMcpServerStatusesOptions,
+): ListMcpServerStatusesRequestParameters {
+  return AppServerMcpServerStatusListRequestSchema.parse({
+    ...(options?.cursor !== undefined ? { cursor: options.cursor } : {}),
+    ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+  });
+}
+
+export function buildListAppsRequestParameters(
+  options?: ListAppsOptions,
+): ListAppsRequestParameters {
+  return AppServerAppListRequestSchema.parse({
+    ...(options?.cursor !== undefined ? { cursor: options.cursor } : {}),
+    ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+    ...(options?.threadId !== undefined ? { threadId: options.threadId } : {}),
+    ...(options?.forceRefetch !== undefined ? { forceRefetch: options.forceRefetch } : {}),
+  });
+}
+
+export function buildListSkillsRequestParameters(
+  options?: ListSkillsOptions,
+): ListSkillsRequestParameters {
+  return AppServerSkillsListRequestSchema.parse({
+    ...(options?.cwds !== undefined ? { cwds: options.cwds } : {}),
+    ...(options?.forceReload !== undefined ? { forceReload: options.forceReload } : {}),
+    ...(options?.perCwdExtraUserRoots !== undefined
+      ? { perCwdExtraUserRoots: options.perCwdExtraUserRoots }
+      : {}),
   });
 }
 

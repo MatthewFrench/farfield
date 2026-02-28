@@ -77,6 +77,10 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
       path: "/tmp/trace-1.ndjson",
     },
   ],
+  isLoadingCoverageDiagnostics: false,
+  coverageDiagnosticsErrorMessage: "",
+  coverageDiagnosticsSnapshot: null,
+  onRefreshCoverageDiagnostics: () => {},
 };
 
 function renderDebugWorkspacePane(properties: DebugWorkspacePaneProps): void {
@@ -124,5 +128,22 @@ describe("DebugWorkspacePane", () => {
 
     expect(screen.getByRole("tab", { name: "Stream" }).getAttribute("data-state")).toBe("active");
     expect(screen.getByRole("tab", { name: "Issues" }).getAttribute("data-state")).toBe("inactive");
+  });
+
+  it("renders coverage panel when coverage section is active", () => {
+    renderDebugWorkspacePane({
+      ...baseDebugWorkspacePaneProperties,
+      debugWorkspaceSection: "coverage",
+      coverageDiagnosticsSnapshot: {
+        requirements: null,
+        experimentalFeatures: [],
+        mcpServers: [],
+        apps: [],
+        skills: [],
+        refreshedAtIso8601: "2026-02-28T20:00:00.000Z",
+      },
+    });
+
+    expect(screen.getByTestId("debug-coverage-panel")).toBeDefined();
   });
 });

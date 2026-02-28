@@ -1,8 +1,13 @@
+app/list
 collaborationMode/list
 config/read
+configRequirements/read
+experimentalFeature/list
 initialize
+mcpServerStatus/list
 model/list
 review/start
+skills/list
 thread/archive
 thread/backgroundTerminals/clean
 thread/compact/start

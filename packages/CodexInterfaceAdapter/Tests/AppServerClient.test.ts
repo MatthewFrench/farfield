@@ -668,6 +668,261 @@ describe("AppServerClient.unsubscribeThread", () => {
   });
 });
 
+describe("AppServerClient.readConfigRequirements", () => {
+  it("sends configRequirements/read with empty parameters and returns normalized requirements", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      requirements: {
+        allowedApprovalPolicies: ["on-request", "never"],
+        enforceResidency: "us",
+        network: {
+          enabled: true,
+          httpPort: 8080,
+        },
+      },
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.readConfigRequirements();
+
+    expect(transportDouble.request).toHaveBeenCalledWith("configRequirements/read", {});
+    expect(result).toEqual({
+      requirements: {
+        allowedApprovalPolicies: ["on-request", "never"],
+        allowedSandboxModes: null,
+        allowedWebSearchModes: null,
+        enforceResidency: "us",
+        network: {
+          enabled: true,
+          httpPort: 8080,
+          socksPort: null,
+          allowUpstreamProxy: null,
+          dangerouslyAllowNonLoopbackProxy: null,
+          dangerouslyAllowNonLoopbackAdmin: null,
+          dangerouslyAllowAllUnixSockets: null,
+          allowedDomains: null,
+          deniedDomains: null,
+          allowUnixSockets: null,
+          allowLocalBinding: null,
+        },
+      },
+    });
+  });
+});
+
+describe("AppServerClient.listExperimentalFeatures", () => {
+  it("sends experimentalFeature/list and returns strict feature contracts", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      data: [
+        {
+          name: "advanced-diff-view",
+          stage: "beta",
+          displayName: "Advanced Diff View",
+          description: "Detailed diff review controls",
+          announcement: null,
+          enabled: true,
+          defaultEnabled: false,
+        },
+      ],
+      nextCursor: "cursor-1",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.listExperimentalFeatures({
+      cursor: null,
+      limit: 25,
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("experimentalFeature/list", {
+      cursor: null,
+      limit: 25,
+    });
+    expect(result).toEqual({
+      data: [
+        {
+          name: "advanced-diff-view",
+          stage: "beta",
+          displayName: "Advanced Diff View",
+          description: "Detailed diff review controls",
+          announcement: null,
+          enabled: true,
+          defaultEnabled: false,
+        },
+      ],
+      nextCursor: "cursor-1",
+    });
+  });
+});
+
+describe("AppServerClient.listMcpServerStatuses", () => {
+  it("projects mcp server status counts from mcpServerStatus/list response", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      data: [
+        {
+          name: "github",
+          tools: {
+            search_repositories: {
+              enabled: true,
+            },
+            read_issue: {
+              enabled: true,
+            },
+          },
+          resources: [
+            {
+              uri: "mcp://github/issues",
+            },
+          ],
+          resourceTemplates: [
+            {
+              name: "issue-by-number",
+            },
+          ],
+          authStatus: "authenticated",
+        },
+      ],
+      nextCursor: null,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.listMcpServerStatuses();
+
+    expect(transportDouble.request).toHaveBeenCalledWith("mcpServerStatus/list", {});
+    expect(result).toEqual({
+      data: [
+        {
+          name: "github",
+          authStatus: "authenticated",
+          toolCount: 2,
+          resourceCount: 1,
+          resourceTemplateCount: 1,
+        },
+      ],
+      nextCursor: null,
+    });
+  });
+});
+
+describe("AppServerClient.listApps", () => {
+  it("sends app/list and normalizes optional app fields", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      data: [
+        {
+          id: "app-github",
+          name: "GitHub",
+          isAccessible: true,
+          isEnabled: true,
+        },
+      ],
+      nextCursor: null,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.listApps({
+      forceRefetch: true,
+      threadId: "thread-1",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("app/list", {
+      threadId: "thread-1",
+      forceRefetch: true,
+    });
+    expect(result).toEqual({
+      data: [
+        {
+          id: "app-github",
+          name: "GitHub",
+          description: null,
+          logoUrl: null,
+          logoUrlDark: null,
+          installUrl: null,
+          isAccessible: true,
+          isEnabled: true,
+        },
+      ],
+      nextCursor: null,
+    });
+  });
+});
+
+describe("AppServerClient.listSkills", () => {
+  it("sends skills/list and maps skill entries into strict typed rows", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      data: [
+        {
+          cwd: "/tmp/workspace",
+          skills: [
+            {
+              name: "checks",
+              description: "Run repository checks",
+              shortDescription: "Checks",
+              path: "/tmp/workspace/.codex/skills/checks/SKILL.md",
+              scope: "repo",
+              enabled: true,
+            },
+          ],
+          errors: [
+            {
+              path: "/tmp/workspace/.codex/skills/broken/SKILL.md",
+              message: "Invalid SKILL.md frontmatter",
+            },
+          ],
+        },
+      ],
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.listSkills({
+      cwds: ["/tmp/workspace"],
+      forceReload: true,
+      perCwdExtraUserRoots: [
+        {
+          cwd: "/tmp/workspace",
+          extraUserRoots: ["/tmp/skills-extra"],
+        },
+      ],
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("skills/list", {
+      cwds: ["/tmp/workspace"],
+      forceReload: true,
+      perCwdExtraUserRoots: [
+        {
+          cwd: "/tmp/workspace",
+          extraUserRoots: ["/tmp/skills-extra"],
+        },
+      ],
+    });
+    expect(result).toEqual({
+      data: [
+        {
+          cwd: "/tmp/workspace",
+          skills: [
+            {
+              name: "checks",
+              description: "Run repository checks",
+              shortDescription: "Checks",
+              path: "/tmp/workspace/.codex/skills/checks/SKILL.md",
+              scope: "repo",
+              enabled: true,
+            },
+          ],
+          errors: [
+            {
+              path: "/tmp/workspace/.codex/skills/broken/SKILL.md",
+              message: "Invalid SKILL.md frontmatter",
+            },
+          ],
+        },
+      ],
+    });
+  });
+});
+
 describe("AppServerClient.listThreadsAll", () => {
   it("starts pagination from an explicit initial cursor", async () => {
     const transportDouble = createTransportDouble();

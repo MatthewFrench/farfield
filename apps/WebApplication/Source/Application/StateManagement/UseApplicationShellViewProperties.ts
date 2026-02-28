@@ -1,3 +1,4 @@
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: Composition split follow-up is tracked in docs/proposed-structure-and-migration.md decision entry 20.
 import { type Dispatch, type SetStateAction, useMemo } from "react";
 import { type ApiSessionBootstrapOverlayProperties } from "@/Application/UserInterface/ApiSessionBootstrapOverlay";
 import { type ApplicationHeaderBarProps } from "@/Application/UserInterface/ApplicationHeaderBar";
@@ -136,6 +137,10 @@ export interface UseApplicationShellViewPropertiesInput {
   markTraceFromDebugPanel: () => void;
   stopTraceFromDebugPanel: () => void;
   recentTraceSummaries: readonly DebugTraceSummary[];
+  isLoadingCoverageDiagnostics: boolean;
+  coverageDiagnosticsErrorMessage: string;
+  coverageDiagnosticsSnapshot: DebugWorkspacePaneProps["coverageDiagnosticsSnapshot"];
+  refreshCoverageDiagnostics: () => void;
   apiSessionTokenDraft: string;
   setApiSessionTokenDraft: (nextTokenValue: string) => void;
   apiSessionBootstrapError: string;
@@ -370,6 +375,10 @@ function buildDebugWorkspacePaneProperties(
     onMarkTrace: input.markTraceFromDebugPanel,
     onStopTrace: input.stopTraceFromDebugPanel,
     recentTraceSummaries: input.recentTraceSummaries,
+    isLoadingCoverageDiagnostics: input.isLoadingCoverageDiagnostics,
+    coverageDiagnosticsErrorMessage: input.coverageDiagnosticsErrorMessage,
+    coverageDiagnosticsSnapshot: input.coverageDiagnosticsSnapshot,
+    onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
   };
 }
 
@@ -555,6 +564,10 @@ export function useApplicationShellViewProperties(
       input.isTraceRecording,
       input.markTraceFromDebugPanel,
       input.recentTraceSummaries,
+      input.isLoadingCoverageDiagnostics,
+      input.coverageDiagnosticsErrorMessage,
+      input.coverageDiagnosticsSnapshot,
+      input.refreshCoverageDiagnostics,
       input.replayHistoryEntryFromDetail,
       input.runtimeRequestErrorOperationMetrics,
       input.isEnablingPushNotifications,

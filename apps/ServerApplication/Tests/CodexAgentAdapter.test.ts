@@ -39,6 +39,11 @@ describe("CodexAgentAdapter", () => {
     expect(adapter.capabilities).toEqual({
       canListModels: true,
       canListCollaborationModes: true,
+      canReadConfigRequirements: true,
+      canListExperimentalFeatures: true,
+      canListMcpServerStatuses: true,
+      canListApps: true,
+      canListSkills: true,
       canSetCollaborationMode: true,
       canSubmitUserInput: true,
       canReadLiveState: true,

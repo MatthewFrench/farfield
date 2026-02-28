@@ -2,11 +2,21 @@ import {
   AppServerClient,
   type AppServerTransport,
   type ForkThreadOptions,
+  type ListAppsOptions,
+  type ListAppsResult,
+  type ListExperimentalFeaturesOptions,
+  type ListExperimentalFeaturesResult,
   type ListLoadedThreadsOptions,
   type ListLoadedThreadsResult,
+  type ListMcpServerStatusesOptions,
+  type ListMcpServerStatusesResult,
+  type ListSkillsOptions,
+  type ListSkillsResult,
   type ListThreadsAllOptions,
   type ListThreadsOptions,
   type ReadConfigOptions,
+  type ReadConfigRequirementsOptions,
+  type ReadConfigRequirementsResult,
   type StartReviewOptions,
   type StartReviewResult,
   type StartThreadOptions,
@@ -69,6 +79,14 @@ class TestAppServerClient extends AppServerClient {
   public readonly listLoadedThreadsCalls: Array<ListLoadedThreadsOptions | undefined> = [];
   public readonly unsubscribeThreadCalls: Array<{ threadId: string }> = [];
   public readonly startReviewCalls: StartReviewOptions[] = [];
+  public readonly readConfigRequirementsCalls: Array<ReadConfigRequirementsOptions | undefined> =
+    [];
+  public readonly listExperimentalFeaturesCalls: Array<
+    ListExperimentalFeaturesOptions | undefined
+  > = [];
+  public readonly listMcpServerStatusesCalls: Array<ListMcpServerStatusesOptions | undefined> = [];
+  public readonly listAppsCalls: Array<ListAppsOptions | undefined> = [];
+  public readonly listSkillsCalls: Array<ListSkillsOptions | undefined> = [];
   public readonly readConfigCalls: Array<ReadConfigOptions | undefined> = [];
 
   private readonly listThreadsResult: AppServerListThreadsResponse;
@@ -78,6 +96,11 @@ class TestAppServerClient extends AppServerClient {
   private readonly listLoadedThreadsResult: ListLoadedThreadsResult;
   private readonly unsubscribeThreadResult: UnsubscribeThreadStatus;
   private readonly startReviewResult: StartReviewResult;
+  private readonly readConfigRequirementsResult: ReadConfigRequirementsResult;
+  private readonly listExperimentalFeaturesResult: ListExperimentalFeaturesResult;
+  private readonly listMcpServerStatusesResult: ListMcpServerStatusesResult;
+  private readonly listAppsResult: ListAppsResult;
+  private readonly listSkillsResult: ListSkillsResult;
   private readonly readConfigResult: AppServerConfigReadResponse;
 
   public constructor(input?: {
@@ -88,6 +111,11 @@ class TestAppServerClient extends AppServerClient {
     listLoadedThreadsResult?: ListLoadedThreadsResult;
     unsubscribeThreadResult?: UnsubscribeThreadStatus;
     startReviewResult?: StartReviewResult;
+    readConfigRequirementsResult?: ReadConfigRequirementsResult;
+    listExperimentalFeaturesResult?: ListExperimentalFeaturesResult;
+    listMcpServerStatusesResult?: ListMcpServerStatusesResult;
+    listAppsResult?: ListAppsResult;
+    listSkillsResult?: ListSkillsResult;
     readConfigResult?: AppServerConfigReadResponse;
   }) {
     super(NOOP_TRANSPORT);
@@ -109,6 +137,24 @@ class TestAppServerClient extends AppServerClient {
     this.startReviewResult = input?.startReviewResult ?? {
       reviewThreadId: "thread-1",
       turnId: "turn-review-1",
+    };
+    this.readConfigRequirementsResult = input?.readConfigRequirementsResult ?? {
+      requirements: null,
+    };
+    this.listExperimentalFeaturesResult = input?.listExperimentalFeaturesResult ?? {
+      data: [],
+      nextCursor: null,
+    };
+    this.listMcpServerStatusesResult = input?.listMcpServerStatusesResult ?? {
+      data: [],
+      nextCursor: null,
+    };
+    this.listAppsResult = input?.listAppsResult ?? {
+      data: [],
+      nextCursor: null,
+    };
+    this.listSkillsResult = input?.listSkillsResult ?? {
+      data: [],
     };
     this.readConfigResult = input?.readConfigResult ?? EMPTY_READ_CONFIG_RESPONSE;
   }
@@ -192,6 +238,37 @@ class TestAppServerClient extends AppServerClient {
   public override async startReview(options: StartReviewOptions): Promise<StartReviewResult> {
     this.startReviewCalls.push(options);
     return this.startReviewResult;
+  }
+
+  public override async readConfigRequirements(
+    options?: ReadConfigRequirementsOptions,
+  ): Promise<ReadConfigRequirementsResult> {
+    this.readConfigRequirementsCalls.push(options);
+    return this.readConfigRequirementsResult;
+  }
+
+  public override async listExperimentalFeatures(
+    options?: ListExperimentalFeaturesOptions,
+  ): Promise<ListExperimentalFeaturesResult> {
+    this.listExperimentalFeaturesCalls.push(options);
+    return this.listExperimentalFeaturesResult;
+  }
+
+  public override async listMcpServerStatuses(
+    options?: ListMcpServerStatusesOptions,
+  ): Promise<ListMcpServerStatusesResult> {
+    this.listMcpServerStatusesCalls.push(options);
+    return this.listMcpServerStatusesResult;
+  }
+
+  public override async listApps(options?: ListAppsOptions): Promise<ListAppsResult> {
+    this.listAppsCalls.push(options);
+    return this.listAppsResult;
+  }
+
+  public override async listSkills(options?: ListSkillsOptions): Promise<ListSkillsResult> {
+    this.listSkillsCalls.push(options);
+    return this.listSkillsResult;
   }
 
   public override async readConfig(
@@ -663,6 +740,171 @@ describe("CodexThreadManagementOwner", () => {
       reviewThreadId: "thread-review-9",
       turnId: "turn-review-9",
     });
+  });
+
+  it("reads config requirements through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      readConfigRequirementsResult: {
+        requirements: {
+          allowedApprovalPolicies: ["on-request"],
+          allowedSandboxModes: ["workspace-write"],
+          allowedWebSearchModes: ["on"],
+          enforceResidency: "us",
+          network: {
+            enabled: true,
+            httpPort: 8080,
+            socksPort: null,
+            allowUpstreamProxy: false,
+            dangerouslyAllowNonLoopbackProxy: false,
+            dangerouslyAllowNonLoopbackAdmin: false,
+            dangerouslyAllowAllUnixSockets: false,
+            allowedDomains: ["example.com"],
+            deniedDomains: null,
+            allowUnixSockets: null,
+            allowLocalBinding: true,
+          },
+        },
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.readConfigRequirements();
+
+    expect(appClient.readConfigRequirementsCalls).toEqual([{}]);
+    expect(result.requirements?.allowedApprovalPolicies).toEqual(["on-request"]);
+  });
+
+  it("lists experimental features through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      listExperimentalFeaturesResult: {
+        data: [
+          {
+            name: "advanced-diff-view",
+            stage: "beta",
+            displayName: "Advanced Diff View",
+            description: "Detailed diff review controls",
+            announcement: null,
+            enabled: true,
+            defaultEnabled: false,
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.listExperimentalFeatures({
+      cursor: null,
+      limit: 30,
+    });
+
+    expect(appClient.listExperimentalFeaturesCalls).toEqual([
+      {
+        cursor: null,
+        limit: 30,
+      },
+    ]);
+    expect(result.data).toHaveLength(1);
+  });
+
+  it("lists mcp server statuses through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      listMcpServerStatusesResult: {
+        data: [
+          {
+            name: "github",
+            authStatus: "authenticated",
+            toolCount: 4,
+            resourceCount: 2,
+            resourceTemplateCount: 1,
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.listMcpServerStatuses({
+      limit: 50,
+    });
+
+    expect(appClient.listMcpServerStatusesCalls).toEqual([
+      {
+        limit: 50,
+      },
+    ]);
+    expect(result.data[0]?.toolCount).toBe(4);
+  });
+
+  it("lists apps through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      listAppsResult: {
+        data: [
+          {
+            id: "app-github",
+            name: "GitHub",
+            description: "GitHub connector",
+            logoUrl: null,
+            logoUrlDark: null,
+            installUrl: "https://example.com/install",
+            isAccessible: true,
+            isEnabled: true,
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.listApps({
+      forceRefetch: true,
+      threadId: "thread-7",
+    });
+
+    expect(appClient.listAppsCalls).toEqual([
+      {
+        forceRefetch: true,
+        threadId: "thread-7",
+      },
+    ]);
+    expect(result.data[0]?.id).toBe("app-github");
+  });
+
+  it("lists skills through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      listSkillsResult: {
+        data: [
+          {
+            cwd: "/tmp/workspace",
+            skills: [
+              {
+                name: "checks",
+                description: "Run repository checks",
+                shortDescription: "Checks",
+                path: "/tmp/workspace/.codex/skills/checks/SKILL.md",
+                scope: "repo",
+                enabled: true,
+              },
+            ],
+            errors: [],
+          },
+        ],
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.listSkills({
+      cwds: ["/tmp/workspace"],
+      forceReload: true,
+    });
+
+    expect(appClient.listSkillsCalls).toEqual([
+      {
+        cwds: ["/tmp/workspace"],
+        forceReload: true,
+      },
+    ]);
+    expect(result.data[0]?.skills[0]?.name).toBe("checks");
   });
 
   it("prefers active profile config defaults and requests config without layers", async () => {

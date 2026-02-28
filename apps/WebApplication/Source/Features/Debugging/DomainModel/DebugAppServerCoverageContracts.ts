@@ -1,0 +1,72 @@
+/**
+ * Owns typed app-server coverage diagnostics contracts rendered in Debug Workspace.
+ */
+export interface DebugAppServerCoverageNetworkRequirements {
+  enabled: boolean | null;
+  httpPort: number | null;
+  socksPort: number | null;
+  allowUpstreamProxy: boolean | null;
+  dangerouslyAllowNonLoopbackProxy: boolean | null;
+  dangerouslyAllowNonLoopbackAdmin: boolean | null;
+  dangerouslyAllowAllUnixSockets: boolean | null;
+  allowedDomains: string[] | null;
+  deniedDomains: string[] | null;
+  allowUnixSockets: string[] | null;
+  allowLocalBinding: boolean | null;
+}
+
+export interface DebugAppServerCoverageRequirements {
+  allowedApprovalPolicies: string[] | null;
+  allowedSandboxModes: string[] | null;
+  allowedWebSearchModes: string[] | null;
+  enforceResidency: string | null;
+  network: DebugAppServerCoverageNetworkRequirements | null;
+}
+
+export interface DebugAppServerCoverageExperimentalFeature {
+  name: string;
+  stage: "beta" | "underDevelopment" | "stable" | "deprecated" | "removed";
+  displayName: string | null;
+  description: string | null;
+  announcement: string | null;
+  enabled: boolean;
+  defaultEnabled: boolean;
+}
+
+export interface DebugAppServerCoverageMcpServerSummary {
+  name: string;
+  authStatus: string;
+  toolCount: number;
+  resourceCount: number;
+  resourceTemplateCount: number;
+}
+
+export interface DebugAppServerCoverageAppSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  isAccessible: boolean;
+  isEnabled: boolean;
+}
+
+export interface DebugAppServerCoverageSkillSummary {
+  name: string;
+  description: string;
+  scope: "user" | "repo" | "system" | "admin";
+  enabled: boolean;
+}
+
+export interface DebugAppServerCoverageSkillEntry {
+  cwd: string;
+  skills: DebugAppServerCoverageSkillSummary[];
+  errorCount: number;
+}
+
+export interface DebugAppServerCoverageSnapshot {
+  requirements: DebugAppServerCoverageRequirements | null;
+  experimentalFeatures: DebugAppServerCoverageExperimentalFeature[];
+  mcpServers: DebugAppServerCoverageMcpServerSummary[];
+  apps: DebugAppServerCoverageAppSummary[];
+  skills: DebugAppServerCoverageSkillEntry[];
+  refreshedAtIso8601: string;
+}

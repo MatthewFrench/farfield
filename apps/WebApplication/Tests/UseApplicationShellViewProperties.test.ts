@@ -141,6 +141,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const startTraceFromDebugPanelSpy = vi.fn((): void => {});
   const markTraceFromDebugPanelSpy = vi.fn((): void => {});
   const stopTraceFromDebugPanelSpy = vi.fn((): void => {});
+  const refreshCoverageDiagnosticsSpy = vi.fn((): void => {});
   const setApiSessionTokenDraftSpy = vi.fn((): void => {});
   const setApiSessionBootstrapErrorSpy = vi.fn((): void => {});
   const submitApiSessionTokenSpy = vi.fn(async (): Promise<void> => {});
@@ -262,6 +263,10 @@ function createUseApplicationShellViewPropertiesFixture() {
     markTraceFromDebugPanel: markTraceFromDebugPanelSpy,
     stopTraceFromDebugPanel: stopTraceFromDebugPanelSpy,
     recentTraceSummaries: [],
+    isLoadingCoverageDiagnostics: false,
+    coverageDiagnosticsErrorMessage: "",
+    coverageDiagnosticsSnapshot: null,
+    refreshCoverageDiagnostics: refreshCoverageDiagnosticsSpy,
     apiSessionTokenDraft: "",
     setApiSessionTokenDraft: setApiSessionTokenDraftSpy,
     apiSessionBootstrapError: "invalid-token",

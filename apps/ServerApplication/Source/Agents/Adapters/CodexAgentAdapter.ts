@@ -19,9 +19,19 @@ import type {
   AgentCreateThreadInput,
   AgentCreateThreadResult,
   AgentInterruptInput,
+  AgentListAppsInput,
+  AgentListAppsResult,
+  AgentListExperimentalFeaturesInput,
+  AgentListExperimentalFeaturesResult,
   AgentListLoadedThreadsResult,
+  AgentListMcpServerStatusesInput,
+  AgentListMcpServerStatusesResult,
+  AgentListSkillsInput,
+  AgentListSkillsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
+  AgentReadConfigRequirementsInput,
+  AgentReadConfigRequirementsResult,
   AgentReadStreamEventsInput,
   AgentReadThreadInput,
   AgentReadThreadResult,
@@ -281,6 +291,32 @@ export class CodexAgentAdapter implements AgentAdapter {
 
   public async listCollaborationModes(): Promise<AppServerCollaborationModeListResponse> {
     return this.threadManagementOwner.listCollaborationModes();
+  }
+
+  public async readConfigRequirements(
+    input?: AgentReadConfigRequirementsInput,
+  ): Promise<AgentReadConfigRequirementsResult> {
+    return this.threadManagementOwner.readConfigRequirements(input);
+  }
+
+  public async listExperimentalFeatures(
+    input?: AgentListExperimentalFeaturesInput,
+  ): Promise<AgentListExperimentalFeaturesResult> {
+    return this.threadManagementOwner.listExperimentalFeatures(input);
+  }
+
+  public async listMcpServerStatuses(
+    input?: AgentListMcpServerStatusesInput,
+  ): Promise<AgentListMcpServerStatusesResult> {
+    return this.threadManagementOwner.listMcpServerStatuses(input);
+  }
+
+  public async listApps(input?: AgentListAppsInput): Promise<AgentListAppsResult> {
+    return this.threadManagementOwner.listApps(input);
+  }
+
+  public async listSkills(input?: AgentListSkillsInput): Promise<AgentListSkillsResult> {
+    return this.threadManagementOwner.listSkills(input);
   }
 
   public async readConfigDefaults(): Promise<AgentConfigDefaults> {

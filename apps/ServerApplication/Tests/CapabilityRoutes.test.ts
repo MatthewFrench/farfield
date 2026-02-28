@@ -19,8 +19,13 @@ import type {
   AgentCreateThreadResult,
   AgentId,
   AgentInterruptInput,
+  AgentListAppsResult,
+  AgentListExperimentalFeaturesResult,
+  AgentListMcpServerStatusesResult,
+  AgentListSkillsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
+  AgentReadConfigRequirementsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
   AgentSendMessageInput,
@@ -47,6 +52,81 @@ const CapabilityCollaborationModesEnvelopeSchema = z
     ok: z.literal(true),
   })
   .merge(AppServerCollaborationModeListResponseSchema);
+
+const CapabilityConfigRequirementsEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    requirements: z
+      .object({
+        allowedApprovalPolicies: z.array(z.string()).nullable(),
+      })
+      .passthrough()
+      .nullable(),
+  })
+  .strict();
+
+const CapabilityExperimentalFeaturesEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    data: z.array(
+      z.object({
+        name: z.string(),
+        stage: z.string(),
+        enabled: z.boolean(),
+        defaultEnabled: z.boolean(),
+      }),
+    ),
+    nextCursor: z.union([z.string(), z.null()]),
+  })
+  .strict();
+
+const CapabilityMcpServersEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    data: z.array(
+      z.object({
+        name: z.string(),
+        toolCount: z.number().int().nonnegative(),
+        resourceCount: z.number().int().nonnegative(),
+        resourceTemplateCount: z.number().int().nonnegative(),
+      }),
+    ),
+    nextCursor: z.union([z.string(), z.null()]),
+  })
+  .strict();
+
+const CapabilityAppsEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    data: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        isAccessible: z.boolean(),
+        isEnabled: z.boolean(),
+      }),
+    ),
+    nextCursor: z.union([z.string(), z.null()]),
+  })
+  .strict();
+
+const CapabilitySkillsEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    data: z.array(
+      z.object({
+        cwd: z.string(),
+        skills: z.array(
+          z.object({
+            name: z.string(),
+            scope: z.string(),
+            enabled: z.boolean(),
+          }),
+        ),
+      }),
+    ),
+  })
+  .strict();
 
 interface CapabilityRouteExecutionResult {
   handled: boolean;
@@ -78,6 +158,11 @@ interface MockAgentAdapterOptions {
   enabled?: boolean;
   connected?: boolean;
   capabilities?: Partial<AgentCapabilities>;
+  readConfigRequirements?: () => Promise<AgentReadConfigRequirementsResult>;
+  listExperimentalFeatures?: () => Promise<AgentListExperimentalFeaturesResult>;
+  listMcpServerStatuses?: () => Promise<AgentListMcpServerStatusesResult>;
+  listApps?: () => Promise<AgentListAppsResult>;
+  listSkills?: () => Promise<AgentListSkillsResult>;
   listModels?: (limit: number) => Promise<AppServerListModelsResponse>;
   listCollaborationModes?: () => Promise<AppServerCollaborationModeListResponse>;
   readConfigDefaults?: () => Promise<AgentConfigDefaults>;
@@ -107,6 +192,11 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
   return {
     canListModels: false,
     canListCollaborationModes: false,
+    canReadConfigRequirements: false,
+    canListExperimentalFeatures: false,
+    canListMcpServerStatuses: false,
+    canListApps: false,
+    canListSkills: false,
     canSetCollaborationMode: false,
     canSubmitUserInput: false,
     canReadLiveState: false,
@@ -158,6 +248,26 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.readConfigDefaults) {
     adapter.readConfigDefaults = options.readConfigDefaults;
+  }
+
+  if (options.readConfigRequirements) {
+    adapter.readConfigRequirements = options.readConfigRequirements;
+  }
+
+  if (options.listExperimentalFeatures) {
+    adapter.listExperimentalFeatures = options.listExperimentalFeatures;
+  }
+
+  if (options.listMcpServerStatuses) {
+    adapter.listMcpServerStatuses = options.listMcpServerStatuses;
+  }
+
+  if (options.listApps) {
+    adapter.listApps = options.listApps;
+  }
+
+  if (options.listSkills) {
+    adapter.listSkills = options.listSkills;
   }
 
   return adapter;
@@ -354,5 +464,184 @@ describe("handleCapabilityRoutes", () => {
       ok: true,
       data: [],
     });
+  });
+
+  it("returns config requirements when adapter supports read-config-requirements", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/config-requirements",
+      url: new URL("http://localhost/api/config-requirements"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canReadConfigRequirements: true,
+          },
+          readConfigRequirements: async (): Promise<AgentReadConfigRequirementsResult> => ({
+            requirements: {
+              allowedApprovalPolicies: ["on-request"],
+              allowedSandboxModes: null,
+              allowedWebSearchModes: null,
+              enforceResidency: "us",
+              network: null,
+            },
+          }),
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    const parsedEnvelope = CapabilityConfigRequirementsEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      requirements: {
+        allowedApprovalPolicies: ["on-request"],
+        allowedSandboxModes: null,
+        allowedWebSearchModes: null,
+        enforceResidency: "us",
+        network: null,
+      },
+    });
+  });
+
+  it("lists experimental features when adapter supports the capability", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/experimental-features",
+      url: new URL("http://localhost/api/experimental-features?limit=20&cursor=page-2"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canListExperimentalFeatures: true,
+          },
+          listExperimentalFeatures: async (): Promise<AgentListExperimentalFeaturesResult> => ({
+            data: [
+              {
+                name: "advanced-diff-view",
+                stage: "beta",
+                displayName: "Advanced Diff View",
+                description: "Detailed diff review controls",
+                announcement: null,
+                enabled: true,
+                defaultEnabled: false,
+              },
+            ],
+            nextCursor: null,
+          }),
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    const parsedEnvelope = CapabilityExperimentalFeaturesEnvelopeSchema.parse(
+      readRouteBody(result),
+    );
+    expect(parsedEnvelope.data[0]?.name).toBe("advanced-diff-view");
+  });
+
+  it("lists mcp server status summaries when adapter supports the capability", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/mcp-servers",
+      url: new URL("http://localhost/api/mcp-servers?limit=15"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canListMcpServerStatuses: true,
+          },
+          listMcpServerStatuses: async (): Promise<AgentListMcpServerStatusesResult> => ({
+            data: [
+              {
+                name: "github",
+                authStatus: "authenticated",
+                toolCount: 3,
+                resourceCount: 2,
+                resourceTemplateCount: 1,
+              },
+            ],
+            nextCursor: null,
+          }),
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    const parsedEnvelope = CapabilityMcpServersEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope.data[0]?.toolCount).toBe(3);
+  });
+
+  it("lists apps when adapter supports the capability", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/apps",
+      url: new URL("http://localhost/api/apps?forceRefetch=true&threadId=thread-1"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canListApps: true,
+          },
+          listApps: async (): Promise<AgentListAppsResult> => ({
+            data: [
+              {
+                id: "app-github",
+                name: "GitHub",
+                description: "GitHub connector",
+                logoUrl: null,
+                logoUrlDark: null,
+                installUrl: null,
+                isAccessible: true,
+                isEnabled: true,
+              },
+            ],
+            nextCursor: null,
+          }),
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    const parsedEnvelope = CapabilityAppsEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope.data[0]?.id).toBe("app-github");
+  });
+
+  it("lists skills when adapter supports the capability", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/skills",
+      url: new URL("http://localhost/api/skills?forceReload=true"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canListSkills: true,
+          },
+          listSkills: async (): Promise<AgentListSkillsResult> => ({
+            data: [
+              {
+                cwd: "/tmp/workspace",
+                skills: [
+                  {
+                    name: "checks",
+                    description: "Run repository checks",
+                    shortDescription: "Checks",
+                    path: "/tmp/workspace/.codex/skills/checks/SKILL.md",
+                    scope: "repo",
+                    enabled: true,
+                  },
+                ],
+                errors: [],
+              },
+            ],
+          }),
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    const parsedEnvelope = CapabilitySkillsEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope.data[0]?.skills[0]?.name).toBe("checks");
   });
 });

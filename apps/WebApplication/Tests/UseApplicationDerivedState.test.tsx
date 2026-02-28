@@ -346,6 +346,11 @@ function buildAgentDescriptorsFixture(): CapabilityAgentsResponse["agents"] {
       capabilities: {
         canListModels: true,
         canListCollaborationModes: true,
+        canReadConfigRequirements: true,
+        canListExperimentalFeatures: true,
+        canListMcpServerStatuses: true,
+        canListApps: true,
+        canListSkills: true,
         canSetCollaborationMode: true,
         canSubmitUserInput: true,
         canReadLiveState: true,
@@ -361,6 +366,11 @@ function buildAgentDescriptorsFixture(): CapabilityAgentsResponse["agents"] {
       capabilities: {
         canListModels: false,
         canListCollaborationModes: false,
+        canReadConfigRequirements: false,
+        canListExperimentalFeatures: false,
+        canListMcpServerStatuses: false,
+        canListApps: false,
+        canListSkills: false,
         canSetCollaborationMode: false,
         canSubmitUserInput: false,
         canReadLiveState: false,

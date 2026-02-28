@@ -2,6 +2,7 @@ import { Bug } from "lucide-react";
 import { Tabs } from "@/Components/UserInterface/Tabs";
 import { TabsList } from "@/Components/UserInterface/TabsList";
 import { TabsTrigger } from "@/Components/UserInterface/TabsTrigger";
+import { type DebugAppServerCoverageSnapshot } from "@/Features/Debugging/DomainModel/DebugAppServerCoverageContracts";
 import {
   type DebugIssue,
   type RuntimeRequestErrorOperationMetric,
@@ -11,6 +12,7 @@ import {
   type DebugWorkspaceSection,
   parseDebugWorkspaceSection,
 } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
+import { DebugAppServerCoveragePanel } from "./DebugAppServerCoveragePanel";
 import { type ReplayHistoryEntryRequestInput } from "./DebugHistoryDetailPanel";
 import { type DebugHistoryEntryListItem, DebugHistoryPanel } from "./DebugHistoryPanel";
 import { DebugIssuesPanel } from "./DebugIssuesPanel";
@@ -53,6 +55,10 @@ export interface DebugWorkspacePaneProps {
   onMarkTrace: () => void;
   onStopTrace: () => void;
   recentTraceSummaries: readonly DebugTraceSummary[];
+  isLoadingCoverageDiagnostics: boolean;
+  coverageDiagnosticsErrorMessage: string;
+  coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
+  onRefreshCoverageDiagnostics: () => void;
 }
 
 export function DebugWorkspacePane({
@@ -91,6 +97,10 @@ export function DebugWorkspacePane({
   onMarkTrace,
   onStopTrace,
   recentTraceSummaries,
+  isLoadingCoverageDiagnostics,
+  coverageDiagnosticsErrorMessage,
+  coverageDiagnosticsSnapshot,
+  onRefreshCoverageDiagnostics,
 }: DebugWorkspacePaneProps): React.JSX.Element {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -125,6 +135,9 @@ export function DebugWorkspacePane({
             </TabsTrigger>
             <TabsTrigger value="trace" className="text-xs h-7 px-2.5">
               Trace
+            </TabsTrigger>
+            <TabsTrigger value="coverage" className="text-xs h-7 px-2.5">
+              Coverage
             </TabsTrigger>
           </TabsList>
         </div>
@@ -177,6 +190,15 @@ export function DebugWorkspacePane({
             onMarkTrace={onMarkTrace}
             onStopTrace={onStopTrace}
             recentTraces={recentTraceSummaries}
+          />
+        )}
+
+        {debugWorkspaceSection === "coverage" && (
+          <DebugAppServerCoveragePanel
+            isLoadingCoverageDiagnostics={isLoadingCoverageDiagnostics}
+            coverageDiagnosticsErrorMessage={coverageDiagnosticsErrorMessage}
+            coverageDiagnosticsSnapshot={coverageDiagnosticsSnapshot}
+            onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
           />
         )}
       </Tabs>

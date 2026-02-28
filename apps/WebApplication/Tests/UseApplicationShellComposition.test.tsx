@@ -18,6 +18,7 @@ import {
 } from "../Source/Application/StateManagement/UseApplicationShellState";
 import * as ApplicationShellViewPropertiesModule from "../Source/Application/StateManagement/UseApplicationShellViewProperties";
 import * as MobileSidebarTouchHandlersModule from "../Source/Application/StateManagement/UseMobileSidebarTouchHandlers";
+import { CapabilityServerClient } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { ConversationItemFlattener } from "../Source/Features/Chat/DomainModel/ConversationItemFlattener";
 import { ConversationSyncSignatureBuilder } from "../Source/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
 import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
@@ -75,6 +76,7 @@ interface ShellCompositionFixture {
     };
   };
   reportTrackedUserInterfaceError: () => Promise<void>;
+  capabilityServerClient: CapabilityServerClient;
   threadMutationServerClient: ThreadMutationServerClient;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
   threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
@@ -215,6 +217,7 @@ function createShellCompositionFixture(): ShellCompositionFixture {
       },
     })),
     reportTrackedUserInterfaceError: vi.fn(async (): Promise<void> => {}),
+    capabilityServerClient: new CapabilityServerClient(),
     threadMutationServerClient: new ThreadMutationServerClient(),
     threadMutationActionCoordinator: new ThreadMutationActionCoordinator(),
     threadDisplayNameStateOwner: new ThreadDisplayNameStateOwner({
@@ -324,6 +327,7 @@ function RuntimeHarness(properties: RuntimeHarnessProperties): React.JSX.Element
     refreshCoreDataAndSelectedThread: properties.fixture.refreshCoreDataAndSelectedThread,
     buildActionRequestOptions: properties.fixture.buildActionRequestOptions,
     reportTrackedUserInterfaceError: properties.fixture.reportTrackedUserInterfaceError,
+    capabilityServerClient: properties.fixture.capabilityServerClient,
     threadMutationServerClient: properties.fixture.threadMutationServerClient,
     threadMutationActionCoordinator: properties.fixture.threadMutationActionCoordinator,
     threadDisplayNameStateOwner: properties.fixture.threadDisplayNameStateOwner,

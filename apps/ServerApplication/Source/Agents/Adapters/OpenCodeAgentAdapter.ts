@@ -36,6 +36,11 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
   public readonly capabilities: AgentCapabilities = {
     canListModels: false,
     canListCollaborationModes: false,
+    canReadConfigRequirements: false,
+    canListExperimentalFeatures: false,
+    canListMcpServerStatuses: false,
+    canListApps: false,
+    canListSkills: false,
     canSetCollaborationMode: false,
     canSubmitUserInput: false,
     canReadLiveState: false,

@@ -7,6 +7,7 @@ describe("DebugWorkspaceSectionContracts", () => {
     expect(parseDebugWorkspaceSection("history")).toBe("history");
     expect(parseDebugWorkspaceSection("stream")).toBe("stream");
     expect(parseDebugWorkspaceSection("trace")).toBe("trace");
+    expect(parseDebugWorkspaceSection("coverage")).toBe("coverage");
   });
 
   it("throws for unsupported debug workspace section values", () => {

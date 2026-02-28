@@ -1294,6 +1294,23 @@ All path families above must remain internally consistent after each rename/move
    - Reason: keeps exclusions bounded and reviewable while preserving hardening progress accountability.
    - Record: `docs/decisions/2026-02-26-ExcludedSurfaceHardeningGovernance.md`
 
+20. Date: 2026-02-28
+   - Status: scheduled hardening.
+   - Owner: app-server coverage owners.
+   - Decision: Temporarily allow line-budget exceptions for three owner files while app-server coverage surfaces are integrated end-to-end.
+   - Affected Files/Modules:
+     - `packages/CodexInterfaceAdapter/Source/AppServerClient.ts`
+     - `apps/ServerApplication/Source/Network/Routes/CapabilityRoutes.ts`
+     - `apps/WebApplication/Source/Application/StateManagement/UseApplicationShellViewProperties.ts`
+   - Reason: integration expanded method and surface contracts in one pass; extraction work is tracked and time-bounded.
+   - Review Date: 2026-03-15.
+   - Planned Removal Date: 2026-03-29.
+   - Dated Follow-up Schedule:
+     - 2026-03-08: extract app-server coverage request/response contracts and mappers from `AppServerClient`.
+     - 2026-03-15: split capability coverage route handlers from `CapabilityRoutes`.
+     - 2026-03-22: split debug workspace pane property builders from `UseApplicationShellViewProperties`.
+     - 2026-03-29: remove temporary file-length ignores after follow-up extractions land.
+
 ### Current Excluded Surface Hardening Register
 
 | Surface | Status | Owner | Review Date | Planned Removal Date | Dated Follow-up Schedule |

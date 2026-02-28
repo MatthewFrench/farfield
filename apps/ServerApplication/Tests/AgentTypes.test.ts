@@ -20,6 +20,11 @@ function createDescriptor(id: AgentId): AgentDescriptor {
     capabilities: {
       canListModels: false,
       canListCollaborationModes: false,
+      canReadConfigRequirements: false,
+      canListExperimentalFeatures: false,
+      canListMcpServerStatuses: false,
+      canListApps: false,
+      canListSkills: false,
       canSetCollaborationMode: false,
       canSubmitUserInput: false,
       canReadLiveState: false,

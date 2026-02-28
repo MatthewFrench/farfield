@@ -30,6 +30,11 @@ export const INBOUND_IPC_FRAME_DIRECTION: CodexIpcFrameEvent["direction"] = "in"
 export const CODEX_AGENT_CAPABILITIES: AgentCapabilities = {
   canListModels: true,
   canListCollaborationModes: true,
+  canReadConfigRequirements: true,
+  canListExperimentalFeatures: true,
+  canListMcpServerStatuses: true,
+  canListApps: true,
+  canListSkills: true,
   canSetCollaborationMode: true,
   canSubmitUserInput: true,
   canReadLiveState: true,

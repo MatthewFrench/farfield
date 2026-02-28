@@ -6,6 +6,7 @@ import type {
   AppServerStartThreadResponse,
   CollaborationMode,
   IpcFrame,
+  JsonValue,
   ThreadConversationRequestResponse,
 } from "@farfield/protocol";
 
@@ -48,6 +49,11 @@ export const AgentThreadListSortKeyValues: ReadonlyArray<AgentThreadListSortKey>
 export interface AgentCapabilities {
   canListModels: boolean;
   canListCollaborationModes: boolean;
+  canReadConfigRequirements: boolean;
+  canListExperimentalFeatures: boolean;
+  canListMcpServerStatuses: boolean;
+  canListApps: boolean;
+  canListSkills: boolean;
   canSetCollaborationMode: boolean;
   canSubmitUserInput: boolean;
   canReadLiveState: boolean;
@@ -265,6 +271,139 @@ export interface AgentListLoadedThreadsResult {
   nextCursor: string | null;
 }
 
+export interface AgentReadConfigRequirementsNetwork {
+  enabled: boolean | null;
+  httpPort: number | null;
+  socksPort: number | null;
+  allowUpstreamProxy: boolean | null;
+  dangerouslyAllowNonLoopbackProxy: boolean | null;
+  dangerouslyAllowNonLoopbackAdmin: boolean | null;
+  dangerouslyAllowAllUnixSockets: boolean | null;
+  allowedDomains: string[] | null;
+  deniedDomains: string[] | null;
+  allowUnixSockets: string[] | null;
+  allowLocalBinding: boolean | null;
+}
+
+export interface AgentReadConfigRequirementsInput {}
+
+export interface AgentReadConfigRequirements {
+  allowedApprovalPolicies: string[] | null;
+  allowedSandboxModes: string[] | null;
+  allowedWebSearchModes: string[] | null;
+  enforceResidency: string | null;
+  network: AgentReadConfigRequirementsNetwork | null;
+}
+
+export interface AgentReadConfigRequirementsResult {
+  requirements: AgentReadConfigRequirements | null;
+}
+
+export interface AgentListExperimentalFeaturesInput {
+  limit?: number | null;
+  cursor?: string | null;
+}
+
+export type AgentExperimentalFeatureStage =
+  | "beta"
+  | "underDevelopment"
+  | "stable"
+  | "deprecated"
+  | "removed";
+
+export interface AgentExperimentalFeature {
+  name: string;
+  stage: AgentExperimentalFeatureStage;
+  displayName: string | null;
+  description: string | null;
+  announcement: string | null;
+  enabled: boolean;
+  defaultEnabled: boolean;
+}
+
+export interface AgentListExperimentalFeaturesResult {
+  data: AgentExperimentalFeature[];
+  nextCursor: string | null;
+}
+
+export interface AgentListMcpServerStatusesInput {
+  limit?: number | null;
+  cursor?: string | null;
+}
+
+export interface AgentMcpServerStatusSummary {
+  name: string;
+  authStatus: JsonValue;
+  toolCount: number;
+  resourceCount: number;
+  resourceTemplateCount: number;
+}
+
+export interface AgentListMcpServerStatusesResult {
+  data: AgentMcpServerStatusSummary[];
+  nextCursor: string | null;
+}
+
+export interface AgentListAppsInput {
+  limit?: number | null;
+  cursor?: string | null;
+  threadId?: string | null;
+  forceRefetch?: boolean;
+}
+
+export interface AgentAppInfoSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  logoUrl: string | null;
+  logoUrlDark: string | null;
+  installUrl: string | null;
+  isAccessible: boolean;
+  isEnabled: boolean;
+}
+
+export interface AgentListAppsResult {
+  data: AgentAppInfoSummary[];
+  nextCursor: string | null;
+}
+
+export interface AgentSkillsListExtraRootsForCwdInput {
+  cwd: string;
+  extraUserRoots: string[];
+}
+
+export interface AgentListSkillsInput {
+  cwds?: string[];
+  forceReload?: boolean;
+  perCwdExtraUserRoots?: AgentSkillsListExtraRootsForCwdInput[] | null;
+}
+
+export type AgentSkillScope = "user" | "repo" | "system" | "admin";
+
+export interface AgentSkillSummary {
+  name: string;
+  description: string;
+  shortDescription: string | null;
+  path: string;
+  scope: AgentSkillScope;
+  enabled: boolean;
+}
+
+export interface AgentSkillErrorSummary {
+  path: string;
+  message: string;
+}
+
+export interface AgentSkillsListEntrySummary {
+  cwd: string;
+  skills: AgentSkillSummary[];
+  errors: AgentSkillErrorSummary[];
+}
+
+export interface AgentListSkillsResult {
+  data: AgentSkillsListEntrySummary[];
+}
+
 export interface AgentSetCollaborationModeResult {
   ownerClientId: string;
 }
@@ -299,6 +438,17 @@ export interface AgentAdapter {
   archiveThread?(input: AgentArchiveThreadInput): Promise<void>;
   unarchiveThread?(input: AgentUnarchiveThreadInput): Promise<void>;
   listLoadedThreads?(): Promise<AgentListLoadedThreadsResult>;
+  readConfigRequirements?(
+    input?: AgentReadConfigRequirementsInput,
+  ): Promise<AgentReadConfigRequirementsResult>;
+  listExperimentalFeatures?(
+    input?: AgentListExperimentalFeaturesInput,
+  ): Promise<AgentListExperimentalFeaturesResult>;
+  listMcpServerStatuses?(
+    input?: AgentListMcpServerStatusesInput,
+  ): Promise<AgentListMcpServerStatusesResult>;
+  listApps?(input?: AgentListAppsInput): Promise<AgentListAppsResult>;
+  listSkills?(input?: AgentListSkillsInput): Promise<AgentListSkillsResult>;
 
   listModels?(limit: number): Promise<AppServerListModelsResponse>;
   listCollaborationModes?(): Promise<AppServerCollaborationModeListResponse>;

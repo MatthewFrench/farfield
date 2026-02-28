@@ -12,8 +12,13 @@ import {
   type UseMobileSidebarTouchHandlersInput,
   useMobileSidebarTouchHandlers,
 } from "@/Application/StateManagement/UseMobileSidebarTouchHandlers";
+import { type CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { type DebugActionHandlers } from "@/Features/Debugging/StateManagement/UseDebugActionHandlers";
+import {
+  type DebugAppServerCoverageDiagnostics,
+  useDebugAppServerCoverageDiagnostics,
+} from "@/Features/Debugging/StateManagement/UseDebugAppServerCoverageDiagnostics";
 import { type ThreadMutationServerClient } from "@/Features/Threads/DataAccess/ThreadMutationServerClient";
 import { type ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import { type ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
@@ -52,6 +57,7 @@ export interface UseApplicationShellCompositionInput {
     requestOptions: ApiRequestOptions;
   };
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
+  capabilityServerClient: CapabilityServerClient;
   threadMutationServerClient: ThreadMutationServerClient;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
   threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
@@ -192,6 +198,7 @@ function buildThreadListPanePropertiesInput(
 
 function buildApplicationShellViewPropertiesInput(
   context: ApplicationShellCompositionContext,
+  debugCoverageDiagnostics: DebugAppServerCoverageDiagnostics,
 ): UseApplicationShellViewPropertiesInput {
   const { input, applicationShellState, applicationDerivedState } = context;
   return {
@@ -300,6 +307,10 @@ function buildApplicationShellViewPropertiesInput(
     markTraceFromDebugPanel: input.debugFeatureComposition.markTraceFromDebugPanel,
     stopTraceFromDebugPanel: input.debugFeatureComposition.stopTraceFromDebugPanel,
     recentTraceSummaries: applicationDerivedState.recentTraceSummaries,
+    isLoadingCoverageDiagnostics: debugCoverageDiagnostics.isLoadingCoverageDiagnostics,
+    coverageDiagnosticsErrorMessage: debugCoverageDiagnostics.coverageDiagnosticsErrorMessage,
+    coverageDiagnosticsSnapshot: debugCoverageDiagnostics.coverageDiagnosticsSnapshot,
+    refreshCoverageDiagnostics: debugCoverageDiagnostics.refreshCoverageDiagnostics,
     apiSessionTokenDraft: applicationShellState.apiSessionTokenDraft,
     setApiSessionTokenDraft: applicationShellState.setApiSessionTokenDraft,
     apiSessionBootstrapError: applicationShellState.apiSessionBootstrapError,
@@ -314,6 +325,11 @@ export function useApplicationShellComposition(
 ): ApplicationShellComposition {
   const context = createApplicationShellCompositionContext(input);
 
+  const debugCoverageDiagnostics = useDebugAppServerCoverageDiagnostics({
+    debugWorkspaceSection: context.applicationShellState.debugWorkspaceSection,
+    capabilityServerClient: input.capabilityServerClient,
+  });
+
   const threadActionHandlers = useThreadActionHandlers(buildThreadActionHandlersInput(context));
 
   const mobileSidebarTouchHandlers = useMobileSidebarTouchHandlers(
@@ -325,7 +341,7 @@ export function useApplicationShellComposition(
   );
 
   const shellViewProperties = useApplicationShellViewProperties(
-    buildApplicationShellViewPropertiesInput(context),
+    buildApplicationShellViewPropertiesInput(context, debugCoverageDiagnostics),
   );
 
   return {

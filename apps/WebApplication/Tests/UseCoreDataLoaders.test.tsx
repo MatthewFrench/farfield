@@ -63,6 +63,11 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
       capabilities: {
         canListModels: true,
         canListCollaborationModes: true,
+        canReadConfigRequirements: true,
+        canListExperimentalFeatures: true,
+        canListMcpServerStatuses: true,
+        canListApps: true,
+        canListSkills: true,
         canSetCollaborationMode: true,
         canSubmitUserInput: true,
         canReadLiveState: true,

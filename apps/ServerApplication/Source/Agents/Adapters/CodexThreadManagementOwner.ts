@@ -1,8 +1,18 @@
 import {
   AppServerClient,
+  type ListAppsOptions,
+  type ListAppsResult,
+  type ListExperimentalFeaturesOptions,
+  type ListExperimentalFeaturesResult,
   type ListLoadedThreadsResult,
+  type ListMcpServerStatusesOptions,
+  type ListMcpServerStatusesResult,
+  type ListSkillsOptions,
+  type ListSkillsResult,
   type ListThreadsAllOptions,
   type ListThreadsOptions,
+  type ReadConfigRequirementsOptions,
+  type ReadConfigRequirementsResult,
   type StartReviewOptions,
   type StartThreadOptions,
 } from "@farfield/api";
@@ -21,9 +31,19 @@ import type {
   AgentCreateThreadInput,
   AgentCreateThreadResult,
   AgentForkThreadInput,
+  AgentListAppsInput,
+  AgentListAppsResult,
+  AgentListExperimentalFeaturesInput,
+  AgentListExperimentalFeaturesResult,
   AgentListLoadedThreadsResult,
+  AgentListMcpServerStatusesInput,
+  AgentListMcpServerStatusesResult,
+  AgentListSkillsInput,
+  AgentListSkillsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
+  AgentReadConfigRequirementsInput,
+  AgentReadConfigRequirementsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
   AgentRollbackThreadInput,
@@ -183,6 +203,49 @@ function mergeLoadedThreadIdentifiers(
   for (const threadId of loadedThreadsResult.data) {
     accumulator.add(threadId);
   }
+}
+
+function buildReadConfigRequirementsOptions(
+  _input?: AgentReadConfigRequirementsInput,
+): ReadConfigRequirementsOptions {
+  return {};
+}
+
+function buildListExperimentalFeaturesOptions(
+  input?: AgentListExperimentalFeaturesInput,
+): ListExperimentalFeaturesOptions {
+  return {
+    ...(input?.limit !== undefined ? { limit: input.limit } : {}),
+    ...(input?.cursor !== undefined ? { cursor: input.cursor } : {}),
+  };
+}
+
+function buildListMcpServerStatusesOptions(
+  input?: AgentListMcpServerStatusesInput,
+): ListMcpServerStatusesOptions {
+  return {
+    ...(input?.limit !== undefined ? { limit: input.limit } : {}),
+    ...(input?.cursor !== undefined ? { cursor: input.cursor } : {}),
+  };
+}
+
+function buildListAppsOptions(input?: AgentListAppsInput): ListAppsOptions {
+  return {
+    ...(input?.limit !== undefined ? { limit: input.limit } : {}),
+    ...(input?.cursor !== undefined ? { cursor: input.cursor } : {}),
+    ...(input?.threadId !== undefined ? { threadId: input.threadId } : {}),
+    ...(input?.forceRefetch !== undefined ? { forceRefetch: input.forceRefetch } : {}),
+  };
+}
+
+function buildListSkillsOptions(input?: AgentListSkillsInput): ListSkillsOptions {
+  return {
+    ...(input?.cwds !== undefined ? { cwds: input.cwds } : {}),
+    ...(input?.forceReload !== undefined ? { forceReload: input.forceReload } : {}),
+    ...(input?.perCwdExtraUserRoots !== undefined
+      ? { perCwdExtraUserRoots: input.perCwdExtraUserRoots }
+      : {}),
+  };
 }
 
 export interface CodexThreadManagementOwnerOptions {
@@ -345,6 +408,52 @@ export class CodexThreadManagementOwner {
   public async listCollaborationModes(): Promise<AppServerCollaborationModeListResponse> {
     this.ensureCodexAvailable();
     return this.runAppServerCall(() => this.appClient.listCollaborationModes());
+  }
+
+  public async readConfigRequirements(
+    input?: AgentReadConfigRequirementsInput,
+  ): Promise<AgentReadConfigRequirementsResult> {
+    this.ensureCodexAvailable();
+    const result: ReadConfigRequirementsResult = await this.runAppServerCall(() =>
+      this.appClient.readConfigRequirements(buildReadConfigRequirementsOptions(input)),
+    );
+    return result;
+  }
+
+  public async listExperimentalFeatures(
+    input?: AgentListExperimentalFeaturesInput,
+  ): Promise<AgentListExperimentalFeaturesResult> {
+    this.ensureCodexAvailable();
+    const result: ListExperimentalFeaturesResult = await this.runAppServerCall(() =>
+      this.appClient.listExperimentalFeatures(buildListExperimentalFeaturesOptions(input)),
+    );
+    return result;
+  }
+
+  public async listMcpServerStatuses(
+    input?: AgentListMcpServerStatusesInput,
+  ): Promise<AgentListMcpServerStatusesResult> {
+    this.ensureCodexAvailable();
+    const result: ListMcpServerStatusesResult = await this.runAppServerCall(() =>
+      this.appClient.listMcpServerStatuses(buildListMcpServerStatusesOptions(input)),
+    );
+    return result;
+  }
+
+  public async listApps(input?: AgentListAppsInput): Promise<AgentListAppsResult> {
+    this.ensureCodexAvailable();
+    const result: ListAppsResult = await this.runAppServerCall(() =>
+      this.appClient.listApps(buildListAppsOptions(input)),
+    );
+    return result;
+  }
+
+  public async listSkills(input?: AgentListSkillsInput): Promise<AgentListSkillsResult> {
+    this.ensureCodexAvailable();
+    const result: ListSkillsResult = await this.runAppServerCall(() =>
+      this.appClient.listSkills(buildListSkillsOptions(input)),
+    );
+    return result;
   }
 
   public async readConfigDefaults(): Promise<AgentConfigDefaults> {

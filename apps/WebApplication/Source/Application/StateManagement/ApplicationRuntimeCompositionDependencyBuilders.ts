@@ -399,6 +399,7 @@ export function buildApplicationShellCompositionInput(
     refreshCoreDataAndSelectedThread: dependencies.refreshCoreDataAndSelectedThread,
     buildActionRequestOptions: runtimeRequestHandlers.buildActionRequestOptions,
     reportTrackedUserInterfaceError: runtimeRequestHandlers.reportTrackedUserInterfaceError,
+    capabilityServerClient: applicationOwnerDependencies.capabilityServerClient,
     threadMutationServerClient: applicationOwnerDependencies.threadMutationServerClient,
     threadMutationActionCoordinator: applicationOwnerDependencies.threadMutationActionCoordinator,
     threadDisplayNameStateOwner: applicationOwnerDependencies.threadDisplayNameStateOwner,

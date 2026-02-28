@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-02-28 20:14:00Z
+Last Updated (UTC): 2026-02-28 17:56:33Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -12,7 +12,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `account/rateLimits/read` | Not used | Not now | Account and auth surface; adopt with explicit product requirement. |
 | `account/read` | Not used | Not now | Account and auth surface; adopt with explicit product requirement. |
 | `addConversationListener` | Not used | Do not adopt | Deprecated upstream request family. |
-| `app/list` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
+| `app/list` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
 | `archiveConversation` | Not used | Do not adopt | Deprecated upstream request family. |
 | `cancelLoginChatGpt` | Not used | Do not adopt | Deprecated upstream request family. |
 | `collaborationMode/list` | Used now | Keep | Current ownership and contracts align with present product behavior. |
@@ -21,9 +21,9 @@ This ledger records recommended disposition for every upstream app-server client
 | `config/mcpServer/reload` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 | `config/read` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `config/value/write` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
-| `configRequirements/read` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
+| `configRequirements/read` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
 | `execOneOffCommand` | Not used | Do not adopt | Deprecated upstream request family. |
-| `experimentalFeature/list` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
+| `experimentalFeature/list` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
 | `externalAgentConfig/detect` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 | `externalAgentConfig/import` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 | `feedback/upload` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
@@ -44,7 +44,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `loginChatGpt` | Not used | Do not adopt | Deprecated upstream request family. |
 | `logoutChatGpt` | Not used | Do not adopt | Deprecated upstream request family. |
 | `mcpServer/oauth/login` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
-| `mcpServerStatus/list` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
+| `mcpServerStatus/list` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
 | `mock/experimentalMethod` | Not used | Do not adopt for production | Experimental or test-focused surface. |
 | `model/list` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `newConversation` | Not used | Do not adopt | Deprecated upstream request family. |
@@ -55,7 +55,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `sendUserTurn` | Not used | Do not adopt | Deprecated upstream request family. |
 | `setDefaultModel` | Not used | Do not adopt | Deprecated upstream request family. |
 | `skills/config/write` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
-| `skills/list` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
+| `skills/list` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
 | `skills/remote/export` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
 | `skills/remote/list` | Not used | Not now | Integration and discovery surface; adopt when corresponding feature is planned. |
 | `thread/archive` | Used now | Keep | Current ownership and contracts align with present product behavior. |
@@ -82,5 +82,5 @@ This ledger records recommended disposition for every upstream app-server client
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 21
-Not used: 53
+Used now: 26
+Not used: 48

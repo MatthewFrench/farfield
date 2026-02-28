@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-02-28 20:14:00Z
+Last Updated (UTC): 2026-02-28 17:56:33Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `20 / 74` request methods (`27.0%`).
+1. Farfield app-server method coverage at request-owner layer: `25 / 74` request methods (`33.8%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `21 / 74` (`28.4%`).
+3. Effective request-method usage including transport-owned `initialize`: `26 / 74` (`35.1%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -98,6 +98,11 @@ As of the upstream snapshot above:
 | `model/list` | Model selector and capability snapshot | High | Explicit capability route ownership and strict envelope parsing | Keep current path |
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | High | Explicit capability ownership and strict envelope parsing | Keep current path |
 | `config/read` | Config defaults resolution for model and reasoning effort | High | Normalized default resolution through typed owner mapping | Keep current path |
+| `configRequirements/read` | Config requirements diagnostics and workspace readiness signals | Medium-high | Strict capability route ownership with typed payload mapping into debug coverage diagnostics | Keep current path |
+| `experimentalFeature/list` | Experimental feature diagnostics and capability coverage projection | Medium-high | Strict capability route ownership with typed list pagination contracts | Keep current path |
+| `mcpServerStatus/list` | MCP server status diagnostics in debug workspace | Medium-high | Strict capability route ownership with typed list pagination contracts | Keep current path |
+| `app/list` | App list diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed thread-scoped query mapping | Keep current path |
+| `skills/list` | Skills diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed refresh query mapping | Keep current path |
 
 ### Transport-owned request method
 
@@ -129,10 +134,15 @@ As of the upstream snapshot above:
 | `model/list` | Model selector and capability snapshot | `/api/models` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listModels` -> `AppServerClient.listModels` |
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | `/api/collaboration-modes` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listCollaborationModes` -> `AppServerClient.listCollaborationModes` |
 | `config/read` | Config defaults (`model`, `reasoningEffort`) | `/api/config/defaults` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigDefaults` -> `AppServerClient.readConfig` |
+| `configRequirements/read` | Config requirements diagnostics | `/api/config-requirements` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigRequirements` -> `AppServerClient.readConfigRequirements` |
+| `experimentalFeature/list` | Experimental feature diagnostics | `/api/experimental-features` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listExperimentalFeatures` -> `AppServerClient.listExperimentalFeatures` |
+| `mcpServerStatus/list` | MCP server status diagnostics | `/api/mcp-servers` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listMcpServerStatuses` -> `AppServerClient.listMcpServerStatuses` |
+| `app/list` | App list diagnostics | `/api/apps` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listApps` -> `AppServerClient.listApps` |
+| `skills/list` | Skills diagnostics | `/api/skills` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listSkills` -> `AppServerClient.listSkills` |
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`54` request methods are not used by Farfield’s app-server client path:
+`49` request methods are not used by Farfield’s app-server client path:
 
 ```text
 account/login/cancel
@@ -141,16 +151,13 @@ account/logout
 account/rateLimits/read
 account/read
 addConversationListener
-app/list
 archiveConversation
 cancelLoginChatGpt
 command/exec
 config/batchWrite
 config/mcpServer/reload
 config/value/write
-configRequirements/read
 execOneOffCommand
-experimentalFeature/list
 externalAgentConfig/detect
 externalAgentConfig/import
 feedback/upload
@@ -171,7 +178,6 @@ loginApiKey
 loginChatGpt
 logoutChatGpt
 mcpServer/oauth/login
-mcpServerStatus/list
 mock/experimentalMethod
 newConversation
 removeConversationListener
@@ -179,7 +185,6 @@ resumeConversation
 sendUserTurn
 setDefaultModel
 skills/config/write
-skills/list
 skills/remote/export
 skills/remote/list
 thread/realtime/appendAudio
@@ -234,23 +239,18 @@ These are explicitly in the upstream deprecated request section and should not b
 1. `config/batchWrite`
 2. `config/mcpServer/reload`
 3. `config/value/write`
-4. `configRequirements/read`
-5. `externalAgentConfig/detect`
-6. `externalAgentConfig/import`
+4. `externalAgentConfig/detect`
+5. `externalAgentConfig/import`
 
 ### Category D: Skills, Apps, and Feature-Discovery Surfaces Not Yet Wired
 
-1. `app/list`
-2. `experimentalFeature/list`
-3. `skills/config/write`
-4. `skills/list`
-5. `skills/remote/export`
-6. `skills/remote/list`
+1. `skills/config/write`
+2. `skills/remote/export`
+3. `skills/remote/list`
 
 ### Category E: MCP and Integration Surfaces Not Yet Wired
 
 1. `mcpServer/oauth/login`
-2. `mcpServerStatus/list`
 
 ### Category F: Thread and Turn v2 Lifecycle Surfaces Not Yet Wired
 
@@ -280,8 +280,8 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `54`
-2. Total methods listed across Category A-I: `54`
+1. Total non-intersection methods: `49`
+2. Total methods listed across Category A-I: `49`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

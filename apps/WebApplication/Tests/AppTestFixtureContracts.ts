@@ -9,6 +9,11 @@ type AgentIdentifier = "codex" | "opencode";
 export interface CapabilityFixture {
   canListModels: boolean;
   canListCollaborationModes: boolean;
+  canReadConfigRequirements: boolean;
+  canListExperimentalFeatures: boolean;
+  canListMcpServerStatuses: boolean;
+  canListApps: boolean;
+  canListSkills: boolean;
   canSetCollaborationMode: boolean;
   canSubmitUserInput: boolean;
   canReadLiveState: boolean;
@@ -192,6 +197,11 @@ export interface AppTestEnvironment {
 export const CODEX_CAPABILITIES: CapabilityFixture = {
   canListModels: true,
   canListCollaborationModes: true,
+  canReadConfigRequirements: true,
+  canListExperimentalFeatures: true,
+  canListMcpServerStatuses: true,
+  canListApps: true,
+  canListSkills: true,
   canSetCollaborationMode: true,
   canSubmitUserInput: true,
   canReadLiveState: true,
@@ -201,6 +211,11 @@ export const CODEX_CAPABILITIES: CapabilityFixture = {
 export const OPENCODE_CAPABILITIES: CapabilityFixture = {
   canListModels: false,
   canListCollaborationModes: false,
+  canReadConfigRequirements: false,
+  canListExperimentalFeatures: false,
+  canListMcpServerStatuses: false,
+  canListApps: false,
+  canListSkills: false,
   canSetCollaborationMode: false,
   canSubmitUserInput: false,
   canReadLiveState: false,
