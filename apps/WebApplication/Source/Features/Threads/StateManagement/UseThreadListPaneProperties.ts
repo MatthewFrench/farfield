@@ -31,6 +31,8 @@ export interface UseThreadListPanePropertiesInput {
   archiveThread: (threadId: string) => void | Promise<void>;
   forkThread: (threadId: string) => void | Promise<void>;
   rollbackThread: (threadId: string) => void | Promise<void>;
+  compactThread: (threadId: string) => void | Promise<void>;
+  cleanThreadBackgroundTerminals: (threadId: string) => void | Promise<void>;
   startThreadReview: (threadId: string) => void | Promise<void>;
   setThreadName: (threadId: string, name: string) => void | Promise<void>;
   isArchivedThreadsOpen: boolean;
@@ -73,6 +75,8 @@ export function useThreadListPaneProperties(
     archiveThread,
     forkThread,
     rollbackThread,
+    compactThread,
+    cleanThreadBackgroundTerminals,
     startThreadReview,
     setThreadName,
     isArchivedThreadsOpen,
@@ -130,6 +134,12 @@ export function useThreadListPaneProperties(
       onRollbackThread: (threadId) => {
         void rollbackThread(threadId);
       },
+      onCompactThread: (threadId) => {
+        void compactThread(threadId);
+      },
+      onCleanThreadBackgroundTerminals: (threadId) => {
+        void cleanThreadBackgroundTerminals(threadId);
+      },
       onStartThreadReview: (threadId) => {
         void startThreadReview(threadId);
       },
@@ -163,6 +173,8 @@ export function useThreadListPaneProperties(
       activeProjectGroups,
       agentsById,
       archiveThread,
+      compactThread,
+      cleanThreadBackgroundTerminals,
       forkThread,
       rollbackThread,
       startThreadReview,

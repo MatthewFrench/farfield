@@ -20,6 +20,8 @@ export const ThreadMemberRouteSegmentByName = {
   fork: "fork",
   name: "name",
   rollback: "rollback",
+  compact: "compact",
+  backgroundTerminalsClean: "background-terminals-clean",
   review: "review",
   collaborationMode: "collaboration-mode",
   userInput: "user-input",
@@ -43,6 +45,8 @@ export const ThreadMemberMutationActionByName = {
   threadFork: "thread-fork",
   threadSetName: "thread-set-name",
   threadRollback: "thread-rollback",
+  threadCompactStart: "thread-compact-start",
+  threadBackgroundTerminalsClean: "thread-background-terminals-clean",
   threadReviewStart: "thread-review-start",
   collaborationMode: ThreadMemberRouteSegmentByName.collaborationMode,
   userInput: ThreadMemberRouteSegmentByName.userInput,
@@ -58,6 +62,8 @@ const ThreadMemberSubresourceRouteSegmentSchema = z.enum([
   ThreadMemberRouteSegmentByName.fork,
   ThreadMemberRouteSegmentByName.name,
   ThreadMemberRouteSegmentByName.rollback,
+  ThreadMemberRouteSegmentByName.compact,
+  ThreadMemberRouteSegmentByName.backgroundTerminalsClean,
   ThreadMemberRouteSegmentByName.review,
   ThreadMemberRouteSegmentByName.collaborationMode,
   ThreadMemberRouteSegmentByName.userInput,
@@ -73,6 +79,8 @@ type ThreadMemberSubresourceRouteSegment =
   | typeof ThreadMemberRouteSegmentByName.fork
   | typeof ThreadMemberRouteSegmentByName.name
   | typeof ThreadMemberRouteSegmentByName.rollback
+  | typeof ThreadMemberRouteSegmentByName.compact
+  | typeof ThreadMemberRouteSegmentByName.backgroundTerminalsClean
   | typeof ThreadMemberRouteSegmentByName.review
   | typeof ThreadMemberRouteSegmentByName.collaborationMode
   | typeof ThreadMemberRouteSegmentByName.userInput

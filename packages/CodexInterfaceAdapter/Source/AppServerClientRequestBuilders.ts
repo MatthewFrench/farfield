@@ -49,6 +49,16 @@ const AppServerRollbackThreadRequestSchema = z
     numTurns: z.number().int().min(1),
   })
   .passthrough();
+const AppServerThreadCompactStartRequestSchema = z
+  .object({
+    threadId: z.string().min(1),
+  })
+  .passthrough();
+const AppServerThreadBackgroundTerminalsCleanRequestSchema = z
+  .object({
+    threadId: z.string().min(1),
+  })
+  .passthrough();
 const AppServerTurnInterruptRequestSchema = z
   .object({
     threadId: z.string().min(1),
@@ -251,6 +261,22 @@ export function buildUnarchiveThreadRequest(
   threadId: string,
 ): z.infer<typeof AppServerUnarchiveThreadRequestSchema> {
   return AppServerUnarchiveThreadRequestSchema.parse({
+    threadId,
+  });
+}
+
+export function buildThreadCompactStartRequest(
+  threadId: string,
+): z.infer<typeof AppServerThreadCompactStartRequestSchema> {
+  return AppServerThreadCompactStartRequestSchema.parse({
+    threadId,
+  });
+}
+
+export function buildThreadBackgroundTerminalsCleanRequest(
+  threadId: string,
+): z.infer<typeof AppServerThreadBackgroundTerminalsCleanRequestSchema> {
+  return AppServerThreadBackgroundTerminalsCleanRequestSchema.parse({
     threadId,
   });
 }

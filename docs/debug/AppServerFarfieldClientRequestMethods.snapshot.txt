@@ -4,6 +4,8 @@ initialize
 model/list
 review/start
 thread/archive
+thread/backgroundTerminals/clean
+thread/compact/start
 thread/fork
 thread/list
 thread/name/set

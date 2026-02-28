@@ -40,6 +40,8 @@ export interface ThreadActionHandlers {
   runArchiveThread: (threadId: string) => Promise<void>;
   runForkThread: (threadId: string) => Promise<void>;
   runRollbackThread: (threadId: string) => Promise<void>;
+  runCompactThread: (threadId: string) => Promise<void>;
+  runCleanThreadBackgroundTerminals: (threadId: string) => Promise<void>;
   runStartThreadReview: (threadId: string) => Promise<void>;
   runSetThreadName: (threadId: string, name: string) => Promise<void>;
   runUnarchiveThread: (threadId: string) => Promise<void>;
@@ -292,6 +294,64 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     ],
   );
 
+  const runCompactThread = useCallback(
+    async (threadId: string) => {
+      await input.threadMutationActionCoordinator.compactThread({
+        threadId,
+        selectedThreadId: selectedThreadIdRef.current,
+        buildActionRequestOptions: input.buildActionRequestOptions,
+        onSetBusy: input.setIsBusy,
+        onInvalidateActiveThreadQuery: () => {
+          input.threadListStateController.invalidateActiveThreadQuery();
+        },
+        loadCoreData: input.loadCoreDataTracked,
+        onRefreshCompactedThreadData: refreshCreatedThreadData,
+        threadMutationClient: input.threadMutationServerClient,
+        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+      });
+    },
+    [
+      input.buildActionRequestOptions,
+      input.loadCoreDataTracked,
+      input.reportTrackedUserInterfaceError,
+      refreshCreatedThreadData,
+      selectedThreadIdRef,
+      input.setIsBusy,
+      input.threadListStateController,
+      input.threadMutationActionCoordinator,
+      input.threadMutationServerClient,
+    ],
+  );
+
+  const runCleanThreadBackgroundTerminals = useCallback(
+    async (threadId: string) => {
+      await input.threadMutationActionCoordinator.cleanThreadBackgroundTerminals({
+        threadId,
+        selectedThreadId: selectedThreadIdRef.current,
+        buildActionRequestOptions: input.buildActionRequestOptions,
+        onSetBusy: input.setIsBusy,
+        onInvalidateActiveThreadQuery: () => {
+          input.threadListStateController.invalidateActiveThreadQuery();
+        },
+        loadCoreData: input.loadCoreDataTracked,
+        onRefreshCleanedThreadData: refreshCreatedThreadData,
+        threadMutationClient: input.threadMutationServerClient,
+        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+      });
+    },
+    [
+      input.buildActionRequestOptions,
+      input.loadCoreDataTracked,
+      input.reportTrackedUserInterfaceError,
+      refreshCreatedThreadData,
+      selectedThreadIdRef,
+      input.setIsBusy,
+      input.threadListStateController,
+      input.threadMutationActionCoordinator,
+      input.threadMutationServerClient,
+    ],
+  );
+
   const runStartThreadReview = useCallback(
     async (threadId: string) => {
       await input.threadMutationActionCoordinator.startThreadReview({
@@ -331,6 +391,8 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     runArchiveThread,
     runForkThread,
     runRollbackThread,
+    runCompactThread,
+    runCleanThreadBackgroundTerminals,
     runStartThreadReview,
     runSetThreadName,
     runUnarchiveThread,

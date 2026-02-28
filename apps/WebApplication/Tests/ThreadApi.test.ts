@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   archiveThread,
+  cleanThreadBackgroundTerminals,
+  compactThread,
   listThreads,
   rollbackThread,
   startThreadReview,
@@ -313,6 +315,42 @@ describe("ThreadApi", () => {
     const requestInit = fetchMock.mock.calls[0]?.[1];
     expect(requestInit?.method).toBe("POST");
     expect(requestInit?.body).toBe(JSON.stringify({ numTurns: 2 }));
+  });
+
+  it("posts compact mutations through encoded thread member routes", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        threadId: "thread_123",
+      }),
+    );
+
+    await compactThread("thread 123/with slash");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
+    expect(requestUrl).toBe("/api/threads/thread%20123%2Fwith%20slash/compact");
+
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    expect(requestInit?.method).toBe("POST");
+  });
+
+  it("posts background-terminal cleanup mutations through encoded thread member routes", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        threadId: "thread_123",
+      }),
+    );
+
+    await cleanThreadBackgroundTerminals("thread 123/with slash");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
+    expect(requestUrl).toBe("/api/threads/thread%20123%2Fwith%20slash/background-terminals-clean");
+
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    expect(requestInit?.method).toBe("POST");
   });
 
   it("posts start-review mutations and parses returned review identifiers", async () => {

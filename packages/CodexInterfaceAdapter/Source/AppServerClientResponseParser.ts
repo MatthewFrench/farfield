@@ -14,6 +14,8 @@ export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   startThread: "AppServerStartThreadResponse",
   setThreadName: "AppServerThreadSetNameResponse",
   rollbackThread: "AppServerThreadRollbackResponse",
+  compactThread: "AppServerThreadCompactStartResponse",
+  cleanThreadBackgroundTerminals: "AppServerThreadBackgroundTerminalsCleanResponse",
   startReview: "AppServerReviewStartResponse",
   startTurn: "AppServerTurnStartResponse",
   steerTurn: "AppServerTurnSteerResponse",

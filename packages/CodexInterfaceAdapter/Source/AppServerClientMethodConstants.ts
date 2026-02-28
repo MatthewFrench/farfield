@@ -11,6 +11,8 @@ export const APP_SERVER_CLIENT_METHODS = {
   startThread: "thread/start",
   setThreadName: "thread/name/set",
   rollbackThread: "thread/rollback",
+  compactThread: "thread/compact/start",
+  cleanThreadBackgroundTerminals: "thread/backgroundTerminals/clean",
   startReview: "review/start",
   startTurn: "turn/start",
   steerTurn: "turn/steer",

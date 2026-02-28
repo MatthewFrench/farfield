@@ -3,6 +3,8 @@ import { Socket } from "node:net";
 import { describe, expect, it, vi } from "vitest";
 import type {
   AgentAdapter,
+  AgentCleanThreadBackgroundTerminalsInput,
+  AgentCompactThreadInput,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
   AgentForkThreadInput,
@@ -52,6 +54,10 @@ function createAgentAdapter(input: {
   forkThread?: (value: AgentForkThreadInput) => Promise<AgentCreateThreadResult>;
   setThreadName?: (value: AgentSetThreadNameInput) => Promise<void>;
   rollbackThread?: (value: AgentRollbackThreadInput) => Promise<AgentReadThreadResult>;
+  compactThread?: (value: AgentCompactThreadInput) => Promise<void>;
+  cleanThreadBackgroundTerminals?: (
+    value: AgentCleanThreadBackgroundTerminalsInput,
+  ) => Promise<void>;
   startThreadReview?: (value: AgentStartThreadReviewInput) => Promise<AgentStartThreadReviewResult>;
 }): AgentAdapter {
   return {
@@ -127,6 +133,20 @@ function createAgentAdapter(input: {
         throw new Error("Not used in mutation route-owner tests");
       }
       return input.rollbackThread(inputValue);
+    },
+    async compactThread(inputValue: AgentCompactThreadInput): Promise<void> {
+      if (!input.compactThread) {
+        throw new Error("Not used in mutation route-owner tests");
+      }
+      await input.compactThread(inputValue);
+    },
+    async cleanThreadBackgroundTerminals(
+      inputValue: AgentCleanThreadBackgroundTerminalsInput,
+    ): Promise<void> {
+      if (!input.cleanThreadBackgroundTerminals) {
+        throw new Error("Not used in mutation route-owner tests");
+      }
+      await input.cleanThreadBackgroundTerminals(inputValue);
     },
     async startThreadReview(
       inputValue: AgentStartThreadReviewInput,
@@ -576,6 +596,94 @@ describe("ThreadMemberMutationRouteOwner", () => {
       {
         threadId: "thread-1",
         numTurns: 2,
+      },
+    ]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
+    });
+  });
+
+  it("handles thread-compaction mutations with canonical payload mapping", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const compactCalls: AgentCompactThreadInput[] = [];
+    const adapter = createAgentAdapter({
+      compactThread: async (value) => {
+        compactCalls.push(value);
+      },
+    });
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "compact"],
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(compactCalls).toEqual([
+      {
+        threadId: "thread-1",
+      },
+    ]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
+    });
+  });
+
+  it("handles background-terminal cleanup mutations with canonical payload mapping", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const cleanCalls: AgentCleanThreadBackgroundTerminalsInput[] = [];
+    const adapter = createAgentAdapter({
+      cleanThreadBackgroundTerminals: async (value) => {
+        cleanCalls.push(value);
+      },
+    });
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "background-terminals-clean"],
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(cleanCalls).toEqual([
+      {
+        threadId: "thread-1",
       },
     ]);
     expect(capturedStatusCode).toBe(200);

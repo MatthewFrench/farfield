@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../Source/Features/Threads/DataAccess/ThreadApi", () => ({
   archiveThread: vi.fn(),
+  cleanThreadBackgroundTerminals: vi.fn(),
+  compactThread: vi.fn(),
   createThread: vi.fn(),
   forkThread: vi.fn(),
   rollbackThread: vi.fn(),
@@ -12,6 +14,8 @@ vi.mock("../Source/Features/Threads/DataAccess/ThreadApi", () => ({
 
 import {
   archiveThread,
+  cleanThreadBackgroundTerminals,
+  compactThread,
   createThread,
   forkThread,
   rollbackThread,
@@ -29,6 +33,8 @@ describe("ThreadMutationServerClient", () => {
       agentId: "codex",
     });
     vi.mocked(archiveThread).mockResolvedValue();
+    vi.mocked(cleanThreadBackgroundTerminals).mockResolvedValue();
+    vi.mocked(compactThread).mockResolvedValue();
     vi.mocked(forkThread).mockResolvedValue({
       threadId: "thread-2",
       sourceThreadId: "thread-1",
@@ -91,6 +97,14 @@ describe("ThreadMutationServerClient", () => {
       actionId: "action-rollback-thread",
       actionName: "rollback-thread",
     });
+    await threadMutationServerClient.compactThread("  thread-4  ", {
+      actionId: "action-compact-thread",
+      actionName: "compact-thread",
+    });
+    await threadMutationServerClient.cleanThreadBackgroundTerminals("  thread-4  ", {
+      actionId: "action-clean-thread-background-terminals",
+      actionName: "clean-thread-background-terminals",
+    });
     await threadMutationServerClient.startThreadReview("  thread-5  ", {
       actionId: "action-start-thread-review",
       actionName: "start-thread-review",
@@ -114,6 +128,14 @@ describe("ThreadMutationServerClient", () => {
         actionName: "rollback-thread",
       },
     );
+    expect(compactThread).toHaveBeenCalledWith("thread-4", {
+      actionId: "action-compact-thread",
+      actionName: "compact-thread",
+    });
+    expect(cleanThreadBackgroundTerminals).toHaveBeenCalledWith("thread-4", {
+      actionId: "action-clean-thread-background-terminals",
+      actionName: "clean-thread-background-terminals",
+    });
     expect(startThreadReview).toHaveBeenCalledWith("thread-5", {
       actionId: "action-start-thread-review",
       actionName: "start-thread-review",
@@ -142,6 +164,12 @@ describe("ThreadMutationServerClient", () => {
     await expect(threadMutationServerClient.rollbackThread("\n\t", 1)).rejects.toThrowError(
       "ThreadMutationServerClient requires threadId to be a non-empty string",
     );
+    await expect(threadMutationServerClient.compactThread("\n\t")).rejects.toThrowError(
+      "ThreadMutationServerClient requires threadId to be a non-empty string",
+    );
+    await expect(
+      threadMutationServerClient.cleanThreadBackgroundTerminals("\n\t"),
+    ).rejects.toThrowError("ThreadMutationServerClient requires threadId to be a non-empty string");
     await expect(threadMutationServerClient.startThreadReview("\n\t")).rejects.toThrowError(
       "ThreadMutationServerClient requires threadId to be a non-empty string",
     );
@@ -152,6 +180,8 @@ describe("ThreadMutationServerClient", () => {
     expect(unarchiveThread).not.toHaveBeenCalled();
     expect(forkThread).not.toHaveBeenCalled();
     expect(rollbackThread).not.toHaveBeenCalled();
+    expect(compactThread).not.toHaveBeenCalled();
+    expect(cleanThreadBackgroundTerminals).not.toHaveBeenCalled();
     expect(startThreadReview).not.toHaveBeenCalled();
     expect(setThreadName).not.toHaveBeenCalled();
   });

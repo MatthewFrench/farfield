@@ -151,6 +151,14 @@ export interface AgentRollbackThreadInput {
   numTurns: number;
 }
 
+export interface AgentCompactThreadInput {
+  threadId: string;
+}
+
+export interface AgentCleanThreadBackgroundTerminalsInput {
+  threadId: string;
+}
+
 export type AgentThreadReviewDelivery = "inline" | "detached";
 
 export interface AgentThreadReviewUncommittedChangesTarget {
@@ -273,6 +281,8 @@ export interface AgentAdapter {
   forkThread?(input: AgentForkThreadInput): Promise<AgentCreateThreadResult>;
   setThreadName?(input: AgentSetThreadNameInput): Promise<void>;
   rollbackThread?(input: AgentRollbackThreadInput): Promise<AgentReadThreadResult>;
+  compactThread?(input: AgentCompactThreadInput): Promise<void>;
+  cleanThreadBackgroundTerminals?(input: AgentCleanThreadBackgroundTerminalsInput): Promise<void>;
   startThreadReview?(input: AgentStartThreadReviewInput): Promise<AgentStartThreadReviewResult>;
   archiveThread?(input: AgentArchiveThreadInput): Promise<void>;
   unarchiveThread?(input: AgentUnarchiveThreadInput): Promise<void>;

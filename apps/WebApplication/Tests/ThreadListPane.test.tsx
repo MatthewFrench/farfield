@@ -96,6 +96,8 @@ function createThreadListPaneProperties(
     onArchiveThread: () => {},
     onForkThread: () => {},
     onRollbackThread: () => {},
+    onCompactThread: () => {},
+    onCleanThreadBackgroundTerminals: () => {},
     onStartThreadReview: () => {},
     onSetThreadName: () => {},
     isArchivedThreadsOpen: true,

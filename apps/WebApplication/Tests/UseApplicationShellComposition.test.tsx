@@ -188,6 +188,8 @@ function createThreadActionHandlersFixture(): ThreadActionHandlers {
     runArchiveThread: vi.fn(async (): Promise<void> => {}),
     runForkThread: vi.fn(async (): Promise<void> => {}),
     runRollbackThread: vi.fn(async (): Promise<void> => {}),
+    runCompactThread: vi.fn(async (): Promise<void> => {}),
+    runCleanThreadBackgroundTerminals: vi.fn(async (): Promise<void> => {}),
     runStartThreadReview: vi.fn(async (): Promise<void> => {}),
     runSetThreadName: vi.fn(async (): Promise<void> => {}),
     runUnarchiveThread: vi.fn(async (): Promise<void> => {}),
@@ -419,6 +421,9 @@ describe("useApplicationShellComposition", () => {
         archiveThread: threadActionHandlersFixture.runArchiveThread,
         forkThread: threadActionHandlersFixture.runForkThread,
         rollbackThread: threadActionHandlersFixture.runRollbackThread,
+        compactThread: threadActionHandlersFixture.runCompactThread,
+        cleanThreadBackgroundTerminals:
+          threadActionHandlersFixture.runCleanThreadBackgroundTerminals,
         startThreadReview: threadActionHandlersFixture.runStartThreadReview,
         setThreadName: threadActionHandlersFixture.runSetThreadName,
         unarchiveThread: threadActionHandlersFixture.runUnarchiveThread,
@@ -494,6 +499,12 @@ describe("useApplicationShellComposition", () => {
     runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onRollbackThread(
       "thread-rollback",
     );
+    runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onCompactThread(
+      "thread-compact",
+    );
+    runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onCleanThreadBackgroundTerminals(
+      "thread-background-terminals-clean",
+    );
     runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onStartThreadReview(
       "thread-review",
     );
@@ -515,6 +526,10 @@ describe("useApplicationShellComposition", () => {
     expect(threadActionHandlersFixture.runArchiveThread).toHaveBeenCalledWith("thread-archive");
     expect(threadActionHandlersFixture.runForkThread).toHaveBeenCalledWith("thread-fork");
     expect(threadActionHandlersFixture.runRollbackThread).toHaveBeenCalledWith("thread-rollback");
+    expect(threadActionHandlersFixture.runCompactThread).toHaveBeenCalledWith("thread-compact");
+    expect(threadActionHandlersFixture.runCleanThreadBackgroundTerminals).toHaveBeenCalledWith(
+      "thread-background-terminals-clean",
+    );
     expect(threadActionHandlersFixture.runStartThreadReview).toHaveBeenCalledWith("thread-review");
     expect(threadActionHandlersFixture.runSetThreadName).toHaveBeenCalledWith(
       "thread-name",

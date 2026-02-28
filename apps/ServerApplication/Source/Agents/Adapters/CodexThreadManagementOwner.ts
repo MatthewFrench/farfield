@@ -14,6 +14,8 @@ import type {
 } from "@farfield/protocol";
 import type {
   AgentArchiveThreadInput,
+  AgentCleanThreadBackgroundTerminalsInput,
+  AgentCompactThreadInput,
   AgentConfigDefaults,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
@@ -253,6 +255,20 @@ export class CodexThreadManagementOwner {
     return {
       thread: result.thread,
     };
+  }
+
+  public async compactThread(input: AgentCompactThreadInput): Promise<void> {
+    this.ensureCodexAvailable();
+    await this.runAppServerCall(() => this.appClient.compactThread(input.threadId));
+  }
+
+  public async cleanThreadBackgroundTerminals(
+    input: AgentCleanThreadBackgroundTerminalsInput,
+  ): Promise<void> {
+    this.ensureCodexAvailable();
+    await this.runAppServerCall(() =>
+      this.appClient.cleanThreadBackgroundTerminals(input.threadId),
+    );
   }
 
   public async startThreadReview(

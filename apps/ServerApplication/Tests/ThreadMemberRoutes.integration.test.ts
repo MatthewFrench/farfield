@@ -14,6 +14,8 @@ import type {
   AgentAdapter,
   AgentArchiveThreadInput,
   AgentCapabilities,
+  AgentCleanThreadBackgroundTerminalsInput,
+  AgentCompactThreadInput,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
   AgentInterruptInput,
@@ -47,6 +49,8 @@ const NestedMessagesPathThreadIdentifier = "thread_nested_messages_path";
 const MessageMutationThreadIdentifier = "thread_message_mutation";
 const ArchiveMutationThreadIdentifier = "thread_archive_mutation";
 const InterruptMutationThreadIdentifier = "thread_interrupt_mutation";
+const CompactMutationThreadIdentifier = "thread_compact_mutation";
+const BackgroundTerminalsCleanMutationThreadIdentifier = "thread_background_terminals_clean";
 const ReviewMutationThreadIdentifier = "thread_review_mutation";
 const InvalidThreadIdentifierSegment = "%E0%A4%A";
 const ActionErrorIdentifier = "action-error-id";
@@ -240,6 +244,10 @@ interface ThreadMemberRouteTestAdapterOptions {
   sendMessage?: (input: AgentSendMessageInput) => Promise<void>;
   interrupt?: (input: AgentInterruptInput) => Promise<void>;
   archiveThread?: (input: AgentArchiveThreadInput) => Promise<void>;
+  compactThread?: (input: AgentCompactThreadInput) => Promise<void>;
+  cleanThreadBackgroundTerminals?: (
+    input: AgentCleanThreadBackgroundTerminalsInput,
+  ) => Promise<void>;
   startThreadReview?: (input: AgentStartThreadReviewInput) => Promise<AgentStartThreadReviewResult>;
   readLiveState?: (threadId: string) => Promise<AgentThreadLiveState>;
   readStreamEvents?: (
@@ -286,6 +294,22 @@ function createAdapter(options: ThreadMemberRouteTestAdapterOptions): AgentAdapt
       ? {
           async archiveThread(input: AgentArchiveThreadInput): Promise<void> {
             await options.archiveThread(input);
+          },
+        }
+      : {}),
+    ...(options.compactThread
+      ? {
+          async compactThread(input: AgentCompactThreadInput): Promise<void> {
+            await options.compactThread(input);
+          },
+        }
+      : {}),
+    ...(options.cleanThreadBackgroundTerminals
+      ? {
+          async cleanThreadBackgroundTerminals(
+            input: AgentCleanThreadBackgroundTerminalsInput,
+          ): Promise<void> {
+            await options.cleanThreadBackgroundTerminals(input);
           },
         }
       : {}),
@@ -861,6 +885,110 @@ describe("ThreadMemberRoutes integration", () => {
       threadId: ReviewMutationThreadIdentifier,
       reviewThreadId: "thread-review-1",
       reviewTurnId: "turn-review-1",
+    });
+  });
+
+  it("routes canonical compact mutations through compact-owner dispatch", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = ThreadMemberRouteMethodByName.post;
+
+    const compactThread = vi.fn<(input: AgentCompactThreadInput) => Promise<void>>(async () => {});
+    const readJsonBody = vi.fn<ThreadMemberRouteDependencies["readJsonBody"]>(async () => ({}));
+
+    const codexAdapter = createAdapter({
+      id: "codex",
+      readThread: async () => {
+        throw new Error("not used in this test");
+      },
+      compactThread,
+    });
+    const resolveAdapterForThread = vi.fn<ThreadMemberRouteDependencies["resolveAdapterForThread"]>(
+      async () => ({
+        ok: true,
+        adapter: codexAdapter,
+        agentId: "codex",
+      }),
+    );
+
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(CompactMutationThreadIdentifier, ThreadMemberRouteSegmentByName.compact),
+      createThreadRouteUrl(CompactMutationThreadIdentifier, ThreadMemberRouteSegmentByName.compact),
+      resolveAdapterForThread,
+      readJsonBody,
+      capturedResponse,
+    );
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+
+    expect(handled).toBe(true);
+    expect(compactThread).toHaveBeenCalledTimes(1);
+    expect(compactThread).toHaveBeenCalledWith({
+      threadId: CompactMutationThreadIdentifier,
+    });
+    expect(readJsonBody).not.toHaveBeenCalled();
+    expect(capturedResponse.statusCode).toBe(200);
+    expect(MutationRouteSuccessResponseSchema.parse(capturedResponse.body)).toEqual({
+      ok: true,
+      threadId: CompactMutationThreadIdentifier,
+    });
+  });
+
+  it("routes canonical background-terminal cleanup mutations through owner dispatch", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = ThreadMemberRouteMethodByName.post;
+
+    const cleanThreadBackgroundTerminals = vi.fn<
+      (input: AgentCleanThreadBackgroundTerminalsInput) => Promise<void>
+    >(async () => {});
+    const readJsonBody = vi.fn<ThreadMemberRouteDependencies["readJsonBody"]>(async () => ({}));
+
+    const codexAdapter = createAdapter({
+      id: "codex",
+      readThread: async () => {
+        throw new Error("not used in this test");
+      },
+      cleanThreadBackgroundTerminals,
+    });
+    const resolveAdapterForThread = vi.fn<ThreadMemberRouteDependencies["resolveAdapterForThread"]>(
+      async () => ({
+        ok: true,
+        adapter: codexAdapter,
+        agentId: "codex",
+      }),
+    );
+
+    const capturedResponse = createCapturedJsonResponse();
+    const dependencies = createThreadMemberRouteDependencies(
+      request,
+      response,
+      createRouteSegments(
+        BackgroundTerminalsCleanMutationThreadIdentifier,
+        ThreadMemberRouteSegmentByName.backgroundTerminalsClean,
+      ),
+      createThreadRouteUrl(
+        BackgroundTerminalsCleanMutationThreadIdentifier,
+        ThreadMemberRouteSegmentByName.backgroundTerminalsClean,
+      ),
+      resolveAdapterForThread,
+      readJsonBody,
+      capturedResponse,
+    );
+
+    const handled = await handleThreadMemberRoutes(dependencies);
+
+    expect(handled).toBe(true);
+    expect(cleanThreadBackgroundTerminals).toHaveBeenCalledTimes(1);
+    expect(cleanThreadBackgroundTerminals).toHaveBeenCalledWith({
+      threadId: BackgroundTerminalsCleanMutationThreadIdentifier,
+    });
+    expect(readJsonBody).not.toHaveBeenCalled();
+    expect(capturedResponse.statusCode).toBe(200);
+    expect(MutationRouteSuccessResponseSchema.parse(capturedResponse.body)).toEqual({
+      ok: true,
+      threadId: BackgroundTerminalsCleanMutationThreadIdentifier,
     });
   });
 });

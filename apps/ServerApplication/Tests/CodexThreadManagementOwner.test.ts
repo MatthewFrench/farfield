@@ -61,6 +61,8 @@ class TestAppServerClient extends AppServerClient {
   public readonly forkThreadCalls: Array<{ threadId: string; options?: ForkThreadOptions }> = [];
   public readonly setThreadNameCalls: Array<{ threadId: string; name: string }> = [];
   public readonly rollbackThreadCalls: Array<{ threadId: string; numTurns: number }> = [];
+  public readonly compactThreadCalls: Array<{ threadId: string }> = [];
+  public readonly cleanThreadBackgroundTerminalsCalls: Array<{ threadId: string }> = [];
   public readonly startReviewCalls: StartReviewOptions[] = [];
   public readonly readConfigCalls: Array<ReadConfigOptions | undefined> = [];
 
@@ -145,6 +147,18 @@ class TestAppServerClient extends AppServerClient {
       numTurns,
     });
     return this.rollbackThreadResult;
+  }
+
+  public override async compactThread(threadId: string): Promise<void> {
+    this.compactThreadCalls.push({
+      threadId,
+    });
+  }
+
+  public override async cleanThreadBackgroundTerminals(threadId: string): Promise<void> {
+    this.cleanThreadBackgroundTerminalsCalls.push({
+      threadId,
+    });
   }
 
   public override async startReview(options: StartReviewOptions): Promise<StartReviewResult> {
@@ -516,6 +530,36 @@ describe("CodexThreadManagementOwner", () => {
         requests: [],
       },
     });
+  });
+
+  it("starts thread compaction through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    await owner.compactThread({
+      threadId: "thread-compact-7",
+    });
+
+    expect(appClient.compactThreadCalls).toEqual([
+      {
+        threadId: "thread-compact-7",
+      },
+    ]);
+  });
+
+  it("cleans background terminals through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    await owner.cleanThreadBackgroundTerminals({
+      threadId: "thread-clean-7",
+    });
+
+    expect(appClient.cleanThreadBackgroundTerminalsCalls).toEqual([
+      {
+        threadId: "thread-clean-7",
+      },
+    ]);
   });
 
   it("starts thread review with strict target and delivery contracts", async () => {

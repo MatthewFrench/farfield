@@ -292,6 +292,50 @@ describe("AppServerClient.rollbackThread", () => {
   });
 });
 
+describe("AppServerClient.compactThread", () => {
+  it("sends thread/compact/start payload with thread id", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.compactThread("thread-1");
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/compact/start", {
+      threadId: "thread-1",
+    });
+  });
+
+  it("validates thread id before transport request", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await expect(client.compactThread("")).rejects.toThrowError();
+    expect(transportDouble.request).not.toHaveBeenCalled();
+  });
+});
+
+describe("AppServerClient.cleanThreadBackgroundTerminals", () => {
+  it("sends thread/backgroundTerminals/clean payload with thread id", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.cleanThreadBackgroundTerminals("thread-1");
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/backgroundTerminals/clean", {
+      threadId: "thread-1",
+    });
+  });
+
+  it("validates thread id before transport request", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await expect(client.cleanThreadBackgroundTerminals("")).rejects.toThrowError();
+    expect(transportDouble.request).not.toHaveBeenCalled();
+  });
+});
+
 describe("AppServerClient.startReview", () => {
   it("sends review/start payload with explicit target and delivery", async () => {
     const transportDouble = createTransportDouble();

@@ -1,4 +1,6 @@
 import { ThreadMemberArchiveMutationRouteOwner } from "./ThreadMemberArchiveMutationRouteOwner.js";
+import { ThreadMemberBackgroundTerminalsCleanMutationRouteOwner } from "./ThreadMemberBackgroundTerminalsCleanMutationRouteOwner.js";
+import { ThreadMemberCompactMutationRouteOwner } from "./ThreadMemberCompactMutationRouteOwner.js";
 import { ThreadMemberForkMutationRouteOwner } from "./ThreadMemberForkMutationRouteOwner.js";
 import { ThreadMemberInteractionMutationRouteOwner } from "./ThreadMemberInteractionMutationRouteOwner.js";
 import { ThreadMemberMessageMutationRouteOwner } from "./ThreadMemberMessageMutationRouteOwner.js";
@@ -26,6 +28,8 @@ const ThreadMemberMutationRouteOwnerNameByName = {
   name: "name",
   review: "review",
   rollback: "rollback",
+  compact: "compact",
+  backgroundTerminalsClean: "background-terminals-clean",
 } as const;
 
 type ThreadMemberMutationRouteOwnerName =
@@ -39,6 +43,8 @@ type ThreadMemberMutationSubresource =
   | typeof ThreadMemberRouteSegmentByName.name
   | typeof ThreadMemberRouteSegmentByName.review
   | typeof ThreadMemberRouteSegmentByName.rollback
+  | typeof ThreadMemberRouteSegmentByName.compact
+  | typeof ThreadMemberRouteSegmentByName.backgroundTerminalsClean
   | typeof ThreadMemberRouteSegmentByName.collaborationMode
   | typeof ThreadMemberRouteSegmentByName.userInput
   | typeof ThreadMemberRouteSegmentByName.interrupt;
@@ -83,6 +89,14 @@ const ThreadMemberMutationDispatchDescriptors: readonly ThreadMemberMutationDisp
     ownerName: ThreadMemberMutationRouteOwnerNameByName.rollback,
   },
   {
+    subresource: ThreadMemberRouteSegmentByName.compact,
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.compact,
+  },
+  {
+    subresource: ThreadMemberRouteSegmentByName.backgroundTerminalsClean,
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.backgroundTerminalsClean,
+  },
+  {
     subresource: ThreadMemberRouteSegmentByName.collaborationMode,
     ownerName: ThreadMemberMutationRouteOwnerNameByName.interaction,
   },
@@ -114,6 +128,10 @@ const ThreadMemberMutationHandlerFactoryByOwnerName: Record<
     new ThreadMemberReviewMutationRouteOwner(options),
   [ThreadMemberMutationRouteOwnerNameByName.rollback]: (options) =>
     new ThreadMemberRollbackMutationRouteOwner(options),
+  [ThreadMemberMutationRouteOwnerNameByName.compact]: (options) =>
+    new ThreadMemberCompactMutationRouteOwner(options),
+  [ThreadMemberMutationRouteOwnerNameByName.backgroundTerminalsClean]: (options) =>
+    new ThreadMemberBackgroundTerminalsCleanMutationRouteOwner(options),
 };
 
 export class ThreadMemberMutationRouteOwner {

@@ -169,6 +169,8 @@ function buildThreadListPanePropertiesInput(
     archiveThread: threadActionHandlers.runArchiveThread,
     forkThread: threadActionHandlers.runForkThread,
     rollbackThread: threadActionHandlers.runRollbackThread,
+    compactThread: threadActionHandlers.runCompactThread,
+    cleanThreadBackgroundTerminals: threadActionHandlers.runCleanThreadBackgroundTerminals,
     startThreadReview: threadActionHandlers.runStartThreadReview,
     setThreadName: threadActionHandlers.runSetThreadName,
     isArchivedThreadsOpen: applicationShellState.isArchivedThreadsOpen,

@@ -13,6 +13,8 @@ import type {
 import type {
   AgentAdapter,
   AgentCapabilities,
+  AgentCleanThreadBackgroundTerminalsInput,
+  AgentCompactThreadInput,
   AgentConfigDefaults,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
@@ -234,6 +236,16 @@ export class CodexAgentAdapter implements AgentAdapter {
     numTurns: number;
   }): Promise<AgentReadThreadResult> {
     return this.threadManagementOwner.rollbackThread(input);
+  }
+
+  public async compactThread(input: AgentCompactThreadInput): Promise<void> {
+    await this.threadManagementOwner.compactThread(input);
+  }
+
+  public async cleanThreadBackgroundTerminals(
+    input: AgentCleanThreadBackgroundTerminalsInput,
+  ): Promise<void> {
+    await this.threadManagementOwner.cleanThreadBackgroundTerminals(input);
   }
 
   public async startThreadReview(

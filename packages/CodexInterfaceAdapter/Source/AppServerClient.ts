@@ -36,6 +36,8 @@ import {
   buildStartThreadRequest,
   buildStartTurnRequest,
   buildSteerTurnRequest,
+  buildThreadBackgroundTerminalsCleanRequest,
+  buildThreadCompactStartRequest,
   buildTurnInterruptRequest,
   buildUnarchiveThreadRequest,
   resolveReadThreadRequestTimeoutMilliseconds,
@@ -151,6 +153,8 @@ const AppServerTurnSteerResponseSchema = z
   })
   .passthrough();
 const AppServerTurnInterruptResponseSchema = z.object({}).passthrough();
+const AppServerThreadCompactStartResponseSchema = z.object({}).passthrough();
+const AppServerThreadBackgroundTerminalsCleanResponseSchema = z.object({}).passthrough();
 const AppServerReviewStartResponseSchema = z
   .object({
     reviewThreadId: z.string().min(1),
@@ -338,6 +342,29 @@ export class AppServerClient {
       AppServerReadThreadResponseSchema,
       result,
       APP_SERVER_CLIENT_RESPONSE_CONTEXTS.rollbackThread,
+    );
+  }
+
+  public async compactThread(threadId: string): Promise<void> {
+    const request = buildThreadCompactStartRequest(threadId);
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.compactThread, request);
+    parseAppServerResponse(
+      AppServerThreadCompactStartResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.compactThread,
+    );
+  }
+
+  public async cleanThreadBackgroundTerminals(threadId: string): Promise<void> {
+    const request = buildThreadBackgroundTerminalsCleanRequest(threadId);
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.cleanThreadBackgroundTerminals,
+      request,
+    );
+    parseAppServerResponse(
+      AppServerThreadBackgroundTerminalsCleanResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.cleanThreadBackgroundTerminals,
     );
   }
 

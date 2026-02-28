@@ -8,6 +8,8 @@ const UNARCHIVE_THREAD_OPERATION_NAME = "unarchive-thread";
 const FORK_THREAD_OPERATION_NAME = "fork-thread";
 const SET_THREAD_NAME_OPERATION_NAME = "set-thread-name";
 const ROLLBACK_THREAD_OPERATION_NAME = "rollback-thread";
+const COMPACT_THREAD_OPERATION_NAME = "compact-thread";
+const CLEAN_THREAD_BACKGROUND_TERMINALS_OPERATION_NAME = "clean-thread-background-terminals";
 const START_THREAD_REVIEW_OPERATION_NAME = "start-thread-review";
 const MISSING_PROJECT_PATH_MESSAGE = "Cannot create thread: missing project path";
 const MISSING_THREAD_NAME_MESSAGE = "Cannot rename thread: missing name";
@@ -21,6 +23,8 @@ export type ThreadMutationOperationName =
   | typeof FORK_THREAD_OPERATION_NAME
   | typeof SET_THREAD_NAME_OPERATION_NAME
   | typeof ROLLBACK_THREAD_OPERATION_NAME
+  | typeof COMPACT_THREAD_OPERATION_NAME
+  | typeof CLEAN_THREAD_BACKGROUND_TERMINALS_OPERATION_NAME
   | typeof START_THREAD_REVIEW_OPERATION_NAME;
 
 export interface ThreadMutationActionRequestOptions {
@@ -52,6 +56,8 @@ export interface ThreadMutationActionClient {
   ): Promise<{ reviewThreadId: string; reviewTurnId: string }>;
   setThreadName(threadId: string, name: string, options?: ApiRequestOptions): Promise<void>;
   rollbackThread(threadId: string, numTurns: number, options?: ApiRequestOptions): Promise<void>;
+  compactThread(threadId: string, options?: ApiRequestOptions): Promise<void>;
+  cleanThreadBackgroundTerminals(threadId: string, options?: ApiRequestOptions): Promise<void>;
   unarchiveThread(threadId: string, options?: ApiRequestOptions): Promise<void>;
 }
 
@@ -166,6 +172,34 @@ export interface StartThreadReviewActionInput {
   onSetMobileSidebarOpen: (isOpen: boolean) => void;
   onInvalidateActiveThreadQuery: () => void;
   onRefreshReviewThreadData: (threadId: string) => Promise<void>;
+  threadMutationClient: ThreadMutationActionClient;
+  reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
+}
+
+export interface CompactThreadActionInput {
+  threadId: string;
+  selectedThreadId: string | null;
+  buildActionRequestOptions: (
+    actionName: ThreadMutationOperationName,
+  ) => ThreadMutationActionRequestOptions;
+  onSetBusy: (isBusy: boolean) => void;
+  onInvalidateActiveThreadQuery: () => void;
+  loadCoreData: () => Promise<void>;
+  onRefreshCompactedThreadData: (threadId: string) => Promise<void>;
+  threadMutationClient: ThreadMutationActionClient;
+  reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
+}
+
+export interface CleanThreadBackgroundTerminalsActionInput {
+  threadId: string;
+  selectedThreadId: string | null;
+  buildActionRequestOptions: (
+    actionName: ThreadMutationOperationName,
+  ) => ThreadMutationActionRequestOptions;
+  onSetBusy: (isBusy: boolean) => void;
+  onInvalidateActiveThreadQuery: () => void;
+  loadCoreData: () => Promise<void>;
+  onRefreshCleanedThreadData: (threadId: string) => Promise<void>;
   threadMutationClient: ThreadMutationActionClient;
   reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
 }
@@ -349,6 +383,61 @@ export class ThreadMutationActionCoordinator {
         details: {
           numTurns: input.numTurns,
         },
+      });
+    } finally {
+      input.onSetBusy(false);
+    }
+  }
+
+  public async compactThread(input: CompactThreadActionInput): Promise<void> {
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      COMPACT_THREAD_OPERATION_NAME,
+    );
+    input.onSetBusy(true);
+    try {
+      await input.threadMutationClient.compactThread(input.threadId, requestOptions);
+      input.onInvalidateActiveThreadQuery();
+      if (input.selectedThreadId === input.threadId) {
+        await input.onRefreshCompactedThreadData(input.threadId);
+      } else {
+        await input.loadCoreData();
+      }
+    } catch (error) {
+      await input.reportTrackedUserInterfaceError({
+        operation: COMPACT_THREAD_OPERATION_NAME,
+        actionId,
+        threadId: input.threadId,
+        error: toErrorMessage(error),
+      });
+    } finally {
+      input.onSetBusy(false);
+    }
+  }
+
+  public async cleanThreadBackgroundTerminals(
+    input: CleanThreadBackgroundTerminalsActionInput,
+  ): Promise<void> {
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      CLEAN_THREAD_BACKGROUND_TERMINALS_OPERATION_NAME,
+    );
+    input.onSetBusy(true);
+    try {
+      await input.threadMutationClient.cleanThreadBackgroundTerminals(
+        input.threadId,
+        requestOptions,
+      );
+      input.onInvalidateActiveThreadQuery();
+      if (input.selectedThreadId === input.threadId) {
+        await input.onRefreshCleanedThreadData(input.threadId);
+      } else {
+        await input.loadCoreData();
+      }
+    } catch (error) {
+      await input.reportTrackedUserInterfaceError({
+        operation: CLEAN_THREAD_BACKGROUND_TERMINALS_OPERATION_NAME,
+        actionId,
+        threadId: input.threadId,
+        error: toErrorMessage(error),
       });
     } finally {
       input.onSetBusy(false);

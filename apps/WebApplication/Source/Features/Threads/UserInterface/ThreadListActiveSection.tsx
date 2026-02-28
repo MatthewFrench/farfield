@@ -5,10 +5,12 @@ import {
   ChevronRight,
   Copy,
   Loader2,
+  Minimize2,
   MoreHorizontal,
   Pencil,
   Plus,
   Search,
+  Trash2,
   Undo2,
   X,
 } from "lucide-react";
@@ -143,6 +145,10 @@ export function ThreadListActiveSection({
                       const canArchive =
                         thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
                       const canRollback =
+                        thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
+                      const canCompact =
+                        thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
+                      const canCleanBackgroundTerminals =
                         thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
                       const canStartReview =
                         thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
@@ -283,6 +289,28 @@ export function ThreadListActiveSection({
                               >
                                 <Search size={13} />
                                 Start code review
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  if (canCompact) {
+                                    properties.onCompactThread(thread.id);
+                                  }
+                                }}
+                                disabled={properties.isBusy || !canCompact}
+                              >
+                                <Minimize2 size={13} />
+                                Compact context
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  if (canCleanBackgroundTerminals) {
+                                    properties.onCleanThreadBackgroundTerminals(thread.id);
+                                  }
+                                }}
+                                disabled={properties.isBusy || !canCleanBackgroundTerminals}
+                              >
+                                <Trash2 size={13} />
+                                Clean background terminals
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onSelect={() => {

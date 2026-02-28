@@ -4,6 +4,8 @@ import {
   type ApiCreateThreadInput,
   type ApiCreateThreadResponse,
   archiveThread,
+  cleanThreadBackgroundTerminals,
+  compactThread,
   createThread,
   forkThread,
   rollbackThread,
@@ -76,6 +78,17 @@ export class ThreadMutationServerClient {
       },
       options,
     );
+  }
+
+  public async compactThread(threadId: string, options?: ApiRequestOptions): Promise<void> {
+    return compactThread(readThreadIdentifier(threadId), options);
+  }
+
+  public async cleanThreadBackgroundTerminals(
+    threadId: string,
+    options?: ApiRequestOptions,
+  ): Promise<void> {
+    return cleanThreadBackgroundTerminals(readThreadIdentifier(threadId), options);
   }
 
   public async startThreadReview(

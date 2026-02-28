@@ -37,6 +37,8 @@ const THREAD_UNARCHIVE_ROUTE_SEGMENT = "unarchive";
 const THREAD_FORK_ROUTE_SEGMENT = "fork";
 const THREAD_NAME_ROUTE_SEGMENT = "name";
 const THREAD_ROLLBACK_ROUTE_SEGMENT = "rollback";
+const THREAD_COMPACT_ROUTE_SEGMENT = "compact";
+const THREAD_BACKGROUND_TERMINALS_CLEAN_ROUTE_SEGMENT = "background-terminals-clean";
 const THREAD_REVIEW_ROUTE_SEGMENT = "review";
 const HTTP_POST_METHOD = "POST";
 const APPLICATION_JSON_CONTENT_TYPE_HEADER_NAME = "Content-Type";
@@ -295,6 +297,8 @@ type ThreadMutationRouteSegment =
   | typeof THREAD_FORK_ROUTE_SEGMENT
   | typeof THREAD_NAME_ROUTE_SEGMENT
   | typeof THREAD_ROLLBACK_ROUTE_SEGMENT
+  | typeof THREAD_COMPACT_ROUTE_SEGMENT
+  | typeof THREAD_BACKGROUND_TERMINALS_CLEAN_ROUTE_SEGMENT
   | typeof THREAD_REVIEW_ROUTE_SEGMENT;
 
 function readBooleanQueryValue(value: boolean): string {
@@ -483,6 +487,17 @@ export async function rollbackThread(
     buildThreadMutationJsonRequestInit(parsedRequestBody, options),
   );
   ThreadMutationResponseSchema.parse(data);
+}
+
+export async function compactThread(threadId: string, options?: ApiRequestOptions): Promise<void> {
+  await runThreadMutation(threadId, THREAD_COMPACT_ROUTE_SEGMENT, options);
+}
+
+export async function cleanThreadBackgroundTerminals(
+  threadId: string,
+  options?: ApiRequestOptions,
+): Promise<void> {
+  await runThreadMutation(threadId, THREAD_BACKGROUND_TERMINALS_CLEAN_ROUTE_SEGMENT, options);
 }
 
 export async function startThreadReview(

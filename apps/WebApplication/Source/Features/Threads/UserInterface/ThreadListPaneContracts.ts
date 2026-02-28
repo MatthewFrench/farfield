@@ -47,6 +47,8 @@ export interface ThreadListPaneProperties {
   onArchiveThread: ThreadListPaneThreadSelectionHandler;
   onForkThread: ThreadListPaneThreadSelectionHandler;
   onRollbackThread: ThreadListPaneThreadSelectionHandler;
+  onCompactThread: ThreadListPaneThreadSelectionHandler;
+  onCleanThreadBackgroundTerminals: ThreadListPaneThreadSelectionHandler;
   onStartThreadReview: ThreadListPaneThreadSelectionHandler;
   onSetThreadName: (threadId: string, name: string) => void;
   isArchivedThreadsOpen: boolean;
