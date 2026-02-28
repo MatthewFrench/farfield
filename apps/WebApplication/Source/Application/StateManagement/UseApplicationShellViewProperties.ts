@@ -365,18 +365,145 @@ export function useApplicationShellViewProperties(
     [input.health],
   );
 
-  const applicationHeaderBarProperties = buildApplicationHeaderBarProperties(input);
-  const debugStatusBannersProperties = buildDebugStatusBannersProperties(input);
-  const chatWorkspacePaneProperties = buildChatWorkspacePaneProperties(input);
-  const debugWorkspacePaneProperties = buildDebugWorkspacePaneProperties(input);
-  const apiSessionBootstrapOverlayProperties = buildApiSessionBootstrapOverlayProperties(input);
+  const applicationHeaderBarProperties = useMemo<ApplicationHeaderBarProps>(
+    () => buildApplicationHeaderBarProperties(input),
+    [
+      input.activeAgentLabel,
+      input.activeTab,
+      input.activeThreadAgentId,
+      input.desktopSidebarOpen,
+      input.enablePushNotificationsFromToolbar,
+      input.hasSelectedThread,
+      input.isBusy,
+      input.isEnablingPushNotifications,
+      input.isGenerating,
+      input.pushClientState,
+      input.refreshCoreDataAndSelectedThread,
+      input.renderAgentFavicon,
+      input.selectedThreadLabel,
+      input.setActiveTab,
+      input.setDesktopSidebarOpen,
+      input.setMobileSidebarOpen,
+      input.theme,
+      input.toggleTheme,
+    ],
+  );
 
-  return {
-    threadSidebarHealthState,
-    applicationHeaderBarProperties,
-    debugStatusBannersProperties,
-    chatWorkspacePaneProperties,
-    debugWorkspacePaneProperties,
-    apiSessionBootstrapOverlayProperties,
-  };
+  const debugStatusBannersProperties = useMemo<DebugStatusBannersProps>(
+    () => buildDebugStatusBannersProperties(input),
+    [
+      input.activeTab,
+      input.errorBannerDetails,
+      input.errorMessage,
+      input.liveStateReductionError,
+      input.openDebugFromErrorBanner,
+      input.setErrorMessage,
+    ],
+  );
+
+  const chatWorkspacePaneProperties = useMemo<ChatWorkspacePaneProps>(
+    () => buildChatWorkspacePaneProperties(input),
+    [
+      input.activeAgentLabel,
+      input.activeRequest,
+      input.answerDraft,
+      input.availableAgentIds,
+      input.canSubmitUserInputForActiveAgent,
+      input.chatContentRef,
+      input.chatModeToolbarProperties,
+      input.chatScrollStateCoordinator,
+      input.chatSurfaceState,
+      input.conversationItemCount,
+      input.handleAnswerChange,
+      input.hasHiddenChatItems,
+      input.firstVisibleChatItemIndex,
+      input.isBusy,
+      input.isChatAtBottom,
+      input.isGenerating,
+      input.runInterrupt,
+      input.scrollRef,
+      input.selectedAgentLabel,
+      input.selectedThreadId,
+      input.setIsChatAtBottom,
+      input.setVisibleChatItemLimit,
+      input.skipPendingRequest,
+      input.submitMessage,
+      input.submitPendingRequest,
+      input.turnCount,
+      input.visibleChatItemsStep,
+      input.visibleConversationItems,
+    ],
+  );
+
+  const debugWorkspacePaneProperties = useMemo<DebugWorkspacePaneProps>(
+    () => buildDebugWorkspacePaneProperties(input),
+    [
+      input.clearDebugIssuesFromDebugPanel,
+      input.debugErrorIssueCount,
+      input.debugErrorSessionId,
+      input.debugErrorSessionLogPath,
+      input.debugHistoryEntryListItems,
+      input.debugIssueFilterQuery,
+      input.debugIssueSeverityFilter,
+      input.debugWarningIssueCount,
+      input.debugWorkspaceSection,
+      input.filteredDebugIssues,
+      input.historyDetailPayloadText,
+      input.isTraceRecording,
+      input.markTraceFromDebugPanel,
+      input.recentTraceSummaries,
+      input.replayHistoryEntryFromDetail,
+      input.runtimeRequestErrorOperationMetrics,
+      input.selectedDebugIssue,
+      input.selectedDebugIssueId,
+      input.selectedHistoryDetailId,
+      input.selectedHistoryId,
+      input.setDebugIssueFilterQuery,
+      input.setDebugIssueSeverityFilter,
+      input.setDebugWorkspaceSection,
+      input.setSelectedDebugIssueId,
+      input.setSelectedHistoryId,
+      input.setTraceLabel,
+      input.setTraceNote,
+      input.setWaitForReplayResponse,
+      input.startTraceFromDebugPanel,
+      input.stopTraceFromDebugPanel,
+      input.streamEventCards,
+      input.streamEventCount,
+      input.traceLabel,
+      input.traceNote,
+      input.waitForReplayResponse,
+    ],
+  );
+
+  const apiSessionBootstrapOverlayProperties = useMemo<ApiSessionBootstrapOverlayProperties>(
+    () => buildApiSessionBootstrapOverlayProperties(input),
+    [
+      input.apiSessionBootstrapError,
+      input.apiSessionTokenDraft,
+      input.isApiSessionBootstrapPending,
+      input.setApiSessionBootstrapError,
+      input.setApiSessionTokenDraft,
+      input.submitApiSessionToken,
+    ],
+  );
+
+  return useMemo<ApplicationShellViewProperties>(
+    () => ({
+      threadSidebarHealthState,
+      applicationHeaderBarProperties,
+      debugStatusBannersProperties,
+      chatWorkspacePaneProperties,
+      debugWorkspacePaneProperties,
+      apiSessionBootstrapOverlayProperties,
+    }),
+    [
+      threadSidebarHealthState,
+      applicationHeaderBarProperties,
+      debugStatusBannersProperties,
+      chatWorkspacePaneProperties,
+      debugWorkspacePaneProperties,
+      apiSessionBootstrapOverlayProperties,
+    ],
+  );
 }

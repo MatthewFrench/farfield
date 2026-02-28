@@ -177,6 +177,16 @@ Completed in repository:
 4. Verification additions:
    - added Playwright scenario coverage for debug stream card node identity stability during retention-window shifts
 
+5. Phase 4 continuation:
+   - memoized `useApplicationShellViewProperties` owner outputs for header, chat pane, debug pane, and bootstrap overlay contracts
+   - added unit coverage asserting unaffected pane-property identity stability across unrelated rerenders
+
+6. Performance verification continuation:
+   - extended `scripts/operations/stream-burst.mjs` to read `/api/debug/observability` route-timing summaries
+   - added queue-delay budget checks and summary readouts for:
+     - `GET /api/threads/:threadId/stream-events`
+     - `GET /api/health`
+
 ## Owners
 
 1. Web application runtime ownership

@@ -289,6 +289,44 @@ function renderViewProperties(
   return capturedProperties.current;
 }
 
+function renderViewPropertiesHarness(input: UseApplicationShellViewPropertiesInput): {
+  rerender: (nextInput: UseApplicationShellViewPropertiesInput) => void;
+  readLatestProperties: () => ApplicationShellViewProperties;
+} {
+  const capturedProperties: { current: ApplicationShellViewProperties | null } = {
+    current: null,
+  };
+
+  const renderResult = render(
+    createElement(Harness, {
+      input,
+      onProperties: (properties) => {
+        capturedProperties.current = properties;
+      },
+    }),
+  );
+
+  return {
+    rerender: (nextInput) => {
+      renderResult.rerender(
+        createElement(Harness, {
+          input: nextInput,
+          onProperties: (properties) => {
+            capturedProperties.current = properties;
+          },
+        }),
+      );
+    },
+    readLatestProperties: () => {
+      if (!capturedProperties.current) {
+        throw new Error("Expected application shell view properties to be captured.");
+      }
+
+      return capturedProperties.current;
+    },
+  };
+}
+
 function renderShowOlderMessagesHarness(
   input: UseApplicationShellViewPropertiesInput,
   initialVisibleChatItemLimit: number,
@@ -440,5 +478,52 @@ describe("useApplicationShellViewProperties", () => {
 
     expect(fixture.setApiSessionTokenDraftSpy).toHaveBeenCalledWith("next-token");
     expect(fixture.setApiSessionBootstrapErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it("preserves chat and header property identity when only debug workspace input changes", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const harness = renderViewPropertiesHarness(fixture.input);
+
+    const initialProperties = harness.readLatestProperties();
+    harness.rerender({
+      ...fixture.input,
+      debugIssueFilterQuery: "request-id:abc123",
+    });
+    const nextProperties = harness.readLatestProperties();
+
+    expect(nextProperties.applicationHeaderBarProperties).toBe(
+      initialProperties.applicationHeaderBarProperties,
+    );
+    expect(nextProperties.chatWorkspacePaneProperties).toBe(
+      initialProperties.chatWorkspacePaneProperties,
+    );
+    expect(nextProperties.debugWorkspacePaneProperties).not.toBe(
+      initialProperties.debugWorkspacePaneProperties,
+    );
+  });
+
+  it("preserves non-bootstrap property identity when only api bootstrap input changes", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const harness = renderViewPropertiesHarness(fixture.input);
+
+    const initialProperties = harness.readLatestProperties();
+    harness.rerender({
+      ...fixture.input,
+      apiSessionTokenDraft: "token-v2",
+    });
+    const nextProperties = harness.readLatestProperties();
+
+    expect(nextProperties.applicationHeaderBarProperties).toBe(
+      initialProperties.applicationHeaderBarProperties,
+    );
+    expect(nextProperties.chatWorkspacePaneProperties).toBe(
+      initialProperties.chatWorkspacePaneProperties,
+    );
+    expect(nextProperties.debugWorkspacePaneProperties).toBe(
+      initialProperties.debugWorkspacePaneProperties,
+    );
+    expect(nextProperties.apiSessionBootstrapOverlayProperties).not.toBe(
+      initialProperties.apiSessionBootstrapOverlayProperties,
+    );
   });
 });

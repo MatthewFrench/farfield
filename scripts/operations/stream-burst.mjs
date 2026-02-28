@@ -41,15 +41,35 @@ const healthBudgetP95Ms = readPositiveIntegerEnv("STREAM_BURST_HEALTH_BUDGET_P95
 const streamEventsLimit = readPositiveIntegerEnv("STREAM_BURST_STREAM_LIMIT", 20);
 const threadsLimit = readPositiveIntegerEnv("STREAM_BURST_THREADS_LIMIT", 40);
 const threadSampleSize = readPositiveIntegerEnv("STREAM_BURST_THREAD_SAMPLE_SIZE", 8);
+const streamRouteQueueDelayBudgetP95Ms = readPositiveIntegerEnv(
+  "STREAM_BURST_STREAM_ROUTE_QUEUE_DELAY_BUDGET_P95_MS",
+  2_000,
+);
+const streamRouteQueueDelayBudgetMaxMs = readPositiveIntegerEnv(
+  "STREAM_BURST_STREAM_ROUTE_QUEUE_DELAY_BUDGET_MAX_MS",
+  5_000,
+);
+const healthRouteQueueDelayBudgetP95Ms = readPositiveIntegerEnv(
+  "STREAM_BURST_HEALTH_ROUTE_QUEUE_DELAY_BUDGET_P95_MS",
+  1_000,
+);
+const healthRouteQueueDelayBudgetMaxMs = readPositiveIntegerEnv(
+  "STREAM_BURST_HEALTH_ROUTE_QUEUE_DELAY_BUDGET_MAX_MS",
+  3_000,
+);
+const observabilityRoutePath = "/api/debug/observability";
+const getMethodName = "GET";
+const streamEventsRoutePath = "/api/threads/:threadId/stream-events";
+const healthRoutePath = "/api/health";
 
 const ThreadsResponseSchema = z
   .object({
     ok: z.literal(true),
     data: z.array(
       z.object({
-        id: z.string().min(1)
-      })
-    )
+        id: z.string().min(1),
+      }),
+    ),
   })
   .strict();
 
@@ -60,9 +80,9 @@ const HealthResponseSchema = z
       .object({
         appReady: z.boolean(),
         ipcConnected: z.boolean(),
-        ipcInitialized: z.boolean()
+        ipcInitialized: z.boolean(),
       })
-      .passthrough()
+      .passthrough(),
   })
   .strict();
 
@@ -71,9 +91,28 @@ const StreamEventsResponseSchema = z
     ok: z.literal(true),
     threadId: z.string().min(1),
     ownerClientId: z.string().nullable(),
-    events: z.array(z.unknown())
+    events: z.array(z.unknown()),
   })
   .strict();
+
+const RouteTimingSummarySchema = z.object({
+  route: z.string().min(1),
+  method: z.string().min(1),
+  p95DurationMs: z.number().nonnegative(),
+  p95QueueDelayMs: z.number().nonnegative(),
+  maxQueueDelayMs: z.number().nonnegative(),
+});
+
+const DebugObservabilityResponseSchema = z.object({
+  ok: z.literal(true),
+  snapshot: z.object({
+    performance: z.object({
+      requestRouting: z.object({
+        routeTimings: z.array(RouteTimingSummarySchema),
+      }),
+    }),
+  }),
+});
 
 const headers = new Headers();
 if (apiToken.length > 0) {
@@ -107,6 +146,14 @@ function warn(label, detail) {
   report("WARN", label, detail);
 }
 
+function reportBudget(label, detail) {
+  if (budgetMode === "fail") {
+    fail(label, detail);
+    return;
+  }
+  warn(label, detail);
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -118,9 +165,18 @@ function percentile(values, percentileValue) {
   const sorted = [...values].sort((left, right) => left - right);
   const index = Math.min(
     sorted.length - 1,
-    Math.max(0, Math.ceil((percentileValue / 100) * sorted.length) - 1)
+    Math.max(0, Math.ceil((percentileValue / 100) * sorted.length) - 1),
   );
   return sorted[index];
+}
+
+function findRouteTiming(routeTimings, method, route) {
+  return (
+    routeTimings.find(
+      (routeTiming) =>
+        routeTiming.method.toUpperCase() === method.toUpperCase() && routeTiming.route === route,
+    ) ?? null
+  );
 }
 
 async function fetchJson(pathname, schema, label) {
@@ -135,7 +191,7 @@ async function fetchJson(pathname, schema, label) {
     const response = await fetch(url, {
       method: "GET",
       headers,
-      signal: controller.signal
+      signal: controller.signal,
     });
     if (!response.ok) {
       throw new Error(`HTTP ${String(response.status)} ${url.toString()}`);
@@ -168,7 +224,7 @@ async function runStreamWorker(workerIndex, threadIds, stopAtMs) {
       await fetchJson(
         `/api/threads/${encodeURIComponent(threadId)}/stream-events?limit=${String(streamEventsLimit)}`,
         StreamEventsResponseSchema,
-        "stream-events"
+        "stream-events",
       );
       streamRequestCount += 1;
     } catch (error) {
@@ -201,13 +257,13 @@ async function runHealthProbeLoop(stopAtMs) {
 async function main() {
   pass(
     "Stream burst config",
-    `url=${baseUrl} durationMs=${String(durationMs)} workers=${String(workerCount)}`
+    `url=${baseUrl} durationMs=${String(durationMs)} workers=${String(workerCount)}`,
   );
 
   const { parsed: threadsResponse } = await fetchJson(
     `/api/threads?limit=${String(threadsLimit)}&archived=false&all=false&maxPages=1`,
     ThreadsResponseSchema,
-    "threads"
+    "threads",
   );
   if (threadsResponse.data.length === 0) {
     fail("Stream burst setup", "No threads available from /api/threads");
@@ -221,7 +277,7 @@ async function main() {
   const stopAtMs = Date.now() + durationMs;
   const healthProbeTask = runHealthProbeLoop(stopAtMs);
   const workerTasks = Array.from({ length: workerCount }, (_, index) =>
-    runStreamWorker(index, threadIds, stopAtMs)
+    runStreamWorker(index, threadIds, stopAtMs),
   );
 
   await Promise.all([...workerTasks, healthProbeTask]);
@@ -238,16 +294,75 @@ async function main() {
   const healthMaxMs = healthLatenciesMs.length > 0 ? Math.max(...healthLatenciesMs) : 0;
   if (healthP95Ms > healthBudgetP95Ms) {
     const detail = `p95=${String(healthP95Ms)}ms max=${String(healthMaxMs)}ms budget=${String(healthBudgetP95Ms)}ms`;
-    if (budgetMode === "fail") {
-      fail("Health latency budget", detail);
+    reportBudget("Health latency budget", detail);
+  }
+
+  let streamRouteQueueDelayP95Ms = 0;
+  let streamRouteQueueDelayMaxMs = 0;
+  let streamRouteLatencyP95Ms = 0;
+  let healthRouteQueueDelayP95Ms = 0;
+  let healthRouteQueueDelayMaxMs = 0;
+
+  try {
+    const { parsed: observabilityResponse } = await fetchJson(
+      observabilityRoutePath,
+      DebugObservabilityResponseSchema,
+      "observability",
+    );
+    const routeTimings = observabilityResponse.snapshot.performance.requestRouting.routeTimings;
+    const streamEventsRouteTiming = findRouteTiming(
+      routeTimings,
+      getMethodName,
+      streamEventsRoutePath,
+    );
+    const healthRouteTiming = findRouteTiming(routeTimings, getMethodName, healthRoutePath);
+
+    if (!streamEventsRouteTiming) {
+      fail("Observability route timing", `Missing route timing for ${streamEventsRoutePath}`);
     } else {
-      warn("Health latency budget", detail);
+      streamRouteQueueDelayP95Ms = streamEventsRouteTiming.p95QueueDelayMs;
+      streamRouteQueueDelayMaxMs = streamEventsRouteTiming.maxQueueDelayMs;
+      streamRouteLatencyP95Ms = streamEventsRouteTiming.p95DurationMs;
+      if (streamEventsRouteTiming.p95QueueDelayMs > streamRouteQueueDelayBudgetP95Ms) {
+        reportBudget(
+          "Stream route queue-delay budget",
+          `route=${streamEventsRoutePath} p95QueueDelay=${String(streamEventsRouteTiming.p95QueueDelayMs)}ms budget=${String(streamRouteQueueDelayBudgetP95Ms)}ms`,
+        );
+      }
+      if (streamEventsRouteTiming.maxQueueDelayMs > streamRouteQueueDelayBudgetMaxMs) {
+        reportBudget(
+          "Stream route queue-delay max budget",
+          `route=${streamEventsRoutePath} maxQueueDelay=${String(streamEventsRouteTiming.maxQueueDelayMs)}ms budget=${String(streamRouteQueueDelayBudgetMaxMs)}ms`,
+        );
+      }
     }
+
+    if (!healthRouteTiming) {
+      fail("Observability route timing", `Missing route timing for ${healthRoutePath}`);
+    } else {
+      healthRouteQueueDelayP95Ms = healthRouteTiming.p95QueueDelayMs;
+      healthRouteQueueDelayMaxMs = healthRouteTiming.maxQueueDelayMs;
+      if (healthRouteTiming.p95QueueDelayMs > healthRouteQueueDelayBudgetP95Ms) {
+        reportBudget(
+          "Health route queue-delay budget",
+          `route=${healthRoutePath} p95QueueDelay=${String(healthRouteTiming.p95QueueDelayMs)}ms budget=${String(healthRouteQueueDelayBudgetP95Ms)}ms`,
+        );
+      }
+      if (healthRouteTiming.maxQueueDelayMs > healthRouteQueueDelayBudgetMaxMs) {
+        reportBudget(
+          "Health route queue-delay max budget",
+          `route=${healthRoutePath} maxQueueDelay=${String(healthRouteTiming.maxQueueDelayMs)}ms budget=${String(healthRouteQueueDelayBudgetMaxMs)}ms`,
+        );
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    fail("Observability route timing", message);
   }
 
   pass(
     "Stream burst summary",
-    `streamRequests=${String(streamRequestCount)} streamFailures=${String(streamFailureCount)} healthProbes=${String(healthProbeCount)} healthFailures=${String(healthFailureCount)} healthNotReady=${String(healthNotReadyCount)} healthP95=${String(healthP95Ms)}ms healthMax=${String(healthMaxMs)}ms`
+    `streamRequests=${String(streamRequestCount)} streamFailures=${String(streamFailureCount)} healthProbes=${String(healthProbeCount)} healthFailures=${String(healthFailureCount)} healthNotReady=${String(healthNotReadyCount)} healthP95=${String(healthP95Ms)}ms healthMax=${String(healthMaxMs)}ms streamRouteP95=${String(streamRouteLatencyP95Ms)}ms streamRouteP95QueueDelay=${String(streamRouteQueueDelayP95Ms)}ms streamRouteMaxQueueDelay=${String(streamRouteQueueDelayMaxMs)}ms healthRouteP95QueueDelay=${String(healthRouteQueueDelayP95Ms)}ms healthRouteMaxQueueDelay=${String(healthRouteQueueDelayMaxMs)}ms`,
   );
 
   if (hasFailure) {
