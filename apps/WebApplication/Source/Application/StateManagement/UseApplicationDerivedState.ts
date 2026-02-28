@@ -40,6 +40,31 @@ const DEFAULT_SELECTED_AGENT_LABEL = "Agent";
 const UNKNOWN_COMMIT_LABEL = "unknown";
 const MINIMUM_VISIBLE_CHAT_ITEM_INDEX = 0;
 
+function readRecentTraceSummaries(
+  traceStatus: UseApplicationDerivedStateInput["traceStatus"],
+): ApplicationDerivedState["recentTraceSummaries"] {
+  if (!traceStatus) {
+    return [];
+  }
+  return traceStatus.recent.map((trace) => ({
+    id: trace.id,
+    label: trace.label,
+    eventCount: trace.eventCount,
+    path: trace.path,
+  }));
+}
+
+function readDebugHistoryEntryListItems(
+  history: UseApplicationDerivedStateInput["history"],
+): ApplicationDerivedState["debugHistoryEntryListItems"] {
+  return history.map((historyEntry) => ({
+    id: historyEntry.id,
+    at: historyEntry.at,
+    source: historyEntry.source,
+    direction: historyEntry.direction,
+  }));
+}
+
 export function useApplicationDerivedState(
   input: UseApplicationDerivedStateInput,
 ): ApplicationDerivedState {
@@ -81,17 +106,6 @@ export function useApplicationDerivedState(
     threadListStateController,
   } = input;
 
-  const threadListPresentationState = useMemo(
-    () =>
-      threadListStateController.readThreadListPresentationState({
-        threads,
-        archivedThreads,
-        selectedThreadIdentifier: selectedThreadId,
-      }),
-    [archivedThreads, selectedThreadId, threadListStateController, threads],
-  );
-
-  const selectedThread = threadListPresentationState.selectedThread;
   const agentsById = useMemo(() => readAgentsById(agentDescriptors), [agentDescriptors]);
 
   const availableAgentIds = useMemo(
@@ -103,6 +117,18 @@ export function useApplicationDerivedState(
     () => readSelectedAgentDescriptor({ agentsById, selectedAgentId }),
     [agentsById, selectedAgentId],
   );
+
+  const threadListPresentationState = useMemo(
+    () =>
+      threadListStateController.readThreadListPresentationState({
+        threads,
+        archivedThreads,
+        selectedThreadIdentifier: selectedThreadId,
+      }),
+    [archivedThreads, selectedThreadId, threadListStateController, threads],
+  );
+
+  const selectedThread = threadListPresentationState.selectedThread;
 
   const appDefaultModel = configDefaults?.model ?? assumedAppDefaultModelIdentifier;
   const appDefaultReasoningEffort =
@@ -176,26 +202,10 @@ export function useApplicationDerivedState(
     return JSON.stringify(historyDetail.fullPayload, null, 2);
   }, [historyDetail]);
 
-  const recentTraceSummaries = useMemo<ApplicationDerivedState["recentTraceSummaries"]>(() => {
-    if (!traceStatus) {
-      return [];
-    }
-    return traceStatus.recent.map((trace) => ({
-      id: trace.id,
-      label: trace.label,
-      eventCount: trace.eventCount,
-      path: trace.path,
-    }));
-  }, [traceStatus]);
+  const recentTraceSummaries = useMemo(() => readRecentTraceSummaries(traceStatus), [traceStatus]);
 
-  const debugHistoryEntryListItems = useMemo<ApplicationDerivedState["debugHistoryEntryListItems"]>(
-    () =>
-      history.map((historyEntry) => ({
-        id: historyEntry.id,
-        at: historyEntry.at,
-        source: historyEntry.source,
-        direction: historyEntry.direction,
-      })),
+  const debugHistoryEntryListItems = useMemo(
+    () => readDebugHistoryEntryListItems(history),
     [history],
   );
 
