@@ -62,8 +62,62 @@ export interface DebugAppServerCoverageSkillEntry {
   errorCount: number;
 }
 
+export type DebugAppServerCoverageAccountPlanType =
+  | "free"
+  | "go"
+  | "plus"
+  | "pro"
+  | "team"
+  | "business"
+  | "enterprise"
+  | "edu"
+  | "unknown";
+
+export interface DebugAppServerCoverageApiKeyAccount {
+  type: "apiKey";
+}
+
+export interface DebugAppServerCoverageChatgptAccount {
+  type: "chatgpt";
+  email: string;
+  planType: DebugAppServerCoverageAccountPlanType;
+}
+
+export type DebugAppServerCoverageAccount =
+  | DebugAppServerCoverageApiKeyAccount
+  | DebugAppServerCoverageChatgptAccount;
+
+export interface DebugAppServerCoverageCreditsSnapshot {
+  balance: string | null;
+  hasCredits: boolean;
+  unlimited: boolean;
+}
+
+export interface DebugAppServerCoverageRateLimitWindow {
+  resetsAt: number | null;
+  usedPercent: number;
+  windowDurationMins: number | null;
+}
+
+export interface DebugAppServerCoverageRateLimitSnapshot {
+  credits: DebugAppServerCoverageCreditsSnapshot | null;
+  limitId: string | null;
+  limitName: string | null;
+  planType: DebugAppServerCoverageAccountPlanType | null;
+  primary: DebugAppServerCoverageRateLimitWindow | null;
+  secondary: DebugAppServerCoverageRateLimitWindow | null;
+}
+
+export interface DebugAppServerCoveragePendingAccountLogin {
+  loginId: string;
+  authUrl: string;
+}
+
 export interface DebugAppServerCoverageSnapshot {
   requirements: DebugAppServerCoverageRequirements | null;
+  account: DebugAppServerCoverageAccount | null;
+  requiresOpenaiAuth: boolean;
+  accountRateLimits: DebugAppServerCoverageRateLimitSnapshot | null;
   experimentalFeatures: DebugAppServerCoverageExperimentalFeature[];
   mcpServers: DebugAppServerCoverageMcpServerSummary[];
   apps: DebugAppServerCoverageAppSummary[];

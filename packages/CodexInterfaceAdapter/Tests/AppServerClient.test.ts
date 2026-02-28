@@ -923,6 +923,201 @@ describe("AppServerClient.listSkills", () => {
   });
 });
 
+describe("AppServerClient.readAccount", () => {
+  it("sends account/read and maps account contract variants", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      account: {
+        type: "chatgpt",
+        email: "dev@example.com",
+        planType: "pro",
+      },
+      requiresOpenaiAuth: false,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.readAccount({
+      refreshToken: true,
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("account/read", {
+      refreshToken: true,
+    });
+    expect(result).toEqual({
+      account: {
+        type: "chatgpt",
+        email: "dev@example.com",
+        planType: "pro",
+      },
+      requiresOpenaiAuth: false,
+    });
+  });
+});
+
+describe("AppServerClient.readAccountRateLimits", () => {
+  it("sends account/rateLimits/read and normalizes snapshot contracts", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      rateLimits: {
+        limitId: "codex",
+        limitName: "Codex",
+        planType: "pro",
+        primary: {
+          usedPercent: 42,
+          resetsAt: 1_700_000_000,
+          windowDurationMins: 60,
+        },
+      },
+      rateLimitsByLimitId: {
+        codex: {
+          credits: {
+            balance: "120.00",
+            hasCredits: true,
+            unlimited: false,
+          },
+          planType: "pro",
+          primary: {
+            usedPercent: 42,
+          },
+          secondary: null,
+        },
+      },
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.readAccountRateLimits();
+
+    expect(transportDouble.request).toHaveBeenCalledWith("account/rateLimits/read", {});
+    expect(result).toEqual({
+      rateLimits: {
+        credits: null,
+        limitId: "codex",
+        limitName: "Codex",
+        planType: "pro",
+        primary: {
+          usedPercent: 42,
+          resetsAt: 1_700_000_000,
+          windowDurationMins: 60,
+        },
+        secondary: null,
+      },
+      rateLimitsByLimitId: {
+        codex: {
+          credits: {
+            balance: "120.00",
+            hasCredits: true,
+            unlimited: false,
+          },
+          limitId: null,
+          limitName: null,
+          planType: "pro",
+          primary: {
+            usedPercent: 42,
+            resetsAt: null,
+            windowDurationMins: null,
+          },
+          secondary: null,
+        },
+      },
+    });
+  });
+});
+
+describe("AppServerClient.startAccountLogin", () => {
+  it("sends account/login/start and returns chatgpt login metadata", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      type: "chatgpt",
+      loginId: "login-1",
+      authUrl: "https://example.com/oauth",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.startAccountLogin({
+      type: "chatgpt",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("account/login/start", {
+      type: "chatgpt",
+    });
+    expect(result).toEqual({
+      type: "chatgpt",
+      loginId: "login-1",
+      authUrl: "https://example.com/oauth",
+    });
+  });
+
+  it("sends explicit token-login payload when auth tokens are provided", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      type: "chatgptAuthTokens",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.startAccountLogin({
+      type: "chatgptAuthTokens",
+      accessToken: "token-1",
+      chatgptAccountId: "acct-1",
+      chatgptPlanType: "pro",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("account/login/start", {
+      type: "chatgptAuthTokens",
+      accessToken: "token-1",
+      chatgptAccountId: "acct-1",
+      chatgptPlanType: "pro",
+    });
+    expect(result).toEqual({
+      type: "chatgptAuthTokens",
+    });
+  });
+});
+
+describe("AppServerClient.cancelAccountLogin", () => {
+  it("sends account/login/cancel with login identifier and returns cancel status", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      status: "canceled",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.cancelAccountLogin({
+      loginId: "login-1",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("account/login/cancel", {
+      loginId: "login-1",
+    });
+    expect(result).toEqual({
+      status: "canceled",
+    });
+  });
+});
+
+describe("AppServerClient.logoutAccount", () => {
+  it("sends account/logout with empty parameters", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.logoutAccount();
+
+    expect(transportDouble.request).toHaveBeenCalledWith("account/logout", {});
+  });
+});
+
+describe("AppServerClient.reloadMcpServerConfig", () => {
+  it("sends config/mcpServer/reload with empty parameters", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    await client.reloadMcpServerConfig();
+
+    expect(transportDouble.request).toHaveBeenCalledWith("config/mcpServer/reload", {});
+  });
+});
+
 describe("AppServerClient.listThreadsAll", () => {
   it("starts pagination from an explicit initial cursor", async () => {
     const transportDouble = createTransportDouble();

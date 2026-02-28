@@ -1,5 +1,11 @@
+account/login/cancel
+account/login/start
+account/logout
+account/rateLimits/read
+account/read
 app/list
 collaborationMode/list
+config/mcpServer/reload
 config/read
 configRequirements/read
 experimentalFeature/list

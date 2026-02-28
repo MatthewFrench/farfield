@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityApi", () => ({
+  cancelAccountLogin: vi.fn(),
+  getAccount: vi.fn(),
+  getAccountRateLimits: vi.fn(),
   getConfigRequirements: vi.fn(),
   getConfigDefaults: vi.fn(),
   getHealth: vi.fn(),
@@ -11,9 +14,15 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityApi", () => ({
   listMcpServers: vi.fn(),
   listModels: vi.fn(),
   listSkills: vi.fn(),
+  logoutAccount: vi.fn(),
+  reloadMcpServerConfig: vi.fn(),
+  startAccountLogin: vi.fn(),
 }));
 
 import {
+  cancelAccountLogin,
+  getAccount,
+  getAccountRateLimits,
   getConfigDefaults,
   getConfigRequirements,
   getHealth,
@@ -24,8 +33,15 @@ import {
   listMcpServers,
   listModels,
   listSkills,
+  logoutAccount,
+  reloadMcpServerConfig,
+  startAccountLogin,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
 import {
+  type CapabilityAccountLoginCancelResponse,
+  type CapabilityAccountLoginStartResponse,
+  type CapabilityAccountRateLimitsResponse,
+  type CapabilityAccountResponse,
   type CapabilityAgentsResponse,
   type CapabilityAppsResponse,
   type CapabilityCollaborationModesResponse,
@@ -35,6 +51,7 @@ import {
   type CapabilityHealthResponse,
   type CapabilityMcpServersResponse,
   type CapabilityModelsResponse,
+  type CapabilityMutationSuccessResponse,
   CapabilityServerClient,
   type CapabilitySkillsResponse,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
@@ -67,6 +84,12 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canListMcpServerStatuses: true,
         canListApps: true,
         canListSkills: true,
+        canReadAccount: true,
+        canReadAccountRateLimits: true,
+        canStartAccountLogin: true,
+        canCancelAccountLogin: true,
+        canLogoutAccount: true,
+        canReloadMcpServerConfig: true,
         canSetCollaborationMode: true,
         canSubmitUserInput: true,
         canReadLiveState: true,
@@ -128,6 +151,49 @@ const CONFIG_REQUIREMENTS_RESPONSE: CapabilityConfigRequirementsResponse = {
     enforceResidency: "us",
     network: null,
   },
+};
+
+const ACCOUNT_RESPONSE: CapabilityAccountResponse = {
+  ok: true,
+  account: {
+    type: "chatgpt",
+    email: "dev@example.com",
+    planType: "pro",
+  },
+  requiresOpenaiAuth: false,
+};
+
+const ACCOUNT_RATE_LIMITS_RESPONSE: CapabilityAccountRateLimitsResponse = {
+  ok: true,
+  rateLimits: {
+    credits: null,
+    limitId: "codex",
+    limitName: "Codex",
+    planType: "pro",
+    primary: {
+      resetsAt: 1_700_000_000,
+      usedPercent: 42,
+      windowDurationMins: 60,
+    },
+    secondary: null,
+  },
+  rateLimitsByLimitId: null,
+};
+
+const ACCOUNT_LOGIN_START_RESPONSE: CapabilityAccountLoginStartResponse = {
+  ok: true,
+  type: "chatgpt",
+  loginId: "login-1",
+  authUrl: "https://example.com/oauth/start",
+};
+
+const ACCOUNT_LOGIN_CANCEL_RESPONSE: CapabilityAccountLoginCancelResponse = {
+  ok: true,
+  status: "canceled",
+};
+
+const MUTATION_SUCCESS_RESPONSE: CapabilityMutationSuccessResponse = {
+  ok: true,
 };
 
 const EXPERIMENTAL_FEATURES_RESPONSE: CapabilityExperimentalFeaturesResponse = {
@@ -206,6 +272,12 @@ describe("CapabilityServerClient", () => {
     vi.mocked(listModels).mockResolvedValue(MODELS_RESPONSE);
     vi.mocked(getConfigDefaults).mockResolvedValue(CONFIG_DEFAULTS_RESPONSE);
     vi.mocked(getConfigRequirements).mockResolvedValue(CONFIG_REQUIREMENTS_RESPONSE);
+    vi.mocked(getAccount).mockResolvedValue(ACCOUNT_RESPONSE);
+    vi.mocked(getAccountRateLimits).mockResolvedValue(ACCOUNT_RATE_LIMITS_RESPONSE);
+    vi.mocked(startAccountLogin).mockResolvedValue(ACCOUNT_LOGIN_START_RESPONSE);
+    vi.mocked(cancelAccountLogin).mockResolvedValue(ACCOUNT_LOGIN_CANCEL_RESPONSE);
+    vi.mocked(logoutAccount).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
+    vi.mocked(reloadMcpServerConfig).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
     vi.mocked(listExperimentalFeatures).mockResolvedValue(EXPERIMENTAL_FEATURES_RESPONSE);
     vi.mocked(listMcpServers).mockResolvedValue(MCP_SERVERS_RESPONSE);
     vi.mocked(listApps).mockResolvedValue(APPS_RESPONSE);
@@ -239,6 +311,32 @@ describe("CapabilityServerClient", () => {
       actionId: "action-config-requirements",
       actionName: "read-config-requirements",
     };
+    const accountOptions = {
+      actionId: "action-account",
+      actionName: "read-account",
+      refreshToken: true,
+    };
+    const accountRateLimitsOptions = {
+      actionId: "action-account-rate-limits",
+      actionName: "read-account-rate-limits",
+    };
+    const accountLoginStartOptions = {
+      actionId: "action-account-login-start",
+      actionName: "start-account-login",
+    };
+    const accountLoginCancelOptions = {
+      actionId: "action-account-login-cancel",
+      actionName: "cancel-account-login",
+      loginId: "login-1",
+    };
+    const accountLogoutOptions = {
+      actionId: "action-account-logout",
+      actionName: "logout-account",
+    };
+    const reloadMcpServerConfigOptions = {
+      actionId: "action-reload-mcp-server-config",
+      actionName: "reload-mcp-server-config",
+    };
     const experimentalFeatureOptions = {
       actionId: "action-experimental-features",
       actionName: "list-experimental-features",
@@ -269,6 +367,17 @@ describe("CapabilityServerClient", () => {
       await capabilityServerClient.readConfigDefaults(configDefaultsOptions);
     const configRequirementsResponse =
       await capabilityServerClient.readConfigRequirements(configRequirementsOptions);
+    const accountResponse = await capabilityServerClient.readAccount(accountOptions);
+    const accountRateLimitsResponse =
+      await capabilityServerClient.readAccountRateLimits(accountRateLimitsOptions);
+    const accountLoginStartResponse =
+      await capabilityServerClient.startAccountLogin(accountLoginStartOptions);
+    const accountLoginCancelResponse =
+      await capabilityServerClient.cancelAccountLogin(accountLoginCancelOptions);
+    const accountLogoutResponse = await capabilityServerClient.logoutAccount(accountLogoutOptions);
+    const reloadMcpServerConfigResponse = await capabilityServerClient.reloadMcpServerConfig(
+      reloadMcpServerConfigOptions,
+    );
     const experimentalFeaturesResponse = await capabilityServerClient.listExperimentalFeatures(
       experimentalFeatureOptions,
     );
@@ -282,6 +391,12 @@ describe("CapabilityServerClient", () => {
     expect(listModels).toHaveBeenCalledWith(modelOptions);
     expect(getConfigDefaults).toHaveBeenCalledWith(configDefaultsOptions);
     expect(getConfigRequirements).toHaveBeenCalledWith(configRequirementsOptions);
+    expect(getAccount).toHaveBeenCalledWith(accountOptions);
+    expect(getAccountRateLimits).toHaveBeenCalledWith(accountRateLimitsOptions);
+    expect(startAccountLogin).toHaveBeenCalledWith(accountLoginStartOptions);
+    expect(cancelAccountLogin).toHaveBeenCalledWith(accountLoginCancelOptions);
+    expect(logoutAccount).toHaveBeenCalledWith(accountLogoutOptions);
+    expect(reloadMcpServerConfig).toHaveBeenCalledWith(reloadMcpServerConfigOptions);
     expect(listExperimentalFeatures).toHaveBeenCalledWith(experimentalFeatureOptions);
     expect(listMcpServers).toHaveBeenCalledWith(mcpServerOptions);
     expect(listApps).toHaveBeenCalledWith(appOptions);
@@ -292,6 +407,12 @@ describe("CapabilityServerClient", () => {
     expect(modelsResponse).toEqual(MODELS_RESPONSE);
     expect(configDefaultsResponse).toEqual(CONFIG_DEFAULTS_RESPONSE);
     expect(configRequirementsResponse).toEqual(CONFIG_REQUIREMENTS_RESPONSE);
+    expect(accountResponse).toEqual(ACCOUNT_RESPONSE);
+    expect(accountRateLimitsResponse).toEqual(ACCOUNT_RATE_LIMITS_RESPONSE);
+    expect(accountLoginStartResponse).toEqual(ACCOUNT_LOGIN_START_RESPONSE);
+    expect(accountLoginCancelResponse).toEqual(ACCOUNT_LOGIN_CANCEL_RESPONSE);
+    expect(accountLogoutResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
+    expect(reloadMcpServerConfigResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
     expect(experimentalFeaturesResponse).toEqual(EXPERIMENTAL_FEATURES_RESPONSE);
     expect(mcpServersResponse).toEqual(MCP_SERVERS_RESPONSE);
     expect(appsResponse).toEqual(APPS_RESPONSE);

@@ -54,6 +54,12 @@ export interface AgentCapabilities {
   canListMcpServerStatuses: boolean;
   canListApps: boolean;
   canListSkills: boolean;
+  canReadAccount: boolean;
+  canReadAccountRateLimits: boolean;
+  canStartAccountLogin: boolean;
+  canCancelAccountLogin: boolean;
+  canLogoutAccount: boolean;
+  canReloadMcpServerConfig: boolean;
   canSetCollaborationMode: boolean;
   canSubmitUserInput: boolean;
   canReadLiveState: boolean;
@@ -404,6 +410,116 @@ export interface AgentListSkillsResult {
   data: AgentSkillsListEntrySummary[];
 }
 
+export interface AgentReadAccountInput {
+  refreshToken?: boolean;
+}
+
+export type AgentAccountPlanType =
+  | "free"
+  | "go"
+  | "plus"
+  | "pro"
+  | "team"
+  | "business"
+  | "enterprise"
+  | "edu"
+  | "unknown";
+
+export interface AgentApiKeyAccount {
+  type: "apiKey";
+}
+
+export interface AgentChatgptAccount {
+  type: "chatgpt";
+  email: string;
+  planType: AgentAccountPlanType;
+}
+
+export type AgentAccount = AgentApiKeyAccount | AgentChatgptAccount;
+
+export interface AgentReadAccountResult {
+  account: AgentAccount | null;
+  requiresOpenaiAuth: boolean;
+}
+
+export interface AgentReadAccountRateLimitsInput {}
+
+export interface AgentAccountCreditsSnapshot {
+  balance: string | null;
+  hasCredits: boolean;
+  unlimited: boolean;
+}
+
+export interface AgentAccountRateLimitWindow {
+  resetsAt: number | null;
+  usedPercent: number;
+  windowDurationMins: number | null;
+}
+
+export interface AgentAccountRateLimitSnapshot {
+  credits: AgentAccountCreditsSnapshot | null;
+  limitId: string | null;
+  limitName: string | null;
+  planType: AgentAccountPlanType | null;
+  primary: AgentAccountRateLimitWindow | null;
+  secondary: AgentAccountRateLimitWindow | null;
+}
+
+export interface AgentReadAccountRateLimitsResult {
+  rateLimits: AgentAccountRateLimitSnapshot;
+  rateLimitsByLimitId: Record<string, AgentAccountRateLimitSnapshot> | null;
+}
+
+export interface AgentStartAccountLoginWithApiKeyInput {
+  type: "apiKey";
+  apiKey: string;
+}
+
+export interface AgentStartAccountLoginWithChatgptInput {
+  type: "chatgpt";
+}
+
+export interface AgentStartAccountLoginWithChatgptAuthTokensInput {
+  type: "chatgptAuthTokens";
+  accessToken: string;
+  chatgptAccountId: string;
+  chatgptPlanType?: AgentAccountPlanType | null;
+}
+
+export type AgentStartAccountLoginInput =
+  | AgentStartAccountLoginWithApiKeyInput
+  | AgentStartAccountLoginWithChatgptInput
+  | AgentStartAccountLoginWithChatgptAuthTokensInput;
+
+export interface AgentStartAccountLoginWithApiKeyResult {
+  type: "apiKey";
+}
+
+export interface AgentStartAccountLoginWithChatgptResult {
+  type: "chatgpt";
+  loginId: string;
+  authUrl: string;
+}
+
+export interface AgentStartAccountLoginWithChatgptAuthTokensResult {
+  type: "chatgptAuthTokens";
+}
+
+export type AgentStartAccountLoginResult =
+  | AgentStartAccountLoginWithApiKeyResult
+  | AgentStartAccountLoginWithChatgptResult
+  | AgentStartAccountLoginWithChatgptAuthTokensResult;
+
+export interface AgentCancelAccountLoginInput {
+  loginId: string;
+}
+
+export type AgentCancelAccountLoginStatus = "canceled" | "notFound";
+
+export interface AgentCancelAccountLoginResult {
+  status: AgentCancelAccountLoginStatus;
+}
+
 export interface AgentSetCollaborationModeResult {
   ownerClientId: string;
 }
@@ -449,6 +565,14 @@ export interface AgentAdapter {
   ): Promise<AgentListMcpServerStatusesResult>;
   listApps?(input?: AgentListAppsInput): Promise<AgentListAppsResult>;
   listSkills?(input?: AgentListSkillsInput): Promise<AgentListSkillsResult>;
+  readAccount?(input?: AgentReadAccountInput): Promise<AgentReadAccountResult>;
+  readAccountRateLimits?(
+    input?: AgentReadAccountRateLimitsInput,
+  ): Promise<AgentReadAccountRateLimitsResult>;
+  startAccountLogin?(input: AgentStartAccountLoginInput): Promise<AgentStartAccountLoginResult>;
+  cancelAccountLogin?(input: AgentCancelAccountLoginInput): Promise<AgentCancelAccountLoginResult>;
+  logoutAccount?(): Promise<void>;
+  reloadMcpServerConfig?(): Promise<void>;
 
   listModels?(limit: number): Promise<AppServerListModelsResponse>;
   listCollaborationModes?(): Promise<AppServerCollaborationModeListResponse>;

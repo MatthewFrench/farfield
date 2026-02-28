@@ -25,6 +25,7 @@ import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
 import {
   APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT,
   buildArchiveThreadRequest,
+  buildCancelAccountLoginRequestParameters,
   buildForkThreadRequest,
   buildListAppsRequestParameters,
   buildListExperimentalFeaturesRequestParameters,
@@ -33,12 +34,17 @@ import {
   buildListSkillsRequestParameters,
   buildListThreadsAllPageOptions,
   buildListThreadsRequestParameters,
+  buildLogoutAccountRequestParameters,
+  buildReadAccountRateLimitsRequestParameters,
+  buildReadAccountRequestParameters,
   buildReadConfigRequestParameters,
   buildReadConfigRequirementsRequestParameters,
   buildReadThreadRequestParameters,
+  buildReloadMcpServerConfigRequestParameters,
   buildResumeThreadRequest,
   buildRollbackThreadRequest,
   buildSetThreadNameRequest,
+  buildStartAccountLoginRequestParameters,
   buildStartReviewRequest,
   buildStartThreadRequest,
   buildStartTurnRequest,
@@ -239,6 +245,114 @@ export interface ListSkillsResult {
   data: SkillsListEntrySummary[];
 }
 
+export interface ReadAccountOptions {
+  refreshToken?: boolean;
+}
+
+export type AccountPlanType =
+  | "free"
+  | "go"
+  | "plus"
+  | "pro"
+  | "team"
+  | "business"
+  | "enterprise"
+  | "edu"
+  | "unknown";
+
+export interface ApiKeyAccountSummary {
+  type: "apiKey";
+}
+
+export interface ChatgptAccountSummary {
+  type: "chatgpt";
+  email: string;
+  planType: AccountPlanType;
+}
+
+export type AccountSummary = ApiKeyAccountSummary | ChatgptAccountSummary;
+
+export interface ReadAccountResult {
+  account: AccountSummary | null;
+  requiresOpenaiAuth: boolean;
+}
+
+export interface AccountCreditsSnapshot {
+  balance: string | null;
+  hasCredits: boolean;
+  unlimited: boolean;
+}
+
+export interface AccountRateLimitWindow {
+  resetsAt: number | null;
+  usedPercent: number;
+  windowDurationMins: number | null;
+}
+
+export interface AccountRateLimitSnapshot {
+  credits: AccountCreditsSnapshot | null;
+  limitId: string | null;
+  limitName: string | null;
+  planType: AccountPlanType | null;
+  primary: AccountRateLimitWindow | null;
+  secondary: AccountRateLimitWindow | null;
+}
+
+export interface ReadAccountRateLimitsResult {
+  rateLimits: AccountRateLimitSnapshot;
+  rateLimitsByLimitId: Record<string, AccountRateLimitSnapshot> | null;
+}
+
+export interface LoginAccountWithApiKeyOptions {
+  type: "apiKey";
+  apiKey: string;
+}
+
+export interface LoginAccountWithChatgptOptions {
+  type: "chatgpt";
+}
+
+export interface LoginAccountWithChatgptAuthTokensOptions {
+  type: "chatgptAuthTokens";
+  accessToken: string;
+  chatgptAccountId: string;
+  chatgptPlanType?: AccountPlanType | null;
+}
+
+export type LoginAccountOptions =
+  | LoginAccountWithApiKeyOptions
+  | LoginAccountWithChatgptOptions
+  | LoginAccountWithChatgptAuthTokensOptions;
+
+export interface LoginAccountWithApiKeyResult {
+  type: "apiKey";
+}
+
+export interface LoginAccountWithChatgptResult {
+  type: "chatgpt";
+  loginId: string;
+  authUrl: string;
+}
+
+export interface LoginAccountWithChatgptAuthTokensResult {
+  type: "chatgptAuthTokens";
+}
+
+export type LoginAccountResult =
+  | LoginAccountWithApiKeyResult
+  | LoginAccountWithChatgptResult
+  | LoginAccountWithChatgptAuthTokensResult;
+
+export interface CancelAccountLoginOptions {
+  loginId: string;
+}
+
+export type CancelAccountLoginStatus = "canceled" | "notFound";
+
+export interface CancelAccountLoginResult {
+  status: CancelAccountLoginStatus;
+}
+
 export interface ResumeThreadOptions {
   persistExtendedHistory?: boolean;
 }
@@ -428,6 +542,93 @@ const AppServerSkillsListResponseSchema = z
     data: z.array(AppServerSkillsListEntrySchema),
   })
   .passthrough();
+const AppServerAccountPlanTypeSchema = z.enum([
+  "free",
+  "go",
+  "plus",
+  "pro",
+  "team",
+  "business",
+  "enterprise",
+  "edu",
+  "unknown",
+]);
+const AppServerAccountSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("apiKey"),
+    })
+    .passthrough(),
+  z
+    .object({
+      type: z.literal("chatgpt"),
+      email: z.string(),
+      planType: AppServerAccountPlanTypeSchema,
+    })
+    .passthrough(),
+]);
+const AppServerGetAccountResponseSchema = z
+  .object({
+    account: AppServerAccountSchema.nullable(),
+    requiresOpenaiAuth: z.boolean(),
+  })
+  .passthrough();
+const AppServerAccountCreditsSnapshotSchema = z
+  .object({
+    balance: z.string().nullable().optional(),
+    hasCredits: z.boolean(),
+    unlimited: z.boolean(),
+  })
+  .passthrough();
+const AppServerAccountRateLimitWindowSchema = z
+  .object({
+    resetsAt: z.number().int().nullable().optional(),
+    usedPercent: z.number().int(),
+    windowDurationMins: z.number().int().nullable().optional(),
+  })
+  .passthrough();
+const AppServerAccountRateLimitSnapshotSchema = z
+  .object({
+    credits: AppServerAccountCreditsSnapshotSchema.nullable().optional(),
+    limitId: z.string().nullable().optional(),
+    limitName: z.string().nullable().optional(),
+    planType: AppServerAccountPlanTypeSchema.nullable().optional(),
+    primary: AppServerAccountRateLimitWindowSchema.nullable().optional(),
+    secondary: AppServerAccountRateLimitWindowSchema.nullable().optional(),
+  })
+  .passthrough();
+const AppServerGetAccountRateLimitsResponseSchema = z
+  .object({
+    rateLimits: AppServerAccountRateLimitSnapshotSchema,
+    rateLimitsByLimitId: z.record(AppServerAccountRateLimitSnapshotSchema).nullable().optional(),
+  })
+  .passthrough();
+const AppServerLoginAccountResponseSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("apiKey"),
+    })
+    .passthrough(),
+  z
+    .object({
+      type: z.literal("chatgpt"),
+      loginId: z.string().min(1),
+      authUrl: z.string().min(1),
+    })
+    .passthrough(),
+  z
+    .object({
+      type: z.literal("chatgptAuthTokens"),
+    })
+    .passthrough(),
+]);
+const AppServerCancelLoginAccountResponseSchema = z
+  .object({
+    status: z.enum(["canceled", "notFound"]),
+  })
+  .passthrough();
+const AppServerLogoutAccountResponseSchema = z.object({}).passthrough();
+const AppServerMcpServerRefreshResponseSchema = z.object({}).passthrough();
 const AppServerThreadUnsubscribeResponseSchema = z
   .object({
     status: z.enum(["notLoaded", "notSubscribed", "unsubscribed"]),
@@ -448,6 +649,40 @@ const AppServerUnarchiveThreadResponseSchema = z
     thread: AppServerThreadListItemSchema,
   })
   .passthrough();
+
+function mapAccountRateLimitSnapshot(
+  snapshot: z.infer<typeof AppServerAccountRateLimitSnapshotSchema>,
+): AccountRateLimitSnapshot {
+  return {
+    credits:
+      snapshot.credits === undefined || snapshot.credits === null
+        ? null
+        : {
+            balance: snapshot.credits.balance ?? null,
+            hasCredits: snapshot.credits.hasCredits,
+            unlimited: snapshot.credits.unlimited,
+          },
+    limitId: snapshot.limitId ?? null,
+    limitName: snapshot.limitName ?? null,
+    planType: snapshot.planType ?? null,
+    primary:
+      snapshot.primary === undefined || snapshot.primary === null
+        ? null
+        : {
+            resetsAt: snapshot.primary.resetsAt ?? null,
+            usedPercent: snapshot.primary.usedPercent,
+            windowDurationMins: snapshot.primary.windowDurationMins ?? null,
+          },
+    secondary:
+      snapshot.secondary === undefined || snapshot.secondary === null
+        ? null
+        : {
+            resetsAt: snapshot.secondary.resetsAt ?? null,
+            usedPercent: snapshot.secondary.usedPercent,
+            windowDurationMins: snapshot.secondary.windowDurationMins ?? null,
+          },
+  };
+}
 
 /**
  * Owns typed request/response mapping for Codex app-server RPC methods.
@@ -754,6 +989,124 @@ export class AppServerClient {
         })),
       })),
     };
+  }
+
+  public async readAccount(options?: ReadAccountOptions): Promise<ReadAccountResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.readAccount,
+      buildReadAccountRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerGetAccountResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readAccount,
+    );
+    return {
+      account:
+        parsed.account === null
+          ? null
+          : parsed.account.type === "apiKey"
+            ? { type: "apiKey" }
+            : {
+                type: "chatgpt",
+                email: parsed.account.email,
+                planType: parsed.account.planType,
+              },
+      requiresOpenaiAuth: parsed.requiresOpenaiAuth,
+    };
+  }
+
+  public async readAccountRateLimits(): Promise<ReadAccountRateLimitsResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.readAccountRateLimits,
+      buildReadAccountRateLimitsRequestParameters(),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerGetAccountRateLimitsResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readAccountRateLimits,
+    );
+    const rateLimitsByLimitIdSource = parsed.rateLimitsByLimitId;
+    return {
+      rateLimits: mapAccountRateLimitSnapshot(parsed.rateLimits),
+      rateLimitsByLimitId:
+        rateLimitsByLimitIdSource === undefined || rateLimitsByLimitIdSource === null
+          ? null
+          : Object.fromEntries(
+              Object.entries(rateLimitsByLimitIdSource).map(([limitId, snapshot]) => [
+                limitId,
+                mapAccountRateLimitSnapshot(snapshot),
+              ]),
+            ),
+    };
+  }
+
+  public async startAccountLogin(options: LoginAccountOptions): Promise<LoginAccountResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.startAccountLogin,
+      buildStartAccountLoginRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerLoginAccountResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.startAccountLogin,
+    );
+    if (parsed.type === "apiKey") {
+      return {
+        type: "apiKey",
+      };
+    }
+    if (parsed.type === "chatgptAuthTokens") {
+      return {
+        type: "chatgptAuthTokens",
+      };
+    }
+    return {
+      type: "chatgpt",
+      loginId: parsed.loginId,
+      authUrl: parsed.authUrl,
+    };
+  }
+
+  public async cancelAccountLogin(
+    options: CancelAccountLoginOptions,
+  ): Promise<CancelAccountLoginResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.cancelAccountLogin,
+      buildCancelAccountLoginRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerCancelLoginAccountResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.cancelAccountLogin,
+    );
+    return {
+      status: parsed.status,
+    };
+  }
+
+  public async logoutAccount(): Promise<void> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.logoutAccount,
+      buildLogoutAccountRequestParameters(),
+    );
+    parseAppServerResponse(
+      AppServerLogoutAccountResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.logoutAccount,
+    );
+  }
+
+  public async reloadMcpServerConfig(): Promise<void> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.reloadMcpServerConfig,
+      buildReloadMcpServerConfigRequestParameters(),
+    );
+    parseAppServerResponse(
+      AppServerMcpServerRefreshResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.reloadMcpServerConfig,
+    );
   }
 
   public async startThread(options: StartThreadOptions): Promise<AppServerStartThreadResponse> {

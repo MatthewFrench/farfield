@@ -1,10 +1,20 @@
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import {
+  type ApiAccountLoginCancelOptions,
+  type ApiAccountLoginCancelResponse,
+  type ApiAccountLoginStartOptions,
+  type ApiAccountLoginStartResponse,
+  type ApiAccountLogoutOptions,
+  type ApiAccountOptions,
+  type ApiAccountRateLimitsOptions,
+  type ApiAccountRateLimitsResponse,
+  type ApiAccountResponse,
   type ApiAgentsResponse,
   type ApiAppsResponse,
   type ApiCollaborationModesResponse,
   type ApiConfigDefaultsOptions,
   type ApiConfigDefaultsResponse,
+  type ApiConfigMcpServerReloadOptions,
   type ApiConfigRequirementsOptions,
   type ApiConfigRequirementsResponse,
   type ApiExperimentalFeaturesResponse,
@@ -14,7 +24,11 @@ import {
   type ApiListSkillsOptions,
   type ApiMcpServersResponse,
   type ApiModelsResponse,
+  type ApiMutationSuccessResponse,
   type ApiSkillsResponse,
+  cancelAccountLogin,
+  getAccount,
+  getAccountRateLimits,
   getConfigDefaults,
   getConfigRequirements,
   getHealth,
@@ -25,15 +39,28 @@ import {
   listMcpServers,
   listModels,
   listSkills,
+  logoutAccount,
+  reloadMcpServerConfig,
+  startAccountLogin,
 } from "./CapabilityApi";
 
 export type CapabilityRequestOptions = ApiRequestOptions;
 export type CapabilityHealthResponse = ApiHealthResponse;
 export type CapabilityAgentsResponse = ApiAgentsResponse;
+export type CapabilityAccountOptions = ApiAccountOptions;
+export type CapabilityAccountLoginStartOptions = ApiAccountLoginStartOptions;
+export type CapabilityAccountLoginStartResponse = ApiAccountLoginStartResponse;
+export type CapabilityAccountLoginCancelOptions = ApiAccountLoginCancelOptions;
+export type CapabilityAccountLoginCancelResponse = ApiAccountLoginCancelResponse;
+export type CapabilityAccountLogoutOptions = ApiAccountLogoutOptions;
+export type CapabilityAccountRateLimitsOptions = ApiAccountRateLimitsOptions;
+export type CapabilityAccountResponse = ApiAccountResponse;
+export type CapabilityAccountRateLimitsResponse = ApiAccountRateLimitsResponse;
 export type CapabilityCollaborationModesResponse = ApiCollaborationModesResponse;
 export type CapabilityModelsResponse = ApiModelsResponse;
 export type CapabilityConfigDefaultsOptions = ApiConfigDefaultsOptions;
 export type CapabilityConfigDefaultsResponse = ApiConfigDefaultsResponse;
+export type CapabilityConfigMcpServerReloadOptions = ApiConfigMcpServerReloadOptions;
 export type CapabilityConfigRequirementsOptions = ApiConfigRequirementsOptions;
 export type CapabilityConfigRequirementsResponse = ApiConfigRequirementsResponse;
 export type CapabilityListPageOptions = ApiListPageOptions;
@@ -43,6 +70,7 @@ export type CapabilityListAppsOptions = ApiListAppsOptions;
 export type CapabilityAppsResponse = ApiAppsResponse;
 export type CapabilityListSkillsOptions = ApiListSkillsOptions;
 export type CapabilitySkillsResponse = ApiSkillsResponse;
+export type CapabilityMutationSuccessResponse = ApiMutationSuccessResponse;
 
 /**
  * Owns capability endpoint reads.
@@ -79,6 +107,40 @@ export class CapabilityServerClient {
     input?: CapabilityConfigRequirementsOptions,
   ): Promise<CapabilityConfigRequirementsResponse> {
     return getConfigRequirements(input);
+  }
+
+  public async readAccount(input?: CapabilityAccountOptions): Promise<CapabilityAccountResponse> {
+    return getAccount(input);
+  }
+
+  public async readAccountRateLimits(
+    input?: CapabilityAccountRateLimitsOptions,
+  ): Promise<CapabilityAccountRateLimitsResponse> {
+    return getAccountRateLimits(input);
+  }
+
+  public async startAccountLogin(
+    input?: CapabilityAccountLoginStartOptions,
+  ): Promise<CapabilityAccountLoginStartResponse> {
+    return startAccountLogin(input);
+  }
+
+  public async cancelAccountLogin(
+    input: CapabilityAccountLoginCancelOptions,
+  ): Promise<CapabilityAccountLoginCancelResponse> {
+    return cancelAccountLogin(input);
+  }
+
+  public async logoutAccount(
+    input?: CapabilityAccountLogoutOptions,
+  ): Promise<CapabilityMutationSuccessResponse> {
+    return logoutAccount(input);
+  }
+
+  public async reloadMcpServerConfig(
+    input?: CapabilityConfigMcpServerReloadOptions,
+  ): Promise<CapabilityMutationSuccessResponse> {
+    return reloadMcpServerConfig(input);
   }
 
   public async listExperimentalFeatures(

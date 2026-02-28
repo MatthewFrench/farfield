@@ -142,6 +142,10 @@ function createUseApplicationShellViewPropertiesFixture() {
   const markTraceFromDebugPanelSpy = vi.fn((): void => {});
   const stopTraceFromDebugPanelSpy = vi.fn((): void => {});
   const refreshCoverageDiagnosticsSpy = vi.fn((): void => {});
+  const startAccountLoginSpy = vi.fn((): void => {});
+  const cancelAccountLoginSpy = vi.fn((): void => {});
+  const logoutAccountSpy = vi.fn((): void => {});
+  const reloadMcpServerConfigSpy = vi.fn((): void => {});
   const setApiSessionTokenDraftSpy = vi.fn((): void => {});
   const setApiSessionBootstrapErrorSpy = vi.fn((): void => {});
   const submitApiSessionTokenSpy = vi.fn(async (): Promise<void> => {});
@@ -264,9 +268,16 @@ function createUseApplicationShellViewPropertiesFixture() {
     stopTraceFromDebugPanel: stopTraceFromDebugPanelSpy,
     recentTraceSummaries: [],
     isLoadingCoverageDiagnostics: false,
+    isRunningCoverageAction: false,
     coverageDiagnosticsErrorMessage: "",
+    coverageActionErrorMessage: "",
     coverageDiagnosticsSnapshot: null,
+    pendingAccountLogin: null,
     refreshCoverageDiagnostics: refreshCoverageDiagnosticsSpy,
+    startAccountLogin: startAccountLoginSpy,
+    cancelAccountLogin: cancelAccountLoginSpy,
+    logoutAccount: logoutAccountSpy,
+    reloadMcpServerConfig: reloadMcpServerConfigSpy,
     apiSessionTokenDraft: "",
     setApiSessionTokenDraft: setApiSessionTokenDraftSpy,
     apiSessionBootstrapError: "invalid-token",

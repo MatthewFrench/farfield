@@ -1,16 +1,16 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-02-28 17:56:33Z
+Last Updated (UTC): 2026-02-28 18:45:20Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
 | Method | Current Farfield State | Recommendation | Notes |
 | --- | --- | --- | --- |
-| `account/login/cancel` | Not used | Not now | Account and auth surface; adopt with explicit product requirement. |
-| `account/login/start` | Not used | Not now | Account and auth surface; adopt with explicit product requirement. |
-| `account/logout` | Not used | Not now | Account and auth surface; adopt with explicit product requirement. |
-| `account/rateLimits/read` | Not used | Not now | Account and auth surface; adopt with explicit product requirement. |
-| `account/read` | Not used | Not now | Account and auth surface; adopt with explicit product requirement. |
+| `account/login/cancel` | Used now | Keep | Exposed through capability ownership and debug workspace account auth controls. |
+| `account/login/start` | Used now | Keep | Exposed through capability ownership and debug workspace account auth controls. |
+| `account/logout` | Used now | Keep | Exposed through capability ownership and debug workspace account auth controls. |
+| `account/rateLimits/read` | Used now | Keep | Exposed through capability ownership and debug workspace account diagnostics. |
+| `account/read` | Used now | Keep | Exposed through capability ownership and debug workspace account diagnostics. |
 | `addConversationListener` | Not used | Do not adopt | Deprecated upstream request family. |
 | `app/list` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
 | `archiveConversation` | Not used | Do not adopt | Deprecated upstream request family. |
@@ -18,7 +18,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `collaborationMode/list` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `command/exec` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 | `config/batchWrite` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
-| `config/mcpServer/reload` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
+| `config/mcpServer/reload` | Used now | Keep | Exposed through capability ownership and debug workspace MCP diagnostics actions. |
 | `config/read` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `config/value/write` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 | `configRequirements/read` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
@@ -82,5 +82,5 @@ This ledger records recommended disposition for every upstream app-server client
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 26
-Not used: 48
+Used now: 32
+Not used: 42

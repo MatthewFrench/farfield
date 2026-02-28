@@ -1,5 +1,7 @@
 import {
   AppServerClient,
+  type CancelAccountLoginOptions,
+  type CancelAccountLoginResult,
   type ListAppsOptions,
   type ListAppsResult,
   type ListExperimentalFeaturesOptions,
@@ -11,6 +13,11 @@ import {
   type ListSkillsResult,
   type ListThreadsAllOptions,
   type ListThreadsOptions,
+  type LoginAccountOptions,
+  type LoginAccountResult,
+  type ReadAccountOptions,
+  type ReadAccountRateLimitsResult,
+  type ReadAccountResult,
   type ReadConfigRequirementsOptions,
   type ReadConfigRequirementsResult,
   type StartReviewOptions,
@@ -25,6 +32,8 @@ import type {
 } from "@farfield/protocol";
 import type {
   AgentArchiveThreadInput,
+  AgentCancelAccountLoginInput,
+  AgentCancelAccountLoginResult,
   AgentCleanThreadBackgroundTerminalsInput,
   AgentCompactThreadInput,
   AgentConfigDefaults,
@@ -42,12 +51,18 @@ import type {
   AgentListSkillsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
+  AgentReadAccountInput,
+  AgentReadAccountRateLimitsInput,
+  AgentReadAccountRateLimitsResult,
+  AgentReadAccountResult,
   AgentReadConfigRequirementsInput,
   AgentReadConfigRequirementsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
   AgentRollbackThreadInput,
   AgentSetThreadNameInput,
+  AgentStartAccountLoginInput,
+  AgentStartAccountLoginResult,
   AgentStartThreadReviewInput,
   AgentStartThreadReviewResult,
   AgentUnarchiveThreadInput,
@@ -209,6 +224,42 @@ function buildReadConfigRequirementsOptions(
   _input?: AgentReadConfigRequirementsInput,
 ): ReadConfigRequirementsOptions {
   return {};
+}
+
+function buildReadAccountOptions(input?: AgentReadAccountInput): ReadAccountOptions {
+  return {
+    ...(input?.refreshToken !== undefined ? { refreshToken: input.refreshToken } : {}),
+  };
+}
+
+function buildStartAccountLoginOptions(input: AgentStartAccountLoginInput): LoginAccountOptions {
+  if (input.type === "apiKey") {
+    return {
+      type: "apiKey",
+      apiKey: input.apiKey,
+    };
+  }
+
+  if (input.type === "chatgpt") {
+    return {
+      type: "chatgpt",
+    };
+  }
+
+  return {
+    type: "chatgptAuthTokens",
+    accessToken: input.accessToken,
+    chatgptAccountId: input.chatgptAccountId,
+    ...(input.chatgptPlanType !== undefined ? { chatgptPlanType: input.chatgptPlanType } : {}),
+  };
+}
+
+function buildCancelAccountLoginOptions(
+  input: AgentCancelAccountLoginInput,
+): CancelAccountLoginOptions {
+  return {
+    loginId: input.loginId,
+  };
 }
 
 function buildListExperimentalFeaturesOptions(
@@ -454,6 +505,54 @@ export class CodexThreadManagementOwner {
       this.appClient.listSkills(buildListSkillsOptions(input)),
     );
     return result;
+  }
+
+  public async readAccount(input?: AgentReadAccountInput): Promise<AgentReadAccountResult> {
+    this.ensureCodexAvailable();
+    const result: ReadAccountResult = await this.runAppServerCall(() =>
+      this.appClient.readAccount(buildReadAccountOptions(input)),
+    );
+    return result;
+  }
+
+  public async readAccountRateLimits(
+    _input?: AgentReadAccountRateLimitsInput,
+  ): Promise<AgentReadAccountRateLimitsResult> {
+    this.ensureCodexAvailable();
+    const result: ReadAccountRateLimitsResult = await this.runAppServerCall(() =>
+      this.appClient.readAccountRateLimits(),
+    );
+    return result;
+  }
+
+  public async startAccountLogin(
+    input: AgentStartAccountLoginInput,
+  ): Promise<AgentStartAccountLoginResult> {
+    this.ensureCodexAvailable();
+    const result: LoginAccountResult = await this.runAppServerCall(() =>
+      this.appClient.startAccountLogin(buildStartAccountLoginOptions(input)),
+    );
+    return result;
+  }
+
+  public async cancelAccountLogin(
+    input: AgentCancelAccountLoginInput,
+  ): Promise<AgentCancelAccountLoginResult> {
+    this.ensureCodexAvailable();
+    const result: CancelAccountLoginResult = await this.runAppServerCall(() =>
+      this.appClient.cancelAccountLogin(buildCancelAccountLoginOptions(input)),
+    );
+    return result;
+  }
+
+  public async logoutAccount(): Promise<void> {
+    this.ensureCodexAvailable();
+    await this.runAppServerCall(() => this.appClient.logoutAccount());
+  }
+
+  public async reloadMcpServerConfig(): Promise<void> {
+    this.ensureCodexAvailable();
+    await this.runAppServerCall(() => this.appClient.reloadMcpServerConfig());
   }
 
   public async readConfigDefaults(): Promise<AgentConfigDefaults> {

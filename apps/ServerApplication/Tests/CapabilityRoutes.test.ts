@@ -13,6 +13,8 @@ import { z } from "zod";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import type {
   AgentAdapter,
+  AgentCancelAccountLoginInput,
+  AgentCancelAccountLoginResult,
   AgentCapabilities,
   AgentConfigDefaults,
   AgentCreateThreadInput,
@@ -25,10 +27,14 @@ import type {
   AgentListSkillsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
+  AgentReadAccountRateLimitsResult,
+  AgentReadAccountResult,
   AgentReadConfigRequirementsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
   AgentSendMessageInput,
+  AgentStartAccountLoginInput,
+  AgentStartAccountLoginResult,
 } from "../Source/Agents/Types.js";
 import { handleCapabilityRoutes } from "../Source/Network/Routes/CapabilityRoutes.js";
 
@@ -62,6 +68,96 @@ const CapabilityConfigRequirementsEnvelopeSchema = z
       })
       .passthrough()
       .nullable(),
+  })
+  .strict();
+
+const CapabilityAccountEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    account: z
+      .discriminatedUnion("type", [
+        z.object({
+          type: z.literal("apiKey"),
+        }),
+        z.object({
+          type: z.literal("chatgpt"),
+          email: z.string(),
+          planType: z.enum([
+            "free",
+            "go",
+            "plus",
+            "pro",
+            "team",
+            "business",
+            "enterprise",
+            "edu",
+            "unknown",
+          ]),
+        }),
+      ])
+      .nullable(),
+    requiresOpenaiAuth: z.boolean(),
+  })
+  .strict();
+
+const CapabilityAccountRateLimitSnapshotSchema = z
+  .object({
+    credits: z
+      .object({
+        balance: z.string().nullable(),
+        hasCredits: z.boolean(),
+        unlimited: z.boolean(),
+      })
+      .nullable(),
+    limitId: z.string().nullable(),
+    limitName: z.string().nullable(),
+    planType: z
+      .enum(["free", "go", "plus", "pro", "team", "business", "enterprise", "edu", "unknown"])
+      .nullable(),
+    primary: z
+      .object({
+        resetsAt: z.number().int().nullable(),
+        usedPercent: z.number().int(),
+        windowDurationMins: z.number().int().nullable(),
+      })
+      .nullable(),
+    secondary: z
+      .object({
+        resetsAt: z.number().int().nullable(),
+        usedPercent: z.number().int(),
+        windowDurationMins: z.number().int().nullable(),
+      })
+      .nullable(),
+  })
+  .strict();
+
+const CapabilityAccountRateLimitsEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    rateLimits: CapabilityAccountRateLimitSnapshotSchema.nullable(),
+    rateLimitsByLimitId: z.record(CapabilityAccountRateLimitSnapshotSchema).nullable(),
+  })
+  .strict();
+
+const CapabilityAccountLoginStartEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    type: z.enum(["apiKey", "chatgpt", "chatgptAuthTokens"]),
+    loginId: z.string().optional(),
+    authUrl: z.string().optional(),
+  })
+  .strict();
+
+const CapabilityAccountLoginCancelEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    status: z.enum(["canceled", "notFound"]),
+  })
+  .strict();
+
+const CapabilityMutationSuccessEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
   })
   .strict();
 
@@ -159,6 +255,14 @@ interface MockAgentAdapterOptions {
   connected?: boolean;
   capabilities?: Partial<AgentCapabilities>;
   readConfigRequirements?: () => Promise<AgentReadConfigRequirementsResult>;
+  readAccount?: () => Promise<AgentReadAccountResult>;
+  readAccountRateLimits?: () => Promise<AgentReadAccountRateLimitsResult>;
+  startAccountLogin?: (input: AgentStartAccountLoginInput) => Promise<AgentStartAccountLoginResult>;
+  cancelAccountLogin?: (
+    input: AgentCancelAccountLoginInput,
+  ) => Promise<AgentCancelAccountLoginResult>;
+  logoutAccount?: () => Promise<void>;
+  reloadMcpServerConfig?: () => Promise<void>;
   listExperimentalFeatures?: () => Promise<AgentListExperimentalFeaturesResult>;
   listMcpServerStatuses?: () => Promise<AgentListMcpServerStatusesResult>;
   listApps?: () => Promise<AgentListAppsResult>;
@@ -197,6 +301,12 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canListMcpServerStatuses: false,
     canListApps: false,
     canListSkills: false,
+    canReadAccount: false,
+    canReadAccountRateLimits: false,
+    canStartAccountLogin: false,
+    canCancelAccountLogin: false,
+    canLogoutAccount: false,
+    canReloadMcpServerConfig: false,
     canSetCollaborationMode: false,
     canSubmitUserInput: false,
     canReadLiveState: false,
@@ -252,6 +362,30 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.readConfigRequirements) {
     adapter.readConfigRequirements = options.readConfigRequirements;
+  }
+
+  if (options.readAccount) {
+    adapter.readAccount = options.readAccount;
+  }
+
+  if (options.readAccountRateLimits) {
+    adapter.readAccountRateLimits = options.readAccountRateLimits;
+  }
+
+  if (options.startAccountLogin) {
+    adapter.startAccountLogin = options.startAccountLogin;
+  }
+
+  if (options.cancelAccountLogin) {
+    adapter.cancelAccountLogin = options.cancelAccountLogin;
+  }
+
+  if (options.logoutAccount) {
+    adapter.logoutAccount = options.logoutAccount;
+  }
+
+  if (options.reloadMcpServerConfig) {
+    adapter.reloadMcpServerConfig = options.reloadMcpServerConfig;
   }
 
   if (options.listExperimentalFeatures) {
@@ -501,6 +635,195 @@ describe("handleCapabilityRoutes", () => {
         enforceResidency: "us",
         network: null,
       },
+    });
+  });
+
+  it("returns account summary when adapter supports account read", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/account",
+      url: new URL("http://localhost/api/account?refreshToken=true"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canReadAccount: true,
+          },
+          readAccount: async (): Promise<AgentReadAccountResult> => ({
+            account: {
+              type: "chatgpt",
+              email: "dev@example.com",
+              planType: "pro",
+            },
+            requiresOpenaiAuth: false,
+          }),
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    const parsedEnvelope = CapabilityAccountEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope.account?.type).toBe("chatgpt");
+  });
+
+  it("returns account rate limits when adapter supports rate-limit read", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/account/rate-limits",
+      url: new URL("http://localhost/api/account/rate-limits"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canReadAccountRateLimits: true,
+          },
+          readAccountRateLimits: async (): Promise<AgentReadAccountRateLimitsResult> => ({
+            rateLimits: {
+              credits: null,
+              limitId: "codex",
+              limitName: "Codex",
+              planType: "pro",
+              primary: {
+                usedPercent: 42,
+                resetsAt: 1_700_000_000,
+                windowDurationMins: 60,
+              },
+              secondary: null,
+            },
+            rateLimitsByLimitId: null,
+          }),
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    const parsedEnvelope = CapabilityAccountRateLimitsEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope.rateLimits?.limitId).toBe("codex");
+  });
+
+  it("starts account login when adapter supports login start", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/account/login/start",
+      url: new URL("http://localhost/api/account/login/start"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canStartAccountLogin: true,
+          },
+          startAccountLogin: async (): Promise<AgentStartAccountLoginResult> => ({
+            type: "chatgpt",
+            loginId: "login-1",
+            authUrl: "https://example.com/oauth/start",
+          }),
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    const parsedEnvelope = CapabilityAccountLoginStartEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      type: "chatgpt",
+      loginId: "login-1",
+      authUrl: "https://example.com/oauth/start",
+    });
+  });
+
+  it("returns 400 when account login cancel omits loginId", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/account/login/cancel",
+      url: new URL("http://localhost/api/account/login/cancel"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing loginId query parameter.",
+    });
+  });
+
+  it("cancels account login when adapter supports login cancel", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/account/login/cancel",
+      url: new URL("http://localhost/api/account/login/cancel?loginId=login-1"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canCancelAccountLogin: true,
+          },
+          cancelAccountLogin: async (): Promise<AgentCancelAccountLoginResult> => ({
+            status: "canceled",
+          }),
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    const parsedEnvelope = CapabilityAccountLoginCancelEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      status: "canceled",
+    });
+  });
+
+  it("logs out account when adapter supports logout", async () => {
+    const logoutAccountSpy = vi.fn(async (): Promise<void> => {});
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/account/logout",
+      url: new URL("http://localhost/api/account/logout"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canLogoutAccount: true,
+          },
+          logoutAccount: logoutAccountSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(logoutAccountSpy).toHaveBeenCalledTimes(1);
+    const parsedEnvelope = CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+    });
+  });
+
+  it("reloads mcp server config when adapter supports config reload", async () => {
+    const reloadMcpServerConfigSpy = vi.fn(async (): Promise<void> => {});
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/config/mcp-server/reload",
+      url: new URL("http://localhost/api/config/mcp-server/reload"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canReloadMcpServerConfig: true,
+          },
+          reloadMcpServerConfig: reloadMcpServerConfigSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(reloadMcpServerConfigSpy).toHaveBeenCalledTimes(1);
+    const parsedEnvelope = CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
     });
   });
 

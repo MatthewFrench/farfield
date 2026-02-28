@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-02-28 17:56:33Z
+Last Updated (UTC): 2026-02-28 18:45:20Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `25 / 74` request methods (`33.8%`).
+1. Farfield app-server method coverage at request-owner layer: `31 / 74` request methods (`41.9%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `26 / 74` (`35.1%`).
+3. Effective request-method usage including transport-owned `initialize`: `32 / 74` (`43.2%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -99,6 +99,12 @@ As of the upstream snapshot above:
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | High | Explicit capability ownership and strict envelope parsing | Keep current path |
 | `config/read` | Config defaults resolution for model and reasoning effort | High | Normalized default resolution through typed owner mapping | Keep current path |
 | `configRequirements/read` | Config requirements diagnostics and workspace readiness signals | Medium-high | Strict capability route ownership with typed payload mapping into debug coverage diagnostics | Keep current path |
+| `config/mcpServer/reload` | MCP server configuration reload action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic mutation path for diagnostics flows | Keep current path |
+| `account/read` | Account diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed account-contract mapping | Keep current path |
+| `account/rateLimits/read` | Account rate-limit diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed rate-limit contract mapping | Keep current path |
+| `account/login/start` | Account auth start action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed login-response mapping and pending-login state | Keep current path |
+| `account/login/cancel` | Account auth cancel action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed cancel-status mapping | Keep current path |
+| `account/logout` | Account logout action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic mutation response contract | Keep current path |
 | `experimentalFeature/list` | Experimental feature diagnostics and capability coverage projection | Medium-high | Strict capability route ownership with typed list pagination contracts | Keep current path |
 | `mcpServerStatus/list` | MCP server status diagnostics in debug workspace | Medium-high | Strict capability route ownership with typed list pagination contracts | Keep current path |
 | `app/list` | App list diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed thread-scoped query mapping | Keep current path |
@@ -135,6 +141,12 @@ As of the upstream snapshot above:
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | `/api/collaboration-modes` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listCollaborationModes` -> `AppServerClient.listCollaborationModes` |
 | `config/read` | Config defaults (`model`, `reasoningEffort`) | `/api/config/defaults` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigDefaults` -> `AppServerClient.readConfig` |
 | `configRequirements/read` | Config requirements diagnostics | `/api/config-requirements` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigRequirements` -> `AppServerClient.readConfigRequirements` |
+| `config/mcpServer/reload` | MCP server config reload diagnostics action | `/api/config/mcp-server/reload` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.reloadMcpServerConfig` -> `AppServerClient.reloadMcpServerConfig` |
+| `account/read` | Account diagnostics | `/api/account` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readAccount` -> `AppServerClient.readAccount` |
+| `account/rateLimits/read` | Account rate-limit diagnostics | `/api/account/rate-limits` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readAccountRateLimits` -> `AppServerClient.readAccountRateLimits` |
+| `account/login/start` | Account login start action | `/api/account/login/start` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.startAccountLogin` -> `AppServerClient.startAccountLogin` |
+| `account/login/cancel` | Account login cancel action | `/api/account/login/cancel` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.cancelAccountLogin` -> `AppServerClient.cancelAccountLogin` |
+| `account/logout` | Account logout action | `/api/account/logout` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.logoutAccount` -> `AppServerClient.logoutAccount` |
 | `experimentalFeature/list` | Experimental feature diagnostics | `/api/experimental-features` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listExperimentalFeatures` -> `AppServerClient.listExperimentalFeatures` |
 | `mcpServerStatus/list` | MCP server status diagnostics | `/api/mcp-servers` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listMcpServerStatuses` -> `AppServerClient.listMcpServerStatuses` |
 | `app/list` | App list diagnostics | `/api/apps` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listApps` -> `AppServerClient.listApps` |
@@ -142,20 +154,14 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`49` request methods are not used by Farfield’s app-server client path:
+`43` request methods are not used by Farfield’s app-server client path:
 
 ```text
-account/login/cancel
-account/login/start
-account/logout
-account/rateLimits/read
-account/read
 addConversationListener
 archiveConversation
 cancelLoginChatGpt
 command/exec
 config/batchWrite
-config/mcpServer/reload
 config/value/write
 execOneOffCommand
 externalAgentConfig/detect
@@ -228,19 +234,14 @@ These are explicitly in the upstream deprecated request section and should not b
 
 ### Category B: Auth, Account, and Tenant/Operator Surfaces Not Yet Wired in Farfield Product Flows
 
-1. `account/login/cancel`
-2. `account/login/start`
-3. `account/logout`
-4. `account/rateLimits/read`
-5. `account/read`
+No remaining methods in this category for the current upstream snapshot.
 
 ### Category C: Configuration and Environment Management Surfaces Not Yet Wired
 
 1. `config/batchWrite`
-2. `config/mcpServer/reload`
-3. `config/value/write`
-4. `externalAgentConfig/detect`
-5. `externalAgentConfig/import`
+2. `config/value/write`
+3. `externalAgentConfig/detect`
+4. `externalAgentConfig/import`
 
 ### Category D: Skills, Apps, and Feature-Discovery Surfaces Not Yet Wired
 
@@ -280,8 +281,8 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `49`
-2. Total methods listed across Category A-I: `49`
+1. Total non-intersection methods: `43`
+2. Total methods listed across Category A-I: `43`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

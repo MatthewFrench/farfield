@@ -1,6 +1,8 @@
 import {
   AppServerClient,
   type AppServerTransport,
+  type CancelAccountLoginOptions,
+  type CancelAccountLoginResult,
   type ForkThreadOptions,
   type ListAppsOptions,
   type ListAppsResult,
@@ -14,6 +16,11 @@ import {
   type ListSkillsResult,
   type ListThreadsAllOptions,
   type ListThreadsOptions,
+  type LoginAccountOptions,
+  type LoginAccountResult,
+  type ReadAccountOptions,
+  type ReadAccountRateLimitsResult,
+  type ReadAccountResult,
   type ReadConfigOptions,
   type ReadConfigRequirementsOptions,
   type ReadConfigRequirementsResult,
@@ -87,6 +94,12 @@ class TestAppServerClient extends AppServerClient {
   public readonly listMcpServerStatusesCalls: Array<ListMcpServerStatusesOptions | undefined> = [];
   public readonly listAppsCalls: Array<ListAppsOptions | undefined> = [];
   public readonly listSkillsCalls: Array<ListSkillsOptions | undefined> = [];
+  public readonly readAccountCalls: Array<ReadAccountOptions | undefined> = [];
+  public readonly readAccountRateLimitsCalls: Array<undefined> = [];
+  public readonly startAccountLoginCalls: LoginAccountOptions[] = [];
+  public readonly cancelAccountLoginCalls: CancelAccountLoginOptions[] = [];
+  public readonly logoutAccountCalls: Array<undefined> = [];
+  public readonly reloadMcpServerConfigCalls: Array<undefined> = [];
   public readonly readConfigCalls: Array<ReadConfigOptions | undefined> = [];
 
   private readonly listThreadsResult: AppServerListThreadsResponse;
@@ -101,6 +114,10 @@ class TestAppServerClient extends AppServerClient {
   private readonly listMcpServerStatusesResult: ListMcpServerStatusesResult;
   private readonly listAppsResult: ListAppsResult;
   private readonly listSkillsResult: ListSkillsResult;
+  private readonly readAccountResult: ReadAccountResult;
+  private readonly readAccountRateLimitsResult: ReadAccountRateLimitsResult;
+  private readonly startAccountLoginResult: LoginAccountResult;
+  private readonly cancelAccountLoginResult: CancelAccountLoginResult;
   private readonly readConfigResult: AppServerConfigReadResponse;
 
   public constructor(input?: {
@@ -116,6 +133,10 @@ class TestAppServerClient extends AppServerClient {
     listMcpServerStatusesResult?: ListMcpServerStatusesResult;
     listAppsResult?: ListAppsResult;
     listSkillsResult?: ListSkillsResult;
+    readAccountResult?: ReadAccountResult;
+    readAccountRateLimitsResult?: ReadAccountRateLimitsResult;
+    startAccountLoginResult?: LoginAccountResult;
+    cancelAccountLoginResult?: CancelAccountLoginResult;
     readConfigResult?: AppServerConfigReadResponse;
   }) {
     super(NOOP_TRANSPORT);
@@ -155,6 +176,29 @@ class TestAppServerClient extends AppServerClient {
     };
     this.listSkillsResult = input?.listSkillsResult ?? {
       data: [],
+    };
+    this.readAccountResult = input?.readAccountResult ?? {
+      account: null,
+      requiresOpenaiAuth: false,
+    };
+    this.readAccountRateLimitsResult = input?.readAccountRateLimitsResult ?? {
+      rateLimits: {
+        credits: null,
+        limitId: null,
+        limitName: null,
+        planType: null,
+        primary: null,
+        secondary: null,
+      },
+      rateLimitsByLimitId: null,
+    };
+    this.startAccountLoginResult = input?.startAccountLoginResult ?? {
+      type: "chatgpt",
+      loginId: "login-1",
+      authUrl: "https://example.com/oauth",
+    };
+    this.cancelAccountLoginResult = input?.cancelAccountLoginResult ?? {
+      status: "canceled",
     };
     this.readConfigResult = input?.readConfigResult ?? EMPTY_READ_CONFIG_RESPONSE;
   }
@@ -269,6 +313,38 @@ class TestAppServerClient extends AppServerClient {
   public override async listSkills(options?: ListSkillsOptions): Promise<ListSkillsResult> {
     this.listSkillsCalls.push(options);
     return this.listSkillsResult;
+  }
+
+  public override async readAccount(options?: ReadAccountOptions): Promise<ReadAccountResult> {
+    this.readAccountCalls.push(options);
+    return this.readAccountResult;
+  }
+
+  public override async readAccountRateLimits(): Promise<ReadAccountRateLimitsResult> {
+    this.readAccountRateLimitsCalls.push(undefined);
+    return this.readAccountRateLimitsResult;
+  }
+
+  public override async startAccountLogin(
+    options: LoginAccountOptions,
+  ): Promise<LoginAccountResult> {
+    this.startAccountLoginCalls.push(options);
+    return this.startAccountLoginResult;
+  }
+
+  public override async cancelAccountLogin(
+    options: CancelAccountLoginOptions,
+  ): Promise<CancelAccountLoginResult> {
+    this.cancelAccountLoginCalls.push(options);
+    return this.cancelAccountLoginResult;
+  }
+
+  public override async logoutAccount(): Promise<void> {
+    this.logoutAccountCalls.push(undefined);
+  }
+
+  public override async reloadMcpServerConfig(): Promise<void> {
+    this.reloadMcpServerConfigCalls.push(undefined);
   }
 
   public override async readConfig(
@@ -905,6 +981,123 @@ describe("CodexThreadManagementOwner", () => {
       },
     ]);
     expect(result.data[0]?.skills[0]?.name).toBe("checks");
+  });
+
+  it("reads account details through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      readAccountResult: {
+        account: {
+          type: "chatgpt",
+          email: "dev@example.com",
+          planType: "pro",
+        },
+        requiresOpenaiAuth: false,
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.readAccount({
+      refreshToken: true,
+    });
+
+    expect(appClient.readAccountCalls).toEqual([
+      {
+        refreshToken: true,
+      },
+    ]);
+    expect(result.account?.type).toBe("chatgpt");
+  });
+
+  it("reads account rate limits through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      readAccountRateLimitsResult: {
+        rateLimits: {
+          credits: null,
+          limitId: "codex",
+          limitName: "Codex",
+          planType: "pro",
+          primary: {
+            usedPercent: 42,
+            resetsAt: 1_700_000_000,
+            windowDurationMins: 60,
+          },
+          secondary: null,
+        },
+        rateLimitsByLimitId: null,
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.readAccountRateLimits();
+
+    expect(appClient.readAccountRateLimitsCalls).toEqual([undefined]);
+    expect(result.rateLimits.limitId).toBe("codex");
+  });
+
+  it("starts chatgpt account login through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      startAccountLoginResult: {
+        type: "chatgpt",
+        loginId: "login-9",
+        authUrl: "https://example.com/oauth/start",
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.startAccountLogin({
+      type: "chatgpt",
+    });
+
+    expect(appClient.startAccountLoginCalls).toEqual([
+      {
+        type: "chatgpt",
+      },
+    ]);
+    expect(result).toEqual({
+      type: "chatgpt",
+      loginId: "login-9",
+      authUrl: "https://example.com/oauth/start",
+    });
+  });
+
+  it("cancels account login through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      cancelAccountLoginResult: {
+        status: "canceled",
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.cancelAccountLogin({
+      loginId: "login-9",
+    });
+
+    expect(appClient.cancelAccountLoginCalls).toEqual([
+      {
+        loginId: "login-9",
+      },
+    ]);
+    expect(result).toEqual({
+      status: "canceled",
+    });
+  });
+
+  it("logs out account through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    await owner.logoutAccount();
+
+    expect(appClient.logoutAccountCalls).toEqual([undefined]);
+  });
+
+  it("reloads mcp server config through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    await owner.reloadMcpServerConfig();
+
+    expect(appClient.reloadMcpServerConfigCalls).toEqual([undefined]);
   });
 
   it("prefers active profile config defaults and requests config without layers", async () => {

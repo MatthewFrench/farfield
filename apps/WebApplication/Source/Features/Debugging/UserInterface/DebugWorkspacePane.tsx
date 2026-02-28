@@ -2,7 +2,10 @@ import { Bug } from "lucide-react";
 import { Tabs } from "@/Components/UserInterface/Tabs";
 import { TabsList } from "@/Components/UserInterface/TabsList";
 import { TabsTrigger } from "@/Components/UserInterface/TabsTrigger";
-import { type DebugAppServerCoverageSnapshot } from "@/Features/Debugging/DomainModel/DebugAppServerCoverageContracts";
+import {
+  type DebugAppServerCoveragePendingAccountLogin,
+  type DebugAppServerCoverageSnapshot,
+} from "@/Features/Debugging/DomainModel/DebugAppServerCoverageContracts";
 import {
   type DebugIssue,
   type RuntimeRequestErrorOperationMetric,
@@ -56,9 +59,16 @@ export interface DebugWorkspacePaneProps {
   onStopTrace: () => void;
   recentTraceSummaries: readonly DebugTraceSummary[];
   isLoadingCoverageDiagnostics: boolean;
+  isRunningCoverageAction: boolean;
   coverageDiagnosticsErrorMessage: string;
+  coverageActionErrorMessage: string;
   coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
+  pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
   onRefreshCoverageDiagnostics: () => void;
+  onStartAccountLogin: () => void;
+  onCancelAccountLogin: () => void;
+  onLogoutAccount: () => void;
+  onReloadMcpServerConfig: () => void;
 }
 
 export function DebugWorkspacePane({
@@ -98,9 +108,16 @@ export function DebugWorkspacePane({
   onStopTrace,
   recentTraceSummaries,
   isLoadingCoverageDiagnostics,
+  isRunningCoverageAction,
   coverageDiagnosticsErrorMessage,
+  coverageActionErrorMessage,
   coverageDiagnosticsSnapshot,
+  pendingAccountLogin,
   onRefreshCoverageDiagnostics,
+  onStartAccountLogin,
+  onCancelAccountLogin,
+  onLogoutAccount,
+  onReloadMcpServerConfig,
 }: DebugWorkspacePaneProps): React.JSX.Element {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -196,9 +213,16 @@ export function DebugWorkspacePane({
         {debugWorkspaceSection === "coverage" && (
           <DebugAppServerCoveragePanel
             isLoadingCoverageDiagnostics={isLoadingCoverageDiagnostics}
+            isRunningCoverageAction={isRunningCoverageAction}
             coverageDiagnosticsErrorMessage={coverageDiagnosticsErrorMessage}
+            coverageActionErrorMessage={coverageActionErrorMessage}
             coverageDiagnosticsSnapshot={coverageDiagnosticsSnapshot}
+            pendingAccountLogin={pendingAccountLogin}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
+            onStartAccountLogin={onStartAccountLogin}
+            onCancelAccountLogin={onCancelAccountLogin}
+            onLogoutAccount={onLogoutAccount}
+            onReloadMcpServerConfig={onReloadMcpServerConfig}
           />
         )}
       </Tabs>

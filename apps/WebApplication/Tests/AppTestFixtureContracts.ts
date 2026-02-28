@@ -14,6 +14,12 @@ export interface CapabilityFixture {
   canListMcpServerStatuses: boolean;
   canListApps: boolean;
   canListSkills: boolean;
+  canReadAccount: boolean;
+  canReadAccountRateLimits: boolean;
+  canStartAccountLogin: boolean;
+  canCancelAccountLogin: boolean;
+  canLogoutAccount: boolean;
+  canReloadMcpServerConfig: boolean;
   canSetCollaborationMode: boolean;
   canSubmitUserInput: boolean;
   canReadLiveState: boolean;
@@ -202,6 +208,12 @@ export const CODEX_CAPABILITIES: CapabilityFixture = {
   canListMcpServerStatuses: true,
   canListApps: true,
   canListSkills: true,
+  canReadAccount: true,
+  canReadAccountRateLimits: true,
+  canStartAccountLogin: true,
+  canCancelAccountLogin: true,
+  canLogoutAccount: true,
+  canReloadMcpServerConfig: true,
   canSetCollaborationMode: true,
   canSubmitUserInput: true,
   canReadLiveState: true,
@@ -216,6 +228,12 @@ export const OPENCODE_CAPABILITIES: CapabilityFixture = {
   canListMcpServerStatuses: false,
   canListApps: false,
   canListSkills: false,
+  canReadAccount: false,
+  canReadAccountRateLimits: false,
+  canStartAccountLogin: false,
+  canCancelAccountLogin: false,
+  canLogoutAccount: false,
+  canReloadMcpServerConfig: false,
   canSetCollaborationMode: false,
   canSubmitUserInput: false,
   canReadLiveState: false,

@@ -78,9 +78,16 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
     },
   ],
   isLoadingCoverageDiagnostics: false,
+  isRunningCoverageAction: false,
   coverageDiagnosticsErrorMessage: "",
+  coverageActionErrorMessage: "",
   coverageDiagnosticsSnapshot: null,
+  pendingAccountLogin: null,
   onRefreshCoverageDiagnostics: () => {},
+  onStartAccountLogin: () => {},
+  onCancelAccountLogin: () => {},
+  onLogoutAccount: () => {},
+  onReloadMcpServerConfig: () => {},
 };
 
 function renderDebugWorkspacePane(properties: DebugWorkspacePaneProps): void {
@@ -136,6 +143,9 @@ describe("DebugWorkspacePane", () => {
       debugWorkspaceSection: "coverage",
       coverageDiagnosticsSnapshot: {
         requirements: null,
+        account: null,
+        requiresOpenaiAuth: false,
+        accountRateLimits: null,
         experimentalFeatures: [],
         mcpServers: [],
         apps: [],

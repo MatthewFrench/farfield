@@ -138,9 +138,16 @@ export interface UseApplicationShellViewPropertiesInput {
   stopTraceFromDebugPanel: () => void;
   recentTraceSummaries: readonly DebugTraceSummary[];
   isLoadingCoverageDiagnostics: boolean;
+  isRunningCoverageAction: boolean;
   coverageDiagnosticsErrorMessage: string;
+  coverageActionErrorMessage: string;
   coverageDiagnosticsSnapshot: DebugWorkspacePaneProps["coverageDiagnosticsSnapshot"];
+  pendingAccountLogin: DebugWorkspacePaneProps["pendingAccountLogin"];
   refreshCoverageDiagnostics: () => void;
+  startAccountLogin: () => void;
+  cancelAccountLogin: () => void;
+  logoutAccount: () => void;
+  reloadMcpServerConfig: () => void;
   apiSessionTokenDraft: string;
   setApiSessionTokenDraft: (nextTokenValue: string) => void;
   apiSessionBootstrapError: string;
@@ -376,9 +383,16 @@ function buildDebugWorkspacePaneProperties(
     onStopTrace: input.stopTraceFromDebugPanel,
     recentTraceSummaries: input.recentTraceSummaries,
     isLoadingCoverageDiagnostics: input.isLoadingCoverageDiagnostics,
+    isRunningCoverageAction: input.isRunningCoverageAction,
     coverageDiagnosticsErrorMessage: input.coverageDiagnosticsErrorMessage,
+    coverageActionErrorMessage: input.coverageActionErrorMessage,
     coverageDiagnosticsSnapshot: input.coverageDiagnosticsSnapshot,
+    pendingAccountLogin: input.pendingAccountLogin,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
+    onStartAccountLogin: input.startAccountLogin,
+    onCancelAccountLogin: input.cancelAccountLogin,
+    onLogoutAccount: input.logoutAccount,
+    onReloadMcpServerConfig: input.reloadMcpServerConfig,
   };
 }
 
@@ -565,9 +579,16 @@ export function useApplicationShellViewProperties(
       input.markTraceFromDebugPanel,
       input.recentTraceSummaries,
       input.isLoadingCoverageDiagnostics,
+      input.isRunningCoverageAction,
       input.coverageDiagnosticsErrorMessage,
+      input.coverageActionErrorMessage,
       input.coverageDiagnosticsSnapshot,
+      input.pendingAccountLogin,
       input.refreshCoverageDiagnostics,
+      input.startAccountLogin,
+      input.cancelAccountLogin,
+      input.logoutAccount,
+      input.reloadMcpServerConfig,
       input.replayHistoryEntryFromDetail,
       input.runtimeRequestErrorOperationMetrics,
       input.isEnablingPushNotifications,

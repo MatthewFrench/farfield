@@ -4,6 +4,7 @@ import {
 } from "@farfield/protocol";
 import { z } from "zod";
 import type {
+  CancelAccountLoginOptions,
   ForkThreadOptions,
   ListAppsOptions,
   ListExperimentalFeaturesOptions,
@@ -12,6 +13,8 @@ import type {
   ListSkillsOptions,
   ListThreadsAllOptions,
   ListThreadsOptions,
+  LoginAccountOptions,
+  ReadAccountOptions,
   ReadConfigOptions,
   ReadConfigRequirementsOptions,
   ResumeThreadOptions,
@@ -34,6 +37,43 @@ const AppServerThreadLoadedListRequestSchema = z
   })
   .passthrough();
 const AppServerConfigRequirementsReadRequestSchema = z.object({}).passthrough();
+const AppServerAccountReadRequestSchema = z
+  .object({
+    refreshToken: z.boolean().optional(),
+  })
+  .passthrough();
+const AppServerAccountRateLimitsReadRequestSchema = z.object({}).passthrough();
+const AppServerAccountLoginStartRequestSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("apiKey"),
+      apiKey: z.string().min(1),
+    })
+    .passthrough(),
+  z
+    .object({
+      type: z.literal("chatgpt"),
+    })
+    .passthrough(),
+  z
+    .object({
+      type: z.literal("chatgptAuthTokens"),
+      accessToken: z.string().min(1),
+      chatgptAccountId: z.string().min(1),
+      chatgptPlanType: z
+        .enum(["free", "go", "plus", "pro", "team", "business", "enterprise", "edu", "unknown"])
+        .nullable()
+        .optional(),
+    })
+    .passthrough(),
+]);
+const AppServerAccountLoginCancelRequestSchema = z
+  .object({
+    loginId: z.string().min(1),
+  })
+  .passthrough();
+const AppServerAccountLogoutRequestSchema = z.object({}).passthrough();
+const AppServerConfigMcpServerReloadRequestSchema = z.object({}).passthrough();
 const AppServerExperimentalFeatureListRequestSchema = z
   .object({
     cursor: z.union([z.string(), z.null()]).optional(),
@@ -219,6 +259,20 @@ interface ListSkillsRequestParameters {
   perCwdExtraUserRoots?: ListSkillsExtraRootsForCwdRequestParameters[] | null | undefined;
 }
 
+interface ReadAccountRequestParameters {
+  refreshToken?: boolean | undefined;
+}
+
+type StartAccountLoginRequestParameters = z.infer<typeof AppServerAccountLoginStartRequestSchema>;
+
+interface CancelAccountLoginRequestParameters {
+  loginId: string;
+}
+
+interface LogoutAccountRequestParameters {}
+
+interface ReloadMcpServerConfigRequestParameters {}
+
 export function buildListLoadedThreadsRequestParameters(
   options?: ListLoadedThreadsOptions,
 ): ListLoadedThreadsRequestParameters {
@@ -232,6 +286,58 @@ export function buildReadConfigRequirementsRequestParameters(
   _options?: ReadConfigRequirementsOptions,
 ): ReadConfigRequirementsRequestParameters {
   return AppServerConfigRequirementsReadRequestSchema.parse({});
+}
+
+export function buildReadAccountRequestParameters(
+  options?: ReadAccountOptions,
+): ReadAccountRequestParameters {
+  return AppServerAccountReadRequestSchema.parse({
+    ...(options?.refreshToken !== undefined ? { refreshToken: options.refreshToken } : {}),
+  });
+}
+
+export function buildReadAccountRateLimitsRequestParameters(): object {
+  return AppServerAccountRateLimitsReadRequestSchema.parse({});
+}
+
+export function buildStartAccountLoginRequestParameters(
+  options: LoginAccountOptions,
+): StartAccountLoginRequestParameters {
+  if (options.type === "apiKey") {
+    return AppServerAccountLoginStartRequestSchema.parse({
+      type: "apiKey",
+      apiKey: options.apiKey,
+    });
+  }
+
+  if (options.type === "chatgpt") {
+    return AppServerAccountLoginStartRequestSchema.parse({
+      type: "chatgpt",
+    });
+  }
+
+  return AppServerAccountLoginStartRequestSchema.parse({
+    type: "chatgptAuthTokens",
+    accessToken: options.accessToken,
+    chatgptAccountId: options.chatgptAccountId,
+    ...(options.chatgptPlanType !== undefined ? { chatgptPlanType: options.chatgptPlanType } : {}),
+  });
+}
+
+export function buildCancelAccountLoginRequestParameters(
+  options: CancelAccountLoginOptions,
+): CancelAccountLoginRequestParameters {
+  return AppServerAccountLoginCancelRequestSchema.parse({
+    loginId: options.loginId,
+  });
+}
+
+export function buildLogoutAccountRequestParameters(): LogoutAccountRequestParameters {
+  return AppServerAccountLogoutRequestSchema.parse({});
+}
+
+export function buildReloadMcpServerConfigRequestParameters(): ReloadMcpServerConfigRequestParameters {
+  return AppServerConfigMcpServerReloadRequestSchema.parse({});
 }
 
 export function buildListExperimentalFeaturesRequestParameters(

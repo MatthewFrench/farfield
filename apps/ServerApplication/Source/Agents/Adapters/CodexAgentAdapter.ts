@@ -12,6 +12,8 @@ import type {
 } from "@farfield/protocol";
 import type {
   AgentAdapter,
+  AgentCancelAccountLoginInput,
+  AgentCancelAccountLoginResult,
   AgentCapabilities,
   AgentCleanThreadBackgroundTerminalsInput,
   AgentCompactThreadInput,
@@ -30,6 +32,10 @@ import type {
   AgentListSkillsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
+  AgentReadAccountInput,
+  AgentReadAccountRateLimitsInput,
+  AgentReadAccountRateLimitsResult,
+  AgentReadAccountResult,
   AgentReadConfigRequirementsInput,
   AgentReadConfigRequirementsResult,
   AgentReadStreamEventsInput,
@@ -37,6 +43,8 @@ import type {
   AgentReadThreadResult,
   AgentSendMessageInput,
   AgentSetCollaborationModeInput,
+  AgentStartAccountLoginInput,
+  AgentStartAccountLoginResult,
   AgentStartThreadReviewInput,
   AgentStartThreadReviewResult,
   AgentSubmitUserInputInput,
@@ -317,6 +325,36 @@ export class CodexAgentAdapter implements AgentAdapter {
 
   public async listSkills(input?: AgentListSkillsInput): Promise<AgentListSkillsResult> {
     return this.threadManagementOwner.listSkills(input);
+  }
+
+  public async readAccount(input?: AgentReadAccountInput): Promise<AgentReadAccountResult> {
+    return this.threadManagementOwner.readAccount(input);
+  }
+
+  public async readAccountRateLimits(
+    input?: AgentReadAccountRateLimitsInput,
+  ): Promise<AgentReadAccountRateLimitsResult> {
+    return this.threadManagementOwner.readAccountRateLimits(input);
+  }
+
+  public async startAccountLogin(
+    input: AgentStartAccountLoginInput,
+  ): Promise<AgentStartAccountLoginResult> {
+    return this.threadManagementOwner.startAccountLogin(input);
+  }
+
+  public async cancelAccountLogin(
+    input: AgentCancelAccountLoginInput,
+  ): Promise<AgentCancelAccountLoginResult> {
+    return this.threadManagementOwner.cancelAccountLogin(input);
+  }
+
+  public async logoutAccount(): Promise<void> {
+    await this.threadManagementOwner.logoutAccount();
+  }
+
+  public async reloadMcpServerConfig(): Promise<void> {
+    await this.threadManagementOwner.reloadMcpServerConfig();
   }
 
   public async readConfigDefaults(): Promise<AgentConfigDefaults> {
