@@ -15,6 +15,7 @@ export interface ThreadDisplayNamePersistenceStore {
   readThreadDisplayName(threadIdentifier: string): string | null;
   writeThreadDisplayName(threadIdentifier: string, threadDisplayName: string): void;
   clearThreadDisplayName(threadIdentifier: string): void;
+  pruneThreadDisplayNames(retainedThreadIdentifiers: string[]): void;
 }
 
 function normalizeOptionalThreadDisplayName(value: string | undefined): string | undefined {
@@ -88,6 +89,17 @@ export class ThreadDisplayNameStateOwner {
       return;
     }
     this.writeThreadDisplayName(threadIdentifier, normalizedThreadDisplayName);
+  }
+
+  public pruneThreadDisplayNames(retainedThreadIdentifiers: ThreadListItem["id"][]): void {
+    const retainedThreadIdentifierSet = new Set<string>(retainedThreadIdentifiers);
+    this.threadDisplayNamePreferenceStore.pruneThreadDisplayNames(retainedThreadIdentifiers);
+    for (const threadIdentifier of this.displayNameByThreadIdentifier.keys()) {
+      if (retainedThreadIdentifierSet.has(threadIdentifier)) {
+        continue;
+      }
+      this.displayNameByThreadIdentifier.delete(threadIdentifier);
+    }
   }
 
   private resolveThreadDisplayName(input: ResolveThreadDisplayNameInput): string | undefined {

@@ -158,4 +158,34 @@ describe("ThreadDisplayNameStateOwner", () => {
 
     expect(readStoredDisplayName(store, "thread-1")).toBe("Saved name");
   });
+
+  it("prunes persisted and cached names outside retained thread identifiers", () => {
+    const { store, owner } = createOwnerFixture();
+    store.writeThreadDisplayName("thread-1", "Persisted name one");
+    store.writeThreadDisplayName("thread-2", "Persisted name two");
+
+    owner.applyDisplayNamesToThreadList([
+      buildThread({
+        id: "thread-1",
+      }),
+      buildThread({
+        id: "thread-2",
+      }),
+    ]);
+
+    owner.pruneThreadDisplayNames(["thread-2"]);
+
+    expect(readStoredDisplayName(store, "thread-1")).toBeNull();
+    expect(readStoredDisplayName(store, "thread-2")).toBe("Persisted name two");
+    const nextThreads = owner.applyDisplayNamesToThreadList([
+      buildThread({
+        id: "thread-1",
+      }),
+      buildThread({
+        id: "thread-2",
+      }),
+    ]);
+    expect(nextThreads[0]?.displayName).toBeUndefined();
+    expect(nextThreads[1]?.displayName).toBe("Persisted name two");
+  });
 });

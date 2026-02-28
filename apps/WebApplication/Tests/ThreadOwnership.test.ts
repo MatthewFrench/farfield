@@ -6,6 +6,10 @@ import type {
   ThreadListLoadOptions,
   ThreadListResponse,
 } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import {
+  type ThreadDisplayNamePersistenceStore,
+  ThreadDisplayNameStateOwner,
+} from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import { ThreadListCacheKeyByName } from "@/Features/Threads/StateManagement/ThreadListCacheKeyContracts";
 import { ThreadListPresentationStateResolver } from "@/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
@@ -37,6 +41,26 @@ function buildThreadListResponse(input: {
         agentId: "codex",
       },
     ],
+    nextCursor: null,
+    pages: 1,
+    truncated: false,
+  };
+}
+
+function buildThreadListResponseFromThreadIdentifiers(
+  threadIdentifiers: string[],
+  updatedAtSeed: number,
+): ThreadListResponse {
+  return {
+    data: threadIdentifiers.map((threadIdentifier, index) => ({
+      id: threadIdentifier,
+      preview: `Thread ${threadIdentifier}`,
+      createdAt: updatedAtSeed + index,
+      updatedAt: updatedAtSeed + index + 1,
+      cwd: "/tmp/project",
+      source: "opencode",
+      agentId: "codex",
+    })),
     nextCursor: null,
     pages: 1,
     truncated: false,
@@ -78,6 +102,30 @@ class TestThreadServerClient extends ThreadServerClient {
     return options.archived
       ? this.responseByArchiveMode.archived
       : this.responseByArchiveMode.active;
+  }
+}
+
+class TestThreadDisplayNamePreferenceStore implements ThreadDisplayNamePersistenceStore {
+  private readonly pruneCalls: string[][];
+
+  public constructor() {
+    this.pruneCalls = [];
+  }
+
+  public readThreadDisplayName(_threadIdentifier: string): string | null {
+    return null;
+  }
+
+  public writeThreadDisplayName(_threadIdentifier: string, _threadDisplayName: string): void {}
+
+  public clearThreadDisplayName(_threadIdentifier: string): void {}
+
+  public pruneThreadDisplayNames(retainedThreadIdentifiers: string[]): void {
+    this.pruneCalls.push([...retainedThreadIdentifiers]);
+  }
+
+  public readPruneCalls(): string[][] {
+    return this.pruneCalls.map((call) => [...call]);
   }
 }
 
@@ -410,6 +458,74 @@ describe("Thread ownership modules", () => {
     expect(secondActiveRead.loadedFromCache).toBe(true);
     expect(secondArchivedRead.loadedFromCache).toBe(true);
     expect(serverClient.getListRequestCount()).toBe(2);
+  });
+
+  it("ThreadListStateController prunes display-name persistence after active and archived lists load", async () => {
+    const active = buildThreadListResponseFromThreadIdentifiers(
+      ["thread-active-one", "thread-active-two"],
+      1_700_000_000,
+    );
+    const archived = buildThreadListResponseFromThreadIdentifiers(
+      ["thread-archived-one"],
+      1_600_000_000,
+    );
+    const serverClient = new TestThreadServerClient({ active, archived });
+    const threadDisplayNamePreferenceStore = new TestThreadDisplayNamePreferenceStore();
+    const threadDisplayNameStateOwner = new ThreadDisplayNameStateOwner({
+      threadDisplayNamePreferenceStore,
+    });
+    const controller = new ThreadListStateController({
+      threadServerClient: serverClient,
+      threadQueryCache: new ThreadQueryCache(10_000, 8),
+      threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
+      threadListStateStore: new ThreadListStateStore(),
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
+      threadDisplayNameStateOwner,
+    });
+
+    await controller.loadActiveThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: "thread-active-one",
+      readFromCache: false,
+    });
+    expect(threadDisplayNamePreferenceStore.readPruneCalls()).toEqual([]);
+
+    await controller.loadArchivedThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      readFromCache: false,
+    });
+    expect(threadDisplayNamePreferenceStore.readPruneCalls()).toEqual([
+      ["thread-active-one", "thread-active-two", "thread-archived-one"],
+    ]);
+
+    controller.resetState();
+    await controller.loadArchivedThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      readFromCache: false,
+    });
+    expect(threadDisplayNamePreferenceStore.readPruneCalls()).toEqual([
+      ["thread-active-one", "thread-active-two", "thread-archived-one"],
+    ]);
+
+    await controller.loadActiveThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: "thread-active-one",
+      readFromCache: false,
+    });
+    expect(threadDisplayNamePreferenceStore.readPruneCalls()).toEqual([
+      ["thread-active-one", "thread-active-two", "thread-archived-one"],
+      ["thread-active-one", "thread-active-two", "thread-archived-one"],
+    ]);
   });
 
   it("ThreadListStateController forwards action metadata to thread list requests", async () => {

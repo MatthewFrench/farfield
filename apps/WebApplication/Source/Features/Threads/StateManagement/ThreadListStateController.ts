@@ -33,6 +33,10 @@ class InMemoryThreadDisplayNamePreferenceStore {
   public clearThreadDisplayName(_threadIdentifier: string): void {
     // Non-browser construction paths keep display names in owner memory only.
   }
+
+  public pruneThreadDisplayNames(_retainedThreadIdentifiers: string[]): void {
+    // Non-browser construction paths keep display names in owner memory only.
+  }
 }
 
 export interface LoadActiveThreadStateInput {
@@ -127,6 +131,10 @@ export class ThreadListStateController {
   private readonly threadListStateStore: ThreadListStateStore;
   private readonly threadListPresentationStateResolver: ThreadListPresentationStateResolver;
   private readonly threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
+  private activeThreadIdentifiers: Set<string>;
+  private archivedThreadIdentifiers: Set<string>;
+  private hasLoadedActiveThreadState: boolean;
+  private hasLoadedArchivedThreadState: boolean;
 
   /**
    * Owns active and archived thread list loading policy, including cache keys and
@@ -143,6 +151,10 @@ export class ThreadListStateController {
       new ThreadDisplayNameStateOwner({
         threadDisplayNamePreferenceStore: new InMemoryThreadDisplayNamePreferenceStore(),
       });
+    this.activeThreadIdentifiers = new Set<string>();
+    this.archivedThreadIdentifiers = new Set<string>();
+    this.hasLoadedActiveThreadState = false;
+    this.hasLoadedArchivedThreadState = false;
   }
 
   public async loadActiveThreadState(
@@ -162,6 +174,7 @@ export class ThreadListStateController {
       previousUnreadThreadIdentifiers: input.previousUnreadThreadIdentifiers,
       selectedThreadIdentifier: input.selectedThreadIdentifier,
     });
+    this.recordLoadedThreadIdentifiersForArchiveMode(false, stateResult.nextThreads);
 
     return {
       didChangeThreads: stateResult.didChangeThreads,
@@ -186,6 +199,7 @@ export class ThreadListStateController {
     const stateResult = this.threadListStateStore.computeArchivedThreadState({
       nextArchivedThreads: threadListResult.response.data,
     });
+    this.recordLoadedThreadIdentifiersForArchiveMode(true, stateResult.nextArchivedThreads);
 
     return {
       didChangeArchivedThreads: stateResult.didChangeArchivedThreads,
@@ -232,6 +246,10 @@ export class ThreadListStateController {
 
   public resetState(): void {
     this.threadListStateStore.resetState();
+    this.activeThreadIdentifiers.clear();
+    this.archivedThreadIdentifiers.clear();
+    this.hasLoadedActiveThreadState = false;
+    this.hasLoadedArchivedThreadState = false;
   }
 
   private buildThreadListLoadOptions(
@@ -336,5 +354,30 @@ export class ThreadListStateController {
       ...response,
       data: nextThreadListItems,
     };
+  }
+
+  private recordLoadedThreadIdentifiersForArchiveMode(
+    archived: boolean,
+    threads: ThreadListResponse["data"],
+  ): void {
+    const nextThreadIdentifiers = new Set(threads.map((thread) => thread.id));
+    if (archived) {
+      this.archivedThreadIdentifiers = nextThreadIdentifiers;
+      this.hasLoadedArchivedThreadState = true;
+    } else {
+      this.activeThreadIdentifiers = nextThreadIdentifiers;
+      this.hasLoadedActiveThreadState = true;
+    }
+    this.pruneThreadDisplayNamesWhenThreadListsLoaded();
+  }
+
+  private pruneThreadDisplayNamesWhenThreadListsLoaded(): void {
+    if (!this.hasLoadedActiveThreadState || !this.hasLoadedArchivedThreadState) {
+      return;
+    }
+    this.threadDisplayNameStateOwner.pruneThreadDisplayNames([
+      ...this.activeThreadIdentifiers,
+      ...this.archivedThreadIdentifiers,
+    ]);
   }
 }

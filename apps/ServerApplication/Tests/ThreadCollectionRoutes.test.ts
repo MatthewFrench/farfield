@@ -448,6 +448,55 @@ describe("handleThreadCollectionRoutes", () => {
     });
   });
 
+  it("returns canonical threadName values in list payloads", async () => {
+    let capturedBody: object | null = null;
+    const firstThread = {
+      id: "thread_with_name",
+      preview: "preview should not win",
+      threadName: "  Configure Caddy for Farfield site  ",
+      createdAt: 1_735_600_000_000,
+      updatedAt: 1_735_600_000_001,
+    };
+    const secondThread = {
+      id: "thread_without_name",
+      preview: "Can you help me set up a caddy reverse proxy...",
+      createdAt: 1_735_600_000_002,
+      updatedAt: 1_735_600_000_003,
+    };
+    const listThreads = vi.fn(
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [firstThread, secondThread],
+        nextCursor: null,
+      }),
+    );
+    const adapter = createMockAgentAdapter("codex", listThreads);
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        url: buildThreadCollectionRouteUrl("?limit=10"),
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: (_statusCode, body) => {
+          capturedBody = body;
+        },
+      }),
+    );
+
+    expect(handled).toBe(true);
+    expect(capturedBody).toMatchObject({
+      ok: true,
+      data: [
+        {
+          id: "thread_without_name",
+          threadName: "Can you help me set up a caddy reverse proxy...",
+        },
+        {
+          id: "thread_with_name",
+          threadName: "Configure Caddy for Farfield site",
+        },
+      ],
+    });
+  });
+
   it("uses updated_at as the default sort key when query sortKey is omitted", async () => {
     const listThreads = vi.fn(
       async (): Promise<AgentListThreadsResult> => ({

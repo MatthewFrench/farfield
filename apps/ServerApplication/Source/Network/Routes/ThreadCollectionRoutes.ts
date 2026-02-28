@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type {
   AgentAdapter,
   AgentCreateThreadInput,
@@ -46,6 +47,15 @@ const ThreadCollectionRouteLogEventByName = {
   agentListThreadsFailed: "agent-list-threads-failed",
   threadListAggregationCacheRead: "thread-list-aggregation-cache-read",
 } as const;
+const OptionalThreadNameSourceSchema = z.union([z.string(), z.null(), z.undefined()]);
+const ThreadNamePayloadSchema = z
+  .object({
+    preview: z.string(),
+    threadName: OptionalThreadNameSourceSchema,
+    title: OptionalThreadNameSourceSchema,
+    name: OptionalThreadNameSourceSchema,
+  })
+  .passthrough();
 
 const ThreadCollectionRouteDefaultSortKey: ThreadListSortKey = "updated_at";
 const ThreadCollectionRouteListThreadsTimeoutLabelPrefix = "list-threads:";
@@ -382,9 +392,13 @@ async function loadThreadListSnapshot(input: {
     combinedTruncated = combinedTruncated || (adapterResult.result.truncated ?? false);
     for (const thread of adapterResult.result.data) {
       input.registerThreadAdapterOwnership(thread.id, adapterResult.adapter.id);
-      mergedData.push({
+      const threadWithAgentId: ThreadListItemWithAgentId = {
         ...thread,
         agentId: adapterResult.adapter.id,
+      };
+      mergedData.push({
+        ...threadWithAgentId,
+        threadName: readCanonicalThreadName(threadWithAgentId),
       });
     }
   }
@@ -401,6 +415,28 @@ async function loadThreadListSnapshot(input: {
 
 function buildListThreadsTimeoutLabel(agentId: AgentId): string {
   return `${ThreadCollectionRouteListThreadsTimeoutLabelPrefix}${agentId}`;
+}
+
+function normalizeOptionalThreadName(value: string | null | undefined): string | undefined {
+  const parsedThreadName = OptionalThreadNameSourceSchema.parse(value);
+  if (parsedThreadName === null || parsedThreadName === undefined) {
+    return undefined;
+  }
+  const trimmedThreadName = parsedThreadName.trim();
+  if (trimmedThreadName.length === 0) {
+    return undefined;
+  }
+  return trimmedThreadName;
+}
+
+function readCanonicalThreadName(thread: ThreadListItemWithAgentId): string {
+  const parsedThreadNamePayload = ThreadNamePayloadSchema.parse(thread);
+  return (
+    normalizeOptionalThreadName(parsedThreadNamePayload.threadName) ??
+    normalizeOptionalThreadName(parsedThreadNamePayload.title) ??
+    normalizeOptionalThreadName(parsedThreadNamePayload.name) ??
+    parsedThreadNamePayload.preview
+  );
 }
 
 function buildThreadListPage(input: {

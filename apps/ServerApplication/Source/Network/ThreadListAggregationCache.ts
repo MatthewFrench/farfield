@@ -4,6 +4,9 @@ import type { AgentId } from "../Agents/Types.js";
 export type ThreadListSortKey = "created_at" | "updated_at";
 export type ThreadListItemWithAgentId = AppServerListThreadsResponse["data"][number] & {
   agentId: AgentId;
+  threadName?: string | null;
+  title?: string | null;
+  name?: string | null;
 };
 
 export interface ThreadListAggregationQuery {
