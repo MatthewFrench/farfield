@@ -19,6 +19,7 @@ import {
   type PendingUserInputRequest,
   type PendingUserInputRequestSelector,
 } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
+import { type ConversationItemFlatteningReader } from "@/Features/Chat/StateManagement/ConversationItemFlatteningWorkerOwner";
 import { type ChatWorkspacePaneProps } from "@/Features/Chat/UserInterface/ChatWorkspacePane";
 import {
   type DebugErrorListResponse,
@@ -35,9 +36,11 @@ import {
   type DebugIssueSeverityFilter,
   DebugIssueStateResolver,
 } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
+import { type DebugIssueDerivationReader } from "@/Features/Debugging/StateManagement/DebugIssueDerivationWorkerOwner";
 import { type DebugHistoryEntryListItem } from "@/Features/Debugging/UserInterface/DebugHistoryPanel";
 import { type DebugTraceSummary } from "@/Features/Debugging/UserInterface/DebugTracePanel";
 import type { ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { type ThreadListPresentationReader } from "@/Features/Threads/StateManagement/ThreadListPresentationWorkerOwner";
 import {
   type ReadThreadListPresentationStateResult,
   type ThreadListStateController,
@@ -109,7 +112,10 @@ export interface UseApplicationDerivedStateInput {
   conversationSyncSignatureBuilder: ConversationSyncSignatureBuilder;
   pendingUserInputRequestSelector: PendingUserInputRequestSelector;
   conversationItemFlattener: ConversationItemFlattener;
+  conversationItemFlatteningWorkerOwner?: ConversationItemFlatteningReader | null;
   debugIssueStateResolver: DebugIssueStateResolver;
+  debugIssueDerivationWorkerOwner?: DebugIssueDerivationReader | null;
+  threadListPresentationWorkerOwner?: ThreadListPresentationReader | null;
   threadListStateController: ThreadListStateController;
 }
 

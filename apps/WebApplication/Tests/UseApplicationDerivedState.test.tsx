@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { useApplicationDerivedState } from "../Source/Application/StateManagement/UseApplicationDerivedState";
 import {
@@ -23,10 +23,14 @@ import { ConversationSyncSignatureBuilder } from "../Source/Features/Chat/Domain
 import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import { PendingUserInputRequestSelector } from "../Source/Features/Chat/DomainModel/PendingUserInputRequestSelector";
 import { DebugIssueStateResolver } from "../Source/Features/Debugging/DomainModel/DebugIssueStateResolver";
+import { type DebugIssueDerivationResult } from "../Source/Features/Debugging/StateManagement/DebugIssueDerivationWorkerContracts";
 import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
 import { type ThreadListItem } from "../Source/Features/Threads/DomainModel/ThreadGroupTypes";
-import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
+import {
+  type ThreadListPresentationStateInput,
+  ThreadListPresentationStateResolver,
+} from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import { ThreadListStateController } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
 import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement/ThreadListStateStore";
 import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
@@ -44,6 +48,184 @@ interface ConversationStateInput {
   turns: ConversationTurn[];
   latestModel: string;
   latestReasoningEffort: string;
+}
+
+interface DeferredPromise<ResolvedType> {
+  promise: Promise<ResolvedType>;
+  resolve: (value: ResolvedType) => void;
+  reject: (error: Error) => void;
+}
+
+interface ThreadListPresentationRequestRecord {
+  deferredPromise: DeferredPromise<ApplicationDerivedState["threadListPresentationState"]>;
+}
+
+interface ConversationFlatteningRequestRecord {
+  deferredPromise: DeferredPromise<ApplicationDerivedState["flatConversationItems"]>;
+}
+
+interface DebugIssueDerivationRequestRecord {
+  deferredPromise: DeferredPromise<DebugIssueDerivationResult>;
+}
+
+class TestThreadListPresentationWorkerOwner {
+  private readonly requestRecords: ThreadListPresentationRequestRecord[] = [];
+
+  public readState(
+    _input: ThreadListPresentationStateInput,
+  ): Promise<ApplicationDerivedState["threadListPresentationState"]> {
+    const deferredPromise =
+      createDeferredPromise<ApplicationDerivedState["threadListPresentationState"]>();
+    this.requestRecords.push({
+      deferredPromise,
+    });
+    return deferredPromise.promise;
+  }
+
+  public dispose(): void {}
+
+  public resolveRequestByIndex(
+    requestIndex: number,
+    value: ApplicationDerivedState["threadListPresentationState"],
+  ): void {
+    const requestRecord = this.requestRecords[requestIndex];
+    if (!requestRecord) {
+      throw new Error(`Missing thread-list worker request at index ${String(requestIndex)}`);
+    }
+    requestRecord.deferredPromise.resolve(value);
+  }
+}
+
+class TestConversationItemFlatteningWorkerOwner {
+  private readonly requestRecords: ConversationFlatteningRequestRecord[] = [];
+
+  public readFlattenedConversationItems(_input: {
+    turns: ConversationTurn[];
+    isGenerating: boolean;
+  }): Promise<ApplicationDerivedState["flatConversationItems"]> {
+    const deferredPromise =
+      createDeferredPromise<ApplicationDerivedState["flatConversationItems"]>();
+    this.requestRecords.push({
+      deferredPromise,
+    });
+    return deferredPromise.promise;
+  }
+
+  public dispose(): void {}
+
+  public resolveRequestByIndex(
+    requestIndex: number,
+    value: ApplicationDerivedState["flatConversationItems"],
+  ): void {
+    const requestRecord = this.requestRecords[requestIndex];
+    if (!requestRecord) {
+      throw new Error(`Missing conversation-item worker request at index ${String(requestIndex)}`);
+    }
+    requestRecord.deferredPromise.resolve(value);
+  }
+}
+
+class TestDebugIssueDerivationWorkerOwner {
+  private readonly requestRecords: DebugIssueDerivationRequestRecord[] = [];
+
+  public readDerivedDebugIssueState(_input: {
+    debugErrors: UseApplicationDerivedStateInput["debugErrors"];
+    historyEntries: UseApplicationDerivedStateInput["history"];
+    severityFilter: UseApplicationDerivedStateInput["debugIssueSeverityFilter"];
+    filterQuery: string;
+    selectedIssueIdentifier: string;
+  }): Promise<DebugIssueDerivationResult> {
+    const deferredPromise = createDeferredPromise<DebugIssueDerivationResult>();
+    this.requestRecords.push({
+      deferredPromise,
+    });
+    return deferredPromise.promise;
+  }
+
+  public dispose(): void {}
+
+  public resolveRequestByIndex(requestIndex: number, value: DebugIssueDerivationResult): void {
+    const requestRecord = this.requestRecords[requestIndex];
+    if (!requestRecord) {
+      throw new Error(`Missing debug-issue worker request at index ${String(requestIndex)}`);
+    }
+    requestRecord.deferredPromise.resolve(value);
+  }
+}
+
+function createDeferredPromise<ResolvedType>(): DeferredPromise<ResolvedType> {
+  let resolve: ((value: ResolvedType) => void) | null = null;
+  let reject: ((error: Error) => void) | null = null;
+  const promise = new Promise<ResolvedType>((resolveValue, rejectValue) => {
+    resolve = resolveValue;
+    reject = rejectValue;
+  });
+  if (resolve === null || reject === null) {
+    throw new Error("Expected deferred promise handlers to initialize.");
+  }
+  return {
+    promise,
+    resolve,
+    reject,
+  };
+}
+
+function buildThreadListPresentationState(
+  activeProjectGroupKey: string,
+): ApplicationDerivedState["threadListPresentationState"] {
+  return {
+    selectedThread: null,
+    activeProjectGroups: [
+      {
+        key: activeProjectGroupKey,
+        label: activeProjectGroupKey,
+        projectPath: `/workspace/${activeProjectGroupKey}`,
+        projectCreatedAt: 1,
+        latestUpdatedAt: 1,
+        isRemoved: false,
+        threads: [],
+      },
+    ],
+    archivedProjectGroups: [],
+    archivedThreadIdentifiers: new Set<string>(),
+    archivedSectionThreadCount: 0,
+  };
+}
+
+function readDebugIssueDerivationResult(
+  resolver: DebugIssueStateResolver,
+  input: {
+    debugErrors: UseApplicationDerivedStateInput["debugErrors"];
+    history: UseApplicationDerivedStateInput["history"];
+    severityFilter: UseApplicationDerivedStateInput["debugIssueSeverityFilter"];
+    filterQuery: string;
+    selectedIssueIdentifier: string;
+  },
+): DebugIssueDerivationResult {
+  const debugErrorIssues = resolver.readDebugErrorIssues(input.debugErrors);
+  const debugWarningIssues = resolver.readDebugWarningIssues(input.history);
+  const debugIssues = resolver.readCombinedDebugIssues({
+    debugErrorIssues,
+    debugWarningIssues,
+  });
+  const filteredDebugIssues = resolver.readFilteredDebugIssues({
+    debugIssues,
+    severityFilter: input.severityFilter,
+    filterQuery: input.filterQuery,
+  });
+  return {
+    debugErrorIssues,
+    debugWarningIssues,
+    debugIssues,
+    runtimeRequestErrorOperationMetrics: resolver.readRuntimeRequestErrorOperationMetrics(
+      input.debugErrors,
+    ),
+    filteredDebugIssues,
+    selectedDebugIssue: resolver.readSelectedDebugIssue({
+      debugIssues: filteredDebugIssues,
+      selectedIssueIdentifier: input.selectedIssueIdentifier,
+    }),
+  };
 }
 
 /**
@@ -458,5 +640,200 @@ describe("useApplicationDerivedState", () => {
         count: 1,
       },
     ]);
+  });
+
+  it("keeps the newest thread-list worker projection when an older response resolves later", async () => {
+    const threadListWorkerOwner = new TestThreadListPresentationWorkerOwner();
+    const firstInput: UseApplicationDerivedStateInput = {
+      ...createBaseInput(),
+      threads: [buildThreadListItem("thread-first")],
+      selectedThreadId: "thread-first",
+      threadListPresentationWorkerOwner: threadListWorkerOwner,
+    };
+    const snapshotReference: { current: ApplicationDerivedState | null } = {
+      current: null,
+    };
+    const { rerender } = render(
+      <Harness
+        input={firstInput}
+        onDerivedState={(derivedState) => {
+          snapshotReference.current = derivedState;
+        }}
+      />,
+    );
+
+    const secondInput: UseApplicationDerivedStateInput = {
+      ...firstInput,
+      threads: [buildThreadListItem("thread-second")],
+      selectedThreadId: "thread-second",
+    };
+    rerender(
+      <Harness
+        input={secondInput}
+        onDerivedState={(derivedState) => {
+          snapshotReference.current = derivedState;
+        }}
+      />,
+    );
+
+    await act(async () => {
+      threadListWorkerOwner.resolveRequestByIndex(
+        1,
+        buildThreadListPresentationState("new-project"),
+      );
+      await Promise.resolve();
+    });
+
+    expect(snapshotReference.current?.activeProjectGroups[0]?.key).toBe("new-project");
+
+    await act(async () => {
+      threadListWorkerOwner.resolveRequestByIndex(
+        0,
+        buildThreadListPresentationState("old-project"),
+      );
+      await Promise.resolve();
+    });
+
+    expect(snapshotReference.current?.activeProjectGroups[0]?.key).toBe("new-project");
+  });
+
+  it("keeps the newest conversation flatten projection when an older response resolves later", async () => {
+    const conversationItemFlattener = new ConversationItemFlattener();
+    const conversationItemFlatteningWorkerOwner = new TestConversationItemFlatteningWorkerOwner();
+    const firstTurns = [buildAgentMessageTurn("turn-first", "first")];
+    const secondTurns = [buildAgentMessageTurn("turn-second", "second")];
+    const firstInput: UseApplicationDerivedStateInput = {
+      ...createBaseInput(),
+      readThreadState: buildReadThreadSnapshot({
+        threadIdentifier: "thread-1",
+        turns: firstTurns,
+        latestModel: "gpt-5",
+        latestReasoningEffort: "medium",
+      }),
+      conversationItemFlatteningWorkerOwner,
+    };
+    const snapshotReference: { current: ApplicationDerivedState | null } = {
+      current: null,
+    };
+    const { rerender } = render(
+      <Harness
+        input={firstInput}
+        onDerivedState={(derivedState) => {
+          snapshotReference.current = derivedState;
+        }}
+      />,
+    );
+
+    const secondInput: UseApplicationDerivedStateInput = {
+      ...firstInput,
+      readThreadState: buildReadThreadSnapshot({
+        threadIdentifier: "thread-1",
+        turns: secondTurns,
+        latestModel: "gpt-5",
+        latestReasoningEffort: "medium",
+      }),
+    };
+    rerender(
+      <Harness
+        input={secondInput}
+        onDerivedState={(derivedState) => {
+          snapshotReference.current = derivedState;
+        }}
+      />,
+    );
+
+    await act(async () => {
+      conversationItemFlatteningWorkerOwner.resolveRequestByIndex(
+        1,
+        conversationItemFlattener.flattenConversationItems(secondTurns, false),
+      );
+      await Promise.resolve();
+    });
+    expect(snapshotReference.current?.flatConversationItems[0]?.key).toBe("item-turn-second");
+
+    await act(async () => {
+      conversationItemFlatteningWorkerOwner.resolveRequestByIndex(
+        0,
+        conversationItemFlattener.flattenConversationItems(firstTurns, false),
+      );
+      await Promise.resolve();
+    });
+    expect(snapshotReference.current?.flatConversationItems[0]?.key).toBe("item-turn-second");
+  });
+
+  it("keeps the newest debug-issue projection when an older response resolves later", async () => {
+    const debugIssueStateResolver = new DebugIssueStateResolver();
+    const debugIssueDerivationWorkerOwner = new TestDebugIssueDerivationWorkerOwner();
+    const firstDebugError = buildDebugErrorRecord({
+      errorId: "error-first",
+      operation: "runtime-request-error",
+      message: "first error",
+    });
+    const secondDebugError = buildDebugErrorRecord({
+      errorId: "error-second",
+      operation: "runtime-request-error",
+      message: "second error",
+    });
+    const firstInput: UseApplicationDerivedStateInput = {
+      ...createBaseInput(),
+      debugErrors: [firstDebugError],
+      debugIssueFilterQuery: "first",
+      debugIssueDerivationWorkerOwner,
+    };
+    const snapshotReference: { current: ApplicationDerivedState | null } = {
+      current: null,
+    };
+    const { rerender } = render(
+      <Harness
+        input={firstInput}
+        onDerivedState={(derivedState) => {
+          snapshotReference.current = derivedState;
+        }}
+      />,
+    );
+
+    const secondInput: UseApplicationDerivedStateInput = {
+      ...firstInput,
+      debugErrors: [secondDebugError],
+      debugIssueFilterQuery: "second",
+    };
+    rerender(
+      <Harness
+        input={secondInput}
+        onDerivedState={(derivedState) => {
+          snapshotReference.current = derivedState;
+        }}
+      />,
+    );
+
+    await act(async () => {
+      debugIssueDerivationWorkerOwner.resolveRequestByIndex(
+        1,
+        readDebugIssueDerivationResult(debugIssueStateResolver, {
+          debugErrors: [secondDebugError],
+          history: [],
+          severityFilter: "all",
+          filterQuery: "second",
+          selectedIssueIdentifier: "",
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(snapshotReference.current?.filteredDebugIssues[0]?.id).toContain("error-second");
+
+    await act(async () => {
+      debugIssueDerivationWorkerOwner.resolveRequestByIndex(
+        0,
+        readDebugIssueDerivationResult(debugIssueStateResolver, {
+          debugErrors: [firstDebugError],
+          history: [],
+          severityFilter: "all",
+          filterQuery: "first",
+          selectedIssueIdentifier: "",
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(snapshotReference.current?.filteredDebugIssues[0]?.id).toContain("error-second");
   });
 });

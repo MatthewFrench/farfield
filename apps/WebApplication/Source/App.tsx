@@ -11,10 +11,12 @@ import {
   ASSUMED_APP_DEFAULT_REASONING_EFFORT,
   CAPABILITY_REFRESH_INTERVAL_MS,
   CHAT_SCROLL_BOTTOM_THRESHOLD_PX,
+  CONVERSATION_ITEM_FLATTENING_EXECUTION_MODE,
   CORE_REFRESH_CONNECTED_MIN_INTERVAL_MS,
   CORE_REFRESH_INTERVAL_MS,
   DEBUG_ERROR_LIST_LIMIT,
   DEBUG_HISTORY_LIMIT,
+  DEBUG_ISSUE_DERIVATION_EXECUTION_MODE,
   DEFAULT_EFFORT_OPTIONS,
   EVENT_REFRESH_SCHEDULE_DELAY_MS,
   EVENT_STREAM_REFRESH_DECISION_EXECUTION_MODE,
@@ -30,6 +32,7 @@ import {
   READ_THREAD_RETRY_MAX_DELAY_MS,
   THREAD_LIST_LIMIT,
   THREAD_LIST_MAX_PAGES,
+  THREAD_LIST_PRESENTATION_EXECUTION_MODE,
   THREAD_ONLY_HISTORY_METHOD_NAMES,
   THREAD_QUERY_CACHE_MAXIMUM_ENTRIES,
   THREAD_QUERY_CACHE_TIME_TO_LIVE_MS,
@@ -138,6 +141,9 @@ export function App(): React.JSX.Element {
     lastViewedThreadPreferenceStore,
     threadOnlyHistoryMethods: THREAD_ONLY_HISTORY_METHOD_IDENTIFIERS,
     eventStreamRefreshDecisionExecutionMode: EVENT_STREAM_REFRESH_DECISION_EXECUTION_MODE,
+    threadListPresentationExecutionMode: THREAD_LIST_PRESENTATION_EXECUTION_MODE,
+    debugIssueDerivationExecutionMode: DEBUG_ISSUE_DERIVATION_EXECUTION_MODE,
+    conversationItemFlatteningExecutionMode: CONVERSATION_ITEM_FLATTENING_EXECUTION_MODE,
     eventRefreshScheduleDelayMilliseconds: EVENT_REFRESH_SCHEDULE_DELAY_MS,
     mobileVisualViewportKeyboardOpenDeltaPx: MOBILE_VISUAL_VIEWPORT_KEYBOARD_OPEN_DELTA_PX,
     mobileLayoutMaximumWidthPx: MOBILE_LAYOUT_MAXIMUM_WIDTH_PX,
@@ -188,7 +194,12 @@ export function App(): React.JSX.Element {
     conversationSyncSignatureBuilder,
     pendingUserInputRequestSelector: applicationOwnerDependencies.pendingUserInputRequestSelector,
     conversationItemFlattener: applicationOwnerDependencies.conversationItemFlattener,
+    conversationItemFlatteningWorkerOwner:
+      applicationOwnerDependencies.conversationItemFlatteningWorkerOwner,
     debugIssueStateResolver: applicationOwnerDependencies.debugIssueStateResolver,
+    debugIssueDerivationWorkerOwner: applicationOwnerDependencies.debugIssueDerivationWorkerOwner,
+    threadListPresentationWorkerOwner:
+      applicationOwnerDependencies.threadListPresentationWorkerOwner,
     threadListStateController: applicationOwnerDependencies.threadListStateController,
   });
 

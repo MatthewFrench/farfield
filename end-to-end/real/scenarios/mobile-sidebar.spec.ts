@@ -34,7 +34,9 @@ test("mobile sidebar open and close behavior", async ({ page, sentinel }) => {
 
   await openButton.click();
   await expect(sidebarMobile).toBeVisible();
-  await page.getByTestId("sidebar-backdrop").click();
+  await page.getByTestId("sidebar-backdrop").click({
+    position: { x: 360, y: 120 },
+  });
   await expect(sidebarMobile).toHaveAttribute("aria-hidden", "true");
   await expect(page.getByTestId("sidebar-backdrop")).toHaveCount(0);
 

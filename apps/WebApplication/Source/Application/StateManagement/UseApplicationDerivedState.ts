@@ -6,11 +6,11 @@ import {
   readActiveAgentLabel,
   readActiveThreadAgentId,
   readAgentCapabilityFlags,
-  readAgentConnectivityState,
   readAgentsById,
   readAvailableAgentIds,
   readSelectedAgentDescriptor,
 } from "./ApplicationAgentCapabilityDerivation";
+import { readAgentConnectivityAndSystemHealth } from "./ApplicationConnectivitySystemHealthDerivation";
 import {
   readActiveRequestSelection,
   readConversationStateSelection,
@@ -24,7 +24,6 @@ import {
   readPlanModeOption,
 } from "./ApplicationModeAndEffortOptionDerivation";
 import { readModelOptions } from "./ApplicationModelOptionDerivation";
-import { readSystemHealthStatus } from "./ApplicationSystemHealthDerivation";
 import {
   readChatSurfaceState,
   readSelectedThreadLabel,
@@ -35,6 +34,8 @@ import {
   type ApplicationDerivedState,
   type UseApplicationDerivedStateInput,
 } from "./UseApplicationDerivedStateContracts";
+import { useFlatConversationItemsDerivedState } from "./UseFlatConversationItemsDerivedState";
+import { useThreadListPresentationDerivedState } from "./UseThreadListPresentationDerivedState";
 
 const DEFAULT_SELECTED_AGENT_LABEL = "Agent";
 const UNKNOWN_COMMIT_LABEL = "unknown";
@@ -102,7 +103,10 @@ export function useApplicationDerivedState(
     conversationSyncSignatureBuilder,
     pendingUserInputRequestSelector,
     conversationItemFlattener,
+    conversationItemFlatteningWorkerOwner,
     debugIssueStateResolver,
+    debugIssueDerivationWorkerOwner,
+    threadListPresentationWorkerOwner,
     threadListStateController,
   } = input;
 
@@ -118,17 +122,35 @@ export function useApplicationDerivedState(
     [agentsById, selectedAgentId],
   );
 
-  const threadListPresentationState = useMemo(
-    () =>
-      threadListStateController.readThreadListPresentationState({
-        threads,
-        archivedThreads,
-        selectedThreadIdentifier: selectedThreadId,
-      }),
-    [archivedThreads, selectedThreadId, threadListStateController, threads],
+  const {
+    threadListPresentationState: rawThreadListPresentationState,
+    threadListPresentationError,
+  } = useThreadListPresentationDerivedState({
+    threads,
+    archivedThreads,
+    selectedThreadId,
+    threadListPresentationWorkerOwner,
+    threadListStateController,
+  });
+
+  if (threadListPresentationError) {
+    throw threadListPresentationError;
+  }
+
+  const selectedThread = useMemo(
+    () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
+    [selectedThreadId, threads],
   );
 
-  const selectedThread = threadListPresentationState.selectedThread;
+  const threadListPresentationState = useMemo<
+    ApplicationDerivedState["threadListPresentationState"]
+  >(
+    () => ({
+      ...rawThreadListPresentationState,
+      selectedThread,
+    }),
+    [rawThreadListPresentationState, selectedThread],
+  );
 
   const appDefaultModel = configDefaults?.model ?? assumedAppDefaultModelIdentifier;
   const appDefaultReasoningEffort =
@@ -324,12 +346,20 @@ export function useApplicationDerivedState(
     debugIssueFilterQuery,
     selectedDebugIssueId,
     debugIssueStateResolver,
+    debugIssueDerivationWorkerOwner,
   });
 
-  const flatConversationItems = useMemo<ApplicationDerivedState["flatConversationItems"]>(
-    () => conversationItemFlattener.flattenConversationItems(turns, isGenerating),
-    [conversationItemFlattener, isGenerating, turns],
-  );
+  const { flatConversationItems, conversationItemFlatteningError } =
+    useFlatConversationItemsDerivedState({
+      turns,
+      isGenerating,
+      conversationItemFlattener,
+      conversationItemFlatteningWorkerOwner,
+    });
+
+  if (conversationItemFlatteningError) {
+    throw conversationItemFlatteningError;
+  }
 
   const conversationItemCount = flatConversationItems.length;
   // Clamp to zero so slicing never underflows when the visible limit is larger than the list.
@@ -345,14 +375,11 @@ export function useApplicationDerivedState(
   );
 
   const commitLabel = health?.state.gitCommit ?? UNKNOWN_COMMIT_LABEL;
-  const { codexConfigured, openCodeConnected } = readAgentConnectivityState({
-    agentsById,
-  });
-  const { allSystemsReady, hasAnySystemFailure } = readSystemHealthStatus({
-    codexConfigured,
-    openCodeConnected,
-    health,
-  });
+  const { codexConfigured, openCodeConnected, allSystemsReady, hasAnySystemFailure } =
+    readAgentConnectivityAndSystemHealth({
+      agentsById,
+      health,
+    });
 
   return {
     threadListPresentationState,

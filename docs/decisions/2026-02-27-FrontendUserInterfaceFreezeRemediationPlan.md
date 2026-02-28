@@ -238,6 +238,51 @@ Completed in repository:
     - repository lint and typecheck passed
     - real end-to-end verification passed through `bun run verify:end-to-end:real` (9 Playwright scenarios)
 
+## Implementation Update (2026-02-28)
+
+Completed in repository:
+
+1. Main-thread compute offload completion for remaining frontend hot paths:
+   - worker-owned thread-list presentation derivation
+   - worker-owned conversation-item flattening
+   - worker-owned debug-issue derivation
+   - worker-owned transport response decode (`JSON.parse` + structured payload schema parse) in `FarfieldHttpTransport`
+
+2. Deterministic asynchronous stale-response protection:
+   - added request-sequence guards so older async worker responses cannot overwrite newer state in:
+     - `UseApplicationDerivedState`
+     - `UseApplicationDebugIssueDerivedState`
+
+3. Strict contract hardening for testability and ownership boundaries:
+   - updated derived-state dependency contracts to use explicit worker reader interfaces instead of concrete worker owner classes
+   - preserved strict typed contracts while removing nominal private-field coupling in tests
+
+4. StrictMode runtime stability fix:
+   - removed StrictMode-preflight-dispose behavior for app-lifetime worker owners in `UseApplicationOwnerDependencies`
+   - ignored expected worker-disposed rejections in worker-backed derived-state hooks to prevent non-actionable disposal races from crashing `<App>`
+
+5. Playwright stability hardening for real-run evidence gates:
+   - updated `mobile-sidebar.spec.ts` backdrop click coordinate to avoid sidebar-overlay interception at mobile viewport width
+   - updated `error-banner.spec.ts` to wait for thread-list settled state before request interception and use deterministic dismissal assertions
+
+6. Final burst-load evidence (`bun run stress:stream-burst`):
+   - `streamRequests=13106`
+   - `streamFailures=0`
+   - `healthProbes=30`
+   - `healthFailures=0`
+   - `healthNotReady=0`
+   - `healthP95=51ms`
+   - `healthMax=66ms`
+   - `streamRouteP95=8.948375000007218ms`
+   - `streamRouteP95QueueDelay=23ms`
+   - `streamRouteMaxQueueDelay=23ms`
+   - `healthRouteP95QueueDelay=46ms`
+   - `healthRouteMaxQueueDelay=526ms`
+
+7. Final real-path verification:
+   - `bun run end-to-end:real:safe-run` passed with `10/10` Playwright scenarios
+   - sentinel summaries reported no unexpected client/page errors in standard scenarios, with the error-banner scenario recording only the intentional injected failure path
+
 ## Owners
 
 1. Web application runtime ownership

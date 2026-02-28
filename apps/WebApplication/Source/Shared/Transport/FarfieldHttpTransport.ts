@@ -4,14 +4,18 @@
  */
 import { z } from "zod";
 import { type StructuredDataValue } from "@/Shared/Contracts/StructuredDataValue";
+import {
+  FarfieldHttpResponseDecodeInThreadOwner,
+  type FarfieldHttpResponseDecodeReader,
+  type FarfieldHttpResponseDecodeResult,
+  FarfieldHttpResponseDecodeWorkerOwner,
+} from "./FarfieldHttpResponseDecodeOwner";
 import { performRequest } from "./FarfieldHttpTransportRequestExecutionOwner";
 import {
   buildInvalidApiEnvelopeMessage,
   buildInvalidJsonResponseMessage,
   buildRequestFailureMessageWithReason,
   createRequestFailureError,
-  decodeApiEnvelope,
-  decodeStructuredDataValue,
   EMPTY_RESPONSE_REASON,
   readResponseBody,
   readResponseRequestId,
@@ -19,6 +23,21 @@ import {
 } from "./FarfieldHttpTransportResponseOwner";
 
 const RequestPathSchema = z.string().trim().min(1, "Request path must not be blank.");
+const HttpResponseDecodeExecutionModeSchema = z.enum(["worker", "in-thread"]);
+const defaultHttpResponseDecodeExecutionMode =
+  import.meta.env.MODE === "test" ? "in-thread" : "worker";
+const HTTP_RESPONSE_DECODE_EXECUTION_MODE = HttpResponseDecodeExecutionModeSchema.parse(
+  defaultHttpResponseDecodeExecutionMode,
+);
+const farfieldHttpResponseDecodeOwner: FarfieldHttpResponseDecodeReader =
+  HTTP_RESPONSE_DECODE_EXECUTION_MODE === "worker"
+    ? new FarfieldHttpResponseDecodeWorkerOwner({
+        createWorker: () =>
+          new Worker(new URL("./FarfieldHttpResponseDecodeWorkerRuntime.ts", import.meta.url), {
+            type: "module",
+          }),
+      })
+    : new FarfieldHttpResponseDecodeInThreadOwner();
 
 function normalizeRequestPath(path: string): string {
   return RequestPathSchema.parse(path);
@@ -46,39 +65,47 @@ export async function request(path: string, init?: RequestInit): Promise<Structu
     );
   }
 
-  const decodedStructuredData = decodeStructuredDataValue(responseBody.parseText);
-  if (decodedStructuredData.kind === "failure") {
+  let decodedPayload: FarfieldHttpResponseDecodeResult;
+  try {
+    decodedPayload = await farfieldHttpResponseDecodeOwner.readDecodedPayload(
+      responseBody.parseText,
+    );
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
     throw createRequestFailureError(
       normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      buildInvalidJsonResponseMessage(normalizedPath, decodedStructuredData.reason),
+      buildInvalidJsonResponseMessage(normalizedPath, reason),
     );
   }
 
-  const decodedEnvelope = decodeApiEnvelope(decodedStructuredData.data);
-  if (decodedEnvelope.kind === "failure") {
+  if (decodedPayload.kind === "failure") {
+    const failureMessage =
+      decodedPayload.reasonKind === "invalid-envelope"
+        ? buildInvalidApiEnvelopeMessage(normalizedPath, decodedPayload.reason)
+        : buildInvalidJsonResponseMessage(normalizedPath, decodedPayload.reason);
     throw createRequestFailureError(
       normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      buildInvalidApiEnvelopeMessage(normalizedPath, decodedEnvelope.reason),
+      failureMessage,
     );
   }
 
-  if (!response.ok || decodedEnvelope.envelope.ok === false) {
+  if (!response.ok || decodedPayload.envelopeOk === false) {
     throw createRequestFailureError(
       normalizedPath,
       responseRequestId,
       response,
       responseBody.responseTextSummary,
-      resolveFailureBaseMessage(normalizedPath, decodedStructuredData.data),
+      resolveFailureBaseMessage(normalizedPath, decodedPayload.data),
     );
   }
 
-  return decodedStructuredData.data;
+  return decodedPayload.data;
 }
 
 export async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
@@ -100,8 +127,16 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
     );
   }
 
-  const decodedStructuredData = decodeStructuredDataValue(responseBody.parseText);
-  const responseData = decodedStructuredData.kind === "success" ? decodedStructuredData.data : null;
+  let decodedPayload: FarfieldHttpResponseDecodeResult | null;
+  try {
+    decodedPayload = await farfieldHttpResponseDecodeOwner.readDecodedPayload(
+      responseBody.parseText,
+    );
+  } catch {
+    decodedPayload = null;
+  }
+  const responseData =
+    decodedPayload && decodedPayload.kind === "success" ? decodedPayload.data : null;
   throw createRequestFailureError(
     normalizedPath,
     responseRequestId,

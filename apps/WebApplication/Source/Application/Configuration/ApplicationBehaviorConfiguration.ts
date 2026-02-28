@@ -37,6 +37,19 @@ export const EVENT_STREAM_REFRESH_DECISION_EXECUTION_MODE =
     defaultEventStreamRefreshDecisionExecutionMode,
   );
 
+const DerivedComputationExecutionModeSchema = z.enum(["worker", "in-thread"]);
+const defaultDerivedComputationExecutionMode =
+  import.meta.env.MODE === "test" ? "in-thread" : "worker";
+
+export const THREAD_LIST_PRESENTATION_EXECUTION_MODE = DerivedComputationExecutionModeSchema.parse(
+  defaultDerivedComputationExecutionMode,
+);
+export const DEBUG_ISSUE_DERIVATION_EXECUTION_MODE = DerivedComputationExecutionModeSchema.parse(
+  defaultDerivedComputationExecutionMode,
+);
+export const CONVERSATION_ITEM_FLATTENING_EXECUTION_MODE =
+  DerivedComputationExecutionModeSchema.parse(defaultDerivedComputationExecutionMode);
+
 export const MOBILE_LAYOUT_MAXIMUM_WIDTH_PX = 768;
 export const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32;
 export const MOBILE_SIDEBAR_SWIPE_TRIGGER_PX = 56;

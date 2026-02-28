@@ -1,5 +1,5 @@
-import type { ThreadTurnSchema, TurnItemSchema } from "@farfield/protocol";
-import type { z } from "zod";
+import { ThreadTurnSchema, TurnItemSchema } from "@farfield/protocol";
+import { z } from "zod";
 
 export type ConversationTurn = z.infer<typeof ThreadTurnSchema>;
 export type ConversationTurnItem = z.infer<typeof TurnItemSchema>;
@@ -15,10 +15,45 @@ export interface FlattenedConversationItem {
   item: ConversationTurnItem;
   isLast: boolean;
   turnIsInProgress: boolean;
-  previousItemType: ConversationTurnItem["type"] | undefined;
-  nextItemType: ConversationTurnItem["type"] | undefined;
+  previousItemType?: ConversationTurnItem["type"] | undefined;
+  nextItemType?: ConversationTurnItem["type"] | undefined;
   spacingTop: number;
 }
+
+const ConversationTurnItemTypeSchema = z.enum([
+  "userMessage",
+  "steeringUserMessage",
+  "agentMessage",
+  "error",
+  "reasoning",
+  "plan",
+  "planImplementation",
+  "todo-list",
+  "userInputResponse",
+  "commandExecution",
+  "fileChange",
+  "contextCompaction",
+  "webSearch",
+  "modelChanged",
+  "mcpToolCall",
+  "collabAgentToolCall",
+  "collabToolCall",
+  "imageView",
+  "enteredReviewMode",
+  "exitedReviewMode",
+]);
+
+export const FlattenedConversationItemSchema = z
+  .object({
+    key: z.string().min(1),
+    item: TurnItemSchema,
+    isLast: z.boolean(),
+    turnIsInProgress: z.boolean(),
+    previousItemType: ConversationTurnItemTypeSchema.optional(),
+    nextItemType: ConversationTurnItemTypeSchema.optional(),
+    spacingTop: z.number().finite(),
+  })
+  .strict();
 
 export class ConversationItemFlattener {
   public isTurnInProgressStatus(status: ConversationTurn["status"] | null | undefined): boolean {
@@ -48,15 +83,22 @@ export class ConversationItemFlattener {
           : startsNewTurn
             ? TOP_SPACING_FOR_NEW_TURN_PIXELS
             : TOP_SPACING_FOR_CONTINUING_TURN_PIXELS;
-        flattened.push({
+        const previousItemType = items[itemIndexInTurn - 1]?.type;
+        const nextItemType = items[itemIndexInTurn + 1]?.type;
+        const flattenedItem: FlattenedConversationItem = {
           key: item.id,
           item,
           isLast: false,
           turnIsInProgress: turnInProgress,
-          previousItemType: items[itemIndexInTurn - 1]?.type,
-          nextItemType: items[itemIndexInTurn + 1]?.type,
           spacingTop,
-        });
+        };
+        if (previousItemType !== undefined) {
+          flattenedItem.previousItemType = previousItemType;
+        }
+        if (nextItemType !== undefined) {
+          flattenedItem.nextItemType = nextItemType;
+        }
+        flattened.push(flattenedItem);
         previousRenderedTurnIndex = turnIndex;
       });
     });

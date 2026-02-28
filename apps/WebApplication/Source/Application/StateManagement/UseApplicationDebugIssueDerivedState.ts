@@ -1,4 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { DebugIssueDerivationResult } from "@/Features/Debugging/StateManagement/DebugIssueDerivationWorkerContracts";
+import { DEBUG_ISSUE_DERIVATION_WORKER_DISPOSED_ERROR_MESSAGE } from "@/Features/Debugging/StateManagement/DebugIssueDerivationWorkerOwner";
 import {
   type ApplicationDerivedState,
   type UseApplicationDerivedStateInput,
@@ -11,6 +13,7 @@ interface UseApplicationDebugIssueDerivedStateInput {
   debugIssueFilterQuery: UseApplicationDerivedStateInput["debugIssueFilterQuery"];
   selectedDebugIssueId: UseApplicationDerivedStateInput["selectedDebugIssueId"];
   debugIssueStateResolver: UseApplicationDerivedStateInput["debugIssueStateResolver"];
+  debugIssueDerivationWorkerOwner?: UseApplicationDerivedStateInput["debugIssueDerivationWorkerOwner"];
 }
 
 export interface ApplicationDebugIssueDerivedState {
@@ -22,63 +25,141 @@ export interface ApplicationDebugIssueDerivedState {
   selectedDebugIssue: ApplicationDerivedState["selectedDebugIssue"];
 }
 
+const INITIAL_ASYNCHRONOUS_DERIVED_STATE: ApplicationDebugIssueDerivedState = {
+  debugErrorIssues: [],
+  debugWarningIssues: [],
+  debugIssues: [],
+  runtimeRequestErrorOperationMetrics: [],
+  filteredDebugIssues: [],
+  selectedDebugIssue: null,
+};
+
+const INITIAL_REQUEST_SEQUENCE = 0;
+
+function mapAsynchronousResultToDerivedState(
+  result: DebugIssueDerivationResult,
+): ApplicationDebugIssueDerivedState {
+  return {
+    debugErrorIssues: result.debugErrorIssues,
+    debugWarningIssues: result.debugWarningIssues,
+    debugIssues: result.debugIssues,
+    runtimeRequestErrorOperationMetrics: result.runtimeRequestErrorOperationMetrics,
+    filteredDebugIssues: result.filteredDebugIssues,
+    selectedDebugIssue: result.selectedDebugIssue,
+  };
+}
+
 export function useApplicationDebugIssueDerivedState(
   input: UseApplicationDebugIssueDerivedStateInput,
 ): ApplicationDebugIssueDerivedState {
-  const debugErrorIssues = useMemo(
-    () => input.debugIssueStateResolver.readDebugErrorIssues(input.debugErrors),
-    [input.debugErrors, input.debugIssueStateResolver],
+  const debugIssueDerivationWorkerOwner = input.debugIssueDerivationWorkerOwner ?? null;
+  const requestSequenceReference = useRef<number>(INITIAL_REQUEST_SEQUENCE);
+  const [asynchronousDerivedState, setAsynchronousDerivedState] =
+    useState<ApplicationDebugIssueDerivedState>(INITIAL_ASYNCHRONOUS_DERIVED_STATE);
+  const [asynchronousDerivationError, setAsynchronousDerivationError] = useState<Error | null>(
+    null,
   );
 
-  const debugWarningIssues = useMemo(
-    () => input.debugIssueStateResolver.readDebugWarningIssues(input.history),
-    [input.debugIssueStateResolver, input.history],
-  );
+  useEffect(() => {
+    if (debugIssueDerivationWorkerOwner === null) {
+      return;
+    }
 
-  const runtimeRequestErrorOperationMetrics = useMemo(
-    () => input.debugIssueStateResolver.readRuntimeRequestErrorOperationMetrics(input.debugErrors),
-    [input.debugErrors, input.debugIssueStateResolver],
-  );
+    const requestSequence = requestSequenceReference.current + 1;
+    requestSequenceReference.current = requestSequence;
+    let isDisposed = false;
 
-  const debugIssues = useMemo(
-    () =>
-      input.debugIssueStateResolver.readCombinedDebugIssues({
-        debugErrorIssues,
-        debugWarningIssues,
-      }),
-    [debugErrorIssues, input.debugIssueStateResolver, debugWarningIssues],
-  );
-
-  const filteredDebugIssues = useMemo(
-    () =>
-      input.debugIssueStateResolver.readFilteredDebugIssues({
-        debugIssues,
+    void debugIssueDerivationWorkerOwner
+      .readDerivedDebugIssueState({
+        debugErrors: input.debugErrors,
+        historyEntries: input.history,
         severityFilter: input.debugIssueSeverityFilter,
         filterQuery: input.debugIssueFilterQuery,
-      }),
-    [
-      input.debugIssueFilterQuery,
-      input.debugIssueSeverityFilter,
-      input.debugIssueStateResolver,
-      debugIssues,
-    ],
-  );
-
-  const selectedDebugIssue = useMemo(
-    () =>
-      input.debugIssueStateResolver.readSelectedDebugIssue({
-        debugIssues: filteredDebugIssues,
         selectedIssueIdentifier: input.selectedDebugIssueId,
-      }),
-    [input.debugIssueStateResolver, filteredDebugIssues, input.selectedDebugIssueId],
-  );
+      })
+      .then((result) => {
+        if (isDisposed || requestSequenceReference.current !== requestSequence) {
+          return;
+        }
+        setAsynchronousDerivationError(null);
+        setAsynchronousDerivedState(mapAsynchronousResultToDerivedState(result));
+      })
+      .catch((error) => {
+        if (isDisposed || requestSequenceReference.current !== requestSequence) {
+          return;
+        }
+        if (error instanceof Error) {
+          if (error.message === DEBUG_ISSUE_DERIVATION_WORKER_DISPOSED_ERROR_MESSAGE) {
+            return;
+          }
+          setAsynchronousDerivationError(error);
+          return;
+        }
+        setAsynchronousDerivationError(
+          new Error("Debug issue worker derivation failed with a non-error rejection."),
+        );
+      });
 
-  return {
-    debugErrorIssues,
-    debugWarningIssues,
-    debugIssues,
-    runtimeRequestErrorOperationMetrics,
-    filteredDebugIssues,
-    selectedDebugIssue,
-  };
+    return () => {
+      isDisposed = true;
+    };
+  }, [
+    debugIssueDerivationWorkerOwner,
+    input.debugErrors,
+    input.history,
+    input.debugIssueSeverityFilter,
+    input.debugIssueFilterQuery,
+    input.selectedDebugIssueId,
+  ]);
+
+  const inThreadDerivedState = useMemo<ApplicationDebugIssueDerivedState | null>(() => {
+    if (debugIssueDerivationWorkerOwner !== null) {
+      return null;
+    }
+
+    const debugErrorIssues = input.debugIssueStateResolver.readDebugErrorIssues(input.debugErrors);
+    const debugWarningIssues = input.debugIssueStateResolver.readDebugWarningIssues(input.history);
+    const runtimeRequestErrorOperationMetrics =
+      input.debugIssueStateResolver.readRuntimeRequestErrorOperationMetrics(input.debugErrors);
+    const debugIssues = input.debugIssueStateResolver.readCombinedDebugIssues({
+      debugErrorIssues,
+      debugWarningIssues,
+    });
+    const filteredDebugIssues = input.debugIssueStateResolver.readFilteredDebugIssues({
+      debugIssues,
+      severityFilter: input.debugIssueSeverityFilter,
+      filterQuery: input.debugIssueFilterQuery,
+    });
+    const selectedDebugIssue = input.debugIssueStateResolver.readSelectedDebugIssue({
+      debugIssues: filteredDebugIssues,
+      selectedIssueIdentifier: input.selectedDebugIssueId,
+    });
+
+    return {
+      debugErrorIssues,
+      debugWarningIssues,
+      debugIssues,
+      runtimeRequestErrorOperationMetrics,
+      filteredDebugIssues,
+      selectedDebugIssue,
+    };
+  }, [
+    debugIssueDerivationWorkerOwner,
+    input.debugErrors,
+    input.history,
+    input.debugIssueFilterQuery,
+    input.debugIssueSeverityFilter,
+    input.debugIssueStateResolver,
+    input.selectedDebugIssueId,
+  ]);
+
+  if (asynchronousDerivationError !== null) {
+    throw asynchronousDerivationError;
+  }
+
+  if (inThreadDerivedState !== null) {
+    return inThreadDerivedState;
+  }
+
+  return asynchronousDerivedState;
 }

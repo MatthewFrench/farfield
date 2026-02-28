@@ -28,12 +28,14 @@ import { PendingUserInputRequestSelector } from "@/Features/Chat/DomainModel/Pen
 import { ChatRequestActionCoordinator } from "@/Features/Chat/StateManagement/ChatRequestActionCoordinator";
 import { ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { CollaborationModeActionCoordinator } from "@/Features/Chat/StateManagement/CollaborationModeActionCoordinator";
+import { ConversationItemFlatteningWorkerOwner } from "@/Features/Chat/StateManagement/ConversationItemFlatteningWorkerOwner";
 import { ModeSelectionSyncCoordinator } from "@/Features/Chat/StateManagement/ModeSelectionSyncCoordinator";
 import { ReadThreadStateMerger } from "@/Features/Chat/StateManagement/ReadThreadStateMerger";
 import { SelectedThreadDataRefreshCoordinator } from "@/Features/Chat/StateManagement/SelectedThreadDataRefreshCoordinator";
 import { SelectedThreadRefreshConcurrencyCoordinator } from "@/Features/Chat/StateManagement/SelectedThreadRefreshConcurrencyCoordinator";
 import { DebugServerClient } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { DebugIssueStateResolver } from "@/Features/Debugging/DomainModel/DebugIssueStateResolver";
+import { DebugIssueDerivationWorkerOwner } from "@/Features/Debugging/StateManagement/DebugIssueDerivationWorkerOwner";
 import { DebugWorkspaceActionCoordinator } from "@/Features/Debugging/StateManagement/DebugWorkspaceActionCoordinator";
 import { DebugWorkspaceDataReader } from "@/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
@@ -46,6 +48,7 @@ import { ThreadMutationServerClient } from "@/Features/Threads/DataAccess/Thread
 import { ThreadQueryCache } from "@/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "@/Features/Threads/DataAccess/ThreadServerClient";
 import { ThreadListPresentationStateResolver } from "@/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
+import { ThreadListPresentationWorkerOwner } from "@/Features/Threads/StateManagement/ThreadListPresentationWorkerOwner";
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import { ThreadListStateStore } from "@/Features/Threads/StateManagement/ThreadListStateStore";
 import { ThreadMutationActionCoordinator } from "@/Features/Threads/StateManagement/ThreadMutationActionCoordinator";
@@ -58,6 +61,9 @@ export interface UseApplicationOwnerDependenciesInput {
   lastViewedThreadPreferenceStore: LastViewedThreadPreferenceStore;
   threadOnlyHistoryMethods: readonly string[];
   eventStreamRefreshDecisionExecutionMode?: "worker" | "in-thread";
+  threadListPresentationExecutionMode?: "worker" | "in-thread";
+  debugIssueDerivationExecutionMode?: "worker" | "in-thread";
+  conversationItemFlatteningExecutionMode?: "worker" | "in-thread";
   eventRefreshScheduleDelayMilliseconds: number;
   mobileVisualViewportKeyboardOpenDeltaPx: number;
   mobileLayoutMaximumWidthPx: number;
@@ -103,11 +109,14 @@ export interface ApplicationOwnerDependencies<
   collaborationModeActionCoordinator: CollaborationModeActionCoordinator;
   selectedThreadDataRefreshCoordinator: SelectedThreadDataRefreshCoordinator;
   conversationItemFlattener: ConversationItemFlattener;
+  threadListPresentationWorkerOwner: ThreadListPresentationWorkerOwner | null;
   debugServerClient: DebugServerClient;
   debugWorkspaceDataReader: DebugWorkspaceDataReader;
   debugWorkspaceStateStore: DebugWorkspaceStateStore;
   debugWorkspaceActionCoordinator: DebugWorkspaceActionCoordinator;
   debugIssueStateResolver: DebugIssueStateResolver;
+  debugIssueDerivationWorkerOwner: DebugIssueDerivationWorkerOwner | null;
+  conversationItemFlatteningWorkerOwner: ConversationItemFlatteningWorkerOwner | null;
   threadMutationServerClient: ThreadMutationServerClient;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
   threadListStateController: ThreadListStateController;
@@ -194,6 +203,9 @@ export function useApplicationOwnerDependencies<
     lastViewedThreadPreferenceStore,
     threadOnlyHistoryMethods,
     eventStreamRefreshDecisionExecutionMode = "in-thread",
+    threadListPresentationExecutionMode = "in-thread",
+    debugIssueDerivationExecutionMode = "in-thread",
+    conversationItemFlatteningExecutionMode = "in-thread",
     eventRefreshScheduleDelayMilliseconds,
     mobileVisualViewportKeyboardOpenDeltaPx,
     mobileLayoutMaximumWidthPx,
@@ -317,6 +329,25 @@ export function useApplicationOwnerDependencies<
     ],
   );
   const conversationItemFlattener = useStableOwner(() => new ConversationItemFlattener());
+  // Worker owners are app-lifetime dependencies. Disposing them in effect cleanup breaks
+  // React StrictMode development preflight, which runs cleanup immediately after setup.
+  const conversationItemFlatteningWorkerOwner = useMemo(() => {
+    if (conversationItemFlatteningExecutionMode === "worker") {
+      return new ConversationItemFlatteningWorkerOwner({
+        createWorker: () =>
+          new Worker(
+            new URL(
+              "../../Features/Chat/StateManagement/ConversationItemFlatteningWorkerRuntime.ts",
+              import.meta.url,
+            ),
+            {
+              type: "module",
+            },
+          ),
+      });
+    }
+    return null;
+  }, [conversationItemFlatteningExecutionMode]);
   const debugServerClient = useStableOwner(() => new DebugServerClient());
   const debugWorkspaceDataReader = useMemo(
     () => new DebugWorkspaceDataReader(debugServerClient),
@@ -327,6 +358,23 @@ export function useApplicationOwnerDependencies<
     () => new DebugWorkspaceActionCoordinator(),
   );
   const debugIssueStateResolver = useStableOwner(() => new DebugIssueStateResolver());
+  const debugIssueDerivationWorkerOwner = useMemo(() => {
+    if (debugIssueDerivationExecutionMode === "worker") {
+      return new DebugIssueDerivationWorkerOwner({
+        createWorker: () =>
+          new Worker(
+            new URL(
+              "../../Features/Debugging/StateManagement/DebugIssueDerivationWorkerRuntime.ts",
+              import.meta.url,
+            ),
+            {
+              type: "module",
+            },
+          ),
+      });
+    }
+    return null;
+  }, [debugIssueDerivationExecutionMode]);
   const threadMutationServerClient = useStableOwner(() => new ThreadMutationServerClient());
   const threadMutationActionCoordinator = useStableOwner(
     () => new ThreadMutationActionCoordinator(),
@@ -339,6 +387,23 @@ export function useApplicationOwnerDependencies<
       }),
     [threadQueryCacheMaximumEntries, threadQueryCacheTimeToLiveMilliseconds],
   );
+  const threadListPresentationWorkerOwner = useMemo(() => {
+    if (threadListPresentationExecutionMode === "worker") {
+      return new ThreadListPresentationWorkerOwner({
+        createWorker: () =>
+          new Worker(
+            new URL(
+              "../../Features/Threads/StateManagement/ThreadListPresentationWorkerRuntime.ts",
+              import.meta.url,
+            ),
+            {
+              type: "module",
+            },
+          ),
+      });
+    }
+    return null;
+  }, [threadListPresentationExecutionMode]);
   const pushClientStateManager = useStableOwner(() => new PushClientStateManager());
   const pushNotificationToolbarActionCoordinator = useMemo(
     () =>
@@ -376,11 +441,14 @@ export function useApplicationOwnerDependencies<
     collaborationModeActionCoordinator,
     selectedThreadDataRefreshCoordinator,
     conversationItemFlattener,
+    threadListPresentationWorkerOwner,
     debugServerClient,
     debugWorkspaceDataReader,
     debugWorkspaceStateStore,
     debugWorkspaceActionCoordinator,
     debugIssueStateResolver,
+    debugIssueDerivationWorkerOwner,
+    conversationItemFlatteningWorkerOwner,
     threadMutationServerClient,
     threadMutationActionCoordinator,
     threadListStateController,
