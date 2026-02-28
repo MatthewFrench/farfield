@@ -332,7 +332,6 @@ describe("useSelectedThreadLoaders", () => {
 
     await loadersSnapshot.loaders.loadSelectedThread("thread-1", {
       includeTurns: false,
-      includeReadThread: false,
     });
 
     await waitFor(() => {
@@ -422,6 +421,13 @@ describe("useSelectedThreadLoaders", () => {
     const loadersSnapshot = readLoadersSnapshot(snapshotReference);
 
     await loadersSnapshot.loaders.loadSelectedThread("thread-1");
+
+    expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls[0]?.includeReadThread).toBe(
+      false,
+    );
+    expect(
+      selectedThreadDataRefreshCoordinator.readSnapshotCalls[0]?.streamEventsSinceSequence,
+    ).toBe(0);
 
     await waitFor(() => {
       expect(snapshotReference.current?.streamEvents).toEqual([

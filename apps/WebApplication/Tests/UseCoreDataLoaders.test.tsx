@@ -396,8 +396,43 @@ describe("useCoreDataLoaders", () => {
     expect(harness.setHealthMock).toHaveBeenCalledTimes(1);
   });
 
-  it("preloads archived threads during tracked core refresh to stabilize project ordering", async () => {
+  it("skips archived-thread refresh during tracked core refresh before archived surface is loaded", async () => {
     const harness = createHarness("chat");
+    const loadActiveThreadStateSpy = vi
+      .spyOn(harness.threadListStateController, "loadActiveThreadState")
+      .mockResolvedValue(ACTIVE_THREAD_STATE);
+    const loadArchivedThreadStateSpy = vi
+      .spyOn(harness.threadListStateController, "loadArchivedThreadState")
+      .mockResolvedValue({
+        didChangeArchivedThreads: true,
+        nextArchivedThreads: THREADS,
+        isTruncated: false,
+        loadedFromCache: false,
+      });
+    vi.spyOn(harness.capabilityServerClient, "readHealthStatus").mockResolvedValue(HEALTH_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "listAgents").mockResolvedValue(AGENTS_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "listCollaborationModes").mockResolvedValue(
+      COLLABORATION_MODES_RESPONSE,
+    );
+    vi.spyOn(harness.capabilityServerClient, "listModels").mockResolvedValue(MODELS_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "readConfigDefaults").mockResolvedValue(
+      CONFIG_DEFAULTS_RESPONSE,
+    );
+
+    const loaders = await renderHarness(harness.input);
+
+    await act(async () => {
+      await loaders.loadCoreDataTracked();
+    });
+
+    expect(loadActiveThreadStateSpy).toHaveBeenCalledTimes(1);
+    expect(loadArchivedThreadStateSpy).toHaveBeenCalledTimes(0);
+    expect(harness.input.lastCoreRefreshAtRef.current).toBeGreaterThan(0);
+  });
+
+  it("refreshes archived threads during tracked core refresh after archived surface is loaded", async () => {
+    const harness = createHarness("chat");
+    harness.input.hasLoadedArchivedThreadsRef.current = true;
     const loadActiveThreadStateSpy = vi
       .spyOn(harness.threadListStateController, "loadActiveThreadState")
       .mockResolvedValue(ACTIVE_THREAD_STATE);

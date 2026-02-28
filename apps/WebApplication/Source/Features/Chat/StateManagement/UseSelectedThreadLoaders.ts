@@ -109,6 +109,28 @@ function resolveIncludeReadThreadForThreadRead(includeReadThread: boolean | unde
   return includeReadThread ?? DEFAULT_INCLUDE_READ_THREAD;
 }
 
+interface ResolveReadThreadDeltaPreferenceInput {
+  includeReadThread: boolean;
+  canReadLiveState: boolean;
+  canReadStreamEvents: boolean;
+  streamEventsSinceSequence: number | null;
+  hasPersistedSnapshot: boolean;
+}
+
+function shouldUseStreamDeltaRefreshWithoutReadThread(
+  input: ResolveReadThreadDeltaPreferenceInput,
+): boolean {
+  // Once we have a trusted baseline snapshot and a stream cursor, live-state + stream delta reads
+  // keep selected-thread state fresh without issuing a full read-thread request each refresh.
+  if (!input.includeReadThread) {
+    return false;
+  }
+  if (!input.canReadLiveState || !input.canReadStreamEvents) {
+    return false;
+  }
+  return input.hasPersistedSnapshot || input.streamEventsSinceSequence !== null;
+}
+
 /**
  * Thin composition hook for selected-thread loading orchestration.
  * Mutable state updates and cursor tracking are owned by SelectedThreadSnapshotStateOwner.
@@ -142,23 +164,7 @@ export function useSelectedThreadLoaders(
         selectedAgentId: input.selectedAgentId,
         agentsById: input.agentsById,
       });
-      const streamEventsSinceSequence = readCapabilities.canReadStreamEvents
-        ? snapshotStateOwner.readStreamEventsSinceSequence(threadId)
-        : null;
-      const snapshotPromise = input.selectedThreadDataRefreshCoordinator.readSnapshot({
-        threadId,
-        includeTurns,
-        includeReadThread,
-        canReadLiveState: readCapabilities.canReadLiveState,
-        canReadStreamEvents: readCapabilities.canReadStreamEvents,
-        streamEventsSinceSequence,
-        chatClient: input.chatServerClient,
-        ...(signal ? { signal } : {}),
-      });
-      const persistedSnapshotPromise =
-        input.selectedThreadSnapshotCacheStore.readSnapshot(threadId);
-
-      const persistedSnapshot = await persistedSnapshotPromise;
+      const persistedSnapshot = await input.selectedThreadSnapshotCacheStore.readSnapshot(threadId);
       if (
         persistedSnapshot !== null &&
         !snapshotStateOwner.shouldSkipSnapshotApply(threadId, signal)
@@ -173,7 +179,33 @@ export function useSelectedThreadLoaders(
         });
       }
 
-      const snapshot = await snapshotPromise;
+      if (snapshotStateOwner.shouldSkipSnapshotApply(threadId, signal)) {
+        return;
+      }
+
+      const streamEventsSinceSequence = readCapabilities.canReadStreamEvents
+        ? snapshotStateOwner.readStreamEventsSinceSequence(threadId)
+        : null;
+      const includeReadThreadForRefresh = shouldUseStreamDeltaRefreshWithoutReadThread({
+        includeReadThread,
+        canReadLiveState: readCapabilities.canReadLiveState,
+        canReadStreamEvents: readCapabilities.canReadStreamEvents,
+        streamEventsSinceSequence,
+        hasPersistedSnapshot: persistedSnapshot !== null,
+      })
+        ? false
+        : includeReadThread;
+      const snapshot = await input.selectedThreadDataRefreshCoordinator.readSnapshot({
+        threadId,
+        includeTurns,
+        includeReadThread: includeReadThreadForRefresh,
+        canReadLiveState: readCapabilities.canReadLiveState,
+        canReadStreamEvents: readCapabilities.canReadStreamEvents,
+        streamEventsSinceSequence,
+        baselineLiveStateSnapshot: persistedSnapshot?.liveStateSnapshot ?? null,
+        chatClient: input.chatServerClient,
+        ...(signal ? { signal } : {}),
+      });
 
       if (snapshotStateOwner.shouldSkipSnapshotApply(threadId, signal)) {
         return;

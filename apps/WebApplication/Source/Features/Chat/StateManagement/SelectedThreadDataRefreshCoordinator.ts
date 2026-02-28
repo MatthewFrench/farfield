@@ -41,6 +41,7 @@ export interface SelectedThreadDataRefreshInput {
   canReadLiveState: boolean;
   canReadStreamEvents: boolean;
   streamEventsSinceSequence: number | null;
+  baselineLiveStateSnapshot?: SelectedThreadLiveStateSnapshot | null;
   chatClient: SelectedThreadDataRefreshChatClient;
   signal?: AbortSignal;
 }
@@ -132,6 +133,26 @@ export class SelectedThreadDataRefreshCoordinator {
             includeTurnsUsedForRead: input.includeTurns,
           });
 
+    if (this.shouldReadStreamEventsBeforeLiveState(input)) {
+      const streamEventsSnapshot = await this.readStreamEventsSnapshot(input);
+      const [liveStateSnapshot, readThreadSnapshotResult] = await Promise.all([
+        this.readLiveStateSnapshotAfterStreamRead(input, streamEventsSnapshot),
+        readThreadSnapshotPromise,
+      ]);
+
+      return {
+        liveStateSnapshot,
+        streamEventsSnapshot,
+        streamEventsSinceSequenceUsed: input.streamEventsSinceSequence,
+        readThreadSnapshot: readThreadSnapshotResult.readThreadSnapshot,
+        includeTurnsUsedForRead: readThreadSnapshotResult.includeTurnsUsedForRead,
+        containsAnyTurns: this.hasAnyTurns(
+          liveStateSnapshot,
+          readThreadSnapshotResult.readThreadSnapshot,
+        ),
+      };
+    }
+
     const [liveStateSnapshot, streamEventsSnapshot, readThreadSnapshotResult] = await Promise.all([
       this.readLiveStateSnapshot(input),
       this.readStreamEventsSnapshot(input),
@@ -149,6 +170,32 @@ export class SelectedThreadDataRefreshCoordinator {
         readThreadSnapshotResult.readThreadSnapshot,
       ),
     };
+  }
+
+  private shouldReadStreamEventsBeforeLiveState(input: SelectedThreadDataRefreshInput): boolean {
+    return (
+      input.canReadLiveState &&
+      input.canReadStreamEvents &&
+      !input.includeReadThread &&
+      input.streamEventsSinceSequence !== null &&
+      input.baselineLiveStateSnapshot !== null &&
+      input.baselineLiveStateSnapshot !== undefined
+    );
+  }
+
+  private async readLiveStateSnapshotAfterStreamRead(
+    input: SelectedThreadDataRefreshInput,
+    streamEventsSnapshot: SelectedThreadStreamEventsSnapshot,
+  ): Promise<SelectedThreadLiveStateSnapshot> {
+    if (
+      input.baselineLiveStateSnapshot !== null &&
+      input.baselineLiveStateSnapshot !== undefined &&
+      !streamEventsSnapshot.resetRequired &&
+      streamEventsSnapshot.events.length === 0
+    ) {
+      return input.baselineLiveStateSnapshot;
+    }
+    return this.readLiveStateSnapshot(input);
   }
 
   private async readLiveStateSnapshot(

@@ -20,15 +20,25 @@ function buildLiveStateSnapshot(
   };
 }
 
-function buildStreamEventsSnapshot(threadId: string): SelectedThreadStreamEventsSnapshot {
+interface BuildStreamEventsSnapshotOptions {
+  events?: SelectedThreadStreamEventsSnapshot["events"];
+  nextSequence?: number;
+  firstAvailableSequence?: number;
+  resetRequired?: boolean;
+}
+
+function buildStreamEventsSnapshot(
+  threadId: string,
+  options?: BuildStreamEventsSnapshotOptions,
+): SelectedThreadStreamEventsSnapshot {
   return {
     ok: true,
     threadId,
     ownerClientId: null,
-    events: [],
-    nextSequence: 0,
-    firstAvailableSequence: 0,
-    resetRequired: false,
+    events: options?.events ?? [],
+    nextSequence: options?.nextSequence ?? 0,
+    firstAvailableSequence: options?.firstAvailableSequence ?? 0,
+    resetRequired: options?.resetRequired ?? false,
   };
 }
 
@@ -295,6 +305,90 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     expect(chatClient.readStreamEvents).toHaveBeenCalledWith("thread-5", {
       sinceSequence: 44,
     });
+  });
+
+  it("reuses baseline live-state snapshot when cursor-scoped stream reads report no changes", async () => {
+    const coordinator = new SelectedThreadDataRefreshCoordinator();
+    const baselineLiveState = buildLiveStateSnapshot("thread-5a", {
+      id: "thread-5a",
+      turns: [
+        {
+          id: "turn-baseline",
+          status: "completed",
+          items: [],
+        },
+      ],
+      requests: [],
+      updatedAt: 1_700_000_000,
+      latestModel: "gpt-5.3-codex",
+      latestReasoningEffort: "medium",
+      latestCollaborationMode: {
+        mode: "default",
+        settings: {
+          model: "gpt-5.3-codex",
+          reasoning_effort: "medium",
+          developer_instructions: null,
+        },
+      },
+    });
+    const chatClient = createChatClient({
+      readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
+      readStreamEvents: vi.fn(async (threadId: string) =>
+        buildStreamEventsSnapshot(threadId, {
+          nextSequence: 27,
+          firstAvailableSequence: 0,
+          resetRequired: false,
+        }),
+      ),
+    });
+
+    const snapshot = await coordinator.readSnapshot({
+      threadId: "thread-5a",
+      includeTurns: false,
+      includeReadThread: false,
+      canReadLiveState: true,
+      canReadStreamEvents: true,
+      streamEventsSinceSequence: 26,
+      baselineLiveStateSnapshot: baselineLiveState,
+      chatClient,
+    });
+
+    expect(chatClient.readLiveState).not.toHaveBeenCalled();
+    expect(snapshot.liveStateSnapshot).toBe(baselineLiveState);
+  });
+
+  it("reads live state when cursor-scoped stream reads include new events", async () => {
+    const coordinator = new SelectedThreadDataRefreshCoordinator();
+    const chatClient = createChatClient({
+      readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
+      readStreamEvents: vi.fn(async (threadId: string) =>
+        buildStreamEventsSnapshot(threadId, {
+          events: [
+            {
+              type: "broadcast",
+              method: "thread-stream-state-changed",
+              params: {},
+            },
+          ],
+          nextSequence: 28,
+          firstAvailableSequence: 0,
+          resetRequired: false,
+        }),
+      ),
+    });
+
+    await coordinator.readSnapshot({
+      threadId: "thread-5b",
+      includeTurns: false,
+      includeReadThread: false,
+      canReadLiveState: true,
+      canReadStreamEvents: true,
+      streamEventsSinceSequence: 27,
+      baselineLiveStateSnapshot: buildLiveStateSnapshot("thread-5b", null),
+      chatClient,
+    });
+
+    expect(chatClient.readLiveState).toHaveBeenCalledTimes(1);
   });
 
   it("passes abort signals to live-state, stream-events, and read-thread reads", async () => {
