@@ -21,6 +21,7 @@ export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   readAuthStatus: "AppServerGetAuthStatusResponse",
   readAccountRateLimits: "AppServerGetAccountRateLimitsResponse",
   readUserInfo: "AppServerUserInfoResponse",
+  gitDiffToRemote: "AppServerGitDiffToRemoteResponse",
   uploadFeedback: "AppServerFeedbackUploadResponse",
   executeCommand: "AppServerCommandExecResponse",
   writeConfigBatch: "AppServerConfigWriteResponse",

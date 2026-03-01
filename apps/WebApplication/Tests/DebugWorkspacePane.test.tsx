@@ -87,6 +87,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastConfigBatchWriteResult: null,
   lastConfigValueWriteResult: null,
   lastFeedbackUploadResult: null,
+  lastGitDiffToRemoteResult: null,
   onRefreshCoverageDiagnostics: () => {},
   onStartAccountLogin: () => {},
   onCancelAccountLogin: () => {},
@@ -97,6 +98,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onWriteConfigBatch: () => {},
   onWriteSkillsConfig: () => {},
   onExportRemoteSkill: () => {},
+  onReadGitDiffToRemote: () => {},
   onExecuteCommand: () => {},
   onUploadFeedback: () => {},
 };

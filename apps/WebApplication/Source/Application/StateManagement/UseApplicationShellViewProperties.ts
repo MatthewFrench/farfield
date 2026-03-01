@@ -147,6 +147,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastConfigBatchWriteResult: DebugWorkspacePaneProps["lastConfigBatchWriteResult"];
   lastConfigValueWriteResult: DebugWorkspacePaneProps["lastConfigValueWriteResult"];
   lastFeedbackUploadResult: DebugWorkspacePaneProps["lastFeedbackUploadResult"];
+  lastGitDiffToRemoteResult: DebugWorkspacePaneProps["lastGitDiffToRemoteResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -163,6 +164,7 @@ export interface UseApplicationShellViewPropertiesInput {
   writeConfigBatch: (edits: string, filePath?: string, expectedVersion?: string) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
+  readGitDiffToRemote: (cwd: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -414,6 +416,7 @@ function buildDebugWorkspacePaneProperties(
     lastConfigBatchWriteResult: input.lastConfigBatchWriteResult,
     lastConfigValueWriteResult: input.lastConfigValueWriteResult,
     lastFeedbackUploadResult: input.lastFeedbackUploadResult,
+    lastGitDiffToRemoteResult: input.lastGitDiffToRemoteResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
     onCancelAccountLogin: input.cancelAccountLogin,
@@ -424,6 +427,7 @@ function buildDebugWorkspacePaneProperties(
     onWriteConfigBatch: input.writeConfigBatch,
     onWriteSkillsConfig: input.writeSkillsConfig,
     onExportRemoteSkill: input.exportRemoteSkill,
+    onReadGitDiffToRemote: input.readGitDiffToRemote,
     onExecuteCommand: input.executeCommand,
     onUploadFeedback: input.uploadFeedback,
   };
@@ -621,6 +625,7 @@ export function useApplicationShellViewProperties(
       input.lastConfigBatchWriteResult,
       input.lastConfigValueWriteResult,
       input.lastFeedbackUploadResult,
+      input.lastGitDiffToRemoteResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
       input.cancelAccountLogin,
@@ -631,6 +636,7 @@ export function useApplicationShellViewProperties(
       input.writeConfigBatch,
       input.writeSkillsConfig,
       input.exportRemoteSkill,
+      input.readGitDiffToRemote,
       input.executeCommand,
       input.uploadFeedback,
       input.replayHistoryEntryFromDetail,

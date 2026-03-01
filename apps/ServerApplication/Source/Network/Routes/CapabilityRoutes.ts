@@ -15,6 +15,7 @@ import type {
   AgentCommandExecutionResult,
   AgentConfigDefaults,
   AgentExportRemoteSkillResult,
+  AgentGitDiffToRemoteResult,
   AgentId,
   AgentListAppsResult,
   AgentListExperimentalFeaturesResult,
@@ -52,6 +53,7 @@ const CapabilityRoutePathnameByName = {
   accountRateLimits: "/api/account/rate-limits",
   accountUserInfo: "/api/account/user-info",
   feedbackUpload: "/api/feedback/upload",
+  gitDiffToRemote: "/api/git/diff-remote",
   accountLoginStart: "/api/account/login/start",
   accountLoginCancel: "/api/account/login/cancel",
   accountLogout: "/api/account/logout",
@@ -115,6 +117,7 @@ const CapabilityRouteLogEventByName = {
   accountRateLimitsReadFailed: "account-rate-limits-read-failed",
   accountUserInfoReadFailed: "account-user-info-read-failed",
   feedbackUploadFailed: "feedback-upload-failed",
+  gitDiffToRemoteFailed: "git-diff-to-remote-failed",
   commandExecFailed: "command-exec-failed",
   accountLoginStartFailed: "account-login-start-failed",
   accountLoginCancelFailed: "account-login-cancel-failed",
@@ -153,6 +156,9 @@ const CapabilityRouteErrorMessagePrefixByName = {
   invalidFeedbackReason: "Invalid reason query parameter.",
   invalidFeedbackThreadId: "Invalid threadId query parameter.",
   failedToUploadFeedback: "Failed to upload feedback: ",
+  missingGitDiffWorkingDirectory: "Missing cwd query parameter.",
+  invalidGitDiffWorkingDirectory: "Invalid cwd query parameter.",
+  failedToReadGitDiffToRemote: "Failed to read git diff to remote: ",
   missingCommand: "Missing command query parameter. Use repeated command query values.",
   invalidCommand: "Invalid command query parameter. Expected non-empty command arguments.",
   invalidTimeoutMilliseconds: "Invalid timeoutMs query parameter.",
@@ -207,6 +213,7 @@ const CapabilityRouteTimeoutLabelByName = {
   accountRateLimitsRead: "account rate limits read",
   accountUserInfoRead: "user info read",
   feedbackUpload: "feedback upload",
+  gitDiffToRemote: "git diff to remote",
   commandExec: "command execution",
   accountLoginStart: "account login start",
   accountLoginCancel: "account login cancel",
@@ -275,6 +282,10 @@ type CapabilityAccountUserInfoResponseBody = AgentReadUserInfoResult & {
 };
 
 type CapabilityFeedbackUploadResponseBody = AgentUploadFeedbackResult & {
+  ok: true;
+};
+
+type CapabilityGitDiffToRemoteResponseBody = AgentGitDiffToRemoteResult & {
   ok: true;
 };
 
@@ -622,6 +633,15 @@ function mapAccountUserInfoResponse(
 function mapFeedbackUploadResponse(
   result: AgentUploadFeedbackResult,
 ): CapabilityFeedbackUploadResponseBody {
+  return {
+    ok: true,
+    ...result,
+  };
+}
+
+function mapGitDiffToRemoteResponse(
+  result: AgentGitDiffToRemoteResult,
+): CapabilityGitDiffToRemoteResponseBody {
   return {
     ok: true,
     ...result,
@@ -1403,6 +1423,95 @@ async function handleFeedbackUploadRoute(deps: CapabilityRouteDependencies): Pro
     jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
       ok: false,
       error: `${CapabilityRouteErrorMessagePrefixByName.failedToUploadFeedback}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleGitDiffToRemoteRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.get,
+      CapabilityRoutePathnameByName.gitDiffToRemote,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const workingDirectoryRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.cwd);
+  if (workingDirectoryRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingGitDiffWorkingDirectory,
+    });
+    return true;
+  }
+  const workingDirectory = parseOptionalWorkingDirectoryQueryValue(workingDirectoryRaw);
+  if (workingDirectory === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidGitDiffWorkingDirectory,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (!adapter || !adapter.isEnabled() || !adapter.gitDiffToRemote) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadGitDiffToRemote}Git diff to remote is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.gitDiffToRemote({
+        cwd: workingDirectory,
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.gitDiffToRemote,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapGitDiffToRemoteResponse(result));
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        cwd: workingDirectory,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.gitDiffToRemoteFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadGitDiffToRemote}${message}`,
     });
   }
 
@@ -2947,8 +3056,8 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
  * Owns capability route dispatch (`/api/config/defaults`, `/api/config-requirements`,
  * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/auth-status`,
  * `/api/account/rate-limits`, `/api/account/user-info`, `/api/feedback/upload`,
- * `/api/commands/exec`, `/api/account/login/start`, `/api/account/login/cancel`,
- * `/api/account/logout`,
+ * `/api/git/diff-remote`, `/api/commands/exec`, `/api/account/login/start`,
+ * `/api/account/login/cancel`, `/api/account/logout`,
  * `/api/config/batch/write`, `/api/config/value/write`, `/api/mcp-servers/oauth/login`, `/api/skills/config/write`,
  * `/api/skills/remote/list`, `/api/skills/remote/export`, `/api/models`,
  * `/api/collaboration-modes`, `/api/experimental-features`,
@@ -2975,6 +3084,9 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleFeedbackUploadRoute(deps)) {
+    return true;
+  }
+  if (await handleGitDiffToRemoteRoute(deps)) {
     return true;
   }
   if (await handleCommandExecRoute(deps)) {

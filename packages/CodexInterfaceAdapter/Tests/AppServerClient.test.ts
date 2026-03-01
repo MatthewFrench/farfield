@@ -1136,6 +1136,29 @@ describe("AppServerClient.uploadFeedback", () => {
   });
 });
 
+describe("AppServerClient.gitDiffToRemote", () => {
+  it("sends gitDiffToRemote request and maps diff response contracts", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      sha: "abc123def456",
+      diff: "diff --git a/file.ts b/file.ts\nindex 1..2 100644\n--- a/file.ts\n+++ b/file.ts\n",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.gitDiffToRemote({
+      cwd: "/tmp/workspace",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("gitDiffToRemote", {
+      cwd: "/tmp/workspace",
+    });
+    expect(result).toEqual({
+      sha: "abc123def456",
+      diff: "diff --git a/file.ts b/file.ts\nindex 1..2 100644\n--- a/file.ts\n+++ b/file.ts\n",
+    });
+  });
+});
+
 describe("AppServerClient.writeConfigValue", () => {
   it("sends config/value/write payload and returns typed config write result", async () => {
     const transportDouble = createTransportDouble();

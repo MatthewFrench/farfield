@@ -17,6 +17,7 @@ import {
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
   type DebugAppServerCoverageFeedbackUploadResult,
+  type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
 } from "../DomainModel/DebugAppServerCoverageContracts";
@@ -28,9 +29,7 @@ import {
   mapAccount,
   mapApps,
   mapAuthStatus,
-  mapCommandExecutionResult,
   mapExperimentalFeatures,
-  mapFeedbackUploadResult,
   mapMcpServers,
   mapPendingAccountLogin,
   mapRateLimitSnapshot,
@@ -39,6 +38,11 @@ import {
   mapSkills,
   mapUserInfo,
 } from "./DebugAppServerCoverageDiagnosticsMappers";
+import {
+  runCommandExecutionAction,
+  runFeedbackUploadAction,
+  runGitDiffToRemoteAction,
+} from "./DebugAppServerCoverageMutationActionRunners";
 
 const COVERAGE_WORKSPACE_SECTION: DebugWorkspaceSection = "coverage";
 
@@ -69,6 +73,7 @@ export interface DebugAppServerCoverageDiagnostics {
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
+  lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -85,6 +90,7 @@ export interface DebugAppServerCoverageDiagnostics {
   writeConfigBatch: (edits: string, filePath?: string, expectedVersion?: string) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
+  readGitDiffToRemote: (cwd: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -233,6 +239,8 @@ export function useDebugAppServerCoverageDiagnostics(
     useState<DebugAppServerCoverageConfigValueWriteResult | null>(null);
   const [lastFeedbackUploadResult, setLastFeedbackUploadResult] =
     useState<DebugAppServerCoverageFeedbackUploadResult | null>(null);
+  const [lastGitDiffToRemoteResult, setLastGitDiffToRemoteResult] =
+    useState<DebugAppServerCoverageGitDiffToRemoteResult | null>(null);
   const requestSerialRef = useRef(0);
 
   const refreshCoverageDiagnostics = useCallback(() => {
@@ -467,103 +475,49 @@ export function useDebugAppServerCoverageDiagnostics(
     [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics],
   );
 
+  const readGitDiffToRemote = useCallback(
+    (cwd: string) => {
+      runGitDiffToRemoteAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        cwd,
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastGitDiffToRemoteResult,
+      });
+    },
+    [input.capabilityServerClient, isRunningCoverageAction],
+  );
+
   const executeCommand = useCallback(
     (command: string[], timeoutMs?: number, cwd?: string) => {
-      if (isRunningCoverageAction) {
-        return;
-      }
-      if (command.length === 0) {
-        return;
-      }
-      const normalizedCommand = command.map((entry) => entry.trim());
-      if (normalizedCommand.some((entry) => entry.length === 0)) {
-        return;
-      }
-      const normalizedWorkingDirectory = cwd?.trim();
-      if (
-        cwd !== undefined &&
-        normalizedWorkingDirectory !== undefined &&
-        normalizedWorkingDirectory.length === 0
-      ) {
-        return;
-      }
-
-      setIsRunningCoverageAction(true);
-      setCoverageActionErrorMessage("");
-
-      void (async () => {
-        try {
-          const response = await input.capabilityServerClient.executeCommand({
-            actionName: COVERAGE_MUTATION_OPERATION_NAME,
-            command: normalizedCommand,
-            ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-            ...(normalizedWorkingDirectory !== undefined
-              ? { cwd: normalizedWorkingDirectory }
-              : {}),
-          });
-          setLastCommandExecutionResult(mapCommandExecutionResult(response, normalizedCommand));
-        } catch (error) {
-          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
-        } finally {
-          setIsRunningCoverageAction(false);
-        }
-      })();
+      runCommandExecutionAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        command,
+        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+        ...(cwd !== undefined ? { cwd } : {}),
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastCommandExecutionResult,
+      });
     },
     [input.capabilityServerClient, isRunningCoverageAction],
   );
 
   const uploadFeedback = useCallback(
     (classification: string, includeLogs: boolean, reason?: string, threadId?: string) => {
-      if (isRunningCoverageAction) {
-        return;
-      }
-
-      const normalizedClassification = classification.trim();
-      if (normalizedClassification.length === 0) {
-        return;
-      }
-
-      const normalizedReason = reason?.trim();
-      if (reason !== undefined && normalizedReason !== undefined && normalizedReason.length === 0) {
-        return;
-      }
-
-      const normalizedThreadId = threadId?.trim();
-      if (
-        threadId !== undefined &&
-        normalizedThreadId !== undefined &&
-        normalizedThreadId.length === 0
-      ) {
-        return;
-      }
-
-      setIsRunningCoverageAction(true);
-      setCoverageActionErrorMessage("");
-
-      void (async () => {
-        try {
-          const response = await input.capabilityServerClient.uploadFeedback({
-            actionName: COVERAGE_MUTATION_OPERATION_NAME,
-            classification: normalizedClassification,
-            includeLogs,
-            ...(normalizedReason !== undefined ? { reason: normalizedReason } : {}),
-            ...(normalizedThreadId !== undefined ? { threadId: normalizedThreadId } : {}),
-          });
-          setLastFeedbackUploadResult(
-            mapFeedbackUploadResult(
-              response,
-              normalizedClassification,
-              includeLogs,
-              normalizedReason ?? null,
-              normalizedThreadId ?? null,
-            ),
-          );
-        } catch (error) {
-          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
-        } finally {
-          setIsRunningCoverageAction(false);
-        }
-      })();
+      runFeedbackUploadAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        classification,
+        includeLogs,
+        ...(reason !== undefined ? { reason } : {}),
+        ...(threadId !== undefined ? { threadId } : {}),
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastFeedbackUploadResult,
+      });
     },
     [input.capabilityServerClient, isRunningCoverageAction],
   );
@@ -594,6 +548,7 @@ export function useDebugAppServerCoverageDiagnostics(
     lastConfigBatchWriteResult,
     lastConfigValueWriteResult,
     lastFeedbackUploadResult,
+    lastGitDiffToRemoteResult,
     refreshCoverageDiagnostics,
     startAccountLogin,
     cancelAccountLogin,
@@ -604,6 +559,7 @@ export function useDebugAppServerCoverageDiagnostics(
     writeConfigBatch,
     writeSkillsConfig,
     exportRemoteSkill,
+    readGitDiffToRemote,
     executeCommand,
     uploadFeedback,
   };

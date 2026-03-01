@@ -14,6 +14,7 @@ configRequirements/read
 experimentalFeature/list
 feedback/upload
 getAuthStatus
+gitDiffToRemote
 initialize
 mcpServer/oauth/login
 mcpServerStatus/list

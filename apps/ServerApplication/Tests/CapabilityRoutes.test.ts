@@ -23,6 +23,8 @@ import type {
   AgentCreateThreadResult,
   AgentExportRemoteSkillInput,
   AgentExportRemoteSkillResult,
+  AgentGitDiffToRemoteInput,
+  AgentGitDiffToRemoteResult,
   AgentId,
   AgentInterruptInput,
   AgentListAppsResult,
@@ -262,6 +264,14 @@ const CapabilityFeedbackUploadEnvelopeSchema = z
   })
   .strict();
 
+const CapabilityGitDiffToRemoteEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    sha: z.string().min(1),
+    diff: z.string(),
+  })
+  .strict();
+
 const CapabilityExperimentalFeaturesEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -361,6 +371,7 @@ interface MockAgentAdapterOptions {
   readAccountRateLimits?: () => Promise<AgentReadAccountRateLimitsResult>;
   readUserInfo?: () => Promise<AgentReadUserInfoResult>;
   uploadFeedback?: (input: AgentUploadFeedbackInput) => Promise<AgentUploadFeedbackResult>;
+  gitDiffToRemote?: (input: AgentGitDiffToRemoteInput) => Promise<AgentGitDiffToRemoteResult>;
   executeCommand?: (input: AgentCommandExecutionInput) => Promise<AgentCommandExecutionResult>;
   startAccountLogin?: (input: AgentStartAccountLoginInput) => Promise<AgentStartAccountLoginResult>;
   cancelAccountLogin?: (
@@ -499,6 +510,10 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.uploadFeedback) {
     adapter.uploadFeedback = options.uploadFeedback;
+  }
+
+  if (options.gitDiffToRemote) {
+    adapter.gitDiffToRemote = options.gitDiffToRemote;
   }
 
   if (options.executeCommand) {
@@ -1044,6 +1059,68 @@ describe("handleCapabilityRoutes", () => {
     expect(parsedEnvelope).toEqual({
       ok: true,
       threadId: "thread-feedback-9",
+    });
+  });
+
+  it("returns 400 when git diff route omits cwd", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/git/diff-remote",
+      url: new URL("http://localhost/api/git/diff-remote"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing cwd query parameter.",
+    });
+  });
+
+  it("returns 400 when git diff route includes empty cwd", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/git/diff-remote",
+      url: new URL("http://localhost/api/git/diff-remote?cwd=%20"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Invalid cwd query parameter.",
+    });
+  });
+
+  it("reads git diff to remote when adapter supports the method", async () => {
+    const gitDiffToRemoteSpy = vi.fn(
+      async (): Promise<AgentGitDiffToRemoteResult> => ({
+        sha: "abc123def456",
+        diff: "diff --git a/file.ts b/file.ts",
+      }),
+    );
+
+    const result = await executeCapabilityRoute({
+      pathname: "/api/git/diff-remote",
+      url: new URL("http://localhost/api/git/diff-remote?agentId=codex&cwd=/tmp/workspace"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          gitDiffToRemote: gitDiffToRemoteSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(gitDiffToRemoteSpy).toHaveBeenCalledWith({
+      cwd: "/tmp/workspace",
+    });
+    const parsedEnvelope = CapabilityGitDiffToRemoteEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      sha: "abc123def456",
+      diff: "diff --git a/file.ts b/file.ts",
     });
   });
 

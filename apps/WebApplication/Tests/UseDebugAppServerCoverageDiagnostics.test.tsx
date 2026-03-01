@@ -202,6 +202,13 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       stdout: "/tmp/project\n",
       stderr: "",
     });
+    const readGitDiffToRemote = vi
+      .spyOn(capabilityServerClient, "readGitDiffToRemote")
+      .mockResolvedValue({
+        ok: true,
+        sha: "abc123def456",
+        diff: "diff --git a/file.ts b/file.ts",
+      });
     const writeConfigValue = vi
       .spyOn(capabilityServerClient, "writeConfigValue")
       .mockResolvedValue({
@@ -288,6 +295,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       "/tmp/project/.codex/config.toml",
       "v2",
     );
+    latestDiagnostics.current?.readGitDiffToRemote("/tmp/project");
     latestDiagnostics.current?.executeCommand(["pwd"], 1200, "/tmp/project");
     latestDiagnostics.current?.writeSkillsConfig(
       "/tmp/project/.codex/skills/checks/SKILL.md",
@@ -311,6 +319,10 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         command: ["pwd"],
         timeoutMs: 1200,
+        cwd: "/tmp/project",
+      });
+      expect(readGitDiffToRemote).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
         cwd: "/tmp/project",
       });
       expect(writeConfigValue).toHaveBeenCalledWith({
@@ -388,6 +400,12 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         requestedThreadId: "thread-1",
         reportedThreadId: "thread-coverage-feedback",
         uploadedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastGitDiffToRemoteResult).toEqual({
+        cwd: "/tmp/project",
+        sha: "abc123def456",
+        diff: "diff --git a/file.ts b/file.ts",
+        readAtIso8601: expect.any(String),
       });
     });
 

@@ -34,6 +34,8 @@ export type {
   FeedbackUploadOptions,
   FeedbackUploadResult,
   ForkThreadOptions,
+  GitDiffToRemoteOptions,
+  GitDiffToRemoteResult,
   ListAppsOptions,
   ListAppsResult,
   ListExperimentalFeaturesOptions,

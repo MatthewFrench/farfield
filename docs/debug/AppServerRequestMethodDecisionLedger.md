@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-03-01 02:37:57Z
+Last Updated (UTC): 2026-03-01 06:45:00Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -36,7 +36,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `getConversationSummary` | Not used | Do not adopt | Deprecated upstream request family. |
 | `getUserAgent` | Not used | Do not adopt | Deprecated upstream request family. |
 | `getUserSavedConfig` | Not used | Do not adopt | Deprecated upstream request family. |
-| `gitDiffToRemote` | Not used | Do not adopt | Deprecated upstream request family. |
+| `gitDiffToRemote` | Used now | Keep | Exposed through capability ownership and debug workspace git-diff diagnostics action and rendered diff output. |
 | `initialize` | Used now | Keep | Required protocol handshake in transport owner. |
 | `interruptConversation` | Not used | Do not adopt | Deprecated upstream request family. |
 | `listConversations` | Not used | Do not adopt | Deprecated upstream request family. |
@@ -82,5 +82,5 @@ This ledger records recommended disposition for every upstream app-server client
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 42
-Not used: 32
+Used now: 43
+Not used: 31

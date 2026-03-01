@@ -13,6 +13,7 @@ import type {
   CapabilityConfigWriteMergeStrategy,
   CapabilityExperimentalFeaturesResponse,
   CapabilityFeedbackUploadResponse,
+  CapabilityGitDiffToRemoteResponse,
   CapabilityMcpServersResponse,
   CapabilityRemoteSkillsListResponse,
   CapabilitySkillsResponse,
@@ -26,6 +27,7 @@ import type {
   DebugAppServerCoverageConfigValueWriteResult,
   DebugAppServerCoverageExperimentalFeature,
   DebugAppServerCoverageFeedbackUploadResult,
+  DebugAppServerCoverageGitDiffToRemoteResult,
   DebugAppServerCoverageMcpServerSummary,
   DebugAppServerCoveragePendingAccountLogin,
   DebugAppServerCoverageRateLimitSnapshot,
@@ -245,5 +247,17 @@ export function mapFeedbackUploadResult(
     requestedThreadId,
     reportedThreadId: response.threadId,
     uploadedAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapGitDiffToRemoteResult(
+  response: CapabilityGitDiffToRemoteResponse,
+  cwd: string,
+): DebugAppServerCoverageGitDiffToRemoteResult {
+  return {
+    cwd,
+    sha: response.sha,
+    diff: response.diff,
+    readAtIso8601: new Date().toISOString(),
   };
 }

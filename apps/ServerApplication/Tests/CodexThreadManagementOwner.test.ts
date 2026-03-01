@@ -13,6 +13,8 @@ import {
   type FeedbackUploadOptions,
   type FeedbackUploadResult,
   type ForkThreadOptions,
+  type GitDiffToRemoteOptions,
+  type GitDiffToRemoteResult,
   type ListAppsOptions,
   type ListAppsResult,
   type ListExperimentalFeaturesOptions,
@@ -119,6 +121,7 @@ class TestAppServerClient extends AppServerClient {
   public readonly readAccountRateLimitsCalls: Array<undefined> = [];
   public readonly readUserInfoCalls: Array<undefined> = [];
   public readonly uploadFeedbackCalls: FeedbackUploadOptions[] = [];
+  public readonly gitDiffToRemoteCalls: GitDiffToRemoteOptions[] = [];
   public readonly executeCommandCalls: CommandExecutionOptions[] = [];
   public readonly startAccountLoginCalls: LoginAccountOptions[] = [];
   public readonly cancelAccountLoginCalls: CancelAccountLoginOptions[] = [];
@@ -149,6 +152,7 @@ class TestAppServerClient extends AppServerClient {
   private readonly readAccountRateLimitsResult: ReadAccountRateLimitsResult;
   private readonly readUserInfoResult: ReadUserInfoResult;
   private readonly uploadFeedbackResult: FeedbackUploadResult;
+  private readonly gitDiffToRemoteResult: GitDiffToRemoteResult;
   private readonly executeCommandResult: CommandExecutionResult;
   private readonly startAccountLoginResult: LoginAccountResult;
   private readonly cancelAccountLoginResult: CancelAccountLoginResult;
@@ -178,6 +182,7 @@ class TestAppServerClient extends AppServerClient {
     readAccountRateLimitsResult?: ReadAccountRateLimitsResult;
     readUserInfoResult?: ReadUserInfoResult;
     uploadFeedbackResult?: FeedbackUploadResult;
+    gitDiffToRemoteResult?: GitDiffToRemoteResult;
     executeCommandResult?: CommandExecutionResult;
     startAccountLoginResult?: LoginAccountResult;
     cancelAccountLoginResult?: CancelAccountLoginResult;
@@ -257,6 +262,10 @@ class TestAppServerClient extends AppServerClient {
     };
     this.uploadFeedbackResult = input?.uploadFeedbackResult ?? {
       threadId: "thread-feedback-1",
+    };
+    this.gitDiffToRemoteResult = input?.gitDiffToRemoteResult ?? {
+      sha: "abc123def456",
+      diff: "diff --git a/file.ts b/file.ts",
     };
     this.executeCommandResult = input?.executeCommandResult ?? {
       exitCode: 0,
@@ -445,6 +454,13 @@ class TestAppServerClient extends AppServerClient {
   ): Promise<FeedbackUploadResult> {
     this.uploadFeedbackCalls.push(options);
     return this.uploadFeedbackResult;
+  }
+
+  public override async gitDiffToRemote(
+    options: GitDiffToRemoteOptions,
+  ): Promise<GitDiffToRemoteResult> {
+    this.gitDiffToRemoteCalls.push(options);
+    return this.gitDiffToRemoteResult;
   }
 
   public override async executeCommand(
@@ -1288,6 +1304,30 @@ describe("CodexThreadManagementOwner", () => {
       exitCode: 0,
       stdout: "/tmp/workspace\n",
       stderr: "",
+    });
+  });
+
+  it("reads git diff to remote through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      gitDiffToRemoteResult: {
+        sha: "abc123def456",
+        diff: "diff --git a/file.ts b/file.ts",
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.gitDiffToRemote({
+      cwd: "/tmp/workspace",
+    });
+
+    expect(appClient.gitDiffToRemoteCalls).toEqual([
+      {
+        cwd: "/tmp/workspace",
+      },
+    ]);
+    expect(result).toEqual({
+      sha: "abc123def456",
+      diff: "diff --git a/file.ts b/file.ts",
     });
   });
 

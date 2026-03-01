@@ -24,6 +24,8 @@ import type {
   AgentCreateThreadResult,
   AgentExportRemoteSkillInput,
   AgentExportRemoteSkillResult,
+  AgentGitDiffToRemoteInput,
+  AgentGitDiffToRemoteResult,
   AgentInterruptInput,
   AgentListAppsInput,
   AgentListAppsResult,
@@ -367,6 +369,12 @@ export class CodexAgentAdapter implements AgentAdapter {
 
   public async uploadFeedback(input: AgentUploadFeedbackInput): Promise<AgentUploadFeedbackResult> {
     return this.threadManagementOwner.uploadFeedback(input);
+  }
+
+  public async gitDiffToRemote(
+    input: AgentGitDiffToRemoteInput,
+  ): Promise<AgentGitDiffToRemoteResult> {
+    return this.threadManagementOwner.gitDiffToRemote(input);
   }
 
   public async executeCommand(

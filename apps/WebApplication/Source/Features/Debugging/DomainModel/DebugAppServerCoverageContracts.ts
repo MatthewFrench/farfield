@@ -106,6 +106,13 @@ export interface DebugAppServerCoverageFeedbackUploadResult {
   uploadedAtIso8601: string;
 }
 
+export interface DebugAppServerCoverageGitDiffToRemoteResult {
+  cwd: string;
+  sha: string;
+  diff: string;
+  readAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

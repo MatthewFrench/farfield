@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 02:37:57Z
+Last Updated (UTC): 2026-03-01 06:45:00Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `41 / 74` request methods (`55.4%`).
+1. Farfield app-server method coverage at request-owner layer: `42 / 74` request methods (`56.8%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `42 / 74` (`56.8%`).
+3. Effective request-method usage including transport-owned `initialize`: `43 / 74` (`58.1%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -98,6 +98,7 @@ As of the upstream snapshot above:
 | `model/list` | Model selector and capability snapshot | High | Explicit capability route ownership and strict envelope parsing | Keep current path |
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | High | Explicit capability ownership and strict envelope parsing | Keep current path |
 | `command/exec` | Command execution diagnostics action with visible stdout/stderr output in debug workspace coverage panel | Medium-high | Strict capability route ownership and typed command request/response mapping for operator diagnostics | Keep current path |
+| `gitDiffToRemote` | Git diff-to-remote diagnostics action with rendered patch output in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed working-directory query parsing and deterministic sha/diff mapping | Keep current path |
 | `config/read` | Config defaults resolution for model and reasoning effort | High | Normalized default resolution through typed owner mapping | Keep current path |
 | `config/batchWrite` | Config batch-write diagnostics action with explicit multi-edit payload testing in debug workspace coverage panel | Medium-high | Strict capability route ownership and typed edit-array request parsing with deterministic write-result mapping | Keep current path |
 | `configRequirements/read` | Config requirements diagnostics and workspace readiness signals | Medium-high | Strict capability route ownership with typed payload mapping into debug coverage diagnostics | Keep current path |
@@ -149,6 +150,7 @@ As of the upstream snapshot above:
 | `model/list` | Model selector and capability snapshot | `/api/models` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listModels` -> `AppServerClient.listModels` |
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | `/api/collaboration-modes` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listCollaborationModes` -> `AppServerClient.listCollaborationModes` |
 | `command/exec` | Command execution diagnostics action and output capture | `/api/commands/exec` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.executeCommand` -> `AppServerClient.executeCommand` |
+| `gitDiffToRemote` | Git diff-to-remote diagnostics action and patch output capture | `/api/git/diff-remote` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.gitDiffToRemote` -> `AppServerClient.gitDiffToRemote` |
 | `config/read` | Config defaults (`model`, `reasoningEffort`) | `/api/config/defaults` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigDefaults` -> `AppServerClient.readConfig` |
 | `config/batchWrite` | Config-batch mutation diagnostics action | `/api/config/batch/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeConfigBatch` -> `AppServerClient.writeConfigBatch` |
 | `config/value/write` | Config-value mutation diagnostics action | `/api/config/value/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeConfigValue` -> `AppServerClient.writeConfigValue` |
@@ -173,7 +175,7 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`33` request methods are not used by Farfield’s app-server client path:
+`32` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
@@ -190,7 +192,6 @@ fuzzyFileSearch/sessionUpdate
 getConversationSummary
 getUserAgent
 getUserSavedConfig
-gitDiffToRemote
 initialize
 interruptConversation
 listConversations
@@ -226,18 +227,17 @@ These are explicitly in the upstream deprecated request section and should not b
 7. `getConversationSummary`
 8. `getUserAgent`
 9. `getUserSavedConfig`
-10. `gitDiffToRemote`
-11. `interruptConversation`
-12. `listConversations`
-13. `loginApiKey`
-14. `loginChatGpt`
-15. `logoutChatGpt`
-16. `newConversation`
-17. `removeConversationListener`
-18. `resumeConversation`
-19. `sendUserTurn`
-20. `sendUserMessage`
-21. `setDefaultModel`
+10. `interruptConversation`
+11. `listConversations`
+12. `loginApiKey`
+13. `loginChatGpt`
+14. `logoutChatGpt`
+15. `newConversation`
+16. `removeConversationListener`
+17. `resumeConversation`
+18. `sendUserTurn`
+19. `sendUserMessage`
+20. `setDefaultModel`
 
 ### Category B: Auth, Account, and Tenant/Operator Surfaces Not Yet Wired in Farfield Product Flows
 
@@ -282,8 +282,8 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `33`
-2. Total methods listed across Category A-I: `33`
+1. Total non-intersection methods: `32`
+2. Total methods listed across Category A-I: `32`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

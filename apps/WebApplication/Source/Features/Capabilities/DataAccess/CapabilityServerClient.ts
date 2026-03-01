@@ -58,6 +58,8 @@ import {
   type ApiExportRemoteSkillOptions,
   type ApiFeedbackUploadOptions,
   type ApiFeedbackUploadResponse,
+  type ApiGitDiffToRemoteOptions,
+  type ApiGitDiffToRemoteResponse,
   type ApiListRemoteSkillsOptions,
   type ApiMcpServerOauthLoginOptions,
   type ApiMcpServerOauthLoginResponse,
@@ -70,6 +72,7 @@ import {
   listRemoteSkills,
   readAccountAuthStatus,
   readAccountUserInfo,
+  readGitDiffToRemote,
   startMcpServerOauthLogin,
   uploadFeedback,
   writeConfigBatch,
@@ -114,6 +117,8 @@ export type CapabilityConfigValueWriteOptions = ApiConfigValueWriteOptions;
 export type CapabilityConfigValueWriteResponse = ApiConfigValueWriteResponse;
 export type CapabilityFeedbackUploadOptions = ApiFeedbackUploadOptions;
 export type CapabilityFeedbackUploadResponse = ApiFeedbackUploadResponse;
+export type CapabilityGitDiffToRemoteOptions = ApiGitDiffToRemoteOptions;
+export type CapabilityGitDiffToRemoteResponse = ApiGitDiffToRemoteResponse;
 export type CapabilityListRemoteSkillsOptions = ApiListRemoteSkillsOptions;
 export type CapabilityRemoteSkillsListResponse = ApiRemoteSkillsListResponse;
 export type CapabilityExportRemoteSkillOptions = ApiExportRemoteSkillOptions;
@@ -237,6 +242,12 @@ export class CapabilityServerClient {
     input: CapabilityCommandExecutionOptions,
   ): Promise<CapabilityCommandExecutionResponse> {
     return executeCommand(input);
+  }
+
+  public async readGitDiffToRemote(
+    input: CapabilityGitDiffToRemoteOptions,
+  ): Promise<CapabilityGitDiffToRemoteResponse> {
+    return readGitDiffToRemote(input);
   }
 
   public async readAuthStatus(

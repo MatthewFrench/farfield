@@ -5,6 +5,7 @@ import {
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
   type DebugAppServerCoverageFeedbackUploadResult,
+  type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
 } from "../DomainModel/DebugAppServerCoverageContracts";
@@ -12,6 +13,7 @@ import { DebugAppServerCoverageCommandExecutionSection } from "./DebugAppServerC
 import { DebugAppServerCoverageConfigBatchWriteSection } from "./DebugAppServerCoverageConfigBatchWriteSection";
 import { DebugAppServerCoverageConfigValueWriteSection } from "./DebugAppServerCoverageConfigValueWriteSection";
 import { DebugAppServerCoverageFeedbackUploadSection } from "./DebugAppServerCoverageFeedbackUploadSection";
+import { DebugAppServerCoverageGitDiffToRemoteSection } from "./DebugAppServerCoverageGitDiffToRemoteSection";
 
 export interface DebugAppServerCoveragePanelProps {
   isLoadingCoverageDiagnostics: boolean;
@@ -24,6 +26,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
+  lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
   onCancelAccountLogin: () => void;
@@ -40,6 +43,7 @@ export interface DebugAppServerCoveragePanelProps {
   onWriteConfigBatch: (edits: string, filePath?: string, expectedVersion?: string) => void;
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
   onExportRemoteSkill: (hazelnutId: string) => void;
+  onReadGitDiffToRemote: (cwd: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
     classification: string,
@@ -71,6 +75,7 @@ export function DebugAppServerCoveragePanel({
   lastConfigBatchWriteResult,
   lastConfigValueWriteResult,
   lastFeedbackUploadResult,
+  lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
   onCancelAccountLogin,
@@ -81,6 +86,7 @@ export function DebugAppServerCoveragePanel({
   onWriteConfigBatch,
   onWriteSkillsConfig,
   onExportRemoteSkill,
+  onReadGitDiffToRemote,
   onExecuteCommand,
   onUploadFeedback,
 }: DebugAppServerCoveragePanelProps): React.JSX.Element {
@@ -91,8 +97,8 @@ export function DebugAppServerCoveragePanel({
           <h3 className="text-sm font-semibold">App-Server Coverage Diagnostics</h3>
           <p className="text-xs text-muted-foreground">
             Skills, apps, experimental features, MCP status, config requirements, and account
-            diagnostics plus config writes, remote skills import, command execution, and feedback
-            upload coverage.
+            diagnostics plus config writes, remote skills import, git diff reads, command execution,
+            and feedback upload coverage.
           </p>
         </div>
         <Button
@@ -489,6 +495,12 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastCommandExecutionResult={lastCommandExecutionResult}
             onExecuteCommand={onExecuteCommand}
+          />
+
+          <DebugAppServerCoverageGitDiffToRemoteSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastGitDiffToRemoteResult={lastGitDiffToRemoteResult}
+            onReadGitDiffToRemote={onReadGitDiffToRemote}
           />
 
           <DebugAppServerCoverageFeedbackUploadSection

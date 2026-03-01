@@ -515,6 +515,15 @@ export interface AgentUploadFeedbackResult {
   threadId: string;
 }
 
+export interface AgentGitDiffToRemoteInput {
+  cwd: string;
+}
+
+export interface AgentGitDiffToRemoteResult {
+  sha: string;
+  diff: string;
+}
+
 export type AgentConfigWriteMergeStrategy = "replace" | "upsert";
 
 export interface AgentWriteConfigValueInput {
@@ -705,6 +714,7 @@ export interface AgentAdapter {
     input?: AgentReadAccountRateLimitsInput,
   ): Promise<AgentReadAccountRateLimitsResult>;
   uploadFeedback?(input: AgentUploadFeedbackInput): Promise<AgentUploadFeedbackResult>;
+  gitDiffToRemote?(input: AgentGitDiffToRemoteInput): Promise<AgentGitDiffToRemoteResult>;
   executeCommand?(input: AgentCommandExecutionInput): Promise<AgentCommandExecutionResult>;
   startAccountLogin?(input: AgentStartAccountLoginInput): Promise<AgentStartAccountLoginResult>;
   cancelAccountLogin?(input: AgentCancelAccountLoginInput): Promise<AgentCancelAccountLoginResult>;

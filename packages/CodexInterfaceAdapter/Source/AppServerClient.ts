@@ -26,6 +26,7 @@ import { buildCommandExecutionRequestParameters } from "./AppServerClientCommand
 import { buildConfigBatchWriteRequestParameters } from "./AppServerClientConfigBatchWriteRequestBuilders.js";
 import { buildConfigValueWriteRequestParameters } from "./AppServerClientConfigValueWriteRequestBuilders.js";
 import { buildFeedbackUploadRequestParameters } from "./AppServerClientFeedbackUploadRequestBuilders.js";
+import { buildGitDiffToRemoteRequestParameters } from "./AppServerClientGitDiffRequestBuilders.js";
 import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
 import {
   APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT,
@@ -340,6 +341,15 @@ export interface FeedbackUploadOptions {
 
 export interface FeedbackUploadResult {
   threadId: string;
+}
+
+export interface GitDiffToRemoteOptions {
+  cwd: string;
+}
+
+export interface GitDiffToRemoteResult {
+  sha: string;
+  diff: string;
 }
 
 export interface CommandExecutionOptions {
@@ -754,6 +764,12 @@ const AppServerGetAccountRateLimitsResponseSchema = z
 const AppServerFeedbackUploadResponseSchema = z
   .object({
     threadId: z.string().min(1),
+  })
+  .passthrough();
+const AppServerGitDiffToRemoteResponseSchema = z
+  .object({
+    sha: z.string().min(1),
+    diff: z.string(),
   })
   .passthrough();
 const AppServerCommandExecResponseSchema = z
@@ -1286,6 +1302,22 @@ export class AppServerClient {
     );
     return {
       threadId: parsed.threadId,
+    };
+  }
+
+  public async gitDiffToRemote(options: GitDiffToRemoteOptions): Promise<GitDiffToRemoteResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.gitDiffToRemote,
+      buildGitDiffToRemoteRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerGitDiffToRemoteResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.gitDiffToRemote,
+    );
+    return {
+      sha: parsed.sha,
+      diff: parsed.diff,
     };
   }
 

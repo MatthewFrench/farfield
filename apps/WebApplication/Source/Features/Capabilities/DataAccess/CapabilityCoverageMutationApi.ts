@@ -11,6 +11,7 @@ const ACCOUNT_USER_INFO_ENDPOINT = "/api/account/user-info";
 const SKILLS_CONFIG_WRITE_ENDPOINT = "/api/skills/config/write";
 const SKILLS_REMOTE_LIST_ENDPOINT = "/api/skills/remote/list";
 const SKILLS_REMOTE_EXPORT_ENDPOINT = "/api/skills/remote/export";
+const GIT_DIFF_TO_REMOTE_ENDPOINT = "/api/git/diff-remote";
 const FEEDBACK_UPLOAD_ENDPOINT = "/api/feedback/upload";
 const COMMAND_EXEC_ENDPOINT = "/api/commands/exec";
 
@@ -83,6 +84,11 @@ export interface ApiListRemoteSkillsOptions extends ApiRequestOptions {
 export interface ApiExportRemoteSkillOptions extends ApiRequestOptions {
   agentId?: AgentId;
   hazelnutId: string;
+}
+
+export interface ApiGitDiffToRemoteOptions extends ApiRequestOptions {
+  agentId?: AgentId;
+  cwd: string;
 }
 
 export interface ApiCommandExecutionOptions extends ApiRequestOptions {
@@ -188,6 +194,15 @@ const CommandExecutionResponseSchema = z
   .strict();
 export type ApiCommandExecutionResponse = z.infer<typeof CommandExecutionResponseSchema>;
 
+const GitDiffToRemoteResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    sha: z.string().min(1),
+    diff: z.string(),
+  })
+  .strict();
+export type ApiGitDiffToRemoteResponse = z.infer<typeof GitDiffToRemoteResponseSchema>;
+
 const FeedbackUploadResponseSchema = z
   .object({
     ok: z.literal(true),
@@ -195,6 +210,12 @@ const FeedbackUploadResponseSchema = z
   })
   .strict();
 export type ApiFeedbackUploadResponse = z.infer<typeof FeedbackUploadResponseSchema>;
+
+const GitDiffToRemoteInputSchema = z
+  .object({
+    cwd: z.string().min(1),
+  })
+  .strict();
 
 const CommandExecutionInputSchema = z
   .object({
@@ -367,6 +388,18 @@ function readRemoteSkillExportPath(options: ApiExportRemoteSkillOptions): string
   return `${SKILLS_REMOTE_EXPORT_ENDPOINT}?${params.toString()}`;
 }
 
+function readGitDiffToRemotePath(options: ApiGitDiffToRemoteOptions): string {
+  const parsedInput = GitDiffToRemoteInputSchema.parse({
+    cwd: options.cwd,
+  });
+  const params = new URLSearchParams();
+  params.set("cwd", parsedInput.cwd);
+  if (options.agentId !== undefined) {
+    params.set("agentId", options.agentId);
+  }
+  return `${GIT_DIFF_TO_REMOTE_ENDPOINT}?${params.toString()}`;
+}
+
 function readCommandExecutionPath(options: ApiCommandExecutionOptions): string {
   const parsedInput = CommandExecutionInputSchema.parse({
     command: options.command,
@@ -498,6 +531,14 @@ export async function executeCommand(
       ...requestInitWithOptions(options),
       method: "POST",
     }),
+  );
+}
+
+export async function readGitDiffToRemote(
+  options: ApiGitDiffToRemoteOptions,
+): Promise<ApiGitDiffToRemoteResponse> {
+  return GitDiffToRemoteResponseSchema.parse(
+    await request(readGitDiffToRemotePath(options), requestInitWithOptions(options)),
   );
 }
 

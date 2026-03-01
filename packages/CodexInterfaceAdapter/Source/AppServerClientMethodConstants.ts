@@ -18,6 +18,7 @@ export const APP_SERVER_CLIENT_METHODS = {
   readAuthStatus: "getAuthStatus",
   readAccountRateLimits: "account/rateLimits/read",
   readUserInfo: "userInfo",
+  gitDiffToRemote: "gitDiffToRemote",
   uploadFeedback: "feedback/upload",
   executeCommand: "command/exec",
   writeConfigBatch: "config/batchWrite",

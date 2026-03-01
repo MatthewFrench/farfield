@@ -7,6 +7,7 @@ import {
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
   type DebugAppServerCoverageFeedbackUploadResult,
+  type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
 } from "@/Features/Debugging/DomainModel/DebugAppServerCoverageContracts";
@@ -72,6 +73,7 @@ export interface DebugWorkspacePaneProps {
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
+  lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
   onCancelAccountLogin: () => void;
@@ -88,6 +90,7 @@ export interface DebugWorkspacePaneProps {
   onWriteConfigBatch: (edits: string, filePath?: string, expectedVersion?: string) => void;
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
   onExportRemoteSkill: (hazelnutId: string) => void;
+  onReadGitDiffToRemote: (cwd: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
     classification: string,
@@ -143,6 +146,7 @@ export function DebugWorkspacePane({
   lastConfigBatchWriteResult,
   lastConfigValueWriteResult,
   lastFeedbackUploadResult,
+  lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
   onCancelAccountLogin,
@@ -153,6 +157,7 @@ export function DebugWorkspacePane({
   onWriteConfigBatch,
   onWriteSkillsConfig,
   onExportRemoteSkill,
+  onReadGitDiffToRemote,
   onExecuteCommand,
   onUploadFeedback,
 }: DebugWorkspacePaneProps): React.JSX.Element {
@@ -259,6 +264,7 @@ export function DebugWorkspacePane({
             lastConfigBatchWriteResult={lastConfigBatchWriteResult}
             lastConfigValueWriteResult={lastConfigValueWriteResult}
             lastFeedbackUploadResult={lastFeedbackUploadResult}
+            lastGitDiffToRemoteResult={lastGitDiffToRemoteResult}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
             onStartAccountLogin={onStartAccountLogin}
             onCancelAccountLogin={onCancelAccountLogin}
@@ -269,6 +275,7 @@ export function DebugWorkspacePane({
             onWriteConfigBatch={onWriteConfigBatch}
             onWriteSkillsConfig={onWriteSkillsConfig}
             onExportRemoteSkill={onExportRemoteSkill}
+            onReadGitDiffToRemote={onReadGitDiffToRemote}
             onExecuteCommand={onExecuteCommand}
             onUploadFeedback={onUploadFeedback}
           />

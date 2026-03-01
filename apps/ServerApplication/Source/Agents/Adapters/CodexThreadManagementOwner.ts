@@ -9,6 +9,8 @@ import {
   type ExportRemoteSkillResult,
   type FeedbackUploadOptions,
   type FeedbackUploadResult,
+  type GitDiffToRemoteOptions,
+  type GitDiffToRemoteResult,
   type ListAppsOptions,
   type ListAppsResult,
   type ListExperimentalFeaturesOptions,
@@ -58,6 +60,8 @@ import type {
   AgentExportRemoteSkillInput,
   AgentExportRemoteSkillResult,
   AgentForkThreadInput,
+  AgentGitDiffToRemoteInput,
+  AgentGitDiffToRemoteResult,
   AgentListAppsInput,
   AgentListAppsResult,
   AgentListExperimentalFeaturesInput,
@@ -322,6 +326,12 @@ function buildExportRemoteSkillOptions(
 ): ExportRemoteSkillOptions {
   return {
     hazelnutId: input.hazelnutId,
+  };
+}
+
+function buildGitDiffToRemoteOptions(input: AgentGitDiffToRemoteInput): GitDiffToRemoteOptions {
+  return {
+    cwd: input.cwd,
   };
 }
 
@@ -610,6 +620,16 @@ export class CodexThreadManagementOwner {
     this.ensureCodexAvailable();
     const result: FeedbackUploadResult = await this.runAppServerCall(() =>
       this.appClient.uploadFeedback(buildFeedbackUploadOptions(input)),
+    );
+    return result;
+  }
+
+  public async gitDiffToRemote(
+    input: AgentGitDiffToRemoteInput,
+  ): Promise<AgentGitDiffToRemoteResult> {
+    this.ensureCodexAvailable();
+    const result: GitDiffToRemoteResult = await this.runAppServerCall(() =>
+      this.appClient.gitDiffToRemote(buildGitDiffToRemoteOptions(input)),
     );
     return result;
   }

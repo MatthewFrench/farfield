@@ -159,6 +159,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const writeConfigBatchSpy = vi.fn(
     (_edits: string, _filePath?: string, _expectedVersion?: string): void => {},
   );
+  const readGitDiffToRemoteSpy = vi.fn((_cwd: string): void => {});
   const executeCommandSpy = vi.fn(
     (_command: string[], _timeoutMs?: number, _cwd?: string): void => {},
   );
@@ -303,6 +304,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastConfigBatchWriteResult: null,
     lastConfigValueWriteResult: null,
     lastFeedbackUploadResult: null,
+    lastGitDiffToRemoteResult: null,
     refreshCoverageDiagnostics: refreshCoverageDiagnosticsSpy,
     startAccountLogin: startAccountLoginSpy,
     cancelAccountLogin: cancelAccountLoginSpy,
@@ -311,6 +313,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     startMcpServerOauthLogin: startMcpServerOauthLoginSpy,
     writeConfigValue: writeConfigValueSpy,
     writeConfigBatch: writeConfigBatchSpy,
+    readGitDiffToRemote: readGitDiffToRemoteSpy,
     executeCommand: executeCommandSpy,
     uploadFeedback: uploadFeedbackSpy,
     writeSkillsConfig: writeSkillsConfigSpy,
