@@ -20,6 +20,7 @@ export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   readAccount: "AppServerGetAccountResponse",
   readAccountRateLimits: "AppServerGetAccountRateLimitsResponse",
   executeCommand: "AppServerCommandExecResponse",
+  writeConfigValue: "AppServerConfigWriteResponse",
   startAccountLogin: "AppServerLoginAccountResponse",
   cancelAccountLogin: "AppServerCancelLoginAccountResponse",
   logoutAccount: "AppServerLogoutAccountResponse",

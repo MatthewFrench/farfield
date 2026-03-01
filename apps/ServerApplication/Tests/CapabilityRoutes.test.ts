@@ -43,6 +43,8 @@ import type {
   AgentStartAccountLoginResult,
   AgentStartMcpServerOauthLoginInput,
   AgentStartMcpServerOauthLoginResult,
+  AgentWriteConfigValueInput,
+  AgentWriteConfigValueResult,
   AgentWriteSkillsConfigInput,
   AgentWriteSkillsConfigResult,
 } from "../Source/Agents/Types.js";
@@ -185,6 +187,22 @@ const CapabilitySkillsConfigWriteEnvelopeSchema = z
   })
   .strict();
 
+const CapabilityConfigValueWriteEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    status: z.enum(["ok", "okOverridden"]),
+    version: z.string().min(1),
+    filePath: z.string().min(1),
+    overriddenMetadata: z
+      .object({
+        message: z.string().min(1),
+        overridingLayer: z.unknown(),
+        effectiveValue: z.unknown(),
+      })
+      .nullable(),
+  })
+  .strict();
+
 const CapabilitySkillsRemoteListEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -321,6 +339,7 @@ interface MockAgentAdapterOptions {
   startMcpServerOauthLogin?: (
     input: AgentStartMcpServerOauthLoginInput,
   ) => Promise<AgentStartMcpServerOauthLoginResult>;
+  writeConfigValue?: (input: AgentWriteConfigValueInput) => Promise<AgentWriteConfigValueResult>;
   writeSkillsConfig?: (input: AgentWriteSkillsConfigInput) => Promise<AgentWriteSkillsConfigResult>;
   listRemoteSkills?: (input: AgentListRemoteSkillsInput) => Promise<AgentListRemoteSkillsResult>;
   exportRemoteSkill?: (input: AgentExportRemoteSkillInput) => Promise<AgentExportRemoteSkillResult>;
@@ -370,6 +389,7 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canLogoutAccount: false,
     canReloadMcpServerConfig: false,
     canStartMcpServerOauthLogin: false,
+    canWriteConfigValue: false,
     canWriteSkillsConfig: false,
     canSetCollaborationMode: false,
     canSubmitUserInput: false,
@@ -458,6 +478,10 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.startMcpServerOauthLogin) {
     adapter.startMcpServerOauthLogin = options.startMcpServerOauthLogin;
+  }
+
+  if (options.writeConfigValue) {
+    adapter.writeConfigValue = options.writeConfigValue;
   }
 
   if (options.writeSkillsConfig) {
@@ -984,6 +1008,101 @@ describe("handleCapabilityRoutes", () => {
     });
   });
 
+  it("returns 400 when config value write omits keyPath", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/config/value/write",
+      url: new URL(
+        "http://localhost/api/config/value/write?value=%7B%22enabled%22%3Atrue%7D&mergeStrategy=upsert",
+      ),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing keyPath query parameter.",
+    });
+  });
+
+  it("returns 400 when config value write receives invalid JSON value", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/config/value/write",
+      url: new URL(
+        "http://localhost/api/config/value/write?keyPath=integrations.github&value=not-json&mergeStrategy=upsert",
+      ),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Invalid value query parameter. Expected JSON value.",
+    });
+  });
+
+  it("writes config value when adapter supports config value writes", async () => {
+    const writeConfigValueSpy = vi.fn(
+      async (): Promise<AgentWriteConfigValueResult> => ({
+        status: "okOverridden",
+        version: "v2",
+        filePath: "/tmp/workspace/.codex/config.toml",
+        overriddenMetadata: {
+          message: "Workspace layer overrides base profile.",
+          overridingLayer: "workspace",
+          effectiveValue: {
+            enabled: true,
+          },
+        },
+      }),
+    );
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/config/value/write",
+      url: new URL(
+        "http://localhost/api/config/value/write?keyPath=integrations.github&value=%7B%22enabled%22%3Atrue%7D&mergeStrategy=upsert&filePath=%2Ftmp%2Fworkspace%2F.codex%2Fconfig.toml&expectedVersion=v1",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canWriteConfigValue: true,
+          },
+          writeConfigValue: writeConfigValueSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(writeConfigValueSpy).toHaveBeenCalledWith({
+      keyPath: "integrations.github",
+      value: {
+        enabled: true,
+      },
+      mergeStrategy: "upsert",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      expectedVersion: "v1",
+    });
+    const parsedEnvelope = CapabilityConfigValueWriteEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      status: "okOverridden",
+      version: "v2",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      overriddenMetadata: {
+        message: "Workspace layer overrides base profile.",
+        overridingLayer: "workspace",
+        effectiveValue: {
+          enabled: true,
+        },
+      },
+    });
+  });
+
   it("returns 400 when mcp oauth login omits server name", async () => {
     const result = await executeCapabilityRoute({
       method: "POST",
@@ -1071,6 +1190,7 @@ describe("handleCapabilityRoutes", () => {
         createMockAgentAdapter({
           id: "codex",
           capabilities: {
+            canWriteConfigValue: true,
             canWriteSkillsConfig: true,
           },
           writeSkillsConfig: writeSkillsConfigSpy,
@@ -1185,6 +1305,7 @@ describe("handleCapabilityRoutes", () => {
         createMockAgentAdapter({
           id: "codex",
           capabilities: {
+            canWriteConfigValue: true,
             canWriteSkillsConfig: true,
           },
           exportRemoteSkill: exportRemoteSkillSpy,

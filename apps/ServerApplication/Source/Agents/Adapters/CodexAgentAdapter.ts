@@ -60,6 +60,8 @@ import type {
   AgentThreadStreamEvents,
   AgentUnsubscribeThreadInput,
   AgentUnsubscribeThreadStatus,
+  AgentWriteConfigValueInput,
+  AgentWriteConfigValueResult,
   AgentWriteSkillsConfigInput,
   AgentWriteSkillsConfigResult,
 } from "../Types.js";
@@ -377,6 +379,12 @@ export class CodexAgentAdapter implements AgentAdapter {
     input: AgentStartMcpServerOauthLoginInput,
   ): Promise<AgentStartMcpServerOauthLoginResult> {
     return this.threadManagementOwner.startMcpServerOauthLogin(input);
+  }
+
+  public async writeConfigValue(
+    input: AgentWriteConfigValueInput,
+  ): Promise<AgentWriteConfigValueResult> {
+    return this.threadManagementOwner.writeConfigValue(input);
   }
 
   public async writeSkillsConfig(

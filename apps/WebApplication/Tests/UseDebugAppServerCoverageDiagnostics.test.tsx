@@ -180,6 +180,21 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       stdout: "/tmp/project\n",
       stderr: "",
     });
+    const writeConfigValue = vi
+      .spyOn(capabilityServerClient, "writeConfigValue")
+      .mockResolvedValue({
+        ok: true,
+        status: "okOverridden",
+        version: "v2",
+        filePath: "/tmp/project/.codex/config.toml",
+        overriddenMetadata: {
+          message: "Workspace layer overrides parent configuration.",
+          overridingLayer: "workspace",
+          effectiveValue: {
+            enabled: true,
+          },
+        },
+      });
     const writeSkillsConfig = vi
       .spyOn(capabilityServerClient, "writeSkillsConfig")
       .mockResolvedValue({
@@ -226,6 +241,13 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.logoutAccount();
     latestDiagnostics.current?.reloadMcpServerConfig();
     latestDiagnostics.current?.startMcpServerOauthLogin("github");
+    latestDiagnostics.current?.writeConfigValue(
+      "integrations.github",
+      '{"enabled":true}',
+      "upsert",
+      "/tmp/project/.codex/config.toml",
+      "v1",
+    );
     latestDiagnostics.current?.executeCommand(["pwd"], 1200, "/tmp/project");
     latestDiagnostics.current?.writeSkillsConfig(
       "/tmp/project/.codex/skills/checks/SKILL.md",
@@ -244,6 +266,16 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         command: ["pwd"],
         timeoutMs: 1200,
         cwd: "/tmp/project",
+      });
+      expect(writeConfigValue).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        keyPath: "integrations.github",
+        value: {
+          enabled: true,
+        },
+        mergeStrategy: "upsert",
+        filePath: "/tmp/project/.codex/config.toml",
+        expectedVersion: "v1",
       });
       expect(writeSkillsConfig).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -265,6 +297,16 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         stdout: "/tmp/project\n",
         stderr: "",
         executedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastConfigValueWriteResult).toEqual({
+        keyPath: "integrations.github",
+        mergeStrategy: "upsert",
+        valueSummary: '{"enabled":true}',
+        status: "okOverridden",
+        version: "v2",
+        filePath: "/tmp/project/.codex/config.toml",
+        overriddenMessage: "Workspace layer overrides parent configuration.",
+        writtenAtIso8601: expect.any(String),
       });
     });
 

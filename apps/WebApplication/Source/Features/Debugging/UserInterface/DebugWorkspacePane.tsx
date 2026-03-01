@@ -4,6 +4,7 @@ import { TabsList } from "@/Components/UserInterface/TabsList";
 import { TabsTrigger } from "@/Components/UserInterface/TabsTrigger";
 import {
   type DebugAppServerCoverageCommandExecutionResult,
+  type DebugAppServerCoverageConfigValueWriteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
 } from "@/Features/Debugging/DomainModel/DebugAppServerCoverageContracts";
@@ -66,12 +67,20 @@ export interface DebugWorkspacePaneProps {
   coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
+  lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
   onCancelAccountLogin: () => void;
   onLogoutAccount: () => void;
   onReloadMcpServerConfig: () => void;
   onStartMcpServerOauthLogin: (serverName: string) => void;
+  onWriteConfigValue: (
+    keyPath: string,
+    value: string,
+    mergeStrategy: "replace" | "upsert",
+    filePath?: string,
+    expectedVersion?: string,
+  ) => void;
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
   onExportRemoteSkill: (hazelnutId: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -120,12 +129,14 @@ export function DebugWorkspacePane({
   coverageDiagnosticsSnapshot,
   pendingAccountLogin,
   lastCommandExecutionResult,
+  lastConfigValueWriteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
   onCancelAccountLogin,
   onLogoutAccount,
   onReloadMcpServerConfig,
   onStartMcpServerOauthLogin,
+  onWriteConfigValue,
   onWriteSkillsConfig,
   onExportRemoteSkill,
   onExecuteCommand,
@@ -230,12 +241,14 @@ export function DebugWorkspacePane({
             coverageDiagnosticsSnapshot={coverageDiagnosticsSnapshot}
             pendingAccountLogin={pendingAccountLogin}
             lastCommandExecutionResult={lastCommandExecutionResult}
+            lastConfigValueWriteResult={lastConfigValueWriteResult}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
             onStartAccountLogin={onStartAccountLogin}
             onCancelAccountLogin={onCancelAccountLogin}
             onLogoutAccount={onLogoutAccount}
             onReloadMcpServerConfig={onReloadMcpServerConfig}
             onStartMcpServerOauthLogin={onStartMcpServerOauthLogin}
+            onWriteConfigValue={onWriteConfigValue}
             onWriteSkillsConfig={onWriteSkillsConfig}
             onExportRemoteSkill={onExportRemoteSkill}
             onExecuteCommand={onExecuteCommand}

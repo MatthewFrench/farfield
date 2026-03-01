@@ -144,12 +144,20 @@ export interface UseApplicationShellViewPropertiesInput {
   coverageDiagnosticsSnapshot: DebugWorkspacePaneProps["coverageDiagnosticsSnapshot"];
   pendingAccountLogin: DebugWorkspacePaneProps["pendingAccountLogin"];
   lastCommandExecutionResult: DebugWorkspacePaneProps["lastCommandExecutionResult"];
+  lastConfigValueWriteResult: DebugWorkspacePaneProps["lastConfigValueWriteResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
   logoutAccount: () => void;
   reloadMcpServerConfig: () => void;
   startMcpServerOauthLogin: (serverName: string) => void;
+  writeConfigValue: (
+    keyPath: string,
+    value: string,
+    mergeStrategy: "replace" | "upsert",
+    filePath?: string,
+    expectedVersion?: string,
+  ) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -394,12 +402,14 @@ function buildDebugWorkspacePaneProperties(
     coverageDiagnosticsSnapshot: input.coverageDiagnosticsSnapshot,
     pendingAccountLogin: input.pendingAccountLogin,
     lastCommandExecutionResult: input.lastCommandExecutionResult,
+    lastConfigValueWriteResult: input.lastConfigValueWriteResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
     onCancelAccountLogin: input.cancelAccountLogin,
     onLogoutAccount: input.logoutAccount,
     onReloadMcpServerConfig: input.reloadMcpServerConfig,
     onStartMcpServerOauthLogin: input.startMcpServerOauthLogin,
+    onWriteConfigValue: input.writeConfigValue,
     onWriteSkillsConfig: input.writeSkillsConfig,
     onExportRemoteSkill: input.exportRemoteSkill,
     onExecuteCommand: input.executeCommand,
@@ -595,12 +605,14 @@ export function useApplicationShellViewProperties(
       input.coverageDiagnosticsSnapshot,
       input.pendingAccountLogin,
       input.lastCommandExecutionResult,
+      input.lastConfigValueWriteResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
       input.cancelAccountLogin,
       input.logoutAccount,
       input.reloadMcpServerConfig,
       input.startMcpServerOauthLogin,
+      input.writeConfigValue,
       input.writeSkillsConfig,
       input.exportRemoteSkill,
       input.executeCommand,

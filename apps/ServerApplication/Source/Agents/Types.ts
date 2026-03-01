@@ -62,6 +62,7 @@ export interface AgentCapabilities {
   canLogoutAccount: boolean;
   canReloadMcpServerConfig: boolean;
   canStartMcpServerOauthLogin: boolean;
+  canWriteConfigValue: boolean;
   canWriteSkillsConfig: boolean;
   canSetCollaborationMode: boolean;
   canSubmitUserInput: boolean;
@@ -485,6 +486,31 @@ export interface AgentCommandExecutionResult {
   stderr: string;
 }
 
+export type AgentConfigWriteMergeStrategy = "replace" | "upsert";
+
+export interface AgentWriteConfigValueInput {
+  keyPath: string;
+  value: JsonValue;
+  mergeStrategy: AgentConfigWriteMergeStrategy;
+  filePath?: string;
+  expectedVersion?: string;
+}
+
+export type AgentConfigWriteStatus = "ok" | "okOverridden";
+
+export interface AgentConfigWriteOverriddenMetadata {
+  message: string;
+  overridingLayer: JsonValue;
+  effectiveValue: JsonValue;
+}
+
+export interface AgentWriteConfigValueResult {
+  status: AgentConfigWriteStatus;
+  version: string;
+  filePath: string;
+  overriddenMetadata: AgentConfigWriteOverriddenMetadata | null;
+}
+
 export interface AgentStartAccountLoginWithApiKeyInput {
   type: "apiKey";
   apiKey: string;
@@ -643,6 +669,7 @@ export interface AgentAdapter {
   startMcpServerOauthLogin?(
     input: AgentStartMcpServerOauthLoginInput,
   ): Promise<AgentStartMcpServerOauthLoginResult>;
+  writeConfigValue?(input: AgentWriteConfigValueInput): Promise<AgentWriteConfigValueResult>;
   writeSkillsConfig?(input: AgentWriteSkillsConfigInput): Promise<AgentWriteSkillsConfigResult>;
   listRemoteSkills?(input: AgentListRemoteSkillsInput): Promise<AgentListRemoteSkillsResult>;
   exportRemoteSkill?(input: AgentExportRemoteSkillInput): Promise<AgentExportRemoteSkillResult>;

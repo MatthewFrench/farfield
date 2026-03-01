@@ -77,6 +77,17 @@ export interface DebugAppServerCoverageCommandExecutionResult {
   executedAtIso8601: string;
 }
 
+export interface DebugAppServerCoverageConfigValueWriteResult {
+  keyPath: string;
+  mergeStrategy: "replace" | "upsert";
+  valueSummary: string;
+  status: "ok" | "okOverridden";
+  version: string;
+  filePath: string;
+  overriddenMessage: string | null;
+  writtenAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

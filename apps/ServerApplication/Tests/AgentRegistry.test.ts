@@ -30,6 +30,7 @@ const DEFAULT_CAPABILITIES: AgentCapabilities = {
   canLogoutAccount: false,
   canReloadMcpServerConfig: false,
   canStartMcpServerOauthLogin: false,
+  canWriteConfigValue: false,
   canWriteSkillsConfig: false,
   canSetCollaborationMode: false,
   canSubmitUserInput: false,

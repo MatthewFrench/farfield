@@ -49,6 +49,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
     canLogoutAccount: false,
     canReloadMcpServerConfig: false,
     canStartMcpServerOauthLogin: false,
+    canWriteConfigValue: false,
     canWriteSkillsConfig: false,
     canSetCollaborationMode: false,
     canSubmitUserInput: false,

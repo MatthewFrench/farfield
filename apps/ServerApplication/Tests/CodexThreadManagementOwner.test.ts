@@ -5,6 +5,8 @@ import {
   type CancelAccountLoginResult,
   type CommandExecutionOptions,
   type CommandExecutionResult,
+  type ConfigWriteResult,
+  type ConfigWriteValueOptions,
   type ExportRemoteSkillOptions,
   type ExportRemoteSkillResult,
   type ForkThreadOptions,
@@ -114,6 +116,7 @@ class TestAppServerClient extends AppServerClient {
   public readonly logoutAccountCalls: Array<undefined> = [];
   public readonly reloadMcpServerConfigCalls: Array<undefined> = [];
   public readonly startMcpServerOauthLoginCalls: StartMcpServerOauthLoginOptions[] = [];
+  public readonly writeConfigValueCalls: ConfigWriteValueOptions[] = [];
   public readonly writeSkillsConfigCalls: WriteSkillsConfigOptions[] = [];
   public readonly readConfigCalls: Array<ReadConfigOptions | undefined> = [];
 
@@ -137,6 +140,7 @@ class TestAppServerClient extends AppServerClient {
   private readonly startAccountLoginResult: LoginAccountResult;
   private readonly cancelAccountLoginResult: CancelAccountLoginResult;
   private readonly startMcpServerOauthLoginResult: StartMcpServerOauthLoginResult;
+  private readonly writeConfigValueResult: ConfigWriteResult;
   private readonly writeSkillsConfigResult: WriteSkillsConfigResult;
   private readonly readConfigResult: AppServerConfigReadResponse;
 
@@ -161,6 +165,7 @@ class TestAppServerClient extends AppServerClient {
     startAccountLoginResult?: LoginAccountResult;
     cancelAccountLoginResult?: CancelAccountLoginResult;
     startMcpServerOauthLoginResult?: StartMcpServerOauthLoginResult;
+    writeConfigValueResult?: ConfigWriteResult;
     writeSkillsConfigResult?: WriteSkillsConfigResult;
     readConfigResult?: AppServerConfigReadResponse;
   }) {
@@ -239,6 +244,12 @@ class TestAppServerClient extends AppServerClient {
     };
     this.startMcpServerOauthLoginResult = input?.startMcpServerOauthLoginResult ?? {
       authorizationUrl: "https://example.com/oauth/mcp",
+    };
+    this.writeConfigValueResult = input?.writeConfigValueResult ?? {
+      status: "ok",
+      version: "v1",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      overriddenMetadata: null,
     };
     this.writeSkillsConfigResult = input?.writeSkillsConfigResult ?? {
       effectiveEnabled: true,
@@ -416,6 +427,13 @@ class TestAppServerClient extends AppServerClient {
   ): Promise<StartMcpServerOauthLoginResult> {
     this.startMcpServerOauthLoginCalls.push(options);
     return this.startMcpServerOauthLoginResult;
+  }
+
+  public override async writeConfigValue(
+    options: ConfigWriteValueOptions,
+  ): Promise<ConfigWriteResult> {
+    this.writeConfigValueCalls.push(options);
+    return this.writeConfigValueResult;
   }
 
   public override async writeSkillsConfig(
@@ -1230,6 +1248,58 @@ describe("CodexThreadManagementOwner", () => {
       },
     ]);
     expect(result.authorizationUrl).toBe("https://example.com/oauth/github");
+  });
+
+  it("writes config values through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      writeConfigValueResult: {
+        status: "okOverridden",
+        version: "v4",
+        filePath: "/tmp/workspace/.codex/config.toml",
+        overriddenMetadata: {
+          message: "Workspace config value overrides parent config.",
+          overridingLayer: "workspace",
+          effectiveValue: {
+            enabled: true,
+          },
+        },
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.writeConfigValue({
+      keyPath: "integrations.github",
+      value: {
+        enabled: true,
+      },
+      mergeStrategy: "upsert",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      expectedVersion: "v3",
+    });
+
+    expect(appClient.writeConfigValueCalls).toEqual([
+      {
+        keyPath: "integrations.github",
+        value: {
+          enabled: true,
+        },
+        mergeStrategy: "upsert",
+        filePath: "/tmp/workspace/.codex/config.toml",
+        expectedVersion: "v3",
+      },
+    ]);
+    expect(result).toEqual({
+      status: "okOverridden",
+      version: "v4",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      overriddenMetadata: {
+        message: "Workspace config value overrides parent config.",
+        overridingLayer: "workspace",
+        effectiveValue: {
+          enabled: true,
+        },
+      },
+    });
   });
 
   it("writes skills config through codex management owner", async () => {

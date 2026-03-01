@@ -46,6 +46,9 @@ import {
 import {
   type ApiCommandExecutionOptions,
   type ApiCommandExecutionResponse,
+  type ApiConfigValueWriteOptions,
+  type ApiConfigValueWriteResponse,
+  type ApiConfigWriteMergeStrategy,
   type ApiExportRemoteSkillOptions,
   type ApiListRemoteSkillsOptions,
   type ApiMcpServerOauthLoginOptions,
@@ -58,6 +61,7 @@ import {
   exportRemoteSkill,
   listRemoteSkills,
   startMcpServerOauthLogin,
+  writeConfigValue,
   writeSkillsConfig,
 } from "./CapabilityCoverageMutationApi";
 
@@ -87,6 +91,9 @@ export type CapabilityMcpServerOauthLoginOptions = ApiMcpServerOauthLoginOptions
 export type CapabilityMcpServerOauthLoginResponse = ApiMcpServerOauthLoginResponse;
 export type CapabilityCommandExecutionOptions = ApiCommandExecutionOptions;
 export type CapabilityCommandExecutionResponse = ApiCommandExecutionResponse;
+export type CapabilityConfigWriteMergeStrategy = ApiConfigWriteMergeStrategy;
+export type CapabilityConfigValueWriteOptions = ApiConfigValueWriteOptions;
+export type CapabilityConfigValueWriteResponse = ApiConfigValueWriteResponse;
 export type CapabilityListRemoteSkillsOptions = ApiListRemoteSkillsOptions;
 export type CapabilityRemoteSkillsListResponse = ApiRemoteSkillsListResponse;
 export type CapabilityExportRemoteSkillOptions = ApiExportRemoteSkillOptions;
@@ -174,6 +181,12 @@ export class CapabilityServerClient {
     input: CapabilityMcpServerOauthLoginOptions,
   ): Promise<CapabilityMcpServerOauthLoginResponse> {
     return startMcpServerOauthLogin(input);
+  }
+
+  public async writeConfigValue(
+    input: CapabilityConfigValueWriteOptions,
+  ): Promise<CapabilityConfigValueWriteResponse> {
+    return writeConfigValue(input);
   }
 
   public async writeSkillsConfig(

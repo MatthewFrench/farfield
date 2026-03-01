@@ -22,6 +22,7 @@ export interface CapabilityFixture {
   canLogoutAccount: boolean;
   canReloadMcpServerConfig: boolean;
   canStartMcpServerOauthLogin: boolean;
+  canWriteConfigValue: boolean;
   canWriteSkillsConfig: boolean;
   canSetCollaborationMode: boolean;
   canSubmitUserInput: boolean;
@@ -219,6 +220,7 @@ export const CODEX_CAPABILITIES: CapabilityFixture = {
   canLogoutAccount: true,
   canReloadMcpServerConfig: true,
   canStartMcpServerOauthLogin: true,
+  canWriteConfigValue: true,
   canWriteSkillsConfig: true,
   canSetCollaborationMode: true,
   canSubmitUserInput: true,
@@ -242,6 +244,7 @@ export const OPENCODE_CAPABILITIES: CapabilityFixture = {
   canLogoutAccount: false,
   canReloadMcpServerConfig: false,
   canStartMcpServerOauthLogin: false,
+  canWriteConfigValue: false,
   canWriteSkillsConfig: false,
   canSetCollaborationMode: false,
   canSubmitUserInput: false,

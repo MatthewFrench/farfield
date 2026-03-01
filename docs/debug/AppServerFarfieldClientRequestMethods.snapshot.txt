@@ -8,6 +8,7 @@ collaborationMode/list
 command/exec
 config/mcpServer/reload
 config/read
+config/value/write
 configRequirements/read
 experimentalFeature/list
 initialize

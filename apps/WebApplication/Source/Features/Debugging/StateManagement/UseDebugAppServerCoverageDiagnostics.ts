@@ -1,32 +1,29 @@
-import { type JsonValue } from "@farfield/protocol";
+import { type JsonValue, JsonValueSchema } from "@farfield/protocol";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
-  CapabilityAccountLoginStartResponse,
-  CapabilityAccountRateLimitsResponse,
-  CapabilityAccountResponse,
-  CapabilityAppsResponse,
-  CapabilityCommandExecutionResponse,
-  CapabilityConfigRequirementsResponse,
-  CapabilityExperimentalFeaturesResponse,
-  CapabilityMcpServersResponse,
-  CapabilityRemoteSkillsListResponse,
+  CapabilityConfigWriteMergeStrategy,
   CapabilityServerClient,
-  CapabilitySkillsResponse,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import {
-  type DebugAppServerCoverageAccount,
-  type DebugAppServerCoverageAppSummary,
   type DebugAppServerCoverageCommandExecutionResult,
-  type DebugAppServerCoverageExperimentalFeature,
-  type DebugAppServerCoverageMcpServerSummary,
+  type DebugAppServerCoverageConfigValueWriteResult,
   type DebugAppServerCoveragePendingAccountLogin,
-  type DebugAppServerCoverageRateLimitSnapshot,
-  type DebugAppServerCoverageRemoteSkillSummary,
-  type DebugAppServerCoverageRequirements,
-  type DebugAppServerCoverageSkillEntry,
   type DebugAppServerCoverageSnapshot,
 } from "../DomainModel/DebugAppServerCoverageContracts";
+import {
+  mapAccount,
+  mapApps,
+  mapCommandExecutionResult,
+  mapConfigValueWriteResult,
+  mapExperimentalFeatures,
+  mapMcpServers,
+  mapPendingAccountLogin,
+  mapRateLimitSnapshot,
+  mapRemoteSkills,
+  mapRequirements,
+  mapSkills,
+} from "./DebugAppServerCoverageDiagnosticsMappers";
 
 const COVERAGE_WORKSPACE_SECTION: DebugWorkspaceSection = "coverage";
 
@@ -52,12 +49,20 @@ export interface DebugAppServerCoverageDiagnostics {
   coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
+  lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
   logoutAccount: () => void;
   reloadMcpServerConfig: () => void;
   startMcpServerOauthLogin: (serverName: string) => void;
+  writeConfigValue: (
+    keyPath: string,
+    value: string,
+    mergeStrategy: CapabilityConfigWriteMergeStrategy,
+    filePath?: string,
+    expectedVersion?: string,
+  ) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -71,150 +76,6 @@ function toErrorMessage<ErrorType>(error: ErrorType): string {
     return error;
   }
   return String(error);
-}
-
-function readAuthStatusLabel(authStatus: JsonValue): string {
-  if (typeof authStatus === "string") {
-    return authStatus;
-  }
-  if (authStatus === null) {
-    return "null";
-  }
-  return JSON.stringify(authStatus);
-}
-
-function mapRequirements(
-  requirements: CapabilityConfigRequirementsResponse["requirements"],
-): DebugAppServerCoverageRequirements | null {
-  if (requirements === null) {
-    return null;
-  }
-  return {
-    allowedApprovalPolicies: requirements.allowedApprovalPolicies,
-    allowedSandboxModes: requirements.allowedSandboxModes,
-    allowedWebSearchModes: requirements.allowedWebSearchModes,
-    enforceResidency: requirements.enforceResidency,
-    network: requirements.network,
-  };
-}
-
-function mapAccount(
-  account: CapabilityAccountResponse["account"],
-): DebugAppServerCoverageAccount | null {
-  if (account === null) {
-    return null;
-  }
-  if (account.type === "apiKey") {
-    return {
-      type: "apiKey",
-    };
-  }
-  return {
-    type: "chatgpt",
-    email: account.email,
-    planType: account.planType,
-  };
-}
-
-function mapRateLimitSnapshot(
-  snapshot: CapabilityAccountRateLimitsResponse["rateLimits"],
-): DebugAppServerCoverageRateLimitSnapshot | null {
-  if (snapshot === null) {
-    return null;
-  }
-  return {
-    credits: snapshot.credits,
-    limitId: snapshot.limitId,
-    limitName: snapshot.limitName,
-    planType: snapshot.planType,
-    primary: snapshot.primary,
-    secondary: snapshot.secondary,
-  };
-}
-
-function mapPendingAccountLogin(
-  response: CapabilityAccountLoginStartResponse,
-): DebugAppServerCoveragePendingAccountLogin | null {
-  if (response.type !== "chatgpt") {
-    return null;
-  }
-  return {
-    loginId: response.loginId,
-    authUrl: response.authUrl,
-  };
-}
-
-function mapExperimentalFeatures(
-  data: CapabilityExperimentalFeaturesResponse["data"],
-): DebugAppServerCoverageExperimentalFeature[] {
-  return data.map((feature) => ({
-    name: feature.name,
-    stage: feature.stage,
-    displayName: feature.displayName,
-    description: feature.description,
-    announcement: feature.announcement,
-    enabled: feature.enabled,
-    defaultEnabled: feature.defaultEnabled,
-  }));
-}
-
-function mapMcpServers(
-  data: CapabilityMcpServersResponse["data"],
-): DebugAppServerCoverageMcpServerSummary[] {
-  return data.map((server) => ({
-    name: server.name,
-    authStatus: readAuthStatusLabel(server.authStatus),
-    toolCount: server.toolCount,
-    resourceCount: server.resourceCount,
-    resourceTemplateCount: server.resourceTemplateCount,
-  }));
-}
-
-function mapApps(data: CapabilityAppsResponse["data"]): DebugAppServerCoverageAppSummary[] {
-  return data.map((appInfo) => ({
-    id: appInfo.id,
-    name: appInfo.name,
-    description: appInfo.description,
-    isAccessible: appInfo.isAccessible,
-    isEnabled: appInfo.isEnabled,
-  }));
-}
-
-function mapSkills(data: CapabilitySkillsResponse["data"]): DebugAppServerCoverageSkillEntry[] {
-  return data.map((entry) => ({
-    cwd: entry.cwd,
-    skills: entry.skills.map((skill) => ({
-      name: skill.name,
-      description: skill.description,
-      path: skill.path,
-      scope: skill.scope,
-      enabled: skill.enabled,
-    })),
-    errorCount: entry.errors.length,
-  }));
-}
-
-function mapRemoteSkills(
-  data: CapabilityRemoteSkillsListResponse["data"],
-): DebugAppServerCoverageRemoteSkillSummary[] {
-  return data.map((skill) => ({
-    id: skill.id,
-    name: skill.name,
-    description: skill.description,
-  }));
-}
-
-function mapCommandExecutionResult(
-  response: CapabilityCommandExecutionResponse,
-  command: string[],
-): DebugAppServerCoverageCommandExecutionResult {
-  return {
-    command,
-    exitCode: response.exitCode,
-    stdout: response.stdout,
-    stderr: response.stderr,
-    executedAtIso8601: new Date().toISOString(),
-  };
 }
 
 /**
@@ -234,6 +95,8 @@ export function useDebugAppServerCoverageDiagnostics(
     useState<DebugAppServerCoveragePendingAccountLogin | null>(null);
   const [lastCommandExecutionResult, setLastCommandExecutionResult] =
     useState<DebugAppServerCoverageCommandExecutionResult | null>(null);
+  const [lastConfigValueWriteResult, setLastConfigValueWriteResult] =
+    useState<DebugAppServerCoverageConfigValueWriteResult | null>(null);
   const requestSerialRef = useRef(0);
 
   const refreshCoverageDiagnostics = useCallback(() => {
@@ -442,6 +305,74 @@ export function useDebugAppServerCoverageDiagnostics(
     [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics],
   );
 
+  const writeConfigValue = useCallback(
+    (
+      keyPath: string,
+      value: string,
+      mergeStrategy: CapabilityConfigWriteMergeStrategy,
+      filePath?: string,
+      expectedVersion?: string,
+    ) => {
+      if (isRunningCoverageAction) {
+        return;
+      }
+
+      const normalizedKeyPath = keyPath.trim();
+      if (normalizedKeyPath.length === 0) {
+        return;
+      }
+
+      const normalizedValue = value.trim();
+      if (normalizedValue.length === 0) {
+        setCoverageActionErrorMessage(
+          `${COVERAGE_ACTION_ERROR_PREFIX}Config value must be valid JSON.`,
+        );
+        return;
+      }
+
+      let parsedValue: JsonValue;
+      try {
+        parsedValue = JsonValueSchema.parse(JSON.parse(normalizedValue));
+      } catch {
+        setCoverageActionErrorMessage(
+          `${COVERAGE_ACTION_ERROR_PREFIX}Config value must be valid JSON.`,
+        );
+        return;
+      }
+
+      const normalizedFilePath = filePath?.trim();
+      const normalizedExpectedVersion = expectedVersion?.trim();
+
+      setIsRunningCoverageAction(true);
+      setCoverageActionErrorMessage("");
+
+      void (async () => {
+        try {
+          const response = await input.capabilityServerClient.writeConfigValue({
+            actionName: COVERAGE_MUTATION_OPERATION_NAME,
+            keyPath: normalizedKeyPath,
+            value: parsedValue,
+            mergeStrategy,
+            ...(normalizedFilePath !== undefined && normalizedFilePath.length > 0
+              ? { filePath: normalizedFilePath }
+              : {}),
+            ...(normalizedExpectedVersion !== undefined && normalizedExpectedVersion.length > 0
+              ? { expectedVersion: normalizedExpectedVersion }
+              : {}),
+          });
+          setLastConfigValueWriteResult(
+            mapConfigValueWriteResult(response, normalizedKeyPath, mergeStrategy, parsedValue),
+          );
+        } catch (error) {
+          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
+        } finally {
+          setIsRunningCoverageAction(false);
+        }
+      })();
+    },
+    [input.capabilityServerClient, isRunningCoverageAction],
+  );
+
   const writeSkillsConfig = useCallback(
     (skillPath: string, enabled: boolean) => {
       if (isRunningCoverageAction) {
@@ -567,12 +498,14 @@ export function useDebugAppServerCoverageDiagnostics(
     coverageDiagnosticsSnapshot,
     pendingAccountLogin,
     lastCommandExecutionResult,
+    lastConfigValueWriteResult,
     refreshCoverageDiagnostics,
     startAccountLogin,
     cancelAccountLogin,
     logoutAccount,
     reloadMcpServerConfig,
     startMcpServerOauthLogin,
+    writeConfigValue,
     writeSkillsConfig,
     exportRemoteSkill,
     executeCommand,

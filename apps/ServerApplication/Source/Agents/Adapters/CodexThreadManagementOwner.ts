@@ -2,8 +2,8 @@ import {
   AppServerClient,
   type CancelAccountLoginOptions,
   type CancelAccountLoginResult,
-  type CommandExecutionOptions,
   type CommandExecutionResult,
+  type ConfigWriteResult,
   type ExportRemoteSkillOptions,
   type ExportRemoteSkillResult,
   type ListAppsOptions,
@@ -26,11 +26,9 @@ import {
   type ReadAccountResult,
   type ReadConfigRequirementsOptions,
   type ReadConfigRequirementsResult,
-  type StartMcpServerOauthLoginOptions,
   type StartMcpServerOauthLoginResult,
   type StartReviewOptions,
   type StartThreadOptions,
-  type WriteSkillsConfigOptions,
   type WriteSkillsConfigResult,
 } from "@farfield/api";
 import type {
@@ -86,9 +84,17 @@ import type {
   AgentUnarchiveThreadInput,
   AgentUnsubscribeThreadInput,
   AgentUnsubscribeThreadStatus,
+  AgentWriteConfigValueInput,
+  AgentWriteConfigValueResult,
   AgentWriteSkillsConfigInput,
   AgentWriteSkillsConfigResult,
 } from "../Types.js";
+import {
+  buildCommandExecutionOptions,
+  buildStartMcpServerOauthLoginOptions,
+  buildWriteConfigValueOptions,
+  buildWriteSkillsConfigOptions,
+} from "./CodexThreadManagementCapabilityMutationOptions.js";
 
 const CREATE_THREAD_REQUIRES_WORKING_DIRECTORY_ERROR = "Codex thread creation requires cwd";
 const FORK_WITH_EXTENDED_HISTORY = true;
@@ -279,35 +285,6 @@ function buildCancelAccountLoginOptions(
 ): CancelAccountLoginOptions {
   return {
     loginId: input.loginId,
-  };
-}
-
-function buildStartMcpServerOauthLoginOptions(
-  input: AgentStartMcpServerOauthLoginInput,
-): StartMcpServerOauthLoginOptions {
-  return {
-    name: input.name,
-    ...(input.scopes !== undefined ? { scopes: input.scopes } : {}),
-    ...(input.timeoutSeconds !== undefined ? { timeoutSeconds: input.timeoutSeconds } : {}),
-  };
-}
-
-function buildWriteSkillsConfigOptions(
-  input: AgentWriteSkillsConfigInput,
-): WriteSkillsConfigOptions {
-  return {
-    path: input.path,
-    enabled: input.enabled,
-  };
-}
-
-function buildCommandExecutionOptions(input: AgentCommandExecutionInput): CommandExecutionOptions {
-  return {
-    command: input.command,
-    ...(input.timeoutMilliseconds !== undefined
-      ? { timeoutMilliseconds: input.timeoutMilliseconds }
-      : {}),
-    ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
   };
 }
 
@@ -636,6 +613,16 @@ export class CodexThreadManagementOwner {
     this.ensureCodexAvailable();
     const result: StartMcpServerOauthLoginResult = await this.runAppServerCall(() =>
       this.appClient.startMcpServerOauthLogin(buildStartMcpServerOauthLoginOptions(input)),
+    );
+    return result;
+  }
+
+  public async writeConfigValue(
+    input: AgentWriteConfigValueInput,
+  ): Promise<AgentWriteConfigValueResult> {
+    this.ensureCodexAvailable();
+    const result: ConfigWriteResult = await this.runAppServerCall(() =>
+      this.appClient.writeConfigValue(buildWriteConfigValueOptions(input)),
     );
     return result;
   }

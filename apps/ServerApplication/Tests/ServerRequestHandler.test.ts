@@ -210,6 +210,7 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
         canLogoutAccount: false,
         canReloadMcpServerConfig: false,
         canStartMcpServerOauthLogin: false,
+        canWriteConfigValue: false,
         canWriteSkillsConfig: false,
         canSetCollaborationMode: false,
         canSubmitUserInput: false,

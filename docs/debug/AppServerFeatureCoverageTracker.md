@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 00:36:00Z
+Last Updated (UTC): 2026-03-01 02:05:00Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `36 / 74` request methods (`48.6%`).
+1. Farfield app-server method coverage at request-owner layer: `37 / 74` request methods (`50.0%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `37 / 74` (`50.0%`).
+3. Effective request-method usage including transport-owned `initialize`: `38 / 74` (`51.4%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -146,6 +146,7 @@ As of the upstream snapshot above:
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | `/api/collaboration-modes` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listCollaborationModes` -> `AppServerClient.listCollaborationModes` |
 | `command/exec` | Command execution diagnostics action and output capture | `/api/commands/exec` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.executeCommand` -> `AppServerClient.executeCommand` |
 | `config/read` | Config defaults (`model`, `reasoningEffort`) | `/api/config/defaults` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigDefaults` -> `AppServerClient.readConfig` |
+| `config/value/write` | Config-value mutation diagnostics action | `/api/config/value/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeConfigValue` -> `AppServerClient.writeConfigValue` |
 | `configRequirements/read` | Config requirements diagnostics | `/api/config-requirements` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigRequirements` -> `AppServerClient.readConfigRequirements` |
 | `config/mcpServer/reload` | MCP server config reload diagnostics action | `/api/config/mcp-server/reload` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.reloadMcpServerConfig` -> `AppServerClient.reloadMcpServerConfig` |
 | `mcpServer/oauth/login` | MCP server oauth login diagnostics action | `/api/mcp-servers/oauth/login` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.startMcpServerOauthLogin` -> `AppServerClient.startMcpServerOauthLogin` |
@@ -164,14 +165,13 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`38` request methods are not used by Farfield’s app-server client path:
+`37` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
 archiveConversation
 cancelLoginChatGpt
 config/batchWrite
-config/value/write
 execOneOffCommand
 externalAgentConfig/detect
 externalAgentConfig/import
@@ -244,9 +244,8 @@ No remaining methods in this category for the current upstream snapshot.
 ### Category C: Configuration and Environment Management Surfaces Not Yet Wired
 
 1. `config/batchWrite`
-2. `config/value/write`
-3. `externalAgentConfig/detect`
-4. `externalAgentConfig/import`
+2. `externalAgentConfig/detect`
+3. `externalAgentConfig/import`
 
 ### Category D: Skills, Apps, and Feature-Discovery Surfaces Not Yet Wired
 
@@ -283,8 +282,8 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `38`
-2. Total methods listed across Category A-I: `38`
+1. Total non-intersection methods: `37`
+2. Total methods listed across Category A-I: `37`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

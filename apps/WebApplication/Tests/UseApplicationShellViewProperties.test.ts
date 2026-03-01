@@ -147,6 +147,15 @@ function createUseApplicationShellViewPropertiesFixture() {
   const logoutAccountSpy = vi.fn((): void => {});
   const reloadMcpServerConfigSpy = vi.fn((): void => {});
   const startMcpServerOauthLoginSpy = vi.fn((_serverName: string): void => {});
+  const writeConfigValueSpy = vi.fn(
+    (
+      _keyPath: string,
+      _value: string,
+      _mergeStrategy: "replace" | "upsert",
+      _filePath?: string,
+      _expectedVersion?: string,
+    ): void => {},
+  );
   const executeCommandSpy = vi.fn(
     (_command: string[], _timeoutMs?: number, _cwd?: string): void => {},
   );
@@ -280,12 +289,14 @@ function createUseApplicationShellViewPropertiesFixture() {
     coverageDiagnosticsSnapshot: null,
     pendingAccountLogin: null,
     lastCommandExecutionResult: null,
+    lastConfigValueWriteResult: null,
     refreshCoverageDiagnostics: refreshCoverageDiagnosticsSpy,
     startAccountLogin: startAccountLoginSpy,
     cancelAccountLogin: cancelAccountLoginSpy,
     logoutAccount: logoutAccountSpy,
     reloadMcpServerConfig: reloadMcpServerConfigSpy,
     startMcpServerOauthLogin: startMcpServerOauthLoginSpy,
+    writeConfigValue: writeConfigValueSpy,
     executeCommand: executeCommandSpy,
     writeSkillsConfig: writeSkillsConfigSpy,
     exportRemoteSkill: exportRemoteSkillSpy,

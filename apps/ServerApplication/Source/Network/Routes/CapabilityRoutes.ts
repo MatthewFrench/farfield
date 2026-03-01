@@ -6,6 +6,7 @@ import {
   type AppServerListModelsResponse,
   AppServerModelSchema,
   AppServerReasoningEffortSchema,
+  JsonValueSchema,
 } from "@farfield/protocol";
 import type { z } from "zod";
 import type { AgentRegistry } from "../../Agents/Registry.js";
@@ -27,6 +28,7 @@ import type {
   AgentRemoteSkillsProductSurface,
   AgentStartAccountLoginResult,
   AgentStartMcpServerOauthLoginResult,
+  AgentWriteConfigValueResult,
   AgentWriteSkillsConfigResult,
 } from "../../Agents/Types.js";
 import { logger } from "../../Shared/Logging/Logger.js";
@@ -40,6 +42,7 @@ const CapabilityRoutePathnameByName = {
   defaults: "/api/config/defaults",
   configRequirements: "/api/config-requirements",
   configMcpServerReload: "/api/config/mcp-server/reload",
+  configValueWrite: "/api/config/value/write",
   account: "/api/account",
   accountRateLimits: "/api/account/rate-limits",
   accountLoginStart: "/api/account/login/start",
@@ -76,6 +79,11 @@ const CapabilityRouteQueryParameterByName = {
   name: "name",
   path: "path",
   enabled: "enabled",
+  keyPath: "keyPath",
+  value: "value",
+  mergeStrategy: "mergeStrategy",
+  filePath: "filePath",
+  expectedVersion: "expectedVersion",
   command: "command",
   cwd: "cwd",
   hazelnutScope: "hazelnutScope",
@@ -97,6 +105,7 @@ const CapabilityRouteLogEventByName = {
   accountLoginCancelFailed: "account-login-cancel-failed",
   accountLogoutFailed: "account-logout-failed",
   configMcpServerReloadFailed: "config-mcp-server-reload-failed",
+  configValueWriteFailed: "config-value-write-failed",
   mcpServerOauthLoginFailed: "mcp-server-oauth-login-failed",
   skillsConfigWriteFailed: "skills-config-write-failed",
   skillsRemoteListFailed: "skills-remote-list-failed",
@@ -123,6 +132,14 @@ const CapabilityRouteErrorMessagePrefixByName = {
   failedToCancelAccountLogin: "Failed to cancel account login: ",
   failedToLogoutAccount: "Failed to logout account: ",
   failedToReloadMcpServerConfig: "Failed to reload MCP server config: ",
+  missingConfigKeyPath: "Missing keyPath query parameter.",
+  missingConfigValue: "Missing value query parameter.",
+  invalidConfigValue: "Invalid value query parameter. Expected JSON value.",
+  missingConfigMergeStrategy: "Missing mergeStrategy query parameter.",
+  invalidConfigMergeStrategy: "Invalid mergeStrategy query parameter. Expected replace or upsert.",
+  invalidConfigFilePath: "Invalid filePath query parameter.",
+  invalidConfigExpectedVersion: "Invalid expectedVersion query parameter.",
+  failedToWriteConfigValue: "Failed to write config value: ",
   missingLoginId: "Missing loginId query parameter.",
   missingMcpServerName: "Missing name query parameter.",
   invalidTimeoutSeconds: "Invalid timeoutSeconds query parameter.",
@@ -159,6 +176,7 @@ const CapabilityRouteTimeoutLabelByName = {
   accountLoginCancel: "account login cancel",
   accountLogout: "account logout",
   configMcpServerReload: "config mcp server reload",
+  configValueWrite: "config value write",
   mcpServerOauthLogin: "mcp server oauth login",
   skillsConfigWrite: "skills config write",
   skillsRemoteList: "skills remote listing",
@@ -236,6 +254,10 @@ interface CapabilitySkillsConfigWriteResponseBody {
   ok: true;
   effectiveEnabled: boolean;
 }
+
+type CapabilityConfigValueWriteResponseBody = AgentWriteConfigValueResult & {
+  ok: true;
+};
 
 type CapabilityExperimentalFeaturesResponseBody = AgentListExperimentalFeaturesResult & {
   ok: true;
@@ -400,6 +422,38 @@ function parseOptionalWorkingDirectoryQueryValue(value: string | null): string |
   return normalized.length > 0 ? normalized : null;
 }
 
+function parseConfigWriteMergeStrategyQueryValue(
+  value: string | null,
+): "replace" | "upsert" | null {
+  if (value === null) {
+    return null;
+  }
+  const normalized = value.trim();
+  if (normalized === "replace") {
+    return "replace";
+  }
+  if (normalized === "upsert") {
+    return "upsert";
+  }
+  return null;
+}
+
+function parseConfigWriteValueQueryValue(
+  value: string | null,
+): z.infer<typeof JsonValueSchema> | null {
+  if (value === null) {
+    return null;
+  }
+
+  try {
+    const parsedJson = JSON.parse(value);
+    const parsedValue = JsonValueSchema.safeParse(parsedJson);
+    return parsedValue.success ? parsedValue.data : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseRemoteSkillsHazelnutScopeQueryValue(
   value: string | null,
 ): AgentRemoteSkillsHazelnutScope | null {
@@ -517,6 +571,15 @@ function mapSkillsConfigWriteResponse(
   return {
     ok: true,
     effectiveEnabled: result.effectiveEnabled,
+  };
+}
+
+function mapConfigValueWriteResponse(
+  result: AgentWriteConfigValueResult,
+): CapabilityConfigValueWriteResponseBody {
+  return {
+    ok: true,
+    ...result,
   };
 }
 
@@ -1352,6 +1415,156 @@ async function handleConfigMcpServerReloadRoute(
   return true;
 }
 
+async function handleConfigValueWriteRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.configValueWrite,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const keyPath = url.searchParams.get(CapabilityRouteQueryParameterByName.keyPath);
+  if (keyPath === null || keyPath.trim().length === 0) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingConfigKeyPath,
+    });
+    return true;
+  }
+  const normalizedKeyPath = keyPath.trim();
+
+  const valueRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.value);
+  if (valueRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingConfigValue,
+    });
+    return true;
+  }
+  const value = parseConfigWriteValueQueryValue(valueRaw);
+  if (value === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidConfigValue,
+    });
+    return true;
+  }
+
+  const mergeStrategyRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.mergeStrategy);
+  if (mergeStrategyRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingConfigMergeStrategy,
+    });
+    return true;
+  }
+  const mergeStrategy = parseConfigWriteMergeStrategyQueryValue(mergeStrategyRaw);
+  if (mergeStrategy === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidConfigMergeStrategy,
+    });
+    return true;
+  }
+
+  const filePathRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.filePath);
+  const filePath = parseOptionalWorkingDirectoryQueryValue(filePathRaw);
+  if (filePathRaw !== null && filePath === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidConfigFilePath,
+    });
+    return true;
+  }
+
+  const expectedVersionRaw = url.searchParams.get(
+    CapabilityRouteQueryParameterByName.expectedVersion,
+  );
+  const expectedVersion = parseOptionalWorkingDirectoryQueryValue(expectedVersionRaw);
+  if (expectedVersionRaw !== null && expectedVersion === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidConfigExpectedVersion,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canWriteConfigValue ||
+    !adapter.writeConfigValue
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToWriteConfigValue}Config value write is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.writeConfigValue({
+        keyPath: normalizedKeyPath,
+        value,
+        mergeStrategy,
+        ...(filePath !== null ? { filePath } : {}),
+        ...(expectedVersion !== null ? { expectedVersion } : {}),
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.configValueWrite,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapConfigValueWriteResponse(result));
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        keyPath: normalizedKeyPath,
+        mergeStrategy,
+        filePath,
+        expectedVersion,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.configValueWriteFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToWriteConfigValue}${message}`,
+    });
+  }
+
+  return true;
+}
+
 async function handleMcpServerOauthLoginRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
   const {
     req,
@@ -2178,7 +2391,7 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
  * Owns capability route dispatch (`/api/config/defaults`, `/api/config-requirements`,
  * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/rate-limits`,
  * `/api/commands/exec`, `/api/account/login/start`, `/api/account/login/cancel`, `/api/account/logout`,
- * `/api/mcp-servers/oauth/login`, `/api/skills/config/write`,
+ * `/api/config/value/write`, `/api/mcp-servers/oauth/login`, `/api/skills/config/write`,
  * `/api/skills/remote/list`, `/api/skills/remote/export`, `/api/models`,
  * `/api/collaboration-modes`, `/api/experimental-features`,
  * `/api/mcp-servers`, `/api/apps`, `/api/skills`)
@@ -2210,6 +2423,9 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleConfigMcpServerReloadRoute(deps)) {
+    return true;
+  }
+  if (await handleConfigValueWriteRoute(deps)) {
     return true;
   }
   if (await handleMcpServerOauthLoginRoute(deps)) {

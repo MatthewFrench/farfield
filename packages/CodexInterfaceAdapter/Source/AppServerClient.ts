@@ -22,6 +22,7 @@ import {
 } from "@farfield/protocol";
 import { z } from "zod";
 import { buildCommandExecutionRequestParameters } from "./AppServerClientCommandExecutionRequestBuilders.js";
+import { buildConfigValueWriteRequestParameters } from "./AppServerClientConfigValueWriteRequestBuilders.js";
 import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
 import {
   APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT,
@@ -320,6 +321,31 @@ export interface CommandExecutionResult {
   exitCode: number;
   stdout: string;
   stderr: string;
+}
+
+export type ConfigWriteMergeStrategy = "replace" | "upsert";
+
+export interface ConfigWriteValueOptions {
+  keyPath: string;
+  value: z.infer<typeof JsonValueSchema>;
+  mergeStrategy: ConfigWriteMergeStrategy;
+  filePath?: string;
+  expectedVersion?: string;
+}
+
+export type ConfigWriteStatus = "ok" | "okOverridden";
+
+export interface ConfigWriteOverriddenMetadata {
+  message: string;
+  overridingLayer: z.infer<typeof JsonValueSchema>;
+  effectiveValue: z.infer<typeof JsonValueSchema>;
+}
+
+export interface ConfigWriteResult {
+  status: ConfigWriteStatus;
+  version: string;
+  filePath: string;
+  overriddenMetadata: ConfigWriteOverriddenMetadata | null;
 }
 
 export interface LoginAccountWithApiKeyOptions {
@@ -674,6 +700,21 @@ const AppServerCommandExecResponseSchema = z
     exitCode: z.number().int(),
     stdout: z.string(),
     stderr: z.string(),
+  })
+  .passthrough();
+const AppServerConfigWriteOverriddenMetadataSchema = z
+  .object({
+    message: z.string(),
+    overridingLayer: JsonValueSchema,
+    effectiveValue: JsonValueSchema,
+  })
+  .passthrough();
+const AppServerConfigWriteResponseSchema = z
+  .object({
+    status: z.enum(["ok", "okOverridden"]),
+    version: z.string().min(1),
+    filePath: z.string().min(1),
+    overriddenMetadata: AppServerConfigWriteOverriddenMetadataSchema.nullable().optional(),
   })
   .passthrough();
 const AppServerLoginAccountResponseSchema = z.discriminatedUnion("type", [
@@ -1157,6 +1198,31 @@ export class AppServerClient {
       exitCode: parsed.exitCode,
       stdout: parsed.stdout,
       stderr: parsed.stderr,
+    };
+  }
+
+  public async writeConfigValue(options: ConfigWriteValueOptions): Promise<ConfigWriteResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.writeConfigValue,
+      buildConfigValueWriteRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerConfigWriteResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.writeConfigValue,
+    );
+    return {
+      status: parsed.status,
+      version: parsed.version,
+      filePath: parsed.filePath,
+      overriddenMetadata:
+        parsed.overriddenMetadata === undefined || parsed.overriddenMetadata === null
+          ? null
+          : {
+              message: parsed.overriddenMetadata.message,
+              overridingLayer: parsed.overriddenMetadata.overridingLayer,
+              effectiveValue: parsed.overriddenMetadata.effectiveValue,
+            },
     };
   }
 

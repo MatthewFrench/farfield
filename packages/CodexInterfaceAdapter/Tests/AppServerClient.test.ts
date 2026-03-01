@@ -1052,6 +1052,71 @@ describe("AppServerClient.executeCommand", () => {
   });
 });
 
+describe("AppServerClient.writeConfigValue", () => {
+  it("sends config/value/write payload and returns typed config write result", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      status: "okOverridden",
+      version: "v9",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      overriddenMetadata: {
+        message: "Workspace value overrides parent configuration layer.",
+        overridingLayer: "workspace",
+        effectiveValue: {
+          enabled: true,
+        },
+      },
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.writeConfigValue({
+      keyPath: "integrations.github",
+      value: {
+        enabled: true,
+      },
+      mergeStrategy: "upsert",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      expectedVersion: "v8",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("config/value/write", {
+      keyPath: "integrations.github",
+      value: {
+        enabled: true,
+      },
+      mergeStrategy: "upsert",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      expectedVersion: "v8",
+    });
+    expect(result).toEqual({
+      status: "okOverridden",
+      version: "v9",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      overriddenMetadata: {
+        message: "Workspace value overrides parent configuration layer.",
+        overridingLayer: "workspace",
+        effectiveValue: {
+          enabled: true,
+        },
+      },
+    });
+  });
+
+  it("validates keyPath before sending config/value/write request", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await expect(
+      client.writeConfigValue({
+        keyPath: "",
+        value: true,
+        mergeStrategy: "replace",
+      }),
+    ).rejects.toThrowError();
+    expect(transportDouble.request).not.toHaveBeenCalled();
+  });
+});
+
 describe("AppServerClient.startAccountLogin", () => {
   it("sends account/login/start and returns chatgpt login metadata", async () => {
     const transportDouble = createTransportDouble();

@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-03-01 00:36:00Z
+Last Updated (UTC): 2026-03-01 02:05:00Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -20,7 +20,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `config/batchWrite` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 | `config/mcpServer/reload` | Used now | Keep | Exposed through capability ownership and debug workspace MCP diagnostics actions. |
 | `config/read` | Used now | Keep | Current ownership and contracts align with present product behavior. |
-| `config/value/write` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
+| `config/value/write` | Used now | Keep | Exposed through capability ownership and debug workspace config-value write actions. |
 | `configRequirements/read` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
 | `execOneOffCommand` | Not used | Do not adopt | Deprecated upstream request family. |
 | `experimentalFeature/list` | Used now | Keep | Exposed through capability ownership and debug workspace coverage diagnostics. |
@@ -82,5 +82,5 @@ This ledger records recommended disposition for every upstream app-server client
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 37
-Not used: 37
+Used now: 38
+Not used: 36

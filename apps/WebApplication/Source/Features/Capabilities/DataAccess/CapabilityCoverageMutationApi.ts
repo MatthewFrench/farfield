@@ -1,8 +1,10 @@
+import { JsonValueSchema } from "@farfield/protocol";
 import { z } from "zod";
 import { type AgentId, type ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { request, requestInitWithOptions } from "@/Shared/Transport/FarfieldHttpTransport";
 
 const MCP_SERVER_OAUTH_LOGIN_ENDPOINT = "/api/mcp-servers/oauth/login";
+const CONFIG_VALUE_WRITE_ENDPOINT = "/api/config/value/write";
 const SKILLS_CONFIG_WRITE_ENDPOINT = "/api/skills/config/write";
 const SKILLS_REMOTE_LIST_ENDPOINT = "/api/skills/remote/list";
 const SKILLS_REMOTE_EXPORT_ENDPOINT = "/api/skills/remote/export";
@@ -19,6 +21,18 @@ export interface ApiSkillsConfigWriteOptions extends ApiRequestOptions {
   agentId?: AgentId;
   path: string;
   enabled: boolean;
+}
+
+const ConfigWriteMergeStrategySchema = z.enum(["replace", "upsert"]);
+export type ApiConfigWriteMergeStrategy = z.infer<typeof ConfigWriteMergeStrategySchema>;
+
+export interface ApiConfigValueWriteOptions extends ApiRequestOptions {
+  agentId?: AgentId;
+  keyPath: string;
+  value: z.infer<typeof JsonValueSchema>;
+  mergeStrategy: ApiConfigWriteMergeStrategy;
+  filePath?: string;
+  expectedVersion?: string;
 }
 
 const RemoteSkillsHazelnutScopeSchema = z.enum([
@@ -67,6 +81,23 @@ const SkillsConfigWriteResponseSchema = z
   .strict();
 export type ApiSkillsConfigWriteResponse = z.infer<typeof SkillsConfigWriteResponseSchema>;
 
+const ConfigValueWriteResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    status: z.enum(["ok", "okOverridden"]),
+    version: z.string().min(1),
+    filePath: z.string().min(1),
+    overriddenMetadata: z
+      .object({
+        message: z.string().min(1),
+        overridingLayer: JsonValueSchema,
+        effectiveValue: JsonValueSchema,
+      })
+      .nullable(),
+  })
+  .strict();
+export type ApiConfigValueWriteResponse = z.infer<typeof ConfigValueWriteResponseSchema>;
+
 const RemoteSkillSummarySchema = z
   .object({
     id: z.string().min(1),
@@ -111,6 +142,16 @@ const CommandExecutionInputSchema = z
   })
   .strict();
 
+const ConfigValueWriteInputSchema = z
+  .object({
+    keyPath: z.string().min(1),
+    value: JsonValueSchema,
+    mergeStrategy: ConfigWriteMergeStrategySchema,
+    filePath: z.string().min(1).optional(),
+    expectedVersion: z.string().min(1).optional(),
+  })
+  .strict();
+
 function readMcpServerOauthLoginPath(options: ApiMcpServerOauthLoginOptions): string {
   const params = new URLSearchParams();
   params.set("name", options.name);
@@ -134,6 +175,30 @@ function readSkillsConfigWritePath(options: ApiSkillsConfigWriteOptions): string
     params.set("agentId", options.agentId);
   }
   return `${SKILLS_CONFIG_WRITE_ENDPOINT}?${params.toString()}`;
+}
+
+function readConfigValueWritePath(options: ApiConfigValueWriteOptions): string {
+  const parsedInput = ConfigValueWriteInputSchema.parse({
+    keyPath: options.keyPath,
+    value: options.value,
+    mergeStrategy: options.mergeStrategy,
+    ...(options.filePath !== undefined ? { filePath: options.filePath } : {}),
+    ...(options.expectedVersion !== undefined ? { expectedVersion: options.expectedVersion } : {}),
+  });
+  const params = new URLSearchParams();
+  params.set("keyPath", parsedInput.keyPath);
+  params.set("value", JSON.stringify(parsedInput.value));
+  params.set("mergeStrategy", parsedInput.mergeStrategy);
+  if (options.agentId !== undefined) {
+    params.set("agentId", options.agentId);
+  }
+  if (parsedInput.filePath !== undefined) {
+    params.set("filePath", parsedInput.filePath);
+  }
+  if (parsedInput.expectedVersion !== undefined) {
+    params.set("expectedVersion", parsedInput.expectedVersion);
+  }
+  return `${CONFIG_VALUE_WRITE_ENDPOINT}?${params.toString()}`;
 }
 
 function readRemoteSkillsListPath(options: ApiListRemoteSkillsOptions): string {
@@ -194,6 +259,17 @@ export async function writeSkillsConfig(
 ): Promise<ApiSkillsConfigWriteResponse> {
   return SkillsConfigWriteResponseSchema.parse(
     await request(readSkillsConfigWritePath(options), {
+      ...requestInitWithOptions(options),
+      method: "POST",
+    }),
+  );
+}
+
+export async function writeConfigValue(
+  options: ApiConfigValueWriteOptions,
+): Promise<ApiConfigValueWriteResponse> {
+  return ConfigValueWriteResponseSchema.parse(
+    await request(readConfigValueWritePath(options), {
       ...requestInitWithOptions(options),
       method: "POST",
     }),
