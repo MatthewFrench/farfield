@@ -18,6 +18,8 @@ const THREAD_STARTED_NOTIFICATION_METHOD = "thread/started";
 const THREAD_COMPACTED_NOTIFICATION_METHOD = "thread/compacted";
 const TURN_STARTED_NOTIFICATION_METHOD = "turn/started";
 const TURN_COMPLETED_NOTIFICATION_METHOD = "turn/completed";
+const TURN_PLAN_UPDATED_NOTIFICATION_METHOD = "turn/plan/updated";
+const TURN_DIFF_UPDATED_NOTIFICATION_METHOD = "turn/diff/updated";
 const THREAD_TOKEN_USAGE_UPDATED_NOTIFICATION_METHOD = "thread/tokenUsage/updated";
 const MODEL_REROUTED_NOTIFICATION_METHOD = "model/rerouted";
 const ACCOUNT_UPDATED_NOTIFICATION_METHOD = "account/updated";
@@ -117,6 +119,32 @@ const TurnLifecycleParametersSchema = z
         id: z.string().min(1),
       })
       .passthrough(),
+  })
+  .strict();
+
+const TurnPlanStepStatusSchema = z.enum(["pending", "inProgress", "completed"]);
+
+const TurnPlanUpdatedParametersSchema = z
+  .object({
+    threadId: z.string().min(1),
+    turnId: z.string().min(1),
+    explanation: z.string().nullable(),
+    plan: z.array(
+      z
+        .object({
+          step: z.string(),
+          status: TurnPlanStepStatusSchema,
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+const TurnDiffUpdatedParametersSchema = z
+  .object({
+    threadId: z.string().min(1),
+    turnId: z.string().min(1),
+    diff: z.string(),
   })
   .strict();
 
@@ -263,6 +291,36 @@ function mapTurnLifecycleEvent(
   };
 }
 
+function mapTurnPlanUpdatedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeThreadProgressEvent {
+  const parsedParameters = TurnPlanUpdatedParametersSchema.parse(event.params);
+  return {
+    method: TURN_PLAN_UPDATED_NOTIFICATION_METHOD,
+    sequence: event.sequence,
+    threadId: parsedParameters.threadId,
+    turnId: parsedParameters.turnId,
+    preview: null,
+    modelProvider: null,
+    receivedAtMilliseconds: event.receivedAtMilliseconds,
+  };
+}
+
+function mapTurnDiffUpdatedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeThreadProgressEvent {
+  const parsedParameters = TurnDiffUpdatedParametersSchema.parse(event.params);
+  return {
+    method: TURN_DIFF_UPDATED_NOTIFICATION_METHOD,
+    sequence: event.sequence,
+    threadId: parsedParameters.threadId,
+    turnId: parsedParameters.turnId,
+    preview: null,
+    modelProvider: null,
+    receivedAtMilliseconds: event.receivedAtMilliseconds,
+  };
+}
+
 function mapModelReroutedEvent(
   event: CapabilityNotificationEventsResponse["events"][number],
 ): RuntimeModelRerouteEvent {
@@ -328,6 +386,18 @@ export function readRuntimeNotificationProjection(
 
     if (event.method === TURN_COMPLETED_NOTIFICATION_METHOD) {
       threadProgressEvents.push(mapTurnLifecycleEvent(event, TURN_COMPLETED_NOTIFICATION_METHOD));
+      relevantEventCount += 1;
+      continue;
+    }
+
+    if (event.method === TURN_PLAN_UPDATED_NOTIFICATION_METHOD) {
+      threadProgressEvents.push(mapTurnPlanUpdatedEvent(event));
+      relevantEventCount += 1;
+      continue;
+    }
+
+    if (event.method === TURN_DIFF_UPDATED_NOTIFICATION_METHOD) {
+      threadProgressEvents.push(mapTurnDiffUpdatedEvent(event));
       relevantEventCount += 1;
       continue;
     }

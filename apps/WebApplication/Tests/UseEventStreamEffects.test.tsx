@@ -353,24 +353,50 @@ function createThreadProgressWarningErrorTokenUsageAndModelRerouteNotificationEv
       },
       {
         sequence: 68,
-        method: "thread/realtime/started",
+        method: "turn/plan/updated",
         params: {
           threadId: "thread-1",
-          sessionId: "session-1",
+          turnId: "turn-3",
+          explanation: "Refine the implementation",
+          plan: [
+            {
+              step: "Update parser",
+              status: "inProgress",
+            },
+          ],
         },
         receivedAtMilliseconds: 2_037,
       },
       {
         sequence: 69,
+        method: "turn/diff/updated",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-3",
+          diff: "@@ -1,1 +1,1 @@\n-old\n+new",
+        },
+        receivedAtMilliseconds: 2_038,
+      },
+      {
+        sequence: 70,
+        method: "thread/realtime/started",
+        params: {
+          threadId: "thread-1",
+          sessionId: "session-1",
+        },
+        receivedAtMilliseconds: 2_039,
+      },
+      {
+        sequence: 71,
         method: "thread/realtime/closed",
         params: {
           threadId: "thread-1",
           reason: "session ended",
         },
-        receivedAtMilliseconds: 2_038,
+        receivedAtMilliseconds: 2_040,
       },
     ],
-    nextSequence: 70,
+    nextSequence: 72,
     firstAvailableSequence: 0,
     resetRequired: false,
   };
@@ -811,13 +837,13 @@ describe("useEventStreamEffects", () => {
       rateLimits: null,
       apps: null,
       progress: {
-        method: "turn/completed",
+        method: "turn/diff/updated",
         threadId: "thread-1",
         turnId: "turn-3",
         preview: null,
         modelProvider: null,
-        sequence: 67,
-        receivedAtMilliseconds: 2_036,
+        sequence: 69,
+        receivedAtMilliseconds: 2_038,
         refreshedAtMilliseconds: expect.any(Number),
       },
       warning: {
@@ -825,8 +851,8 @@ describe("useEventStreamEffects", () => {
         summary: "Closed (session ended)",
         threadId: "thread-1",
         isRetrying: false,
-        sequence: 69,
-        receivedAtMilliseconds: 2_038,
+        sequence: 71,
+        receivedAtMilliseconds: 2_040,
         refreshedAtMilliseconds: expect.any(Number),
       },
       tokenUsage: {

@@ -6,7 +6,7 @@ const THREAD_ONLY_METHODS = [
   "thread-queued-followups-changed",
 ] as const;
 const RUNTIME_NOTIFICATION_METHODS_FOR_PROJECTION =
-  "configWarning,deprecationNotice,windows/worldWritableWarning,error,turn/started,turn/completed,thread/realtime/started,thread/realtime/closed,thread/realtime/error".split(
+  "configWarning,deprecationNotice,windows/worldWritableWarning,error,turn/started,turn/completed,turn/plan/updated,turn/diff/updated,thread/realtime/started,thread/realtime/closed,thread/realtime/error".split(
     ",",
   );
 

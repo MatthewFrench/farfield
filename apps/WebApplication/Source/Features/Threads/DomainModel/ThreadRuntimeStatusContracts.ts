@@ -59,7 +59,9 @@ export type ThreadRuntimeProgressMethod =
   | "thread/started"
   | "thread/compacted"
   | "turn/started"
-  | "turn/completed";
+  | "turn/completed"
+  | "turn/plan/updated"
+  | "turn/diff/updated";
 
 export interface ThreadRuntimeProgressSummary {
   method: ThreadRuntimeProgressMethod;

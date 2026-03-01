@@ -292,6 +292,12 @@ function readThreadSidebarProgressSummaryLabel(summary: ThreadSidebarRuntimeSumm
   if (summary.progress.method === "turn/completed") {
     return "Progress turn completed";
   }
+  if (summary.progress.method === "turn/plan/updated") {
+    return "Progress turn plan updated";
+  }
+  if (summary.progress.method === "turn/diff/updated") {
+    return "Progress turn diff updated";
+  }
   return "Progress compacted";
 }
 

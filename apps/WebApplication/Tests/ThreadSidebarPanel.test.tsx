@@ -229,6 +229,34 @@ describe("ThreadSidebarPanel", () => {
     );
   });
 
+  it("renders turn-diff-updated progress label when latest progress event is turn diff update", () => {
+    renderThreadSidebarPanel({
+      viewport: "desktop",
+      threadSidebarRuntimeSummary: {
+        account: null,
+        rateLimits: null,
+        apps: null,
+        progress: {
+          method: "turn/diff/updated",
+          threadId: "thread-1",
+          turnId: "turn-4",
+          preview: null,
+          modelProvider: null,
+          sequence: 21,
+          receivedAtMilliseconds: 1_700_000_001_020,
+          refreshedAtMilliseconds: 1_700_000_001_030,
+        },
+        warning: null,
+        tokenUsage: null,
+        modelReroute: null,
+      },
+    });
+
+    expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe(
+      "Progress turn diff updated",
+    );
+  });
+
   it("calls desktop close handler", () => {
     const onHideDesktopSidebar = vi.fn();
     renderThreadSidebarPanel({
