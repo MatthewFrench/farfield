@@ -352,6 +352,32 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     const readNotificationEvents = vi
       .spyOn(capabilityServerClient, "readNotificationEvents")
       .mockImplementation(async (input) => {
+        if (input.limit === 320) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 24,
+                method: "error",
+                params: {
+                  error: {
+                    message: "Rate limit exceeded",
+                    codexErrorInfo: "usageLimitExceeded",
+                    additionalDetails: "Try again after reset.",
+                  },
+                  willRetry: true,
+                  threadId: "thread-realtime-1",
+                  turnId: "turn-11",
+                },
+                receivedAtMilliseconds: 17_780,
+              },
+            ],
+            nextSequence: 25,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 300) {
           return {
             ok: true,
@@ -669,6 +695,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readModelReroutedEvents(16);
     latestDiagnostics.current?.readWarningNotifications(18);
     latestDiagnostics.current?.readThreadLifecycleNotifications(21);
+    latestDiagnostics.current?.readErrorNotifications(24);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -823,6 +850,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 21,
         limit: 300,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 24,
+        limit: 320,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -1210,6 +1242,27 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             threadId: "thread-legacy-1",
             threadName: null,
             receivedAtMilliseconds: 17_770,
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastErrorNotificationsResult).toEqual({
+        sinceSequence: 24,
+        eventCount: 1,
+        retryCount: 1,
+        nextSequence: 25,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        events: [
+          {
+            sequence: 24,
+            threadId: "thread-realtime-1",
+            turnId: "turn-11",
+            message: "Rate limit exceeded",
+            codexErrorInfoSummary: "usageLimitExceeded",
+            additionalDetails: "Try again after reset.",
+            willRetry: true,
+            receivedAtMilliseconds: 17_780,
           },
         ],
         readAtIso8601: expect.any(String),

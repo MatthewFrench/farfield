@@ -2,6 +2,7 @@ import { type Dispatch, type SetStateAction } from "react";
 import type { CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import type {
   DebugAppServerCoverageAuthCompletionEventsResult,
+  DebugAppServerCoverageErrorNotificationsResult,
   DebugAppServerCoverageFuzzySessionNotificationsResult,
   DebugAppServerCoverageModelReroutedEventsResult,
   DebugAppServerCoverageNotificationEventsResult,
@@ -10,6 +11,7 @@ import type {
   DebugAppServerCoverageThreadLifecycleNotificationsResult,
   DebugAppServerCoverageWarningNotificationsResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
+import { createReadErrorNotificationsAction } from "./DebugAppServerCoverageErrorNotificationReadAction";
 import {
   createReadAuthCompletionEventsAction,
   createReadFuzzySessionNotificationsAction,
@@ -29,6 +31,7 @@ interface NotificationCoverageReadActions {
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
   readWarningNotifications: (sinceSequence?: number | null) => void;
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
+  readErrorNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
 }
 
@@ -57,6 +60,9 @@ interface CreateNotificationCoverageReadActionsInput {
   >;
   setLastThreadLifecycleNotificationsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageThreadLifecycleNotificationsResult | null>
+  >;
+  setLastErrorNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageErrorNotificationsResult | null>
   >;
   setLastPendingServerRequestsResult: Dispatch<
     SetStateAction<DebugAppServerCoveragePendingServerRequestsResult | null>
@@ -105,6 +111,10 @@ export function createNotificationCoverageReadActions(
     readThreadLifecycleNotifications: createReadThreadLifecycleNotificationsAction({
       ...sharedActionInput,
       setLastThreadLifecycleNotificationsResult: input.setLastThreadLifecycleNotificationsResult,
+    }),
+    readErrorNotifications: createReadErrorNotificationsAction({
+      ...sharedActionInput,
+      setLastErrorNotificationsResult: input.setLastErrorNotificationsResult,
     }),
     readPendingServerRequests: createReadPendingServerRequestsAction({
       ...sharedActionInput,

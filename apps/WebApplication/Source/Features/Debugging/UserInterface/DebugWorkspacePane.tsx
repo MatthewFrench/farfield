@@ -7,6 +7,7 @@ import {
   type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
+  type DebugAppServerCoverageErrorNotificationsResult,
   type DebugAppServerCoverageExternalAgentConfigDetectResult,
   type DebugAppServerCoverageExternalAgentConfigImportResult,
   type DebugAppServerCoverageExternalAgentConfigMigrationItem,
@@ -108,6 +109,7 @@ export interface DebugWorkspacePaneProps {
   lastServerRequestResolvedEventsResult: DebugAppServerCoverageServerRequestResolvedEventsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
+  lastErrorNotificationsResult: DebugAppServerCoverageErrorNotificationsResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
   lastFuzzyFileSearchSessionStartResult: DebugAppServerCoverageFuzzyFileSearchSessionStartResult | null;
   lastFuzzyFileSearchSessionUpdateResult: DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null;
@@ -159,6 +161,7 @@ export interface DebugWorkspacePaneProps {
   onReadModelReroutedEvents: (sinceSequence?: number | null) => void;
   onReadWarningNotifications: (sinceSequence?: number | null) => void;
   onReadThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
+  onReadErrorNotifications: (sinceSequence?: number | null) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
     classification: string,
@@ -226,6 +229,7 @@ export function DebugWorkspacePane({
   lastServerRequestResolvedEventsResult,
   lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
+  lastErrorNotificationsResult,
   lastFuzzyFileSearchResult,
   lastFuzzyFileSearchSessionStartResult,
   lastFuzzyFileSearchSessionUpdateResult,
@@ -266,6 +270,7 @@ export function DebugWorkspacePane({
   onReadModelReroutedEvents,
   onReadWarningNotifications,
   onReadThreadLifecycleNotifications,
+  onReadErrorNotifications,
   onExecuteCommand,
   onUploadFeedback,
 }: DebugWorkspacePaneProps): React.JSX.Element {
@@ -384,6 +389,7 @@ export function DebugWorkspacePane({
             lastServerRequestResolvedEventsResult={lastServerRequestResolvedEventsResult}
             lastWindowsSandboxSetupStartResult={lastWindowsSandboxSetupStartResult}
             lastFeedbackUploadResult={lastFeedbackUploadResult}
+            lastErrorNotificationsResult={lastErrorNotificationsResult}
             lastFuzzyFileSearchResult={lastFuzzyFileSearchResult}
             lastFuzzyFileSearchSessionStartResult={lastFuzzyFileSearchSessionStartResult}
             lastFuzzyFileSearchSessionUpdateResult={lastFuzzyFileSearchSessionUpdateResult}
@@ -424,6 +430,7 @@ export function DebugWorkspacePane({
             onReadModelReroutedEvents={onReadModelReroutedEvents}
             onReadWarningNotifications={onReadWarningNotifications}
             onReadThreadLifecycleNotifications={onReadThreadLifecycleNotifications}
+            onReadErrorNotifications={onReadErrorNotifications}
             onExecuteCommand={onExecuteCommand}
             onUploadFeedback={onUploadFeedback}
           />

@@ -474,6 +474,28 @@ export interface DebugAppServerCoverageThreadLifecycleNotificationsResult {
   readAtIso8601: string;
 }
 
+export interface DebugAppServerCoverageErrorNotificationSummary {
+  sequence: number;
+  threadId: string;
+  turnId: string;
+  message: string;
+  codexErrorInfoSummary: string | null;
+  additionalDetails: string | null;
+  willRetry: boolean;
+  receivedAtMilliseconds: number;
+}
+
+export interface DebugAppServerCoverageErrorNotificationsResult {
+  sinceSequence: number | null;
+  eventCount: number;
+  retryCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageErrorNotificationSummary[];
+  readAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

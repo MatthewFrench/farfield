@@ -8,6 +8,7 @@ import type {
   DebugAppServerCoverageCommandExecutionResult,
   DebugAppServerCoverageConfigBatchWriteResult,
   DebugAppServerCoverageConfigValueWriteResult,
+  DebugAppServerCoverageErrorNotificationsResult,
   DebugAppServerCoverageExternalAgentConfigDetectResult,
   DebugAppServerCoverageExternalAgentConfigImportResult,
   DebugAppServerCoverageExternalAgentConfigMigrationItem,
@@ -96,6 +97,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastServerRequestResolvedEventsResult: DebugAppServerCoverageServerRequestResolvedEventsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
+  lastErrorNotificationsResult: DebugAppServerCoverageErrorNotificationsResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
   lastFuzzyFileSearchSessionStartResult: DebugAppServerCoverageFuzzyFileSearchSessionStartResult | null;
   lastFuzzyFileSearchSessionUpdateResult: DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null;
@@ -139,6 +141,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
   readWarningNotifications: (sinceSequence?: number | null) => void;
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
+  readErrorNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
@@ -240,6 +243,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageWindowsSandboxSetupStartResult | null>(null);
   const [lastFeedbackUploadResult, setLastFeedbackUploadResult] =
     useState<DebugAppServerCoverageFeedbackUploadResult | null>(null);
+  const [lastErrorNotificationsResult, setLastErrorNotificationsResult] =
+    useState<DebugAppServerCoverageErrorNotificationsResult | null>(null);
   const [lastFuzzyFileSearchResult, setLastFuzzyFileSearchResult] =
     useState<DebugAppServerCoverageFuzzyFileSearchResult | null>(null);
   const [lastFuzzyFileSearchSessionStartResult, setLastFuzzyFileSearchSessionStartResult] =
@@ -483,6 +488,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     setLastModelReroutedEventsResult,
     setLastWarningNotificationsResult,
     setLastThreadLifecycleNotificationsResult,
+    setLastErrorNotificationsResult,
     setLastPendingServerRequestsResult,
   });
 
@@ -510,6 +516,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastServerRequestResolvedEventsResult,
       lastWindowsSandboxSetupStartResult,
       lastFeedbackUploadResult,
+      lastErrorNotificationsResult,
       lastFuzzyFileSearchResult,
       lastFuzzyFileSearchSessionStartResult,
       lastFuzzyFileSearchSessionUpdateResult,

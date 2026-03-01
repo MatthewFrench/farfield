@@ -171,6 +171,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastServerRequestResolvedEventsResult: DebugWorkspacePaneProps["lastServerRequestResolvedEventsResult"];
   lastWindowsSandboxSetupStartResult: DebugWorkspacePaneProps["lastWindowsSandboxSetupStartResult"];
   lastFeedbackUploadResult: DebugWorkspacePaneProps["lastFeedbackUploadResult"];
+  lastErrorNotificationsResult: DebugWorkspacePaneProps["lastErrorNotificationsResult"];
   lastFuzzyFileSearchResult: DebugWorkspacePaneProps["lastFuzzyFileSearchResult"];
   lastFuzzyFileSearchSessionStartResult: DebugWorkspacePaneProps["lastFuzzyFileSearchSessionStartResult"];
   lastFuzzyFileSearchSessionUpdateResult: DebugWorkspacePaneProps["lastFuzzyFileSearchSessionUpdateResult"];
@@ -217,6 +218,7 @@ export interface UseApplicationShellViewPropertiesInput {
   readModelReroutedEvents: DebugWorkspacePaneProps["onReadModelReroutedEvents"];
   readWarningNotifications: DebugWorkspacePaneProps["onReadWarningNotifications"];
   readThreadLifecycleNotifications: DebugWorkspacePaneProps["onReadThreadLifecycleNotifications"];
+  readErrorNotifications: DebugWorkspacePaneProps["onReadErrorNotifications"];
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -532,6 +534,7 @@ function buildDebugWorkspacePaneProperties(
     lastServerRequestResolvedEventsResult: input.lastServerRequestResolvedEventsResult,
     lastWindowsSandboxSetupStartResult: input.lastWindowsSandboxSetupStartResult,
     lastFeedbackUploadResult: input.lastFeedbackUploadResult,
+    lastErrorNotificationsResult: input.lastErrorNotificationsResult,
     lastFuzzyFileSearchResult: input.lastFuzzyFileSearchResult,
     lastFuzzyFileSearchSessionStartResult: input.lastFuzzyFileSearchSessionStartResult,
     lastFuzzyFileSearchSessionUpdateResult: input.lastFuzzyFileSearchSessionUpdateResult,
@@ -572,6 +575,7 @@ function buildDebugWorkspacePaneProperties(
     onReadModelReroutedEvents: input.readModelReroutedEvents,
     onReadWarningNotifications: input.readWarningNotifications,
     onReadThreadLifecycleNotifications: input.readThreadLifecycleNotifications,
+    onReadErrorNotifications: input.readErrorNotifications,
     onExecuteCommand: input.executeCommand,
     onUploadFeedback: input.uploadFeedback,
   };
@@ -792,6 +796,7 @@ export function useApplicationShellViewProperties(
       input.lastServerRequestResolvedEventsResult,
       input.lastWindowsSandboxSetupStartResult,
       input.lastFeedbackUploadResult,
+      input.lastErrorNotificationsResult,
       input.lastFuzzyFileSearchResult,
       input.lastFuzzyFileSearchSessionStartResult,
       input.lastFuzzyFileSearchSessionUpdateResult,
@@ -831,6 +836,7 @@ export function useApplicationShellViewProperties(
       input.readModelReroutedEvents,
       input.readWarningNotifications,
       input.readThreadLifecycleNotifications,
+      input.readErrorNotifications,
       input.executeCommand,
       input.uploadFeedback,
       input.replayHistoryEntryFromDetail,

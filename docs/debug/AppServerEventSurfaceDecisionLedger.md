@@ -1,9 +1,9 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-03-01 09:52:41Z
+Last Updated (UTC): 2026-03-01 10:11:22Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
-Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session/model-reroute/warning/thread-lifecycle diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`, `model/rerouted`, `configWarning`, `deprecationNotice`, `windows/worldWritableWarning`, `thread/archived`, `thread/unarchived`, and `thread/name/updated`; per-method product workflows below remain tracked independently.
+Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session/model-reroute/warning/thread-lifecycle/error diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`, `model/rerouted`, `configWarning`, `deprecationNotice`, `windows/worldWritableWarning`, `thread/archived`, `thread/unarchived`, `thread/name/updated`, and `error`; per-method product workflows below remain tracked independently.
 
 | Method | Surface Type | Current Farfield State | Recommendation | Notes |
 | --- | --- | --- | --- | --- |
@@ -14,7 +14,7 @@ Farfield now exposes raw notification-event cursors in debug coverage diagnostic
 | `authStatusChange` | server-to-client notification | Not consumed | Do not adopt | Deprecated notification surface. |
 | `configWarning` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated warning diagnostics surface validates summary/details/path/range payload mapping. |
 | `deprecationNotice` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated warning diagnostics surface validates deprecation summary/details payload mapping. |
-| `error` | server-to-client notification | Not consumed | Plan candidate | Useful for direct app-server failure visibility when app-server notifications are consumed. |
+| `error` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated error diagnostics surface validates retry behavior and codex error classifications from turn failures. |
 | `fuzzyFileSearch/sessionCompleted` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated fuzzy-session diagnostics surface validates asynchronous session-completion notifications and cursor behavior. |
 | `fuzzyFileSearch/sessionUpdated` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated fuzzy-session diagnostics surface validates session-update notifications and result-count projection. |
 | `item/agentMessage/delta` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |

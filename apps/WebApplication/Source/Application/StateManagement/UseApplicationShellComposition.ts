@@ -363,6 +363,7 @@ function buildApplicationShellViewPropertiesInput(
       debugCoverageDiagnostics.lastServerRequestResolvedEventsResult,
     lastWindowsSandboxSetupStartResult: debugCoverageDiagnostics.lastWindowsSandboxSetupStartResult,
     lastFeedbackUploadResult: debugCoverageDiagnostics.lastFeedbackUploadResult,
+    lastErrorNotificationsResult: debugCoverageDiagnostics.lastErrorNotificationsResult,
     lastFuzzyFileSearchResult: debugCoverageDiagnostics.lastFuzzyFileSearchResult,
     lastFuzzyFileSearchSessionStartResult:
       debugCoverageDiagnostics.lastFuzzyFileSearchSessionStartResult,
@@ -408,6 +409,7 @@ function buildApplicationShellViewPropertiesInput(
     readModelReroutedEvents: debugCoverageDiagnostics.readModelReroutedEvents,
     readWarningNotifications: debugCoverageDiagnostics.readWarningNotifications,
     readThreadLifecycleNotifications: debugCoverageDiagnostics.readThreadLifecycleNotifications,
+    readErrorNotifications: debugCoverageDiagnostics.readErrorNotifications,
     executeCommand: debugCoverageDiagnostics.executeCommand,
     uploadFeedback: debugCoverageDiagnostics.uploadFeedback,
     apiSessionTokenDraft: applicationShellState.apiSessionTokenDraft,

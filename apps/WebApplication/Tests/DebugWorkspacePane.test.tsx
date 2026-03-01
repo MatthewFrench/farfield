@@ -99,6 +99,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastServerRequestResolvedEventsResult: null,
   lastWindowsSandboxSetupStartResult: null,
   lastFeedbackUploadResult: null,
+  lastErrorNotificationsResult: null,
   lastFuzzyFileSearchResult: null,
   lastFuzzyFileSearchSessionStartResult: null,
   lastFuzzyFileSearchSessionUpdateResult: null,
@@ -139,6 +140,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onReadModelReroutedEvents: () => {},
   onReadWarningNotifications: () => {},
   onReadThreadLifecycleNotifications: () => {},
+  onReadErrorNotifications: () => {},
   onExecuteCommand: () => {},
   onUploadFeedback: () => {},
 };
@@ -220,5 +222,6 @@ describe("DebugWorkspacePane", () => {
     expect(screen.getByTestId("debug-coverage-model-rerouted-events-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-warning-notifications-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-thread-lifecycle-notifications-read")).toBeDefined();
+    expect(screen.getByTestId("debug-coverage-error-notifications-read")).toBeDefined();
   });
 });
