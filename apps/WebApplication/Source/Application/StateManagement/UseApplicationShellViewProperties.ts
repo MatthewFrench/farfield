@@ -146,6 +146,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastCommandExecutionResult: DebugWorkspacePaneProps["lastCommandExecutionResult"];
   lastConfigBatchWriteResult: DebugWorkspacePaneProps["lastConfigBatchWriteResult"];
   lastConfigValueWriteResult: DebugWorkspacePaneProps["lastConfigValueWriteResult"];
+  lastFeedbackUploadResult: DebugWorkspacePaneProps["lastFeedbackUploadResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -163,6 +164,12 @@ export interface UseApplicationShellViewPropertiesInput {
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
+  uploadFeedback: (
+    classification: string,
+    includeLogs: boolean,
+    reason?: string,
+    threadId?: string,
+  ) => void;
   apiSessionTokenDraft: string;
   setApiSessionTokenDraft: (nextTokenValue: string) => void;
   apiSessionBootstrapError: string;
@@ -406,6 +413,7 @@ function buildDebugWorkspacePaneProperties(
     lastCommandExecutionResult: input.lastCommandExecutionResult,
     lastConfigBatchWriteResult: input.lastConfigBatchWriteResult,
     lastConfigValueWriteResult: input.lastConfigValueWriteResult,
+    lastFeedbackUploadResult: input.lastFeedbackUploadResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
     onCancelAccountLogin: input.cancelAccountLogin,
@@ -417,6 +425,7 @@ function buildDebugWorkspacePaneProperties(
     onWriteSkillsConfig: input.writeSkillsConfig,
     onExportRemoteSkill: input.exportRemoteSkill,
     onExecuteCommand: input.executeCommand,
+    onUploadFeedback: input.uploadFeedback,
   };
 }
 
@@ -611,6 +620,7 @@ export function useApplicationShellViewProperties(
       input.lastCommandExecutionResult,
       input.lastConfigBatchWriteResult,
       input.lastConfigValueWriteResult,
+      input.lastFeedbackUploadResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
       input.cancelAccountLogin,
@@ -622,6 +632,7 @@ export function useApplicationShellViewProperties(
       input.writeSkillsConfig,
       input.exportRemoteSkill,
       input.executeCommand,
+      input.uploadFeedback,
       input.replayHistoryEntryFromDetail,
       input.runtimeRequestErrorOperationMetrics,
       input.isEnablingPushNotifications,

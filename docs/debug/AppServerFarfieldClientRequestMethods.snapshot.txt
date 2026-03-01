@@ -12,6 +12,7 @@ config/read
 config/value/write
 configRequirements/read
 experimentalFeature/list
+feedback/upload
 initialize
 mcpServer/oauth/login
 mcpServerStatus/list

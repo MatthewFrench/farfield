@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 02:06:29Z
+Last Updated (UTC): 2026-03-01 02:23:07Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `38 / 74` request methods (`51.4%`).
+1. Farfield app-server method coverage at request-owner layer: `39 / 74` request methods (`52.7%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `39 / 74` (`52.7%`).
+3. Effective request-method usage including transport-owned `initialize`: `40 / 74` (`54.1%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -109,6 +109,7 @@ As of the upstream snapshot above:
 | `account/login/cancel` | Account auth cancel action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed cancel-status mapping | Keep current path |
 | `account/logout` | Account logout action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic mutation response contract | Keep current path |
 | `experimentalFeature/list` | Experimental feature diagnostics and capability coverage projection | Medium-high | Strict capability route ownership with typed list pagination contracts | Keep current path |
+| `feedback/upload` | Feedback upload diagnostics action in debug workspace coverage panel with classification, logs, and optional thread targeting | Medium-high | Strict capability route ownership with typed query parsing and deterministic thread-id response mapping | Keep current path |
 | `mcpServerStatus/list` | MCP server status diagnostics in debug workspace | Medium-high | Strict capability route ownership with typed list pagination contracts | Keep current path |
 | `app/list` | App list diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed thread-scoped query mapping | Keep current path |
 | `skills/list` | Skills diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed refresh query mapping | Keep current path |
@@ -158,6 +159,7 @@ As of the upstream snapshot above:
 | `account/login/cancel` | Account login cancel action | `/api/account/login/cancel` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.cancelAccountLogin` -> `AppServerClient.cancelAccountLogin` |
 | `account/logout` | Account logout action | `/api/account/logout` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.logoutAccount` -> `AppServerClient.logoutAccount` |
 | `experimentalFeature/list` | Experimental feature diagnostics | `/api/experimental-features` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listExperimentalFeatures` -> `AppServerClient.listExperimentalFeatures` |
+| `feedback/upload` | Feedback upload diagnostics action with classification, logs, and optional thread targeting | `/api/feedback/upload` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.uploadFeedback` -> `AppServerClient.uploadFeedback` |
 | `mcpServerStatus/list` | MCP server status diagnostics | `/api/mcp-servers` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listMcpServerStatuses` -> `AppServerClient.listMcpServerStatuses` |
 | `app/list` | App list diagnostics | `/api/apps` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listApps` -> `AppServerClient.listApps` |
 | `skills/list` | Skills diagnostics | `/api/skills` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listSkills` -> `AppServerClient.listSkills` |
@@ -167,7 +169,7 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`36` request methods are not used by Farfield’s app-server client path:
+`35` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
@@ -176,7 +178,6 @@ cancelLoginChatGpt
 execOneOffCommand
 externalAgentConfig/detect
 externalAgentConfig/import
-feedback/upload
 forkConversation
 fuzzyFileSearch
 fuzzyFileSearch/sessionStart
@@ -277,13 +278,12 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ### Category I: Miscellaneous Product Surface Not Yet Wired
 
-1. `feedback/upload`
-2. `windowsSandbox/setupStart`
+1. `windowsSandbox/setupStart`
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `37`
-2. Total methods listed across Category A-I: `37`
+1. Total non-intersection methods: `35`
+2. Total methods listed across Category A-I: `35`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

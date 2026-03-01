@@ -24,6 +24,7 @@ import { z } from "zod";
 import { buildCommandExecutionRequestParameters } from "./AppServerClientCommandExecutionRequestBuilders.js";
 import { buildConfigBatchWriteRequestParameters } from "./AppServerClientConfigBatchWriteRequestBuilders.js";
 import { buildConfigValueWriteRequestParameters } from "./AppServerClientConfigValueWriteRequestBuilders.js";
+import { buildFeedbackUploadRequestParameters } from "./AppServerClientFeedbackUploadRequestBuilders.js";
 import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
 import {
   APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT,
@@ -310,6 +311,17 @@ export interface AccountRateLimitSnapshot {
 export interface ReadAccountRateLimitsResult {
   rateLimits: AccountRateLimitSnapshot;
   rateLimitsByLimitId: Record<string, AccountRateLimitSnapshot> | null;
+}
+
+export interface FeedbackUploadOptions {
+  classification: string;
+  reason?: string | null;
+  threadId?: string | null;
+  includeLogs: boolean;
+}
+
+export interface FeedbackUploadResult {
+  threadId: string;
 }
 
 export interface CommandExecutionOptions {
@@ -706,6 +718,11 @@ const AppServerGetAccountRateLimitsResponseSchema = z
   .object({
     rateLimits: AppServerAccountRateLimitSnapshotSchema,
     rateLimitsByLimitId: z.record(AppServerAccountRateLimitSnapshotSchema).nullable().optional(),
+  })
+  .passthrough();
+const AppServerFeedbackUploadResponseSchema = z
+  .object({
+    threadId: z.string().min(1),
   })
   .passthrough();
 const AppServerCommandExecResponseSchema = z
@@ -1194,6 +1211,21 @@ export class AppServerClient {
                 mapAccountRateLimitSnapshot(snapshot),
               ]),
             ),
+    };
+  }
+
+  public async uploadFeedback(options: FeedbackUploadOptions): Promise<FeedbackUploadResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.uploadFeedback,
+      buildFeedbackUploadRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerFeedbackUploadResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.uploadFeedback,
+    );
+    return {
+      threadId: parsed.threadId,
     };
   }
 

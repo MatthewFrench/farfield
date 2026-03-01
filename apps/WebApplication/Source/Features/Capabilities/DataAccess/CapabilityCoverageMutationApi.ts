@@ -9,6 +9,7 @@ const CONFIG_VALUE_WRITE_ENDPOINT = "/api/config/value/write";
 const SKILLS_CONFIG_WRITE_ENDPOINT = "/api/skills/config/write";
 const SKILLS_REMOTE_LIST_ENDPOINT = "/api/skills/remote/list";
 const SKILLS_REMOTE_EXPORT_ENDPOINT = "/api/skills/remote/export";
+const FEEDBACK_UPLOAD_ENDPOINT = "/api/feedback/upload";
 const COMMAND_EXEC_ENDPOINT = "/api/commands/exec";
 
 export interface ApiMcpServerOauthLoginOptions extends ApiRequestOptions {
@@ -77,6 +78,14 @@ export interface ApiCommandExecutionOptions extends ApiRequestOptions {
   command: string[];
   timeoutMs?: number;
   cwd?: string;
+}
+
+export interface ApiFeedbackUploadOptions extends ApiRequestOptions {
+  agentId?: AgentId;
+  classification: string;
+  includeLogs: boolean;
+  reason?: string;
+  threadId?: string;
 }
 
 const McpServerOauthLoginResponseSchema = z
@@ -149,6 +158,14 @@ const CommandExecutionResponseSchema = z
   .strict();
 export type ApiCommandExecutionResponse = z.infer<typeof CommandExecutionResponseSchema>;
 
+const FeedbackUploadResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1),
+  })
+  .strict();
+export type ApiFeedbackUploadResponse = z.infer<typeof FeedbackUploadResponseSchema>;
+
 const CommandExecutionInputSchema = z
   .object({
     command: z.array(z.string().min(1)).min(1),
@@ -182,6 +199,15 @@ const ConfigBatchWriteInputSchema = z
       .min(1),
     filePath: z.string().min(1).optional(),
     expectedVersion: z.string().min(1).optional(),
+  })
+  .strict();
+
+const FeedbackUploadInputSchema = z
+  .object({
+    classification: z.string().min(1),
+    includeLogs: z.boolean(),
+    reason: z.string().min(1).optional(),
+    threadId: z.string().min(1).optional(),
   })
   .strict();
 
@@ -300,6 +326,28 @@ function readCommandExecutionPath(options: ApiCommandExecutionOptions): string {
   return `${COMMAND_EXEC_ENDPOINT}?${params.toString()}`;
 }
 
+function readFeedbackUploadPath(options: ApiFeedbackUploadOptions): string {
+  const parsedInput = FeedbackUploadInputSchema.parse({
+    classification: options.classification,
+    includeLogs: options.includeLogs,
+    ...(options.reason !== undefined ? { reason: options.reason } : {}),
+    ...(options.threadId !== undefined ? { threadId: options.threadId } : {}),
+  });
+  const params = new URLSearchParams();
+  params.set("classification", parsedInput.classification);
+  params.set("includeLogs", parsedInput.includeLogs ? "true" : "false");
+  if (options.agentId !== undefined) {
+    params.set("agentId", options.agentId);
+  }
+  if (parsedInput.reason !== undefined) {
+    params.set("reason", parsedInput.reason);
+  }
+  if (parsedInput.threadId !== undefined) {
+    params.set("threadId", parsedInput.threadId);
+  }
+  return `${FEEDBACK_UPLOAD_ENDPOINT}?${params.toString()}`;
+}
+
 export async function startMcpServerOauthLogin(
   options: ApiMcpServerOauthLoginOptions,
 ): Promise<ApiMcpServerOauthLoginResponse> {
@@ -368,6 +416,17 @@ export async function executeCommand(
 ): Promise<ApiCommandExecutionResponse> {
   return CommandExecutionResponseSchema.parse(
     await request(readCommandExecutionPath(options), {
+      ...requestInitWithOptions(options),
+      method: "POST",
+    }),
+  );
+}
+
+export async function uploadFeedback(
+  options: ApiFeedbackUploadOptions,
+): Promise<ApiFeedbackUploadResponse> {
+  return FeedbackUploadResponseSchema.parse(
+    await request(readFeedbackUploadPath(options), {
       ...requestInitWithOptions(options),
       method: "POST",
     }),

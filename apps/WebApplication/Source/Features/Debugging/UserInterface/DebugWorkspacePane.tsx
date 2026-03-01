@@ -6,6 +6,7 @@ import {
   type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
+  type DebugAppServerCoverageFeedbackUploadResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
 } from "@/Features/Debugging/DomainModel/DebugAppServerCoverageContracts";
@@ -70,6 +71,7 @@ export interface DebugWorkspacePaneProps {
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
+  lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
   onCancelAccountLogin: () => void;
@@ -87,6 +89,12 @@ export interface DebugWorkspacePaneProps {
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
   onExportRemoteSkill: (hazelnutId: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
+  onUploadFeedback: (
+    classification: string,
+    includeLogs: boolean,
+    reason?: string,
+    threadId?: string,
+  ) => void;
 }
 
 export function DebugWorkspacePane({
@@ -134,6 +142,7 @@ export function DebugWorkspacePane({
   lastCommandExecutionResult,
   lastConfigBatchWriteResult,
   lastConfigValueWriteResult,
+  lastFeedbackUploadResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
   onCancelAccountLogin,
@@ -145,6 +154,7 @@ export function DebugWorkspacePane({
   onWriteSkillsConfig,
   onExportRemoteSkill,
   onExecuteCommand,
+  onUploadFeedback,
 }: DebugWorkspacePaneProps): React.JSX.Element {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -248,6 +258,7 @@ export function DebugWorkspacePane({
             lastCommandExecutionResult={lastCommandExecutionResult}
             lastConfigBatchWriteResult={lastConfigBatchWriteResult}
             lastConfigValueWriteResult={lastConfigValueWriteResult}
+            lastFeedbackUploadResult={lastFeedbackUploadResult}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
             onStartAccountLogin={onStartAccountLogin}
             onCancelAccountLogin={onCancelAccountLogin}
@@ -259,6 +270,7 @@ export function DebugWorkspacePane({
             onWriteSkillsConfig={onWriteSkillsConfig}
             onExportRemoteSkill={onExportRemoteSkill}
             onExecuteCommand={onExecuteCommand}
+            onUploadFeedback={onUploadFeedback}
           />
         )}
       </Tabs>

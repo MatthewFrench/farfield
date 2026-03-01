@@ -86,6 +86,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastCommandExecutionResult: null,
   lastConfigBatchWriteResult: null,
   lastConfigValueWriteResult: null,
+  lastFeedbackUploadResult: null,
   onRefreshCoverageDiagnostics: () => {},
   onStartAccountLogin: () => {},
   onCancelAccountLogin: () => {},
@@ -97,6 +98,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onWriteSkillsConfig: () => {},
   onExportRemoteSkill: () => {},
   onExecuteCommand: () => {},
+  onUploadFeedback: () => {},
 };
 
 function renderDebugWorkspacePane(properties: DebugWorkspacePaneProps): void {
@@ -165,5 +167,6 @@ describe("DebugWorkspacePane", () => {
     });
 
     expect(screen.getByTestId("debug-coverage-panel")).toBeDefined();
+    expect(screen.getByTestId("debug-coverage-feedback-upload-run")).toBeDefined();
   });
 });

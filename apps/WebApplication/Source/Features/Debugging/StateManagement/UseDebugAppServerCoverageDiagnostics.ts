@@ -16,6 +16,7 @@ import {
   type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
+  type DebugAppServerCoverageFeedbackUploadResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
 } from "../DomainModel/DebugAppServerCoverageContracts";
@@ -28,6 +29,7 @@ import {
   mapApps,
   mapCommandExecutionResult,
   mapExperimentalFeatures,
+  mapFeedbackUploadResult,
   mapMcpServers,
   mapPendingAccountLogin,
   mapRateLimitSnapshot,
@@ -62,6 +64,7 @@ export interface DebugAppServerCoverageDiagnostics {
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
+  lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -79,6 +82,12 @@ export interface DebugAppServerCoverageDiagnostics {
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
+  uploadFeedback: (
+    classification: string,
+    includeLogs: boolean,
+    reason?: string,
+    threadId?: string,
+  ) => void;
 }
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {
@@ -206,6 +215,8 @@ export function useDebugAppServerCoverageDiagnostics(
     useState<DebugAppServerCoverageConfigBatchWriteResult | null>(null);
   const [lastConfigValueWriteResult, setLastConfigValueWriteResult] =
     useState<DebugAppServerCoverageConfigValueWriteResult | null>(null);
+  const [lastFeedbackUploadResult, setLastFeedbackUploadResult] =
+    useState<DebugAppServerCoverageFeedbackUploadResult | null>(null);
   const requestSerialRef = useRef(0);
 
   const refreshCoverageDiagnostics = useCallback(() => {
@@ -485,6 +496,62 @@ export function useDebugAppServerCoverageDiagnostics(
     [input.capabilityServerClient, isRunningCoverageAction],
   );
 
+  const uploadFeedback = useCallback(
+    (classification: string, includeLogs: boolean, reason?: string, threadId?: string) => {
+      if (isRunningCoverageAction) {
+        return;
+      }
+
+      const normalizedClassification = classification.trim();
+      if (normalizedClassification.length === 0) {
+        return;
+      }
+
+      const normalizedReason = reason?.trim();
+      if (reason !== undefined && normalizedReason !== undefined && normalizedReason.length === 0) {
+        return;
+      }
+
+      const normalizedThreadId = threadId?.trim();
+      if (
+        threadId !== undefined &&
+        normalizedThreadId !== undefined &&
+        normalizedThreadId.length === 0
+      ) {
+        return;
+      }
+
+      setIsRunningCoverageAction(true);
+      setCoverageActionErrorMessage("");
+
+      void (async () => {
+        try {
+          const response = await input.capabilityServerClient.uploadFeedback({
+            actionName: COVERAGE_MUTATION_OPERATION_NAME,
+            classification: normalizedClassification,
+            includeLogs,
+            ...(normalizedReason !== undefined ? { reason: normalizedReason } : {}),
+            ...(normalizedThreadId !== undefined ? { threadId: normalizedThreadId } : {}),
+          });
+          setLastFeedbackUploadResult(
+            mapFeedbackUploadResult(
+              response,
+              normalizedClassification,
+              includeLogs,
+              normalizedReason ?? null,
+              normalizedThreadId ?? null,
+            ),
+          );
+        } catch (error) {
+          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
+        } finally {
+          setIsRunningCoverageAction(false);
+        }
+      })();
+    },
+    [input.capabilityServerClient, isRunningCoverageAction],
+  );
+
   useEffect(() => {
     if (input.debugWorkspaceSection !== COVERAGE_WORKSPACE_SECTION) {
       return;
@@ -510,6 +577,7 @@ export function useDebugAppServerCoverageDiagnostics(
     lastCommandExecutionResult,
     lastConfigBatchWriteResult,
     lastConfigValueWriteResult,
+    lastFeedbackUploadResult,
     refreshCoverageDiagnostics,
     startAccountLogin,
     cancelAccountLogin,
@@ -521,5 +589,6 @@ export function useDebugAppServerCoverageDiagnostics(
     writeSkillsConfig,
     exportRemoteSkill,
     executeCommand,
+    uploadFeedback,
   };
 }

@@ -30,6 +30,8 @@ export type {
   ExperimentalFeatureStage,
   ExportRemoteSkillOptions,
   ExportRemoteSkillResult,
+  FeedbackUploadOptions,
+  FeedbackUploadResult,
   ForkThreadOptions,
   ListAppsOptions,
   ListAppsResult,

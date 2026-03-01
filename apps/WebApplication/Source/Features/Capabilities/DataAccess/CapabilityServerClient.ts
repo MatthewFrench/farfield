@@ -52,6 +52,8 @@ import {
   type ApiConfigValueWriteResponse,
   type ApiConfigWriteMergeStrategy,
   type ApiExportRemoteSkillOptions,
+  type ApiFeedbackUploadOptions,
+  type ApiFeedbackUploadResponse,
   type ApiListRemoteSkillsOptions,
   type ApiMcpServerOauthLoginOptions,
   type ApiMcpServerOauthLoginResponse,
@@ -63,6 +65,7 @@ import {
   exportRemoteSkill,
   listRemoteSkills,
   startMcpServerOauthLogin,
+  uploadFeedback,
   writeConfigBatch,
   writeConfigValue,
   writeSkillsConfig,
@@ -99,6 +102,8 @@ export type CapabilityConfigBatchWriteOptions = ApiConfigBatchWriteOptions;
 export type CapabilityConfigBatchWriteResponse = ApiConfigBatchWriteResponse;
 export type CapabilityConfigValueWriteOptions = ApiConfigValueWriteOptions;
 export type CapabilityConfigValueWriteResponse = ApiConfigValueWriteResponse;
+export type CapabilityFeedbackUploadOptions = ApiFeedbackUploadOptions;
+export type CapabilityFeedbackUploadResponse = ApiFeedbackUploadResponse;
 export type CapabilityListRemoteSkillsOptions = ApiListRemoteSkillsOptions;
 export type CapabilityRemoteSkillsListResponse = ApiRemoteSkillsListResponse;
 export type CapabilityExportRemoteSkillOptions = ApiExportRemoteSkillOptions;
@@ -222,6 +227,12 @@ export class CapabilityServerClient {
     input: CapabilityCommandExecutionOptions,
   ): Promise<CapabilityCommandExecutionResponse> {
     return executeCommand(input);
+  }
+
+  public async uploadFeedback(
+    input: CapabilityFeedbackUploadOptions,
+  ): Promise<CapabilityFeedbackUploadResponse> {
+    return uploadFeedback(input);
   }
 
   public async listExperimentalFeatures(

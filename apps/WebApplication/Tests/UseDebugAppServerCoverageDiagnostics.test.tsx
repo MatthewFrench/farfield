@@ -217,6 +217,10 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         id: "remote-skill-1",
         path: "/tmp/project/.codex/skills/repository-checks/SKILL.md",
       });
+    const uploadFeedback = vi.spyOn(capabilityServerClient, "uploadFeedback").mockResolvedValue({
+      ok: true,
+      threadId: "thread-coverage-feedback",
+    });
 
     const latestDiagnostics: { current: DebugAppServerCoverageDiagnostics | null } = {
       current: null,
@@ -268,6 +272,12 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       false,
     );
     latestDiagnostics.current?.exportRemoteSkill("remote-skill-1");
+    latestDiagnostics.current?.uploadFeedback(
+      "quality",
+      true,
+      "Coverage validation from debug surface.",
+      "thread-1",
+    );
     await waitFor(() => {
       expect(logoutAccount).toHaveBeenCalledTimes(1);
       expect(reloadMcpServerConfig).toHaveBeenCalledTimes(1);
@@ -312,6 +322,13 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         hazelnutId: "remote-skill-1",
       });
+      expect(uploadFeedback).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        classification: "quality",
+        includeLogs: true,
+        reason: "Coverage validation from debug surface.",
+        threadId: "thread-1",
+      });
       expect(openWindow).toHaveBeenCalledWith(
         "https://example.com/oauth/mcp/github",
         "_blank",
@@ -341,6 +358,14 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         filePath: "/tmp/project/.codex/config.toml",
         overriddenMessage: null,
         writtenAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastFeedbackUploadResult).toEqual({
+        classification: "quality",
+        includeLogs: true,
+        reason: "Coverage validation from debug surface.",
+        requestedThreadId: "thread-1",
+        reportedThreadId: "thread-coverage-feedback",
+        uploadedAtIso8601: expect.any(String),
       });
     });
 

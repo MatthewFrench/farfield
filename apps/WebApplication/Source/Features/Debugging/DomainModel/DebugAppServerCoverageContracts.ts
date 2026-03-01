@@ -97,6 +97,15 @@ export interface DebugAppServerCoverageConfigBatchWriteResult {
   writtenAtIso8601: string;
 }
 
+export interface DebugAppServerCoverageFeedbackUploadResult {
+  classification: string;
+  includeLogs: boolean;
+  reason: string | null;
+  requestedThreadId: string | null;
+  reportedThreadId: string;
+  uploadedAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

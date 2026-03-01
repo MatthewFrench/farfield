@@ -4,12 +4,14 @@ import {
   type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
+  type DebugAppServerCoverageFeedbackUploadResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import { DebugAppServerCoverageCommandExecutionSection } from "./DebugAppServerCoverageCommandExecutionSection";
 import { DebugAppServerCoverageConfigBatchWriteSection } from "./DebugAppServerCoverageConfigBatchWriteSection";
 import { DebugAppServerCoverageConfigValueWriteSection } from "./DebugAppServerCoverageConfigValueWriteSection";
+import { DebugAppServerCoverageFeedbackUploadSection } from "./DebugAppServerCoverageFeedbackUploadSection";
 
 export interface DebugAppServerCoveragePanelProps {
   isLoadingCoverageDiagnostics: boolean;
@@ -21,6 +23,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
+  lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
   onCancelAccountLogin: () => void;
@@ -38,6 +41,12 @@ export interface DebugAppServerCoveragePanelProps {
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
   onExportRemoteSkill: (hazelnutId: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
+  onUploadFeedback: (
+    classification: string,
+    includeLogs: boolean,
+    reason?: string,
+    threadId?: string,
+  ) => void;
 }
 
 function renderListValues(values: string[] | null): string {
@@ -61,6 +70,7 @@ export function DebugAppServerCoveragePanel({
   lastCommandExecutionResult,
   lastConfigBatchWriteResult,
   lastConfigValueWriteResult,
+  lastFeedbackUploadResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
   onCancelAccountLogin,
@@ -72,6 +82,7 @@ export function DebugAppServerCoveragePanel({
   onWriteSkillsConfig,
   onExportRemoteSkill,
   onExecuteCommand,
+  onUploadFeedback,
 }: DebugAppServerCoveragePanelProps): React.JSX.Element {
   return (
     <div data-testid="debug-coverage-panel" className="flex-1 min-h-0 overflow-auto p-4 space-y-3">
@@ -80,7 +91,8 @@ export function DebugAppServerCoveragePanel({
           <h3 className="text-sm font-semibold">App-Server Coverage Diagnostics</h3>
           <p className="text-xs text-muted-foreground">
             Skills, apps, experimental features, MCP status, config requirements, and account
-            diagnostics plus config writes, remote skills import, and command execution coverage.
+            diagnostics plus config writes, remote skills import, command execution, and feedback
+            upload coverage.
           </p>
         </div>
         <Button
@@ -449,6 +461,12 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastCommandExecutionResult={lastCommandExecutionResult}
             onExecuteCommand={onExecuteCommand}
+          />
+
+          <DebugAppServerCoverageFeedbackUploadSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastFeedbackUploadResult={lastFeedbackUploadResult}
+            onUploadFeedback={onUploadFeedback}
           />
         </>
       )}

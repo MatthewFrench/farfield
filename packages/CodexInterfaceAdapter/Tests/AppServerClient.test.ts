@@ -1052,6 +1052,46 @@ describe("AppServerClient.executeCommand", () => {
   });
 });
 
+describe("AppServerClient.uploadFeedback", () => {
+  it("sends feedback/upload payload and returns typed response contracts", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      threadId: "thread-feedback-1",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.uploadFeedback({
+      classification: "quality",
+      reason: "The output omitted expected edge-case handling.",
+      includeLogs: true,
+      threadId: "thread-1",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("feedback/upload", {
+      classification: "quality",
+      reason: "The output omitted expected edge-case handling.",
+      includeLogs: true,
+      threadId: "thread-1",
+    });
+    expect(result).toEqual({
+      threadId: "thread-feedback-1",
+    });
+  });
+
+  it("validates required classification before sending feedback/upload request", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await expect(
+      client.uploadFeedback({
+        classification: "",
+        includeLogs: false,
+      }),
+    ).rejects.toThrowError();
+    expect(transportDouble.request).not.toHaveBeenCalled();
+  });
+});
+
 describe("AppServerClient.writeConfigValue", () => {
   it("sends config/value/write payload and returns typed config write result", async () => {
     const transportDouble = createTransportDouble();

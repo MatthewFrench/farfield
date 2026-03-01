@@ -28,6 +28,7 @@ import type {
   AgentRemoteSkillsProductSurface,
   AgentStartAccountLoginResult,
   AgentStartMcpServerOauthLoginResult,
+  AgentUploadFeedbackResult,
   AgentWriteConfigValueResult,
   AgentWriteSkillsConfigResult,
 } from "../../Agents/Types.js";
@@ -46,6 +47,7 @@ const CapabilityRoutePathnameByName = {
   configValueWrite: "/api/config/value/write",
   account: "/api/account",
   accountRateLimits: "/api/account/rate-limits",
+  feedbackUpload: "/api/feedback/upload",
   accountLoginStart: "/api/account/login/start",
   accountLoginCancel: "/api/account/login/cancel",
   accountLogout: "/api/account/logout",
@@ -76,6 +78,9 @@ const CapabilityRouteQueryParameterByName = {
   forceRefetch: "forceRefetch",
   forceReload: "forceReload",
   refreshToken: "refreshToken",
+  classification: "classification",
+  reason: "reason",
+  includeLogs: "includeLogs",
   loginId: "loginId",
   name: "name",
   path: "path",
@@ -102,6 +107,7 @@ const CapabilityRouteLogEventByName = {
   configRequirementsReadFailed: "config-requirements-read-failed",
   accountReadFailed: "account-read-failed",
   accountRateLimitsReadFailed: "account-rate-limits-read-failed",
+  feedbackUploadFailed: "feedback-upload-failed",
   commandExecFailed: "command-exec-failed",
   accountLoginStartFailed: "account-login-start-failed",
   accountLoginCancelFailed: "account-login-cancel-failed",
@@ -126,6 +132,14 @@ const CapabilityRouteErrorMessagePrefixByName = {
   failedToReadConfigRequirements: "Failed to read config requirements: ",
   failedToReadAccount: "Failed to read account: ",
   failedToReadAccountRateLimits: "Failed to read account rate limits: ",
+  missingFeedbackClassification: "Missing classification query parameter.",
+  invalidFeedbackClassification:
+    "Invalid classification query parameter. Expected non-empty value.",
+  missingFeedbackIncludeLogs: "Missing includeLogs query parameter.",
+  invalidFeedbackIncludeLogs: "Invalid includeLogs query parameter. Expected true/false or 1/0.",
+  invalidFeedbackReason: "Invalid reason query parameter.",
+  invalidFeedbackThreadId: "Invalid threadId query parameter.",
+  failedToUploadFeedback: "Failed to upload feedback: ",
   missingCommand: "Missing command query parameter. Use repeated command query values.",
   invalidCommand: "Invalid command query parameter. Expected non-empty command arguments.",
   invalidTimeoutMilliseconds: "Invalid timeoutMs query parameter.",
@@ -177,6 +191,7 @@ const CapabilityRouteTimeoutLabelByName = {
   configRequirementsRead: "config requirements read",
   accountRead: "account read",
   accountRateLimitsRead: "account rate limits read",
+  feedbackUpload: "feedback upload",
   commandExec: "command execution",
   accountLoginStart: "account login start",
   accountLoginCancel: "account login cancel",
@@ -235,6 +250,10 @@ interface CapabilityAccountRateLimitsResponseBody {
   rateLimits: AgentReadAccountRateLimitsResult["rateLimits"] | null;
   rateLimitsByLimitId: AgentReadAccountRateLimitsResult["rateLimitsByLimitId"];
 }
+
+type CapabilityFeedbackUploadResponseBody = AgentUploadFeedbackResult & {
+  ok: true;
+};
 
 type CapabilityCommandExecutionResponseBody = AgentCommandExecutionResult & {
   ok: true;
@@ -553,6 +572,15 @@ function mapAccountResponse(result: AgentReadAccountResult): CapabilityAccountRe
 function mapAccountRateLimitsResponse(
   result: AgentReadAccountRateLimitsResult,
 ): CapabilityAccountRateLimitsResponseBody {
+  return {
+    ok: true,
+    ...result,
+  };
+}
+
+function mapFeedbackUploadResponse(
+  result: AgentUploadFeedbackResult,
+): CapabilityFeedbackUploadResponseBody {
   return {
     ok: true,
     ...result,
@@ -1016,6 +1044,139 @@ async function handleAccountRateLimitsRoute(deps: CapabilityRouteDependencies): 
     jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
       ok: false,
       error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadAccountRateLimits}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleFeedbackUploadRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.feedbackUpload,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const classificationRaw = url.searchParams.get(
+    CapabilityRouteQueryParameterByName.classification,
+  );
+  if (classificationRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingFeedbackClassification,
+    });
+    return true;
+  }
+  const classification = classificationRaw.trim();
+  if (classification.length === 0) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidFeedbackClassification,
+    });
+    return true;
+  }
+
+  const includeLogsRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.includeLogs);
+  if (includeLogsRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingFeedbackIncludeLogs,
+    });
+    return true;
+  }
+  const includeLogs = parseBooleanQueryValueStrict(includeLogsRaw);
+  if (includeLogs === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidFeedbackIncludeLogs,
+    });
+    return true;
+  }
+
+  const reasonRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.reason);
+  const reason = parseOptionalWorkingDirectoryQueryValue(reasonRaw);
+  if (reasonRaw !== null && reason === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidFeedbackReason,
+    });
+    return true;
+  }
+
+  const threadIdRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.threadId);
+  const threadId = parseOptionalWorkingDirectoryQueryValue(threadIdRaw);
+  if (threadIdRaw !== null && threadId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidFeedbackThreadId,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (!adapter || !adapter.isEnabled() || !adapter.uploadFeedback) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToUploadFeedback}Feedback upload is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.uploadFeedback({
+        classification,
+        includeLogs,
+        ...(reason !== null ? { reason } : {}),
+        ...(threadId !== null ? { threadId } : {}),
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.feedbackUpload,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapFeedbackUploadResponse(result));
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        classification,
+        includeLogs,
+        threadId,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.feedbackUploadFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToUploadFeedback}${message}`,
     });
   }
 
@@ -2558,7 +2719,7 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
 
 /**
  * Owns capability route dispatch (`/api/config/defaults`, `/api/config-requirements`,
- * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/rate-limits`,
+ * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/rate-limits`, `/api/feedback/upload`,
  * `/api/commands/exec`, `/api/account/login/start`, `/api/account/login/cancel`, `/api/account/logout`,
  * `/api/config/batch/write`, `/api/config/value/write`, `/api/mcp-servers/oauth/login`, `/api/skills/config/write`,
  * `/api/skills/remote/list`, `/api/skills/remote/export`, `/api/models`,
@@ -2577,6 +2738,9 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleAccountRateLimitsRoute(deps)) {
+    return true;
+  }
+  if (await handleFeedbackUploadRoute(deps)) {
     return true;
   }
   if (await handleCommandExecRoute(deps)) {

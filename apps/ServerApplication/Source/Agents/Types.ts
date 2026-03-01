@@ -486,6 +486,17 @@ export interface AgentCommandExecutionResult {
   stderr: string;
 }
 
+export interface AgentUploadFeedbackInput {
+  classification: string;
+  reason?: string | null;
+  threadId?: string | null;
+  includeLogs: boolean;
+}
+
+export interface AgentUploadFeedbackResult {
+  threadId: string;
+}
+
 export type AgentConfigWriteMergeStrategy = "replace" | "upsert";
 
 export interface AgentWriteConfigValueInput {
@@ -673,6 +684,7 @@ export interface AgentAdapter {
   readAccountRateLimits?(
     input?: AgentReadAccountRateLimitsInput,
   ): Promise<AgentReadAccountRateLimitsResult>;
+  uploadFeedback?(input: AgentUploadFeedbackInput): Promise<AgentUploadFeedbackResult>;
   executeCommand?(input: AgentCommandExecutionInput): Promise<AgentCommandExecutionResult>;
   startAccountLogin?(input: AgentStartAccountLoginInput): Promise<AgentStartAccountLoginResult>;
   cancelAccountLogin?(input: AgentCancelAccountLoginInput): Promise<AgentCancelAccountLoginResult>;

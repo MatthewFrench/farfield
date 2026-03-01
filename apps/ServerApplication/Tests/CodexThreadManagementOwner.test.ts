@@ -10,6 +10,8 @@ import {
   type ConfigWriteValueOptions,
   type ExportRemoteSkillOptions,
   type ExportRemoteSkillResult,
+  type FeedbackUploadOptions,
+  type FeedbackUploadResult,
   type ForkThreadOptions,
   type ListAppsOptions,
   type ListAppsResult,
@@ -111,6 +113,7 @@ class TestAppServerClient extends AppServerClient {
   public readonly exportRemoteSkillCalls: ExportRemoteSkillOptions[] = [];
   public readonly readAccountCalls: Array<ReadAccountOptions | undefined> = [];
   public readonly readAccountRateLimitsCalls: Array<undefined> = [];
+  public readonly uploadFeedbackCalls: FeedbackUploadOptions[] = [];
   public readonly executeCommandCalls: CommandExecutionOptions[] = [];
   public readonly startAccountLoginCalls: LoginAccountOptions[] = [];
   public readonly cancelAccountLoginCalls: CancelAccountLoginOptions[] = [];
@@ -138,6 +141,7 @@ class TestAppServerClient extends AppServerClient {
   private readonly exportRemoteSkillResult: ExportRemoteSkillResult;
   private readonly readAccountResult: ReadAccountResult;
   private readonly readAccountRateLimitsResult: ReadAccountRateLimitsResult;
+  private readonly uploadFeedbackResult: FeedbackUploadResult;
   private readonly executeCommandResult: CommandExecutionResult;
   private readonly startAccountLoginResult: LoginAccountResult;
   private readonly cancelAccountLoginResult: CancelAccountLoginResult;
@@ -164,6 +168,7 @@ class TestAppServerClient extends AppServerClient {
     exportRemoteSkillResult?: ExportRemoteSkillResult;
     readAccountResult?: ReadAccountResult;
     readAccountRateLimitsResult?: ReadAccountRateLimitsResult;
+    uploadFeedbackResult?: FeedbackUploadResult;
     executeCommandResult?: CommandExecutionResult;
     startAccountLoginResult?: LoginAccountResult;
     cancelAccountLoginResult?: CancelAccountLoginResult;
@@ -232,6 +237,9 @@ class TestAppServerClient extends AppServerClient {
         secondary: null,
       },
       rateLimitsByLimitId: null,
+    };
+    this.uploadFeedbackResult = input?.uploadFeedbackResult ?? {
+      threadId: "thread-feedback-1",
     };
     this.executeCommandResult = input?.executeCommandResult ?? {
       exitCode: 0,
@@ -401,6 +409,13 @@ class TestAppServerClient extends AppServerClient {
   public override async readAccountRateLimits(): Promise<ReadAccountRateLimitsResult> {
     this.readAccountRateLimitsCalls.push(undefined);
     return this.readAccountRateLimitsResult;
+  }
+
+  public override async uploadFeedback(
+    options: FeedbackUploadOptions,
+  ): Promise<FeedbackUploadResult> {
+    this.uploadFeedbackCalls.push(options);
+    return this.uploadFeedbackResult;
   }
 
   public override async executeCommand(
@@ -1200,6 +1215,34 @@ describe("CodexThreadManagementOwner", () => {
       exitCode: 0,
       stdout: "/tmp/workspace\n",
       stderr: "",
+    });
+  });
+
+  it("uploads feedback through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      uploadFeedbackResult: {
+        threadId: "thread-feedback-9",
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.uploadFeedback({
+      classification: "quality",
+      reason: "The generated answer omitted key acceptance criteria.",
+      includeLogs: true,
+      threadId: "thread-1",
+    });
+
+    expect(appClient.uploadFeedbackCalls).toEqual([
+      {
+        classification: "quality",
+        reason: "The generated answer omitted key acceptance criteria.",
+        includeLogs: true,
+        threadId: "thread-1",
+      },
+    ]);
+    expect(result).toEqual({
+      threadId: "thread-feedback-9",
     });
   });
 

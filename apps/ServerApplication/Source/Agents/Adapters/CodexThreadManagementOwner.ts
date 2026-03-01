@@ -1,3 +1,4 @@
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: Adapter owner extraction is tracked in docs/proposed-structure-and-migration.md decision entry 20.
 import {
   AppServerClient,
   type CancelAccountLoginOptions,
@@ -6,6 +7,8 @@ import {
   type ConfigWriteResult,
   type ExportRemoteSkillOptions,
   type ExportRemoteSkillResult,
+  type FeedbackUploadOptions,
+  type FeedbackUploadResult,
   type ListAppsOptions,
   type ListAppsResult,
   type ListExperimentalFeaturesOptions,
@@ -84,6 +87,8 @@ import type {
   AgentUnarchiveThreadInput,
   AgentUnsubscribeThreadInput,
   AgentUnsubscribeThreadStatus,
+  AgentUploadFeedbackInput,
+  AgentUploadFeedbackResult,
   AgentWriteConfigBatchInput,
   AgentWriteConfigValueInput,
   AgentWriteConfigValueResult,
@@ -92,6 +97,7 @@ import type {
 } from "../Types.js";
 import {
   buildCommandExecutionOptions,
+  buildFeedbackUploadOptions,
   buildStartMcpServerOauthLoginOptions,
   buildWriteConfigBatchOptions,
   buildWriteConfigValueOptions,
@@ -565,6 +571,14 @@ export class CodexThreadManagementOwner {
     this.ensureCodexAvailable();
     const result: ReadAccountRateLimitsResult = await this.runAppServerCall(() =>
       this.appClient.readAccountRateLimits(),
+    );
+    return result;
+  }
+
+  public async uploadFeedback(input: AgentUploadFeedbackInput): Promise<AgentUploadFeedbackResult> {
+    this.ensureCodexAvailable();
+    const result: FeedbackUploadResult = await this.runAppServerCall(() =>
+      this.appClient.uploadFeedback(buildFeedbackUploadOptions(input)),
     );
     return result;
   }

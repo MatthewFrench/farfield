@@ -43,6 +43,8 @@ import type {
   AgentStartAccountLoginResult,
   AgentStartMcpServerOauthLoginInput,
   AgentStartMcpServerOauthLoginResult,
+  AgentUploadFeedbackInput,
+  AgentUploadFeedbackResult,
   AgentWriteConfigBatchInput,
   AgentWriteConfigValueInput,
   AgentWriteConfigValueResult,
@@ -234,6 +236,13 @@ const CapabilityCommandExecutionEnvelopeSchema = z
   })
   .strict();
 
+const CapabilityFeedbackUploadEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1),
+  })
+  .strict();
+
 const CapabilityExperimentalFeaturesEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -330,6 +339,7 @@ interface MockAgentAdapterOptions {
   readConfigRequirements?: () => Promise<AgentReadConfigRequirementsResult>;
   readAccount?: () => Promise<AgentReadAccountResult>;
   readAccountRateLimits?: () => Promise<AgentReadAccountRateLimitsResult>;
+  uploadFeedback?: (input: AgentUploadFeedbackInput) => Promise<AgentUploadFeedbackResult>;
   executeCommand?: (input: AgentCommandExecutionInput) => Promise<AgentCommandExecutionResult>;
   startAccountLogin?: (input: AgentStartAccountLoginInput) => Promise<AgentStartAccountLoginResult>;
   cancelAccountLogin?: (
@@ -456,6 +466,10 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.readAccountRateLimits) {
     adapter.readAccountRateLimits = options.readAccountRateLimits;
+  }
+
+  if (options.uploadFeedback) {
+    adapter.uploadFeedback = options.uploadFeedback;
   }
 
   if (options.executeCommand) {
@@ -843,6 +857,91 @@ describe("handleCapabilityRoutes", () => {
       type: "chatgpt",
       loginId: "login-1",
       authUrl: "https://example.com/oauth/start",
+    });
+  });
+
+  it("returns 400 when feedback upload omits classification", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/feedback/upload",
+      url: new URL("http://localhost/api/feedback/upload?includeLogs=true"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing classification query parameter.",
+    });
+  });
+
+  it("returns 400 when feedback upload omits includeLogs", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/feedback/upload",
+      url: new URL("http://localhost/api/feedback/upload?classification=quality"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing includeLogs query parameter.",
+    });
+  });
+
+  it("returns 400 when feedback upload includes invalid includeLogs", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/feedback/upload",
+      url: new URL(
+        "http://localhost/api/feedback/upload?classification=quality&includeLogs=definitely",
+      ),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Invalid includeLogs query parameter. Expected true/false or 1/0.",
+    });
+  });
+
+  it("uploads feedback when adapter exposes feedback upload", async () => {
+    const uploadFeedbackSpy = vi.fn(
+      async (): Promise<AgentUploadFeedbackResult> => ({
+        threadId: "thread-feedback-9",
+      }),
+    );
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/feedback/upload",
+      url: new URL(
+        "http://localhost/api/feedback/upload?agentId=codex&classification=quality&includeLogs=true&reason=Missing%20edge%20case%20coverage&threadId=thread-1",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          uploadFeedback: uploadFeedbackSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(uploadFeedbackSpy).toHaveBeenCalledWith({
+      classification: "quality",
+      includeLogs: true,
+      reason: "Missing edge case coverage",
+      threadId: "thread-1",
+    });
+    const parsedEnvelope = CapabilityFeedbackUploadEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      threadId: "thread-feedback-9",
     });
   });
 

@@ -24,6 +24,7 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationAp
   exportRemoteSkill: vi.fn(),
   listRemoteSkills: vi.fn(),
   startMcpServerOauthLogin: vi.fn(),
+  uploadFeedback: vi.fn(),
   writeConfigBatch: vi.fn(),
   writeConfigValue: vi.fn(),
   writeSkillsConfig: vi.fn(),
@@ -52,6 +53,7 @@ import {
   exportRemoteSkill,
   listRemoteSkills,
   startMcpServerOauthLogin,
+  uploadFeedback,
   writeConfigBatch,
   writeConfigValue,
   writeSkillsConfig,
@@ -70,6 +72,7 @@ import {
   type CapabilityConfigRequirementsResponse,
   type CapabilityConfigValueWriteResponse,
   type CapabilityExperimentalFeaturesResponse,
+  type CapabilityFeedbackUploadResponse,
   type CapabilityHealthResponse,
   type CapabilityMcpServerOauthLoginResponse,
   type CapabilityMcpServersResponse,
@@ -238,6 +241,11 @@ const COMMAND_EXECUTION_RESPONSE: CapabilityCommandExecutionResponse = {
   stderr: "",
 };
 
+const FEEDBACK_UPLOAD_RESPONSE: CapabilityFeedbackUploadResponse = {
+  ok: true,
+  threadId: "thread-feedback-1",
+};
+
 const SKILLS_CONFIG_WRITE_RESPONSE: CapabilitySkillsConfigWriteResponse = {
   ok: true,
   effectiveEnabled: false,
@@ -366,6 +374,7 @@ describe("CapabilityServerClient", () => {
     vi.mocked(reloadMcpServerConfig).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
     vi.mocked(startMcpServerOauthLogin).mockResolvedValue(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
     vi.mocked(executeCommand).mockResolvedValue(COMMAND_EXECUTION_RESPONSE);
+    vi.mocked(uploadFeedback).mockResolvedValue(FEEDBACK_UPLOAD_RESPONSE);
     vi.mocked(writeConfigBatch).mockResolvedValue(CONFIG_BATCH_WRITE_RESPONSE);
     vi.mocked(writeConfigValue).mockResolvedValue(CONFIG_VALUE_WRITE_RESPONSE);
     vi.mocked(writeSkillsConfig).mockResolvedValue(SKILLS_CONFIG_WRITE_RESPONSE);
@@ -443,6 +452,14 @@ describe("CapabilityServerClient", () => {
       command: ["pwd"],
       timeoutMs: 1200,
       cwd: "/tmp/project",
+    };
+    const feedbackUploadOptions = {
+      actionId: "action-feedback-upload",
+      actionName: "upload-feedback",
+      classification: "quality",
+      includeLogs: true,
+      reason: "Missing edge-case handling in response body.",
+      threadId: "thread-1",
     };
     const skillsConfigWriteOptions = {
       actionId: "action-skills-config-write",
@@ -537,6 +554,8 @@ describe("CapabilityServerClient", () => {
     );
     const commandExecutionResponse =
       await capabilityServerClient.executeCommand(commandExecutionOptions);
+    const feedbackUploadResponse =
+      await capabilityServerClient.uploadFeedback(feedbackUploadOptions);
     const configBatchWriteResponse =
       await capabilityServerClient.writeConfigBatch(configBatchWriteOptions);
     const configValueWriteResponse =
@@ -568,6 +587,7 @@ describe("CapabilityServerClient", () => {
     expect(reloadMcpServerConfig).toHaveBeenCalledWith(reloadMcpServerConfigOptions);
     expect(startMcpServerOauthLogin).toHaveBeenCalledWith(mcpServerOauthLoginOptions);
     expect(executeCommand).toHaveBeenCalledWith(commandExecutionOptions);
+    expect(uploadFeedback).toHaveBeenCalledWith(feedbackUploadOptions);
     expect(writeConfigBatch).toHaveBeenCalledWith(configBatchWriteOptions);
     expect(writeConfigValue).toHaveBeenCalledWith(configValueWriteOptions);
     expect(writeSkillsConfig).toHaveBeenCalledWith(skillsConfigWriteOptions);
@@ -591,6 +611,7 @@ describe("CapabilityServerClient", () => {
     expect(reloadMcpServerConfigResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
     expect(mcpServerOauthLoginResponse).toEqual(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
     expect(commandExecutionResponse).toEqual(COMMAND_EXECUTION_RESPONSE);
+    expect(feedbackUploadResponse).toEqual(FEEDBACK_UPLOAD_RESPONSE);
     expect(configBatchWriteResponse).toEqual(CONFIG_BATCH_WRITE_RESPONSE);
     expect(configValueWriteResponse).toEqual(CONFIG_VALUE_WRITE_RESPONSE);
     expect(skillsConfigWriteResponse).toEqual(SKILLS_CONFIG_WRITE_RESPONSE);

@@ -2,12 +2,14 @@ import type {
   CommandExecutionOptions,
   ConfigBatchWriteOptions,
   ConfigWriteValueOptions,
+  FeedbackUploadOptions,
   StartMcpServerOauthLoginOptions,
   WriteSkillsConfigOptions,
 } from "@farfield/api";
 import type {
   AgentCommandExecutionInput,
   AgentStartMcpServerOauthLoginInput,
+  AgentUploadFeedbackInput,
   AgentWriteConfigBatchInput,
   AgentWriteConfigValueInput,
   AgentWriteSkillsConfigInput,
@@ -70,5 +72,14 @@ export function buildCommandExecutionOptions(
       ? { timeoutMilliseconds: input.timeoutMilliseconds }
       : {}),
     ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
+  };
+}
+
+export function buildFeedbackUploadOptions(input: AgentUploadFeedbackInput): FeedbackUploadOptions {
+  return {
+    classification: input.classification,
+    includeLogs: input.includeLogs,
+    ...(input.reason !== undefined ? { reason: input.reason } : {}),
+    ...(input.threadId !== undefined ? { threadId: input.threadId } : {}),
   };
 }

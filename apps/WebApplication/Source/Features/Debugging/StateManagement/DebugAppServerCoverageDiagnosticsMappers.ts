@@ -10,6 +10,7 @@ import type {
   CapabilityConfigValueWriteResponse,
   CapabilityConfigWriteMergeStrategy,
   CapabilityExperimentalFeaturesResponse,
+  CapabilityFeedbackUploadResponse,
   CapabilityMcpServersResponse,
   CapabilityRemoteSkillsListResponse,
   CapabilitySkillsResponse,
@@ -21,6 +22,7 @@ import type {
   DebugAppServerCoverageConfigBatchWriteResult,
   DebugAppServerCoverageConfigValueWriteResult,
   DebugAppServerCoverageExperimentalFeature,
+  DebugAppServerCoverageFeedbackUploadResult,
   DebugAppServerCoverageMcpServerSummary,
   DebugAppServerCoveragePendingAccountLogin,
   DebugAppServerCoverageRateLimitSnapshot,
@@ -204,5 +206,22 @@ export function mapConfigBatchWriteResult(
     filePath: response.filePath,
     overriddenMessage: response.overriddenMetadata?.message ?? null,
     writtenAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapFeedbackUploadResult(
+  response: CapabilityFeedbackUploadResponse,
+  classification: string,
+  includeLogs: boolean,
+  reason: string | null,
+  requestedThreadId: string | null,
+): DebugAppServerCoverageFeedbackUploadResult {
+  return {
+    classification,
+    includeLogs,
+    reason,
+    requestedThreadId,
+    reportedThreadId: response.threadId,
+    uploadedAtIso8601: new Date().toISOString(),
   };
 }

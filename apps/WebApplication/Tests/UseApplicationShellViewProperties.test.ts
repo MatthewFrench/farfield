@@ -162,6 +162,14 @@ function createUseApplicationShellViewPropertiesFixture() {
   const executeCommandSpy = vi.fn(
     (_command: string[], _timeoutMs?: number, _cwd?: string): void => {},
   );
+  const uploadFeedbackSpy = vi.fn(
+    (
+      _classification: string,
+      _includeLogs: boolean,
+      _reason?: string,
+      _threadId?: string,
+    ): void => {},
+  );
   const writeSkillsConfigSpy = vi.fn((_skillPath: string, _enabled: boolean): void => {});
   const exportRemoteSkillSpy = vi.fn((_hazelnutId: string): void => {});
   const setApiSessionTokenDraftSpy = vi.fn((): void => {});
@@ -294,6 +302,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastCommandExecutionResult: null,
     lastConfigBatchWriteResult: null,
     lastConfigValueWriteResult: null,
+    lastFeedbackUploadResult: null,
     refreshCoverageDiagnostics: refreshCoverageDiagnosticsSpy,
     startAccountLogin: startAccountLoginSpy,
     cancelAccountLogin: cancelAccountLoginSpy,
@@ -303,6 +312,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     writeConfigValue: writeConfigValueSpy,
     writeConfigBatch: writeConfigBatchSpy,
     executeCommand: executeCommandSpy,
+    uploadFeedback: uploadFeedbackSpy,
     writeSkillsConfig: writeSkillsConfigSpy,
     exportRemoteSkill: exportRemoteSkillSpy,
     apiSessionTokenDraft: "",
@@ -330,6 +340,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     setIsChatAtBottomSpy,
     setApiSessionTokenDraftSpy,
     setApiSessionBootstrapErrorSpy,
+    uploadFeedbackSpy,
   };
 }
 
@@ -588,6 +599,25 @@ describe("useApplicationShellViewProperties", () => {
     );
     expect(nextProperties.apiSessionBootstrapOverlayProperties).not.toBe(
       initialProperties.apiSessionBootstrapOverlayProperties,
+    );
+  });
+
+  it("wires coverage feedback upload action through debug workspace pane properties", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const viewProperties = renderViewProperties(fixture.input);
+
+    viewProperties.settingsWorkspacePaneProperties.debugWorkspacePaneProperties.onUploadFeedback(
+      "quality",
+      true,
+      "Coverage validation path",
+      "thread-002",
+    );
+
+    expect(fixture.uploadFeedbackSpy).toHaveBeenCalledWith(
+      "quality",
+      true,
+      "Coverage validation path",
+      "thread-002",
     );
   });
 });

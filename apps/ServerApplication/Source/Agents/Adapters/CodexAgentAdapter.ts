@@ -60,6 +60,8 @@ import type {
   AgentThreadStreamEvents,
   AgentUnsubscribeThreadInput,
   AgentUnsubscribeThreadStatus,
+  AgentUploadFeedbackInput,
+  AgentUploadFeedbackResult,
   AgentWriteConfigBatchInput,
   AgentWriteConfigValueInput,
   AgentWriteConfigValueResult,
@@ -348,6 +350,10 @@ export class CodexAgentAdapter implements AgentAdapter {
     input?: AgentReadAccountRateLimitsInput,
   ): Promise<AgentReadAccountRateLimitsResult> {
     return this.threadManagementOwner.readAccountRateLimits(input);
+  }
+
+  public async uploadFeedback(input: AgentUploadFeedbackInput): Promise<AgentUploadFeedbackResult> {
+    return this.threadManagementOwner.uploadFeedback(input);
   }
 
   public async executeCommand(
