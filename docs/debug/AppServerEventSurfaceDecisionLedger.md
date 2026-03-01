@@ -3,7 +3,7 @@
 Last Updated (UTC): 2026-03-01 09:00:42Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
-Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, and `fuzzyFileSearch/sessionCompleted`; per-method product workflows below remain tracked independently.
+Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session/model-reroute diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`, and `model/rerouted`; per-method product workflows below remain tracked independently.
 
 | Method | Surface Type | Current Farfield State | Recommendation | Notes |
 | --- | --- | --- | --- | --- |
@@ -30,7 +30,7 @@ Farfield now exposes raw notification-event cursors in debug coverage diagnostic
 | `item/started` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `loginChatGptComplete` | server-to-client notification | Not consumed | Do not adopt | Deprecated notification surface. |
 | `mcpServer/oauthLogin/completed` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated auth-completion diagnostics surface validates MCP OAuth completion state and error messaging. |
-| `model/rerouted` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
+| `model/rerouted` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated model-reroute diagnostics surface validates model-switch notifications and reroute reasons. |
 | `rawResponseItem/completed` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `serverRequest/resolved` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated server-request resolved diagnostics surface validates request completion signals and complements pending-request snapshots (`/api/server-requests/pending`). |
 | `sessionConfigured` | server-to-client notification | Not consumed | Do not adopt | Deprecated notification surface. |

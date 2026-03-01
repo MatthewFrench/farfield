@@ -372,6 +372,7 @@ function buildApplicationShellViewPropertiesInput(
       debugCoverageDiagnostics.lastFuzzyFileSearchSessionStopResult,
     lastFuzzySessionNotificationsResult:
       debugCoverageDiagnostics.lastFuzzySessionNotificationsResult,
+    lastModelReroutedEventsResult: debugCoverageDiagnostics.lastModelReroutedEventsResult,
     lastGitDiffToRemoteResult: debugCoverageDiagnostics.lastGitDiffToRemoteResult,
     refreshCoverageDiagnostics: debugCoverageDiagnostics.refreshCoverageDiagnostics,
     startAccountLogin: debugCoverageDiagnostics.startAccountLogin,
@@ -401,6 +402,7 @@ function buildApplicationShellViewPropertiesInput(
     updateFuzzyFileSearchSession: debugCoverageDiagnostics.updateFuzzyFileSearchSession,
     stopFuzzyFileSearchSession: debugCoverageDiagnostics.stopFuzzyFileSearchSession,
     readFuzzySessionNotifications: debugCoverageDiagnostics.readFuzzySessionNotifications,
+    readModelReroutedEvents: debugCoverageDiagnostics.readModelReroutedEvents,
     executeCommand: debugCoverageDiagnostics.executeCommand,
     uploadFeedback: debugCoverageDiagnostics.uploadFeedback,
     apiSessionTokenDraft: applicationShellState.apiSessionTokenDraft,

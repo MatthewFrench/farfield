@@ -104,6 +104,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastFuzzyFileSearchSessionUpdateResult: null,
   lastFuzzyFileSearchSessionStopResult: null,
   lastFuzzySessionNotificationsResult: null,
+  lastModelReroutedEventsResult: null,
   lastGitDiffToRemoteResult: null,
   onRefreshCoverageDiagnostics: () => {},
   onStartAccountLogin: () => {},
@@ -133,6 +134,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onUpdateFuzzyFileSearchSession: () => {},
   onStopFuzzyFileSearchSession: () => {},
   onReadFuzzySessionNotifications: () => {},
+  onReadModelReroutedEvents: () => {},
   onExecuteCommand: () => {},
   onUploadFeedback: () => {},
 };
@@ -211,5 +213,6 @@ describe("DebugWorkspacePane", () => {
     expect(screen.getByTestId("debug-coverage-auth-completion-events-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-server-request-resolved-events-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-fuzzy-session-notifications-read")).toBeDefined();
+    expect(screen.getByTestId("debug-coverage-model-rerouted-events-read")).toBeDefined();
   });
 });

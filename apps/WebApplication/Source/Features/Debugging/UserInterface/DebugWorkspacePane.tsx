@@ -17,6 +17,7 @@ import {
   type DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   type DebugAppServerCoverageFuzzySessionNotificationsResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
+  type DebugAppServerCoverageModelReroutedEventsResult,
   type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoveragePendingServerRequestsResult,
@@ -110,6 +111,7 @@ export interface DebugWorkspacePaneProps {
   lastFuzzyFileSearchSessionUpdateResult: DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null;
   lastFuzzyFileSearchSessionStopResult: DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null;
   lastFuzzySessionNotificationsResult: DebugAppServerCoverageFuzzySessionNotificationsResult | null;
+  lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -150,6 +152,7 @@ export interface DebugWorkspacePaneProps {
   onUpdateFuzzyFileSearchSession: (sessionId: string, query: string) => void;
   onStopFuzzyFileSearchSession: (sessionId: string) => void;
   onReadFuzzySessionNotifications: (sinceSequence?: number | null) => void;
+  onReadModelReroutedEvents: (sinceSequence?: number | null) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
     classification: string,
@@ -222,6 +225,7 @@ export function DebugWorkspacePane({
   lastFuzzyFileSearchSessionUpdateResult,
   lastFuzzyFileSearchSessionStopResult,
   lastFuzzySessionNotificationsResult,
+  lastModelReroutedEventsResult,
   lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -251,6 +255,7 @@ export function DebugWorkspacePane({
   onUpdateFuzzyFileSearchSession,
   onStopFuzzyFileSearchSession,
   onReadFuzzySessionNotifications,
+  onReadModelReroutedEvents,
   onExecuteCommand,
   onUploadFeedback,
 }: DebugWorkspacePaneProps): React.JSX.Element {
@@ -374,6 +379,7 @@ export function DebugWorkspacePane({
             lastFuzzyFileSearchSessionUpdateResult={lastFuzzyFileSearchSessionUpdateResult}
             lastFuzzyFileSearchSessionStopResult={lastFuzzyFileSearchSessionStopResult}
             lastFuzzySessionNotificationsResult={lastFuzzySessionNotificationsResult}
+            lastModelReroutedEventsResult={lastModelReroutedEventsResult}
             lastGitDiffToRemoteResult={lastGitDiffToRemoteResult}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
             onStartAccountLogin={onStartAccountLogin}
@@ -403,6 +409,7 @@ export function DebugWorkspacePane({
             onUpdateFuzzyFileSearchSession={onUpdateFuzzyFileSearchSession}
             onStopFuzzyFileSearchSession={onStopFuzzyFileSearchSession}
             onReadFuzzySessionNotifications={onReadFuzzySessionNotifications}
+            onReadModelReroutedEvents={onReadModelReroutedEvents}
             onExecuteCommand={onExecuteCommand}
             onUploadFeedback={onUploadFeedback}
           />

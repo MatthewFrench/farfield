@@ -176,6 +176,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastFuzzyFileSearchSessionUpdateResult: DebugWorkspacePaneProps["lastFuzzyFileSearchSessionUpdateResult"];
   lastFuzzyFileSearchSessionStopResult: DebugWorkspacePaneProps["lastFuzzyFileSearchSessionStopResult"];
   lastFuzzySessionNotificationsResult: DebugWorkspacePaneProps["lastFuzzySessionNotificationsResult"];
+  lastModelReroutedEventsResult: DebugWorkspacePaneProps["lastModelReroutedEventsResult"];
   lastGitDiffToRemoteResult: DebugWorkspacePaneProps["lastGitDiffToRemoteResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -211,6 +212,7 @@ export interface UseApplicationShellViewPropertiesInput {
   updateFuzzyFileSearchSession: (sessionId: string, query: string) => void;
   stopFuzzyFileSearchSession: (sessionId: string) => void;
   readFuzzySessionNotifications: DebugWorkspacePaneProps["onReadFuzzySessionNotifications"];
+  readModelReroutedEvents: DebugWorkspacePaneProps["onReadModelReroutedEvents"];
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -531,6 +533,7 @@ function buildDebugWorkspacePaneProperties(
     lastFuzzyFileSearchSessionUpdateResult: input.lastFuzzyFileSearchSessionUpdateResult,
     lastFuzzyFileSearchSessionStopResult: input.lastFuzzyFileSearchSessionStopResult,
     lastFuzzySessionNotificationsResult: input.lastFuzzySessionNotificationsResult,
+    lastModelReroutedEventsResult: input.lastModelReroutedEventsResult,
     lastGitDiffToRemoteResult: input.lastGitDiffToRemoteResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
@@ -560,6 +563,7 @@ function buildDebugWorkspacePaneProperties(
     onUpdateFuzzyFileSearchSession: input.updateFuzzyFileSearchSession,
     onStopFuzzyFileSearchSession: input.stopFuzzyFileSearchSession,
     onReadFuzzySessionNotifications: input.readFuzzySessionNotifications,
+    onReadModelReroutedEvents: input.readModelReroutedEvents,
     onExecuteCommand: input.executeCommand,
     onUploadFeedback: input.uploadFeedback,
   };
@@ -785,6 +789,7 @@ export function useApplicationShellViewProperties(
       input.lastFuzzyFileSearchSessionUpdateResult,
       input.lastFuzzyFileSearchSessionStopResult,
       input.lastFuzzySessionNotificationsResult,
+      input.lastModelReroutedEventsResult,
       input.lastGitDiffToRemoteResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
@@ -813,6 +818,7 @@ export function useApplicationShellViewProperties(
       input.updateFuzzyFileSearchSession,
       input.stopFuzzyFileSearchSession,
       input.readFuzzySessionNotifications,
+      input.readModelReroutedEvents,
       input.executeCommand,
       input.uploadFeedback,
       input.replayHistoryEntryFromDetail,

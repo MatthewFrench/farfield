@@ -352,6 +352,29 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     const readNotificationEvents = vi
       .spyOn(capabilityServerClient, "readNotificationEvents")
       .mockImplementation(async (input) => {
+        if (input.limit === 260) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 17,
+                method: "model/rerouted",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turnId: "turn-9",
+                  fromModel: "gpt-5",
+                  toModel: "gpt-5-mini",
+                  reason: "highRiskCyberActivity",
+                },
+                receivedAtMilliseconds: 17_710,
+              },
+            ],
+            nextSequence: 18,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 240) {
           return {
             ok: true,
@@ -557,6 +580,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readAuthCompletionEvents(12);
     latestDiagnostics.current?.readServerRequestResolvedEvents(13);
     latestDiagnostics.current?.readFuzzySessionNotifications(14);
+    latestDiagnostics.current?.readModelReroutedEvents(16);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -696,6 +720,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 14,
         limit: 240,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 16,
+        limit: 260,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -962,6 +991,25 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             query: null,
             fileCount: null,
             receivedAtMilliseconds: 17_695,
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastModelReroutedEventsResult).toEqual({
+        sinceSequence: 16,
+        eventCount: 1,
+        nextSequence: 18,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        events: [
+          {
+            sequence: 17,
+            threadId: "thread-realtime-1",
+            turnId: "turn-9",
+            fromModel: "gpt-5",
+            toModel: "gpt-5-mini",
+            reason: "highRiskCyberActivity",
+            receivedAtMilliseconds: 17_710,
           },
         ],
         readAtIso8601: expect.any(String),

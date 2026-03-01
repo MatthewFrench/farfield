@@ -360,6 +360,28 @@ export interface DebugAppServerCoverageFuzzySessionNotificationsResult {
   readAtIso8601: string;
 }
 
+export type DebugAppServerCoverageModelRerouteReason = "highRiskCyberActivity";
+
+export interface DebugAppServerCoverageModelReroutedSummary {
+  sequence: number;
+  threadId: string;
+  turnId: string;
+  fromModel: string;
+  toModel: string;
+  reason: DebugAppServerCoverageModelRerouteReason;
+  receivedAtMilliseconds: number;
+}
+
+export interface DebugAppServerCoverageModelReroutedEventsResult {
+  sinceSequence: number | null;
+  eventCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageModelReroutedSummary[];
+  readAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

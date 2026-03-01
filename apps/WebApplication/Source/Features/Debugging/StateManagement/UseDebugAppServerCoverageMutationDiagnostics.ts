@@ -18,6 +18,7 @@ import type {
   DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   DebugAppServerCoverageFuzzySessionNotificationsResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
+  DebugAppServerCoverageModelReroutedEventsResult,
   DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingAccountLogin,
   DebugAppServerCoveragePendingServerRequestsResult,
@@ -37,11 +38,6 @@ import {
 } from "./DebugAppServerCoverageConfigWriteActionRunners";
 import { mapPendingAccountLogin } from "./DebugAppServerCoverageDiagnosticsMappers";
 import {
-  createReadAuthCompletionEventsAction,
-  createReadFuzzySessionNotificationsAction,
-  createReadNotificationEventsAction,
-  createReadPendingServerRequestsAction,
-  createReadServerRequestResolvedEventsAction,
   createReadThreadStreamEventsAction,
   runCoverageAsyncMutation,
 } from "./DebugAppServerCoverageMutationActionHelpers";
@@ -49,6 +45,7 @@ import {
   runExternalAgentConfigDetectAction,
   runExternalAgentConfigImportAction,
 } from "./DebugAppServerCoverageMutationActionRunners";
+import { createNotificationCoverageReadActions } from "./DebugAppServerCoverageNotificationReadActionFactory";
 import { useDebugAppServerCoverageRuntimeMutationActions } from "./UseDebugAppServerCoverageRuntimeMutationActions";
 
 const COVERAGE_MUTATION_OPERATION_NAME = "debug-coverage-action";
@@ -102,6 +99,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastFuzzyFileSearchSessionUpdateResult: DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null;
   lastFuzzyFileSearchSessionStopResult: DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null;
   lastFuzzySessionNotificationsResult: DebugAppServerCoverageFuzzySessionNotificationsResult | null;
+  lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -134,6 +132,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   readAuthCompletionEvents: (sinceSequence?: number | null) => void;
   readServerRequestResolvedEvents: (sinceSequence?: number | null) => void;
   readFuzzySessionNotifications: (sinceSequence?: number | null) => void;
+  readModelReroutedEvents: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
@@ -245,6 +244,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null>(null);
   const [lastFuzzySessionNotificationsResult, setLastFuzzySessionNotificationsResult] =
     useState<DebugAppServerCoverageFuzzySessionNotificationsResult | null>(null);
+  const [lastModelReroutedEventsResult, setLastModelReroutedEventsResult] =
+    useState<DebugAppServerCoverageModelReroutedEventsResult | null>(null);
   const [lastGitDiffToRemoteResult, setLastGitDiffToRemoteResult] =
     useState<DebugAppServerCoverageGitDiffToRemoteResult | null>(null);
 
@@ -460,6 +461,19 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     setLastFeedbackUploadResult,
   });
 
+  const notificationCoverageReadActions = createNotificationCoverageReadActions({
+    capabilityServerClient: input.capabilityServerClient,
+    isRunningCoverageAction,
+    setIsRunningCoverageAction,
+    setCoverageActionErrorMessage,
+    setLastNotificationEventsResult,
+    setLastAuthCompletionEventsResult,
+    setLastServerRequestResolvedEventsResult,
+    setLastFuzzySessionNotificationsResult,
+    setLastModelReroutedEventsResult,
+    setLastPendingServerRequestsResult,
+  });
+
   return {
     clearPendingAccountLogin: () => {
       setPendingAccountLogin(null);
@@ -489,6 +503,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastFuzzyFileSearchSessionUpdateResult,
       lastFuzzyFileSearchSessionStopResult,
       lastFuzzySessionNotificationsResult,
+      lastModelReroutedEventsResult,
       lastGitDiffToRemoteResult,
       startAccountLogin,
       cancelAccountLogin,
@@ -512,41 +527,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
         setCoverageActionErrorMessage,
         setLastThreadStreamEventsResult,
       }),
-      readNotificationEvents: createReadNotificationEventsAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastNotificationEventsResult,
-      }),
-      readAuthCompletionEvents: createReadAuthCompletionEventsAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastAuthCompletionEventsResult,
-      }),
-      readServerRequestResolvedEvents: createReadServerRequestResolvedEventsAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastServerRequestResolvedEventsResult,
-      }),
-      readFuzzySessionNotifications: createReadFuzzySessionNotificationsAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastFuzzySessionNotificationsResult,
-      }),
-      readPendingServerRequests: createReadPendingServerRequestsAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastPendingServerRequestsResult,
-      }),
+      ...notificationCoverageReadActions,
       startWindowsSandboxSetup: runtimeMutationActions.startWindowsSandboxSetup,
       readGitDiffToRemote: runtimeMutationActions.readGitDiffToRemote,
       searchFuzzyFiles: runtimeMutationActions.searchFuzzyFiles,
