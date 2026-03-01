@@ -60,6 +60,7 @@ const AgentCapabilitiesSchema = z
     canDetectExternalAgentConfig: z.boolean(),
     canImportExternalAgentConfig: z.boolean(),
     canStartThreadRealtime: z.boolean(),
+    canAppendThreadRealtimeAudio: z.boolean(),
     canAppendThreadRealtimeText: z.boolean(),
     canStopThreadRealtime: z.boolean(),
     canStartWindowsSandboxSetup: z.boolean(),

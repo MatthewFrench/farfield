@@ -24,7 +24,9 @@ import {
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
+  type DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   type DebugAppServerCoverageThreadRealtimeAppendTextResult,
+  type DebugAppServerCoverageThreadRealtimeAudioChunk,
   type DebugAppServerCoverageThreadRealtimeStartResult,
   type DebugAppServerCoverageThreadRealtimeStopResult,
   type DebugAppServerCoverageWindowsSandboxSetupMode,
@@ -77,6 +79,7 @@ export interface DebugAppServerCoverageDiagnostics {
   lastExternalAgentConfigDetectResult: DebugAppServerCoverageExternalAgentConfigDetectResult | null;
   lastExternalAgentConfigImportResult: DebugAppServerCoverageExternalAgentConfigImportResult | null;
   lastThreadRealtimeStartResult: DebugAppServerCoverageThreadRealtimeStartResult | null;
+  lastThreadRealtimeAppendAudioResult: DebugAppServerCoverageThreadRealtimeAppendAudioResult | null;
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
@@ -104,6 +107,10 @@ export interface DebugAppServerCoverageDiagnostics {
     migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[],
   ) => void;
   startThreadRealtime: (threadId: string, prompt: string, sessionId?: string) => void;
+  appendThreadRealtimeAudio: (
+    threadId: string,
+    audio: DebugAppServerCoverageThreadRealtimeAudioChunk,
+  ) => void;
   appendThreadRealtimeText: (threadId: string, text: string) => void;
   stopThreadRealtime: (threadId: string) => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;

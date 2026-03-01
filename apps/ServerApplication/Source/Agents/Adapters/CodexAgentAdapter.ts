@@ -12,6 +12,8 @@ import type {
 } from "@farfield/protocol";
 import type {
   AgentAdapter,
+  AgentAppendThreadRealtimeAudioInput,
+  AgentAppendThreadRealtimeAudioResult,
   AgentAppendThreadRealtimeTextInput,
   AgentAppendThreadRealtimeTextResult,
   AgentCancelAccountLoginInput,
@@ -481,6 +483,12 @@ export class CodexAgentAdapter implements AgentAdapter {
     input: AgentAppendThreadRealtimeTextInput,
   ): Promise<AgentAppendThreadRealtimeTextResult> {
     return this.threadManagementOwner.appendThreadRealtimeText(input);
+  }
+
+  public async appendThreadRealtimeAudio(
+    input: AgentAppendThreadRealtimeAudioInput,
+  ): Promise<AgentAppendThreadRealtimeAudioResult> {
+    return this.threadManagementOwner.appendThreadRealtimeAudio(input);
   }
 
   public async stopThreadRealtime(

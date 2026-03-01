@@ -69,6 +69,7 @@ export interface AgentCapabilities {
   canDetectExternalAgentConfig: boolean;
   canImportExternalAgentConfig: boolean;
   canStartThreadRealtime: boolean;
+  canAppendThreadRealtimeAudio: boolean;
   canAppendThreadRealtimeText: boolean;
   canStopThreadRealtime: boolean;
   canStartWindowsSandboxSetup: boolean;
@@ -722,6 +723,20 @@ export interface AgentStartThreadRealtimeInput {
 
 export interface AgentStartThreadRealtimeResult {}
 
+export interface AgentThreadRealtimeAudioChunk {
+  data: string;
+  sampleRate: number;
+  numChannels: number;
+  samplesPerChannel?: number;
+}
+
+export interface AgentAppendThreadRealtimeAudioInput {
+  threadId: string;
+  audio: AgentThreadRealtimeAudioChunk;
+}
+
+export interface AgentAppendThreadRealtimeAudioResult {}
+
 export interface AgentAppendThreadRealtimeTextInput {
   threadId: string;
   text: string;
@@ -821,6 +836,9 @@ export interface AgentAdapter {
   startThreadRealtime?(
     input: AgentStartThreadRealtimeInput,
   ): Promise<AgentStartThreadRealtimeResult>;
+  appendThreadRealtimeAudio?(
+    input: AgentAppendThreadRealtimeAudioInput,
+  ): Promise<AgentAppendThreadRealtimeAudioResult>;
   appendThreadRealtimeText?(
     input: AgentAppendThreadRealtimeTextInput,
   ): Promise<AgentAppendThreadRealtimeTextResult>;

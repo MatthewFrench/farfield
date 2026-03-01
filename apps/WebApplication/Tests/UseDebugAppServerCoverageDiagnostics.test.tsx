@@ -282,6 +282,32 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       .mockResolvedValue({
         ok: true,
       });
+    const startThreadRealtime = vi
+      .spyOn(capabilityServerClient, "startThreadRealtime")
+      .mockResolvedValue({
+        ok: true,
+      });
+    const appendThreadRealtimeAudio = vi
+      .spyOn(capabilityServerClient, "appendThreadRealtimeAudio")
+      .mockResolvedValue({
+        ok: true,
+      });
+    const appendThreadRealtimeText = vi
+      .spyOn(capabilityServerClient, "appendThreadRealtimeText")
+      .mockResolvedValue({
+        ok: true,
+      });
+    const stopThreadRealtime = vi
+      .spyOn(capabilityServerClient, "stopThreadRealtime")
+      .mockResolvedValue({
+        ok: true,
+      });
+    const startWindowsSandboxSetup = vi
+      .spyOn(capabilityServerClient, "startWindowsSandboxSetup")
+      .mockResolvedValue({
+        ok: true,
+        started: true,
+      });
     const uploadFeedback = vi.spyOn(capabilityServerClient, "uploadFeedback").mockResolvedValue({
       ok: true,
       threadId: "thread-coverage-feedback",
@@ -347,6 +373,23 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         cwd: null,
       },
     ]);
+    latestDiagnostics.current?.startThreadRealtime(
+      "thread-realtime-1",
+      "Summarize the project status.",
+      "session-coverage-1",
+    );
+    latestDiagnostics.current?.appendThreadRealtimeAudio("thread-realtime-1", {
+      data: "YmFzZTY0LWF1ZGlv",
+      sampleRate: 16000,
+      numChannels: 1,
+      samplesPerChannel: 640,
+    });
+    latestDiagnostics.current?.appendThreadRealtimeText(
+      "thread-realtime-1",
+      "Continue with implementation details.",
+    );
+    latestDiagnostics.current?.stopThreadRealtime("thread-realtime-1");
+    latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
       "quality",
       true,
@@ -421,6 +464,35 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             cwd: null,
           },
         ],
+      });
+      expect(startThreadRealtime).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        threadId: "thread-realtime-1",
+        prompt: "Summarize the project status.",
+        sessionId: "session-coverage-1",
+      });
+      expect(appendThreadRealtimeAudio).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        threadId: "thread-realtime-1",
+        audio: {
+          data: "YmFzZTY0LWF1ZGlv",
+          sampleRate: 16000,
+          numChannels: 1,
+          samplesPerChannel: 640,
+        },
+      });
+      expect(appendThreadRealtimeText).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        threadId: "thread-realtime-1",
+        text: "Continue with implementation details.",
+      });
+      expect(stopThreadRealtime).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        threadId: "thread-realtime-1",
+      });
+      expect(startWindowsSandboxSetup).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        mode: "unelevated",
       });
       expect(uploadFeedback).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -507,6 +579,36 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       expect(latestDiagnostics.current?.lastExternalAgentConfigImportResult).toEqual({
         itemCount: 1,
         importedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastThreadRealtimeStartResult).toEqual({
+        threadId: "thread-realtime-1",
+        prompt: "Summarize the project status.",
+        sessionId: "session-coverage-1",
+        startedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastThreadRealtimeAppendAudioResult).toEqual({
+        threadId: "thread-realtime-1",
+        audio: {
+          data: "YmFzZTY0LWF1ZGlv",
+          sampleRate: 16000,
+          numChannels: 1,
+          samplesPerChannel: 640,
+        },
+        appendedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastThreadRealtimeAppendTextResult).toEqual({
+        threadId: "thread-realtime-1",
+        text: "Continue with implementation details.",
+        appendedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastThreadRealtimeStopResult).toEqual({
+        threadId: "thread-realtime-1",
+        stoppedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastWindowsSandboxSetupStartResult).toEqual({
+        mode: "unelevated",
+        started: true,
+        startedAtIso8601: expect.any(String),
       });
     });
 

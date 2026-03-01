@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 04:11:15Z
+Last Updated (UTC): 2026-03-01 04:33:07Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `49 / 74` request methods (`66.2%`).
+1. Farfield app-server method coverage at request-owner layer: `50 / 74` request methods (`67.6%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `50 / 74` (`67.6%`).
+3. Effective request-method usage including transport-owned `initialize`: `51 / 74` (`68.9%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -82,6 +82,7 @@ As of the upstream snapshot above:
 | `thread/loaded/list` | Loaded-in-memory status projection on thread list surfaces | High | Canonical v2 lifecycle signal now mapped through strict owner boundaries into list contracts | Keep current path |
 | `thread/read` | Open-thread hydration and selected-thread refresh | High | Contract parsing at boundary and owner-controlled read flow | Keep current path |
 | `thread/realtime/start` | Realtime conversation diagnostics start action with prompt and optional session id in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed prompt/session validation and deterministic start action mapping | Keep current path |
+| `thread/realtime/appendAudio` | Realtime conversation diagnostics append-audio action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed audio chunk parsing and deterministic action mapping | Keep current path |
 | `thread/realtime/appendText` | Realtime conversation diagnostics append-text action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed append payload parsing and deterministic action mapping | Keep current path |
 | `thread/realtime/stop` | Realtime conversation diagnostics stop action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed thread identifier parsing and deterministic stop action mapping | Keep current path |
 | `thread/start` | Thread creation | High | Clear create ownership with strict request shaping | Keep current path |
@@ -141,6 +142,7 @@ As of the upstream snapshot above:
 | `thread/loaded/list` | Loaded-in-memory status projection for thread rows | `/api/threads` GET -> `ThreadCollectionRoutes` -> `CodexThreadManagementOwner.listLoadedThreads` -> `AppServerClient.listLoadedThreads` |
 | `thread/read` | Open thread and selected-thread refresh | `/api/threads/:threadId` GET -> `ThreadMemberReadRouteOwner` -> `CodexThreadManagementOwner.readThread` -> `AppServerClient.readThread` |
 | `thread/realtime/start` | Realtime conversation diagnostics start action | `/api/threads/realtime/start` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.startThreadRealtime` -> `AppServerClient.startThreadRealtime` |
+| `thread/realtime/appendAudio` | Realtime conversation diagnostics append-audio action | `/api/threads/realtime/append-audio` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.appendThreadRealtimeAudio` -> `AppServerClient.appendThreadRealtimeAudio` |
 | `thread/realtime/appendText` | Realtime conversation diagnostics append-text action | `/api/threads/realtime/append-text` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.appendThreadRealtimeText` -> `AppServerClient.appendThreadRealtimeText` |
 | `thread/realtime/stop` | Realtime conversation diagnostics stop action | `/api/threads/realtime/stop` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.stopThreadRealtime` -> `AppServerClient.stopThreadRealtime` |
 | `thread/start` | Create thread | `/api/threads` POST -> `ThreadCollectionRoutes` -> `CodexThreadManagementOwner.createThread` -> `AppServerClient.startThread` |
@@ -189,7 +191,7 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`25` request methods are not used by Farfield’s app-server client path:
+`24` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
@@ -215,7 +217,6 @@ removeConversationListener
 resumeConversation
 sendUserTurn
 setDefaultModel
-thread/realtime/appendAudio
 sendUserMessage
 ```
 
@@ -263,9 +264,7 @@ No remaining methods in this category for the current upstream snapshot.
 
 ### Category F: Thread and Turn v2 Lifecycle Surfaces Not Yet Wired
 
-This remaining method is an idiomatic modern surface upstream and can be considered if audio-stream diagnostics become a product objective.
-
-1. `thread/realtime/appendAudio`
+No remaining methods in this category for the current upstream snapshot.
 
 ### Category G: Experimental and Test-only Surfaces Not Intended for Production Flow
 
@@ -284,8 +283,8 @@ No remaining methods in this category for the current upstream snapshot.
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `25`
-2. Total methods listed across Category A-I: `25`
+1. Total non-intersection methods: `24`
+2. Total methods listed across Category A-I: `24`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

@@ -35,6 +35,7 @@ thread/list
 thread/loaded/list
 thread/name/set
 thread/read
+thread/realtime/appendAudio
 thread/realtime/appendText
 thread/realtime/start
 thread/realtime/stop

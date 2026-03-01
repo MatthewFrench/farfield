@@ -6,6 +6,7 @@ import type {
   ExternalAgentConfigImportOptions,
   FeedbackUploadOptions,
   StartMcpServerOauthLoginOptions,
+  ThreadRealtimeAppendAudioOptions,
   ThreadRealtimeAppendTextOptions,
   ThreadRealtimeStartOptions,
   ThreadRealtimeStopOptions,
@@ -13,6 +14,7 @@ import type {
   WriteSkillsConfigOptions,
 } from "@farfield/api";
 import type {
+  AgentAppendThreadRealtimeAudioInput,
   AgentAppendThreadRealtimeTextInput,
   AgentCommandExecutionInput,
   AgentDetectExternalAgentConfigInput,
@@ -133,6 +135,22 @@ export function buildThreadRealtimeAppendTextOptions(
   return {
     threadId: input.threadId,
     text: input.text,
+  };
+}
+
+export function buildThreadRealtimeAppendAudioOptions(
+  input: AgentAppendThreadRealtimeAudioInput,
+): ThreadRealtimeAppendAudioOptions {
+  return {
+    threadId: input.threadId,
+    audio: {
+      data: input.audio.data,
+      sampleRate: input.audio.sampleRate,
+      numChannels: input.audio.numChannels,
+      ...(input.audio.samplesPerChannel !== undefined
+        ? { samplesPerChannel: input.audio.samplesPerChannel }
+        : {}),
+    },
   };
 }
 

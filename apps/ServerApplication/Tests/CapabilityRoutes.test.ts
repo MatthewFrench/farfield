@@ -13,6 +13,8 @@ import { z } from "zod";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import type {
   AgentAdapter,
+  AgentAppendThreadRealtimeAudioInput,
+  AgentAppendThreadRealtimeAudioResult,
   AgentAppendThreadRealtimeTextInput,
   AgentAppendThreadRealtimeTextResult,
   AgentCancelAccountLoginInput,
@@ -448,6 +450,9 @@ interface MockAgentAdapterOptions {
   startThreadRealtime?: (
     input: AgentStartThreadRealtimeInput,
   ) => Promise<AgentStartThreadRealtimeResult>;
+  appendThreadRealtimeAudio?: (
+    input: AgentAppendThreadRealtimeAudioInput,
+  ) => Promise<AgentAppendThreadRealtimeAudioResult>;
   appendThreadRealtimeText?: (
     input: AgentAppendThreadRealtimeTextInput,
   ) => Promise<AgentAppendThreadRealtimeTextResult>;
@@ -509,6 +514,7 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canDetectExternalAgentConfig: false,
     canImportExternalAgentConfig: false,
     canStartThreadRealtime: false,
+    canAppendThreadRealtimeAudio: false,
     canAppendThreadRealtimeText: false,
     canStopThreadRealtime: false,
     canStartWindowsSandboxSetup: false,
@@ -651,6 +657,10 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.startThreadRealtime) {
     adapter.startThreadRealtime = options.startThreadRealtime;
+  }
+
+  if (options.appendThreadRealtimeAudio) {
+    adapter.appendThreadRealtimeAudio = options.appendThreadRealtimeAudio;
   }
 
   if (options.appendThreadRealtimeText) {
@@ -2095,6 +2105,60 @@ describe("handleCapabilityRoutes", () => {
     expect(appendThreadRealtimeTextSpy).toHaveBeenCalledWith({
       threadId: "thread-1",
       text: "Continue with implementation details",
+    });
+    const parsedEnvelope = CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+    });
+  });
+
+  it("returns 400 when thread realtime append-audio omits required audio fields", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/threads/realtime/append-audio",
+      url: new URL("http://localhost/api/threads/realtime/append-audio?threadId=thread-1"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing audioData query parameter.",
+    });
+  });
+
+  it("appends thread realtime audio when adapter supports realtime audio append", async () => {
+    const appendThreadRealtimeAudioSpy = vi.fn(
+      async (): Promise<AgentAppendThreadRealtimeAudioResult> => ({}),
+    );
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/threads/realtime/append-audio",
+      url: new URL(
+        "http://localhost/api/threads/realtime/append-audio?threadId=thread-1&audioData=base64chunk&audioSampleRate=16000&audioNumChannels=1&audioSamplesPerChannel=640",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canAppendThreadRealtimeAudio: true,
+          },
+          appendThreadRealtimeAudio: appendThreadRealtimeAudioSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(appendThreadRealtimeAudioSpy).toHaveBeenCalledWith({
+      threadId: "thread-1",
+      audio: {
+        data: "base64chunk",
+        sampleRate: 16000,
+        numChannels: 1,
+        samplesPerChannel: 640,
+      },
     });
     const parsedEnvelope = CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result));
     expect(parsedEnvelope).toEqual({

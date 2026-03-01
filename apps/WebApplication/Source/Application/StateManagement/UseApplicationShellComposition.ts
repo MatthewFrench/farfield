@@ -321,6 +321,8 @@ function buildApplicationShellViewPropertiesInput(
     lastExternalAgentConfigImportResult:
       debugCoverageDiagnostics.lastExternalAgentConfigImportResult,
     lastThreadRealtimeStartResult: debugCoverageDiagnostics.lastThreadRealtimeStartResult,
+    lastThreadRealtimeAppendAudioResult:
+      debugCoverageDiagnostics.lastThreadRealtimeAppendAudioResult,
     lastThreadRealtimeAppendTextResult: debugCoverageDiagnostics.lastThreadRealtimeAppendTextResult,
     lastThreadRealtimeStopResult: debugCoverageDiagnostics.lastThreadRealtimeStopResult,
     lastWindowsSandboxSetupStartResult: debugCoverageDiagnostics.lastWindowsSandboxSetupStartResult,
@@ -340,6 +342,7 @@ function buildApplicationShellViewPropertiesInput(
     detectExternalAgentConfig: debugCoverageDiagnostics.detectExternalAgentConfig,
     importExternalAgentConfig: debugCoverageDiagnostics.importExternalAgentConfig,
     startThreadRealtime: debugCoverageDiagnostics.startThreadRealtime,
+    appendThreadRealtimeAudio: debugCoverageDiagnostics.appendThreadRealtimeAudio,
     appendThreadRealtimeText: debugCoverageDiagnostics.appendThreadRealtimeText,
     stopThreadRealtime: debugCoverageDiagnostics.stopThreadRealtime,
     startWindowsSandboxSetup: debugCoverageDiagnostics.startWindowsSandboxSetup,

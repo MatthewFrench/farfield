@@ -14,7 +14,9 @@ import type {
   DebugAppServerCoverageFuzzyFileSearchResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
   DebugAppServerCoveragePendingAccountLogin,
+  DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   DebugAppServerCoverageThreadRealtimeAppendTextResult,
+  DebugAppServerCoverageThreadRealtimeAudioChunk,
   DebugAppServerCoverageThreadRealtimeStartResult,
   DebugAppServerCoverageThreadRealtimeStopResult,
   DebugAppServerCoverageWindowsSandboxSetupMode,
@@ -56,6 +58,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastExternalAgentConfigDetectResult: DebugAppServerCoverageExternalAgentConfigDetectResult | null;
   lastExternalAgentConfigImportResult: DebugAppServerCoverageExternalAgentConfigImportResult | null;
   lastThreadRealtimeStartResult: DebugAppServerCoverageThreadRealtimeStartResult | null;
+  lastThreadRealtimeAppendAudioResult: DebugAppServerCoverageThreadRealtimeAppendAudioResult | null;
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
@@ -82,6 +85,10 @@ export interface DebugAppServerCoverageMutationDiagnostics {
     migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[],
   ) => void;
   startThreadRealtime: (threadId: string, prompt: string, sessionId?: string) => void;
+  appendThreadRealtimeAudio: (
+    threadId: string,
+    audio: DebugAppServerCoverageThreadRealtimeAudioChunk,
+  ) => void;
   appendThreadRealtimeText: (threadId: string, text: string) => void;
   stopThreadRealtime: (threadId: string) => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
@@ -151,6 +158,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageExternalAgentConfigImportResult | null>(null);
   const [lastThreadRealtimeStartResult, setLastThreadRealtimeStartResult] =
     useState<DebugAppServerCoverageThreadRealtimeStartResult | null>(null);
+  const [lastThreadRealtimeAppendAudioResult, setLastThreadRealtimeAppendAudioResult] =
+    useState<DebugAppServerCoverageThreadRealtimeAppendAudioResult | null>(null);
   const [lastThreadRealtimeAppendTextResult, setLastThreadRealtimeAppendTextResult] =
     useState<DebugAppServerCoverageThreadRealtimeAppendTextResult | null>(null);
   const [lastThreadRealtimeStopResult, setLastThreadRealtimeStopResult] =
@@ -384,6 +393,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     setIsRunningCoverageAction,
     setCoverageActionErrorMessage,
     setLastThreadRealtimeStartResult,
+    setLastThreadRealtimeAppendAudioResult,
     setLastThreadRealtimeAppendTextResult,
     setLastThreadRealtimeStopResult,
     setLastWindowsSandboxSetupStartResult,
@@ -405,6 +415,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastExternalAgentConfigDetectResult,
       lastExternalAgentConfigImportResult,
       lastThreadRealtimeStartResult,
+      lastThreadRealtimeAppendAudioResult,
       lastThreadRealtimeAppendTextResult,
       lastThreadRealtimeStopResult,
       lastWindowsSandboxSetupStartResult,
@@ -423,6 +434,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       detectExternalAgentConfig,
       importExternalAgentConfig,
       startThreadRealtime: runtimeMutationActions.startThreadRealtime,
+      appendThreadRealtimeAudio: runtimeMutationActions.appendThreadRealtimeAudio,
       appendThreadRealtimeText: runtimeMutationActions.appendThreadRealtimeText,
       stopThreadRealtime: runtimeMutationActions.stopThreadRealtime,
       startWindowsSandboxSetup: runtimeMutationActions.startWindowsSandboxSetup,

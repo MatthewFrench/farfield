@@ -35,6 +35,7 @@ export const APP_SERVER_CLIENT_METHODS = {
   detectExternalAgentConfig: "externalAgentConfig/detect",
   importExternalAgentConfig: "externalAgentConfig/import",
   startThreadRealtime: "thread/realtime/start",
+  appendThreadRealtimeAudio: "thread/realtime/appendAudio",
   appendThreadRealtimeText: "thread/realtime/appendText",
   stopThreadRealtime: "thread/realtime/stop",
   startWindowsSandboxSetup: "windowsSandbox/setupStart",

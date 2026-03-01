@@ -100,6 +100,19 @@ export interface DebugAppServerCoverageThreadRealtimeStartResult {
   startedAtIso8601: string;
 }
 
+export interface DebugAppServerCoverageThreadRealtimeAudioChunk {
+  data: string;
+  sampleRate: number;
+  numChannels: number;
+  samplesPerChannel: number | null;
+}
+
+export interface DebugAppServerCoverageThreadRealtimeAppendAudioResult {
+  threadId: string;
+  audio: DebugAppServerCoverageThreadRealtimeAudioChunk;
+  appendedAtIso8601: string;
+}
+
 export interface DebugAppServerCoverageThreadRealtimeAppendTextResult {
   threadId: string;
   text: string;

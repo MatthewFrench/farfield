@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-03-01 04:11:15Z
+Last Updated (UTC): 2026-03-01 04:33:07Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -66,7 +66,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `thread/loaded/list` | Used now | Keep | Enables loaded-thread projection for list surfaces through strict owner boundaries. |
 | `thread/name/set` | Used now | Keep | Thread rename action is routed through strict owner boundaries and typed app-server mapping. |
 | `thread/read` | Used now | Keep | Current ownership and contracts align with present product behavior. |
-| `thread/realtime/appendAudio` | Not used | Not now | Adopt only if realtime conversation feature is a planned product objective. |
+| `thread/realtime/appendAudio` | Used now | Keep | Exposed through capability ownership and debug workspace realtime diagnostics append-audio action. |
 | `thread/realtime/appendText` | Used now | Keep | Exposed through capability ownership and debug workspace realtime diagnostics append-text action. |
 | `thread/realtime/start` | Used now | Keep | Exposed through capability ownership and debug workspace realtime diagnostics start action. |
 | `thread/realtime/stop` | Used now | Keep | Exposed through capability ownership and debug workspace realtime diagnostics stop action. |
@@ -82,5 +82,5 @@ This ledger records recommended disposition for every upstream app-server client
 | `windowsSandbox/setupStart` | Used now | Keep | Exposed through capability ownership and debug workspace windows-sandbox setup diagnostics action. |
 
 Total methods: 74
-Used now: 50
-Not used: 24
+Used now: 51
+Not used: 23

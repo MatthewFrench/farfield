@@ -181,6 +181,17 @@ function createUseApplicationShellViewPropertiesFixture() {
   const startThreadRealtimeSpy = vi.fn(
     (_threadId: string, _prompt: string, _sessionId?: string): void => {},
   );
+  const appendThreadRealtimeAudioSpy = vi.fn(
+    (
+      _threadId: string,
+      _audio: {
+        data: string;
+        sampleRate: number;
+        numChannels: number;
+        samplesPerChannel: number | null;
+      },
+    ): void => {},
+  );
   const appendThreadRealtimeTextSpy = vi.fn((_threadId: string, _text: string): void => {});
   const stopThreadRealtimeSpy = vi.fn((_threadId: string): void => {});
   const startWindowsSandboxSetupSpy = vi.fn((_mode: "elevated" | "unelevated"): void => {});
@@ -317,6 +328,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastExternalAgentConfigDetectResult: null,
     lastExternalAgentConfigImportResult: null,
     lastThreadRealtimeStartResult: null,
+    lastThreadRealtimeAppendAudioResult: null,
     lastThreadRealtimeAppendTextResult: null,
     lastThreadRealtimeStopResult: null,
     lastWindowsSandboxSetupStartResult: null,
@@ -340,6 +352,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     detectExternalAgentConfig: detectExternalAgentConfigSpy,
     importExternalAgentConfig: importExternalAgentConfigSpy,
     startThreadRealtime: startThreadRealtimeSpy,
+    appendThreadRealtimeAudio: appendThreadRealtimeAudioSpy,
     appendThreadRealtimeText: appendThreadRealtimeTextSpy,
     stopThreadRealtime: stopThreadRealtimeSpy,
     startWindowsSandboxSetup: startWindowsSandboxSetupSpy,

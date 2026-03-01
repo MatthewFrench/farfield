@@ -38,6 +38,7 @@ export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   detectExternalAgentConfig: "AppServerExternalAgentConfigDetectResponse",
   importExternalAgentConfig: "AppServerExternalAgentConfigImportResponse",
   startThreadRealtime: "AppServerThreadRealtimeStartResponse",
+  appendThreadRealtimeAudio: "AppServerThreadRealtimeAppendAudioResponse",
   appendThreadRealtimeText: "AppServerThreadRealtimeAppendTextResponse",
   stopThreadRealtime: "AppServerThreadRealtimeStopResponse",
   startWindowsSandboxSetup: "AppServerWindowsSandboxSetupStartResponse",

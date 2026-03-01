@@ -82,6 +82,7 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canDetectExternalAgentConfig: true,
         canImportExternalAgentConfig: true,
         canStartThreadRealtime: true,
+        canAppendThreadRealtimeAudio: true,
         canAppendThreadRealtimeText: true,
         canStopThreadRealtime: true,
         canStartWindowsSandboxSetup: true,

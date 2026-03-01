@@ -19,6 +19,7 @@ import type {
   CapabilityMcpServersResponse,
   CapabilityRemoteSkillsListResponse,
   CapabilitySkillsResponse,
+  CapabilityThreadRealtimeAppendAudioResponse,
   CapabilityThreadRealtimeAppendTextResponse,
   CapabilityThreadRealtimeStartResponse,
   CapabilityThreadRealtimeStopResponse,
@@ -44,6 +45,7 @@ import type {
   DebugAppServerCoverageRemoteSkillSummary,
   DebugAppServerCoverageRequirements,
   DebugAppServerCoverageSkillEntry,
+  DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   DebugAppServerCoverageThreadRealtimeAppendTextResult,
   DebugAppServerCoverageThreadRealtimeStartResult,
   DebugAppServerCoverageThreadRealtimeStopResult,
@@ -250,6 +252,28 @@ export function mapThreadRealtimeAppendTextResult(
   return {
     threadId,
     text,
+    appendedAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapThreadRealtimeAppendAudioResult(
+  _response: CapabilityThreadRealtimeAppendAudioResponse,
+  threadId: string,
+  audio: {
+    data: string;
+    sampleRate: number;
+    numChannels: number;
+    samplesPerChannel?: number;
+  },
+): DebugAppServerCoverageThreadRealtimeAppendAudioResult {
+  return {
+    threadId,
+    audio: {
+      data: audio.data,
+      sampleRate: audio.sampleRate,
+      numChannels: audio.numChannels,
+      samplesPerChannel: audio.samplesPerChannel ?? null,
+    },
     appendedAtIso8601: new Date().toISOString(),
   };
 }

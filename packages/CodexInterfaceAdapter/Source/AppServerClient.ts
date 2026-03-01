@@ -78,6 +78,7 @@ import {
   buildListRemoteSkillsRequestParameters,
 } from "./AppServerClientSkillsRemoteRequestBuilders.js";
 import {
+  buildThreadRealtimeAppendAudioRequestParameters,
   buildThreadRealtimeAppendTextRequestParameters,
   buildThreadRealtimeStartRequestParameters,
   buildThreadRealtimeStopRequestParameters,
@@ -562,6 +563,20 @@ export interface ThreadRealtimeStartOptions {
 
 export interface ThreadRealtimeStartResult {}
 
+export interface ThreadRealtimeAudioChunk {
+  data: string;
+  sampleRate: number;
+  numChannels: number;
+  samplesPerChannel?: number;
+}
+
+export interface ThreadRealtimeAppendAudioOptions {
+  threadId: string;
+  audio: ThreadRealtimeAudioChunk;
+}
+
+export interface ThreadRealtimeAppendAudioResult {}
+
 export interface ThreadRealtimeAppendTextOptions {
   threadId: string;
   text: string;
@@ -971,6 +986,7 @@ const AppServerExternalAgentConfigDetectResponseSchema = z
   .passthrough();
 const AppServerExternalAgentConfigImportResponseSchema = z.object({}).passthrough();
 const AppServerThreadRealtimeStartResponseSchema = z.object({}).passthrough();
+const AppServerThreadRealtimeAppendAudioResponseSchema = z.object({}).passthrough();
 const AppServerThreadRealtimeAppendTextResponseSchema = z.object({}).passthrough();
 const AppServerThreadRealtimeStopResponseSchema = z.object({}).passthrough();
 const AppServerWindowsSandboxSetupStartResponseSchema = z
@@ -1724,6 +1740,21 @@ export class AppServerClient {
       AppServerThreadRealtimeStartResponseSchema,
       result,
       APP_SERVER_CLIENT_RESPONSE_CONTEXTS.startThreadRealtime,
+    );
+    return {};
+  }
+
+  public async appendThreadRealtimeAudio(
+    options: ThreadRealtimeAppendAudioOptions,
+  ): Promise<ThreadRealtimeAppendAudioResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.appendThreadRealtimeAudio,
+      buildThreadRealtimeAppendAudioRequestParameters(options),
+    );
+    parseAppServerResponse(
+      AppServerThreadRealtimeAppendAudioResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.appendThreadRealtimeAudio,
     );
     return {};
   }

@@ -5,7 +5,9 @@ import type {
   DebugAppServerCoverageFeedbackUploadResult,
   DebugAppServerCoverageFuzzyFileSearchResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
+  DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   DebugAppServerCoverageThreadRealtimeAppendTextResult,
+  DebugAppServerCoverageThreadRealtimeAudioChunk,
   DebugAppServerCoverageThreadRealtimeStartResult,
   DebugAppServerCoverageThreadRealtimeStopResult,
   DebugAppServerCoverageWindowsSandboxSetupMode,
@@ -16,11 +18,14 @@ import {
   runFeedbackUploadAction,
   runFuzzyFileSearchAction,
   runGitDiffToRemoteAction,
+} from "./DebugAppServerCoverageMutationActionRunners";
+import {
+  runThreadRealtimeAppendAudioAction,
   runThreadRealtimeAppendTextAction,
   runThreadRealtimeStartAction,
   runThreadRealtimeStopAction,
   runWindowsSandboxSetupStartAction,
-} from "./DebugAppServerCoverageMutationActionRunners";
+} from "./DebugAppServerCoverageRealtimeMutationActionRunners";
 
 export interface UseDebugAppServerCoverageRuntimeMutationActionsInput {
   capabilityServerClient: CapabilityServerClient;
@@ -29,6 +34,9 @@ export interface UseDebugAppServerCoverageRuntimeMutationActionsInput {
   setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
   setLastThreadRealtimeStartResult: Dispatch<
     SetStateAction<DebugAppServerCoverageThreadRealtimeStartResult | null>
+  >;
+  setLastThreadRealtimeAppendAudioResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageThreadRealtimeAppendAudioResult | null>
   >;
   setLastThreadRealtimeAppendTextResult: Dispatch<
     SetStateAction<DebugAppServerCoverageThreadRealtimeAppendTextResult | null>
@@ -55,6 +63,10 @@ export interface UseDebugAppServerCoverageRuntimeMutationActionsInput {
 
 export interface DebugAppServerCoverageRuntimeMutationActions {
   startThreadRealtime: (threadId: string, prompt: string, sessionId?: string) => void;
+  appendThreadRealtimeAudio: (
+    threadId: string,
+    audio: DebugAppServerCoverageThreadRealtimeAudioChunk,
+  ) => void;
   appendThreadRealtimeText: (threadId: string, text: string) => void;
   stopThreadRealtime: (threadId: string) => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
@@ -91,6 +103,34 @@ export function useDebugAppServerCoverageRuntimeMutationActions(
       input.setCoverageActionErrorMessage,
       input.setIsRunningCoverageAction,
       input.setLastThreadRealtimeStartResult,
+    ],
+  );
+
+  const appendThreadRealtimeAudio = useCallback(
+    (threadId: string, audio: DebugAppServerCoverageThreadRealtimeAudioChunk) => {
+      runThreadRealtimeAppendAudioAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction: input.isRunningCoverageAction,
+        threadId,
+        audio: {
+          data: audio.data,
+          sampleRate: audio.sampleRate,
+          numChannels: audio.numChannels,
+          ...(audio.samplesPerChannel !== null
+            ? { samplesPerChannel: audio.samplesPerChannel }
+            : {}),
+        },
+        setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+        setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+        setLastThreadRealtimeAppendAudioResult: input.setLastThreadRealtimeAppendAudioResult,
+      });
+    },
+    [
+      input.capabilityServerClient,
+      input.isRunningCoverageAction,
+      input.setCoverageActionErrorMessage,
+      input.setIsRunningCoverageAction,
+      input.setLastThreadRealtimeAppendAudioResult,
     ],
   );
 
@@ -244,6 +284,7 @@ export function useDebugAppServerCoverageRuntimeMutationActions(
 
   return {
     startThreadRealtime,
+    appendThreadRealtimeAudio,
     appendThreadRealtimeText,
     stopThreadRealtime,
     startWindowsSandboxSetup,

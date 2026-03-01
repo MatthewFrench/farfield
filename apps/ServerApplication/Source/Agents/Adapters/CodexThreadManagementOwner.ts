@@ -43,6 +43,8 @@ import {
   type StartMcpServerOauthLoginResult,
   type StartReviewOptions,
   type StartThreadOptions,
+  type ThreadRealtimeAppendAudioOptions,
+  type ThreadRealtimeAppendAudioResult,
   type ThreadRealtimeAppendTextOptions,
   type ThreadRealtimeAppendTextResult,
   type ThreadRealtimeStartOptions,
@@ -61,6 +63,8 @@ import type {
   AppServerStartThreadResponse,
 } from "@farfield/protocol";
 import type {
+  AgentAppendThreadRealtimeAudioInput,
+  AgentAppendThreadRealtimeAudioResult,
   AgentAppendThreadRealtimeTextInput,
   AgentAppendThreadRealtimeTextResult,
   AgentArchiveThreadInput,
@@ -139,6 +143,7 @@ import {
   buildExternalAgentConfigImportOptions,
   buildFeedbackUploadOptions,
   buildStartMcpServerOauthLoginOptions,
+  buildThreadRealtimeAppendAudioOptions,
   buildThreadRealtimeAppendTextOptions,
   buildThreadRealtimeStartOptions,
   buildThreadRealtimeStopOptions,
@@ -824,6 +829,16 @@ export class CodexThreadManagementOwner {
     this.ensureCodexAvailable();
     const result: ThreadRealtimeAppendTextResult = await this.runAppServerCall(() =>
       this.appClient.appendThreadRealtimeText(buildThreadRealtimeAppendTextOptions(input)),
+    );
+    return result;
+  }
+
+  public async appendThreadRealtimeAudio(
+    input: AgentAppendThreadRealtimeAudioInput,
+  ): Promise<AgentAppendThreadRealtimeAudioResult> {
+    this.ensureCodexAvailable();
+    const result: ThreadRealtimeAppendAudioResult = await this.runAppServerCall(() =>
+      this.appClient.appendThreadRealtimeAudio(buildThreadRealtimeAppendAudioOptions(input)),
     );
     return result;
   }

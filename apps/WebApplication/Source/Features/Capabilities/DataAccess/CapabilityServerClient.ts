@@ -93,12 +93,15 @@ import {
   writeSkillsConfig,
 } from "./CapabilityCoverageMutationApi";
 import {
+  type ApiThreadRealtimeAppendAudioOptions,
+  type ApiThreadRealtimeAppendAudioResponse,
   type ApiThreadRealtimeAppendTextOptions,
   type ApiThreadRealtimeAppendTextResponse,
   type ApiThreadRealtimeStartOptions,
   type ApiThreadRealtimeStartResponse,
   type ApiThreadRealtimeStopOptions,
   type ApiThreadRealtimeStopResponse,
+  appendThreadRealtimeAudio,
   appendThreadRealtimeText,
   startThreadRealtime,
   stopThreadRealtime,
@@ -161,6 +164,8 @@ export type CapabilityExternalAgentConfigImportOptions = ApiExternalAgentConfigI
 export type CapabilityExternalAgentConfigImportResponse = ApiExternalAgentConfigImportResponse;
 export type CapabilityThreadRealtimeStartOptions = ApiThreadRealtimeStartOptions;
 export type CapabilityThreadRealtimeStartResponse = ApiThreadRealtimeStartResponse;
+export type CapabilityThreadRealtimeAppendAudioOptions = ApiThreadRealtimeAppendAudioOptions;
+export type CapabilityThreadRealtimeAppendAudioResponse = ApiThreadRealtimeAppendAudioResponse;
 export type CapabilityThreadRealtimeAppendTextOptions = ApiThreadRealtimeAppendTextOptions;
 export type CapabilityThreadRealtimeAppendTextResponse = ApiThreadRealtimeAppendTextResponse;
 export type CapabilityThreadRealtimeStopOptions = ApiThreadRealtimeStopOptions;
@@ -305,6 +310,12 @@ export class CapabilityServerClient {
     input: CapabilityThreadRealtimeAppendTextOptions,
   ): Promise<CapabilityThreadRealtimeAppendTextResponse> {
     return appendThreadRealtimeText(input);
+  }
+
+  public async appendThreadRealtimeAudio(
+    input: CapabilityThreadRealtimeAppendAudioOptions,
+  ): Promise<CapabilityThreadRealtimeAppendAudioResponse> {
+    return appendThreadRealtimeAudio(input);
   }
 
   public async stopThreadRealtime(

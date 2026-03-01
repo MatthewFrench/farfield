@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/Components/UserInterface/Button";
 import type {
+  DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   DebugAppServerCoverageThreadRealtimeAppendTextResult,
+  DebugAppServerCoverageThreadRealtimeAudioChunk,
   DebugAppServerCoverageThreadRealtimeStartResult,
   DebugAppServerCoverageThreadRealtimeStopResult,
   DebugAppServerCoverageWindowsSandboxSetupMode,
@@ -11,10 +13,15 @@ import type {
 export interface DebugAppServerCoverageRealtimeAndWindowsSectionProps {
   isRunningCoverageAction: boolean;
   lastThreadRealtimeStartResult: DebugAppServerCoverageThreadRealtimeStartResult | null;
+  lastThreadRealtimeAppendAudioResult: DebugAppServerCoverageThreadRealtimeAppendAudioResult | null;
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   onStartThreadRealtime: (threadId: string, prompt: string, sessionId?: string) => void;
+  onAppendThreadRealtimeAudio: (
+    threadId: string,
+    audio: DebugAppServerCoverageThreadRealtimeAudioChunk,
+  ) => void;
   onAppendThreadRealtimeText: (threadId: string, text: string) => void;
   onStopThreadRealtime: (threadId: string) => void;
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
@@ -27,10 +34,12 @@ export interface DebugAppServerCoverageRealtimeAndWindowsSectionProps {
 export function DebugAppServerCoverageRealtimeAndWindowsSection({
   isRunningCoverageAction,
   lastThreadRealtimeStartResult,
+  lastThreadRealtimeAppendAudioResult,
   lastThreadRealtimeAppendTextResult,
   lastThreadRealtimeStopResult,
   lastWindowsSandboxSetupStartResult,
   onStartThreadRealtime,
+  onAppendThreadRealtimeAudio,
   onAppendThreadRealtimeText,
   onStopThreadRealtime,
   onStartWindowsSandboxSetup,
@@ -43,6 +52,11 @@ export function DebugAppServerCoverageRealtimeAndWindowsSection({
   const [threadRealtimeText, setThreadRealtimeText] = useState(
     "Continue with concrete implementation details.",
   );
+  const [threadRealtimeAudioData, setThreadRealtimeAudioData] = useState("base64-audio-chunk");
+  const [threadRealtimeAudioSampleRate, setThreadRealtimeAudioSampleRate] = useState("16000");
+  const [threadRealtimeAudioNumChannels, setThreadRealtimeAudioNumChannels] = useState("1");
+  const [threadRealtimeAudioSamplesPerChannel, setThreadRealtimeAudioSamplesPerChannel] =
+    useState("640");
   const [windowsSandboxMode, setWindowsSandboxMode] =
     useState<DebugAppServerCoverageWindowsSandboxSetupMode>("unelevated");
 
@@ -156,6 +170,73 @@ export function DebugAppServerCoverageRealtimeAndWindowsSection({
         >
           Append Text
         </Button>
+
+        <label
+          className="text-xs text-muted-foreground"
+          htmlFor="debug-coverage-realtime-audio-data"
+        >
+          Append Audio (base64)
+        </label>
+        <textarea
+          id="debug-coverage-realtime-audio-data"
+          value={threadRealtimeAudioData}
+          onChange={(event) => {
+            setThreadRealtimeAudioData(event.target.value);
+          }}
+          className="w-full rounded border border-border bg-background px-2 py-1 text-xs min-h-12"
+          data-testid="debug-coverage-realtime-audio-data-input"
+        />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <input
+            type="number"
+            value={threadRealtimeAudioSampleRate}
+            onChange={(event) => {
+              setThreadRealtimeAudioSampleRate(event.target.value);
+            }}
+            className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+            data-testid="debug-coverage-realtime-audio-sample-rate-input"
+            placeholder="Sample Rate"
+          />
+          <input
+            type="number"
+            value={threadRealtimeAudioNumChannels}
+            onChange={(event) => {
+              setThreadRealtimeAudioNumChannels(event.target.value);
+            }}
+            className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+            data-testid="debug-coverage-realtime-audio-num-channels-input"
+            placeholder="Channels"
+          />
+          <input
+            type="number"
+            value={threadRealtimeAudioSamplesPerChannel}
+            onChange={(event) => {
+              setThreadRealtimeAudioSamplesPerChannel(event.target.value);
+            }}
+            className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+            data-testid="debug-coverage-realtime-audio-samples-per-channel-input"
+            placeholder="Samples/Channel"
+          />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="debug-coverage-thread-realtime-append-audio-run"
+          disabled={isRunningCoverageAction}
+          onClick={() => {
+            const normalizedSamplesPerChannel = threadRealtimeAudioSamplesPerChannel.trim();
+            onAppendThreadRealtimeAudio(threadRealtimeThreadId, {
+              data: threadRealtimeAudioData,
+              sampleRate: Number(threadRealtimeAudioSampleRate),
+              numChannels: Number(threadRealtimeAudioNumChannels),
+              samplesPerChannel:
+                normalizedSamplesPerChannel.length > 0 ? Number(normalizedSamplesPerChannel) : null,
+            });
+          }}
+        >
+          Append Audio
+        </Button>
       </div>
 
       <div className="space-y-1 text-xs">
@@ -163,6 +244,12 @@ export function DebugAppServerCoverageRealtimeAndWindowsSection({
           <p data-testid="debug-coverage-thread-realtime-start-result">
             Realtime started for {lastThreadRealtimeStartResult.threadId} at{" "}
             {new Date(lastThreadRealtimeStartResult.startedAtIso8601).toLocaleTimeString()}
+          </p>
+        )}
+        {lastThreadRealtimeAppendAudioResult !== null && (
+          <p data-testid="debug-coverage-thread-realtime-append-audio-result">
+            Realtime audio appended for {lastThreadRealtimeAppendAudioResult.threadId} at{" "}
+            {new Date(lastThreadRealtimeAppendAudioResult.appendedAtIso8601).toLocaleTimeString()}
           </p>
         )}
         {lastThreadRealtimeAppendTextResult !== null && (

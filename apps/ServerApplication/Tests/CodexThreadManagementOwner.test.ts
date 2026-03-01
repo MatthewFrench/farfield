@@ -51,6 +51,8 @@ import {
   type StartReviewOptions,
   type StartReviewResult,
   type StartThreadOptions,
+  type ThreadRealtimeAppendAudioOptions,
+  type ThreadRealtimeAppendAudioResult,
   type ThreadRealtimeAppendTextOptions,
   type ThreadRealtimeAppendTextResult,
   type ThreadRealtimeStartOptions,
@@ -133,6 +135,7 @@ class TestAppServerClient extends AppServerClient {
   public readonly detectExternalAgentConfigCalls: ExternalAgentConfigDetectOptions[] = [];
   public readonly importExternalAgentConfigCalls: ExternalAgentConfigImportOptions[] = [];
   public readonly startThreadRealtimeCalls: ThreadRealtimeStartOptions[] = [];
+  public readonly appendThreadRealtimeAudioCalls: ThreadRealtimeAppendAudioOptions[] = [];
   public readonly appendThreadRealtimeTextCalls: ThreadRealtimeAppendTextOptions[] = [];
   public readonly stopThreadRealtimeCalls: ThreadRealtimeStopOptions[] = [];
   public readonly startWindowsSandboxSetupCalls: WindowsSandboxSetupStartOptions[] = [];
@@ -171,6 +174,7 @@ class TestAppServerClient extends AppServerClient {
   private readonly detectExternalAgentConfigResult: ExternalAgentConfigDetectResult;
   private readonly importExternalAgentConfigResult: ExternalAgentConfigImportResult;
   private readonly startThreadRealtimeResult: ThreadRealtimeStartResult;
+  private readonly appendThreadRealtimeAudioResult: ThreadRealtimeAppendAudioResult;
   private readonly appendThreadRealtimeTextResult: ThreadRealtimeAppendTextResult;
   private readonly stopThreadRealtimeResult: ThreadRealtimeStopResult;
   private readonly startWindowsSandboxSetupResult: WindowsSandboxSetupStartResult;
@@ -208,6 +212,7 @@ class TestAppServerClient extends AppServerClient {
     detectExternalAgentConfigResult?: ExternalAgentConfigDetectResult;
     importExternalAgentConfigResult?: ExternalAgentConfigImportResult;
     startThreadRealtimeResult?: ThreadRealtimeStartResult;
+    appendThreadRealtimeAudioResult?: ThreadRealtimeAppendAudioResult;
     appendThreadRealtimeTextResult?: ThreadRealtimeAppendTextResult;
     stopThreadRealtimeResult?: ThreadRealtimeStopResult;
     startWindowsSandboxSetupResult?: WindowsSandboxSetupStartResult;
@@ -277,6 +282,7 @@ class TestAppServerClient extends AppServerClient {
     };
     this.importExternalAgentConfigResult = input?.importExternalAgentConfigResult ?? {};
     this.startThreadRealtimeResult = input?.startThreadRealtimeResult ?? {};
+    this.appendThreadRealtimeAudioResult = input?.appendThreadRealtimeAudioResult ?? {};
     this.appendThreadRealtimeTextResult = input?.appendThreadRealtimeTextResult ?? {};
     this.stopThreadRealtimeResult = input?.stopThreadRealtimeResult ?? {};
     this.startWindowsSandboxSetupResult = input?.startWindowsSandboxSetupResult ?? {
@@ -501,6 +507,13 @@ class TestAppServerClient extends AppServerClient {
   ): Promise<ThreadRealtimeAppendTextResult> {
     this.appendThreadRealtimeTextCalls.push(options);
     return this.appendThreadRealtimeTextResult;
+  }
+
+  public override async appendThreadRealtimeAudio(
+    options: ThreadRealtimeAppendAudioOptions,
+  ): Promise<ThreadRealtimeAppendAudioResult> {
+    this.appendThreadRealtimeAudioCalls.push(options);
+    return this.appendThreadRealtimeAudioResult;
   }
 
   public override async stopThreadRealtime(
@@ -1869,6 +1882,34 @@ describe("CodexThreadManagementOwner", () => {
       {
         threadId: "thread-1",
         text: "Continue with implementation details.",
+      },
+    ]);
+    expect(result).toEqual({});
+  });
+
+  it("appends thread realtime audio through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    const result = await owner.appendThreadRealtimeAudio({
+      threadId: "thread-1",
+      audio: {
+        data: "base64-audio-chunk",
+        sampleRate: 16000,
+        numChannels: 1,
+        samplesPerChannel: 640,
+      },
+    });
+
+    expect(appClient.appendThreadRealtimeAudioCalls).toEqual([
+      {
+        threadId: "thread-1",
+        audio: {
+          data: "base64-audio-chunk",
+          sampleRate: 16000,
+          numChannels: 1,
+          samplesPerChannel: 640,
+        },
       },
     ]);
     expect(result).toEqual({});

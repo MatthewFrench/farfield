@@ -1638,6 +1638,35 @@ describe("AppServerClient.startThreadRealtime", () => {
   });
 });
 
+describe("AppServerClient.appendThreadRealtimeAudio", () => {
+  it("sends thread/realtime/appendAudio payload", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.appendThreadRealtimeAudio({
+      threadId: "thread-1",
+      audio: {
+        data: "base64-audio-chunk",
+        sampleRate: 16_000,
+        numChannels: 1,
+        samplesPerChannel: 640,
+      },
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/realtime/appendAudio", {
+      threadId: "thread-1",
+      audio: {
+        data: "base64-audio-chunk",
+        sampleRate: 16_000,
+        numChannels: 1,
+        samplesPerChannel: 640,
+      },
+    });
+    expect(result).toEqual({});
+  });
+});
+
 describe("AppServerClient.appendThreadRealtimeText", () => {
   it("sends thread/realtime/appendText payload", async () => {
     const transportDouble = createTransportDouble();

@@ -12,7 +12,9 @@ import {
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
+  type DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   type DebugAppServerCoverageThreadRealtimeAppendTextResult,
+  type DebugAppServerCoverageThreadRealtimeAudioChunk,
   type DebugAppServerCoverageThreadRealtimeStartResult,
   type DebugAppServerCoverageThreadRealtimeStopResult,
   type DebugAppServerCoverageWindowsSandboxSetupMode,
@@ -40,6 +42,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastExternalAgentConfigDetectResult: DebugAppServerCoverageExternalAgentConfigDetectResult | null;
   lastExternalAgentConfigImportResult: DebugAppServerCoverageExternalAgentConfigImportResult | null;
   lastThreadRealtimeStartResult: DebugAppServerCoverageThreadRealtimeStartResult | null;
+  lastThreadRealtimeAppendAudioResult: DebugAppServerCoverageThreadRealtimeAppendAudioResult | null;
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
@@ -67,6 +70,10 @@ export interface DebugAppServerCoveragePanelProps {
     migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[],
   ) => void;
   onStartThreadRealtime: (threadId: string, prompt: string, sessionId?: string) => void;
+  onAppendThreadRealtimeAudio: (
+    threadId: string,
+    audio: DebugAppServerCoverageThreadRealtimeAudioChunk,
+  ) => void;
   onAppendThreadRealtimeText: (threadId: string, text: string) => void;
   onStopThreadRealtime: (threadId: string) => void;
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
@@ -105,6 +112,7 @@ export function DebugAppServerCoveragePanel({
   lastExternalAgentConfigDetectResult,
   lastExternalAgentConfigImportResult,
   lastThreadRealtimeStartResult,
+  lastThreadRealtimeAppendAudioResult,
   lastThreadRealtimeAppendTextResult,
   lastThreadRealtimeStopResult,
   lastWindowsSandboxSetupStartResult,
@@ -124,6 +132,7 @@ export function DebugAppServerCoveragePanel({
   onDetectExternalAgentConfig,
   onImportExternalAgentConfig,
   onStartThreadRealtime,
+  onAppendThreadRealtimeAudio,
   onAppendThreadRealtimeText,
   onStopThreadRealtime,
   onStartWindowsSandboxSetup,
@@ -545,10 +554,12 @@ export function DebugAppServerCoveragePanel({
           <DebugAppServerCoverageRealtimeAndWindowsSection
             isRunningCoverageAction={isRunningCoverageAction}
             lastThreadRealtimeStartResult={lastThreadRealtimeStartResult}
+            lastThreadRealtimeAppendAudioResult={lastThreadRealtimeAppendAudioResult}
             lastThreadRealtimeAppendTextResult={lastThreadRealtimeAppendTextResult}
             lastThreadRealtimeStopResult={lastThreadRealtimeStopResult}
             lastWindowsSandboxSetupStartResult={lastWindowsSandboxSetupStartResult}
             onStartThreadRealtime={onStartThreadRealtime}
+            onAppendThreadRealtimeAudio={onAppendThreadRealtimeAudio}
             onAppendThreadRealtimeText={onAppendThreadRealtimeText}
             onStopThreadRealtime={onStopThreadRealtime}
             onStartWindowsSandboxSetup={onStartWindowsSandboxSetup}

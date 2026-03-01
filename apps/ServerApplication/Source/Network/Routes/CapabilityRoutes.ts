@@ -70,6 +70,7 @@ const CapabilityRoutePathnameByName = {
   externalAgentConfigDetect: "/api/external-agent-config/detect",
   externalAgentConfigImport: "/api/external-agent-config/import",
   threadRealtimeStart: "/api/threads/realtime/start",
+  threadRealtimeAppendAudio: "/api/threads/realtime/append-audio",
   threadRealtimeAppendText: "/api/threads/realtime/append-text",
   threadRealtimeStop: "/api/threads/realtime/stop",
   windowsSandboxSetupStart: "/api/windows-sandbox/setup-start",
@@ -124,6 +125,10 @@ const CapabilityRouteQueryParameterByName = {
   migrationItems: "migrationItems",
   prompt: "prompt",
   sessionId: "sessionId",
+  audioData: "audioData",
+  audioSampleRate: "audioSampleRate",
+  audioNumChannels: "audioNumChannels",
+  audioSamplesPerChannel: "audioSamplesPerChannel",
   text: "text",
   mode: "mode",
 } as const;
@@ -153,6 +158,7 @@ const CapabilityRouteLogEventByName = {
   externalAgentConfigDetectFailed: "external-agent-config-detect-failed",
   externalAgentConfigImportFailed: "external-agent-config-import-failed",
   threadRealtimeStartFailed: "thread-realtime-start-failed",
+  threadRealtimeAppendAudioFailed: "thread-realtime-append-audio-failed",
   threadRealtimeAppendTextFailed: "thread-realtime-append-text-failed",
   threadRealtimeStopFailed: "thread-realtime-stop-failed",
   windowsSandboxSetupStartFailed: "windows-sandbox-setup-start-failed",
@@ -245,12 +251,23 @@ const CapabilityRouteErrorMessagePrefixByName = {
   failedToImportExternalAgentConfig: "Failed to import external agent config: ",
   missingThreadRealtimeThreadId: "Missing threadId query parameter.",
   missingThreadRealtimePrompt: "Missing prompt query parameter.",
+  missingThreadRealtimeAudioData: "Missing audioData query parameter.",
+  missingThreadRealtimeAudioSampleRate: "Missing audioSampleRate query parameter.",
+  missingThreadRealtimeAudioNumChannels: "Missing audioNumChannels query parameter.",
   missingThreadRealtimeText: "Missing text query parameter.",
   invalidThreadRealtimeThreadId: "Invalid threadId query parameter.",
   invalidThreadRealtimePrompt: "Invalid prompt query parameter.",
+  invalidThreadRealtimeAudioData: "Invalid audioData query parameter.",
+  invalidThreadRealtimeAudioSampleRate:
+    "Invalid audioSampleRate query parameter. Expected positive integer.",
+  invalidThreadRealtimeAudioNumChannels:
+    "Invalid audioNumChannels query parameter. Expected positive integer.",
+  invalidThreadRealtimeAudioSamplesPerChannel:
+    "Invalid audioSamplesPerChannel query parameter. Expected positive integer.",
   invalidThreadRealtimeText: "Invalid text query parameter.",
   invalidThreadRealtimeSessionId: "Invalid sessionId query parameter.",
   failedToStartThreadRealtime: "Failed to start thread realtime: ",
+  failedToAppendThreadRealtimeAudio: "Failed to append thread realtime audio: ",
   failedToAppendThreadRealtimeText: "Failed to append thread realtime text: ",
   failedToStopThreadRealtime: "Failed to stop thread realtime: ",
   missingWindowsSandboxMode: "Missing mode query parameter.",
@@ -287,6 +304,7 @@ const CapabilityRouteTimeoutLabelByName = {
   externalAgentConfigDetect: "external agent config detect",
   externalAgentConfigImport: "external agent config import",
   threadRealtimeStart: "thread realtime start",
+  threadRealtimeAppendAudio: "thread realtime append audio",
   threadRealtimeAppendText: "thread realtime append text",
   threadRealtimeStop: "thread realtime stop",
   windowsSandboxSetupStart: "windows sandbox setup start",
@@ -3316,6 +3334,182 @@ async function handleThreadRealtimeStartRoute(deps: CapabilityRouteDependencies)
   return true;
 }
 
+async function handleThreadRealtimeAppendAudioRoute(
+  deps: CapabilityRouteDependencies,
+): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.threadRealtimeAppendAudio,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const threadIdRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.threadId);
+  if (threadIdRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingThreadRealtimeThreadId,
+    });
+    return true;
+  }
+  const threadId = parseOptionalNonEmptyQueryValue(threadIdRaw);
+  if (threadId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidThreadRealtimeThreadId,
+    });
+    return true;
+  }
+
+  const audioDataRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.audioData);
+  if (audioDataRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingThreadRealtimeAudioData,
+    });
+    return true;
+  }
+  const audioData = parseOptionalNonEmptyQueryValue(audioDataRaw);
+  if (audioData === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidThreadRealtimeAudioData,
+    });
+    return true;
+  }
+
+  const audioSampleRateRaw = url.searchParams.get(
+    CapabilityRouteQueryParameterByName.audioSampleRate,
+  );
+  if (audioSampleRateRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingThreadRealtimeAudioSampleRate,
+    });
+    return true;
+  }
+  const audioSampleRate = parseOptionalPositiveIntegerQueryValue(audioSampleRateRaw);
+  if (audioSampleRate === null || audioSampleRate <= 0) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidThreadRealtimeAudioSampleRate,
+    });
+    return true;
+  }
+
+  const audioNumChannelsRaw = url.searchParams.get(
+    CapabilityRouteQueryParameterByName.audioNumChannels,
+  );
+  if (audioNumChannelsRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingThreadRealtimeAudioNumChannels,
+    });
+    return true;
+  }
+  const audioNumChannels = parseOptionalPositiveIntegerQueryValue(audioNumChannelsRaw);
+  if (audioNumChannels === null || audioNumChannels <= 0) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidThreadRealtimeAudioNumChannels,
+    });
+    return true;
+  }
+
+  const audioSamplesPerChannelRaw = url.searchParams.get(
+    CapabilityRouteQueryParameterByName.audioSamplesPerChannel,
+  );
+  const audioSamplesPerChannel = parseOptionalPositiveIntegerQueryValue(audioSamplesPerChannelRaw);
+  if (
+    audioSamplesPerChannelRaw !== null &&
+    (audioSamplesPerChannel === null || audioSamplesPerChannel <= 0)
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidThreadRealtimeAudioSamplesPerChannel,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canAppendThreadRealtimeAudio ||
+    !adapter.appendThreadRealtimeAudio
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToAppendThreadRealtimeAudio}Thread realtime audio append is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    await withTimeout(
+      adapter.appendThreadRealtimeAudio({
+        threadId,
+        audio: {
+          data: audioData,
+          sampleRate: audioSampleRate,
+          numChannels: audioNumChannels,
+          ...(audioSamplesPerChannel !== null ? { samplesPerChannel: audioSamplesPerChannel } : {}),
+        },
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.threadRealtimeAppendAudio,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapMutationSuccessResponse());
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        threadId,
+        audioDataLength: audioData.length,
+        audioSampleRate,
+        audioNumChannels,
+        audioSamplesPerChannel,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.threadRealtimeAppendAudioFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToAppendThreadRealtimeAudio}${message}`,
+    });
+  }
+
+  return true;
+}
+
 async function handleThreadRealtimeAppendTextRoute(
   deps: CapabilityRouteDependencies,
 ): Promise<boolean> {
@@ -4012,7 +4206,8 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
  * `/api/config/batch/write`, `/api/config/value/write`, `/api/mcp-servers/oauth/login`, `/api/skills/config/write`,
  * `/api/skills/remote/list`, `/api/skills/remote/export`,
  * `/api/external-agent-config/detect`, `/api/external-agent-config/import`,
- * `/api/threads/realtime/start`, `/api/threads/realtime/append-text`, `/api/threads/realtime/stop`,
+ * `/api/threads/realtime/start`, `/api/threads/realtime/append-audio`,
+ * `/api/threads/realtime/append-text`, `/api/threads/realtime/stop`,
  * `/api/windows-sandbox/setup-start`, `/api/models`,
  * `/api/collaboration-modes`, `/api/experimental-features`,
  * `/api/mcp-servers`, `/api/apps`, `/api/skills`)
@@ -4086,6 +4281,9 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleThreadRealtimeStartRoute(deps)) {
+    return true;
+  }
+  if (await handleThreadRealtimeAppendAudioRoute(deps)) {
     return true;
   }
   if (await handleThreadRealtimeAppendTextRoute(deps)) {

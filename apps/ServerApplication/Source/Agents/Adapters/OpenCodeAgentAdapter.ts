@@ -55,6 +55,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
     canDetectExternalAgentConfig: false,
     canImportExternalAgentConfig: false,
     canStartThreadRealtime: false,
+    canAppendThreadRealtimeAudio: false,
     canAppendThreadRealtimeText: false,
     canStopThreadRealtime: false,
     canStartWindowsSandboxSetup: false,

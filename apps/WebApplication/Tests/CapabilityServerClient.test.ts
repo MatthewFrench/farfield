@@ -37,6 +37,17 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageFuzzyFileS
   searchFuzzyFiles: vi.fn(),
 }));
 
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageThreadRealtimeApi", () => ({
+  startThreadRealtime: vi.fn(),
+  appendThreadRealtimeAudio: vi.fn(),
+  appendThreadRealtimeText: vi.fn(),
+  stopThreadRealtime: vi.fn(),
+}));
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageWindowsSandboxApi", () => ({
+  startWindowsSandboxSetup: vi.fn(),
+}));
+
 vi.mock(
   "../Source/Features/Capabilities/DataAccess/CapabilityCoverageExternalAgentConfigApi",
   () => ({
@@ -82,6 +93,13 @@ import {
   writeSkillsConfig,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi";
 import {
+  appendThreadRealtimeAudio,
+  appendThreadRealtimeText,
+  startThreadRealtime,
+  stopThreadRealtime,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageThreadRealtimeApi";
+import { startWindowsSandboxSetup } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageWindowsSandboxApi";
+import {
   type CapabilityAccountAuthStatusResponse,
   type CapabilityAccountLoginCancelResponse,
   type CapabilityAccountLoginStartResponse,
@@ -112,6 +130,11 @@ import {
   CapabilityServerClient,
   type CapabilitySkillsConfigWriteResponse,
   type CapabilitySkillsResponse,
+  type CapabilityThreadRealtimeAppendAudioResponse,
+  type CapabilityThreadRealtimeAppendTextResponse,
+  type CapabilityThreadRealtimeStartResponse,
+  type CapabilityThreadRealtimeStopResponse,
+  type CapabilityWindowsSandboxSetupStartResponse,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
 
 const HEALTH_RESPONSE: CapabilityHealthResponse = {
@@ -156,6 +179,7 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canDetectExternalAgentConfig: true,
         canImportExternalAgentConfig: true,
         canStartThreadRealtime: true,
+        canAppendThreadRealtimeAudio: true,
         canAppendThreadRealtimeText: true,
         canStopThreadRealtime: true,
         canStartWindowsSandboxSetup: true,
@@ -377,6 +401,27 @@ const EXTERNAL_AGENT_CONFIG_IMPORT_RESPONSE: CapabilityExternalAgentConfigImport
   ok: true,
 };
 
+const THREAD_REALTIME_START_RESPONSE: CapabilityThreadRealtimeStartResponse = {
+  ok: true,
+};
+
+const THREAD_REALTIME_APPEND_AUDIO_RESPONSE: CapabilityThreadRealtimeAppendAudioResponse = {
+  ok: true,
+};
+
+const THREAD_REALTIME_APPEND_TEXT_RESPONSE: CapabilityThreadRealtimeAppendTextResponse = {
+  ok: true,
+};
+
+const THREAD_REALTIME_STOP_RESPONSE: CapabilityThreadRealtimeStopResponse = {
+  ok: true,
+};
+
+const WINDOWS_SANDBOX_SETUP_START_RESPONSE: CapabilityWindowsSandboxSetupStartResponse = {
+  ok: true,
+  started: true,
+};
+
 const EXPERIMENTAL_FEATURES_RESPONSE: CapabilityExperimentalFeaturesResponse = {
   ok: true,
   data: [
@@ -473,6 +518,11 @@ describe("CapabilityServerClient", () => {
     vi.mocked(exportRemoteSkill).mockResolvedValue(REMOTE_SKILL_EXPORT_RESPONSE);
     vi.mocked(detectExternalAgentConfig).mockResolvedValue(EXTERNAL_AGENT_CONFIG_DETECT_RESPONSE);
     vi.mocked(importExternalAgentConfig).mockResolvedValue(EXTERNAL_AGENT_CONFIG_IMPORT_RESPONSE);
+    vi.mocked(startThreadRealtime).mockResolvedValue(THREAD_REALTIME_START_RESPONSE);
+    vi.mocked(appendThreadRealtimeAudio).mockResolvedValue(THREAD_REALTIME_APPEND_AUDIO_RESPONSE);
+    vi.mocked(appendThreadRealtimeText).mockResolvedValue(THREAD_REALTIME_APPEND_TEXT_RESPONSE);
+    vi.mocked(stopThreadRealtime).mockResolvedValue(THREAD_REALTIME_STOP_RESPONSE);
+    vi.mocked(startWindowsSandboxSetup).mockResolvedValue(WINDOWS_SANDBOX_SETUP_START_RESPONSE);
     vi.mocked(listExperimentalFeatures).mockResolvedValue(EXPERIMENTAL_FEATURES_RESPONSE);
     vi.mocked(listMcpServers).mockResolvedValue(MCP_SERVERS_RESPONSE);
     vi.mocked(listApps).mockResolvedValue(APPS_RESPONSE);
@@ -645,6 +695,40 @@ describe("CapabilityServerClient", () => {
         },
       ],
     };
+    const threadRealtimeStartOptions = {
+      actionId: "action-thread-realtime-start",
+      actionName: "thread-realtime-start",
+      threadId: "thread-1",
+      prompt: "Summarize repository status.",
+      sessionId: "session-1",
+    };
+    const threadRealtimeAppendAudioOptions = {
+      actionId: "action-thread-realtime-append-audio",
+      actionName: "thread-realtime-append-audio",
+      threadId: "thread-1",
+      audio: {
+        data: "base64-audio-chunk",
+        sampleRate: 16000,
+        numChannels: 1,
+        samplesPerChannel: 640,
+      },
+    };
+    const threadRealtimeAppendTextOptions = {
+      actionId: "action-thread-realtime-append-text",
+      actionName: "thread-realtime-append-text",
+      threadId: "thread-1",
+      text: "Continue with implementation details.",
+    };
+    const threadRealtimeStopOptions = {
+      actionId: "action-thread-realtime-stop",
+      actionName: "thread-realtime-stop",
+      threadId: "thread-1",
+    };
+    const windowsSandboxSetupStartOptions = {
+      actionId: "action-windows-sandbox-setup-start",
+      actionName: "windows-sandbox-setup-start",
+      mode: "elevated" as const,
+    };
     const experimentalFeatureOptions = {
       actionId: "action-experimental-features",
       actionName: "list-experimental-features",
@@ -715,6 +799,19 @@ describe("CapabilityServerClient", () => {
       await capabilityServerClient.detectExternalAgentConfig(externalAgentConfigDetectOptions);
     const externalAgentConfigImportResponse =
       await capabilityServerClient.importExternalAgentConfig(externalAgentConfigImportOptions);
+    const threadRealtimeStartResponse = await capabilityServerClient.startThreadRealtime(
+      threadRealtimeStartOptions,
+    );
+    const threadRealtimeAppendAudioResponse =
+      await capabilityServerClient.appendThreadRealtimeAudio(threadRealtimeAppendAudioOptions);
+    const threadRealtimeAppendTextResponse = await capabilityServerClient.appendThreadRealtimeText(
+      threadRealtimeAppendTextOptions,
+    );
+    const threadRealtimeStopResponse =
+      await capabilityServerClient.stopThreadRealtime(threadRealtimeStopOptions);
+    const windowsSandboxSetupStartResponse = await capabilityServerClient.startWindowsSandboxSetup(
+      windowsSandboxSetupStartOptions,
+    );
     const experimentalFeaturesResponse = await capabilityServerClient.listExperimentalFeatures(
       experimentalFeatureOptions,
     );
@@ -748,6 +845,11 @@ describe("CapabilityServerClient", () => {
     expect(exportRemoteSkill).toHaveBeenCalledWith(exportRemoteSkillOptions);
     expect(detectExternalAgentConfig).toHaveBeenCalledWith(externalAgentConfigDetectOptions);
     expect(importExternalAgentConfig).toHaveBeenCalledWith(externalAgentConfigImportOptions);
+    expect(startThreadRealtime).toHaveBeenCalledWith(threadRealtimeStartOptions);
+    expect(appendThreadRealtimeAudio).toHaveBeenCalledWith(threadRealtimeAppendAudioOptions);
+    expect(appendThreadRealtimeText).toHaveBeenCalledWith(threadRealtimeAppendTextOptions);
+    expect(stopThreadRealtime).toHaveBeenCalledWith(threadRealtimeStopOptions);
+    expect(startWindowsSandboxSetup).toHaveBeenCalledWith(windowsSandboxSetupStartOptions);
     expect(listExperimentalFeatures).toHaveBeenCalledWith(experimentalFeatureOptions);
     expect(listMcpServers).toHaveBeenCalledWith(mcpServerOptions);
     expect(listApps).toHaveBeenCalledWith(appOptions);
@@ -778,6 +880,11 @@ describe("CapabilityServerClient", () => {
     expect(remoteSkillExportResponse).toEqual(REMOTE_SKILL_EXPORT_RESPONSE);
     expect(externalAgentConfigDetectResponse).toEqual(EXTERNAL_AGENT_CONFIG_DETECT_RESPONSE);
     expect(externalAgentConfigImportResponse).toEqual(EXTERNAL_AGENT_CONFIG_IMPORT_RESPONSE);
+    expect(threadRealtimeStartResponse).toEqual(THREAD_REALTIME_START_RESPONSE);
+    expect(threadRealtimeAppendAudioResponse).toEqual(THREAD_REALTIME_APPEND_AUDIO_RESPONSE);
+    expect(threadRealtimeAppendTextResponse).toEqual(THREAD_REALTIME_APPEND_TEXT_RESPONSE);
+    expect(threadRealtimeStopResponse).toEqual(THREAD_REALTIME_STOP_RESPONSE);
+    expect(windowsSandboxSetupStartResponse).toEqual(WINDOWS_SANDBOX_SETUP_START_RESPONSE);
     expect(experimentalFeaturesResponse).toEqual(EXPERIMENTAL_FEATURES_RESPONSE);
     expect(mcpServersResponse).toEqual(MCP_SERVERS_RESPONSE);
     expect(appsResponse).toEqual(APPS_RESPONSE);

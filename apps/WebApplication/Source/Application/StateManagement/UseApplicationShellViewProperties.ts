@@ -149,6 +149,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastExternalAgentConfigDetectResult: DebugWorkspacePaneProps["lastExternalAgentConfigDetectResult"];
   lastExternalAgentConfigImportResult: DebugWorkspacePaneProps["lastExternalAgentConfigImportResult"];
   lastThreadRealtimeStartResult: DebugWorkspacePaneProps["lastThreadRealtimeStartResult"];
+  lastThreadRealtimeAppendAudioResult: DebugWorkspacePaneProps["lastThreadRealtimeAppendAudioResult"];
   lastThreadRealtimeAppendTextResult: DebugWorkspacePaneProps["lastThreadRealtimeAppendTextResult"];
   lastThreadRealtimeStopResult: DebugWorkspacePaneProps["lastThreadRealtimeStopResult"];
   lastWindowsSandboxSetupStartResult: DebugWorkspacePaneProps["lastWindowsSandboxSetupStartResult"];
@@ -174,6 +175,7 @@ export interface UseApplicationShellViewPropertiesInput {
   detectExternalAgentConfig: (includeHome: boolean, cwds: string[]) => void;
   importExternalAgentConfig: DebugWorkspacePaneProps["onImportExternalAgentConfig"];
   startThreadRealtime: DebugWorkspacePaneProps["onStartThreadRealtime"];
+  appendThreadRealtimeAudio: DebugWorkspacePaneProps["onAppendThreadRealtimeAudio"];
   appendThreadRealtimeText: DebugWorkspacePaneProps["onAppendThreadRealtimeText"];
   stopThreadRealtime: DebugWorkspacePaneProps["onStopThreadRealtime"];
   startWindowsSandboxSetup: DebugWorkspacePaneProps["onStartWindowsSandboxSetup"];
@@ -432,6 +434,7 @@ function buildDebugWorkspacePaneProperties(
     lastExternalAgentConfigDetectResult: input.lastExternalAgentConfigDetectResult,
     lastExternalAgentConfigImportResult: input.lastExternalAgentConfigImportResult,
     lastThreadRealtimeStartResult: input.lastThreadRealtimeStartResult,
+    lastThreadRealtimeAppendAudioResult: input.lastThreadRealtimeAppendAudioResult,
     lastThreadRealtimeAppendTextResult: input.lastThreadRealtimeAppendTextResult,
     lastThreadRealtimeStopResult: input.lastThreadRealtimeStopResult,
     lastWindowsSandboxSetupStartResult: input.lastWindowsSandboxSetupStartResult,
@@ -451,6 +454,7 @@ function buildDebugWorkspacePaneProperties(
     onDetectExternalAgentConfig: input.detectExternalAgentConfig,
     onImportExternalAgentConfig: input.importExternalAgentConfig,
     onStartThreadRealtime: input.startThreadRealtime,
+    onAppendThreadRealtimeAudio: input.appendThreadRealtimeAudio,
     onAppendThreadRealtimeText: input.appendThreadRealtimeText,
     onStopThreadRealtime: input.stopThreadRealtime,
     onStartWindowsSandboxSetup: input.startWindowsSandboxSetup,
