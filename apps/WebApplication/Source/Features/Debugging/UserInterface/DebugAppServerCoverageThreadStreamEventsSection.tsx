@@ -13,6 +13,46 @@ export interface DebugAppServerCoverageThreadStreamEventsSectionProps {
 
 const ALL_FRAME_TYPES_FILTER_VALUE = "all";
 
+interface StreamMethodFilterPreset {
+  testIdentifierSuffix: string;
+  label: string;
+  methodQuery: string;
+  frameType: DebugAppServerCoverageThreadStreamEventFrameType | typeof ALL_FRAME_TYPES_FILTER_VALUE;
+}
+
+const STREAM_METHOD_FILTER_PRESETS: readonly StreamMethodFilterPreset[] = [
+  {
+    testIdentifierSuffix: "turn-notifications",
+    label: "Turn Notifications",
+    methodQuery: "turn/",
+    frameType: "broadcast",
+  },
+  {
+    testIdentifierSuffix: "thread-notifications",
+    label: "Thread Notifications",
+    methodQuery: "thread/",
+    frameType: "broadcast",
+  },
+  {
+    testIdentifierSuffix: "item-notifications",
+    label: "Item Notifications",
+    methodQuery: "item/",
+    frameType: "broadcast",
+  },
+  {
+    testIdentifierSuffix: "approval-requests",
+    label: "Approval Requests",
+    methodQuery: "requestApproval",
+    frameType: "request",
+  },
+  {
+    testIdentifierSuffix: "account-events",
+    label: "Account Events",
+    methodQuery: "account/",
+    frameType: "broadcast",
+  },
+];
+
 function parseFrameTypeFilterValue(
   value: string,
   availableFrameTypes: readonly DebugAppServerCoverageThreadStreamEventFrameType[],
@@ -244,6 +284,24 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
             >
               Method filter (optional)
             </label>
+            <div className="flex flex-wrap gap-2">
+              {STREAM_METHOD_FILTER_PRESETS.map((preset) => (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  key={preset.testIdentifierSuffix}
+                  data-testid={`debug-coverage-thread-stream-method-preset-${preset.testIdentifierSuffix}`}
+                  disabled={isRunningCoverageAction}
+                  onClick={() => {
+                    setMethodFilterDraft(preset.methodQuery);
+                    setFrameTypeFilterDraft(preset.frameType);
+                  }}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
             <div className="flex items-center gap-2">
               <input
                 id="debug-coverage-thread-stream-method-filter"

@@ -386,4 +386,85 @@ describe("DebugAppServerCoverageThreadStreamEventsSection", () => {
       });
     }
   });
+
+  it("applies stream method preset filters with frame-type defaults", () => {
+    const readThreadStreamEventsSpy = vi.fn(
+      (_threadId: string, _sinceSequence?: number | null) => {},
+    );
+
+    render(
+      <DebugAppServerCoverageThreadStreamEventsSection
+        isRunningCoverageAction={false}
+        lastThreadStreamEventsResult={{
+          threadId: "thread-stream-presets",
+          sinceSequence: null,
+          ownerClientId: "client-owner",
+          eventCount: 3,
+          nextSequence: 40,
+          firstAvailableSequence: 20,
+          resetRequired: false,
+          methodCounts: [
+            {
+              method: "turn/completed",
+              count: 1,
+            },
+            {
+              method: "turn/start",
+              count: 1,
+            },
+            {
+              method: "item/tool/call",
+              count: 1,
+            },
+          ],
+          events: [
+            {
+              frameType: "broadcast",
+              method: "turn/completed",
+              requestId: null,
+              sourceClientId: "client-codex",
+              sequence: 38,
+              receivedAtMilliseconds: 24_500,
+              preview: '{"event":"turn-completed"}',
+            },
+            {
+              frameType: "request",
+              method: "turn/start",
+              requestId: "request-turn-start",
+              sourceClientId: "client-router",
+              sequence: null,
+              receivedAtMilliseconds: null,
+              preview: '{"request":"turn-start"}',
+            },
+            {
+              frameType: "broadcast",
+              method: "item/tool/call",
+              requestId: null,
+              sourceClientId: "client-codex",
+              sequence: 39,
+              receivedAtMilliseconds: 24_600,
+              preview: '{"event":"item-tool-call"}',
+            },
+          ],
+          readAtIso8601: "2026-03-01T00:00:00.000Z",
+        }}
+        onReadThreadStreamEvents={readThreadStreamEventsSpy}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("debug-coverage-thread-stream-method-preset-turn-notifications"),
+    );
+
+    expect(
+      (screen.getByTestId("debug-coverage-thread-stream-method-filter") as HTMLInputElement).value,
+    ).toBe("turn/");
+    expect(
+      (screen.getByTestId("debug-coverage-thread-stream-frame-type-filter") as HTMLSelectElement)
+        .value,
+    ).toBe("broadcast");
+    expect(screen.getByText("Filtered events: 1 of 3")).toBeDefined();
+    expect(screen.getByText("broadcast • turn/completed")).toBeDefined();
+    expect(screen.queryByText("request • turn/start")).toBeNull();
+  });
 });
