@@ -32,8 +32,10 @@ import { applyRuntimeThreadStatusUpdates } from "./RuntimeThreadStatusStateReduc
 import {
   createInitialThreadSidebarRuntimeSummary,
   readLatestModelRerouteEventForThread,
+  readLatestThreadProgressEventForThread,
   readLatestThreadTokenUsageUpdateForThread,
   readThreadRuntimeModelRerouteSummary,
+  readThreadRuntimeProgressSummary,
   readThreadSidebarAccountSummary,
   readThreadSidebarAppsSummary,
   readThreadSidebarRateLimitSummary,
@@ -409,10 +411,16 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
                     runtimeNotificationProjection.modelRerouteEvents,
                     scheduledRefreshSnapshot.selectedThreadId,
                   );
+                const latestThreadProgressEventForSelectedThread =
+                  readLatestThreadProgressEventForThread(
+                    runtimeNotificationProjection.threadProgressEvents,
+                    scheduledRefreshSnapshot.selectedThreadId,
+                  );
                 if (
                   runtimeNotificationProjection.resetRequired ||
                   latestTokenUsageUpdateForSelectedThread !== null ||
-                  latestModelRerouteEventForSelectedThread !== null
+                  latestModelRerouteEventForSelectedThread !== null ||
+                  latestThreadProgressEventForSelectedThread !== null
                 ) {
                   input.setThreadSidebarRuntimeSummary((previousSummary) => {
                     const nextTokenUsageSummary =
@@ -431,14 +439,24 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
                         : runtimeNotificationProjection.resetRequired
                           ? null
                           : previousSummary.modelReroute;
+                    const nextThreadProgressSummary =
+                      latestThreadProgressEventForSelectedThread !== null
+                        ? readThreadRuntimeProgressSummary(
+                            latestThreadProgressEventForSelectedThread,
+                          )
+                        : runtimeNotificationProjection.resetRequired
+                          ? null
+                          : previousSummary.progress;
                     if (
                       nextTokenUsageSummary === previousSummary.tokenUsage &&
-                      nextModelRerouteSummary === previousSummary.modelReroute
+                      nextModelRerouteSummary === previousSummary.modelReroute &&
+                      nextThreadProgressSummary === previousSummary.progress
                     ) {
                       return previousSummary;
                     }
                     return {
                       ...previousSummary,
+                      progress: nextThreadProgressSummary,
                       tokenUsage: nextTokenUsageSummary,
                       modelReroute: nextModelRerouteSummary,
                     };

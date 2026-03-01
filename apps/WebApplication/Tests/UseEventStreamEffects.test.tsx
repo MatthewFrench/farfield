@@ -244,10 +244,22 @@ function createAccountAndAppNotificationEventsResponse(): CapabilityNotification
   };
 }
 
-function createThreadTokenUsageAndModelRerouteNotificationEventsResponse(): CapabilityNotificationEventsResponse {
+function createThreadProgressTokenUsageAndModelRerouteNotificationEventsResponse(): CapabilityNotificationEventsResponse {
   return {
     ok: true,
     events: [
+      {
+        sequence: 60,
+        method: "thread/started",
+        params: {
+          thread: {
+            id: "thread-1",
+            preview: "Thread one",
+            modelProvider: "openai",
+          },
+        },
+        receivedAtMilliseconds: 2_029,
+      },
       {
         sequence: 61,
         method: "thread/tokenUsage/updated",
@@ -286,8 +298,17 @@ function createThreadTokenUsageAndModelRerouteNotificationEventsResponse(): Capa
         },
         receivedAtMilliseconds: 2_031,
       },
+      {
+        sequence: 63,
+        method: "thread/compacted",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-2",
+        },
+        receivedAtMilliseconds: 2_032,
+      },
     ],
-    nextSequence: 63,
+    nextSequence: 64,
     firstAvailableSequence: 0,
     resetRequired: false,
   };
@@ -678,7 +699,7 @@ describe("useEventStreamEffects", () => {
     expect(setThreadSidebarRuntimeSummary).toHaveBeenCalled();
   });
 
-  it("projects selected-thread token-usage and model-reroute summaries from notification-event reads", async () => {
+  it("projects selected-thread progress token-usage and model-reroute summaries", async () => {
     setDocumentVisibilityState("visible");
 
     const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
@@ -692,7 +713,7 @@ describe("useEventStreamEffects", () => {
     );
     input.setThreadSidebarRuntimeSummary = setThreadSidebarRuntimeSummary;
     vi.spyOn(input.capabilityServerClient, "readNotificationEvents").mockResolvedValue(
-      createThreadTokenUsageAndModelRerouteNotificationEventsResponse(),
+      createThreadProgressTokenUsageAndModelRerouteNotificationEventsResponse(),
     );
 
     render(<Harness input={input} />);
@@ -718,6 +739,7 @@ describe("useEventStreamEffects", () => {
         account: null,
         rateLimits: null,
         apps: null,
+        progress: null,
         tokenUsage: null,
         modelReroute: null,
       }),
@@ -725,6 +747,16 @@ describe("useEventStreamEffects", () => {
       account: null,
       rateLimits: null,
       apps: null,
+      progress: {
+        method: "thread/compacted",
+        threadId: "thread-1",
+        turnId: "turn-2",
+        preview: null,
+        modelProvider: null,
+        sequence: 63,
+        receivedAtMilliseconds: 2_032,
+        refreshedAtMilliseconds: expect.any(Number),
+      },
       tokenUsage: {
         threadId: "thread-1",
         turnId: "turn-1",

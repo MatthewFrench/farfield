@@ -181,6 +181,80 @@ describe("EventStreamRefreshDecisionEngine", () => {
     });
   });
 
+  it("marks runtime-notification projection work when thread-started updates are present", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "chat",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 9,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: "entry-9-started",
+            at: "2026-02-26T00:00:00.000Z",
+            source: "app",
+            direction: "out",
+            payload: {
+              type: "action",
+              action: "thread/started",
+            },
+            meta: {
+              method: "thread/started",
+              threadId: "thread-1",
+            },
+          },
+        },
+      }),
+    });
+
+    expect(decision).toEqual({
+      refreshCore: true,
+      refreshHistory: false,
+      refreshSelectedThread: true,
+      refreshNotificationProjections: true,
+      threadStreamDelta: null,
+    });
+  });
+
+  it("marks runtime-notification projection work when thread-compacted updates are present", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "chat",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 9,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: "entry-9-compacted",
+            at: "2026-02-26T00:00:00.000Z",
+            source: "app",
+            direction: "out",
+            payload: {
+              type: "action",
+              action: "thread/compacted",
+            },
+            meta: {
+              method: "thread/compacted",
+              threadId: "thread-1",
+            },
+          },
+        },
+      }),
+    });
+
+    expect(decision).toEqual({
+      refreshCore: true,
+      refreshHistory: false,
+      refreshSelectedThread: true,
+      refreshNotificationProjections: true,
+      threadStreamDelta: null,
+    });
+  });
+
   it("marks runtime-notification projection work when thread token-usage updates are present", () => {
     const engine = createEngine();
 

@@ -55,6 +55,19 @@ export interface ThreadSidebarTokenUsageSummary {
   refreshedAtMilliseconds: number;
 }
 
+export type ThreadRuntimeProgressMethod = "thread/started" | "thread/compacted";
+
+export interface ThreadRuntimeProgressSummary {
+  method: ThreadRuntimeProgressMethod;
+  threadId: string;
+  turnId: string | null;
+  preview: string | null;
+  modelProvider: string | null;
+  sequence: number;
+  receivedAtMilliseconds: number;
+  refreshedAtMilliseconds: number;
+}
+
 export type ThreadRuntimeModelRerouteReason = "highRiskCyberActivity";
 
 export interface ThreadRuntimeModelRerouteSummary {
@@ -72,6 +85,7 @@ export interface ThreadSidebarRuntimeSummary {
   account: ThreadSidebarAccountSummary | null;
   rateLimits: ThreadSidebarRateLimitSummary | null;
   apps: ThreadSidebarAppsSummary | null;
+  progress: ThreadRuntimeProgressSummary | null;
   tokenUsage: ThreadSidebarTokenUsageSummary | null;
   modelReroute: ThreadRuntimeModelRerouteSummary | null;
 }

@@ -15,9 +15,21 @@ function createNotificationEventsResponse(
 }
 
 describe("RuntimeNotificationProjectionParser", () => {
-  it("projects thread-status and token/model updates plus account-app refresh markers", () => {
+  it("projects thread status/progress/token/model updates plus account-app refresh markers", () => {
     const projection = readRuntimeNotificationProjection(
       createNotificationEventsResponse([
+        {
+          sequence: 100,
+          method: "thread/started",
+          params: {
+            thread: {
+              id: "thread-1",
+              preview: "Thread one",
+              modelProvider: "openai",
+            },
+          },
+          receivedAtMilliseconds: 8_099,
+        },
         {
           sequence: 101,
           method: "thread/status/changed",
@@ -29,6 +41,15 @@ describe("RuntimeNotificationProjectionParser", () => {
             },
           },
           receivedAtMilliseconds: 8_100,
+        },
+        {
+          sequence: 107,
+          method: "thread/compacted",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-2",
+          },
+          receivedAtMilliseconds: 8_106,
         },
         {
           sequence: 102,
@@ -90,8 +111,8 @@ describe("RuntimeNotificationProjectionParser", () => {
     );
 
     expect(projection).toEqual({
-      processedEventCount: 6,
-      relevantEventCount: 6,
+      processedEventCount: 8,
+      relevantEventCount: 8,
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [
@@ -101,6 +122,26 @@ describe("RuntimeNotificationProjectionParser", () => {
           statusType: "active",
           activeFlags: ["waitingOnApproval"],
           receivedAtMilliseconds: 8_100,
+        },
+      ],
+      threadProgressEvents: [
+        {
+          method: "thread/started",
+          sequence: 100,
+          threadId: "thread-1",
+          turnId: null,
+          preview: "Thread one",
+          modelProvider: "openai",
+          receivedAtMilliseconds: 8_099,
+        },
+        {
+          method: "thread/compacted",
+          sequence: 107,
+          threadId: "thread-1",
+          turnId: "turn-2",
+          preview: null,
+          modelProvider: null,
+          receivedAtMilliseconds: 8_106,
         },
       ],
       threadTokenUsageUpdates: [
@@ -171,6 +212,7 @@ describe("RuntimeNotificationProjectionParser", () => {
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [],
+      threadProgressEvents: [],
       threadTokenUsageUpdates: [],
       modelRerouteEvents: [],
       shouldRefreshAccount: false,

@@ -5,11 +5,13 @@ import {
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import {
   type ThreadRuntimeModelRerouteSummary,
+  type ThreadRuntimeProgressSummary,
   type ThreadSidebarRuntimeSummary,
   type ThreadSidebarTokenUsageSummary,
 } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import {
   type RuntimeModelRerouteEvent,
+  type RuntimeThreadProgressEvent,
   type RuntimeThreadTokenUsageUpdate,
 } from "./RuntimeNotificationProjectionParser";
 
@@ -22,6 +24,7 @@ export function createInitialThreadSidebarRuntimeSummary(): ThreadSidebarRuntime
     account: null,
     rateLimits: null,
     apps: null,
+    progress: null,
     tokenUsage: null,
     modelReroute: null,
   };
@@ -114,6 +117,21 @@ export function readThreadRuntimeModelRerouteSummary(
   };
 }
 
+export function readThreadRuntimeProgressSummary(
+  event: RuntimeThreadProgressEvent,
+): ThreadRuntimeProgressSummary {
+  return {
+    method: event.method,
+    threadId: event.threadId,
+    turnId: event.turnId,
+    preview: event.preview,
+    modelProvider: event.modelProvider,
+    sequence: event.sequence,
+    receivedAtMilliseconds: event.receivedAtMilliseconds,
+    refreshedAtMilliseconds: Date.now(),
+  };
+}
+
 export function readLatestThreadTokenUsageUpdateForThread(
   updates: readonly RuntimeThreadTokenUsageUpdate[],
   selectedThreadId: string | null,
@@ -129,6 +147,17 @@ export function readLatestModelRerouteEventForThread(
   events: readonly RuntimeModelRerouteEvent[],
   selectedThreadId: string | null,
 ): RuntimeModelRerouteEvent | null {
+  if (selectedThreadId === null || selectedThreadId.length === 0) {
+    return null;
+  }
+  const matchingEvents = events.filter((event) => event.threadId === selectedThreadId);
+  return matchingEvents.at(-1) ?? null;
+}
+
+export function readLatestThreadProgressEventForThread(
+  events: readonly RuntimeThreadProgressEvent[],
+  selectedThreadId: string | null,
+): RuntimeThreadProgressEvent | null {
   if (selectedThreadId === null || selectedThreadId.length === 0) {
     return null;
   }

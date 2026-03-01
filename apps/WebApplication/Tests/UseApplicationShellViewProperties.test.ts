@@ -229,6 +229,7 @@ function createUseApplicationShellViewPropertiesFixture() {
       account: null,
       rateLimits: null,
       apps: null,
+      progress: null,
       tokenUsage: null,
       modelReroute: null,
     },
@@ -594,6 +595,7 @@ describe("useApplicationShellViewProperties", () => {
         appCount: 3,
         refreshedAtMilliseconds: 1_700_000_000_500,
       },
+      progress: null,
       tokenUsage: null,
       modelReroute: null,
     };
@@ -618,6 +620,7 @@ describe("useApplicationShellViewProperties", () => {
         appCount: 3,
         refreshedAtMilliseconds: 1_700_000_000_500,
       },
+      progress: null,
       tokenUsage: null,
       modelReroute: null,
     });
@@ -629,6 +632,7 @@ describe("useApplicationShellViewProperties", () => {
       account: null,
       rateLimits: null,
       apps: null,
+      progress: null,
       tokenUsage: null,
       modelReroute: {
         threadId: "thread-1",

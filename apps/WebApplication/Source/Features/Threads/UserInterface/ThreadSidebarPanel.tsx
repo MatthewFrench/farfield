@@ -116,7 +116,7 @@ export function ThreadSidebarPanel({
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 -top-3 bottom-0 bg-gradient-to-t from-sidebar from-58% via-sidebar/88 via-80% to-transparent to-100%"
         />
-        <div className="relative z-10 mb-2 grid grid-cols-4 gap-2">
+        <div className="relative z-10 mb-2 grid grid-cols-5 gap-2">
           <div
             data-testid="sidebar-runtime-account-summary"
             className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
@@ -134,6 +134,12 @@ export function ThreadSidebarPanel({
             className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
           >
             {readThreadSidebarAppsSummaryLabel(threadSidebarRuntimeSummary)}
+          </div>
+          <div
+            data-testid="sidebar-runtime-progress-summary"
+            className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
+          >
+            {readThreadSidebarProgressSummaryLabel(threadSidebarRuntimeSummary)}
           </div>
           <div
             data-testid="sidebar-runtime-token-usage-summary"
@@ -268,6 +274,16 @@ function readThreadSidebarAppsSummaryLabel(summary: ThreadSidebarRuntimeSummary)
     return "Apps n/a";
   }
   return `Apps ${String(summary.apps.appCount)}`;
+}
+
+function readThreadSidebarProgressSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {
+  if (summary.progress === null) {
+    return "Progress n/a";
+  }
+  if (summary.progress.method === "thread/started") {
+    return "Progress started";
+  }
+  return "Progress compacted";
 }
 
 function readThreadSidebarTokenUsageSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {

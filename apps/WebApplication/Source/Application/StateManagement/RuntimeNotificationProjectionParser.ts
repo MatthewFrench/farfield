@@ -3,10 +3,13 @@ import { type CapabilityNotificationEventsResponse } from "@/Features/Capabiliti
 import {
   type ThreadRuntimeActiveFlag,
   type ThreadRuntimeModelRerouteReason,
+  type ThreadRuntimeProgressMethod,
   type ThreadRuntimeStatusType,
 } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 
 const THREAD_STATUS_CHANGED_NOTIFICATION_METHOD = "thread/status/changed";
+const THREAD_STARTED_NOTIFICATION_METHOD = "thread/started";
+const THREAD_COMPACTED_NOTIFICATION_METHOD = "thread/compacted";
 const THREAD_TOKEN_USAGE_UPDATED_NOTIFICATION_METHOD = "thread/tokenUsage/updated";
 const MODEL_REROUTED_NOTIFICATION_METHOD = "model/rerouted";
 const ACCOUNT_UPDATED_NOTIFICATION_METHOD = "account/updated";
@@ -79,6 +82,25 @@ const ThreadTokenUsageUpdatedNotificationParametersSchema = z
   })
   .strict();
 
+const ThreadStartedParametersSchema = z
+  .object({
+    thread: z
+      .object({
+        id: z.string().min(1),
+        preview: z.string(),
+        modelProvider: z.string().min(1),
+      })
+      .passthrough(),
+  })
+  .strict();
+
+const ThreadCompactedParametersSchema = z
+  .object({
+    threadId: z.string().min(1),
+    turnId: z.string().min(1),
+  })
+  .strict();
+
 const ModelReroutedNotificationParametersSchema = z
   .object({
     threadId: z.string().min(1),
@@ -107,6 +129,16 @@ export interface RuntimeThreadTokenUsageUpdate {
   receivedAtMilliseconds: number;
 }
 
+export interface RuntimeThreadProgressEvent {
+  method: ThreadRuntimeProgressMethod;
+  sequence: number;
+  threadId: string;
+  turnId: string | null;
+  preview: string | null;
+  modelProvider: string | null;
+  receivedAtMilliseconds: number;
+}
+
 export interface RuntimeModelRerouteEvent {
   sequence: number;
   threadId: string;
@@ -123,6 +155,7 @@ export interface RuntimeNotificationProjectionResult {
   resetRequired: boolean;
   nextSequence: number;
   threadStatusUpdates: RuntimeThreadStatusUpdate[];
+  threadProgressEvents: RuntimeThreadProgressEvent[];
   threadTokenUsageUpdates: RuntimeThreadTokenUsageUpdate[];
   modelRerouteEvents: RuntimeModelRerouteEvent[];
   shouldRefreshAccount: boolean;
@@ -164,6 +197,36 @@ function mapThreadTokenUsageUpdatedEvent(
   };
 }
 
+function mapThreadStartedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeThreadProgressEvent {
+  const parsedParameters = ThreadStartedParametersSchema.parse(event.params);
+  return {
+    method: THREAD_STARTED_NOTIFICATION_METHOD,
+    sequence: event.sequence,
+    threadId: parsedParameters.thread.id,
+    turnId: null,
+    preview: parsedParameters.thread.preview,
+    modelProvider: parsedParameters.thread.modelProvider,
+    receivedAtMilliseconds: event.receivedAtMilliseconds,
+  };
+}
+
+function mapThreadCompactedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeThreadProgressEvent {
+  const parsedParameters = ThreadCompactedParametersSchema.parse(event.params);
+  return {
+    method: THREAD_COMPACTED_NOTIFICATION_METHOD,
+    sequence: event.sequence,
+    threadId: parsedParameters.threadId,
+    turnId: parsedParameters.turnId,
+    preview: null,
+    modelProvider: null,
+    receivedAtMilliseconds: event.receivedAtMilliseconds,
+  };
+}
+
 function mapModelReroutedEvent(
   event: CapabilityNotificationEventsResponse["events"][number],
 ): RuntimeModelRerouteEvent {
@@ -187,6 +250,7 @@ export function readRuntimeNotificationProjection(
   response: CapabilityNotificationEventsResponse,
 ): RuntimeNotificationProjectionResult {
   const threadStatusUpdates: RuntimeThreadStatusUpdate[] = [];
+  const threadProgressEvents: RuntimeThreadProgressEvent[] = [];
   const threadTokenUsageUpdates: RuntimeThreadTokenUsageUpdate[] = [];
   const modelRerouteEvents: RuntimeModelRerouteEvent[] = [];
   let shouldRefreshAccount = false;
@@ -203,6 +267,18 @@ export function readRuntimeNotificationProjection(
 
     if (event.method === THREAD_TOKEN_USAGE_UPDATED_NOTIFICATION_METHOD) {
       threadTokenUsageUpdates.push(mapThreadTokenUsageUpdatedEvent(event));
+      relevantEventCount += 1;
+      continue;
+    }
+
+    if (event.method === THREAD_STARTED_NOTIFICATION_METHOD) {
+      threadProgressEvents.push(mapThreadStartedEvent(event));
+      relevantEventCount += 1;
+      continue;
+    }
+
+    if (event.method === THREAD_COMPACTED_NOTIFICATION_METHOD) {
+      threadProgressEvents.push(mapThreadCompactedEvent(event));
       relevantEventCount += 1;
       continue;
     }
@@ -237,6 +313,7 @@ export function readRuntimeNotificationProjection(
     resetRequired: response.resetRequired,
     nextSequence: response.nextSequence,
     threadStatusUpdates,
+    threadProgressEvents,
     threadTokenUsageUpdates,
     modelRerouteEvents,
     shouldRefreshAccount,

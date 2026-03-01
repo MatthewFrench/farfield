@@ -50,6 +50,7 @@ const BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY: ThreadSidebarRuntimeSummary = {
   account: null,
   rateLimits: null,
   apps: null,
+  progress: null,
   tokenUsage: null,
   modelReroute: null,
 };
@@ -105,6 +106,7 @@ describe("ThreadSidebarPanel", () => {
     expect(screen.getByTestId("sidebar-runtime-account-summary").textContent).toBe("Account n/a");
     expect(screen.getByTestId("sidebar-runtime-rate-limit-summary").textContent).toBe("Usage n/a");
     expect(screen.getByTestId("sidebar-runtime-app-summary").textContent).toBe("Apps n/a");
+    expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe("Progress n/a");
     expect(screen.getByTestId("sidebar-runtime-token-usage-summary").textContent).toBe(
       "Tokens n/a",
     );
@@ -131,6 +133,16 @@ describe("ThreadSidebarPanel", () => {
           appCount: 3,
           refreshedAtMilliseconds: 1_700_000_000_500,
         },
+        progress: {
+          method: "thread/started",
+          threadId: "thread-1",
+          turnId: null,
+          preview: "Thread one",
+          modelProvider: "openai",
+          sequence: 17,
+          receivedAtMilliseconds: 1_700_000_000_550,
+          refreshedAtMilliseconds: 1_700_000_000_560,
+        },
         tokenUsage: {
           threadId: "thread-1",
           turnId: "turn-1",
@@ -151,8 +163,38 @@ describe("ThreadSidebarPanel", () => {
       "Usage 42% · pro",
     );
     expect(screen.getByTestId("sidebar-runtime-app-summary").textContent).toBe("Apps 3");
+    expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe(
+      "Progress started",
+    );
     expect(screen.getByTestId("sidebar-runtime-token-usage-summary").textContent).toBe(
       "Tokens 21%",
+    );
+  });
+
+  it("renders compacted progress label when latest progress event is compaction", () => {
+    renderThreadSidebarPanel({
+      viewport: "desktop",
+      threadSidebarRuntimeSummary: {
+        account: null,
+        rateLimits: null,
+        apps: null,
+        progress: {
+          method: "thread/compacted",
+          threadId: "thread-1",
+          turnId: "turn-3",
+          preview: null,
+          modelProvider: null,
+          sequence: 19,
+          receivedAtMilliseconds: 1_700_000_000_800,
+          refreshedAtMilliseconds: 1_700_000_000_900,
+        },
+        tokenUsage: null,
+        modelReroute: null,
+      },
+    });
+
+    expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe(
+      "Progress compacted",
     );
   });
 
