@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 13:27:00Z
+Last Updated (UTC): 2026-03-01 13:40:00Z
 
 ## Purpose
 
@@ -68,7 +68,7 @@ As of the upstream snapshot above:
 13. Farfield now consumes `error` notifications through dedicated debug coverage diagnostics with strict typed turn-error mapping and retry-state visibility.
 14. Farfield now consumes turn-lifecycle notifications (`turn/started`, `turn/completed`, `turn/plan/updated`, `turn/diff/updated`) through dedicated debug coverage diagnostics with strict typed lifecycle mapping and cursor-safe reads.
 15. Farfield now consumes item-delta notifications (`item/agentMessage/delta`, `item/plan/delta`, `item/reasoning/summaryTextDelta`, `item/reasoning/summaryPartAdded`, `item/reasoning/textDelta`, `item/commandExecution/outputDelta`, `item/commandExecution/terminalInteraction`, `item/fileChange/outputDelta`, `item/mcpToolCall/progress`) through dedicated debug coverage diagnostics with strict typed delta payload mapping and cursor-safe reads.
-16. Farfield now consumes item-lifecycle notifications (`item/started`, `item/completed`) through dedicated debug coverage diagnostics with strict typed item identity mapping and cursor-safe reads.
+16. Farfield now consumes item-lifecycle and raw-response notifications (`item/started`, `item/completed`, `rawResponseItem/completed`) through dedicated debug coverage diagnostics with strict typed item identity mapping and cursor-safe reads.
 17. Farfield now consumes thread-progress notifications (`thread/started`, `thread/compacted`, `thread/tokenUsage/updated`) through dedicated debug coverage diagnostics with strict typed thread/token mapping and cursor-safe reads.
 18. Farfield now consumes thread-realtime notifications (`thread/realtime/started`, `thread/realtime/itemAdded`, `thread/realtime/outputAudio/delta`, `thread/realtime/error`, `thread/realtime/closed`) through dedicated debug coverage diagnostics with strict typed realtime payload mapping and cursor-safe reads.
 19. Farfield now consumes account/app/sandbox update notifications (`account/updated`, `account/rateLimits/updated`, `app/list/updated`, `windowsSandbox/setupCompleted`) through dedicated debug coverage diagnostics with strict typed update-state mapping and cursor-safe reads.

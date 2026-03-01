@@ -10,7 +10,7 @@ export interface DebugAppServerCoverageItemLifecycleNotificationsSectionProps {
 
 /**
  * Owns item-lifecycle notification diagnostics.
- * Operators use this to verify item start/completion sequencing and item identity mapping.
+ * Operators use this to verify item start/completion plus raw-response item identity mapping.
  */
 export function DebugAppServerCoverageItemLifecycleNotificationsSection({
   isRunningCoverageAction,

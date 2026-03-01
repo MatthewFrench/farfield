@@ -1,3 +1,4 @@
+import type { DebugAppServerCoverageItemLifecycleNotificationMethod } from "./DebugAppServerCoverageItemLifecycleContracts";
 import type {
   DebugAppServerCoverageThreadActiveFlag,
   DebugAppServerCoverageThreadStatusType,
@@ -563,10 +564,6 @@ export interface DebugAppServerCoverageItemDeltaNotificationsResult {
   methodCounts: DebugAppServerCoverageItemDeltaNotificationMethodCount[];
   readAtIso8601: string;
 }
-
-export type DebugAppServerCoverageItemLifecycleNotificationMethod =
-  | "item/completed"
-  | "item/started";
 
 export interface DebugAppServerCoverageItemLifecycleNotificationSummary {
   method: DebugAppServerCoverageItemLifecycleNotificationMethod;

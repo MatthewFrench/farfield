@@ -2,14 +2,15 @@ import { type JsonValue } from "@farfield/protocol";
 import { z } from "zod";
 import type { CapabilityNotificationEventsResponse } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import type {
-  DebugAppServerCoverageItemLifecycleNotificationMethod,
   DebugAppServerCoverageItemLifecycleNotificationMethodCount,
   DebugAppServerCoverageItemLifecycleNotificationSummary,
   DebugAppServerCoverageItemLifecycleNotificationsResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
+import type { DebugAppServerCoverageItemLifecycleNotificationMethod } from "../DomainModel/DebugAppServerCoverageItemLifecycleContracts";
 
 const ITEM_STARTED_NOTIFICATION_METHOD = "item/started";
 const ITEM_COMPLETED_NOTIFICATION_METHOD = "item/completed";
+const RAW_RESPONSE_ITEM_COMPLETED_NOTIFICATION_METHOD = "rawResponseItem/completed";
 
 const ItemIdentitySchema = z
   .object({
@@ -42,7 +43,7 @@ function mapMethodCounts(
 
 function mapItemLifecycleEvent(
   event: CapabilityNotificationEventsResponse["events"][number],
-  method: "item/started" | "item/completed",
+  method: "item/started" | "item/completed" | "rawResponseItem/completed",
   params: JsonValue | null,
 ): DebugAppServerCoverageItemLifecycleNotificationSummary {
   const parsedParameters = ItemLifecycleParametersSchema.parse(params);
@@ -70,6 +71,13 @@ export function mapItemLifecycleNotificationsResult(
 
     if (event.method === ITEM_COMPLETED_NOTIFICATION_METHOD) {
       events.push(mapItemLifecycleEvent(event, ITEM_COMPLETED_NOTIFICATION_METHOD, event.params));
+      continue;
+    }
+
+    if (event.method === RAW_RESPONSE_ITEM_COMPLETED_NOTIFICATION_METHOD) {
+      events.push(
+        mapItemLifecycleEvent(event, RAW_RESPONSE_ITEM_COMPLETED_NOTIFICATION_METHOD, event.params),
+      );
     }
   }
 

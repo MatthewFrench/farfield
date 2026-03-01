@@ -540,8 +540,23 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
                 },
                 receivedAtMilliseconds: 17_835,
               },
+              {
+                sequence: 35,
+                method: "rawResponseItem/completed",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turnId: "turn-13",
+                  item: {
+                    id: "raw-response-item-1",
+                    type: "message",
+                    role: "assistant",
+                    content: [],
+                  },
+                },
+                receivedAtMilliseconds: 17_838,
+              },
             ],
-            nextSequence: 35,
+            nextSequence: 36,
             firstAvailableSequence: 3,
             resetRequired: false,
           };
@@ -1873,8 +1888,8 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       });
       expect(latestDiagnostics.current?.lastItemLifecycleNotificationsResult).toEqual({
         sinceSequence: 33,
-        eventCount: 2,
-        nextSequence: 35,
+        eventCount: 3,
+        nextSequence: 36,
         firstAvailableSequence: 3,
         resetRequired: false,
         methodCounts: [
@@ -1884,6 +1899,10 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
           },
           {
             method: "item/started",
+            count: 1,
+          },
+          {
+            method: "rawResponseItem/completed",
             count: 1,
           },
         ],
@@ -1905,6 +1924,15 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             itemId: "item-lifecycle-1",
             itemType: "agentMessage",
             receivedAtMilliseconds: 17_835,
+          },
+          {
+            method: "rawResponseItem/completed",
+            sequence: 35,
+            threadId: "thread-realtime-1",
+            turnId: "turn-13",
+            itemId: "raw-response-item-1",
+            itemType: "message",
+            receivedAtMilliseconds: 17_838,
           },
         ],
         readAtIso8601: expect.any(String),
