@@ -172,6 +172,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const readThreadLifecycleNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readTurnLifecycleNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readItemDeltaNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readItemLifecycleNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readErrorNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const executeCommandSpy = vi.fn(
     (_command: string[], _timeoutMs?: number, _cwd?: string): void => {},
@@ -361,6 +362,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastThreadLifecycleNotificationsResult: null,
     lastTurnLifecycleNotificationsResult: null,
     lastItemDeltaNotificationsResult: null,
+    lastItemLifecycleNotificationsResult: null,
     lastGitDiffToRemoteResult: null,
     lastThreadStreamEventsResult: null,
     lastNotificationEventsResult: null,
@@ -386,6 +388,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     readThreadLifecycleNotifications: readThreadLifecycleNotificationsSpy,
     readTurnLifecycleNotifications: readTurnLifecycleNotificationsSpy,
     readItemDeltaNotifications: readItemDeltaNotificationsSpy,
+    readItemLifecycleNotifications: readItemLifecycleNotificationsSpy,
     readErrorNotifications: readErrorNotificationsSpy,
     executeCommand: executeCommandSpy,
     uploadFeedback: uploadFeedbackSpy,

@@ -555,6 +555,36 @@ export interface DebugAppServerCoverageItemDeltaNotificationsResult {
   readAtIso8601: string;
 }
 
+export type DebugAppServerCoverageItemLifecycleNotificationMethod =
+  | "item/completed"
+  | "item/started";
+
+export interface DebugAppServerCoverageItemLifecycleNotificationSummary {
+  method: DebugAppServerCoverageItemLifecycleNotificationMethod;
+  sequence: number;
+  threadId: string;
+  turnId: string;
+  itemId: string;
+  itemType: string;
+  receivedAtMilliseconds: number;
+}
+
+export interface DebugAppServerCoverageItemLifecycleNotificationMethodCount {
+  method: DebugAppServerCoverageItemLifecycleNotificationMethod;
+  count: number;
+}
+
+export interface DebugAppServerCoverageItemLifecycleNotificationsResult {
+  sinceSequence: number | null;
+  eventCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageItemLifecycleNotificationSummary[];
+  methodCounts: DebugAppServerCoverageItemLifecycleNotificationMethodCount[];
+  readAtIso8601: string;
+}
+
 export interface DebugAppServerCoverageErrorNotificationSummary {
   sequence: number;
   threadId: string;

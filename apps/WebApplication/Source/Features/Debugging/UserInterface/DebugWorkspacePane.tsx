@@ -19,6 +19,7 @@ import {
   type DebugAppServerCoverageFuzzySessionNotificationsResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoverageItemDeltaNotificationsResult,
+  type DebugAppServerCoverageItemLifecycleNotificationsResult,
   type DebugAppServerCoverageModelReroutedEventsResult,
   type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
@@ -122,6 +123,7 @@ export interface DebugWorkspacePaneProps {
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
   lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
   lastItemDeltaNotificationsResult: DebugAppServerCoverageItemDeltaNotificationsResult | null;
+  lastItemLifecycleNotificationsResult: DebugAppServerCoverageItemLifecycleNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -167,6 +169,7 @@ export interface DebugWorkspacePaneProps {
   onReadThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   onReadTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   onReadItemDeltaNotifications: (sinceSequence?: number | null) => void;
+  onReadItemLifecycleNotifications: (sinceSequence?: number | null) => void;
   onReadErrorNotifications: (sinceSequence?: number | null) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
@@ -246,6 +249,7 @@ export function DebugWorkspacePane({
   lastThreadLifecycleNotificationsResult,
   lastTurnLifecycleNotificationsResult,
   lastItemDeltaNotificationsResult,
+  lastItemLifecycleNotificationsResult,
   lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -280,6 +284,7 @@ export function DebugWorkspacePane({
   onReadThreadLifecycleNotifications,
   onReadTurnLifecycleNotifications,
   onReadItemDeltaNotifications,
+  onReadItemLifecycleNotifications,
   onReadErrorNotifications,
   onExecuteCommand,
   onUploadFeedback,
@@ -410,6 +415,7 @@ export function DebugWorkspacePane({
             lastThreadLifecycleNotificationsResult={lastThreadLifecycleNotificationsResult}
             lastTurnLifecycleNotificationsResult={lastTurnLifecycleNotificationsResult}
             lastItemDeltaNotificationsResult={lastItemDeltaNotificationsResult}
+            lastItemLifecycleNotificationsResult={lastItemLifecycleNotificationsResult}
             lastGitDiffToRemoteResult={lastGitDiffToRemoteResult}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
             onStartAccountLogin={onStartAccountLogin}
@@ -444,6 +450,7 @@ export function DebugWorkspacePane({
             onReadThreadLifecycleNotifications={onReadThreadLifecycleNotifications}
             onReadTurnLifecycleNotifications={onReadTurnLifecycleNotifications}
             onReadItemDeltaNotifications={onReadItemDeltaNotifications}
+            onReadItemLifecycleNotifications={onReadItemLifecycleNotifications}
             onReadErrorNotifications={onReadErrorNotifications}
             onExecuteCommand={onExecuteCommand}
             onUploadFeedback={onUploadFeedback}

@@ -17,6 +17,7 @@ import {
   type DebugAppServerCoverageFuzzySessionNotificationsResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoverageItemDeltaNotificationsResult,
+  type DebugAppServerCoverageItemLifecycleNotificationsResult,
   type DebugAppServerCoverageModelReroutedEventsResult,
   type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
@@ -46,6 +47,7 @@ import { DebugAppServerCoverageFuzzyFileSearchSection } from "./DebugAppServerCo
 import { DebugAppServerCoverageFuzzySessionNotificationsSection } from "./DebugAppServerCoverageFuzzySessionNotificationsSection";
 import { DebugAppServerCoverageGitDiffToRemoteSection } from "./DebugAppServerCoverageGitDiffToRemoteSection";
 import { DebugAppServerCoverageItemDeltaNotificationsSection } from "./DebugAppServerCoverageItemDeltaNotificationsSection";
+import { DebugAppServerCoverageItemLifecycleNotificationsSection } from "./DebugAppServerCoverageItemLifecycleNotificationsSection";
 import { DebugAppServerCoverageModelReroutedEventsSection } from "./DebugAppServerCoverageModelReroutedEventsSection";
 import { DebugAppServerCoverageNotificationEventsSection } from "./DebugAppServerCoverageNotificationEventsSection";
 import { DebugAppServerCoveragePendingServerRequestsSection } from "./DebugAppServerCoveragePendingServerRequestsSection";
@@ -90,6 +92,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
   lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
   lastItemDeltaNotificationsResult: DebugAppServerCoverageItemDeltaNotificationsResult | null;
+  lastItemLifecycleNotificationsResult: DebugAppServerCoverageItemLifecycleNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -135,6 +138,7 @@ export interface DebugAppServerCoveragePanelProps {
   onReadThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   onReadTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   onReadItemDeltaNotifications: (sinceSequence?: number | null) => void;
+  onReadItemLifecycleNotifications: (sinceSequence?: number | null) => void;
   onReadErrorNotifications: (sinceSequence?: number | null) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
@@ -190,6 +194,7 @@ export function DebugAppServerCoveragePanel({
   lastThreadLifecycleNotificationsResult,
   lastTurnLifecycleNotificationsResult,
   lastItemDeltaNotificationsResult,
+  lastItemLifecycleNotificationsResult,
   lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -224,6 +229,7 @@ export function DebugAppServerCoveragePanel({
   onReadThreadLifecycleNotifications,
   onReadTurnLifecycleNotifications,
   onReadItemDeltaNotifications,
+  onReadItemLifecycleNotifications,
   onReadErrorNotifications,
   onExecuteCommand,
   onUploadFeedback,
@@ -238,8 +244,8 @@ export function DebugAppServerCoveragePanel({
             diagnostics plus config writes, remote skills import, external-agent config migration,
             realtime thread actions, notification and auth-completion reads, pending-request reads,
             windows sandbox setup actions, git diff reads, command execution, fuzzy file search, and
-            warning, thread-lifecycle, turn-lifecycle, item-delta, and error-notification
-            diagnostics, and feedback upload coverage.
+            warning, thread-lifecycle, turn-lifecycle, item-delta, item-lifecycle, and
+            error-notification diagnostics, and feedback upload coverage.
           </p>
         </div>
         <Button
@@ -743,6 +749,12 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastItemDeltaNotificationsResult={lastItemDeltaNotificationsResult}
             onReadItemDeltaNotifications={onReadItemDeltaNotifications}
+          />
+
+          <DebugAppServerCoverageItemLifecycleNotificationsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastItemLifecycleNotificationsResult={lastItemLifecycleNotificationsResult}
+            onReadItemLifecycleNotifications={onReadItemLifecycleNotifications}
           />
 
           <DebugAppServerCoverageErrorNotificationsSection

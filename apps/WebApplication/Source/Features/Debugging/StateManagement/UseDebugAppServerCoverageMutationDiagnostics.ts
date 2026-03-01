@@ -20,6 +20,7 @@ import type {
   DebugAppServerCoverageFuzzySessionNotificationsResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
   DebugAppServerCoverageItemDeltaNotificationsResult,
+  DebugAppServerCoverageItemLifecycleNotificationsResult,
   DebugAppServerCoverageModelReroutedEventsResult,
   DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingAccountLogin,
@@ -92,6 +93,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
   lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
   lastItemDeltaNotificationsResult: DebugAppServerCoverageItemDeltaNotificationsResult | null;
+  lastItemLifecycleNotificationsResult: DebugAppServerCoverageItemLifecycleNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -129,6 +131,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   readTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   readItemDeltaNotifications: (sinceSequence?: number | null) => void;
+  readItemLifecycleNotifications: (sinceSequence?: number | null) => void;
   readErrorNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
@@ -212,6 +215,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageTurnLifecycleNotificationsResult | null>(null);
   const [lastItemDeltaNotificationsResult, setLastItemDeltaNotificationsResult] =
     useState<DebugAppServerCoverageItemDeltaNotificationsResult | null>(null);
+  const [lastItemLifecycleNotificationsResult, setLastItemLifecycleNotificationsResult] =
+    useState<DebugAppServerCoverageItemLifecycleNotificationsResult | null>(null);
   const [lastGitDiffToRemoteResult, setLastGitDiffToRemoteResult] =
     useState<DebugAppServerCoverageGitDiffToRemoteResult | null>(null);
 
@@ -420,6 +425,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     setLastThreadLifecycleNotificationsResult,
     setLastTurnLifecycleNotificationsResult,
     setLastItemDeltaNotificationsResult,
+    setLastItemLifecycleNotificationsResult,
     setLastErrorNotificationsResult,
     setLastPendingServerRequestsResult,
   });
@@ -459,6 +465,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastThreadLifecycleNotificationsResult,
       lastTurnLifecycleNotificationsResult,
       lastItemDeltaNotificationsResult,
+      lastItemLifecycleNotificationsResult,
       lastGitDiffToRemoteResult,
       startAccountLogin,
       cancelAccountLogin,

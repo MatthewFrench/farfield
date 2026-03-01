@@ -508,6 +508,45 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
           };
         }
 
+        if (input.limit === 380) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 33,
+                method: "item/started",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turnId: "turn-13",
+                  item: {
+                    id: "item-lifecycle-1",
+                    type: "agentMessage",
+                    text: "Initial draft",
+                  },
+                },
+                receivedAtMilliseconds: 17_830,
+              },
+              {
+                sequence: 34,
+                method: "item/completed",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turnId: "turn-13",
+                  item: {
+                    id: "item-lifecycle-1",
+                    type: "agentMessage",
+                    text: "Final draft",
+                  },
+                },
+                receivedAtMilliseconds: 17_835,
+              },
+            ],
+            nextSequence: 35,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 300) {
           return {
             ok: true,
@@ -828,6 +867,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readErrorNotifications(24);
     latestDiagnostics.current?.readTurnLifecycleNotifications(25);
     latestDiagnostics.current?.readItemDeltaNotifications(29);
+    latestDiagnostics.current?.readItemLifecycleNotifications(33);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -997,6 +1037,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 29,
         limit: 360,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 33,
+        limit: 380,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -1554,6 +1599,44 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             detailIndex: null,
             processId: "pty-17",
             receivedAtMilliseconds: 17_825,
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastItemLifecycleNotificationsResult).toEqual({
+        sinceSequence: 33,
+        eventCount: 2,
+        nextSequence: 35,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        methodCounts: [
+          {
+            method: "item/completed",
+            count: 1,
+          },
+          {
+            method: "item/started",
+            count: 1,
+          },
+        ],
+        events: [
+          {
+            method: "item/started",
+            sequence: 33,
+            threadId: "thread-realtime-1",
+            turnId: "turn-13",
+            itemId: "item-lifecycle-1",
+            itemType: "agentMessage",
+            receivedAtMilliseconds: 17_830,
+          },
+          {
+            method: "item/completed",
+            sequence: 34,
+            threadId: "thread-realtime-1",
+            turnId: "turn-13",
+            itemId: "item-lifecycle-1",
+            itemType: "agentMessage",
+            receivedAtMilliseconds: 17_835,
           },
         ],
         readAtIso8601: expect.any(String),

@@ -110,6 +110,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastThreadLifecycleNotificationsResult: null,
   lastTurnLifecycleNotificationsResult: null,
   lastItemDeltaNotificationsResult: null,
+  lastItemLifecycleNotificationsResult: null,
   lastGitDiffToRemoteResult: null,
   onRefreshCoverageDiagnostics: () => {},
   onStartAccountLogin: () => {},
@@ -144,6 +145,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onReadThreadLifecycleNotifications: () => {},
   onReadTurnLifecycleNotifications: () => {},
   onReadItemDeltaNotifications: () => {},
+  onReadItemLifecycleNotifications: () => {},
   onReadErrorNotifications: () => {},
   onExecuteCommand: () => {},
   onUploadFeedback: () => {},
@@ -228,6 +230,7 @@ describe("DebugWorkspacePane", () => {
     expect(screen.getByTestId("debug-coverage-thread-lifecycle-notifications-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-turn-lifecycle-notifications-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-item-delta-notifications-read")).toBeDefined();
+    expect(screen.getByTestId("debug-coverage-item-lifecycle-notifications-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-error-notifications-read")).toBeDefined();
   });
 });

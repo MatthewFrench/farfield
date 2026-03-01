@@ -182,6 +182,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastThreadLifecycleNotificationsResult: DebugWorkspacePaneProps["lastThreadLifecycleNotificationsResult"];
   lastTurnLifecycleNotificationsResult: DebugWorkspacePaneProps["lastTurnLifecycleNotificationsResult"];
   lastItemDeltaNotificationsResult: DebugWorkspacePaneProps["lastItemDeltaNotificationsResult"];
+  lastItemLifecycleNotificationsResult: DebugWorkspacePaneProps["lastItemLifecycleNotificationsResult"];
   lastGitDiffToRemoteResult: DebugWorkspacePaneProps["lastGitDiffToRemoteResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -222,6 +223,7 @@ export interface UseApplicationShellViewPropertiesInput {
   readThreadLifecycleNotifications: DebugWorkspacePaneProps["onReadThreadLifecycleNotifications"];
   readTurnLifecycleNotifications: DebugWorkspacePaneProps["onReadTurnLifecycleNotifications"];
   readItemDeltaNotifications: DebugWorkspacePaneProps["onReadItemDeltaNotifications"];
+  readItemLifecycleNotifications: DebugWorkspacePaneProps["onReadItemLifecycleNotifications"];
   readErrorNotifications: DebugWorkspacePaneProps["onReadErrorNotifications"];
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
@@ -549,6 +551,7 @@ function buildDebugWorkspacePaneProperties(
     lastThreadLifecycleNotificationsResult: input.lastThreadLifecycleNotificationsResult,
     lastTurnLifecycleNotificationsResult: input.lastTurnLifecycleNotificationsResult,
     lastItemDeltaNotificationsResult: input.lastItemDeltaNotificationsResult,
+    lastItemLifecycleNotificationsResult: input.lastItemLifecycleNotificationsResult,
     lastGitDiffToRemoteResult: input.lastGitDiffToRemoteResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
@@ -583,6 +586,7 @@ function buildDebugWorkspacePaneProperties(
     onReadThreadLifecycleNotifications: input.readThreadLifecycleNotifications,
     onReadTurnLifecycleNotifications: input.readTurnLifecycleNotifications,
     onReadItemDeltaNotifications: input.readItemDeltaNotifications,
+    onReadItemLifecycleNotifications: input.readItemLifecycleNotifications,
     onReadErrorNotifications: input.readErrorNotifications,
     onExecuteCommand: input.executeCommand,
     onUploadFeedback: input.uploadFeedback,
@@ -815,6 +819,7 @@ export function useApplicationShellViewProperties(
       input.lastThreadLifecycleNotificationsResult,
       input.lastTurnLifecycleNotificationsResult,
       input.lastItemDeltaNotificationsResult,
+      input.lastItemLifecycleNotificationsResult,
       input.lastGitDiffToRemoteResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
@@ -848,6 +853,7 @@ export function useApplicationShellViewProperties(
       input.readThreadLifecycleNotifications,
       input.readTurnLifecycleNotifications,
       input.readItemDeltaNotifications,
+      input.readItemLifecycleNotifications,
       input.readErrorNotifications,
       input.executeCommand,
       input.uploadFeedback,
