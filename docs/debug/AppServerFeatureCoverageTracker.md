@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 12:15:20Z
+Last Updated (UTC): 2026-03-01 12:42:10Z
 
 ## Purpose
 
@@ -64,7 +64,7 @@ As of the upstream snapshot above:
 9. Farfield now consumes fuzzy-session notifications (`fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`) through dedicated debug coverage diagnostics with strict typed session/result mapping and cursor-safe reads.
 10. Farfield now consumes `model/rerouted` notifications through dedicated debug coverage diagnostics with strict typed reroute mapping and explicit reason visibility.
 11. Farfield now consumes warning notifications (`configWarning`, `deprecationNotice`, `windows/worldWritableWarning`) through dedicated debug coverage diagnostics with strict typed warning payload mapping and cursor-safe reads.
-12. Farfield now consumes thread-lifecycle notifications (`thread/archived`, `thread/unarchived`, `thread/name/updated`) through dedicated debug coverage diagnostics with strict typed lifecycle mapping and thread-filtered reads.
+12. Farfield now consumes thread-lifecycle notifications (`thread/archived`, `thread/unarchived`, `thread/name/updated`, `thread/closed`, `thread/status/changed`) through dedicated debug coverage diagnostics with strict typed lifecycle/state mapping and thread-filtered reads.
 13. Farfield now consumes `error` notifications through dedicated debug coverage diagnostics with strict typed turn-error mapping and retry-state visibility.
 14. Farfield now consumes turn-lifecycle notifications (`turn/started`, `turn/completed`, `turn/plan/updated`, `turn/diff/updated`) through dedicated debug coverage diagnostics with strict typed lifecycle mapping and cursor-safe reads.
 15. Farfield now consumes item-delta notifications (`item/agentMessage/delta`, `item/plan/delta`, `item/reasoning/summaryTextDelta`, `item/reasoning/summaryPartAdded`, `item/reasoning/textDelta`, `item/commandExecution/outputDelta`, `item/commandExecution/terminalInteraction`, `item/fileChange/outputDelta`, `item/mcpToolCall/progress`) through dedicated debug coverage diagnostics with strict typed delta payload mapping and cursor-safe reads.

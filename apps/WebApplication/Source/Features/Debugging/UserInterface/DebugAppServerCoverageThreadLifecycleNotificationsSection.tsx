@@ -10,7 +10,7 @@ export interface DebugAppServerCoverageThreadLifecycleNotificationsSectionProps 
 
 /**
  * Owns thread-lifecycle notification diagnostics.
- * Operators use this to verify archive/unarchive and thread-name update event propagation.
+ * Operators use this to verify archive/unarchive/close, name updates, and status-transition events.
  */
 export function DebugAppServerCoverageThreadLifecycleNotificationsSection({
   isRunningCoverageAction,
@@ -265,7 +265,14 @@ export function DebugAppServerCoverageThreadLifecycleNotificationsSection({
                     {event.method} • threadId={event.threadId}
                   </p>
                   <p className="text-muted-foreground">
-                    Thread name: {event.threadName === null ? "(none)" : event.threadName}
+                    Thread name: {event.threadName === null ? "(none)" : event.threadName} • status=
+                    {event.threadStatusType ?? "(none)"}
+                  </p>
+                  <p className="text-muted-foreground">
+                    activeFlags=
+                    {event.threadActiveFlags.length === 0
+                      ? "(none)"
+                      : event.threadActiveFlags.join(", ")}
                   </p>
                   <p className="text-muted-foreground">
                     Received: {new Date(event.receivedAtMilliseconds).toLocaleTimeString()}

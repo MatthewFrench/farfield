@@ -1,3 +1,8 @@
+import type {
+  DebugAppServerCoverageThreadActiveFlag,
+  DebugAppServerCoverageThreadStatusType,
+} from "./DebugAppServerCoverageThreadLifecycleStatusContracts";
+
 /**
  * Owns typed app-server coverage diagnostics contracts rendered in Debug Workspace.
  */
@@ -447,7 +452,9 @@ export interface DebugAppServerCoverageWarningNotificationsResult {
 
 export type DebugAppServerCoverageThreadLifecycleNotificationMethod =
   | "thread/archived"
+  | "thread/closed"
   | "thread/name/updated"
+  | "thread/status/changed"
   | "thread/unarchived";
 
 export interface DebugAppServerCoverageThreadLifecycleNotificationSummary {
@@ -455,6 +462,8 @@ export interface DebugAppServerCoverageThreadLifecycleNotificationSummary {
   sequence: number;
   threadId: string;
   threadName: string | null;
+  threadStatusType: DebugAppServerCoverageThreadStatusType | null;
+  threadActiveFlags: DebugAppServerCoverageThreadActiveFlag[];
   receivedAtMilliseconds: number;
 }
 

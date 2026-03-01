@@ -39,6 +39,8 @@ describe("DebugAppServerCoverageThreadLifecycleNotificationsSection", () => {
               sequence: 6,
               threadId: "thread-alpha",
               threadName: "Alpha",
+              threadStatusType: null,
+              threadActiveFlags: [],
               receivedAtMilliseconds: 17_200,
             },
             {
@@ -46,6 +48,8 @@ describe("DebugAppServerCoverageThreadLifecycleNotificationsSection", () => {
               sequence: 7,
               threadId: "thread-beta",
               threadName: null,
+              threadStatusType: null,
+              threadActiveFlags: [],
               receivedAtMilliseconds: 17_210,
             },
           ],

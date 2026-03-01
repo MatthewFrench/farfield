@@ -634,8 +634,28 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
                 },
                 receivedAtMilliseconds: 17_770,
               },
+              {
+                sequence: 24,
+                method: "thread/status/changed",
+                params: {
+                  threadId: "thread-realtime-1",
+                  status: {
+                    type: "active",
+                    activeFlags: ["waitingOnApproval"],
+                  },
+                },
+                receivedAtMilliseconds: 17_775,
+              },
+              {
+                sequence: 25,
+                method: "thread/closed",
+                params: {
+                  threadId: "thread-legacy-1",
+                },
+                receivedAtMilliseconds: 17_778,
+              },
             ],
-            nextSequence: 24,
+            nextSequence: 26,
             firstAvailableSequence: 3,
             resetRequired: false,
           };
@@ -1454,8 +1474,8 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       });
       expect(latestDiagnostics.current?.lastThreadLifecycleNotificationsResult).toEqual({
         sinceSequence: 21,
-        eventCount: 3,
-        nextSequence: 24,
+        eventCount: 5,
+        nextSequence: 26,
         firstAvailableSequence: 3,
         resetRequired: false,
         methodCounts: [
@@ -1464,7 +1484,15 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             count: 1,
           },
           {
+            method: "thread/closed",
+            count: 1,
+          },
+          {
             method: "thread/name/updated",
+            count: 1,
+          },
+          {
+            method: "thread/status/changed",
             count: 1,
           },
           {
@@ -1478,6 +1506,8 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             sequence: 21,
             threadId: "thread-realtime-1",
             threadName: "Release Planning",
+            threadStatusType: null,
+            threadActiveFlags: [],
             receivedAtMilliseconds: 17_750,
           },
           {
@@ -1485,6 +1515,8 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             sequence: 22,
             threadId: "thread-legacy-1",
             threadName: null,
+            threadStatusType: null,
+            threadActiveFlags: [],
             receivedAtMilliseconds: 17_760,
           },
           {
@@ -1492,7 +1524,27 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             sequence: 23,
             threadId: "thread-legacy-1",
             threadName: null,
+            threadStatusType: null,
+            threadActiveFlags: [],
             receivedAtMilliseconds: 17_770,
+          },
+          {
+            method: "thread/status/changed",
+            sequence: 24,
+            threadId: "thread-realtime-1",
+            threadName: null,
+            threadStatusType: "active",
+            threadActiveFlags: ["waitingOnApproval"],
+            receivedAtMilliseconds: 17_775,
+          },
+          {
+            method: "thread/closed",
+            sequence: 25,
+            threadId: "thread-legacy-1",
+            threadName: null,
+            threadStatusType: null,
+            threadActiveFlags: [],
+            receivedAtMilliseconds: 17_778,
           },
         ],
         readAtIso8601: expect.any(String),
