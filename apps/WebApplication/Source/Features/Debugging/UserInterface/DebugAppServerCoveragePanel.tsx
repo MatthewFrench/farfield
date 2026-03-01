@@ -21,6 +21,7 @@ import {
   type DebugAppServerCoveragePendingServerRequestsResult,
   type DebugAppServerCoverageServerRequestResolvedEventsResult,
   type DebugAppServerCoverageSnapshot,
+  type DebugAppServerCoverageThreadLifecycleNotificationsResult,
   type DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   type DebugAppServerCoverageThreadRealtimeAppendTextResult,
   type DebugAppServerCoverageThreadRealtimeAudioChunk,
@@ -45,6 +46,7 @@ import { DebugAppServerCoverageNotificationEventsSection } from "./DebugAppServe
 import { DebugAppServerCoveragePendingServerRequestsSection } from "./DebugAppServerCoveragePendingServerRequestsSection";
 import { DebugAppServerCoverageRealtimeAndWindowsSection } from "./DebugAppServerCoverageRealtimeAndWindowsSection";
 import { DebugAppServerCoverageServerRequestResolvedEventsSection } from "./DebugAppServerCoverageServerRequestResolvedEventsSection";
+import { DebugAppServerCoverageThreadLifecycleNotificationsSection } from "./DebugAppServerCoverageThreadLifecycleNotificationsSection";
 import { DebugAppServerCoverageThreadStreamEventsSection } from "./DebugAppServerCoverageThreadStreamEventsSection";
 import { DebugAppServerCoverageWarningNotificationsSection } from "./DebugAppServerCoverageWarningNotificationsSection";
 
@@ -78,6 +80,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastFuzzySessionNotificationsResult: DebugAppServerCoverageFuzzySessionNotificationsResult | null;
   lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
+  lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -120,6 +123,7 @@ export interface DebugAppServerCoveragePanelProps {
   onReadFuzzySessionNotifications: (sinceSequence?: number | null) => void;
   onReadModelReroutedEvents: (sinceSequence?: number | null) => void;
   onReadWarningNotifications: (sinceSequence?: number | null) => void;
+  onReadThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
     classification: string,
@@ -170,6 +174,7 @@ export function DebugAppServerCoveragePanel({
   lastFuzzySessionNotificationsResult,
   lastModelReroutedEventsResult,
   lastWarningNotificationsResult,
+  lastThreadLifecycleNotificationsResult,
   lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -201,6 +206,7 @@ export function DebugAppServerCoveragePanel({
   onReadFuzzySessionNotifications,
   onReadModelReroutedEvents,
   onReadWarningNotifications,
+  onReadThreadLifecycleNotifications,
   onExecuteCommand,
   onUploadFeedback,
 }: DebugAppServerCoveragePanelProps): React.JSX.Element {
@@ -214,7 +220,7 @@ export function DebugAppServerCoveragePanel({
             diagnostics plus config writes, remote skills import, external-agent config migration,
             realtime thread actions, notification and auth-completion reads, pending-request reads,
             windows sandbox setup actions, git diff reads, command execution, fuzzy file search, and
-            warning-notification diagnostics, and feedback upload coverage.
+            warning and thread-lifecycle notification diagnostics, and feedback upload coverage.
           </p>
         </div>
         <Button
@@ -700,6 +706,12 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastWarningNotificationsResult={lastWarningNotificationsResult}
             onReadWarningNotifications={onReadWarningNotifications}
+          />
+
+          <DebugAppServerCoverageThreadLifecycleNotificationsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastThreadLifecycleNotificationsResult={lastThreadLifecycleNotificationsResult}
+            onReadThreadLifecycleNotifications={onReadThreadLifecycleNotifications}
           />
 
           <DebugAppServerCoverageFeedbackUploadSection

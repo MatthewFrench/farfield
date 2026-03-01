@@ -1,9 +1,9 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-03-01 09:36:18Z
+Last Updated (UTC): 2026-03-01 09:52:41Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
-Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session/model-reroute/warning diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`, `model/rerouted`, `configWarning`, `deprecationNotice`, and `windows/worldWritableWarning`; per-method product workflows below remain tracked independently.
+Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session/model-reroute/warning/thread-lifecycle diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`, `model/rerouted`, `configWarning`, `deprecationNotice`, `windows/worldWritableWarning`, `thread/archived`, `thread/unarchived`, and `thread/name/updated`; per-method product workflows below remain tracked independently.
 
 | Method | Surface Type | Current Farfield State | Recommendation | Notes |
 | --- | --- | --- | --- | --- |
@@ -34,10 +34,10 @@ Farfield now exposes raw notification-event cursors in debug coverage diagnostic
 | `rawResponseItem/completed` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `serverRequest/resolved` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated server-request resolved diagnostics surface validates request completion signals and complements pending-request snapshots (`/api/server-requests/pending`). |
 | `sessionConfigured` | server-to-client notification | Not consumed | Do not adopt | Deprecated notification surface. |
-| `thread/archived` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
+| `thread/archived` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated thread-lifecycle diagnostics surface validates archive notifications and thread identifiers. |
 | `thread/closed` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `thread/compacted` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `thread/name/updated` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
+| `thread/name/updated` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated thread-lifecycle diagnostics surface validates thread-name update notifications and nullable names. |
 | `thread/realtime/closed` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `thread/realtime/error` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `thread/realtime/itemAdded` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
@@ -46,7 +46,7 @@ Farfield now exposes raw notification-event cursors in debug coverage diagnostic
 | `thread/started` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `thread/status/changed` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `thread/tokenUsage/updated` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `thread/unarchived` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
+| `thread/unarchived` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated thread-lifecycle diagnostics surface validates unarchive notifications and thread identifiers. |
 | `turn/completed` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `turn/diff/updated` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `turn/plan/updated` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |

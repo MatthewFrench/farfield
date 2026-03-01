@@ -106,6 +106,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastFuzzySessionNotificationsResult: null,
   lastModelReroutedEventsResult: null,
   lastWarningNotificationsResult: null,
+  lastThreadLifecycleNotificationsResult: null,
   lastGitDiffToRemoteResult: null,
   onRefreshCoverageDiagnostics: () => {},
   onStartAccountLogin: () => {},
@@ -137,6 +138,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onReadFuzzySessionNotifications: () => {},
   onReadModelReroutedEvents: () => {},
   onReadWarningNotifications: () => {},
+  onReadThreadLifecycleNotifications: () => {},
   onExecuteCommand: () => {},
   onUploadFeedback: () => {},
 };
@@ -217,5 +219,6 @@ describe("DebugWorkspacePane", () => {
     expect(screen.getByTestId("debug-coverage-fuzzy-session-notifications-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-model-rerouted-events-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-warning-notifications-read")).toBeDefined();
+    expect(screen.getByTestId("debug-coverage-thread-lifecycle-notifications-read")).toBeDefined();
   });
 });

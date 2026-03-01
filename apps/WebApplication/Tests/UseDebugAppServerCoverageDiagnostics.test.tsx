@@ -352,6 +352,42 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     const readNotificationEvents = vi
       .spyOn(capabilityServerClient, "readNotificationEvents")
       .mockImplementation(async (input) => {
+        if (input.limit === 300) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 21,
+                method: "thread/name/updated",
+                params: {
+                  threadId: "thread-realtime-1",
+                  threadName: "Release Planning",
+                },
+                receivedAtMilliseconds: 17_750,
+              },
+              {
+                sequence: 22,
+                method: "thread/archived",
+                params: {
+                  threadId: "thread-legacy-1",
+                },
+                receivedAtMilliseconds: 17_760,
+              },
+              {
+                sequence: 23,
+                method: "thread/unarchived",
+                params: {
+                  threadId: "thread-legacy-1",
+                },
+                receivedAtMilliseconds: 17_770,
+              },
+            ],
+            nextSequence: 24,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 280) {
           return {
             ok: true,
@@ -632,6 +668,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readFuzzySessionNotifications(14);
     latestDiagnostics.current?.readModelReroutedEvents(16);
     latestDiagnostics.current?.readWarningNotifications(18);
+    latestDiagnostics.current?.readThreadLifecycleNotifications(21);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -781,6 +818,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 18,
         limit: 280,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 21,
+        limit: 300,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -1123,6 +1165,51 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             extraCount: 3,
             failedScan: false,
             receivedAtMilliseconds: 17_740,
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastThreadLifecycleNotificationsResult).toEqual({
+        sinceSequence: 21,
+        eventCount: 3,
+        nextSequence: 24,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        methodCounts: [
+          {
+            method: "thread/archived",
+            count: 1,
+          },
+          {
+            method: "thread/name/updated",
+            count: 1,
+          },
+          {
+            method: "thread/unarchived",
+            count: 1,
+          },
+        ],
+        events: [
+          {
+            method: "thread/name/updated",
+            sequence: 21,
+            threadId: "thread-realtime-1",
+            threadName: "Release Planning",
+            receivedAtMilliseconds: 17_750,
+          },
+          {
+            method: "thread/archived",
+            sequence: 22,
+            threadId: "thread-legacy-1",
+            threadName: null,
+            receivedAtMilliseconds: 17_760,
+          },
+          {
+            method: "thread/unarchived",
+            sequence: 23,
+            threadId: "thread-legacy-1",
+            threadName: null,
+            receivedAtMilliseconds: 17_770,
           },
         ],
         readAtIso8601: expect.any(String),

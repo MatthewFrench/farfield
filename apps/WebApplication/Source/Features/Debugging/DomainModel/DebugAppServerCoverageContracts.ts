@@ -445,6 +445,35 @@ export interface DebugAppServerCoverageWarningNotificationsResult {
   readAtIso8601: string;
 }
 
+export type DebugAppServerCoverageThreadLifecycleNotificationMethod =
+  | "thread/archived"
+  | "thread/name/updated"
+  | "thread/unarchived";
+
+export interface DebugAppServerCoverageThreadLifecycleNotificationSummary {
+  method: DebugAppServerCoverageThreadLifecycleNotificationMethod;
+  sequence: number;
+  threadId: string;
+  threadName: string | null;
+  receivedAtMilliseconds: number;
+}
+
+export interface DebugAppServerCoverageThreadLifecycleNotificationMethodCount {
+  method: DebugAppServerCoverageThreadLifecycleNotificationMethod;
+  count: number;
+}
+
+export interface DebugAppServerCoverageThreadLifecycleNotificationsResult {
+  sinceSequence: number | null;
+  eventCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageThreadLifecycleNotificationSummary[];
+  methodCounts: DebugAppServerCoverageThreadLifecycleNotificationMethodCount[];
+  readAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

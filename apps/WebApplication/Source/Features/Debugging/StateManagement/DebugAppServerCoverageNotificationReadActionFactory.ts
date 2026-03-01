@@ -7,6 +7,7 @@ import type {
   DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingServerRequestsResult,
   DebugAppServerCoverageServerRequestResolvedEventsResult,
+  DebugAppServerCoverageThreadLifecycleNotificationsResult,
   DebugAppServerCoverageWarningNotificationsResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import {
@@ -18,6 +19,7 @@ import {
   createReadServerRequestResolvedEventsAction,
   createReadWarningNotificationsAction,
 } from "./DebugAppServerCoverageMutationActionHelpers";
+import { createReadThreadLifecycleNotificationsAction } from "./DebugAppServerCoverageThreadLifecycleNotificationReadAction";
 
 interface NotificationCoverageReadActions {
   readNotificationEvents: (sinceSequence?: number | null) => void;
@@ -26,6 +28,7 @@ interface NotificationCoverageReadActions {
   readFuzzySessionNotifications: (sinceSequence?: number | null) => void;
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
   readWarningNotifications: (sinceSequence?: number | null) => void;
+  readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
 }
 
@@ -51,6 +54,9 @@ interface CreateNotificationCoverageReadActionsInput {
   >;
   setLastWarningNotificationsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageWarningNotificationsResult | null>
+  >;
+  setLastThreadLifecycleNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageThreadLifecycleNotificationsResult | null>
   >;
   setLastPendingServerRequestsResult: Dispatch<
     SetStateAction<DebugAppServerCoveragePendingServerRequestsResult | null>
@@ -95,6 +101,10 @@ export function createNotificationCoverageReadActions(
     readWarningNotifications: createReadWarningNotificationsAction({
       ...sharedActionInput,
       setLastWarningNotificationsResult: input.setLastWarningNotificationsResult,
+    }),
+    readThreadLifecycleNotifications: createReadThreadLifecycleNotificationsAction({
+      ...sharedActionInput,
+      setLastThreadLifecycleNotificationsResult: input.setLastThreadLifecycleNotificationsResult,
     }),
     readPendingServerRequests: createReadPendingServerRequestsAction({
       ...sharedActionInput,

@@ -178,6 +178,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastFuzzySessionNotificationsResult: DebugWorkspacePaneProps["lastFuzzySessionNotificationsResult"];
   lastModelReroutedEventsResult: DebugWorkspacePaneProps["lastModelReroutedEventsResult"];
   lastWarningNotificationsResult: DebugWorkspacePaneProps["lastWarningNotificationsResult"];
+  lastThreadLifecycleNotificationsResult: DebugWorkspacePaneProps["lastThreadLifecycleNotificationsResult"];
   lastGitDiffToRemoteResult: DebugWorkspacePaneProps["lastGitDiffToRemoteResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -215,6 +216,7 @@ export interface UseApplicationShellViewPropertiesInput {
   readFuzzySessionNotifications: DebugWorkspacePaneProps["onReadFuzzySessionNotifications"];
   readModelReroutedEvents: DebugWorkspacePaneProps["onReadModelReroutedEvents"];
   readWarningNotifications: DebugWorkspacePaneProps["onReadWarningNotifications"];
+  readThreadLifecycleNotifications: DebugWorkspacePaneProps["onReadThreadLifecycleNotifications"];
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -537,6 +539,7 @@ function buildDebugWorkspacePaneProperties(
     lastFuzzySessionNotificationsResult: input.lastFuzzySessionNotificationsResult,
     lastModelReroutedEventsResult: input.lastModelReroutedEventsResult,
     lastWarningNotificationsResult: input.lastWarningNotificationsResult,
+    lastThreadLifecycleNotificationsResult: input.lastThreadLifecycleNotificationsResult,
     lastGitDiffToRemoteResult: input.lastGitDiffToRemoteResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
@@ -568,6 +571,7 @@ function buildDebugWorkspacePaneProperties(
     onReadFuzzySessionNotifications: input.readFuzzySessionNotifications,
     onReadModelReroutedEvents: input.readModelReroutedEvents,
     onReadWarningNotifications: input.readWarningNotifications,
+    onReadThreadLifecycleNotifications: input.readThreadLifecycleNotifications,
     onExecuteCommand: input.executeCommand,
     onUploadFeedback: input.uploadFeedback,
   };
@@ -795,6 +799,7 @@ export function useApplicationShellViewProperties(
       input.lastFuzzySessionNotificationsResult,
       input.lastModelReroutedEventsResult,
       input.lastWarningNotificationsResult,
+      input.lastThreadLifecycleNotificationsResult,
       input.lastGitDiffToRemoteResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
@@ -825,6 +830,7 @@ export function useApplicationShellViewProperties(
       input.readFuzzySessionNotifications,
       input.readModelReroutedEvents,
       input.readWarningNotifications,
+      input.readThreadLifecycleNotifications,
       input.executeCommand,
       input.uploadFeedback,
       input.replayHistoryEntryFromDetail,

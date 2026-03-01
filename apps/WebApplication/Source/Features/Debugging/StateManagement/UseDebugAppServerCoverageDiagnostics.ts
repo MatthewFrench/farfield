@@ -33,6 +33,7 @@ import {
   type DebugAppServerCoveragePendingServerRequestsResult,
   type DebugAppServerCoverageServerRequestResolvedEventsResult,
   type DebugAppServerCoverageSnapshot,
+  type DebugAppServerCoverageThreadLifecycleNotificationsResult,
   type DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   type DebugAppServerCoverageThreadRealtimeAppendTextResult,
   type DebugAppServerCoverageThreadRealtimeAudioChunk,
@@ -107,6 +108,7 @@ export interface DebugAppServerCoverageDiagnostics {
   lastFuzzySessionNotificationsResult: DebugAppServerCoverageFuzzySessionNotificationsResult | null;
   lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
+  lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -142,6 +144,7 @@ export interface DebugAppServerCoverageDiagnostics {
   readFuzzySessionNotifications: (sinceSequence?: number | null) => void;
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
   readWarningNotifications: (sinceSequence?: number | null) => void;
+  readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;

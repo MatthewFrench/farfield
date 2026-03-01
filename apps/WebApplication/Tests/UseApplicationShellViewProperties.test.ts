@@ -169,6 +169,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const readFuzzySessionNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readModelReroutedEventsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readWarningNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readThreadLifecycleNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const executeCommandSpy = vi.fn(
     (_command: string[], _timeoutMs?: number, _cwd?: string): void => {},
   );
@@ -353,6 +354,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastFuzzySessionNotificationsResult: null,
     lastModelReroutedEventsResult: null,
     lastWarningNotificationsResult: null,
+    lastThreadLifecycleNotificationsResult: null,
     lastGitDiffToRemoteResult: null,
     lastThreadStreamEventsResult: null,
     lastNotificationEventsResult: null,
@@ -375,6 +377,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     readFuzzySessionNotifications: readFuzzySessionNotificationsSpy,
     readModelReroutedEvents: readModelReroutedEventsSpy,
     readWarningNotifications: readWarningNotificationsSpy,
+    readThreadLifecycleNotifications: readThreadLifecycleNotificationsSpy,
     executeCommand: executeCommandSpy,
     uploadFeedback: uploadFeedbackSpy,
     writeSkillsConfig: writeSkillsConfigSpy,

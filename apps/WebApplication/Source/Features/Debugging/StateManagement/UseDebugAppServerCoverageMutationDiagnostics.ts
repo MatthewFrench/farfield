@@ -23,6 +23,7 @@ import type {
   DebugAppServerCoveragePendingAccountLogin,
   DebugAppServerCoveragePendingServerRequestsResult,
   DebugAppServerCoverageServerRequestResolvedEventsResult,
+  DebugAppServerCoverageThreadLifecycleNotificationsResult,
   DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   DebugAppServerCoverageThreadRealtimeAppendTextResult,
   DebugAppServerCoverageThreadRealtimeAudioChunk,
@@ -102,6 +103,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastFuzzySessionNotificationsResult: DebugAppServerCoverageFuzzySessionNotificationsResult | null;
   lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
+  lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -136,6 +138,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   readFuzzySessionNotifications: (sinceSequence?: number | null) => void;
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
   readWarningNotifications: (sinceSequence?: number | null) => void;
+  readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
@@ -251,6 +254,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageModelReroutedEventsResult | null>(null);
   const [lastWarningNotificationsResult, setLastWarningNotificationsResult] =
     useState<DebugAppServerCoverageWarningNotificationsResult | null>(null);
+  const [lastThreadLifecycleNotificationsResult, setLastThreadLifecycleNotificationsResult] =
+    useState<DebugAppServerCoverageThreadLifecycleNotificationsResult | null>(null);
   const [lastGitDiffToRemoteResult, setLastGitDiffToRemoteResult] =
     useState<DebugAppServerCoverageGitDiffToRemoteResult | null>(null);
 
@@ -477,6 +482,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     setLastFuzzySessionNotificationsResult,
     setLastModelReroutedEventsResult,
     setLastWarningNotificationsResult,
+    setLastThreadLifecycleNotificationsResult,
     setLastPendingServerRequestsResult,
   });
 
@@ -511,6 +517,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastFuzzySessionNotificationsResult,
       lastModelReroutedEventsResult,
       lastWarningNotificationsResult,
+      lastThreadLifecycleNotificationsResult,
       lastGitDiffToRemoteResult,
       startAccountLogin,
       cancelAccountLogin,
