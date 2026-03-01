@@ -629,6 +629,46 @@ describe("useEventStreamEffects", () => {
     expect(setThreadSidebarRuntimeSummary).toHaveBeenCalled();
   });
 
+  it("hydrates sidebar runtime summary on mount when capability reads are enabled", async () => {
+    setDocumentVisibilityState("visible");
+
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    input.canReadAccount = true;
+    input.canReadAccountRateLimits = true;
+    input.canListApps = true;
+    const readAccount = vi
+      .spyOn(input.capabilityServerClient, "readAccount")
+      .mockResolvedValue(createAccountResponse());
+    const readAccountRateLimits = vi
+      .spyOn(input.capabilityServerClient, "readAccountRateLimits")
+      .mockResolvedValue(createAccountRateLimitsResponse());
+    const listApps = vi
+      .spyOn(input.capabilityServerClient, "listApps")
+      .mockResolvedValue(createAppsResponse());
+
+    render(<Harness input={input} />);
+
+    await waitFor(() => {
+      expect(readAccount).toHaveBeenCalledTimes(1);
+      expect(readAccountRateLimits).toHaveBeenCalledTimes(1);
+      expect(listApps).toHaveBeenCalledTimes(1);
+    });
+
+    expect(readAccount).toHaveBeenCalledWith({
+      agentId: "codex",
+    });
+    expect(readAccountRateLimits).toHaveBeenCalledWith({
+      agentId: "codex",
+    });
+    expect(listApps).toHaveBeenCalledWith({
+      limit: 100,
+    });
+  });
+
   it("suppresses canceled-request errors from runtime error reporting", async () => {
     setDocumentVisibilityState("visible");
 

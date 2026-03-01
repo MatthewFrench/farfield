@@ -38,6 +38,7 @@ const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
 const DEBUG_APPLICATION_TAB = "debug";
 const NOTIFICATION_EVENTS_REFRESH_LIMIT = 80;
 const SIDEBAR_APPS_LIST_LIMIT = 100;
+const SIDEBAR_RUNTIME_SUMMARY_REFRESH_OPERATION = "refresh-sidebar-runtime-summary";
 const SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS: SelectedThreadLoaderOptions = {
   includeReadThread: true,
   includeTurns: false,
@@ -156,6 +157,76 @@ function readThreadSidebarAppsSummary(
   };
 }
 
+interface RefreshThreadSidebarRuntimeSummaryInput {
+  selectedAgentId: AgentId;
+  canReadAccount: boolean;
+  canReadAccountRateLimits: boolean;
+  canListApps: boolean;
+  capabilityServerClient: CapabilityServerClient;
+  setThreadSidebarRuntimeSummary: Dispatch<SetStateAction<ThreadSidebarRuntimeSummary>>;
+  shouldCancel: () => boolean;
+}
+
+async function refreshThreadSidebarRuntimeSummary(
+  input: RefreshThreadSidebarRuntimeSummaryInput,
+): Promise<void> {
+  const refreshOperations: Promise<void>[] = [];
+
+  if (input.canReadAccount) {
+    const refreshAccountSummary = async (): Promise<void> => {
+      const accountResponse = await input.capabilityServerClient.readAccount({
+        agentId: input.selectedAgentId,
+      });
+      if (input.shouldCancel()) {
+        return;
+      }
+      input.setThreadSidebarRuntimeSummary((previousSummary) => ({
+        ...previousSummary,
+        account: readThreadSidebarAccountSummary(accountResponse),
+      }));
+    };
+    refreshOperations.push(refreshAccountSummary());
+  }
+
+  if (input.canReadAccountRateLimits) {
+    const refreshRateLimitsSummary = async (): Promise<void> => {
+      const rateLimitsResponse = await input.capabilityServerClient.readAccountRateLimits({
+        agentId: input.selectedAgentId,
+      });
+      if (input.shouldCancel()) {
+        return;
+      }
+      input.setThreadSidebarRuntimeSummary((previousSummary) => ({
+        ...previousSummary,
+        rateLimits: readThreadSidebarRateLimitSummary(rateLimitsResponse),
+      }));
+    };
+    refreshOperations.push(refreshRateLimitsSummary());
+  }
+
+  if (input.canListApps) {
+    const refreshAppsSummary = async (): Promise<void> => {
+      const appsResponse = await input.capabilityServerClient.listApps({
+        limit: SIDEBAR_APPS_LIST_LIMIT,
+      });
+      if (input.shouldCancel()) {
+        return;
+      }
+      input.setThreadSidebarRuntimeSummary((previousSummary) => ({
+        ...previousSummary,
+        apps: readThreadSidebarAppsSummary(appsResponse),
+      }));
+    };
+    refreshOperations.push(refreshAppsSummary());
+  }
+
+  if (refreshOperations.length === 0) {
+    return;
+  }
+
+  await Promise.all(refreshOperations);
+}
+
 export interface UseEventStreamEffectsInput {
   debugHistoryLimit: number;
   debugErrorListLimit: number;
@@ -212,6 +283,48 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
     input.selectedAgentId,
     input.setThreadRuntimeStatusByThreadIdentifier,
     input.setThreadSidebarRuntimeSummary,
+  ]);
+
+  useEffect(() => {
+    let shouldCancelRefresh = false;
+
+    const hydrateThreadSidebarRuntimeSummary = async (): Promise<void> => {
+      try {
+        await refreshThreadSidebarRuntimeSummary({
+          selectedAgentId: input.selectedAgentId,
+          canReadAccount: input.canReadAccount,
+          canReadAccountRateLimits: input.canReadAccountRateLimits,
+          canListApps: input.canListApps,
+          capabilityServerClient: input.capabilityServerClient,
+          setThreadSidebarRuntimeSummary: input.setThreadSidebarRuntimeSummary,
+          shouldCancel: () => shouldCancelRefresh,
+        });
+      } catch (error) {
+        if (shouldCancelRefresh) {
+          return;
+        }
+        if (error instanceof Error && isRequestCanceledError(error)) {
+          return;
+        }
+        input.handleRuntimeRequestError({
+          operation: SIDEBAR_RUNTIME_SUMMARY_REFRESH_OPERATION,
+          error,
+        });
+      }
+    };
+
+    void hydrateThreadSidebarRuntimeSummary();
+    return () => {
+      shouldCancelRefresh = true;
+    };
+  }, [
+    input.selectedAgentId,
+    input.canReadAccount,
+    input.canReadAccountRateLimits,
+    input.canListApps,
+    input.capabilityServerClient,
+    input.setThreadSidebarRuntimeSummary,
+    input.handleRuntimeRequestError,
   ]);
 
   useEffect(() => {
