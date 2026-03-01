@@ -92,6 +92,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastThreadRealtimeAppendAudioResult: null,
   lastThreadRealtimeAppendTextResult: null,
   lastThreadRealtimeStopResult: null,
+  lastThreadStreamEventsResult: null,
   lastWindowsSandboxSetupStartResult: null,
   lastFeedbackUploadResult: null,
   lastFuzzyFileSearchResult: null,
@@ -115,6 +116,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onAppendThreadRealtimeAudio: () => {},
   onAppendThreadRealtimeText: () => {},
   onStopThreadRealtime: () => {},
+  onReadThreadStreamEvents: () => {},
   onStartWindowsSandboxSetup: () => {},
   onReadGitDiffToRemote: () => {},
   onSearchFuzzyFiles: () => {},
@@ -195,5 +197,6 @@ describe("DebugWorkspacePane", () => {
     expect(screen.getByTestId("debug-coverage-panel")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-feedback-upload-run")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-fuzzy-session-start-run")).toBeDefined();
+    expect(screen.getByTestId("debug-coverage-thread-stream-read")).toBeDefined();
   });
 });

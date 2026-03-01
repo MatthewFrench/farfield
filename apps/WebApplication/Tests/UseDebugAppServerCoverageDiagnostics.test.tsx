@@ -327,6 +327,28 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       ok: true,
       threadId: "thread-coverage-feedback",
     });
+    const readThreadStreamEvents = vi
+      .spyOn(capabilityServerClient, "readThreadStreamEvents")
+      .mockResolvedValue({
+        ok: true,
+        threadId: "thread-realtime-1",
+        ownerClientId: "client-coverage",
+        events: [
+          {
+            type: "broadcast",
+            method: "turn/completed",
+            sourceClientId: "client-codex",
+            params: {
+              sequence: 7,
+              receivedAtMilliseconds: 17_200,
+              note: "done",
+            },
+          },
+        ],
+        nextSequence: 8,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+      });
 
     const latestDiagnostics: { current: DebugAppServerCoverageDiagnostics | null } = {
       current: null,
@@ -407,6 +429,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       "Continue with implementation details.",
     );
     latestDiagnostics.current?.stopThreadRealtime("thread-realtime-1");
+    latestDiagnostics.current?.readThreadStreamEvents("thread-realtime-1", 7);
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
       "quality",
@@ -521,6 +544,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       expect(stopThreadRealtime).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
         threadId: "thread-realtime-1",
+      });
+      expect(readThreadStreamEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        threadId: "thread-realtime-1",
+        sinceSequence: 7,
       });
       expect(startWindowsSandboxSetup).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -650,6 +678,27 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       expect(latestDiagnostics.current?.lastThreadRealtimeStopResult).toEqual({
         threadId: "thread-realtime-1",
         stoppedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastThreadStreamEventsResult).toEqual({
+        threadId: "thread-realtime-1",
+        sinceSequence: 7,
+        ownerClientId: "client-coverage",
+        eventCount: 1,
+        nextSequence: 8,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        events: [
+          {
+            frameType: "broadcast",
+            method: "turn/completed",
+            requestId: null,
+            sourceClientId: "client-codex",
+            sequence: 7,
+            receivedAtMilliseconds: 17_200,
+            preview: expect.stringContaining('"note": "done"'),
+          },
+        ],
+        readAtIso8601: expect.any(String),
       });
       expect(latestDiagnostics.current?.lastWindowsSandboxSetupStartResult).toEqual({
         mode: "unelevated",

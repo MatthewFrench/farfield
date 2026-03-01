@@ -208,6 +208,35 @@ export interface DebugAppServerCoverageFuzzyFileSearchSessionStopResult {
   stoppedAtIso8601: string;
 }
 
+export type DebugAppServerCoverageThreadStreamEventFrameType =
+  | "request"
+  | "response"
+  | "broadcast"
+  | "client-discovery-request"
+  | "client-discovery-response";
+
+export interface DebugAppServerCoverageThreadStreamEventSummary {
+  frameType: DebugAppServerCoverageThreadStreamEventFrameType;
+  method: string | null;
+  requestId: string | null;
+  sourceClientId: string | null;
+  sequence: number | null;
+  receivedAtMilliseconds: number | null;
+  preview: string;
+}
+
+export interface DebugAppServerCoverageThreadStreamEventsResult {
+  threadId: string;
+  sinceSequence: number | null;
+  ownerClientId: string | null;
+  eventCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageThreadStreamEventSummary[];
+  readAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

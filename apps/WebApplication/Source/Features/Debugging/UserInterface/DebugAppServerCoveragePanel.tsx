@@ -20,6 +20,7 @@ import {
   type DebugAppServerCoverageThreadRealtimeAudioChunk,
   type DebugAppServerCoverageThreadRealtimeStartResult,
   type DebugAppServerCoverageThreadRealtimeStopResult,
+  type DebugAppServerCoverageThreadStreamEventsResult,
   type DebugAppServerCoverageWindowsSandboxSetupMode,
   type DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
@@ -31,6 +32,7 @@ import { DebugAppServerCoverageFeedbackUploadSection } from "./DebugAppServerCov
 import { DebugAppServerCoverageFuzzyFileSearchSection } from "./DebugAppServerCoverageFuzzyFileSearchSection";
 import { DebugAppServerCoverageGitDiffToRemoteSection } from "./DebugAppServerCoverageGitDiffToRemoteSection";
 import { DebugAppServerCoverageRealtimeAndWindowsSection } from "./DebugAppServerCoverageRealtimeAndWindowsSection";
+import { DebugAppServerCoverageThreadStreamEventsSection } from "./DebugAppServerCoverageThreadStreamEventsSection";
 
 export interface DebugAppServerCoveragePanelProps {
   isLoadingCoverageDiagnostics: boolean;
@@ -48,6 +50,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastThreadRealtimeAppendAudioResult: DebugAppServerCoverageThreadRealtimeAppendAudioResult | null;
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
+  lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
@@ -82,6 +85,7 @@ export interface DebugAppServerCoveragePanelProps {
   ) => void;
   onAppendThreadRealtimeText: (threadId: string, text: string) => void;
   onStopThreadRealtime: (threadId: string) => void;
+  onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
   onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
@@ -124,6 +128,7 @@ export function DebugAppServerCoveragePanel({
   lastThreadRealtimeAppendAudioResult,
   lastThreadRealtimeAppendTextResult,
   lastThreadRealtimeStopResult,
+  lastThreadStreamEventsResult,
   lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
@@ -147,6 +152,7 @@ export function DebugAppServerCoveragePanel({
   onAppendThreadRealtimeAudio,
   onAppendThreadRealtimeText,
   onStopThreadRealtime,
+  onReadThreadStreamEvents,
   onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
   onSearchFuzzyFiles,
@@ -578,6 +584,12 @@ export function DebugAppServerCoveragePanel({
             onAppendThreadRealtimeText={onAppendThreadRealtimeText}
             onStopThreadRealtime={onStopThreadRealtime}
             onStartWindowsSandboxSetup={onStartWindowsSandboxSetup}
+          />
+
+          <DebugAppServerCoverageThreadStreamEventsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastThreadStreamEventsResult={lastThreadStreamEventsResult}
+            onReadThreadStreamEvents={onReadThreadStreamEvents}
           />
 
           <DebugAppServerCoverageCommandExecutionSection

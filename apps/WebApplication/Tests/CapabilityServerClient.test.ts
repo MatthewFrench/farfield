@@ -52,6 +52,13 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageWindowsSan
 }));
 
 vi.mock(
+  "../Source/Features/Capabilities/DataAccess/CapabilityCoverageThreadStreamEventsApi",
+  () => ({
+    readThreadStreamEvents: vi.fn(),
+  }),
+);
+
+vi.mock(
   "../Source/Features/Capabilities/DataAccess/CapabilityCoverageExternalAgentConfigApi",
   () => ({
     detectExternalAgentConfig: vi.fn(),
@@ -106,6 +113,7 @@ import {
   startThreadRealtime,
   stopThreadRealtime,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageThreadRealtimeApi";
+import { readThreadStreamEvents } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageThreadStreamEventsApi";
 import { startWindowsSandboxSetup } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageWindowsSandboxApi";
 import {
   type CapabilityAccountAuthStatusResponse,
@@ -145,6 +153,7 @@ import {
   type CapabilityThreadRealtimeAppendTextResponse,
   type CapabilityThreadRealtimeStartResponse,
   type CapabilityThreadRealtimeStopResponse,
+  type CapabilityThreadStreamEventsResponse,
   type CapabilityWindowsSandboxSetupStartResponse,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
 
@@ -445,6 +454,31 @@ const WINDOWS_SANDBOX_SETUP_START_RESPONSE: CapabilityWindowsSandboxSetupStartRe
   started: true,
 };
 
+const THREAD_STREAM_EVENTS_RESPONSE: CapabilityThreadStreamEventsResponse = {
+  ok: true,
+  threadId: "thread-1",
+  ownerClientId: "app-server",
+  events: [
+    {
+      type: "broadcast",
+      method: "turn/started",
+      sourceClientId: "app-server",
+      version: 1,
+      params: {
+        sequence: 21,
+        receivedAtMilliseconds: 1_700_000_000_000,
+        threadId: "thread-1",
+        payload: {
+          threadId: "thread-1",
+        },
+      },
+    },
+  ],
+  nextSequence: 22,
+  firstAvailableSequence: 0,
+  resetRequired: false,
+};
+
 const EXPERIMENTAL_FEATURES_RESPONSE: CapabilityExperimentalFeaturesResponse = {
   ok: true,
   data: [
@@ -555,6 +589,7 @@ describe("CapabilityServerClient", () => {
     vi.mocked(appendThreadRealtimeText).mockResolvedValue(THREAD_REALTIME_APPEND_TEXT_RESPONSE);
     vi.mocked(stopThreadRealtime).mockResolvedValue(THREAD_REALTIME_STOP_RESPONSE);
     vi.mocked(startWindowsSandboxSetup).mockResolvedValue(WINDOWS_SANDBOX_SETUP_START_RESPONSE);
+    vi.mocked(readThreadStreamEvents).mockResolvedValue(THREAD_STREAM_EVENTS_RESPONSE);
     vi.mocked(listExperimentalFeatures).mockResolvedValue(EXPERIMENTAL_FEATURES_RESPONSE);
     vi.mocked(listMcpServers).mockResolvedValue(MCP_SERVERS_RESPONSE);
     vi.mocked(listApps).mockResolvedValue(APPS_RESPONSE);
@@ -778,6 +813,13 @@ describe("CapabilityServerClient", () => {
       actionName: "windows-sandbox-setup-start",
       mode: "elevated" as const,
     };
+    const threadStreamEventsOptions = {
+      actionId: "action-thread-stream-events",
+      actionName: "thread-stream-events",
+      threadId: "thread-1",
+      limit: 20,
+      sinceSequence: 15,
+    };
     const experimentalFeatureOptions = {
       actionId: "action-experimental-features",
       actionName: "list-experimental-features",
@@ -869,6 +911,8 @@ describe("CapabilityServerClient", () => {
     const windowsSandboxSetupStartResponse = await capabilityServerClient.startWindowsSandboxSetup(
       windowsSandboxSetupStartOptions,
     );
+    const threadStreamEventsResponse =
+      await capabilityServerClient.readThreadStreamEvents(threadStreamEventsOptions);
     const experimentalFeaturesResponse = await capabilityServerClient.listExperimentalFeatures(
       experimentalFeatureOptions,
     );
@@ -910,6 +954,7 @@ describe("CapabilityServerClient", () => {
     expect(appendThreadRealtimeText).toHaveBeenCalledWith(threadRealtimeAppendTextOptions);
     expect(stopThreadRealtime).toHaveBeenCalledWith(threadRealtimeStopOptions);
     expect(startWindowsSandboxSetup).toHaveBeenCalledWith(windowsSandboxSetupStartOptions);
+    expect(readThreadStreamEvents).toHaveBeenCalledWith(threadStreamEventsOptions);
     expect(listExperimentalFeatures).toHaveBeenCalledWith(experimentalFeatureOptions);
     expect(listMcpServers).toHaveBeenCalledWith(mcpServerOptions);
     expect(listApps).toHaveBeenCalledWith(appOptions);
@@ -948,6 +993,7 @@ describe("CapabilityServerClient", () => {
     expect(threadRealtimeAppendTextResponse).toEqual(THREAD_REALTIME_APPEND_TEXT_RESPONSE);
     expect(threadRealtimeStopResponse).toEqual(THREAD_REALTIME_STOP_RESPONSE);
     expect(windowsSandboxSetupStartResponse).toEqual(WINDOWS_SANDBOX_SETUP_START_RESPONSE);
+    expect(threadStreamEventsResponse).toEqual(THREAD_STREAM_EVENTS_RESPONSE);
     expect(experimentalFeaturesResponse).toEqual(EXPERIMENTAL_FEATURES_RESPONSE);
     expect(mcpServersResponse).toEqual(MCP_SERVERS_RESPONSE);
     expect(appsResponse).toEqual(APPS_RESPONSE);

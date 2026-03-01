@@ -179,6 +179,9 @@ function createUseApplicationShellViewPropertiesFixture() {
   );
   const writeSkillsConfigSpy = vi.fn((_skillPath: string, _enabled: boolean): void => {});
   const exportRemoteSkillSpy = vi.fn((_hazelnutId: string): void => {});
+  const readThreadStreamEventsSpy = vi.fn(
+    (_threadId: string, _sinceSequence?: number | null): void => {},
+  );
   const detectExternalAgentConfigSpy = vi.fn((_includeHome: boolean, _cwds: string[]): void => {});
   const importExternalAgentConfigSpy = vi.fn((): void => {});
   const startThreadRealtimeSpy = vi.fn(
@@ -341,6 +344,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastFuzzyFileSearchSessionUpdateResult: null,
     lastFuzzyFileSearchSessionStopResult: null,
     lastGitDiffToRemoteResult: null,
+    lastThreadStreamEventsResult: null,
     refreshCoverageDiagnostics: refreshCoverageDiagnosticsSpy,
     startAccountLogin: startAccountLoginSpy,
     cancelAccountLogin: cancelAccountLoginSpy,
@@ -358,6 +362,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     uploadFeedback: uploadFeedbackSpy,
     writeSkillsConfig: writeSkillsConfigSpy,
     exportRemoteSkill: exportRemoteSkillSpy,
+    readThreadStreamEvents: readThreadStreamEventsSpy,
     detectExternalAgentConfig: detectExternalAgentConfigSpy,
     importExternalAgentConfig: importExternalAgentConfigSpy,
     startThreadRealtime: startThreadRealtimeSpy,

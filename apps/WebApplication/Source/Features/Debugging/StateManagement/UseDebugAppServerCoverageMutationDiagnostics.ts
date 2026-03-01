@@ -22,6 +22,7 @@ import type {
   DebugAppServerCoverageThreadRealtimeAudioChunk,
   DebugAppServerCoverageThreadRealtimeStartResult,
   DebugAppServerCoverageThreadRealtimeStopResult,
+  DebugAppServerCoverageThreadStreamEventsResult,
   DebugAppServerCoverageWindowsSandboxSetupMode,
   DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
@@ -34,6 +35,7 @@ import {
   runExternalAgentConfigDetectAction,
   runExternalAgentConfigImportAction,
 } from "./DebugAppServerCoverageMutationActionRunners";
+import { mapThreadStreamEventsResult } from "./DebugAppServerCoverageThreadStreamEventMappers";
 import { useDebugAppServerCoverageRuntimeMutationActions } from "./UseDebugAppServerCoverageRuntimeMutationActions";
 
 const COVERAGE_MUTATION_OPERATION_NAME = "debug-coverage-action";
@@ -64,6 +66,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastThreadRealtimeAppendAudioResult: DebugAppServerCoverageThreadRealtimeAppendAudioResult | null;
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
+  lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
@@ -97,6 +100,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   ) => void;
   appendThreadRealtimeText: (threadId: string, text: string) => void;
   stopThreadRealtime: (threadId: string) => void;
+  readThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
@@ -173,6 +177,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageThreadRealtimeAppendTextResult | null>(null);
   const [lastThreadRealtimeStopResult, setLastThreadRealtimeStopResult] =
     useState<DebugAppServerCoverageThreadRealtimeStopResult | null>(null);
+  const [lastThreadStreamEventsResult, setLastThreadStreamEventsResult] =
+    useState<DebugAppServerCoverageThreadStreamEventsResult | null>(null);
   const [lastWindowsSandboxSetupStartResult, setLastWindowsSandboxSetupStartResult] =
     useState<DebugAppServerCoverageWindowsSandboxSetupStartResult | null>(null);
   const [lastFeedbackUploadResult, setLastFeedbackUploadResult] =
@@ -402,6 +408,42 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     },
     [input.capabilityServerClient, isRunningCoverageAction],
   );
+
+  const readThreadStreamEvents = useCallback(
+    (threadId: string, sinceSequence?: number | null) => {
+      const normalizedThreadId = threadId.trim();
+      if (normalizedThreadId.length === 0) {
+        return;
+      }
+
+      const normalizedSinceSequence =
+        sinceSequence === undefined || sinceSequence === null ? null : sinceSequence;
+      if (
+        normalizedSinceSequence !== null &&
+        (!Number.isInteger(normalizedSinceSequence) || normalizedSinceSequence < 0)
+      ) {
+        return;
+      }
+
+      runCoverageAsyncMutation({
+        isRunningCoverageAction,
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        run: async () => {
+          const response = await input.capabilityServerClient.readThreadStreamEvents({
+            actionName: COVERAGE_MUTATION_OPERATION_NAME,
+            threadId: normalizedThreadId,
+            ...(normalizedSinceSequence !== null ? { sinceSequence: normalizedSinceSequence } : {}),
+          });
+          setLastThreadStreamEventsResult(
+            mapThreadStreamEventsResult(response, normalizedSinceSequence),
+          );
+        },
+      });
+    },
+    [input.capabilityServerClient, isRunningCoverageAction],
+  );
+
   const runtimeMutationActions = useDebugAppServerCoverageRuntimeMutationActions({
     capabilityServerClient: input.capabilityServerClient,
     isRunningCoverageAction,
@@ -436,6 +478,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastThreadRealtimeAppendAudioResult,
       lastThreadRealtimeAppendTextResult,
       lastThreadRealtimeStopResult,
+      lastThreadStreamEventsResult,
       lastWindowsSandboxSetupStartResult,
       lastFeedbackUploadResult,
       lastFuzzyFileSearchResult,
@@ -458,6 +501,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       appendThreadRealtimeAudio: runtimeMutationActions.appendThreadRealtimeAudio,
       appendThreadRealtimeText: runtimeMutationActions.appendThreadRealtimeText,
       stopThreadRealtime: runtimeMutationActions.stopThreadRealtime,
+      readThreadStreamEvents,
       startWindowsSandboxSetup: runtimeMutationActions.startWindowsSandboxSetup,
       readGitDiffToRemote: runtimeMutationActions.readGitDiffToRemote,
       searchFuzzyFiles: runtimeMutationActions.searchFuzzyFiles,

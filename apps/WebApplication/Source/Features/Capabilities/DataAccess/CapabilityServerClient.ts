@@ -116,6 +116,11 @@ import {
   stopThreadRealtime,
 } from "./CapabilityCoverageThreadRealtimeApi";
 import {
+  type ApiReadThreadStreamEventsOptions,
+  type ApiThreadStreamEventsResponse,
+  readThreadStreamEvents,
+} from "./CapabilityCoverageThreadStreamEventsApi";
+import {
   type ApiWindowsSandboxSetupMode,
   type ApiWindowsSandboxSetupStartOptions,
   type ApiWindowsSandboxSetupStartResponse,
@@ -189,6 +194,8 @@ export type CapabilityThreadRealtimeStopResponse = ApiThreadRealtimeStopResponse
 export type CapabilityWindowsSandboxSetupMode = ApiWindowsSandboxSetupMode;
 export type CapabilityWindowsSandboxSetupStartOptions = ApiWindowsSandboxSetupStartOptions;
 export type CapabilityWindowsSandboxSetupStartResponse = ApiWindowsSandboxSetupStartResponse;
+export type CapabilityReadThreadStreamEventsOptions = ApiReadThreadStreamEventsOptions;
+export type CapabilityThreadStreamEventsResponse = ApiThreadStreamEventsResponse;
 export type CapabilityListAppsOptions = ApiListAppsOptions;
 export type CapabilityAppsResponse = ApiAppsResponse;
 export type CapabilityListSkillsOptions = ApiListSkillsOptions;
@@ -344,6 +351,12 @@ export class CapabilityServerClient {
     input: CapabilityWindowsSandboxSetupStartOptions,
   ): Promise<CapabilityWindowsSandboxSetupStartResponse> {
     return startWindowsSandboxSetup(input);
+  }
+
+  public async readThreadStreamEvents(
+    input: CapabilityReadThreadStreamEventsOptions,
+  ): Promise<CapabilityThreadStreamEventsResponse> {
+    return readThreadStreamEvents(input);
   }
 
   public async executeCommand(

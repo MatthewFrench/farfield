@@ -164,6 +164,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastThreadRealtimeAppendAudioResult: DebugWorkspacePaneProps["lastThreadRealtimeAppendAudioResult"];
   lastThreadRealtimeAppendTextResult: DebugWorkspacePaneProps["lastThreadRealtimeAppendTextResult"];
   lastThreadRealtimeStopResult: DebugWorkspacePaneProps["lastThreadRealtimeStopResult"];
+  lastThreadStreamEventsResult: DebugWorkspacePaneProps["lastThreadStreamEventsResult"];
   lastWindowsSandboxSetupStartResult: DebugWorkspacePaneProps["lastWindowsSandboxSetupStartResult"];
   lastFeedbackUploadResult: DebugWorkspacePaneProps["lastFeedbackUploadResult"];
   lastFuzzyFileSearchResult: DebugWorkspacePaneProps["lastFuzzyFileSearchResult"];
@@ -193,6 +194,7 @@ export interface UseApplicationShellViewPropertiesInput {
   appendThreadRealtimeAudio: DebugWorkspacePaneProps["onAppendThreadRealtimeAudio"];
   appendThreadRealtimeText: DebugWorkspacePaneProps["onAppendThreadRealtimeText"];
   stopThreadRealtime: DebugWorkspacePaneProps["onStopThreadRealtime"];
+  readThreadStreamEvents: DebugWorkspacePaneProps["onReadThreadStreamEvents"];
   startWindowsSandboxSetup: DebugWorkspacePaneProps["onStartWindowsSandboxSetup"];
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
@@ -507,6 +509,7 @@ function buildDebugWorkspacePaneProperties(
     lastThreadRealtimeAppendAudioResult: input.lastThreadRealtimeAppendAudioResult,
     lastThreadRealtimeAppendTextResult: input.lastThreadRealtimeAppendTextResult,
     lastThreadRealtimeStopResult: input.lastThreadRealtimeStopResult,
+    lastThreadStreamEventsResult: input.lastThreadStreamEventsResult,
     lastWindowsSandboxSetupStartResult: input.lastWindowsSandboxSetupStartResult,
     lastFeedbackUploadResult: input.lastFeedbackUploadResult,
     lastFuzzyFileSearchResult: input.lastFuzzyFileSearchResult,
@@ -530,6 +533,7 @@ function buildDebugWorkspacePaneProperties(
     onAppendThreadRealtimeAudio: input.appendThreadRealtimeAudio,
     onAppendThreadRealtimeText: input.appendThreadRealtimeText,
     onStopThreadRealtime: input.stopThreadRealtime,
+    onReadThreadStreamEvents: input.readThreadStreamEvents,
     onStartWindowsSandboxSetup: input.startWindowsSandboxSetup,
     onReadGitDiffToRemote: input.readGitDiffToRemote,
     onSearchFuzzyFiles: input.searchFuzzyFiles,
@@ -749,6 +753,7 @@ export function useApplicationShellViewProperties(
       input.lastThreadRealtimeStartResult,
       input.lastThreadRealtimeAppendTextResult,
       input.lastThreadRealtimeStopResult,
+      input.lastThreadStreamEventsResult,
       input.lastWindowsSandboxSetupStartResult,
       input.lastFeedbackUploadResult,
       input.lastFuzzyFileSearchResult,
@@ -771,6 +776,7 @@ export function useApplicationShellViewProperties(
       input.startThreadRealtime,
       input.appendThreadRealtimeText,
       input.stopThreadRealtime,
+      input.readThreadStreamEvents,
       input.startWindowsSandboxSetup,
       input.readGitDiffToRemote,
       input.searchFuzzyFiles,

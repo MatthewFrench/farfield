@@ -1,0 +1,154 @@
+import { useState } from "react";
+import { Button } from "@/Components/UserInterface/Button";
+import { type DebugAppServerCoverageThreadStreamEventsResult } from "../DomainModel/DebugAppServerCoverageContracts";
+
+export interface DebugAppServerCoverageThreadStreamEventsSectionProps {
+  isRunningCoverageAction: boolean;
+  lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
+  onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
+}
+
+/**
+ * Owns thread stream-event diagnostics controls for app-server coverage verification.
+ * Operators use this to inspect frame-level event batches and cursor behavior.
+ */
+export function DebugAppServerCoverageThreadStreamEventsSection({
+  isRunningCoverageAction,
+  lastThreadStreamEventsResult,
+  onReadThreadStreamEvents,
+}: DebugAppServerCoverageThreadStreamEventsSectionProps): React.JSX.Element {
+  const [threadIdDraft, setThreadIdDraft] = useState("");
+  const [sinceSequenceDraft, setSinceSequenceDraft] = useState("");
+
+  const runThreadStreamEventsRead = (): void => {
+    const normalizedThreadIdentifier = threadIdDraft.trim();
+    if (normalizedThreadIdentifier.length === 0) {
+      return;
+    }
+
+    const normalizedSinceSequence = sinceSequenceDraft.trim();
+    if (normalizedSinceSequence.length === 0) {
+      onReadThreadStreamEvents(normalizedThreadIdentifier, null);
+      return;
+    }
+
+    const parsedSinceSequence = Number(normalizedSinceSequence);
+    if (!Number.isInteger(parsedSinceSequence) || parsedSinceSequence < 0) {
+      return;
+    }
+
+    onReadThreadStreamEvents(normalizedThreadIdentifier, parsedSinceSequence);
+  };
+
+  return (
+    <div className="rounded-md border border-border bg-card p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Thread Stream Events
+        </h4>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="debug-coverage-thread-stream-read"
+          disabled={isRunningCoverageAction}
+          onClick={runThreadStreamEventsRead}
+        >
+          Read Stream Events
+        </Button>
+      </div>
+      <div className="space-y-2">
+        <label className="text-xs text-muted-foreground" htmlFor="debug-coverage-thread-stream-id">
+          Thread Id
+        </label>
+        <input
+          id="debug-coverage-thread-stream-id"
+          data-testid="debug-coverage-thread-stream-thread-id"
+          type="text"
+          className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+          value={threadIdDraft}
+          onChange={(event) => {
+            setThreadIdDraft(event.target.value);
+          }}
+          placeholder="thread-123"
+        />
+        <label
+          className="text-xs text-muted-foreground"
+          htmlFor="debug-coverage-thread-stream-since-sequence"
+        >
+          Since sequence (optional)
+        </label>
+        <input
+          id="debug-coverage-thread-stream-since-sequence"
+          data-testid="debug-coverage-thread-stream-since-sequence"
+          type="text"
+          className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+          value={sinceSequenceDraft}
+          onChange={(event) => {
+            setSinceSequenceDraft(event.target.value);
+          }}
+          placeholder="0"
+        />
+      </div>
+      {lastThreadStreamEventsResult === null ? (
+        <p className="text-xs text-muted-foreground">No stream-event diagnostics captured.</p>
+      ) : (
+        <div
+          className="rounded border border-border/70 p-2 text-xs space-y-2"
+          data-testid="debug-coverage-thread-stream-result"
+        >
+          <p>
+            Thread: <span className="font-mono">{lastThreadStreamEventsResult.threadId}</span>
+          </p>
+          <p>Owner: {lastThreadStreamEventsResult.ownerClientId ?? "None"}</p>
+          <p>Events returned: {lastThreadStreamEventsResult.eventCount}</p>
+          <p>
+            Cursor: next={String(lastThreadStreamEventsResult.nextSequence)} • firstAvailable=
+            {String(lastThreadStreamEventsResult.firstAvailableSequence)} • resetRequired=
+            {lastThreadStreamEventsResult.resetRequired ? "true" : "false"}
+          </p>
+          <p>
+            Since sequence used:{" "}
+            {lastThreadStreamEventsResult.sinceSequence === null
+              ? "none"
+              : String(lastThreadStreamEventsResult.sinceSequence)}
+          </p>
+          <p>
+            Read at: {new Date(lastThreadStreamEventsResult.readAtIso8601).toLocaleTimeString()}
+          </p>
+          {lastThreadStreamEventsResult.events.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No frames in the returned stream batch.</p>
+          ) : (
+            <div className="space-y-2">
+              {lastThreadStreamEventsResult.events.map((event, eventIndex) => (
+                <div
+                  key={`${event.frameType}-${eventIndex}`}
+                  data-testid={`debug-coverage-thread-stream-event-${String(eventIndex)}`}
+                  className="rounded border border-border/60 p-2 space-y-1"
+                >
+                  <p>
+                    {event.frameType} • {event.method ?? "(no method)"}
+                  </p>
+                  <p>
+                    requestId={event.requestId ?? "none"} • sourceClientId=
+                    {event.sourceClientId ?? "none"} • sequence=
+                    {event.sequence === null ? "none" : String(event.sequence)}
+                  </p>
+                  <p>
+                    receivedAtMilliseconds=
+                    {event.receivedAtMilliseconds === null
+                      ? "none"
+                      : String(event.receivedAtMilliseconds)}
+                  </p>
+                  <pre className="rounded border border-border/60 bg-background p-2 whitespace-pre-wrap break-words">
+                    {event.preview}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

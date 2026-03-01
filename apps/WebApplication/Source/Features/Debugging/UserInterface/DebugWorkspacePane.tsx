@@ -22,6 +22,7 @@ import {
   type DebugAppServerCoverageThreadRealtimeAudioChunk,
   type DebugAppServerCoverageThreadRealtimeStartResult,
   type DebugAppServerCoverageThreadRealtimeStopResult,
+  type DebugAppServerCoverageThreadStreamEventsResult,
   type DebugAppServerCoverageWindowsSandboxSetupMode,
   type DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "@/Features/Debugging/DomainModel/DebugAppServerCoverageContracts";
@@ -92,6 +93,7 @@ export interface DebugWorkspacePaneProps {
   lastThreadRealtimeAppendAudioResult: DebugAppServerCoverageThreadRealtimeAppendAudioResult | null;
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
+  lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
@@ -126,6 +128,7 @@ export interface DebugWorkspacePaneProps {
   ) => void;
   onAppendThreadRealtimeText: (threadId: string, text: string) => void;
   onStopThreadRealtime: (threadId: string) => void;
+  onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
   onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
@@ -192,6 +195,7 @@ export function DebugWorkspacePane({
   lastThreadRealtimeAppendAudioResult,
   lastThreadRealtimeAppendTextResult,
   lastThreadRealtimeStopResult,
+  lastThreadStreamEventsResult,
   lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
@@ -215,6 +219,7 @@ export function DebugWorkspacePane({
   onAppendThreadRealtimeAudio,
   onAppendThreadRealtimeText,
   onStopThreadRealtime,
+  onReadThreadStreamEvents,
   onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
   onSearchFuzzyFiles,
@@ -332,6 +337,7 @@ export function DebugWorkspacePane({
             lastThreadRealtimeAppendAudioResult={lastThreadRealtimeAppendAudioResult}
             lastThreadRealtimeAppendTextResult={lastThreadRealtimeAppendTextResult}
             lastThreadRealtimeStopResult={lastThreadRealtimeStopResult}
+            lastThreadStreamEventsResult={lastThreadStreamEventsResult}
             lastWindowsSandboxSetupStartResult={lastWindowsSandboxSetupStartResult}
             lastFeedbackUploadResult={lastFeedbackUploadResult}
             lastFuzzyFileSearchResult={lastFuzzyFileSearchResult}
@@ -355,6 +361,7 @@ export function DebugWorkspacePane({
             onAppendThreadRealtimeAudio={onAppendThreadRealtimeAudio}
             onAppendThreadRealtimeText={onAppendThreadRealtimeText}
             onStopThreadRealtime={onStopThreadRealtime}
+            onReadThreadStreamEvents={onReadThreadStreamEvents}
             onStartWindowsSandboxSetup={onStartWindowsSandboxSetup}
             onReadGitDiffToRemote={onReadGitDiffToRemote}
             onSearchFuzzyFiles={onSearchFuzzyFiles}
