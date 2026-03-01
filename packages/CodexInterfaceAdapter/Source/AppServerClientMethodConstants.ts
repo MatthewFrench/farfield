@@ -16,6 +16,7 @@ export const APP_SERVER_CLIENT_METHODS = {
   listMcpServerStatuses: "mcpServerStatus/list",
   readAccount: "account/read",
   readAccountRateLimits: "account/rateLimits/read",
+  executeCommand: "command/exec",
   startAccountLogin: "account/login/start",
   cancelAccountLogin: "account/login/cancel",
   logoutAccount: "account/logout",

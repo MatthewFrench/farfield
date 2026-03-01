@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-02-28 23:04:09Z
+Last Updated (UTC): 2026-03-01 00:36:00Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `35 / 74` request methods (`47.3%`).
+1. Farfield app-server method coverage at request-owner layer: `36 / 74` request methods (`48.6%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `36 / 74` (`48.6%`).
+3. Effective request-method usage including transport-owned `initialize`: `37 / 74` (`50.0%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -97,6 +97,7 @@ As of the upstream snapshot above:
 | `thread/unsubscribe` | Stop app-server thread subscription when thread is deselected or closed | High | Canonical v2 lifecycle unsubscribe is now exposed through strict owner routing | Keep current path |
 | `model/list` | Model selector and capability snapshot | High | Explicit capability route ownership and strict envelope parsing | Keep current path |
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | High | Explicit capability ownership and strict envelope parsing | Keep current path |
+| `command/exec` | Command execution diagnostics action with visible stdout/stderr output in debug workspace coverage panel | Medium-high | Strict capability route ownership and typed command request/response mapping for operator diagnostics | Keep current path |
 | `config/read` | Config defaults resolution for model and reasoning effort | High | Normalized default resolution through typed owner mapping | Keep current path |
 | `configRequirements/read` | Config requirements diagnostics and workspace readiness signals | Medium-high | Strict capability route ownership with typed payload mapping into debug coverage diagnostics | Keep current path |
 | `config/mcpServer/reload` | MCP server configuration reload action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic mutation path for diagnostics flows | Keep current path |
@@ -143,6 +144,7 @@ As of the upstream snapshot above:
 | `thread/unsubscribe` | Unsubscribe thread subscription on lifecycle transitions | `/api/threads/:threadId/unsubscribe` POST -> `ThreadMemberUnsubscribeMutationRouteOwner` -> `CodexThreadManagementOwner.unsubscribeThread` -> `AppServerClient.unsubscribeThread` |
 | `model/list` | Model selector and capability snapshot | `/api/models` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listModels` -> `AppServerClient.listModels` |
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | `/api/collaboration-modes` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listCollaborationModes` -> `AppServerClient.listCollaborationModes` |
+| `command/exec` | Command execution diagnostics action and output capture | `/api/commands/exec` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.executeCommand` -> `AppServerClient.executeCommand` |
 | `config/read` | Config defaults (`model`, `reasoningEffort`) | `/api/config/defaults` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigDefaults` -> `AppServerClient.readConfig` |
 | `configRequirements/read` | Config requirements diagnostics | `/api/config-requirements` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigRequirements` -> `AppServerClient.readConfigRequirements` |
 | `config/mcpServer/reload` | MCP server config reload diagnostics action | `/api/config/mcp-server/reload` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.reloadMcpServerConfig` -> `AppServerClient.reloadMcpServerConfig` |
@@ -162,13 +164,12 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`39` request methods are not used by Farfield’s app-server client path:
+`38` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
 archiveConversation
 cancelLoginChatGpt
-command/exec
 config/batchWrite
 config/value/write
 execOneOffCommand
@@ -277,14 +278,13 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ### Category I: Miscellaneous Product Surface Not Yet Wired
 
-1. `command/exec`
-2. `feedback/upload`
-3. `windowsSandbox/setupStart`
+1. `feedback/upload`
+2. `windowsSandbox/setupStart`
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `39`
-2. Total methods listed across Category A-I: `39`
+1. Total non-intersection methods: `38`
+2. Total methods listed across Category A-I: `38`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

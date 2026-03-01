@@ -56,6 +56,7 @@ export interface AgentCapabilities {
   canListSkills: boolean;
   canReadAccount: boolean;
   canReadAccountRateLimits: boolean;
+  canExecuteCommand: boolean;
   canStartAccountLogin: boolean;
   canCancelAccountLogin: boolean;
   canLogoutAccount: boolean;
@@ -472,6 +473,18 @@ export interface AgentReadAccountRateLimitsResult {
   rateLimitsByLimitId: Record<string, AgentAccountRateLimitSnapshot> | null;
 }
 
+export interface AgentCommandExecutionInput {
+  command: string[];
+  timeoutMilliseconds?: number;
+  cwd?: string;
+}
+
+export interface AgentCommandExecutionResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
 export interface AgentStartAccountLoginWithApiKeyInput {
   type: "apiKey";
   apiKey: string;
@@ -622,6 +635,7 @@ export interface AgentAdapter {
   readAccountRateLimits?(
     input?: AgentReadAccountRateLimitsInput,
   ): Promise<AgentReadAccountRateLimitsResult>;
+  executeCommand?(input: AgentCommandExecutionInput): Promise<AgentCommandExecutionResult>;
   startAccountLogin?(input: AgentStartAccountLoginInput): Promise<AgentStartAccountLoginResult>;
   cancelAccountLogin?(input: AgentCancelAccountLoginInput): Promise<AgentCancelAccountLoginResult>;
   logoutAccount?(): Promise<void>;

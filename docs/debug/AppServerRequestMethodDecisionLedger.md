@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-02-28 23:04:09Z
+Last Updated (UTC): 2026-03-01 00:36:00Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -16,7 +16,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `archiveConversation` | Not used | Do not adopt | Deprecated upstream request family. |
 | `cancelLoginChatGpt` | Not used | Do not adopt | Deprecated upstream request family. |
 | `collaborationMode/list` | Used now | Keep | Current ownership and contracts align with present product behavior. |
-| `command/exec` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
+| `command/exec` | Used now | Keep | Exposed through capability ownership and debug workspace command diagnostics action/output. |
 | `config/batchWrite` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 | `config/mcpServer/reload` | Used now | Keep | Exposed through capability ownership and debug workspace MCP diagnostics actions. |
 | `config/read` | Used now | Keep | Current ownership and contracts align with present product behavior. |
@@ -82,5 +82,5 @@ This ledger records recommended disposition for every upstream app-server client
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 36
-Not used: 38
+Used now: 37
+Not used: 37

@@ -147,6 +147,9 @@ function createUseApplicationShellViewPropertiesFixture() {
   const logoutAccountSpy = vi.fn((): void => {});
   const reloadMcpServerConfigSpy = vi.fn((): void => {});
   const startMcpServerOauthLoginSpy = vi.fn((_serverName: string): void => {});
+  const executeCommandSpy = vi.fn(
+    (_command: string[], _timeoutMs?: number, _cwd?: string): void => {},
+  );
   const writeSkillsConfigSpy = vi.fn((_skillPath: string, _enabled: boolean): void => {});
   const exportRemoteSkillSpy = vi.fn((_hazelnutId: string): void => {});
   const setApiSessionTokenDraftSpy = vi.fn((): void => {});
@@ -276,12 +279,14 @@ function createUseApplicationShellViewPropertiesFixture() {
     coverageActionErrorMessage: "",
     coverageDiagnosticsSnapshot: null,
     pendingAccountLogin: null,
+    lastCommandExecutionResult: null,
     refreshCoverageDiagnostics: refreshCoverageDiagnosticsSpy,
     startAccountLogin: startAccountLoginSpy,
     cancelAccountLogin: cancelAccountLoginSpy,
     logoutAccount: logoutAccountSpy,
     reloadMcpServerConfig: reloadMcpServerConfigSpy,
     startMcpServerOauthLogin: startMcpServerOauthLoginSpy,
+    executeCommand: executeCommandSpy,
     writeSkillsConfig: writeSkillsConfigSpy,
     exportRemoteSkill: exportRemoteSkillSpy,
     apiSessionTokenDraft: "",

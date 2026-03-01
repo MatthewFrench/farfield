@@ -5,6 +5,7 @@ import type {
   CapabilityAccountRateLimitsResponse,
   CapabilityAccountResponse,
   CapabilityAppsResponse,
+  CapabilityCommandExecutionResponse,
   CapabilityConfigRequirementsResponse,
   CapabilityExperimentalFeaturesResponse,
   CapabilityMcpServersResponse,
@@ -16,6 +17,7 @@ import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/Deb
 import {
   type DebugAppServerCoverageAccount,
   type DebugAppServerCoverageAppSummary,
+  type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoverageExperimentalFeature,
   type DebugAppServerCoverageMcpServerSummary,
   type DebugAppServerCoveragePendingAccountLogin,
@@ -49,6 +51,7 @@ export interface DebugAppServerCoverageDiagnostics {
   coverageActionErrorMessage: string;
   coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
+  lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -57,6 +60,7 @@ export interface DebugAppServerCoverageDiagnostics {
   startMcpServerOauthLogin: (serverName: string) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
+  executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
 }
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {
@@ -200,6 +204,19 @@ function mapRemoteSkills(
   }));
 }
 
+function mapCommandExecutionResult(
+  response: CapabilityCommandExecutionResponse,
+  command: string[],
+): DebugAppServerCoverageCommandExecutionResult {
+  return {
+    command,
+    exitCode: response.exitCode,
+    stdout: response.stdout,
+    stderr: response.stderr,
+    executedAtIso8601: new Date().toISOString(),
+  };
+}
+
 /**
  * Owns read cadence for app-server coverage diagnostics rendered in Debug Workspace.
  * Request concurrency is sequenced with request serials so stale responses cannot overwrite fresh state.
@@ -215,6 +232,8 @@ export function useDebugAppServerCoverageDiagnostics(
     useState<DebugAppServerCoverageSnapshot | null>(null);
   const [pendingAccountLogin, setPendingAccountLogin] =
     useState<DebugAppServerCoveragePendingAccountLogin | null>(null);
+  const [lastCommandExecutionResult, setLastCommandExecutionResult] =
+    useState<DebugAppServerCoverageCommandExecutionResult | null>(null);
   const requestSerialRef = useRef(0);
 
   const refreshCoverageDiagnostics = useCallback(() => {
@@ -480,6 +499,51 @@ export function useDebugAppServerCoverageDiagnostics(
     [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics],
   );
 
+  const executeCommand = useCallback(
+    (command: string[], timeoutMs?: number, cwd?: string) => {
+      if (isRunningCoverageAction) {
+        return;
+      }
+      if (command.length === 0) {
+        return;
+      }
+      const normalizedCommand = command.map((entry) => entry.trim());
+      if (normalizedCommand.some((entry) => entry.length === 0)) {
+        return;
+      }
+      const normalizedWorkingDirectory = cwd?.trim();
+      if (
+        cwd !== undefined &&
+        normalizedWorkingDirectory !== undefined &&
+        normalizedWorkingDirectory.length === 0
+      ) {
+        return;
+      }
+
+      setIsRunningCoverageAction(true);
+      setCoverageActionErrorMessage("");
+
+      void (async () => {
+        try {
+          const response = await input.capabilityServerClient.executeCommand({
+            actionName: COVERAGE_MUTATION_OPERATION_NAME,
+            command: normalizedCommand,
+            ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+            ...(normalizedWorkingDirectory !== undefined
+              ? { cwd: normalizedWorkingDirectory }
+              : {}),
+          });
+          setLastCommandExecutionResult(mapCommandExecutionResult(response, normalizedCommand));
+        } catch (error) {
+          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
+        } finally {
+          setIsRunningCoverageAction(false);
+        }
+      })();
+    },
+    [input.capabilityServerClient, isRunningCoverageAction],
+  );
+
   useEffect(() => {
     if (input.debugWorkspaceSection !== COVERAGE_WORKSPACE_SECTION) {
       return;
@@ -502,6 +566,7 @@ export function useDebugAppServerCoverageDiagnostics(
     coverageActionErrorMessage,
     coverageDiagnosticsSnapshot,
     pendingAccountLogin,
+    lastCommandExecutionResult,
     refreshCoverageDiagnostics,
     startAccountLogin,
     cancelAccountLogin,
@@ -510,5 +575,6 @@ export function useDebugAppServerCoverageDiagnostics(
     startMcpServerOauthLogin,
     writeSkillsConfig,
     exportRemoteSkill,
+    executeCommand,
   };
 }

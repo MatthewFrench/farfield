@@ -16,6 +16,8 @@ import type {
   AgentCancelAccountLoginInput,
   AgentCancelAccountLoginResult,
   AgentCapabilities,
+  AgentCommandExecutionInput,
+  AgentCommandExecutionResult,
   AgentConfigDefaults,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
@@ -204,6 +206,15 @@ const CapabilitySkillsRemoteExportEnvelopeSchema = z
   })
   .strict();
 
+const CapabilityCommandExecutionEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    exitCode: z.number().int(),
+    stdout: z.string(),
+    stderr: z.string(),
+  })
+  .strict();
+
 const CapabilityExperimentalFeaturesEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -300,6 +311,7 @@ interface MockAgentAdapterOptions {
   readConfigRequirements?: () => Promise<AgentReadConfigRequirementsResult>;
   readAccount?: () => Promise<AgentReadAccountResult>;
   readAccountRateLimits?: () => Promise<AgentReadAccountRateLimitsResult>;
+  executeCommand?: (input: AgentCommandExecutionInput) => Promise<AgentCommandExecutionResult>;
   startAccountLogin?: (input: AgentStartAccountLoginInput) => Promise<AgentStartAccountLoginResult>;
   cancelAccountLogin?: (
     input: AgentCancelAccountLoginInput,
@@ -352,6 +364,7 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canListSkills: false,
     canReadAccount: false,
     canReadAccountRateLimits: false,
+    canExecuteCommand: false,
     canStartAccountLogin: false,
     canCancelAccountLogin: false,
     canLogoutAccount: false,
@@ -421,6 +434,10 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.readAccountRateLimits) {
     adapter.readAccountRateLimits = options.readAccountRateLimits;
+  }
+
+  if (options.executeCommand) {
+    adapter.executeCommand = options.executeCommand;
   }
 
   if (options.startAccountLogin) {
@@ -796,6 +813,79 @@ describe("handleCapabilityRoutes", () => {
       type: "chatgpt",
       loginId: "login-1",
       authUrl: "https://example.com/oauth/start",
+    });
+  });
+
+  it("returns 400 when command execution omits command query parameters", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/commands/exec",
+      url: new URL("http://localhost/api/commands/exec"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing command query parameter. Use repeated command query values.",
+    });
+  });
+
+  it("returns 400 when command execution includes empty command arguments", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/commands/exec",
+      url: new URL("http://localhost/api/commands/exec?command="),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Invalid command query parameter. Expected non-empty command arguments.",
+    });
+  });
+
+  it("executes command when adapter supports command execution", async () => {
+    const executeCommandSpy = vi.fn(
+      async (): Promise<AgentCommandExecutionResult> => ({
+        exitCode: 0,
+        stdout: "/tmp/workspace\n",
+        stderr: "",
+      }),
+    );
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/commands/exec",
+      url: new URL(
+        "http://localhost/api/commands/exec?agentId=codex&command=pwd&command=-P&cwd=/tmp/workspace&timeoutMs=5000",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canExecuteCommand: true,
+          },
+          executeCommand: executeCommandSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(executeCommandSpy).toHaveBeenCalledWith({
+      command: ["pwd", "-P"],
+      cwd: "/tmp/workspace",
+      timeoutMilliseconds: 5000,
+    });
+    const parsedEnvelope = CapabilityCommandExecutionEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      exitCode: 0,
+      stdout: "/tmp/workspace\n",
+      stderr: "",
     });
   });
 

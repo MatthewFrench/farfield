@@ -44,6 +44,8 @@ import {
   startAccountLogin,
 } from "./CapabilityApi";
 import {
+  type ApiCommandExecutionOptions,
+  type ApiCommandExecutionResponse,
   type ApiExportRemoteSkillOptions,
   type ApiListRemoteSkillsOptions,
   type ApiMcpServerOauthLoginOptions,
@@ -52,6 +54,7 @@ import {
   type ApiRemoteSkillsListResponse,
   type ApiSkillsConfigWriteOptions,
   type ApiSkillsConfigWriteResponse,
+  executeCommand,
   exportRemoteSkill,
   listRemoteSkills,
   startMcpServerOauthLogin,
@@ -82,6 +85,8 @@ export type CapabilityExperimentalFeaturesResponse = ApiExperimentalFeaturesResp
 export type CapabilityMcpServersResponse = ApiMcpServersResponse;
 export type CapabilityMcpServerOauthLoginOptions = ApiMcpServerOauthLoginOptions;
 export type CapabilityMcpServerOauthLoginResponse = ApiMcpServerOauthLoginResponse;
+export type CapabilityCommandExecutionOptions = ApiCommandExecutionOptions;
+export type CapabilityCommandExecutionResponse = ApiCommandExecutionResponse;
 export type CapabilityListRemoteSkillsOptions = ApiListRemoteSkillsOptions;
 export type CapabilityRemoteSkillsListResponse = ApiRemoteSkillsListResponse;
 export type CapabilityExportRemoteSkillOptions = ApiExportRemoteSkillOptions;
@@ -187,6 +192,12 @@ export class CapabilityServerClient {
     input: CapabilityExportRemoteSkillOptions,
   ): Promise<CapabilityRemoteSkillExportResponse> {
     return exportRemoteSkill(input);
+  }
+
+  public async executeCommand(
+    input: CapabilityCommandExecutionOptions,
+  ): Promise<CapabilityCommandExecutionResponse> {
+    return executeCommand(input);
   }
 
   public async listExperimentalFeatures(

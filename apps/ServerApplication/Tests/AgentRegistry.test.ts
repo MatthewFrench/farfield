@@ -24,6 +24,7 @@ const DEFAULT_CAPABILITIES: AgentCapabilities = {
   canListSkills: false,
   canReadAccount: false,
   canReadAccountRateLimits: false,
+  canExecuteCommand: false,
   canStartAccountLogin: false,
   canCancelAccountLogin: false,
   canLogoutAccount: false,

@@ -3,6 +3,8 @@ import {
   type AppServerTransport,
   type CancelAccountLoginOptions,
   type CancelAccountLoginResult,
+  type CommandExecutionOptions,
+  type CommandExecutionResult,
   type ExportRemoteSkillOptions,
   type ExportRemoteSkillResult,
   type ForkThreadOptions,
@@ -106,6 +108,7 @@ class TestAppServerClient extends AppServerClient {
   public readonly exportRemoteSkillCalls: ExportRemoteSkillOptions[] = [];
   public readonly readAccountCalls: Array<ReadAccountOptions | undefined> = [];
   public readonly readAccountRateLimitsCalls: Array<undefined> = [];
+  public readonly executeCommandCalls: CommandExecutionOptions[] = [];
   public readonly startAccountLoginCalls: LoginAccountOptions[] = [];
   public readonly cancelAccountLoginCalls: CancelAccountLoginOptions[] = [];
   public readonly logoutAccountCalls: Array<undefined> = [];
@@ -130,6 +133,7 @@ class TestAppServerClient extends AppServerClient {
   private readonly exportRemoteSkillResult: ExportRemoteSkillResult;
   private readonly readAccountResult: ReadAccountResult;
   private readonly readAccountRateLimitsResult: ReadAccountRateLimitsResult;
+  private readonly executeCommandResult: CommandExecutionResult;
   private readonly startAccountLoginResult: LoginAccountResult;
   private readonly cancelAccountLoginResult: CancelAccountLoginResult;
   private readonly startMcpServerOauthLoginResult: StartMcpServerOauthLoginResult;
@@ -153,6 +157,7 @@ class TestAppServerClient extends AppServerClient {
     exportRemoteSkillResult?: ExportRemoteSkillResult;
     readAccountResult?: ReadAccountResult;
     readAccountRateLimitsResult?: ReadAccountRateLimitsResult;
+    executeCommandResult?: CommandExecutionResult;
     startAccountLoginResult?: LoginAccountResult;
     cancelAccountLoginResult?: CancelAccountLoginResult;
     startMcpServerOauthLoginResult?: StartMcpServerOauthLoginResult;
@@ -218,6 +223,11 @@ class TestAppServerClient extends AppServerClient {
         secondary: null,
       },
       rateLimitsByLimitId: null,
+    };
+    this.executeCommandResult = input?.executeCommandResult ?? {
+      exitCode: 0,
+      stdout: "",
+      stderr: "",
     };
     this.startAccountLoginResult = input?.startAccountLoginResult ?? {
       type: "chatgpt",
@@ -370,6 +380,13 @@ class TestAppServerClient extends AppServerClient {
   public override async readAccountRateLimits(): Promise<ReadAccountRateLimitsResult> {
     this.readAccountRateLimitsCalls.push(undefined);
     return this.readAccountRateLimitsResult;
+  }
+
+  public override async executeCommand(
+    options: CommandExecutionOptions,
+  ): Promise<CommandExecutionResult> {
+    this.executeCommandCalls.push(options);
+    return this.executeCommandResult;
   }
 
   public override async startAccountLogin(
@@ -1118,6 +1135,36 @@ describe("CodexThreadManagementOwner", () => {
       type: "chatgpt",
       loginId: "login-9",
       authUrl: "https://example.com/oauth/start",
+    });
+  });
+
+  it("executes commands through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      executeCommandResult: {
+        exitCode: 0,
+        stdout: "/tmp/workspace\n",
+        stderr: "",
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.executeCommand({
+      command: ["pwd", "-P"],
+      timeoutMilliseconds: 3_000,
+      cwd: "/tmp/workspace",
+    });
+
+    expect(appClient.executeCommandCalls).toEqual([
+      {
+        command: ["pwd", "-P"],
+        timeoutMilliseconds: 3_000,
+        cwd: "/tmp/workspace",
+      },
+    ]);
+    expect(result).toEqual({
+      exitCode: 0,
+      stdout: "/tmp/workspace\n",
+      stderr: "",
     });
   });
 

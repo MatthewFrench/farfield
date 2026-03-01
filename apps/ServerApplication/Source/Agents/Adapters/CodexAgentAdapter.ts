@@ -16,6 +16,8 @@ import type {
   AgentCancelAccountLoginResult,
   AgentCapabilities,
   AgentCleanThreadBackgroundTerminalsInput,
+  AgentCommandExecutionInput,
+  AgentCommandExecutionResult,
   AgentCompactThreadInput,
   AgentConfigDefaults,
   AgentCreateThreadInput,
@@ -343,6 +345,12 @@ export class CodexAgentAdapter implements AgentAdapter {
     input?: AgentReadAccountRateLimitsInput,
   ): Promise<AgentReadAccountRateLimitsResult> {
     return this.threadManagementOwner.readAccountRateLimits(input);
+  }
+
+  public async executeCommand(
+    input: AgentCommandExecutionInput,
+  ): Promise<AgentCommandExecutionResult> {
+    return this.threadManagementOwner.executeCommand(input);
   }
 
   public async startAccountLogin(

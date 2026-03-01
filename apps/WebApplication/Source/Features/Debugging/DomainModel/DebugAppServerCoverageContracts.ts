@@ -69,6 +69,14 @@ export interface DebugAppServerCoverageRemoteSkillSummary {
   description: string;
 }
 
+export interface DebugAppServerCoverageCommandExecutionResult {
+  command: string[];
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  executedAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

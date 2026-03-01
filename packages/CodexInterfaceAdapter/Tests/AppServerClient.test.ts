@@ -1023,6 +1023,35 @@ describe("AppServerClient.readAccountRateLimits", () => {
   });
 });
 
+describe("AppServerClient.executeCommand", () => {
+  it("sends command/exec payload and returns command output contracts", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      exitCode: 0,
+      stdout: "/tmp/workspace\n",
+      stderr: "",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.executeCommand({
+      command: ["pwd"],
+      timeoutMilliseconds: 5_000,
+      cwd: "/tmp/workspace",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("command/exec", {
+      command: ["pwd"],
+      timeoutMs: 5_000,
+      cwd: "/tmp/workspace",
+    });
+    expect(result).toEqual({
+      exitCode: 0,
+      stdout: "/tmp/workspace\n",
+      stderr: "",
+    });
+  });
+});
+
 describe("AppServerClient.startAccountLogin", () => {
   it("sends account/login/start and returns chatgpt login metadata", async () => {
     const transportDouble = createTransportDouble();

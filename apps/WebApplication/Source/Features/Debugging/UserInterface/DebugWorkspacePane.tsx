@@ -3,6 +3,7 @@ import { Tabs } from "@/Components/UserInterface/Tabs";
 import { TabsList } from "@/Components/UserInterface/TabsList";
 import { TabsTrigger } from "@/Components/UserInterface/TabsTrigger";
 import {
+  type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
 } from "@/Features/Debugging/DomainModel/DebugAppServerCoverageContracts";
@@ -64,6 +65,7 @@ export interface DebugWorkspacePaneProps {
   coverageActionErrorMessage: string;
   coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
+  lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
   onCancelAccountLogin: () => void;
@@ -72,6 +74,7 @@ export interface DebugWorkspacePaneProps {
   onStartMcpServerOauthLogin: (serverName: string) => void;
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
   onExportRemoteSkill: (hazelnutId: string) => void;
+  onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
 }
 
 export function DebugWorkspacePane({
@@ -116,6 +119,7 @@ export function DebugWorkspacePane({
   coverageActionErrorMessage,
   coverageDiagnosticsSnapshot,
   pendingAccountLogin,
+  lastCommandExecutionResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
   onCancelAccountLogin,
@@ -124,6 +128,7 @@ export function DebugWorkspacePane({
   onStartMcpServerOauthLogin,
   onWriteSkillsConfig,
   onExportRemoteSkill,
+  onExecuteCommand,
 }: DebugWorkspacePaneProps): React.JSX.Element {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -224,6 +229,7 @@ export function DebugWorkspacePane({
             coverageActionErrorMessage={coverageActionErrorMessage}
             coverageDiagnosticsSnapshot={coverageDiagnosticsSnapshot}
             pendingAccountLogin={pendingAccountLogin}
+            lastCommandExecutionResult={lastCommandExecutionResult}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
             onStartAccountLogin={onStartAccountLogin}
             onCancelAccountLogin={onCancelAccountLogin}
@@ -232,6 +238,7 @@ export function DebugWorkspacePane({
             onStartMcpServerOauthLogin={onStartMcpServerOauthLogin}
             onWriteSkillsConfig={onWriteSkillsConfig}
             onExportRemoteSkill={onExportRemoteSkill}
+            onExecuteCommand={onExecuteCommand}
           />
         )}
       </Tabs>

@@ -6,6 +6,7 @@ const MCP_SERVER_OAUTH_LOGIN_ENDPOINT = "/api/mcp-servers/oauth/login";
 const SKILLS_CONFIG_WRITE_ENDPOINT = "/api/skills/config/write";
 const SKILLS_REMOTE_LIST_ENDPOINT = "/api/skills/remote/list";
 const SKILLS_REMOTE_EXPORT_ENDPOINT = "/api/skills/remote/export";
+const COMMAND_EXEC_ENDPOINT = "/api/commands/exec";
 
 export interface ApiMcpServerOauthLoginOptions extends ApiRequestOptions {
   agentId?: AgentId;
@@ -41,6 +42,13 @@ export interface ApiListRemoteSkillsOptions extends ApiRequestOptions {
 export interface ApiExportRemoteSkillOptions extends ApiRequestOptions {
   agentId?: AgentId;
   hazelnutId: string;
+}
+
+export interface ApiCommandExecutionOptions extends ApiRequestOptions {
+  agentId?: AgentId;
+  command: string[];
+  timeoutMs?: number;
+  cwd?: string;
 }
 
 const McpServerOauthLoginResponseSchema = z
@@ -84,6 +92,24 @@ const RemoteSkillExportResponseSchema = z
   })
   .strict();
 export type ApiRemoteSkillExportResponse = z.infer<typeof RemoteSkillExportResponseSchema>;
+
+const CommandExecutionResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    exitCode: z.number().int(),
+    stdout: z.string(),
+    stderr: z.string(),
+  })
+  .strict();
+export type ApiCommandExecutionResponse = z.infer<typeof CommandExecutionResponseSchema>;
+
+const CommandExecutionInputSchema = z
+  .object({
+    command: z.array(z.string().min(1)).min(1),
+    timeoutMs: z.number().int().nonnegative().optional(),
+    cwd: z.string().min(1).optional(),
+  })
+  .strict();
 
 function readMcpServerOauthLoginPath(options: ApiMcpServerOauthLoginOptions): string {
   const params = new URLSearchParams();
@@ -130,6 +156,28 @@ function readRemoteSkillExportPath(options: ApiExportRemoteSkillOptions): string
   return `${SKILLS_REMOTE_EXPORT_ENDPOINT}?${params.toString()}`;
 }
 
+function readCommandExecutionPath(options: ApiCommandExecutionOptions): string {
+  const parsedInput = CommandExecutionInputSchema.parse({
+    command: options.command,
+    ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+    ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
+  });
+  const params = new URLSearchParams();
+  for (const commandValue of parsedInput.command) {
+    params.append("command", commandValue);
+  }
+  if (options.agentId !== undefined) {
+    params.set("agentId", options.agentId);
+  }
+  if (parsedInput.timeoutMs !== undefined) {
+    params.set("timeoutMs", String(parsedInput.timeoutMs));
+  }
+  if (parsedInput.cwd !== undefined) {
+    params.set("cwd", parsedInput.cwd);
+  }
+  return `${COMMAND_EXEC_ENDPOINT}?${params.toString()}`;
+}
+
 export async function startMcpServerOauthLogin(
   options: ApiMcpServerOauthLoginOptions,
 ): Promise<ApiMcpServerOauthLoginResponse> {
@@ -165,6 +213,17 @@ export async function exportRemoteSkill(
 ): Promise<ApiRemoteSkillExportResponse> {
   return RemoteSkillExportResponseSchema.parse(
     await request(readRemoteSkillExportPath(options), {
+      ...requestInitWithOptions(options),
+      method: "POST",
+    }),
+  );
+}
+
+export async function executeCommand(
+  options: ApiCommandExecutionOptions,
+): Promise<ApiCommandExecutionResponse> {
+  return CommandExecutionResponseSchema.parse(
+    await request(readCommandExecutionPath(options), {
       ...requestInitWithOptions(options),
       method: "POST",
     }),

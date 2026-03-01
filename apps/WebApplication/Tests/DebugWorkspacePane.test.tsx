@@ -83,6 +83,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   coverageActionErrorMessage: "",
   coverageDiagnosticsSnapshot: null,
   pendingAccountLogin: null,
+  lastCommandExecutionResult: null,
   onRefreshCoverageDiagnostics: () => {},
   onStartAccountLogin: () => {},
   onCancelAccountLogin: () => {},
@@ -91,6 +92,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onStartMcpServerOauthLogin: () => {},
   onWriteSkillsConfig: () => {},
   onExportRemoteSkill: () => {},
+  onExecuteCommand: () => {},
 };
 
 function renderDebugWorkspacePane(properties: DebugWorkspacePaneProps): void {

@@ -21,6 +21,7 @@ import {
   type TurnStartParams,
 } from "@farfield/protocol";
 import { z } from "zod";
+import { buildCommandExecutionRequestParameters } from "./AppServerClientCommandExecutionRequestBuilders.js";
 import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
 import {
   APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT,
@@ -307,6 +308,18 @@ export interface AccountRateLimitSnapshot {
 export interface ReadAccountRateLimitsResult {
   rateLimits: AccountRateLimitSnapshot;
   rateLimitsByLimitId: Record<string, AccountRateLimitSnapshot> | null;
+}
+
+export interface CommandExecutionOptions {
+  command: string[];
+  timeoutMilliseconds?: number;
+  cwd?: string;
+}
+
+export interface CommandExecutionResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
 }
 
 export interface LoginAccountWithApiKeyOptions {
@@ -654,6 +667,13 @@ const AppServerGetAccountRateLimitsResponseSchema = z
   .object({
     rateLimits: AppServerAccountRateLimitSnapshotSchema,
     rateLimitsByLimitId: z.record(AppServerAccountRateLimitSnapshotSchema).nullable().optional(),
+  })
+  .passthrough();
+const AppServerCommandExecResponseSchema = z
+  .object({
+    exitCode: z.number().int(),
+    stdout: z.string(),
+    stderr: z.string(),
   })
   .passthrough();
 const AppServerLoginAccountResponseSchema = z.discriminatedUnion("type", [
@@ -1120,6 +1140,23 @@ export class AppServerClient {
                 mapAccountRateLimitSnapshot(snapshot),
               ]),
             ),
+    };
+  }
+
+  public async executeCommand(options: CommandExecutionOptions): Promise<CommandExecutionResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.executeCommand,
+      buildCommandExecutionRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerCommandExecResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.executeCommand,
+    );
+    return {
+      exitCode: parsed.exitCode,
+      stdout: parsed.stdout,
+      stderr: parsed.stderr,
     };
   }
 

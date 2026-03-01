@@ -5,6 +5,7 @@ account/rateLimits/read
 account/read
 app/list
 collaborationMode/list
+command/exec
 config/mcpServer/reload
 config/read
 configRequirements/read

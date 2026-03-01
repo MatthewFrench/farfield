@@ -1,6 +1,8 @@
 import { RefreshCcw } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/Components/UserInterface/Button";
 import {
+  type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
 } from "../DomainModel/DebugAppServerCoverageContracts";
@@ -12,6 +14,7 @@ export interface DebugAppServerCoveragePanelProps {
   coverageActionErrorMessage: string;
   coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
+  lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
   onCancelAccountLogin: () => void;
@@ -20,6 +23,7 @@ export interface DebugAppServerCoveragePanelProps {
   onStartMcpServerOauthLogin: (serverName: string) => void;
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
   onExportRemoteSkill: (hazelnutId: string) => void;
+  onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
 }
 
 function renderListValues(values: string[] | null): string {
@@ -40,6 +44,7 @@ export function DebugAppServerCoveragePanel({
   coverageActionErrorMessage,
   coverageDiagnosticsSnapshot,
   pendingAccountLogin,
+  lastCommandExecutionResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
   onCancelAccountLogin,
@@ -48,7 +53,39 @@ export function DebugAppServerCoveragePanel({
   onStartMcpServerOauthLogin,
   onWriteSkillsConfig,
   onExportRemoteSkill,
+  onExecuteCommand,
 }: DebugAppServerCoveragePanelProps): React.JSX.Element {
+  const [commandExecutable, setCommandExecutable] = useState("pwd");
+  const [commandArgumentsText, setCommandArgumentsText] = useState("");
+  const [commandWorkingDirectory, setCommandWorkingDirectory] = useState("");
+  const [commandTimeoutMilliseconds, setCommandTimeoutMilliseconds] = useState("2000");
+
+  const runCoverageCommand = (): void => {
+    const normalizedExecutable = commandExecutable.trim();
+    if (normalizedExecutable.length === 0) {
+      return;
+    }
+
+    const commandArguments = commandArgumentsText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    const command = [normalizedExecutable, ...commandArguments];
+
+    const normalizedTimeout = commandTimeoutMilliseconds.trim();
+    const parsedTimeout = normalizedTimeout.length === 0 ? undefined : Number(normalizedTimeout);
+    if (parsedTimeout !== undefined && (!Number.isInteger(parsedTimeout) || parsedTimeout < 0)) {
+      return;
+    }
+
+    const normalizedWorkingDirectory = commandWorkingDirectory.trim();
+    onExecuteCommand(
+      command,
+      parsedTimeout,
+      normalizedWorkingDirectory.length > 0 ? normalizedWorkingDirectory : undefined,
+    );
+  };
+
   return (
     <div data-testid="debug-coverage-panel" className="flex-1 min-h-0 overflow-auto p-4 space-y-3">
       <div className="rounded-md border border-border bg-card p-3 flex items-center justify-between gap-3">
@@ -56,7 +93,7 @@ export function DebugAppServerCoveragePanel({
           <h3 className="text-sm font-semibold">App-Server Coverage Diagnostics</h3>
           <p className="text-xs text-muted-foreground">
             Skills, apps, experimental features, MCP status, config requirements, and account
-            diagnostics plus remote skills import coverage.
+            diagnostics plus remote skills import and command execution coverage.
           </p>
         </div>
         <Button
@@ -406,6 +443,113 @@ export function DebugAppServerCoveragePanel({
                   <p className="text-muted-foreground break-all">{skill.id}</p>
                 </div>
               ))
+            )}
+          </div>
+
+          <div className="rounded-md border border-border bg-card p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Command Execution
+              </h4>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-testid="debug-coverage-command-exec-run"
+                disabled={isRunningCoverageAction}
+                onClick={runCoverageCommand}
+              >
+                Run Command
+              </Button>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-muted-foreground" htmlFor="debug-coverage-command">
+                Executable
+              </label>
+              <input
+                id="debug-coverage-command"
+                type="text"
+                className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                value={commandExecutable}
+                onChange={(event) => {
+                  setCommandExecutable(event.target.value);
+                }}
+              />
+              <label
+                className="text-xs text-muted-foreground"
+                htmlFor="debug-coverage-command-args"
+              >
+                Arguments (one per line)
+              </label>
+              <textarea
+                id="debug-coverage-command-args"
+                className="w-full rounded border border-border bg-background px-2 py-1 text-xs min-h-16"
+                value={commandArgumentsText}
+                onChange={(event) => {
+                  setCommandArgumentsText(event.target.value);
+                }}
+              />
+              <label className="text-xs text-muted-foreground" htmlFor="debug-coverage-command-cwd">
+                Working Directory (optional)
+              </label>
+              <input
+                id="debug-coverage-command-cwd"
+                type="text"
+                className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                value={commandWorkingDirectory}
+                onChange={(event) => {
+                  setCommandWorkingDirectory(event.target.value);
+                }}
+              />
+              <label
+                className="text-xs text-muted-foreground"
+                htmlFor="debug-coverage-command-timeout-ms"
+              >
+                Timeout (milliseconds, optional)
+              </label>
+              <input
+                id="debug-coverage-command-timeout-ms"
+                type="text"
+                className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                value={commandTimeoutMilliseconds}
+                onChange={(event) => {
+                  setCommandTimeoutMilliseconds(event.target.value);
+                }}
+              />
+            </div>
+            {lastCommandExecutionResult === null ? (
+              <p className="text-xs text-muted-foreground">No command output captured.</p>
+            ) : (
+              <div
+                className="rounded border border-border/70 p-2 text-xs space-y-2"
+                data-testid="debug-coverage-command-exec-result"
+              >
+                <p>
+                  Command:{" "}
+                  <span className="font-mono">{lastCommandExecutionResult.command.join(" ")}</span>
+                </p>
+                <p>Exit code: {lastCommandExecutionResult.exitCode}</p>
+                <p>
+                  Executed:{" "}
+                  {new Date(lastCommandExecutionResult.executedAtIso8601).toLocaleTimeString()}
+                </p>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground">stdout</p>
+                  <pre className="rounded border border-border/60 bg-background p-2 whitespace-pre-wrap break-words">
+                    {lastCommandExecutionResult.stdout.length > 0
+                      ? lastCommandExecutionResult.stdout
+                      : "(empty)"}
+                  </pre>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground">stderr</p>
+                  <pre className="rounded border border-border/60 bg-background p-2 whitespace-pre-wrap break-words">
+                    {lastCommandExecutionResult.stderr.length > 0
+                      ? lastCommandExecutionResult.stderr
+                      : "(empty)"}
+                  </pre>
+                </div>
+              </div>
             )}
           </div>
         </>

@@ -2,6 +2,8 @@ import {
   AppServerClient,
   type CancelAccountLoginOptions,
   type CancelAccountLoginResult,
+  type CommandExecutionOptions,
+  type CommandExecutionResult,
   type ExportRemoteSkillOptions,
   type ExportRemoteSkillResult,
   type ListAppsOptions,
@@ -43,6 +45,8 @@ import type {
   AgentCancelAccountLoginInput,
   AgentCancelAccountLoginResult,
   AgentCleanThreadBackgroundTerminalsInput,
+  AgentCommandExecutionInput,
+  AgentCommandExecutionResult,
   AgentCompactThreadInput,
   AgentConfigDefaults,
   AgentCreateThreadInput,
@@ -294,6 +298,16 @@ function buildWriteSkillsConfigOptions(
   return {
     path: input.path,
     enabled: input.enabled,
+  };
+}
+
+function buildCommandExecutionOptions(input: AgentCommandExecutionInput): CommandExecutionOptions {
+  return {
+    command: input.command,
+    ...(input.timeoutMilliseconds !== undefined
+      ? { timeoutMilliseconds: input.timeoutMilliseconds }
+      : {}),
+    ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
   };
 }
 
@@ -572,6 +586,16 @@ export class CodexThreadManagementOwner {
     this.ensureCodexAvailable();
     const result: ReadAccountRateLimitsResult = await this.runAppServerCall(() =>
       this.appClient.readAccountRateLimits(),
+    );
+    return result;
+  }
+
+  public async executeCommand(
+    input: AgentCommandExecutionInput,
+  ): Promise<AgentCommandExecutionResult> {
+    this.ensureCodexAvailable();
+    const result: CommandExecutionResult = await this.runAppServerCall(() =>
+      this.appClient.executeCommand(buildCommandExecutionOptions(input)),
     );
     return result;
   }

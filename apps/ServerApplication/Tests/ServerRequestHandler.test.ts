@@ -204,6 +204,7 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
         canListSkills: false,
         canReadAccount: false,
         canReadAccountRateLimits: false,
+        canExecuteCommand: false,
         canStartAccountLogin: false,
         canCancelAccountLogin: false,
         canLogoutAccount: false,

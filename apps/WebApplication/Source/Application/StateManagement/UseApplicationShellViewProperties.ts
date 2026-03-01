@@ -143,6 +143,7 @@ export interface UseApplicationShellViewPropertiesInput {
   coverageActionErrorMessage: string;
   coverageDiagnosticsSnapshot: DebugWorkspacePaneProps["coverageDiagnosticsSnapshot"];
   pendingAccountLogin: DebugWorkspacePaneProps["pendingAccountLogin"];
+  lastCommandExecutionResult: DebugWorkspacePaneProps["lastCommandExecutionResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -151,6 +152,7 @@ export interface UseApplicationShellViewPropertiesInput {
   startMcpServerOauthLogin: (serverName: string) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
+  executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   apiSessionTokenDraft: string;
   setApiSessionTokenDraft: (nextTokenValue: string) => void;
   apiSessionBootstrapError: string;
@@ -391,6 +393,7 @@ function buildDebugWorkspacePaneProperties(
     coverageActionErrorMessage: input.coverageActionErrorMessage,
     coverageDiagnosticsSnapshot: input.coverageDiagnosticsSnapshot,
     pendingAccountLogin: input.pendingAccountLogin,
+    lastCommandExecutionResult: input.lastCommandExecutionResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
     onCancelAccountLogin: input.cancelAccountLogin,
@@ -399,6 +402,7 @@ function buildDebugWorkspacePaneProperties(
     onStartMcpServerOauthLogin: input.startMcpServerOauthLogin,
     onWriteSkillsConfig: input.writeSkillsConfig,
     onExportRemoteSkill: input.exportRemoteSkill,
+    onExecuteCommand: input.executeCommand,
   };
 }
 
@@ -590,6 +594,7 @@ export function useApplicationShellViewProperties(
       input.coverageActionErrorMessage,
       input.coverageDiagnosticsSnapshot,
       input.pendingAccountLogin,
+      input.lastCommandExecutionResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
       input.cancelAccountLogin,
@@ -598,6 +603,7 @@ export function useApplicationShellViewProperties(
       input.startMcpServerOauthLogin,
       input.writeSkillsConfig,
       input.exportRemoteSkill,
+      input.executeCommand,
       input.replayHistoryEntryFromDetail,
       input.runtimeRequestErrorOperationMetrics,
       input.isEnablingPushNotifications,

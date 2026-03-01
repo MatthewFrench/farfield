@@ -37,6 +37,7 @@ export const CODEX_AGENT_CAPABILITIES: AgentCapabilities = {
   canListSkills: true,
   canReadAccount: true,
   canReadAccountRateLimits: true,
+  canExecuteCommand: true,
   canStartAccountLogin: true,
   canCancelAccountLogin: true,
   canLogoutAccount: true,

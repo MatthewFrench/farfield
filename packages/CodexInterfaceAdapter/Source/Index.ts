@@ -15,6 +15,8 @@ export type {
   CancelAccountLoginResult,
   CancelAccountLoginStatus,
   ChatgptAccountSummary,
+  CommandExecutionOptions,
+  CommandExecutionResult,
   ConfigRequirements,
   ConfigRequirementsNetwork,
   ExperimentalFeature,

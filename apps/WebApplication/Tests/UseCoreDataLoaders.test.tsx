@@ -70,6 +70,7 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canListSkills: true,
         canReadAccount: true,
         canReadAccountRateLimits: true,
+        canExecuteCommand: true,
         canStartAccountLogin: true,
         canCancelAccountLogin: true,
         canLogoutAccount: true,

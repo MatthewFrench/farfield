@@ -19,6 +19,7 @@ export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   listSkills: "AppServerSkillsListResponse",
   readAccount: "AppServerGetAccountResponse",
   readAccountRateLimits: "AppServerGetAccountRateLimitsResponse",
+  executeCommand: "AppServerCommandExecResponse",
   startAccountLogin: "AppServerLoginAccountResponse",
   cancelAccountLogin: "AppServerCancelLoginAccountResponse",
   logoutAccount: "AppServerLogoutAccountResponse",

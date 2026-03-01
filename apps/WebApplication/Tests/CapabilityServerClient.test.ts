@@ -20,6 +20,7 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityApi", () => ({
 }));
 
 vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi", () => ({
+  executeCommand: vi.fn(),
   exportRemoteSkill: vi.fn(),
   listRemoteSkills: vi.fn(),
   startMcpServerOauthLogin: vi.fn(),
@@ -45,6 +46,7 @@ import {
   startAccountLogin,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
 import {
+  executeCommand,
   exportRemoteSkill,
   listRemoteSkills,
   startMcpServerOauthLogin,
@@ -58,6 +60,7 @@ import {
   type CapabilityAgentsResponse,
   type CapabilityAppsResponse,
   type CapabilityCollaborationModesResponse,
+  type CapabilityCommandExecutionResponse,
   type CapabilityConfigDefaultsResponse,
   type CapabilityConfigRequirementsResponse,
   type CapabilityExperimentalFeaturesResponse,
@@ -103,6 +106,7 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canListSkills: true,
         canReadAccount: true,
         canReadAccountRateLimits: true,
+        canExecuteCommand: true,
         canStartAccountLogin: true,
         canCancelAccountLogin: true,
         canLogoutAccount: true,
@@ -220,6 +224,13 @@ const MCP_SERVER_OAUTH_LOGIN_RESPONSE: CapabilityMcpServerOauthLoginResponse = {
   authorizationUrl: "https://example.com/oauth/mcp/github",
 };
 
+const COMMAND_EXECUTION_RESPONSE: CapabilityCommandExecutionResponse = {
+  ok: true,
+  exitCode: 0,
+  stdout: "/tmp/project\n",
+  stderr: "",
+};
+
 const SKILLS_CONFIG_WRITE_RESPONSE: CapabilitySkillsConfigWriteResponse = {
   ok: true,
   effectiveEnabled: false,
@@ -325,6 +336,7 @@ describe("CapabilityServerClient", () => {
     vi.mocked(logoutAccount).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
     vi.mocked(reloadMcpServerConfig).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
     vi.mocked(startMcpServerOauthLogin).mockResolvedValue(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
+    vi.mocked(executeCommand).mockResolvedValue(COMMAND_EXECUTION_RESPONSE);
     vi.mocked(writeSkillsConfig).mockResolvedValue(SKILLS_CONFIG_WRITE_RESPONSE);
     vi.mocked(listRemoteSkills).mockResolvedValue(REMOTE_SKILLS_LIST_RESPONSE);
     vi.mocked(exportRemoteSkill).mockResolvedValue(REMOTE_SKILL_EXPORT_RESPONSE);
@@ -394,6 +406,13 @@ describe("CapabilityServerClient", () => {
       scopes: ["read:org", "repo"],
       timeoutSeconds: 180,
     };
+    const commandExecutionOptions = {
+      actionId: "action-command-execution",
+      actionName: "execute-command",
+      command: ["pwd"],
+      timeoutMs: 1200,
+      cwd: "/tmp/project",
+    };
     const skillsConfigWriteOptions = {
       actionId: "action-skills-config-write",
       actionName: "write-skills-config",
@@ -456,6 +475,8 @@ describe("CapabilityServerClient", () => {
     const mcpServerOauthLoginResponse = await capabilityServerClient.startMcpServerOauthLogin(
       mcpServerOauthLoginOptions,
     );
+    const commandExecutionResponse =
+      await capabilityServerClient.executeCommand(commandExecutionOptions);
     const skillsConfigWriteResponse =
       await capabilityServerClient.writeSkillsConfig(skillsConfigWriteOptions);
     const remoteSkillsListResponse =
@@ -482,6 +503,7 @@ describe("CapabilityServerClient", () => {
     expect(logoutAccount).toHaveBeenCalledWith(accountLogoutOptions);
     expect(reloadMcpServerConfig).toHaveBeenCalledWith(reloadMcpServerConfigOptions);
     expect(startMcpServerOauthLogin).toHaveBeenCalledWith(mcpServerOauthLoginOptions);
+    expect(executeCommand).toHaveBeenCalledWith(commandExecutionOptions);
     expect(writeSkillsConfig).toHaveBeenCalledWith(skillsConfigWriteOptions);
     expect(listRemoteSkills).toHaveBeenCalledWith(listRemoteSkillsOptions);
     expect(exportRemoteSkill).toHaveBeenCalledWith(exportRemoteSkillOptions);
@@ -502,6 +524,7 @@ describe("CapabilityServerClient", () => {
     expect(accountLogoutResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
     expect(reloadMcpServerConfigResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
     expect(mcpServerOauthLoginResponse).toEqual(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
+    expect(commandExecutionResponse).toEqual(COMMAND_EXECUTION_RESPONSE);
     expect(skillsConfigWriteResponse).toEqual(SKILLS_CONFIG_WRITE_RESPONSE);
     expect(remoteSkillsListResponse).toEqual(REMOTE_SKILLS_LIST_RESPONSE);
     expect(remoteSkillExportResponse).toEqual(REMOTE_SKILL_EXPORT_RESPONSE);

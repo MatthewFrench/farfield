@@ -11,6 +11,7 @@ import type { z } from "zod";
 import type { AgentRegistry } from "../../Agents/Registry.js";
 import type {
   AgentCancelAccountLoginResult,
+  AgentCommandExecutionResult,
   AgentConfigDefaults,
   AgentExportRemoteSkillResult,
   AgentId,
@@ -44,6 +45,7 @@ const CapabilityRoutePathnameByName = {
   accountLoginStart: "/api/account/login/start",
   accountLoginCancel: "/api/account/login/cancel",
   accountLogout: "/api/account/logout",
+  commandsExec: "/api/commands/exec",
   mcpServerOauthLogin: "/api/mcp-servers/oauth/login",
   skillsConfigWrite: "/api/skills/config/write",
   skillsRemoteList: "/api/skills/remote/list",
@@ -74,10 +76,13 @@ const CapabilityRouteQueryParameterByName = {
   name: "name",
   path: "path",
   enabled: "enabled",
+  command: "command",
+  cwd: "cwd",
   hazelnutScope: "hazelnutScope",
   productSurface: "productSurface",
   hazelnutId: "hazelnutId",
   scopes: "scopes",
+  timeoutMs: "timeoutMs",
   timeoutSeconds: "timeoutSeconds",
 } as const;
 
@@ -87,6 +92,7 @@ const CapabilityRouteLogEventByName = {
   configRequirementsReadFailed: "config-requirements-read-failed",
   accountReadFailed: "account-read-failed",
   accountRateLimitsReadFailed: "account-rate-limits-read-failed",
+  commandExecFailed: "command-exec-failed",
   accountLoginStartFailed: "account-login-start-failed",
   accountLoginCancelFailed: "account-login-cancel-failed",
   accountLogoutFailed: "account-logout-failed",
@@ -108,6 +114,11 @@ const CapabilityRouteErrorMessagePrefixByName = {
   failedToReadConfigRequirements: "Failed to read config requirements: ",
   failedToReadAccount: "Failed to read account: ",
   failedToReadAccountRateLimits: "Failed to read account rate limits: ",
+  missingCommand: "Missing command query parameter. Use repeated command query values.",
+  invalidCommand: "Invalid command query parameter. Expected non-empty command arguments.",
+  invalidTimeoutMilliseconds: "Invalid timeoutMs query parameter.",
+  invalidCommandWorkingDirectory: "Invalid cwd query parameter.",
+  failedToExecuteCommand: "Failed to execute command: ",
   failedToStartAccountLogin: "Failed to start account login: ",
   failedToCancelAccountLogin: "Failed to cancel account login: ",
   failedToLogoutAccount: "Failed to logout account: ",
@@ -143,6 +154,7 @@ const CapabilityRouteTimeoutLabelByName = {
   configRequirementsRead: "config requirements read",
   accountRead: "account read",
   accountRateLimitsRead: "account rate limits read",
+  commandExec: "command execution",
   accountLoginStart: "account login start",
   accountLoginCancel: "account login cancel",
   accountLogout: "account logout",
@@ -198,6 +210,10 @@ interface CapabilityAccountRateLimitsResponseBody {
   rateLimits: AgentReadAccountRateLimitsResult["rateLimits"] | null;
   rateLimitsByLimitId: AgentReadAccountRateLimitsResult["rateLimitsByLimitId"];
 }
+
+type CapabilityCommandExecutionResponseBody = AgentCommandExecutionResult & {
+  ok: true;
+};
 
 type CapabilityAccountLoginStartResponseBody = AgentStartAccountLoginResult & {
   ok: true;
@@ -365,6 +381,25 @@ function parseOptionalScopesQueryValue(value: string | null): string[] | null {
   return scopes.length > 0 ? scopes : null;
 }
 
+function parseCommandArgumentsQueryValues(values: string[]): string[] | null {
+  if (values.length === 0) {
+    return null;
+  }
+  const normalizedValues = values.map((value) => value.trim());
+  if (normalizedValues.some((value) => value.length === 0)) {
+    return null;
+  }
+  return normalizedValues;
+}
+
+function parseOptionalWorkingDirectoryQueryValue(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 function parseRemoteSkillsHazelnutScopeQueryValue(
   value: string | null,
 ): AgentRemoteSkillsHazelnutScope | null {
@@ -428,6 +463,15 @@ function mapAccountResponse(result: AgentReadAccountResult): CapabilityAccountRe
 function mapAccountRateLimitsResponse(
   result: AgentReadAccountRateLimitsResult,
 ): CapabilityAccountRateLimitsResponseBody {
+  return {
+    ok: true,
+    ...result,
+  };
+}
+
+function mapCommandExecutionResponse(
+  result: AgentCommandExecutionResult,
+): CapabilityCommandExecutionResponseBody {
   return {
     ok: true,
     ...result,
@@ -864,6 +908,125 @@ async function handleAccountRateLimitsRoute(deps: CapabilityRouteDependencies): 
     jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
       ok: false,
       error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadAccountRateLimits}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleCommandExecRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.commandsExec,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const commandArguments = parseCommandArgumentsQueryValues(
+    url.searchParams.getAll(CapabilityRouteQueryParameterByName.command),
+  );
+  if (commandArguments === null) {
+    const commandQueryValues = url.searchParams.getAll(CapabilityRouteQueryParameterByName.command);
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error:
+        commandQueryValues.length > 0
+          ? CapabilityRouteErrorMessagePrefixByName.invalidCommand
+          : CapabilityRouteErrorMessagePrefixByName.missingCommand,
+    });
+    return true;
+  }
+
+  const timeoutMillisecondsRaw = url.searchParams.get(
+    CapabilityRouteQueryParameterByName.timeoutMs,
+  );
+  const timeoutMilliseconds = parseOptionalPositiveIntegerQueryValue(timeoutMillisecondsRaw);
+  if (timeoutMillisecondsRaw !== null && timeoutMilliseconds === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidTimeoutMilliseconds,
+    });
+    return true;
+  }
+
+  const workingDirectoryRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.cwd);
+  const workingDirectory = parseOptionalWorkingDirectoryQueryValue(workingDirectoryRaw);
+  if (workingDirectoryRaw !== null && workingDirectory === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidCommandWorkingDirectory,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canExecuteCommand ||
+    !adapter.executeCommand
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToExecuteCommand}Command execution is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  const routeTimeoutMilliseconds = timeoutMilliseconds ?? capabilityListTimeoutMs;
+  try {
+    const result = await withTimeout(
+      adapter.executeCommand({
+        command: commandArguments,
+        ...(timeoutMilliseconds !== null ? { timeoutMilliseconds } : {}),
+        ...(workingDirectory !== null ? { cwd: workingDirectory } : {}),
+      }),
+      routeTimeoutMilliseconds,
+      CapabilityRouteTimeoutLabelByName.commandExec,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapCommandExecutionResponse(result));
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        commandArguments,
+        timeoutMilliseconds,
+        workingDirectory,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.commandExecFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToExecuteCommand}${message}`,
     });
   }
 
@@ -2014,7 +2177,7 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
 /**
  * Owns capability route dispatch (`/api/config/defaults`, `/api/config-requirements`,
  * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/rate-limits`,
- * `/api/account/login/start`, `/api/account/login/cancel`, `/api/account/logout`,
+ * `/api/commands/exec`, `/api/account/login/start`, `/api/account/login/cancel`, `/api/account/logout`,
  * `/api/mcp-servers/oauth/login`, `/api/skills/config/write`,
  * `/api/skills/remote/list`, `/api/skills/remote/export`, `/api/models`,
  * `/api/collaboration-modes`, `/api/experimental-features`,
@@ -2032,6 +2195,9 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleAccountRateLimitsRoute(deps)) {
+    return true;
+  }
+  if (await handleCommandExecRoute(deps)) {
     return true;
   }
   if (await handleAccountLoginStartRoute(deps)) {

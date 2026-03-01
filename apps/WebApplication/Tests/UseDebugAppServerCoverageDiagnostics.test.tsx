@@ -174,6 +174,12 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         ok: true,
         authorizationUrl: "https://example.com/oauth/mcp/github",
       });
+    const executeCommand = vi.spyOn(capabilityServerClient, "executeCommand").mockResolvedValue({
+      ok: true,
+      exitCode: 0,
+      stdout: "/tmp/project\n",
+      stderr: "",
+    });
     const writeSkillsConfig = vi
       .spyOn(capabilityServerClient, "writeSkillsConfig")
       .mockResolvedValue({
@@ -220,6 +226,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.logoutAccount();
     latestDiagnostics.current?.reloadMcpServerConfig();
     latestDiagnostics.current?.startMcpServerOauthLogin("github");
+    latestDiagnostics.current?.executeCommand(["pwd"], 1200, "/tmp/project");
     latestDiagnostics.current?.writeSkillsConfig(
       "/tmp/project/.codex/skills/checks/SKILL.md",
       false,
@@ -231,6 +238,12 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       expect(startMcpServerOauthLogin).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
         name: "github",
+      });
+      expect(executeCommand).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        command: ["pwd"],
+        timeoutMs: 1200,
+        cwd: "/tmp/project",
       });
       expect(writeSkillsConfig).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -246,6 +259,13 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         "_blank",
         "noopener,noreferrer",
       );
+      expect(latestDiagnostics.current?.lastCommandExecutionResult).toEqual({
+        command: ["pwd"],
+        exitCode: 0,
+        stdout: "/tmp/project\n",
+        stderr: "",
+        executedAtIso8601: expect.any(String),
+      });
     });
 
     openWindow.mockRestore();
