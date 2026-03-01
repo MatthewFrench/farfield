@@ -345,6 +345,29 @@ describe("ChatWorkspacePane", () => {
     expect(onSubmitApplyPatchApprovalRequest).toHaveBeenCalledWith("approved_for_session");
   });
 
+  it("submits apply-patch execpolicy-amendment decisions from the deprecated apply-patch approval card", () => {
+    const onSubmitApplyPatchApprovalRequest = vi.fn();
+
+    renderChatWorkspacePane({
+      chatSurfaceState: "ready",
+      turnCount: 1,
+      canSubmitUserInputForActiveAgent: true,
+      activeApplyPatchApprovalRequest: buildPendingApplyPatchApprovalRequest(),
+      onSubmitApplyPatchApprovalRequest,
+    });
+
+    fireEvent.change(screen.getByLabelText("Execpolicy amendment commands (one per line)"), {
+      target: { value: " git status \n git diff --stat " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Approve with execpolicy amendment" }));
+
+    expect(onSubmitApplyPatchApprovalRequest).toHaveBeenCalledWith({
+      approved_execpolicy_amendment: {
+        proposed_execpolicy_amendment: ["git status", "git diff --stat"],
+      },
+    });
+  });
+
   it("submits execute-command approval decisions from the deprecated execute-command approval card", () => {
     const onSubmitExecuteCommandApprovalRequest = vi.fn();
 
@@ -359,6 +382,29 @@ describe("ChatWorkspacePane", () => {
     fireEvent.click(screen.getByRole("button", { name: "Deny" }));
 
     expect(onSubmitExecuteCommandApprovalRequest).toHaveBeenCalledWith("denied");
+  });
+
+  it("submits execute-command execpolicy-amendment decisions from the deprecated execute-command approval card", () => {
+    const onSubmitExecuteCommandApprovalRequest = vi.fn();
+
+    renderChatWorkspacePane({
+      chatSurfaceState: "ready",
+      turnCount: 1,
+      canSubmitUserInputForActiveAgent: true,
+      activeExecuteCommandApprovalRequest: buildPendingExecuteCommandApprovalRequest(),
+      onSubmitExecuteCommandApprovalRequest,
+    });
+
+    fireEvent.change(screen.getByLabelText("Execpolicy amendment commands (one per line)"), {
+      target: { value: " git status \n npm test " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Approve with execpolicy amendment" }));
+
+    expect(onSubmitExecuteCommandApprovalRequest).toHaveBeenCalledWith({
+      approved_execpolicy_amendment: {
+        proposed_execpolicy_amendment: ["git status", "npm test"],
+      },
+    });
   });
 
   it("submits tool-call responses from the tool-call request card", () => {

@@ -299,7 +299,11 @@ describe("codex-protocol thread contract hardening", () => {
     const executeCommandApprovalResponse = parseThreadConversationRequestResponse({
       method: "execCommandApproval",
       payload: {
-        decision: "approved",
+        decision: {
+          approved_execpolicy_amendment: {
+            proposed_execpolicy_amendment: ["git status", "npm test"],
+          },
+        },
       },
     });
 
@@ -309,6 +313,13 @@ describe("codex-protocol thread contract hardening", () => {
     expect(refreshResponse.method).toBe(ChatGptAuthTokensRefreshRequestMethod);
     expect(applyPatchApprovalResponse.method).toBe("applyPatchApproval");
     expect(executeCommandApprovalResponse.method).toBe("execCommandApproval");
+    expect(executeCommandApprovalResponse.payload).toEqual({
+      decision: {
+        approved_execpolicy_amendment: {
+          proposed_execpolicy_amendment: ["git status", "npm test"],
+        },
+      },
+    });
   });
 
   it("rejects thread request-response envelopes when payload does not match method schema", () => {

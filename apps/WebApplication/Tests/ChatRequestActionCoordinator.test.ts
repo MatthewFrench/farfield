@@ -673,7 +673,11 @@ describe("ChatRequestActionCoordinator", () => {
     await coordinator.submitExecuteCommandApprovalRequest({
       selectedThreadId: DEFAULT_THREAD_ID,
       requestId: 66,
-      decision: "denied",
+      decision: {
+        approved_execpolicy_amendment: {
+          proposed_execpolicy_amendment: ["git status", "npm test"],
+        },
+      },
       buildActionRequestOptions,
       onSetBusy,
       chatClient,
@@ -689,7 +693,11 @@ describe("ChatRequestActionCoordinator", () => {
         response: {
           method: ExecuteCommandApprovalRequestMethod,
           payload: {
-            decision: "denied",
+            decision: {
+              approved_execpolicy_amendment: {
+                proposed_execpolicy_amendment: ["git status", "npm test"],
+              },
+            },
           },
         },
       },

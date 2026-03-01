@@ -474,7 +474,11 @@ describe("AppServerClient.submitServerRequestResponse", () => {
     await client.submitServerRequestResponse(32, {
       method: "execCommandApproval",
       payload: {
-        decision: "approved",
+        decision: {
+          approved_execpolicy_amendment: {
+            proposed_execpolicy_amendment: ["git status", "npm test"],
+          },
+        },
       },
     });
 
@@ -487,7 +491,11 @@ describe("AppServerClient.submitServerRequestResponse", () => {
     expect(transportDouble.respond).toHaveBeenNthCalledWith(2, 32, {
       method: "execCommandApproval",
       payload: {
-        decision: "approved",
+        decision: {
+          approved_execpolicy_amendment: {
+            proposed_execpolicy_amendment: ["git status", "npm test"],
+          },
+        },
       },
     });
   });

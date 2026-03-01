@@ -1,6 +1,6 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-03-01 07:07:18Z
+Last Updated (UTC): 2026-03-01 07:13:47Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
 
@@ -53,8 +53,8 @@ This ledger records recommended disposition for upstream app-server event and ca
 | `windows/worldWritableWarning` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `windowsSandbox/setupCompleted` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `account/chatgptAuthTokens/refresh` | server-to-client request | Used now | Keep | Farfield surfaces this request in chat with a dedicated auth-token refresh card and submits typed responses through app-server transport. |
-| `applyPatchApproval` | server-to-client request | Used now | Keep (compatibility only) | Deprecated server-request path, but Farfield now keeps typed compatibility handling and dedicated in-chat approval controls to avoid transport-level request drops. |
-| `execCommandApproval` | server-to-client request | Used now | Keep (compatibility only) | Deprecated server-request path, but Farfield now keeps typed compatibility handling and dedicated in-chat approval controls to avoid transport-level request drops. |
+| `applyPatchApproval` | server-to-client request | Used now | Keep (compatibility only) | Deprecated server-request path, but Farfield now keeps typed compatibility handling and dedicated in-chat approval controls, including execpolicy-amendment decision submissions, to avoid transport-level request drops. |
+| `execCommandApproval` | server-to-client request | Used now | Keep (compatibility only) | Deprecated server-request path, but Farfield now keeps typed compatibility handling and dedicated in-chat approval controls, including execpolicy-amendment decision submissions, to avoid transport-level request drops. |
 | `item/commandExecution/requestApproval` | server-to-client request | Used now | Keep | Farfield surfaces this request in chat with approval controls and submits typed command-decision responses through app-server transport. |
 | `item/fileChange/requestApproval` | server-to-client request | Used now | Keep | Farfield surfaces this request in chat with approval controls and submits typed file-change decisions through app-server transport. |
 | `item/tool/call` | server-to-client request | Used now | Keep | Farfield surfaces this request in chat with tool-response controls and submits typed tool-call responses through app-server transport. |
