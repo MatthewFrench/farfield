@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 04:58:26Z
+Last Updated (UTC): 2026-03-01 06:50:57Z
 
 ## Purpose
 
@@ -57,7 +57,7 @@ As of the upstream snapshot above:
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
 3. Effective request-method usage including transport-owned `initialize`: `54 / 74` (`73.0%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
-5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
+5. Farfield now handles all upstream app-server server-request methods (`item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, `item/tool/call`, `account/chatgptAuthTokens/refresh`, `applyPatchApproval`, `execCommandApproval`) with typed response contracts and user-facing response controls for current product flows.
 
 ## Canonical Coverage Artifacts
 

@@ -1,7 +1,15 @@
+import {
+  type CommandExecutionApprovalResponsePayload,
+  type FileChangeApprovalResponsePayload,
+  type ToolCallResponsePayload,
+} from "@farfield/protocol";
 import { type Dispatch, type MutableRefObject, type SetStateAction, useCallback } from "react";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { type PendingAuthTokenRefreshRequest } from "../DomainModel/PendingAuthTokenRefreshRequestSelector";
+import { type PendingCommandExecutionApprovalRequest } from "../DomainModel/PendingCommandExecutionApprovalRequestSelector";
+import { type PendingFileChangeApprovalRequest } from "../DomainModel/PendingFileChangeApprovalRequestSelector";
+import { type PendingToolCallRequest } from "../DomainModel/PendingToolCallRequestSelector";
 import {
   createEmptyPendingUserInputAnswerDraft,
   PendingUserInputAnswerBuilder,
@@ -70,6 +78,9 @@ export interface UseChatActionHandlersInput {
   isModeSyncing: boolean;
   activeRequest: PendingUserInputRequest | null;
   activeAuthTokenRefreshRequest?: PendingAuthTokenRefreshRequest | null;
+  activeCommandExecutionApprovalRequest?: PendingCommandExecutionApprovalRequest | null;
+  activeFileChangeApprovalRequest?: PendingFileChangeApprovalRequest | null;
+  activeToolCallRequest?: PendingToolCallRequest | null;
   answerDraft: PendingUserInputAnswerDraftByQuestionId;
   setAnswerDraft: Dispatch<SetStateAction<PendingUserInputAnswerDraftByQuestionId>>;
   buildActionRequestOptions: (actionName: string) => ActionRequestOptions;
@@ -102,12 +113,91 @@ export interface ChatActionHandlers {
     chatgptAccountId: string,
     chatgptPlanType: string | null,
   ) => Promise<void>;
+  submitCommandExecutionApprovalRequest?: (
+    decision: CommandExecutionApprovalResponsePayload["decision"],
+  ) => Promise<void>;
+  submitFileChangeApprovalRequest?: (
+    decision: FileChangeApprovalResponsePayload["decision"],
+  ) => Promise<void>;
+  submitToolCallRequestResponse?: (payload: ToolCallResponsePayload) => Promise<void>;
   runInterrupt: () => Promise<void>;
   handleAnswerChange: (
     questionId: string,
     field: PendingUserInputAnswerField,
     value: string,
   ) => void;
+}
+
+function createSubmitCommandExecutionApprovalRequestHandler(
+  input: UseChatActionHandlersInput,
+  refreshThreadData: (threadId: string) => Promise<void>,
+): (decision: CommandExecutionApprovalResponsePayload["decision"]) => Promise<void> {
+  return async (decision: CommandExecutionApprovalResponsePayload["decision"]) => {
+    const activeCommandExecutionApprovalRequest = input.activeCommandExecutionApprovalRequest;
+    if (!activeCommandExecutionApprovalRequest) {
+      return;
+    }
+
+    await input.chatRequestActionCoordinator.submitCommandExecutionApprovalRequest({
+      selectedThreadId: input.selectedThreadId,
+      requestId: activeCommandExecutionApprovalRequest.id,
+      decision,
+      buildActionRequestOptions: input.buildActionRequestOptions,
+      onSetBusy: input.setIsBusy,
+      chatClient: input.chatClient,
+      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
+      onRefreshThreadData: refreshThreadData,
+      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+    });
+  };
+}
+
+function createSubmitFileChangeApprovalRequestHandler(
+  input: UseChatActionHandlersInput,
+  refreshThreadData: (threadId: string) => Promise<void>,
+): (decision: FileChangeApprovalResponsePayload["decision"]) => Promise<void> {
+  return async (decision: FileChangeApprovalResponsePayload["decision"]) => {
+    const activeFileChangeApprovalRequest = input.activeFileChangeApprovalRequest;
+    if (!activeFileChangeApprovalRequest) {
+      return;
+    }
+
+    await input.chatRequestActionCoordinator.submitFileChangeApprovalRequest({
+      selectedThreadId: input.selectedThreadId,
+      requestId: activeFileChangeApprovalRequest.id,
+      decision,
+      buildActionRequestOptions: input.buildActionRequestOptions,
+      onSetBusy: input.setIsBusy,
+      chatClient: input.chatClient,
+      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
+      onRefreshThreadData: refreshThreadData,
+      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+    });
+  };
+}
+
+function createSubmitToolCallRequestResponseHandler(
+  input: UseChatActionHandlersInput,
+  refreshThreadData: (threadId: string) => Promise<void>,
+): (payload: ToolCallResponsePayload) => Promise<void> {
+  return async (payload: ToolCallResponsePayload) => {
+    const activeToolCallRequest = input.activeToolCallRequest;
+    if (!activeToolCallRequest) {
+      return;
+    }
+
+    await input.chatRequestActionCoordinator.submitToolCallResponseRequest({
+      selectedThreadId: input.selectedThreadId,
+      requestId: activeToolCallRequest.id,
+      payload,
+      buildActionRequestOptions: input.buildActionRequestOptions,
+      onSetBusy: input.setIsBusy,
+      chatClient: input.chatClient,
+      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
+      onRefreshThreadData: refreshThreadData,
+      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+    });
+  };
 }
 
 export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatActionHandlers {
@@ -119,29 +209,19 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     [input.loadCoreDataTracked, input.onReloadSelectedThread],
   );
 
-  const handleThreadSelected = useCallback(
-    (threadId: string): void => {
-      // Keep state and ref synchronized so async request callbacks observe the same thread selection.
-      input.setSelectedThreadId(threadId);
-      const selectedThreadIdRef = input.selectedThreadIdRef;
-      selectedThreadIdRef.current = threadId;
-    },
-    [input.selectedThreadIdRef, input.setSelectedThreadId],
-  );
+  const handleThreadSelected = (threadId: string): void => {
+    input.setSelectedThreadId(threadId);
+    const selectedThreadIdReference = input.selectedThreadIdRef;
+    selectedThreadIdReference.current = threadId;
+  };
 
-  const markThreadPendingMaterialization = useCallback(
-    (threadId: string): void => {
-      input.pendingThreadMaterializationCoordinator.markPending(threadId);
-    },
-    [input.pendingThreadMaterializationCoordinator],
-  );
+  const markThreadPendingMaterialization = (threadId: string): void => {
+    input.pendingThreadMaterializationCoordinator.markPending(threadId);
+  };
 
-  const clearThreadPendingMaterialization = useCallback(
-    (threadId: string): void => {
-      input.pendingThreadMaterializationCoordinator.clearPending(threadId);
-    },
-    [input.pendingThreadMaterializationCoordinator],
-  );
+  const clearThreadPendingMaterialization = (threadId: string): void => {
+    input.pendingThreadMaterializationCoordinator.clearPending(threadId);
+  };
 
   const submitMessage = useCallback(
     async (draft: string) => {
@@ -327,6 +407,21 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     ],
   );
 
+  const submitCommandExecutionApprovalRequest = createSubmitCommandExecutionApprovalRequestHandler(
+    input,
+    refreshThreadData,
+  );
+
+  const submitFileChangeApprovalRequest = createSubmitFileChangeApprovalRequestHandler(
+    input,
+    refreshThreadData,
+  );
+
+  const submitToolCallRequestResponse = createSubmitToolCallRequestResponseHandler(
+    input,
+    refreshThreadData,
+  );
+
   const runInterrupt = useCallback(async () => {
     await input.chatRequestActionCoordinator.interruptThread({
       selectedThreadId: input.selectedThreadId,
@@ -369,6 +464,9 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     submitPendingRequest,
     skipPendingRequest,
     submitAuthTokenRefreshRequest,
+    submitCommandExecutionApprovalRequest,
+    submitFileChangeApprovalRequest,
+    submitToolCallRequestResponse,
     runInterrupt,
     handleAnswerChange,
   };

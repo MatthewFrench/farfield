@@ -14,6 +14,9 @@ import {
 } from "@/Application/StateManagement/UseMobileSidebarTouchHandlers";
 import { type CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { readActiveAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
+import { readActiveCommandExecutionApprovalRequest } from "@/Features/Chat/DomainModel/PendingCommandExecutionApprovalRequestSelector";
+import { readActiveFileChangeApprovalRequest } from "@/Features/Chat/DomainModel/PendingFileChangeApprovalRequestSelector";
+import { readActiveToolCallRequest } from "@/Features/Chat/DomainModel/PendingToolCallRequestSelector";
 import { type ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { type DebugActionHandlers } from "@/Features/Debugging/StateManagement/UseDebugActionHandlers";
 import {
@@ -265,12 +268,23 @@ function buildApplicationShellViewPropertiesInput(
     activeAuthTokenRefreshRequest: readActiveAuthTokenRefreshRequest(
       applicationDerivedState.conversationState,
     ),
+    activeCommandExecutionApprovalRequest: readActiveCommandExecutionApprovalRequest(
+      applicationDerivedState.conversationState,
+    ),
+    activeFileChangeApprovalRequest: readActiveFileChangeApprovalRequest(
+      applicationDerivedState.conversationState,
+    ),
+    activeToolCallRequest: readActiveToolCallRequest(applicationDerivedState.conversationState),
     canSubmitUserInputForActiveAgent: applicationDerivedState.canSubmitUserInputForActiveAgent,
     answerDraft: applicationShellState.answerDraft,
     handleAnswerChange: input.chatFeatureComposition.handleAnswerChange,
     submitPendingRequest: input.chatFeatureComposition.submitPendingRequest,
     skipPendingRequest: input.chatFeatureComposition.skipPendingRequest,
     submitAuthTokenRefreshRequest: input.chatFeatureComposition.submitAuthTokenRefreshRequest,
+    submitCommandExecutionApprovalRequest:
+      input.chatFeatureComposition.submitCommandExecutionApprovalRequest,
+    submitFileChangeApprovalRequest: input.chatFeatureComposition.submitFileChangeApprovalRequest,
+    submitToolCallRequestResponse: input.chatFeatureComposition.submitToolCallRequestResponse,
     selectedAgentLabel: applicationDerivedState.selectedAgentLabel,
     runInterrupt: input.chatFeatureComposition.runInterrupt,
     steerMessage: input.chatFeatureComposition.steerMessage,

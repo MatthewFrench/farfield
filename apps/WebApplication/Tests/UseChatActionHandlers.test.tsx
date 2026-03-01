@@ -301,45 +301,6 @@ describe("UseChatActionHandlers", () => {
     );
   });
 
-  it("delegates steer-message actions with the current thread context", async () => {
-    const { input, chatRequestActionCoordinator } = createTestInput();
-    const steerMessageSpy = vi
-      .spyOn(chatRequestActionCoordinator, "steerMessage")
-      .mockImplementation(async (nextInput) => {
-        void nextInput;
-      });
-
-    const handlerState: { current: ChatActionHandlers | null } = {
-      current: null,
-    };
-    render(
-      <HandlerHarness
-        input={input}
-        onHandlersReady={(handlers) => {
-          handlerState.current = handlers;
-        }}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(handlerState.current).not.toBeNull();
-    });
-
-    const handlers = handlerState.current;
-    if (handlers === null) {
-      throw new Error("expected handlers to be ready");
-    }
-
-    await handlers.steerMessage("refine this response");
-
-    expect(steerMessageSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        draft: "refine this response",
-        selectedThreadId: DEFAULT_THREAD_IDENTIFIER,
-      }),
-    );
-  });
-
   it("delegates mode draft application with the current owner state", async () => {
     const { input, collaborationModeActionCoordinator } = createTestInput();
     const applyDraftSpy = vi

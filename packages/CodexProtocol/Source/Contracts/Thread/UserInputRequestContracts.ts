@@ -208,7 +208,16 @@ export const ThreadConversationRequestResponseSchema = z.discriminatedUnion(
 );
 
 export type UserInputRequest = z.infer<typeof UserInputRequestSchema>;
+export type CommandExecutionApprovalRequest = z.infer<typeof CommandExecutionApprovalRequestSchema>;
+export type FileChangeApprovalRequest = z.infer<typeof FileChangeApprovalRequestSchema>;
+export type ToolCallRequest = z.infer<typeof ToolCallRequestSchema>;
+export type ChatGptAuthTokensRefreshRequest = z.infer<typeof ChatGptAuthTokensRefreshRequestSchema>;
 export type ThreadConversationRequest = z.infer<typeof ThreadConversationRequestSchema>;
+export type CommandExecutionApprovalRequestParams = z.infer<
+  typeof CommandExecutionRequestApprovalParamsSchema
+>;
+export type FileChangeApprovalRequestParams = z.infer<typeof FileChangeRequestApprovalParamsSchema>;
+export type ToolCallRequestParams = z.infer<typeof DynamicToolCallParamsSchema>;
 export type UserInputResponsePayload = z.infer<typeof UserInputResponsePayloadSchema>;
 export type CommandExecutionApprovalResponsePayload = z.infer<
   typeof CommandExecutionApprovalResponsePayloadSchema

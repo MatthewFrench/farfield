@@ -1,12 +1,23 @@
+import {
+  type CommandExecutionApprovalResponsePayload,
+  type FileChangeApprovalResponsePayload,
+  type ToolCallResponsePayload,
+} from "@farfield/protocol";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, Loader2 } from "lucide-react";
 import { ChatComposer } from "@/Components/ChatComposer";
 import { ConversationItem } from "@/Components/ConversationItem";
 import { PendingAuthTokenRefreshRequestCard } from "@/Components/PendingAuthTokenRefreshRequestCard";
+import { PendingCommandExecutionApprovalRequestCard } from "@/Components/PendingCommandExecutionApprovalRequestCard";
+import { PendingFileChangeApprovalRequestCard } from "@/Components/PendingFileChangeApprovalRequestCard";
 import { PendingRequestCard } from "@/Components/PendingRequestCard";
+import { PendingToolCallRequestCard } from "@/Components/PendingToolCallRequestCard";
 import { Button } from "@/Components/UserInterface/Button";
 import { type FlattenedConversationItem } from "@/Features/Chat/DomainModel/ConversationItemFlattener";
 import { type PendingAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
+import { type PendingCommandExecutionApprovalRequest } from "@/Features/Chat/DomainModel/PendingCommandExecutionApprovalRequestSelector";
+import { type PendingFileChangeApprovalRequest } from "@/Features/Chat/DomainModel/PendingFileChangeApprovalRequestSelector";
+import { type PendingToolCallRequest } from "@/Features/Chat/DomainModel/PendingToolCallRequestSelector";
 import { type PendingUserInputAnswerDraftByQuestionId } from "@/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
 import { type PendingUserInputRequest } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
@@ -104,6 +115,9 @@ export interface ChatWorkspacePaneProps {
   onJumpToBottom: () => void;
   activeRequest: PendingUserInputRequest | null;
   activeAuthTokenRefreshRequest?: PendingAuthTokenRefreshRequest | null;
+  activeCommandExecutionApprovalRequest?: PendingCommandExecutionApprovalRequest | null;
+  activeFileChangeApprovalRequest?: PendingFileChangeApprovalRequest | null;
+  activeToolCallRequest?: PendingToolCallRequest | null;
   canSubmitUserInputForActiveAgent: boolean;
   answerDraft: PendingUserInputAnswerDraftByQuestionId;
   onAnswerDraftChange: (questionId: string, field: PendingRequestDraftField, value: string) => void;
@@ -114,6 +128,13 @@ export interface ChatWorkspacePaneProps {
     chatgptAccountId: string,
     chatgptPlanType: string | null,
   ) => void;
+  onSubmitCommandExecutionApprovalRequest?: (
+    decision: CommandExecutionApprovalResponsePayload["decision"],
+  ) => void;
+  onSubmitFileChangeApprovalRequest?: (
+    decision: FileChangeApprovalResponsePayload["decision"],
+  ) => void;
+  onSubmitToolCallRequestResponse?: (payload: ToolCallResponsePayload) => void;
   isBusy: boolean;
   isGenerating: boolean;
   activeAgentLabel: string;
@@ -139,12 +160,18 @@ export function ChatWorkspacePane({
   onJumpToBottom,
   activeRequest,
   activeAuthTokenRefreshRequest,
+  activeCommandExecutionApprovalRequest,
+  activeFileChangeApprovalRequest,
+  activeToolCallRequest,
   canSubmitUserInputForActiveAgent,
   answerDraft,
   onAnswerDraftChange,
   onSubmitPendingRequest,
   onSkipPendingRequest,
   onSubmitAuthTokenRefreshRequest,
+  onSubmitCommandExecutionApprovalRequest,
+  onSubmitFileChangeApprovalRequest,
+  onSubmitToolCallRequestResponse,
   isBusy,
   isGenerating,
   activeAgentLabel,
@@ -294,6 +321,33 @@ export function ChatWorkspacePane({
         />
         <div className="relative w-full px-0 md:px-2 lg:px-4 space-y-2">
           <AnimatePresence>
+            {activeCommandExecutionApprovalRequest &&
+            canSubmitUserInputForActiveAgent &&
+            onSubmitCommandExecutionApprovalRequest ? (
+              <PendingCommandExecutionApprovalRequestCard
+                request={activeCommandExecutionApprovalRequest}
+                onSubmitDecision={onSubmitCommandExecutionApprovalRequest}
+                isBusy={isBusy}
+              />
+            ) : null}
+            {activeFileChangeApprovalRequest &&
+            canSubmitUserInputForActiveAgent &&
+            onSubmitFileChangeApprovalRequest ? (
+              <PendingFileChangeApprovalRequestCard
+                request={activeFileChangeApprovalRequest}
+                onSubmitDecision={onSubmitFileChangeApprovalRequest}
+                isBusy={isBusy}
+              />
+            ) : null}
+            {activeToolCallRequest &&
+            canSubmitUserInputForActiveAgent &&
+            onSubmitToolCallRequestResponse ? (
+              <PendingToolCallRequestCard
+                request={activeToolCallRequest}
+                onSubmitResponse={onSubmitToolCallRequestResponse}
+                isBusy={isBusy}
+              />
+            ) : null}
             {activeAuthTokenRefreshRequest &&
             canSubmitUserInputForActiveAgent &&
             onSubmitAuthTokenRefreshRequest ? (

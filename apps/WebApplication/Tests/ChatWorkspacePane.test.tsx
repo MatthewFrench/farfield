@@ -3,6 +3,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { type PendingAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
+import { type PendingCommandExecutionApprovalRequest } from "@/Features/Chat/DomainModel/PendingCommandExecutionApprovalRequestSelector";
+import { type PendingFileChangeApprovalRequest } from "@/Features/Chat/DomainModel/PendingFileChangeApprovalRequestSelector";
+import { type PendingToolCallRequest } from "@/Features/Chat/DomainModel/PendingToolCallRequestSelector";
 import {
   ChatWorkspacePane,
   type ChatWorkspacePaneProps,
@@ -70,6 +73,54 @@ function buildPendingAuthTokenRefreshRequest(): PendingAuthTokenRefreshRequest {
     params: {
       reason: "unauthorized",
       previousAccountId: "account-previous",
+    },
+  };
+}
+
+function buildPendingCommandExecutionApprovalRequest(): PendingCommandExecutionApprovalRequest {
+  return {
+    method: "item/commandExecution/requestApproval",
+    id: 92,
+    completed: false,
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-92",
+      itemId: "item-92",
+      command: "git status",
+      reason: "Needs read access to inspect state.",
+      proposedExecpolicyAmendment: ["git status"],
+    },
+  };
+}
+
+function buildPendingFileChangeApprovalRequest(): PendingFileChangeApprovalRequest {
+  return {
+    method: "item/fileChange/requestApproval",
+    id: 93,
+    completed: false,
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-93",
+      itemId: "item-93",
+      reason: "Needs to update source files.",
+      grantRoot: "/workspace",
+    },
+  };
+}
+
+function buildPendingToolCallRequest(): PendingToolCallRequest {
+  return {
+    method: "item/tool/call",
+    id: 94,
+    completed: false,
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-94",
+      callId: "call-94",
+      tool: "files.search",
+      arguments: {
+        query: "README",
+      },
     },
   };
 }
@@ -214,5 +265,65 @@ describe("ChatWorkspacePane", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit refresh token" }));
 
     expect(onSubmitAuthTokenRefreshRequest).toHaveBeenCalledWith("token-new", "account-new", "pro");
+  });
+
+  it("submits command approval decisions from the command approval card", () => {
+    const onSubmitCommandExecutionApprovalRequest = vi.fn();
+
+    renderChatWorkspacePane({
+      chatSurfaceState: "ready",
+      turnCount: 1,
+      canSubmitUserInputForActiveAgent: true,
+      activeCommandExecutionApprovalRequest: buildPendingCommandExecutionApprovalRequest(),
+      onSubmitCommandExecutionApprovalRequest,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve for session" }));
+
+    expect(onSubmitCommandExecutionApprovalRequest).toHaveBeenCalledWith("acceptForSession");
+  });
+
+  it("submits file-change approval decisions from the file-change approval card", () => {
+    const onSubmitFileChangeApprovalRequest = vi.fn();
+
+    renderChatWorkspacePane({
+      chatSurfaceState: "ready",
+      turnCount: 1,
+      canSubmitUserInputForActiveAgent: true,
+      activeFileChangeApprovalRequest: buildPendingFileChangeApprovalRequest(),
+      onSubmitFileChangeApprovalRequest,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Decline" }));
+
+    expect(onSubmitFileChangeApprovalRequest).toHaveBeenCalledWith("decline");
+  });
+
+  it("submits tool-call responses from the tool-call request card", () => {
+    const onSubmitToolCallRequestResponse = vi.fn();
+
+    renderChatWorkspacePane({
+      chatSurfaceState: "ready",
+      turnCount: 1,
+      canSubmitUserInputForActiveAgent: true,
+      activeToolCallRequest: buildPendingToolCallRequest(),
+      onSubmitToolCallRequestResponse,
+      isBusy: false,
+    });
+
+    fireEvent.change(screen.getByLabelText("Response text"), {
+      target: { value: "  done  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit success" }));
+
+    expect(onSubmitToolCallRequestResponse).toHaveBeenCalledWith({
+      success: true,
+      contentItems: [
+        {
+          type: "inputText",
+          text: "done",
+        },
+      ],
+    });
   });
 });

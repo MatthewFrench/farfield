@@ -2,6 +2,18 @@ import {
   readActiveAuthTokenRefreshRequest,
   readPendingAuthTokenRefreshRequests,
 } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
+import {
+  readActiveCommandExecutionApprovalRequest,
+  readPendingCommandExecutionApprovalRequests,
+} from "@/Features/Chat/DomainModel/PendingCommandExecutionApprovalRequestSelector";
+import {
+  readActiveFileChangeApprovalRequest,
+  readPendingFileChangeApprovalRequests,
+} from "@/Features/Chat/DomainModel/PendingFileChangeApprovalRequestSelector";
+import {
+  readActiveToolCallRequest,
+  readPendingToolCallRequests,
+} from "@/Features/Chat/DomainModel/PendingToolCallRequestSelector";
 import { type UseModeAndPendingRequestEffectsInput } from "@/Features/Chat/StateManagement/UseModeAndPendingRequestEffects";
 import { type UseSelectedThreadLifecycleEffectsInput } from "@/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects";
 import { type DebugActionHandlers } from "@/Features/Debugging/StateManagement/UseDebugActionHandlers";
@@ -286,6 +298,13 @@ export function buildApplicationChatFeatureCompositionInput(
       activeAuthTokenRefreshRequest: readActiveAuthTokenRefreshRequest(
         applicationDerivedState.conversationState,
       ),
+      activeCommandExecutionApprovalRequest: readActiveCommandExecutionApprovalRequest(
+        applicationDerivedState.conversationState,
+      ),
+      activeFileChangeApprovalRequest: readActiveFileChangeApprovalRequest(
+        applicationDerivedState.conversationState,
+      ),
+      activeToolCallRequest: readActiveToolCallRequest(applicationDerivedState.conversationState),
       answerDraft: applicationShellState.answerDraft,
       setAnswerDraft: applicationShellState.setAnswerDraft,
       buildActionRequestOptions: runtimeRequestHandlers.buildActionRequestOptions,
@@ -328,7 +347,11 @@ export function buildApplicationChatFeatureCompositionInput(
       isModeSyncing: applicationShellState.isModeSyncing,
       pendingRequestCount:
         applicationDerivedState.pendingRequests.length +
-        readPendingAuthTokenRefreshRequests(applicationDerivedState.conversationState).length,
+        readPendingAuthTokenRefreshRequests(applicationDerivedState.conversationState).length +
+        readPendingCommandExecutionApprovalRequests(applicationDerivedState.conversationState)
+          .length +
+        readPendingFileChangeApprovalRequests(applicationDerivedState.conversationState).length +
+        readPendingToolCallRequests(applicationDerivedState.conversationState).length,
       setSelectedModeKey: applicationShellState.setSelectedModeKey,
       setSelectedModelId: applicationShellState.setSelectedModelId,
       setSelectedReasoningEffort: applicationShellState.setSelectedReasoningEffort,

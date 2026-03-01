@@ -1,4 +1,10 @@
-import { ChatGptAuthTokensRefreshRequestMethod, UserInputRequestMethod } from "@farfield/protocol";
+import {
+  ChatGptAuthTokensRefreshRequestMethod,
+  CommandExecutionApprovalRequestMethod,
+  FileChangeApprovalRequestMethod,
+  ToolCallRequestMethod,
+  UserInputRequestMethod,
+} from "@farfield/protocol";
 import { describe, expect, it, vi } from "vitest";
 import {
   type ChatRequestActionChatClient,
@@ -412,6 +418,185 @@ describe("ChatRequestActionCoordinator", () => {
       accessToken: "token-55",
       chatgptAccountId: "account-55",
       chatgptPlanType: null,
+      buildActionRequestOptions,
+      onSetBusy,
+      chatClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(onSetBusy).not.toHaveBeenCalled();
+    expect(chatClient.submitUserInput).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
+    expect(onRefreshThreadData).not.toHaveBeenCalled();
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+  });
+
+  it("submits command-execution approval requests and refreshes selected thread", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const {
+      busyStates,
+      onSetBusy,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    } = createActionCallbacks();
+    const chatClient = createChatClient();
+
+    await coordinator.submitCommandExecutionApprovalRequest({
+      selectedThreadId: DEFAULT_THREAD_ID,
+      requestId: 61,
+      decision: "acceptForSession",
+      buildActionRequestOptions,
+      onSetBusy,
+      chatClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(chatClient.submitUserInput).toHaveBeenCalledWith(
+      {
+        threadId: DEFAULT_THREAD_ID,
+        requestId: 61,
+        response: {
+          method: CommandExecutionApprovalRequestMethod,
+          payload: {
+            decision: "acceptForSession",
+          },
+        },
+      },
+      {
+        actionId: "action-submit-command-execution-approval",
+        actionName: "submit-command-execution-approval",
+      },
+    );
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onRefreshThreadData).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
+  });
+
+  it("submits file-change approval requests and refreshes selected thread", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const {
+      busyStates,
+      onSetBusy,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    } = createActionCallbacks();
+    const chatClient = createChatClient();
+
+    await coordinator.submitFileChangeApprovalRequest({
+      selectedThreadId: DEFAULT_THREAD_ID,
+      requestId: 62,
+      decision: "decline",
+      buildActionRequestOptions,
+      onSetBusy,
+      chatClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(chatClient.submitUserInput).toHaveBeenCalledWith(
+      {
+        threadId: DEFAULT_THREAD_ID,
+        requestId: 62,
+        response: {
+          method: FileChangeApprovalRequestMethod,
+          payload: {
+            decision: "decline",
+          },
+        },
+      },
+      {
+        actionId: "action-submit-file-change-approval",
+        actionName: "submit-file-change-approval",
+      },
+    );
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onRefreshThreadData).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
+  });
+
+  it("submits tool-call responses and refreshes selected thread", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const {
+      busyStates,
+      onSetBusy,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    } = createActionCallbacks();
+    const chatClient = createChatClient();
+
+    await coordinator.submitToolCallResponseRequest({
+      selectedThreadId: DEFAULT_THREAD_ID,
+      requestId: 63,
+      payload: {
+        success: true,
+        contentItems: [
+          {
+            type: "inputText",
+            text: "ready",
+          },
+        ],
+      },
+      buildActionRequestOptions,
+      onSetBusy,
+      chatClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(chatClient.submitUserInput).toHaveBeenCalledWith(
+      {
+        threadId: DEFAULT_THREAD_ID,
+        requestId: 63,
+        response: {
+          method: ToolCallRequestMethod,
+          payload: {
+            success: true,
+            contentItems: [
+              {
+                type: "inputText",
+                text: "ready",
+              },
+            ],
+          },
+        },
+      },
+      {
+        actionId: "action-submit-tool-call-response",
+        actionName: "submit-tool-call-response",
+      },
+    );
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onRefreshThreadData).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
+  });
+
+  it("skips tool-call response submit when no selected thread exists", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const onSetBusy = vi.fn();
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onRefreshThreadData = vi.fn(async (_threadId: string) => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const chatClient = createChatClient();
+
+    await coordinator.submitToolCallResponseRequest({
+      selectedThreadId: null,
+      requestId: 64,
+      payload: {
+        success: false,
+        contentItems: [],
+      },
       buildActionRequestOptions,
       onSetBusy,
       chatClient,

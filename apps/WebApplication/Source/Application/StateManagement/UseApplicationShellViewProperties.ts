@@ -93,12 +93,18 @@ export interface UseApplicationShellViewPropertiesInput {
   setIsChatAtBottom: (nextIsAtBottom: boolean) => void;
   activeRequest: ChatWorkspacePaneProps["activeRequest"];
   activeAuthTokenRefreshRequest?: ChatWorkspacePaneProps["activeAuthTokenRefreshRequest"];
+  activeCommandExecutionApprovalRequest?: ChatWorkspacePaneProps["activeCommandExecutionApprovalRequest"];
+  activeFileChangeApprovalRequest?: ChatWorkspacePaneProps["activeFileChangeApprovalRequest"];
+  activeToolCallRequest?: ChatWorkspacePaneProps["activeToolCallRequest"];
   canSubmitUserInputForActiveAgent: boolean;
   answerDraft: ChatWorkspacePaneProps["answerDraft"];
   handleAnswerChange: ChatWorkspacePaneProps["onAnswerDraftChange"];
   submitPendingRequest: () => void | Promise<void>;
   skipPendingRequest: () => void | Promise<void>;
   submitAuthTokenRefreshRequest?: ChatWorkspacePaneProps["onSubmitAuthTokenRefreshRequest"];
+  submitCommandExecutionApprovalRequest?: ChatWorkspacePaneProps["onSubmitCommandExecutionApprovalRequest"];
+  submitFileChangeApprovalRequest?: ChatWorkspacePaneProps["onSubmitFileChangeApprovalRequest"];
+  submitToolCallRequestResponse?: ChatWorkspacePaneProps["onSubmitToolCallRequestResponse"];
   selectedAgentLabel: string;
   runInterrupt: ChatWorkspacePaneProps["onInterrupt"];
   steerMessage: ChatWorkspacePaneProps["onSteerMessage"];
@@ -372,6 +378,9 @@ function buildChatWorkspacePaneProperties(
     },
     activeRequest: input.activeRequest,
     activeAuthTokenRefreshRequest: input.activeAuthTokenRefreshRequest ?? null,
+    activeCommandExecutionApprovalRequest: input.activeCommandExecutionApprovalRequest ?? null,
+    activeFileChangeApprovalRequest: input.activeFileChangeApprovalRequest ?? null,
+    activeToolCallRequest: input.activeToolCallRequest ?? null,
     canSubmitUserInputForActiveAgent: input.canSubmitUserInputForActiveAgent,
     answerDraft: input.answerDraft,
     onAnswerDraftChange: input.handleAnswerChange,
@@ -391,14 +400,37 @@ function buildChatWorkspacePaneProperties(
     chatModeToolbarProperties: input.chatModeToolbarProperties,
   };
 
+  let nextProperties = properties;
+
   if (input.submitAuthTokenRefreshRequest) {
-    return {
-      ...properties,
+    nextProperties = {
+      ...nextProperties,
       onSubmitAuthTokenRefreshRequest: input.submitAuthTokenRefreshRequest,
     };
   }
 
-  return properties;
+  if (input.submitCommandExecutionApprovalRequest) {
+    nextProperties = {
+      ...nextProperties,
+      onSubmitCommandExecutionApprovalRequest: input.submitCommandExecutionApprovalRequest,
+    };
+  }
+
+  if (input.submitFileChangeApprovalRequest) {
+    nextProperties = {
+      ...nextProperties,
+      onSubmitFileChangeApprovalRequest: input.submitFileChangeApprovalRequest,
+    };
+  }
+
+  if (input.submitToolCallRequestResponse) {
+    nextProperties = {
+      ...nextProperties,
+      onSubmitToolCallRequestResponse: input.submitToolCallRequestResponse,
+    };
+  }
+
+  return nextProperties;
 }
 
 function buildDebugWorkspacePaneProperties(
@@ -624,6 +656,9 @@ export function useApplicationShellViewProperties(
       input.activeAgentLabel,
       input.activeRequest,
       input.activeAuthTokenRefreshRequest,
+      input.activeCommandExecutionApprovalRequest,
+      input.activeFileChangeApprovalRequest,
+      input.activeToolCallRequest,
       input.answerDraft,
       input.availableAgentIds,
       input.canSubmitUserInputForActiveAgent,
@@ -648,7 +683,10 @@ export function useApplicationShellViewProperties(
       input.steerMessage,
       input.submitMessage,
       input.submitAuthTokenRefreshRequest,
+      input.submitCommandExecutionApprovalRequest,
+      input.submitFileChangeApprovalRequest,
       input.submitPendingRequest,
+      input.submitToolCallRequestResponse,
       input.turnCount,
       input.visibleChatItemsStep,
       input.visibleConversationItems,

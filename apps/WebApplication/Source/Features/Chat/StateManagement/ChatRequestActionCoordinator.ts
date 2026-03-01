@@ -1,6 +1,12 @@
 import {
   ChatGptAuthTokensRefreshRequestMethod,
+  CommandExecutionApprovalRequestMethod,
+  type CommandExecutionApprovalResponsePayload,
+  FileChangeApprovalRequestMethod,
+  type FileChangeApprovalResponsePayload,
   type ThreadConversationRequestResponse,
+  ToolCallRequestMethod,
+  type ToolCallResponsePayload,
   UserInputRequestMethod,
 } from "@farfield/protocol";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
@@ -10,6 +16,9 @@ const SEND_MESSAGE_ACTION_NAME = "send-message";
 const STEER_MESSAGE_ACTION_NAME = "steer-message";
 const SUBMIT_USER_INPUT_ACTION_NAME = "submit-user-input";
 const SUBMIT_AUTH_TOKEN_REFRESH_ACTION_NAME = "submit-auth-token-refresh";
+const SUBMIT_COMMAND_EXECUTION_APPROVAL_ACTION_NAME = "submit-command-execution-approval";
+const SUBMIT_FILE_CHANGE_APPROVAL_ACTION_NAME = "submit-file-change-approval";
+const SUBMIT_TOOL_CALL_RESPONSE_ACTION_NAME = "submit-tool-call-response";
 const SKIP_USER_INPUT_ACTION_NAME = "skip-user-input";
 const INTERRUPT_THREAD_ACTION_NAME = "interrupt-thread";
 
@@ -107,6 +116,42 @@ export interface SubmitAuthTokenRefreshActionInput {
   accessToken: string;
   chatgptAccountId: string;
   chatgptPlanType: string | null;
+  buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
+  onSetBusy: (isBusy: boolean) => void;
+  chatClient: ChatRequestActionChatClient;
+  onInvalidateActiveThreadQuery: () => void;
+  onRefreshThreadData: (threadId: string) => Promise<void>;
+  reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
+}
+
+export interface SubmitCommandExecutionApprovalActionInput {
+  selectedThreadId: string | null;
+  requestId: number;
+  decision: CommandExecutionApprovalResponsePayload["decision"];
+  buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
+  onSetBusy: (isBusy: boolean) => void;
+  chatClient: ChatRequestActionChatClient;
+  onInvalidateActiveThreadQuery: () => void;
+  onRefreshThreadData: (threadId: string) => Promise<void>;
+  reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
+}
+
+export interface SubmitFileChangeApprovalActionInput {
+  selectedThreadId: string | null;
+  requestId: number;
+  decision: FileChangeApprovalResponsePayload["decision"];
+  buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
+  onSetBusy: (isBusy: boolean) => void;
+  chatClient: ChatRequestActionChatClient;
+  onInvalidateActiveThreadQuery: () => void;
+  onRefreshThreadData: (threadId: string) => Promise<void>;
+  reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
+}
+
+export interface SubmitToolCallResponseActionInput {
+  selectedThreadId: string | null;
+  requestId: number;
+  payload: ToolCallResponsePayload;
   buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
   onSetBusy: (isBusy: boolean) => void;
   chatClient: ChatRequestActionChatClient;
@@ -328,6 +373,130 @@ export class ChatRequestActionCoordinator {
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
         operation: SUBMIT_AUTH_TOKEN_REFRESH_ACTION_NAME,
+        actionId,
+        threadId: input.selectedThreadId,
+        error: toErrorMessage(error),
+        details: {
+          requestId: input.requestId,
+        },
+      });
+    } finally {
+      input.onSetBusy(false);
+    }
+  }
+
+  public async submitCommandExecutionApprovalRequest(
+    input: SubmitCommandExecutionApprovalActionInput,
+  ): Promise<void> {
+    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
+      return;
+    }
+
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      SUBMIT_COMMAND_EXECUTION_APPROVAL_ACTION_NAME,
+    );
+    input.onSetBusy(true);
+    try {
+      await input.chatClient.submitUserInput(
+        {
+          threadId: input.selectedThreadId,
+          requestId: input.requestId,
+          response: {
+            method: CommandExecutionApprovalRequestMethod,
+            payload: {
+              decision: input.decision,
+            },
+          },
+        },
+        requestOptions,
+      );
+      input.onInvalidateActiveThreadQuery();
+      await input.onRefreshThreadData(input.selectedThreadId);
+    } catch (error) {
+      await input.reportTrackedUserInterfaceError({
+        operation: SUBMIT_COMMAND_EXECUTION_APPROVAL_ACTION_NAME,
+        actionId,
+        threadId: input.selectedThreadId,
+        error: toErrorMessage(error),
+        details: {
+          requestId: input.requestId,
+        },
+      });
+    } finally {
+      input.onSetBusy(false);
+    }
+  }
+
+  public async submitFileChangeApprovalRequest(
+    input: SubmitFileChangeApprovalActionInput,
+  ): Promise<void> {
+    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
+      return;
+    }
+
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      SUBMIT_FILE_CHANGE_APPROVAL_ACTION_NAME,
+    );
+    input.onSetBusy(true);
+    try {
+      await input.chatClient.submitUserInput(
+        {
+          threadId: input.selectedThreadId,
+          requestId: input.requestId,
+          response: {
+            method: FileChangeApprovalRequestMethod,
+            payload: {
+              decision: input.decision,
+            },
+          },
+        },
+        requestOptions,
+      );
+      input.onInvalidateActiveThreadQuery();
+      await input.onRefreshThreadData(input.selectedThreadId);
+    } catch (error) {
+      await input.reportTrackedUserInterfaceError({
+        operation: SUBMIT_FILE_CHANGE_APPROVAL_ACTION_NAME,
+        actionId,
+        threadId: input.selectedThreadId,
+        error: toErrorMessage(error),
+        details: {
+          requestId: input.requestId,
+        },
+      });
+    } finally {
+      input.onSetBusy(false);
+    }
+  }
+
+  public async submitToolCallResponseRequest(
+    input: SubmitToolCallResponseActionInput,
+  ): Promise<void> {
+    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
+      return;
+    }
+
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      SUBMIT_TOOL_CALL_RESPONSE_ACTION_NAME,
+    );
+    input.onSetBusy(true);
+    try {
+      await input.chatClient.submitUserInput(
+        {
+          threadId: input.selectedThreadId,
+          requestId: input.requestId,
+          response: {
+            method: ToolCallRequestMethod,
+            payload: input.payload,
+          },
+        },
+        requestOptions,
+      );
+      input.onInvalidateActiveThreadQuery();
+      await input.onRefreshThreadData(input.selectedThreadId);
+    } catch (error) {
+      await input.reportTrackedUserInterfaceError({
+        operation: SUBMIT_TOOL_CALL_RESPONSE_ACTION_NAME,
         actionId,
         threadId: input.selectedThreadId,
         error: toErrorMessage(error),

@@ -1,16 +1,11 @@
 import {
+  type ChatGptAuthTokensRefreshRequest,
   ChatGptAuthTokensRefreshRequestMethod,
   type ThreadConversationRequest,
   type ThreadConversationState,
 } from "@farfield/protocol";
 
-export type PendingAuthTokenRefreshRequest = ThreadConversationRequest & {
-  method: typeof ChatGptAuthTokensRefreshRequestMethod;
-  params: {
-    reason: "unauthorized";
-    previousAccountId?: string | null;
-  };
-};
+export type PendingAuthTokenRefreshRequest = ChatGptAuthTokensRefreshRequest;
 
 function isPendingAuthTokenRefreshRequest(
   request: ThreadConversationRequest,
