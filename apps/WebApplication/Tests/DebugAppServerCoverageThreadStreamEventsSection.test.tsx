@@ -131,4 +131,121 @@ describe("DebugAppServerCoverageThreadStreamEventsSection", () => {
     expect(readThreadStreamEventsSpy).toHaveBeenCalledTimes(1);
     expect(readThreadStreamEventsSpy).toHaveBeenCalledWith("thread-stream-reset", null);
   });
+
+  it("filters rendered events by selected method count chip", () => {
+    const readThreadStreamEventsSpy = vi.fn(
+      (_threadId: string, _sinceSequence?: number | null) => {},
+    );
+
+    render(
+      <DebugAppServerCoverageThreadStreamEventsSection
+        isRunningCoverageAction={false}
+        lastThreadStreamEventsResult={{
+          threadId: "thread-stream-filter",
+          sinceSequence: null,
+          ownerClientId: "client-owner",
+          eventCount: 2,
+          nextSequence: 50,
+          firstAvailableSequence: 10,
+          resetRequired: false,
+          methodCounts: [
+            {
+              method: "turn/completed",
+              count: 1,
+            },
+            {
+              method: "thread/started",
+              count: 1,
+            },
+          ],
+          events: [
+            {
+              frameType: "broadcast",
+              method: "turn/completed",
+              requestId: null,
+              sourceClientId: "client-codex",
+              sequence: 49,
+              receivedAtMilliseconds: 17_500,
+              preview: '{"event":"turn-done"}',
+            },
+            {
+              frameType: "broadcast",
+              method: "thread/started",
+              requestId: null,
+              sourceClientId: "client-codex",
+              sequence: 50,
+              receivedAtMilliseconds: 17_600,
+              preview: '{"event":"thread-started"}',
+            },
+          ],
+          readAtIso8601: "2026-03-01T00:00:00.000Z",
+        }}
+        onReadThreadStreamEvents={readThreadStreamEventsSpy}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("debug-coverage-thread-stream-method-count-turn/completed"));
+
+    expect(
+      (screen.getByTestId("debug-coverage-thread-stream-method-filter") as HTMLInputElement).value,
+    ).toBe("turn/completed");
+    expect(screen.getByText("Filtered events: 1 of 2")).toBeDefined();
+    expect(screen.getByText("broadcast • turn/completed")).toBeDefined();
+    expect(screen.queryByText("broadcast • thread/started")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("debug-coverage-thread-stream-method-count-all"));
+    expect(
+      (screen.getByTestId("debug-coverage-thread-stream-method-filter") as HTMLInputElement).value,
+    ).toBe("");
+    expect(screen.queryByTestId("debug-coverage-thread-stream-filter-summary")).toBeNull();
+    expect(screen.getByText("broadcast • thread/started")).toBeDefined();
+  });
+
+  it("shows explicit empty-filter feedback when no events match", () => {
+    const readThreadStreamEventsSpy = vi.fn(
+      (_threadId: string, _sinceSequence?: number | null) => {},
+    );
+
+    render(
+      <DebugAppServerCoverageThreadStreamEventsSection
+        isRunningCoverageAction={false}
+        lastThreadStreamEventsResult={{
+          threadId: "thread-stream-filter-empty",
+          sinceSequence: null,
+          ownerClientId: "client-owner",
+          eventCount: 1,
+          nextSequence: 75,
+          firstAvailableSequence: 70,
+          resetRequired: false,
+          methodCounts: [
+            {
+              method: "turn/completed",
+              count: 1,
+            },
+          ],
+          events: [
+            {
+              frameType: "broadcast",
+              method: "turn/completed",
+              requestId: null,
+              sourceClientId: "client-codex",
+              sequence: 74,
+              receivedAtMilliseconds: 20_100,
+              preview: '{"event":"turn-done"}',
+            },
+          ],
+          readAtIso8601: "2026-03-01T00:00:00.000Z",
+        }}
+        onReadThreadStreamEvents={readThreadStreamEventsSpy}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("debug-coverage-thread-stream-method-filter"), {
+      target: { value: "item/commandExecution/outputDelta" },
+    });
+
+    expect(screen.getByText("Filtered events: 0 of 1")).toBeDefined();
+    expect(screen.getByText("No frames match the current method filter.")).toBeDefined();
+    expect(screen.queryByText("broadcast • turn/completed")).toBeNull();
+  });
 });

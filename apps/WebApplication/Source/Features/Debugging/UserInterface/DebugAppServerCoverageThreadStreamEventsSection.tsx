@@ -19,6 +19,8 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
 }: DebugAppServerCoverageThreadStreamEventsSectionProps): React.JSX.Element {
   const [threadIdDraft, setThreadIdDraft] = useState("");
   const [sinceSequenceDraft, setSinceSequenceDraft] = useState("");
+  const [methodFilterDraft, setMethodFilterDraft] = useState("");
+  const normalizedMethodFilter = methodFilterDraft.trim().toLowerCase();
 
   const runThreadStreamEventsRead = (): void => {
     const normalizedThreadIdentifier = threadIdDraft.trim();
@@ -39,6 +41,16 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
 
     onReadThreadStreamEvents(normalizedThreadIdentifier, parsedSinceSequence);
   };
+
+  const filteredEvents =
+    lastThreadStreamEventsResult === null
+      ? []
+      : lastThreadStreamEventsResult.events.filter((event) => {
+          if (normalizedMethodFilter.length === 0) {
+            return true;
+          }
+          return (event.method ?? "").toLowerCase().includes(normalizedMethodFilter);
+        });
 
   return (
     <div className="rounded-md border border-border bg-card p-3 space-y-2">
@@ -160,29 +172,91 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
           <p>
             Read at: {new Date(lastThreadStreamEventsResult.readAtIso8601).toLocaleTimeString()}
           </p>
+          <div className="space-y-2">
+            <label
+              className="text-xs text-muted-foreground"
+              htmlFor="debug-coverage-thread-stream-method-filter"
+            >
+              Method filter (optional)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="debug-coverage-thread-stream-method-filter"
+                data-testid="debug-coverage-thread-stream-method-filter"
+                type="text"
+                className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                value={methodFilterDraft}
+                onChange={(event) => {
+                  setMethodFilterDraft(event.target.value);
+                }}
+                placeholder="turn/completed"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-testid="debug-coverage-thread-stream-method-filter-clear"
+                disabled={methodFilterDraft.length === 0}
+                onClick={() => {
+                  setMethodFilterDraft("");
+                }}
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
           {lastThreadStreamEventsResult.methodCounts.length === 0 ? (
             <p className="text-xs text-muted-foreground">Method counts: none captured.</p>
           ) : (
             <div className="space-y-1">
               <p>Method counts:</p>
               <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="debug-coverage-thread-stream-method-count-all"
+                  disabled={methodFilterDraft.length === 0}
+                  onClick={() => {
+                    setMethodFilterDraft("");
+                  }}
+                >
+                  All
+                </Button>
                 {lastThreadStreamEventsResult.methodCounts.map((methodCount) => (
-                  <span
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
                     key={methodCount.method}
-                    className="rounded border border-border/60 px-2 py-0.5 text-[11px]"
                     data-testid={`debug-coverage-thread-stream-method-count-${methodCount.method}`}
+                    disabled={isRunningCoverageAction}
+                    onClick={() => {
+                      setMethodFilterDraft(methodCount.method);
+                    }}
                   >
                     {methodCount.method}: {String(methodCount.count)}
-                  </span>
+                  </Button>
                 ))}
               </div>
             </div>
           )}
-          {lastThreadStreamEventsResult.events.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No frames in the returned stream batch.</p>
+          {normalizedMethodFilter.length > 0 ? (
+            <p data-testid="debug-coverage-thread-stream-filter-summary">
+              Filtered events: {String(filteredEvents.length)} of{" "}
+              {String(lastThreadStreamEventsResult.events.length)}
+            </p>
+          ) : null}
+          {filteredEvents.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {lastThreadStreamEventsResult.events.length === 0 ||
+              normalizedMethodFilter.length === 0
+                ? "No frames in the returned stream batch."
+                : "No frames match the current method filter."}
+            </p>
           ) : (
             <div className="space-y-2">
-              {lastThreadStreamEventsResult.events.map((event, eventIndex) => (
+              {filteredEvents.map((event, eventIndex) => (
                 <div
                   key={`${event.frameType}-${eventIndex}`}
                   data-testid={`debug-coverage-thread-stream-event-${String(eventIndex)}`}
