@@ -1,7 +1,10 @@
 import {
+  ApplyPatchApprovalRequestMethod,
   ChatGptAuthTokensRefreshRequestMethod,
   CommandExecutionApprovalRequestMethod,
   type CommandExecutionApprovalResponsePayload,
+  type DeprecatedApprovalReviewDecision,
+  ExecuteCommandApprovalRequestMethod,
   FileChangeApprovalRequestMethod,
   type FileChangeApprovalResponsePayload,
   type ThreadConversationRequestResponse,
@@ -19,6 +22,8 @@ const SUBMIT_AUTH_TOKEN_REFRESH_ACTION_NAME = "submit-auth-token-refresh";
 const SUBMIT_COMMAND_EXECUTION_APPROVAL_ACTION_NAME = "submit-command-execution-approval";
 const SUBMIT_FILE_CHANGE_APPROVAL_ACTION_NAME = "submit-file-change-approval";
 const SUBMIT_TOOL_CALL_RESPONSE_ACTION_NAME = "submit-tool-call-response";
+const SUBMIT_APPLY_PATCH_APPROVAL_ACTION_NAME = "submit-apply-patch-approval";
+const SUBMIT_EXECUTE_COMMAND_APPROVAL_ACTION_NAME = "submit-execute-command-approval";
 const SKIP_USER_INPUT_ACTION_NAME = "skip-user-input";
 const INTERRUPT_THREAD_ACTION_NAME = "interrupt-thread";
 
@@ -124,40 +129,39 @@ export interface SubmitAuthTokenRefreshActionInput {
   reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
 }
 
-export interface SubmitCommandExecutionApprovalActionInput {
+interface SubmitThreadRequestResponseActionInput {
   selectedThreadId: string | null;
   requestId: number;
+  buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
+  onSetBusy: (isBusy: boolean) => void;
+  chatClient: ChatRequestActionChatClient;
+  onInvalidateActiveThreadQuery: () => void;
+  onRefreshThreadData: (threadId: string) => Promise<void>;
+  reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
+}
+
+export interface SubmitCommandExecutionApprovalActionInput
+  extends SubmitThreadRequestResponseActionInput {
   decision: CommandExecutionApprovalResponsePayload["decision"];
-  buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
-  onSetBusy: (isBusy: boolean) => void;
-  chatClient: ChatRequestActionChatClient;
-  onInvalidateActiveThreadQuery: () => void;
-  onRefreshThreadData: (threadId: string) => Promise<void>;
-  reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
 }
 
-export interface SubmitFileChangeApprovalActionInput {
-  selectedThreadId: string | null;
-  requestId: number;
+export interface SubmitFileChangeApprovalActionInput
+  extends SubmitThreadRequestResponseActionInput {
   decision: FileChangeApprovalResponsePayload["decision"];
-  buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
-  onSetBusy: (isBusy: boolean) => void;
-  chatClient: ChatRequestActionChatClient;
-  onInvalidateActiveThreadQuery: () => void;
-  onRefreshThreadData: (threadId: string) => Promise<void>;
-  reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
 }
 
-export interface SubmitToolCallResponseActionInput {
-  selectedThreadId: string | null;
-  requestId: number;
+export interface SubmitApplyPatchApprovalActionInput
+  extends SubmitThreadRequestResponseActionInput {
+  decision: DeprecatedApprovalReviewDecision;
+}
+
+export interface SubmitExecuteCommandApprovalActionInput
+  extends SubmitThreadRequestResponseActionInput {
+  decision: DeprecatedApprovalReviewDecision;
+}
+
+export interface SubmitToolCallResponseActionInput extends SubmitThreadRequestResponseActionInput {
   payload: ToolCallResponsePayload;
-  buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
-  onSetBusy: (isBusy: boolean) => void;
-  chatClient: ChatRequestActionChatClient;
-  onInvalidateActiveThreadQuery: () => void;
-  onRefreshThreadData: (threadId: string) => Promise<void>;
-  reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
 }
 
 export interface SkipPendingUserInputActionInput {
@@ -182,6 +186,43 @@ export interface InterruptThreadActionInput {
 }
 
 export class ChatRequestActionCoordinator {
+  private async submitThreadRequestResponse(
+    input: SubmitThreadRequestResponseActionInput,
+    actionName: string,
+    response: ThreadConversationRequestResponse,
+  ): Promise<void> {
+    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
+      return;
+    }
+
+    const { actionId, requestOptions } = input.buildActionRequestOptions(actionName);
+    input.onSetBusy(true);
+    try {
+      await input.chatClient.submitUserInput(
+        {
+          threadId: input.selectedThreadId,
+          requestId: input.requestId,
+          response,
+        },
+        requestOptions,
+      );
+      input.onInvalidateActiveThreadQuery();
+      await input.onRefreshThreadData(input.selectedThreadId);
+    } catch (error) {
+      await input.reportTrackedUserInterfaceError({
+        operation: actionName,
+        actionId,
+        threadId: input.selectedThreadId,
+        error: toErrorMessage(error),
+        details: {
+          requestId: input.requestId,
+        },
+      });
+    } finally {
+      input.onSetBusy(false);
+    }
+  }
+
   public async sendMessage(input: SendMessageActionInput): Promise<void> {
     const trimmedDraft = input.draft.trim();
     if (trimmedDraft.length === 0) {
@@ -388,125 +429,54 @@ export class ChatRequestActionCoordinator {
   public async submitCommandExecutionApprovalRequest(
     input: SubmitCommandExecutionApprovalActionInput,
   ): Promise<void> {
-    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
-      return;
-    }
-
-    const { actionId, requestOptions } = input.buildActionRequestOptions(
-      SUBMIT_COMMAND_EXECUTION_APPROVAL_ACTION_NAME,
-    );
-    input.onSetBusy(true);
-    try {
-      await input.chatClient.submitUserInput(
-        {
-          threadId: input.selectedThreadId,
-          requestId: input.requestId,
-          response: {
-            method: CommandExecutionApprovalRequestMethod,
-            payload: {
-              decision: input.decision,
-            },
-          },
-        },
-        requestOptions,
-      );
-      input.onInvalidateActiveThreadQuery();
-      await input.onRefreshThreadData(input.selectedThreadId);
-    } catch (error) {
-      await input.reportTrackedUserInterfaceError({
-        operation: SUBMIT_COMMAND_EXECUTION_APPROVAL_ACTION_NAME,
-        actionId,
-        threadId: input.selectedThreadId,
-        error: toErrorMessage(error),
-        details: {
-          requestId: input.requestId,
-        },
-      });
-    } finally {
-      input.onSetBusy(false);
-    }
+    await this.submitThreadRequestResponse(input, SUBMIT_COMMAND_EXECUTION_APPROVAL_ACTION_NAME, {
+      method: CommandExecutionApprovalRequestMethod,
+      payload: {
+        decision: input.decision,
+      },
+    });
   }
 
   public async submitFileChangeApprovalRequest(
     input: SubmitFileChangeApprovalActionInput,
   ): Promise<void> {
-    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
-      return;
-    }
-
-    const { actionId, requestOptions } = input.buildActionRequestOptions(
-      SUBMIT_FILE_CHANGE_APPROVAL_ACTION_NAME,
-    );
-    input.onSetBusy(true);
-    try {
-      await input.chatClient.submitUserInput(
-        {
-          threadId: input.selectedThreadId,
-          requestId: input.requestId,
-          response: {
-            method: FileChangeApprovalRequestMethod,
-            payload: {
-              decision: input.decision,
-            },
-          },
-        },
-        requestOptions,
-      );
-      input.onInvalidateActiveThreadQuery();
-      await input.onRefreshThreadData(input.selectedThreadId);
-    } catch (error) {
-      await input.reportTrackedUserInterfaceError({
-        operation: SUBMIT_FILE_CHANGE_APPROVAL_ACTION_NAME,
-        actionId,
-        threadId: input.selectedThreadId,
-        error: toErrorMessage(error),
-        details: {
-          requestId: input.requestId,
-        },
-      });
-    } finally {
-      input.onSetBusy(false);
-    }
+    await this.submitThreadRequestResponse(input, SUBMIT_FILE_CHANGE_APPROVAL_ACTION_NAME, {
+      method: FileChangeApprovalRequestMethod,
+      payload: {
+        decision: input.decision,
+      },
+    });
   }
 
   public async submitToolCallResponseRequest(
     input: SubmitToolCallResponseActionInput,
   ): Promise<void> {
-    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
-      return;
-    }
+    await this.submitThreadRequestResponse(input, SUBMIT_TOOL_CALL_RESPONSE_ACTION_NAME, {
+      method: ToolCallRequestMethod,
+      payload: input.payload,
+    });
+  }
 
-    const { actionId, requestOptions } = input.buildActionRequestOptions(
-      SUBMIT_TOOL_CALL_RESPONSE_ACTION_NAME,
-    );
-    input.onSetBusy(true);
-    try {
-      await input.chatClient.submitUserInput(
-        {
-          threadId: input.selectedThreadId,
-          requestId: input.requestId,
-          response: {
-            method: ToolCallRequestMethod,
-            payload: input.payload,
-          },
-        },
-        requestOptions,
-      );
-      input.onInvalidateActiveThreadQuery();
-      await input.onRefreshThreadData(input.selectedThreadId);
-    } catch (error) {
-      await input.reportTrackedUserInterfaceError({
-        operation: SUBMIT_TOOL_CALL_RESPONSE_ACTION_NAME,
-        actionId,
-        threadId: input.selectedThreadId,
-        error: toErrorMessage(error),
-        details: {
-          requestId: input.requestId,
-        },
-      });
-    } finally {
-      input.onSetBusy(false);
-    }
+  public async submitApplyPatchApprovalRequest(
+    input: SubmitApplyPatchApprovalActionInput,
+  ): Promise<void> {
+    await this.submitThreadRequestResponse(input, SUBMIT_APPLY_PATCH_APPROVAL_ACTION_NAME, {
+      method: ApplyPatchApprovalRequestMethod,
+      payload: {
+        decision: input.decision,
+      },
+    });
+  }
+
+  public async submitExecuteCommandApprovalRequest(
+    input: SubmitExecuteCommandApprovalActionInput,
+  ): Promise<void> {
+    await this.submitThreadRequestResponse(input, SUBMIT_EXECUTE_COMMAND_APPROVAL_ACTION_NAME, {
+      method: ExecuteCommandApprovalRequestMethod,
+      payload: {
+        decision: input.decision,
+      },
+    });
   }
 
   public async interruptThread(input: InterruptThreadActionInput): Promise<void> {

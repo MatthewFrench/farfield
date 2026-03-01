@@ -293,13 +293,13 @@ describe("codex-protocol thread contract hardening", () => {
     const applyPatchApprovalResponse = parseThreadConversationRequestResponse({
       method: "applyPatchApproval",
       payload: {
-        decision: "allow",
+        decision: "approved",
       },
     });
     const executeCommandApprovalResponse = parseThreadConversationRequestResponse({
       method: "execCommandApproval",
       payload: {
-        decision: "allow",
+        decision: "approved",
       },
     });
 

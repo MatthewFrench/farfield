@@ -1,13 +1,16 @@
 import {
   type CommandExecutionApprovalResponsePayload,
+  type DeprecatedApprovalReviewDecision,
   type FileChangeApprovalResponsePayload,
   type ToolCallResponsePayload,
 } from "@farfield/protocol";
 import { type Dispatch, type MutableRefObject, type SetStateAction, useCallback } from "react";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
+import { type PendingApplyPatchApprovalRequest } from "../DomainModel/PendingApplyPatchApprovalRequestSelector";
 import { type PendingAuthTokenRefreshRequest } from "../DomainModel/PendingAuthTokenRefreshRequestSelector";
 import { type PendingCommandExecutionApprovalRequest } from "../DomainModel/PendingCommandExecutionApprovalRequestSelector";
+import { type PendingExecuteCommandApprovalRequest } from "../DomainModel/PendingExecuteCommandApprovalRequestSelector";
 import { type PendingFileChangeApprovalRequest } from "../DomainModel/PendingFileChangeApprovalRequestSelector";
 import { type PendingToolCallRequest } from "../DomainModel/PendingToolCallRequestSelector";
 import {
@@ -78,7 +81,9 @@ export interface UseChatActionHandlersInput {
   isModeSyncing: boolean;
   activeRequest: PendingUserInputRequest | null;
   activeAuthTokenRefreshRequest?: PendingAuthTokenRefreshRequest | null;
+  activeApplyPatchApprovalRequest?: PendingApplyPatchApprovalRequest | null;
   activeCommandExecutionApprovalRequest?: PendingCommandExecutionApprovalRequest | null;
+  activeExecuteCommandApprovalRequest?: PendingExecuteCommandApprovalRequest | null;
   activeFileChangeApprovalRequest?: PendingFileChangeApprovalRequest | null;
   activeToolCallRequest?: PendingToolCallRequest | null;
   answerDraft: PendingUserInputAnswerDraftByQuestionId;
@@ -113,8 +118,12 @@ export interface ChatActionHandlers {
     chatgptAccountId: string,
     chatgptPlanType: string | null,
   ) => Promise<void>;
+  submitApplyPatchApprovalRequest?: (decision: DeprecatedApprovalReviewDecision) => Promise<void>;
   submitCommandExecutionApprovalRequest?: (
     decision: CommandExecutionApprovalResponsePayload["decision"],
+  ) => Promise<void>;
+  submitExecuteCommandApprovalRequest?: (
+    decision: DeprecatedApprovalReviewDecision,
   ) => Promise<void>;
   submitFileChangeApprovalRequest?: (
     decision: FileChangeApprovalResponsePayload["decision"],
@@ -141,6 +150,54 @@ function createSubmitCommandExecutionApprovalRequestHandler(
     await input.chatRequestActionCoordinator.submitCommandExecutionApprovalRequest({
       selectedThreadId: input.selectedThreadId,
       requestId: activeCommandExecutionApprovalRequest.id,
+      decision,
+      buildActionRequestOptions: input.buildActionRequestOptions,
+      onSetBusy: input.setIsBusy,
+      chatClient: input.chatClient,
+      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
+      onRefreshThreadData: refreshThreadData,
+      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+    });
+  };
+}
+
+function createSubmitApplyPatchApprovalRequestHandler(
+  input: UseChatActionHandlersInput,
+  refreshThreadData: (threadId: string) => Promise<void>,
+): (decision: DeprecatedApprovalReviewDecision) => Promise<void> {
+  return async (decision: DeprecatedApprovalReviewDecision) => {
+    const activeApplyPatchApprovalRequest = input.activeApplyPatchApprovalRequest;
+    if (!activeApplyPatchApprovalRequest) {
+      return;
+    }
+
+    await input.chatRequestActionCoordinator.submitApplyPatchApprovalRequest({
+      selectedThreadId: input.selectedThreadId,
+      requestId: activeApplyPatchApprovalRequest.id,
+      decision,
+      buildActionRequestOptions: input.buildActionRequestOptions,
+      onSetBusy: input.setIsBusy,
+      chatClient: input.chatClient,
+      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
+      onRefreshThreadData: refreshThreadData,
+      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+    });
+  };
+}
+
+function createSubmitExecuteCommandApprovalRequestHandler(
+  input: UseChatActionHandlersInput,
+  refreshThreadData: (threadId: string) => Promise<void>,
+): (decision: DeprecatedApprovalReviewDecision) => Promise<void> {
+  return async (decision: DeprecatedApprovalReviewDecision) => {
+    const activeExecuteCommandApprovalRequest = input.activeExecuteCommandApprovalRequest;
+    if (!activeExecuteCommandApprovalRequest) {
+      return;
+    }
+
+    await input.chatRequestActionCoordinator.submitExecuteCommandApprovalRequest({
+      selectedThreadId: input.selectedThreadId,
+      requestId: activeExecuteCommandApprovalRequest.id,
       decision,
       buildActionRequestOptions: input.buildActionRequestOptions,
       onSetBusy: input.setIsBusy,
@@ -407,7 +464,17 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     ],
   );
 
+  const submitApplyPatchApprovalRequest = createSubmitApplyPatchApprovalRequestHandler(
+    input,
+    refreshThreadData,
+  );
+
   const submitCommandExecutionApprovalRequest = createSubmitCommandExecutionApprovalRequestHandler(
+    input,
+    refreshThreadData,
+  );
+
+  const submitExecuteCommandApprovalRequest = createSubmitExecuteCommandApprovalRequestHandler(
     input,
     refreshThreadData,
   );
@@ -464,7 +531,9 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     submitPendingRequest,
     skipPendingRequest,
     submitAuthTokenRefreshRequest,
+    submitApplyPatchApprovalRequest,
     submitCommandExecutionApprovalRequest,
+    submitExecuteCommandApprovalRequest,
     submitFileChangeApprovalRequest,
     submitToolCallRequestResponse,
     runInterrupt,

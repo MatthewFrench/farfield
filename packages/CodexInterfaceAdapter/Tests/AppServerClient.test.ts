@@ -468,26 +468,26 @@ describe("AppServerClient.submitServerRequestResponse", () => {
     await client.submitServerRequestResponse(31, {
       method: "applyPatchApproval",
       payload: {
-        decision: "allow",
+        decision: "approved",
       },
     });
     await client.submitServerRequestResponse(32, {
       method: "execCommandApproval",
       payload: {
-        decision: "allow",
+        decision: "approved",
       },
     });
 
     expect(transportDouble.respond).toHaveBeenNthCalledWith(1, 31, {
       method: "applyPatchApproval",
       payload: {
-        decision: "allow",
+        decision: "approved",
       },
     });
     expect(transportDouble.respond).toHaveBeenNthCalledWith(2, 32, {
       method: "execCommandApproval",
       payload: {
-        decision: "allow",
+        decision: "approved",
       },
     });
   });

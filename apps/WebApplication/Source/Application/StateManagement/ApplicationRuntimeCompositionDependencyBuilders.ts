@@ -1,4 +1,8 @@
 import {
+  readActiveApplyPatchApprovalRequest,
+  readPendingApplyPatchApprovalRequests,
+} from "@/Features/Chat/DomainModel/PendingApplyPatchApprovalRequestSelector";
+import {
   readActiveAuthTokenRefreshRequest,
   readPendingAuthTokenRefreshRequests,
 } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
@@ -6,6 +10,10 @@ import {
   readActiveCommandExecutionApprovalRequest,
   readPendingCommandExecutionApprovalRequests,
 } from "@/Features/Chat/DomainModel/PendingCommandExecutionApprovalRequestSelector";
+import {
+  readActiveExecuteCommandApprovalRequest,
+  readPendingExecuteCommandApprovalRequests,
+} from "@/Features/Chat/DomainModel/PendingExecuteCommandApprovalRequestSelector";
 import {
   readActiveFileChangeApprovalRequest,
   readPendingFileChangeApprovalRequests,
@@ -298,7 +306,13 @@ export function buildApplicationChatFeatureCompositionInput(
       activeAuthTokenRefreshRequest: readActiveAuthTokenRefreshRequest(
         applicationDerivedState.conversationState,
       ),
+      activeApplyPatchApprovalRequest: readActiveApplyPatchApprovalRequest(
+        applicationDerivedState.conversationState,
+      ),
       activeCommandExecutionApprovalRequest: readActiveCommandExecutionApprovalRequest(
+        applicationDerivedState.conversationState,
+      ),
+      activeExecuteCommandApprovalRequest: readActiveExecuteCommandApprovalRequest(
         applicationDerivedState.conversationState,
       ),
       activeFileChangeApprovalRequest: readActiveFileChangeApprovalRequest(
@@ -348,7 +362,10 @@ export function buildApplicationChatFeatureCompositionInput(
       pendingRequestCount:
         applicationDerivedState.pendingRequests.length +
         readPendingAuthTokenRefreshRequests(applicationDerivedState.conversationState).length +
+        readPendingApplyPatchApprovalRequests(applicationDerivedState.conversationState).length +
         readPendingCommandExecutionApprovalRequests(applicationDerivedState.conversationState)
+          .length +
+        readPendingExecuteCommandApprovalRequests(applicationDerivedState.conversationState)
           .length +
         readPendingFileChangeApprovalRequests(applicationDerivedState.conversationState).length +
         readPendingToolCallRequests(applicationDerivedState.conversationState).length,

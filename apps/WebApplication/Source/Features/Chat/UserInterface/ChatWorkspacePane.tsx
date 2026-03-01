@@ -1,5 +1,6 @@
 import {
   type CommandExecutionApprovalResponsePayload,
+  type DeprecatedApprovalReviewDecision,
   type FileChangeApprovalResponsePayload,
   type ToolCallResponsePayload,
 } from "@farfield/protocol";
@@ -7,15 +8,19 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, Loader2 } from "lucide-react";
 import { ChatComposer } from "@/Components/ChatComposer";
 import { ConversationItem } from "@/Components/ConversationItem";
+import { PendingApplyPatchApprovalRequestCard } from "@/Components/PendingApplyPatchApprovalRequestCard";
 import { PendingAuthTokenRefreshRequestCard } from "@/Components/PendingAuthTokenRefreshRequestCard";
 import { PendingCommandExecutionApprovalRequestCard } from "@/Components/PendingCommandExecutionApprovalRequestCard";
+import { PendingExecuteCommandApprovalRequestCard } from "@/Components/PendingExecuteCommandApprovalRequestCard";
 import { PendingFileChangeApprovalRequestCard } from "@/Components/PendingFileChangeApprovalRequestCard";
 import { PendingRequestCard } from "@/Components/PendingRequestCard";
 import { PendingToolCallRequestCard } from "@/Components/PendingToolCallRequestCard";
 import { Button } from "@/Components/UserInterface/Button";
 import { type FlattenedConversationItem } from "@/Features/Chat/DomainModel/ConversationItemFlattener";
+import { type PendingApplyPatchApprovalRequest } from "@/Features/Chat/DomainModel/PendingApplyPatchApprovalRequestSelector";
 import { type PendingAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
 import { type PendingCommandExecutionApprovalRequest } from "@/Features/Chat/DomainModel/PendingCommandExecutionApprovalRequestSelector";
+import { type PendingExecuteCommandApprovalRequest } from "@/Features/Chat/DomainModel/PendingExecuteCommandApprovalRequestSelector";
 import { type PendingFileChangeApprovalRequest } from "@/Features/Chat/DomainModel/PendingFileChangeApprovalRequestSelector";
 import { type PendingToolCallRequest } from "@/Features/Chat/DomainModel/PendingToolCallRequestSelector";
 import { type PendingUserInputAnswerDraftByQuestionId } from "@/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
@@ -115,7 +120,9 @@ export interface ChatWorkspacePaneProps {
   onJumpToBottom: () => void;
   activeRequest: PendingUserInputRequest | null;
   activeAuthTokenRefreshRequest?: PendingAuthTokenRefreshRequest | null;
+  activeApplyPatchApprovalRequest?: PendingApplyPatchApprovalRequest | null;
   activeCommandExecutionApprovalRequest?: PendingCommandExecutionApprovalRequest | null;
+  activeExecuteCommandApprovalRequest?: PendingExecuteCommandApprovalRequest | null;
   activeFileChangeApprovalRequest?: PendingFileChangeApprovalRequest | null;
   activeToolCallRequest?: PendingToolCallRequest | null;
   canSubmitUserInputForActiveAgent: boolean;
@@ -128,9 +135,11 @@ export interface ChatWorkspacePaneProps {
     chatgptAccountId: string,
     chatgptPlanType: string | null,
   ) => void;
+  onSubmitApplyPatchApprovalRequest?: (decision: DeprecatedApprovalReviewDecision) => void;
   onSubmitCommandExecutionApprovalRequest?: (
     decision: CommandExecutionApprovalResponsePayload["decision"],
   ) => void;
+  onSubmitExecuteCommandApprovalRequest?: (decision: DeprecatedApprovalReviewDecision) => void;
   onSubmitFileChangeApprovalRequest?: (
     decision: FileChangeApprovalResponsePayload["decision"],
   ) => void;
@@ -160,7 +169,9 @@ export function ChatWorkspacePane({
   onJumpToBottom,
   activeRequest,
   activeAuthTokenRefreshRequest,
+  activeApplyPatchApprovalRequest,
   activeCommandExecutionApprovalRequest,
+  activeExecuteCommandApprovalRequest,
   activeFileChangeApprovalRequest,
   activeToolCallRequest,
   canSubmitUserInputForActiveAgent,
@@ -169,7 +180,9 @@ export function ChatWorkspacePane({
   onSubmitPendingRequest,
   onSkipPendingRequest,
   onSubmitAuthTokenRefreshRequest,
+  onSubmitApplyPatchApprovalRequest,
   onSubmitCommandExecutionApprovalRequest,
+  onSubmitExecuteCommandApprovalRequest,
   onSubmitFileChangeApprovalRequest,
   onSubmitToolCallRequestResponse,
   isBusy,
@@ -321,12 +334,30 @@ export function ChatWorkspacePane({
         />
         <div className="relative w-full px-0 md:px-2 lg:px-4 space-y-2">
           <AnimatePresence>
+            {activeApplyPatchApprovalRequest &&
+            canSubmitUserInputForActiveAgent &&
+            onSubmitApplyPatchApprovalRequest ? (
+              <PendingApplyPatchApprovalRequestCard
+                request={activeApplyPatchApprovalRequest}
+                onSubmitDecision={onSubmitApplyPatchApprovalRequest}
+                isBusy={isBusy}
+              />
+            ) : null}
             {activeCommandExecutionApprovalRequest &&
             canSubmitUserInputForActiveAgent &&
             onSubmitCommandExecutionApprovalRequest ? (
               <PendingCommandExecutionApprovalRequestCard
                 request={activeCommandExecutionApprovalRequest}
                 onSubmitDecision={onSubmitCommandExecutionApprovalRequest}
+                isBusy={isBusy}
+              />
+            ) : null}
+            {activeExecuteCommandApprovalRequest &&
+            canSubmitUserInputForActiveAgent &&
+            onSubmitExecuteCommandApprovalRequest ? (
+              <PendingExecuteCommandApprovalRequestCard
+                request={activeExecuteCommandApprovalRequest}
+                onSubmitDecision={onSubmitExecuteCommandApprovalRequest}
                 isBusy={isBusy}
               />
             ) : null}

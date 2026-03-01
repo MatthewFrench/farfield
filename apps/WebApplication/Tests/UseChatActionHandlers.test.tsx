@@ -3,7 +3,9 @@ import { cleanup, render, waitFor } from "@testing-library/react";
 import { type MutableRefObject, useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
+import { type PendingApplyPatchApprovalRequest } from "@/Features/Chat/DomainModel/PendingApplyPatchApprovalRequestSelector";
 import { type PendingAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
+import { type PendingExecuteCommandApprovalRequest } from "@/Features/Chat/DomainModel/PendingExecuteCommandApprovalRequestSelector";
 import {
   PendingUserInputAnswerBuilder,
   type PendingUserInputAnswerDraftByQuestionId,
@@ -44,6 +46,8 @@ interface TestInputOverrides {
   selectedThreadId?: string | null;
   activeRequest?: PendingUserInputRequest | null;
   activeAuthTokenRefreshRequest?: PendingAuthTokenRefreshRequest | null;
+  activeApplyPatchApprovalRequest?: PendingApplyPatchApprovalRequest | null;
+  activeExecuteCommandApprovalRequest?: PendingExecuteCommandApprovalRequest | null;
   answerDraft?: PendingUserInputAnswerDraftByQuestionId;
   modes?: CollaborationModeActionModeOption[];
   isModeSyncing?: boolean;
@@ -151,6 +155,31 @@ function buildPendingAuthTokenRefreshRequest(): PendingAuthTokenRefreshRequest {
   };
 }
 
+function buildPendingApplyPatchApprovalRequest(): PendingApplyPatchApprovalRequest {
+  return {
+    method: "applyPatchApproval",
+    id: 73,
+    completed: false,
+    params: {
+      callId: "call-73",
+      changes: "*** Begin Patch\n*** End Patch",
+    },
+  };
+}
+
+function buildPendingExecuteCommandApprovalRequest(): PendingExecuteCommandApprovalRequest {
+  return {
+    method: "execCommandApproval",
+    id: 74,
+    completed: false,
+    params: {
+      callId: "call-74",
+      command: ["git", "status"],
+      cwd: "/workspace",
+    },
+  };
+}
+
 function createChatClient(): ChatActionHandlersChatClient {
   return {
     sendMessage: vi.fn(async () => {}),
@@ -206,6 +235,8 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     isModeSyncing: overrides.isModeSyncing ?? false,
     activeRequest: overrides.activeRequest ?? null,
     activeAuthTokenRefreshRequest: overrides.activeAuthTokenRefreshRequest ?? null,
+    activeApplyPatchApprovalRequest: overrides.activeApplyPatchApprovalRequest ?? null,
+    activeExecuteCommandApprovalRequest: overrides.activeExecuteCommandApprovalRequest ?? null,
     answerDraft: overrides.answerDraft ?? {},
     setAnswerDraft,
     buildActionRequestOptions,
@@ -523,6 +554,127 @@ describe("UseChatActionHandlers", () => {
     await handlers.submitAuthTokenRefreshRequest("token-73", "account-73", null);
 
     expect(submitAuthTokenRefreshRequestSpy).not.toHaveBeenCalled();
+  });
+
+  it("delegates apply-patch approval submission with the active deprecated request id", async () => {
+    const activeApplyPatchApprovalRequest = buildPendingApplyPatchApprovalRequest();
+    const { input, chatRequestActionCoordinator } = createTestInput({
+      activeApplyPatchApprovalRequest,
+    });
+    const submitApplyPatchApprovalRequestSpy = vi
+      .spyOn(chatRequestActionCoordinator, "submitApplyPatchApprovalRequest")
+      .mockImplementation(async (nextInput) => {
+        void nextInput;
+      });
+
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
+    render(
+      <HandlerHarness
+        input={input}
+        onHandlersReady={(handlers) => {
+          handlerState.current = handlers;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(handlerState.current).not.toBeNull();
+    });
+
+    const handlers = handlerState.current;
+    if (handlers === null || !handlers.submitApplyPatchApprovalRequest) {
+      throw new Error("expected apply-patch approval handler to be ready");
+    }
+
+    await handlers.submitApplyPatchApprovalRequest("approved");
+
+    expect(submitApplyPatchApprovalRequestSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedThreadId: DEFAULT_THREAD_IDENTIFIER,
+        requestId: activeApplyPatchApprovalRequest.id,
+        decision: "approved",
+      }),
+    );
+  });
+
+  it("does not submit execute-command approval when there is no active deprecated request", async () => {
+    const { input, chatRequestActionCoordinator } = createTestInput({
+      activeExecuteCommandApprovalRequest: null,
+    });
+    const submitExecuteCommandApprovalRequestSpy = vi.spyOn(
+      chatRequestActionCoordinator,
+      "submitExecuteCommandApprovalRequest",
+    );
+
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
+    render(
+      <HandlerHarness
+        input={input}
+        onHandlersReady={(handlers) => {
+          handlerState.current = handlers;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(handlerState.current).not.toBeNull();
+    });
+
+    const handlers = handlerState.current;
+    if (handlers === null || !handlers.submitExecuteCommandApprovalRequest) {
+      throw new Error("expected execute-command approval handler to be ready");
+    }
+
+    await handlers.submitExecuteCommandApprovalRequest("denied");
+
+    expect(submitExecuteCommandApprovalRequestSpy).not.toHaveBeenCalled();
+  });
+
+  it("delegates execute-command approval submission with the active deprecated request id", async () => {
+    const activeExecuteCommandApprovalRequest = buildPendingExecuteCommandApprovalRequest();
+    const { input, chatRequestActionCoordinator } = createTestInput({
+      activeExecuteCommandApprovalRequest,
+    });
+    const submitExecuteCommandApprovalRequestSpy = vi
+      .spyOn(chatRequestActionCoordinator, "submitExecuteCommandApprovalRequest")
+      .mockImplementation(async (nextInput) => {
+        void nextInput;
+      });
+
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
+    render(
+      <HandlerHarness
+        input={input}
+        onHandlersReady={(handlers) => {
+          handlerState.current = handlers;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(handlerState.current).not.toBeNull();
+    });
+
+    const handlers = handlerState.current;
+    if (handlers === null || !handlers.submitExecuteCommandApprovalRequest) {
+      throw new Error("expected execute-command approval handler to be ready");
+    }
+
+    await handlers.submitExecuteCommandApprovalRequest("denied");
+
+    expect(submitExecuteCommandApprovalRequestSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedThreadId: DEFAULT_THREAD_IDENTIFIER,
+        requestId: activeExecuteCommandApprovalRequest.id,
+        decision: "denied",
+      }),
+    );
   });
 
   it("updates answer draft state for option and freeform fields while preserving existing values", async () => {

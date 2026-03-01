@@ -2,8 +2,10 @@ import { ChatGptAuthTokensRefreshRequestMethod } from "@farfield/protocol";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { type PendingApplyPatchApprovalRequest } from "@/Features/Chat/DomainModel/PendingApplyPatchApprovalRequestSelector";
 import { type PendingAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
 import { type PendingCommandExecutionApprovalRequest } from "@/Features/Chat/DomainModel/PendingCommandExecutionApprovalRequestSelector";
+import { type PendingExecuteCommandApprovalRequest } from "@/Features/Chat/DomainModel/PendingExecuteCommandApprovalRequestSelector";
 import { type PendingFileChangeApprovalRequest } from "@/Features/Chat/DomainModel/PendingFileChangeApprovalRequestSelector";
 import { type PendingToolCallRequest } from "@/Features/Chat/DomainModel/PendingToolCallRequestSelector";
 import {
@@ -89,6 +91,34 @@ function buildPendingCommandExecutionApprovalRequest(): PendingCommandExecutionA
       command: "git status",
       reason: "Needs read access to inspect state.",
       proposedExecpolicyAmendment: ["git status"],
+    },
+  };
+}
+
+function buildPendingApplyPatchApprovalRequest(): PendingApplyPatchApprovalRequest {
+  return {
+    method: "applyPatchApproval",
+    id: 95,
+    completed: false,
+    params: {
+      callId: "call-95",
+      changes: "*** Begin Patch\n*** End Patch",
+      grantRoot: "/workspace",
+      reason: "Legacy apply patch approval path.",
+    },
+  };
+}
+
+function buildPendingExecuteCommandApprovalRequest(): PendingExecuteCommandApprovalRequest {
+  return {
+    method: "execCommandApproval",
+    id: 96,
+    completed: false,
+    params: {
+      callId: "call-96",
+      command: ["git", "status"],
+      cwd: "/workspace",
+      reason: "Legacy execute command approval path.",
     },
   };
 }
@@ -297,6 +327,38 @@ describe("ChatWorkspacePane", () => {
     fireEvent.click(screen.getByRole("button", { name: "Decline" }));
 
     expect(onSubmitFileChangeApprovalRequest).toHaveBeenCalledWith("decline");
+  });
+
+  it("submits apply-patch approval decisions from the deprecated apply-patch approval card", () => {
+    const onSubmitApplyPatchApprovalRequest = vi.fn();
+
+    renderChatWorkspacePane({
+      chatSurfaceState: "ready",
+      turnCount: 1,
+      canSubmitUserInputForActiveAgent: true,
+      activeApplyPatchApprovalRequest: buildPendingApplyPatchApprovalRequest(),
+      onSubmitApplyPatchApprovalRequest,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve for session" }));
+
+    expect(onSubmitApplyPatchApprovalRequest).toHaveBeenCalledWith("approved_for_session");
+  });
+
+  it("submits execute-command approval decisions from the deprecated execute-command approval card", () => {
+    const onSubmitExecuteCommandApprovalRequest = vi.fn();
+
+    renderChatWorkspacePane({
+      chatSurfaceState: "ready",
+      turnCount: 1,
+      canSubmitUserInputForActiveAgent: true,
+      activeExecuteCommandApprovalRequest: buildPendingExecuteCommandApprovalRequest(),
+      onSubmitExecuteCommandApprovalRequest,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Deny" }));
+
+    expect(onSubmitExecuteCommandApprovalRequest).toHaveBeenCalledWith("denied");
   });
 
   it("submits tool-call responses from the tool-call request card", () => {

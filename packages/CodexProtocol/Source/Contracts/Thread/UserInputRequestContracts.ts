@@ -144,8 +144,31 @@ export const ChatGptAuthTokensRefreshResponsePayloadSchema = z
     chatgptPlanType: z.string().nullable().optional(),
   })
   .passthrough();
-export const ApplyPatchApprovalResponsePayloadSchema = JsonValueSchema;
-export const ExecuteCommandApprovalResponsePayloadSchema = JsonValueSchema;
+export const DeprecatedApprovalReviewDecisionSchema = z
+  .union([
+    z.literal("approved"),
+    z.literal("approved_for_session"),
+    z.literal("denied"),
+    z.literal("abort"),
+    z
+      .object({
+        approved_execpolicy_amendment: z.object({
+          proposed_execpolicy_amendment: z.array(z.string()),
+        }),
+      })
+      .strict(),
+  ])
+  .describe("Deprecated compatibility review decision for legacy approval request methods.");
+export const ApplyPatchApprovalResponsePayloadSchema = z
+  .object({
+    decision: DeprecatedApprovalReviewDecisionSchema,
+  })
+  .strict();
+export const ExecuteCommandApprovalResponsePayloadSchema = z
+  .object({
+    decision: DeprecatedApprovalReviewDecisionSchema,
+  })
+  .strict();
 
 export const ThreadConversationResponseMethodValues = [
   CommandExecutionApprovalRequestMethod,
@@ -212,6 +235,8 @@ export type CommandExecutionApprovalRequest = z.infer<typeof CommandExecutionApp
 export type FileChangeApprovalRequest = z.infer<typeof FileChangeApprovalRequestSchema>;
 export type ToolCallRequest = z.infer<typeof ToolCallRequestSchema>;
 export type ChatGptAuthTokensRefreshRequest = z.infer<typeof ChatGptAuthTokensRefreshRequestSchema>;
+export type ApplyPatchApprovalRequest = z.infer<typeof ApplyPatchApprovalRequestSchema>;
+export type ExecuteCommandApprovalRequest = z.infer<typeof ExecuteCommandApprovalRequestSchema>;
 export type ThreadConversationRequest = z.infer<typeof ThreadConversationRequestSchema>;
 export type CommandExecutionApprovalRequestParams = z.infer<
   typeof CommandExecutionRequestApprovalParamsSchema
@@ -228,6 +253,9 @@ export type FileChangeApprovalResponsePayload = z.infer<
 export type ToolCallResponsePayload = z.infer<typeof ToolCallResponsePayloadSchema>;
 export type ChatGptAuthTokensRefreshResponsePayload = z.infer<
   typeof ChatGptAuthTokensRefreshResponsePayloadSchema
+>;
+export type DeprecatedApprovalReviewDecision = z.infer<
+  typeof DeprecatedApprovalReviewDecisionSchema
 >;
 export type ApplyPatchApprovalResponsePayload = z.infer<
   typeof ApplyPatchApprovalResponsePayloadSchema

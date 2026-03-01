@@ -1,6 +1,8 @@
 import {
+  ApplyPatchApprovalRequestMethod,
   ChatGptAuthTokensRefreshRequestMethod,
   CommandExecutionApprovalRequestMethod,
+  ExecuteCommandApprovalRequestMethod,
   FileChangeApprovalRequestMethod,
   ToolCallRequestMethod,
   UserInputRequestMethod,
@@ -610,6 +612,96 @@ describe("ChatRequestActionCoordinator", () => {
     expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
     expect(onRefreshThreadData).not.toHaveBeenCalled();
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+  });
+
+  it("submits apply-patch approval decisions and refreshes selected thread", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const {
+      busyStates,
+      onSetBusy,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    } = createActionCallbacks();
+    const chatClient = createChatClient();
+
+    await coordinator.submitApplyPatchApprovalRequest({
+      selectedThreadId: DEFAULT_THREAD_ID,
+      requestId: 65,
+      decision: "approved",
+      buildActionRequestOptions,
+      onSetBusy,
+      chatClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(chatClient.submitUserInput).toHaveBeenCalledWith(
+      {
+        threadId: DEFAULT_THREAD_ID,
+        requestId: 65,
+        response: {
+          method: ApplyPatchApprovalRequestMethod,
+          payload: {
+            decision: "approved",
+          },
+        },
+      },
+      {
+        actionId: "action-submit-apply-patch-approval",
+        actionName: "submit-apply-patch-approval",
+      },
+    );
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onRefreshThreadData).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
+  });
+
+  it("submits execute-command approval decisions and refreshes selected thread", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const {
+      busyStates,
+      onSetBusy,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    } = createActionCallbacks();
+    const chatClient = createChatClient();
+
+    await coordinator.submitExecuteCommandApprovalRequest({
+      selectedThreadId: DEFAULT_THREAD_ID,
+      requestId: 66,
+      decision: "denied",
+      buildActionRequestOptions,
+      onSetBusy,
+      chatClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(chatClient.submitUserInput).toHaveBeenCalledWith(
+      {
+        threadId: DEFAULT_THREAD_ID,
+        requestId: 66,
+        response: {
+          method: ExecuteCommandApprovalRequestMethod,
+          payload: {
+            decision: "denied",
+          },
+        },
+      },
+      {
+        actionId: "action-submit-execute-command-approval",
+        actionName: "submit-execute-command-approval",
+      },
+    );
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onRefreshThreadData).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
   });
 
   it("interrupts selected thread and refreshes data", async () => {

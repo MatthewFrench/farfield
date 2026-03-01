@@ -93,7 +93,9 @@ export interface UseApplicationShellViewPropertiesInput {
   setIsChatAtBottom: (nextIsAtBottom: boolean) => void;
   activeRequest: ChatWorkspacePaneProps["activeRequest"];
   activeAuthTokenRefreshRequest?: ChatWorkspacePaneProps["activeAuthTokenRefreshRequest"];
+  activeApplyPatchApprovalRequest?: ChatWorkspacePaneProps["activeApplyPatchApprovalRequest"];
   activeCommandExecutionApprovalRequest?: ChatWorkspacePaneProps["activeCommandExecutionApprovalRequest"];
+  activeExecuteCommandApprovalRequest?: ChatWorkspacePaneProps["activeExecuteCommandApprovalRequest"];
   activeFileChangeApprovalRequest?: ChatWorkspacePaneProps["activeFileChangeApprovalRequest"];
   activeToolCallRequest?: ChatWorkspacePaneProps["activeToolCallRequest"];
   canSubmitUserInputForActiveAgent: boolean;
@@ -102,7 +104,9 @@ export interface UseApplicationShellViewPropertiesInput {
   submitPendingRequest: () => void | Promise<void>;
   skipPendingRequest: () => void | Promise<void>;
   submitAuthTokenRefreshRequest?: ChatWorkspacePaneProps["onSubmitAuthTokenRefreshRequest"];
+  submitApplyPatchApprovalRequest?: ChatWorkspacePaneProps["onSubmitApplyPatchApprovalRequest"];
   submitCommandExecutionApprovalRequest?: ChatWorkspacePaneProps["onSubmitCommandExecutionApprovalRequest"];
+  submitExecuteCommandApprovalRequest?: ChatWorkspacePaneProps["onSubmitExecuteCommandApprovalRequest"];
   submitFileChangeApprovalRequest?: ChatWorkspacePaneProps["onSubmitFileChangeApprovalRequest"];
   submitToolCallRequestResponse?: ChatWorkspacePaneProps["onSubmitToolCallRequestResponse"];
   selectedAgentLabel: string;
@@ -378,7 +382,9 @@ function buildChatWorkspacePaneProperties(
     },
     activeRequest: input.activeRequest,
     activeAuthTokenRefreshRequest: input.activeAuthTokenRefreshRequest ?? null,
+    activeApplyPatchApprovalRequest: input.activeApplyPatchApprovalRequest ?? null,
     activeCommandExecutionApprovalRequest: input.activeCommandExecutionApprovalRequest ?? null,
+    activeExecuteCommandApprovalRequest: input.activeExecuteCommandApprovalRequest ?? null,
     activeFileChangeApprovalRequest: input.activeFileChangeApprovalRequest ?? null,
     activeToolCallRequest: input.activeToolCallRequest ?? null,
     canSubmitUserInputForActiveAgent: input.canSubmitUserInputForActiveAgent,
@@ -409,10 +415,24 @@ function buildChatWorkspacePaneProperties(
     };
   }
 
+  if (input.submitApplyPatchApprovalRequest) {
+    nextProperties = {
+      ...nextProperties,
+      onSubmitApplyPatchApprovalRequest: input.submitApplyPatchApprovalRequest,
+    };
+  }
+
   if (input.submitCommandExecutionApprovalRequest) {
     nextProperties = {
       ...nextProperties,
       onSubmitCommandExecutionApprovalRequest: input.submitCommandExecutionApprovalRequest,
+    };
+  }
+
+  if (input.submitExecuteCommandApprovalRequest) {
+    nextProperties = {
+      ...nextProperties,
+      onSubmitExecuteCommandApprovalRequest: input.submitExecuteCommandApprovalRequest,
     };
   }
 
@@ -656,7 +676,9 @@ export function useApplicationShellViewProperties(
       input.activeAgentLabel,
       input.activeRequest,
       input.activeAuthTokenRefreshRequest,
+      input.activeApplyPatchApprovalRequest,
       input.activeCommandExecutionApprovalRequest,
+      input.activeExecuteCommandApprovalRequest,
       input.activeFileChangeApprovalRequest,
       input.activeToolCallRequest,
       input.answerDraft,
@@ -683,7 +705,9 @@ export function useApplicationShellViewProperties(
       input.steerMessage,
       input.submitMessage,
       input.submitAuthTokenRefreshRequest,
+      input.submitApplyPatchApprovalRequest,
       input.submitCommandExecutionApprovalRequest,
+      input.submitExecuteCommandApprovalRequest,
       input.submitFileChangeApprovalRequest,
       input.submitPendingRequest,
       input.submitToolCallRequestResponse,

@@ -13,8 +13,10 @@ import {
   useMobileSidebarTouchHandlers,
 } from "@/Application/StateManagement/UseMobileSidebarTouchHandlers";
 import { type CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
+import { readActiveApplyPatchApprovalRequest } from "@/Features/Chat/DomainModel/PendingApplyPatchApprovalRequestSelector";
 import { readActiveAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
 import { readActiveCommandExecutionApprovalRequest } from "@/Features/Chat/DomainModel/PendingCommandExecutionApprovalRequestSelector";
+import { readActiveExecuteCommandApprovalRequest } from "@/Features/Chat/DomainModel/PendingExecuteCommandApprovalRequestSelector";
 import { readActiveFileChangeApprovalRequest } from "@/Features/Chat/DomainModel/PendingFileChangeApprovalRequestSelector";
 import { readActiveToolCallRequest } from "@/Features/Chat/DomainModel/PendingToolCallRequestSelector";
 import { type ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
@@ -268,7 +270,13 @@ function buildApplicationShellViewPropertiesInput(
     activeAuthTokenRefreshRequest: readActiveAuthTokenRefreshRequest(
       applicationDerivedState.conversationState,
     ),
+    activeApplyPatchApprovalRequest: readActiveApplyPatchApprovalRequest(
+      applicationDerivedState.conversationState,
+    ),
     activeCommandExecutionApprovalRequest: readActiveCommandExecutionApprovalRequest(
+      applicationDerivedState.conversationState,
+    ),
+    activeExecuteCommandApprovalRequest: readActiveExecuteCommandApprovalRequest(
       applicationDerivedState.conversationState,
     ),
     activeFileChangeApprovalRequest: readActiveFileChangeApprovalRequest(
@@ -281,8 +289,11 @@ function buildApplicationShellViewPropertiesInput(
     submitPendingRequest: input.chatFeatureComposition.submitPendingRequest,
     skipPendingRequest: input.chatFeatureComposition.skipPendingRequest,
     submitAuthTokenRefreshRequest: input.chatFeatureComposition.submitAuthTokenRefreshRequest,
+    submitApplyPatchApprovalRequest: input.chatFeatureComposition.submitApplyPatchApprovalRequest,
     submitCommandExecutionApprovalRequest:
       input.chatFeatureComposition.submitCommandExecutionApprovalRequest,
+    submitExecuteCommandApprovalRequest:
+      input.chatFeatureComposition.submitExecuteCommandApprovalRequest,
     submitFileChangeApprovalRequest: input.chatFeatureComposition.submitFileChangeApprovalRequest,
     submitToolCallRequestResponse: input.chatFeatureComposition.submitToolCallRequestResponse,
     selectedAgentLabel: applicationDerivedState.selectedAgentLabel,
