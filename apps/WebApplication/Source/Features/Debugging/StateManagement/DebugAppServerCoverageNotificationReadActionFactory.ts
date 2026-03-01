@@ -14,6 +14,7 @@ import type {
   DebugAppServerCoverageTurnLifecycleNotificationsResult,
   DebugAppServerCoverageWarningNotificationsResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
+import type { DebugAppServerCoverageThreadProgressNotificationsResult } from "../DomainModel/DebugAppServerCoverageThreadProgressContracts";
 import { createReadErrorNotificationsAction } from "./DebugAppServerCoverageErrorNotificationReadAction";
 import { createReadItemDeltaNotificationsAction } from "./DebugAppServerCoverageItemDeltaNotificationReadAction";
 import { createReadItemLifecycleNotificationsAction } from "./DebugAppServerCoverageItemLifecycleNotificationReadAction";
@@ -27,6 +28,7 @@ import {
   createReadWarningNotificationsAction,
 } from "./DebugAppServerCoverageMutationActionHelpers";
 import { createReadThreadLifecycleNotificationsAction } from "./DebugAppServerCoverageThreadLifecycleNotificationReadAction";
+import { createReadThreadProgressNotificationsAction } from "./DebugAppServerCoverageThreadProgressNotificationReadAction";
 import { createReadTurnLifecycleNotificationsAction } from "./DebugAppServerCoverageTurnLifecycleNotificationReadAction";
 
 interface NotificationCoverageReadActions {
@@ -37,6 +39,7 @@ interface NotificationCoverageReadActions {
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
   readWarningNotifications: (sinceSequence?: number | null) => void;
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
+  readThreadProgressNotifications: (sinceSequence?: number | null) => void;
   readTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   readItemDeltaNotifications: (sinceSequence?: number | null) => void;
   readItemLifecycleNotifications: (sinceSequence?: number | null) => void;
@@ -69,6 +72,9 @@ interface CreateNotificationCoverageReadActionsInput {
   >;
   setLastThreadLifecycleNotificationsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageThreadLifecycleNotificationsResult | null>
+  >;
+  setLastThreadProgressNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageThreadProgressNotificationsResult | null>
   >;
   setLastTurnLifecycleNotificationsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageTurnLifecycleNotificationsResult | null>
@@ -129,6 +135,10 @@ export function createNotificationCoverageReadActions(
     readThreadLifecycleNotifications: createReadThreadLifecycleNotificationsAction({
       ...sharedActionInput,
       setLastThreadLifecycleNotificationsResult: input.setLastThreadLifecycleNotificationsResult,
+    }),
+    readThreadProgressNotifications: createReadThreadProgressNotificationsAction({
+      ...sharedActionInput,
+      setLastThreadProgressNotificationsResult: input.setLastThreadProgressNotificationsResult,
     }),
     readTurnLifecycleNotifications: createReadTurnLifecycleNotificationsAction({
       ...sharedActionInput,

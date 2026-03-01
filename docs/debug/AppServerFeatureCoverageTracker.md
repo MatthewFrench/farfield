@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 11:41:27Z
+Last Updated (UTC): 2026-03-01 12:15:20Z
 
 ## Purpose
 
@@ -69,6 +69,7 @@ As of the upstream snapshot above:
 14. Farfield now consumes turn-lifecycle notifications (`turn/started`, `turn/completed`, `turn/plan/updated`, `turn/diff/updated`) through dedicated debug coverage diagnostics with strict typed lifecycle mapping and cursor-safe reads.
 15. Farfield now consumes item-delta notifications (`item/agentMessage/delta`, `item/plan/delta`, `item/reasoning/summaryTextDelta`, `item/reasoning/summaryPartAdded`, `item/reasoning/textDelta`, `item/commandExecution/outputDelta`, `item/commandExecution/terminalInteraction`, `item/fileChange/outputDelta`, `item/mcpToolCall/progress`) through dedicated debug coverage diagnostics with strict typed delta payload mapping and cursor-safe reads.
 16. Farfield now consumes item-lifecycle notifications (`item/started`, `item/completed`) through dedicated debug coverage diagnostics with strict typed item identity mapping and cursor-safe reads.
+17. Farfield now consumes thread-progress notifications (`thread/started`, `thread/compacted`, `thread/tokenUsage/updated`) through dedicated debug coverage diagnostics with strict typed thread/token mapping and cursor-safe reads.
 
 ## Canonical Coverage Artifacts
 

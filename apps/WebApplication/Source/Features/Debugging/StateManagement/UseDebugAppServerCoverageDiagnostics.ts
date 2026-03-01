@@ -48,6 +48,7 @@ import {
   type DebugAppServerCoverageWindowsSandboxSetupMode,
   type DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
+import type { DebugAppServerCoverageThreadProgressNotificationsResult } from "../DomainModel/DebugAppServerCoverageThreadProgressContracts";
 import {
   runConfigBatchWriteAction,
   runConfigValueWriteAction,
@@ -114,6 +115,7 @@ export interface DebugAppServerCoverageDiagnostics {
   lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
+  lastThreadProgressNotificationsResult: DebugAppServerCoverageThreadProgressNotificationsResult | null;
   lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
   lastItemDeltaNotificationsResult: DebugAppServerCoverageItemDeltaNotificationsResult | null;
   lastItemLifecycleNotificationsResult: DebugAppServerCoverageItemLifecycleNotificationsResult | null;
@@ -153,6 +155,7 @@ export interface DebugAppServerCoverageDiagnostics {
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
   readWarningNotifications: (sinceSequence?: number | null) => void;
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
+  readThreadProgressNotifications: (sinceSequence?: number | null) => void;
   readTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   readItemDeltaNotifications: (sinceSequence?: number | null) => void;
   readItemLifecycleNotifications: (sinceSequence?: number | null) => void;

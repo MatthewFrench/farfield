@@ -38,6 +38,7 @@ import {
   type DebugAppServerCoverageWindowsSandboxSetupMode,
   type DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "@/Features/Debugging/DomainModel/DebugAppServerCoverageContracts";
+import { type DebugAppServerCoverageThreadProgressNotificationsResult } from "@/Features/Debugging/DomainModel/DebugAppServerCoverageThreadProgressContracts";
 import {
   type DebugIssue,
   type RuntimeRequestErrorOperationMetric,
@@ -121,6 +122,7 @@ export interface DebugWorkspacePaneProps {
   lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
+  lastThreadProgressNotificationsResult: DebugAppServerCoverageThreadProgressNotificationsResult | null;
   lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
   lastItemDeltaNotificationsResult: DebugAppServerCoverageItemDeltaNotificationsResult | null;
   lastItemLifecycleNotificationsResult: DebugAppServerCoverageItemLifecycleNotificationsResult | null;
@@ -167,6 +169,7 @@ export interface DebugWorkspacePaneProps {
   onReadModelReroutedEvents: (sinceSequence?: number | null) => void;
   onReadWarningNotifications: (sinceSequence?: number | null) => void;
   onReadThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
+  onReadThreadProgressNotifications: (sinceSequence?: number | null) => void;
   onReadTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   onReadItemDeltaNotifications: (sinceSequence?: number | null) => void;
   onReadItemLifecycleNotifications: (sinceSequence?: number | null) => void;
@@ -247,6 +250,7 @@ export function DebugWorkspacePane({
   lastModelReroutedEventsResult,
   lastWarningNotificationsResult,
   lastThreadLifecycleNotificationsResult,
+  lastThreadProgressNotificationsResult,
   lastTurnLifecycleNotificationsResult,
   lastItemDeltaNotificationsResult,
   lastItemLifecycleNotificationsResult,
@@ -282,6 +286,7 @@ export function DebugWorkspacePane({
   onReadModelReroutedEvents,
   onReadWarningNotifications,
   onReadThreadLifecycleNotifications,
+  onReadThreadProgressNotifications,
   onReadTurnLifecycleNotifications,
   onReadItemDeltaNotifications,
   onReadItemLifecycleNotifications,
@@ -413,6 +418,7 @@ export function DebugWorkspacePane({
             lastModelReroutedEventsResult={lastModelReroutedEventsResult}
             lastWarningNotificationsResult={lastWarningNotificationsResult}
             lastThreadLifecycleNotificationsResult={lastThreadLifecycleNotificationsResult}
+            lastThreadProgressNotificationsResult={lastThreadProgressNotificationsResult}
             lastTurnLifecycleNotificationsResult={lastTurnLifecycleNotificationsResult}
             lastItemDeltaNotificationsResult={lastItemDeltaNotificationsResult}
             lastItemLifecycleNotificationsResult={lastItemLifecycleNotificationsResult}
@@ -448,6 +454,7 @@ export function DebugWorkspacePane({
             onReadModelReroutedEvents={onReadModelReroutedEvents}
             onReadWarningNotifications={onReadWarningNotifications}
             onReadThreadLifecycleNotifications={onReadThreadLifecycleNotifications}
+            onReadThreadProgressNotifications={onReadThreadProgressNotifications}
             onReadTurnLifecycleNotifications={onReadTurnLifecycleNotifications}
             onReadItemDeltaNotifications={onReadItemDeltaNotifications}
             onReadItemLifecycleNotifications={onReadItemLifecycleNotifications}

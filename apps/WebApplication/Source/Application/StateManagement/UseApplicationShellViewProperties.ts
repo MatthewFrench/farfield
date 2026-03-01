@@ -180,6 +180,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastModelReroutedEventsResult: DebugWorkspacePaneProps["lastModelReroutedEventsResult"];
   lastWarningNotificationsResult: DebugWorkspacePaneProps["lastWarningNotificationsResult"];
   lastThreadLifecycleNotificationsResult: DebugWorkspacePaneProps["lastThreadLifecycleNotificationsResult"];
+  lastThreadProgressNotificationsResult: DebugWorkspacePaneProps["lastThreadProgressNotificationsResult"];
   lastTurnLifecycleNotificationsResult: DebugWorkspacePaneProps["lastTurnLifecycleNotificationsResult"];
   lastItemDeltaNotificationsResult: DebugWorkspacePaneProps["lastItemDeltaNotificationsResult"];
   lastItemLifecycleNotificationsResult: DebugWorkspacePaneProps["lastItemLifecycleNotificationsResult"];
@@ -221,6 +222,7 @@ export interface UseApplicationShellViewPropertiesInput {
   readModelReroutedEvents: DebugWorkspacePaneProps["onReadModelReroutedEvents"];
   readWarningNotifications: DebugWorkspacePaneProps["onReadWarningNotifications"];
   readThreadLifecycleNotifications: DebugWorkspacePaneProps["onReadThreadLifecycleNotifications"];
+  readThreadProgressNotifications: DebugWorkspacePaneProps["onReadThreadProgressNotifications"];
   readTurnLifecycleNotifications: DebugWorkspacePaneProps["onReadTurnLifecycleNotifications"];
   readItemDeltaNotifications: DebugWorkspacePaneProps["onReadItemDeltaNotifications"];
   readItemLifecycleNotifications: DebugWorkspacePaneProps["onReadItemLifecycleNotifications"];
@@ -549,6 +551,7 @@ function buildDebugWorkspacePaneProperties(
     lastModelReroutedEventsResult: input.lastModelReroutedEventsResult,
     lastWarningNotificationsResult: input.lastWarningNotificationsResult,
     lastThreadLifecycleNotificationsResult: input.lastThreadLifecycleNotificationsResult,
+    lastThreadProgressNotificationsResult: input.lastThreadProgressNotificationsResult,
     lastTurnLifecycleNotificationsResult: input.lastTurnLifecycleNotificationsResult,
     lastItemDeltaNotificationsResult: input.lastItemDeltaNotificationsResult,
     lastItemLifecycleNotificationsResult: input.lastItemLifecycleNotificationsResult,
@@ -584,6 +587,7 @@ function buildDebugWorkspacePaneProperties(
     onReadModelReroutedEvents: input.readModelReroutedEvents,
     onReadWarningNotifications: input.readWarningNotifications,
     onReadThreadLifecycleNotifications: input.readThreadLifecycleNotifications,
+    onReadThreadProgressNotifications: input.readThreadProgressNotifications,
     onReadTurnLifecycleNotifications: input.readTurnLifecycleNotifications,
     onReadItemDeltaNotifications: input.readItemDeltaNotifications,
     onReadItemLifecycleNotifications: input.readItemLifecycleNotifications,
@@ -817,6 +821,7 @@ export function useApplicationShellViewProperties(
       input.lastModelReroutedEventsResult,
       input.lastWarningNotificationsResult,
       input.lastThreadLifecycleNotificationsResult,
+      input.lastThreadProgressNotificationsResult,
       input.lastTurnLifecycleNotificationsResult,
       input.lastItemDeltaNotificationsResult,
       input.lastItemLifecycleNotificationsResult,
@@ -851,6 +856,7 @@ export function useApplicationShellViewProperties(
       input.readModelReroutedEvents,
       input.readWarningNotifications,
       input.readThreadLifecycleNotifications,
+      input.readThreadProgressNotifications,
       input.readTurnLifecycleNotifications,
       input.readItemDeltaNotifications,
       input.readItemLifecycleNotifications,

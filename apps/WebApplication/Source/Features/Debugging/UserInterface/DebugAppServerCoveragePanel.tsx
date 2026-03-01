@@ -36,6 +36,7 @@ import {
   type DebugAppServerCoverageWindowsSandboxSetupMode,
   type DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
+import { type DebugAppServerCoverageThreadProgressNotificationsResult } from "../DomainModel/DebugAppServerCoverageThreadProgressContracts";
 import { DebugAppServerCoverageAuthCompletionEventsSection } from "./DebugAppServerCoverageAuthCompletionEventsSection";
 import { DebugAppServerCoverageCommandExecutionSection } from "./DebugAppServerCoverageCommandExecutionSection";
 import { DebugAppServerCoverageConfigBatchWriteSection } from "./DebugAppServerCoverageConfigBatchWriteSection";
@@ -54,6 +55,7 @@ import { DebugAppServerCoveragePendingServerRequestsSection } from "./DebugAppSe
 import { DebugAppServerCoverageRealtimeAndWindowsSection } from "./DebugAppServerCoverageRealtimeAndWindowsSection";
 import { DebugAppServerCoverageServerRequestResolvedEventsSection } from "./DebugAppServerCoverageServerRequestResolvedEventsSection";
 import { DebugAppServerCoverageThreadLifecycleNotificationsSection } from "./DebugAppServerCoverageThreadLifecycleNotificationsSection";
+import { DebugAppServerCoverageThreadProgressNotificationsSection } from "./DebugAppServerCoverageThreadProgressNotificationsSection";
 import { DebugAppServerCoverageThreadStreamEventsSection } from "./DebugAppServerCoverageThreadStreamEventsSection";
 import { DebugAppServerCoverageTurnLifecycleNotificationsSection } from "./DebugAppServerCoverageTurnLifecycleNotificationsSection";
 import { DebugAppServerCoverageWarningNotificationsSection } from "./DebugAppServerCoverageWarningNotificationsSection";
@@ -90,6 +92,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
+  lastThreadProgressNotificationsResult: DebugAppServerCoverageThreadProgressNotificationsResult | null;
   lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
   lastItemDeltaNotificationsResult: DebugAppServerCoverageItemDeltaNotificationsResult | null;
   lastItemLifecycleNotificationsResult: DebugAppServerCoverageItemLifecycleNotificationsResult | null;
@@ -136,6 +139,7 @@ export interface DebugAppServerCoveragePanelProps {
   onReadModelReroutedEvents: (sinceSequence?: number | null) => void;
   onReadWarningNotifications: (sinceSequence?: number | null) => void;
   onReadThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
+  onReadThreadProgressNotifications: (sinceSequence?: number | null) => void;
   onReadTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   onReadItemDeltaNotifications: (sinceSequence?: number | null) => void;
   onReadItemLifecycleNotifications: (sinceSequence?: number | null) => void;
@@ -192,6 +196,7 @@ export function DebugAppServerCoveragePanel({
   lastModelReroutedEventsResult,
   lastWarningNotificationsResult,
   lastThreadLifecycleNotificationsResult,
+  lastThreadProgressNotificationsResult,
   lastTurnLifecycleNotificationsResult,
   lastItemDeltaNotificationsResult,
   lastItemLifecycleNotificationsResult,
@@ -227,6 +232,7 @@ export function DebugAppServerCoveragePanel({
   onReadModelReroutedEvents,
   onReadWarningNotifications,
   onReadThreadLifecycleNotifications,
+  onReadThreadProgressNotifications,
   onReadTurnLifecycleNotifications,
   onReadItemDeltaNotifications,
   onReadItemLifecycleNotifications,
@@ -244,8 +250,8 @@ export function DebugAppServerCoveragePanel({
             diagnostics plus config writes, remote skills import, external-agent config migration,
             realtime thread actions, notification and auth-completion reads, pending-request reads,
             windows sandbox setup actions, git diff reads, command execution, fuzzy file search, and
-            warning, thread-lifecycle, turn-lifecycle, item-delta, item-lifecycle, and
-            error-notification diagnostics, and feedback upload coverage.
+            warning, thread-lifecycle, thread-progress, turn-lifecycle, item-delta, item-lifecycle,
+            and error-notification diagnostics, and feedback upload coverage.
           </p>
         </div>
         <Button
@@ -737,6 +743,12 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastThreadLifecycleNotificationsResult={lastThreadLifecycleNotificationsResult}
             onReadThreadLifecycleNotifications={onReadThreadLifecycleNotifications}
+          />
+
+          <DebugAppServerCoverageThreadProgressNotificationsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastThreadProgressNotificationsResult={lastThreadProgressNotificationsResult}
+            onReadThreadProgressNotifications={onReadThreadProgressNotifications}
           />
 
           <DebugAppServerCoverageTurnLifecycleNotificationsSection

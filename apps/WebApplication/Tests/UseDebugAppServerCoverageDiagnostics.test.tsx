@@ -547,6 +547,64 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
           };
         }
 
+        if (input.limit === 420) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 35,
+                method: "thread/started",
+                params: {
+                  thread: {
+                    id: "thread-realtime-2",
+                    preview: "Implement notification diagnostics",
+                    modelProvider: "openai",
+                  },
+                },
+                receivedAtMilliseconds: 17_840,
+              },
+              {
+                sequence: 36,
+                method: "thread/compacted",
+                params: {
+                  threadId: "thread-realtime-2",
+                  turnId: "turn-14",
+                },
+                receivedAtMilliseconds: 17_845,
+              },
+              {
+                sequence: 37,
+                method: "thread/tokenUsage/updated",
+                params: {
+                  threadId: "thread-realtime-2",
+                  turnId: "turn-14",
+                  tokenUsage: {
+                    total: {
+                      totalTokens: 4096,
+                      inputTokens: 2048,
+                      cachedInputTokens: 512,
+                      outputTokens: 1792,
+                      reasoningOutputTokens: 256,
+                    },
+                    last: {
+                      totalTokens: 256,
+                      inputTokens: 128,
+                      cachedInputTokens: 32,
+                      outputTokens: 112,
+                      reasoningOutputTokens: 16,
+                    },
+                    modelContextWindow: 8192,
+                  },
+                },
+                receivedAtMilliseconds: 17_850,
+              },
+            ],
+            nextSequence: 38,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 300) {
           return {
             ok: true,
@@ -868,6 +926,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readTurnLifecycleNotifications(25);
     latestDiagnostics.current?.readItemDeltaNotifications(29);
     latestDiagnostics.current?.readItemLifecycleNotifications(33);
+    latestDiagnostics.current?.readThreadProgressNotifications(35);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -1042,6 +1101,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 33,
         limit: 380,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 35,
+        limit: 420,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -1637,6 +1701,66 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             itemId: "item-lifecycle-1",
             itemType: "agentMessage",
             receivedAtMilliseconds: 17_835,
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastThreadProgressNotificationsResult).toEqual({
+        sinceSequence: 35,
+        eventCount: 3,
+        nextSequence: 38,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        methodCounts: [
+          {
+            method: "thread/compacted",
+            count: 1,
+          },
+          {
+            method: "thread/started",
+            count: 1,
+          },
+          {
+            method: "thread/tokenUsage/updated",
+            count: 1,
+          },
+        ],
+        events: [
+          {
+            method: "thread/started",
+            sequence: 35,
+            threadId: "thread-realtime-2",
+            turnId: null,
+            modelProvider: "openai",
+            preview: "Implement notification diagnostics",
+            totalTokens: null,
+            lastTotalTokens: null,
+            modelContextWindow: null,
+            receivedAtMilliseconds: 17_840,
+          },
+          {
+            method: "thread/compacted",
+            sequence: 36,
+            threadId: "thread-realtime-2",
+            turnId: "turn-14",
+            modelProvider: null,
+            preview: null,
+            totalTokens: null,
+            lastTotalTokens: null,
+            modelContextWindow: null,
+            receivedAtMilliseconds: 17_845,
+          },
+          {
+            method: "thread/tokenUsage/updated",
+            sequence: 37,
+            threadId: "thread-realtime-2",
+            turnId: "turn-14",
+            modelProvider: null,
+            preview: null,
+            totalTokens: 4096,
+            lastTotalTokens: 256,
+            modelContextWindow: 8192,
+            receivedAtMilliseconds: 17_850,
           },
         ],
         readAtIso8601: expect.any(String),
