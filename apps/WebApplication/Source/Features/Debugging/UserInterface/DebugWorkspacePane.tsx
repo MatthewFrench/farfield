@@ -31,6 +31,7 @@ import {
   type DebugAppServerCoverageThreadRealtimeStartResult,
   type DebugAppServerCoverageThreadRealtimeStopResult,
   type DebugAppServerCoverageThreadStreamEventsResult,
+  type DebugAppServerCoverageTurnLifecycleNotificationsResult,
   type DebugAppServerCoverageWarningNotificationsResult,
   type DebugAppServerCoverageWindowsSandboxSetupMode,
   type DebugAppServerCoverageWindowsSandboxSetupStartResult,
@@ -118,6 +119,7 @@ export interface DebugWorkspacePaneProps {
   lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
+  lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -161,6 +163,7 @@ export interface DebugWorkspacePaneProps {
   onReadModelReroutedEvents: (sinceSequence?: number | null) => void;
   onReadWarningNotifications: (sinceSequence?: number | null) => void;
   onReadThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
+  onReadTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   onReadErrorNotifications: (sinceSequence?: number | null) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
@@ -238,6 +241,7 @@ export function DebugWorkspacePane({
   lastModelReroutedEventsResult,
   lastWarningNotificationsResult,
   lastThreadLifecycleNotificationsResult,
+  lastTurnLifecycleNotificationsResult,
   lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -270,6 +274,7 @@ export function DebugWorkspacePane({
   onReadModelReroutedEvents,
   onReadWarningNotifications,
   onReadThreadLifecycleNotifications,
+  onReadTurnLifecycleNotifications,
   onReadErrorNotifications,
   onExecuteCommand,
   onUploadFeedback,
@@ -398,6 +403,7 @@ export function DebugWorkspacePane({
             lastModelReroutedEventsResult={lastModelReroutedEventsResult}
             lastWarningNotificationsResult={lastWarningNotificationsResult}
             lastThreadLifecycleNotificationsResult={lastThreadLifecycleNotificationsResult}
+            lastTurnLifecycleNotificationsResult={lastTurnLifecycleNotificationsResult}
             lastGitDiffToRemoteResult={lastGitDiffToRemoteResult}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
             onStartAccountLogin={onStartAccountLogin}
@@ -430,6 +436,7 @@ export function DebugWorkspacePane({
             onReadModelReroutedEvents={onReadModelReroutedEvents}
             onReadWarningNotifications={onReadWarningNotifications}
             onReadThreadLifecycleNotifications={onReadThreadLifecycleNotifications}
+            onReadTurnLifecycleNotifications={onReadTurnLifecycleNotifications}
             onReadErrorNotifications={onReadErrorNotifications}
             onExecuteCommand={onExecuteCommand}
             onUploadFeedback={onUploadFeedback}

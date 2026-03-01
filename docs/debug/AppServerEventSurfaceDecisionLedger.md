@@ -1,9 +1,9 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-03-01 10:11:22Z
+Last Updated (UTC): 2026-03-01 10:57:34Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
-Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session/model-reroute/warning/thread-lifecycle/error diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`, `model/rerouted`, `configWarning`, `deprecationNotice`, `windows/worldWritableWarning`, `thread/archived`, `thread/unarchived`, `thread/name/updated`, and `error`; per-method product workflows below remain tracked independently.
+Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session/model-reroute/warning/thread-lifecycle/turn-lifecycle/error diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`, `model/rerouted`, `configWarning`, `deprecationNotice`, `windows/worldWritableWarning`, `thread/archived`, `thread/unarchived`, `thread/name/updated`, `turn/started`, `turn/completed`, `turn/plan/updated`, `turn/diff/updated`, and `error`; per-method product workflows below remain tracked independently.
 
 | Method | Surface Type | Current Farfield State | Recommendation | Notes |
 | --- | --- | --- | --- | --- |
@@ -47,10 +47,10 @@ Farfield now exposes raw notification-event cursors in debug coverage diagnostic
 | `thread/status/changed` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `thread/tokenUsage/updated` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `thread/unarchived` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated thread-lifecycle diagnostics surface validates unarchive notifications and thread identifiers. |
-| `turn/completed` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `turn/diff/updated` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `turn/plan/updated` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `turn/started` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
+| `turn/completed` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated turn-lifecycle diagnostics surface validates completion status and turn-error projection. |
+| `turn/diff/updated` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated turn-lifecycle diagnostics surface validates turn-diff update presence and diff line-count projection. |
+| `turn/plan/updated` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated turn-lifecycle diagnostics surface validates plan-step update payload mapping and explanation visibility. |
+| `turn/started` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated turn-lifecycle diagnostics surface validates start events and turn status projection. |
 | `windows/worldWritableWarning` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated warning diagnostics surface validates sampled-path and scan-status payload mapping. |
 | `windowsSandbox/setupCompleted` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `account/chatgptAuthTokens/refresh` | server-to-client request | Used now | Keep | Farfield surfaces this request in chat with a dedicated auth-token refresh card and submits typed responses through app-server transport. |

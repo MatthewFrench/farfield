@@ -9,6 +9,7 @@ import type {
   DebugAppServerCoveragePendingServerRequestsResult,
   DebugAppServerCoverageServerRequestResolvedEventsResult,
   DebugAppServerCoverageThreadLifecycleNotificationsResult,
+  DebugAppServerCoverageTurnLifecycleNotificationsResult,
   DebugAppServerCoverageWarningNotificationsResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import { createReadErrorNotificationsAction } from "./DebugAppServerCoverageErrorNotificationReadAction";
@@ -22,6 +23,7 @@ import {
   createReadWarningNotificationsAction,
 } from "./DebugAppServerCoverageMutationActionHelpers";
 import { createReadThreadLifecycleNotificationsAction } from "./DebugAppServerCoverageThreadLifecycleNotificationReadAction";
+import { createReadTurnLifecycleNotificationsAction } from "./DebugAppServerCoverageTurnLifecycleNotificationReadAction";
 
 interface NotificationCoverageReadActions {
   readNotificationEvents: (sinceSequence?: number | null) => void;
@@ -31,6 +33,7 @@ interface NotificationCoverageReadActions {
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
   readWarningNotifications: (sinceSequence?: number | null) => void;
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
+  readTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   readErrorNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
 }
@@ -60,6 +63,9 @@ interface CreateNotificationCoverageReadActionsInput {
   >;
   setLastThreadLifecycleNotificationsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageThreadLifecycleNotificationsResult | null>
+  >;
+  setLastTurnLifecycleNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageTurnLifecycleNotificationsResult | null>
   >;
   setLastErrorNotificationsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageErrorNotificationsResult | null>
@@ -111,6 +117,10 @@ export function createNotificationCoverageReadActions(
     readThreadLifecycleNotifications: createReadThreadLifecycleNotificationsAction({
       ...sharedActionInput,
       setLastThreadLifecycleNotificationsResult: input.setLastThreadLifecycleNotificationsResult,
+    }),
+    readTurnLifecycleNotifications: createReadTurnLifecycleNotificationsAction({
+      ...sharedActionInput,
+      setLastTurnLifecycleNotificationsResult: input.setLastTurnLifecycleNotificationsResult,
     }),
     readErrorNotifications: createReadErrorNotificationsAction({
       ...sharedActionInput,

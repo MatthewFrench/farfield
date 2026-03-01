@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 09:00:42Z
+Last Updated (UTC): 2026-03-01 10:57:34Z
 
 ## Purpose
 
@@ -66,6 +66,7 @@ As of the upstream snapshot above:
 11. Farfield now consumes warning notifications (`configWarning`, `deprecationNotice`, `windows/worldWritableWarning`) through dedicated debug coverage diagnostics with strict typed warning payload mapping and cursor-safe reads.
 12. Farfield now consumes thread-lifecycle notifications (`thread/archived`, `thread/unarchived`, `thread/name/updated`) through dedicated debug coverage diagnostics with strict typed lifecycle mapping and thread-filtered reads.
 13. Farfield now consumes `error` notifications through dedicated debug coverage diagnostics with strict typed turn-error mapping and retry-state visibility.
+14. Farfield now consumes turn-lifecycle notifications (`turn/started`, `turn/completed`, `turn/plan/updated`, `turn/diff/updated`) through dedicated debug coverage diagnostics with strict typed lifecycle mapping and cursor-safe reads.
 
 ## Canonical Coverage Artifacts
 
@@ -312,6 +313,7 @@ Upstream publishes `46` notification methods. Farfield now captures these notifi
 9. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageWarningNotificationMappers.ts` projects `configWarning`, `deprecationNotice`, and `windows/worldWritableWarning` notification payloads into strict warning diagnostics.
 10. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageThreadLifecycleNotificationMappers.ts` projects `thread/archived`, `thread/unarchived`, and `thread/name/updated` notification payloads into strict thread-lifecycle diagnostics.
 11. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageErrorNotificationMappers.ts` projects `error` notification payloads into strict error diagnostics.
+12. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageTurnLifecycleNotificationMappers.ts` projects `turn/started`, `turn/completed`, `turn/plan/updated`, and `turn/diff/updated` notification payloads into strict turn-lifecycle diagnostics.
 
 ### Server-to-client requests
 

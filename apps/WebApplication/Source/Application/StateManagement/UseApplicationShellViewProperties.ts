@@ -180,6 +180,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastModelReroutedEventsResult: DebugWorkspacePaneProps["lastModelReroutedEventsResult"];
   lastWarningNotificationsResult: DebugWorkspacePaneProps["lastWarningNotificationsResult"];
   lastThreadLifecycleNotificationsResult: DebugWorkspacePaneProps["lastThreadLifecycleNotificationsResult"];
+  lastTurnLifecycleNotificationsResult: DebugWorkspacePaneProps["lastTurnLifecycleNotificationsResult"];
   lastGitDiffToRemoteResult: DebugWorkspacePaneProps["lastGitDiffToRemoteResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -218,6 +219,7 @@ export interface UseApplicationShellViewPropertiesInput {
   readModelReroutedEvents: DebugWorkspacePaneProps["onReadModelReroutedEvents"];
   readWarningNotifications: DebugWorkspacePaneProps["onReadWarningNotifications"];
   readThreadLifecycleNotifications: DebugWorkspacePaneProps["onReadThreadLifecycleNotifications"];
+  readTurnLifecycleNotifications: DebugWorkspacePaneProps["onReadTurnLifecycleNotifications"];
   readErrorNotifications: DebugWorkspacePaneProps["onReadErrorNotifications"];
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
@@ -543,6 +545,7 @@ function buildDebugWorkspacePaneProperties(
     lastModelReroutedEventsResult: input.lastModelReroutedEventsResult,
     lastWarningNotificationsResult: input.lastWarningNotificationsResult,
     lastThreadLifecycleNotificationsResult: input.lastThreadLifecycleNotificationsResult,
+    lastTurnLifecycleNotificationsResult: input.lastTurnLifecycleNotificationsResult,
     lastGitDiffToRemoteResult: input.lastGitDiffToRemoteResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
@@ -575,6 +578,7 @@ function buildDebugWorkspacePaneProperties(
     onReadModelReroutedEvents: input.readModelReroutedEvents,
     onReadWarningNotifications: input.readWarningNotifications,
     onReadThreadLifecycleNotifications: input.readThreadLifecycleNotifications,
+    onReadTurnLifecycleNotifications: input.readTurnLifecycleNotifications,
     onReadErrorNotifications: input.readErrorNotifications,
     onExecuteCommand: input.executeCommand,
     onUploadFeedback: input.uploadFeedback,
@@ -805,6 +809,7 @@ export function useApplicationShellViewProperties(
       input.lastModelReroutedEventsResult,
       input.lastWarningNotificationsResult,
       input.lastThreadLifecycleNotificationsResult,
+      input.lastTurnLifecycleNotificationsResult,
       input.lastGitDiffToRemoteResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
@@ -836,6 +841,7 @@ export function useApplicationShellViewProperties(
       input.readModelReroutedEvents,
       input.readWarningNotifications,
       input.readThreadLifecycleNotifications,
+      input.readTurnLifecycleNotifications,
       input.readErrorNotifications,
       input.executeCommand,
       input.uploadFeedback,

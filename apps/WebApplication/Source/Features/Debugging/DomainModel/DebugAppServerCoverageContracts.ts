@@ -474,6 +474,47 @@ export interface DebugAppServerCoverageThreadLifecycleNotificationsResult {
   readAtIso8601: string;
 }
 
+export type DebugAppServerCoverageTurnLifecycleNotificationMethod =
+  | "turn/completed"
+  | "turn/diff/updated"
+  | "turn/plan/updated"
+  | "turn/started";
+
+export type DebugAppServerCoverageTurnStatus =
+  | "completed"
+  | "interrupted"
+  | "failed"
+  | "inProgress";
+
+export interface DebugAppServerCoverageTurnLifecycleNotificationSummary {
+  method: DebugAppServerCoverageTurnLifecycleNotificationMethod;
+  sequence: number;
+  threadId: string;
+  turnId: string;
+  turnStatus: DebugAppServerCoverageTurnStatus | null;
+  errorMessage: string | null;
+  planStepCount: number | null;
+  diffLineCount: number | null;
+  explanation: string | null;
+  receivedAtMilliseconds: number;
+}
+
+export interface DebugAppServerCoverageTurnLifecycleNotificationMethodCount {
+  method: DebugAppServerCoverageTurnLifecycleNotificationMethod;
+  count: number;
+}
+
+export interface DebugAppServerCoverageTurnLifecycleNotificationsResult {
+  sinceSequence: number | null;
+  eventCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageTurnLifecycleNotificationSummary[];
+  methodCounts: DebugAppServerCoverageTurnLifecycleNotificationMethodCount[];
+  readAtIso8601: string;
+}
+
 export interface DebugAppServerCoverageErrorNotificationSummary {
   sequence: number;
   threadId: string;

@@ -41,6 +41,7 @@ import {
   type DebugAppServerCoverageThreadRealtimeStartResult,
   type DebugAppServerCoverageThreadRealtimeStopResult,
   type DebugAppServerCoverageThreadStreamEventsResult,
+  type DebugAppServerCoverageTurnLifecycleNotificationsResult,
   type DebugAppServerCoverageWarningNotificationsResult,
   type DebugAppServerCoverageWindowsSandboxSetupMode,
   type DebugAppServerCoverageWindowsSandboxSetupStartResult,
@@ -111,6 +112,7 @@ export interface DebugAppServerCoverageDiagnostics {
   lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
+  lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -147,6 +149,7 @@ export interface DebugAppServerCoverageDiagnostics {
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
   readWarningNotifications: (sinceSequence?: number | null) => void;
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
+  readTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   readErrorNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;

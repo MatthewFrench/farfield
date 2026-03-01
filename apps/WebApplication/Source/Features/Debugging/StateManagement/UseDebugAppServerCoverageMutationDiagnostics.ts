@@ -31,6 +31,7 @@ import type {
   DebugAppServerCoverageThreadRealtimeStartResult,
   DebugAppServerCoverageThreadRealtimeStopResult,
   DebugAppServerCoverageThreadStreamEventsResult,
+  DebugAppServerCoverageTurnLifecycleNotificationsResult,
   DebugAppServerCoverageWarningNotificationsResult,
   DebugAppServerCoverageWindowsSandboxSetupMode,
   DebugAppServerCoverageWindowsSandboxSetupStartResult,
@@ -106,6 +107,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
+  lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -141,6 +143,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
   readWarningNotifications: (sinceSequence?: number | null) => void;
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
+  readTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   readErrorNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
@@ -261,6 +264,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageWarningNotificationsResult | null>(null);
   const [lastThreadLifecycleNotificationsResult, setLastThreadLifecycleNotificationsResult] =
     useState<DebugAppServerCoverageThreadLifecycleNotificationsResult | null>(null);
+  const [lastTurnLifecycleNotificationsResult, setLastTurnLifecycleNotificationsResult] =
+    useState<DebugAppServerCoverageTurnLifecycleNotificationsResult | null>(null);
   const [lastGitDiffToRemoteResult, setLastGitDiffToRemoteResult] =
     useState<DebugAppServerCoverageGitDiffToRemoteResult | null>(null);
 
@@ -488,6 +493,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     setLastModelReroutedEventsResult,
     setLastWarningNotificationsResult,
     setLastThreadLifecycleNotificationsResult,
+    setLastTurnLifecycleNotificationsResult,
     setLastErrorNotificationsResult,
     setLastPendingServerRequestsResult,
   });
@@ -525,6 +531,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastModelReroutedEventsResult,
       lastWarningNotificationsResult,
       lastThreadLifecycleNotificationsResult,
+      lastTurnLifecycleNotificationsResult,
       lastGitDiffToRemoteResult,
       startAccountLogin,
       cancelAccountLogin,

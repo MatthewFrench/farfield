@@ -378,6 +378,79 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
           };
         }
 
+        if (input.limit === 340) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 25,
+                method: "turn/started",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turn: {
+                    id: "turn-12",
+                    items: [],
+                    status: "inProgress",
+                    error: null,
+                  },
+                },
+                receivedAtMilliseconds: 17_790,
+              },
+              {
+                sequence: 26,
+                method: "turn/completed",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turn: {
+                    id: "turn-12",
+                    items: [],
+                    status: "failed",
+                    error: {
+                      message: "Tool timeout",
+                      codexErrorInfo: "other",
+                      additionalDetails: null,
+                    },
+                  },
+                },
+                receivedAtMilliseconds: 17_795,
+              },
+              {
+                sequence: 27,
+                method: "turn/plan/updated",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turnId: "turn-12",
+                  explanation: "Complete the coverage diagnostics implementation.",
+                  plan: [
+                    {
+                      step: "Add strict mapper",
+                      status: "completed",
+                    },
+                    {
+                      step: "Wire panel section",
+                      status: "inProgress",
+                    },
+                  ],
+                },
+                receivedAtMilliseconds: 17_800,
+              },
+              {
+                sequence: 28,
+                method: "turn/diff/updated",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turnId: "turn-12",
+                  diff: "diff --git a/file.ts b/file.ts\n+const value = true;",
+                },
+                receivedAtMilliseconds: 17_805,
+              },
+            ],
+            nextSequence: 29,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 300) {
           return {
             ok: true,
@@ -696,6 +769,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readWarningNotifications(18);
     latestDiagnostics.current?.readThreadLifecycleNotifications(21);
     latestDiagnostics.current?.readErrorNotifications(24);
+    latestDiagnostics.current?.readTurnLifecycleNotifications(25);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -855,6 +929,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 24,
         limit: 320,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 25,
+        limit: 340,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -1263,6 +1342,82 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             additionalDetails: "Try again after reset.",
             willRetry: true,
             receivedAtMilliseconds: 17_780,
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastTurnLifecycleNotificationsResult).toEqual({
+        sinceSequence: 25,
+        eventCount: 4,
+        nextSequence: 29,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        methodCounts: [
+          {
+            method: "turn/completed",
+            count: 1,
+          },
+          {
+            method: "turn/diff/updated",
+            count: 1,
+          },
+          {
+            method: "turn/plan/updated",
+            count: 1,
+          },
+          {
+            method: "turn/started",
+            count: 1,
+          },
+        ],
+        events: [
+          {
+            method: "turn/started",
+            sequence: 25,
+            threadId: "thread-realtime-1",
+            turnId: "turn-12",
+            turnStatus: "inProgress",
+            errorMessage: null,
+            planStepCount: null,
+            diffLineCount: null,
+            explanation: null,
+            receivedAtMilliseconds: 17_790,
+          },
+          {
+            method: "turn/completed",
+            sequence: 26,
+            threadId: "thread-realtime-1",
+            turnId: "turn-12",
+            turnStatus: "failed",
+            errorMessage: "Tool timeout",
+            planStepCount: null,
+            diffLineCount: null,
+            explanation: null,
+            receivedAtMilliseconds: 17_795,
+          },
+          {
+            method: "turn/plan/updated",
+            sequence: 27,
+            threadId: "thread-realtime-1",
+            turnId: "turn-12",
+            turnStatus: null,
+            errorMessage: null,
+            planStepCount: 2,
+            diffLineCount: null,
+            explanation: "Complete the coverage diagnostics implementation.",
+            receivedAtMilliseconds: 17_800,
+          },
+          {
+            method: "turn/diff/updated",
+            sequence: 28,
+            threadId: "thread-realtime-1",
+            turnId: "turn-12",
+            turnStatus: null,
+            errorMessage: null,
+            planStepCount: null,
+            diffLineCount: 2,
+            explanation: null,
+            receivedAtMilliseconds: 17_805,
           },
         ],
         readAtIso8601: expect.any(String),
