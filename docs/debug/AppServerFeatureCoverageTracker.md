@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 08:52:33Z
+Last Updated (UTC): 2026-03-01 09:00:42Z
 
 ## Purpose
 
@@ -61,6 +61,7 @@ As of the upstream snapshot above:
 6. Farfield now exposes pending unresolved app-server server-request snapshots through debug coverage diagnostics (`/api/server-requests/pending`) with strict typed request metadata and payload previews.
 7. Farfield now consumes auth-completion notifications (`mcpServer/oauthLogin/completed`, `account/login/completed`) through dedicated debug coverage diagnostics with strict typed event mapping and cursor-safe reads.
 8. Farfield now consumes `serverRequest/resolved` notifications through dedicated debug coverage diagnostics with strict typed event mapping and explicit pending-request refresh controls.
+9. Farfield now consumes fuzzy-session notifications (`fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`) through dedicated debug coverage diagnostics with strict typed session/result mapping and cursor-safe reads.
 
 ## Canonical Coverage Artifacts
 
@@ -302,6 +303,7 @@ Upstream publishes `46` notification methods. Farfield now captures these notifi
 4. `apps/ServerApplication/Source/Network/Routes/CapabilityRoutes.ts` exposes `/api/notifications/events` for direct notification cursor diagnostics.
 5. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageAuthCompletionEventMappers.ts` projects `mcpServer/oauthLogin/completed` and `account/login/completed` notification payloads into strict auth-completion diagnostics.
 6. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageServerRequestResolvedEventMappers.ts` projects `serverRequest/resolved` notification payloads into strict server-request completion diagnostics.
+7. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageFuzzySessionNotificationMappers.ts` projects `fuzzyFileSearch/sessionUpdated` and `fuzzyFileSearch/sessionCompleted` notification payloads into strict fuzzy-session diagnostics.
 
 ### Server-to-client requests
 

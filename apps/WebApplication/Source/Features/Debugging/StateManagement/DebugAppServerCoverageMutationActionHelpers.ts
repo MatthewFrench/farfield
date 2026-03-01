@@ -2,12 +2,14 @@ import { type Dispatch, type SetStateAction } from "react";
 import type { CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import type {
   DebugAppServerCoverageAuthCompletionEventsResult,
+  DebugAppServerCoverageFuzzySessionNotificationsResult,
   DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingServerRequestsResult,
   DebugAppServerCoverageServerRequestResolvedEventsResult,
   DebugAppServerCoverageThreadStreamEventsResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import { mapAuthCompletionEventsResult } from "./DebugAppServerCoverageAuthCompletionEventMappers";
+import { mapFuzzySessionNotificationsResult } from "./DebugAppServerCoverageFuzzySessionNotificationMappers";
 import { mapNotificationEventsResult } from "./DebugAppServerCoverageNotificationEventMappers";
 import { mapPendingServerRequestsResult } from "./DebugAppServerCoveragePendingServerRequestMappers";
 import { mapServerRequestResolvedEventsResult } from "./DebugAppServerCoverageServerRequestResolvedEventMappers";
@@ -17,6 +19,7 @@ const COVERAGE_MUTATION_OPERATION_NAME = "debug-coverage-action";
 const COVERAGE_ACTION_ERROR_PREFIX = "Unable to run coverage action: ";
 const COVERAGE_AUTH_COMPLETION_EVENTS_LIMIT = 200;
 const COVERAGE_SERVER_REQUEST_RESOLVED_EVENTS_LIMIT = 220;
+const COVERAGE_FUZZY_SESSION_NOTIFICATIONS_LIMIT = 240;
 
 interface RunCoverageAsyncMutationInput {
   isRunningCoverageAction: boolean;
@@ -68,6 +71,17 @@ interface RunServerRequestResolvedEventsReadMutationInput {
   sinceSequence?: number | null;
 }
 
+interface RunFuzzySessionNotificationsReadMutationInput {
+  capabilityServerClient: CapabilityServerClient;
+  isRunningCoverageAction: boolean;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastFuzzySessionNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageFuzzySessionNotificationsResult | null>
+  >;
+  sinceSequence?: number | null;
+}
+
 interface CreateReadNotificationEventsActionInput {
   capabilityServerClient: CapabilityServerClient;
   isRunningCoverageAction: boolean;
@@ -105,6 +119,16 @@ interface CreateReadServerRequestResolvedEventsActionInput {
   setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
   setLastServerRequestResolvedEventsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageServerRequestResolvedEventsResult | null>
+  >;
+}
+
+interface CreateReadFuzzySessionNotificationsActionInput {
+  capabilityServerClient: CapabilityServerClient;
+  isRunningCoverageAction: boolean;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastFuzzySessionNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageFuzzySessionNotificationsResult | null>
   >;
 }
 
@@ -249,6 +273,35 @@ function runServerRequestResolvedEventsReadMutation(
   });
 }
 
+function runFuzzySessionNotificationsReadMutation(
+  input: RunFuzzySessionNotificationsReadMutationInput,
+): void {
+  const normalizedSinceSequence =
+    input.sinceSequence === undefined || input.sinceSequence === null ? null : input.sinceSequence;
+  if (
+    normalizedSinceSequence !== null &&
+    (!Number.isInteger(normalizedSinceSequence) || normalizedSinceSequence < 0)
+  ) {
+    return;
+  }
+
+  runCoverageAsyncMutation({
+    isRunningCoverageAction: input.isRunningCoverageAction,
+    setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+    setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+    run: async () => {
+      const response = await input.capabilityServerClient.readNotificationEvents({
+        actionName: COVERAGE_MUTATION_OPERATION_NAME,
+        limit: COVERAGE_FUZZY_SESSION_NOTIFICATIONS_LIMIT,
+        ...(normalizedSinceSequence !== null ? { sinceSequence: normalizedSinceSequence } : {}),
+      });
+      input.setLastFuzzySessionNotificationsResult(
+        mapFuzzySessionNotificationsResult(response, normalizedSinceSequence),
+      );
+    },
+  });
+}
+
 export function createReadNotificationEventsAction(input: CreateReadNotificationEventsActionInput) {
   return (sinceSequence?: number | null): void => {
     runNotificationEventsReadMutation({
@@ -287,6 +340,21 @@ export function createReadServerRequestResolvedEventsAction(
       setIsRunningCoverageAction: input.setIsRunningCoverageAction,
       setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
       setLastServerRequestResolvedEventsResult: input.setLastServerRequestResolvedEventsResult,
+      ...(sinceSequence !== undefined ? { sinceSequence } : {}),
+    });
+  };
+}
+
+export function createReadFuzzySessionNotificationsAction(
+  input: CreateReadFuzzySessionNotificationsActionInput,
+) {
+  return (sinceSequence?: number | null): void => {
+    runFuzzySessionNotificationsReadMutation({
+      capabilityServerClient: input.capabilityServerClient,
+      isRunningCoverageAction: input.isRunningCoverageAction,
+      setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+      setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+      setLastFuzzySessionNotificationsResult: input.setLastFuzzySessionNotificationsResult,
       ...(sinceSequence !== undefined ? { sinceSequence } : {}),
     });
   };

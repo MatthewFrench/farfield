@@ -331,6 +331,35 @@ export interface DebugAppServerCoverageServerRequestResolvedEventsResult {
   readAtIso8601: string;
 }
 
+export type DebugAppServerCoverageFuzzySessionNotificationMethod =
+  | "fuzzyFileSearch/sessionUpdated"
+  | "fuzzyFileSearch/sessionCompleted";
+
+export interface DebugAppServerCoverageFuzzySessionNotificationSummary {
+  method: DebugAppServerCoverageFuzzySessionNotificationMethod;
+  sequence: number;
+  sessionId: string;
+  query: string | null;
+  fileCount: number | null;
+  receivedAtMilliseconds: number;
+}
+
+export interface DebugAppServerCoverageFuzzySessionNotificationMethodCount {
+  method: DebugAppServerCoverageFuzzySessionNotificationMethod;
+  count: number;
+}
+
+export interface DebugAppServerCoverageFuzzySessionNotificationsResult {
+  sinceSequence: number | null;
+  eventCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageFuzzySessionNotificationSummary[];
+  methodCounts: DebugAppServerCoverageFuzzySessionNotificationMethodCount[];
+  readAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

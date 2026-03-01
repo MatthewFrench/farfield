@@ -25,6 +25,7 @@ import {
   type DebugAppServerCoverageFuzzyFileSearchSessionStartResult,
   type DebugAppServerCoverageFuzzyFileSearchSessionStopResult,
   type DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
+  type DebugAppServerCoverageFuzzySessionNotificationsResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
@@ -101,6 +102,7 @@ export interface DebugAppServerCoverageDiagnostics {
   lastFuzzyFileSearchSessionStartResult: DebugAppServerCoverageFuzzyFileSearchSessionStartResult | null;
   lastFuzzyFileSearchSessionUpdateResult: DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null;
   lastFuzzyFileSearchSessionStopResult: DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null;
+  lastFuzzySessionNotificationsResult: DebugAppServerCoverageFuzzySessionNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -133,6 +135,7 @@ export interface DebugAppServerCoverageDiagnostics {
   readNotificationEvents: (sinceSequence?: number | null) => void;
   readAuthCompletionEvents: (sinceSequence?: number | null) => void;
   readServerRequestResolvedEvents: (sinceSequence?: number | null) => void;
+  readFuzzySessionNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;

@@ -103,6 +103,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastFuzzyFileSearchSessionStartResult: null,
   lastFuzzyFileSearchSessionUpdateResult: null,
   lastFuzzyFileSearchSessionStopResult: null,
+  lastFuzzySessionNotificationsResult: null,
   lastGitDiffToRemoteResult: null,
   onRefreshCoverageDiagnostics: () => {},
   onStartAccountLogin: () => {},
@@ -131,6 +132,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onStartFuzzyFileSearchSession: () => {},
   onUpdateFuzzyFileSearchSession: () => {},
   onStopFuzzyFileSearchSession: () => {},
+  onReadFuzzySessionNotifications: () => {},
   onExecuteCommand: () => {},
   onUploadFeedback: () => {},
 };
@@ -208,5 +210,6 @@ describe("DebugWorkspacePane", () => {
     expect(screen.getByTestId("debug-coverage-thread-stream-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-auth-completion-events-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-server-request-resolved-events-read")).toBeDefined();
+    expect(screen.getByTestId("debug-coverage-fuzzy-session-notifications-read")).toBeDefined();
   });
 });

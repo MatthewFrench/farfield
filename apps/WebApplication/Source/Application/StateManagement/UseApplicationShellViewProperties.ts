@@ -175,6 +175,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastFuzzyFileSearchSessionStartResult: DebugWorkspacePaneProps["lastFuzzyFileSearchSessionStartResult"];
   lastFuzzyFileSearchSessionUpdateResult: DebugWorkspacePaneProps["lastFuzzyFileSearchSessionUpdateResult"];
   lastFuzzyFileSearchSessionStopResult: DebugWorkspacePaneProps["lastFuzzyFileSearchSessionStopResult"];
+  lastFuzzySessionNotificationsResult: DebugWorkspacePaneProps["lastFuzzySessionNotificationsResult"];
   lastGitDiffToRemoteResult: DebugWorkspacePaneProps["lastGitDiffToRemoteResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -209,6 +210,7 @@ export interface UseApplicationShellViewPropertiesInput {
   startFuzzyFileSearchSession: (sessionId: string, roots: string[]) => void;
   updateFuzzyFileSearchSession: (sessionId: string, query: string) => void;
   stopFuzzyFileSearchSession: (sessionId: string) => void;
+  readFuzzySessionNotifications: DebugWorkspacePaneProps["onReadFuzzySessionNotifications"];
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -528,6 +530,7 @@ function buildDebugWorkspacePaneProperties(
     lastFuzzyFileSearchSessionStartResult: input.lastFuzzyFileSearchSessionStartResult,
     lastFuzzyFileSearchSessionUpdateResult: input.lastFuzzyFileSearchSessionUpdateResult,
     lastFuzzyFileSearchSessionStopResult: input.lastFuzzyFileSearchSessionStopResult,
+    lastFuzzySessionNotificationsResult: input.lastFuzzySessionNotificationsResult,
     lastGitDiffToRemoteResult: input.lastGitDiffToRemoteResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
@@ -556,6 +559,7 @@ function buildDebugWorkspacePaneProperties(
     onStartFuzzyFileSearchSession: input.startFuzzyFileSearchSession,
     onUpdateFuzzyFileSearchSession: input.updateFuzzyFileSearchSession,
     onStopFuzzyFileSearchSession: input.stopFuzzyFileSearchSession,
+    onReadFuzzySessionNotifications: input.readFuzzySessionNotifications,
     onExecuteCommand: input.executeCommand,
     onUploadFeedback: input.uploadFeedback,
   };
@@ -780,6 +784,7 @@ export function useApplicationShellViewProperties(
       input.lastFuzzyFileSearchSessionStartResult,
       input.lastFuzzyFileSearchSessionUpdateResult,
       input.lastFuzzyFileSearchSessionStopResult,
+      input.lastFuzzySessionNotificationsResult,
       input.lastGitDiffToRemoteResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
@@ -807,6 +812,7 @@ export function useApplicationShellViewProperties(
       input.startFuzzyFileSearchSession,
       input.updateFuzzyFileSearchSession,
       input.stopFuzzyFileSearchSession,
+      input.readFuzzySessionNotifications,
       input.executeCommand,
       input.uploadFeedback,
       input.replayHistoryEntryFromDetail,

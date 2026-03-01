@@ -166,6 +166,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const startFuzzyFileSearchSessionSpy = vi.fn((_sessionId: string, _roots: string[]): void => {});
   const updateFuzzyFileSearchSessionSpy = vi.fn((_sessionId: string, _query: string): void => {});
   const stopFuzzyFileSearchSessionSpy = vi.fn((_sessionId: string): void => {});
+  const readFuzzySessionNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const executeCommandSpy = vi.fn(
     (_command: string[], _timeoutMs?: number, _cwd?: string): void => {},
   );
@@ -347,6 +348,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastFuzzyFileSearchSessionStartResult: null,
     lastFuzzyFileSearchSessionUpdateResult: null,
     lastFuzzyFileSearchSessionStopResult: null,
+    lastFuzzySessionNotificationsResult: null,
     lastGitDiffToRemoteResult: null,
     lastThreadStreamEventsResult: null,
     lastNotificationEventsResult: null,
@@ -366,6 +368,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     startFuzzyFileSearchSession: startFuzzyFileSearchSessionSpy,
     updateFuzzyFileSearchSession: updateFuzzyFileSearchSessionSpy,
     stopFuzzyFileSearchSession: stopFuzzyFileSearchSessionSpy,
+    readFuzzySessionNotifications: readFuzzySessionNotificationsSpy,
     executeCommand: executeCommandSpy,
     uploadFeedback: uploadFeedbackSpy,
     writeSkillsConfig: writeSkillsConfigSpy,

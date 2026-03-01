@@ -1,9 +1,9 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-03-01 08:52:33Z
+Last Updated (UTC): 2026-03-01 09:00:42Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
-Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request completion diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, and `serverRequest/resolved`; per-method product workflows below remain tracked independently.
+Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, and `fuzzyFileSearch/sessionCompleted`; per-method product workflows below remain tracked independently.
 
 | Method | Surface Type | Current Farfield State | Recommendation | Notes |
 | --- | --- | --- | --- | --- |
@@ -15,8 +15,8 @@ Farfield now exposes raw notification-event cursors in debug coverage diagnostic
 | `configWarning` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `deprecationNotice` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `error` | server-to-client notification | Not consumed | Plan candidate | Useful for direct app-server failure visibility when app-server notifications are consumed. |
-| `fuzzyFileSearch/sessionCompleted` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
-| `fuzzyFileSearch/sessionUpdated` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
+| `fuzzyFileSearch/sessionCompleted` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated fuzzy-session diagnostics surface validates asynchronous session-completion notifications and cursor behavior. |
+| `fuzzyFileSearch/sessionUpdated` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated fuzzy-session diagnostics surface validates session-update notifications and result-count projection. |
 | `item/agentMessage/delta` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `item/commandExecution/outputDelta` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `item/commandExecution/terminalInteraction` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |

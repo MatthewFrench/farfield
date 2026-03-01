@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useState } from "react";
 import type {
   CapabilityConfigWriteMergeStrategy,
   CapabilityServerClient,
@@ -16,6 +16,7 @@ import type {
   DebugAppServerCoverageFuzzyFileSearchSessionStartResult,
   DebugAppServerCoverageFuzzyFileSearchSessionStopResult,
   DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
+  DebugAppServerCoverageFuzzySessionNotificationsResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
   DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingAccountLogin,
@@ -37,6 +38,7 @@ import {
 import { mapPendingAccountLogin } from "./DebugAppServerCoverageDiagnosticsMappers";
 import {
   createReadAuthCompletionEventsAction,
+  createReadFuzzySessionNotificationsAction,
   createReadNotificationEventsAction,
   createReadPendingServerRequestsAction,
   createReadServerRequestResolvedEventsAction,
@@ -54,6 +56,25 @@ const COVERAGE_MUTATION_OPERATION_NAME = "debug-coverage-action";
 interface UseDebugAppServerCoverageMutationDiagnosticsInput {
   capabilityServerClient: CapabilityServerClient;
   refreshCoverageDiagnostics: () => void;
+}
+
+interface RunWriteSkillsConfigMutationInput {
+  capabilityServerClient: CapabilityServerClient;
+  refreshCoverageDiagnostics: () => void;
+  isRunningCoverageAction: boolean;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  skillPath: string;
+  enabled: boolean;
+}
+
+interface RunExportRemoteSkillMutationInput {
+  capabilityServerClient: CapabilityServerClient;
+  refreshCoverageDiagnostics: () => void;
+  isRunningCoverageAction: boolean;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  hazelnutId: string;
 }
 
 export interface DebugAppServerCoverageMutationDiagnostics {
@@ -80,6 +101,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastFuzzyFileSearchSessionStartResult: DebugAppServerCoverageFuzzyFileSearchSessionStartResult | null;
   lastFuzzyFileSearchSessionUpdateResult: DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null;
   lastFuzzyFileSearchSessionStopResult: DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null;
+  lastFuzzySessionNotificationsResult: DebugAppServerCoverageFuzzySessionNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -111,6 +133,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   readNotificationEvents: (sinceSequence?: number | null) => void;
   readAuthCompletionEvents: (sinceSequence?: number | null) => void;
   readServerRequestResolvedEvents: (sinceSequence?: number | null) => void;
+  readFuzzySessionNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
@@ -130,6 +153,47 @@ export interface DebugAppServerCoverageMutationDiagnostics {
 export interface DebugAppServerCoverageMutationDiagnosticsBundle {
   clearPendingAccountLogin: () => void;
   diagnostics: DebugAppServerCoverageMutationDiagnostics;
+}
+
+function runWriteSkillsConfigMutation(input: RunWriteSkillsConfigMutationInput): void {
+  const normalizedSkillPath = input.skillPath.trim();
+  if (normalizedSkillPath.length === 0) {
+    return;
+  }
+
+  runCoverageAsyncMutation({
+    isRunningCoverageAction: input.isRunningCoverageAction,
+    setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+    setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+    run: async () => {
+      await input.capabilityServerClient.writeSkillsConfig({
+        actionName: COVERAGE_MUTATION_OPERATION_NAME,
+        path: normalizedSkillPath,
+        enabled: input.enabled,
+      });
+      input.refreshCoverageDiagnostics();
+    },
+  });
+}
+
+function runExportRemoteSkillMutation(input: RunExportRemoteSkillMutationInput): void {
+  const normalizedHazelnutIdentifier = input.hazelnutId.trim();
+  if (normalizedHazelnutIdentifier.length === 0) {
+    return;
+  }
+
+  runCoverageAsyncMutation({
+    isRunningCoverageAction: input.isRunningCoverageAction,
+    setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+    setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+    run: async () => {
+      await input.capabilityServerClient.exportRemoteSkill({
+        actionName: COVERAGE_MUTATION_OPERATION_NAME,
+        hazelnutId: normalizedHazelnutIdentifier,
+      });
+      input.refreshCoverageDiagnostics();
+    },
+  });
 }
 
 export function useDebugAppServerCoverageMutationDiagnostics(
@@ -179,6 +243,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null>(null);
   const [lastFuzzyFileSearchSessionStopResult, setLastFuzzyFileSearchSessionStopResult] =
     useState<DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null>(null);
+  const [lastFuzzySessionNotificationsResult, setLastFuzzySessionNotificationsResult] =
+    useState<DebugAppServerCoverageFuzzySessionNotificationsResult | null>(null);
   const [lastGitDiffToRemoteResult, setLastGitDiffToRemoteResult] =
     useState<DebugAppServerCoverageGitDiffToRemoteResult | null>(null);
 
@@ -319,23 +385,14 @@ export function useDebugAppServerCoverageMutationDiagnostics(
 
   const writeSkillsConfig = useCallback(
     (skillPath: string, enabled: boolean) => {
-      const normalizedSkillPath = skillPath.trim();
-      if (normalizedSkillPath.length === 0) {
-        return;
-      }
-
-      runCoverageAsyncMutation({
+      runWriteSkillsConfigMutation({
+        capabilityServerClient: input.capabilityServerClient,
+        refreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
         isRunningCoverageAction,
         setIsRunningCoverageAction,
         setCoverageActionErrorMessage,
-        run: async () => {
-          await input.capabilityServerClient.writeSkillsConfig({
-            actionName: COVERAGE_MUTATION_OPERATION_NAME,
-            path: normalizedSkillPath,
-            enabled,
-          });
-          input.refreshCoverageDiagnostics();
-        },
+        skillPath,
+        enabled,
       });
     },
     [input.capabilityServerClient, input.refreshCoverageDiagnostics, isRunningCoverageAction],
@@ -343,22 +400,13 @@ export function useDebugAppServerCoverageMutationDiagnostics(
 
   const exportRemoteSkill = useCallback(
     (hazelnutId: string) => {
-      const normalizedHazelnutIdentifier = hazelnutId.trim();
-      if (normalizedHazelnutIdentifier.length === 0) {
-        return;
-      }
-
-      runCoverageAsyncMutation({
+      runExportRemoteSkillMutation({
+        capabilityServerClient: input.capabilityServerClient,
+        refreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
         isRunningCoverageAction,
         setIsRunningCoverageAction,
         setCoverageActionErrorMessage,
-        run: async () => {
-          await input.capabilityServerClient.exportRemoteSkill({
-            actionName: COVERAGE_MUTATION_OPERATION_NAME,
-            hazelnutId: normalizedHazelnutIdentifier,
-          });
-          input.refreshCoverageDiagnostics();
-        },
+        hazelnutId,
       });
     },
     [input.capabilityServerClient, input.refreshCoverageDiagnostics, isRunningCoverageAction],
@@ -440,6 +488,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastFuzzyFileSearchSessionStartResult,
       lastFuzzyFileSearchSessionUpdateResult,
       lastFuzzyFileSearchSessionStopResult,
+      lastFuzzySessionNotificationsResult,
       lastGitDiffToRemoteResult,
       startAccountLogin,
       cancelAccountLogin,
@@ -483,6 +532,13 @@ export function useDebugAppServerCoverageMutationDiagnostics(
         setIsRunningCoverageAction,
         setCoverageActionErrorMessage,
         setLastServerRequestResolvedEventsResult,
+      }),
+      readFuzzySessionNotifications: createReadFuzzySessionNotificationsAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastFuzzySessionNotificationsResult,
       }),
       readPendingServerRequests: createReadPendingServerRequestsAction({
         capabilityServerClient: input.capabilityServerClient,

@@ -352,6 +352,43 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     const readNotificationEvents = vi
       .spyOn(capabilityServerClient, "readNotificationEvents")
       .mockImplementation(async (input) => {
+        if (input.limit === 240) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 15,
+                method: "fuzzyFileSearch/sessionUpdated",
+                params: {
+                  sessionId: "fuzzy-session-1",
+                  query: "main",
+                  files: [
+                    {
+                      root: "/tmp/project",
+                      path: "apps/WebApplication/Source/Main.tsx",
+                      fileName: "Main.tsx",
+                      score: 0.91,
+                      indices: [0, 1],
+                    },
+                  ],
+                },
+                receivedAtMilliseconds: 17_690,
+              },
+              {
+                sequence: 16,
+                method: "fuzzyFileSearch/sessionCompleted",
+                params: {
+                  sessionId: "fuzzy-session-1",
+                },
+                receivedAtMilliseconds: 17_695,
+              },
+            ],
+            nextSequence: 17,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 220) {
           return {
             ok: true,
@@ -519,6 +556,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readNotificationEvents(7);
     latestDiagnostics.current?.readAuthCompletionEvents(12);
     latestDiagnostics.current?.readServerRequestResolvedEvents(13);
+    latestDiagnostics.current?.readFuzzySessionNotifications(14);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -653,6 +691,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 13,
         limit: 220,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 14,
+        limit: 240,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -883,6 +926,42 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             requestId: 13,
             threadId: "thread-realtime-1",
             receivedAtMilliseconds: 17_680,
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastFuzzySessionNotificationsResult).toEqual({
+        sinceSequence: 14,
+        eventCount: 2,
+        nextSequence: 17,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        methodCounts: [
+          {
+            method: "fuzzyFileSearch/sessionCompleted",
+            count: 1,
+          },
+          {
+            method: "fuzzyFileSearch/sessionUpdated",
+            count: 1,
+          },
+        ],
+        events: [
+          {
+            method: "fuzzyFileSearch/sessionUpdated",
+            sequence: 15,
+            sessionId: "fuzzy-session-1",
+            query: "main",
+            fileCount: 1,
+            receivedAtMilliseconds: 17_690,
+          },
+          {
+            method: "fuzzyFileSearch/sessionCompleted",
+            sequence: 16,
+            sessionId: "fuzzy-session-1",
+            query: null,
+            fileCount: null,
+            receivedAtMilliseconds: 17_695,
           },
         ],
         readAtIso8601: expect.any(String),
