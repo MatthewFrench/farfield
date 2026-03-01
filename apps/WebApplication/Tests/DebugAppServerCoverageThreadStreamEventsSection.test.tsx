@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DebugAppServerCoverageThreadStreamEventsSection } from "@/Features/Debugging/UserInterface/DebugAppServerCoverageThreadStreamEventsSection";
 
@@ -319,5 +319,71 @@ describe("DebugAppServerCoverageThreadStreamEventsSection", () => {
     ).toBe("all");
     expect(screen.queryByTestId("debug-coverage-thread-stream-filter-summary")).toBeNull();
     expect(screen.getByText("broadcast • turn/completed")).toBeDefined();
+  });
+
+  it("copies the filtered event payload to clipboard as json", async () => {
+    const readThreadStreamEventsSpy = vi.fn(
+      (_threadId: string, _sinceSequence?: number | null) => {},
+    );
+    const writeTextSpy = vi.fn(async (_text: string): Promise<void> => {});
+    const originalClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: writeTextSpy,
+      },
+      configurable: true,
+    });
+
+    try {
+      render(
+        <DebugAppServerCoverageThreadStreamEventsSection
+          isRunningCoverageAction={false}
+          lastThreadStreamEventsResult={{
+            threadId: "thread-stream-copy",
+            sinceSequence: 10,
+            ownerClientId: "client-owner",
+            eventCount: 1,
+            nextSequence: 11,
+            firstAvailableSequence: 1,
+            resetRequired: false,
+            methodCounts: [
+              {
+                method: "turn/completed",
+                count: 1,
+              },
+            ],
+            events: [
+              {
+                frameType: "broadcast",
+                method: "turn/completed",
+                requestId: null,
+                sourceClientId: "client-codex",
+                sequence: 10,
+                receivedAtMilliseconds: 20_000,
+                preview: '{"event":"turn-done"}',
+              },
+            ],
+            readAtIso8601: "2026-03-01T00:00:00.000Z",
+          }}
+          onReadThreadStreamEvents={readThreadStreamEventsSpy}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId("debug-coverage-thread-stream-copy-filtered-json"));
+
+      await waitFor(() => {
+        expect(writeTextSpy).toHaveBeenCalledTimes(1);
+      });
+      expect(writeTextSpy.mock.calls[0]?.[0]).toContain('"threadId": "thread-stream-copy"');
+      expect(writeTextSpy.mock.calls[0]?.[0]).toContain('"filteredEventCount": 1');
+      expect(screen.getByTestId("debug-coverage-thread-stream-copy-status").textContent).toBe(
+        "Copied 1 filtered event.",
+      );
+    } finally {
+      Object.defineProperty(navigator, "clipboard", {
+        value: originalClipboard,
+        configurable: true,
+      });
+    }
   });
 });

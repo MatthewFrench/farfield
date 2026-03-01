@@ -41,6 +41,7 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
   const [frameTypeFilterDraft, setFrameTypeFilterDraft] = useState<
     DebugAppServerCoverageThreadStreamEventFrameType | typeof ALL_FRAME_TYPES_FILTER_VALUE
   >(ALL_FRAME_TYPES_FILTER_VALUE);
+  const [copyStatusMessage, setCopyStatusMessage] = useState<string | null>(null);
   const normalizedMethodFilter = methodFilterDraft.trim().toLowerCase();
   const isFrameTypeFilterActive = frameTypeFilterDraft !== ALL_FRAME_TYPES_FILTER_VALUE;
 
@@ -80,6 +81,41 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
     lastThreadStreamEventsResult === null
       ? []
       : [...new Set(lastThreadStreamEventsResult.events.map((event) => event.frameType))].sort();
+
+  const copyFilteredEventsAsJson = async (): Promise<void> => {
+    if (lastThreadStreamEventsResult === null) {
+      return;
+    }
+    const clipboard = navigator.clipboard;
+    if (!clipboard || typeof clipboard.writeText !== "function") {
+      setCopyStatusMessage("Clipboard write is unavailable in this environment.");
+      return;
+    }
+
+    const payload = {
+      threadId: lastThreadStreamEventsResult.threadId,
+      sinceSequence: lastThreadStreamEventsResult.sinceSequence,
+      nextSequence: lastThreadStreamEventsResult.nextSequence,
+      firstAvailableSequence: lastThreadStreamEventsResult.firstAvailableSequence,
+      resetRequired: lastThreadStreamEventsResult.resetRequired,
+      methodFilter: normalizedMethodFilter.length === 0 ? null : methodFilterDraft,
+      frameTypeFilter:
+        frameTypeFilterDraft === ALL_FRAME_TYPES_FILTER_VALUE ? null : frameTypeFilterDraft,
+      filteredEventCount: filteredEvents.length,
+      events: filteredEvents,
+    };
+
+    try {
+      await clipboard.writeText(JSON.stringify(payload, null, 2));
+      setCopyStatusMessage(
+        filteredEvents.length === 1
+          ? "Copied 1 filtered event."
+          : `Copied ${String(filteredEvents.length)} filtered events.`,
+      );
+    } catch {
+      setCopyStatusMessage("Failed to copy filtered events.");
+    }
+  };
 
   return (
     <div className="rounded-md border border-border bg-card p-3 space-y-2">
@@ -309,6 +345,25 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
               {String(lastThreadStreamEventsResult.events.length)}
             </p>
           ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="debug-coverage-thread-stream-copy-filtered-json"
+            onClick={() => {
+              void copyFilteredEventsAsJson();
+            }}
+          >
+            Copy Filtered JSON
+          </Button>
+          {copyStatusMessage === null ? null : (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="debug-coverage-thread-stream-copy-status"
+            >
+              {copyStatusMessage}
+            </p>
+          )}
           {filteredEvents.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               {lastThreadStreamEventsResult.events.length === 0 ||
