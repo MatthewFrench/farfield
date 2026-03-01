@@ -225,6 +225,10 @@ function createUseApplicationShellViewPropertiesFixture() {
 
   const input: UseApplicationShellViewPropertiesInput = {
     health: null,
+    threadSidebarRuntimeSummary: {
+      rateLimits: null,
+      apps: null,
+    },
     activeTab: "chat",
     settingsWorkspaceSection: "notifications",
     desktopSidebarOpen: false,
@@ -565,6 +569,37 @@ describe("useApplicationShellViewProperties", () => {
 
     headerProperties.onToggleSettingsTab();
     expect(fixture.setActiveTabSpy).toHaveBeenLastCalledWith("debug");
+  });
+
+  it("exposes thread-sidebar runtime summary from shell state without remapping", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.threadSidebarRuntimeSummary = {
+      rateLimits: {
+        limitId: "codex",
+        planType: "pro",
+        usedPercent: 42,
+        refreshedAtMilliseconds: 1_700_000_000_000,
+      },
+      apps: {
+        appCount: 3,
+        refreshedAtMilliseconds: 1_700_000_000_500,
+      },
+    };
+
+    const viewProperties = renderViewProperties(fixture.input);
+
+    expect(viewProperties.threadSidebarRuntimeSummary).toEqual({
+      rateLimits: {
+        limitId: "codex",
+        planType: "pro",
+        usedPercent: 42,
+        refreshedAtMilliseconds: 1_700_000_000_000,
+      },
+      apps: {
+        appCount: 3,
+        refreshedAtMilliseconds: 1_700_000_000_500,
+      },
+    });
   });
 
   it("toggles settings tab back to chat when settings tab is already active", () => {

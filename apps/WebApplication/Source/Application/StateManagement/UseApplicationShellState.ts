@@ -29,7 +29,10 @@ import {
 } from "@/Features/PushNotifications/DataAccess/PushServerClient";
 import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/SettingsWorkspaceSectionContracts";
 import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
-import { type ThreadRuntimeStatusByThreadIdentifier } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
+import {
+  type ThreadRuntimeStatusByThreadIdentifier,
+  type ThreadSidebarRuntimeSummary,
+} from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import { useApplicationArchivedThreadState } from "./UseApplicationArchivedThreadState";
@@ -113,6 +116,13 @@ function createInitialThreadRuntimeStatusByThreadIdentifier(): ThreadRuntimeStat
   return {};
 }
 
+function createInitialThreadSidebarRuntimeSummary(): ThreadSidebarRuntimeSummary {
+  return {
+    rateLimits: null,
+    apps: null,
+  };
+}
+
 function createInitialStreamEvents(): ChatStreamEventsResponse["events"] {
   return [];
 }
@@ -180,6 +190,8 @@ export function useApplicationShellState(
     useState<ThreadRuntimeStatusByThreadIdentifier>(
       createInitialThreadRuntimeStatusByThreadIdentifier,
     );
+  const [threadSidebarRuntimeSummary, setThreadSidebarRuntimeSummary] =
+    useState<ThreadSidebarRuntimeSummary>(createInitialThreadSidebarRuntimeSummary);
   const applicationArchivedThreadState = useApplicationArchivedThreadState();
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(
     routeSeededShellState.selectedThreadIdentifier,
@@ -308,6 +320,8 @@ export function useApplicationShellState(
     setUnreadThreadIds,
     threadRuntimeStatusByThreadIdentifier,
     setThreadRuntimeStatusByThreadIdentifier,
+    threadSidebarRuntimeSummary,
+    setThreadSidebarRuntimeSummary,
     ...applicationArchivedThreadState,
     selectedThreadId,
     setSelectedThreadId,

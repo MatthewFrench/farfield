@@ -7,6 +7,8 @@ import {
   useRef,
 } from "react";
 import {
+  type CapabilityAccountRateLimitsResponse,
+  type CapabilityAppsResponse,
   type CapabilityReadNotificationEventsOptions,
   type CapabilityServerClient,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
@@ -17,7 +19,10 @@ import type {
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { DebugWorkspaceDataReader } from "@/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
-import { type ThreadRuntimeStatusByThreadIdentifier } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
+import {
+  type ThreadRuntimeStatusByThreadIdentifier,
+  type ThreadSidebarRuntimeSummary,
+} from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
 import { type EventRefreshFlags, EventRefreshScheduler } from "./EventRefreshScheduler";
@@ -31,6 +36,7 @@ import type { SelectedThreadLoaderOptions } from "./UseCoreDataLoaders";
 const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
 const DEBUG_APPLICATION_TAB = "debug";
 const NOTIFICATION_EVENTS_REFRESH_LIMIT = 80;
+const SIDEBAR_APPS_LIST_LIMIT = 100;
 const SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS: SelectedThreadLoaderOptions = {
   includeReadThread: true,
   includeTurns: false,
@@ -78,6 +84,13 @@ function createEmptyThreadRuntimeStatusByThreadIdentifier(): ThreadRuntimeStatus
   return {};
 }
 
+function createInitialThreadSidebarRuntimeSummary(): ThreadSidebarRuntimeSummary {
+  return {
+    rateLimits: null,
+    apps: null,
+  };
+}
+
 function readNotificationEventsRequestOptions(input: {
   selectedAgentId: AgentId;
   notificationProjectionCursorState: RuntimeNotificationProjectionCursorState;
@@ -86,6 +99,26 @@ function readNotificationEventsRequestOptions(input: {
     agentId: input.selectedAgentId,
     limit: NOTIFICATION_EVENTS_REFRESH_LIMIT,
     sinceSequence: input.notificationProjectionCursorState.nextSequence,
+  };
+}
+
+function readThreadSidebarRateLimitSummary(
+  response: CapabilityAccountRateLimitsResponse,
+): NonNullable<ThreadSidebarRuntimeSummary["rateLimits"]> {
+  return {
+    limitId: response.rateLimits?.limitId ?? null,
+    planType: response.rateLimits?.planType ?? null,
+    usedPercent: response.rateLimits?.primary?.usedPercent ?? null,
+    refreshedAtMilliseconds: Date.now(),
+  };
+}
+
+function readThreadSidebarAppsSummary(
+  response: CapabilityAppsResponse,
+): NonNullable<ThreadSidebarRuntimeSummary["apps"]> {
+  return {
+    appCount: response.data.length,
+    refreshedAtMilliseconds: Date.now(),
   };
 }
 
@@ -109,9 +142,12 @@ export interface UseEventStreamEffectsInput {
   capabilityServerClient: CapabilityServerClient;
   selectedAgentId: AgentId;
   canReadNotificationEvents: boolean;
+  canReadAccountRateLimits: boolean;
+  canListApps: boolean;
   setThreadRuntimeStatusByThreadIdentifier: Dispatch<
     SetStateAction<ThreadRuntimeStatusByThreadIdentifier>
   >;
+  setThreadSidebarRuntimeSummary: Dispatch<SetStateAction<ThreadSidebarRuntimeSummary>>;
   setHistory: Dispatch<SetStateAction<DebugHistoryResponse["history"]>>;
   setDebugErrors: Dispatch<SetStateAction<DebugErrorListResponse["data"]>>;
   setDebugErrorSessionId: Dispatch<SetStateAction<string>>;
@@ -136,7 +172,12 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
     input.setThreadRuntimeStatusByThreadIdentifier(
       createEmptyThreadRuntimeStatusByThreadIdentifier(),
     );
-  }, [input.selectedAgentId, input.setThreadRuntimeStatusByThreadIdentifier]);
+    input.setThreadSidebarRuntimeSummary(createInitialThreadSidebarRuntimeSummary());
+  }, [
+    input.selectedAgentId,
+    input.setThreadRuntimeStatusByThreadIdentifier,
+    input.setThreadSidebarRuntimeSummary,
+  ]);
 
   useEffect(() => {
     let shouldStopConnectionStart = false;
@@ -272,6 +313,30 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
                   requestedAppsRefresh: runtimeNotificationProjection.shouldRefreshApps,
                   resetRequired: runtimeNotificationProjection.resetRequired,
                 });
+
+                if (
+                  runtimeNotificationProjection.shouldRefreshAccountRateLimits &&
+                  input.canReadAccountRateLimits
+                ) {
+                  const rateLimitsResponse =
+                    await input.capabilityServerClient.readAccountRateLimits({
+                      agentId: input.selectedAgentId,
+                    });
+                  input.setThreadSidebarRuntimeSummary((previousSummary) => ({
+                    ...previousSummary,
+                    rateLimits: readThreadSidebarRateLimitSummary(rateLimitsResponse),
+                  }));
+                }
+
+                if (runtimeNotificationProjection.shouldRefreshApps && input.canListApps) {
+                  const appsResponse = await input.capabilityServerClient.listApps({
+                    limit: SIDEBAR_APPS_LIST_LIMIT,
+                  });
+                  input.setThreadSidebarRuntimeSummary((previousSummary) => ({
+                    ...previousSummary,
+                    apps: readThreadSidebarAppsSummary(appsResponse),
+                  }));
+                }
               }
 
               if (refreshOperations.length > 0) {
@@ -328,12 +393,15 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
     input.capabilityServerClient,
     input.selectedAgentId,
     input.canReadNotificationEvents,
+    input.canReadAccountRateLimits,
+    input.canListApps,
     input.applySelectedThreadStreamDelta,
     input.handleRuntimeRequestError,
     input.loadCoreDataTrackedRef,
     input.loadSelectedThreadRef,
     input.selectedThreadIdRef,
     input.setThreadRuntimeStatusByThreadIdentifier,
+    input.setThreadSidebarRuntimeSummary,
     input.setDebugErrorSessionId,
     input.setDebugErrorSessionLogPath,
     input.setDebugErrors,

@@ -71,7 +71,7 @@ As of the upstream snapshot above:
 16. Farfield now consumes item-lifecycle and raw-response notifications (`item/started`, `item/completed`, `rawResponseItem/completed`) through dedicated debug coverage diagnostics with strict typed item identity mapping and cursor-safe reads.
 17. Farfield now consumes thread-progress notifications (`thread/started`, `thread/compacted`, `thread/tokenUsage/updated`) through dedicated debug coverage diagnostics with strict typed thread/token mapping and cursor-safe reads.
 18. Farfield now consumes thread-realtime notifications (`thread/realtime/started`, `thread/realtime/itemAdded`, `thread/realtime/outputAudio/delta`, `thread/realtime/error`, `thread/realtime/closed`) through dedicated debug coverage diagnostics with strict typed realtime payload mapping and cursor-safe reads.
-19. Farfield now consumes account/app/sandbox update notifications (`account/updated`, `account/rateLimits/updated`, `app/list/updated`, `windowsSandbox/setupCompleted`) through dedicated debug coverage diagnostics with strict typed update-state mapping and cursor-safe reads.
+19. Farfield now consumes account/app/sandbox update notifications (`account/updated`, `account/rateLimits/updated`, `app/list/updated`, `windowsSandbox/setupCompleted`) through dedicated debug coverage diagnostics with strict typed update-state mapping and cursor-safe reads, and projects rate-limit/app-list updates into sidebar runtime summary chips.
 20. Farfield runtime composition now projects notification-event reads for `thread/status/changed` into thread-row status badges with strict status-schema parsing, deterministic per-thread sequence merges, and bounded read observability ownership.
 
 ## Canonical Coverage Artifacts

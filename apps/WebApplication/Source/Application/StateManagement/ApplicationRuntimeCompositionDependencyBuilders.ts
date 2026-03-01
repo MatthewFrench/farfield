@@ -237,8 +237,12 @@ export function buildEventStreamEffectsInput(
     selectedAgentId: applicationShellState.selectedAgentId,
     canReadNotificationEvents:
       applicationDerivedState.activeAgentCapabilities?.canReadNotificationEvents === true,
+    canReadAccountRateLimits:
+      applicationDerivedState.activeAgentCapabilities?.canReadAccountRateLimits === true,
+    canListApps: applicationDerivedState.activeAgentCapabilities?.canListApps === true,
     setThreadRuntimeStatusByThreadIdentifier:
       applicationShellState.setThreadRuntimeStatusByThreadIdentifier,
+    setThreadSidebarRuntimeSummary: applicationShellState.setThreadSidebarRuntimeSummary,
     setHistory: applicationShellState.setHistory,
     setDebugErrors: applicationShellState.setDebugErrors,
     setDebugErrorSessionId: applicationShellState.setDebugErrorSessionId,

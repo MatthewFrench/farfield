@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, type RenderResult, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
+import { type ThreadSidebarRuntimeSummary } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 import { ThreadSidebarViewport } from "@/Features/Threads/UserInterface/ThreadSidebarViewport";
 
@@ -45,6 +46,11 @@ const BASE_THREAD_LIST_PANE_PROPERTIES: ThreadListPaneProperties = {
   renderAgentFavicon: () => null,
 };
 
+const BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY: ThreadSidebarRuntimeSummary = {
+  rateLimits: null,
+  apps: null,
+};
+
 function renderThreadSidebarViewport(input: {
   viewport: "desktop" | "mobile";
   isOpen: boolean;
@@ -57,6 +63,7 @@ function renderThreadSidebarViewport(input: {
         viewport={input.viewport}
         isOpen={input.isOpen}
         threadListPaneProperties={BASE_THREAD_LIST_PANE_PROPERTIES}
+        threadSidebarRuntimeSummary={BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY}
         onHideDesktopSidebar={() => {}}
         onCloseMobileSidebar={input.onCloseMobileSidebar ?? (() => {})}
         allSystemsReady={true}
@@ -126,6 +133,7 @@ describe("ThreadSidebarViewport", () => {
           viewport="desktop"
           isOpen={false}
           threadListPaneProperties={BASE_THREAD_LIST_PANE_PROPERTIES}
+          threadSidebarRuntimeSummary={BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY}
           onHideDesktopSidebar={() => {}}
           onCloseMobileSidebar={() => {}}
           allSystemsReady={true}

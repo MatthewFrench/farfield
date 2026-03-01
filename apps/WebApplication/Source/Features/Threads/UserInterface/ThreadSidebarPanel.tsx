@@ -1,6 +1,7 @@
 import { Github, PanelLeft, X } from "lucide-react";
 import { Button } from "@/Components/UserInterface/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/UserInterface/Tooltip";
+import { type ThreadSidebarRuntimeSummary } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import { ThreadListPane, type ThreadListPaneProperties } from "./ThreadListPane";
 
@@ -37,6 +38,7 @@ export interface ThreadSidebarPanelHealthState {
 export interface ThreadSidebarPanelProps {
   viewport: "desktop" | "mobile";
   threadListPaneProperties: ThreadListPaneProperties;
+  threadSidebarRuntimeSummary: ThreadSidebarRuntimeSummary;
   onHideDesktopSidebar: () => void;
   onCloseMobileSidebar: () => void;
   allSystemsReady: boolean;
@@ -50,6 +52,7 @@ export interface ThreadSidebarPanelProps {
 export function ThreadSidebarPanel({
   viewport,
   threadListPaneProperties,
+  threadSidebarRuntimeSummary,
   onHideDesktopSidebar,
   onCloseMobileSidebar,
   allSystemsReady,
@@ -113,6 +116,20 @@ export function ThreadSidebarPanel({
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 -top-3 bottom-0 bg-gradient-to-t from-sidebar from-58% via-sidebar/88 via-80% to-transparent to-100%"
         />
+        <div className="relative z-10 mb-2 grid grid-cols-2 gap-2">
+          <div
+            data-testid="sidebar-runtime-rate-limit-summary"
+            className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
+          >
+            {readThreadSidebarRateLimitSummaryLabel(threadSidebarRuntimeSummary)}
+          </div>
+          <div
+            data-testid="sidebar-runtime-app-summary"
+            className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
+          >
+            {readThreadSidebarAppsSummaryLabel(threadSidebarRuntimeSummary)}
+          </div>
+        </div>
         <div className="relative z-10 flex items-center justify-between gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -205,4 +222,21 @@ function readSidebarHealthState(
     return SIDEBAR_HEALTH_STATE_FAILURE;
   }
   return SIDEBAR_HEALTH_STATE_PARTIAL;
+}
+
+function readThreadSidebarRateLimitSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {
+  if (summary.rateLimits === null) {
+    return "Usage n/a";
+  }
+  const usedPercentLabel =
+    summary.rateLimits.usedPercent === null ? "n/a" : `${String(summary.rateLimits.usedPercent)}%`;
+  const planTypeLabel = summary.rateLimits.planType ?? "n/a";
+  return `Usage ${usedPercentLabel} · ${planTypeLabel}`;
+}
+
+function readThreadSidebarAppsSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {
+  if (summary.apps === null) {
+    return "Apps n/a";
+  }
+  return `Apps ${String(summary.apps.appCount)}`;
 }

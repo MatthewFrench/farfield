@@ -20,6 +20,7 @@ import {
   SettingsWorkspacePane,
   type SettingsWorkspacePaneProps,
 } from "@/Features/Settings/UserInterface/SettingsWorkspacePane";
+import { type ThreadSidebarRuntimeSummary } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPane";
 import {
   type ThreadSidebarAgentDescriptor,
@@ -45,6 +46,7 @@ export interface ApplicationShellLayoutProps {
   agentDescriptors: ThreadSidebarAgentDescriptor[];
   codexConfigured: boolean;
   threadSidebarHealthState: ThreadSidebarPanelHealthState | null;
+  threadSidebarRuntimeSummary: ThreadSidebarRuntimeSummary;
   activeTab: ApplicationShellActiveTab;
   applicationHeaderBarProperties: ApplicationHeaderBarProps;
   debugStatusBannersProperties: DebugStatusBannersProps;
@@ -70,6 +72,7 @@ export function ApplicationShellLayout({
   agentDescriptors,
   codexConfigured,
   threadSidebarHealthState,
+  threadSidebarRuntimeSummary,
   activeTab,
   applicationHeaderBarProperties,
   debugStatusBannersProperties,
@@ -88,6 +91,7 @@ export function ApplicationShellLayout({
     agentDescriptors,
     codexConfigured,
     healthState: threadSidebarHealthState,
+    threadSidebarRuntimeSummary,
   };
 
   return (

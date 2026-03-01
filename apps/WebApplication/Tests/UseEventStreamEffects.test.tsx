@@ -15,6 +15,8 @@ import {
   useEventStreamEffects,
 } from "../Source/Application/StateManagement/UseEventStreamEffects";
 import {
+  type CapabilityAccountRateLimitsResponse,
+  type CapabilityAppsResponse,
   type CapabilityNotificationEventsResponse,
   CapabilityServerClient,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
@@ -29,7 +31,10 @@ import {
   type DebugWorkspaceDataSnapshot,
 } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
-import { type ThreadRuntimeStatusByThreadIdentifier } from "../Source/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
+import {
+  type ThreadRuntimeStatusByThreadIdentifier,
+  type ThreadSidebarRuntimeSummary,
+} from "../Source/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { RequestCanceledError } from "../Source/Shared/Errors/RequestCanceledError";
 
 type DebugErrors = DebugErrorListResponse["data"];
@@ -200,6 +205,84 @@ function createNotificationEventsResponse(): CapabilityNotificationEventsRespons
   };
 }
 
+function createAccountAndAppNotificationEventsResponse(): CapabilityNotificationEventsResponse {
+  return {
+    ok: true,
+    events: [
+      {
+        sequence: 51,
+        method: "account/rateLimits/updated",
+        params: {
+          rateLimits: {
+            limitId: "codex",
+            planType: "pro",
+          },
+        },
+        receivedAtMilliseconds: 2_010,
+      },
+      {
+        sequence: 52,
+        method: "app/list/updated",
+        params: {
+          data: [],
+        },
+        receivedAtMilliseconds: 2_020,
+      },
+    ],
+    nextSequence: 53,
+    firstAvailableSequence: 0,
+    resetRequired: false,
+  };
+}
+
+function createAccountRateLimitsResponse(): CapabilityAccountRateLimitsResponse {
+  return {
+    ok: true,
+    rateLimits: {
+      credits: null,
+      limitId: "codex",
+      limitName: "Codex",
+      planType: "pro",
+      primary: {
+        resetsAt: 1_700_000_000,
+        usedPercent: 42,
+        windowDurationMins: 60,
+      },
+      secondary: null,
+    },
+    rateLimitsByLimitId: null,
+  };
+}
+
+function createAppsResponse(): CapabilityAppsResponse {
+  return {
+    ok: true,
+    data: [
+      {
+        id: "app-1",
+        name: "GitHub",
+        description: null,
+        logoUrl: null,
+        logoUrlDark: null,
+        installUrl: null,
+        isAccessible: true,
+        isEnabled: true,
+      },
+      {
+        id: "app-2",
+        name: "Linear",
+        description: null,
+        logoUrl: null,
+        logoUrlDark: null,
+        installUrl: null,
+        isAccessible: true,
+        isEnabled: false,
+      },
+    ],
+    nextCursor: null,
+  };
+}
+
 function createBaseInput(
   eventStreamConnectionCoordinator: TestEventStreamConnectionCoordinator,
   debugWorkspaceDataReader: TestDebugWorkspaceDataReader,
@@ -228,8 +311,11 @@ function createBaseInput(
     capabilityServerClient,
     selectedAgentId: "codex",
     canReadNotificationEvents: false,
+    canReadAccountRateLimits: false,
+    canListApps: false,
     setThreadRuntimeStatusByThreadIdentifier:
       createDispatchSpy<ThreadRuntimeStatusByThreadIdentifier>(),
+    setThreadSidebarRuntimeSummary: createDispatchSpy<ThreadSidebarRuntimeSummary>(),
     setHistory: createDispatchSpy<DebugHistory>(),
     setDebugErrors: createDispatchSpy<DebugErrors>(),
     setDebugErrorSessionId: createDispatchSpy<string>(),
@@ -468,6 +554,50 @@ describe("useEventStreamEffects", () => {
         receivedAtMilliseconds: 2_001,
       },
     });
+  });
+
+  it("projects account rate-limit and app summary refreshes from notification-event reads", async () => {
+    setDocumentVisibilityState("visible");
+
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    input.canReadNotificationEvents = true;
+    input.canReadAccountRateLimits = true;
+    input.canListApps = true;
+    const setThreadSidebarRuntimeSummary = vi.fn(
+      (_nextValue: SetStateAction<ThreadSidebarRuntimeSummary>): void => {},
+    );
+    input.setThreadSidebarRuntimeSummary = setThreadSidebarRuntimeSummary;
+    const readNotificationEvents = vi
+      .spyOn(input.capabilityServerClient, "readNotificationEvents")
+      .mockResolvedValue(createAccountAndAppNotificationEventsResponse());
+    const readAccountRateLimits = vi
+      .spyOn(input.capabilityServerClient, "readAccountRateLimits")
+      .mockResolvedValue(createAccountRateLimitsResponse());
+    const listApps = vi
+      .spyOn(input.capabilityServerClient, "listApps")
+      .mockResolvedValue(createAppsResponse());
+
+    render(<Harness input={input} />);
+
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
+    await startInput.executeScheduledRefresh(NOTIFICATION_PROJECTION_ONLY_REFRESH_FLAGS);
+
+    expect(readNotificationEvents).toHaveBeenCalledWith({
+      agentId: "codex",
+      limit: 80,
+      sinceSequence: null,
+    });
+    expect(readAccountRateLimits).toHaveBeenCalledWith({
+      agentId: "codex",
+    });
+    expect(listApps).toHaveBeenCalledWith({
+      limit: 100,
+    });
+    expect(setThreadSidebarRuntimeSummary).toHaveBeenCalled();
   });
 
   it("suppresses canceled-request errors from runtime error reporting", async () => {

@@ -32,7 +32,10 @@ import {
 import { type PushClientState } from "@/Features/PushNotifications/DomainModel/PushClientContracts";
 import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/SettingsWorkspaceSectionContracts";
 import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
-import { type ThreadRuntimeStatusByThreadIdentifier } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
+import {
+  type ThreadRuntimeStatusByThreadIdentifier,
+  type ThreadSidebarRuntimeSummary,
+} from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 
@@ -75,6 +78,8 @@ export interface ApplicationShellState {
   setUnreadThreadIds: ApplicationShellStateSetter<UnreadThreadIdentifierMap>;
   threadRuntimeStatusByThreadIdentifier: ThreadRuntimeStatusByThreadIdentifier;
   setThreadRuntimeStatusByThreadIdentifier: ApplicationShellStateSetter<ThreadRuntimeStatusByThreadIdentifier>;
+  threadSidebarRuntimeSummary: ThreadSidebarRuntimeSummary;
+  setThreadSidebarRuntimeSummary: ApplicationShellStateSetter<ThreadSidebarRuntimeSummary>;
   archivedThreads: ThreadListResponse["data"];
   setArchivedThreads: ApplicationShellStateSetter<ThreadListResponse["data"]>;
   hasLoadedArchivedThreads: boolean;

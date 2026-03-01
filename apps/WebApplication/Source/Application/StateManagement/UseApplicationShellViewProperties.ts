@@ -25,6 +25,7 @@ import { type PushClientState } from "@/Features/PushNotifications/DomainModel/P
 import { type PushNotificationsSettingsPaneProps } from "@/Features/PushNotifications/UserInterface/PushNotificationsSettingsPane";
 import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/SettingsWorkspaceSectionContracts";
 import { type SettingsWorkspacePaneProps } from "@/Features/Settings/UserInterface/SettingsWorkspacePane";
+import { type ThreadSidebarRuntimeSummary } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type ThreadSidebarPanelHealthState } from "@/Features/Threads/UserInterface/ThreadSidebarPanel";
 
 interface SendPushTestNotificationFromSettingsInput {
@@ -34,6 +35,7 @@ interface SendPushTestNotificationFromSettingsInput {
 
 export interface UseApplicationShellViewPropertiesInput {
   health: CapabilityHealthResponse | null;
+  threadSidebarRuntimeSummary: ThreadSidebarRuntimeSummary;
   activeTab: ApplicationHeaderBarProps["activeTab"];
   settingsWorkspaceSection: SettingsWorkspaceSection;
   desktopSidebarOpen: boolean;
@@ -248,6 +250,7 @@ export interface UseApplicationShellViewPropertiesInput {
 
 export interface ApplicationShellViewProperties {
   threadSidebarHealthState: ThreadSidebarPanelHealthState | null;
+  threadSidebarRuntimeSummary: ThreadSidebarRuntimeSummary;
   applicationHeaderBarProperties: ApplicationHeaderBarProps;
   debugStatusBannersProperties: DebugStatusBannersProps;
   chatWorkspacePaneProperties: ChatWorkspacePaneProps;
@@ -930,6 +933,7 @@ export function useApplicationShellViewProperties(
   return useMemo<ApplicationShellViewProperties>(
     () => ({
       threadSidebarHealthState,
+      threadSidebarRuntimeSummary: input.threadSidebarRuntimeSummary,
       applicationHeaderBarProperties,
       debugStatusBannersProperties,
       chatWorkspacePaneProperties,
@@ -938,6 +942,7 @@ export function useApplicationShellViewProperties(
     }),
     [
       threadSidebarHealthState,
+      input.threadSidebarRuntimeSummary,
       applicationHeaderBarProperties,
       debugStatusBannersProperties,
       chatWorkspacePaneProperties,

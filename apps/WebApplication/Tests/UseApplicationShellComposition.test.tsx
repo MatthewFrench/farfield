@@ -446,6 +446,8 @@ describe("useApplicationShellComposition", () => {
     expect(shellViewPropertiesInput).toEqual(
       expect.objectContaining({
         theme: fixture.theme,
+        threadSidebarRuntimeSummary:
+          runtimeHarnessSnapshot.applicationShellState.threadSidebarRuntimeSummary,
         visibleChatItemsStep: fixture.visibleChatItemsStep,
         enablePushNotificationsFromToolbar:
           fixture.pushFeatureComposition.enablePushNotificationsFromToolbar,

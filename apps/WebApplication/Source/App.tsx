@@ -365,6 +365,7 @@ export function App(): React.JSX.Element {
         agentDescriptors={applicationShellState.agentDescriptors}
         codexConfigured={applicationDerivedState.codexConfigured}
         threadSidebarHealthState={shellComposition.threadSidebarHealthState}
+        threadSidebarRuntimeSummary={shellComposition.threadSidebarRuntimeSummary}
         activeTab={applicationShellState.activeTab}
         applicationHeaderBarProperties={shellComposition.applicationHeaderBarProperties}
         debugStatusBannersProperties={shellComposition.debugStatusBannersProperties}

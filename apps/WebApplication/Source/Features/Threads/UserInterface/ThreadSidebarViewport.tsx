@@ -22,6 +22,7 @@ export function ThreadSidebarViewport({
   viewport,
   isOpen,
   threadListPaneProperties,
+  threadSidebarRuntimeSummary,
   onHideDesktopSidebar,
   onCloseMobileSidebar,
   allSystemsReady,
@@ -63,6 +64,7 @@ export function ThreadSidebarViewport({
         <ThreadSidebarPanel
           viewport={viewport}
           threadListPaneProperties={threadListPaneProperties}
+          threadSidebarRuntimeSummary={threadSidebarRuntimeSummary}
           onHideDesktopSidebar={onHideDesktopSidebar}
           onCloseMobileSidebar={onCloseMobileSidebar}
           allSystemsReady={allSystemsReady}
@@ -90,6 +92,7 @@ export function ThreadSidebarViewport({
       <ThreadSidebarPanel
         viewport={viewport}
         threadListPaneProperties={threadListPaneProperties}
+        threadSidebarRuntimeSummary={threadSidebarRuntimeSummary}
         onHideDesktopSidebar={onHideDesktopSidebar}
         onCloseMobileSidebar={onCloseMobileSidebar}
         allSystemsReady={allSystemsReady}

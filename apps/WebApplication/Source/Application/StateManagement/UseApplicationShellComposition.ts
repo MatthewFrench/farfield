@@ -211,6 +211,7 @@ function buildApplicationShellViewPropertiesInput(
   const { input, applicationShellState, applicationDerivedState } = context;
   return {
     health: applicationShellState.health,
+    threadSidebarRuntimeSummary: applicationShellState.threadSidebarRuntimeSummary,
     activeTab: applicationShellState.activeTab,
     settingsWorkspaceSection: applicationShellState.settingsWorkspaceSection,
     desktopSidebarOpen: applicationShellState.desktopSidebarOpen,
