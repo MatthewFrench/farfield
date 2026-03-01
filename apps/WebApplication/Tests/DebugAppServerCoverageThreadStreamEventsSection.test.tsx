@@ -100,4 +100,35 @@ describe("DebugAppServerCoverageThreadStreamEventsSection", () => {
       screen.getByTestId("debug-coverage-thread-stream-method-count-turn/completed"),
     ).toBeDefined();
   });
+
+  it("renders reset-required controls and triggers a cursor-reset read", () => {
+    const readThreadStreamEventsSpy = vi.fn(
+      (_threadId: string, _sinceSequence?: number | null) => {},
+    );
+
+    render(
+      <DebugAppServerCoverageThreadStreamEventsSection
+        isRunningCoverageAction={false}
+        lastThreadStreamEventsResult={{
+          threadId: "thread-stream-reset",
+          sinceSequence: 100,
+          ownerClientId: "client-owner",
+          eventCount: 0,
+          nextSequence: 130,
+          firstAvailableSequence: 120,
+          resetRequired: true,
+          methodCounts: [],
+          events: [],
+          readAtIso8601: "2026-03-01T00:00:00.000Z",
+        }}
+        onReadThreadStreamEvents={readThreadStreamEventsSpy}
+      />,
+    );
+
+    expect(screen.getByTestId("debug-coverage-thread-stream-reset-required")).toBeDefined();
+    fireEvent.click(screen.getByTestId("debug-coverage-thread-stream-read-reset"));
+
+    expect(readThreadStreamEventsSpy).toHaveBeenCalledTimes(1);
+    expect(readThreadStreamEventsSpy).toHaveBeenCalledWith("thread-stream-reset", null);
+  });
 });

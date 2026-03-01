@@ -128,6 +128,29 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
             {String(lastThreadStreamEventsResult.firstAvailableSequence)} • resetRequired=
             {lastThreadStreamEventsResult.resetRequired ? "true" : "false"}
           </p>
+          {lastThreadStreamEventsResult.resetRequired ? (
+            <div
+              className="rounded border border-amber-400/60 bg-amber-50/40 p-2 text-xs space-y-2"
+              data-testid="debug-coverage-thread-stream-reset-required"
+            >
+              <p>
+                Returned cursor indicates a dropped range. Read without a since-sequence cursor to
+                resynchronize.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-testid="debug-coverage-thread-stream-read-reset"
+                disabled={isRunningCoverageAction}
+                onClick={() => {
+                  onReadThreadStreamEvents(lastThreadStreamEventsResult.threadId, null);
+                }}
+              >
+                Read Without Cursor
+              </Button>
+            </div>
+          ) : null}
           <p>
             Since sequence used:{" "}
             {lastThreadStreamEventsResult.sinceSequence === null
