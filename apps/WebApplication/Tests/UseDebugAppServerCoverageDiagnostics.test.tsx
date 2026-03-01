@@ -605,6 +605,71 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
           };
         }
 
+        if (input.limit === 460) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 38,
+                method: "thread/realtime/started",
+                params: {
+                  threadId: "thread-realtime-2",
+                  sessionId: "session-live-2",
+                },
+                receivedAtMilliseconds: 17_855,
+              },
+              {
+                sequence: 39,
+                method: "thread/realtime/outputAudio/delta",
+                params: {
+                  threadId: "thread-realtime-2",
+                  audio: {
+                    data: "QUJDRA==",
+                    sampleRate: 24_000,
+                    numChannels: 1,
+                    samplesPerChannel: 512,
+                  },
+                },
+                receivedAtMilliseconds: 17_860,
+              },
+              {
+                sequence: 40,
+                method: "thread/realtime/itemAdded",
+                params: {
+                  threadId: "thread-realtime-2",
+                  item: {
+                    id: "rt-item-1",
+                    type: "assistant_message",
+                    text: "Audio chunk rendered.",
+                  },
+                },
+                receivedAtMilliseconds: 17_865,
+              },
+              {
+                sequence: 41,
+                method: "thread/realtime/error",
+                params: {
+                  threadId: "thread-realtime-2",
+                  message: "Realtime transport temporarily unavailable",
+                },
+                receivedAtMilliseconds: 17_870,
+              },
+              {
+                sequence: 42,
+                method: "thread/realtime/closed",
+                params: {
+                  threadId: "thread-realtime-2",
+                  reason: "session-ended",
+                },
+                receivedAtMilliseconds: 17_875,
+              },
+            ],
+            nextSequence: 43,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 300) {
           return {
             ok: true,
@@ -947,6 +1012,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readItemDeltaNotifications(29);
     latestDiagnostics.current?.readItemLifecycleNotifications(33);
     latestDiagnostics.current?.readThreadProgressNotifications(35);
+    latestDiagnostics.current?.readThreadRealtimeNotifications(38);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -1126,6 +1192,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 35,
         limit: 420,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 38,
+        limit: 460,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -1813,6 +1884,109 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             lastTotalTokens: 256,
             modelContextWindow: 8192,
             receivedAtMilliseconds: 17_850,
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastThreadRealtimeNotificationsResult).toEqual({
+        sinceSequence: 38,
+        eventCount: 5,
+        nextSequence: 43,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        methodCounts: [
+          {
+            method: "thread/realtime/closed",
+            count: 1,
+          },
+          {
+            method: "thread/realtime/error",
+            count: 1,
+          },
+          {
+            method: "thread/realtime/itemAdded",
+            count: 1,
+          },
+          {
+            method: "thread/realtime/outputAudio/delta",
+            count: 1,
+          },
+          {
+            method: "thread/realtime/started",
+            count: 1,
+          },
+        ],
+        events: [
+          {
+            method: "thread/realtime/started",
+            sequence: 38,
+            threadId: "thread-realtime-2",
+            sessionId: "session-live-2",
+            itemPreview: null,
+            audioDataLength: null,
+            audioSampleRate: null,
+            audioNumChannels: null,
+            audioSamplesPerChannel: null,
+            errorMessage: null,
+            closeReason: null,
+            receivedAtMilliseconds: 17_855,
+          },
+          {
+            method: "thread/realtime/outputAudio/delta",
+            sequence: 39,
+            threadId: "thread-realtime-2",
+            sessionId: null,
+            itemPreview: null,
+            audioDataLength: 8,
+            audioSampleRate: 24_000,
+            audioNumChannels: 1,
+            audioSamplesPerChannel: 512,
+            errorMessage: null,
+            closeReason: null,
+            receivedAtMilliseconds: 17_860,
+          },
+          {
+            method: "thread/realtime/itemAdded",
+            sequence: 40,
+            threadId: "thread-realtime-2",
+            sessionId: null,
+            itemPreview:
+              '{"id":"rt-item-1","type":"assistant_message","text":"Audio chunk rendered."}',
+            audioDataLength: null,
+            audioSampleRate: null,
+            audioNumChannels: null,
+            audioSamplesPerChannel: null,
+            errorMessage: null,
+            closeReason: null,
+            receivedAtMilliseconds: 17_865,
+          },
+          {
+            method: "thread/realtime/error",
+            sequence: 41,
+            threadId: "thread-realtime-2",
+            sessionId: null,
+            itemPreview: null,
+            audioDataLength: null,
+            audioSampleRate: null,
+            audioNumChannels: null,
+            audioSamplesPerChannel: null,
+            errorMessage: "Realtime transport temporarily unavailable",
+            closeReason: null,
+            receivedAtMilliseconds: 17_870,
+          },
+          {
+            method: "thread/realtime/closed",
+            sequence: 42,
+            threadId: "thread-realtime-2",
+            sessionId: null,
+            itemPreview: null,
+            audioDataLength: null,
+            audioSampleRate: null,
+            audioNumChannels: null,
+            audioSamplesPerChannel: null,
+            errorMessage: null,
+            closeReason: "session-ended",
+            receivedAtMilliseconds: 17_875,
           },
         ],
         readAtIso8601: expect.any(String),

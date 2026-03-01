@@ -379,6 +379,8 @@ function buildApplicationShellViewPropertiesInput(
       debugCoverageDiagnostics.lastThreadLifecycleNotificationsResult,
     lastThreadProgressNotificationsResult:
       debugCoverageDiagnostics.lastThreadProgressNotificationsResult,
+    lastThreadRealtimeNotificationsResult:
+      debugCoverageDiagnostics.lastThreadRealtimeNotificationsResult,
     lastTurnLifecycleNotificationsResult:
       debugCoverageDiagnostics.lastTurnLifecycleNotificationsResult,
     lastItemDeltaNotificationsResult: debugCoverageDiagnostics.lastItemDeltaNotificationsResult,
@@ -417,6 +419,7 @@ function buildApplicationShellViewPropertiesInput(
     readWarningNotifications: debugCoverageDiagnostics.readWarningNotifications,
     readThreadLifecycleNotifications: debugCoverageDiagnostics.readThreadLifecycleNotifications,
     readThreadProgressNotifications: debugCoverageDiagnostics.readThreadProgressNotifications,
+    readThreadRealtimeNotifications: debugCoverageDiagnostics.readThreadRealtimeNotifications,
     readTurnLifecycleNotifications: debugCoverageDiagnostics.readTurnLifecycleNotifications,
     readItemDeltaNotifications: debugCoverageDiagnostics.readItemDeltaNotifications,
     readItemLifecycleNotifications: debugCoverageDiagnostics.readItemLifecycleNotifications,

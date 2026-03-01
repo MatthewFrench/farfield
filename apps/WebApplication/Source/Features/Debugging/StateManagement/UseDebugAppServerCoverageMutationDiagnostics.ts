@@ -39,6 +39,7 @@ import type {
   DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import type { DebugAppServerCoverageThreadProgressNotificationsResult } from "../DomainModel/DebugAppServerCoverageThreadProgressContracts";
+import type { DebugAppServerCoverageThreadRealtimeNotificationsResult } from "../DomainModel/DebugAppServerCoverageThreadRealtimeNotificationContracts";
 import {
   runConfigBatchWriteAction,
   runConfigValueWriteAction,
@@ -93,6 +94,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
   lastThreadProgressNotificationsResult: DebugAppServerCoverageThreadProgressNotificationsResult | null;
+  lastThreadRealtimeNotificationsResult: DebugAppServerCoverageThreadRealtimeNotificationsResult | null;
   lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
   lastItemDeltaNotificationsResult: DebugAppServerCoverageItemDeltaNotificationsResult | null;
   lastItemLifecycleNotificationsResult: DebugAppServerCoverageItemLifecycleNotificationsResult | null;
@@ -132,6 +134,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   readWarningNotifications: (sinceSequence?: number | null) => void;
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   readThreadProgressNotifications: (sinceSequence?: number | null) => void;
+  readThreadRealtimeNotifications: (sinceSequence?: number | null) => void;
   readTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
   readItemDeltaNotifications: (sinceSequence?: number | null) => void;
   readItemLifecycleNotifications: (sinceSequence?: number | null) => void;
@@ -216,6 +219,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageThreadLifecycleNotificationsResult | null>(null);
   const [lastThreadProgressNotificationsResult, setLastThreadProgressNotificationsResult] =
     useState<DebugAppServerCoverageThreadProgressNotificationsResult | null>(null);
+  const [lastThreadRealtimeNotificationsResult, setLastThreadRealtimeNotificationsResult] =
+    useState<DebugAppServerCoverageThreadRealtimeNotificationsResult | null>(null);
   const [lastTurnLifecycleNotificationsResult, setLastTurnLifecycleNotificationsResult] =
     useState<DebugAppServerCoverageTurnLifecycleNotificationsResult | null>(null);
   const [lastItemDeltaNotificationsResult, setLastItemDeltaNotificationsResult] =
@@ -429,6 +434,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     setLastWarningNotificationsResult,
     setLastThreadLifecycleNotificationsResult,
     setLastThreadProgressNotificationsResult,
+    setLastThreadRealtimeNotificationsResult,
     setLastTurnLifecycleNotificationsResult,
     setLastItemDeltaNotificationsResult,
     setLastItemLifecycleNotificationsResult,
@@ -470,6 +476,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastWarningNotificationsResult,
       lastThreadLifecycleNotificationsResult,
       lastThreadProgressNotificationsResult,
+      lastThreadRealtimeNotificationsResult,
       lastTurnLifecycleNotificationsResult,
       lastItemDeltaNotificationsResult,
       lastItemLifecycleNotificationsResult,

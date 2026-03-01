@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 12:42:10Z
+Last Updated (UTC): 2026-03-01 13:05:00Z
 
 ## Purpose
 
@@ -70,6 +70,7 @@ As of the upstream snapshot above:
 15. Farfield now consumes item-delta notifications (`item/agentMessage/delta`, `item/plan/delta`, `item/reasoning/summaryTextDelta`, `item/reasoning/summaryPartAdded`, `item/reasoning/textDelta`, `item/commandExecution/outputDelta`, `item/commandExecution/terminalInteraction`, `item/fileChange/outputDelta`, `item/mcpToolCall/progress`) through dedicated debug coverage diagnostics with strict typed delta payload mapping and cursor-safe reads.
 16. Farfield now consumes item-lifecycle notifications (`item/started`, `item/completed`) through dedicated debug coverage diagnostics with strict typed item identity mapping and cursor-safe reads.
 17. Farfield now consumes thread-progress notifications (`thread/started`, `thread/compacted`, `thread/tokenUsage/updated`) through dedicated debug coverage diagnostics with strict typed thread/token mapping and cursor-safe reads.
+18. Farfield now consumes thread-realtime notifications (`thread/realtime/started`, `thread/realtime/itemAdded`, `thread/realtime/outputAudio/delta`, `thread/realtime/error`, `thread/realtime/closed`) through dedicated debug coverage diagnostics with strict typed realtime payload mapping and cursor-safe reads.
 
 ## Canonical Coverage Artifacts
 

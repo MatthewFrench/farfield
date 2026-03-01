@@ -171,6 +171,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const readWarningNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readThreadLifecycleNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readThreadProgressNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readThreadRealtimeNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readTurnLifecycleNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readItemDeltaNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readItemLifecycleNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
@@ -362,6 +363,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastWarningNotificationsResult: null,
     lastThreadLifecycleNotificationsResult: null,
     lastThreadProgressNotificationsResult: null,
+    lastThreadRealtimeNotificationsResult: null,
     lastTurnLifecycleNotificationsResult: null,
     lastItemDeltaNotificationsResult: null,
     lastItemLifecycleNotificationsResult: null,
@@ -389,6 +391,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     readWarningNotifications: readWarningNotificationsSpy,
     readThreadLifecycleNotifications: readThreadLifecycleNotificationsSpy,
     readThreadProgressNotifications: readThreadProgressNotificationsSpy,
+    readThreadRealtimeNotifications: readThreadRealtimeNotificationsSpy,
     readTurnLifecycleNotifications: readTurnLifecycleNotificationsSpy,
     readItemDeltaNotifications: readItemDeltaNotificationsSpy,
     readItemLifecycleNotifications: readItemLifecycleNotificationsSpy,

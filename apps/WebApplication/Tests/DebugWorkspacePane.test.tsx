@@ -109,6 +109,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastWarningNotificationsResult: null,
   lastThreadLifecycleNotificationsResult: null,
   lastThreadProgressNotificationsResult: null,
+  lastThreadRealtimeNotificationsResult: null,
   lastTurnLifecycleNotificationsResult: null,
   lastItemDeltaNotificationsResult: null,
   lastItemLifecycleNotificationsResult: null,
@@ -145,6 +146,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onReadWarningNotifications: () => {},
   onReadThreadLifecycleNotifications: () => {},
   onReadThreadProgressNotifications: () => {},
+  onReadThreadRealtimeNotifications: () => {},
   onReadTurnLifecycleNotifications: () => {},
   onReadItemDeltaNotifications: () => {},
   onReadItemLifecycleNotifications: () => {},
@@ -231,6 +233,7 @@ describe("DebugWorkspacePane", () => {
     expect(screen.getByTestId("debug-coverage-warning-notifications-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-thread-lifecycle-notifications-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-thread-progress-notifications-read")).toBeDefined();
+    expect(screen.getByTestId("debug-coverage-thread-realtime-notifications-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-turn-lifecycle-notifications-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-item-delta-notifications-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-item-lifecycle-notifications-read")).toBeDefined();
