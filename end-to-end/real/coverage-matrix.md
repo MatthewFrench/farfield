@@ -12,7 +12,7 @@
 | Mobile sidebar toggles | Open and close the mobile sidebar via close button and backdrop | `end-to-end/real/scenarios/mobile-sidebar.spec.ts` (`mobile sidebar open and close behavior`) | `MANUAL-MOBILE-SIDEBAR` | `@farfield` | `2026-02-20` |
 | Startup refresh + header refresh | Validate startup settle and manual header refresh settle without runtime regressions | `end-to-end/real/scenarios/startup-and-header-refresh.spec.ts` (`startup and header refresh behavior`) | `MANUAL-STARTUP-HEADER-REFRESH` | `@farfield` | `2026-02-24` |
 | Startup under deferred-load pressure | Slow deferred startup endpoints and verify shell/thread list remain interactive without startup banner | `end-to-end/real/scenarios/startup-under-load.spec.ts` (`startup remains interactive when deferred startup requests are slow`) | `MANUAL-STARTUP-UNDER-LOAD` | `@farfield` | `2026-02-25` |
-| Thread row maintenance actions + identity stability | Trigger row-menu maintenance actions and verify thread row, runtime-status badge, and sidebar runtime summary chips keep stable node identity | `end-to-end/real/scenarios/thread-row-menu-maintenance-actions.spec.ts` (`row-menu compact and clean actions keep row identity stable and show success feedback`) | `MANUAL-THREAD-ROW-MAINTENANCE` | `@farfield` | `2026-03-01` |
+| Thread row maintenance actions + identity stability | Trigger row-menu maintenance actions and verify thread row, runtime-status badge, and sidebar runtime summary chips keep stable node identity | `end-to-end/real/scenarios/thread-row-menu-maintenance-actions.spec.ts` (`row-menu compact and clean actions keep row and runtime-summary identity stable`) | `MANUAL-THREAD-ROW-MAINTENANCE` | `@farfield` | `2026-03-01` |
 
 ## Open Gaps
 

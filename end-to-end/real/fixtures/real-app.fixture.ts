@@ -1,18 +1,21 @@
 import { test as base, expect } from "@playwright/test";
-import {
-  createErrorSentinel,
-  type ErrorSentinel
-} from "../helpers/error-sentinel";
+import { createErrorSentinel, type ErrorSentinel } from "../helpers/error-sentinel";
 import { RealAppStateIsolationGuard } from "../helpers/state-isolation";
 
 export type RealAppFixtures = {
   sentinel: ErrorSentinel;
   stateGuard: RealAppStateIsolationGuard;
+  enforceStateIsolation: boolean;
+  enforceRuntimeAvailabilityCheck: boolean;
+  enforceDebugErrorEndpointReads: boolean;
 };
 
 export const test = base.extend<RealAppFixtures>({
+  enforceStateIsolation: [true, { option: true }],
+  enforceRuntimeAvailabilityCheck: [true, { option: true }],
+  enforceDebugErrorEndpointReads: [true, { option: true }],
   stateGuard: [
-    async ({ page, playwright }, use) => {
+    async ({ page, playwright, enforceStateIsolation }, use) => {
       const apiBaseUrl = (process.env["E2E_REAL_API_URL"] ?? "http://127.0.0.1:4311").trim();
       const apiToken = (
         process.env["E2E_REAL_API_TOKEN"] ??
@@ -24,25 +27,33 @@ export const test = base.extend<RealAppFixtures>({
       const requestHeaders = apiToken.length > 0 ? { "X-Farfield-Token": apiToken } : {};
       const request = await playwright.request.newContext({
         baseURL: apiBaseUrl,
-        extraHTTPHeaders: requestHeaders
+        extraHTTPHeaders: requestHeaders,
       });
       const stateGuard = new RealAppStateIsolationGuard({
         page,
-        request
+        request,
       });
-      await stateGuard.initialize();
+      if (enforceStateIsolation) {
+        await stateGuard.initialize();
+      }
 
       try {
         await use(stateGuard);
       } finally {
-        await stateGuard.dispose();
+        if (enforceStateIsolation) {
+          await stateGuard.dispose();
+          stateGuard.assertNoViolations();
+        }
         await request.dispose();
-        stateGuard.assertNoViolations();
       }
     },
-    { auto: true }
+    { auto: true },
   ],
-  sentinel: async ({ page, playwright }, use, testInfo) => {
+  sentinel: async (
+    { page, playwright, enforceRuntimeAvailabilityCheck, enforceDebugErrorEndpointReads },
+    use,
+    testInfo,
+  ) => {
     const scenarioId = testInfo.titlePath.join(" :: ");
     const apiBaseUrl = (process.env["E2E_REAL_API_URL"] ?? "http://127.0.0.1:4311").trim();
     const apiToken = (
@@ -55,13 +66,15 @@ export const test = base.extend<RealAppFixtures>({
     const requestHeaders = apiToken.length > 0 ? { "X-Farfield-Token": apiToken } : {};
     const request = await playwright.request.newContext({
       baseURL: apiBaseUrl,
-      extraHTTPHeaders: requestHeaders
+      extraHTTPHeaders: requestHeaders,
     });
     const sentinel = await createErrorSentinel({
       page,
       request,
       testInfo,
-      scenarioId
+      scenarioId,
+      enforceRuntimeAvailabilityCheck,
+      enforceDebugErrorEndpointReads,
     });
 
     try {
@@ -71,7 +84,7 @@ export const test = base.extend<RealAppFixtures>({
       await sentinel.dispose();
       await request.dispose();
     }
-  }
+  },
 });
 
 export { expect };

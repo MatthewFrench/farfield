@@ -1,23 +1,20 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import {
-  DebugErrorEventSchema,
-  DebugErrorListResponseSchema
-} from "@farfield/protocol";
+import { DebugErrorEventSchema, DebugErrorListResponseSchema } from "@farfield/protocol";
 import type {
-  APIResponse,
   APIRequestContext,
+  APIResponse,
+  Response as BrowserResponse,
   ConsoleMessage,
   Page,
-  Response as BrowserResponse,
-  TestInfo
+  TestInfo,
 } from "@playwright/test";
 import { z } from "zod";
 import { buildSignalFailureMessage } from "./diagnostics";
 import {
   findMatchingSignalAllowlistEntry,
   type SignalMatchInput,
-  type SignalType
+  type SignalType,
 } from "./signal-allowlist";
 
 const HealthEnvelopeSchema = z
@@ -31,15 +28,15 @@ const HealthEnvelopeSchema = z
         gitCommit: z.string().nullable().optional(),
         lastError: z.string().nullable(),
         historyCount: z.number().int().nonnegative(),
-        threadOwnerCount: z.number().int().nonnegative()
+        threadOwnerCount: z.number().int().nonnegative(),
       })
-      .passthrough()
+      .passthrough(),
   })
   .passthrough();
 
 const DebugErrorListEnvelopeSchema = z
   .object({
-    ok: z.literal(true)
+    ok: z.literal(true),
   })
   .merge(DebugErrorListResponseSchema)
   .strict();
@@ -54,7 +51,7 @@ const BannerEventSchema = z
     operation: z.string(),
     message: z.string(),
     requestId: z.string().nullable(),
-    errorId: z.string().nullable()
+    errorId: z.string().nullable(),
   })
   .strict();
 
@@ -65,7 +62,7 @@ const ApiFailureSchema = z
     method: z.string().min(1),
     url: z.string().min(1),
     status: z.number().int().min(100).max(599),
-    statusText: z.string()
+    statusText: z.string(),
   })
   .strict();
 
@@ -73,7 +70,7 @@ const LoadingTimeoutBreachSchema = z
   .object({
     surface: z.string().min(1),
     timeoutMs: z.number().int().positive(),
-    observedState: z.string().min(1)
+    observedState: z.string().min(1),
   })
   .strict();
 
@@ -89,7 +86,7 @@ const ErrorSentinelSummarySchema = z
     pageErrors: z.array(z.string()),
     bannerEvents: BannerEventArraySchema,
     loadingTimeoutBreaches: z.array(LoadingTimeoutBreachSchema),
-    summaryPath: z.string().min(1)
+    summaryPath: z.string().min(1),
   })
   .strict();
 
@@ -130,7 +127,7 @@ function buildSignalInput(partial: {
     url: partial.url ?? "",
     text: partial.text ?? "",
     surface: partial.surface ?? "",
-    status: typeof partial.status === "number" ? partial.status : null
+    status: typeof partial.status === "number" ? partial.status : null,
   };
 }
 
@@ -147,6 +144,8 @@ export interface ErrorSentinelOptions {
   request: APIRequestContext;
   testInfo: TestInfo;
   scenarioId: string;
+  enforceRuntimeAvailabilityCheck?: boolean;
+  enforceDebugErrorEndpointReads?: boolean;
 }
 
 export class ErrorSentinel {
@@ -154,6 +153,8 @@ export class ErrorSentinel {
   private readonly request: APIRequestContext;
   private readonly testInfo: TestInfo;
   private readonly scenarioId: string;
+  private readonly enforceRuntimeAvailabilityCheck: boolean;
+  private readonly enforceDebugErrorEndpointReads: boolean;
 
   private readonly baselineErrorIds = new Set<string>();
   private newErrorEvents: DebugErrorEvent[] = [];
@@ -183,7 +184,7 @@ export class ErrorSentinel {
       method: response.request().method(),
       url,
       status,
-      statusText: response.statusText()
+      statusText: response.statusText(),
     });
 
     this.failedApiResponses.push(failure);
@@ -209,6 +210,8 @@ export class ErrorSentinel {
     this.request = options.request;
     this.testInfo = options.testInfo;
     this.scenarioId = options.scenarioId;
+    this.enforceRuntimeAvailabilityCheck = options.enforceRuntimeAvailabilityCheck ?? true;
+    this.enforceDebugErrorEndpointReads = options.enforceDebugErrorEndpointReads ?? true;
   }
 
   public async initialize(): Promise<void> {
@@ -216,12 +219,16 @@ export class ErrorSentinel {
       return;
     }
 
-    await this.verifyRuntimeAvailability();
+    if (this.enforceRuntimeAvailabilityCheck) {
+      await this.verifyRuntimeAvailability();
+    }
     await this.installBannerObserver();
 
-    const baseline = await this.fetchDebugErrors();
-    for (const event of baseline) {
-      this.baselineErrorIds.add(event.errorId);
+    if (this.enforceDebugErrorEndpointReads) {
+      const baseline = await this.fetchDebugErrors();
+      for (const event of baseline) {
+        this.baselineErrorIds.add(event.errorId);
+      }
     }
 
     this.page.on("response", this.handleResponse);
@@ -260,8 +267,12 @@ export class ErrorSentinel {
   }
 
   public async refresh(): Promise<void> {
-    const allEvents = await this.fetchDebugErrors();
-    this.newErrorEvents = allEvents.filter((event) => !this.baselineErrorIds.has(event.errorId));
+    if (this.enforceDebugErrorEndpointReads) {
+      const allEvents = await this.fetchDebugErrors();
+      this.newErrorEvents = allEvents.filter((event) => !this.baselineErrorIds.has(event.errorId));
+    } else {
+      this.newErrorEvents = [];
+    }
     this.bannerEvents = await this.readBannerEvents();
   }
 
@@ -274,7 +285,7 @@ export class ErrorSentinel {
         signalType: "debug-error",
         operation: event.operation,
         message: event.message,
-        text: `${event.operation} ${event.message}`
+        text: `${event.operation} ${event.message}`,
       });
 
       const allowed = findMatchingSignalAllowlistEntry(input);
@@ -282,7 +293,7 @@ export class ErrorSentinel {
         failures.push({
           signalType: "debug-error",
           input,
-          detail: `${event.errorId} ${event.operation}: ${event.message}`
+          detail: `${event.errorId} ${event.operation}: ${event.message}`,
         });
       }
     }
@@ -291,8 +302,8 @@ export class ErrorSentinel {
       throw new Error(
         buildSignalFailureMessage(
           "Unexpected debug error events",
-          failures.map((failure) => failure.detail)
-        )
+          failures.map((failure) => failure.detail),
+        ),
       );
     }
   }
@@ -306,14 +317,14 @@ export class ErrorSentinel {
         signalType: "api-failure",
         url: event.url,
         status: event.status,
-        text: `${event.method} ${event.url} -> ${String(event.status)} ${event.statusText}`
+        text: `${event.method} ${event.url} -> ${String(event.status)} ${event.statusText}`,
       });
       const allowed = findMatchingSignalAllowlistEntry(input);
       if (!allowed) {
         failures.push({
           signalType: "api-failure",
           input,
-          detail: `${event.method} ${event.url} -> ${String(event.status)} ${event.statusText}`
+          detail: `${event.method} ${event.url} -> ${String(event.status)} ${event.statusText}`,
         });
       }
     }
@@ -322,8 +333,8 @@ export class ErrorSentinel {
       throw new Error(
         buildSignalFailureMessage(
           "Unexpected failed API responses",
-          failures.map((failure) => failure.detail)
-        )
+          failures.map((failure) => failure.detail),
+        ),
       );
     }
   }
@@ -337,14 +348,14 @@ export class ErrorSentinel {
       const input = buildSignalInput({
         signalType: "console-warning",
         text: line,
-        message: line
+        message: line,
       });
       const allowed = findMatchingSignalAllowlistEntry(input);
       if (!allowed) {
         failures.push({
           signalType: "console-warning",
           input,
-          detail: line
+          detail: line,
         });
       }
     }
@@ -353,14 +364,14 @@ export class ErrorSentinel {
       const input = buildSignalInput({
         signalType: "console-error",
         text: line,
-        message: line
+        message: line,
       });
       const allowed = findMatchingSignalAllowlistEntry(input);
       if (!allowed) {
         failures.push({
           signalType: "console-error",
           input,
-          detail: line
+          detail: line,
         });
       }
     }
@@ -369,14 +380,14 @@ export class ErrorSentinel {
       const input = buildSignalInput({
         signalType: "page-error",
         text: line,
-        message: line
+        message: line,
       });
       const allowed = findMatchingSignalAllowlistEntry(input);
       if (!allowed) {
         failures.push({
           signalType: "page-error",
           input,
-          detail: line
+          detail: line,
         });
       }
     }
@@ -386,14 +397,14 @@ export class ErrorSentinel {
         signalType: "banner-event",
         operation: event.operation,
         message: event.message,
-        text: `${event.eventType} ${event.operation} ${event.message}`
+        text: `${event.eventType} ${event.operation} ${event.message}`,
       });
       const allowed = findMatchingSignalAllowlistEntry(input);
       if (!allowed) {
         failures.push({
           signalType: "banner-event",
           input,
-          detail: `${event.eventType} ${event.operation}: ${event.message}`
+          detail: `${event.eventType} ${event.operation}: ${event.message}`,
         });
       }
     }
@@ -402,14 +413,14 @@ export class ErrorSentinel {
       const input = buildSignalInput({
         signalType: "loading-timeout",
         surface: breach.surface,
-        text: `${breach.surface} timeout ${String(breach.timeoutMs)}ms (${breach.observedState})`
+        text: `${breach.surface} timeout ${String(breach.timeoutMs)}ms (${breach.observedState})`,
       });
       const allowed = findMatchingSignalAllowlistEntry(input);
       if (!allowed) {
         failures.push({
           signalType: "loading-timeout",
           input,
-          detail: `${breach.surface} timeout ${String(breach.timeoutMs)}ms (state=${breach.observedState})`
+          detail: `${breach.surface} timeout ${String(breach.timeoutMs)}ms (state=${breach.observedState})`,
         });
       }
     }
@@ -418,8 +429,8 @@ export class ErrorSentinel {
       throw new Error(
         buildSignalFailureMessage(
           "Unexpected warning/error signals",
-          failures.map((failure) => failure.detail)
-        )
+          failures.map((failure) => failure.detail),
+        ),
       );
     }
   }
@@ -450,7 +461,7 @@ export class ErrorSentinel {
       pageErrors: this.pageErrors,
       bannerEvents: this.bannerEvents,
       loadingTimeoutBreaches: this.loadingTimeoutBreaches,
-      summaryPath
+      summaryPath,
     });
 
     const encoded = `${JSON.stringify(summary)}\n`;
@@ -459,11 +470,11 @@ export class ErrorSentinel {
 
     await this.testInfo.attach("end-to-end-sentinel-summary", {
       body: Buffer.from(JSON.stringify(summary, null, 2), "utf8"),
-      contentType: "application/json"
+      contentType: "application/json",
     });
 
     process.stdout.write(
-      `[end-to-end-sentinel] ${this.scenarioId}: debug=${String(this.newErrorEvents.length)} api=${String(this.failedApiResponses.length)} warn=${String(this.consoleWarnings.length)} err=${String(this.consoleErrors.length)} page=${String(this.pageErrors.length)} banner=${String(this.bannerEvents.length)} timeout=${String(this.loadingTimeoutBreaches.length)}\n`
+      `[end-to-end-sentinel] ${this.scenarioId}: debug=${String(this.newErrorEvents.length)} api=${String(this.failedApiResponses.length)} warn=${String(this.consoleWarnings.length)} err=${String(this.consoleErrors.length)} page=${String(this.pageErrors.length)} banner=${String(this.bannerEvents.length)} timeout=${String(this.loadingTimeoutBreaches.length)}\n`,
     );
     process.stdout.write(`[end-to-end-sentinel] summary ${summaryPath}\n`);
 
@@ -474,7 +485,7 @@ export class ErrorSentinel {
     const healthResponse = await this.getApiWithRetry("/api/health");
     if (!healthResponse.ok()) {
       throw new Error(
-        `Runtime health check failed: GET /api/health -> HTTP ${String(healthResponse.status())}`
+        `Runtime health check failed: GET /api/health -> HTTP ${String(healthResponse.status())}`,
       );
     }
 
@@ -486,7 +497,7 @@ export class ErrorSentinel {
     const response = await this.getApiWithRetry("/api/debug/client-errors?limit=120");
     if (!response.ok()) {
       throw new Error(
-        `Debug error endpoint failed: GET /api/debug/client-errors -> HTTP ${String(response.status())}`
+        `Debug error endpoint failed: GET /api/debug/client-errors -> HTTP ${String(response.status())}`,
       );
     }
 
@@ -577,7 +588,7 @@ export class ErrorSentinel {
         operation: "",
         message: "",
         requestId: null,
-        errorId: null
+        errorId: null,
       };
 
       const appendEvent = (eventType: BannerEventType, details: BannerDetails): void => {
@@ -589,7 +600,7 @@ export class ErrorSentinel {
           operation: details.operation,
           message: details.message,
           requestId: details.requestId,
-          errorId: details.errorId
+          errorId: details.errorId,
         });
         sequence += 1;
         if (events.length > 200) {
@@ -610,7 +621,8 @@ export class ErrorSentinel {
           banner.querySelector('[data-testid="error-banner-message"]')?.textContent?.trim() ?? "";
 
         const requestRaw =
-          banner.querySelector('[data-testid="error-banner-request-id"]')?.textContent?.trim() ?? "";
+          banner.querySelector('[data-testid="error-banner-request-id"]')?.textContent?.trim() ??
+          "";
         const errorRaw =
           banner.querySelector('[data-testid="error-banner-error-id"]')?.textContent?.trim() ?? "";
 
@@ -625,7 +637,7 @@ export class ErrorSentinel {
           operation,
           message,
           requestId,
-          errorId
+          errorId,
         };
       };
 
@@ -643,7 +655,7 @@ export class ErrorSentinel {
               operation: "",
               message: "",
               requestId: null,
-              errorId: null
+              errorId: null,
             };
           }
           return;
@@ -679,7 +691,7 @@ export class ErrorSentinel {
           subtree: true,
           childList: true,
           characterData: true,
-          attributes: true
+          attributes: true,
         });
 
         reconcile();
