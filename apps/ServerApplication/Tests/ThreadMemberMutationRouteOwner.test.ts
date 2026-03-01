@@ -91,6 +91,8 @@ function createAgentAdapter(input: {
       canSubmitUserInput: input.submitUserInput !== undefined,
       canReadLiveState: false,
       canReadStreamEvents: false,
+
+      canReadNotificationEvents: false,
     },
     async start(): Promise<void> {},
     async stop(): Promise<void> {},

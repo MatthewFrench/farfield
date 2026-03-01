@@ -25,6 +25,7 @@ import {
   type DebugAppServerCoverageFuzzyFileSearchSessionStopResult,
   type DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
+  type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
   type DebugAppServerCoverageThreadRealtimeAppendAudioResult,
@@ -87,6 +88,7 @@ export interface DebugAppServerCoverageDiagnostics {
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
+  lastNotificationEventsResult: DebugAppServerCoverageNotificationEventsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
@@ -122,6 +124,7 @@ export interface DebugAppServerCoverageDiagnostics {
   appendThreadRealtimeText: (threadId: string, text: string) => void;
   stopThreadRealtime: (threadId: string) => void;
   readThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
+  readNotificationEvents: (sinceSequence?: number | null) => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;

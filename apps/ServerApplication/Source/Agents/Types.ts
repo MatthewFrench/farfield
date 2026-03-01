@@ -77,6 +77,7 @@ export interface AgentCapabilities {
   canSubmitUserInput: boolean;
   canReadLiveState: boolean;
   canReadStreamEvents: boolean;
+  canReadNotificationEvents: boolean;
 }
 
 export interface AgentListThreadsInput {
@@ -266,7 +267,26 @@ export interface AgentThreadStreamEvents {
   resetRequired: boolean;
 }
 
+export interface AgentNotificationEvent {
+  sequence: number;
+  method: string;
+  params: JsonValue | null;
+  receivedAtMilliseconds: number;
+}
+
+export interface AgentNotificationEvents {
+  events: AgentNotificationEvent[];
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+}
+
 export interface AgentReadStreamEventsInput {
+  limit: number;
+  sinceSequence: number | null;
+}
+
+export interface AgentReadNotificationEventsInput {
   limit: number;
   sinceSequence: number | null;
 }
@@ -887,6 +907,9 @@ export interface AgentAdapter {
     threadId: string,
     input: AgentReadStreamEventsInput,
   ): Promise<AgentThreadStreamEvents>;
+  readNotificationEvents?(
+    input: AgentReadNotificationEventsInput,
+  ): Promise<AgentNotificationEvents>;
   isThreadNotLoadedError?(error: Error): boolean;
   listProjectDirectories?(): Promise<string[]>;
   readConfigDefaults?(): Promise<AgentConfigDefaults>;

@@ -696,6 +696,60 @@ describe("CodexThreadInteractionOwner", () => {
     });
   });
 
+  it("reads app-server notification events without readiness checks", async () => {
+    const context = createOwnerTestContext({
+      ipcReady: true,
+    });
+    context.appServerTransport.setNotificationEventsResult({
+      events: [
+        {
+          sequence: 14,
+          method: "turn/completed",
+          params: {
+            threadId: "thread-live",
+            status: "completed",
+          },
+          receivedAtMilliseconds: 500,
+        },
+      ],
+      nextSequence: 15,
+      firstAvailableSequence: 3,
+      resetRequired: false,
+    });
+
+    const notificationEvents = await context.owner.readNotificationEvents({
+      limit: 25,
+      sinceSequence: 8,
+    });
+
+    expect(notificationEvents).toEqual({
+      events: [
+        {
+          sequence: 14,
+          method: "turn/completed",
+          params: {
+            threadId: "thread-live",
+            status: "completed",
+          },
+          receivedAtMilliseconds: 500,
+        },
+      ],
+      nextSequence: 15,
+      firstAvailableSequence: 3,
+      resetRequired: false,
+    });
+    expect(context.appServerTransport.readNotificationEventsCalls).toEqual([
+      {
+        limit: 25,
+        sinceSequence: 8,
+      },
+    ]);
+    expect(context.readReadinessCounters()).toEqual({
+      codexAvailabilityChecks: 0,
+      ipcReadinessChecks: 0,
+    });
+  });
+
   it("returns app-server notification stream events when IPC is not ready", async () => {
     const context = createOwnerTestContext({
       ipcReady: false,

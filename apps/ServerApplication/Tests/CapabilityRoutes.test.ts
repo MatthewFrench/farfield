@@ -51,11 +51,13 @@ import type {
   AgentListSkillsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
+  AgentNotificationEvents,
   AgentReadAccountRateLimitsResult,
   AgentReadAccountResult,
   AgentReadAuthStatusInput,
   AgentReadAuthStatusResult,
   AgentReadConfigRequirementsResult,
+  AgentReadNotificationEventsInput,
   AgentReadThreadInput,
   AgentReadThreadResult,
   AgentReadUserInfoResult,
@@ -306,6 +308,25 @@ const CapabilityFeedbackUploadEnvelopeSchema = z
   })
   .strict();
 
+const CapabilityNotificationEventsEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    events: z.array(
+      z
+        .object({
+          sequence: z.number().int().nonnegative(),
+          method: z.string().min(1),
+          params: z.unknown().nullable(),
+          receivedAtMilliseconds: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+    nextSequence: z.number().int().nonnegative(),
+    firstAvailableSequence: z.number().int().nonnegative(),
+    resetRequired: z.boolean(),
+  })
+  .strict();
+
 const CapabilityGitDiffToRemoteEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -430,6 +451,9 @@ interface MockAgentAdapterOptions {
   readAccountRateLimits?: () => Promise<AgentReadAccountRateLimitsResult>;
   readUserInfo?: () => Promise<AgentReadUserInfoResult>;
   uploadFeedback?: (input: AgentUploadFeedbackInput) => Promise<AgentUploadFeedbackResult>;
+  readNotificationEvents?: (
+    input: AgentReadNotificationEventsInput,
+  ) => Promise<AgentNotificationEvents>;
   gitDiffToRemote?: (input: AgentGitDiffToRemoteInput) => Promise<AgentGitDiffToRemoteResult>;
   fuzzyFileSearch?: (input: AgentFuzzyFileSearchInput) => Promise<AgentFuzzyFileSearchResult>;
   startFuzzyFileSearchSession?: (
@@ -537,6 +561,7 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canSubmitUserInput: false,
     canReadLiveState: false,
     canReadStreamEvents: false,
+    canReadNotificationEvents: false,
     ...overrides,
   };
 }
@@ -608,6 +633,10 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.uploadFeedback) {
     adapter.uploadFeedback = options.uploadFeedback;
+  }
+
+  if (options.readNotificationEvents) {
+    adapter.readNotificationEvents = options.readNotificationEvents;
   }
 
   if (options.gitDiffToRemote) {
@@ -1201,6 +1230,104 @@ describe("handleCapabilityRoutes", () => {
     expect(parsedEnvelope).toEqual({
       ok: true,
       threadId: "thread-feedback-9",
+    });
+  });
+
+  it("returns 400 when notification-event query parameters are invalid", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/notifications/events",
+      url: new URL("http://localhost/api/notifications/events?limit=0&sinceSequence=-2"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    expect(readRouteBody(result)).toMatchObject({
+      ok: false,
+      error: "Invalid notification events query parameters.",
+    });
+  });
+
+  it("returns 503 when notification-event reads are unsupported for the selected agent", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/notifications/events",
+      url: new URL("http://localhost/api/notifications/events?agentId=codex&limit=10"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canReadNotificationEvents: false,
+          },
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(503);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error:
+        "Failed to read notification events: Notification event reads are unavailable for the selected agent.",
+    });
+  });
+
+  it("reads notification events when adapter supports the method", async () => {
+    const readNotificationEventsSpy = vi.fn(
+      async (): Promise<AgentNotificationEvents> => ({
+        events: [
+          {
+            sequence: 21,
+            method: "turn/started",
+            params: {
+              threadId: "thread-1",
+            },
+            receivedAtMilliseconds: 1_700_000_000_000,
+          },
+        ],
+        nextSequence: 22,
+        firstAvailableSequence: 1,
+        resetRequired: false,
+      }),
+    );
+
+    const result = await executeCapabilityRoute({
+      pathname: "/api/notifications/events",
+      url: new URL(
+        "http://localhost/api/notifications/events?agentId=codex&limit=15&sinceSequence=10",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canReadNotificationEvents: true,
+          },
+          readNotificationEvents: readNotificationEventsSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(readNotificationEventsSpy).toHaveBeenCalledWith({
+      limit: 15,
+      sinceSequence: 10,
+    });
+    const parsedEnvelope = CapabilityNotificationEventsEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      events: [
+        {
+          sequence: 21,
+          method: "turn/started",
+          params: {
+            threadId: "thread-1",
+          },
+          receivedAtMilliseconds: 1_700_000_000_000,
+        },
+      ],
+      nextSequence: 22,
+      firstAvailableSequence: 1,
+      resetRequired: false,
     });
   });
 

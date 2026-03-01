@@ -1,8 +1,9 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-03-01 07:13:47Z
+Last Updated (UTC): 2026-03-01 08:12:21Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
+Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`); per-method product workflows below remain tracked independently.
 
 | Method | Surface Type | Current Farfield State | Recommendation | Notes |
 | --- | --- | --- | --- | --- |

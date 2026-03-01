@@ -56,6 +56,7 @@ import type {
   AgentListSkillsResult,
   AgentListThreadsInput,
   AgentListThreadsResult,
+  AgentNotificationEvents,
   AgentReadAccountInput,
   AgentReadAccountRateLimitsInput,
   AgentReadAccountRateLimitsResult,
@@ -64,6 +65,7 @@ import type {
   AgentReadAuthStatusResult,
   AgentReadConfigRequirementsInput,
   AgentReadConfigRequirementsResult,
+  AgentReadNotificationEventsInput,
   AgentReadStreamEventsInput,
   AgentReadThreadInput,
   AgentReadThreadResult,
@@ -552,6 +554,12 @@ export class CodexAgentAdapter implements AgentAdapter {
     input: AgentReadStreamEventsInput,
   ): Promise<AgentThreadStreamEvents> {
     return this.threadInteractionOwner.readStreamEvents(threadId, input);
+  }
+
+  public async readNotificationEvents(
+    input: AgentReadNotificationEventsInput,
+  ): Promise<AgentNotificationEvents> {
+    return this.threadInteractionOwner.readNotificationEvents(input);
   }
 
   public async replayRequest(

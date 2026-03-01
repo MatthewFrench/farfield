@@ -84,6 +84,8 @@ function createUnsupportedAgentAdapter(): AgentAdapter {
       canSubmitUserInput: false,
       canReadLiveState: false,
       canReadStreamEvents: false,
+
+      canReadNotificationEvents: false,
     },
     async start(): Promise<void> {},
     async stop(): Promise<void> {},
@@ -150,6 +152,8 @@ describe("ThreadMemberReadRouteOwner", () => {
         canSubmitUserInput: false,
         canReadLiveState: false,
         canReadStreamEvents: true,
+
+        canReadNotificationEvents: true,
       },
       readStreamEvents,
     };
@@ -252,6 +256,8 @@ describe("ThreadMemberReadRouteOwner", () => {
         canSubmitUserInput: false,
         canReadLiveState: false,
         canReadStreamEvents: true,
+
+        canReadNotificationEvents: true,
       },
       readStreamEvents,
     };
@@ -343,6 +349,8 @@ describe("ThreadMemberReadRouteOwner", () => {
         canSubmitUserInput: false,
         canReadLiveState: false,
         canReadStreamEvents: true,
+
+        canReadNotificationEvents: true,
       },
       readStreamEvents,
     };
@@ -431,6 +439,8 @@ describe("ThreadMemberReadRouteOwner", () => {
         canSubmitUserInput: false,
         canReadLiveState: true,
         canReadStreamEvents: false,
+
+        canReadNotificationEvents: false,
       },
       readLiveState,
     };

@@ -57,10 +57,16 @@ describe("CodexAgentAdapter", () => {
       canWriteSkillsConfig: true,
       canDetectExternalAgentConfig: true,
       canImportExternalAgentConfig: true,
+      canStartThreadRealtime: true,
+      canAppendThreadRealtimeAudio: true,
+      canAppendThreadRealtimeText: true,
+      canStopThreadRealtime: true,
+      canStartWindowsSandboxSetup: true,
       canSetCollaborationMode: true,
       canSubmitUserInput: true,
       canReadLiveState: true,
       canReadStreamEvents: true,
+      canReadNotificationEvents: true,
     });
   });
 

@@ -243,6 +243,29 @@ export interface DebugAppServerCoverageThreadStreamEventsResult {
   readAtIso8601: string;
 }
 
+export interface DebugAppServerCoverageNotificationEventSummary {
+  method: string;
+  sequence: number;
+  receivedAtMilliseconds: number;
+  preview: string;
+}
+
+export interface DebugAppServerCoverageNotificationEventMethodCount {
+  method: string;
+  count: number;
+}
+
+export interface DebugAppServerCoverageNotificationEventsResult {
+  sinceSequence: number | null;
+  eventCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageNotificationEventSummary[];
+  methodCounts: DebugAppServerCoverageNotificationEventMethodCount[];
+  readAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

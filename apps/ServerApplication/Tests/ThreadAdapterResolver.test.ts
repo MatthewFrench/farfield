@@ -19,6 +19,8 @@ const defaultCapabilities: AgentCapabilities = {
   canSubmitUserInput: false,
   canReadLiveState: false,
   canReadStreamEvents: false,
+
+  canReadNotificationEvents: false,
 };
 
 function createThreadMissingError(): AppServerRpcError {

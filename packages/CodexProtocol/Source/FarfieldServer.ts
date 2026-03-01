@@ -127,6 +127,30 @@ export const FarfieldThreadStreamEventsSnapshotSchema = z
 export type FarfieldThreadStreamEventsSnapshot = z.infer<
   typeof FarfieldThreadStreamEventsSnapshotSchema
 >;
+
+export const FarfieldNotificationEventSchema = z
+  .object({
+    sequence: z.number().int().nonnegative(),
+    method: z.string().min(1),
+    params: JsonValueSchema.nullable(),
+    receivedAtMilliseconds: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const FarfieldNotificationEventsSnapshotSchema = z
+  .object({
+    ok: z.literal(FarfieldProtocolStatusValue.Success),
+    events: z.array(FarfieldNotificationEventSchema),
+    nextSequence: z.number().int().nonnegative(),
+    firstAvailableSequence: z.number().int().nonnegative(),
+    resetRequired: z.boolean(),
+  })
+  .strict();
+
+export type FarfieldNotificationEvent = z.infer<typeof FarfieldNotificationEventSchema>;
+export type FarfieldNotificationEventsSnapshot = z.infer<
+  typeof FarfieldNotificationEventsSnapshotSchema
+>;
 export type FarfieldHealthState = z.infer<typeof FarfieldHealthStateSchema>;
 
 export const FarfieldThreadStreamDeltaSchema: z.ZodObject<

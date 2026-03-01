@@ -31,6 +31,7 @@ export interface CapabilityFixture {
   canSubmitUserInput: boolean;
   canReadLiveState: boolean;
   canReadStreamEvents: boolean;
+  canReadNotificationEvents: boolean;
 }
 
 export interface AgentFixture {
@@ -232,6 +233,8 @@ export const CODEX_CAPABILITIES: CapabilityFixture = {
   canSubmitUserInput: true,
   canReadLiveState: true,
   canReadStreamEvents: true,
+
+  canReadNotificationEvents: true,
 };
 
 export const OPENCODE_CAPABILITIES: CapabilityFixture = {
@@ -259,6 +262,8 @@ export const OPENCODE_CAPABILITIES: CapabilityFixture = {
   canSubmitUserInput: false,
   canReadLiveState: false,
   canReadStreamEvents: false,
+
+  canReadNotificationEvents: false,
 };
 
 export function buildConversationStateFixture(

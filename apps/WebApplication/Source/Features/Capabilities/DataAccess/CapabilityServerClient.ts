@@ -102,6 +102,11 @@ import {
   writeSkillsConfig,
 } from "./CapabilityCoverageMutationApi";
 import {
+  type ApiNotificationEventsResponse,
+  type ApiReadNotificationEventsOptions,
+  readNotificationEvents,
+} from "./CapabilityCoverageNotificationEventsApi";
+import {
   type ApiThreadRealtimeAppendAudioOptions,
   type ApiThreadRealtimeAppendAudioResponse,
   type ApiThreadRealtimeAppendTextOptions,
@@ -196,6 +201,8 @@ export type CapabilityWindowsSandboxSetupStartOptions = ApiWindowsSandboxSetupSt
 export type CapabilityWindowsSandboxSetupStartResponse = ApiWindowsSandboxSetupStartResponse;
 export type CapabilityReadThreadStreamEventsOptions = ApiReadThreadStreamEventsOptions;
 export type CapabilityThreadStreamEventsResponse = ApiThreadStreamEventsResponse;
+export type CapabilityReadNotificationEventsOptions = ApiReadNotificationEventsOptions;
+export type CapabilityNotificationEventsResponse = ApiNotificationEventsResponse;
 export type CapabilityListAppsOptions = ApiListAppsOptions;
 export type CapabilityAppsResponse = ApiAppsResponse;
 export type CapabilityListSkillsOptions = ApiListSkillsOptions;
@@ -357,6 +364,12 @@ export class CapabilityServerClient {
     input: CapabilityReadThreadStreamEventsOptions,
   ): Promise<CapabilityThreadStreamEventsResponse> {
     return readThreadStreamEvents(input);
+  }
+
+  public async readNotificationEvents(
+    input: CapabilityReadNotificationEventsOptions,
+  ): Promise<CapabilityNotificationEventsResponse> {
+    return readNotificationEvents(input);
   }
 
   public async executeCommand(

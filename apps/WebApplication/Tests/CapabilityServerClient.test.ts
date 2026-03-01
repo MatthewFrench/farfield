@@ -59,6 +59,13 @@ vi.mock(
 );
 
 vi.mock(
+  "../Source/Features/Capabilities/DataAccess/CapabilityCoverageNotificationEventsApi",
+  () => ({
+    readNotificationEvents: vi.fn(),
+  }),
+);
+
+vi.mock(
   "../Source/Features/Capabilities/DataAccess/CapabilityCoverageExternalAgentConfigApi",
   () => ({
     detectExternalAgentConfig: vi.fn(),
@@ -107,6 +114,7 @@ import {
   writeConfigValue,
   writeSkillsConfig,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi";
+import { readNotificationEvents } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageNotificationEventsApi";
 import {
   appendThreadRealtimeAudio,
   appendThreadRealtimeText,
@@ -144,6 +152,7 @@ import {
   type CapabilityMcpServersResponse,
   type CapabilityModelsResponse,
   type CapabilityMutationSuccessResponse,
+  type CapabilityNotificationEventsResponse,
   type CapabilityRemoteSkillExportResponse,
   type CapabilityRemoteSkillsListResponse,
   CapabilityServerClient,
@@ -207,6 +216,7 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canSubmitUserInput: true,
         canReadLiveState: true,
         canReadStreamEvents: true,
+        canReadNotificationEvents: true,
       },
       projectDirectories: ["/tmp/project"],
     },
@@ -479,6 +489,23 @@ const THREAD_STREAM_EVENTS_RESPONSE: CapabilityThreadStreamEventsResponse = {
   resetRequired: false,
 };
 
+const NOTIFICATION_EVENTS_RESPONSE: CapabilityNotificationEventsResponse = {
+  ok: true,
+  events: [
+    {
+      sequence: 7,
+      method: "turn/started",
+      params: {
+        threadId: "thread-1",
+      },
+      receivedAtMilliseconds: 1_700_000_000_100,
+    },
+  ],
+  nextSequence: 8,
+  firstAvailableSequence: 1,
+  resetRequired: false,
+};
+
 const EXPERIMENTAL_FEATURES_RESPONSE: CapabilityExperimentalFeaturesResponse = {
   ok: true,
   data: [
@@ -590,6 +617,7 @@ describe("CapabilityServerClient", () => {
     vi.mocked(stopThreadRealtime).mockResolvedValue(THREAD_REALTIME_STOP_RESPONSE);
     vi.mocked(startWindowsSandboxSetup).mockResolvedValue(WINDOWS_SANDBOX_SETUP_START_RESPONSE);
     vi.mocked(readThreadStreamEvents).mockResolvedValue(THREAD_STREAM_EVENTS_RESPONSE);
+    vi.mocked(readNotificationEvents).mockResolvedValue(NOTIFICATION_EVENTS_RESPONSE);
     vi.mocked(listExperimentalFeatures).mockResolvedValue(EXPERIMENTAL_FEATURES_RESPONSE);
     vi.mocked(listMcpServers).mockResolvedValue(MCP_SERVERS_RESPONSE);
     vi.mocked(listApps).mockResolvedValue(APPS_RESPONSE);
@@ -820,6 +848,12 @@ describe("CapabilityServerClient", () => {
       limit: 20,
       sinceSequence: 15,
     };
+    const notificationEventsOptions = {
+      actionId: "action-notification-events",
+      actionName: "notification-events",
+      limit: 25,
+      sinceSequence: 5,
+    };
     const experimentalFeatureOptions = {
       actionId: "action-experimental-features",
       actionName: "list-experimental-features",
@@ -913,6 +947,8 @@ describe("CapabilityServerClient", () => {
     );
     const threadStreamEventsResponse =
       await capabilityServerClient.readThreadStreamEvents(threadStreamEventsOptions);
+    const notificationEventsResponse =
+      await capabilityServerClient.readNotificationEvents(notificationEventsOptions);
     const experimentalFeaturesResponse = await capabilityServerClient.listExperimentalFeatures(
       experimentalFeatureOptions,
     );
@@ -955,6 +991,7 @@ describe("CapabilityServerClient", () => {
     expect(stopThreadRealtime).toHaveBeenCalledWith(threadRealtimeStopOptions);
     expect(startWindowsSandboxSetup).toHaveBeenCalledWith(windowsSandboxSetupStartOptions);
     expect(readThreadStreamEvents).toHaveBeenCalledWith(threadStreamEventsOptions);
+    expect(readNotificationEvents).toHaveBeenCalledWith(notificationEventsOptions);
     expect(listExperimentalFeatures).toHaveBeenCalledWith(experimentalFeatureOptions);
     expect(listMcpServers).toHaveBeenCalledWith(mcpServerOptions);
     expect(listApps).toHaveBeenCalledWith(appOptions);
@@ -994,6 +1031,7 @@ describe("CapabilityServerClient", () => {
     expect(threadRealtimeStopResponse).toEqual(THREAD_REALTIME_STOP_RESPONSE);
     expect(windowsSandboxSetupStartResponse).toEqual(WINDOWS_SANDBOX_SETUP_START_RESPONSE);
     expect(threadStreamEventsResponse).toEqual(THREAD_STREAM_EVENTS_RESPONSE);
+    expect(notificationEventsResponse).toEqual(NOTIFICATION_EVENTS_RESPONSE);
     expect(experimentalFeaturesResponse).toEqual(EXPERIMENTAL_FEATURES_RESPONSE);
     expect(mcpServersResponse).toEqual(MCP_SERVERS_RESPONSE);
     expect(appsResponse).toEqual(APPS_RESPONSE);

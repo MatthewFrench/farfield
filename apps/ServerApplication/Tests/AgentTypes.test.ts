@@ -42,6 +42,8 @@ function createDescriptor(id: AgentId): AgentDescriptor {
       canSubmitUserInput: false,
       canReadLiveState: false,
       canReadStreamEvents: false,
+
+      canReadNotificationEvents: false,
     },
     projectDirectories: [],
   };

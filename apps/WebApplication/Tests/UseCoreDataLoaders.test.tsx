@@ -90,6 +90,8 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canSubmitUserInput: true,
         canReadLiveState: true,
         canReadStreamEvents: true,
+
+        canReadNotificationEvents: true,
       },
       projectDirectories: [],
     },

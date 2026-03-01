@@ -57,6 +57,7 @@ export const CODEX_AGENT_CAPABILITIES: AgentCapabilities = {
   canSubmitUserInput: true,
   canReadLiveState: true,
   canReadStreamEvents: true,
+  canReadNotificationEvents: true,
 };
 
 export function isInvalidRequestErrorMatchingMessageFragment<ErrorType>(

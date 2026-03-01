@@ -349,6 +349,25 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         firstAvailableSequence: 3,
         resetRequired: false,
       });
+    const readNotificationEvents = vi
+      .spyOn(capabilityServerClient, "readNotificationEvents")
+      .mockResolvedValue({
+        ok: true,
+        events: [
+          {
+            sequence: 11,
+            method: "turn/started",
+            params: {
+              threadId: "thread-realtime-1",
+              detail: "started",
+            },
+            receivedAtMilliseconds: 17_500,
+          },
+        ],
+        nextSequence: 12,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+      });
 
     const latestDiagnostics: { current: DebugAppServerCoverageDiagnostics | null } = {
       current: null,
@@ -430,6 +449,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     );
     latestDiagnostics.current?.stopThreadRealtime("thread-realtime-1");
     latestDiagnostics.current?.readThreadStreamEvents("thread-realtime-1", 7);
+    latestDiagnostics.current?.readNotificationEvents(7);
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
       "quality",
@@ -548,6 +568,10 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       expect(readThreadStreamEvents).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
         threadId: "thread-realtime-1",
+        sinceSequence: 7,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
         sinceSequence: 7,
       });
       expect(startWindowsSandboxSetup).toHaveBeenCalledWith({
@@ -702,6 +726,28 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             sequence: 7,
             receivedAtMilliseconds: 17_200,
             preview: expect.stringContaining('"note": "done"'),
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastNotificationEventsResult).toEqual({
+        sinceSequence: 7,
+        eventCount: 1,
+        nextSequence: 12,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        methodCounts: [
+          {
+            method: "turn/started",
+            count: 1,
+          },
+        ],
+        events: [
+          {
+            method: "turn/started",
+            sequence: 11,
+            receivedAtMilliseconds: 17_500,
+            preview: expect.stringContaining('"detail": "started"'),
           },
         ],
         readAtIso8601: expect.any(String),

@@ -24,6 +24,7 @@ import type {
   AgentListMcpServerStatusesResult,
   AgentListRemoteSkillsResult,
   AgentListSkillsResult,
+  AgentNotificationEvents,
   AgentReadAccountRateLimitsResult,
   AgentReadAccountResult,
   AgentReadAuthStatusResult,
@@ -57,6 +58,7 @@ const CapabilityRoutePathnameByName = {
   accountRateLimits: "/api/account/rate-limits",
   accountUserInfo: "/api/account/user-info",
   feedbackUpload: "/api/feedback/upload",
+  notificationEvents: "/api/notifications/events",
   gitDiffToRemote: "/api/git/diff-remote",
   fuzzyFileSearch: "/api/files/fuzzy-search",
   fuzzyFileSearchSessionStart: "/api/files/fuzzy-search/session-start",
@@ -94,6 +96,7 @@ const CapabilityRouteStatusCodeByName = {
 const CapabilityRouteQueryParameterByName = {
   agentId: "agentId",
   limit: "limit",
+  sinceSequence: "sinceSequence",
   cursor: "cursor",
   threadId: "threadId",
   forceRefetch: "forceRefetch",
@@ -145,6 +148,7 @@ const CapabilityRouteLogEventByName = {
   accountRateLimitsReadFailed: "account-rate-limits-read-failed",
   accountUserInfoReadFailed: "account-user-info-read-failed",
   feedbackUploadFailed: "feedback-upload-failed",
+  notificationEventsReadFailed: "notification-events-read-failed",
   gitDiffToRemoteFailed: "git-diff-to-remote-failed",
   fuzzyFileSearchFailed: "fuzzy-file-search-failed",
   fuzzyFileSearchSessionStartFailed: "fuzzy-file-search-session-start-failed",
@@ -195,6 +199,8 @@ const CapabilityRouteErrorMessagePrefixByName = {
   invalidFeedbackReason: "Invalid reason query parameter.",
   invalidFeedbackThreadId: "Invalid threadId query parameter.",
   failedToUploadFeedback: "Failed to upload feedback: ",
+  invalidNotificationEventsQueryParameters: "Invalid notification events query parameters.",
+  failedToReadNotificationEvents: "Failed to read notification events: ",
   missingGitDiffWorkingDirectory: "Missing cwd query parameter.",
   invalidGitDiffWorkingDirectory: "Invalid cwd query parameter.",
   failedToReadGitDiffToRemote: "Failed to read git diff to remote: ",
@@ -299,6 +305,7 @@ const CapabilityRouteTimeoutLabelByName = {
   accountRateLimitsRead: "account rate limits read",
   accountUserInfoRead: "user info read",
   feedbackUpload: "feedback upload",
+  notificationEventsRead: "notification events read",
   gitDiffToRemote: "git diff to remote",
   fuzzyFileSearch: "fuzzy file search",
   fuzzyFileSearchSessionStart: "fuzzy file search session start",
@@ -379,6 +386,10 @@ type CapabilityAccountUserInfoResponseBody = AgentReadUserInfoResult & {
 };
 
 type CapabilityFeedbackUploadResponseBody = AgentUploadFeedbackResult & {
+  ok: true;
+};
+
+type CapabilityNotificationEventsResponseBody = AgentNotificationEvents & {
   ok: true;
 };
 
@@ -564,6 +575,37 @@ function parseOptionalPositiveIntegerQueryValue(value: string | null): number | 
     return null;
   }
   return parsed;
+}
+
+interface NotificationEventsQueryInput {
+  limit: string | undefined;
+  sinceSequence: string | undefined;
+}
+
+const CAPABILITY_NOTIFICATION_EVENTS_QUERY_LIMIT_MAXIMUM = 400;
+const CAPABILITY_NOTIFICATION_EVENTS_QUERY_LIMIT_DEFAULT = 80;
+
+const CapabilityNotificationEventsQuerySchema = z
+  .object({
+    limit: z.preprocess(
+      (value) => (value === undefined ? CAPABILITY_NOTIFICATION_EVENTS_QUERY_LIMIT_DEFAULT : value),
+      z.coerce.number().int().positive().max(CAPABILITY_NOTIFICATION_EVENTS_QUERY_LIMIT_MAXIMUM),
+    ),
+    sinceSequence: z.preprocess(
+      (value) => (value === undefined ? null : value),
+      z.union([z.null(), z.coerce.number().int().nonnegative()]),
+    ),
+  })
+  .strict();
+
+function parseNotificationEventsQuery(searchParameters: URLSearchParams) {
+  const query: NotificationEventsQueryInput = {
+    limit: searchParameters.get(CapabilityRouteQueryParameterByName.limit) ?? undefined,
+    sinceSequence:
+      searchParameters.get(CapabilityRouteQueryParameterByName.sinceSequence) ?? undefined,
+  };
+
+  return CapabilityNotificationEventsQuerySchema.safeParse(query);
 }
 
 function parseOptionalScopesQueryValue(value: string | null): string[] | null {
@@ -817,6 +859,15 @@ function mapAccountUserInfoResponse(
 function mapFeedbackUploadResponse(
   result: AgentUploadFeedbackResult,
 ): CapabilityFeedbackUploadResponseBody {
+  return {
+    ok: true,
+    ...result,
+  };
+}
+
+function mapNotificationEventsResponse(
+  result: AgentNotificationEvents,
+): CapabilityNotificationEventsResponseBody {
   return {
     ok: true,
     ...result,
@@ -1634,6 +1685,95 @@ async function handleFeedbackUploadRoute(deps: CapabilityRouteDependencies): Pro
     jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
       ok: false,
       error: `${CapabilityRouteErrorMessagePrefixByName.failedToUploadFeedback}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleNotificationEventsRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.get,
+      CapabilityRoutePathnameByName.notificationEvents,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const parsedNotificationEventsQuery = parseNotificationEventsQuery(url.searchParams);
+  if (!parsedNotificationEventsQuery.success) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidNotificationEventsQueryParameters,
+      details: parsedNotificationEventsQuery.error.issues,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canReadNotificationEvents ||
+    !adapter.readNotificationEvents
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadNotificationEvents}Notification event reads are unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.readNotificationEvents(parsedNotificationEventsQuery.data),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.notificationEventsRead,
+    );
+    jsonResponse(
+      res,
+      CapabilityRouteStatusCodeByName.success,
+      mapNotificationEventsResponse(result),
+    );
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        ...parsedNotificationEventsQuery.data,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.notificationEventsReadFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadNotificationEvents}${message}`,
     });
   }
 
@@ -4537,6 +4677,7 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
  * Owns capability route dispatch (`/api/config/defaults`, `/api/config-requirements`,
  * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/auth-status`,
  * `/api/account/rate-limits`, `/api/account/user-info`, `/api/feedback/upload`,
+ * `/api/notifications/events`,
  * `/api/git/diff-remote`, `/api/files/fuzzy-search`,
  * `/api/files/fuzzy-search/session-start`, `/api/files/fuzzy-search/session-update`,
  * `/api/files/fuzzy-search/session-stop`, `/api/commands/exec`, `/api/account/login/start`,
@@ -4571,6 +4712,9 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleFeedbackUploadRoute(deps)) {
+    return true;
+  }
+  if (await handleNotificationEventsRoute(deps)) {
     return true;
   }
   if (await handleGitDiffToRemoteRoute(deps)) {

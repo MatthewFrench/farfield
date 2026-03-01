@@ -18,6 +18,8 @@ import {
 import { z } from "zod";
 import type {
   AgentInterruptInput,
+  AgentNotificationEvents,
+  AgentReadNotificationEventsInput,
   AgentReadStreamEventsInput,
   AgentSetCollaborationModeInput,
   AgentSubmitUserInputInput,
@@ -228,6 +230,27 @@ export class CodexThreadInteractionOwner {
     }
 
     return this.threadStreamStateOwner.readStreamEvents(threadId, input);
+  }
+
+  public async readNotificationEvents(
+    input: AgentReadNotificationEventsInput,
+  ): Promise<AgentNotificationEvents> {
+    const notificationBatch = this.appClient.readNotificationEvents({
+      limit: input.limit,
+      sinceSequence: input.sinceSequence,
+    });
+
+    return {
+      events: notificationBatch.events.map((event) => ({
+        sequence: event.sequence,
+        method: event.method,
+        params: event.params,
+        receivedAtMilliseconds: event.receivedAtMilliseconds,
+      })),
+      nextSequence: notificationBatch.nextSequence,
+      firstAvailableSequence: notificationBatch.firstAvailableSequence,
+      resetRequired: notificationBatch.resetRequired,
+    };
   }
 
   public async replayRequest(

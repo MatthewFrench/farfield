@@ -67,6 +67,8 @@ const defaultCapabilities: AgentCapabilities = {
   canSubmitUserInput: false,
   canReadLiveState: false,
   canReadStreamEvents: false,
+
+  canReadNotificationEvents: false,
 };
 
 const liveStateReadCapabilities: AgentCapabilities = {
@@ -77,6 +79,8 @@ const liveStateReadCapabilities: AgentCapabilities = {
 const streamEventsReadCapabilities: AgentCapabilities = {
   ...defaultCapabilities,
   canReadStreamEvents: true,
+
+  canReadNotificationEvents: true,
 };
 
 const AmbiguousThreadResolutionResponseSchema = z

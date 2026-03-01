@@ -373,6 +373,8 @@ function buildAgentDescriptorsFixture(): CapabilityAgentsResponse["agents"] {
         canSubmitUserInput: true,
         canReadLiveState: true,
         canReadStreamEvents: true,
+
+        canReadNotificationEvents: true,
       },
       projectDirectories: [],
     },
@@ -411,6 +413,8 @@ function buildAgentDescriptorsFixture(): CapabilityAgentsResponse["agents"] {
         canSubmitUserInput: false,
         canReadLiveState: false,
         canReadStreamEvents: false,
+
+        canReadNotificationEvents: false,
       },
       projectDirectories: [],
     },

@@ -63,6 +63,7 @@ const AgentCapabilitiesSchema = z
     canSubmitUserInput: z.boolean(),
     canReadLiveState: z.boolean(),
     canReadStreamEvents: z.boolean(),
+    canReadNotificationEvents: z.boolean(),
   })
   .strict();
 
@@ -152,6 +153,8 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canSubmitUserInput: false,
     canReadLiveState: false,
     canReadStreamEvents: false,
+
+    canReadNotificationEvents: false,
     ...overrides,
   };
 }
@@ -320,6 +323,8 @@ describe("handleAgentRoutes", () => {
             canSubmitUserInput: false,
             canReadLiveState: false,
             canReadStreamEvents: false,
+
+            canReadNotificationEvents: false,
           },
           projectDirectories: ["/workspace/codex", "/workspace/shared"],
         },
@@ -353,6 +358,8 @@ describe("handleAgentRoutes", () => {
             canSubmitUserInput: false,
             canReadLiveState: false,
             canReadStreamEvents: false,
+
+            canReadNotificationEvents: false,
           },
           projectDirectories: [],
         },

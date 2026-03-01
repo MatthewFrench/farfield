@@ -39,6 +39,8 @@ const DEFAULT_CAPABILITIES: AgentCapabilities = {
   canSubmitUserInput: false,
   canReadLiveState: false,
   canReadStreamEvents: false,
+
+  canReadNotificationEvents: false,
 };
 
 interface AgentAdapterFactoryInput {

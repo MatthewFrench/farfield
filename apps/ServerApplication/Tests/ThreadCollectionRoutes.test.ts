@@ -84,6 +84,8 @@ function createMockAgentAdapter(
       canSubmitUserInput: false,
       canReadLiveState: false,
       canReadStreamEvents: false,
+
+      canReadNotificationEvents: false,
     },
     async start(): Promise<void> {},
     async stop(): Promise<void> {},

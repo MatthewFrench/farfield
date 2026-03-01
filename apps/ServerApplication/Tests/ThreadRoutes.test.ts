@@ -16,6 +16,8 @@ const ThreadRouteTestAdapterCapabilities: AgentCapabilities = {
   canSubmitUserInput: false,
   canReadLiveState: false,
   canReadStreamEvents: false,
+
+  canReadNotificationEvents: false,
 };
 
 function createMockRequestResponsePair(): {

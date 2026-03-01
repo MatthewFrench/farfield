@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 07:13:47Z
+Last Updated (UTC): 2026-03-01 08:12:21Z
 
 ## Purpose
 
@@ -56,7 +56,7 @@ As of the upstream snapshot above:
 1. Farfield app-server method coverage at request-owner layer: `53 / 74` request methods (`71.6%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
 3. Effective request-method usage including transport-owned `initialize`: `54 / 74` (`73.0%`).
-4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
+4. Farfield now captures app-server notification streams and exposes them through thread stream-event reads and dedicated notification-event reads in debug coverage diagnostics.
 5. Farfield now handles all upstream app-server server-request methods (`item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, `item/tool/call`, `account/chatgptAuthTokens/refresh`, `applyPatchApproval`, `execCommandApproval`) with typed response contracts and user-facing response controls for current product flows.
 
 ## Canonical Coverage Artifacts
@@ -291,11 +291,12 @@ No remaining methods in this category for the current upstream snapshot.
 
 ### Server-to-client notifications
 
-Upstream publishes `46` notification methods. Farfield now captures these notifications in app-server transport ownership and exposes them through `readNotificationEvents`:
+Upstream publishes `46` notification methods. Farfield now captures these notifications in app-server transport ownership and exposes them through `readNotificationEvents` plus dedicated debug coverage route ownership:
 
 1. `packages/CodexInterfaceAdapter/Source/AppServerTransport.ts`
 2. `packages/CodexInterfaceAdapter/Source/AppServerClient.ts`
 3. `apps/ServerApplication/Source/Agents/Adapters/CodexThreadInteractionOwner.ts` maps thread-scoped notifications into stream-event reads when IPC is unavailable.
+4. `apps/ServerApplication/Source/Network/Routes/CapabilityRoutes.ts` exposes `/api/notifications/events` for direct notification cursor diagnostics.
 
 ### Server-to-client requests
 

@@ -68,6 +68,7 @@ const AgentCapabilitiesSchema = z
     canSubmitUserInput: z.boolean(),
     canReadLiveState: z.boolean(),
     canReadStreamEvents: z.boolean(),
+    canReadNotificationEvents: z.boolean(),
   })
   .strict();
 export type ApiAgentCapabilities = z.infer<typeof AgentCapabilitiesSchema>;

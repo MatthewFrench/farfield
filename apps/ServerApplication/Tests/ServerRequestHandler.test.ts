@@ -219,6 +219,8 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
         canSubmitUserInput: false,
         canReadLiveState: false,
         canReadStreamEvents: false,
+
+        canReadNotificationEvents: false,
       },
       projectDirectories,
     }),

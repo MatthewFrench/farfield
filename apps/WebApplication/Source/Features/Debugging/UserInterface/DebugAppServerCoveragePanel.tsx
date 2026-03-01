@@ -13,6 +13,7 @@ import {
   type DebugAppServerCoverageFuzzyFileSearchSessionStopResult,
   type DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
+  type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
   type DebugAppServerCoverageThreadRealtimeAppendAudioResult,
@@ -31,6 +32,7 @@ import { DebugAppServerCoverageExternalAgentConfigSection } from "./DebugAppServ
 import { DebugAppServerCoverageFeedbackUploadSection } from "./DebugAppServerCoverageFeedbackUploadSection";
 import { DebugAppServerCoverageFuzzyFileSearchSection } from "./DebugAppServerCoverageFuzzyFileSearchSection";
 import { DebugAppServerCoverageGitDiffToRemoteSection } from "./DebugAppServerCoverageGitDiffToRemoteSection";
+import { DebugAppServerCoverageNotificationEventsSection } from "./DebugAppServerCoverageNotificationEventsSection";
 import { DebugAppServerCoverageRealtimeAndWindowsSection } from "./DebugAppServerCoverageRealtimeAndWindowsSection";
 import { DebugAppServerCoverageThreadStreamEventsSection } from "./DebugAppServerCoverageThreadStreamEventsSection";
 
@@ -51,6 +53,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
+  lastNotificationEventsResult: DebugAppServerCoverageNotificationEventsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
@@ -86,6 +89,7 @@ export interface DebugAppServerCoveragePanelProps {
   onAppendThreadRealtimeText: (threadId: string, text: string) => void;
   onStopThreadRealtime: (threadId: string) => void;
   onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
+  onReadNotificationEvents: (sinceSequence?: number | null) => void;
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
   onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
@@ -129,6 +133,7 @@ export function DebugAppServerCoveragePanel({
   lastThreadRealtimeAppendTextResult,
   lastThreadRealtimeStopResult,
   lastThreadStreamEventsResult,
+  lastNotificationEventsResult,
   lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
@@ -153,6 +158,7 @@ export function DebugAppServerCoveragePanel({
   onAppendThreadRealtimeText,
   onStopThreadRealtime,
   onReadThreadStreamEvents,
+  onReadNotificationEvents,
   onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
   onSearchFuzzyFiles,
@@ -590,6 +596,12 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastThreadStreamEventsResult={lastThreadStreamEventsResult}
             onReadThreadStreamEvents={onReadThreadStreamEvents}
+          />
+
+          <DebugAppServerCoverageNotificationEventsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastNotificationEventsResult={lastNotificationEventsResult}
+            onReadNotificationEvents={onReadNotificationEvents}
           />
 
           <DebugAppServerCoverageCommandExecutionSection

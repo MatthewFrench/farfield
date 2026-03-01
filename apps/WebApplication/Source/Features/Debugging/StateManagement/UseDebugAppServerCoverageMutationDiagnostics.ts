@@ -16,6 +16,7 @@ import type {
   DebugAppServerCoverageFuzzyFileSearchSessionStopResult,
   DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
+  DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingAccountLogin,
   DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   DebugAppServerCoverageThreadRealtimeAppendTextResult,
@@ -35,6 +36,7 @@ import {
   runExternalAgentConfigDetectAction,
   runExternalAgentConfigImportAction,
 } from "./DebugAppServerCoverageMutationActionRunners";
+import { mapNotificationEventsResult } from "./DebugAppServerCoverageNotificationEventMappers";
 import { mapThreadStreamEventsResult } from "./DebugAppServerCoverageThreadStreamEventMappers";
 import { useDebugAppServerCoverageRuntimeMutationActions } from "./UseDebugAppServerCoverageRuntimeMutationActions";
 
@@ -67,6 +69,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
+  lastNotificationEventsResult: DebugAppServerCoverageNotificationEventsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
@@ -101,6 +104,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   appendThreadRealtimeText: (threadId: string, text: string) => void;
   stopThreadRealtime: (threadId: string) => void;
   readThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
+  readNotificationEvents: (sinceSequence?: number | null) => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
@@ -152,6 +156,43 @@ function runCoverageAsyncMutation(input: RunCoverageAsyncMutationInput): void {
   })();
 }
 
+interface RunNotificationEventsReadMutationInput {
+  capabilityServerClient: CapabilityServerClient;
+  isRunningCoverageAction: boolean;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastNotificationEventsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageNotificationEventsResult | null>
+  >;
+  sinceSequence?: number | null;
+}
+
+function runNotificationEventsReadMutation(input: RunNotificationEventsReadMutationInput): void {
+  const normalizedSinceSequence =
+    input.sinceSequence === undefined || input.sinceSequence === null ? null : input.sinceSequence;
+  if (
+    normalizedSinceSequence !== null &&
+    (!Number.isInteger(normalizedSinceSequence) || normalizedSinceSequence < 0)
+  ) {
+    return;
+  }
+
+  runCoverageAsyncMutation({
+    isRunningCoverageAction: input.isRunningCoverageAction,
+    setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+    setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+    run: async () => {
+      const response = await input.capabilityServerClient.readNotificationEvents({
+        actionName: COVERAGE_MUTATION_OPERATION_NAME,
+        ...(normalizedSinceSequence !== null ? { sinceSequence: normalizedSinceSequence } : {}),
+      });
+      input.setLastNotificationEventsResult(
+        mapNotificationEventsResult(response, normalizedSinceSequence),
+      );
+    },
+  });
+}
+
 export function useDebugAppServerCoverageMutationDiagnostics(
   input: UseDebugAppServerCoverageMutationDiagnosticsInput,
 ): DebugAppServerCoverageMutationDiagnosticsBundle {
@@ -179,6 +220,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageThreadRealtimeStopResult | null>(null);
   const [lastThreadStreamEventsResult, setLastThreadStreamEventsResult] =
     useState<DebugAppServerCoverageThreadStreamEventsResult | null>(null);
+  const [lastNotificationEventsResult, setLastNotificationEventsResult] =
+    useState<DebugAppServerCoverageNotificationEventsResult | null>(null);
   const [lastWindowsSandboxSetupStartResult, setLastWindowsSandboxSetupStartResult] =
     useState<DebugAppServerCoverageWindowsSandboxSetupStartResult | null>(null);
   const [lastFeedbackUploadResult, setLastFeedbackUploadResult] =
@@ -444,6 +487,20 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     [input.capabilityServerClient, isRunningCoverageAction],
   );
 
+  const readNotificationEvents = useCallback(
+    (sinceSequence?: number | null) => {
+      runNotificationEventsReadMutation({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastNotificationEventsResult,
+        sinceSequence,
+      });
+    },
+    [input.capabilityServerClient, isRunningCoverageAction],
+  );
+
   const runtimeMutationActions = useDebugAppServerCoverageRuntimeMutationActions({
     capabilityServerClient: input.capabilityServerClient,
     isRunningCoverageAction,
@@ -479,6 +536,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastThreadRealtimeAppendTextResult,
       lastThreadRealtimeStopResult,
       lastThreadStreamEventsResult,
+      lastNotificationEventsResult,
       lastWindowsSandboxSetupStartResult,
       lastFeedbackUploadResult,
       lastFuzzyFileSearchResult,
@@ -502,6 +560,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       appendThreadRealtimeText: runtimeMutationActions.appendThreadRealtimeText,
       stopThreadRealtime: runtimeMutationActions.stopThreadRealtime,
       readThreadStreamEvents,
+      readNotificationEvents,
       startWindowsSandboxSetup: runtimeMutationActions.startWindowsSandboxSetup,
       readGitDiffToRemote: runtimeMutationActions.readGitDiffToRemote,
       searchFuzzyFiles: runtimeMutationActions.searchFuzzyFiles,
