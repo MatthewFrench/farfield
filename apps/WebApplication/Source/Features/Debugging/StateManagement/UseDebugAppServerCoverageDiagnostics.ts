@@ -13,6 +13,7 @@ import type {
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import {
+  type DebugAppServerCoverageAuthCompletionEventsResult,
   type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
@@ -79,6 +80,7 @@ export interface DebugAppServerCoverageDiagnostics {
   coverageActionErrorMessage: string;
   coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
+  lastAuthCompletionEventsResult: DebugAppServerCoverageAuthCompletionEventsResult | null;
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
@@ -127,6 +129,7 @@ export interface DebugAppServerCoverageDiagnostics {
   stopThreadRealtime: (threadId: string) => void;
   readThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   readNotificationEvents: (sinceSequence?: number | null) => void;
+  readAuthCompletionEvents: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;

@@ -3,6 +3,7 @@ import { Tabs } from "@/Components/UserInterface/Tabs";
 import { TabsList } from "@/Components/UserInterface/TabsList";
 import { TabsTrigger } from "@/Components/UserInterface/TabsTrigger";
 import {
+  type DebugAppServerCoverageAuthCompletionEventsResult,
   type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
@@ -97,6 +98,7 @@ export interface DebugWorkspacePaneProps {
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
   lastNotificationEventsResult: DebugAppServerCoverageNotificationEventsResult | null;
+  lastAuthCompletionEventsResult: DebugAppServerCoverageAuthCompletionEventsResult | null;
   lastPendingServerRequestsResult: DebugAppServerCoveragePendingServerRequestsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
@@ -134,6 +136,7 @@ export interface DebugWorkspacePaneProps {
   onStopThreadRealtime: (threadId: string) => void;
   onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   onReadNotificationEvents: (sinceSequence?: number | null) => void;
+  onReadAuthCompletionEvents: (sinceSequence?: number | null) => void;
   onReadPendingServerRequests: () => void;
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
@@ -203,6 +206,7 @@ export function DebugWorkspacePane({
   lastThreadRealtimeStopResult,
   lastThreadStreamEventsResult,
   lastNotificationEventsResult,
+  lastAuthCompletionEventsResult,
   lastPendingServerRequestsResult,
   lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
@@ -229,6 +233,7 @@ export function DebugWorkspacePane({
   onStopThreadRealtime,
   onReadThreadStreamEvents,
   onReadNotificationEvents,
+  onReadAuthCompletionEvents,
   onReadPendingServerRequests,
   onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
@@ -349,6 +354,7 @@ export function DebugWorkspacePane({
             lastThreadRealtimeStopResult={lastThreadRealtimeStopResult}
             lastThreadStreamEventsResult={lastThreadStreamEventsResult}
             lastNotificationEventsResult={lastNotificationEventsResult}
+            lastAuthCompletionEventsResult={lastAuthCompletionEventsResult}
             lastPendingServerRequestsResult={lastPendingServerRequestsResult}
             lastWindowsSandboxSetupStartResult={lastWindowsSandboxSetupStartResult}
             lastFeedbackUploadResult={lastFeedbackUploadResult}
@@ -375,6 +381,7 @@ export function DebugWorkspacePane({
             onStopThreadRealtime={onStopThreadRealtime}
             onReadThreadStreamEvents={onReadThreadStreamEvents}
             onReadNotificationEvents={onReadNotificationEvents}
+            onReadAuthCompletionEvents={onReadAuthCompletionEvents}
             onReadPendingServerRequests={onReadPendingServerRequests}
             onStartWindowsSandboxSetup={onStartWindowsSandboxSetup}
             onReadGitDiffToRemote={onReadGitDiffToRemote}

@@ -4,6 +4,7 @@ import type {
   CapabilityServerClient,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import type {
+  DebugAppServerCoverageAuthCompletionEventsResult,
   DebugAppServerCoverageCommandExecutionResult,
   DebugAppServerCoverageConfigBatchWriteResult,
   DebugAppServerCoverageConfigValueWriteResult,
@@ -34,6 +35,7 @@ import {
 } from "./DebugAppServerCoverageConfigWriteActionRunners";
 import { mapPendingAccountLogin } from "./DebugAppServerCoverageDiagnosticsMappers";
 import {
+  createReadAuthCompletionEventsAction,
   createReadNotificationEventsAction,
   createReadPendingServerRequestsAction,
   createReadThreadStreamEventsAction,
@@ -56,6 +58,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   isRunningCoverageAction: boolean;
   coverageActionErrorMessage: string;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
+  lastAuthCompletionEventsResult: DebugAppServerCoverageAuthCompletionEventsResult | null;
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
@@ -103,6 +106,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   stopThreadRealtime: (threadId: string) => void;
   readThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   readNotificationEvents: (sinceSequence?: number | null) => void;
+  readAuthCompletionEvents: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
@@ -131,6 +135,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
   const [coverageActionErrorMessage, setCoverageActionErrorMessage] = useState("");
   const [pendingAccountLogin, setPendingAccountLogin] =
     useState<DebugAppServerCoveragePendingAccountLogin | null>(null);
+  const [lastAuthCompletionEventsResult, setLastAuthCompletionEventsResult] =
+    useState<DebugAppServerCoverageAuthCompletionEventsResult | null>(null);
   const [lastCommandExecutionResult, setLastCommandExecutionResult] =
     useState<DebugAppServerCoverageCommandExecutionResult | null>(null);
   const [lastConfigBatchWriteResult, setLastConfigBatchWriteResult] =
@@ -408,6 +414,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       isRunningCoverageAction,
       coverageActionErrorMessage,
       pendingAccountLogin,
+      lastAuthCompletionEventsResult,
       lastCommandExecutionResult,
       lastConfigBatchWriteResult,
       lastConfigValueWriteResult,
@@ -455,6 +462,13 @@ export function useDebugAppServerCoverageMutationDiagnostics(
         setIsRunningCoverageAction,
         setCoverageActionErrorMessage,
         setLastNotificationEventsResult,
+      }),
+      readAuthCompletionEvents: createReadAuthCompletionEventsAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastAuthCompletionEventsResult,
       }),
       readPendingServerRequests: createReadPendingServerRequestsAction({
         capabilityServerClient: input.capabilityServerClient,

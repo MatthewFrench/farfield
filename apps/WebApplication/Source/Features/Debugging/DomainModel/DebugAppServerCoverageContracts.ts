@@ -285,6 +285,35 @@ export interface DebugAppServerCoveragePendingServerRequestsResult {
   readAtIso8601: string;
 }
 
+export type DebugAppServerCoverageAuthCompletionEventMethod =
+  | "mcpServer/oauthLogin/completed"
+  | "account/login/completed";
+
+export interface DebugAppServerCoverageAuthCompletionSummary {
+  method: DebugAppServerCoverageAuthCompletionEventMethod;
+  sequence: number;
+  receivedAtMilliseconds: number;
+  status: "success" | "error";
+  subject: string;
+  errorMessage: string | null;
+}
+
+export interface DebugAppServerCoverageAuthCompletionMethodCount {
+  method: DebugAppServerCoverageAuthCompletionEventMethod;
+  count: number;
+}
+
+export interface DebugAppServerCoverageAuthCompletionEventsResult {
+  sinceSequence: number | null;
+  eventCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageAuthCompletionSummary[];
+  methodCounts: DebugAppServerCoverageAuthCompletionMethodCount[];
+  readAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

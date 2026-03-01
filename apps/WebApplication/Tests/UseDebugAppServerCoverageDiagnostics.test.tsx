@@ -351,22 +351,54 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       });
     const readNotificationEvents = vi
       .spyOn(capabilityServerClient, "readNotificationEvents")
-      .mockResolvedValue({
-        ok: true,
-        events: [
-          {
-            sequence: 11,
-            method: "turn/started",
-            params: {
-              threadId: "thread-realtime-1",
-              detail: "started",
+      .mockImplementation(async (input) => {
+        if (input.limit === 200) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 12,
+                method: "mcpServer/oauthLogin/completed",
+                params: {
+                  name: "github",
+                  success: true,
+                },
+                receivedAtMilliseconds: 17_600,
+              },
+              {
+                sequence: 13,
+                method: "account/login/completed",
+                params: {
+                  loginId: "login-1",
+                  success: false,
+                  error: "User canceled login.",
+                },
+                receivedAtMilliseconds: 17_650,
+              },
+            ],
+            nextSequence: 14,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
+        return {
+          ok: true,
+          events: [
+            {
+              sequence: 11,
+              method: "turn/started",
+              params: {
+                threadId: "thread-realtime-1",
+                detail: "started",
+              },
+              receivedAtMilliseconds: 17_500,
             },
-            receivedAtMilliseconds: 17_500,
-          },
-        ],
-        nextSequence: 12,
-        firstAvailableSequence: 3,
-        resetRequired: false,
+          ],
+          nextSequence: 12,
+          firstAvailableSequence: 3,
+          resetRequired: false,
+        };
       });
     const readPendingServerRequests = vi
       .spyOn(capabilityServerClient, "readPendingServerRequests")
@@ -465,6 +497,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.stopThreadRealtime("thread-realtime-1");
     latestDiagnostics.current?.readThreadStreamEvents("thread-realtime-1", 7);
     latestDiagnostics.current?.readNotificationEvents(7);
+    latestDiagnostics.current?.readAuthCompletionEvents(12);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -589,6 +622,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       expect(readNotificationEvents).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
         sinceSequence: 7,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 12,
+        limit: 200,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -767,6 +805,42 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             sequence: 11,
             receivedAtMilliseconds: 17_500,
             preview: expect.stringContaining('"detail": "started"'),
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastAuthCompletionEventsResult).toEqual({
+        sinceSequence: 12,
+        eventCount: 2,
+        nextSequence: 14,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        methodCounts: [
+          {
+            method: "account/login/completed",
+            count: 1,
+          },
+          {
+            method: "mcpServer/oauthLogin/completed",
+            count: 1,
+          },
+        ],
+        events: [
+          {
+            method: "mcpServer/oauthLogin/completed",
+            sequence: 12,
+            receivedAtMilliseconds: 17_600,
+            status: "success",
+            subject: "github",
+            errorMessage: null,
+          },
+          {
+            method: "account/login/completed",
+            sequence: 13,
+            receivedAtMilliseconds: 17_650,
+            status: "error",
+            subject: "login-1",
+            errorMessage: "User canceled login.",
           },
         ],
         readAtIso8601: expect.any(String),

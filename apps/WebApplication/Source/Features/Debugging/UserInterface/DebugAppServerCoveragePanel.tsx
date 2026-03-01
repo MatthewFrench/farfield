@@ -1,6 +1,7 @@
 import { RefreshCcw } from "lucide-react";
 import { Button } from "@/Components/UserInterface/Button";
 import {
+  type DebugAppServerCoverageAuthCompletionEventsResult,
   type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
@@ -26,6 +27,7 @@ import {
   type DebugAppServerCoverageWindowsSandboxSetupMode,
   type DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
+import { DebugAppServerCoverageAuthCompletionEventsSection } from "./DebugAppServerCoverageAuthCompletionEventsSection";
 import { DebugAppServerCoverageCommandExecutionSection } from "./DebugAppServerCoverageCommandExecutionSection";
 import { DebugAppServerCoverageConfigBatchWriteSection } from "./DebugAppServerCoverageConfigBatchWriteSection";
 import { DebugAppServerCoverageConfigValueWriteSection } from "./DebugAppServerCoverageConfigValueWriteSection";
@@ -45,6 +47,7 @@ export interface DebugAppServerCoveragePanelProps {
   coverageActionErrorMessage: string;
   coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
+  lastAuthCompletionEventsResult: DebugAppServerCoverageAuthCompletionEventsResult | null;
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
@@ -93,6 +96,7 @@ export interface DebugAppServerCoveragePanelProps {
   onStopThreadRealtime: (threadId: string) => void;
   onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   onReadNotificationEvents: (sinceSequence?: number | null) => void;
+  onReadAuthCompletionEvents: (sinceSequence?: number | null) => void;
   onReadPendingServerRequests: () => void;
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
@@ -127,6 +131,7 @@ export function DebugAppServerCoveragePanel({
   coverageActionErrorMessage,
   coverageDiagnosticsSnapshot,
   pendingAccountLogin,
+  lastAuthCompletionEventsResult,
   lastCommandExecutionResult,
   lastConfigBatchWriteResult,
   lastConfigValueWriteResult,
@@ -164,6 +169,7 @@ export function DebugAppServerCoveragePanel({
   onStopThreadRealtime,
   onReadThreadStreamEvents,
   onReadNotificationEvents,
+  onReadAuthCompletionEvents,
   onReadPendingServerRequests,
   onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
@@ -182,9 +188,9 @@ export function DebugAppServerCoveragePanel({
           <p className="text-xs text-muted-foreground">
             Skills, apps, experimental features, MCP status, config requirements, and account
             diagnostics plus config writes, remote skills import, external-agent config migration,
-            realtime thread actions, notification and pending-request reads, windows sandbox setup
-            actions, git diff reads, command execution, fuzzy file search, and feedback upload
-            coverage.
+            realtime thread actions, notification and auth-completion reads, pending-request reads,
+            windows sandbox setup actions, git diff reads, command execution, fuzzy file search, and
+            feedback upload coverage.
           </p>
         </div>
         <Button
@@ -609,6 +615,12 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastNotificationEventsResult={lastNotificationEventsResult}
             onReadNotificationEvents={onReadNotificationEvents}
+          />
+
+          <DebugAppServerCoverageAuthCompletionEventsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastAuthCompletionEventsResult={lastAuthCompletionEventsResult}
+            onReadAuthCompletionEvents={onReadAuthCompletionEvents}
           />
 
           <DebugAppServerCoveragePendingServerRequestsSection
