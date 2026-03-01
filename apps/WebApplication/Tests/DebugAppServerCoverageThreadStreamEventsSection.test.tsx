@@ -2,8 +2,38 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DebugAppServerCoverageThreadStreamEventsSection } from "@/Features/Debugging/UserInterface/DebugAppServerCoverageThreadStreamEventsSection";
 
+const ORIGINAL_LOCAL_STORAGE = window.localStorage;
+
+interface MockLocalStorage {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+}
+
+function createMockLocalStorage(initialValues?: Record<string, string>): MockLocalStorage {
+  const store = new Map<string, string>(Object.entries(initialValues ?? {}));
+  return {
+    getItem: (key) => store.get(key) ?? null,
+    setItem: (key, value) => {
+      store.set(key, value);
+    },
+  };
+}
+
+function installMockLocalStorage(initialValues?: Record<string, string>): MockLocalStorage {
+  const mockLocalStorage = createMockLocalStorage(initialValues);
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: mockLocalStorage,
+  });
+  return mockLocalStorage;
+}
+
 afterEach(() => {
   cleanup();
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: ORIGINAL_LOCAL_STORAGE,
+  });
 });
 
 describe("DebugAppServerCoverageThreadStreamEventsSection", () => {
@@ -466,5 +496,130 @@ describe("DebugAppServerCoverageThreadStreamEventsSection", () => {
     expect(screen.getByText("Filtered events: 1 of 3")).toBeDefined();
     expect(screen.getByText("broadcast • turn/completed")).toBeDefined();
     expect(screen.queryByText("request • turn/start")).toBeNull();
+  });
+
+  it("restores persisted filter state from local storage", () => {
+    installMockLocalStorage({
+      "debug-coverage-thread-stream-filter-state": JSON.stringify({
+        methodFilterDraft: "item/",
+        frameTypeFilterDraft: "broadcast",
+      }),
+    });
+    const readThreadStreamEventsSpy = vi.fn(
+      (_threadId: string, _sinceSequence?: number | null) => {},
+    );
+
+    render(
+      <DebugAppServerCoverageThreadStreamEventsSection
+        isRunningCoverageAction={false}
+        lastThreadStreamEventsResult={{
+          threadId: "thread-stream-persisted",
+          sinceSequence: null,
+          ownerClientId: "client-owner",
+          eventCount: 2,
+          nextSequence: 90,
+          firstAvailableSequence: 80,
+          resetRequired: false,
+          methodCounts: [
+            {
+              method: "item/tool/call",
+              count: 1,
+            },
+            {
+              method: "turn/completed",
+              count: 1,
+            },
+          ],
+          events: [
+            {
+              frameType: "broadcast",
+              method: "item/tool/call",
+              requestId: null,
+              sourceClientId: "client-codex",
+              sequence: 88,
+              receivedAtMilliseconds: 27_100,
+              preview: '{"event":"item-tool-call"}',
+            },
+            {
+              frameType: "broadcast",
+              method: "turn/completed",
+              requestId: null,
+              sourceClientId: "client-codex",
+              sequence: 89,
+              receivedAtMilliseconds: 27_200,
+              preview: '{"event":"turn-completed"}',
+            },
+          ],
+          readAtIso8601: "2026-03-01T00:00:00.000Z",
+        }}
+        onReadThreadStreamEvents={readThreadStreamEventsSpy}
+      />,
+    );
+
+    expect(
+      (screen.getByTestId("debug-coverage-thread-stream-method-filter") as HTMLInputElement).value,
+    ).toBe("item/");
+    expect(
+      (screen.getByTestId("debug-coverage-thread-stream-frame-type-filter") as HTMLSelectElement)
+        .value,
+    ).toBe("broadcast");
+    expect(screen.getByText("Filtered events: 1 of 2")).toBeDefined();
+    expect(screen.getByText("broadcast • item/tool/call")).toBeDefined();
+    expect(screen.queryByText("broadcast • turn/completed")).toBeNull();
+  });
+
+  it("persists filter state updates to local storage", () => {
+    const localStorageMock = installMockLocalStorage();
+    const readThreadStreamEventsSpy = vi.fn(
+      (_threadId: string, _sinceSequence?: number | null) => {},
+    );
+
+    render(
+      <DebugAppServerCoverageThreadStreamEventsSection
+        isRunningCoverageAction={false}
+        lastThreadStreamEventsResult={{
+          threadId: "thread-stream-persist",
+          sinceSequence: null,
+          ownerClientId: "client-owner",
+          eventCount: 1,
+          nextSequence: 101,
+          firstAvailableSequence: 90,
+          resetRequired: false,
+          methodCounts: [
+            {
+              method: "thread/started",
+              count: 1,
+            },
+          ],
+          events: [
+            {
+              frameType: "broadcast",
+              method: "thread/started",
+              requestId: null,
+              sourceClientId: "client-codex",
+              sequence: 100,
+              receivedAtMilliseconds: 30_000,
+              preview: '{"event":"thread-started"}',
+            },
+          ],
+          readAtIso8601: "2026-03-01T00:00:00.000Z",
+        }}
+        onReadThreadStreamEvents={readThreadStreamEventsSpy}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("debug-coverage-thread-stream-method-filter"), {
+      target: { value: "thread/" },
+    });
+    fireEvent.change(screen.getByTestId("debug-coverage-thread-stream-frame-type-filter"), {
+      target: { value: "broadcast" },
+    });
+
+    expect(localStorageMock.getItem("debug-coverage-thread-stream-filter-state")).toBe(
+      JSON.stringify({
+        methodFilterDraft: "thread/",
+        frameTypeFilterDraft: "broadcast",
+      }),
+    );
   });
 });

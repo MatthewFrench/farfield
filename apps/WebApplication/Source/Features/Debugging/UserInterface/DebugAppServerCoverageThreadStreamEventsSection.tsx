@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { z } from "zod";
 import { Button } from "@/Components/UserInterface/Button";
 import {
   type DebugAppServerCoverageThreadStreamEventFrameType,
@@ -12,6 +13,29 @@ export interface DebugAppServerCoverageThreadStreamEventsSectionProps {
 }
 
 const ALL_FRAME_TYPES_FILTER_VALUE = "all";
+const STREAM_FILTER_STORAGE_KEY = "debug-coverage-thread-stream-filter-state";
+const STREAM_FRAME_TYPE_FILTER_VALUES = [
+  ALL_FRAME_TYPES_FILTER_VALUE,
+  "request",
+  "response",
+  "broadcast",
+  "client-discovery-request",
+  "client-discovery-response",
+] as const;
+
+const StreamFilterStateSchema = z
+  .object({
+    methodFilterDraft: z.string(),
+    frameTypeFilterDraft: z.enum(STREAM_FRAME_TYPE_FILTER_VALUES),
+  })
+  .strict();
+
+interface StreamFilterState {
+  methodFilterDraft: string;
+  frameTypeFilterDraft:
+    | DebugAppServerCoverageThreadStreamEventFrameType
+    | typeof ALL_FRAME_TYPES_FILTER_VALUE;
+}
 
 interface StreamMethodFilterPreset {
   testIdentifierSuffix: string;
@@ -53,6 +77,59 @@ const STREAM_METHOD_FILTER_PRESETS: readonly StreamMethodFilterPreset[] = [
   },
 ];
 
+function createDefaultStreamFilterState(): StreamFilterState {
+  return {
+    methodFilterDraft: "",
+    frameTypeFilterDraft: ALL_FRAME_TYPES_FILTER_VALUE,
+  };
+}
+
+function readLocalStorageClient(): Pick<Storage, "getItem" | "setItem"> | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const localStorageClient = window.localStorage;
+  if (!localStorageClient) {
+    return null;
+  }
+  if (
+    typeof localStorageClient.getItem !== "function" ||
+    typeof localStorageClient.setItem !== "function"
+  ) {
+    return null;
+  }
+  return localStorageClient;
+}
+
+function readPersistedStreamFilterState(): StreamFilterState {
+  const localStorageClient = readLocalStorageClient();
+  if (localStorageClient === null) {
+    return createDefaultStreamFilterState();
+  }
+  const persistedValue = localStorageClient.getItem(STREAM_FILTER_STORAGE_KEY);
+  if (persistedValue === null) {
+    return createDefaultStreamFilterState();
+  }
+  try {
+    const parsedValue = JSON.parse(persistedValue);
+    const parsedFilterState = StreamFilterStateSchema.safeParse(parsedValue);
+    if (!parsedFilterState.success) {
+      return createDefaultStreamFilterState();
+    }
+    return parsedFilterState.data;
+  } catch {
+    return createDefaultStreamFilterState();
+  }
+}
+
+function persistStreamFilterState(state: StreamFilterState): void {
+  const localStorageClient = readLocalStorageClient();
+  if (localStorageClient === null) {
+    return;
+  }
+  localStorageClient.setItem(STREAM_FILTER_STORAGE_KEY, JSON.stringify(state));
+}
+
 function parseFrameTypeFilterValue(
   value: string,
   availableFrameTypes: readonly DebugAppServerCoverageThreadStreamEventFrameType[],
@@ -77,13 +154,22 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
 }: DebugAppServerCoverageThreadStreamEventsSectionProps): React.JSX.Element {
   const [threadIdDraft, setThreadIdDraft] = useState("");
   const [sinceSequenceDraft, setSinceSequenceDraft] = useState("");
-  const [methodFilterDraft, setMethodFilterDraft] = useState("");
+  const [methodFilterDraft, setMethodFilterDraft] = useState<string>(
+    () => readPersistedStreamFilterState().methodFilterDraft,
+  );
   const [frameTypeFilterDraft, setFrameTypeFilterDraft] = useState<
     DebugAppServerCoverageThreadStreamEventFrameType | typeof ALL_FRAME_TYPES_FILTER_VALUE
-  >(ALL_FRAME_TYPES_FILTER_VALUE);
+  >(() => readPersistedStreamFilterState().frameTypeFilterDraft);
   const [copyStatusMessage, setCopyStatusMessage] = useState<string | null>(null);
   const normalizedMethodFilter = methodFilterDraft.trim().toLowerCase();
   const isFrameTypeFilterActive = frameTypeFilterDraft !== ALL_FRAME_TYPES_FILTER_VALUE;
+
+  useEffect(() => {
+    persistStreamFilterState({
+      methodFilterDraft,
+      frameTypeFilterDraft,
+    });
+  }, [methodFilterDraft, frameTypeFilterDraft]);
 
   const runThreadStreamEventsRead = (): void => {
     const normalizedThreadIdentifier = threadIdDraft.trim();
