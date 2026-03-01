@@ -16,6 +16,7 @@ import {
   type DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   type DebugAppServerCoverageFuzzySessionNotificationsResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
+  type DebugAppServerCoverageItemDeltaNotificationsResult,
   type DebugAppServerCoverageModelReroutedEventsResult,
   type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
@@ -44,6 +45,7 @@ import { DebugAppServerCoverageFeedbackUploadSection } from "./DebugAppServerCov
 import { DebugAppServerCoverageFuzzyFileSearchSection } from "./DebugAppServerCoverageFuzzyFileSearchSection";
 import { DebugAppServerCoverageFuzzySessionNotificationsSection } from "./DebugAppServerCoverageFuzzySessionNotificationsSection";
 import { DebugAppServerCoverageGitDiffToRemoteSection } from "./DebugAppServerCoverageGitDiffToRemoteSection";
+import { DebugAppServerCoverageItemDeltaNotificationsSection } from "./DebugAppServerCoverageItemDeltaNotificationsSection";
 import { DebugAppServerCoverageModelReroutedEventsSection } from "./DebugAppServerCoverageModelReroutedEventsSection";
 import { DebugAppServerCoverageNotificationEventsSection } from "./DebugAppServerCoverageNotificationEventsSection";
 import { DebugAppServerCoveragePendingServerRequestsSection } from "./DebugAppServerCoveragePendingServerRequestsSection";
@@ -87,6 +89,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
   lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
+  lastItemDeltaNotificationsResult: DebugAppServerCoverageItemDeltaNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -131,6 +134,7 @@ export interface DebugAppServerCoveragePanelProps {
   onReadWarningNotifications: (sinceSequence?: number | null) => void;
   onReadThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   onReadTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
+  onReadItemDeltaNotifications: (sinceSequence?: number | null) => void;
   onReadErrorNotifications: (sinceSequence?: number | null) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
@@ -185,6 +189,7 @@ export function DebugAppServerCoveragePanel({
   lastWarningNotificationsResult,
   lastThreadLifecycleNotificationsResult,
   lastTurnLifecycleNotificationsResult,
+  lastItemDeltaNotificationsResult,
   lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -218,6 +223,7 @@ export function DebugAppServerCoveragePanel({
   onReadWarningNotifications,
   onReadThreadLifecycleNotifications,
   onReadTurnLifecycleNotifications,
+  onReadItemDeltaNotifications,
   onReadErrorNotifications,
   onExecuteCommand,
   onUploadFeedback,
@@ -232,8 +238,8 @@ export function DebugAppServerCoveragePanel({
             diagnostics plus config writes, remote skills import, external-agent config migration,
             realtime thread actions, notification and auth-completion reads, pending-request reads,
             windows sandbox setup actions, git diff reads, command execution, fuzzy file search, and
-            warning, thread-lifecycle, turn-lifecycle, and error-notification diagnostics, and
-            feedback upload coverage.
+            warning, thread-lifecycle, turn-lifecycle, item-delta, and error-notification
+            diagnostics, and feedback upload coverage.
           </p>
         </div>
         <Button
@@ -731,6 +737,12 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastTurnLifecycleNotificationsResult={lastTurnLifecycleNotificationsResult}
             onReadTurnLifecycleNotifications={onReadTurnLifecycleNotifications}
+          />
+
+          <DebugAppServerCoverageItemDeltaNotificationsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastItemDeltaNotificationsResult={lastItemDeltaNotificationsResult}
+            onReadItemDeltaNotifications={onReadItemDeltaNotifications}
           />
 
           <DebugAppServerCoverageErrorNotificationsSection

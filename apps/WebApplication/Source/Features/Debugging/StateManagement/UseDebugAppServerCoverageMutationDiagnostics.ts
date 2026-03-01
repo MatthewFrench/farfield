@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import type {
   CapabilityConfigWriteMergeStrategy,
   CapabilityServerClient,
@@ -19,6 +19,7 @@ import type {
   DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   DebugAppServerCoverageFuzzySessionNotificationsResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
+  DebugAppServerCoverageItemDeltaNotificationsResult,
   DebugAppServerCoverageModelReroutedEventsResult,
   DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingAccountLogin,
@@ -50,6 +51,7 @@ import {
   runExternalAgentConfigImportAction,
 } from "./DebugAppServerCoverageMutationActionRunners";
 import { createNotificationCoverageReadActions } from "./DebugAppServerCoverageNotificationReadActionFactory";
+import { useCoverageSkillMutationActions } from "./DebugAppServerCoverageSkillMutationActions";
 import { useDebugAppServerCoverageRuntimeMutationActions } from "./UseDebugAppServerCoverageRuntimeMutationActions";
 
 const COVERAGE_MUTATION_OPERATION_NAME = "debug-coverage-action";
@@ -57,25 +59,6 @@ const COVERAGE_MUTATION_OPERATION_NAME = "debug-coverage-action";
 interface UseDebugAppServerCoverageMutationDiagnosticsInput {
   capabilityServerClient: CapabilityServerClient;
   refreshCoverageDiagnostics: () => void;
-}
-
-interface RunWriteSkillsConfigMutationInput {
-  capabilityServerClient: CapabilityServerClient;
-  refreshCoverageDiagnostics: () => void;
-  isRunningCoverageAction: boolean;
-  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
-  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
-  skillPath: string;
-  enabled: boolean;
-}
-
-interface RunExportRemoteSkillMutationInput {
-  capabilityServerClient: CapabilityServerClient;
-  refreshCoverageDiagnostics: () => void;
-  isRunningCoverageAction: boolean;
-  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
-  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
-  hazelnutId: string;
 }
 
 export interface DebugAppServerCoverageMutationDiagnostics {
@@ -108,6 +91,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
   lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
+  lastItemDeltaNotificationsResult: DebugAppServerCoverageItemDeltaNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -144,6 +128,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   readWarningNotifications: (sinceSequence?: number | null) => void;
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   readTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
+  readItemDeltaNotifications: (sinceSequence?: number | null) => void;
   readErrorNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
@@ -164,47 +149,6 @@ export interface DebugAppServerCoverageMutationDiagnostics {
 export interface DebugAppServerCoverageMutationDiagnosticsBundle {
   clearPendingAccountLogin: () => void;
   diagnostics: DebugAppServerCoverageMutationDiagnostics;
-}
-
-function runWriteSkillsConfigMutation(input: RunWriteSkillsConfigMutationInput): void {
-  const normalizedSkillPath = input.skillPath.trim();
-  if (normalizedSkillPath.length === 0) {
-    return;
-  }
-
-  runCoverageAsyncMutation({
-    isRunningCoverageAction: input.isRunningCoverageAction,
-    setIsRunningCoverageAction: input.setIsRunningCoverageAction,
-    setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
-    run: async () => {
-      await input.capabilityServerClient.writeSkillsConfig({
-        actionName: COVERAGE_MUTATION_OPERATION_NAME,
-        path: normalizedSkillPath,
-        enabled: input.enabled,
-      });
-      input.refreshCoverageDiagnostics();
-    },
-  });
-}
-
-function runExportRemoteSkillMutation(input: RunExportRemoteSkillMutationInput): void {
-  const normalizedHazelnutIdentifier = input.hazelnutId.trim();
-  if (normalizedHazelnutIdentifier.length === 0) {
-    return;
-  }
-
-  runCoverageAsyncMutation({
-    isRunningCoverageAction: input.isRunningCoverageAction,
-    setIsRunningCoverageAction: input.setIsRunningCoverageAction,
-    setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
-    run: async () => {
-      await input.capabilityServerClient.exportRemoteSkill({
-        actionName: COVERAGE_MUTATION_OPERATION_NAME,
-        hazelnutId: normalizedHazelnutIdentifier,
-      });
-      input.refreshCoverageDiagnostics();
-    },
-  });
 }
 
 export function useDebugAppServerCoverageMutationDiagnostics(
@@ -266,6 +210,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageThreadLifecycleNotificationsResult | null>(null);
   const [lastTurnLifecycleNotificationsResult, setLastTurnLifecycleNotificationsResult] =
     useState<DebugAppServerCoverageTurnLifecycleNotificationsResult | null>(null);
+  const [lastItemDeltaNotificationsResult, setLastItemDeltaNotificationsResult] =
+    useState<DebugAppServerCoverageItemDeltaNotificationsResult | null>(null);
   const [lastGitDiffToRemoteResult, setLastGitDiffToRemoteResult] =
     useState<DebugAppServerCoverageGitDiffToRemoteResult | null>(null);
 
@@ -404,34 +350,13 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     [input.capabilityServerClient, isRunningCoverageAction],
   );
 
-  const writeSkillsConfig = useCallback(
-    (skillPath: string, enabled: boolean) => {
-      runWriteSkillsConfigMutation({
-        capabilityServerClient: input.capabilityServerClient,
-        refreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
-        isRunningCoverageAction,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        skillPath,
-        enabled,
-      });
-    },
-    [input.capabilityServerClient, input.refreshCoverageDiagnostics, isRunningCoverageAction],
-  );
-
-  const exportRemoteSkill = useCallback(
-    (hazelnutId: string) => {
-      runExportRemoteSkillMutation({
-        capabilityServerClient: input.capabilityServerClient,
-        refreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
-        isRunningCoverageAction,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        hazelnutId,
-      });
-    },
-    [input.capabilityServerClient, input.refreshCoverageDiagnostics, isRunningCoverageAction],
-  );
+  const coverageSkillMutationActions = useCoverageSkillMutationActions({
+    capabilityServerClient: input.capabilityServerClient,
+    refreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
+    isRunningCoverageAction,
+    setIsRunningCoverageAction,
+    setCoverageActionErrorMessage,
+  });
 
   const detectExternalAgentConfig = useCallback(
     (includeHome: boolean, cwds: string[]) => {
@@ -494,6 +419,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     setLastWarningNotificationsResult,
     setLastThreadLifecycleNotificationsResult,
     setLastTurnLifecycleNotificationsResult,
+    setLastItemDeltaNotificationsResult,
     setLastErrorNotificationsResult,
     setLastPendingServerRequestsResult,
   });
@@ -532,6 +458,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastWarningNotificationsResult,
       lastThreadLifecycleNotificationsResult,
       lastTurnLifecycleNotificationsResult,
+      lastItemDeltaNotificationsResult,
       lastGitDiffToRemoteResult,
       startAccountLogin,
       cancelAccountLogin,
@@ -540,8 +467,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       startMcpServerOauthLogin,
       writeConfigValue,
       writeConfigBatch,
-      writeSkillsConfig,
-      exportRemoteSkill,
+      writeSkillsConfig: coverageSkillMutationActions.writeSkillsConfig,
+      exportRemoteSkill: coverageSkillMutationActions.exportRemoteSkill,
       detectExternalAgentConfig,
       importExternalAgentConfig,
       startThreadRealtime: runtimeMutationActions.startThreadRealtime,

@@ -515,6 +515,46 @@ export interface DebugAppServerCoverageTurnLifecycleNotificationsResult {
   readAtIso8601: string;
 }
 
+export type DebugAppServerCoverageItemDeltaNotificationMethod =
+  | "item/agentMessage/delta"
+  | "item/commandExecution/outputDelta"
+  | "item/commandExecution/terminalInteraction"
+  | "item/fileChange/outputDelta"
+  | "item/mcpToolCall/progress"
+  | "item/plan/delta"
+  | "item/reasoning/summaryPartAdded"
+  | "item/reasoning/summaryTextDelta"
+  | "item/reasoning/textDelta";
+
+export interface DebugAppServerCoverageItemDeltaNotificationSummary {
+  method: DebugAppServerCoverageItemDeltaNotificationMethod;
+  sequence: number;
+  threadId: string;
+  turnId: string;
+  itemId: string;
+  detailText: string;
+  detailIndex: number | null;
+  processId: string | null;
+  receivedAtMilliseconds: number;
+}
+
+export interface DebugAppServerCoverageItemDeltaNotificationMethodCount {
+  method: DebugAppServerCoverageItemDeltaNotificationMethod;
+  count: number;
+}
+
+export interface DebugAppServerCoverageItemDeltaNotificationsResult {
+  sinceSequence: number | null;
+  eventCount: number;
+  totalDetailCharacterCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageItemDeltaNotificationSummary[];
+  methodCounts: DebugAppServerCoverageItemDeltaNotificationMethodCount[];
+  readAtIso8601: string;
+}
+
 export interface DebugAppServerCoverageErrorNotificationSummary {
   sequence: number;
   threadId: string;

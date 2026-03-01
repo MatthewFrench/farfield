@@ -28,6 +28,7 @@ import {
   type DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   type DebugAppServerCoverageFuzzySessionNotificationsResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
+  type DebugAppServerCoverageItemDeltaNotificationsResult,
   type DebugAppServerCoverageModelReroutedEventsResult,
   type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
@@ -113,6 +114,7 @@ export interface DebugAppServerCoverageDiagnostics {
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
   lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
+  lastItemDeltaNotificationsResult: DebugAppServerCoverageItemDeltaNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -150,6 +152,7 @@ export interface DebugAppServerCoverageDiagnostics {
   readWarningNotifications: (sinceSequence?: number | null) => void;
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   readTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
+  readItemDeltaNotifications: (sinceSequence?: number | null) => void;
   readErrorNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;

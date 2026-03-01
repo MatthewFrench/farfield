@@ -451,6 +451,63 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
           };
         }
 
+        if (input.limit === 360) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 29,
+                method: "item/agentMessage/delta",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turnId: "turn-12",
+                  itemId: "item-agent-1",
+                  delta: "Working through the remaining diagnostics surfaces.",
+                },
+                receivedAtMilliseconds: 17_810,
+              },
+              {
+                sequence: 30,
+                method: "item/plan/delta",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turnId: "turn-12",
+                  itemId: "item-plan-1",
+                  delta: "Implement strict mapper coverage for item deltas.",
+                },
+                receivedAtMilliseconds: 17_815,
+              },
+              {
+                sequence: 31,
+                method: "item/reasoning/summaryTextDelta",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turnId: "turn-12",
+                  itemId: "item-reasoning-1",
+                  delta: "Summary chunk ",
+                  summaryIndex: 0,
+                },
+                receivedAtMilliseconds: 17_820,
+              },
+              {
+                sequence: 32,
+                method: "item/commandExecution/terminalInteraction",
+                params: {
+                  threadId: "thread-realtime-1",
+                  turnId: "turn-12",
+                  itemId: "item-command-1",
+                  processId: "pty-17",
+                  stdin: "npm run test\n",
+                },
+                receivedAtMilliseconds: 17_825,
+              },
+            ],
+            nextSequence: 33,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 300) {
           return {
             ok: true,
@@ -770,6 +827,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readThreadLifecycleNotifications(21);
     latestDiagnostics.current?.readErrorNotifications(24);
     latestDiagnostics.current?.readTurnLifecycleNotifications(25);
+    latestDiagnostics.current?.readItemDeltaNotifications(29);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -934,6 +992,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 25,
         limit: 340,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 29,
+        limit: 360,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -1418,6 +1481,79 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             diffLineCount: 2,
             explanation: null,
             receivedAtMilliseconds: 17_805,
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastItemDeltaNotificationsResult).toEqual({
+        sinceSequence: 29,
+        eventCount: 4,
+        totalDetailCharacterCount: 127,
+        nextSequence: 33,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        methodCounts: [
+          {
+            method: "item/agentMessage/delta",
+            count: 1,
+          },
+          {
+            method: "item/commandExecution/terminalInteraction",
+            count: 1,
+          },
+          {
+            method: "item/plan/delta",
+            count: 1,
+          },
+          {
+            method: "item/reasoning/summaryTextDelta",
+            count: 1,
+          },
+        ],
+        events: [
+          {
+            method: "item/agentMessage/delta",
+            sequence: 29,
+            threadId: "thread-realtime-1",
+            turnId: "turn-12",
+            itemId: "item-agent-1",
+            detailText: "Working through the remaining diagnostics surfaces.",
+            detailIndex: null,
+            processId: null,
+            receivedAtMilliseconds: 17_810,
+          },
+          {
+            method: "item/plan/delta",
+            sequence: 30,
+            threadId: "thread-realtime-1",
+            turnId: "turn-12",
+            itemId: "item-plan-1",
+            detailText: "Implement strict mapper coverage for item deltas.",
+            detailIndex: null,
+            processId: null,
+            receivedAtMilliseconds: 17_815,
+          },
+          {
+            method: "item/reasoning/summaryTextDelta",
+            sequence: 31,
+            threadId: "thread-realtime-1",
+            turnId: "turn-12",
+            itemId: "item-reasoning-1",
+            detailText: "Summary chunk ",
+            detailIndex: 0,
+            processId: null,
+            receivedAtMilliseconds: 17_820,
+          },
+          {
+            method: "item/commandExecution/terminalInteraction",
+            sequence: 32,
+            threadId: "thread-realtime-1",
+            turnId: "turn-12",
+            itemId: "item-command-1",
+            detailText: "npm run test\n",
+            detailIndex: null,
+            processId: "pty-17",
+            receivedAtMilliseconds: 17_825,
           },
         ],
         readAtIso8601: expect.any(String),

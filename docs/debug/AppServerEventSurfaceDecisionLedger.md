@@ -1,9 +1,9 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-03-01 10:57:34Z
+Last Updated (UTC): 2026-03-01 11:24:18Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
-Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session/model-reroute/warning/thread-lifecycle/turn-lifecycle/error diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`, `model/rerouted`, `configWarning`, `deprecationNotice`, `windows/worldWritableWarning`, `thread/archived`, `thread/unarchived`, `thread/name/updated`, `turn/started`, `turn/completed`, `turn/plan/updated`, `turn/diff/updated`, and `error`; per-method product workflows below remain tracked independently.
+Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session/model-reroute/warning/thread-lifecycle/turn-lifecycle/item-delta/error diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`, `model/rerouted`, `configWarning`, `deprecationNotice`, `windows/worldWritableWarning`, `thread/archived`, `thread/unarchived`, `thread/name/updated`, `turn/started`, `turn/completed`, `turn/plan/updated`, `turn/diff/updated`, `item/agentMessage/delta`, `item/plan/delta`, `item/reasoning/summaryTextDelta`, `item/reasoning/summaryPartAdded`, `item/reasoning/textDelta`, `item/commandExecution/outputDelta`, `item/commandExecution/terminalInteraction`, `item/fileChange/outputDelta`, `item/mcpToolCall/progress`, and `error`; per-method product workflows below remain tracked independently.
 
 | Method | Surface Type | Current Farfield State | Recommendation | Notes |
 | --- | --- | --- | --- | --- |
@@ -17,16 +17,16 @@ Farfield now exposes raw notification-event cursors in debug coverage diagnostic
 | `error` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated error diagnostics surface validates retry behavior and codex error classifications from turn failures. |
 | `fuzzyFileSearch/sessionCompleted` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated fuzzy-session diagnostics surface validates asynchronous session-completion notifications and cursor behavior. |
 | `fuzzyFileSearch/sessionUpdated` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated fuzzy-session diagnostics surface validates session-update notifications and result-count projection. |
-| `item/agentMessage/delta` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `item/commandExecution/outputDelta` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `item/commandExecution/terminalInteraction` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
+| `item/agentMessage/delta` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated item-delta diagnostics surface validates agent-message stream deltas and item identity mapping. |
+| `item/commandExecution/outputDelta` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated item-delta diagnostics surface validates command output stream deltas and item identity mapping. |
+| `item/commandExecution/terminalInteraction` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated item-delta diagnostics surface validates terminal stdin/proc-id payload mapping for command interactions. |
 | `item/completed` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `item/fileChange/outputDelta` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `item/mcpToolCall/progress` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `item/plan/delta` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `item/reasoning/summaryPartAdded` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `item/reasoning/summaryTextDelta` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `item/reasoning/textDelta` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
+| `item/fileChange/outputDelta` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated item-delta diagnostics surface validates file-change output delta mapping and item identity projection. |
+| `item/mcpToolCall/progress` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated item-delta diagnostics surface validates MCP progress message mapping with thread/turn/item identity. |
+| `item/plan/delta` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated item-delta diagnostics surface validates plan streaming delta payload mapping and item identity projection. |
+| `item/reasoning/summaryPartAdded` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated item-delta diagnostics surface validates summary-part index updates for reasoning streams. |
+| `item/reasoning/summaryTextDelta` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated item-delta diagnostics surface validates reasoning summary text-delta payloads and index mapping. |
+| `item/reasoning/textDelta` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated item-delta diagnostics surface validates reasoning content text-delta payloads and index mapping. |
 | `item/started` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `loginChatGptComplete` | server-to-client notification | Not consumed | Do not adopt | Deprecated notification surface. |
 | `mcpServer/oauthLogin/completed` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated auth-completion diagnostics surface validates MCP OAuth completion state and error messaging. |

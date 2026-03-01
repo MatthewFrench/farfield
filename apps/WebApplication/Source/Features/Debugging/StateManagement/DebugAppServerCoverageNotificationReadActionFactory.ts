@@ -4,6 +4,7 @@ import type {
   DebugAppServerCoverageAuthCompletionEventsResult,
   DebugAppServerCoverageErrorNotificationsResult,
   DebugAppServerCoverageFuzzySessionNotificationsResult,
+  DebugAppServerCoverageItemDeltaNotificationsResult,
   DebugAppServerCoverageModelReroutedEventsResult,
   DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingServerRequestsResult,
@@ -13,6 +14,7 @@ import type {
   DebugAppServerCoverageWarningNotificationsResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import { createReadErrorNotificationsAction } from "./DebugAppServerCoverageErrorNotificationReadAction";
+import { createReadItemDeltaNotificationsAction } from "./DebugAppServerCoverageItemDeltaNotificationReadAction";
 import {
   createReadAuthCompletionEventsAction,
   createReadFuzzySessionNotificationsAction,
@@ -34,6 +36,7 @@ interface NotificationCoverageReadActions {
   readWarningNotifications: (sinceSequence?: number | null) => void;
   readThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   readTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
+  readItemDeltaNotifications: (sinceSequence?: number | null) => void;
   readErrorNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
 }
@@ -66,6 +69,9 @@ interface CreateNotificationCoverageReadActionsInput {
   >;
   setLastTurnLifecycleNotificationsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageTurnLifecycleNotificationsResult | null>
+  >;
+  setLastItemDeltaNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageItemDeltaNotificationsResult | null>
   >;
   setLastErrorNotificationsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageErrorNotificationsResult | null>
@@ -121,6 +127,10 @@ export function createNotificationCoverageReadActions(
     readTurnLifecycleNotifications: createReadTurnLifecycleNotificationsAction({
       ...sharedActionInput,
       setLastTurnLifecycleNotificationsResult: input.setLastTurnLifecycleNotificationsResult,
+    }),
+    readItemDeltaNotifications: createReadItemDeltaNotificationsAction({
+      ...sharedActionInput,
+      setLastItemDeltaNotificationsResult: input.setLastItemDeltaNotificationsResult,
     }),
     readErrorNotifications: createReadErrorNotificationsAction({
       ...sharedActionInput,

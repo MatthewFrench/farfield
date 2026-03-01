@@ -18,6 +18,7 @@ import {
   type DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   type DebugAppServerCoverageFuzzySessionNotificationsResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
+  type DebugAppServerCoverageItemDeltaNotificationsResult,
   type DebugAppServerCoverageModelReroutedEventsResult,
   type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
@@ -120,6 +121,7 @@ export interface DebugWorkspacePaneProps {
   lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastThreadLifecycleNotificationsResult: DebugAppServerCoverageThreadLifecycleNotificationsResult | null;
   lastTurnLifecycleNotificationsResult: DebugAppServerCoverageTurnLifecycleNotificationsResult | null;
+  lastItemDeltaNotificationsResult: DebugAppServerCoverageItemDeltaNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -164,6 +166,7 @@ export interface DebugWorkspacePaneProps {
   onReadWarningNotifications: (sinceSequence?: number | null) => void;
   onReadThreadLifecycleNotifications: (sinceSequence?: number | null) => void;
   onReadTurnLifecycleNotifications: (sinceSequence?: number | null) => void;
+  onReadItemDeltaNotifications: (sinceSequence?: number | null) => void;
   onReadErrorNotifications: (sinceSequence?: number | null) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
@@ -242,6 +245,7 @@ export function DebugWorkspacePane({
   lastWarningNotificationsResult,
   lastThreadLifecycleNotificationsResult,
   lastTurnLifecycleNotificationsResult,
+  lastItemDeltaNotificationsResult,
   lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -275,6 +279,7 @@ export function DebugWorkspacePane({
   onReadWarningNotifications,
   onReadThreadLifecycleNotifications,
   onReadTurnLifecycleNotifications,
+  onReadItemDeltaNotifications,
   onReadErrorNotifications,
   onExecuteCommand,
   onUploadFeedback,
@@ -404,6 +409,7 @@ export function DebugWorkspacePane({
             lastWarningNotificationsResult={lastWarningNotificationsResult}
             lastThreadLifecycleNotificationsResult={lastThreadLifecycleNotificationsResult}
             lastTurnLifecycleNotificationsResult={lastTurnLifecycleNotificationsResult}
+            lastItemDeltaNotificationsResult={lastItemDeltaNotificationsResult}
             lastGitDiffToRemoteResult={lastGitDiffToRemoteResult}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
             onStartAccountLogin={onStartAccountLogin}
@@ -437,6 +443,7 @@ export function DebugWorkspacePane({
             onReadWarningNotifications={onReadWarningNotifications}
             onReadThreadLifecycleNotifications={onReadThreadLifecycleNotifications}
             onReadTurnLifecycleNotifications={onReadTurnLifecycleNotifications}
+            onReadItemDeltaNotifications={onReadItemDeltaNotifications}
             onReadErrorNotifications={onReadErrorNotifications}
             onExecuteCommand={onExecuteCommand}
             onUploadFeedback={onUploadFeedback}
