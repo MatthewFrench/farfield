@@ -291,6 +291,17 @@ export interface AgentReadNotificationEventsInput {
   sinceSequence: number | null;
 }
 
+export interface AgentPendingServerRequest {
+  requestId: number;
+  method: string;
+  params: JsonValue | null;
+  receivedAtMilliseconds: number;
+}
+
+export interface AgentPendingServerRequests {
+  requests: AgentPendingServerRequest[];
+}
+
 export interface AgentDescriptor {
   id: AgentId;
   label: string;
@@ -910,6 +921,7 @@ export interface AgentAdapter {
   readNotificationEvents?(
     input: AgentReadNotificationEventsInput,
   ): Promise<AgentNotificationEvents>;
+  readPendingServerRequests?(): Promise<AgentPendingServerRequests>;
   isThreadNotLoadedError?(error: Error): boolean;
   listProjectDirectories?(): Promise<string[]>;
   readConfigDefaults?(): Promise<AgentConfigDefaults>;

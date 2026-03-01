@@ -1,6 +1,6 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-03-01 08:12:21Z
+Last Updated (UTC): 2026-03-01 08:27:16Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
 Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`); per-method product workflows below remain tracked independently.
@@ -32,7 +32,7 @@ Farfield now exposes raw notification-event cursors in debug coverage diagnostic
 | `mcpServer/oauthLogin/completed` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `model/rerouted` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `rawResponseItem/completed` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
-| `serverRequest/resolved` | server-to-client notification | Not consumed | Not now | Adopt when explicit server-request lifecycle feedback is required in product surfaces. |
+| `serverRequest/resolved` | server-to-client notification | Not consumed | Not now | Adopt when explicit server-request lifecycle feedback is required in product surfaces. Pending unresolved server-request snapshots are now readable in debug coverage diagnostics via `/api/server-requests/pending`. |
 | `sessionConfigured` | server-to-client notification | Not consumed | Do not adopt | Deprecated notification surface. |
 | `thread/archived` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `thread/closed` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |

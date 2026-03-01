@@ -166,6 +166,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastThreadRealtimeStopResult: DebugWorkspacePaneProps["lastThreadRealtimeStopResult"];
   lastThreadStreamEventsResult: DebugWorkspacePaneProps["lastThreadStreamEventsResult"];
   lastNotificationEventsResult: DebugWorkspacePaneProps["lastNotificationEventsResult"];
+  lastPendingServerRequestsResult: DebugWorkspacePaneProps["lastPendingServerRequestsResult"];
   lastWindowsSandboxSetupStartResult: DebugWorkspacePaneProps["lastWindowsSandboxSetupStartResult"];
   lastFeedbackUploadResult: DebugWorkspacePaneProps["lastFeedbackUploadResult"];
   lastFuzzyFileSearchResult: DebugWorkspacePaneProps["lastFuzzyFileSearchResult"];
@@ -197,6 +198,7 @@ export interface UseApplicationShellViewPropertiesInput {
   stopThreadRealtime: DebugWorkspacePaneProps["onStopThreadRealtime"];
   readThreadStreamEvents: DebugWorkspacePaneProps["onReadThreadStreamEvents"];
   readNotificationEvents: DebugWorkspacePaneProps["onReadNotificationEvents"];
+  readPendingServerRequests: DebugWorkspacePaneProps["onReadPendingServerRequests"];
   startWindowsSandboxSetup: DebugWorkspacePaneProps["onStartWindowsSandboxSetup"];
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
@@ -513,6 +515,7 @@ function buildDebugWorkspacePaneProperties(
     lastThreadRealtimeStopResult: input.lastThreadRealtimeStopResult,
     lastThreadStreamEventsResult: input.lastThreadStreamEventsResult,
     lastNotificationEventsResult: input.lastNotificationEventsResult,
+    lastPendingServerRequestsResult: input.lastPendingServerRequestsResult,
     lastWindowsSandboxSetupStartResult: input.lastWindowsSandboxSetupStartResult,
     lastFeedbackUploadResult: input.lastFeedbackUploadResult,
     lastFuzzyFileSearchResult: input.lastFuzzyFileSearchResult,
@@ -538,6 +541,7 @@ function buildDebugWorkspacePaneProperties(
     onStopThreadRealtime: input.stopThreadRealtime,
     onReadThreadStreamEvents: input.readThreadStreamEvents,
     onReadNotificationEvents: input.readNotificationEvents,
+    onReadPendingServerRequests: input.readPendingServerRequests,
     onStartWindowsSandboxSetup: input.startWindowsSandboxSetup,
     onReadGitDiffToRemote: input.readGitDiffToRemote,
     onSearchFuzzyFiles: input.searchFuzzyFiles,
@@ -759,6 +763,7 @@ export function useApplicationShellViewProperties(
       input.lastThreadRealtimeStopResult,
       input.lastThreadStreamEventsResult,
       input.lastNotificationEventsResult,
+      input.lastPendingServerRequestsResult,
       input.lastWindowsSandboxSetupStartResult,
       input.lastFeedbackUploadResult,
       input.lastFuzzyFileSearchResult,
@@ -783,6 +788,7 @@ export function useApplicationShellViewProperties(
       input.stopThreadRealtime,
       input.readThreadStreamEvents,
       input.readNotificationEvents,
+      input.readPendingServerRequests,
       input.startWindowsSandboxSetup,
       input.readGitDiffToRemote,
       input.searchFuzzyFiles,

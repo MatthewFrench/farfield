@@ -368,6 +368,21 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         firstAvailableSequence: 3,
         resetRequired: false,
       });
+    const readPendingServerRequests = vi
+      .spyOn(capabilityServerClient, "readPendingServerRequests")
+      .mockResolvedValue({
+        ok: true,
+        requests: [
+          {
+            requestId: 13,
+            method: "item/tool/requestUserInput",
+            params: {
+              question: "Select deployment target",
+            },
+            receivedAtMilliseconds: 17_700,
+          },
+        ],
+      });
 
     const latestDiagnostics: { current: DebugAppServerCoverageDiagnostics | null } = {
       current: null,
@@ -450,6 +465,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.stopThreadRealtime("thread-realtime-1");
     latestDiagnostics.current?.readThreadStreamEvents("thread-realtime-1", 7);
     latestDiagnostics.current?.readNotificationEvents(7);
+    latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
       "quality",
@@ -573,6 +589,9 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       expect(readNotificationEvents).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
         sinceSequence: 7,
+      });
+      expect(readPendingServerRequests).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
       });
       expect(startWindowsSandboxSetup).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -748,6 +767,24 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             sequence: 11,
             receivedAtMilliseconds: 17_500,
             preview: expect.stringContaining('"detail": "started"'),
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastPendingServerRequestsResult).toEqual({
+        requestCount: 1,
+        requests: [
+          {
+            requestId: 13,
+            method: "item/tool/requestUserInput",
+            receivedAtMilliseconds: 17_700,
+            preview: expect.stringContaining('"question": "Select deployment target"'),
+          },
+        ],
+        methodCounts: [
+          {
+            method: "item/tool/requestUserInput",
+            count: 1,
           },
         ],
         readAtIso8601: expect.any(String),

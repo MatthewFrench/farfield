@@ -17,6 +17,7 @@ import {
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
+  type DebugAppServerCoveragePendingServerRequestsResult,
   type DebugAppServerCoverageSnapshot,
   type DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   type DebugAppServerCoverageThreadRealtimeAppendTextResult,
@@ -96,6 +97,7 @@ export interface DebugWorkspacePaneProps {
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
   lastNotificationEventsResult: DebugAppServerCoverageNotificationEventsResult | null;
+  lastPendingServerRequestsResult: DebugAppServerCoveragePendingServerRequestsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
@@ -132,6 +134,7 @@ export interface DebugWorkspacePaneProps {
   onStopThreadRealtime: (threadId: string) => void;
   onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   onReadNotificationEvents: (sinceSequence?: number | null) => void;
+  onReadPendingServerRequests: () => void;
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
   onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
@@ -200,6 +203,7 @@ export function DebugWorkspacePane({
   lastThreadRealtimeStopResult,
   lastThreadStreamEventsResult,
   lastNotificationEventsResult,
+  lastPendingServerRequestsResult,
   lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
@@ -225,6 +229,7 @@ export function DebugWorkspacePane({
   onStopThreadRealtime,
   onReadThreadStreamEvents,
   onReadNotificationEvents,
+  onReadPendingServerRequests,
   onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
   onSearchFuzzyFiles,
@@ -344,6 +349,7 @@ export function DebugWorkspacePane({
             lastThreadRealtimeStopResult={lastThreadRealtimeStopResult}
             lastThreadStreamEventsResult={lastThreadStreamEventsResult}
             lastNotificationEventsResult={lastNotificationEventsResult}
+            lastPendingServerRequestsResult={lastPendingServerRequestsResult}
             lastWindowsSandboxSetupStartResult={lastWindowsSandboxSetupStartResult}
             lastFeedbackUploadResult={lastFeedbackUploadResult}
             lastFuzzyFileSearchResult={lastFuzzyFileSearchResult}
@@ -369,6 +375,7 @@ export function DebugWorkspacePane({
             onStopThreadRealtime={onStopThreadRealtime}
             onReadThreadStreamEvents={onReadThreadStreamEvents}
             onReadNotificationEvents={onReadNotificationEvents}
+            onReadPendingServerRequests={onReadPendingServerRequests}
             onStartWindowsSandboxSetup={onStartWindowsSandboxSetup}
             onReadGitDiffToRemote={onReadGitDiffToRemote}
             onSearchFuzzyFiles={onSearchFuzzyFiles}

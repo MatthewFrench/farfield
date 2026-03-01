@@ -25,6 +25,7 @@ import type {
   AgentListRemoteSkillsResult,
   AgentListSkillsResult,
   AgentNotificationEvents,
+  AgentPendingServerRequests,
   AgentReadAccountRateLimitsResult,
   AgentReadAccountResult,
   AgentReadAuthStatusResult,
@@ -57,6 +58,7 @@ const CapabilityRoutePathnameByName = {
   accountAuthStatus: "/api/account/auth-status",
   accountRateLimits: "/api/account/rate-limits",
   accountUserInfo: "/api/account/user-info",
+  pendingServerRequests: "/api/server-requests/pending",
   feedbackUpload: "/api/feedback/upload",
   notificationEvents: "/api/notifications/events",
   gitDiffToRemote: "/api/git/diff-remote",
@@ -147,6 +149,7 @@ const CapabilityRouteLogEventByName = {
   accountAuthStatusReadFailed: "account-auth-status-read-failed",
   accountRateLimitsReadFailed: "account-rate-limits-read-failed",
   accountUserInfoReadFailed: "account-user-info-read-failed",
+  pendingServerRequestsReadFailed: "pending-server-requests-read-failed",
   feedbackUploadFailed: "feedback-upload-failed",
   notificationEventsReadFailed: "notification-events-read-failed",
   gitDiffToRemoteFailed: "git-diff-to-remote-failed",
@@ -191,6 +194,7 @@ const CapabilityRouteErrorMessagePrefixByName = {
   failedToReadAuthStatus: "Failed to read auth status: ",
   failedToReadAccountRateLimits: "Failed to read account rate limits: ",
   failedToReadUserInfo: "Failed to read user info: ",
+  failedToReadPendingServerRequests: "Failed to read pending server requests: ",
   missingFeedbackClassification: "Missing classification query parameter.",
   invalidFeedbackClassification:
     "Invalid classification query parameter. Expected non-empty value.",
@@ -304,6 +308,7 @@ const CapabilityRouteTimeoutLabelByName = {
   accountAuthStatusRead: "auth status read",
   accountRateLimitsRead: "account rate limits read",
   accountUserInfoRead: "user info read",
+  pendingServerRequestsRead: "pending server requests read",
   feedbackUpload: "feedback upload",
   notificationEventsRead: "notification events read",
   gitDiffToRemote: "git diff to remote",
@@ -390,6 +395,10 @@ type CapabilityFeedbackUploadResponseBody = AgentUploadFeedbackResult & {
 };
 
 type CapabilityNotificationEventsResponseBody = AgentNotificationEvents & {
+  ok: true;
+};
+
+type CapabilityPendingServerRequestsResponseBody = AgentPendingServerRequests & {
   ok: true;
 };
 
@@ -868,6 +877,15 @@ function mapFeedbackUploadResponse(
 function mapNotificationEventsResponse(
   result: AgentNotificationEvents,
 ): CapabilityNotificationEventsResponseBody {
+  return {
+    ok: true,
+    ...result,
+  };
+}
+
+function mapPendingServerRequestsResponse(
+  result: AgentPendingServerRequests,
+): CapabilityPendingServerRequestsResponseBody {
   return {
     ok: true,
     ...result,
@@ -1552,6 +1570,86 @@ async function handleAccountRateLimitsRoute(deps: CapabilityRouteDependencies): 
     jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
       ok: false,
       error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadAccountRateLimits}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handlePendingServerRequestsRoute(
+  deps: CapabilityRouteDependencies,
+): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.get,
+      CapabilityRoutePathnameByName.pendingServerRequests,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canSubmitUserInput ||
+    !adapter.readPendingServerRequests
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadPendingServerRequests}Pending server-request reads are unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.readPendingServerRequests(),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.pendingServerRequestsRead,
+    );
+    jsonResponse(
+      res,
+      CapabilityRouteStatusCodeByName.success,
+      mapPendingServerRequestsResponse(result),
+    );
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.pendingServerRequestsReadFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadPendingServerRequests}${message}`,
     });
   }
 
@@ -4676,7 +4774,8 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
 /**
  * Owns capability route dispatch (`/api/config/defaults`, `/api/config-requirements`,
  * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/auth-status`,
- * `/api/account/rate-limits`, `/api/account/user-info`, `/api/feedback/upload`,
+ * `/api/account/rate-limits`, `/api/account/user-info`, `/api/server-requests/pending`,
+ * `/api/feedback/upload`,
  * `/api/notifications/events`,
  * `/api/git/diff-remote`, `/api/files/fuzzy-search`,
  * `/api/files/fuzzy-search/session-start`, `/api/files/fuzzy-search/session-update`,
@@ -4709,6 +4808,9 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleAccountUserInfoRoute(deps)) {
+    return true;
+  }
+  if (await handlePendingServerRequestsRoute(deps)) {
     return true;
   }
   if (await handleFeedbackUploadRoute(deps)) {

@@ -19,6 +19,7 @@ import { z } from "zod";
 import type {
   AgentInterruptInput,
   AgentNotificationEvents,
+  AgentPendingServerRequests,
   AgentReadNotificationEventsInput,
   AgentReadStreamEventsInput,
   AgentSetCollaborationModeInput,
@@ -250,6 +251,17 @@ export class CodexThreadInteractionOwner {
       nextSequence: notificationBatch.nextSequence,
       firstAvailableSequence: notificationBatch.firstAvailableSequence,
       resetRequired: notificationBatch.resetRequired,
+    };
+  }
+
+  public async readPendingServerRequests(): Promise<AgentPendingServerRequests> {
+    return {
+      requests: this.appClient.readPendingServerRequests().map((request) => ({
+        requestId: request.requestId,
+        method: request.method,
+        params: request.params,
+        receivedAtMilliseconds: request.receivedAtMilliseconds,
+      })),
     };
   }
 

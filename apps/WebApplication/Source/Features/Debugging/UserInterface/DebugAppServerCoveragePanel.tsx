@@ -15,6 +15,7 @@ import {
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
+  type DebugAppServerCoveragePendingServerRequestsResult,
   type DebugAppServerCoverageSnapshot,
   type DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   type DebugAppServerCoverageThreadRealtimeAppendTextResult,
@@ -33,6 +34,7 @@ import { DebugAppServerCoverageFeedbackUploadSection } from "./DebugAppServerCov
 import { DebugAppServerCoverageFuzzyFileSearchSection } from "./DebugAppServerCoverageFuzzyFileSearchSection";
 import { DebugAppServerCoverageGitDiffToRemoteSection } from "./DebugAppServerCoverageGitDiffToRemoteSection";
 import { DebugAppServerCoverageNotificationEventsSection } from "./DebugAppServerCoverageNotificationEventsSection";
+import { DebugAppServerCoveragePendingServerRequestsSection } from "./DebugAppServerCoveragePendingServerRequestsSection";
 import { DebugAppServerCoverageRealtimeAndWindowsSection } from "./DebugAppServerCoverageRealtimeAndWindowsSection";
 import { DebugAppServerCoverageThreadStreamEventsSection } from "./DebugAppServerCoverageThreadStreamEventsSection";
 
@@ -54,6 +56,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
   lastNotificationEventsResult: DebugAppServerCoverageNotificationEventsResult | null;
+  lastPendingServerRequestsResult: DebugAppServerCoveragePendingServerRequestsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
@@ -90,6 +93,7 @@ export interface DebugAppServerCoveragePanelProps {
   onStopThreadRealtime: (threadId: string) => void;
   onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   onReadNotificationEvents: (sinceSequence?: number | null) => void;
+  onReadPendingServerRequests: () => void;
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
   onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
@@ -134,6 +138,7 @@ export function DebugAppServerCoveragePanel({
   lastThreadRealtimeStopResult,
   lastThreadStreamEventsResult,
   lastNotificationEventsResult,
+  lastPendingServerRequestsResult,
   lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
@@ -159,6 +164,7 @@ export function DebugAppServerCoveragePanel({
   onStopThreadRealtime,
   onReadThreadStreamEvents,
   onReadNotificationEvents,
+  onReadPendingServerRequests,
   onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
   onSearchFuzzyFiles,
@@ -176,8 +182,9 @@ export function DebugAppServerCoveragePanel({
           <p className="text-xs text-muted-foreground">
             Skills, apps, experimental features, MCP status, config requirements, and account
             diagnostics plus config writes, remote skills import, external-agent config migration,
-            realtime thread actions, windows sandbox setup actions, git diff reads, command
-            execution, fuzzy file search, and feedback upload coverage.
+            realtime thread actions, notification and pending-request reads, windows sandbox setup
+            actions, git diff reads, command execution, fuzzy file search, and feedback upload
+            coverage.
           </p>
         </div>
         <Button
@@ -602,6 +609,12 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastNotificationEventsResult={lastNotificationEventsResult}
             onReadNotificationEvents={onReadNotificationEvents}
+          />
+
+          <DebugAppServerCoveragePendingServerRequestsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastPendingServerRequestsResult={lastPendingServerRequestsResult}
+            onReadPendingServerRequests={onReadPendingServerRequests}
           />
 
           <DebugAppServerCoverageCommandExecutionSection

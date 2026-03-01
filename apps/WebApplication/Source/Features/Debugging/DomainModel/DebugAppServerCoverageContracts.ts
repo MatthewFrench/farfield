@@ -266,6 +266,25 @@ export interface DebugAppServerCoverageNotificationEventsResult {
   readAtIso8601: string;
 }
 
+export interface DebugAppServerCoveragePendingServerRequestSummary {
+  requestId: number;
+  method: string;
+  receivedAtMilliseconds: number;
+  preview: string;
+}
+
+export interface DebugAppServerCoveragePendingServerRequestMethodCount {
+  method: string;
+  count: number;
+}
+
+export interface DebugAppServerCoveragePendingServerRequestsResult {
+  requestCount: number;
+  requests: DebugAppServerCoveragePendingServerRequestSummary[];
+  methodCounts: DebugAppServerCoveragePendingServerRequestMethodCount[];
+  readAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

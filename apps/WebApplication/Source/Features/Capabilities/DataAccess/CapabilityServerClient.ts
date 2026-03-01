@@ -107,6 +107,11 @@ import {
   readNotificationEvents,
 } from "./CapabilityCoverageNotificationEventsApi";
 import {
+  type ApiPendingServerRequestsResponse,
+  type ApiReadPendingServerRequestsOptions,
+  readPendingServerRequests,
+} from "./CapabilityCoveragePendingServerRequestsApi";
+import {
   type ApiThreadRealtimeAppendAudioOptions,
   type ApiThreadRealtimeAppendAudioResponse,
   type ApiThreadRealtimeAppendTextOptions,
@@ -203,6 +208,8 @@ export type CapabilityReadThreadStreamEventsOptions = ApiReadThreadStreamEventsO
 export type CapabilityThreadStreamEventsResponse = ApiThreadStreamEventsResponse;
 export type CapabilityReadNotificationEventsOptions = ApiReadNotificationEventsOptions;
 export type CapabilityNotificationEventsResponse = ApiNotificationEventsResponse;
+export type CapabilityReadPendingServerRequestsOptions = ApiReadPendingServerRequestsOptions;
+export type CapabilityPendingServerRequestsResponse = ApiPendingServerRequestsResponse;
 export type CapabilityListAppsOptions = ApiListAppsOptions;
 export type CapabilityAppsResponse = ApiAppsResponse;
 export type CapabilityListSkillsOptions = ApiListSkillsOptions;
@@ -370,6 +377,12 @@ export class CapabilityServerClient {
     input: CapabilityReadNotificationEventsOptions,
   ): Promise<CapabilityNotificationEventsResponse> {
     return readNotificationEvents(input);
+  }
+
+  public async readPendingServerRequests(
+    input?: CapabilityReadPendingServerRequestsOptions,
+  ): Promise<CapabilityPendingServerRequestsResponse> {
+    return readPendingServerRequests(input);
   }
 
   public async executeCommand(

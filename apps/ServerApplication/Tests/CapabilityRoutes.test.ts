@@ -7,6 +7,7 @@ import {
   AppServerListModelsResponseSchema,
   AppServerReasoningEffortSchema,
   FarfieldApiErrorResponseSchema,
+  JsonValueSchema,
 } from "@farfield/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -52,6 +53,7 @@ import type {
   AgentListThreadsInput,
   AgentListThreadsResult,
   AgentNotificationEvents,
+  AgentPendingServerRequests,
   AgentReadAccountRateLimitsResult,
   AgentReadAccountResult,
   AgentReadAuthStatusInput,
@@ -327,6 +329,22 @@ const CapabilityNotificationEventsEnvelopeSchema = z
   })
   .strict();
 
+const CapabilityPendingServerRequestsEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    requests: z.array(
+      z
+        .object({
+          requestId: z.number().int().nonnegative(),
+          method: z.string().min(1),
+          params: JsonValueSchema.nullable(),
+          receivedAtMilliseconds: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 const CapabilityGitDiffToRemoteEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -454,6 +472,7 @@ interface MockAgentAdapterOptions {
   readNotificationEvents?: (
     input: AgentReadNotificationEventsInput,
   ) => Promise<AgentNotificationEvents>;
+  readPendingServerRequests?: () => Promise<AgentPendingServerRequests>;
   gitDiffToRemote?: (input: AgentGitDiffToRemoteInput) => Promise<AgentGitDiffToRemoteResult>;
   fuzzyFileSearch?: (input: AgentFuzzyFileSearchInput) => Promise<AgentFuzzyFileSearchResult>;
   startFuzzyFileSearchSession?: (
@@ -637,6 +656,10 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.readNotificationEvents) {
     adapter.readNotificationEvents = options.readNotificationEvents;
+  }
+
+  if (options.readPendingServerRequests) {
+    adapter.readPendingServerRequests = options.readPendingServerRequests;
   }
 
   if (options.gitDiffToRemote) {
@@ -1328,6 +1351,99 @@ describe("handleCapabilityRoutes", () => {
       nextSequence: 22,
       firstAvailableSequence: 1,
       resetRequired: false,
+    });
+  });
+
+  it("returns 503 when pending server-request reads are unsupported for the selected agent", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/server-requests/pending",
+      url: new URL("http://localhost/api/server-requests/pending?agentId=codex"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canSubmitUserInput: false,
+          },
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(503);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error:
+        "Failed to read pending server requests: Pending server-request reads are unavailable for the selected agent.",
+    });
+  });
+
+  it("reads pending server requests when adapter supports the method", async () => {
+    const readPendingServerRequestsSpy = vi.fn(
+      async (): Promise<AgentPendingServerRequests> => ({
+        requests: [
+          {
+            requestId: 51,
+            method: "item/tool/requestUserInput",
+            params: {
+              question: "Select deployment target",
+            },
+            receivedAtMilliseconds: 1_700_000_001_001,
+          },
+          {
+            requestId: 52,
+            method: "item/commandExecution/requestApproval",
+            params: {
+              command: ["npm", "run", "build"],
+              cwd: "/tmp/project",
+            },
+            receivedAtMilliseconds: 1_700_000_001_050,
+          },
+        ],
+      }),
+    );
+
+    const result = await executeCapabilityRoute({
+      pathname: "/api/server-requests/pending",
+      url: new URL("http://localhost/api/server-requests/pending?agentId=codex"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canSubmitUserInput: true,
+          },
+          readPendingServerRequests: readPendingServerRequestsSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(readPendingServerRequestsSpy).toHaveBeenCalledTimes(1);
+    const parsedEnvelope = CapabilityPendingServerRequestsEnvelopeSchema.parse(
+      readRouteBody(result),
+    );
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      requests: [
+        {
+          requestId: 51,
+          method: "item/tool/requestUserInput",
+          params: {
+            question: "Select deployment target",
+          },
+          receivedAtMilliseconds: 1_700_000_001_001,
+        },
+        {
+          requestId: 52,
+          method: "item/commandExecution/requestApproval",
+          params: {
+            command: ["npm", "run", "build"],
+            cwd: "/tmp/project",
+          },
+          receivedAtMilliseconds: 1_700_000_001_050,
+        },
+      ],
     });
   });
 

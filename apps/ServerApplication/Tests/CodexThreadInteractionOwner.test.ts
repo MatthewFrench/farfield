@@ -24,6 +24,7 @@ import type { CodexIpcFrameEvent } from "../Source/Agents/Adapters/CodexAgentAda
 import { CodexThreadInteractionOwner } from "../Source/Agents/Adapters/CodexThreadInteractionOwner.js";
 import { CodexThreadStreamStateOwner } from "../Source/Agents/Adapters/CodexThreadStreamStateOwner.js";
 import type {
+  AgentPendingServerRequests,
   AgentReadStreamEventsInput,
   AgentThreadConversationState,
   AgentThreadLiveState,
@@ -87,6 +88,10 @@ interface AppServerRespondCall {
 interface AppServerNotificationReadCall {
   limit: number;
   sinceSequence: number | null;
+}
+
+interface AppServerPendingServerRequestReadCall {
+  requestedAtMilliseconds: number;
 }
 
 interface OwnerTestContext {
@@ -173,12 +178,14 @@ class TestAppServerTransport implements AppServerTransport {
   public readonly requestCalls: Array<{ method: string; params: object; timeoutMs?: number }> = [];
   public readonly respondCalls: AppServerRespondCall[] = [];
   public readonly readNotificationEventsCalls: AppServerNotificationReadCall[] = [];
+  public readonly readPendingServerRequestsCalls: AppServerPendingServerRequestReadCall[] = [];
   private readonly notificationEventsResult = {
     events: [],
     nextSequence: 0,
     firstAvailableSequence: 0,
     resetRequired: false,
   };
+  private pendingServerRequestsResult: AgentPendingServerRequests["requests"] = [];
 
   public async request(method: string, params: object, timeoutMs?: number): Promise<JsonValue> {
     this.requestCalls.push({
@@ -237,7 +244,14 @@ class TestAppServerTransport implements AppServerTransport {
     params: JsonValue | null;
     receivedAtMilliseconds: number;
   }> {
-    return [];
+    this.readPendingServerRequestsCalls.push({
+      requestedAtMilliseconds: Date.now(),
+    });
+    return this.pendingServerRequestsResult;
+  }
+
+  public setPendingServerRequestsResult(requests: AgentPendingServerRequests["requests"]): void {
+    this.pendingServerRequestsResult = requests;
   }
 
   public async close(): Promise<void> {}
@@ -744,6 +758,60 @@ describe("CodexThreadInteractionOwner", () => {
         sinceSequence: 8,
       },
     ]);
+    expect(context.readReadinessCounters()).toEqual({
+      codexAvailabilityChecks: 0,
+      ipcReadinessChecks: 0,
+    });
+  });
+
+  it("reads pending app-server requests without readiness checks", async () => {
+    const context = createOwnerTestContext({
+      ipcReady: false,
+    });
+    context.appServerTransport.setPendingServerRequestsResult([
+      {
+        requestId: 41,
+        method: CommandExecutionApprovalRequestMethod,
+        params: {
+          command: ["git", "status"],
+          cwd: "/tmp/project",
+        },
+        receivedAtMilliseconds: 1_700_000_001_200,
+      },
+      {
+        requestId: 42,
+        method: UserInputRequestMethod,
+        params: {
+          question: "Proceed with deployment?",
+        },
+        receivedAtMilliseconds: 1_700_000_001_500,
+      },
+    ]);
+
+    const pendingServerRequests = await context.owner.readPendingServerRequests();
+
+    expect(pendingServerRequests).toEqual({
+      requests: [
+        {
+          requestId: 41,
+          method: CommandExecutionApprovalRequestMethod,
+          params: {
+            command: ["git", "status"],
+            cwd: "/tmp/project",
+          },
+          receivedAtMilliseconds: 1_700_000_001_200,
+        },
+        {
+          requestId: 42,
+          method: UserInputRequestMethod,
+          params: {
+            question: "Proceed with deployment?",
+          },
+          receivedAtMilliseconds: 1_700_000_001_500,
+        },
+      ],
+    });
+    expect(context.appServerTransport.readPendingServerRequestsCalls).toHaveLength(1);
     expect(context.readReadinessCounters()).toEqual({
       codexAvailabilityChecks: 0,
       ipcReadinessChecks: 0,

@@ -151,6 +151,27 @@ export type FarfieldNotificationEvent = z.infer<typeof FarfieldNotificationEvent
 export type FarfieldNotificationEventsSnapshot = z.infer<
   typeof FarfieldNotificationEventsSnapshotSchema
 >;
+
+export const FarfieldPendingServerRequestSchema = z
+  .object({
+    requestId: z.number().int().nonnegative(),
+    method: z.string().min(1),
+    params: JsonValueSchema.nullable(),
+    receivedAtMilliseconds: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const FarfieldPendingServerRequestsSnapshotSchema = z
+  .object({
+    ok: z.literal(FarfieldProtocolStatusValue.Success),
+    requests: z.array(FarfieldPendingServerRequestSchema),
+  })
+  .strict();
+
+export type FarfieldPendingServerRequest = z.infer<typeof FarfieldPendingServerRequestSchema>;
+export type FarfieldPendingServerRequestsSnapshot = z.infer<
+  typeof FarfieldPendingServerRequestsSnapshotSchema
+>;
 export type FarfieldHealthState = z.infer<typeof FarfieldHealthStateSchema>;
 
 export const FarfieldThreadStreamDeltaSchema: z.ZodObject<

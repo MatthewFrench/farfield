@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import type {
   CapabilityConfigWriteMergeStrategy,
   CapabilityServerClient,
@@ -18,6 +18,7 @@ import type {
   DebugAppServerCoverageGitDiffToRemoteResult,
   DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingAccountLogin,
+  DebugAppServerCoveragePendingServerRequestsResult,
   DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   DebugAppServerCoverageThreadRealtimeAppendTextResult,
   DebugAppServerCoverageThreadRealtimeAudioChunk,
@@ -33,22 +34,18 @@ import {
 } from "./DebugAppServerCoverageConfigWriteActionRunners";
 import { mapPendingAccountLogin } from "./DebugAppServerCoverageDiagnosticsMappers";
 import {
+  createReadNotificationEventsAction,
+  createReadPendingServerRequestsAction,
+  createReadThreadStreamEventsAction,
+  runCoverageAsyncMutation,
+} from "./DebugAppServerCoverageMutationActionHelpers";
+import {
   runExternalAgentConfigDetectAction,
   runExternalAgentConfigImportAction,
 } from "./DebugAppServerCoverageMutationActionRunners";
-import { mapNotificationEventsResult } from "./DebugAppServerCoverageNotificationEventMappers";
-import { mapThreadStreamEventsResult } from "./DebugAppServerCoverageThreadStreamEventMappers";
 import { useDebugAppServerCoverageRuntimeMutationActions } from "./UseDebugAppServerCoverageRuntimeMutationActions";
 
 const COVERAGE_MUTATION_OPERATION_NAME = "debug-coverage-action";
-const COVERAGE_ACTION_ERROR_PREFIX = "Unable to run coverage action: ";
-
-interface RunCoverageAsyncMutationInput {
-  isRunningCoverageAction: boolean;
-  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
-  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
-  run: () => Promise<void>;
-}
 
 interface UseDebugAppServerCoverageMutationDiagnosticsInput {
   capabilityServerClient: CapabilityServerClient;
@@ -70,6 +67,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
   lastNotificationEventsResult: DebugAppServerCoverageNotificationEventsResult | null;
+  lastPendingServerRequestsResult: DebugAppServerCoveragePendingServerRequestsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
@@ -105,6 +103,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   stopThreadRealtime: (threadId: string) => void;
   readThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   readNotificationEvents: (sinceSequence?: number | null) => void;
+  readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
@@ -123,74 +122,6 @@ export interface DebugAppServerCoverageMutationDiagnostics {
 export interface DebugAppServerCoverageMutationDiagnosticsBundle {
   clearPendingAccountLogin: () => void;
   diagnostics: DebugAppServerCoverageMutationDiagnostics;
-}
-
-function toErrorMessage<ErrorType>(error: ErrorType): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  return String(error);
-}
-
-function runCoverageAsyncMutation(input: RunCoverageAsyncMutationInput): void {
-  if (input.isRunningCoverageAction) {
-    return;
-  }
-
-  input.setIsRunningCoverageAction(true);
-  input.setCoverageActionErrorMessage("");
-
-  void (async () => {
-    try {
-      await input.run();
-    } catch (error) {
-      input.setCoverageActionErrorMessage(
-        `${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`,
-      );
-    } finally {
-      input.setIsRunningCoverageAction(false);
-    }
-  })();
-}
-
-interface RunNotificationEventsReadMutationInput {
-  capabilityServerClient: CapabilityServerClient;
-  isRunningCoverageAction: boolean;
-  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
-  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
-  setLastNotificationEventsResult: Dispatch<
-    SetStateAction<DebugAppServerCoverageNotificationEventsResult | null>
-  >;
-  sinceSequence?: number | null;
-}
-
-function runNotificationEventsReadMutation(input: RunNotificationEventsReadMutationInput): void {
-  const normalizedSinceSequence =
-    input.sinceSequence === undefined || input.sinceSequence === null ? null : input.sinceSequence;
-  if (
-    normalizedSinceSequence !== null &&
-    (!Number.isInteger(normalizedSinceSequence) || normalizedSinceSequence < 0)
-  ) {
-    return;
-  }
-
-  runCoverageAsyncMutation({
-    isRunningCoverageAction: input.isRunningCoverageAction,
-    setIsRunningCoverageAction: input.setIsRunningCoverageAction,
-    setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
-    run: async () => {
-      const response = await input.capabilityServerClient.readNotificationEvents({
-        actionName: COVERAGE_MUTATION_OPERATION_NAME,
-        ...(normalizedSinceSequence !== null ? { sinceSequence: normalizedSinceSequence } : {}),
-      });
-      input.setLastNotificationEventsResult(
-        mapNotificationEventsResult(response, normalizedSinceSequence),
-      );
-    },
-  });
 }
 
 export function useDebugAppServerCoverageMutationDiagnostics(
@@ -222,6 +153,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageThreadStreamEventsResult | null>(null);
   const [lastNotificationEventsResult, setLastNotificationEventsResult] =
     useState<DebugAppServerCoverageNotificationEventsResult | null>(null);
+  const [lastPendingServerRequestsResult, setLastPendingServerRequestsResult] =
+    useState<DebugAppServerCoveragePendingServerRequestsResult | null>(null);
   const [lastWindowsSandboxSetupStartResult, setLastWindowsSandboxSetupStartResult] =
     useState<DebugAppServerCoverageWindowsSandboxSetupStartResult | null>(null);
   const [lastFeedbackUploadResult, setLastFeedbackUploadResult] =
@@ -236,10 +169,6 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null>(null);
   const [lastGitDiffToRemoteResult, setLastGitDiffToRemoteResult] =
     useState<DebugAppServerCoverageGitDiffToRemoteResult | null>(null);
-
-  const clearPendingAccountLogin = useCallback(() => {
-    setPendingAccountLogin(null);
-  }, []);
 
   const startAccountLogin = useCallback(() => {
     runCoverageAsyncMutation({
@@ -452,55 +381,6 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     [input.capabilityServerClient, isRunningCoverageAction],
   );
 
-  const readThreadStreamEvents = useCallback(
-    (threadId: string, sinceSequence?: number | null) => {
-      const normalizedThreadId = threadId.trim();
-      if (normalizedThreadId.length === 0) {
-        return;
-      }
-
-      const normalizedSinceSequence =
-        sinceSequence === undefined || sinceSequence === null ? null : sinceSequence;
-      if (
-        normalizedSinceSequence !== null &&
-        (!Number.isInteger(normalizedSinceSequence) || normalizedSinceSequence < 0)
-      ) {
-        return;
-      }
-
-      runCoverageAsyncMutation({
-        isRunningCoverageAction,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        run: async () => {
-          const response = await input.capabilityServerClient.readThreadStreamEvents({
-            actionName: COVERAGE_MUTATION_OPERATION_NAME,
-            threadId: normalizedThreadId,
-            ...(normalizedSinceSequence !== null ? { sinceSequence: normalizedSinceSequence } : {}),
-          });
-          setLastThreadStreamEventsResult(
-            mapThreadStreamEventsResult(response, normalizedSinceSequence),
-          );
-        },
-      });
-    },
-    [input.capabilityServerClient, isRunningCoverageAction],
-  );
-
-  const readNotificationEvents = useCallback(
-    (sinceSequence?: number | null) => {
-      runNotificationEventsReadMutation({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastNotificationEventsResult,
-        sinceSequence,
-      });
-    },
-    [input.capabilityServerClient, isRunningCoverageAction],
-  );
-
   const runtimeMutationActions = useDebugAppServerCoverageRuntimeMutationActions({
     capabilityServerClient: input.capabilityServerClient,
     isRunningCoverageAction,
@@ -521,7 +401,9 @@ export function useDebugAppServerCoverageMutationDiagnostics(
   });
 
   return {
-    clearPendingAccountLogin,
+    clearPendingAccountLogin: () => {
+      setPendingAccountLogin(null);
+    },
     diagnostics: {
       isRunningCoverageAction,
       coverageActionErrorMessage,
@@ -537,6 +419,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastThreadRealtimeStopResult,
       lastThreadStreamEventsResult,
       lastNotificationEventsResult,
+      lastPendingServerRequestsResult,
       lastWindowsSandboxSetupStartResult,
       lastFeedbackUploadResult,
       lastFuzzyFileSearchResult,
@@ -559,8 +442,27 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       appendThreadRealtimeAudio: runtimeMutationActions.appendThreadRealtimeAudio,
       appendThreadRealtimeText: runtimeMutationActions.appendThreadRealtimeText,
       stopThreadRealtime: runtimeMutationActions.stopThreadRealtime,
-      readThreadStreamEvents,
-      readNotificationEvents,
+      readThreadStreamEvents: createReadThreadStreamEventsAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastThreadStreamEventsResult,
+      }),
+      readNotificationEvents: createReadNotificationEventsAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastNotificationEventsResult,
+      }),
+      readPendingServerRequests: createReadPendingServerRequestsAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastPendingServerRequestsResult,
+      }),
       startWindowsSandboxSetup: runtimeMutationActions.startWindowsSandboxSetup,
       readGitDiffToRemote: runtimeMutationActions.readGitDiffToRemote,
       searchFuzzyFiles: runtimeMutationActions.searchFuzzyFiles,

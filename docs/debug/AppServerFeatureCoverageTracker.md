@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 08:12:21Z
+Last Updated (UTC): 2026-03-01 08:27:16Z
 
 ## Purpose
 
@@ -58,6 +58,7 @@ As of the upstream snapshot above:
 3. Effective request-method usage including transport-owned `initialize`: `54 / 74` (`73.0%`).
 4. Farfield now captures app-server notification streams and exposes them through thread stream-event reads and dedicated notification-event reads in debug coverage diagnostics.
 5. Farfield now handles all upstream app-server server-request methods (`item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, `item/tool/call`, `account/chatgptAuthTokens/refresh`, `applyPatchApproval`, `execCommandApproval`) with typed response contracts and user-facing response controls for current product flows.
+6. Farfield now exposes pending unresolved app-server server-request snapshots through debug coverage diagnostics (`/api/server-requests/pending`) with strict typed request metadata and payload previews.
 
 ## Canonical Coverage Artifacts
 
