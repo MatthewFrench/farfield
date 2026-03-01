@@ -1117,6 +1117,71 @@ describe("AppServerClient.writeConfigValue", () => {
   });
 });
 
+describe("AppServerClient.writeConfigBatch", () => {
+  it("sends config/batchWrite payload and returns typed config write result", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      status: "ok",
+      version: "v10",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      overriddenMetadata: null,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.writeConfigBatch({
+      edits: [
+        {
+          keyPath: "integrations.github.enabled",
+          value: true,
+          mergeStrategy: "replace",
+        },
+        {
+          keyPath: "integrations.github.scopes",
+          value: ["repo", "read:org"],
+          mergeStrategy: "upsert",
+        },
+      ],
+      filePath: "/tmp/workspace/.codex/config.toml",
+      expectedVersion: "v9",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("config/batchWrite", {
+      edits: [
+        {
+          keyPath: "integrations.github.enabled",
+          value: true,
+          mergeStrategy: "replace",
+        },
+        {
+          keyPath: "integrations.github.scopes",
+          value: ["repo", "read:org"],
+          mergeStrategy: "upsert",
+        },
+      ],
+      filePath: "/tmp/workspace/.codex/config.toml",
+      expectedVersion: "v9",
+    });
+    expect(result).toEqual({
+      status: "ok",
+      version: "v10",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      overriddenMetadata: null,
+    });
+  });
+
+  it("validates non-empty edit lists before sending config/batchWrite request", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await expect(
+      client.writeConfigBatch({
+        edits: [],
+      }),
+    ).rejects.toThrowError();
+    expect(transportDouble.request).not.toHaveBeenCalled();
+  });
+});
+
 describe("AppServerClient.startAccountLogin", () => {
   it("sends account/login/start and returns chatgpt login metadata", async () => {
     const transportDouble = createTransportDouble();

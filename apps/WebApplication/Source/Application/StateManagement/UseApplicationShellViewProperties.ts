@@ -144,6 +144,7 @@ export interface UseApplicationShellViewPropertiesInput {
   coverageDiagnosticsSnapshot: DebugWorkspacePaneProps["coverageDiagnosticsSnapshot"];
   pendingAccountLogin: DebugWorkspacePaneProps["pendingAccountLogin"];
   lastCommandExecutionResult: DebugWorkspacePaneProps["lastCommandExecutionResult"];
+  lastConfigBatchWriteResult: DebugWorkspacePaneProps["lastConfigBatchWriteResult"];
   lastConfigValueWriteResult: DebugWorkspacePaneProps["lastConfigValueWriteResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -158,6 +159,7 @@ export interface UseApplicationShellViewPropertiesInput {
     filePath?: string,
     expectedVersion?: string,
   ) => void;
+  writeConfigBatch: (edits: string, filePath?: string, expectedVersion?: string) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -402,6 +404,7 @@ function buildDebugWorkspacePaneProperties(
     coverageDiagnosticsSnapshot: input.coverageDiagnosticsSnapshot,
     pendingAccountLogin: input.pendingAccountLogin,
     lastCommandExecutionResult: input.lastCommandExecutionResult,
+    lastConfigBatchWriteResult: input.lastConfigBatchWriteResult,
     lastConfigValueWriteResult: input.lastConfigValueWriteResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
@@ -410,6 +413,7 @@ function buildDebugWorkspacePaneProperties(
     onReloadMcpServerConfig: input.reloadMcpServerConfig,
     onStartMcpServerOauthLogin: input.startMcpServerOauthLogin,
     onWriteConfigValue: input.writeConfigValue,
+    onWriteConfigBatch: input.writeConfigBatch,
     onWriteSkillsConfig: input.writeSkillsConfig,
     onExportRemoteSkill: input.exportRemoteSkill,
     onExecuteCommand: input.executeCommand,
@@ -605,6 +609,7 @@ export function useApplicationShellViewProperties(
       input.coverageDiagnosticsSnapshot,
       input.pendingAccountLogin,
       input.lastCommandExecutionResult,
+      input.lastConfigBatchWriteResult,
       input.lastConfigValueWriteResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
@@ -613,6 +618,7 @@ export function useApplicationShellViewProperties(
       input.reloadMcpServerConfig,
       input.startMcpServerOauthLogin,
       input.writeConfigValue,
+      input.writeConfigBatch,
       input.writeSkillsConfig,
       input.exportRemoteSkill,
       input.executeCommand,

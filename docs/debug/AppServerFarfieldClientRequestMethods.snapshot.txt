@@ -6,6 +6,7 @@ account/read
 app/list
 collaborationMode/list
 command/exec
+config/batchWrite
 config/mcpServer/reload
 config/read
 config/value/write

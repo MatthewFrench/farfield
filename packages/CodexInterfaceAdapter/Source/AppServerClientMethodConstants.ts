@@ -17,6 +17,7 @@ export const APP_SERVER_CLIENT_METHODS = {
   readAccount: "account/read",
   readAccountRateLimits: "account/rateLimits/read",
   executeCommand: "command/exec",
+  writeConfigBatch: "config/batchWrite",
   writeConfigValue: "config/value/write",
   startAccountLogin: "account/login/start",
   cancelAccountLogin: "account/login/cancel",

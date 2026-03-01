@@ -5,6 +5,7 @@ import type {
   CapabilityAccountResponse,
   CapabilityAppsResponse,
   CapabilityCommandExecutionResponse,
+  CapabilityConfigBatchWriteResponse,
   CapabilityConfigRequirementsResponse,
   CapabilityConfigValueWriteResponse,
   CapabilityConfigWriteMergeStrategy,
@@ -17,6 +18,7 @@ import type {
   DebugAppServerCoverageAccount,
   DebugAppServerCoverageAppSummary,
   DebugAppServerCoverageCommandExecutionResult,
+  DebugAppServerCoverageConfigBatchWriteResult,
   DebugAppServerCoverageConfigValueWriteResult,
   DebugAppServerCoverageExperimentalFeature,
   DebugAppServerCoverageMcpServerSummary,
@@ -183,6 +185,20 @@ export function mapConfigValueWriteResult(
     keyPath,
     mergeStrategy,
     valueSummary: JSON.stringify(value),
+    status: response.status,
+    version: response.version,
+    filePath: response.filePath,
+    overriddenMessage: response.overriddenMetadata?.message ?? null,
+    writtenAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapConfigBatchWriteResult(
+  response: CapabilityConfigBatchWriteResponse,
+  editCount: number,
+): DebugAppServerCoverageConfigBatchWriteResult {
+  return {
+    editCount,
     status: response.status,
     version: response.version,
     filePath: response.filePath,

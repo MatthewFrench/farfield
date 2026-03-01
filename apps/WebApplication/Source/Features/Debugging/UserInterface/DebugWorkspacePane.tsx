@@ -4,6 +4,7 @@ import { TabsList } from "@/Components/UserInterface/TabsList";
 import { TabsTrigger } from "@/Components/UserInterface/TabsTrigger";
 import {
   type DebugAppServerCoverageCommandExecutionResult,
+  type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
@@ -67,6 +68,7 @@ export interface DebugWorkspacePaneProps {
   coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
+  lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -81,6 +83,7 @@ export interface DebugWorkspacePaneProps {
     filePath?: string,
     expectedVersion?: string,
   ) => void;
+  onWriteConfigBatch: (edits: string, filePath?: string, expectedVersion?: string) => void;
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
   onExportRemoteSkill: (hazelnutId: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -129,6 +132,7 @@ export function DebugWorkspacePane({
   coverageDiagnosticsSnapshot,
   pendingAccountLogin,
   lastCommandExecutionResult,
+  lastConfigBatchWriteResult,
   lastConfigValueWriteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -137,6 +141,7 @@ export function DebugWorkspacePane({
   onReloadMcpServerConfig,
   onStartMcpServerOauthLogin,
   onWriteConfigValue,
+  onWriteConfigBatch,
   onWriteSkillsConfig,
   onExportRemoteSkill,
   onExecuteCommand,
@@ -241,6 +246,7 @@ export function DebugWorkspacePane({
             coverageDiagnosticsSnapshot={coverageDiagnosticsSnapshot}
             pendingAccountLogin={pendingAccountLogin}
             lastCommandExecutionResult={lastCommandExecutionResult}
+            lastConfigBatchWriteResult={lastConfigBatchWriteResult}
             lastConfigValueWriteResult={lastConfigValueWriteResult}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
             onStartAccountLogin={onStartAccountLogin}
@@ -249,6 +255,7 @@ export function DebugWorkspacePane({
             onReloadMcpServerConfig={onReloadMcpServerConfig}
             onStartMcpServerOauthLogin={onStartMcpServerOauthLogin}
             onWriteConfigValue={onWriteConfigValue}
+            onWriteConfigBatch={onWriteConfigBatch}
             onWriteSkillsConfig={onWriteSkillsConfig}
             onExportRemoteSkill={onExportRemoteSkill}
             onExecuteCommand={onExecuteCommand}

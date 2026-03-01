@@ -84,6 +84,7 @@ import type {
   AgentUnarchiveThreadInput,
   AgentUnsubscribeThreadInput,
   AgentUnsubscribeThreadStatus,
+  AgentWriteConfigBatchInput,
   AgentWriteConfigValueInput,
   AgentWriteConfigValueResult,
   AgentWriteSkillsConfigInput,
@@ -92,6 +93,7 @@ import type {
 import {
   buildCommandExecutionOptions,
   buildStartMcpServerOauthLoginOptions,
+  buildWriteConfigBatchOptions,
   buildWriteConfigValueOptions,
   buildWriteSkillsConfigOptions,
 } from "./CodexThreadManagementCapabilityMutationOptions.js";
@@ -623,6 +625,16 @@ export class CodexThreadManagementOwner {
     this.ensureCodexAvailable();
     const result: ConfigWriteResult = await this.runAppServerCall(() =>
       this.appClient.writeConfigValue(buildWriteConfigValueOptions(input)),
+    );
+    return result;
+  }
+
+  public async writeConfigBatch(
+    input: AgentWriteConfigBatchInput,
+  ): Promise<AgentWriteConfigValueResult> {
+    this.ensureCodexAvailable();
+    const result: ConfigWriteResult = await this.runAppServerCall(() =>
+      this.appClient.writeConfigBatch(buildWriteConfigBatchOptions(input)),
     );
     return result;
   }

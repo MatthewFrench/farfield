@@ -88,6 +88,15 @@ export interface DebugAppServerCoverageConfigValueWriteResult {
   writtenAtIso8601: string;
 }
 
+export interface DebugAppServerCoverageConfigBatchWriteResult {
+  editCount: number;
+  status: "ok" | "okOverridden";
+  version: string;
+  filePath: string;
+  overriddenMessage: string | null;
+  writtenAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

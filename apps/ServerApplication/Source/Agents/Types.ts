@@ -496,6 +496,18 @@ export interface AgentWriteConfigValueInput {
   expectedVersion?: string;
 }
 
+export interface AgentConfigBatchWriteEdit {
+  keyPath: string;
+  value: JsonValue;
+  mergeStrategy: AgentConfigWriteMergeStrategy;
+}
+
+export interface AgentWriteConfigBatchInput {
+  edits: AgentConfigBatchWriteEdit[];
+  filePath?: string;
+  expectedVersion?: string;
+}
+
 export type AgentConfigWriteStatus = "ok" | "okOverridden";
 
 export interface AgentConfigWriteOverriddenMetadata {
@@ -669,6 +681,7 @@ export interface AgentAdapter {
   startMcpServerOauthLogin?(
     input: AgentStartMcpServerOauthLoginInput,
   ): Promise<AgentStartMcpServerOauthLoginResult>;
+  writeConfigBatch?(input: AgentWriteConfigBatchInput): Promise<AgentWriteConfigValueResult>;
   writeConfigValue?(input: AgentWriteConfigValueInput): Promise<AgentWriteConfigValueResult>;
   writeSkillsConfig?(input: AgentWriteSkillsConfigInput): Promise<AgentWriteSkillsConfigResult>;
   listRemoteSkills?(input: AgentListRemoteSkillsInput): Promise<AgentListRemoteSkillsResult>;

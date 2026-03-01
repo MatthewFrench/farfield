@@ -17,6 +17,8 @@ export type {
   ChatgptAccountSummary,
   CommandExecutionOptions,
   CommandExecutionResult,
+  ConfigBatchWriteEditOptions,
+  ConfigBatchWriteOptions,
   ConfigRequirements,
   ConfigRequirementsNetwork,
   ConfigWriteMergeStrategy,

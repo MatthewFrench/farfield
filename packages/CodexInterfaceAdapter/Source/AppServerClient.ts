@@ -22,6 +22,7 @@ import {
 } from "@farfield/protocol";
 import { z } from "zod";
 import { buildCommandExecutionRequestParameters } from "./AppServerClientCommandExecutionRequestBuilders.js";
+import { buildConfigBatchWriteRequestParameters } from "./AppServerClientConfigBatchWriteRequestBuilders.js";
 import { buildConfigValueWriteRequestParameters } from "./AppServerClientConfigValueWriteRequestBuilders.js";
 import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
 import {
@@ -324,6 +325,18 @@ export interface CommandExecutionResult {
 }
 
 export type ConfigWriteMergeStrategy = "replace" | "upsert";
+
+export interface ConfigBatchWriteEditOptions {
+  keyPath: string;
+  value: z.infer<typeof JsonValueSchema>;
+  mergeStrategy: ConfigWriteMergeStrategy;
+}
+
+export interface ConfigBatchWriteOptions {
+  edits: ConfigBatchWriteEditOptions[];
+  filePath?: string;
+  expectedVersion?: string;
+}
 
 export interface ConfigWriteValueOptions {
   keyPath: string;
@@ -1198,6 +1211,31 @@ export class AppServerClient {
       exitCode: parsed.exitCode,
       stdout: parsed.stdout,
       stderr: parsed.stderr,
+    };
+  }
+
+  public async writeConfigBatch(options: ConfigBatchWriteOptions): Promise<ConfigWriteResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.writeConfigBatch,
+      buildConfigBatchWriteRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerConfigWriteResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.writeConfigBatch,
+    );
+    return {
+      status: parsed.status,
+      version: parsed.version,
+      filePath: parsed.filePath,
+      overriddenMetadata:
+        parsed.overriddenMetadata === undefined || parsed.overriddenMetadata === null
+          ? null
+          : {
+              message: parsed.overriddenMetadata.message,
+              overridingLayer: parsed.overriddenMetadata.overridingLayer,
+              effectiveValue: parsed.overriddenMetadata.effectiveValue,
+            },
     };
   }
 

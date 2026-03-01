@@ -60,6 +60,7 @@ import type {
   AgentThreadStreamEvents,
   AgentUnsubscribeThreadInput,
   AgentUnsubscribeThreadStatus,
+  AgentWriteConfigBatchInput,
   AgentWriteConfigValueInput,
   AgentWriteConfigValueResult,
   AgentWriteSkillsConfigInput,
@@ -385,6 +386,12 @@ export class CodexAgentAdapter implements AgentAdapter {
     input: AgentWriteConfigValueInput,
   ): Promise<AgentWriteConfigValueResult> {
     return this.threadManagementOwner.writeConfigValue(input);
+  }
+
+  public async writeConfigBatch(
+    input: AgentWriteConfigBatchInput,
+  ): Promise<AgentWriteConfigValueResult> {
+    return this.threadManagementOwner.writeConfigBatch(input);
   }
 
   public async writeSkillsConfig(

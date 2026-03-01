@@ -43,6 +43,7 @@ import type {
   AgentStartAccountLoginResult,
   AgentStartMcpServerOauthLoginInput,
   AgentStartMcpServerOauthLoginResult,
+  AgentWriteConfigBatchInput,
   AgentWriteConfigValueInput,
   AgentWriteConfigValueResult,
   AgentWriteSkillsConfigInput,
@@ -339,6 +340,7 @@ interface MockAgentAdapterOptions {
   startMcpServerOauthLogin?: (
     input: AgentStartMcpServerOauthLoginInput,
   ) => Promise<AgentStartMcpServerOauthLoginResult>;
+  writeConfigBatch?: (input: AgentWriteConfigBatchInput) => Promise<AgentWriteConfigValueResult>;
   writeConfigValue?: (input: AgentWriteConfigValueInput) => Promise<AgentWriteConfigValueResult>;
   writeSkillsConfig?: (input: AgentWriteSkillsConfigInput) => Promise<AgentWriteSkillsConfigResult>;
   listRemoteSkills?: (input: AgentListRemoteSkillsInput) => Promise<AgentListRemoteSkillsResult>;
@@ -478,6 +480,10 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.startMcpServerOauthLogin) {
     adapter.startMcpServerOauthLogin = options.startMcpServerOauthLogin;
+  }
+
+  if (options.writeConfigBatch) {
+    adapter.writeConfigBatch = options.writeConfigBatch;
   }
 
   if (options.writeConfigValue) {
@@ -1005,6 +1011,92 @@ describe("handleCapabilityRoutes", () => {
     const parsedEnvelope = CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result));
     expect(parsedEnvelope).toEqual({
       ok: true,
+    });
+  });
+
+  it("returns 400 when config batch write omits edits", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/config/batch/write",
+      url: new URL("http://localhost/api/config/batch/write"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing edits query parameter.",
+    });
+  });
+
+  it("returns 400 when config batch write receives invalid edits JSON", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/config/batch/write",
+      url: new URL("http://localhost/api/config/batch/write?edits=not-json"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Invalid edits query parameter. Expected JSON array of config edits.",
+    });
+  });
+
+  it("writes config batch when adapter supports config value writes", async () => {
+    const writeConfigBatchSpy = vi.fn(
+      async (): Promise<AgentWriteConfigValueResult> => ({
+        status: "ok",
+        version: "v3",
+        filePath: "/tmp/workspace/.codex/config.toml",
+        overriddenMetadata: null,
+      }),
+    );
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/config/batch/write",
+      url: new URL(
+        "http://localhost/api/config/batch/write?edits=%5B%7B%22keyPath%22%3A%22integrations.github.enabled%22%2C%22value%22%3Atrue%2C%22mergeStrategy%22%3A%22replace%22%7D%2C%7B%22keyPath%22%3A%22integrations.github.scopes%22%2C%22value%22%3A%5B%22repo%22%5D%2C%22mergeStrategy%22%3A%22upsert%22%7D%5D&filePath=%2Ftmp%2Fworkspace%2F.codex%2Fconfig.toml&expectedVersion=v2",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canWriteConfigValue: true,
+          },
+          writeConfigBatch: writeConfigBatchSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(writeConfigBatchSpy).toHaveBeenCalledWith({
+      edits: [
+        {
+          keyPath: "integrations.github.enabled",
+          value: true,
+          mergeStrategy: "replace",
+        },
+        {
+          keyPath: "integrations.github.scopes",
+          value: ["repo"],
+          mergeStrategy: "upsert",
+        },
+      ],
+      filePath: "/tmp/workspace/.codex/config.toml",
+      expectedVersion: "v2",
+    });
+    const parsedEnvelope = CapabilityConfigValueWriteEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      status: "ok",
+      version: "v3",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      overriddenMetadata: null,
     });
   });
 

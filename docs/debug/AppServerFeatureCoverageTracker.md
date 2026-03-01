@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 02:05:00Z
+Last Updated (UTC): 2026-03-01 02:06:29Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `37 / 74` request methods (`50.0%`).
+1. Farfield app-server method coverage at request-owner layer: `38 / 74` request methods (`51.4%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `38 / 74` (`51.4%`).
+3. Effective request-method usage including transport-owned `initialize`: `39 / 74` (`52.7%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -99,6 +99,7 @@ As of the upstream snapshot above:
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | High | Explicit capability ownership and strict envelope parsing | Keep current path |
 | `command/exec` | Command execution diagnostics action with visible stdout/stderr output in debug workspace coverage panel | Medium-high | Strict capability route ownership and typed command request/response mapping for operator diagnostics | Keep current path |
 | `config/read` | Config defaults resolution for model and reasoning effort | High | Normalized default resolution through typed owner mapping | Keep current path |
+| `config/batchWrite` | Config batch-write diagnostics action with explicit multi-edit payload testing in debug workspace coverage panel | Medium-high | Strict capability route ownership and typed edit-array request parsing with deterministic write-result mapping | Keep current path |
 | `configRequirements/read` | Config requirements diagnostics and workspace readiness signals | Medium-high | Strict capability route ownership with typed payload mapping into debug coverage diagnostics | Keep current path |
 | `config/mcpServer/reload` | MCP server configuration reload action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic mutation path for diagnostics flows | Keep current path |
 | `mcpServer/oauth/login` | MCP server oauth-login start action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic oauth-url response mapping for integration diagnostics | Keep current path |
@@ -146,6 +147,7 @@ As of the upstream snapshot above:
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | `/api/collaboration-modes` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listCollaborationModes` -> `AppServerClient.listCollaborationModes` |
 | `command/exec` | Command execution diagnostics action and output capture | `/api/commands/exec` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.executeCommand` -> `AppServerClient.executeCommand` |
 | `config/read` | Config defaults (`model`, `reasoningEffort`) | `/api/config/defaults` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigDefaults` -> `AppServerClient.readConfig` |
+| `config/batchWrite` | Config-batch mutation diagnostics action | `/api/config/batch/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeConfigBatch` -> `AppServerClient.writeConfigBatch` |
 | `config/value/write` | Config-value mutation diagnostics action | `/api/config/value/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeConfigValue` -> `AppServerClient.writeConfigValue` |
 | `configRequirements/read` | Config requirements diagnostics | `/api/config-requirements` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigRequirements` -> `AppServerClient.readConfigRequirements` |
 | `config/mcpServer/reload` | MCP server config reload diagnostics action | `/api/config/mcp-server/reload` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.reloadMcpServerConfig` -> `AppServerClient.reloadMcpServerConfig` |
@@ -165,13 +167,12 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`37` request methods are not used by Farfield’s app-server client path:
+`36` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
 archiveConversation
 cancelLoginChatGpt
-config/batchWrite
 execOneOffCommand
 externalAgentConfig/detect
 externalAgentConfig/import
@@ -243,9 +244,8 @@ No remaining methods in this category for the current upstream snapshot.
 
 ### Category C: Configuration and Environment Management Surfaces Not Yet Wired
 
-1. `config/batchWrite`
-2. `externalAgentConfig/detect`
-3. `externalAgentConfig/import`
+1. `externalAgentConfig/detect`
+2. `externalAgentConfig/import`
 
 ### Category D: Skills, Apps, and Feature-Discovery Surfaces Not Yet Wired
 

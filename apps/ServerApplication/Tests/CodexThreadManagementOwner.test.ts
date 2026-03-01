@@ -5,6 +5,7 @@ import {
   type CancelAccountLoginResult,
   type CommandExecutionOptions,
   type CommandExecutionResult,
+  type ConfigBatchWriteOptions,
   type ConfigWriteResult,
   type ConfigWriteValueOptions,
   type ExportRemoteSkillOptions,
@@ -116,6 +117,7 @@ class TestAppServerClient extends AppServerClient {
   public readonly logoutAccountCalls: Array<undefined> = [];
   public readonly reloadMcpServerConfigCalls: Array<undefined> = [];
   public readonly startMcpServerOauthLoginCalls: StartMcpServerOauthLoginOptions[] = [];
+  public readonly writeConfigBatchCalls: ConfigBatchWriteOptions[] = [];
   public readonly writeConfigValueCalls: ConfigWriteValueOptions[] = [];
   public readonly writeSkillsConfigCalls: WriteSkillsConfigOptions[] = [];
   public readonly readConfigCalls: Array<ReadConfigOptions | undefined> = [];
@@ -140,6 +142,7 @@ class TestAppServerClient extends AppServerClient {
   private readonly startAccountLoginResult: LoginAccountResult;
   private readonly cancelAccountLoginResult: CancelAccountLoginResult;
   private readonly startMcpServerOauthLoginResult: StartMcpServerOauthLoginResult;
+  private readonly writeConfigBatchResult: ConfigWriteResult;
   private readonly writeConfigValueResult: ConfigWriteResult;
   private readonly writeSkillsConfigResult: WriteSkillsConfigResult;
   private readonly readConfigResult: AppServerConfigReadResponse;
@@ -165,6 +168,7 @@ class TestAppServerClient extends AppServerClient {
     startAccountLoginResult?: LoginAccountResult;
     cancelAccountLoginResult?: CancelAccountLoginResult;
     startMcpServerOauthLoginResult?: StartMcpServerOauthLoginResult;
+    writeConfigBatchResult?: ConfigWriteResult;
     writeConfigValueResult?: ConfigWriteResult;
     writeSkillsConfigResult?: WriteSkillsConfigResult;
     readConfigResult?: AppServerConfigReadResponse;
@@ -244,6 +248,12 @@ class TestAppServerClient extends AppServerClient {
     };
     this.startMcpServerOauthLoginResult = input?.startMcpServerOauthLoginResult ?? {
       authorizationUrl: "https://example.com/oauth/mcp",
+    };
+    this.writeConfigBatchResult = input?.writeConfigBatchResult ?? {
+      status: "ok",
+      version: "v1",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      overriddenMetadata: null,
     };
     this.writeConfigValueResult = input?.writeConfigValueResult ?? {
       status: "ok",
@@ -434,6 +444,13 @@ class TestAppServerClient extends AppServerClient {
   ): Promise<ConfigWriteResult> {
     this.writeConfigValueCalls.push(options);
     return this.writeConfigValueResult;
+  }
+
+  public override async writeConfigBatch(
+    options: ConfigBatchWriteOptions,
+  ): Promise<ConfigWriteResult> {
+    this.writeConfigBatchCalls.push(options);
+    return this.writeConfigBatchResult;
   }
 
   public override async writeSkillsConfig(
@@ -1248,6 +1265,60 @@ describe("CodexThreadManagementOwner", () => {
       },
     ]);
     expect(result.authorizationUrl).toBe("https://example.com/oauth/github");
+  });
+
+  it("writes config batches through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      writeConfigBatchResult: {
+        status: "ok",
+        version: "v8",
+        filePath: "/tmp/workspace/.codex/config.toml",
+        overriddenMetadata: null,
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.writeConfigBatch({
+      edits: [
+        {
+          keyPath: "integrations.github.enabled",
+          value: true,
+          mergeStrategy: "replace",
+        },
+        {
+          keyPath: "integrations.github.scopes",
+          value: ["repo", "read:org"],
+          mergeStrategy: "upsert",
+        },
+      ],
+      filePath: "/tmp/workspace/.codex/config.toml",
+      expectedVersion: "v7",
+    });
+
+    expect(appClient.writeConfigBatchCalls).toEqual([
+      {
+        edits: [
+          {
+            keyPath: "integrations.github.enabled",
+            value: true,
+            mergeStrategy: "replace",
+          },
+          {
+            keyPath: "integrations.github.scopes",
+            value: ["repo", "read:org"],
+            mergeStrategy: "upsert",
+          },
+        ],
+        filePath: "/tmp/workspace/.codex/config.toml",
+        expectedVersion: "v7",
+      },
+    ]);
+    expect(result).toEqual({
+      status: "ok",
+      version: "v8",
+      filePath: "/tmp/workspace/.codex/config.toml",
+      overriddenMetadata: null,
+    });
   });
 
   it("writes config values through codex management owner", async () => {

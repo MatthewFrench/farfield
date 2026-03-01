@@ -1,5 +1,12 @@
-import { type JsonValue, JsonValueSchema } from "@farfield/protocol";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type {
   CapabilityConfigWriteMergeStrategy,
   CapabilityServerClient,
@@ -7,15 +14,19 @@ import type {
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
 import {
   type DebugAppServerCoverageCommandExecutionResult,
+  type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import {
+  runConfigBatchWriteAction,
+  runConfigValueWriteAction,
+} from "./DebugAppServerCoverageConfigWriteActionRunners";
+import {
   mapAccount,
   mapApps,
   mapCommandExecutionResult,
-  mapConfigValueWriteResult,
   mapExperimentalFeatures,
   mapMcpServers,
   mapPendingAccountLogin,
@@ -49,6 +60,7 @@ export interface DebugAppServerCoverageDiagnostics {
   coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
+  lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -63,6 +75,7 @@ export interface DebugAppServerCoverageDiagnostics {
     filePath?: string,
     expectedVersion?: string,
   ) => void;
+  writeConfigBatch: (edits: string, filePath?: string, expectedVersion?: string) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -76,6 +89,100 @@ function toErrorMessage<ErrorType>(error: ErrorType): string {
     return error;
   }
   return String(error);
+}
+
+interface RunCoverageDiagnosticsRefreshInput {
+  capabilityServerClient: CapabilityServerClient;
+  requestSerialRef: MutableRefObject<number>;
+  setIsLoadingCoverageDiagnostics: Dispatch<SetStateAction<boolean>>;
+  setCoverageDiagnosticsErrorMessage: Dispatch<SetStateAction<string>>;
+  setCoverageDiagnosticsSnapshot: Dispatch<SetStateAction<DebugAppServerCoverageSnapshot | null>>;
+  setPendingAccountLogin: Dispatch<
+    SetStateAction<DebugAppServerCoveragePendingAccountLogin | null>
+  >;
+}
+
+function runCoverageDiagnosticsRefresh(input: RunCoverageDiagnosticsRefreshInput): void {
+  const requestSerialReference = input.requestSerialRef;
+  const nextRequestSerial = requestSerialReference.current + 1;
+  requestSerialReference.current = nextRequestSerial;
+  input.setIsLoadingCoverageDiagnostics(true);
+  input.setCoverageDiagnosticsErrorMessage("");
+
+  void (async () => {
+    try {
+      const [
+        configRequirementsResponse,
+        accountResponse,
+        accountRateLimitsResponse,
+        experimentalFeaturesResponse,
+        mcpServersResponse,
+        appsResponse,
+        skillsResponse,
+        remoteSkillsResponse,
+      ] = await Promise.all([
+        input.capabilityServerClient.readConfigRequirements({
+          actionName: COVERAGE_REQUEST_OPERATION_NAME,
+        }),
+        input.capabilityServerClient.readAccount({
+          actionName: COVERAGE_REQUEST_OPERATION_NAME,
+        }),
+        input.capabilityServerClient.readAccountRateLimits({
+          actionName: COVERAGE_REQUEST_OPERATION_NAME,
+        }),
+        input.capabilityServerClient.listExperimentalFeatures({
+          actionName: COVERAGE_REQUEST_OPERATION_NAME,
+          limit: COVERAGE_REQUEST_LIST_LIMIT,
+        }),
+        input.capabilityServerClient.listMcpServers({
+          actionName: COVERAGE_REQUEST_OPERATION_NAME,
+          limit: COVERAGE_REQUEST_LIST_LIMIT,
+        }),
+        input.capabilityServerClient.listApps({
+          actionName: COVERAGE_REQUEST_OPERATION_NAME,
+          limit: COVERAGE_REQUEST_LIST_LIMIT,
+        }),
+        input.capabilityServerClient.listSkills({
+          actionName: COVERAGE_REQUEST_OPERATION_NAME,
+        }),
+        input.capabilityServerClient.listRemoteSkills({
+          actionName: COVERAGE_REQUEST_OPERATION_NAME,
+          hazelnutScope: COVERAGE_REMOTE_SKILLS_HAZELNUT_SCOPE,
+          productSurface: COVERAGE_REMOTE_SKILLS_PRODUCT_SURFACE,
+          enabled: COVERAGE_REMOTE_SKILLS_ENABLED,
+        }),
+      ]);
+
+      if (requestSerialReference.current !== nextRequestSerial) {
+        return;
+      }
+
+      input.setCoverageDiagnosticsSnapshot({
+        requirements: mapRequirements(configRequirementsResponse.requirements),
+        account: mapAccount(accountResponse.account),
+        requiresOpenaiAuth: accountResponse.requiresOpenaiAuth,
+        accountRateLimits: mapRateLimitSnapshot(accountRateLimitsResponse.rateLimits),
+        experimentalFeatures: mapExperimentalFeatures(experimentalFeaturesResponse.data),
+        mcpServers: mapMcpServers(mcpServersResponse.data),
+        apps: mapApps(appsResponse.data),
+        skills: mapSkills(skillsResponse.data),
+        remoteSkills: mapRemoteSkills(remoteSkillsResponse.data),
+        refreshedAtIso8601: new Date().toISOString(),
+      });
+      if (accountResponse.account !== null) {
+        input.setPendingAccountLogin(null);
+      }
+    } catch (error) {
+      if (requestSerialReference.current !== nextRequestSerial) {
+        return;
+      }
+      input.setCoverageDiagnosticsErrorMessage(`${COVERAGE_ERROR_PREFIX}${toErrorMessage(error)}`);
+    } finally {
+      if (requestSerialReference.current === nextRequestSerial) {
+        input.setIsLoadingCoverageDiagnostics(false);
+      }
+    }
+  })();
 }
 
 /**
@@ -95,90 +202,21 @@ export function useDebugAppServerCoverageDiagnostics(
     useState<DebugAppServerCoveragePendingAccountLogin | null>(null);
   const [lastCommandExecutionResult, setLastCommandExecutionResult] =
     useState<DebugAppServerCoverageCommandExecutionResult | null>(null);
+  const [lastConfigBatchWriteResult, setLastConfigBatchWriteResult] =
+    useState<DebugAppServerCoverageConfigBatchWriteResult | null>(null);
   const [lastConfigValueWriteResult, setLastConfigValueWriteResult] =
     useState<DebugAppServerCoverageConfigValueWriteResult | null>(null);
   const requestSerialRef = useRef(0);
 
   const refreshCoverageDiagnostics = useCallback(() => {
-    const nextRequestSerial = requestSerialRef.current + 1;
-    requestSerialRef.current = nextRequestSerial;
-    setIsLoadingCoverageDiagnostics(true);
-    setCoverageDiagnosticsErrorMessage("");
-
-    void (async () => {
-      try {
-        const [
-          configRequirementsResponse,
-          accountResponse,
-          accountRateLimitsResponse,
-          experimentalFeaturesResponse,
-          mcpServersResponse,
-          appsResponse,
-          skillsResponse,
-          remoteSkillsResponse,
-        ] = await Promise.all([
-          input.capabilityServerClient.readConfigRequirements({
-            actionName: COVERAGE_REQUEST_OPERATION_NAME,
-          }),
-          input.capabilityServerClient.readAccount({
-            actionName: COVERAGE_REQUEST_OPERATION_NAME,
-          }),
-          input.capabilityServerClient.readAccountRateLimits({
-            actionName: COVERAGE_REQUEST_OPERATION_NAME,
-          }),
-          input.capabilityServerClient.listExperimentalFeatures({
-            actionName: COVERAGE_REQUEST_OPERATION_NAME,
-            limit: COVERAGE_REQUEST_LIST_LIMIT,
-          }),
-          input.capabilityServerClient.listMcpServers({
-            actionName: COVERAGE_REQUEST_OPERATION_NAME,
-            limit: COVERAGE_REQUEST_LIST_LIMIT,
-          }),
-          input.capabilityServerClient.listApps({
-            actionName: COVERAGE_REQUEST_OPERATION_NAME,
-            limit: COVERAGE_REQUEST_LIST_LIMIT,
-          }),
-          input.capabilityServerClient.listSkills({
-            actionName: COVERAGE_REQUEST_OPERATION_NAME,
-          }),
-          input.capabilityServerClient.listRemoteSkills({
-            actionName: COVERAGE_REQUEST_OPERATION_NAME,
-            hazelnutScope: COVERAGE_REMOTE_SKILLS_HAZELNUT_SCOPE,
-            productSurface: COVERAGE_REMOTE_SKILLS_PRODUCT_SURFACE,
-            enabled: COVERAGE_REMOTE_SKILLS_ENABLED,
-          }),
-        ]);
-
-        if (requestSerialRef.current !== nextRequestSerial) {
-          return;
-        }
-
-        setCoverageDiagnosticsSnapshot({
-          requirements: mapRequirements(configRequirementsResponse.requirements),
-          account: mapAccount(accountResponse.account),
-          requiresOpenaiAuth: accountResponse.requiresOpenaiAuth,
-          accountRateLimits: mapRateLimitSnapshot(accountRateLimitsResponse.rateLimits),
-          experimentalFeatures: mapExperimentalFeatures(experimentalFeaturesResponse.data),
-          mcpServers: mapMcpServers(mcpServersResponse.data),
-          apps: mapApps(appsResponse.data),
-          skills: mapSkills(skillsResponse.data),
-          remoteSkills: mapRemoteSkills(remoteSkillsResponse.data),
-          refreshedAtIso8601: new Date().toISOString(),
-        });
-        if (accountResponse.account !== null) {
-          setPendingAccountLogin(null);
-        }
-      } catch (error) {
-        if (requestSerialRef.current !== nextRequestSerial) {
-          return;
-        }
-        setCoverageDiagnosticsErrorMessage(`${COVERAGE_ERROR_PREFIX}${toErrorMessage(error)}`);
-      } finally {
-        if (requestSerialRef.current === nextRequestSerial) {
-          setIsLoadingCoverageDiagnostics(false);
-        }
-      }
-    })();
+    runCoverageDiagnosticsRefresh({
+      capabilityServerClient: input.capabilityServerClient,
+      requestSerialRef,
+      setIsLoadingCoverageDiagnostics,
+      setCoverageDiagnosticsErrorMessage,
+      setCoverageDiagnosticsSnapshot,
+      setPendingAccountLogin,
+    });
   }, [input.capabilityServerClient]);
 
   const startAccountLogin = useCallback(() => {
@@ -313,62 +351,34 @@ export function useDebugAppServerCoverageDiagnostics(
       filePath?: string,
       expectedVersion?: string,
     ) => {
-      if (isRunningCoverageAction) {
-        return;
-      }
+      runConfigValueWriteAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        keyPath,
+        value,
+        mergeStrategy,
+        ...(filePath !== undefined ? { filePath } : {}),
+        ...(expectedVersion !== undefined ? { expectedVersion } : {}),
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastConfigValueWriteResult,
+      });
+    },
+    [input.capabilityServerClient, isRunningCoverageAction],
+  );
 
-      const normalizedKeyPath = keyPath.trim();
-      if (normalizedKeyPath.length === 0) {
-        return;
-      }
-
-      const normalizedValue = value.trim();
-      if (normalizedValue.length === 0) {
-        setCoverageActionErrorMessage(
-          `${COVERAGE_ACTION_ERROR_PREFIX}Config value must be valid JSON.`,
-        );
-        return;
-      }
-
-      let parsedValue: JsonValue;
-      try {
-        parsedValue = JsonValueSchema.parse(JSON.parse(normalizedValue));
-      } catch {
-        setCoverageActionErrorMessage(
-          `${COVERAGE_ACTION_ERROR_PREFIX}Config value must be valid JSON.`,
-        );
-        return;
-      }
-
-      const normalizedFilePath = filePath?.trim();
-      const normalizedExpectedVersion = expectedVersion?.trim();
-
-      setIsRunningCoverageAction(true);
-      setCoverageActionErrorMessage("");
-
-      void (async () => {
-        try {
-          const response = await input.capabilityServerClient.writeConfigValue({
-            actionName: COVERAGE_MUTATION_OPERATION_NAME,
-            keyPath: normalizedKeyPath,
-            value: parsedValue,
-            mergeStrategy,
-            ...(normalizedFilePath !== undefined && normalizedFilePath.length > 0
-              ? { filePath: normalizedFilePath }
-              : {}),
-            ...(normalizedExpectedVersion !== undefined && normalizedExpectedVersion.length > 0
-              ? { expectedVersion: normalizedExpectedVersion }
-              : {}),
-          });
-          setLastConfigValueWriteResult(
-            mapConfigValueWriteResult(response, normalizedKeyPath, mergeStrategy, parsedValue),
-          );
-        } catch (error) {
-          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
-        } finally {
-          setIsRunningCoverageAction(false);
-        }
-      })();
+  const writeConfigBatch = useCallback(
+    (edits: string, filePath?: string, expectedVersion?: string) => {
+      runConfigBatchWriteAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        edits,
+        ...(filePath !== undefined ? { filePath } : {}),
+        ...(expectedVersion !== undefined ? { expectedVersion } : {}),
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastConfigBatchWriteResult,
+      });
     },
     [input.capabilityServerClient, isRunningCoverageAction],
   );
@@ -498,6 +508,7 @@ export function useDebugAppServerCoverageDiagnostics(
     coverageDiagnosticsSnapshot,
     pendingAccountLogin,
     lastCommandExecutionResult,
+    lastConfigBatchWriteResult,
     lastConfigValueWriteResult,
     refreshCoverageDiagnostics,
     startAccountLogin,
@@ -506,6 +517,7 @@ export function useDebugAppServerCoverageDiagnostics(
     reloadMcpServerConfig,
     startMcpServerOauthLogin,
     writeConfigValue,
+    writeConfigBatch,
     writeSkillsConfig,
     exportRemoteSkill,
     executeCommand,

@@ -1,5 +1,6 @@
 import type {
   CommandExecutionOptions,
+  ConfigBatchWriteOptions,
   ConfigWriteValueOptions,
   StartMcpServerOauthLoginOptions,
   WriteSkillsConfigOptions,
@@ -7,6 +8,7 @@ import type {
 import type {
   AgentCommandExecutionInput,
   AgentStartMcpServerOauthLoginInput,
+  AgentWriteConfigBatchInput,
   AgentWriteConfigValueInput,
   AgentWriteSkillsConfigInput,
 } from "../Types.js";
@@ -31,6 +33,20 @@ export function buildWriteConfigValueOptions(
     keyPath: input.keyPath,
     value: input.value,
     mergeStrategy: input.mergeStrategy,
+    ...(input.filePath !== undefined ? { filePath: input.filePath } : {}),
+    ...(input.expectedVersion !== undefined ? { expectedVersion: input.expectedVersion } : {}),
+  };
+}
+
+export function buildWriteConfigBatchOptions(
+  input: AgentWriteConfigBatchInput,
+): ConfigBatchWriteOptions {
+  return {
+    edits: input.edits.map((edit) => ({
+      keyPath: edit.keyPath,
+      value: edit.value,
+      mergeStrategy: edit.mergeStrategy,
+    })),
     ...(input.filePath !== undefined ? { filePath: input.filePath } : {}),
     ...(input.expectedVersion !== undefined ? { expectedVersion: input.expectedVersion } : {}),
   };

@@ -4,6 +4,7 @@ import { type AgentId, type ApiRequestOptions } from "@/Shared/Contracts/ApiCont
 import { request, requestInitWithOptions } from "@/Shared/Transport/FarfieldHttpTransport";
 
 const MCP_SERVER_OAUTH_LOGIN_ENDPOINT = "/api/mcp-servers/oauth/login";
+const CONFIG_BATCH_WRITE_ENDPOINT = "/api/config/batch/write";
 const CONFIG_VALUE_WRITE_ENDPOINT = "/api/config/value/write";
 const SKILLS_CONFIG_WRITE_ENDPOINT = "/api/skills/config/write";
 const SKILLS_REMOTE_LIST_ENDPOINT = "/api/skills/remote/list";
@@ -31,6 +32,19 @@ export interface ApiConfigValueWriteOptions extends ApiRequestOptions {
   keyPath: string;
   value: z.infer<typeof JsonValueSchema>;
   mergeStrategy: ApiConfigWriteMergeStrategy;
+  filePath?: string;
+  expectedVersion?: string;
+}
+
+export interface ApiConfigBatchWriteEdit {
+  keyPath: string;
+  value: z.infer<typeof JsonValueSchema>;
+  mergeStrategy: ApiConfigWriteMergeStrategy;
+}
+
+export interface ApiConfigBatchWriteOptions extends ApiRequestOptions {
+  agentId?: AgentId;
+  edits: ApiConfigBatchWriteEdit[];
   filePath?: string;
   expectedVersion?: string;
 }
@@ -97,6 +111,7 @@ const ConfigValueWriteResponseSchema = z
   })
   .strict();
 export type ApiConfigValueWriteResponse = z.infer<typeof ConfigValueWriteResponseSchema>;
+export type ApiConfigBatchWriteResponse = z.infer<typeof ConfigValueWriteResponseSchema>;
 
 const RemoteSkillSummarySchema = z
   .object({
@@ -152,6 +167,24 @@ const ConfigValueWriteInputSchema = z
   })
   .strict();
 
+const ConfigBatchWriteInputSchema = z
+  .object({
+    edits: z
+      .array(
+        z
+          .object({
+            keyPath: z.string().min(1),
+            value: JsonValueSchema,
+            mergeStrategy: ConfigWriteMergeStrategySchema,
+          })
+          .strict(),
+      )
+      .min(1),
+    filePath: z.string().min(1).optional(),
+    expectedVersion: z.string().min(1).optional(),
+  })
+  .strict();
+
 function readMcpServerOauthLoginPath(options: ApiMcpServerOauthLoginOptions): string {
   const params = new URLSearchParams();
   params.set("name", options.name);
@@ -199,6 +232,30 @@ function readConfigValueWritePath(options: ApiConfigValueWriteOptions): string {
     params.set("expectedVersion", parsedInput.expectedVersion);
   }
   return `${CONFIG_VALUE_WRITE_ENDPOINT}?${params.toString()}`;
+}
+
+function readConfigBatchWritePath(options: ApiConfigBatchWriteOptions): string {
+  const parsedInput = ConfigBatchWriteInputSchema.parse({
+    edits: options.edits.map((edit) => ({
+      keyPath: edit.keyPath,
+      value: edit.value,
+      mergeStrategy: edit.mergeStrategy,
+    })),
+    ...(options.filePath !== undefined ? { filePath: options.filePath } : {}),
+    ...(options.expectedVersion !== undefined ? { expectedVersion: options.expectedVersion } : {}),
+  });
+  const params = new URLSearchParams();
+  params.set("edits", JSON.stringify(parsedInput.edits));
+  if (options.agentId !== undefined) {
+    params.set("agentId", options.agentId);
+  }
+  if (parsedInput.filePath !== undefined) {
+    params.set("filePath", parsedInput.filePath);
+  }
+  if (parsedInput.expectedVersion !== undefined) {
+    params.set("expectedVersion", parsedInput.expectedVersion);
+  }
+  return `${CONFIG_BATCH_WRITE_ENDPOINT}?${params.toString()}`;
 }
 
 function readRemoteSkillsListPath(options: ApiListRemoteSkillsOptions): string {
@@ -270,6 +327,17 @@ export async function writeConfigValue(
 ): Promise<ApiConfigValueWriteResponse> {
   return ConfigValueWriteResponseSchema.parse(
     await request(readConfigValueWritePath(options), {
+      ...requestInitWithOptions(options),
+      method: "POST",
+    }),
+  );
+}
+
+export async function writeConfigBatch(
+  options: ApiConfigBatchWriteOptions,
+): Promise<ApiConfigBatchWriteResponse> {
+  return ConfigValueWriteResponseSchema.parse(
+    await request(readConfigBatchWritePath(options), {
       ...requestInitWithOptions(options),
       method: "POST",
     }),

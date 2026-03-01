@@ -24,6 +24,7 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationAp
   exportRemoteSkill: vi.fn(),
   listRemoteSkills: vi.fn(),
   startMcpServerOauthLogin: vi.fn(),
+  writeConfigBatch: vi.fn(),
   writeConfigValue: vi.fn(),
   writeSkillsConfig: vi.fn(),
 }));
@@ -51,6 +52,7 @@ import {
   exportRemoteSkill,
   listRemoteSkills,
   startMcpServerOauthLogin,
+  writeConfigBatch,
   writeConfigValue,
   writeSkillsConfig,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi";
@@ -63,6 +65,7 @@ import {
   type CapabilityAppsResponse,
   type CapabilityCollaborationModesResponse,
   type CapabilityCommandExecutionResponse,
+  type CapabilityConfigBatchWriteResponse,
   type CapabilityConfigDefaultsResponse,
   type CapabilityConfigRequirementsResponse,
   type CapabilityConfigValueWriteResponse,
@@ -248,6 +251,20 @@ const CONFIG_VALUE_WRITE_RESPONSE: CapabilityConfigValueWriteResponse = {
   overriddenMetadata: null,
 };
 
+const CONFIG_BATCH_WRITE_RESPONSE: CapabilityConfigBatchWriteResponse = {
+  ok: true,
+  status: "okOverridden",
+  version: "v4",
+  filePath: "/tmp/project/.codex/config.toml",
+  overriddenMetadata: {
+    message: "Workspace overrides one key from user-level configuration.",
+    overridingLayer: "workspace",
+    effectiveValue: {
+      enabled: true,
+    },
+  },
+};
+
 const REMOTE_SKILLS_LIST_RESPONSE: CapabilityRemoteSkillsListResponse = {
   ok: true,
   data: [
@@ -349,6 +366,7 @@ describe("CapabilityServerClient", () => {
     vi.mocked(reloadMcpServerConfig).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
     vi.mocked(startMcpServerOauthLogin).mockResolvedValue(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
     vi.mocked(executeCommand).mockResolvedValue(COMMAND_EXECUTION_RESPONSE);
+    vi.mocked(writeConfigBatch).mockResolvedValue(CONFIG_BATCH_WRITE_RESPONSE);
     vi.mocked(writeConfigValue).mockResolvedValue(CONFIG_VALUE_WRITE_RESPONSE);
     vi.mocked(writeSkillsConfig).mockResolvedValue(SKILLS_CONFIG_WRITE_RESPONSE);
     vi.mocked(listRemoteSkills).mockResolvedValue(REMOTE_SKILLS_LIST_RESPONSE);
@@ -443,6 +461,24 @@ describe("CapabilityServerClient", () => {
       filePath: "/tmp/project/.codex/config.toml",
       expectedVersion: "v2",
     };
+    const configBatchWriteOptions = {
+      actionId: "action-config-batch-write",
+      actionName: "write-config-batch",
+      edits: [
+        {
+          keyPath: "integrations.github.enabled",
+          value: true,
+          mergeStrategy: "replace" as const,
+        },
+        {
+          keyPath: "integrations.github.scopes",
+          value: ["repo"],
+          mergeStrategy: "upsert" as const,
+        },
+      ],
+      filePath: "/tmp/project/.codex/config.toml",
+      expectedVersion: "v3",
+    };
     const listRemoteSkillsOptions = {
       actionId: "action-remote-skills-list",
       actionName: "list-remote-skills",
@@ -501,6 +537,8 @@ describe("CapabilityServerClient", () => {
     );
     const commandExecutionResponse =
       await capabilityServerClient.executeCommand(commandExecutionOptions);
+    const configBatchWriteResponse =
+      await capabilityServerClient.writeConfigBatch(configBatchWriteOptions);
     const configValueWriteResponse =
       await capabilityServerClient.writeConfigValue(configValueWriteOptions);
     const skillsConfigWriteResponse =
@@ -530,6 +568,7 @@ describe("CapabilityServerClient", () => {
     expect(reloadMcpServerConfig).toHaveBeenCalledWith(reloadMcpServerConfigOptions);
     expect(startMcpServerOauthLogin).toHaveBeenCalledWith(mcpServerOauthLoginOptions);
     expect(executeCommand).toHaveBeenCalledWith(commandExecutionOptions);
+    expect(writeConfigBatch).toHaveBeenCalledWith(configBatchWriteOptions);
     expect(writeConfigValue).toHaveBeenCalledWith(configValueWriteOptions);
     expect(writeSkillsConfig).toHaveBeenCalledWith(skillsConfigWriteOptions);
     expect(listRemoteSkills).toHaveBeenCalledWith(listRemoteSkillsOptions);
@@ -552,6 +591,7 @@ describe("CapabilityServerClient", () => {
     expect(reloadMcpServerConfigResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
     expect(mcpServerOauthLoginResponse).toEqual(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
     expect(commandExecutionResponse).toEqual(COMMAND_EXECUTION_RESPONSE);
+    expect(configBatchWriteResponse).toEqual(CONFIG_BATCH_WRITE_RESPONSE);
     expect(configValueWriteResponse).toEqual(CONFIG_VALUE_WRITE_RESPONSE);
     expect(skillsConfigWriteResponse).toEqual(SKILLS_CONFIG_WRITE_RESPONSE);
     expect(remoteSkillsListResponse).toEqual(REMOTE_SKILLS_LIST_RESPONSE);

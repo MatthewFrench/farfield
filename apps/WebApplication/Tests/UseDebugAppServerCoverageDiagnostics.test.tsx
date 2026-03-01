@@ -195,6 +195,15 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
           },
         },
       });
+    const writeConfigBatch = vi
+      .spyOn(capabilityServerClient, "writeConfigBatch")
+      .mockResolvedValue({
+        ok: true,
+        status: "ok",
+        version: "v3",
+        filePath: "/tmp/project/.codex/config.toml",
+        overriddenMetadata: null,
+      });
     const writeSkillsConfig = vi
       .spyOn(capabilityServerClient, "writeSkillsConfig")
       .mockResolvedValue({
@@ -248,6 +257,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       "/tmp/project/.codex/config.toml",
       "v1",
     );
+    latestDiagnostics.current?.writeConfigBatch(
+      '[{\"keyPath\":\"integrations.github.enabled\",\"value\":true,\"mergeStrategy\":\"replace\"}]',
+      "/tmp/project/.codex/config.toml",
+      "v2",
+    );
     latestDiagnostics.current?.executeCommand(["pwd"], 1200, "/tmp/project");
     latestDiagnostics.current?.writeSkillsConfig(
       "/tmp/project/.codex/skills/checks/SKILL.md",
@@ -276,6 +290,18 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         mergeStrategy: "upsert",
         filePath: "/tmp/project/.codex/config.toml",
         expectedVersion: "v1",
+      });
+      expect(writeConfigBatch).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        edits: [
+          {
+            keyPath: "integrations.github.enabled",
+            value: true,
+            mergeStrategy: "replace",
+          },
+        ],
+        filePath: "/tmp/project/.codex/config.toml",
+        expectedVersion: "v2",
       });
       expect(writeSkillsConfig).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -306,6 +332,14 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         version: "v2",
         filePath: "/tmp/project/.codex/config.toml",
         overriddenMessage: "Workspace layer overrides parent configuration.",
+        writtenAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastConfigBatchWriteResult).toEqual({
+        editCount: 1,
+        status: "ok",
+        version: "v3",
+        filePath: "/tmp/project/.codex/config.toml",
+        overriddenMessage: null,
         writtenAtIso8601: expect.any(String),
       });
     });
