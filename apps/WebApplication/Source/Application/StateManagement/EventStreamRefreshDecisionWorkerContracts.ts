@@ -20,6 +20,7 @@ const EventStreamRefreshDecisionSchema = z
     refreshCore: z.boolean(),
     refreshHistory: z.boolean(),
     refreshSelectedThread: z.boolean(),
+    refreshNotificationProjections: z.boolean(),
     threadStreamDelta: FarfieldThreadStreamDeltaSchema.nullable(),
   })
   .strict();

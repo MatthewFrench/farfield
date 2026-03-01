@@ -15,6 +15,10 @@ import {
   useEventStreamEffects,
 } from "../Source/Application/StateManagement/UseEventStreamEffects";
 import {
+  type CapabilityNotificationEventsResponse,
+  CapabilityServerClient,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
+import {
   type DebugErrorListResponse,
   type DebugHistoryResponse,
   DebugServerClient,
@@ -25,6 +29,7 @@ import {
   type DebugWorkspaceDataSnapshot,
 } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
+import { type ThreadRuntimeStatusByThreadIdentifier } from "../Source/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { RequestCanceledError } from "../Source/Shared/Errors/RequestCanceledError";
 
 type DebugErrors = DebugErrorListResponse["data"];
@@ -38,26 +43,37 @@ const CORE_AND_SELECTED_THREAD_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: true,
   refreshHistory: false,
   refreshSelectedThread: true,
+  refreshNotificationProjections: false,
 };
 const SELECTED_THREAD_ONLY_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: false,
   refreshHistory: false,
   refreshSelectedThread: true,
+  refreshNotificationProjections: false,
 };
 const DEBUG_HISTORY_ONLY_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: false,
   refreshHistory: true,
   refreshSelectedThread: false,
+  refreshNotificationProjections: false,
 };
 const CORE_ONLY_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: true,
   refreshHistory: false,
   refreshSelectedThread: false,
+  refreshNotificationProjections: false,
 };
 const CORE_AND_HISTORY_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: true,
   refreshHistory: true,
   refreshSelectedThread: false,
+  refreshNotificationProjections: false,
+};
+const NOTIFICATION_PROJECTION_ONLY_REFRESH_FLAGS: EventRefreshFlags = {
+  refreshCore: false,
+  refreshHistory: false,
+  refreshSelectedThread: false,
+  refreshNotificationProjections: true,
 };
 
 interface HarnessProperties {
@@ -161,12 +177,36 @@ function createDebugSnapshot(): DebugWorkspaceDataSnapshot {
   };
 }
 
+function createNotificationEventsResponse(): CapabilityNotificationEventsResponse {
+  return {
+    ok: true,
+    events: [
+      {
+        sequence: 41,
+        method: "thread/status/changed",
+        params: {
+          threadId: "thread-1",
+          status: {
+            type: "active",
+            activeFlags: ["waitingOnApproval"],
+          },
+        },
+        receivedAtMilliseconds: 2_001,
+      },
+    ],
+    nextSequence: 42,
+    firstAvailableSequence: 0,
+    resetRequired: false,
+  };
+}
+
 function createBaseInput(
   eventStreamConnectionCoordinator: TestEventStreamConnectionCoordinator,
   debugWorkspaceDataReader: TestDebugWorkspaceDataReader,
 ): UseEventStreamEffectsInput {
   const loadCoreDataTracked = vi.fn(async (): Promise<void> => {});
   const loadSelectedThread = vi.fn(async (_threadId: string): Promise<void> => {});
+  const capabilityServerClient = new CapabilityServerClient();
 
   return {
     debugHistoryLimit: DEBUG_HISTORY_LIMIT,
@@ -185,6 +225,11 @@ function createBaseInput(
     debugWorkspaceStateStore: new DebugWorkspaceStateStore(),
     debugErrorsSignatureRef: { current: [] },
     eventsConnectedRef: { current: false },
+    capabilityServerClient,
+    selectedAgentId: "codex",
+    canReadNotificationEvents: false,
+    setThreadRuntimeStatusByThreadIdentifier:
+      createDispatchSpy<ThreadRuntimeStatusByThreadIdentifier>(),
     setHistory: createDispatchSpy<DebugHistory>(),
     setDebugErrors: createDispatchSpy<DebugErrors>(),
     setDebugErrorSessionId: createDispatchSpy<string>(),
@@ -372,6 +417,57 @@ describe("useEventStreamEffects", () => {
 
     expect(input.loadCoreDataTrackedRef.current).toHaveBeenCalledTimes(1);
     expect(debugWorkspaceDataReader.readSnapshotCallCount).toBe(0);
+  });
+
+  it("projects thread runtime status updates from notification-event reads", async () => {
+    setDocumentVisibilityState("visible");
+
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    input.canReadNotificationEvents = true;
+    const setThreadRuntimeStatusByThreadIdentifier = vi.fn(
+      (_nextValue: SetStateAction<ThreadRuntimeStatusByThreadIdentifier>): void => {},
+    );
+    input.setThreadRuntimeStatusByThreadIdentifier = setThreadRuntimeStatusByThreadIdentifier;
+    const readNotificationEvents = vi
+      .spyOn(input.capabilityServerClient, "readNotificationEvents")
+      .mockResolvedValue(createNotificationEventsResponse());
+
+    render(<Harness input={input} />);
+
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
+    await startInput.executeScheduledRefresh(NOTIFICATION_PROJECTION_ONLY_REFRESH_FLAGS);
+
+    expect(readNotificationEvents).toHaveBeenCalledWith({
+      agentId: "codex",
+      limit: 80,
+      sinceSequence: null,
+    });
+
+    const updateStateAction = setThreadRuntimeStatusByThreadIdentifier.mock.calls
+      .map((call) => call[0])
+      .find(
+        (
+          action,
+        ): action is (
+          previousValue: ThreadRuntimeStatusByThreadIdentifier,
+        ) => ThreadRuntimeStatusByThreadIdentifier => typeof action === "function",
+      );
+    if (updateStateAction === undefined) {
+      throw new Error("Expected a thread-runtime-status update state action");
+    }
+
+    expect(updateStateAction({})).toEqual({
+      "thread-1": {
+        sequence: 41,
+        statusType: "active",
+        activeFlags: ["waitingOnApproval"],
+        receivedAtMilliseconds: 2_001,
+      },
+    });
   });
 
   it("suppresses canceled-request errors from runtime error reporting", async () => {

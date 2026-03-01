@@ -3,6 +3,7 @@ import type {
   ThreadListItem,
   ThreadProjectGroup,
 } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { type ThreadRuntimeStatusByThreadIdentifier } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 
 export interface ThreadListPaneAgentDescriptor {
@@ -39,6 +40,7 @@ export interface ThreadListPaneProperties {
   selectedThreadId: string | null;
   collapsedThreadProjectGroups: ThreadListPaneCollapsedProjectGroups;
   unreadThreadIds: ThreadListPaneUnreadThreadIdentifiers;
+  threadRuntimeStatusByThreadIdentifier: ThreadRuntimeStatusByThreadIdentifier;
   isGenerating: boolean;
   onToggleThreadProjectGroup: ThreadListPaneToggleProjectGroup;
   onCreateThreadForSingleAgent: ThreadListPaneCreateThreadForSingleAgent;

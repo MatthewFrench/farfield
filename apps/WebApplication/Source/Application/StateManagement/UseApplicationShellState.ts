@@ -29,6 +29,7 @@ import {
 } from "@/Features/PushNotifications/DataAccess/PushServerClient";
 import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/SettingsWorkspaceSectionContracts";
 import { type ThreadListResponse } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { type ThreadRuntimeStatusByThreadIdentifier } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import { useApplicationArchivedThreadState } from "./UseApplicationArchivedThreadState";
@@ -108,6 +109,10 @@ function createInitialUnreadThreadIdentifierMap(): UnreadThreadIdentifierMap {
   return {};
 }
 
+function createInitialThreadRuntimeStatusByThreadIdentifier(): ThreadRuntimeStatusByThreadIdentifier {
+  return {};
+}
+
 function createInitialStreamEvents(): ChatStreamEventsResponse["events"] {
   return [];
 }
@@ -171,6 +176,10 @@ export function useApplicationShellState(
   const [unreadThreadIds, setUnreadThreadIds] = useState<UnreadThreadIdentifierMap>(
     createInitialUnreadThreadIdentifierMap,
   );
+  const [threadRuntimeStatusByThreadIdentifier, setThreadRuntimeStatusByThreadIdentifier] =
+    useState<ThreadRuntimeStatusByThreadIdentifier>(
+      createInitialThreadRuntimeStatusByThreadIdentifier,
+    );
   const applicationArchivedThreadState = useApplicationArchivedThreadState();
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(
     routeSeededShellState.selectedThreadIdentifier,
@@ -297,6 +306,8 @@ export function useApplicationShellState(
     setThreads,
     unreadThreadIds,
     setUnreadThreadIds,
+    threadRuntimeStatusByThreadIdentifier,
+    setThreadRuntimeStatusByThreadIdentifier,
     ...applicationArchivedThreadState,
     selectedThreadId,
     setSelectedThreadId,

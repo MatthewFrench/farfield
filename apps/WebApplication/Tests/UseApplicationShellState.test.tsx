@@ -112,6 +112,7 @@ describe("useApplicationShellState", () => {
     expect(applicationShellState.error).toBe("");
     expect(applicationShellState.traceLabel).toBe("capture");
     expect(applicationShellState.traceNote).toBe("");
+    expect(applicationShellState.threadRuntimeStatusByThreadIdentifier).toEqual({});
     expect(applicationShellState.selectedModeKey).toBe("");
     expect(applicationShellState.selectedModelId).toBe("");
     expect(applicationShellState.selectedReasoningEffort).toBe("");

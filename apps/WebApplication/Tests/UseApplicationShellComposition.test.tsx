@@ -432,6 +432,8 @@ describe("useApplicationShellComposition", () => {
         startThreadReview: threadActionHandlersFixture.runStartThreadReview,
         setThreadName: threadActionHandlersFixture.runSetThreadName,
         unarchiveThread: threadActionHandlersFixture.runUnarchiveThread,
+        threadRuntimeStatusByThreadIdentifier:
+          runtimeHarnessSnapshot.applicationShellState.threadRuntimeStatusByThreadIdentifier,
         formatDate: fixture.formatDateValue,
         renderAgentFavicon: fixture.renderAgentFavicon,
       }),

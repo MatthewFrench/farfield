@@ -17,6 +17,7 @@ const BASE_THREAD_LIST_PANE_PROPERTIES: ThreadListPaneProperties = {
   selectedThreadId: null,
   collapsedThreadProjectGroups: {},
   unreadThreadIds: {},
+  threadRuntimeStatusByThreadIdentifier: {},
   isGenerating: false,
   onToggleThreadProjectGroup: () => {},
   onCreateThreadForSingleAgent: () => {},

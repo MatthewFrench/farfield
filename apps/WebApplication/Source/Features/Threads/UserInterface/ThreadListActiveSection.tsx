@@ -30,6 +30,11 @@ import {
   THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER,
   THREAD_GROUP_NO_PROJECT_TOOLTIP,
 } from "@/Features/Threads/UserInterface/ThreadListUserInterfaceConstants";
+import {
+  readThreadRuntimeStatusBadgeClasses,
+  readThreadRuntimeStatusBadgeLabel,
+  readThreadRuntimeStatusBadgeTitle,
+} from "@/Features/Threads/UserInterface/ThreadRuntimeStatusBadgeMetadata";
 
 interface ThreadListActiveSectionProps {
   properties: ThreadListPaneProperties;
@@ -141,6 +146,8 @@ export function ThreadListActiveSection({
                       const isSelected = thread.id === properties.selectedThreadId;
                       const hasUnread =
                         properties.unreadThreadIds[thread.id] === true && !isSelected;
+                      const threadRuntimeStatus =
+                        properties.threadRuntimeStatusByThreadIdentifier[thread.id];
                       const threadIsGenerating = isSelected && properties.isGenerating;
                       const canArchive =
                         thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
@@ -226,6 +233,15 @@ export function ThreadListActiveSection({
                                 {ThreadGroupSelectors.threadLabel(thread)}
                               </span>
                               <span className="shrink-0 flex items-center gap-1.5">
+                                <span
+                                  data-testid={`thread-runtime-status-badge-${thread.id}`}
+                                  title={readThreadRuntimeStatusBadgeTitle(threadRuntimeStatus)}
+                                  className={`rounded-full px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${readThreadRuntimeStatusBadgeClasses(
+                                    threadRuntimeStatus,
+                                  )}`}
+                                >
+                                  {readThreadRuntimeStatusBadgeLabel(threadRuntimeStatus)}
+                                </span>
                                 {thread.isLoadedInMemory === true && (
                                   <span
                                     data-testid={`thread-loaded-indicator-${thread.id}`}

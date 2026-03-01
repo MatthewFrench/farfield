@@ -2,12 +2,14 @@ export interface EventRefreshFlags {
   refreshCore: boolean;
   refreshHistory: boolean;
   refreshSelectedThread: boolean;
+  refreshNotificationProjections: boolean;
 }
 
 const EMPTY_EVENT_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: false,
   refreshHistory: false,
   refreshSelectedThread: false,
+  refreshNotificationProjections: false,
 };
 
 function createEmptyEventRefreshFlags(): EventRefreshFlags {
@@ -15,6 +17,7 @@ function createEmptyEventRefreshFlags(): EventRefreshFlags {
     refreshCore: EMPTY_EVENT_REFRESH_FLAGS.refreshCore,
     refreshHistory: EMPTY_EVENT_REFRESH_FLAGS.refreshHistory,
     refreshSelectedThread: EMPTY_EVENT_REFRESH_FLAGS.refreshSelectedThread,
+    refreshNotificationProjections: EMPTY_EVENT_REFRESH_FLAGS.refreshNotificationProjections,
   };
 }
 
@@ -27,12 +30,18 @@ export function mergeEventRefreshFlags(
     refreshHistory: existingRefreshFlags.refreshHistory || nextRefreshFlags.refreshHistory,
     refreshSelectedThread:
       existingRefreshFlags.refreshSelectedThread || nextRefreshFlags.refreshSelectedThread,
+    refreshNotificationProjections:
+      existingRefreshFlags.refreshNotificationProjections ||
+      nextRefreshFlags.refreshNotificationProjections,
   };
 }
 
 export function hasEventRefreshWork(refreshFlags: EventRefreshFlags): boolean {
   return (
-    refreshFlags.refreshCore || refreshFlags.refreshHistory || refreshFlags.refreshSelectedThread
+    refreshFlags.refreshCore ||
+    refreshFlags.refreshHistory ||
+    refreshFlags.refreshSelectedThread ||
+    refreshFlags.refreshNotificationProjections
   );
 }
 

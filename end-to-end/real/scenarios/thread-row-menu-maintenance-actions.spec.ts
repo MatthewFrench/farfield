@@ -225,13 +225,18 @@ test("row-menu compact and clean actions keep row identity stable and show succe
   const threadRow = page.locator(
     `[data-testid="thread-list-item"][data-thread-id="${ThreadIdentifier}"]`,
   );
+  const threadRuntimeStatusBadge = page.getByTestId(
+    `thread-runtime-status-badge-${ThreadIdentifier}`,
+  );
   await expect(threadRow).toBeVisible();
+  await expect(threadRuntimeStatusBadge).toHaveText("Not loaded");
   await threadRow.click();
 
   await threadRow.evaluate((element) => {
     const threadRowElement = element as ThreadRowIdentityProbeElement;
     threadRowElement.__threadRowIdentityProbe__ = ThreadRowIdentityProbeValue;
   });
+  const runtimeStatusBadgeBefore = await threadRuntimeStatusBadge.evaluateHandle((node) => node);
 
   await clickThreadRowMenuAction(page, ThreadIdentifier, "Compact context");
   await expect(page.getByTestId("success-banner-message")).toContainText("Compaction started.");
@@ -286,6 +291,13 @@ test("row-menu compact and clean actions keep row identity stable and show succe
     },
   );
   expect(cleanIdentityIsStable).toBe(true);
+
+  const runtimeStatusBadgeAfter = await threadRuntimeStatusBadge.evaluateHandle((node) => node);
+  const runtimeStatusBadgeIdentityIsStable = await runtimeStatusBadgeBefore.evaluate(
+    (previousNode, nextNode) => previousNode === nextNode,
+    runtimeStatusBadgeAfter,
+  );
+  expect(runtimeStatusBadgeIdentityIsStable).toBe(true);
 
   await expectNoErrorBanner(page);
   await expectNoUnexpectedClientErrors(sentinel);

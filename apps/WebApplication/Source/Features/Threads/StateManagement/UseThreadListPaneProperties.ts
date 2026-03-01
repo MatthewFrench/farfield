@@ -3,6 +3,7 @@ import {
   type ThreadListItem,
   type ThreadProjectGroup,
 } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { type ThreadRuntimeStatusByThreadIdentifier } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import {
   type ThreadListPaneAgentDescriptor,
   type ThreadListPaneProperties,
@@ -22,6 +23,7 @@ export interface UseThreadListPanePropertiesInput {
   selectedThreadId: string | null;
   collapsedThreadProjectGroups: Record<string, boolean>;
   unreadThreadIds: Record<string, true>;
+  threadRuntimeStatusByThreadIdentifier: ThreadRuntimeStatusByThreadIdentifier;
   isGenerating: boolean;
   setCollapsedThreadProjectGroups: Dispatch<SetStateAction<Record<string, boolean>>>;
   createThreadForSingleAgent: (projectPath: string) => void;
@@ -66,6 +68,7 @@ export function useThreadListPaneProperties(
     selectedThreadId,
     collapsedThreadProjectGroups,
     unreadThreadIds,
+    threadRuntimeStatusByThreadIdentifier,
     isGenerating,
     setCollapsedThreadProjectGroups,
     createThreadForSingleAgent,
@@ -108,6 +111,7 @@ export function useThreadListPaneProperties(
       selectedThreadId,
       collapsedThreadProjectGroups,
       unreadThreadIds,
+      threadRuntimeStatusByThreadIdentifier,
       isGenerating,
       onToggleThreadProjectGroup: (groupKey, nextCollapsed) => {
         setCollapsedThreadProjectGroups((previous) => ({
@@ -206,6 +210,7 @@ export function useThreadListPaneProperties(
       setSelectedThreadId,
       threadListState,
       threads,
+      threadRuntimeStatusByThreadIdentifier,
       unarchiveThread,
       unreadThreadIds,
     ],

@@ -88,6 +88,7 @@ function createThreadListPaneProperties(
     selectedThreadId: null,
     collapsedThreadProjectGroups: {},
     unreadThreadIds: {},
+    threadRuntimeStatusByThreadIdentifier: {},
     isGenerating: false,
     onToggleThreadProjectGroup: () => {},
     onCreateThreadForSingleAgent: () => {},
@@ -168,6 +169,31 @@ describe("ThreadListPane", () => {
     expect(screen.queryByText("Archived regression follow-up")).toBeNull();
     expect(screen.getByTestId("thread-list-search-summary").textContent).toContain(
       "No matching threads",
+    );
+  });
+
+  it("renders runtime status badges for thread rows", () => {
+    cleanup();
+    render(
+      <ThreadListPane
+        {...createThreadListPaneProperties({
+          threadRuntimeStatusByThreadIdentifier: {
+            thread_active_one: {
+              sequence: 22,
+              statusType: "active",
+              activeFlags: ["waitingOnApproval"],
+              receivedAtMilliseconds: 8_450,
+            },
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("thread-runtime-status-badge-thread_active_one").textContent).toBe(
+      "Awaiting approval",
+    );
+    expect(screen.getByTestId("thread-runtime-status-badge-thread_active_two").textContent).toBe(
+      "Not loaded",
     );
   });
 });

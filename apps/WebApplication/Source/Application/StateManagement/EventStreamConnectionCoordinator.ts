@@ -70,6 +70,7 @@ function readInitialRefreshFlags(snapshot: EventStreamConnectionSnapshot): Event
     refreshCore: true,
     refreshHistory: snapshot.activeTab === DEBUG_ACTIVE_TAB,
     refreshSelectedThread: Boolean(snapshot.selectedThreadId),
+    refreshNotificationProjections: false,
   };
 }
 
@@ -78,6 +79,7 @@ function readRefreshFlagsFromDecision(decision: EventStreamRefreshDecision): Eve
     refreshCore: decision.refreshCore,
     refreshHistory: decision.refreshHistory,
     refreshSelectedThread: decision.refreshSelectedThread,
+    refreshNotificationProjections: decision.refreshNotificationProjections,
   };
 }
 
@@ -88,6 +90,7 @@ function readRefreshFlagsFromDecisionFailure(
     refreshCore: true,
     refreshHistory: snapshot.activeTab === DEBUG_ACTIVE_TAB,
     refreshSelectedThread: false,
+    refreshNotificationProjections: false,
   };
 }
 

@@ -211,8 +211,13 @@ export function buildSelectedThreadLifecycleEffectsInput(
 export function buildEventStreamEffectsInput(
   context: ApplicationRuntimeCompositionContext,
 ): UseEventStreamEffectsInput {
-  const { input, applicationShellState, applicationOwnerDependencies, runtimeRequestHandlers } =
-    context;
+  const {
+    input,
+    applicationShellState,
+    applicationDerivedState,
+    applicationOwnerDependencies,
+    runtimeRequestHandlers,
+  } = context;
   return {
     debugHistoryLimit: input.debugHistoryLimit,
     debugErrorListLimit: input.debugErrorListLimit,
@@ -228,6 +233,12 @@ export function buildEventStreamEffectsInput(
     debugWorkspaceStateStore: applicationOwnerDependencies.debugWorkspaceStateStore,
     debugErrorsSignatureRef: applicationShellState.debugErrorsSignatureRef,
     eventsConnectedRef: applicationShellState.eventsConnectedRef,
+    capabilityServerClient: applicationOwnerDependencies.capabilityServerClient,
+    selectedAgentId: applicationShellState.selectedAgentId,
+    canReadNotificationEvents:
+      applicationDerivedState.activeAgentCapabilities?.canReadNotificationEvents === true,
+    setThreadRuntimeStatusByThreadIdentifier:
+      applicationShellState.setThreadRuntimeStatusByThreadIdentifier,
     setHistory: applicationShellState.setHistory,
     setDebugErrors: applicationShellState.setDebugErrors,
     setDebugErrorSessionId: applicationShellState.setDebugErrorSessionId,

@@ -10,11 +10,13 @@ function createRefreshFlags(input: {
   refreshCore: boolean;
   refreshHistory: boolean;
   refreshSelectedThread: boolean;
+  refreshNotificationProjections?: boolean;
 }): EventRefreshFlags {
   return {
     refreshCore: input.refreshCore,
     refreshHistory: input.refreshHistory,
     refreshSelectedThread: input.refreshSelectedThread,
+    refreshNotificationProjections: input.refreshNotificationProjections ?? false,
   };
 }
 
@@ -43,6 +45,7 @@ describe("EventRefreshScheduler", () => {
         refreshCore: false,
         refreshHistory: true,
         refreshSelectedThread: true,
+        refreshNotificationProjections: true,
       }),
       async (refreshFlags) => {
         executedRefreshFlags.push(refreshFlags);
@@ -56,6 +59,7 @@ describe("EventRefreshScheduler", () => {
         refreshCore: true,
         refreshHistory: true,
         refreshSelectedThread: true,
+        refreshNotificationProjections: true,
       }),
     ]);
   });

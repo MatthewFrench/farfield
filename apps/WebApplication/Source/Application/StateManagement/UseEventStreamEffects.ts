@@ -4,7 +4,12 @@ import {
   type SetStateAction,
   startTransition,
   useEffect,
+  useRef,
 } from "react";
+import {
+  type CapabilityReadNotificationEventsOptions,
+  type CapabilityServerClient,
+} from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type ApplySelectedThreadStreamDeltaInput } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import type {
   DebugErrorListResponse,
@@ -12,14 +17,20 @@ import type {
 } from "@/Features/Debugging/DataAccess/DebugServerClient";
 import { DebugWorkspaceDataReader } from "@/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
+import { type ThreadRuntimeStatusByThreadIdentifier } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
+import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
 import { type EventRefreshFlags, EventRefreshScheduler } from "./EventRefreshScheduler";
 import { EventStreamConnectionCoordinator } from "./EventStreamConnectionCoordinator";
 import { type EventStreamRefreshDecisionReader } from "./EventStreamRefreshDecisionEngine";
+import { readRuntimeNotificationProjection } from "./RuntimeNotificationProjectionParser";
+import { RuntimeNotificationReadObservabilityOwner } from "./RuntimeNotificationReadObservabilityOwner";
+import { applyRuntimeThreadStatusUpdates } from "./RuntimeThreadStatusStateReducer";
 import type { SelectedThreadLoaderOptions } from "./UseCoreDataLoaders";
 
 const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
 const DEBUG_APPLICATION_TAB = "debug";
+const NOTIFICATION_EVENTS_REFRESH_LIMIT = 80;
 const SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS: SelectedThreadLoaderOptions = {
   includeReadThread: true,
   includeTurns: false,
@@ -28,6 +39,10 @@ const SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS: SelectedThreadLoaderOptions =
 interface ScheduledRefreshExecutionSnapshot {
   activeTab: "chat" | "debug";
   selectedThreadId: string | null;
+}
+
+interface RuntimeNotificationProjectionCursorState {
+  nextSequence: number | null;
 }
 
 function isScheduledRefreshDocumentVisible(): boolean {
@@ -53,6 +68,27 @@ function shouldRefreshDebugWorkspace(
   );
 }
 
+function createInitialRuntimeNotificationProjectionCursorState(): RuntimeNotificationProjectionCursorState {
+  return {
+    nextSequence: null,
+  };
+}
+
+function createEmptyThreadRuntimeStatusByThreadIdentifier(): ThreadRuntimeStatusByThreadIdentifier {
+  return {};
+}
+
+function readNotificationEventsRequestOptions(input: {
+  selectedAgentId: AgentId;
+  notificationProjectionCursorState: RuntimeNotificationProjectionCursorState;
+}): CapabilityReadNotificationEventsOptions {
+  return {
+    agentId: input.selectedAgentId,
+    limit: NOTIFICATION_EVENTS_REFRESH_LIMIT,
+    sinceSequence: input.notificationProjectionCursorState.nextSequence,
+  };
+}
+
 export interface UseEventStreamEffectsInput {
   debugHistoryLimit: number;
   debugErrorListLimit: number;
@@ -70,6 +106,12 @@ export interface UseEventStreamEffectsInput {
   debugWorkspaceStateStore: DebugWorkspaceStateStore;
   debugErrorsSignatureRef: MutableRefObject<string[]>;
   eventsConnectedRef: MutableRefObject<boolean>;
+  capabilityServerClient: CapabilityServerClient;
+  selectedAgentId: AgentId;
+  canReadNotificationEvents: boolean;
+  setThreadRuntimeStatusByThreadIdentifier: Dispatch<
+    SetStateAction<ThreadRuntimeStatusByThreadIdentifier>
+  >;
   setHistory: Dispatch<SetStateAction<DebugHistoryResponse["history"]>>;
   setDebugErrors: Dispatch<SetStateAction<DebugErrorListResponse["data"]>>;
   setDebugErrorSessionId: Dispatch<SetStateAction<string>>;
@@ -79,6 +121,23 @@ export interface UseEventStreamEffectsInput {
 }
 
 export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
+  const runtimeNotificationProjectionCursorStateRef =
+    useRef<RuntimeNotificationProjectionCursorState>(
+      createInitialRuntimeNotificationProjectionCursorState(),
+    );
+  const runtimeNotificationReadObservabilityOwnerRef =
+    useRef<RuntimeNotificationReadObservabilityOwner>(
+      new RuntimeNotificationReadObservabilityOwner(),
+    );
+
+  useEffect(() => {
+    runtimeNotificationProjectionCursorStateRef.current =
+      createInitialRuntimeNotificationProjectionCursorState();
+    input.setThreadRuntimeStatusByThreadIdentifier(
+      createEmptyThreadRuntimeStatusByThreadIdentifier(),
+    );
+  }, [input.selectedAgentId, input.setThreadRuntimeStatusByThreadIdentifier]);
+
   useEffect(() => {
     let shouldStopConnectionStart = false;
     const startEventStreamConnection = async (): Promise<void> => {
@@ -160,6 +219,61 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
                 );
               }
 
+              if (flags.refreshNotificationProjections && input.canReadNotificationEvents) {
+                const runtimeNotificationProjectionCursorState =
+                  runtimeNotificationProjectionCursorStateRef.current;
+                const notificationEventsResponse =
+                  await input.capabilityServerClient.readNotificationEvents(
+                    readNotificationEventsRequestOptions({
+                      selectedAgentId: input.selectedAgentId,
+                      notificationProjectionCursorState: runtimeNotificationProjectionCursorState,
+                    }),
+                  );
+                const runtimeNotificationProjection = readRuntimeNotificationProjection(
+                  notificationEventsResponse,
+                );
+                runtimeNotificationProjectionCursorStateRef.current = {
+                  nextSequence: runtimeNotificationProjection.nextSequence,
+                };
+
+                input.setThreadRuntimeStatusByThreadIdentifier((previousThreadStatusByThreadId) => {
+                  if (
+                    runtimeNotificationProjection.resetRequired &&
+                    runtimeNotificationProjection.threadStatusUpdates.length === 0
+                  ) {
+                    return Object.keys(previousThreadStatusByThreadId).length > 0
+                      ? createEmptyThreadRuntimeStatusByThreadIdentifier()
+                      : previousThreadStatusByThreadId;
+                  }
+
+                  const baselineThreadStatusByThreadIdentifier =
+                    runtimeNotificationProjection.resetRequired
+                      ? createEmptyThreadRuntimeStatusByThreadIdentifier()
+                      : previousThreadStatusByThreadId;
+
+                  if (runtimeNotificationProjection.threadStatusUpdates.length === 0) {
+                    return baselineThreadStatusByThreadIdentifier;
+                  }
+
+                  const updateResult = applyRuntimeThreadStatusUpdates({
+                    previousStatusByThreadIdentifier: baselineThreadStatusByThreadIdentifier,
+                    updates: runtimeNotificationProjection.threadStatusUpdates,
+                  });
+
+                  return updateResult.nextStatusByThreadIdentifier;
+                });
+
+                runtimeNotificationReadObservabilityOwnerRef.current.recordRead({
+                  processedEventCount: runtimeNotificationProjection.processedEventCount,
+                  relevantEventCount: runtimeNotificationProjection.relevantEventCount,
+                  threadStatusUpdateCount: runtimeNotificationProjection.threadStatusUpdates.length,
+                  requestedRateLimitRefresh:
+                    runtimeNotificationProjection.shouldRefreshAccountRateLimits,
+                  requestedAppsRefresh: runtimeNotificationProjection.shouldRefreshApps,
+                  resetRequired: runtimeNotificationProjection.resetRequired,
+                });
+              }
+
               if (refreshOperations.length > 0) {
                 await Promise.all(refreshOperations);
               }
@@ -211,11 +325,15 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
     input.eventStreamConnectionCoordinator,
     input.eventStreamRefreshDecisionEngine,
     input.eventsConnectedRef,
+    input.capabilityServerClient,
+    input.selectedAgentId,
+    input.canReadNotificationEvents,
     input.applySelectedThreadStreamDelta,
     input.handleRuntimeRequestError,
     input.loadCoreDataTrackedRef,
     input.loadSelectedThreadRef,
     input.selectedThreadIdRef,
+    input.setThreadRuntimeStatusByThreadIdentifier,
     input.setDebugErrorSessionId,
     input.setDebugErrorSessionLogPath,
     input.setDebugErrors,

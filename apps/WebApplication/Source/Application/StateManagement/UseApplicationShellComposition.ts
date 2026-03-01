@@ -173,6 +173,8 @@ function buildThreadListPanePropertiesInput(
     selectedThreadId: applicationShellState.selectedThreadId,
     collapsedThreadProjectGroups: applicationShellState.collapsedThreadProjectGroups,
     unreadThreadIds: applicationShellState.unreadThreadIds,
+    threadRuntimeStatusByThreadIdentifier:
+      applicationShellState.threadRuntimeStatusByThreadIdentifier,
     isGenerating: applicationDerivedState.isGenerating,
     setCollapsedThreadProjectGroups: applicationShellState.setCollapsedThreadProjectGroups,
     createThreadForSingleAgent: threadActionHandlers.createThreadForSingleAgent,

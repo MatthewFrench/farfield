@@ -30,6 +30,7 @@ describe("EventStreamRefreshDecisionEngine", () => {
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
+      refreshNotificationProjections: false,
       threadStreamDelta: null,
     });
   });
@@ -66,6 +67,7 @@ describe("EventStreamRefreshDecisionEngine", () => {
       refreshCore: false,
       refreshHistory: true,
       refreshSelectedThread: true,
+      refreshNotificationProjections: false,
       threadStreamDelta: null,
     });
   });
@@ -101,6 +103,7 @@ describe("EventStreamRefreshDecisionEngine", () => {
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
+      refreshNotificationProjections: false,
       threadStreamDelta: null,
     });
   });
@@ -136,6 +139,44 @@ describe("EventStreamRefreshDecisionEngine", () => {
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
+      refreshNotificationProjections: false,
+      threadStreamDelta: null,
+    });
+  });
+
+  it("marks runtime-notification projection work when thread status updates are present", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "chat",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 9,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: "entry-9",
+            at: "2026-02-26T00:00:00.000Z",
+            source: "app",
+            direction: "out",
+            payload: {
+              type: "action",
+              action: "thread/status/changed",
+            },
+            meta: {
+              method: "thread/status/changed",
+              threadId: "thread-1",
+            },
+          },
+        },
+      }),
+    });
+
+    expect(decision).toEqual({
+      refreshCore: true,
+      refreshHistory: false,
+      refreshSelectedThread: true,
+      refreshNotificationProjections: true,
       threadStreamDelta: null,
     });
   });
@@ -172,6 +213,7 @@ describe("EventStreamRefreshDecisionEngine", () => {
       refreshCore: false,
       refreshHistory: true,
       refreshSelectedThread: false,
+      refreshNotificationProjections: false,
       threadStreamDelta: null,
     });
   });
@@ -208,6 +250,7 @@ describe("EventStreamRefreshDecisionEngine", () => {
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
+      refreshNotificationProjections: false,
       threadStreamDelta: null,
     });
   });
@@ -290,6 +333,7 @@ describe("EventStreamRefreshDecisionEngine", () => {
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
+      refreshNotificationProjections: false,
       threadStreamDelta: null,
     });
   });
@@ -315,6 +359,7 @@ describe("EventStreamRefreshDecisionEngine", () => {
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
+      refreshNotificationProjections: false,
       threadStreamDelta: null,
     });
   });
@@ -332,6 +377,7 @@ describe("EventStreamRefreshDecisionEngine", () => {
       refreshCore: true,
       refreshHistory: false,
       refreshSelectedThread: false,
+      refreshNotificationProjections: false,
       threadStreamDelta: null,
     });
   });
@@ -357,6 +403,7 @@ describe("EventStreamRefreshDecisionEngine", () => {
       refreshCore: true,
       refreshHistory: true,
       refreshSelectedThread: false,
+      refreshNotificationProjections: false,
       threadStreamDelta: null,
     });
   });

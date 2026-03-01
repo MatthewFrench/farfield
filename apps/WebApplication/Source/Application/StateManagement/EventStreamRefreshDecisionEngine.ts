@@ -9,7 +9,15 @@ const EVENT_TYPE_RUNTIME_STATE_CHANGED = "runtime-state-changed";
 const EVENT_TYPE_ACTIVITY_HISTORY_APPENDED = "activity-history-appended";
 const EVENT_TYPE_THREAD_STREAM_DELTA = "thread-stream-delta";
 const THREAD_STREAM_STATE_CHANGED_METHOD = "thread-stream-state-changed";
+const THREAD_STATUS_CHANGED_NOTIFICATION_METHOD = "thread/status/changed";
+const ACCOUNT_RATE_LIMITS_UPDATED_NOTIFICATION_METHOD = "account/rateLimits/updated";
+const APP_LIST_UPDATED_NOTIFICATION_METHOD = "app/list/updated";
 const CORE_REFRESH_HISTORY_ENTRY_SOURCES = new Set(["app", "system"]);
+const RUNTIME_NOTIFICATION_PROJECTION_METHODS = new Set([
+  THREAD_STATUS_CHANGED_NOTIFICATION_METHOD,
+  ACCOUNT_RATE_LIMITS_UPDATED_NOTIFICATION_METHOD,
+  APP_LIST_UPDATED_NOTIFICATION_METHOD,
+]);
 const EVENT_HISTORY_REFRESH_METADATA_STRING_SCHEMA = z.preprocess(
   (value) => (typeof value === "string" && value.length > 0 ? value : null),
   z.string().min(1).nullable(),
@@ -76,6 +84,7 @@ export interface EventStreamRefreshDecision {
   refreshCore: boolean;
   refreshHistory: boolean;
   refreshSelectedThread: boolean;
+  refreshNotificationProjections: boolean;
   threadStreamDelta: FarfieldThreadStreamDelta | null;
 }
 
@@ -100,6 +109,7 @@ export class EventStreamRefreshDecisionEngine implements EventStreamRefreshDecis
     let refreshCore = false;
     let refreshHistory = false;
     let refreshSelectedThread = false;
+    let refreshNotificationProjections = false;
     let threadStreamDelta: FarfieldThreadStreamDelta | null = null;
     const refreshHistoryForDebugTab = input.activeTab === DEBUG_ACTIVE_TAB;
 
@@ -122,6 +132,7 @@ export class EventStreamRefreshDecisionEngine implements EventStreamRefreshDecis
             refreshCore,
             refreshHistory,
             refreshSelectedThread,
+            refreshNotificationProjections,
             threadStreamDelta,
           };
         }
@@ -132,6 +143,9 @@ export class EventStreamRefreshDecisionEngine implements EventStreamRefreshDecis
         );
         const eventMethod = eventHistoryRefreshMetadata.method;
         const eventThreadId = eventHistoryRefreshMetadata.threadId;
+        if (eventMethod !== null && RUNTIME_NOTIFICATION_PROJECTION_METHODS.has(eventMethod)) {
+          refreshNotificationProjections = true;
+        }
         const isThreadOnlyMethod =
           eventMethod !== null && this.threadOnlyHistoryMethods.has(eventMethod);
 
@@ -167,6 +181,7 @@ export class EventStreamRefreshDecisionEngine implements EventStreamRefreshDecis
             refreshCore,
             refreshHistory,
             refreshSelectedThread,
+            refreshNotificationProjections,
             threadStreamDelta,
           };
         }
@@ -200,6 +215,7 @@ export class EventStreamRefreshDecisionEngine implements EventStreamRefreshDecis
       refreshCore,
       refreshHistory,
       refreshSelectedThread,
+      refreshNotificationProjections,
       threadStreamDelta,
     };
   }
