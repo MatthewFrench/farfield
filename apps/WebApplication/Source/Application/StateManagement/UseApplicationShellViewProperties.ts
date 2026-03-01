@@ -155,6 +155,9 @@ export interface UseApplicationShellViewPropertiesInput {
   lastWindowsSandboxSetupStartResult: DebugWorkspacePaneProps["lastWindowsSandboxSetupStartResult"];
   lastFeedbackUploadResult: DebugWorkspacePaneProps["lastFeedbackUploadResult"];
   lastFuzzyFileSearchResult: DebugWorkspacePaneProps["lastFuzzyFileSearchResult"];
+  lastFuzzyFileSearchSessionStartResult: DebugWorkspacePaneProps["lastFuzzyFileSearchSessionStartResult"];
+  lastFuzzyFileSearchSessionUpdateResult: DebugWorkspacePaneProps["lastFuzzyFileSearchSessionUpdateResult"];
+  lastFuzzyFileSearchSessionStopResult: DebugWorkspacePaneProps["lastFuzzyFileSearchSessionStopResult"];
   lastGitDiffToRemoteResult: DebugWorkspacePaneProps["lastGitDiffToRemoteResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -181,6 +184,9 @@ export interface UseApplicationShellViewPropertiesInput {
   startWindowsSandboxSetup: DebugWorkspacePaneProps["onStartWindowsSandboxSetup"];
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
+  startFuzzyFileSearchSession: (sessionId: string, roots: string[]) => void;
+  updateFuzzyFileSearchSession: (sessionId: string, query: string) => void;
+  stopFuzzyFileSearchSession: (sessionId: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -440,6 +446,9 @@ function buildDebugWorkspacePaneProperties(
     lastWindowsSandboxSetupStartResult: input.lastWindowsSandboxSetupStartResult,
     lastFeedbackUploadResult: input.lastFeedbackUploadResult,
     lastFuzzyFileSearchResult: input.lastFuzzyFileSearchResult,
+    lastFuzzyFileSearchSessionStartResult: input.lastFuzzyFileSearchSessionStartResult,
+    lastFuzzyFileSearchSessionUpdateResult: input.lastFuzzyFileSearchSessionUpdateResult,
+    lastFuzzyFileSearchSessionStopResult: input.lastFuzzyFileSearchSessionStopResult,
     lastGitDiffToRemoteResult: input.lastGitDiffToRemoteResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
@@ -460,6 +469,9 @@ function buildDebugWorkspacePaneProperties(
     onStartWindowsSandboxSetup: input.startWindowsSandboxSetup,
     onReadGitDiffToRemote: input.readGitDiffToRemote,
     onSearchFuzzyFiles: input.searchFuzzyFiles,
+    onStartFuzzyFileSearchSession: input.startFuzzyFileSearchSession,
+    onUpdateFuzzyFileSearchSession: input.updateFuzzyFileSearchSession,
+    onStopFuzzyFileSearchSession: input.stopFuzzyFileSearchSession,
     onExecuteCommand: input.executeCommand,
     onUploadFeedback: input.uploadFeedback,
   };
@@ -664,6 +676,9 @@ export function useApplicationShellViewProperties(
       input.lastWindowsSandboxSetupStartResult,
       input.lastFeedbackUploadResult,
       input.lastFuzzyFileSearchResult,
+      input.lastFuzzyFileSearchSessionStartResult,
+      input.lastFuzzyFileSearchSessionUpdateResult,
+      input.lastFuzzyFileSearchSessionStopResult,
       input.lastGitDiffToRemoteResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
@@ -683,6 +698,9 @@ export function useApplicationShellViewProperties(
       input.startWindowsSandboxSetup,
       input.readGitDiffToRemote,
       input.searchFuzzyFiles,
+      input.startFuzzyFileSearchSession,
+      input.updateFuzzyFileSearchSession,
+      input.stopFuzzyFileSearchSession,
       input.executeCommand,
       input.uploadFeedback,
       input.replayHistoryEntryFromDetail,

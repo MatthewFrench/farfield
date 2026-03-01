@@ -9,6 +9,9 @@ import {
   type DebugAppServerCoverageExternalAgentConfigMigrationItem,
   type DebugAppServerCoverageFeedbackUploadResult,
   type DebugAppServerCoverageFuzzyFileSearchResult,
+  type DebugAppServerCoverageFuzzyFileSearchSessionStartResult,
+  type DebugAppServerCoverageFuzzyFileSearchSessionStopResult,
+  type DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
@@ -48,6 +51,9 @@ export interface DebugAppServerCoveragePanelProps {
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
+  lastFuzzyFileSearchSessionStartResult: DebugAppServerCoverageFuzzyFileSearchSessionStartResult | null;
+  lastFuzzyFileSearchSessionUpdateResult: DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null;
+  lastFuzzyFileSearchSessionStopResult: DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -79,6 +85,9 @@ export interface DebugAppServerCoveragePanelProps {
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
   onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
+  onStartFuzzyFileSearchSession: (sessionId: string, roots: string[]) => void;
+  onUpdateFuzzyFileSearchSession: (sessionId: string, query: string) => void;
+  onStopFuzzyFileSearchSession: (sessionId: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
     classification: string,
@@ -118,6 +127,9 @@ export function DebugAppServerCoveragePanel({
   lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
+  lastFuzzyFileSearchSessionStartResult,
+  lastFuzzyFileSearchSessionUpdateResult,
+  lastFuzzyFileSearchSessionStopResult,
   lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -138,6 +150,9 @@ export function DebugAppServerCoveragePanel({
   onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
   onSearchFuzzyFiles,
+  onStartFuzzyFileSearchSession,
+  onUpdateFuzzyFileSearchSession,
+  onStopFuzzyFileSearchSession,
   onExecuteCommand,
   onUploadFeedback,
 }: DebugAppServerCoveragePanelProps): React.JSX.Element {
@@ -580,7 +595,13 @@ export function DebugAppServerCoveragePanel({
           <DebugAppServerCoverageFuzzyFileSearchSection
             isRunningCoverageAction={isRunningCoverageAction}
             lastFuzzyFileSearchResult={lastFuzzyFileSearchResult}
+            lastFuzzyFileSearchSessionStartResult={lastFuzzyFileSearchSessionStartResult}
+            lastFuzzyFileSearchSessionUpdateResult={lastFuzzyFileSearchSessionUpdateResult}
+            lastFuzzyFileSearchSessionStopResult={lastFuzzyFileSearchSessionStopResult}
             onSearchFuzzyFiles={onSearchFuzzyFiles}
+            onStartFuzzyFileSearchSession={onStartFuzzyFileSearchSession}
+            onUpdateFuzzyFileSearchSession={onUpdateFuzzyFileSearchSession}
+            onStopFuzzyFileSearchSession={onStopFuzzyFileSearchSession}
           />
 
           <DebugAppServerCoverageFeedbackUploadSection

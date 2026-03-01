@@ -31,6 +31,12 @@ import type {
   AgentExportRemoteSkillResult,
   AgentFuzzyFileSearchInput,
   AgentFuzzyFileSearchResult,
+  AgentFuzzyFileSearchSessionStartInput,
+  AgentFuzzyFileSearchSessionStartResult,
+  AgentFuzzyFileSearchSessionStopInput,
+  AgentFuzzyFileSearchSessionStopResult,
+  AgentFuzzyFileSearchSessionUpdateInput,
+  AgentFuzzyFileSearchSessionUpdateResult,
   AgentGitDiffToRemoteInput,
   AgentGitDiffToRemoteResult,
   AgentId,
@@ -426,6 +432,15 @@ interface MockAgentAdapterOptions {
   uploadFeedback?: (input: AgentUploadFeedbackInput) => Promise<AgentUploadFeedbackResult>;
   gitDiffToRemote?: (input: AgentGitDiffToRemoteInput) => Promise<AgentGitDiffToRemoteResult>;
   fuzzyFileSearch?: (input: AgentFuzzyFileSearchInput) => Promise<AgentFuzzyFileSearchResult>;
+  startFuzzyFileSearchSession?: (
+    input: AgentFuzzyFileSearchSessionStartInput,
+  ) => Promise<AgentFuzzyFileSearchSessionStartResult>;
+  updateFuzzyFileSearchSession?: (
+    input: AgentFuzzyFileSearchSessionUpdateInput,
+  ) => Promise<AgentFuzzyFileSearchSessionUpdateResult>;
+  stopFuzzyFileSearchSession?: (
+    input: AgentFuzzyFileSearchSessionStopInput,
+  ) => Promise<AgentFuzzyFileSearchSessionStopResult>;
   executeCommand?: (input: AgentCommandExecutionInput) => Promise<AgentCommandExecutionResult>;
   startAccountLogin?: (input: AgentStartAccountLoginInput) => Promise<AgentStartAccountLoginResult>;
   cancelAccountLogin?: (
@@ -601,6 +616,18 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.fuzzyFileSearch) {
     adapter.fuzzyFileSearch = options.fuzzyFileSearch;
+  }
+
+  if (options.startFuzzyFileSearchSession) {
+    adapter.startFuzzyFileSearchSession = options.startFuzzyFileSearchSession;
+  }
+
+  if (options.updateFuzzyFileSearchSession) {
+    adapter.updateFuzzyFileSearchSession = options.updateFuzzyFileSearchSession;
+  }
+
+  if (options.stopFuzzyFileSearchSession) {
+    adapter.stopFuzzyFileSearchSession = options.stopFuzzyFileSearchSession;
   }
 
   if (options.executeCommand) {
@@ -1319,6 +1346,120 @@ describe("handleCapabilityRoutes", () => {
           indices: [0, 1, 2],
         },
       ],
+    });
+  });
+
+  it("returns 400 when fuzzy file search session start omits sessionId", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/files/fuzzy-search/session-start",
+      url: new URL("http://localhost/api/files/fuzzy-search/session-start?root=/tmp/project"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing sessionId query parameter.",
+    });
+  });
+
+  it("starts fuzzy file search session when adapter supports the method", async () => {
+    const startFuzzyFileSearchSessionSpy = vi.fn(
+      async (): Promise<AgentFuzzyFileSearchSessionStartResult> => ({}),
+    );
+
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/files/fuzzy-search/session-start",
+      url: new URL(
+        "http://localhost/api/files/fuzzy-search/session-start?agentId=codex&sessionId=session-1&root=/tmp/project&root=/tmp/project/packages",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canSearchFuzzyFiles: true,
+          },
+          startFuzzyFileSearchSession: startFuzzyFileSearchSessionSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(startFuzzyFileSearchSessionSpy).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      roots: ["/tmp/project", "/tmp/project/packages"],
+    });
+    expect(CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result))).toEqual({
+      ok: true,
+    });
+  });
+
+  it("updates fuzzy file search session when adapter supports the method", async () => {
+    const updateFuzzyFileSearchSessionSpy = vi.fn(
+      async (): Promise<AgentFuzzyFileSearchSessionUpdateResult> => ({}),
+    );
+
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/files/fuzzy-search/session-update",
+      url: new URL(
+        "http://localhost/api/files/fuzzy-search/session-update?agentId=codex&sessionId=session-1&query=main",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canSearchFuzzyFiles: true,
+          },
+          updateFuzzyFileSearchSession: updateFuzzyFileSearchSessionSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(updateFuzzyFileSearchSessionSpy).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      query: "main",
+    });
+    expect(CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result))).toEqual({
+      ok: true,
+    });
+  });
+
+  it("stops fuzzy file search session when adapter supports the method", async () => {
+    const stopFuzzyFileSearchSessionSpy = vi.fn(
+      async (): Promise<AgentFuzzyFileSearchSessionStopResult> => ({}),
+    );
+
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/files/fuzzy-search/session-stop",
+      url: new URL(
+        "http://localhost/api/files/fuzzy-search/session-stop?agentId=codex&sessionId=session-1",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canSearchFuzzyFiles: true,
+          },
+          stopFuzzyFileSearchSession: stopFuzzyFileSearchSessionSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(stopFuzzyFileSearchSessionSpy).toHaveBeenCalledWith({
+      sessionId: "session-1",
+    });
+    expect(CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result))).toEqual({
+      ok: true,
     });
   });
 

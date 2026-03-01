@@ -550,6 +550,26 @@ export interface AgentFuzzyFileSearchResult {
   files: AgentFuzzyFileSearchMatch[];
 }
 
+export interface AgentFuzzyFileSearchSessionStartInput {
+  sessionId: string;
+  roots: string[];
+}
+
+export interface AgentFuzzyFileSearchSessionStartResult {}
+
+export interface AgentFuzzyFileSearchSessionUpdateInput {
+  sessionId: string;
+  query: string;
+}
+
+export interface AgentFuzzyFileSearchSessionUpdateResult {}
+
+export interface AgentFuzzyFileSearchSessionStopInput {
+  sessionId: string;
+}
+
+export interface AgentFuzzyFileSearchSessionStopResult {}
+
 export type AgentConfigWriteMergeStrategy = "replace" | "upsert";
 
 export interface AgentWriteConfigValueInput {
@@ -814,6 +834,15 @@ export interface AgentAdapter {
   uploadFeedback?(input: AgentUploadFeedbackInput): Promise<AgentUploadFeedbackResult>;
   gitDiffToRemote?(input: AgentGitDiffToRemoteInput): Promise<AgentGitDiffToRemoteResult>;
   fuzzyFileSearch?(input: AgentFuzzyFileSearchInput): Promise<AgentFuzzyFileSearchResult>;
+  startFuzzyFileSearchSession?(
+    input: AgentFuzzyFileSearchSessionStartInput,
+  ): Promise<AgentFuzzyFileSearchSessionStartResult>;
+  updateFuzzyFileSearchSession?(
+    input: AgentFuzzyFileSearchSessionUpdateInput,
+  ): Promise<AgentFuzzyFileSearchSessionUpdateResult>;
+  stopFuzzyFileSearchSession?(
+    input: AgentFuzzyFileSearchSessionStopInput,
+  ): Promise<AgentFuzzyFileSearchSessionStopResult>;
   executeCommand?(input: AgentCommandExecutionInput): Promise<AgentCommandExecutionResult>;
   startAccountLogin?(input: AgentStartAccountLoginInput): Promise<AgentStartAccountLoginResult>;
   cancelAccountLogin?(input: AgentCancelAccountLoginInput): Promise<AgentCancelAccountLoginResult>;

@@ -21,6 +21,9 @@ import {
   type DebugAppServerCoverageExternalAgentConfigMigrationItem,
   type DebugAppServerCoverageFeedbackUploadResult,
   type DebugAppServerCoverageFuzzyFileSearchResult,
+  type DebugAppServerCoverageFuzzyFileSearchSessionStartResult,
+  type DebugAppServerCoverageFuzzyFileSearchSessionStopResult,
+  type DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
@@ -85,6 +88,9 @@ export interface DebugAppServerCoverageDiagnostics {
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
+  lastFuzzyFileSearchSessionStartResult: DebugAppServerCoverageFuzzyFileSearchSessionStartResult | null;
+  lastFuzzyFileSearchSessionUpdateResult: DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null;
+  lastFuzzyFileSearchSessionStopResult: DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -116,6 +122,9 @@ export interface DebugAppServerCoverageDiagnostics {
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
+  startFuzzyFileSearchSession: (sessionId: string, roots: string[]) => void;
+  updateFuzzyFileSearchSession: (sessionId: string, query: string) => void;
+  stopFuzzyFileSearchSession: (sessionId: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,

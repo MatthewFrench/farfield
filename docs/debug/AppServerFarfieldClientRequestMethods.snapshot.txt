@@ -16,6 +16,9 @@ externalAgentConfig/detect
 externalAgentConfig/import
 feedback/upload
 fuzzyFileSearch
+fuzzyFileSearch/sessionStart
+fuzzyFileSearch/sessionStop
+fuzzyFileSearch/sessionUpdate
 getAuthStatus
 gitDiffToRemote
 initialize

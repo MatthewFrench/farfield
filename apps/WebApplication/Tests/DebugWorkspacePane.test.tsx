@@ -95,6 +95,9 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastWindowsSandboxSetupStartResult: null,
   lastFeedbackUploadResult: null,
   lastFuzzyFileSearchResult: null,
+  lastFuzzyFileSearchSessionStartResult: null,
+  lastFuzzyFileSearchSessionUpdateResult: null,
+  lastFuzzyFileSearchSessionStopResult: null,
   lastGitDiffToRemoteResult: null,
   onRefreshCoverageDiagnostics: () => {},
   onStartAccountLogin: () => {},
@@ -115,6 +118,9 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onStartWindowsSandboxSetup: () => {},
   onReadGitDiffToRemote: () => {},
   onSearchFuzzyFiles: () => {},
+  onStartFuzzyFileSearchSession: () => {},
+  onUpdateFuzzyFileSearchSession: () => {},
+  onStopFuzzyFileSearchSession: () => {},
   onExecuteCommand: () => {},
   onUploadFeedback: () => {},
 };
@@ -188,5 +194,6 @@ describe("DebugWorkspacePane", () => {
 
     expect(screen.getByTestId("debug-coverage-panel")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-feedback-upload-run")).toBeDefined();
+    expect(screen.getByTestId("debug-coverage-fuzzy-session-start-run")).toBeDefined();
   });
 });

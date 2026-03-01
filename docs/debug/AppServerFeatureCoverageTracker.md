@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 04:33:07Z
+Last Updated (UTC): 2026-03-01 04:58:26Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `50 / 74` request methods (`67.6%`).
+1. Farfield app-server method coverage at request-owner layer: `53 / 74` request methods (`71.6%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `51 / 74` (`68.9%`).
+3. Effective request-method usage including transport-owned `initialize`: `54 / 74` (`73.0%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -104,6 +104,9 @@ As of the upstream snapshot above:
 | `command/exec` | Command execution diagnostics action with visible stdout/stderr output in debug workspace coverage panel | Medium-high | Strict capability route ownership and typed command request/response mapping for operator diagnostics | Keep current path |
 | `gitDiffToRemote` | Git diff-to-remote diagnostics action with rendered patch output in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed working-directory query parsing and deterministic sha/diff mapping | Keep current path |
 | `fuzzyFileSearch` | Fuzzy file search diagnostics action with query and root controls plus ranked file-match output in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed query and repeated-root parsing plus deterministic file-match response mapping | Keep current path |
+| `fuzzyFileSearch/sessionStart` | Fuzzy file search session-start diagnostics action with explicit session id and roots controls in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed session-id and repeated-root parsing plus deterministic session-start result mapping | Keep current path |
+| `fuzzyFileSearch/sessionUpdate` | Fuzzy file search session-update diagnostics action with explicit session id and query controls in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed session-id and query parsing plus deterministic session-update result mapping | Keep current path |
+| `fuzzyFileSearch/sessionStop` | Fuzzy file search session-stop diagnostics action with explicit session id controls in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed session-id parsing plus deterministic session-stop result mapping | Keep current path |
 | `config/read` | Config defaults resolution for model and reasoning effort | High | Normalized default resolution through typed owner mapping | Keep current path |
 | `config/batchWrite` | Config batch-write diagnostics action with explicit multi-edit payload testing in debug workspace coverage panel | Medium-high | Strict capability route ownership and typed edit-array request parsing with deterministic write-result mapping | Keep current path |
 | `configRequirements/read` | Config requirements diagnostics and workspace readiness signals | Medium-high | Strict capability route ownership with typed payload mapping into debug coverage diagnostics | Keep current path |
@@ -164,6 +167,9 @@ As of the upstream snapshot above:
 | `command/exec` | Command execution diagnostics action and output capture | `/api/commands/exec` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.executeCommand` -> `AppServerClient.executeCommand` |
 | `gitDiffToRemote` | Git diff-to-remote diagnostics action and patch output capture | `/api/git/diff-remote` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.gitDiffToRemote` -> `AppServerClient.gitDiffToRemote` |
 | `fuzzyFileSearch` | Fuzzy file search diagnostics action and ranked file-match output | `/api/files/fuzzy-search` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.fuzzyFileSearch` -> `AppServerClient.fuzzyFileSearch` |
+| `fuzzyFileSearch/sessionStart` | Fuzzy file search session-start diagnostics action | `/api/files/fuzzy-search/session-start` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.startFuzzyFileSearchSession` -> `AppServerClient.startFuzzyFileSearchSession` |
+| `fuzzyFileSearch/sessionUpdate` | Fuzzy file search session-update diagnostics action | `/api/files/fuzzy-search/session-update` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.updateFuzzyFileSearchSession` -> `AppServerClient.updateFuzzyFileSearchSession` |
+| `fuzzyFileSearch/sessionStop` | Fuzzy file search session-stop diagnostics action | `/api/files/fuzzy-search/session-stop` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.stopFuzzyFileSearchSession` -> `AppServerClient.stopFuzzyFileSearchSession` |
 | `config/read` | Config defaults (`model`, `reasoningEffort`) | `/api/config/defaults` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigDefaults` -> `AppServerClient.readConfig` |
 | `config/batchWrite` | Config-batch mutation diagnostics action | `/api/config/batch/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeConfigBatch` -> `AppServerClient.writeConfigBatch` |
 | `config/value/write` | Config-value mutation diagnostics action | `/api/config/value/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeConfigValue` -> `AppServerClient.writeConfigValue` |
@@ -191,7 +197,7 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`24` request methods are not used by Farfield’s app-server client path:
+`21` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
@@ -199,9 +205,6 @@ archiveConversation
 cancelLoginChatGpt
 execOneOffCommand
 forkConversation
-fuzzyFileSearch/sessionStart
-fuzzyFileSearch/sessionStop
-fuzzyFileSearch/sessionUpdate
 getConversationSummary
 getUserAgent
 getUserSavedConfig
@@ -268,10 +271,7 @@ No remaining methods in this category for the current upstream snapshot.
 
 ### Category G: Experimental and Test-only Surfaces Not Intended for Production Flow
 
-1. `fuzzyFileSearch/sessionStart`
-2. `fuzzyFileSearch/sessionStop`
-3. `fuzzyFileSearch/sessionUpdate`
-4. `mock/experimentalMethod`
+1. `mock/experimentalMethod`
 
 ### Category H: Operational Method Already Handled in Transport Layer (Not in Product Request Owner List)
 
@@ -283,8 +283,8 @@ No remaining methods in this category for the current upstream snapshot.
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `24`
-2. Total methods listed across Category A-I: `24`
+1. Total non-intersection methods: `21`
+2. Total methods listed across Category A-I: `21`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

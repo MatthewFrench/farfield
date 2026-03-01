@@ -223,6 +223,21 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
           },
         ],
       });
+    const startFuzzyFileSearchSession = vi
+      .spyOn(capabilityServerClient, "startFuzzyFileSearchSession")
+      .mockResolvedValue({
+        ok: true,
+      });
+    const updateFuzzyFileSearchSession = vi
+      .spyOn(capabilityServerClient, "updateFuzzyFileSearchSession")
+      .mockResolvedValue({
+        ok: true,
+      });
+    const stopFuzzyFileSearchSession = vi
+      .spyOn(capabilityServerClient, "stopFuzzyFileSearchSession")
+      .mockResolvedValue({
+        ok: true,
+      });
     const writeConfigValue = vi
       .spyOn(capabilityServerClient, "writeConfigValue")
       .mockResolvedValue({
@@ -359,6 +374,9 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     );
     latestDiagnostics.current?.readGitDiffToRemote("/tmp/project");
     latestDiagnostics.current?.searchFuzzyFiles("main", ["/tmp/project"], "token-1");
+    latestDiagnostics.current?.startFuzzyFileSearchSession("fuzzy-session-1", ["/tmp/project"]);
+    latestDiagnostics.current?.updateFuzzyFileSearchSession("fuzzy-session-1", "main");
+    latestDiagnostics.current?.stopFuzzyFileSearchSession("fuzzy-session-1");
     latestDiagnostics.current?.executeCommand(["pwd"], 1200, "/tmp/project");
     latestDiagnostics.current?.writeSkillsConfig(
       "/tmp/project/.codex/skills/checks/SKILL.md",
@@ -418,6 +436,20 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         query: "main",
         roots: ["/tmp/project"],
         cancellationToken: "token-1",
+      });
+      expect(startFuzzyFileSearchSession).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sessionId: "fuzzy-session-1",
+        roots: ["/tmp/project"],
+      });
+      expect(updateFuzzyFileSearchSession).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sessionId: "fuzzy-session-1",
+        query: "main",
+      });
+      expect(stopFuzzyFileSearchSession).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sessionId: "fuzzy-session-1",
       });
       expect(writeConfigValue).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -558,6 +590,20 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
           },
         ],
         searchedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastFuzzyFileSearchSessionStartResult).toEqual({
+        sessionId: "fuzzy-session-1",
+        roots: ["/tmp/project"],
+        startedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastFuzzyFileSearchSessionUpdateResult).toEqual({
+        sessionId: "fuzzy-session-1",
+        query: "main",
+        updatedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastFuzzyFileSearchSessionStopResult).toEqual({
+        sessionId: "fuzzy-session-1",
+        stoppedAtIso8601: expect.any(String),
       });
       expect(latestDiagnostics.current?.lastExternalAgentConfigDetectResult).toEqual({
         includeHome: true,

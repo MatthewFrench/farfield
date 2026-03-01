@@ -54,7 +54,16 @@ import {
 import {
   type ApiFuzzyFileSearchOptions,
   type ApiFuzzyFileSearchResponse,
+  type ApiFuzzyFileSearchSessionStartOptions,
+  type ApiFuzzyFileSearchSessionStartResponse,
+  type ApiFuzzyFileSearchSessionStopOptions,
+  type ApiFuzzyFileSearchSessionStopResponse,
+  type ApiFuzzyFileSearchSessionUpdateOptions,
+  type ApiFuzzyFileSearchSessionUpdateResponse,
   searchFuzzyFiles,
+  startFuzzyFileSearchSession,
+  stopFuzzyFileSearchSession,
+  updateFuzzyFileSearchSession,
 } from "./CapabilityCoverageFuzzyFileSearchApi";
 import {
   type ApiAccountAuthStatusOptions,
@@ -152,6 +161,13 @@ export type CapabilityFeedbackUploadOptions = ApiFeedbackUploadOptions;
 export type CapabilityFeedbackUploadResponse = ApiFeedbackUploadResponse;
 export type CapabilityFuzzyFileSearchOptions = ApiFuzzyFileSearchOptions;
 export type CapabilityFuzzyFileSearchResponse = ApiFuzzyFileSearchResponse;
+export type CapabilityFuzzyFileSearchSessionStartOptions = ApiFuzzyFileSearchSessionStartOptions;
+export type CapabilityFuzzyFileSearchSessionStartResponse = ApiFuzzyFileSearchSessionStartResponse;
+export type CapabilityFuzzyFileSearchSessionUpdateOptions = ApiFuzzyFileSearchSessionUpdateOptions;
+export type CapabilityFuzzyFileSearchSessionUpdateResponse =
+  ApiFuzzyFileSearchSessionUpdateResponse;
+export type CapabilityFuzzyFileSearchSessionStopOptions = ApiFuzzyFileSearchSessionStopOptions;
+export type CapabilityFuzzyFileSearchSessionStopResponse = ApiFuzzyFileSearchSessionStopResponse;
 export type CapabilityGitDiffToRemoteOptions = ApiGitDiffToRemoteOptions;
 export type CapabilityGitDiffToRemoteResponse = ApiGitDiffToRemoteResponse;
 export type CapabilityListRemoteSkillsOptions = ApiListRemoteSkillsOptions;
@@ -346,6 +362,24 @@ export class CapabilityServerClient {
     input: CapabilityFuzzyFileSearchOptions,
   ): Promise<CapabilityFuzzyFileSearchResponse> {
     return searchFuzzyFiles(input);
+  }
+
+  public async startFuzzyFileSearchSession(
+    input: CapabilityFuzzyFileSearchSessionStartOptions,
+  ): Promise<CapabilityFuzzyFileSearchSessionStartResponse> {
+    return startFuzzyFileSearchSession(input);
+  }
+
+  public async updateFuzzyFileSearchSession(
+    input: CapabilityFuzzyFileSearchSessionUpdateOptions,
+  ): Promise<CapabilityFuzzyFileSearchSessionUpdateResponse> {
+    return updateFuzzyFileSearchSession(input);
+  }
+
+  public async stopFuzzyFileSearchSession(
+    input: CapabilityFuzzyFileSearchSessionStopOptions,
+  ): Promise<CapabilityFuzzyFileSearchSessionStopResponse> {
+    return stopFuzzyFileSearchSession(input);
   }
 
   public async readAuthStatus(

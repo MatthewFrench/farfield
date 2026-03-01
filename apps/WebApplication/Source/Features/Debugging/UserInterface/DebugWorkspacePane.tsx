@@ -11,6 +11,9 @@ import {
   type DebugAppServerCoverageExternalAgentConfigMigrationItem,
   type DebugAppServerCoverageFeedbackUploadResult,
   type DebugAppServerCoverageFuzzyFileSearchResult,
+  type DebugAppServerCoverageFuzzyFileSearchSessionStartResult,
+  type DebugAppServerCoverageFuzzyFileSearchSessionStopResult,
+  type DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
@@ -92,6 +95,9 @@ export interface DebugWorkspacePaneProps {
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
+  lastFuzzyFileSearchSessionStartResult: DebugAppServerCoverageFuzzyFileSearchSessionStartResult | null;
+  lastFuzzyFileSearchSessionUpdateResult: DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null;
+  lastFuzzyFileSearchSessionStopResult: DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -123,6 +129,9 @@ export interface DebugWorkspacePaneProps {
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
   onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
+  onStartFuzzyFileSearchSession: (sessionId: string, roots: string[]) => void;
+  onUpdateFuzzyFileSearchSession: (sessionId: string, query: string) => void;
+  onStopFuzzyFileSearchSession: (sessionId: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
     classification: string,
@@ -186,6 +195,9 @@ export function DebugWorkspacePane({
   lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
+  lastFuzzyFileSearchSessionStartResult,
+  lastFuzzyFileSearchSessionUpdateResult,
+  lastFuzzyFileSearchSessionStopResult,
   lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -206,6 +218,9 @@ export function DebugWorkspacePane({
   onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
   onSearchFuzzyFiles,
+  onStartFuzzyFileSearchSession,
+  onUpdateFuzzyFileSearchSession,
+  onStopFuzzyFileSearchSession,
   onExecuteCommand,
   onUploadFeedback,
 }: DebugWorkspacePaneProps): React.JSX.Element {
@@ -320,6 +335,9 @@ export function DebugWorkspacePane({
             lastWindowsSandboxSetupStartResult={lastWindowsSandboxSetupStartResult}
             lastFeedbackUploadResult={lastFeedbackUploadResult}
             lastFuzzyFileSearchResult={lastFuzzyFileSearchResult}
+            lastFuzzyFileSearchSessionStartResult={lastFuzzyFileSearchSessionStartResult}
+            lastFuzzyFileSearchSessionUpdateResult={lastFuzzyFileSearchSessionUpdateResult}
+            lastFuzzyFileSearchSessionStopResult={lastFuzzyFileSearchSessionStopResult}
             lastGitDiffToRemoteResult={lastGitDiffToRemoteResult}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
             onStartAccountLogin={onStartAccountLogin}
@@ -340,6 +358,9 @@ export function DebugWorkspacePane({
             onStartWindowsSandboxSetup={onStartWindowsSandboxSetup}
             onReadGitDiffToRemote={onReadGitDiffToRemote}
             onSearchFuzzyFiles={onSearchFuzzyFiles}
+            onStartFuzzyFileSearchSession={onStartFuzzyFileSearchSession}
+            onUpdateFuzzyFileSearchSession={onUpdateFuzzyFileSearchSession}
+            onStopFuzzyFileSearchSession={onStopFuzzyFileSearchSession}
             onExecuteCommand={onExecuteCommand}
             onUploadFeedback={onUploadFeedback}
           />

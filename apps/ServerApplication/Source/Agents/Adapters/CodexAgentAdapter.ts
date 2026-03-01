@@ -32,6 +32,12 @@ import type {
   AgentExportRemoteSkillResult,
   AgentFuzzyFileSearchInput,
   AgentFuzzyFileSearchResult,
+  AgentFuzzyFileSearchSessionStartInput,
+  AgentFuzzyFileSearchSessionStartResult,
+  AgentFuzzyFileSearchSessionStopInput,
+  AgentFuzzyFileSearchSessionStopResult,
+  AgentFuzzyFileSearchSessionUpdateInput,
+  AgentFuzzyFileSearchSessionUpdateResult,
   AgentGitDiffToRemoteInput,
   AgentGitDiffToRemoteResult,
   AgentImportExternalAgentConfigInput,
@@ -397,6 +403,24 @@ export class CodexAgentAdapter implements AgentAdapter {
     input: AgentFuzzyFileSearchInput,
   ): Promise<AgentFuzzyFileSearchResult> {
     return this.threadManagementOwner.fuzzyFileSearch(input);
+  }
+
+  public async startFuzzyFileSearchSession(
+    input: AgentFuzzyFileSearchSessionStartInput,
+  ): Promise<AgentFuzzyFileSearchSessionStartResult> {
+    return this.threadManagementOwner.startFuzzyFileSearchSession(input);
+  }
+
+  public async updateFuzzyFileSearchSession(
+    input: AgentFuzzyFileSearchSessionUpdateInput,
+  ): Promise<AgentFuzzyFileSearchSessionUpdateResult> {
+    return this.threadManagementOwner.updateFuzzyFileSearchSession(input);
+  }
+
+  public async stopFuzzyFileSearchSession(
+    input: AgentFuzzyFileSearchSessionStopInput,
+  ): Promise<AgentFuzzyFileSearchSessionStopResult> {
+    return this.threadManagementOwner.stopFuzzyFileSearchSession(input);
   }
 
   public async executeCommand(

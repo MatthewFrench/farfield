@@ -15,6 +15,12 @@ import {
   type FeedbackUploadResult,
   type FuzzyFileSearchOptions,
   type FuzzyFileSearchResult,
+  type FuzzyFileSearchSessionStartOptions,
+  type FuzzyFileSearchSessionStartResult,
+  type FuzzyFileSearchSessionStopOptions,
+  type FuzzyFileSearchSessionStopResult,
+  type FuzzyFileSearchSessionUpdateOptions,
+  type FuzzyFileSearchSessionUpdateResult,
   type GitDiffToRemoteOptions,
   type GitDiffToRemoteResult,
   type ListAppsOptions,
@@ -84,6 +90,12 @@ import type {
   AgentForkThreadInput,
   AgentFuzzyFileSearchInput,
   AgentFuzzyFileSearchResult,
+  AgentFuzzyFileSearchSessionStartInput,
+  AgentFuzzyFileSearchSessionStartResult,
+  AgentFuzzyFileSearchSessionStopInput,
+  AgentFuzzyFileSearchSessionStopResult,
+  AgentFuzzyFileSearchSessionUpdateInput,
+  AgentFuzzyFileSearchSessionUpdateResult,
   AgentGitDiffToRemoteInput,
   AgentGitDiffToRemoteResult,
   AgentImportExternalAgentConfigInput,
@@ -381,6 +393,32 @@ function buildFuzzyFileSearchOptions(input: AgentFuzzyFileSearchInput): FuzzyFil
     ...(input.cancellationToken !== undefined
       ? { cancellationToken: input.cancellationToken }
       : {}),
+  };
+}
+
+function buildFuzzyFileSearchSessionStartOptions(
+  input: AgentFuzzyFileSearchSessionStartInput,
+): FuzzyFileSearchSessionStartOptions {
+  return {
+    sessionId: input.sessionId,
+    roots: input.roots,
+  };
+}
+
+function buildFuzzyFileSearchSessionUpdateOptions(
+  input: AgentFuzzyFileSearchSessionUpdateInput,
+): FuzzyFileSearchSessionUpdateOptions {
+  return {
+    sessionId: input.sessionId,
+    query: input.query,
+  };
+}
+
+function buildFuzzyFileSearchSessionStopOptions(
+  input: AgentFuzzyFileSearchSessionStopInput,
+): FuzzyFileSearchSessionStopOptions {
+  return {
+    sessionId: input.sessionId,
   };
 }
 
@@ -689,6 +727,36 @@ export class CodexThreadManagementOwner {
     this.ensureCodexAvailable();
     const result: FuzzyFileSearchResult = await this.runAppServerCall(() =>
       this.appClient.fuzzyFileSearch(buildFuzzyFileSearchOptions(input)),
+    );
+    return result;
+  }
+
+  public async startFuzzyFileSearchSession(
+    input: AgentFuzzyFileSearchSessionStartInput,
+  ): Promise<AgentFuzzyFileSearchSessionStartResult> {
+    this.ensureCodexAvailable();
+    const result: FuzzyFileSearchSessionStartResult = await this.runAppServerCall(() =>
+      this.appClient.startFuzzyFileSearchSession(buildFuzzyFileSearchSessionStartOptions(input)),
+    );
+    return result;
+  }
+
+  public async updateFuzzyFileSearchSession(
+    input: AgentFuzzyFileSearchSessionUpdateInput,
+  ): Promise<AgentFuzzyFileSearchSessionUpdateResult> {
+    this.ensureCodexAvailable();
+    const result: FuzzyFileSearchSessionUpdateResult = await this.runAppServerCall(() =>
+      this.appClient.updateFuzzyFileSearchSession(buildFuzzyFileSearchSessionUpdateOptions(input)),
+    );
+    return result;
+  }
+
+  public async stopFuzzyFileSearchSession(
+    input: AgentFuzzyFileSearchSessionStopInput,
+  ): Promise<AgentFuzzyFileSearchSessionStopResult> {
+    this.ensureCodexAvailable();
+    const result: FuzzyFileSearchSessionStopResult = await this.runAppServerCall(() =>
+      this.appClient.stopFuzzyFileSearchSession(buildFuzzyFileSearchSessionStopOptions(input)),
     );
     return result;
   }

@@ -1200,6 +1200,61 @@ describe("AppServerClient.fuzzyFileSearch", () => {
   });
 });
 
+describe("AppServerClient.startFuzzyFileSearchSession", () => {
+  it("sends fuzzyFileSearch/sessionStart payload", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.startFuzzyFileSearchSession({
+      sessionId: "session-1",
+      roots: ["/tmp/workspace", "/tmp/workspace/packages"],
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("fuzzyFileSearch/sessionStart", {
+      sessionId: "session-1",
+      roots: ["/tmp/workspace", "/tmp/workspace/packages"],
+    });
+    expect(result).toEqual({});
+  });
+});
+
+describe("AppServerClient.updateFuzzyFileSearchSession", () => {
+  it("sends fuzzyFileSearch/sessionUpdate payload", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.updateFuzzyFileSearchSession({
+      sessionId: "session-1",
+      query: "main",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("fuzzyFileSearch/sessionUpdate", {
+      sessionId: "session-1",
+      query: "main",
+    });
+    expect(result).toEqual({});
+  });
+});
+
+describe("AppServerClient.stopFuzzyFileSearchSession", () => {
+  it("sends fuzzyFileSearch/sessionStop payload", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.stopFuzzyFileSearchSession({
+      sessionId: "session-1",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("fuzzyFileSearch/sessionStop", {
+      sessionId: "session-1",
+    });
+    expect(result).toEqual({});
+  });
+});
+
 describe("AppServerClient.writeConfigValue", () => {
   it("sends config/value/write payload and returns typed config write result", async () => {
     const transportDouble = createTransportDouble();

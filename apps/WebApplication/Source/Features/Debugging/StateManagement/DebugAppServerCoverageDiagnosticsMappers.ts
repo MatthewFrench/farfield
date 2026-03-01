@@ -15,6 +15,9 @@ import type {
   CapabilityExternalAgentConfigDetectResponse,
   CapabilityFeedbackUploadResponse,
   CapabilityFuzzyFileSearchResponse,
+  CapabilityFuzzyFileSearchSessionStartResponse,
+  CapabilityFuzzyFileSearchSessionStopResponse,
+  CapabilityFuzzyFileSearchSessionUpdateResponse,
   CapabilityGitDiffToRemoteResponse,
   CapabilityMcpServersResponse,
   CapabilityRemoteSkillsListResponse,
@@ -38,6 +41,9 @@ import type {
   DebugAppServerCoverageExternalAgentConfigImportResult,
   DebugAppServerCoverageFeedbackUploadResult,
   DebugAppServerCoverageFuzzyFileSearchResult,
+  DebugAppServerCoverageFuzzyFileSearchSessionStartResult,
+  DebugAppServerCoverageFuzzyFileSearchSessionStopResult,
+  DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
   DebugAppServerCoverageMcpServerSummary,
   DebugAppServerCoveragePendingAccountLogin,
@@ -389,5 +395,39 @@ export function mapFuzzyFileSearchResult(
       indices: fileMatch.indices,
     })),
     searchedAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapFuzzyFileSearchSessionStartResult(
+  _response: CapabilityFuzzyFileSearchSessionStartResponse,
+  sessionId: string,
+  roots: string[],
+): DebugAppServerCoverageFuzzyFileSearchSessionStartResult {
+  return {
+    sessionId,
+    roots,
+    startedAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapFuzzyFileSearchSessionUpdateResult(
+  _response: CapabilityFuzzyFileSearchSessionUpdateResponse,
+  sessionId: string,
+  query: string,
+): DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult {
+  return {
+    sessionId,
+    query,
+    updatedAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapFuzzyFileSearchSessionStopResult(
+  _response: CapabilityFuzzyFileSearchSessionStopResponse,
+  sessionId: string,
+): DebugAppServerCoverageFuzzyFileSearchSessionStopResult {
+  return {
+    sessionId,
+    stoppedAtIso8601: new Date().toISOString(),
   };
 }

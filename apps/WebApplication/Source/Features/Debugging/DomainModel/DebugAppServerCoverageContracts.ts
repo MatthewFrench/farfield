@@ -191,6 +191,23 @@ export interface DebugAppServerCoverageFuzzyFileSearchResult {
   searchedAtIso8601: string;
 }
 
+export interface DebugAppServerCoverageFuzzyFileSearchSessionStartResult {
+  sessionId: string;
+  roots: string[];
+  startedAtIso8601: string;
+}
+
+export interface DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult {
+  sessionId: string;
+  query: string;
+  updatedAtIso8601: string;
+}
+
+export interface DebugAppServerCoverageFuzzyFileSearchSessionStopResult {
+  sessionId: string;
+  stoppedAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

@@ -19,6 +19,12 @@ import {
   type ForkThreadOptions,
   type FuzzyFileSearchOptions,
   type FuzzyFileSearchResult,
+  type FuzzyFileSearchSessionStartOptions,
+  type FuzzyFileSearchSessionStartResult,
+  type FuzzyFileSearchSessionStopOptions,
+  type FuzzyFileSearchSessionStopResult,
+  type FuzzyFileSearchSessionUpdateOptions,
+  type FuzzyFileSearchSessionUpdateResult,
   type GitDiffToRemoteOptions,
   type GitDiffToRemoteResult,
   type ListAppsOptions,
@@ -146,6 +152,9 @@ class TestAppServerClient extends AppServerClient {
   public readonly uploadFeedbackCalls: FeedbackUploadOptions[] = [];
   public readonly gitDiffToRemoteCalls: GitDiffToRemoteOptions[] = [];
   public readonly fuzzyFileSearchCalls: FuzzyFileSearchOptions[] = [];
+  public readonly startFuzzyFileSearchSessionCalls: FuzzyFileSearchSessionStartOptions[] = [];
+  public readonly updateFuzzyFileSearchSessionCalls: FuzzyFileSearchSessionUpdateOptions[] = [];
+  public readonly stopFuzzyFileSearchSessionCalls: FuzzyFileSearchSessionStopOptions[] = [];
   public readonly executeCommandCalls: CommandExecutionOptions[] = [];
   public readonly startAccountLoginCalls: LoginAccountOptions[] = [];
   public readonly cancelAccountLoginCalls: CancelAccountLoginOptions[] = [];
@@ -185,6 +194,9 @@ class TestAppServerClient extends AppServerClient {
   private readonly uploadFeedbackResult: FeedbackUploadResult;
   private readonly gitDiffToRemoteResult: GitDiffToRemoteResult;
   private readonly fuzzyFileSearchResult: FuzzyFileSearchResult;
+  private readonly startFuzzyFileSearchSessionResult: FuzzyFileSearchSessionStartResult;
+  private readonly updateFuzzyFileSearchSessionResult: FuzzyFileSearchSessionUpdateResult;
+  private readonly stopFuzzyFileSearchSessionResult: FuzzyFileSearchSessionStopResult;
   private readonly executeCommandResult: CommandExecutionResult;
   private readonly startAccountLoginResult: LoginAccountResult;
   private readonly cancelAccountLoginResult: CancelAccountLoginResult;
@@ -223,6 +235,9 @@ class TestAppServerClient extends AppServerClient {
     uploadFeedbackResult?: FeedbackUploadResult;
     gitDiffToRemoteResult?: GitDiffToRemoteResult;
     fuzzyFileSearchResult?: FuzzyFileSearchResult;
+    startFuzzyFileSearchSessionResult?: FuzzyFileSearchSessionStartResult;
+    updateFuzzyFileSearchSessionResult?: FuzzyFileSearchSessionUpdateResult;
+    stopFuzzyFileSearchSessionResult?: FuzzyFileSearchSessionStopResult;
     executeCommandResult?: CommandExecutionResult;
     startAccountLoginResult?: LoginAccountResult;
     cancelAccountLoginResult?: CancelAccountLoginResult;
@@ -321,6 +336,9 @@ class TestAppServerClient extends AppServerClient {
     this.fuzzyFileSearchResult = input?.fuzzyFileSearchResult ?? {
       files: [],
     };
+    this.startFuzzyFileSearchSessionResult = input?.startFuzzyFileSearchSessionResult ?? {};
+    this.updateFuzzyFileSearchSessionResult = input?.updateFuzzyFileSearchSessionResult ?? {};
+    this.stopFuzzyFileSearchSessionResult = input?.stopFuzzyFileSearchSessionResult ?? {};
     this.executeCommandResult = input?.executeCommandResult ?? {
       exitCode: 0,
       stdout: "",
@@ -571,6 +589,27 @@ class TestAppServerClient extends AppServerClient {
   ): Promise<FuzzyFileSearchResult> {
     this.fuzzyFileSearchCalls.push(options);
     return this.fuzzyFileSearchResult;
+  }
+
+  public override async startFuzzyFileSearchSession(
+    options: FuzzyFileSearchSessionStartOptions,
+  ): Promise<FuzzyFileSearchSessionStartResult> {
+    this.startFuzzyFileSearchSessionCalls.push(options);
+    return this.startFuzzyFileSearchSessionResult;
+  }
+
+  public override async updateFuzzyFileSearchSession(
+    options: FuzzyFileSearchSessionUpdateOptions,
+  ): Promise<FuzzyFileSearchSessionUpdateResult> {
+    this.updateFuzzyFileSearchSessionCalls.push(options);
+    return this.updateFuzzyFileSearchSessionResult;
+  }
+
+  public override async stopFuzzyFileSearchSession(
+    options: FuzzyFileSearchSessionStopOptions,
+  ): Promise<FuzzyFileSearchSessionStopResult> {
+    this.stopFuzzyFileSearchSessionCalls.push(options);
+    return this.stopFuzzyFileSearchSessionResult;
   }
 
   public override async executeCommand(
@@ -1481,6 +1520,58 @@ describe("CodexThreadManagementOwner", () => {
         },
       ],
     });
+  });
+
+  it("starts fuzzy file search session through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    const result = await owner.startFuzzyFileSearchSession({
+      sessionId: "session-1",
+      roots: ["/tmp/workspace", "/tmp/workspace/packages"],
+    });
+
+    expect(appClient.startFuzzyFileSearchSessionCalls).toEqual([
+      {
+        sessionId: "session-1",
+        roots: ["/tmp/workspace", "/tmp/workspace/packages"],
+      },
+    ]);
+    expect(result).toEqual({});
+  });
+
+  it("updates fuzzy file search session through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    const result = await owner.updateFuzzyFileSearchSession({
+      sessionId: "session-1",
+      query: "main",
+    });
+
+    expect(appClient.updateFuzzyFileSearchSessionCalls).toEqual([
+      {
+        sessionId: "session-1",
+        query: "main",
+      },
+    ]);
+    expect(result).toEqual({});
+  });
+
+  it("stops fuzzy file search session through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    const result = await owner.stopFuzzyFileSearchSession({
+      sessionId: "session-1",
+    });
+
+    expect(appClient.stopFuzzyFileSearchSessionCalls).toEqual([
+      {
+        sessionId: "session-1",
+      },
+    ]);
+    expect(result).toEqual({});
   });
 
   it("uploads feedback through codex management owner", async () => {

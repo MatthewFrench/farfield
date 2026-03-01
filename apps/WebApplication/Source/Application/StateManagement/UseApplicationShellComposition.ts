@@ -328,6 +328,12 @@ function buildApplicationShellViewPropertiesInput(
     lastWindowsSandboxSetupStartResult: debugCoverageDiagnostics.lastWindowsSandboxSetupStartResult,
     lastFeedbackUploadResult: debugCoverageDiagnostics.lastFeedbackUploadResult,
     lastFuzzyFileSearchResult: debugCoverageDiagnostics.lastFuzzyFileSearchResult,
+    lastFuzzyFileSearchSessionStartResult:
+      debugCoverageDiagnostics.lastFuzzyFileSearchSessionStartResult,
+    lastFuzzyFileSearchSessionUpdateResult:
+      debugCoverageDiagnostics.lastFuzzyFileSearchSessionUpdateResult,
+    lastFuzzyFileSearchSessionStopResult:
+      debugCoverageDiagnostics.lastFuzzyFileSearchSessionStopResult,
     lastGitDiffToRemoteResult: debugCoverageDiagnostics.lastGitDiffToRemoteResult,
     refreshCoverageDiagnostics: debugCoverageDiagnostics.refreshCoverageDiagnostics,
     startAccountLogin: debugCoverageDiagnostics.startAccountLogin,
@@ -348,6 +354,9 @@ function buildApplicationShellViewPropertiesInput(
     startWindowsSandboxSetup: debugCoverageDiagnostics.startWindowsSandboxSetup,
     readGitDiffToRemote: debugCoverageDiagnostics.readGitDiffToRemote,
     searchFuzzyFiles: debugCoverageDiagnostics.searchFuzzyFiles,
+    startFuzzyFileSearchSession: debugCoverageDiagnostics.startFuzzyFileSearchSession,
+    updateFuzzyFileSearchSession: debugCoverageDiagnostics.updateFuzzyFileSearchSession,
+    stopFuzzyFileSearchSession: debugCoverageDiagnostics.stopFuzzyFileSearchSession,
     executeCommand: debugCoverageDiagnostics.executeCommand,
     uploadFeedback: debugCoverageDiagnostics.uploadFeedback,
     apiSessionTokenDraft: applicationShellState.apiSessionTokenDraft,

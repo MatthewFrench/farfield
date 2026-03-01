@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-03-01 04:33:07Z
+Last Updated (UTC): 2026-03-01 04:58:26Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -29,9 +29,9 @@ This ledger records recommended disposition for every upstream app-server client
 | `feedback/upload` | Used now | Keep | Exposed through capability ownership and debug workspace feedback-upload diagnostics action. |
 | `forkConversation` | Not used | Do not adopt | Deprecated upstream request family. |
 | `fuzzyFileSearch` | Used now | Keep | Exposed through capability ownership and debug workspace fuzzy-file-search diagnostics action/results. |
-| `fuzzyFileSearch/sessionStart` | Not used | Do not adopt for production | Experimental or test-focused surface. |
-| `fuzzyFileSearch/sessionStop` | Not used | Do not adopt for production | Experimental or test-focused surface. |
-| `fuzzyFileSearch/sessionUpdate` | Not used | Do not adopt for production | Experimental or test-focused surface. |
+| `fuzzyFileSearch/sessionStart` | Used now | Keep | Exposed through capability ownership and debug workspace fuzzy-session start diagnostics action. |
+| `fuzzyFileSearch/sessionStop` | Used now | Keep | Exposed through capability ownership and debug workspace fuzzy-session stop diagnostics action. |
+| `fuzzyFileSearch/sessionUpdate` | Used now | Keep | Exposed through capability ownership and debug workspace fuzzy-session update diagnostics action. |
 | `getAuthStatus` | Used now | Keep | Exposed through capability ownership and debug workspace legacy auth-status diagnostics. |
 | `getConversationSummary` | Not used | Do not adopt | Deprecated upstream request family. |
 | `getUserAgent` | Not used | Do not adopt | Deprecated upstream request family. |
@@ -82,5 +82,5 @@ This ledger records recommended disposition for every upstream app-server client
 | `windowsSandbox/setupStart` | Used now | Keep | Exposed through capability ownership and debug workspace windows-sandbox setup diagnostics action. |
 
 Total methods: 74
-Used now: 51
-Not used: 23
+Used now: 54
+Not used: 20

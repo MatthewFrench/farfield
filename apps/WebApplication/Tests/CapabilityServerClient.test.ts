@@ -35,6 +35,9 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationAp
 
 vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageFuzzyFileSearchApi", () => ({
   searchFuzzyFiles: vi.fn(),
+  startFuzzyFileSearchSession: vi.fn(),
+  updateFuzzyFileSearchSession: vi.fn(),
+  stopFuzzyFileSearchSession: vi.fn(),
 }));
 
 vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageThreadRealtimeApi", () => ({
@@ -78,7 +81,12 @@ import {
   detectExternalAgentConfig,
   importExternalAgentConfig,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageExternalAgentConfigApi";
-import { searchFuzzyFiles } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageFuzzyFileSearchApi";
+import {
+  searchFuzzyFiles,
+  startFuzzyFileSearchSession,
+  stopFuzzyFileSearchSession,
+  updateFuzzyFileSearchSession,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageFuzzyFileSearchApi";
 import {
   executeCommand,
   exportRemoteSkill,
@@ -119,6 +127,9 @@ import {
   type CapabilityExternalAgentConfigImportResponse,
   type CapabilityFeedbackUploadResponse,
   type CapabilityFuzzyFileSearchResponse,
+  type CapabilityFuzzyFileSearchSessionStartResponse,
+  type CapabilityFuzzyFileSearchSessionStopResponse,
+  type CapabilityFuzzyFileSearchSessionUpdateResponse,
   type CapabilityGitDiffToRemoteResponse,
   type CapabilityHealthResponse,
   type CapabilityMcpServerOauthLoginResponse,
@@ -320,6 +331,18 @@ const FUZZY_FILE_SEARCH_RESPONSE: CapabilityFuzzyFileSearchResponse = {
   ],
 };
 
+const FUZZY_FILE_SEARCH_SESSION_START_RESPONSE: CapabilityFuzzyFileSearchSessionStartResponse = {
+  ok: true,
+};
+
+const FUZZY_FILE_SEARCH_SESSION_UPDATE_RESPONSE: CapabilityFuzzyFileSearchSessionUpdateResponse = {
+  ok: true,
+};
+
+const FUZZY_FILE_SEARCH_SESSION_STOP_RESPONSE: CapabilityFuzzyFileSearchSessionStopResponse = {
+  ok: true,
+};
+
 const ACCOUNT_AUTH_STATUS_RESPONSE: CapabilityAccountAuthStatusResponse = {
   ok: true,
   authMethod: "chatgpt",
@@ -508,6 +531,15 @@ describe("CapabilityServerClient", () => {
     vi.mocked(executeCommand).mockResolvedValue(COMMAND_EXECUTION_RESPONSE);
     vi.mocked(readGitDiffToRemote).mockResolvedValue(GIT_DIFF_TO_REMOTE_RESPONSE);
     vi.mocked(searchFuzzyFiles).mockResolvedValue(FUZZY_FILE_SEARCH_RESPONSE);
+    vi.mocked(startFuzzyFileSearchSession).mockResolvedValue(
+      FUZZY_FILE_SEARCH_SESSION_START_RESPONSE,
+    );
+    vi.mocked(updateFuzzyFileSearchSession).mockResolvedValue(
+      FUZZY_FILE_SEARCH_SESSION_UPDATE_RESPONSE,
+    );
+    vi.mocked(stopFuzzyFileSearchSession).mockResolvedValue(
+      FUZZY_FILE_SEARCH_SESSION_STOP_RESPONSE,
+    );
     vi.mocked(readAccountAuthStatus).mockResolvedValue(ACCOUNT_AUTH_STATUS_RESPONSE);
     vi.mocked(readAccountUserInfo).mockResolvedValue(ACCOUNT_USER_INFO_RESPONSE);
     vi.mocked(uploadFeedback).mockResolvedValue(FEEDBACK_UPLOAD_RESPONSE);
@@ -607,6 +639,23 @@ describe("CapabilityServerClient", () => {
       query: "main",
       roots: ["/tmp/project", "/tmp/project/packages"],
       cancellationToken: "token-1",
+    };
+    const fuzzyFileSearchSessionStartOptions = {
+      actionId: "action-fuzzy-file-search-session-start",
+      actionName: "start-fuzzy-file-search-session",
+      sessionId: "session-1",
+      roots: ["/tmp/project", "/tmp/project/packages"],
+    };
+    const fuzzyFileSearchSessionUpdateOptions = {
+      actionId: "action-fuzzy-file-search-session-update",
+      actionName: "update-fuzzy-file-search-session",
+      sessionId: "session-1",
+      query: "main",
+    };
+    const fuzzyFileSearchSessionStopOptions = {
+      actionId: "action-fuzzy-file-search-session-stop",
+      actionName: "stop-fuzzy-file-search-session",
+      sessionId: "session-1",
     };
     const accountAuthStatusOptions = {
       actionId: "action-account-auth-status",
@@ -779,6 +828,14 @@ describe("CapabilityServerClient", () => {
       await capabilityServerClient.readGitDiffToRemote(gitDiffToRemoteOptions);
     const fuzzyFileSearchResponse =
       await capabilityServerClient.searchFuzzyFiles(fuzzyFileSearchOptions);
+    const fuzzyFileSearchSessionStartResponse =
+      await capabilityServerClient.startFuzzyFileSearchSession(fuzzyFileSearchSessionStartOptions);
+    const fuzzyFileSearchSessionUpdateResponse =
+      await capabilityServerClient.updateFuzzyFileSearchSession(
+        fuzzyFileSearchSessionUpdateOptions,
+      );
+    const fuzzyFileSearchSessionStopResponse =
+      await capabilityServerClient.stopFuzzyFileSearchSession(fuzzyFileSearchSessionStopOptions);
     const accountAuthStatusResponse =
       await capabilityServerClient.readAuthStatus(accountAuthStatusOptions);
     const accountUserInfoResponse =
@@ -835,6 +892,9 @@ describe("CapabilityServerClient", () => {
     expect(executeCommand).toHaveBeenCalledWith(commandExecutionOptions);
     expect(readGitDiffToRemote).toHaveBeenCalledWith(gitDiffToRemoteOptions);
     expect(searchFuzzyFiles).toHaveBeenCalledWith(fuzzyFileSearchOptions);
+    expect(startFuzzyFileSearchSession).toHaveBeenCalledWith(fuzzyFileSearchSessionStartOptions);
+    expect(updateFuzzyFileSearchSession).toHaveBeenCalledWith(fuzzyFileSearchSessionUpdateOptions);
+    expect(stopFuzzyFileSearchSession).toHaveBeenCalledWith(fuzzyFileSearchSessionStopOptions);
     expect(readAccountAuthStatus).toHaveBeenCalledWith(accountAuthStatusOptions);
     expect(readAccountUserInfo).toHaveBeenCalledWith(accountUserInfoOptions);
     expect(uploadFeedback).toHaveBeenCalledWith(feedbackUploadOptions);
@@ -870,6 +930,9 @@ describe("CapabilityServerClient", () => {
     expect(commandExecutionResponse).toEqual(COMMAND_EXECUTION_RESPONSE);
     expect(gitDiffToRemoteResponse).toEqual(GIT_DIFF_TO_REMOTE_RESPONSE);
     expect(fuzzyFileSearchResponse).toEqual(FUZZY_FILE_SEARCH_RESPONSE);
+    expect(fuzzyFileSearchSessionStartResponse).toEqual(FUZZY_FILE_SEARCH_SESSION_START_RESPONSE);
+    expect(fuzzyFileSearchSessionUpdateResponse).toEqual(FUZZY_FILE_SEARCH_SESSION_UPDATE_RESPONSE);
+    expect(fuzzyFileSearchSessionStopResponse).toEqual(FUZZY_FILE_SEARCH_SESSION_STOP_RESPONSE);
     expect(accountAuthStatusResponse).toEqual(ACCOUNT_AUTH_STATUS_RESPONSE);
     expect(accountUserInfoResponse).toEqual(ACCOUNT_USER_INFO_RESPONSE);
     expect(feedbackUploadResponse).toEqual(FEEDBACK_UPLOAD_RESPONSE);

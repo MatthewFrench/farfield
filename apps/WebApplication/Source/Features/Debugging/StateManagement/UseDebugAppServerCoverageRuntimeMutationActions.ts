@@ -4,6 +4,9 @@ import type {
   DebugAppServerCoverageCommandExecutionResult,
   DebugAppServerCoverageFeedbackUploadResult,
   DebugAppServerCoverageFuzzyFileSearchResult,
+  DebugAppServerCoverageFuzzyFileSearchSessionStartResult,
+  DebugAppServerCoverageFuzzyFileSearchSessionStopResult,
+  DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
   DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   DebugAppServerCoverageThreadRealtimeAppendTextResult,
@@ -17,6 +20,9 @@ import {
   runCommandExecutionAction,
   runFeedbackUploadAction,
   runFuzzyFileSearchAction,
+  runFuzzyFileSearchSessionStartAction,
+  runFuzzyFileSearchSessionStopAction,
+  runFuzzyFileSearchSessionUpdateAction,
   runGitDiffToRemoteAction,
 } from "./DebugAppServerCoverageMutationActionRunners";
 import {
@@ -53,6 +59,15 @@ export interface UseDebugAppServerCoverageRuntimeMutationActionsInput {
   setLastFuzzyFileSearchResult: Dispatch<
     SetStateAction<DebugAppServerCoverageFuzzyFileSearchResult | null>
   >;
+  setLastFuzzyFileSearchSessionStartResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageFuzzyFileSearchSessionStartResult | null>
+  >;
+  setLastFuzzyFileSearchSessionUpdateResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null>
+  >;
+  setLastFuzzyFileSearchSessionStopResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null>
+  >;
   setLastCommandExecutionResult: Dispatch<
     SetStateAction<DebugAppServerCoverageCommandExecutionResult | null>
   >;
@@ -72,6 +87,9 @@ export interface DebugAppServerCoverageRuntimeMutationActions {
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
+  startFuzzyFileSearchSession: (sessionId: string, roots: string[]) => void;
+  updateFuzzyFileSearchSession: (sessionId: string, query: string) => void;
+  stopFuzzyFileSearchSession: (sessionId: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -237,6 +255,68 @@ export function useDebugAppServerCoverageRuntimeMutationActions(
     ],
   );
 
+  const startFuzzyFileSearchSession = useCallback(
+    (sessionId: string, roots: string[]) => {
+      runFuzzyFileSearchSessionStartAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction: input.isRunningCoverageAction,
+        sessionId,
+        roots,
+        setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+        setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+        setLastFuzzyFileSearchSessionStartResult: input.setLastFuzzyFileSearchSessionStartResult,
+      });
+    },
+    [
+      input.capabilityServerClient,
+      input.isRunningCoverageAction,
+      input.setCoverageActionErrorMessage,
+      input.setIsRunningCoverageAction,
+      input.setLastFuzzyFileSearchSessionStartResult,
+    ],
+  );
+
+  const updateFuzzyFileSearchSession = useCallback(
+    (sessionId: string, query: string) => {
+      runFuzzyFileSearchSessionUpdateAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction: input.isRunningCoverageAction,
+        sessionId,
+        query,
+        setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+        setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+        setLastFuzzyFileSearchSessionUpdateResult: input.setLastFuzzyFileSearchSessionUpdateResult,
+      });
+    },
+    [
+      input.capabilityServerClient,
+      input.isRunningCoverageAction,
+      input.setCoverageActionErrorMessage,
+      input.setIsRunningCoverageAction,
+      input.setLastFuzzyFileSearchSessionUpdateResult,
+    ],
+  );
+
+  const stopFuzzyFileSearchSession = useCallback(
+    (sessionId: string) => {
+      runFuzzyFileSearchSessionStopAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction: input.isRunningCoverageAction,
+        sessionId,
+        setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+        setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+        setLastFuzzyFileSearchSessionStopResult: input.setLastFuzzyFileSearchSessionStopResult,
+      });
+    },
+    [
+      input.capabilityServerClient,
+      input.isRunningCoverageAction,
+      input.setCoverageActionErrorMessage,
+      input.setIsRunningCoverageAction,
+      input.setLastFuzzyFileSearchSessionStopResult,
+    ],
+  );
+
   const executeCommand = useCallback(
     (command: string[], timeoutMs?: number, cwd?: string) => {
       runCommandExecutionAction({
@@ -290,6 +370,9 @@ export function useDebugAppServerCoverageRuntimeMutationActions(
     startWindowsSandboxSetup,
     readGitDiffToRemote,
     searchFuzzyFiles,
+    startFuzzyFileSearchSession,
+    updateFuzzyFileSearchSession,
+    stopFuzzyFileSearchSession,
     executeCommand,
     uploadFeedback,
   };

@@ -30,7 +30,12 @@ import {
   buildExternalAgentConfigImportRequestParameters,
 } from "./AppServerClientExternalAgentConfigRequestBuilders.js";
 import { buildFeedbackUploadRequestParameters } from "./AppServerClientFeedbackUploadRequestBuilders.js";
-import { buildFuzzyFileSearchRequestParameters } from "./AppServerClientFuzzyFileSearchRequestBuilders.js";
+import {
+  buildFuzzyFileSearchRequestParameters,
+  buildFuzzyFileSearchSessionStartRequestParameters,
+  buildFuzzyFileSearchSessionStopRequestParameters,
+  buildFuzzyFileSearchSessionUpdateRequestParameters,
+} from "./AppServerClientFuzzyFileSearchRequestBuilders.js";
 import { buildGitDiffToRemoteRequestParameters } from "./AppServerClientGitDiffRequestBuilders.js";
 import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
 import {
@@ -381,6 +386,26 @@ export interface FuzzyFileSearchMatch {
 export interface FuzzyFileSearchResult {
   files: FuzzyFileSearchMatch[];
 }
+
+export interface FuzzyFileSearchSessionStartOptions {
+  sessionId: string;
+  roots: string[];
+}
+
+export interface FuzzyFileSearchSessionStartResult {}
+
+export interface FuzzyFileSearchSessionUpdateOptions {
+  sessionId: string;
+  query: string;
+}
+
+export interface FuzzyFileSearchSessionUpdateResult {}
+
+export interface FuzzyFileSearchSessionStopOptions {
+  sessionId: string;
+}
+
+export interface FuzzyFileSearchSessionStopResult {}
 
 export interface CommandExecutionOptions {
   command: string[];
@@ -889,6 +914,9 @@ const AppServerFuzzyFileSearchResponseSchema = z
     ),
   })
   .passthrough();
+const AppServerFuzzyFileSearchSessionStartResponseSchema = z.object({}).passthrough();
+const AppServerFuzzyFileSearchSessionUpdateResponseSchema = z.object({}).passthrough();
+const AppServerFuzzyFileSearchSessionStopResponseSchema = z.object({}).passthrough();
 const AppServerCommandExecResponseSchema = z
   .object({
     exitCode: z.number().int(),
@@ -1485,6 +1513,48 @@ export class AppServerClient {
         indices: fileMatch.indices,
       })),
     };
+  }
+
+  public async startFuzzyFileSearchSession(
+    options: FuzzyFileSearchSessionStartOptions,
+  ): Promise<FuzzyFileSearchSessionStartResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.fuzzyFileSearchSessionStart,
+      buildFuzzyFileSearchSessionStartRequestParameters(options),
+    );
+    return parseAppServerResponse(
+      AppServerFuzzyFileSearchSessionStartResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.fuzzyFileSearchSessionStart,
+    );
+  }
+
+  public async updateFuzzyFileSearchSession(
+    options: FuzzyFileSearchSessionUpdateOptions,
+  ): Promise<FuzzyFileSearchSessionUpdateResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.fuzzyFileSearchSessionUpdate,
+      buildFuzzyFileSearchSessionUpdateRequestParameters(options),
+    );
+    return parseAppServerResponse(
+      AppServerFuzzyFileSearchSessionUpdateResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.fuzzyFileSearchSessionUpdate,
+    );
+  }
+
+  public async stopFuzzyFileSearchSession(
+    options: FuzzyFileSearchSessionStopOptions,
+  ): Promise<FuzzyFileSearchSessionStopResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.fuzzyFileSearchSessionStop,
+      buildFuzzyFileSearchSessionStopRequestParameters(options),
+    );
+    return parseAppServerResponse(
+      AppServerFuzzyFileSearchSessionStopResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.fuzzyFileSearchSessionStop,
+    );
   }
 
   public async executeCommand(options: CommandExecutionOptions): Promise<CommandExecutionResult> {

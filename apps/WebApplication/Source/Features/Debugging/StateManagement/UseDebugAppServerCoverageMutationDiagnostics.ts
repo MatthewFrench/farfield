@@ -12,6 +12,9 @@ import type {
   DebugAppServerCoverageExternalAgentConfigMigrationItem,
   DebugAppServerCoverageFeedbackUploadResult,
   DebugAppServerCoverageFuzzyFileSearchResult,
+  DebugAppServerCoverageFuzzyFileSearchSessionStartResult,
+  DebugAppServerCoverageFuzzyFileSearchSessionStopResult,
+  DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
   DebugAppServerCoveragePendingAccountLogin,
   DebugAppServerCoverageThreadRealtimeAppendAudioResult,
@@ -64,6 +67,9 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
+  lastFuzzyFileSearchSessionStartResult: DebugAppServerCoverageFuzzyFileSearchSessionStartResult | null;
+  lastFuzzyFileSearchSessionUpdateResult: DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null;
+  lastFuzzyFileSearchSessionStopResult: DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   startAccountLogin: () => void;
   cancelAccountLogin: () => void;
@@ -94,6 +100,9 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
+  startFuzzyFileSearchSession: (sessionId: string, roots: string[]) => void;
+  updateFuzzyFileSearchSession: (sessionId: string, query: string) => void;
+  stopFuzzyFileSearchSession: (sessionId: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -170,6 +179,12 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageFeedbackUploadResult | null>(null);
   const [lastFuzzyFileSearchResult, setLastFuzzyFileSearchResult] =
     useState<DebugAppServerCoverageFuzzyFileSearchResult | null>(null);
+  const [lastFuzzyFileSearchSessionStartResult, setLastFuzzyFileSearchSessionStartResult] =
+    useState<DebugAppServerCoverageFuzzyFileSearchSessionStartResult | null>(null);
+  const [lastFuzzyFileSearchSessionUpdateResult, setLastFuzzyFileSearchSessionUpdateResult] =
+    useState<DebugAppServerCoverageFuzzyFileSearchSessionUpdateResult | null>(null);
+  const [lastFuzzyFileSearchSessionStopResult, setLastFuzzyFileSearchSessionStopResult] =
+    useState<DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null>(null);
   const [lastGitDiffToRemoteResult, setLastGitDiffToRemoteResult] =
     useState<DebugAppServerCoverageGitDiffToRemoteResult | null>(null);
 
@@ -399,6 +414,9 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     setLastWindowsSandboxSetupStartResult,
     setLastGitDiffToRemoteResult,
     setLastFuzzyFileSearchResult,
+    setLastFuzzyFileSearchSessionStartResult,
+    setLastFuzzyFileSearchSessionUpdateResult,
+    setLastFuzzyFileSearchSessionStopResult,
     setLastCommandExecutionResult,
     setLastFeedbackUploadResult,
   });
@@ -421,6 +439,9 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastWindowsSandboxSetupStartResult,
       lastFeedbackUploadResult,
       lastFuzzyFileSearchResult,
+      lastFuzzyFileSearchSessionStartResult,
+      lastFuzzyFileSearchSessionUpdateResult,
+      lastFuzzyFileSearchSessionStopResult,
       lastGitDiffToRemoteResult,
       startAccountLogin,
       cancelAccountLogin,
@@ -440,6 +461,9 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       startWindowsSandboxSetup: runtimeMutationActions.startWindowsSandboxSetup,
       readGitDiffToRemote: runtimeMutationActions.readGitDiffToRemote,
       searchFuzzyFiles: runtimeMutationActions.searchFuzzyFiles,
+      startFuzzyFileSearchSession: runtimeMutationActions.startFuzzyFileSearchSession,
+      updateFuzzyFileSearchSession: runtimeMutationActions.updateFuzzyFileSearchSession,
+      stopFuzzyFileSearchSession: runtimeMutationActions.stopFuzzyFileSearchSession,
       executeCommand: runtimeMutationActions.executeCommand,
       uploadFeedback: runtimeMutationActions.uploadFeedback,
     },
