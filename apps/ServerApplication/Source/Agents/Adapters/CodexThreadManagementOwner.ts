@@ -27,8 +27,11 @@ import {
   type ReadAccountOptions,
   type ReadAccountRateLimitsResult,
   type ReadAccountResult,
+  type ReadAuthStatusOptions,
+  type ReadAuthStatusResult,
   type ReadConfigRequirementsOptions,
   type ReadConfigRequirementsResult,
+  type ReadUserInfoResult,
   type StartMcpServerOauthLoginResult,
   type StartReviewOptions,
   type StartThreadOptions,
@@ -72,10 +75,13 @@ import type {
   AgentReadAccountRateLimitsInput,
   AgentReadAccountRateLimitsResult,
   AgentReadAccountResult,
+  AgentReadAuthStatusInput,
+  AgentReadAuthStatusResult,
   AgentReadConfigRequirementsInput,
   AgentReadConfigRequirementsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
+  AgentReadUserInfoResult,
   AgentRollbackThreadInput,
   AgentSetThreadNameInput,
   AgentStartAccountLoginInput,
@@ -262,6 +268,13 @@ function buildReadConfigRequirementsOptions(
 
 function buildReadAccountOptions(input?: AgentReadAccountInput): ReadAccountOptions {
   return {
+    ...(input?.refreshToken !== undefined ? { refreshToken: input.refreshToken } : {}),
+  };
+}
+
+function buildReadAuthStatusOptions(input?: AgentReadAuthStatusInput): ReadAuthStatusOptions {
+  return {
+    ...(input?.includeToken !== undefined ? { includeToken: input.includeToken } : {}),
     ...(input?.refreshToken !== undefined ? { refreshToken: input.refreshToken } : {}),
   };
 }
@@ -565,12 +578,30 @@ export class CodexThreadManagementOwner {
     return result;
   }
 
+  public async readAuthStatus(
+    input?: AgentReadAuthStatusInput,
+  ): Promise<AgentReadAuthStatusResult> {
+    this.ensureCodexAvailable();
+    const result: ReadAuthStatusResult = await this.runAppServerCall(() =>
+      this.appClient.readAuthStatus(buildReadAuthStatusOptions(input)),
+    );
+    return result;
+  }
+
   public async readAccountRateLimits(
     _input?: AgentReadAccountRateLimitsInput,
   ): Promise<AgentReadAccountRateLimitsResult> {
     this.ensureCodexAvailable();
     const result: ReadAccountRateLimitsResult = await this.runAppServerCall(() =>
       this.appClient.readAccountRateLimits(),
+    );
+    return result;
+  }
+
+  public async readUserInfo(): Promise<AgentReadUserInfoResult> {
+    this.ensureCodexAvailable();
+    const result: ReadUserInfoResult = await this.runAppServerCall(() =>
+      this.appClient.readUserInfo(),
     );
     return result;
   }

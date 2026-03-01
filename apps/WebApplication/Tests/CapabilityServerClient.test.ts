@@ -20,6 +20,8 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityApi", () => ({
 }));
 
 vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi", () => ({
+  readAccountAuthStatus: vi.fn(),
+  readAccountUserInfo: vi.fn(),
   executeCommand: vi.fn(),
   exportRemoteSkill: vi.fn(),
   listRemoteSkills: vi.fn(),
@@ -52,6 +54,8 @@ import {
   executeCommand,
   exportRemoteSkill,
   listRemoteSkills,
+  readAccountAuthStatus,
+  readAccountUserInfo,
   startMcpServerOauthLogin,
   uploadFeedback,
   writeConfigBatch,
@@ -59,10 +63,12 @@ import {
   writeSkillsConfig,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi";
 import {
+  type CapabilityAccountAuthStatusResponse,
   type CapabilityAccountLoginCancelResponse,
   type CapabilityAccountLoginStartResponse,
   type CapabilityAccountRateLimitsResponse,
   type CapabilityAccountResponse,
+  type CapabilityAccountUserInfoResponse,
   type CapabilityAgentsResponse,
   type CapabilityAppsResponse,
   type CapabilityCollaborationModesResponse,
@@ -241,6 +247,18 @@ const COMMAND_EXECUTION_RESPONSE: CapabilityCommandExecutionResponse = {
   stderr: "",
 };
 
+const ACCOUNT_AUTH_STATUS_RESPONSE: CapabilityAccountAuthStatusResponse = {
+  ok: true,
+  authMethod: "chatgpt",
+  authToken: null,
+  requiresOpenaiAuth: true,
+};
+
+const ACCOUNT_USER_INFO_RESPONSE: CapabilityAccountUserInfoResponse = {
+  ok: true,
+  allegedUserEmail: "dev@example.com",
+};
+
 const FEEDBACK_UPLOAD_RESPONSE: CapabilityFeedbackUploadResponse = {
   ok: true,
   threadId: "thread-feedback-1",
@@ -374,6 +392,8 @@ describe("CapabilityServerClient", () => {
     vi.mocked(reloadMcpServerConfig).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
     vi.mocked(startMcpServerOauthLogin).mockResolvedValue(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
     vi.mocked(executeCommand).mockResolvedValue(COMMAND_EXECUTION_RESPONSE);
+    vi.mocked(readAccountAuthStatus).mockResolvedValue(ACCOUNT_AUTH_STATUS_RESPONSE);
+    vi.mocked(readAccountUserInfo).mockResolvedValue(ACCOUNT_USER_INFO_RESPONSE);
     vi.mocked(uploadFeedback).mockResolvedValue(FEEDBACK_UPLOAD_RESPONSE);
     vi.mocked(writeConfigBatch).mockResolvedValue(CONFIG_BATCH_WRITE_RESPONSE);
     vi.mocked(writeConfigValue).mockResolvedValue(CONFIG_VALUE_WRITE_RESPONSE);
@@ -452,6 +472,16 @@ describe("CapabilityServerClient", () => {
       command: ["pwd"],
       timeoutMs: 1200,
       cwd: "/tmp/project",
+    };
+    const accountAuthStatusOptions = {
+      actionId: "action-account-auth-status",
+      actionName: "read-account-auth-status",
+      includeToken: false,
+      refreshToken: true,
+    };
+    const accountUserInfoOptions = {
+      actionId: "action-account-user-info",
+      actionName: "read-account-user-info",
     };
     const feedbackUploadOptions = {
       actionId: "action-feedback-upload",
@@ -554,6 +584,10 @@ describe("CapabilityServerClient", () => {
     );
     const commandExecutionResponse =
       await capabilityServerClient.executeCommand(commandExecutionOptions);
+    const accountAuthStatusResponse =
+      await capabilityServerClient.readAuthStatus(accountAuthStatusOptions);
+    const accountUserInfoResponse =
+      await capabilityServerClient.readUserInfo(accountUserInfoOptions);
     const feedbackUploadResponse =
       await capabilityServerClient.uploadFeedback(feedbackUploadOptions);
     const configBatchWriteResponse =
@@ -587,6 +621,8 @@ describe("CapabilityServerClient", () => {
     expect(reloadMcpServerConfig).toHaveBeenCalledWith(reloadMcpServerConfigOptions);
     expect(startMcpServerOauthLogin).toHaveBeenCalledWith(mcpServerOauthLoginOptions);
     expect(executeCommand).toHaveBeenCalledWith(commandExecutionOptions);
+    expect(readAccountAuthStatus).toHaveBeenCalledWith(accountAuthStatusOptions);
+    expect(readAccountUserInfo).toHaveBeenCalledWith(accountUserInfoOptions);
     expect(uploadFeedback).toHaveBeenCalledWith(feedbackUploadOptions);
     expect(writeConfigBatch).toHaveBeenCalledWith(configBatchWriteOptions);
     expect(writeConfigValue).toHaveBeenCalledWith(configValueWriteOptions);
@@ -611,6 +647,8 @@ describe("CapabilityServerClient", () => {
     expect(reloadMcpServerConfigResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
     expect(mcpServerOauthLoginResponse).toEqual(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
     expect(commandExecutionResponse).toEqual(COMMAND_EXECUTION_RESPONSE);
+    expect(accountAuthStatusResponse).toEqual(ACCOUNT_AUTH_STATUS_RESPONSE);
+    expect(accountUserInfoResponse).toEqual(ACCOUNT_USER_INFO_RESPONSE);
     expect(feedbackUploadResponse).toEqual(FEEDBACK_UPLOAD_RESPONSE);
     expect(configBatchWriteResponse).toEqual(CONFIG_BATCH_WRITE_RESPONSE);
     expect(configValueWriteResponse).toEqual(CONFIG_VALUE_WRITE_RESPONSE);

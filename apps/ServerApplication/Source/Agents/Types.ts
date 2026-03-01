@@ -1,3 +1,4 @@
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: Agent contract decomposition follow-up is tracked in docs/proposed-structure-and-migration.md decision entry 20.
 import type {
   AppServerCollaborationModeListResponse,
   AppServerListModelsResponse,
@@ -446,6 +447,23 @@ export interface AgentReadAccountResult {
   requiresOpenaiAuth: boolean;
 }
 
+export interface AgentReadAuthStatusInput {
+  includeToken?: boolean;
+  refreshToken?: boolean;
+}
+
+export type AgentAuthStatusMethod = "apikey" | "chatgpt" | "chatgptAuthTokens";
+
+export interface AgentReadAuthStatusResult {
+  authMethod: AgentAuthStatusMethod | null;
+  authToken: string | null;
+  requiresOpenaiAuth: boolean | null;
+}
+
+export interface AgentReadUserInfoResult {
+  allegedUserEmail: string | null;
+}
+
 export interface AgentReadAccountRateLimitsInput {}
 
 export interface AgentAccountCreditsSnapshot {
@@ -681,6 +699,8 @@ export interface AgentAdapter {
   listApps?(input?: AgentListAppsInput): Promise<AgentListAppsResult>;
   listSkills?(input?: AgentListSkillsInput): Promise<AgentListSkillsResult>;
   readAccount?(input?: AgentReadAccountInput): Promise<AgentReadAccountResult>;
+  readAuthStatus?(input?: AgentReadAuthStatusInput): Promise<AgentReadAuthStatusResult>;
+  readUserInfo?(): Promise<AgentReadUserInfoResult>;
   readAccountRateLimits?(
     input?: AgentReadAccountRateLimitsInput,
   ): Promise<AgentReadAccountRateLimitsResult>;

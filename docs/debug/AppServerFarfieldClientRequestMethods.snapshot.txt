@@ -13,6 +13,7 @@ config/value/write
 configRequirements/read
 experimentalFeature/list
 feedback/upload
+getAuthStatus
 initialize
 mcpServer/oauth/login
 mcpServerStatus/list
@@ -38,3 +39,4 @@ thread/unsubscribe
 turn/interrupt
 turn/start
 turn/steer
+userInfo

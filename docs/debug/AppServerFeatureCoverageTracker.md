@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 02:23:07Z
+Last Updated (UTC): 2026-03-01 02:37:57Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `39 / 74` request methods (`52.7%`).
+1. Farfield app-server method coverage at request-owner layer: `41 / 74` request methods (`55.4%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `40 / 74` (`54.1%`).
+3. Effective request-method usage including transport-owned `initialize`: `42 / 74` (`56.8%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -104,6 +104,8 @@ As of the upstream snapshot above:
 | `config/mcpServer/reload` | MCP server configuration reload action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic mutation path for diagnostics flows | Keep current path |
 | `mcpServer/oauth/login` | MCP server oauth-login start action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic oauth-url response mapping for integration diagnostics | Keep current path |
 | `account/read` | Account diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed account-contract mapping | Keep current path |
+| `getAuthStatus` | Legacy auth-status diagnostics in debug workspace coverage panel to validate auth mode, token-return behavior, and OpenAI-auth requirements | Medium-high | Strict capability route ownership with typed boolean-query parsing and deterministic nullable auth-status mapping | Keep current path |
+| `userInfo` | Legacy user-info diagnostics in debug workspace coverage panel for account troubleshooting workflows | Medium-high | Strict capability route ownership with deterministic nullable email mapping | Keep current path |
 | `account/rateLimits/read` | Account rate-limit diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed rate-limit contract mapping | Keep current path |
 | `account/login/start` | Account auth start action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed login-response mapping and pending-login state | Keep current path |
 | `account/login/cancel` | Account auth cancel action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed cancel-status mapping | Keep current path |
@@ -154,6 +156,8 @@ As of the upstream snapshot above:
 | `config/mcpServer/reload` | MCP server config reload diagnostics action | `/api/config/mcp-server/reload` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.reloadMcpServerConfig` -> `AppServerClient.reloadMcpServerConfig` |
 | `mcpServer/oauth/login` | MCP server oauth login diagnostics action | `/api/mcp-servers/oauth/login` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.startMcpServerOauthLogin` -> `AppServerClient.startMcpServerOauthLogin` |
 | `account/read` | Account diagnostics | `/api/account` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readAccount` -> `AppServerClient.readAccount` |
+| `getAuthStatus` | Legacy auth-status diagnostics | `/api/account/auth-status` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readAuthStatus` -> `AppServerClient.readAuthStatus` |
+| `userInfo` | Legacy user-info diagnostics | `/api/account/user-info` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readUserInfo` -> `AppServerClient.readUserInfo` |
 | `account/rateLimits/read` | Account rate-limit diagnostics | `/api/account/rate-limits` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readAccountRateLimits` -> `AppServerClient.readAccountRateLimits` |
 | `account/login/start` | Account login start action | `/api/account/login/start` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.startAccountLogin` -> `AppServerClient.startAccountLogin` |
 | `account/login/cancel` | Account login cancel action | `/api/account/login/cancel` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.cancelAccountLogin` -> `AppServerClient.cancelAccountLogin` |
@@ -169,7 +173,7 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`35` request methods are not used by Farfield’s app-server client path:
+`33` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
@@ -183,7 +187,6 @@ fuzzyFileSearch
 fuzzyFileSearch/sessionStart
 fuzzyFileSearch/sessionStop
 fuzzyFileSearch/sessionUpdate
-getAuthStatus
 getConversationSummary
 getUserAgent
 getUserSavedConfig
@@ -205,7 +208,6 @@ thread/realtime/appendText
 thread/realtime/start
 thread/realtime/stop
 sendUserMessage
-userInfo
 windowsSandbox/setupStart
 ```
 
@@ -221,23 +223,21 @@ These are explicitly in the upstream deprecated request section and should not b
 4. `execOneOffCommand`
 5. `forkConversation`
 6. `fuzzyFileSearch`
-7. `getAuthStatus`
-8. `getConversationSummary`
-9. `getUserAgent`
-10. `getUserSavedConfig`
-11. `gitDiffToRemote`
-12. `interruptConversation`
-13. `listConversations`
-14. `loginApiKey`
-15. `loginChatGpt`
-16. `logoutChatGpt`
-17. `newConversation`
-18. `removeConversationListener`
-19. `resumeConversation`
-20. `sendUserTurn`
-21. `sendUserMessage`
-22. `setDefaultModel`
-23. `userInfo`
+7. `getConversationSummary`
+8. `getUserAgent`
+9. `getUserSavedConfig`
+10. `gitDiffToRemote`
+11. `interruptConversation`
+12. `listConversations`
+13. `loginApiKey`
+14. `loginChatGpt`
+15. `logoutChatGpt`
+16. `newConversation`
+17. `removeConversationListener`
+18. `resumeConversation`
+19. `sendUserTurn`
+20. `sendUserMessage`
+21. `setDefaultModel`
 
 ### Category B: Auth, Account, and Tenant/Operator Surfaces Not Yet Wired in Farfield Product Flows
 
@@ -282,8 +282,8 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `35`
-2. Total methods listed across Category A-I: `35`
+1. Total non-intersection methods: `33`
+2. Total methods listed across Category A-I: `33`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

@@ -21,6 +21,7 @@ import {
   type TurnStartParams,
 } from "@farfield/protocol";
 import { z } from "zod";
+import { buildReadAuthStatusRequestParameters } from "./AppServerClientAuthStatusRequestBuilders.js";
 import { buildCommandExecutionRequestParameters } from "./AppServerClientCommandExecutionRequestBuilders.js";
 import { buildConfigBatchWriteRequestParameters } from "./AppServerClientConfigBatchWriteRequestBuilders.js";
 import { buildConfigValueWriteRequestParameters } from "./AppServerClientConfigValueWriteRequestBuilders.js";
@@ -259,6 +260,11 @@ export interface ReadAccountOptions {
   refreshToken?: boolean;
 }
 
+export interface ReadAuthStatusOptions {
+  includeToken?: boolean;
+  refreshToken?: boolean;
+}
+
 export type AccountPlanType =
   | "free"
   | "go"
@@ -285,6 +291,18 @@ export type AccountSummary = ApiKeyAccountSummary | ChatgptAccountSummary;
 export interface ReadAccountResult {
   account: AccountSummary | null;
   requiresOpenaiAuth: boolean;
+}
+
+export type AuthStatusMethod = "apikey" | "chatgpt" | "chatgptAuthTokens";
+
+export interface ReadAuthStatusResult {
+  authMethod: AuthStatusMethod | null;
+  authToken: string | null;
+  requiresOpenaiAuth: boolean | null;
+}
+
+export interface ReadUserInfoResult {
+  allegedUserEmail: string | null;
 }
 
 export interface AccountCreditsSnapshot {
@@ -688,6 +706,19 @@ const AppServerGetAccountResponseSchema = z
   .object({
     account: AppServerAccountSchema.nullable(),
     requiresOpenaiAuth: z.boolean(),
+  })
+  .passthrough();
+const AppServerGetAuthStatusAuthMethodSchema = z.enum(["apikey", "chatgpt", "chatgptAuthTokens"]);
+const AppServerGetAuthStatusResponseSchema = z
+  .object({
+    authMethod: AppServerGetAuthStatusAuthMethodSchema.nullable().optional(),
+    authToken: z.string().nullable().optional(),
+    requiresOpenaiAuth: z.boolean().nullable().optional(),
+  })
+  .passthrough();
+const AppServerUserInfoResponseSchema = z
+  .object({
+    allegedUserEmail: z.string().nullable().optional(),
   })
   .passthrough();
 const AppServerAccountCreditsSnapshotSchema = z
@@ -1189,6 +1220,23 @@ export class AppServerClient {
     };
   }
 
+  public async readAuthStatus(options?: ReadAuthStatusOptions): Promise<ReadAuthStatusResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.readAuthStatus,
+      buildReadAuthStatusRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerGetAuthStatusResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readAuthStatus,
+    );
+    return {
+      authMethod: parsed.authMethod ?? null,
+      authToken: parsed.authToken ?? null,
+      requiresOpenaiAuth: parsed.requiresOpenaiAuth ?? null,
+    };
+  }
+
   public async readAccountRateLimits(): Promise<ReadAccountRateLimitsResult> {
     const result = await this.transport.request(
       APP_SERVER_CLIENT_METHODS.readAccountRateLimits,
@@ -1211,6 +1259,18 @@ export class AppServerClient {
                 mapAccountRateLimitSnapshot(snapshot),
               ]),
             ),
+    };
+  }
+
+  public async readUserInfo(): Promise<ReadUserInfoResult> {
+    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.readUserInfo, {});
+    const parsed = parseAppServerResponse(
+      AppServerUserInfoResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readUserInfo,
+    );
+    return {
+      allegedUserEmail: parsed.allegedUserEmail ?? null,
     };
   }
 

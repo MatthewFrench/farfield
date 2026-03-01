@@ -35,9 +35,12 @@ import type {
   AgentListThreadsResult,
   AgentReadAccountRateLimitsResult,
   AgentReadAccountResult,
+  AgentReadAuthStatusInput,
+  AgentReadAuthStatusResult,
   AgentReadConfigRequirementsResult,
   AgentReadThreadInput,
   AgentReadThreadResult,
+  AgentReadUserInfoResult,
   AgentSendMessageInput,
   AgentStartAccountLoginInput,
   AgentStartAccountLoginResult,
@@ -115,6 +118,15 @@ const CapabilityAccountEnvelopeSchema = z
   })
   .strict();
 
+const CapabilityAccountAuthStatusEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    authMethod: z.enum(["apikey", "chatgpt", "chatgptAuthTokens"]).nullable(),
+    authToken: z.string().nullable(),
+    requiresOpenaiAuth: z.boolean().nullable(),
+  })
+  .strict();
+
 const CapabilityAccountRateLimitSnapshotSchema = z
   .object({
     credits: z
@@ -151,6 +163,13 @@ const CapabilityAccountRateLimitsEnvelopeSchema = z
     ok: z.literal(true),
     rateLimits: CapabilityAccountRateLimitSnapshotSchema.nullable(),
     rateLimitsByLimitId: z.record(CapabilityAccountRateLimitSnapshotSchema).nullable(),
+  })
+  .strict();
+
+const CapabilityAccountUserInfoEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    allegedUserEmail: z.string().nullable(),
   })
   .strict();
 
@@ -338,7 +357,9 @@ interface MockAgentAdapterOptions {
   capabilities?: Partial<AgentCapabilities>;
   readConfigRequirements?: () => Promise<AgentReadConfigRequirementsResult>;
   readAccount?: () => Promise<AgentReadAccountResult>;
+  readAuthStatus?: (input: AgentReadAuthStatusInput) => Promise<AgentReadAuthStatusResult>;
   readAccountRateLimits?: () => Promise<AgentReadAccountRateLimitsResult>;
+  readUserInfo?: () => Promise<AgentReadUserInfoResult>;
   uploadFeedback?: (input: AgentUploadFeedbackInput) => Promise<AgentUploadFeedbackResult>;
   executeCommand?: (input: AgentCommandExecutionInput) => Promise<AgentCommandExecutionResult>;
   startAccountLogin?: (input: AgentStartAccountLoginInput) => Promise<AgentStartAccountLoginResult>;
@@ -464,8 +485,16 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
     adapter.readAccount = options.readAccount;
   }
 
+  if (options.readAuthStatus) {
+    adapter.readAuthStatus = options.readAuthStatus;
+  }
+
   if (options.readAccountRateLimits) {
     adapter.readAccountRateLimits = options.readAccountRateLimits;
+  }
+
+  if (options.readUserInfo) {
+    adapter.readUserInfo = options.readUserInfo;
   }
 
   if (options.uploadFeedback) {
@@ -792,6 +821,79 @@ describe("handleCapabilityRoutes", () => {
     expect(result.statusCode).toBe(200);
     const parsedEnvelope = CapabilityAccountEnvelopeSchema.parse(readRouteBody(result));
     expect(parsedEnvelope.account?.type).toBe("chatgpt");
+  });
+
+  it("returns auth status when adapter supports auth-status read", async () => {
+    const readAuthStatusSpy = vi.fn(
+      async (input: AgentReadAuthStatusInput): Promise<AgentReadAuthStatusResult> => ({
+        authMethod: "chatgpt",
+        authToken: null,
+        requiresOpenaiAuth: true,
+      }),
+    );
+
+    const result = await executeCapabilityRoute({
+      pathname: "/api/account/auth-status",
+      url: new URL("http://localhost/api/account/auth-status?includeToken=true&refreshToken=0"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          readAuthStatus: readAuthStatusSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(readAuthStatusSpy).toHaveBeenCalledWith({
+      includeToken: true,
+      refreshToken: false,
+    });
+    const parsedEnvelope = CapabilityAccountAuthStatusEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      authMethod: "chatgpt",
+      authToken: null,
+      requiresOpenaiAuth: true,
+    });
+  });
+
+  it("returns 400 when account auth-status includeToken is invalid", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/account/auth-status",
+      url: new URL("http://localhost/api/account/auth-status?includeToken=definitely"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Invalid includeToken query parameter. Expected true/false or 1/0.",
+    });
+  });
+
+  it("returns user info when adapter supports user-info read", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/account/user-info",
+      url: new URL("http://localhost/api/account/user-info"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          readUserInfo: async (): Promise<AgentReadUserInfoResult> => ({
+            allegedUserEmail: "dev@example.com",
+          }),
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    const parsedEnvelope = CapabilityAccountUserInfoEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      allegedUserEmail: "dev@example.com",
+    });
   });
 
   it("returns account rate limits when adapter supports rate-limit read", async () => {

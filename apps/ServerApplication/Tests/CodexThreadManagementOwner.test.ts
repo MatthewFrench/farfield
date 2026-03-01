@@ -32,9 +32,12 @@ import {
   type ReadAccountOptions,
   type ReadAccountRateLimitsResult,
   type ReadAccountResult,
+  type ReadAuthStatusOptions,
+  type ReadAuthStatusResult,
   type ReadConfigOptions,
   type ReadConfigRequirementsOptions,
   type ReadConfigRequirementsResult,
+  type ReadUserInfoResult,
   type StartMcpServerOauthLoginOptions,
   type StartMcpServerOauthLoginResult,
   type StartReviewOptions,
@@ -112,7 +115,9 @@ class TestAppServerClient extends AppServerClient {
   public readonly listRemoteSkillsCalls: ListRemoteSkillsOptions[] = [];
   public readonly exportRemoteSkillCalls: ExportRemoteSkillOptions[] = [];
   public readonly readAccountCalls: Array<ReadAccountOptions | undefined> = [];
+  public readonly readAuthStatusCalls: Array<ReadAuthStatusOptions | undefined> = [];
   public readonly readAccountRateLimitsCalls: Array<undefined> = [];
+  public readonly readUserInfoCalls: Array<undefined> = [];
   public readonly uploadFeedbackCalls: FeedbackUploadOptions[] = [];
   public readonly executeCommandCalls: CommandExecutionOptions[] = [];
   public readonly startAccountLoginCalls: LoginAccountOptions[] = [];
@@ -140,7 +145,9 @@ class TestAppServerClient extends AppServerClient {
   private readonly listRemoteSkillsResult: ListRemoteSkillsResult;
   private readonly exportRemoteSkillResult: ExportRemoteSkillResult;
   private readonly readAccountResult: ReadAccountResult;
+  private readonly readAuthStatusResult: ReadAuthStatusResult;
   private readonly readAccountRateLimitsResult: ReadAccountRateLimitsResult;
+  private readonly readUserInfoResult: ReadUserInfoResult;
   private readonly uploadFeedbackResult: FeedbackUploadResult;
   private readonly executeCommandResult: CommandExecutionResult;
   private readonly startAccountLoginResult: LoginAccountResult;
@@ -167,7 +174,9 @@ class TestAppServerClient extends AppServerClient {
     listRemoteSkillsResult?: ListRemoteSkillsResult;
     exportRemoteSkillResult?: ExportRemoteSkillResult;
     readAccountResult?: ReadAccountResult;
+    readAuthStatusResult?: ReadAuthStatusResult;
     readAccountRateLimitsResult?: ReadAccountRateLimitsResult;
+    readUserInfoResult?: ReadUserInfoResult;
     uploadFeedbackResult?: FeedbackUploadResult;
     executeCommandResult?: CommandExecutionResult;
     startAccountLoginResult?: LoginAccountResult;
@@ -227,6 +236,11 @@ class TestAppServerClient extends AppServerClient {
       account: null,
       requiresOpenaiAuth: false,
     };
+    this.readAuthStatusResult = input?.readAuthStatusResult ?? {
+      authMethod: null,
+      authToken: null,
+      requiresOpenaiAuth: null,
+    };
     this.readAccountRateLimitsResult = input?.readAccountRateLimitsResult ?? {
       rateLimits: {
         credits: null,
@@ -237,6 +251,9 @@ class TestAppServerClient extends AppServerClient {
         secondary: null,
       },
       rateLimitsByLimitId: null,
+    };
+    this.readUserInfoResult = input?.readUserInfoResult ?? {
+      allegedUserEmail: null,
     };
     this.uploadFeedbackResult = input?.uploadFeedbackResult ?? {
       threadId: "thread-feedback-1",
@@ -406,9 +423,21 @@ class TestAppServerClient extends AppServerClient {
     return this.readAccountResult;
   }
 
+  public override async readAuthStatus(
+    options?: ReadAuthStatusOptions,
+  ): Promise<ReadAuthStatusResult> {
+    this.readAuthStatusCalls.push(options);
+    return this.readAuthStatusResult;
+  }
+
   public override async readAccountRateLimits(): Promise<ReadAccountRateLimitsResult> {
     this.readAccountRateLimitsCalls.push(undefined);
     return this.readAccountRateLimitsResult;
+  }
+
+  public override async readUserInfo(): Promise<ReadUserInfoResult> {
+    this.readUserInfoCalls.push(undefined);
+    return this.readUserInfoResult;
   }
 
   public override async uploadFeedback(
@@ -1136,6 +1165,34 @@ describe("CodexThreadManagementOwner", () => {
     expect(result.account?.type).toBe("chatgpt");
   });
 
+  it("reads auth status through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      readAuthStatusResult: {
+        authMethod: "chatgpt",
+        authToken: null,
+        requiresOpenaiAuth: true,
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.readAuthStatus({
+      includeToken: true,
+      refreshToken: false,
+    });
+
+    expect(appClient.readAuthStatusCalls).toEqual([
+      {
+        includeToken: true,
+        refreshToken: false,
+      },
+    ]);
+    expect(result).toEqual({
+      authMethod: "chatgpt",
+      authToken: null,
+      requiresOpenaiAuth: true,
+    });
+  });
+
   it("reads account rate limits through codex management owner", async () => {
     const appClient = new TestAppServerClient({
       readAccountRateLimitsResult: {
@@ -1160,6 +1217,22 @@ describe("CodexThreadManagementOwner", () => {
 
     expect(appClient.readAccountRateLimitsCalls).toEqual([undefined]);
     expect(result.rateLimits.limitId).toBe("codex");
+  });
+
+  it("reads user info through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      readUserInfoResult: {
+        allegedUserEmail: "dev@example.com",
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.readUserInfo();
+
+    expect(appClient.readUserInfoCalls).toEqual([undefined]);
+    expect(result).toEqual({
+      allegedUserEmail: "dev@example.com",
+    });
   });
 
   it("starts chatgpt account login through codex management owner", async () => {

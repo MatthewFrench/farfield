@@ -27,6 +27,7 @@ import {
 import {
   mapAccount,
   mapApps,
+  mapAuthStatus,
   mapCommandExecutionResult,
   mapExperimentalFeatures,
   mapFeedbackUploadResult,
@@ -36,6 +37,7 @@ import {
   mapRemoteSkills,
   mapRequirements,
   mapSkills,
+  mapUserInfo,
 } from "./DebugAppServerCoverageDiagnosticsMappers";
 
 const COVERAGE_WORKSPACE_SECTION: DebugWorkspaceSection = "coverage";
@@ -48,6 +50,8 @@ const COVERAGE_ACTION_ERROR_PREFIX = "Unable to run coverage action: ";
 const COVERAGE_REMOTE_SKILLS_HAZELNUT_SCOPE = "personal";
 const COVERAGE_REMOTE_SKILLS_PRODUCT_SURFACE = "codex";
 const COVERAGE_REMOTE_SKILLS_ENABLED = true;
+const COVERAGE_AUTH_STATUS_INCLUDE_TOKEN = false;
+const COVERAGE_AUTH_STATUS_REFRESH_TOKEN = false;
 
 export interface UseDebugAppServerCoverageDiagnosticsInput {
   debugWorkspaceSection: DebugWorkspaceSection;
@@ -123,7 +127,9 @@ function runCoverageDiagnosticsRefresh(input: RunCoverageDiagnosticsRefreshInput
       const [
         configRequirementsResponse,
         accountResponse,
+        authStatusResponse,
         accountRateLimitsResponse,
+        userInfoResponse,
         experimentalFeaturesResponse,
         mcpServersResponse,
         appsResponse,
@@ -136,7 +142,15 @@ function runCoverageDiagnosticsRefresh(input: RunCoverageDiagnosticsRefreshInput
         input.capabilityServerClient.readAccount({
           actionName: COVERAGE_REQUEST_OPERATION_NAME,
         }),
+        input.capabilityServerClient.readAuthStatus({
+          actionName: COVERAGE_REQUEST_OPERATION_NAME,
+          includeToken: COVERAGE_AUTH_STATUS_INCLUDE_TOKEN,
+          refreshToken: COVERAGE_AUTH_STATUS_REFRESH_TOKEN,
+        }),
         input.capabilityServerClient.readAccountRateLimits({
+          actionName: COVERAGE_REQUEST_OPERATION_NAME,
+        }),
+        input.capabilityServerClient.readUserInfo({
           actionName: COVERAGE_REQUEST_OPERATION_NAME,
         }),
         input.capabilityServerClient.listExperimentalFeatures({
@@ -170,7 +184,9 @@ function runCoverageDiagnosticsRefresh(input: RunCoverageDiagnosticsRefreshInput
         requirements: mapRequirements(configRequirementsResponse.requirements),
         account: mapAccount(accountResponse.account),
         requiresOpenaiAuth: accountResponse.requiresOpenaiAuth,
+        authStatus: mapAuthStatus(authStatusResponse),
         accountRateLimits: mapRateLimitSnapshot(accountRateLimitsResponse.rateLimits),
+        userInfo: mapUserInfo(userInfoResponse),
         experimentalFeatures: mapExperimentalFeatures(experimentalFeaturesResponse.data),
         mcpServers: mapMcpServers(mcpServersResponse.data),
         apps: mapApps(appsResponse.data),

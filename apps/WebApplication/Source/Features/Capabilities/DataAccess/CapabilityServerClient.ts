@@ -44,6 +44,10 @@ import {
   startAccountLogin,
 } from "./CapabilityApi";
 import {
+  type ApiAccountAuthStatusOptions,
+  type ApiAccountAuthStatusResponse,
+  type ApiAccountUserInfoOptions,
+  type ApiAccountUserInfoResponse,
   type ApiCommandExecutionOptions,
   type ApiCommandExecutionResponse,
   type ApiConfigBatchWriteOptions,
@@ -64,6 +68,8 @@ import {
   executeCommand,
   exportRemoteSkill,
   listRemoteSkills,
+  readAccountAuthStatus,
+  readAccountUserInfo,
   startMcpServerOauthLogin,
   uploadFeedback,
   writeConfigBatch,
@@ -97,6 +103,10 @@ export type CapabilityMcpServerOauthLoginOptions = ApiMcpServerOauthLoginOptions
 export type CapabilityMcpServerOauthLoginResponse = ApiMcpServerOauthLoginResponse;
 export type CapabilityCommandExecutionOptions = ApiCommandExecutionOptions;
 export type CapabilityCommandExecutionResponse = ApiCommandExecutionResponse;
+export type CapabilityAccountAuthStatusOptions = ApiAccountAuthStatusOptions;
+export type CapabilityAccountAuthStatusResponse = ApiAccountAuthStatusResponse;
+export type CapabilityAccountUserInfoOptions = ApiAccountUserInfoOptions;
+export type CapabilityAccountUserInfoResponse = ApiAccountUserInfoResponse;
 export type CapabilityConfigWriteMergeStrategy = ApiConfigWriteMergeStrategy;
 export type CapabilityConfigBatchWriteOptions = ApiConfigBatchWriteOptions;
 export type CapabilityConfigBatchWriteResponse = ApiConfigBatchWriteResponse;
@@ -227,6 +237,18 @@ export class CapabilityServerClient {
     input: CapabilityCommandExecutionOptions,
   ): Promise<CapabilityCommandExecutionResponse> {
     return executeCommand(input);
+  }
+
+  public async readAuthStatus(
+    input: CapabilityAccountAuthStatusOptions,
+  ): Promise<CapabilityAccountAuthStatusResponse> {
+    return readAccountAuthStatus(input);
+  }
+
+  public async readUserInfo(
+    input: CapabilityAccountUserInfoOptions,
+  ): Promise<CapabilityAccountUserInfoResponse> {
+    return readAccountUserInfo(input);
   }
 
   public async uploadFeedback(

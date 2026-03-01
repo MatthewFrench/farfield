@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-03-01 02:23:07Z
+Last Updated (UTC): 2026-03-01 02:37:57Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -32,7 +32,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `fuzzyFileSearch/sessionStart` | Not used | Do not adopt for production | Experimental or test-focused surface. |
 | `fuzzyFileSearch/sessionStop` | Not used | Do not adopt for production | Experimental or test-focused surface. |
 | `fuzzyFileSearch/sessionUpdate` | Not used | Do not adopt for production | Experimental or test-focused surface. |
-| `getAuthStatus` | Not used | Do not adopt | Deprecated upstream request family. |
+| `getAuthStatus` | Used now | Keep | Exposed through capability ownership and debug workspace legacy auth-status diagnostics. |
 | `getConversationSummary` | Not used | Do not adopt | Deprecated upstream request family. |
 | `getUserAgent` | Not used | Do not adopt | Deprecated upstream request family. |
 | `getUserSavedConfig` | Not used | Do not adopt | Deprecated upstream request family. |
@@ -78,9 +78,9 @@ This ledger records recommended disposition for every upstream app-server client
 | `turn/interrupt` | Used now | Keep | Interrupt fallback path is routed through strict owner boundaries and typed turn-id mapping. |
 | `turn/start` | Used now | Keep | Canonical send path for app-server mode in Farfield. |
 | `turn/steer` | Used now | Keep | Steering path now routes through strict owner boundaries with explicit in-progress turn precondition mapping. |
-| `userInfo` | Not used | Do not adopt | Deprecated upstream request family. |
+| `userInfo` | Used now | Keep | Exposed through capability ownership and debug workspace legacy user-info diagnostics. |
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 40
-Not used: 34
+Used now: 42
+Not used: 32

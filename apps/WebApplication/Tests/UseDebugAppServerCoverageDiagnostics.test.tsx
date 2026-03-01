@@ -43,6 +43,12 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       account: null,
       requiresOpenaiAuth: false,
     });
+    const readAuthStatus = vi.spyOn(capabilityServerClient, "readAuthStatus").mockResolvedValue({
+      ok: true,
+      authMethod: null,
+      authToken: null,
+      requiresOpenaiAuth: null,
+    });
     const readAccountRateLimits = vi
       .spyOn(capabilityServerClient, "readAccountRateLimits")
       .mockResolvedValue({
@@ -50,6 +56,10 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         rateLimits: null,
         rateLimitsByLimitId: null,
       });
+    const readUserInfo = vi.spyOn(capabilityServerClient, "readUserInfo").mockResolvedValue({
+      ok: true,
+      allegedUserEmail: null,
+    });
     const listExperimentalFeatures = vi
       .spyOn(capabilityServerClient, "listExperimentalFeatures")
       .mockResolvedValue({
@@ -98,7 +108,9 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
 
     expect(readConfigRequirements).toHaveBeenCalledTimes(1);
     expect(readAccount).toHaveBeenCalledTimes(1);
+    expect(readAuthStatus).toHaveBeenCalledTimes(1);
     expect(readAccountRateLimits).toHaveBeenCalledTimes(1);
+    expect(readUserInfo).toHaveBeenCalledTimes(1);
     expect(listExperimentalFeatures).toHaveBeenCalledTimes(1);
     expect(listMcpServers).toHaveBeenCalledTimes(1);
     expect(listApps).toHaveBeenCalledTimes(1);
@@ -118,10 +130,20 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       account: null,
       requiresOpenaiAuth: true,
     });
+    vi.spyOn(capabilityServerClient, "readAuthStatus").mockResolvedValue({
+      ok: true,
+      authMethod: "chatgpt",
+      authToken: null,
+      requiresOpenaiAuth: true,
+    });
     vi.spyOn(capabilityServerClient, "readAccountRateLimits").mockResolvedValue({
       ok: true,
       rateLimits: null,
       rateLimitsByLimitId: null,
+    });
+    vi.spyOn(capabilityServerClient, "readUserInfo").mockResolvedValue({
+      ok: true,
+      allegedUserEmail: "dev@example.com",
     });
     vi.spyOn(capabilityServerClient, "listExperimentalFeatures").mockResolvedValue({
       ok: true,

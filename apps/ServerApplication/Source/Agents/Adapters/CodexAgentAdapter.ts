@@ -42,11 +42,14 @@ import type {
   AgentReadAccountRateLimitsInput,
   AgentReadAccountRateLimitsResult,
   AgentReadAccountResult,
+  AgentReadAuthStatusInput,
+  AgentReadAuthStatusResult,
   AgentReadConfigRequirementsInput,
   AgentReadConfigRequirementsResult,
   AgentReadStreamEventsInput,
   AgentReadThreadInput,
   AgentReadThreadResult,
+  AgentReadUserInfoResult,
   AgentSendMessageInput,
   AgentSetCollaborationModeInput,
   AgentStartAccountLoginInput,
@@ -346,10 +349,20 @@ export class CodexAgentAdapter implements AgentAdapter {
     return this.threadManagementOwner.readAccount(input);
   }
 
+  public async readAuthStatus(
+    input?: AgentReadAuthStatusInput,
+  ): Promise<AgentReadAuthStatusResult> {
+    return this.threadManagementOwner.readAuthStatus(input);
+  }
+
   public async readAccountRateLimits(
     input?: AgentReadAccountRateLimitsInput,
   ): Promise<AgentReadAccountRateLimitsResult> {
     return this.threadManagementOwner.readAccountRateLimits(input);
+  }
+
+  public async readUserInfo(): Promise<AgentReadUserInfoResult> {
+    return this.threadManagementOwner.readUserInfo();
   }
 
   public async uploadFeedback(input: AgentUploadFeedbackInput): Promise<AgentUploadFeedbackResult> {

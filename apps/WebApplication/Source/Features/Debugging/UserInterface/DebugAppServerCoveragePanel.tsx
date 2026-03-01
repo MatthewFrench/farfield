@@ -233,6 +233,34 @@ export function DebugAppServerCoveragePanel({
             <p className="text-xs">
               Requires OpenAI auth: {coverageDiagnosticsSnapshot.requiresOpenaiAuth ? "Yes" : "No"}
             </p>
+            {coverageDiagnosticsSnapshot.authStatus === null ? (
+              <p className="text-xs text-muted-foreground">No auth-status diagnostics reported.</p>
+            ) : (
+              <>
+                <p className="text-xs">
+                  Auth method: {coverageDiagnosticsSnapshot.authStatus.authMethod ?? "None"}
+                </p>
+                <p className="text-xs">
+                  Auth token returned:{" "}
+                  {coverageDiagnosticsSnapshot.authStatus.authToken === null ? "No" : "Yes"}
+                </p>
+                <p className="text-xs">
+                  Auth status requires OpenAI auth:{" "}
+                  {coverageDiagnosticsSnapshot.authStatus.requiresOpenaiAuth === null
+                    ? "Unknown"
+                    : coverageDiagnosticsSnapshot.authStatus.requiresOpenaiAuth
+                      ? "Yes"
+                      : "No"}
+                </p>
+              </>
+            )}
+            {coverageDiagnosticsSnapshot.userInfo === null ? (
+              <p className="text-xs text-muted-foreground">No user-info diagnostics reported.</p>
+            ) : (
+              <p className="text-xs">
+                User email: {coverageDiagnosticsSnapshot.userInfo.allegedUserEmail ?? "None"}
+              </p>
+            )}
             {pendingAccountLogin !== null && (
               <>
                 <p className="text-xs">Pending login id: {pendingAccountLogin.loginId}</p>

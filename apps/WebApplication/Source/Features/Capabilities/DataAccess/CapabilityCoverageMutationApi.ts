@@ -6,6 +6,8 @@ import { request, requestInitWithOptions } from "@/Shared/Transport/FarfieldHttp
 const MCP_SERVER_OAUTH_LOGIN_ENDPOINT = "/api/mcp-servers/oauth/login";
 const CONFIG_BATCH_WRITE_ENDPOINT = "/api/config/batch/write";
 const CONFIG_VALUE_WRITE_ENDPOINT = "/api/config/value/write";
+const ACCOUNT_AUTH_STATUS_ENDPOINT = "/api/account/auth-status";
+const ACCOUNT_USER_INFO_ENDPOINT = "/api/account/user-info";
 const SKILLS_CONFIG_WRITE_ENDPOINT = "/api/skills/config/write";
 const SKILLS_REMOTE_LIST_ENDPOINT = "/api/skills/remote/list";
 const SKILLS_REMOTE_EXPORT_ENDPOINT = "/api/skills/remote/export";
@@ -48,6 +50,16 @@ export interface ApiConfigBatchWriteOptions extends ApiRequestOptions {
   edits: ApiConfigBatchWriteEdit[];
   filePath?: string;
   expectedVersion?: string;
+}
+
+export interface ApiAccountAuthStatusOptions extends ApiRequestOptions {
+  agentId?: AgentId;
+  includeToken?: boolean;
+  refreshToken?: boolean;
+}
+
+export interface ApiAccountUserInfoOptions extends ApiRequestOptions {
+  agentId?: AgentId;
 }
 
 const RemoteSkillsHazelnutScopeSchema = z.enum([
@@ -148,6 +160,24 @@ const RemoteSkillExportResponseSchema = z
   .strict();
 export type ApiRemoteSkillExportResponse = z.infer<typeof RemoteSkillExportResponseSchema>;
 
+const AccountAuthStatusResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    authMethod: z.enum(["apikey", "chatgpt", "chatgptAuthTokens"]).nullable(),
+    authToken: z.string().nullable(),
+    requiresOpenaiAuth: z.boolean().nullable(),
+  })
+  .strict();
+export type ApiAccountAuthStatusResponse = z.infer<typeof AccountAuthStatusResponseSchema>;
+
+const AccountUserInfoResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    allegedUserEmail: z.string().nullable(),
+  })
+  .strict();
+export type ApiAccountUserInfoResponse = z.infer<typeof AccountUserInfoResponseSchema>;
+
 const CommandExecutionResponseSchema = z
   .object({
     ok: z.literal(true),
@@ -208,6 +238,13 @@ const FeedbackUploadInputSchema = z
     includeLogs: z.boolean(),
     reason: z.string().min(1).optional(),
     threadId: z.string().min(1).optional(),
+  })
+  .strict();
+
+const AccountAuthStatusInputSchema = z
+  .object({
+    includeToken: z.boolean().optional(),
+    refreshToken: z.boolean().optional(),
   })
   .strict();
 
@@ -282,6 +319,32 @@ function readConfigBatchWritePath(options: ApiConfigBatchWriteOptions): string {
     params.set("expectedVersion", parsedInput.expectedVersion);
   }
   return `${CONFIG_BATCH_WRITE_ENDPOINT}?${params.toString()}`;
+}
+
+function readAccountAuthStatusPath(options: ApiAccountAuthStatusOptions): string {
+  const parsedInput = AccountAuthStatusInputSchema.parse({
+    ...(options.includeToken !== undefined ? { includeToken: options.includeToken } : {}),
+    ...(options.refreshToken !== undefined ? { refreshToken: options.refreshToken } : {}),
+  });
+  const params = new URLSearchParams();
+  if (options.agentId !== undefined) {
+    params.set("agentId", options.agentId);
+  }
+  if (parsedInput.includeToken !== undefined) {
+    params.set("includeToken", parsedInput.includeToken ? "true" : "false");
+  }
+  if (parsedInput.refreshToken !== undefined) {
+    params.set("refreshToken", parsedInput.refreshToken ? "true" : "false");
+  }
+  return `${ACCOUNT_AUTH_STATUS_ENDPOINT}?${params.toString()}`;
+}
+
+function readAccountUserInfoPath(options: ApiAccountUserInfoOptions): string {
+  const params = new URLSearchParams();
+  if (options.agentId !== undefined) {
+    params.set("agentId", options.agentId);
+  }
+  return `${ACCOUNT_USER_INFO_ENDPOINT}?${params.toString()}`;
 }
 
 function readRemoteSkillsListPath(options: ApiListRemoteSkillsOptions): string {
@@ -389,6 +452,22 @@ export async function writeConfigBatch(
       ...requestInitWithOptions(options),
       method: "POST",
     }),
+  );
+}
+
+export async function readAccountAuthStatus(
+  options: ApiAccountAuthStatusOptions,
+): Promise<ApiAccountAuthStatusResponse> {
+  return AccountAuthStatusResponseSchema.parse(
+    await request(readAccountAuthStatusPath(options), requestInitWithOptions(options)),
+  );
+}
+
+export async function readAccountUserInfo(
+  options: ApiAccountUserInfoOptions,
+): Promise<ApiAccountUserInfoResponse> {
+  return AccountUserInfoResponseSchema.parse(
+    await request(readAccountUserInfoPath(options), requestInitWithOptions(options)),
   );
 }
 

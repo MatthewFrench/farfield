@@ -23,7 +23,9 @@ import type {
   AgentListSkillsResult,
   AgentReadAccountRateLimitsResult,
   AgentReadAccountResult,
+  AgentReadAuthStatusResult,
   AgentReadConfigRequirementsResult,
+  AgentReadUserInfoResult,
   AgentRemoteSkillsHazelnutScope,
   AgentRemoteSkillsProductSurface,
   AgentStartAccountLoginResult,
@@ -46,7 +48,9 @@ const CapabilityRoutePathnameByName = {
   configBatchWrite: "/api/config/batch/write",
   configValueWrite: "/api/config/value/write",
   account: "/api/account",
+  accountAuthStatus: "/api/account/auth-status",
   accountRateLimits: "/api/account/rate-limits",
+  accountUserInfo: "/api/account/user-info",
   feedbackUpload: "/api/feedback/upload",
   accountLoginStart: "/api/account/login/start",
   accountLoginCancel: "/api/account/login/cancel",
@@ -77,6 +81,7 @@ const CapabilityRouteQueryParameterByName = {
   threadId: "threadId",
   forceRefetch: "forceRefetch",
   forceReload: "forceReload",
+  includeToken: "includeToken",
   refreshToken: "refreshToken",
   classification: "classification",
   reason: "reason",
@@ -106,7 +111,9 @@ const CapabilityRouteLogEventByName = {
   defaultsInvalidReasoningEffort: "agent-config-defaults-invalid-reasoning-effort",
   configRequirementsReadFailed: "config-requirements-read-failed",
   accountReadFailed: "account-read-failed",
+  accountAuthStatusReadFailed: "account-auth-status-read-failed",
   accountRateLimitsReadFailed: "account-rate-limits-read-failed",
+  accountUserInfoReadFailed: "account-user-info-read-failed",
   feedbackUploadFailed: "feedback-upload-failed",
   commandExecFailed: "command-exec-failed",
   accountLoginStartFailed: "account-login-start-failed",
@@ -131,7 +138,13 @@ const CapabilityRouteErrorMessagePrefixByName = {
   invalidAgentId: "Invalid agentId: ",
   failedToReadConfigRequirements: "Failed to read config requirements: ",
   failedToReadAccount: "Failed to read account: ",
+  invalidAccountAuthStatusIncludeToken:
+    "Invalid includeToken query parameter. Expected true/false or 1/0.",
+  invalidAccountAuthStatusRefreshToken:
+    "Invalid refreshToken query parameter. Expected true/false or 1/0.",
+  failedToReadAuthStatus: "Failed to read auth status: ",
   failedToReadAccountRateLimits: "Failed to read account rate limits: ",
+  failedToReadUserInfo: "Failed to read user info: ",
   missingFeedbackClassification: "Missing classification query parameter.",
   invalidFeedbackClassification:
     "Invalid classification query parameter. Expected non-empty value.",
@@ -190,7 +203,9 @@ const CapabilityRouteErrorMessagePrefixByName = {
 const CapabilityRouteTimeoutLabelByName = {
   configRequirementsRead: "config requirements read",
   accountRead: "account read",
+  accountAuthStatusRead: "auth status read",
   accountRateLimitsRead: "account rate limits read",
+  accountUserInfoRead: "user info read",
   feedbackUpload: "feedback upload",
   commandExec: "command execution",
   accountLoginStart: "account login start",
@@ -245,11 +260,19 @@ type CapabilityAccountResponseBody = AgentReadAccountResult & {
   ok: true;
 };
 
+type CapabilityAccountAuthStatusResponseBody = AgentReadAuthStatusResult & {
+  ok: true;
+};
+
 interface CapabilityAccountRateLimitsResponseBody {
   ok: true;
   rateLimits: AgentReadAccountRateLimitsResult["rateLimits"] | null;
   rateLimitsByLimitId: AgentReadAccountRateLimitsResult["rateLimitsByLimitId"];
 }
+
+type CapabilityAccountUserInfoResponseBody = AgentReadUserInfoResult & {
+  ok: true;
+};
 
 type CapabilityFeedbackUploadResponseBody = AgentUploadFeedbackResult & {
   ok: true;
@@ -569,9 +592,27 @@ function mapAccountResponse(result: AgentReadAccountResult): CapabilityAccountRe
   };
 }
 
+function mapAccountAuthStatusResponse(
+  result: AgentReadAuthStatusResult,
+): CapabilityAccountAuthStatusResponseBody {
+  return {
+    ok: true,
+    ...result,
+  };
+}
+
 function mapAccountRateLimitsResponse(
   result: AgentReadAccountRateLimitsResult,
 ): CapabilityAccountRateLimitsResponseBody {
+  return {
+    ok: true,
+    ...result,
+  };
+}
+
+function mapAccountUserInfoResponse(
+  result: AgentReadUserInfoResult,
+): CapabilityAccountUserInfoResponseBody {
   return {
     ok: true,
     ...result,
@@ -956,6 +997,191 @@ async function handleAccountRoute(deps: CapabilityRouteDependencies): Promise<bo
     jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
       ok: false,
       error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadAccount}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleAccountAuthStatusRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.get,
+      CapabilityRoutePathnameByName.accountAuthStatus,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const includeTokenRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.includeToken);
+  const includeToken = parseBooleanQueryValueStrict(includeTokenRaw);
+  if (includeTokenRaw !== null && includeToken === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidAccountAuthStatusIncludeToken,
+    });
+    return true;
+  }
+
+  const refreshTokenRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.refreshToken);
+  const refreshToken = parseBooleanQueryValueStrict(refreshTokenRaw);
+  if (refreshTokenRaw !== null && refreshToken === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidAccountAuthStatusRefreshToken,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  if (resolvedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, {
+      ok: true,
+      authMethod: null,
+      authToken: null,
+      requiresOpenaiAuth: null,
+    });
+    return true;
+  }
+
+  const adapter = registry.getAdapter(resolvedAgentId);
+  if (!adapter || !adapter.isEnabled() || !adapter.readAuthStatus) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, {
+      ok: true,
+      authMethod: null,
+      authToken: null,
+      requiresOpenaiAuth: null,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.readAuthStatus({
+        ...(includeToken !== null ? { includeToken } : {}),
+        ...(refreshToken !== null ? { refreshToken } : {}),
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.accountAuthStatusRead,
+    );
+    jsonResponse(
+      res,
+      CapabilityRouteStatusCodeByName.success,
+      mapAccountAuthStatusResponse(result),
+    );
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.accountAuthStatusReadFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadAuthStatus}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleAccountUserInfoRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.get,
+      CapabilityRoutePathnameByName.accountUserInfo,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  if (resolvedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, {
+      ok: true,
+      allegedUserEmail: null,
+    });
+    return true;
+  }
+
+  const adapter = registry.getAdapter(resolvedAgentId);
+  if (!adapter || !adapter.isEnabled() || !adapter.readUserInfo) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, {
+      ok: true,
+      allegedUserEmail: null,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.readUserInfo(),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.accountUserInfoRead,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapAccountUserInfoResponse(result));
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.accountUserInfoReadFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToReadUserInfo}${message}`,
     });
   }
 
@@ -2719,8 +2945,10 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
 
 /**
  * Owns capability route dispatch (`/api/config/defaults`, `/api/config-requirements`,
- * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/rate-limits`, `/api/feedback/upload`,
- * `/api/commands/exec`, `/api/account/login/start`, `/api/account/login/cancel`, `/api/account/logout`,
+ * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/auth-status`,
+ * `/api/account/rate-limits`, `/api/account/user-info`, `/api/feedback/upload`,
+ * `/api/commands/exec`, `/api/account/login/start`, `/api/account/login/cancel`,
+ * `/api/account/logout`,
  * `/api/config/batch/write`, `/api/config/value/write`, `/api/mcp-servers/oauth/login`, `/api/skills/config/write`,
  * `/api/skills/remote/list`, `/api/skills/remote/export`, `/api/models`,
  * `/api/collaboration-modes`, `/api/experimental-features`,
@@ -2737,7 +2965,13 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
   if (await handleAccountRoute(deps)) {
     return true;
   }
+  if (await handleAccountAuthStatusRoute(deps)) {
+    return true;
+  }
   if (await handleAccountRateLimitsRoute(deps)) {
+    return true;
+  }
+  if (await handleAccountUserInfoRoute(deps)) {
     return true;
   }
   if (await handleFeedbackUploadRoute(deps)) {

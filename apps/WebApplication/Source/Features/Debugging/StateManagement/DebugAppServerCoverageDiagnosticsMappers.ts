@@ -1,8 +1,10 @@
 import { type JsonValue } from "@farfield/protocol";
 import type {
+  CapabilityAccountAuthStatusResponse,
   CapabilityAccountLoginStartResponse,
   CapabilityAccountRateLimitsResponse,
   CapabilityAccountResponse,
+  CapabilityAccountUserInfoResponse,
   CapabilityAppsResponse,
   CapabilityCommandExecutionResponse,
   CapabilityConfigBatchWriteResponse,
@@ -18,6 +20,7 @@ import type {
 import type {
   DebugAppServerCoverageAccount,
   DebugAppServerCoverageAppSummary,
+  DebugAppServerCoverageAuthStatusSnapshot,
   DebugAppServerCoverageCommandExecutionResult,
   DebugAppServerCoverageConfigBatchWriteResult,
   DebugAppServerCoverageConfigValueWriteResult,
@@ -29,6 +32,7 @@ import type {
   DebugAppServerCoverageRemoteSkillSummary,
   DebugAppServerCoverageRequirements,
   DebugAppServerCoverageSkillEntry,
+  DebugAppServerCoverageUserInfoSnapshot,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 
 function readAuthStatusLabel(authStatus: JsonValue): string {
@@ -71,6 +75,24 @@ export function mapAccount(
     type: "chatgpt",
     email: account.email,
     planType: account.planType,
+  };
+}
+
+export function mapAuthStatus(
+  response: CapabilityAccountAuthStatusResponse,
+): DebugAppServerCoverageAuthStatusSnapshot | null {
+  return {
+    authMethod: response.authMethod,
+    authToken: response.authToken,
+    requiresOpenaiAuth: response.requiresOpenaiAuth,
+  };
+}
+
+export function mapUserInfo(
+  response: CapabilityAccountUserInfoResponse,
+): DebugAppServerCoverageUserInfoSnapshot | null {
+  return {
+    allegedUserEmail: response.allegedUserEmail,
   };
 }
 

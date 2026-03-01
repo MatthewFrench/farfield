@@ -954,6 +954,50 @@ describe("AppServerClient.readAccount", () => {
   });
 });
 
+describe("AppServerClient.readAuthStatus", () => {
+  it("sends getAuthStatus and maps nullable auth status fields", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      authMethod: "chatgpt",
+      authToken: null,
+      requiresOpenaiAuth: true,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.readAuthStatus({
+      includeToken: true,
+      refreshToken: true,
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("getAuthStatus", {
+      includeToken: true,
+      refreshToken: true,
+    });
+    expect(result).toEqual({
+      authMethod: "chatgpt",
+      authToken: null,
+      requiresOpenaiAuth: true,
+    });
+  });
+});
+
+describe("AppServerClient.readUserInfo", () => {
+  it("sends userInfo and maps user-info response fields", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      allegedUserEmail: "dev@example.com",
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.readUserInfo();
+
+    expect(transportDouble.request).toHaveBeenCalledWith("userInfo", {});
+    expect(result).toEqual({
+      allegedUserEmail: "dev@example.com",
+    });
+  });
+});
+
 describe("AppServerClient.readAccountRateLimits", () => {
   it("sends account/rateLimits/read and normalizes snapshot contracts", async () => {
     const transportDouble = createTransportDouble();

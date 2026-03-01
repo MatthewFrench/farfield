@@ -131,6 +131,18 @@ export type DebugAppServerCoverageAccount =
   | DebugAppServerCoverageApiKeyAccount
   | DebugAppServerCoverageChatgptAccount;
 
+export type DebugAppServerCoverageAuthStatusMethod = "apikey" | "chatgpt" | "chatgptAuthTokens";
+
+export interface DebugAppServerCoverageAuthStatusSnapshot {
+  authMethod: DebugAppServerCoverageAuthStatusMethod | null;
+  authToken: string | null;
+  requiresOpenaiAuth: boolean | null;
+}
+
+export interface DebugAppServerCoverageUserInfoSnapshot {
+  allegedUserEmail: string | null;
+}
+
 export interface DebugAppServerCoverageCreditsSnapshot {
   balance: string | null;
   hasCredits: boolean;
@@ -161,7 +173,9 @@ export interface DebugAppServerCoverageSnapshot {
   requirements: DebugAppServerCoverageRequirements | null;
   account: DebugAppServerCoverageAccount | null;
   requiresOpenaiAuth: boolean;
+  authStatus: DebugAppServerCoverageAuthStatusSnapshot | null;
   accountRateLimits: DebugAppServerCoverageRateLimitSnapshot | null;
+  userInfo: DebugAppServerCoverageUserInfoSnapshot | null;
   experimentalFeatures: DebugAppServerCoverageExperimentalFeature[];
   mcpServers: DebugAppServerCoverageMcpServerSummary[];
   apps: DebugAppServerCoverageAppSummary[];
