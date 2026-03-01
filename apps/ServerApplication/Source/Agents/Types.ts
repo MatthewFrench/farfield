@@ -66,6 +66,8 @@ export interface AgentCapabilities {
   canStartMcpServerOauthLogin: boolean;
   canWriteConfigValue: boolean;
   canWriteSkillsConfig: boolean;
+  canDetectExternalAgentConfig: boolean;
+  canImportExternalAgentConfig: boolean;
   canSetCollaborationMode: boolean;
   canSubmitUserInput: boolean;
   canReadLiveState: boolean;
@@ -681,6 +683,33 @@ export interface AgentExportRemoteSkillResult {
   path: string;
 }
 
+export type AgentExternalAgentConfigMigrationItemType =
+  | "AGENTS_MD"
+  | "CONFIG"
+  | "SKILLS"
+  | "MCP_SERVER_CONFIG";
+
+export interface AgentExternalAgentConfigMigrationItem {
+  itemType: AgentExternalAgentConfigMigrationItemType;
+  description: string;
+  cwd: string | null;
+}
+
+export interface AgentDetectExternalAgentConfigInput {
+  includeHome: boolean;
+  cwds?: string[];
+}
+
+export interface AgentDetectExternalAgentConfigResult {
+  items: AgentExternalAgentConfigMigrationItem[];
+}
+
+export interface AgentImportExternalAgentConfigInput {
+  migrationItems: AgentExternalAgentConfigMigrationItem[];
+}
+
+export interface AgentImportExternalAgentConfigResult {}
+
 export interface AgentSetCollaborationModeResult {
   ownerClientId: string;
 }
@@ -748,6 +777,12 @@ export interface AgentAdapter {
   writeSkillsConfig?(input: AgentWriteSkillsConfigInput): Promise<AgentWriteSkillsConfigResult>;
   listRemoteSkills?(input: AgentListRemoteSkillsInput): Promise<AgentListRemoteSkillsResult>;
   exportRemoteSkill?(input: AgentExportRemoteSkillInput): Promise<AgentExportRemoteSkillResult>;
+  detectExternalAgentConfig?(
+    input: AgentDetectExternalAgentConfigInput,
+  ): Promise<AgentDetectExternalAgentConfigResult>;
+  importExternalAgentConfig?(
+    input: AgentImportExternalAgentConfigInput,
+  ): Promise<AgentImportExternalAgentConfigResult>;
 
   listModels?(limit: number): Promise<AppServerListModelsResponse>;
   listCollaborationModes?(): Promise<AppServerCollaborationModeListResponse>;

@@ -33,6 +33,8 @@ const DEFAULT_CAPABILITIES: AgentCapabilities = {
   canStartMcpServerOauthLogin: false,
   canWriteConfigValue: false,
   canWriteSkillsConfig: false,
+  canDetectExternalAgentConfig: false,
+  canImportExternalAgentConfig: false,
   canSetCollaborationMode: false,
   canSubmitUserInput: false,
   canReadLiveState: false,

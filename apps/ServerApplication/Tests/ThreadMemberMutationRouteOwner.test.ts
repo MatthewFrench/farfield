@@ -85,6 +85,8 @@ function createAgentAdapter(input: {
       canStartMcpServerOauthLogin: false,
       canWriteConfigValue: false,
       canWriteSkillsConfig: false,
+      canDetectExternalAgentConfig: false,
+      canImportExternalAgentConfig: false,
       canSetCollaborationMode: input.setCollaborationMode !== undefined,
       canSubmitUserInput: input.submitUserInput !== undefined,
       canReadLiveState: false,

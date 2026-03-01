@@ -44,6 +44,14 @@ import {
   startAccountLogin,
 } from "./CapabilityApi";
 import {
+  type ApiExternalAgentConfigDetectOptions,
+  type ApiExternalAgentConfigDetectResponse,
+  type ApiExternalAgentConfigImportOptions,
+  type ApiExternalAgentConfigImportResponse,
+  detectExternalAgentConfig,
+  importExternalAgentConfig,
+} from "./CapabilityCoverageExternalAgentConfigApi";
+import {
   type ApiFuzzyFileSearchOptions,
   type ApiFuzzyFileSearchResponse,
   searchFuzzyFiles,
@@ -130,6 +138,10 @@ export type CapabilityListRemoteSkillsOptions = ApiListRemoteSkillsOptions;
 export type CapabilityRemoteSkillsListResponse = ApiRemoteSkillsListResponse;
 export type CapabilityExportRemoteSkillOptions = ApiExportRemoteSkillOptions;
 export type CapabilityRemoteSkillExportResponse = ApiRemoteSkillExportResponse;
+export type CapabilityExternalAgentConfigDetectOptions = ApiExternalAgentConfigDetectOptions;
+export type CapabilityExternalAgentConfigDetectResponse = ApiExternalAgentConfigDetectResponse;
+export type CapabilityExternalAgentConfigImportOptions = ApiExternalAgentConfigImportOptions;
+export type CapabilityExternalAgentConfigImportResponse = ApiExternalAgentConfigImportResponse;
 export type CapabilityListAppsOptions = ApiListAppsOptions;
 export type CapabilityAppsResponse = ApiAppsResponse;
 export type CapabilityListSkillsOptions = ApiListSkillsOptions;
@@ -243,6 +255,18 @@ export class CapabilityServerClient {
     input: CapabilityExportRemoteSkillOptions,
   ): Promise<CapabilityRemoteSkillExportResponse> {
     return exportRemoteSkill(input);
+  }
+
+  public async detectExternalAgentConfig(
+    input: CapabilityExternalAgentConfigDetectOptions,
+  ): Promise<CapabilityExternalAgentConfigDetectResponse> {
+    return detectExternalAgentConfig(input);
+  }
+
+  public async importExternalAgentConfig(
+    input: CapabilityExternalAgentConfigImportOptions,
+  ): Promise<CapabilityExternalAgentConfigImportResponse> {
+    return importExternalAgentConfig(input);
   }
 
   public async executeCommand(

@@ -146,6 +146,8 @@ export interface UseApplicationShellViewPropertiesInput {
   lastCommandExecutionResult: DebugWorkspacePaneProps["lastCommandExecutionResult"];
   lastConfigBatchWriteResult: DebugWorkspacePaneProps["lastConfigBatchWriteResult"];
   lastConfigValueWriteResult: DebugWorkspacePaneProps["lastConfigValueWriteResult"];
+  lastExternalAgentConfigDetectResult: DebugWorkspacePaneProps["lastExternalAgentConfigDetectResult"];
+  lastExternalAgentConfigImportResult: DebugWorkspacePaneProps["lastExternalAgentConfigImportResult"];
   lastFeedbackUploadResult: DebugWorkspacePaneProps["lastFeedbackUploadResult"];
   lastFuzzyFileSearchResult: DebugWorkspacePaneProps["lastFuzzyFileSearchResult"];
   lastGitDiffToRemoteResult: DebugWorkspacePaneProps["lastGitDiffToRemoteResult"];
@@ -165,6 +167,8 @@ export interface UseApplicationShellViewPropertiesInput {
   writeConfigBatch: (edits: string, filePath?: string, expectedVersion?: string) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
+  detectExternalAgentConfig: (includeHome: boolean, cwds: string[]) => void;
+  importExternalAgentConfig: DebugWorkspacePaneProps["onImportExternalAgentConfig"];
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -417,6 +421,8 @@ function buildDebugWorkspacePaneProperties(
     lastCommandExecutionResult: input.lastCommandExecutionResult,
     lastConfigBatchWriteResult: input.lastConfigBatchWriteResult,
     lastConfigValueWriteResult: input.lastConfigValueWriteResult,
+    lastExternalAgentConfigDetectResult: input.lastExternalAgentConfigDetectResult,
+    lastExternalAgentConfigImportResult: input.lastExternalAgentConfigImportResult,
     lastFeedbackUploadResult: input.lastFeedbackUploadResult,
     lastFuzzyFileSearchResult: input.lastFuzzyFileSearchResult,
     lastGitDiffToRemoteResult: input.lastGitDiffToRemoteResult,
@@ -430,6 +436,8 @@ function buildDebugWorkspacePaneProperties(
     onWriteConfigBatch: input.writeConfigBatch,
     onWriteSkillsConfig: input.writeSkillsConfig,
     onExportRemoteSkill: input.exportRemoteSkill,
+    onDetectExternalAgentConfig: input.detectExternalAgentConfig,
+    onImportExternalAgentConfig: input.importExternalAgentConfig,
     onReadGitDiffToRemote: input.readGitDiffToRemote,
     onSearchFuzzyFiles: input.searchFuzzyFiles,
     onExecuteCommand: input.executeCommand,
@@ -628,6 +636,8 @@ export function useApplicationShellViewProperties(
       input.lastCommandExecutionResult,
       input.lastConfigBatchWriteResult,
       input.lastConfigValueWriteResult,
+      input.lastExternalAgentConfigDetectResult,
+      input.lastExternalAgentConfigImportResult,
       input.lastFeedbackUploadResult,
       input.lastFuzzyFileSearchResult,
       input.lastGitDiffToRemoteResult,
@@ -641,6 +651,8 @@ export function useApplicationShellViewProperties(
       input.writeConfigBatch,
       input.writeSkillsConfig,
       input.exportRemoteSkill,
+      input.detectExternalAgentConfig,
+      input.importExternalAgentConfig,
       input.readGitDiffToRemote,
       input.searchFuzzyFiles,
       input.executeCommand,

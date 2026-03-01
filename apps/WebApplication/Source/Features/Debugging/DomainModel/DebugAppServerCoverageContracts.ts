@@ -69,6 +69,30 @@ export interface DebugAppServerCoverageRemoteSkillSummary {
   description: string;
 }
 
+export type DebugAppServerCoverageExternalAgentConfigMigrationItemType =
+  | "AGENTS_MD"
+  | "CONFIG"
+  | "SKILLS"
+  | "MCP_SERVER_CONFIG";
+
+export interface DebugAppServerCoverageExternalAgentConfigMigrationItem {
+  itemType: DebugAppServerCoverageExternalAgentConfigMigrationItemType;
+  description: string;
+  cwd: string | null;
+}
+
+export interface DebugAppServerCoverageExternalAgentConfigDetectResult {
+  includeHome: boolean;
+  cwds: string[];
+  items: DebugAppServerCoverageExternalAgentConfigMigrationItem[];
+  detectedAtIso8601: string;
+}
+
+export interface DebugAppServerCoverageExternalAgentConfigImportResult {
+  itemCount: number;
+  importedAtIso8601: string;
+}
+
 export interface DebugAppServerCoverageCommandExecutionResult {
   command: string[];
   exitCode: number;

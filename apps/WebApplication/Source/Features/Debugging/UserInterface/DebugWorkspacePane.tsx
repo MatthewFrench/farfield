@@ -6,6 +6,9 @@ import {
   type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
+  type DebugAppServerCoverageExternalAgentConfigDetectResult,
+  type DebugAppServerCoverageExternalAgentConfigImportResult,
+  type DebugAppServerCoverageExternalAgentConfigMigrationItem,
   type DebugAppServerCoverageFeedbackUploadResult,
   type DebugAppServerCoverageFuzzyFileSearchResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
@@ -73,6 +76,8 @@ export interface DebugWorkspacePaneProps {
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
+  lastExternalAgentConfigDetectResult: DebugAppServerCoverageExternalAgentConfigDetectResult | null;
+  lastExternalAgentConfigImportResult: DebugAppServerCoverageExternalAgentConfigImportResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
@@ -92,6 +97,10 @@ export interface DebugWorkspacePaneProps {
   onWriteConfigBatch: (edits: string, filePath?: string, expectedVersion?: string) => void;
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
   onExportRemoteSkill: (hazelnutId: string) => void;
+  onDetectExternalAgentConfig: (includeHome: boolean, cwds: string[]) => void;
+  onImportExternalAgentConfig: (
+    migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[],
+  ) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
   onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -148,6 +157,8 @@ export function DebugWorkspacePane({
   lastCommandExecutionResult,
   lastConfigBatchWriteResult,
   lastConfigValueWriteResult,
+  lastExternalAgentConfigDetectResult,
+  lastExternalAgentConfigImportResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
   lastGitDiffToRemoteResult,
@@ -161,6 +172,8 @@ export function DebugWorkspacePane({
   onWriteConfigBatch,
   onWriteSkillsConfig,
   onExportRemoteSkill,
+  onDetectExternalAgentConfig,
+  onImportExternalAgentConfig,
   onReadGitDiffToRemote,
   onSearchFuzzyFiles,
   onExecuteCommand,
@@ -268,6 +281,8 @@ export function DebugWorkspacePane({
             lastCommandExecutionResult={lastCommandExecutionResult}
             lastConfigBatchWriteResult={lastConfigBatchWriteResult}
             lastConfigValueWriteResult={lastConfigValueWriteResult}
+            lastExternalAgentConfigDetectResult={lastExternalAgentConfigDetectResult}
+            lastExternalAgentConfigImportResult={lastExternalAgentConfigImportResult}
             lastFeedbackUploadResult={lastFeedbackUploadResult}
             lastFuzzyFileSearchResult={lastFuzzyFileSearchResult}
             lastGitDiffToRemoteResult={lastGitDiffToRemoteResult}
@@ -281,6 +296,8 @@ export function DebugWorkspacePane({
             onWriteConfigBatch={onWriteConfigBatch}
             onWriteSkillsConfig={onWriteSkillsConfig}
             onExportRemoteSkill={onExportRemoteSkill}
+            onDetectExternalAgentConfig={onDetectExternalAgentConfig}
+            onImportExternalAgentConfig={onImportExternalAgentConfig}
             onReadGitDiffToRemote={onReadGitDiffToRemote}
             onSearchFuzzyFiles={onSearchFuzzyFiles}
             onExecuteCommand={onExecuteCommand}

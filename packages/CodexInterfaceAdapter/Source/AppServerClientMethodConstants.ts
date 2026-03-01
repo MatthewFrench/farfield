@@ -32,6 +32,8 @@ export const APP_SERVER_CLIENT_METHODS = {
   writeSkillsConfig: "skills/config/write",
   listRemoteSkills: "skills/remote/list",
   exportRemoteSkill: "skills/remote/export",
+  detectExternalAgentConfig: "externalAgentConfig/detect",
+  importExternalAgentConfig: "externalAgentConfig/import",
   startThread: "thread/start",
   setThreadName: "thread/name/set",
   rollbackThread: "thread/rollback",

@@ -316,6 +316,10 @@ function buildApplicationShellViewPropertiesInput(
     lastCommandExecutionResult: debugCoverageDiagnostics.lastCommandExecutionResult,
     lastConfigBatchWriteResult: debugCoverageDiagnostics.lastConfigBatchWriteResult,
     lastConfigValueWriteResult: debugCoverageDiagnostics.lastConfigValueWriteResult,
+    lastExternalAgentConfigDetectResult:
+      debugCoverageDiagnostics.lastExternalAgentConfigDetectResult,
+    lastExternalAgentConfigImportResult:
+      debugCoverageDiagnostics.lastExternalAgentConfigImportResult,
     lastFeedbackUploadResult: debugCoverageDiagnostics.lastFeedbackUploadResult,
     lastFuzzyFileSearchResult: debugCoverageDiagnostics.lastFuzzyFileSearchResult,
     lastGitDiffToRemoteResult: debugCoverageDiagnostics.lastGitDiffToRemoteResult,
@@ -329,6 +333,8 @@ function buildApplicationShellViewPropertiesInput(
     writeConfigBatch: debugCoverageDiagnostics.writeConfigBatch,
     writeSkillsConfig: debugCoverageDiagnostics.writeSkillsConfig,
     exportRemoteSkill: debugCoverageDiagnostics.exportRemoteSkill,
+    detectExternalAgentConfig: debugCoverageDiagnostics.detectExternalAgentConfig,
+    importExternalAgentConfig: debugCoverageDiagnostics.importExternalAgentConfig,
     readGitDiffToRemote: debugCoverageDiagnostics.readGitDiffToRemote,
     searchFuzzyFiles: debugCoverageDiagnostics.searchFuzzyFiles,
     executeCommand: debugCoverageDiagnostics.executeCommand,

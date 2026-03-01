@@ -7,6 +7,10 @@ import {
   type ConfigWriteResult,
   type ExportRemoteSkillOptions,
   type ExportRemoteSkillResult,
+  type ExternalAgentConfigDetectOptions,
+  type ExternalAgentConfigDetectResult,
+  type ExternalAgentConfigImportOptions,
+  type ExternalAgentConfigImportResult,
   type FeedbackUploadOptions,
   type FeedbackUploadResult,
   type FuzzyFileSearchOptions,
@@ -59,6 +63,8 @@ import type {
   AgentConfigDefaults,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
+  AgentDetectExternalAgentConfigInput,
+  AgentDetectExternalAgentConfigResult,
   AgentExportRemoteSkillInput,
   AgentExportRemoteSkillResult,
   AgentForkThreadInput,
@@ -66,6 +72,8 @@ import type {
   AgentFuzzyFileSearchResult,
   AgentGitDiffToRemoteInput,
   AgentGitDiffToRemoteResult,
+  AgentImportExternalAgentConfigInput,
+  AgentImportExternalAgentConfigResult,
   AgentListAppsInput,
   AgentListAppsResult,
   AgentListExperimentalFeaturesInput,
@@ -111,6 +119,8 @@ import type {
 } from "../Types.js";
 import {
   buildCommandExecutionOptions,
+  buildExternalAgentConfigDetectOptions,
+  buildExternalAgentConfigImportOptions,
   buildFeedbackUploadOptions,
   buildStartMcpServerOauthLoginOptions,
   buildWriteConfigBatchOptions,
@@ -754,6 +764,26 @@ export class CodexThreadManagementOwner {
     this.ensureCodexAvailable();
     const result: ExportRemoteSkillResult = await this.runAppServerCall(() =>
       this.appClient.exportRemoteSkill(buildExportRemoteSkillOptions(input)),
+    );
+    return result;
+  }
+
+  public async detectExternalAgentConfig(
+    input: AgentDetectExternalAgentConfigInput,
+  ): Promise<AgentDetectExternalAgentConfigResult> {
+    this.ensureCodexAvailable();
+    const result: ExternalAgentConfigDetectResult = await this.runAppServerCall(() =>
+      this.appClient.detectExternalAgentConfig(buildExternalAgentConfigDetectOptions(input)),
+    );
+    return result;
+  }
+
+  public async importExternalAgentConfig(
+    input: AgentImportExternalAgentConfigInput,
+  ): Promise<AgentImportExternalAgentConfigResult> {
+    this.ensureCodexAvailable();
+    const result: ExternalAgentConfigImportResult = await this.runAppServerCall(() =>
+      this.appClient.importExternalAgentConfig(buildExternalAgentConfigImportOptions(input)),
     );
     return result;
   }

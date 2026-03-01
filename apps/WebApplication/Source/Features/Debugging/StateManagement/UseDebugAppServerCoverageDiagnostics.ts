@@ -16,6 +16,9 @@ import {
   type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
+  type DebugAppServerCoverageExternalAgentConfigDetectResult,
+  type DebugAppServerCoverageExternalAgentConfigImportResult,
+  type DebugAppServerCoverageExternalAgentConfigMigrationItem,
   type DebugAppServerCoverageFeedbackUploadResult,
   type DebugAppServerCoverageFuzzyFileSearchResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
@@ -41,6 +44,8 @@ import {
 } from "./DebugAppServerCoverageDiagnosticsMappers";
 import {
   runCommandExecutionAction,
+  runExternalAgentConfigDetectAction,
+  runExternalAgentConfigImportAction,
   runFeedbackUploadAction,
   runFuzzyFileSearchAction,
   runGitDiffToRemoteAction,
@@ -74,6 +79,8 @@ export interface DebugAppServerCoverageDiagnostics {
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
+  lastExternalAgentConfigDetectResult: DebugAppServerCoverageExternalAgentConfigDetectResult | null;
+  lastExternalAgentConfigImportResult: DebugAppServerCoverageExternalAgentConfigImportResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
@@ -93,6 +100,10 @@ export interface DebugAppServerCoverageDiagnostics {
   writeConfigBatch: (edits: string, filePath?: string, expectedVersion?: string) => void;
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
+  detectExternalAgentConfig: (includeHome: boolean, cwds: string[]) => void;
+  importExternalAgentConfig: (
+    migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[],
+  ) => void;
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -241,6 +252,10 @@ export function useDebugAppServerCoverageDiagnostics(
     useState<DebugAppServerCoverageConfigBatchWriteResult | null>(null);
   const [lastConfigValueWriteResult, setLastConfigValueWriteResult] =
     useState<DebugAppServerCoverageConfigValueWriteResult | null>(null);
+  const [lastExternalAgentConfigDetectResult, setLastExternalAgentConfigDetectResult] =
+    useState<DebugAppServerCoverageExternalAgentConfigDetectResult | null>(null);
+  const [lastExternalAgentConfigImportResult, setLastExternalAgentConfigImportResult] =
+    useState<DebugAppServerCoverageExternalAgentConfigImportResult | null>(null);
   const [lastFeedbackUploadResult, setLastFeedbackUploadResult] =
     useState<DebugAppServerCoverageFeedbackUploadResult | null>(null);
   const [lastFuzzyFileSearchResult, setLastFuzzyFileSearchResult] =
@@ -481,6 +496,35 @@ export function useDebugAppServerCoverageDiagnostics(
     [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics],
   );
 
+  const detectExternalAgentConfig = useCallback(
+    (includeHome: boolean, cwds: string[]) => {
+      runExternalAgentConfigDetectAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        includeHome,
+        cwds,
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastExternalAgentConfigDetectResult,
+      });
+    },
+    [input.capabilityServerClient, isRunningCoverageAction],
+  );
+
+  const importExternalAgentConfig = useCallback(
+    (migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[]) => {
+      runExternalAgentConfigImportAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        migrationItems,
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastExternalAgentConfigImportResult,
+      });
+    },
+    [input.capabilityServerClient, isRunningCoverageAction],
+  );
+
   const readGitDiffToRemote = useCallback(
     (cwd: string) => {
       runGitDiffToRemoteAction({
@@ -569,6 +613,8 @@ export function useDebugAppServerCoverageDiagnostics(
     lastCommandExecutionResult,
     lastConfigBatchWriteResult,
     lastConfigValueWriteResult,
+    lastExternalAgentConfigDetectResult,
+    lastExternalAgentConfigImportResult,
     lastFeedbackUploadResult,
     lastFuzzyFileSearchResult,
     lastGitDiffToRemoteResult,
@@ -582,6 +628,8 @@ export function useDebugAppServerCoverageDiagnostics(
     writeConfigBatch,
     writeSkillsConfig,
     exportRemoteSkill,
+    detectExternalAgentConfig,
+    importExternalAgentConfig,
     readGitDiffToRemote,
     searchFuzzyFiles,
     executeCommand,

@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 03:14:14Z
+Last Updated (UTC): 2026-03-01 03:40:00Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `43 / 74` request methods (`58.1%`).
+1. Farfield app-server method coverage at request-owner layer: `45 / 74` request methods (`60.8%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `44 / 74` (`59.5%`).
+3. Effective request-method usage including transport-owned `initialize`: `46 / 74` (`62.2%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -105,6 +105,8 @@ As of the upstream snapshot above:
 | `configRequirements/read` | Config requirements diagnostics and workspace readiness signals | Medium-high | Strict capability route ownership with typed payload mapping into debug coverage diagnostics | Keep current path |
 | `config/mcpServer/reload` | MCP server configuration reload action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic mutation path for diagnostics flows | Keep current path |
 | `mcpServer/oauth/login` | MCP server oauth-login start action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic oauth-url response mapping for integration diagnostics | Keep current path |
+| `externalAgentConfig/detect` | External agent-config detection diagnostics with typed migration-item projection in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic include-home and repeated-cwd parsing plus typed migration-item mapping | Keep current path |
+| `externalAgentConfig/import` | External agent-config import diagnostics action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed migration-item request parsing and deterministic import-result mapping | Keep current path |
 | `account/read` | Account diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed account-contract mapping | Keep current path |
 | `getAuthStatus` | Legacy auth-status diagnostics in debug workspace coverage panel to validate auth mode, token-return behavior, and OpenAI-auth requirements | Medium-high | Strict capability route ownership with typed boolean-query parsing and deterministic nullable auth-status mapping | Keep current path |
 | `userInfo` | Legacy user-info diagnostics in debug workspace coverage panel for account troubleshooting workflows | Medium-high | Strict capability route ownership with deterministic nullable email mapping | Keep current path |
@@ -159,6 +161,8 @@ As of the upstream snapshot above:
 | `configRequirements/read` | Config requirements diagnostics | `/api/config-requirements` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigRequirements` -> `AppServerClient.readConfigRequirements` |
 | `config/mcpServer/reload` | MCP server config reload diagnostics action | `/api/config/mcp-server/reload` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.reloadMcpServerConfig` -> `AppServerClient.reloadMcpServerConfig` |
 | `mcpServer/oauth/login` | MCP server oauth login diagnostics action | `/api/mcp-servers/oauth/login` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.startMcpServerOauthLogin` -> `AppServerClient.startMcpServerOauthLogin` |
+| `externalAgentConfig/detect` | External agent-config detection diagnostics action | `/api/external-agent-config/detect` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.detectExternalAgentConfig` -> `AppServerClient.detectExternalAgentConfig` |
+| `externalAgentConfig/import` | External agent-config import diagnostics action | `/api/external-agent-config/import` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.importExternalAgentConfig` -> `AppServerClient.importExternalAgentConfig` |
 | `account/read` | Account diagnostics | `/api/account` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readAccount` -> `AppServerClient.readAccount` |
 | `getAuthStatus` | Legacy auth-status diagnostics | `/api/account/auth-status` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readAuthStatus` -> `AppServerClient.readAuthStatus` |
 | `userInfo` | Legacy user-info diagnostics | `/api/account/user-info` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readUserInfo` -> `AppServerClient.readUserInfo` |
@@ -177,15 +181,13 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`31` request methods are not used by Farfield’s app-server client path:
+`29` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
 archiveConversation
 cancelLoginChatGpt
 execOneOffCommand
-externalAgentConfig/detect
-externalAgentConfig/import
 forkConversation
 fuzzyFileSearch/sessionStart
 fuzzyFileSearch/sessionStop
@@ -245,8 +247,7 @@ No remaining methods in this category for the current upstream snapshot.
 
 ### Category C: Configuration and Environment Management Surfaces Not Yet Wired
 
-1. `externalAgentConfig/detect`
-2. `externalAgentConfig/import`
+No remaining methods in this category for the current upstream snapshot.
 
 ### Category D: Skills, Apps, and Feature-Discovery Surfaces Not Yet Wired
 
@@ -282,8 +283,8 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `31`
-2. Total methods listed across Category A-I: `31`
+1. Total non-intersection methods: `29`
+2. Total methods listed across Category A-I: `29`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

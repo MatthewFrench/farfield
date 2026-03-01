@@ -14,6 +14,7 @@ import type {
   AgentCancelAccountLoginResult,
   AgentCommandExecutionResult,
   AgentConfigDefaults,
+  AgentDetectExternalAgentConfigResult,
   AgentExportRemoteSkillResult,
   AgentFuzzyFileSearchResult,
   AgentGitDiffToRemoteResult,
@@ -64,6 +65,8 @@ const CapabilityRoutePathnameByName = {
   skillsConfigWrite: "/api/skills/config/write",
   skillsRemoteList: "/api/skills/remote/list",
   skillsRemoteExport: "/api/skills/remote/export",
+  externalAgentConfigDetect: "/api/external-agent-config/detect",
+  externalAgentConfigImport: "/api/external-agent-config/import",
   models: "/api/models",
   collaborationModes: "/api/collaboration-modes",
   experimentalFeatures: "/api/experimental-features",
@@ -111,6 +114,8 @@ const CapabilityRouteQueryParameterByName = {
   scopes: "scopes",
   timeoutMs: "timeoutMs",
   timeoutSeconds: "timeoutSeconds",
+  includeHome: "includeHome",
+  migrationItems: "migrationItems",
 } as const;
 
 const CapabilityRouteLogEventByName = {
@@ -135,6 +140,8 @@ const CapabilityRouteLogEventByName = {
   skillsConfigWriteFailed: "skills-config-write-failed",
   skillsRemoteListFailed: "skills-remote-list-failed",
   skillsRemoteExportFailed: "skills-remote-export-failed",
+  externalAgentConfigDetectFailed: "external-agent-config-detect-failed",
+  externalAgentConfigImportFailed: "external-agent-config-import-failed",
   modelsListTimeout: "models-list-timeout",
   collaborationModesListTimeout: "collaboration-modes-list-timeout",
   experimentalFeaturesListTimeout: "experimental-features-list-timeout",
@@ -211,6 +218,17 @@ const CapabilityRouteErrorMessagePrefixByName = {
   failedToListRemoteSkills: "Failed to list remote skills: ",
   missingRemoteSkillHazelnutId: "Missing hazelnutId query parameter.",
   failedToExportRemoteSkill: "Failed to export remote skill: ",
+  invalidExternalAgentConfigIncludeHome:
+    "Invalid includeHome query parameter. Expected true/false or 1/0.",
+  missingExternalAgentConfigDetectTargets:
+    "Specify includeHome=true and/or at least one cwd query parameter.",
+  invalidExternalAgentConfigDetectCwds:
+    "Invalid cwd query parameter. Expected non-empty cwd values.",
+  failedToDetectExternalAgentConfig: "Failed to detect external agent config: ",
+  missingExternalAgentConfigMigrationItems: "Missing migrationItems query parameter.",
+  invalidExternalAgentConfigMigrationItems:
+    "Invalid migrationItems query parameter. Expected JSON array of migration items.",
+  failedToImportExternalAgentConfig: "Failed to import external agent config: ",
   failedToListModels: "Failed to list models: ",
   failedToListCollaborationModes: "Failed to list collaboration modes: ",
   failedToListExperimentalFeatures: "Failed to list experimental features: ",
@@ -239,6 +257,8 @@ const CapabilityRouteTimeoutLabelByName = {
   skillsConfigWrite: "skills config write",
   skillsRemoteList: "skills remote listing",
   skillsRemoteExport: "skills remote export",
+  externalAgentConfigDetect: "external agent config detect",
+  externalAgentConfigImport: "external agent config import",
   modelsList: "models listing",
   collaborationModesList: "collaboration modes listing",
   experimentalFeaturesList: "experimental features listing",
@@ -362,6 +382,10 @@ type CapabilitySkillsRemoteListResponseBody = AgentListRemoteSkillsResult & {
 };
 
 type CapabilitySkillsRemoteExportResponseBody = AgentExportRemoteSkillResult & {
+  ok: true;
+};
+
+type CapabilityExternalAgentConfigDetectResponseBody = AgentDetectExternalAgentConfigResult & {
   ok: true;
 };
 
@@ -523,6 +547,17 @@ function parseOptionalNonEmptyQueryValue(value: string | null): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
+function parseWorkingDirectoriesQueryValues(values: string[]): string[] | null {
+  if (values.length === 0) {
+    return null;
+  }
+  const normalizedValues = values.map((value) => value.trim());
+  if (normalizedValues.some((value) => value.length === 0)) {
+    return null;
+  }
+  return normalizedValues;
+}
+
 function parseConfigWriteMergeStrategyQueryValue(
   value: string | null,
 ): "replace" | "upsert" | null {
@@ -622,6 +657,34 @@ function parseRemoteSkillsProductSurfaceQueryValue(
     return "atlas";
   }
   return null;
+}
+
+const CapabilityExternalAgentConfigMigrationItemSchema = z
+  .object({
+    itemType: z.enum(["AGENTS_MD", "CONFIG", "SKILLS", "MCP_SERVER_CONFIG"]),
+    description: z.string().min(1),
+    cwd: z.string().min(1).nullable().optional(),
+  })
+  .strict();
+const CapabilityExternalAgentConfigMigrationItemsSchema = z
+  .array(CapabilityExternalAgentConfigMigrationItemSchema)
+  .min(1);
+
+function parseExternalAgentConfigMigrationItemsQueryValue(
+  value: string | null,
+): z.infer<typeof CapabilityExternalAgentConfigMigrationItemsSchema> | null {
+  if (value === null) {
+    return null;
+  }
+
+  try {
+    const parsedJson = JSON.parse(value);
+    const parsedMigrationItems =
+      CapabilityExternalAgentConfigMigrationItemsSchema.safeParse(parsedJson);
+    return parsedMigrationItems.success ? parsedMigrationItems.data : null;
+  } catch {
+    return null;
+  }
 }
 
 function mapConfigRequirementsResponse(
@@ -810,6 +873,15 @@ function mapSkillsRemoteListResponse(
 function mapSkillsRemoteExportResponse(
   result: AgentExportRemoteSkillResult,
 ): CapabilitySkillsRemoteExportResponseBody {
+  return {
+    ok: true,
+    ...result,
+  };
+}
+
+function mapExternalAgentConfigDetectResponse(
+  result: AgentDetectExternalAgentConfigResult,
+): CapabilityExternalAgentConfigDetectResponseBody {
   return {
     ok: true,
     ...result,
@@ -2843,6 +2915,222 @@ async function handleSkillsRemoteExportRoute(deps: CapabilityRouteDependencies):
   return true;
 }
 
+async function handleExternalAgentConfigDetectRoute(
+  deps: CapabilityRouteDependencies,
+): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.get,
+      CapabilityRoutePathnameByName.externalAgentConfigDetect,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const includeHomeRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.includeHome);
+  const includeHome = parseBooleanQueryValueStrict(includeHomeRaw);
+  if (includeHomeRaw !== null && includeHome === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidExternalAgentConfigIncludeHome,
+    });
+    return true;
+  }
+
+  const cwdsRaw = url.searchParams.getAll(CapabilityRouteQueryParameterByName.cwd);
+  const cwds = parseWorkingDirectoriesQueryValues(cwdsRaw);
+  if (cwdsRaw.length > 0 && cwds === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidExternalAgentConfigDetectCwds,
+    });
+    return true;
+  }
+
+  const resolvedIncludeHome = includeHome ?? false;
+  if (!resolvedIncludeHome && cwds === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingExternalAgentConfigDetectTargets,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canDetectExternalAgentConfig ||
+    !adapter.detectExternalAgentConfig
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToDetectExternalAgentConfig}External-agent config detection is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.detectExternalAgentConfig({
+        includeHome: resolvedIncludeHome,
+        ...(cwds !== null ? { cwds } : {}),
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.externalAgentConfigDetect,
+    );
+    jsonResponse(
+      res,
+      CapabilityRouteStatusCodeByName.success,
+      mapExternalAgentConfigDetectResponse(result),
+    );
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        includeHome: resolvedIncludeHome,
+        cwdCount: cwds?.length ?? 0,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.externalAgentConfigDetectFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToDetectExternalAgentConfig}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleExternalAgentConfigImportRoute(
+  deps: CapabilityRouteDependencies,
+): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.externalAgentConfigImport,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const migrationItemsRaw = url.searchParams.get(
+    CapabilityRouteQueryParameterByName.migrationItems,
+  );
+  if (migrationItemsRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingExternalAgentConfigMigrationItems,
+    });
+    return true;
+  }
+  const migrationItems = parseExternalAgentConfigMigrationItemsQueryValue(migrationItemsRaw);
+  if (migrationItems === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidExternalAgentConfigMigrationItems,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canImportExternalAgentConfig ||
+    !adapter.importExternalAgentConfig
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToImportExternalAgentConfig}External-agent config import is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    await withTimeout(
+      adapter.importExternalAgentConfig({
+        migrationItems: migrationItems.map((migrationItem) => ({
+          itemType: migrationItem.itemType,
+          description: migrationItem.description,
+          cwd: migrationItem.cwd ?? null,
+        })),
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.externalAgentConfigImport,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapMutationSuccessResponse());
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        migrationItemCount: migrationItems.length,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.externalAgentConfigImportFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToImportExternalAgentConfig}${message}`,
+    });
+  }
+
+  return true;
+}
+
 async function handleModelsRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
   const {
     req,
@@ -3228,7 +3516,8 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
  * `/api/git/diff-remote`, `/api/files/fuzzy-search`, `/api/commands/exec`, `/api/account/login/start`,
  * `/api/account/login/cancel`, `/api/account/logout`,
  * `/api/config/batch/write`, `/api/config/value/write`, `/api/mcp-servers/oauth/login`, `/api/skills/config/write`,
- * `/api/skills/remote/list`, `/api/skills/remote/export`, `/api/models`,
+ * `/api/skills/remote/list`, `/api/skills/remote/export`,
+ * `/api/external-agent-config/detect`, `/api/external-agent-config/import`, `/api/models`,
  * `/api/collaboration-modes`, `/api/experimental-features`,
  * `/api/mcp-servers`, `/api/apps`, `/api/skills`)
  * route dispatch with explicit adapter-to-response mapping.
@@ -3292,6 +3581,12 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleSkillsRemoteExportRoute(deps)) {
+    return true;
+  }
+  if (await handleExternalAgentConfigDetectRoute(deps)) {
+    return true;
+  }
+  if (await handleExternalAgentConfigImportRoute(deps)) {
     return true;
   }
   if (await handleModelsRoute(deps)) {

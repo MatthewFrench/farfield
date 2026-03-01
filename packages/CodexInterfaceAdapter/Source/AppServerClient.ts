@@ -25,6 +25,10 @@ import { buildReadAuthStatusRequestParameters } from "./AppServerClientAuthStatu
 import { buildCommandExecutionRequestParameters } from "./AppServerClientCommandExecutionRequestBuilders.js";
 import { buildConfigBatchWriteRequestParameters } from "./AppServerClientConfigBatchWriteRequestBuilders.js";
 import { buildConfigValueWriteRequestParameters } from "./AppServerClientConfigValueWriteRequestBuilders.js";
+import {
+  buildExternalAgentConfigDetectRequestParameters,
+  buildExternalAgentConfigImportRequestParameters,
+} from "./AppServerClientExternalAgentConfigRequestBuilders.js";
 import { buildFeedbackUploadRequestParameters } from "./AppServerClientFeedbackUploadRequestBuilders.js";
 import { buildFuzzyFileSearchRequestParameters } from "./AppServerClientFuzzyFileSearchRequestBuilders.js";
 import { buildGitDiffToRemoteRequestParameters } from "./AppServerClientGitDiffRequestBuilders.js";
@@ -517,6 +521,33 @@ export interface ExportRemoteSkillResult {
   path: string;
 }
 
+export type ExternalAgentConfigMigrationItemType =
+  | "AGENTS_MD"
+  | "CONFIG"
+  | "SKILLS"
+  | "MCP_SERVER_CONFIG";
+
+export interface ExternalAgentConfigMigrationItem {
+  itemType: ExternalAgentConfigMigrationItemType;
+  description: string;
+  cwd: string | null;
+}
+
+export interface ExternalAgentConfigDetectOptions {
+  includeHome: boolean;
+  cwds?: string[];
+}
+
+export interface ExternalAgentConfigDetectResult {
+  items: ExternalAgentConfigMigrationItem[];
+}
+
+export interface ExternalAgentConfigImportOptions {
+  migrationItems: ExternalAgentConfigMigrationItem[];
+}
+
+export interface ExternalAgentConfigImportResult {}
+
 export interface ResumeThreadOptions {
   persistExtendedHistory?: boolean;
 }
@@ -883,6 +914,25 @@ const AppServerSkillsRemoteExportResponseSchema = z
     path: z.string().min(1),
   })
   .passthrough();
+const AppServerExternalAgentConfigMigrationItemTypeSchema = z.enum([
+  "AGENTS_MD",
+  "CONFIG",
+  "SKILLS",
+  "MCP_SERVER_CONFIG",
+]);
+const AppServerExternalAgentConfigMigrationItemSchema = z
+  .object({
+    itemType: AppServerExternalAgentConfigMigrationItemTypeSchema,
+    description: z.string().min(1),
+    cwd: z.string().nullable().optional(),
+  })
+  .passthrough();
+const AppServerExternalAgentConfigDetectResponseSchema = z
+  .object({
+    items: z.array(AppServerExternalAgentConfigMigrationItemSchema),
+  })
+  .passthrough();
+const AppServerExternalAgentConfigImportResponseSchema = z.object({}).passthrough();
 const AppServerThreadUnsubscribeResponseSchema = z
   .object({
     status: z.enum(["notLoaded", "notSubscribed", "unsubscribed"]),
@@ -1580,6 +1630,42 @@ export class AppServerClient {
       id: parsed.id,
       path: parsed.path,
     };
+  }
+
+  public async detectExternalAgentConfig(
+    options: ExternalAgentConfigDetectOptions,
+  ): Promise<ExternalAgentConfigDetectResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.detectExternalAgentConfig,
+      buildExternalAgentConfigDetectRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerExternalAgentConfigDetectResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.detectExternalAgentConfig,
+    );
+    return {
+      items: parsed.items.map((migrationItem) => ({
+        itemType: migrationItem.itemType,
+        description: migrationItem.description,
+        cwd: migrationItem.cwd ?? null,
+      })),
+    };
+  }
+
+  public async importExternalAgentConfig(
+    options: ExternalAgentConfigImportOptions,
+  ): Promise<ExternalAgentConfigImportResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.importExternalAgentConfig,
+      buildExternalAgentConfigImportRequestParameters(options),
+    );
+    parseAppServerResponse(
+      AppServerExternalAgentConfigImportResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.importExternalAgentConfig,
+    );
+    return {};
   }
 
   public async startThread(options: StartThreadOptions): Promise<AppServerStartThreadResponse> {

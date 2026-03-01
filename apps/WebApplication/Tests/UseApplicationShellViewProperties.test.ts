@@ -176,6 +176,8 @@ function createUseApplicationShellViewPropertiesFixture() {
   );
   const writeSkillsConfigSpy = vi.fn((_skillPath: string, _enabled: boolean): void => {});
   const exportRemoteSkillSpy = vi.fn((_hazelnutId: string): void => {});
+  const detectExternalAgentConfigSpy = vi.fn((_includeHome: boolean, _cwds: string[]): void => {});
+  const importExternalAgentConfigSpy = vi.fn((): void => {});
   const setApiSessionTokenDraftSpy = vi.fn((): void => {});
   const setApiSessionBootstrapErrorSpy = vi.fn((): void => {});
   const submitApiSessionTokenSpy = vi.fn(async (): Promise<void> => {});
@@ -306,6 +308,8 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastCommandExecutionResult: null,
     lastConfigBatchWriteResult: null,
     lastConfigValueWriteResult: null,
+    lastExternalAgentConfigDetectResult: null,
+    lastExternalAgentConfigImportResult: null,
     lastFeedbackUploadResult: null,
     lastFuzzyFileSearchResult: null,
     lastGitDiffToRemoteResult: null,
@@ -323,6 +327,8 @@ function createUseApplicationShellViewPropertiesFixture() {
     uploadFeedback: uploadFeedbackSpy,
     writeSkillsConfig: writeSkillsConfigSpy,
     exportRemoteSkill: exportRemoteSkillSpy,
+    detectExternalAgentConfig: detectExternalAgentConfigSpy,
+    importExternalAgentConfig: importExternalAgentConfigSpy,
     apiSessionTokenDraft: "",
     setApiSessionTokenDraft: setApiSessionTokenDraftSpy,
     apiSessionBootstrapError: "invalid-token",

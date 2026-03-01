@@ -37,6 +37,14 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageFuzzyFileS
   searchFuzzyFiles: vi.fn(),
 }));
 
+vi.mock(
+  "../Source/Features/Capabilities/DataAccess/CapabilityCoverageExternalAgentConfigApi",
+  () => ({
+    detectExternalAgentConfig: vi.fn(),
+    importExternalAgentConfig: vi.fn(),
+  }),
+);
+
 import {
   cancelAccountLogin,
   getAccount,
@@ -55,6 +63,10 @@ import {
   reloadMcpServerConfig,
   startAccountLogin,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
+import {
+  detectExternalAgentConfig,
+  importExternalAgentConfig,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageExternalAgentConfigApi";
 import { searchFuzzyFiles } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageFuzzyFileSearchApi";
 import {
   executeCommand,
@@ -85,6 +97,8 @@ import {
   type CapabilityConfigRequirementsResponse,
   type CapabilityConfigValueWriteResponse,
   type CapabilityExperimentalFeaturesResponse,
+  type CapabilityExternalAgentConfigDetectResponse,
+  type CapabilityExternalAgentConfigImportResponse,
   type CapabilityFeedbackUploadResponse,
   type CapabilityFuzzyFileSearchResponse,
   type CapabilityGitDiffToRemoteResponse,
@@ -139,6 +153,8 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canStartMcpServerOauthLogin: true,
         canWriteConfigValue: true,
         canWriteSkillsConfig: true,
+        canDetectExternalAgentConfig: true,
+        canImportExternalAgentConfig: true,
         canSetCollaborationMode: true,
         canSubmitUserInput: true,
         canReadLiveState: true,
@@ -337,6 +353,26 @@ const REMOTE_SKILL_EXPORT_RESPONSE: CapabilityRemoteSkillExportResponse = {
   path: "/tmp/project/.codex/skills/repository-checks/SKILL.md",
 };
 
+const EXTERNAL_AGENT_CONFIG_DETECT_RESPONSE: CapabilityExternalAgentConfigDetectResponse = {
+  ok: true,
+  items: [
+    {
+      itemType: "AGENTS_MD",
+      description: "Migrate AGENTS.md from ~/.claude",
+      cwd: null,
+    },
+    {
+      itemType: "CONFIG",
+      description: "Import repository config",
+      cwd: "/tmp/project",
+    },
+  ],
+};
+
+const EXTERNAL_AGENT_CONFIG_IMPORT_RESPONSE: CapabilityExternalAgentConfigImportResponse = {
+  ok: true,
+};
+
 const EXPERIMENTAL_FEATURES_RESPONSE: CapabilityExperimentalFeaturesResponse = {
   ok: true,
   data: [
@@ -431,6 +467,8 @@ describe("CapabilityServerClient", () => {
     vi.mocked(writeSkillsConfig).mockResolvedValue(SKILLS_CONFIG_WRITE_RESPONSE);
     vi.mocked(listRemoteSkills).mockResolvedValue(REMOTE_SKILLS_LIST_RESPONSE);
     vi.mocked(exportRemoteSkill).mockResolvedValue(REMOTE_SKILL_EXPORT_RESPONSE);
+    vi.mocked(detectExternalAgentConfig).mockResolvedValue(EXTERNAL_AGENT_CONFIG_DETECT_RESPONSE);
+    vi.mocked(importExternalAgentConfig).mockResolvedValue(EXTERNAL_AGENT_CONFIG_IMPORT_RESPONSE);
     vi.mocked(listExperimentalFeatures).mockResolvedValue(EXPERIMENTAL_FEATURES_RESPONSE);
     vi.mocked(listMcpServers).mockResolvedValue(MCP_SERVERS_RESPONSE);
     vi.mocked(listApps).mockResolvedValue(APPS_RESPONSE);
@@ -581,6 +619,28 @@ describe("CapabilityServerClient", () => {
       actionName: "export-remote-skill",
       hazelnutId: "remote-skill-1",
     };
+    const externalAgentConfigDetectOptions = {
+      actionId: "action-external-agent-config-detect",
+      actionName: "detect-external-agent-config",
+      includeHome: true,
+      cwds: ["/tmp/project", "/tmp/project/packages"],
+    };
+    const externalAgentConfigImportOptions = {
+      actionId: "action-external-agent-config-import",
+      actionName: "import-external-agent-config",
+      migrationItems: [
+        {
+          itemType: "AGENTS_MD" as const,
+          description: "Migrate AGENTS.md from ~/.claude",
+          cwd: null,
+        },
+        {
+          itemType: "CONFIG" as const,
+          description: "Import repository config",
+          cwd: "/tmp/project",
+        },
+      ],
+    };
     const experimentalFeatureOptions = {
       actionId: "action-experimental-features",
       actionName: "list-experimental-features",
@@ -647,6 +707,10 @@ describe("CapabilityServerClient", () => {
       await capabilityServerClient.listRemoteSkills(listRemoteSkillsOptions);
     const remoteSkillExportResponse =
       await capabilityServerClient.exportRemoteSkill(exportRemoteSkillOptions);
+    const externalAgentConfigDetectResponse =
+      await capabilityServerClient.detectExternalAgentConfig(externalAgentConfigDetectOptions);
+    const externalAgentConfigImportResponse =
+      await capabilityServerClient.importExternalAgentConfig(externalAgentConfigImportOptions);
     const experimentalFeaturesResponse = await capabilityServerClient.listExperimentalFeatures(
       experimentalFeatureOptions,
     );
@@ -678,6 +742,8 @@ describe("CapabilityServerClient", () => {
     expect(writeSkillsConfig).toHaveBeenCalledWith(skillsConfigWriteOptions);
     expect(listRemoteSkills).toHaveBeenCalledWith(listRemoteSkillsOptions);
     expect(exportRemoteSkill).toHaveBeenCalledWith(exportRemoteSkillOptions);
+    expect(detectExternalAgentConfig).toHaveBeenCalledWith(externalAgentConfigDetectOptions);
+    expect(importExternalAgentConfig).toHaveBeenCalledWith(externalAgentConfigImportOptions);
     expect(listExperimentalFeatures).toHaveBeenCalledWith(experimentalFeatureOptions);
     expect(listMcpServers).toHaveBeenCalledWith(mcpServerOptions);
     expect(listApps).toHaveBeenCalledWith(appOptions);
@@ -706,6 +772,8 @@ describe("CapabilityServerClient", () => {
     expect(skillsConfigWriteResponse).toEqual(SKILLS_CONFIG_WRITE_RESPONSE);
     expect(remoteSkillsListResponse).toEqual(REMOTE_SKILLS_LIST_RESPONSE);
     expect(remoteSkillExportResponse).toEqual(REMOTE_SKILL_EXPORT_RESPONSE);
+    expect(externalAgentConfigDetectResponse).toEqual(EXTERNAL_AGENT_CONFIG_DETECT_RESPONSE);
+    expect(externalAgentConfigImportResponse).toEqual(EXTERNAL_AGENT_CONFIG_IMPORT_RESPONSE);
     expect(experimentalFeaturesResponse).toEqual(EXPERIMENTAL_FEATURES_RESPONSE);
     expect(mcpServersResponse).toEqual(MCP_SERVERS_RESPONSE);
     expect(appsResponse).toEqual(APPS_RESPONSE);

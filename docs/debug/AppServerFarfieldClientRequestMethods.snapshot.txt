@@ -12,6 +12,8 @@ config/read
 config/value/write
 configRequirements/read
 experimentalFeature/list
+externalAgentConfig/detect
+externalAgentConfig/import
 feedback/upload
 fuzzyFileSearch
 getAuthStatus

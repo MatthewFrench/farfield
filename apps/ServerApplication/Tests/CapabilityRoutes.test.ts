@@ -21,6 +21,8 @@ import type {
   AgentConfigDefaults,
   AgentCreateThreadInput,
   AgentCreateThreadResult,
+  AgentDetectExternalAgentConfigInput,
+  AgentDetectExternalAgentConfigResult,
   AgentExportRemoteSkillInput,
   AgentExportRemoteSkillResult,
   AgentFuzzyFileSearchInput,
@@ -28,6 +30,8 @@ import type {
   AgentGitDiffToRemoteInput,
   AgentGitDiffToRemoteResult,
   AgentId,
+  AgentImportExternalAgentConfigInput,
+  AgentImportExternalAgentConfigResult,
   AgentInterruptInput,
   AgentListAppsResult,
   AgentListExperimentalFeaturesResult,
@@ -250,6 +254,19 @@ const CapabilitySkillsRemoteExportEnvelopeSchema = z
   })
   .strict();
 
+const CapabilityExternalAgentConfigDetectEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    items: z.array(
+      z.object({
+        itemType: z.enum(["AGENTS_MD", "CONFIG", "SKILLS", "MCP_SERVER_CONFIG"]),
+        description: z.string().min(1),
+        cwd: z.string().nullable(),
+      }),
+    ),
+  })
+  .strict();
+
 const CapabilityCommandExecutionEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -407,6 +424,12 @@ interface MockAgentAdapterOptions {
   writeSkillsConfig?: (input: AgentWriteSkillsConfigInput) => Promise<AgentWriteSkillsConfigResult>;
   listRemoteSkills?: (input: AgentListRemoteSkillsInput) => Promise<AgentListRemoteSkillsResult>;
   exportRemoteSkill?: (input: AgentExportRemoteSkillInput) => Promise<AgentExportRemoteSkillResult>;
+  detectExternalAgentConfig?: (
+    input: AgentDetectExternalAgentConfigInput,
+  ) => Promise<AgentDetectExternalAgentConfigResult>;
+  importExternalAgentConfig?: (
+    input: AgentImportExternalAgentConfigInput,
+  ) => Promise<AgentImportExternalAgentConfigResult>;
   listExperimentalFeatures?: () => Promise<AgentListExperimentalFeaturesResult>;
   listMcpServerStatuses?: () => Promise<AgentListMcpServerStatusesResult>;
   listApps?: () => Promise<AgentListAppsResult>;
@@ -456,6 +479,8 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canStartMcpServerOauthLogin: false,
     canWriteConfigValue: false,
     canWriteSkillsConfig: false,
+    canDetectExternalAgentConfig: false,
+    canImportExternalAgentConfig: false,
     canSetCollaborationMode: false,
     canSubmitUserInput: false,
     canReadLiveState: false,
@@ -583,6 +608,14 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.exportRemoteSkill) {
     adapter.exportRemoteSkill = options.exportRemoteSkill;
+  }
+
+  if (options.detectExternalAgentConfig) {
+    adapter.detectExternalAgentConfig = options.detectExternalAgentConfig;
+  }
+
+  if (options.importExternalAgentConfig) {
+    adapter.importExternalAgentConfig = options.importExternalAgentConfig;
   }
 
   if (options.listExperimentalFeatures) {
@@ -1670,6 +1703,8 @@ describe("handleCapabilityRoutes", () => {
           capabilities: {
             canWriteConfigValue: true,
             canWriteSkillsConfig: true,
+            canDetectExternalAgentConfig: true,
+            canImportExternalAgentConfig: true,
           },
           writeSkillsConfig: writeSkillsConfigSpy,
         }),
@@ -1785,6 +1820,8 @@ describe("handleCapabilityRoutes", () => {
           capabilities: {
             canWriteConfigValue: true,
             canWriteSkillsConfig: true,
+            canDetectExternalAgentConfig: true,
+            canImportExternalAgentConfig: true,
           },
           exportRemoteSkill: exportRemoteSkillSpy,
         }),
@@ -1801,6 +1838,139 @@ describe("handleCapabilityRoutes", () => {
       ok: true,
       id: "remote-skill-1",
       path: "/tmp/workspace/.codex/skills/repository-checks/SKILL.md",
+    });
+  });
+
+  it("returns 400 when external-agent config detection has no targets", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/external-agent-config/detect",
+      url: new URL("http://localhost/api/external-agent-config/detect"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Specify includeHome=true and/or at least one cwd query parameter.",
+    });
+  });
+
+  it("detects external-agent config migration items with includeHome and cwd filters", async () => {
+    const detectExternalAgentConfigSpy = vi.fn(
+      async (): Promise<AgentDetectExternalAgentConfigResult> => ({
+        items: [
+          {
+            itemType: "AGENTS_MD",
+            description: "Migrate AGENTS.md from ~/.claude",
+            cwd: null,
+          },
+          {
+            itemType: "CONFIG",
+            description: "Import repository config",
+            cwd: "/tmp/project",
+          },
+        ],
+      }),
+    );
+    const result = await executeCapabilityRoute({
+      pathname: "/api/external-agent-config/detect",
+      url: new URL(
+        "http://localhost/api/external-agent-config/detect?includeHome=true&cwd=/tmp/project&cwd=/tmp/project/packages",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canDetectExternalAgentConfig: true,
+          },
+          detectExternalAgentConfig: detectExternalAgentConfigSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(detectExternalAgentConfigSpy).toHaveBeenCalledWith({
+      includeHome: true,
+      cwds: ["/tmp/project", "/tmp/project/packages"],
+    });
+    const parsedEnvelope = CapabilityExternalAgentConfigDetectEnvelopeSchema.parse(
+      readRouteBody(result),
+    );
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      items: [
+        {
+          itemType: "AGENTS_MD",
+          description: "Migrate AGENTS.md from ~/.claude",
+          cwd: null,
+        },
+        {
+          itemType: "CONFIG",
+          description: "Import repository config",
+          cwd: "/tmp/project",
+        },
+      ],
+    });
+  });
+
+  it("returns 400 when external-agent config import omits migrationItems", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/external-agent-config/import",
+      url: new URL("http://localhost/api/external-agent-config/import"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing migrationItems query parameter.",
+    });
+  });
+
+  it("imports external-agent config migration items through adapter ownership", async () => {
+    const importExternalAgentConfigSpy = vi.fn(
+      async (): Promise<AgentImportExternalAgentConfigResult> => ({}),
+    );
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/external-agent-config/import",
+      url: new URL(
+        "http://localhost/api/external-agent-config/import?migrationItems=%5B%7B%22itemType%22%3A%22AGENTS_MD%22%2C%22description%22%3A%22Migrate%20AGENTS.md%22%2C%22cwd%22%3Anull%7D%2C%7B%22itemType%22%3A%22CONFIG%22%2C%22description%22%3A%22Import%20repository%20config%22%2C%22cwd%22%3A%22%2Ftmp%2Fproject%22%7D%5D",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canImportExternalAgentConfig: true,
+          },
+          importExternalAgentConfig: importExternalAgentConfigSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(importExternalAgentConfigSpy).toHaveBeenCalledWith({
+      migrationItems: [
+        {
+          itemType: "AGENTS_MD",
+          description: "Migrate AGENTS.md",
+          cwd: null,
+        },
+        {
+          itemType: "CONFIG",
+          description: "Import repository config",
+          cwd: "/tmp/project",
+        },
+      ],
+    });
+    const parsedEnvelope = CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
     });
   });
 

@@ -12,6 +12,7 @@ import type {
   CapabilityConfigValueWriteResponse,
   CapabilityConfigWriteMergeStrategy,
   CapabilityExperimentalFeaturesResponse,
+  CapabilityExternalAgentConfigDetectResponse,
   CapabilityFeedbackUploadResponse,
   CapabilityFuzzyFileSearchResponse,
   CapabilityGitDiffToRemoteResponse,
@@ -27,6 +28,8 @@ import type {
   DebugAppServerCoverageConfigBatchWriteResult,
   DebugAppServerCoverageConfigValueWriteResult,
   DebugAppServerCoverageExperimentalFeature,
+  DebugAppServerCoverageExternalAgentConfigDetectResult,
+  DebugAppServerCoverageExternalAgentConfigImportResult,
   DebugAppServerCoverageFeedbackUploadResult,
   DebugAppServerCoverageFuzzyFileSearchResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
@@ -188,6 +191,32 @@ export function mapRemoteSkills(
     name: skill.name,
     description: skill.description,
   }));
+}
+
+export function mapExternalAgentConfigDetectResult(
+  response: CapabilityExternalAgentConfigDetectResponse,
+  includeHome: boolean,
+  cwds: string[],
+): DebugAppServerCoverageExternalAgentConfigDetectResult {
+  return {
+    includeHome,
+    cwds,
+    items: response.items.map((migrationItem) => ({
+      itemType: migrationItem.itemType,
+      description: migrationItem.description,
+      cwd: migrationItem.cwd,
+    })),
+    detectedAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapExternalAgentConfigImportResult(
+  itemCount: number,
+): DebugAppServerCoverageExternalAgentConfigImportResult {
+  return {
+    itemCount,
+    importedAtIso8601: new Date().toISOString(),
+  };
 }
 
 export function mapCommandExecutionResult(

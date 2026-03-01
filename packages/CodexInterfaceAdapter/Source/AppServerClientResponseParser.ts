@@ -35,6 +35,8 @@ export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   writeSkillsConfig: "AppServerSkillsConfigWriteResponse",
   listRemoteSkills: "AppServerSkillsRemoteListResponse",
   exportRemoteSkill: "AppServerSkillsRemoteExportResponse",
+  detectExternalAgentConfig: "AppServerExternalAgentConfigDetectResponse",
+  importExternalAgentConfig: "AppServerExternalAgentConfigImportResponse",
   startThread: "AppServerStartThreadResponse",
   setThreadName: "AppServerThreadSetNameResponse",
   rollbackThread: "AppServerThreadRollbackResponse",

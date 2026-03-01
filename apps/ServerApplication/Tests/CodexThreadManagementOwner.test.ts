@@ -10,6 +10,10 @@ import {
   type ConfigWriteValueOptions,
   type ExportRemoteSkillOptions,
   type ExportRemoteSkillResult,
+  type ExternalAgentConfigDetectOptions,
+  type ExternalAgentConfigDetectResult,
+  type ExternalAgentConfigImportOptions,
+  type ExternalAgentConfigImportResult,
   type FeedbackUploadOptions,
   type FeedbackUploadResult,
   type ForkThreadOptions,
@@ -118,6 +122,8 @@ class TestAppServerClient extends AppServerClient {
   public readonly listSkillsCalls: Array<ListSkillsOptions | undefined> = [];
   public readonly listRemoteSkillsCalls: ListRemoteSkillsOptions[] = [];
   public readonly exportRemoteSkillCalls: ExportRemoteSkillOptions[] = [];
+  public readonly detectExternalAgentConfigCalls: ExternalAgentConfigDetectOptions[] = [];
+  public readonly importExternalAgentConfigCalls: ExternalAgentConfigImportOptions[] = [];
   public readonly readAccountCalls: Array<ReadAccountOptions | undefined> = [];
   public readonly readAuthStatusCalls: Array<ReadAuthStatusOptions | undefined> = [];
   public readonly readAccountRateLimitsCalls: Array<undefined> = [];
@@ -150,6 +156,8 @@ class TestAppServerClient extends AppServerClient {
   private readonly listSkillsResult: ListSkillsResult;
   private readonly listRemoteSkillsResult: ListRemoteSkillsResult;
   private readonly exportRemoteSkillResult: ExportRemoteSkillResult;
+  private readonly detectExternalAgentConfigResult: ExternalAgentConfigDetectResult;
+  private readonly importExternalAgentConfigResult: ExternalAgentConfigImportResult;
   private readonly readAccountResult: ReadAccountResult;
   private readonly readAuthStatusResult: ReadAuthStatusResult;
   private readonly readAccountRateLimitsResult: ReadAccountRateLimitsResult;
@@ -181,6 +189,8 @@ class TestAppServerClient extends AppServerClient {
     listSkillsResult?: ListSkillsResult;
     listRemoteSkillsResult?: ListRemoteSkillsResult;
     exportRemoteSkillResult?: ExportRemoteSkillResult;
+    detectExternalAgentConfigResult?: ExternalAgentConfigDetectResult;
+    importExternalAgentConfigResult?: ExternalAgentConfigImportResult;
     readAccountResult?: ReadAccountResult;
     readAuthStatusResult?: ReadAuthStatusResult;
     readAccountRateLimitsResult?: ReadAccountRateLimitsResult;
@@ -242,6 +252,10 @@ class TestAppServerClient extends AppServerClient {
       id: "remote-skill-1",
       path: "/tmp/workspace/.codex/skills/remote-skill-1/SKILL.md",
     };
+    this.detectExternalAgentConfigResult = input?.detectExternalAgentConfigResult ?? {
+      items: [],
+    };
+    this.importExternalAgentConfigResult = input?.importExternalAgentConfigResult ?? {};
     this.readAccountResult = input?.readAccountResult ?? {
       account: null,
       requiresOpenaiAuth: false,
@@ -433,6 +447,20 @@ class TestAppServerClient extends AppServerClient {
   ): Promise<ExportRemoteSkillResult> {
     this.exportRemoteSkillCalls.push(options);
     return this.exportRemoteSkillResult;
+  }
+
+  public override async detectExternalAgentConfig(
+    options: ExternalAgentConfigDetectOptions,
+  ): Promise<ExternalAgentConfigDetectResult> {
+    this.detectExternalAgentConfigCalls.push(options);
+    return this.detectExternalAgentConfigResult;
+  }
+
+  public override async importExternalAgentConfig(
+    options: ExternalAgentConfigImportOptions,
+  ): Promise<ExternalAgentConfigImportResult> {
+    this.importExternalAgentConfigCalls.push(options);
+    return this.importExternalAgentConfigResult;
   }
 
   public override async readAccount(options?: ReadAccountOptions): Promise<ReadAccountResult> {
@@ -1668,6 +1696,90 @@ describe("CodexThreadManagementOwner", () => {
       id: "remote-skill-1",
       path: "/tmp/workspace/.codex/skills/repository-checks/SKILL.md",
     });
+  });
+
+  it("detects external-agent config migration items through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      detectExternalAgentConfigResult: {
+        items: [
+          {
+            itemType: "AGENTS_MD",
+            description: "Migrate AGENTS.md from ~/.claude",
+            cwd: null,
+          },
+          {
+            itemType: "CONFIG",
+            description: "Import repository config",
+            cwd: "/tmp/workspace",
+          },
+        ],
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.detectExternalAgentConfig({
+      includeHome: true,
+      cwds: ["/tmp/workspace"],
+    });
+
+    expect(appClient.detectExternalAgentConfigCalls).toEqual([
+      {
+        includeHome: true,
+        cwds: ["/tmp/workspace"],
+      },
+    ]);
+    expect(result).toEqual({
+      items: [
+        {
+          itemType: "AGENTS_MD",
+          description: "Migrate AGENTS.md from ~/.claude",
+          cwd: null,
+        },
+        {
+          itemType: "CONFIG",
+          description: "Import repository config",
+          cwd: "/tmp/workspace",
+        },
+      ],
+    });
+  });
+
+  it("imports external-agent config migration items through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    const result = await owner.importExternalAgentConfig({
+      migrationItems: [
+        {
+          itemType: "AGENTS_MD",
+          description: "Migrate AGENTS.md from ~/.claude",
+          cwd: null,
+        },
+        {
+          itemType: "CONFIG",
+          description: "Import repository config",
+          cwd: "/tmp/workspace",
+        },
+      ],
+    });
+
+    expect(appClient.importExternalAgentConfigCalls).toEqual([
+      {
+        migrationItems: [
+          {
+            itemType: "AGENTS_MD",
+            description: "Migrate AGENTS.md from ~/.claude",
+            cwd: null,
+          },
+          {
+            itemType: "CONFIG",
+            description: "Import repository config",
+            cwd: "/tmp/workspace",
+          },
+        ],
+      },
+    ]);
+    expect(result).toEqual({});
   });
 
   it("prefers active profile config defaults and requests config without layers", async () => {

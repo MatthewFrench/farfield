@@ -57,6 +57,8 @@ const AgentCapabilitiesSchema = z
     canStartMcpServerOauthLogin: z.boolean(),
     canWriteConfigValue: z.boolean(),
     canWriteSkillsConfig: z.boolean(),
+    canDetectExternalAgentConfig: z.boolean(),
+    canImportExternalAgentConfig: z.boolean(),
     canSetCollaborationMode: z.boolean(),
     canSubmitUserInput: z.boolean(),
     canReadLiveState: z.boolean(),

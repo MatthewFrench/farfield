@@ -260,6 +260,28 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         id: "remote-skill-1",
         path: "/tmp/project/.codex/skills/repository-checks/SKILL.md",
       });
+    const detectExternalAgentConfig = vi
+      .spyOn(capabilityServerClient, "detectExternalAgentConfig")
+      .mockResolvedValue({
+        ok: true,
+        items: [
+          {
+            itemType: "AGENTS_MD",
+            description: "Migrate AGENTS.md from ~/.claude",
+            cwd: null,
+          },
+          {
+            itemType: "CONFIG",
+            description: "Import repository config",
+            cwd: "/tmp/project",
+          },
+        ],
+      });
+    const importExternalAgentConfig = vi
+      .spyOn(capabilityServerClient, "importExternalAgentConfig")
+      .mockResolvedValue({
+        ok: true,
+      });
     const uploadFeedback = vi.spyOn(capabilityServerClient, "uploadFeedback").mockResolvedValue({
       ok: true,
       threadId: "thread-coverage-feedback",
@@ -317,6 +339,14 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       false,
     );
     latestDiagnostics.current?.exportRemoteSkill("remote-skill-1");
+    latestDiagnostics.current?.detectExternalAgentConfig(true, ["/tmp/project"]);
+    latestDiagnostics.current?.importExternalAgentConfig([
+      {
+        itemType: "AGENTS_MD",
+        description: "Migrate AGENTS.md from ~/.claude",
+        cwd: null,
+      },
+    ]);
     latestDiagnostics.current?.uploadFeedback(
       "quality",
       true,
@@ -376,6 +406,21 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       expect(exportRemoteSkill).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
         hazelnutId: "remote-skill-1",
+      });
+      expect(detectExternalAgentConfig).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        includeHome: true,
+        cwds: ["/tmp/project"],
+      });
+      expect(importExternalAgentConfig).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        migrationItems: [
+          {
+            itemType: "AGENTS_MD",
+            description: "Migrate AGENTS.md from ~/.claude",
+            cwd: null,
+          },
+        ],
       });
       expect(uploadFeedback).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -441,6 +486,27 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
           },
         ],
         searchedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastExternalAgentConfigDetectResult).toEqual({
+        includeHome: true,
+        cwds: ["/tmp/project"],
+        items: [
+          {
+            itemType: "AGENTS_MD",
+            description: "Migrate AGENTS.md from ~/.claude",
+            cwd: null,
+          },
+          {
+            itemType: "CONFIG",
+            description: "Import repository config",
+            cwd: "/tmp/project",
+          },
+        ],
+        detectedAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastExternalAgentConfigImportResult).toEqual({
+        itemCount: 1,
+        importedAtIso8601: expect.any(String),
       });
     });
 

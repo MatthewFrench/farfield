@@ -2,12 +2,17 @@ import { type Dispatch, type SetStateAction } from "react";
 import type { CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import type {
   DebugAppServerCoverageCommandExecutionResult,
+  DebugAppServerCoverageExternalAgentConfigDetectResult,
+  DebugAppServerCoverageExternalAgentConfigImportResult,
+  DebugAppServerCoverageExternalAgentConfigMigrationItem,
   DebugAppServerCoverageFeedbackUploadResult,
   DebugAppServerCoverageFuzzyFileSearchResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import {
   mapCommandExecutionResult,
+  mapExternalAgentConfigDetectResult,
+  mapExternalAgentConfigImportResult,
   mapFeedbackUploadResult,
   mapFuzzyFileSearchResult,
   mapGitDiffToRemoteResult,
@@ -250,6 +255,104 @@ export function runFuzzyFileSearchAction(input: RunFuzzyFileSearchActionInput): 
       });
       input.setLastFuzzyFileSearchResult(
         mapFuzzyFileSearchResult(response, normalizedQuery, normalizedRoots),
+      );
+    } catch (error) {
+      input.setCoverageActionErrorMessage(
+        `${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`,
+      );
+    } finally {
+      input.setIsRunningCoverageAction(false);
+    }
+  })();
+}
+
+export interface RunExternalAgentConfigDetectActionInput {
+  capabilityServerClient: CapabilityServerClient;
+  isRunningCoverageAction: boolean;
+  includeHome: boolean;
+  cwds: string[];
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastExternalAgentConfigDetectResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageExternalAgentConfigDetectResult | null>
+  >;
+}
+
+export function runExternalAgentConfigDetectAction(
+  input: RunExternalAgentConfigDetectActionInput,
+): void {
+  if (input.isRunningCoverageAction) {
+    return;
+  }
+
+  const normalizedWorkingDirectories = input.cwds.map((cwd) => cwd.trim());
+  if (
+    normalizedWorkingDirectories.some((workingDirectory) => workingDirectory.length === 0) ||
+    (!input.includeHome && normalizedWorkingDirectories.length === 0)
+  ) {
+    return;
+  }
+
+  input.setIsRunningCoverageAction(true);
+  input.setCoverageActionErrorMessage("");
+
+  void (async () => {
+    try {
+      const response = await input.capabilityServerClient.detectExternalAgentConfig({
+        actionName: COVERAGE_MUTATION_OPERATION_NAME,
+        includeHome: input.includeHome,
+        ...(normalizedWorkingDirectories.length > 0 ? { cwds: normalizedWorkingDirectories } : {}),
+      });
+      input.setLastExternalAgentConfigDetectResult(
+        mapExternalAgentConfigDetectResult(
+          response,
+          input.includeHome,
+          normalizedWorkingDirectories,
+        ),
+      );
+    } catch (error) {
+      input.setCoverageActionErrorMessage(
+        `${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`,
+      );
+    } finally {
+      input.setIsRunningCoverageAction(false);
+    }
+  })();
+}
+
+export interface RunExternalAgentConfigImportActionInput {
+  capabilityServerClient: CapabilityServerClient;
+  isRunningCoverageAction: boolean;
+  migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[];
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastExternalAgentConfigImportResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageExternalAgentConfigImportResult | null>
+  >;
+}
+
+export function runExternalAgentConfigImportAction(
+  input: RunExternalAgentConfigImportActionInput,
+): void {
+  if (input.isRunningCoverageAction || input.migrationItems.length === 0) {
+    return;
+  }
+
+  input.setIsRunningCoverageAction(true);
+  input.setCoverageActionErrorMessage("");
+
+  void (async () => {
+    try {
+      await input.capabilityServerClient.importExternalAgentConfig({
+        actionName: COVERAGE_MUTATION_OPERATION_NAME,
+        migrationItems: input.migrationItems.map((migrationItem) => ({
+          itemType: migrationItem.itemType,
+          description: migrationItem.description,
+          cwd: migrationItem.cwd,
+        })),
+      });
+      input.setLastExternalAgentConfigImportResult(
+        mapExternalAgentConfigImportResult(input.migrationItems.length),
       );
     } catch (error) {
       input.setCoverageActionErrorMessage(

@@ -1533,6 +1533,90 @@ describe("AppServerClient.exportRemoteSkill", () => {
   });
 });
 
+describe("AppServerClient.detectExternalAgentConfig", () => {
+  it("sends externalAgentConfig/detect payload and maps migration items", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      items: [
+        {
+          itemType: "AGENTS_MD",
+          description: "Migrate AGENTS.md from ~/.claude",
+          cwd: null,
+        },
+        {
+          itemType: "CONFIG",
+          description: "Import repository config",
+          cwd: "/tmp/workspace",
+        },
+      ],
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.detectExternalAgentConfig({
+      includeHome: true,
+      cwds: ["/tmp/workspace"],
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("externalAgentConfig/detect", {
+      includeHome: true,
+      cwds: ["/tmp/workspace"],
+    });
+    expect(result).toEqual({
+      items: [
+        {
+          itemType: "AGENTS_MD",
+          description: "Migrate AGENTS.md from ~/.claude",
+          cwd: null,
+        },
+        {
+          itemType: "CONFIG",
+          description: "Import repository config",
+          cwd: "/tmp/workspace",
+        },
+      ],
+    });
+  });
+});
+
+describe("AppServerClient.importExternalAgentConfig", () => {
+  it("sends externalAgentConfig/import payload with migration items", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.importExternalAgentConfig({
+      migrationItems: [
+        {
+          itemType: "AGENTS_MD",
+          description: "Migrate AGENTS.md from ~/.claude",
+          cwd: null,
+        },
+        {
+          itemType: "CONFIG",
+          description: "Import repository config",
+          cwd: "/tmp/workspace",
+        },
+      ],
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("externalAgentConfig/import", {
+      migrationItems: [
+        {
+          itemType: "AGENTS_MD",
+          description: "Migrate AGENTS.md from ~/.claude",
+          cwd: null,
+        },
+        {
+          itemType: "CONFIG",
+          description: "Import repository config",
+          cwd: "/tmp/workspace",
+        },
+      ],
+    });
+    expect(result).toEqual({});
+  });
+});
+
 describe("AppServerClient.listThreadsAll", () => {
   it("starts pagination from an explicit initial cursor", async () => {
     const transportDouble = createTransportDouble();

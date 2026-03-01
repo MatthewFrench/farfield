@@ -2,12 +2,16 @@ import type {
   CommandExecutionOptions,
   ConfigBatchWriteOptions,
   ConfigWriteValueOptions,
+  ExternalAgentConfigDetectOptions,
+  ExternalAgentConfigImportOptions,
   FeedbackUploadOptions,
   StartMcpServerOauthLoginOptions,
   WriteSkillsConfigOptions,
 } from "@farfield/api";
 import type {
   AgentCommandExecutionInput,
+  AgentDetectExternalAgentConfigInput,
+  AgentImportExternalAgentConfigInput,
   AgentStartMcpServerOauthLoginInput,
   AgentUploadFeedbackInput,
   AgentWriteConfigBatchInput,
@@ -81,5 +85,26 @@ export function buildFeedbackUploadOptions(input: AgentUploadFeedbackInput): Fee
     includeLogs: input.includeLogs,
     ...(input.reason !== undefined ? { reason: input.reason } : {}),
     ...(input.threadId !== undefined ? { threadId: input.threadId } : {}),
+  };
+}
+
+export function buildExternalAgentConfigDetectOptions(
+  input: AgentDetectExternalAgentConfigInput,
+): ExternalAgentConfigDetectOptions {
+  return {
+    includeHome: input.includeHome,
+    ...(input.cwds !== undefined ? { cwds: input.cwds } : {}),
+  };
+}
+
+export function buildExternalAgentConfigImportOptions(
+  input: AgentImportExternalAgentConfigInput,
+): ExternalAgentConfigImportOptions {
+  return {
+    migrationItems: input.migrationItems.map((migrationItem) => ({
+      itemType: migrationItem.itemType,
+      description: migrationItem.description,
+      cwd: migrationItem.cwd,
+    })),
   };
 }

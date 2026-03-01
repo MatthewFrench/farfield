@@ -4,6 +4,9 @@ import {
   type DebugAppServerCoverageCommandExecutionResult,
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
+  type DebugAppServerCoverageExternalAgentConfigDetectResult,
+  type DebugAppServerCoverageExternalAgentConfigImportResult,
+  type DebugAppServerCoverageExternalAgentConfigMigrationItem,
   type DebugAppServerCoverageFeedbackUploadResult,
   type DebugAppServerCoverageFuzzyFileSearchResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
@@ -13,6 +16,7 @@ import {
 import { DebugAppServerCoverageCommandExecutionSection } from "./DebugAppServerCoverageCommandExecutionSection";
 import { DebugAppServerCoverageConfigBatchWriteSection } from "./DebugAppServerCoverageConfigBatchWriteSection";
 import { DebugAppServerCoverageConfigValueWriteSection } from "./DebugAppServerCoverageConfigValueWriteSection";
+import { DebugAppServerCoverageExternalAgentConfigSection } from "./DebugAppServerCoverageExternalAgentConfigSection";
 import { DebugAppServerCoverageFeedbackUploadSection } from "./DebugAppServerCoverageFeedbackUploadSection";
 import { DebugAppServerCoverageFuzzyFileSearchSection } from "./DebugAppServerCoverageFuzzyFileSearchSection";
 import { DebugAppServerCoverageGitDiffToRemoteSection } from "./DebugAppServerCoverageGitDiffToRemoteSection";
@@ -27,6 +31,8 @@ export interface DebugAppServerCoveragePanelProps {
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
+  lastExternalAgentConfigDetectResult: DebugAppServerCoverageExternalAgentConfigDetectResult | null;
+  lastExternalAgentConfigImportResult: DebugAppServerCoverageExternalAgentConfigImportResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
@@ -46,6 +52,10 @@ export interface DebugAppServerCoveragePanelProps {
   onWriteConfigBatch: (edits: string, filePath?: string, expectedVersion?: string) => void;
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
   onExportRemoteSkill: (hazelnutId: string) => void;
+  onDetectExternalAgentConfig: (includeHome: boolean, cwds: string[]) => void;
+  onImportExternalAgentConfig: (
+    migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[],
+  ) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
   onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -78,6 +88,8 @@ export function DebugAppServerCoveragePanel({
   lastCommandExecutionResult,
   lastConfigBatchWriteResult,
   lastConfigValueWriteResult,
+  lastExternalAgentConfigDetectResult,
+  lastExternalAgentConfigImportResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
   lastGitDiffToRemoteResult,
@@ -91,6 +103,8 @@ export function DebugAppServerCoveragePanel({
   onWriteConfigBatch,
   onWriteSkillsConfig,
   onExportRemoteSkill,
+  onDetectExternalAgentConfig,
+  onImportExternalAgentConfig,
   onReadGitDiffToRemote,
   onSearchFuzzyFiles,
   onExecuteCommand,
@@ -103,8 +117,8 @@ export function DebugAppServerCoveragePanel({
           <h3 className="text-sm font-semibold">App-Server Coverage Diagnostics</h3>
           <p className="text-xs text-muted-foreground">
             Skills, apps, experimental features, MCP status, config requirements, and account
-            diagnostics plus config writes, remote skills import, git diff reads, command execution,
-            fuzzy file search, and feedback upload coverage.
+            diagnostics plus config writes, remote skills import, external-agent config migration,
+            git diff reads, command execution, fuzzy file search, and feedback upload coverage.
           </p>
         </div>
         <Button
@@ -496,6 +510,14 @@ export function DebugAppServerCoveragePanel({
               ))
             )}
           </div>
+
+          <DebugAppServerCoverageExternalAgentConfigSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastExternalAgentConfigDetectResult={lastExternalAgentConfigDetectResult}
+            lastExternalAgentConfigImportResult={lastExternalAgentConfigImportResult}
+            onDetectExternalAgentConfig={onDetectExternalAgentConfig}
+            onImportExternalAgentConfig={onImportExternalAgentConfig}
+          />
 
           <DebugAppServerCoverageCommandExecutionSection
             isRunningCoverageAction={isRunningCoverageAction}
