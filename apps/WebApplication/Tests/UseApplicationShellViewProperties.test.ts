@@ -226,6 +226,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const input: UseApplicationShellViewPropertiesInput = {
     health: null,
     threadSidebarRuntimeSummary: {
+      account: null,
       rateLimits: null,
       apps: null,
     },
@@ -574,6 +575,13 @@ describe("useApplicationShellViewProperties", () => {
   it("exposes thread-sidebar runtime summary from shell state without remapping", () => {
     const fixture = createUseApplicationShellViewPropertiesFixture();
     fixture.input.threadSidebarRuntimeSummary = {
+      account: {
+        mode: "chatgpt",
+        planType: "pro",
+        email: "dev@example.com",
+        requiresOpenaiAuth: false,
+        refreshedAtMilliseconds: 1_700_000_000_100,
+      },
       rateLimits: {
         limitId: "codex",
         planType: "pro",
@@ -589,6 +597,13 @@ describe("useApplicationShellViewProperties", () => {
     const viewProperties = renderViewProperties(fixture.input);
 
     expect(viewProperties.threadSidebarRuntimeSummary).toEqual({
+      account: {
+        mode: "chatgpt",
+        planType: "pro",
+        email: "dev@example.com",
+        requiresOpenaiAuth: false,
+        refreshedAtMilliseconds: 1_700_000_000_100,
+      },
       rateLimits: {
         limitId: "codex",
         planType: "pro",

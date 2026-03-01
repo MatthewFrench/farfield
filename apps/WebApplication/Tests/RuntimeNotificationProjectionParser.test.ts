@@ -32,22 +32,28 @@ describe("RuntimeNotificationProjectionParser", () => {
         },
         {
           sequence: 102,
-          method: "account/rateLimits/updated",
+          method: "account/updated",
           params: {},
           receivedAtMilliseconds: 8_101,
         },
         {
           sequence: 103,
-          method: "app/list/updated",
+          method: "account/rateLimits/updated",
           params: {},
           receivedAtMilliseconds: 8_102,
+        },
+        {
+          sequence: 104,
+          method: "app/list/updated",
+          params: {},
+          receivedAtMilliseconds: 8_103,
         },
       ]),
     );
 
     expect(projection).toEqual({
-      processedEventCount: 3,
-      relevantEventCount: 3,
+      processedEventCount: 4,
+      relevantEventCount: 4,
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [
@@ -59,6 +65,7 @@ describe("RuntimeNotificationProjectionParser", () => {
           receivedAtMilliseconds: 8_100,
         },
       ],
+      shouldRefreshAccount: true,
       shouldRefreshAccountRateLimits: true,
       shouldRefreshApps: true,
     });
@@ -104,6 +111,7 @@ describe("RuntimeNotificationProjectionParser", () => {
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [],
+      shouldRefreshAccount: false,
       shouldRefreshAccountRateLimits: false,
       shouldRefreshApps: false,
     });

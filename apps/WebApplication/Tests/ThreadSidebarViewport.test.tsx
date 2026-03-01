@@ -47,6 +47,7 @@ const BASE_THREAD_LIST_PANE_PROPERTIES: ThreadListPaneProperties = {
 };
 
 const BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY: ThreadSidebarRuntimeSummary = {
+  account: null,
   rateLimits: null,
   apps: null,
 };

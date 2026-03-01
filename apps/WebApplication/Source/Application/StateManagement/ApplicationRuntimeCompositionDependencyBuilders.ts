@@ -237,6 +237,7 @@ export function buildEventStreamEffectsInput(
     selectedAgentId: applicationShellState.selectedAgentId,
     canReadNotificationEvents:
       applicationDerivedState.activeAgentCapabilities?.canReadNotificationEvents === true,
+    canReadAccount: applicationDerivedState.activeAgentCapabilities?.canReadAccount === true,
     canReadAccountRateLimits:
       applicationDerivedState.activeAgentCapabilities?.canReadAccountRateLimits === true,
     canListApps: applicationDerivedState.activeAgentCapabilities?.canListApps === true,

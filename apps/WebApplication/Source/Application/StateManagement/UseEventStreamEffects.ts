@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   type CapabilityAccountRateLimitsResponse,
+  type CapabilityAccountResponse,
   type CapabilityAppsResponse,
   type CapabilityReadNotificationEventsOptions,
   type CapabilityServerClient,
@@ -86,6 +87,7 @@ function createEmptyThreadRuntimeStatusByThreadIdentifier(): ThreadRuntimeStatus
 
 function createInitialThreadSidebarRuntimeSummary(): ThreadSidebarRuntimeSummary {
   return {
+    account: null,
     rateLimits: null,
     apps: null,
   };
@@ -99,6 +101,38 @@ function readNotificationEventsRequestOptions(input: {
     agentId: input.selectedAgentId,
     limit: NOTIFICATION_EVENTS_REFRESH_LIMIT,
     sinceSequence: input.notificationProjectionCursorState.nextSequence,
+  };
+}
+
+function readThreadSidebarAccountSummary(
+  response: CapabilityAccountResponse,
+): NonNullable<ThreadSidebarRuntimeSummary["account"]> {
+  if (response.account === null) {
+    return {
+      mode: "signedOut",
+      planType: null,
+      email: null,
+      requiresOpenaiAuth: response.requiresOpenaiAuth,
+      refreshedAtMilliseconds: Date.now(),
+    };
+  }
+
+  if (response.account.type === "apiKey") {
+    return {
+      mode: "apiKey",
+      planType: null,
+      email: null,
+      requiresOpenaiAuth: response.requiresOpenaiAuth,
+      refreshedAtMilliseconds: Date.now(),
+    };
+  }
+
+  return {
+    mode: "chatgpt",
+    planType: response.account.planType,
+    email: response.account.email,
+    requiresOpenaiAuth: response.requiresOpenaiAuth,
+    refreshedAtMilliseconds: Date.now(),
   };
 }
 
@@ -142,6 +176,7 @@ export interface UseEventStreamEffectsInput {
   capabilityServerClient: CapabilityServerClient;
   selectedAgentId: AgentId;
   canReadNotificationEvents: boolean;
+  canReadAccount: boolean;
   canReadAccountRateLimits: boolean;
   canListApps: boolean;
   setThreadRuntimeStatusByThreadIdentifier: Dispatch<
@@ -314,6 +349,16 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
                   resetRequired: runtimeNotificationProjection.resetRequired,
                 });
 
+                if (runtimeNotificationProjection.shouldRefreshAccount && input.canReadAccount) {
+                  const accountResponse = await input.capabilityServerClient.readAccount({
+                    agentId: input.selectedAgentId,
+                  });
+                  input.setThreadSidebarRuntimeSummary((previousSummary) => ({
+                    ...previousSummary,
+                    account: readThreadSidebarAccountSummary(accountResponse),
+                  }));
+                }
+
                 if (
                   runtimeNotificationProjection.shouldRefreshAccountRateLimits &&
                   input.canReadAccountRateLimits
@@ -393,6 +438,7 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
     input.capabilityServerClient,
     input.selectedAgentId,
     input.canReadNotificationEvents,
+    input.canReadAccount,
     input.canReadAccountRateLimits,
     input.canListApps,
     input.applySelectedThreadStreamDelta,

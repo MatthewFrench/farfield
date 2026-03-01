@@ -114,6 +114,7 @@ describe("useApplicationShellState", () => {
     expect(applicationShellState.traceNote).toBe("");
     expect(applicationShellState.threadRuntimeStatusByThreadIdentifier).toEqual({});
     expect(applicationShellState.threadSidebarRuntimeSummary).toEqual({
+      account: null,
       rateLimits: null,
       apps: null,
     });

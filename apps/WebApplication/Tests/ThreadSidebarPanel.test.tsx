@@ -47,6 +47,7 @@ const BASE_THREAD_LIST_PANE_PROPERTIES: ThreadListPaneProperties = {
 };
 
 const BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY: ThreadSidebarRuntimeSummary = {
+  account: null,
   rateLimits: null,
   apps: null,
 };
@@ -99,6 +100,7 @@ describe("ThreadSidebarPanel", () => {
       viewport: "desktop",
     });
 
+    expect(screen.getByTestId("sidebar-runtime-account-summary").textContent).toBe("Account n/a");
     expect(screen.getByTestId("sidebar-runtime-rate-limit-summary").textContent).toBe("Usage n/a");
     expect(screen.getByTestId("sidebar-runtime-app-summary").textContent).toBe("Apps n/a");
   });
@@ -107,6 +109,13 @@ describe("ThreadSidebarPanel", () => {
     renderThreadSidebarPanel({
       viewport: "desktop",
       threadSidebarRuntimeSummary: {
+        account: {
+          mode: "chatgpt",
+          planType: "pro",
+          email: "dev@example.com",
+          requiresOpenaiAuth: false,
+          refreshedAtMilliseconds: 1_700_000_000_100,
+        },
         rateLimits: {
           limitId: "codex",
           planType: "pro",
@@ -120,6 +129,7 @@ describe("ThreadSidebarPanel", () => {
       },
     });
 
+    expect(screen.getByTestId("sidebar-runtime-account-summary").textContent).toBe("Account pro");
     expect(screen.getByTestId("sidebar-runtime-rate-limit-summary").textContent).toBe(
       "Usage 42% · pro",
     );

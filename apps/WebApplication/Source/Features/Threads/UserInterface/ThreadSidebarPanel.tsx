@@ -116,7 +116,13 @@ export function ThreadSidebarPanel({
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 -top-3 bottom-0 bg-gradient-to-t from-sidebar from-58% via-sidebar/88 via-80% to-transparent to-100%"
         />
-        <div className="relative z-10 mb-2 grid grid-cols-2 gap-2">
+        <div className="relative z-10 mb-2 grid grid-cols-3 gap-2">
+          <div
+            data-testid="sidebar-runtime-account-summary"
+            className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
+          >
+            {readThreadSidebarAccountSummaryLabel(threadSidebarRuntimeSummary)}
+          </div>
           <div
             data-testid="sidebar-runtime-rate-limit-summary"
             className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
@@ -232,6 +238,23 @@ function readThreadSidebarRateLimitSummaryLabel(summary: ThreadSidebarRuntimeSum
     summary.rateLimits.usedPercent === null ? "n/a" : `${String(summary.rateLimits.usedPercent)}%`;
   const planTypeLabel = summary.rateLimits.planType ?? "n/a";
   return `Usage ${usedPercentLabel} · ${planTypeLabel}`;
+}
+
+function readThreadSidebarAccountSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {
+  if (summary.account === null) {
+    return "Account n/a";
+  }
+
+  if (summary.account.mode === "signedOut") {
+    return summary.account.requiresOpenaiAuth ? "Account sign in" : "Account signed out";
+  }
+
+  if (summary.account.mode === "apiKey") {
+    return "Account API key";
+  }
+
+  const planLabel = summary.account.planType ?? "unknown";
+  return `Account ${planLabel}`;
 }
 
 function readThreadSidebarAppsSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {

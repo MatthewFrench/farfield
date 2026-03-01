@@ -118,6 +118,7 @@ function createInitialThreadRuntimeStatusByThreadIdentifier(): ThreadRuntimeStat
 
 function createInitialThreadSidebarRuntimeSummary(): ThreadSidebarRuntimeSummary {
   return {
+    account: null,
     rateLimits: null,
     apps: null,
   };

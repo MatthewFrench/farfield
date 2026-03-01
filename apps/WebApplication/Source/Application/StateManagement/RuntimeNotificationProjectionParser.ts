@@ -6,6 +6,7 @@ import {
 } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 
 const THREAD_STATUS_CHANGED_NOTIFICATION_METHOD = "thread/status/changed";
+const ACCOUNT_UPDATED_NOTIFICATION_METHOD = "account/updated";
 const ACCOUNT_RATE_LIMITS_UPDATED_NOTIFICATION_METHOD = "account/rateLimits/updated";
 const APP_LIST_UPDATED_NOTIFICATION_METHOD = "app/list/updated";
 const THREAD_STATUS_TYPE_ACTIVE = "active";
@@ -65,6 +66,7 @@ export interface RuntimeNotificationProjectionResult {
   resetRequired: boolean;
   nextSequence: number;
   threadStatusUpdates: RuntimeThreadStatusUpdate[];
+  shouldRefreshAccount: boolean;
   shouldRefreshAccountRateLimits: boolean;
   shouldRefreshApps: boolean;
 }
@@ -96,6 +98,7 @@ export function readRuntimeNotificationProjection(
   response: CapabilityNotificationEventsResponse,
 ): RuntimeNotificationProjectionResult {
   const threadStatusUpdates: RuntimeThreadStatusUpdate[] = [];
+  let shouldRefreshAccount = false;
   let shouldRefreshAccountRateLimits = false;
   let shouldRefreshApps = false;
   let relevantEventCount = 0;
@@ -103,6 +106,12 @@ export function readRuntimeNotificationProjection(
   for (const event of response.events) {
     if (event.method === THREAD_STATUS_CHANGED_NOTIFICATION_METHOD) {
       threadStatusUpdates.push(mapThreadStatusChangedEvent(event));
+      relevantEventCount += 1;
+      continue;
+    }
+
+    if (event.method === ACCOUNT_UPDATED_NOTIFICATION_METHOD) {
+      shouldRefreshAccount = true;
       relevantEventCount += 1;
       continue;
     }
@@ -125,6 +134,7 @@ export function readRuntimeNotificationProjection(
     resetRequired: response.resetRequired,
     nextSequence: response.nextSequence,
     threadStatusUpdates,
+    shouldRefreshAccount,
     shouldRefreshAccountRateLimits,
     shouldRefreshApps,
   };

@@ -28,12 +28,23 @@ export interface ThreadSidebarRateLimitSummary {
   refreshedAtMilliseconds: number;
 }
 
+export type ThreadSidebarAccountMode = "signedOut" | "apiKey" | "chatgpt";
+
+export interface ThreadSidebarAccountSummary {
+  mode: ThreadSidebarAccountMode;
+  planType: ThreadSidebarAccountPlanType | null;
+  email: string | null;
+  requiresOpenaiAuth: boolean;
+  refreshedAtMilliseconds: number;
+}
+
 export interface ThreadSidebarAppsSummary {
   appCount: number;
   refreshedAtMilliseconds: number;
 }
 
 export interface ThreadSidebarRuntimeSummary {
+  account: ThreadSidebarAccountSummary | null;
   rateLimits: ThreadSidebarRateLimitSummary | null;
   apps: ThreadSidebarAppsSummary | null;
 }

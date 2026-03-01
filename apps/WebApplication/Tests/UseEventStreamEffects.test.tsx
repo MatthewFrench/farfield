@@ -16,6 +16,7 @@ import {
 } from "../Source/Application/StateManagement/UseEventStreamEffects";
 import {
   type CapabilityAccountRateLimitsResponse,
+  type CapabilityAccountResponse,
   type CapabilityAppsResponse,
   type CapabilityNotificationEventsResponse,
   CapabilityServerClient,
@@ -211,6 +212,14 @@ function createAccountAndAppNotificationEventsResponse(): CapabilityNotification
     events: [
       {
         sequence: 51,
+        method: "account/updated",
+        params: {
+          authMode: "chatgpt",
+        },
+        receivedAtMilliseconds: 2_005,
+      },
+      {
+        sequence: 52,
         method: "account/rateLimits/updated",
         params: {
           rateLimits: {
@@ -221,7 +230,7 @@ function createAccountAndAppNotificationEventsResponse(): CapabilityNotification
         receivedAtMilliseconds: 2_010,
       },
       {
-        sequence: 52,
+        sequence: 53,
         method: "app/list/updated",
         params: {
           data: [],
@@ -229,9 +238,21 @@ function createAccountAndAppNotificationEventsResponse(): CapabilityNotification
         receivedAtMilliseconds: 2_020,
       },
     ],
-    nextSequence: 53,
+    nextSequence: 54,
     firstAvailableSequence: 0,
     resetRequired: false,
+  };
+}
+
+function createAccountResponse(): CapabilityAccountResponse {
+  return {
+    ok: true,
+    account: {
+      type: "chatgpt",
+      email: "dev@example.com",
+      planType: "pro",
+    },
+    requiresOpenaiAuth: false,
   };
 }
 
@@ -311,6 +332,7 @@ function createBaseInput(
     capabilityServerClient,
     selectedAgentId: "codex",
     canReadNotificationEvents: false,
+    canReadAccount: false,
     canReadAccountRateLimits: false,
     canListApps: false,
     setThreadRuntimeStatusByThreadIdentifier:
@@ -565,6 +587,7 @@ describe("useEventStreamEffects", () => {
       new TestDebugWorkspaceDataReader(createDebugSnapshot()),
     );
     input.canReadNotificationEvents = true;
+    input.canReadAccount = true;
     input.canReadAccountRateLimits = true;
     input.canListApps = true;
     const setThreadSidebarRuntimeSummary = vi.fn(
@@ -577,6 +600,9 @@ describe("useEventStreamEffects", () => {
     const readAccountRateLimits = vi
       .spyOn(input.capabilityServerClient, "readAccountRateLimits")
       .mockResolvedValue(createAccountRateLimitsResponse());
+    const readAccount = vi
+      .spyOn(input.capabilityServerClient, "readAccount")
+      .mockResolvedValue(createAccountResponse());
     const listApps = vi
       .spyOn(input.capabilityServerClient, "listApps")
       .mockResolvedValue(createAppsResponse());
@@ -590,6 +616,9 @@ describe("useEventStreamEffects", () => {
       agentId: "codex",
       limit: 80,
       sinceSequence: null,
+    });
+    expect(readAccount).toHaveBeenCalledWith({
+      agentId: "codex",
     });
     expect(readAccountRateLimits).toHaveBeenCalledWith({
       agentId: "codex",
