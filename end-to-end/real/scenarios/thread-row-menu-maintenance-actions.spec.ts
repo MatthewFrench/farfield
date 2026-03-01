@@ -106,6 +106,106 @@ function buildStreamEventsResponse() {
 }
 
 async function mockThreadMaintenanceRoutes(page: Page): Promise<void> {
+  await page.route("**/api/account*", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== "/api/account" || route.request().method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        account: {
+          type: "chatgpt",
+          email: "dev@example.com",
+          planType: "pro",
+        },
+        requiresOpenaiAuth: false,
+      }),
+    });
+  });
+
+  await page.route("**/api/account/rate-limits*", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== "/api/account/rate-limits" || route.request().method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        rateLimits: {
+          credits: null,
+          limitId: "codex",
+          limitName: "Codex",
+          planType: "pro",
+          primary: {
+            resetsAt: 1_736_500_100_000,
+            usedPercent: 42,
+            windowDurationMins: 60,
+          },
+          secondary: null,
+        },
+        rateLimitsByLimitId: null,
+      }),
+    });
+  });
+
+  await page.route("**/api/apps*", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== "/api/apps" || route.request().method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        data: [
+          {
+            id: "app-1",
+            name: "GitHub",
+            description: null,
+            logoUrl: null,
+            logoUrlDark: null,
+            installUrl: null,
+            isAccessible: true,
+            isEnabled: true,
+          },
+        ],
+        nextCursor: null,
+      }),
+    });
+  });
+
+  await page.route("**/api/notifications/events*", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== "/api/notifications/events" || route.request().method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        events: [],
+        nextSequence: 0,
+        firstAvailableSequence: 0,
+        resetRequired: false,
+      }),
+    });
+  });
+
   await page.route("**/api/threads**", async (route) => {
     const url = new URL(route.request().url());
     const pathSegments = url.pathname.split("/").filter((segment) => segment.length > 0);
@@ -228,8 +328,12 @@ test("row-menu compact and clean actions keep row identity stable and show succe
   const threadRuntimeStatusBadge = page.getByTestId(
     `thread-runtime-status-badge-${ThreadIdentifier}`,
   );
+  const sidebarRuntimeAccountSummary = page.getByTestId("sidebar-runtime-account-summary");
+  const sidebarRuntimeTokenUsageSummary = page.getByTestId("sidebar-runtime-token-usage-summary");
   await expect(threadRow).toBeVisible();
   await expect(threadRuntimeStatusBadge).toHaveText("Not loaded");
+  await expect(sidebarRuntimeAccountSummary).toHaveText("Account pro");
+  await expect(sidebarRuntimeTokenUsageSummary).toHaveText("Tokens n/a");
   await threadRow.click();
 
   await threadRow.evaluate((element) => {
@@ -237,6 +341,12 @@ test("row-menu compact and clean actions keep row identity stable and show succe
     threadRowElement.__threadRowIdentityProbe__ = ThreadRowIdentityProbeValue;
   });
   const runtimeStatusBadgeBefore = await threadRuntimeStatusBadge.evaluateHandle((node) => node);
+  const sidebarRuntimeAccountSummaryBefore = await sidebarRuntimeAccountSummary.evaluateHandle(
+    (node) => node,
+  );
+  const sidebarRuntimeTokenUsageSummaryBefore = await sidebarRuntimeTokenUsageSummary.evaluateHandle(
+    (node) => node,
+  );
 
   await clickThreadRowMenuAction(page, ThreadIdentifier, "Compact context");
   await expect(page.getByTestId("success-banner-message")).toContainText("Compaction started.");
@@ -298,6 +408,24 @@ test("row-menu compact and clean actions keep row identity stable and show succe
     runtimeStatusBadgeAfter,
   );
   expect(runtimeStatusBadgeIdentityIsStable).toBe(true);
+  const sidebarRuntimeAccountSummaryAfter = await sidebarRuntimeAccountSummary.evaluateHandle(
+    (node) => node,
+  );
+  const sidebarRuntimeTokenUsageSummaryAfter = await sidebarRuntimeTokenUsageSummary.evaluateHandle(
+    (node) => node,
+  );
+  const sidebarRuntimeAccountSummaryIdentityIsStable =
+    await sidebarRuntimeAccountSummaryBefore.evaluate(
+      (previousNode, nextNode) => previousNode === nextNode,
+      sidebarRuntimeAccountSummaryAfter,
+    );
+  const sidebarRuntimeTokenUsageSummaryIdentityIsStable =
+    await sidebarRuntimeTokenUsageSummaryBefore.evaluate(
+      (previousNode, nextNode) => previousNode === nextNode,
+      sidebarRuntimeTokenUsageSummaryAfter,
+    );
+  expect(sidebarRuntimeAccountSummaryIdentityIsStable).toBe(true);
+  expect(sidebarRuntimeTokenUsageSummaryIdentityIsStable).toBe(true);
 
   await expectNoErrorBanner(page);
   await expectNoUnexpectedClientErrors(sentinel);

@@ -11,6 +11,16 @@ interface RenderApplicationHeaderBarInput {
   onToggleSettingsTab?: () => void;
   onOpenMobileSidebar?: () => void;
   onOpenDesktopSidebar?: () => void;
+  runtimeModelRerouteSummary?: {
+    threadId: string;
+    turnId: string;
+    fromModel: string;
+    toModel: string;
+    reason: "highRiskCyberActivity";
+    sequence: number;
+    receivedAtMilliseconds: number;
+    refreshedAtMilliseconds: number;
+  } | null;
 }
 
 function renderApplicationHeaderBar(input?: RenderApplicationHeaderBarInput): void {
@@ -25,6 +35,7 @@ function renderApplicationHeaderBar(input?: RenderApplicationHeaderBarInput): vo
         activeThreadAgentId="codex"
         activeAgentLabel="Codex"
         isGenerating={false}
+        runtimeModelRerouteSummary={input?.runtimeModelRerouteSummary ?? null}
         isBusy={input?.isBusy ?? false}
         theme="light"
         onOpenMobileSidebar={input?.onOpenMobileSidebar ?? (() => {})}
@@ -130,5 +141,24 @@ describe("ApplicationHeaderBar", () => {
 
     expect(onOpenDesktopSidebar).toHaveBeenCalledTimes(1);
     expect(onToggleSettingsTab).not.toHaveBeenCalled();
+  });
+
+  it("renders model-reroute runtime banner when a reroute summary is present", () => {
+    renderApplicationHeaderBar({
+      runtimeModelRerouteSummary: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        fromModel: "gpt-5",
+        toModel: "gpt-5-safe",
+        reason: "highRiskCyberActivity",
+        sequence: 17,
+        receivedAtMilliseconds: 1_700_000_000_000,
+        refreshedAtMilliseconds: 1_700_000_000_500,
+      },
+    });
+
+    expect(screen.getByTestId("header-runtime-model-reroute-banner").textContent).toBe(
+      "Model rerouted gpt-5 -> gpt-5-safe",
+    );
   });
 });

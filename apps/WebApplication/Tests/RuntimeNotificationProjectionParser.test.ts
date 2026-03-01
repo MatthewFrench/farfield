@@ -15,7 +15,7 @@ function createNotificationEventsResponse(
 }
 
 describe("RuntimeNotificationProjectionParser", () => {
-  it("projects thread-status updates and account-app refresh markers from notification events", () => {
+  it("projects thread-status and token/model updates plus account-app refresh markers", () => {
     const projection = readRuntimeNotificationProjection(
       createNotificationEventsResponse([
         {
@@ -48,12 +48,50 @@ describe("RuntimeNotificationProjectionParser", () => {
           params: {},
           receivedAtMilliseconds: 8_103,
         },
+        {
+          sequence: 105,
+          method: "thread/tokenUsage/updated",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            tokenUsage: {
+              total: {
+                totalTokens: 42_000,
+                inputTokens: 20_000,
+                cachedInputTokens: 1_000,
+                outputTokens: 22_000,
+                reasoningOutputTokens: 8_000,
+              },
+              last: {
+                totalTokens: 5_000,
+                inputTokens: 2_000,
+                cachedInputTokens: 300,
+                outputTokens: 3_000,
+                reasoningOutputTokens: 1_000,
+              },
+              modelContextWindow: 200_000,
+            },
+          },
+          receivedAtMilliseconds: 8_104,
+        },
+        {
+          sequence: 106,
+          method: "model/rerouted",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            fromModel: "gpt-5",
+            toModel: "gpt-5-safe",
+            reason: "highRiskCyberActivity",
+          },
+          receivedAtMilliseconds: 8_105,
+        },
       ]),
     );
 
     expect(projection).toEqual({
-      processedEventCount: 4,
-      relevantEventCount: 4,
+      processedEventCount: 6,
+      relevantEventCount: 6,
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [
@@ -63,6 +101,28 @@ describe("RuntimeNotificationProjectionParser", () => {
           statusType: "active",
           activeFlags: ["waitingOnApproval"],
           receivedAtMilliseconds: 8_100,
+        },
+      ],
+      threadTokenUsageUpdates: [
+        {
+          sequence: 105,
+          threadId: "thread-1",
+          turnId: "turn-1",
+          totalTokens: 42_000,
+          lastTotalTokens: 5_000,
+          modelContextWindow: 200_000,
+          receivedAtMilliseconds: 8_104,
+        },
+      ],
+      modelRerouteEvents: [
+        {
+          sequence: 106,
+          threadId: "thread-1",
+          turnId: "turn-1",
+          fromModel: "gpt-5",
+          toModel: "gpt-5-safe",
+          reason: "highRiskCyberActivity",
+          receivedAtMilliseconds: 8_105,
         },
       ],
       shouldRefreshAccount: true,
@@ -111,6 +171,8 @@ describe("RuntimeNotificationProjectionParser", () => {
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [],
+      threadTokenUsageUpdates: [],
+      modelRerouteEvents: [],
       shouldRefreshAccount: false,
       shouldRefreshAccountRateLimits: false,
       shouldRefreshApps: false,

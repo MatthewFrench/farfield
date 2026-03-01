@@ -50,6 +50,8 @@ const BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY: ThreadSidebarRuntimeSummary = {
   account: null,
   rateLimits: null,
   apps: null,
+  tokenUsage: null,
+  modelReroute: null,
 };
 
 function renderThreadSidebarPanel(input: {
@@ -103,6 +105,9 @@ describe("ThreadSidebarPanel", () => {
     expect(screen.getByTestId("sidebar-runtime-account-summary").textContent).toBe("Account n/a");
     expect(screen.getByTestId("sidebar-runtime-rate-limit-summary").textContent).toBe("Usage n/a");
     expect(screen.getByTestId("sidebar-runtime-app-summary").textContent).toBe("Apps n/a");
+    expect(screen.getByTestId("sidebar-runtime-token-usage-summary").textContent).toBe(
+      "Tokens n/a",
+    );
   });
 
   it("renders projected runtime summary labels when data is available", () => {
@@ -126,6 +131,18 @@ describe("ThreadSidebarPanel", () => {
           appCount: 3,
           refreshedAtMilliseconds: 1_700_000_000_500,
         },
+        tokenUsage: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          totalTokens: 42_000,
+          lastTotalTokens: 10_000,
+          modelContextWindow: 200_000,
+          usedPercent: 21,
+          sequence: 18,
+          receivedAtMilliseconds: 1_700_000_000_600,
+          refreshedAtMilliseconds: 1_700_000_000_700,
+        },
+        modelReroute: null,
       },
     });
 
@@ -134,6 +151,9 @@ describe("ThreadSidebarPanel", () => {
       "Usage 42% · pro",
     );
     expect(screen.getByTestId("sidebar-runtime-app-summary").textContent).toBe("Apps 3");
+    expect(screen.getByTestId("sidebar-runtime-token-usage-summary").textContent).toBe(
+      "Tokens 21%",
+    );
   });
 
   it("calls desktop close handler", () => {

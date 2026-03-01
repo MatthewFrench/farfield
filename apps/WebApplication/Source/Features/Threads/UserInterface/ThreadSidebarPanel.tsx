@@ -116,7 +116,7 @@ export function ThreadSidebarPanel({
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 -top-3 bottom-0 bg-gradient-to-t from-sidebar from-58% via-sidebar/88 via-80% to-transparent to-100%"
         />
-        <div className="relative z-10 mb-2 grid grid-cols-3 gap-2">
+        <div className="relative z-10 mb-2 grid grid-cols-4 gap-2">
           <div
             data-testid="sidebar-runtime-account-summary"
             className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
@@ -134,6 +134,12 @@ export function ThreadSidebarPanel({
             className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
           >
             {readThreadSidebarAppsSummaryLabel(threadSidebarRuntimeSummary)}
+          </div>
+          <div
+            data-testid="sidebar-runtime-token-usage-summary"
+            className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
+          >
+            {readThreadSidebarTokenUsageSummaryLabel(threadSidebarRuntimeSummary)}
           </div>
         </div>
         <div className="relative z-10 flex items-center justify-between gap-2">
@@ -262,4 +268,18 @@ function readThreadSidebarAppsSummaryLabel(summary: ThreadSidebarRuntimeSummary)
     return "Apps n/a";
   }
   return `Apps ${String(summary.apps.appCount)}`;
+}
+
+function readThreadSidebarTokenUsageSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {
+  if (summary.tokenUsage === null) {
+    return "Tokens n/a";
+  }
+
+  if (summary.tokenUsage.modelContextWindow === null) {
+    return `Tokens ${String(summary.tokenUsage.totalTokens)}`;
+  }
+
+  const usedPercentLabel =
+    summary.tokenUsage.usedPercent === null ? "n/a" : `${String(summary.tokenUsage.usedPercent)}%`;
+  return `Tokens ${usedPercentLabel}`;
 }

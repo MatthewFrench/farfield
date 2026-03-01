@@ -50,6 +50,8 @@ const BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY: ThreadSidebarRuntimeSummary = {
   account: null,
   rateLimits: null,
   apps: null,
+  tokenUsage: null,
+  modelReroute: null,
 };
 
 function renderThreadSidebarViewport(input: {

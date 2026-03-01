@@ -348,6 +348,7 @@ function buildApplicationHeaderBarProperties(
     activeThreadAgentId: input.activeThreadAgentId,
     activeAgentLabel: input.activeAgentLabel,
     isGenerating: input.isGenerating,
+    runtimeModelRerouteSummary: input.threadSidebarRuntimeSummary.modelReroute,
     isBusy: input.isBusy,
     theme: input.theme,
     onOpenMobileSidebar: () => {
@@ -720,6 +721,7 @@ export function useApplicationShellViewProperties(
       input.setActiveTab,
       input.setDesktopSidebarOpen,
       input.setMobileSidebarOpen,
+      input.threadSidebarRuntimeSummary.modelReroute,
       input.theme,
       input.toggleTheme,
     ],

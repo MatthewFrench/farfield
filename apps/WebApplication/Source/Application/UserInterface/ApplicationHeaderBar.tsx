@@ -1,6 +1,7 @@
 import { Loader2, Menu, Moon, PanelLeft, RefreshCcw, Settings2, Sun } from "lucide-react";
 import { Button } from "@/Components/UserInterface/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/UserInterface/Tooltip";
+import { type ThreadRuntimeModelRerouteSummary } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 
 const DEBUG_TAB = "debug";
@@ -68,6 +69,7 @@ export interface ApplicationHeaderBarProps {
   activeThreadAgentId: AgentId;
   activeAgentLabel: string;
   isGenerating: boolean;
+  runtimeModelRerouteSummary: ThreadRuntimeModelRerouteSummary | null;
   isBusy: boolean;
   theme: string;
   onOpenMobileSidebar: () => void;
@@ -76,6 +78,10 @@ export interface ApplicationHeaderBarProps {
   onToggleSettingsTab: () => void;
   onToggleTheme: () => void;
   renderAgentFavicon: (agentId: AgentId, label: string, className: string) => React.ReactNode;
+}
+
+function readModelRerouteBannerLabel(summary: ThreadRuntimeModelRerouteSummary): string {
+  return `Model rerouted ${summary.fromModel} -> ${summary.toModel}`;
 }
 
 function buildSidebarOpenHandler(
@@ -107,6 +113,7 @@ export function ApplicationHeaderBar({
   activeThreadAgentId,
   activeAgentLabel,
   isGenerating,
+  runtimeModelRerouteSummary,
   isBusy,
   theme,
   onOpenMobileSidebar,
@@ -166,6 +173,14 @@ export function ApplicationHeaderBar({
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <Loader2 size={9} className="animate-spin" />
               <span>generating</span>
+            </div>
+          )}
+          {runtimeModelRerouteSummary !== null && (
+            <div
+              data-testid="header-runtime-model-reroute-banner"
+              className="text-[11px] text-muted-foreground"
+            >
+              {readModelRerouteBannerLabel(runtimeModelRerouteSummary)}
             </div>
           )}
         </div>

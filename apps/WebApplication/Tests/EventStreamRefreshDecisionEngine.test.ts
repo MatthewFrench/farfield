@@ -181,6 +181,80 @@ describe("EventStreamRefreshDecisionEngine", () => {
     });
   });
 
+  it("marks runtime-notification projection work when thread token-usage updates are present", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "chat",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 10,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: "entry-10",
+            at: "2026-02-26T00:00:00.000Z",
+            source: "app",
+            direction: "out",
+            payload: {
+              type: "action",
+              action: "thread/tokenUsage/updated",
+            },
+            meta: {
+              method: "thread/tokenUsage/updated",
+              threadId: "thread-1",
+            },
+          },
+        },
+      }),
+    });
+
+    expect(decision).toEqual({
+      refreshCore: true,
+      refreshHistory: false,
+      refreshSelectedThread: true,
+      refreshNotificationProjections: true,
+      threadStreamDelta: null,
+    });
+  });
+
+  it("marks runtime-notification projection work when model-reroute events are present", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "chat",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 11,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: "entry-11",
+            at: "2026-02-26T00:00:00.000Z",
+            source: "app",
+            direction: "out",
+            payload: {
+              type: "action",
+              action: "model/rerouted",
+            },
+            meta: {
+              method: "model/rerouted",
+              threadId: "thread-1",
+            },
+          },
+        },
+      }),
+    });
+
+    expect(decision).toEqual({
+      refreshCore: true,
+      refreshHistory: false,
+      refreshSelectedThread: true,
+      refreshNotificationProjections: true,
+      threadStreamDelta: null,
+    });
+  });
+
   it("skips selected-thread refresh for stream-state-changed history methods", () => {
     const engine = createEngine();
 

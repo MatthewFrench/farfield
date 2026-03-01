@@ -43,8 +43,35 @@ export interface ThreadSidebarAppsSummary {
   refreshedAtMilliseconds: number;
 }
 
+export interface ThreadSidebarTokenUsageSummary {
+  threadId: string;
+  turnId: string;
+  totalTokens: number;
+  lastTotalTokens: number;
+  modelContextWindow: number | null;
+  usedPercent: number | null;
+  sequence: number;
+  receivedAtMilliseconds: number;
+  refreshedAtMilliseconds: number;
+}
+
+export type ThreadRuntimeModelRerouteReason = "highRiskCyberActivity";
+
+export interface ThreadRuntimeModelRerouteSummary {
+  threadId: string;
+  turnId: string;
+  fromModel: string;
+  toModel: string;
+  reason: ThreadRuntimeModelRerouteReason;
+  sequence: number;
+  receivedAtMilliseconds: number;
+  refreshedAtMilliseconds: number;
+}
+
 export interface ThreadSidebarRuntimeSummary {
   account: ThreadSidebarAccountSummary | null;
   rateLimits: ThreadSidebarRateLimitSummary | null;
   apps: ThreadSidebarAppsSummary | null;
+  tokenUsage: ThreadSidebarTokenUsageSummary | null;
+  modelReroute: ThreadRuntimeModelRerouteSummary | null;
 }

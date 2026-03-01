@@ -229,6 +229,8 @@ function createUseApplicationShellViewPropertiesFixture() {
       account: null,
       rateLimits: null,
       apps: null,
+      tokenUsage: null,
+      modelReroute: null,
     },
     activeTab: "chat",
     settingsWorkspaceSection: "notifications",
@@ -592,6 +594,8 @@ describe("useApplicationShellViewProperties", () => {
         appCount: 3,
         refreshedAtMilliseconds: 1_700_000_000_500,
       },
+      tokenUsage: null,
+      modelReroute: null,
     };
 
     const viewProperties = renderViewProperties(fixture.input);
@@ -614,6 +618,41 @@ describe("useApplicationShellViewProperties", () => {
         appCount: 3,
         refreshedAtMilliseconds: 1_700_000_000_500,
       },
+      tokenUsage: null,
+      modelReroute: null,
+    });
+  });
+
+  it("maps runtime model-reroute summary into header properties", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.threadSidebarRuntimeSummary = {
+      account: null,
+      rateLimits: null,
+      apps: null,
+      tokenUsage: null,
+      modelReroute: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        fromModel: "gpt-5",
+        toModel: "gpt-5-safe",
+        reason: "highRiskCyberActivity",
+        sequence: 17,
+        receivedAtMilliseconds: 1_700_000_000_000,
+        refreshedAtMilliseconds: 1_700_000_000_500,
+      },
+    };
+
+    const viewProperties = renderViewProperties(fixture.input);
+
+    expect(viewProperties.applicationHeaderBarProperties.runtimeModelRerouteSummary).toEqual({
+      threadId: "thread-1",
+      turnId: "turn-1",
+      fromModel: "gpt-5",
+      toModel: "gpt-5-safe",
+      reason: "highRiskCyberActivity",
+      sequence: 17,
+      receivedAtMilliseconds: 1_700_000_000_000,
+      refreshedAtMilliseconds: 1_700_000_000_500,
     });
   });
 

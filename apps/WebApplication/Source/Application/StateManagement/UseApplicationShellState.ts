@@ -121,6 +121,8 @@ function createInitialThreadSidebarRuntimeSummary(): ThreadSidebarRuntimeSummary
     account: null,
     rateLimits: null,
     apps: null,
+    tokenUsage: null,
+    modelReroute: null,
   };
 }
 

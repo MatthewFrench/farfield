@@ -117,6 +117,8 @@ describe("useApplicationShellState", () => {
       account: null,
       rateLimits: null,
       apps: null,
+      tokenUsage: null,
+      modelReroute: null,
     });
     expect(applicationShellState.selectedModeKey).toBe("");
     expect(applicationShellState.selectedModelId).toBe("");

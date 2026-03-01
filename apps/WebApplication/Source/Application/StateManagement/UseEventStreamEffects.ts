@@ -7,9 +7,6 @@ import {
   useRef,
 } from "react";
 import {
-  type CapabilityAccountRateLimitsResponse,
-  type CapabilityAccountResponse,
-  type CapabilityAppsResponse,
   type CapabilityReadNotificationEventsOptions,
   type CapabilityServerClient,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
@@ -32,6 +29,16 @@ import { type EventStreamRefreshDecisionReader } from "./EventStreamRefreshDecis
 import { readRuntimeNotificationProjection } from "./RuntimeNotificationProjectionParser";
 import { RuntimeNotificationReadObservabilityOwner } from "./RuntimeNotificationReadObservabilityOwner";
 import { applyRuntimeThreadStatusUpdates } from "./RuntimeThreadStatusStateReducer";
+import {
+  createInitialThreadSidebarRuntimeSummary,
+  readLatestModelRerouteEventForThread,
+  readLatestThreadTokenUsageUpdateForThread,
+  readThreadRuntimeModelRerouteSummary,
+  readThreadSidebarAccountSummary,
+  readThreadSidebarAppsSummary,
+  readThreadSidebarRateLimitSummary,
+  readThreadSidebarTokenUsageSummary,
+} from "./ThreadSidebarRuntimeSummaryProjection";
 import type { SelectedThreadLoaderOptions } from "./UseCoreDataLoaders";
 
 const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
@@ -86,14 +93,6 @@ function createEmptyThreadRuntimeStatusByThreadIdentifier(): ThreadRuntimeStatus
   return {};
 }
 
-function createInitialThreadSidebarRuntimeSummary(): ThreadSidebarRuntimeSummary {
-  return {
-    account: null,
-    rateLimits: null,
-    apps: null,
-  };
-}
-
 function readNotificationEventsRequestOptions(input: {
   selectedAgentId: AgentId;
   notificationProjectionCursorState: RuntimeNotificationProjectionCursorState;
@@ -102,58 +101,6 @@ function readNotificationEventsRequestOptions(input: {
     agentId: input.selectedAgentId,
     limit: NOTIFICATION_EVENTS_REFRESH_LIMIT,
     sinceSequence: input.notificationProjectionCursorState.nextSequence,
-  };
-}
-
-function readThreadSidebarAccountSummary(
-  response: CapabilityAccountResponse,
-): NonNullable<ThreadSidebarRuntimeSummary["account"]> {
-  if (response.account === null) {
-    return {
-      mode: "signedOut",
-      planType: null,
-      email: null,
-      requiresOpenaiAuth: response.requiresOpenaiAuth,
-      refreshedAtMilliseconds: Date.now(),
-    };
-  }
-
-  if (response.account.type === "apiKey") {
-    return {
-      mode: "apiKey",
-      planType: null,
-      email: null,
-      requiresOpenaiAuth: response.requiresOpenaiAuth,
-      refreshedAtMilliseconds: Date.now(),
-    };
-  }
-
-  return {
-    mode: "chatgpt",
-    planType: response.account.planType,
-    email: response.account.email,
-    requiresOpenaiAuth: response.requiresOpenaiAuth,
-    refreshedAtMilliseconds: Date.now(),
-  };
-}
-
-function readThreadSidebarRateLimitSummary(
-  response: CapabilityAccountRateLimitsResponse,
-): NonNullable<ThreadSidebarRuntimeSummary["rateLimits"]> {
-  return {
-    limitId: response.rateLimits?.limitId ?? null,
-    planType: response.rateLimits?.planType ?? null,
-    usedPercent: response.rateLimits?.primary?.usedPercent ?? null,
-    refreshedAtMilliseconds: Date.now(),
-  };
-}
-
-function readThreadSidebarAppsSummary(
-  response: CapabilityAppsResponse,
-): NonNullable<ThreadSidebarRuntimeSummary["apps"]> {
-  return {
-    appCount: response.data.length,
-    refreshedAtMilliseconds: Date.now(),
   };
 }
 
@@ -451,6 +398,52 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
 
                   return updateResult.nextStatusByThreadIdentifier;
                 });
+
+                const latestTokenUsageUpdateForSelectedThread =
+                  readLatestThreadTokenUsageUpdateForThread(
+                    runtimeNotificationProjection.threadTokenUsageUpdates,
+                    scheduledRefreshSnapshot.selectedThreadId,
+                  );
+                const latestModelRerouteEventForSelectedThread =
+                  readLatestModelRerouteEventForThread(
+                    runtimeNotificationProjection.modelRerouteEvents,
+                    scheduledRefreshSnapshot.selectedThreadId,
+                  );
+                if (
+                  runtimeNotificationProjection.resetRequired ||
+                  latestTokenUsageUpdateForSelectedThread !== null ||
+                  latestModelRerouteEventForSelectedThread !== null
+                ) {
+                  input.setThreadSidebarRuntimeSummary((previousSummary) => {
+                    const nextTokenUsageSummary =
+                      latestTokenUsageUpdateForSelectedThread !== null
+                        ? readThreadSidebarTokenUsageSummary(
+                            latestTokenUsageUpdateForSelectedThread,
+                          )
+                        : runtimeNotificationProjection.resetRequired
+                          ? null
+                          : previousSummary.tokenUsage;
+                    const nextModelRerouteSummary =
+                      latestModelRerouteEventForSelectedThread !== null
+                        ? readThreadRuntimeModelRerouteSummary(
+                            latestModelRerouteEventForSelectedThread,
+                          )
+                        : runtimeNotificationProjection.resetRequired
+                          ? null
+                          : previousSummary.modelReroute;
+                    if (
+                      nextTokenUsageSummary === previousSummary.tokenUsage &&
+                      nextModelRerouteSummary === previousSummary.modelReroute
+                    ) {
+                      return previousSummary;
+                    }
+                    return {
+                      ...previousSummary,
+                      tokenUsage: nextTokenUsageSummary,
+                      modelReroute: nextModelRerouteSummary,
+                    };
+                  });
+                }
 
                 runtimeNotificationReadObservabilityOwnerRef.current.recordRead({
                   processedEventCount: runtimeNotificationProjection.processedEventCount,

@@ -244,6 +244,55 @@ function createAccountAndAppNotificationEventsResponse(): CapabilityNotification
   };
 }
 
+function createThreadTokenUsageAndModelRerouteNotificationEventsResponse(): CapabilityNotificationEventsResponse {
+  return {
+    ok: true,
+    events: [
+      {
+        sequence: 61,
+        method: "thread/tokenUsage/updated",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          tokenUsage: {
+            total: {
+              totalTokens: 42_000,
+              inputTokens: 20_000,
+              cachedInputTokens: 1_000,
+              outputTokens: 22_000,
+              reasoningOutputTokens: 8_000,
+            },
+            last: {
+              totalTokens: 5_000,
+              inputTokens: 2_000,
+              cachedInputTokens: 300,
+              outputTokens: 3_000,
+              reasoningOutputTokens: 1_000,
+            },
+            modelContextWindow: 200_000,
+          },
+        },
+        receivedAtMilliseconds: 2_030,
+      },
+      {
+        sequence: 62,
+        method: "model/rerouted",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          fromModel: "gpt-5",
+          toModel: "gpt-5-safe",
+          reason: "highRiskCyberActivity",
+        },
+        receivedAtMilliseconds: 2_031,
+      },
+    ],
+    nextSequence: 63,
+    firstAvailableSequence: 0,
+    resetRequired: false,
+  };
+}
+
 function createAccountResponse(): CapabilityAccountResponse {
   return {
     ok: true,
@@ -627,6 +676,77 @@ describe("useEventStreamEffects", () => {
       limit: 100,
     });
     expect(setThreadSidebarRuntimeSummary).toHaveBeenCalled();
+  });
+
+  it("projects selected-thread token-usage and model-reroute summaries from notification-event reads", async () => {
+    setDocumentVisibilityState("visible");
+
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    input.canReadNotificationEvents = true;
+    const setThreadSidebarRuntimeSummary = vi.fn(
+      (_nextValue: SetStateAction<ThreadSidebarRuntimeSummary>): void => {},
+    );
+    input.setThreadSidebarRuntimeSummary = setThreadSidebarRuntimeSummary;
+    vi.spyOn(input.capabilityServerClient, "readNotificationEvents").mockResolvedValue(
+      createThreadTokenUsageAndModelRerouteNotificationEventsResponse(),
+    );
+
+    render(<Harness input={input} />);
+
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
+    await startInput.executeScheduledRefresh(NOTIFICATION_PROJECTION_ONLY_REFRESH_FLAGS);
+
+    const updateStateAction = setThreadSidebarRuntimeSummary.mock.calls
+      .map((call) => call[0])
+      .find(
+        (
+          action,
+        ): action is (previousValue: ThreadSidebarRuntimeSummary) => ThreadSidebarRuntimeSummary =>
+          typeof action === "function",
+      );
+
+    if (updateStateAction === undefined) {
+      throw new Error("Expected sidebar runtime summary update state action");
+    }
+
+    expect(
+      updateStateAction({
+        account: null,
+        rateLimits: null,
+        apps: null,
+        tokenUsage: null,
+        modelReroute: null,
+      }),
+    ).toEqual({
+      account: null,
+      rateLimits: null,
+      apps: null,
+      tokenUsage: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        totalTokens: 42_000,
+        lastTotalTokens: 5_000,
+        modelContextWindow: 200_000,
+        usedPercent: 21,
+        sequence: 61,
+        receivedAtMilliseconds: 2_030,
+        refreshedAtMilliseconds: expect.any(Number),
+      },
+      modelReroute: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        fromModel: "gpt-5",
+        toModel: "gpt-5-safe",
+        reason: "highRiskCyberActivity",
+        sequence: 62,
+        receivedAtMilliseconds: 2_031,
+        refreshedAtMilliseconds: expect.any(Number),
+      },
+    });
   });
 
   it("hydrates sidebar runtime summary on mount when capability reads are enabled", async () => {
