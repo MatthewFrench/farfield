@@ -19,6 +19,7 @@ export const APP_SERVER_CLIENT_METHODS = {
   readAccountRateLimits: "account/rateLimits/read",
   readUserInfo: "userInfo",
   gitDiffToRemote: "gitDiffToRemote",
+  fuzzyFileSearch: "fuzzyFileSearch",
   uploadFeedback: "feedback/upload",
   executeCommand: "command/exec",
   writeConfigBatch: "config/batchWrite",

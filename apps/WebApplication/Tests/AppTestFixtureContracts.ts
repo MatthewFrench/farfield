@@ -16,6 +16,7 @@ export interface CapabilityFixture {
   canListSkills: boolean;
   canReadAccount: boolean;
   canReadAccountRateLimits: boolean;
+  canSearchFuzzyFiles: boolean;
   canExecuteCommand: boolean;
   canStartAccountLogin: boolean;
   canCancelAccountLogin: boolean;
@@ -214,6 +215,7 @@ export const CODEX_CAPABILITIES: CapabilityFixture = {
   canListSkills: true,
   canReadAccount: true,
   canReadAccountRateLimits: true,
+  canSearchFuzzyFiles: true,
   canExecuteCommand: true,
   canStartAccountLogin: true,
   canCancelAccountLogin: true,
@@ -238,6 +240,7 @@ export const OPENCODE_CAPABILITIES: CapabilityFixture = {
   canListSkills: false,
   canReadAccount: false,
   canReadAccountRateLimits: false,
+  canSearchFuzzyFiles: false,
   canExecuteCommand: false,
   canStartAccountLogin: false,
   canCancelAccountLogin: false,

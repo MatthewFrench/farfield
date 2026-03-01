@@ -22,6 +22,7 @@ export const APP_SERVER_CLIENT_RESPONSE_CONTEXTS = {
   readAccountRateLimits: "AppServerGetAccountRateLimitsResponse",
   readUserInfo: "AppServerUserInfoResponse",
   gitDiffToRemote: "AppServerGitDiffToRemoteResponse",
+  fuzzyFileSearch: "AppServerFuzzyFileSearchResponse",
   uploadFeedback: "AppServerFeedbackUploadResponse",
   executeCommand: "AppServerCommandExecResponse",
   writeConfigBatch: "AppServerConfigWriteResponse",

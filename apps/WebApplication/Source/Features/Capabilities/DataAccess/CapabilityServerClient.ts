@@ -44,6 +44,11 @@ import {
   startAccountLogin,
 } from "./CapabilityApi";
 import {
+  type ApiFuzzyFileSearchOptions,
+  type ApiFuzzyFileSearchResponse,
+  searchFuzzyFiles,
+} from "./CapabilityCoverageFuzzyFileSearchApi";
+import {
   type ApiAccountAuthStatusOptions,
   type ApiAccountAuthStatusResponse,
   type ApiAccountUserInfoOptions,
@@ -117,6 +122,8 @@ export type CapabilityConfigValueWriteOptions = ApiConfigValueWriteOptions;
 export type CapabilityConfigValueWriteResponse = ApiConfigValueWriteResponse;
 export type CapabilityFeedbackUploadOptions = ApiFeedbackUploadOptions;
 export type CapabilityFeedbackUploadResponse = ApiFeedbackUploadResponse;
+export type CapabilityFuzzyFileSearchOptions = ApiFuzzyFileSearchOptions;
+export type CapabilityFuzzyFileSearchResponse = ApiFuzzyFileSearchResponse;
 export type CapabilityGitDiffToRemoteOptions = ApiGitDiffToRemoteOptions;
 export type CapabilityGitDiffToRemoteResponse = ApiGitDiffToRemoteResponse;
 export type CapabilityListRemoteSkillsOptions = ApiListRemoteSkillsOptions;
@@ -248,6 +255,12 @@ export class CapabilityServerClient {
     input: CapabilityGitDiffToRemoteOptions,
   ): Promise<CapabilityGitDiffToRemoteResponse> {
     return readGitDiffToRemote(input);
+  }
+
+  public async searchFuzzyFiles(
+    input: CapabilityFuzzyFileSearchOptions,
+  ): Promise<CapabilityFuzzyFileSearchResponse> {
+    return searchFuzzyFiles(input);
   }
 
   public async readAuthStatus(

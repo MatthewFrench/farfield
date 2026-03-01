@@ -13,6 +13,7 @@ config/value/write
 configRequirements/read
 experimentalFeature/list
 feedback/upload
+fuzzyFileSearch
 getAuthStatus
 gitDiffToRemote
 initialize

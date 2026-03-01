@@ -24,6 +24,8 @@ import type {
   AgentCreateThreadResult,
   AgentExportRemoteSkillInput,
   AgentExportRemoteSkillResult,
+  AgentFuzzyFileSearchInput,
+  AgentFuzzyFileSearchResult,
   AgentGitDiffToRemoteInput,
   AgentGitDiffToRemoteResult,
   AgentInterruptInput,
@@ -375,6 +377,12 @@ export class CodexAgentAdapter implements AgentAdapter {
     input: AgentGitDiffToRemoteInput,
   ): Promise<AgentGitDiffToRemoteResult> {
     return this.threadManagementOwner.gitDiffToRemote(input);
+  }
+
+  public async fuzzyFileSearch(
+    input: AgentFuzzyFileSearchInput,
+  ): Promise<AgentFuzzyFileSearchResult> {
+    return this.threadManagementOwner.fuzzyFileSearch(input);
   }
 
   public async executeCommand(

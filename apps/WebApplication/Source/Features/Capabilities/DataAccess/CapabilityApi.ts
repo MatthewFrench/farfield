@@ -48,6 +48,7 @@ const AgentCapabilitiesSchema = z
     canListSkills: z.boolean(),
     canReadAccount: z.boolean(),
     canReadAccountRateLimits: z.boolean(),
+    canSearchFuzzyFiles: z.boolean(),
     canExecuteCommand: z.boolean(),
     canStartAccountLogin: z.boolean(),
     canCancelAccountLogin: z.boolean(),

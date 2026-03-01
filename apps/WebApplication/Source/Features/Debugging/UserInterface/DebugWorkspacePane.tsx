@@ -7,6 +7,7 @@ import {
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
   type DebugAppServerCoverageFeedbackUploadResult,
+  type DebugAppServerCoverageFuzzyFileSearchResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
@@ -73,6 +74,7 @@ export interface DebugWorkspacePaneProps {
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
+  lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -91,6 +93,7 @@ export interface DebugWorkspacePaneProps {
   onWriteSkillsConfig: (skillPath: string, enabled: boolean) => void;
   onExportRemoteSkill: (hazelnutId: string) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
+  onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
     classification: string,
@@ -146,6 +149,7 @@ export function DebugWorkspacePane({
   lastConfigBatchWriteResult,
   lastConfigValueWriteResult,
   lastFeedbackUploadResult,
+  lastFuzzyFileSearchResult,
   lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -158,6 +162,7 @@ export function DebugWorkspacePane({
   onWriteSkillsConfig,
   onExportRemoteSkill,
   onReadGitDiffToRemote,
+  onSearchFuzzyFiles,
   onExecuteCommand,
   onUploadFeedback,
 }: DebugWorkspacePaneProps): React.JSX.Element {
@@ -264,6 +269,7 @@ export function DebugWorkspacePane({
             lastConfigBatchWriteResult={lastConfigBatchWriteResult}
             lastConfigValueWriteResult={lastConfigValueWriteResult}
             lastFeedbackUploadResult={lastFeedbackUploadResult}
+            lastFuzzyFileSearchResult={lastFuzzyFileSearchResult}
             lastGitDiffToRemoteResult={lastGitDiffToRemoteResult}
             onRefreshCoverageDiagnostics={onRefreshCoverageDiagnostics}
             onStartAccountLogin={onStartAccountLogin}
@@ -276,6 +282,7 @@ export function DebugWorkspacePane({
             onWriteSkillsConfig={onWriteSkillsConfig}
             onExportRemoteSkill={onExportRemoteSkill}
             onReadGitDiffToRemote={onReadGitDiffToRemote}
+            onSearchFuzzyFiles={onSearchFuzzyFiles}
             onExecuteCommand={onExecuteCommand}
             onUploadFeedback={onUploadFeedback}
           />

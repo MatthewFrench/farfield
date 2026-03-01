@@ -113,6 +113,21 @@ export interface DebugAppServerCoverageGitDiffToRemoteResult {
   readAtIso8601: string;
 }
 
+export interface DebugAppServerCoverageFuzzyFileSearchResultFile {
+  root: string;
+  path: string;
+  fileName: string;
+  score: number;
+  indices: number[] | null;
+}
+
+export interface DebugAppServerCoverageFuzzyFileSearchResult {
+  query: string;
+  roots: string[];
+  files: DebugAppServerCoverageFuzzyFileSearchResultFile[];
+  searchedAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

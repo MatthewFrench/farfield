@@ -3,11 +3,13 @@ import type { CapabilityServerClient } from "@/Features/Capabilities/DataAccess/
 import type {
   DebugAppServerCoverageCommandExecutionResult,
   DebugAppServerCoverageFeedbackUploadResult,
+  DebugAppServerCoverageFuzzyFileSearchResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import {
   mapCommandExecutionResult,
   mapFeedbackUploadResult,
+  mapFuzzyFileSearchResult,
   mapGitDiffToRemoteResult,
 } from "./DebugAppServerCoverageDiagnosticsMappers";
 
@@ -185,6 +187,69 @@ export function runGitDiffToRemoteAction(input: RunGitDiffToRemoteActionInput): 
       });
       input.setLastGitDiffToRemoteResult(
         mapGitDiffToRemoteResult(response, normalizedWorkingDirectory),
+      );
+    } catch (error) {
+      input.setCoverageActionErrorMessage(
+        `${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`,
+      );
+    } finally {
+      input.setIsRunningCoverageAction(false);
+    }
+  })();
+}
+
+export interface RunFuzzyFileSearchActionInput {
+  capabilityServerClient: CapabilityServerClient;
+  isRunningCoverageAction: boolean;
+  query: string;
+  roots: string[];
+  cancellationToken?: string;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastFuzzyFileSearchResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageFuzzyFileSearchResult | null>
+  >;
+}
+
+export function runFuzzyFileSearchAction(input: RunFuzzyFileSearchActionInput): void {
+  if (input.isRunningCoverageAction) {
+    return;
+  }
+
+  const normalizedQuery = input.query.trim();
+  if (normalizedQuery.length === 0) {
+    return;
+  }
+
+  const normalizedRoots = input.roots.map((rootPath) => rootPath.trim());
+  if (normalizedRoots.length === 0 || normalizedRoots.some((rootPath) => rootPath.length === 0)) {
+    return;
+  }
+
+  const normalizedCancellationToken = input.cancellationToken?.trim();
+  if (
+    input.cancellationToken !== undefined &&
+    normalizedCancellationToken !== undefined &&
+    normalizedCancellationToken.length === 0
+  ) {
+    return;
+  }
+
+  input.setIsRunningCoverageAction(true);
+  input.setCoverageActionErrorMessage("");
+
+  void (async () => {
+    try {
+      const response = await input.capabilityServerClient.searchFuzzyFiles({
+        actionName: COVERAGE_MUTATION_OPERATION_NAME,
+        query: normalizedQuery,
+        roots: normalizedRoots,
+        ...(normalizedCancellationToken !== undefined
+          ? { cancellationToken: normalizedCancellationToken }
+          : {}),
+      });
+      input.setLastFuzzyFileSearchResult(
+        mapFuzzyFileSearchResult(response, normalizedQuery, normalizedRoots),
       );
     } catch (error) {
       input.setCoverageActionErrorMessage(

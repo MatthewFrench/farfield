@@ -15,6 +15,7 @@ import type {
   AgentCommandExecutionResult,
   AgentConfigDefaults,
   AgentExportRemoteSkillResult,
+  AgentFuzzyFileSearchResult,
   AgentGitDiffToRemoteResult,
   AgentId,
   AgentListAppsResult,
@@ -54,6 +55,7 @@ const CapabilityRoutePathnameByName = {
   accountUserInfo: "/api/account/user-info",
   feedbackUpload: "/api/feedback/upload",
   gitDiffToRemote: "/api/git/diff-remote",
+  fuzzyFileSearch: "/api/files/fuzzy-search",
   accountLoginStart: "/api/account/login/start",
   accountLoginCancel: "/api/account/login/cancel",
   accountLogout: "/api/account/logout",
@@ -99,6 +101,9 @@ const CapabilityRouteQueryParameterByName = {
   filePath: "filePath",
   expectedVersion: "expectedVersion",
   command: "command",
+  query: "query",
+  root: "root",
+  cancellationToken: "cancellationToken",
   cwd: "cwd",
   hazelnutScope: "hazelnutScope",
   productSurface: "productSurface",
@@ -118,6 +123,7 @@ const CapabilityRouteLogEventByName = {
   accountUserInfoReadFailed: "account-user-info-read-failed",
   feedbackUploadFailed: "feedback-upload-failed",
   gitDiffToRemoteFailed: "git-diff-to-remote-failed",
+  fuzzyFileSearchFailed: "fuzzy-file-search-failed",
   commandExecFailed: "command-exec-failed",
   accountLoginStartFailed: "account-login-start-failed",
   accountLoginCancelFailed: "account-login-cancel-failed",
@@ -161,6 +167,13 @@ const CapabilityRouteErrorMessagePrefixByName = {
   failedToReadGitDiffToRemote: "Failed to read git diff to remote: ",
   missingCommand: "Missing command query parameter. Use repeated command query values.",
   invalidCommand: "Invalid command query parameter. Expected non-empty command arguments.",
+  missingFuzzyFileSearchQuery: "Missing query parameter.",
+  invalidFuzzyFileSearchQuery: "Invalid query parameter. Expected non-empty search text.",
+  missingFuzzyFileSearchRoots: "Missing root query parameter. Use repeated root query values.",
+  invalidFuzzyFileSearchRoots: "Invalid root query parameter. Expected non-empty root path values.",
+  invalidFuzzyFileSearchCancellationToken:
+    "Invalid cancellationToken query parameter. Expected non-empty text value.",
+  failedToSearchFuzzyFiles: "Failed to search fuzzy files: ",
   invalidTimeoutMilliseconds: "Invalid timeoutMs query parameter.",
   invalidCommandWorkingDirectory: "Invalid cwd query parameter.",
   failedToExecuteCommand: "Failed to execute command: ",
@@ -214,6 +227,7 @@ const CapabilityRouteTimeoutLabelByName = {
   accountUserInfoRead: "user info read",
   feedbackUpload: "feedback upload",
   gitDiffToRemote: "git diff to remote",
+  fuzzyFileSearch: "fuzzy file search",
   commandExec: "command execution",
   accountLoginStart: "account login start",
   accountLoginCancel: "account login cancel",
@@ -286,6 +300,10 @@ type CapabilityFeedbackUploadResponseBody = AgentUploadFeedbackResult & {
 };
 
 type CapabilityGitDiffToRemoteResponseBody = AgentGitDiffToRemoteResult & {
+  ok: true;
+};
+
+type CapabilityFuzzyFileSearchResponseBody = AgentFuzzyFileSearchResult & {
   ok: true;
 };
 
@@ -478,7 +496,26 @@ function parseCommandArgumentsQueryValues(values: string[]): string[] | null {
   return normalizedValues;
 }
 
+function parseFuzzyFileSearchRootsQueryValues(values: string[]): string[] | null {
+  if (values.length === 0) {
+    return null;
+  }
+  const normalizedValues = values.map((value) => value.trim());
+  if (normalizedValues.some((value) => value.length === 0)) {
+    return null;
+  }
+  return normalizedValues;
+}
+
 function parseOptionalWorkingDirectoryQueryValue(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function parseOptionalNonEmptyQueryValue(value: string | null): string | null {
   if (value === null) {
     return null;
   }
@@ -642,6 +679,15 @@ function mapFeedbackUploadResponse(
 function mapGitDiffToRemoteResponse(
   result: AgentGitDiffToRemoteResult,
 ): CapabilityGitDiffToRemoteResponseBody {
+  return {
+    ok: true,
+    ...result,
+  };
+}
+
+function mapFuzzyFileSearchResponse(
+  result: AgentFuzzyFileSearchResult,
+): CapabilityFuzzyFileSearchResponseBody {
   return {
     ok: true,
     ...result,
@@ -1631,6 +1677,129 @@ async function handleCommandExecRoute(deps: CapabilityRouteDependencies): Promis
     jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
       ok: false,
       error: `${CapabilityRouteErrorMessagePrefixByName.failedToExecuteCommand}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleFuzzyFileSearchRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.get,
+      CapabilityRoutePathnameByName.fuzzyFileSearch,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const queryRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.query);
+  if (queryRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingFuzzyFileSearchQuery,
+    });
+    return true;
+  }
+  const query = parseOptionalNonEmptyQueryValue(queryRaw);
+  if (query === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidFuzzyFileSearchQuery,
+    });
+    return true;
+  }
+
+  const rootsRaw = url.searchParams.getAll(CapabilityRouteQueryParameterByName.root);
+  const roots = parseFuzzyFileSearchRootsQueryValues(rootsRaw);
+  if (roots === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error:
+        rootsRaw.length > 0
+          ? CapabilityRouteErrorMessagePrefixByName.invalidFuzzyFileSearchRoots
+          : CapabilityRouteErrorMessagePrefixByName.missingFuzzyFileSearchRoots,
+    });
+    return true;
+  }
+
+  const cancellationTokenRaw = url.searchParams.get(
+    CapabilityRouteQueryParameterByName.cancellationToken,
+  );
+  const cancellationToken = parseOptionalNonEmptyQueryValue(cancellationTokenRaw);
+  if (cancellationTokenRaw !== null && cancellationToken === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidFuzzyFileSearchCancellationToken,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canSearchFuzzyFiles ||
+    !adapter.fuzzyFileSearch
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToSearchFuzzyFiles}Fuzzy file search is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.fuzzyFileSearch({
+        query,
+        roots,
+        ...(cancellationToken !== null ? { cancellationToken } : {}),
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.fuzzyFileSearch,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapFuzzyFileSearchResponse(result));
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        query,
+        roots,
+        cancellationToken,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.fuzzyFileSearchFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToSearchFuzzyFiles}${message}`,
     });
   }
 
@@ -3056,7 +3225,7 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
  * Owns capability route dispatch (`/api/config/defaults`, `/api/config-requirements`,
  * `/api/config/mcp-server/reload`, `/api/account`, `/api/account/auth-status`,
  * `/api/account/rate-limits`, `/api/account/user-info`, `/api/feedback/upload`,
- * `/api/git/diff-remote`, `/api/commands/exec`, `/api/account/login/start`,
+ * `/api/git/diff-remote`, `/api/files/fuzzy-search`, `/api/commands/exec`, `/api/account/login/start`,
  * `/api/account/login/cancel`, `/api/account/logout`,
  * `/api/config/batch/write`, `/api/config/value/write`, `/api/mcp-servers/oauth/login`, `/api/skills/config/write`,
  * `/api/skills/remote/list`, `/api/skills/remote/export`, `/api/models`,
@@ -3087,6 +3256,9 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleGitDiffToRemoteRoute(deps)) {
+    return true;
+  }
+  if (await handleFuzzyFileSearchRoute(deps)) {
     return true;
   }
   if (await handleCommandExecRoute(deps)) {

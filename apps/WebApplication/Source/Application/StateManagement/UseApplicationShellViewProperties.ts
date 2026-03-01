@@ -147,6 +147,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastConfigBatchWriteResult: DebugWorkspacePaneProps["lastConfigBatchWriteResult"];
   lastConfigValueWriteResult: DebugWorkspacePaneProps["lastConfigValueWriteResult"];
   lastFeedbackUploadResult: DebugWorkspacePaneProps["lastFeedbackUploadResult"];
+  lastFuzzyFileSearchResult: DebugWorkspacePaneProps["lastFuzzyFileSearchResult"];
   lastGitDiffToRemoteResult: DebugWorkspacePaneProps["lastGitDiffToRemoteResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -165,6 +166,7 @@ export interface UseApplicationShellViewPropertiesInput {
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
   readGitDiffToRemote: (cwd: string) => void;
+  searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -416,6 +418,7 @@ function buildDebugWorkspacePaneProperties(
     lastConfigBatchWriteResult: input.lastConfigBatchWriteResult,
     lastConfigValueWriteResult: input.lastConfigValueWriteResult,
     lastFeedbackUploadResult: input.lastFeedbackUploadResult,
+    lastFuzzyFileSearchResult: input.lastFuzzyFileSearchResult,
     lastGitDiffToRemoteResult: input.lastGitDiffToRemoteResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
@@ -428,6 +431,7 @@ function buildDebugWorkspacePaneProperties(
     onWriteSkillsConfig: input.writeSkillsConfig,
     onExportRemoteSkill: input.exportRemoteSkill,
     onReadGitDiffToRemote: input.readGitDiffToRemote,
+    onSearchFuzzyFiles: input.searchFuzzyFiles,
     onExecuteCommand: input.executeCommand,
     onUploadFeedback: input.uploadFeedback,
   };
@@ -625,6 +629,7 @@ export function useApplicationShellViewProperties(
       input.lastConfigBatchWriteResult,
       input.lastConfigValueWriteResult,
       input.lastFeedbackUploadResult,
+      input.lastFuzzyFileSearchResult,
       input.lastGitDiffToRemoteResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
@@ -637,6 +642,7 @@ export function useApplicationShellViewProperties(
       input.writeSkillsConfig,
       input.exportRemoteSkill,
       input.readGitDiffToRemote,
+      input.searchFuzzyFiles,
       input.executeCommand,
       input.uploadFeedback,
       input.replayHistoryEntryFromDetail,

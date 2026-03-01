@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 06:45:00Z
+Last Updated (UTC): 2026-03-01 03:14:14Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `42 / 74` request methods (`56.8%`).
+1. Farfield app-server method coverage at request-owner layer: `43 / 74` request methods (`58.1%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `43 / 74` (`58.1%`).
+3. Effective request-method usage including transport-owned `initialize`: `44 / 74` (`59.5%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -99,6 +99,7 @@ As of the upstream snapshot above:
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | High | Explicit capability ownership and strict envelope parsing | Keep current path |
 | `command/exec` | Command execution diagnostics action with visible stdout/stderr output in debug workspace coverage panel | Medium-high | Strict capability route ownership and typed command request/response mapping for operator diagnostics | Keep current path |
 | `gitDiffToRemote` | Git diff-to-remote diagnostics action with rendered patch output in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed working-directory query parsing and deterministic sha/diff mapping | Keep current path |
+| `fuzzyFileSearch` | Fuzzy file search diagnostics action with query and root controls plus ranked file-match output in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed query and repeated-root parsing plus deterministic file-match response mapping | Keep current path |
 | `config/read` | Config defaults resolution for model and reasoning effort | High | Normalized default resolution through typed owner mapping | Keep current path |
 | `config/batchWrite` | Config batch-write diagnostics action with explicit multi-edit payload testing in debug workspace coverage panel | Medium-high | Strict capability route ownership and typed edit-array request parsing with deterministic write-result mapping | Keep current path |
 | `configRequirements/read` | Config requirements diagnostics and workspace readiness signals | Medium-high | Strict capability route ownership with typed payload mapping into debug coverage diagnostics | Keep current path |
@@ -151,6 +152,7 @@ As of the upstream snapshot above:
 | `collaborationMode/list` | Collaboration mode selector and capability snapshot | `/api/collaboration-modes` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listCollaborationModes` -> `AppServerClient.listCollaborationModes` |
 | `command/exec` | Command execution diagnostics action and output capture | `/api/commands/exec` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.executeCommand` -> `AppServerClient.executeCommand` |
 | `gitDiffToRemote` | Git diff-to-remote diagnostics action and patch output capture | `/api/git/diff-remote` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.gitDiffToRemote` -> `AppServerClient.gitDiffToRemote` |
+| `fuzzyFileSearch` | Fuzzy file search diagnostics action and ranked file-match output | `/api/files/fuzzy-search` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.fuzzyFileSearch` -> `AppServerClient.fuzzyFileSearch` |
 | `config/read` | Config defaults (`model`, `reasoningEffort`) | `/api/config/defaults` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.readConfigDefaults` -> `AppServerClient.readConfig` |
 | `config/batchWrite` | Config-batch mutation diagnostics action | `/api/config/batch/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeConfigBatch` -> `AppServerClient.writeConfigBatch` |
 | `config/value/write` | Config-value mutation diagnostics action | `/api/config/value/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeConfigValue` -> `AppServerClient.writeConfigValue` |
@@ -175,7 +177,7 @@ As of the upstream snapshot above:
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`32` request methods are not used by Farfield’s app-server client path:
+`31` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
@@ -185,7 +187,6 @@ execOneOffCommand
 externalAgentConfig/detect
 externalAgentConfig/import
 forkConversation
-fuzzyFileSearch
 fuzzyFileSearch/sessionStart
 fuzzyFileSearch/sessionStop
 fuzzyFileSearch/sessionUpdate
@@ -223,21 +224,20 @@ These are explicitly in the upstream deprecated request section and should not b
 3. `cancelLoginChatGpt`
 4. `execOneOffCommand`
 5. `forkConversation`
-6. `fuzzyFileSearch`
-7. `getConversationSummary`
-8. `getUserAgent`
-9. `getUserSavedConfig`
-10. `interruptConversation`
-11. `listConversations`
-12. `loginApiKey`
-13. `loginChatGpt`
-14. `logoutChatGpt`
-15. `newConversation`
-16. `removeConversationListener`
-17. `resumeConversation`
-18. `sendUserTurn`
-19. `sendUserMessage`
-20. `setDefaultModel`
+6. `getConversationSummary`
+7. `getUserAgent`
+8. `getUserSavedConfig`
+9. `interruptConversation`
+10. `listConversations`
+11. `loginApiKey`
+12. `loginChatGpt`
+13. `logoutChatGpt`
+14. `newConversation`
+15. `removeConversationListener`
+16. `resumeConversation`
+17. `sendUserTurn`
+18. `sendUserMessage`
+19. `setDefaultModel`
 
 ### Category B: Auth, Account, and Tenant/Operator Surfaces Not Yet Wired in Farfield Product Flows
 
@@ -282,8 +282,8 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `32`
-2. Total methods listed across Category A-I: `32`
+1. Total non-intersection methods: `31`
+2. Total methods listed across Category A-I: `31`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

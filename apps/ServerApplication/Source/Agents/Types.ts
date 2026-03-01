@@ -57,6 +57,7 @@ export interface AgentCapabilities {
   canListSkills: boolean;
   canReadAccount: boolean;
   canReadAccountRateLimits: boolean;
+  canSearchFuzzyFiles: boolean;
   canExecuteCommand: boolean;
   canStartAccountLogin: boolean;
   canCancelAccountLogin: boolean;
@@ -524,6 +525,24 @@ export interface AgentGitDiffToRemoteResult {
   diff: string;
 }
 
+export interface AgentFuzzyFileSearchInput {
+  query: string;
+  roots: string[];
+  cancellationToken?: string | null;
+}
+
+export interface AgentFuzzyFileSearchMatch {
+  root: string;
+  path: string;
+  fileName: string;
+  score: number;
+  indices: number[] | null;
+}
+
+export interface AgentFuzzyFileSearchResult {
+  files: AgentFuzzyFileSearchMatch[];
+}
+
 export type AgentConfigWriteMergeStrategy = "replace" | "upsert";
 
 export interface AgentWriteConfigValueInput {
@@ -715,6 +734,7 @@ export interface AgentAdapter {
   ): Promise<AgentReadAccountRateLimitsResult>;
   uploadFeedback?(input: AgentUploadFeedbackInput): Promise<AgentUploadFeedbackResult>;
   gitDiffToRemote?(input: AgentGitDiffToRemoteInput): Promise<AgentGitDiffToRemoteResult>;
+  fuzzyFileSearch?(input: AgentFuzzyFileSearchInput): Promise<AgentFuzzyFileSearchResult>;
   executeCommand?(input: AgentCommandExecutionInput): Promise<AgentCommandExecutionResult>;
   startAccountLogin?(input: AgentStartAccountLoginInput): Promise<AgentStartAccountLoginResult>;
   cancelAccountLogin?(input: AgentCancelAccountLoginInput): Promise<AgentCancelAccountLoginResult>;

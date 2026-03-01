@@ -160,6 +160,9 @@ function createUseApplicationShellViewPropertiesFixture() {
     (_edits: string, _filePath?: string, _expectedVersion?: string): void => {},
   );
   const readGitDiffToRemoteSpy = vi.fn((_cwd: string): void => {});
+  const searchFuzzyFilesSpy = vi.fn(
+    (_query: string, _roots: string[], _cancellationToken?: string): void => {},
+  );
   const executeCommandSpy = vi.fn(
     (_command: string[], _timeoutMs?: number, _cwd?: string): void => {},
   );
@@ -304,6 +307,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastConfigBatchWriteResult: null,
     lastConfigValueWriteResult: null,
     lastFeedbackUploadResult: null,
+    lastFuzzyFileSearchResult: null,
     lastGitDiffToRemoteResult: null,
     refreshCoverageDiagnostics: refreshCoverageDiagnosticsSpy,
     startAccountLogin: startAccountLoginSpy,
@@ -314,6 +318,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     writeConfigValue: writeConfigValueSpy,
     writeConfigBatch: writeConfigBatchSpy,
     readGitDiffToRemote: readGitDiffToRemoteSpy,
+    searchFuzzyFiles: searchFuzzyFilesSpy,
     executeCommand: executeCommandSpy,
     uploadFeedback: uploadFeedbackSpy,
     writeSkillsConfig: writeSkillsConfigSpy,

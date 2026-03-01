@@ -23,6 +23,8 @@ import type {
   AgentCreateThreadResult,
   AgentExportRemoteSkillInput,
   AgentExportRemoteSkillResult,
+  AgentFuzzyFileSearchInput,
+  AgentFuzzyFileSearchResult,
   AgentGitDiffToRemoteInput,
   AgentGitDiffToRemoteResult,
   AgentId,
@@ -272,6 +274,23 @@ const CapabilityGitDiffToRemoteEnvelopeSchema = z
   })
   .strict();
 
+const CapabilityFuzzyFileSearchEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    files: z.array(
+      z
+        .object({
+          root: z.string().min(1),
+          path: z.string().min(1),
+          fileName: z.string().min(1),
+          score: z.number(),
+          indices: z.array(z.number().int()).nullable(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 const CapabilityExperimentalFeaturesEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -372,6 +391,7 @@ interface MockAgentAdapterOptions {
   readUserInfo?: () => Promise<AgentReadUserInfoResult>;
   uploadFeedback?: (input: AgentUploadFeedbackInput) => Promise<AgentUploadFeedbackResult>;
   gitDiffToRemote?: (input: AgentGitDiffToRemoteInput) => Promise<AgentGitDiffToRemoteResult>;
+  fuzzyFileSearch?: (input: AgentFuzzyFileSearchInput) => Promise<AgentFuzzyFileSearchResult>;
   executeCommand?: (input: AgentCommandExecutionInput) => Promise<AgentCommandExecutionResult>;
   startAccountLogin?: (input: AgentStartAccountLoginInput) => Promise<AgentStartAccountLoginResult>;
   cancelAccountLogin?: (
@@ -427,6 +447,7 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canListSkills: false,
     canReadAccount: false,
     canReadAccountRateLimits: false,
+    canSearchFuzzyFiles: false,
     canExecuteCommand: false,
     canStartAccountLogin: false,
     canCancelAccountLogin: false,
@@ -514,6 +535,10 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.gitDiffToRemote) {
     adapter.gitDiffToRemote = options.gitDiffToRemote;
+  }
+
+  if (options.fuzzyFileSearch) {
+    adapter.fuzzyFileSearch = options.fuzzyFileSearch;
   }
 
   if (options.executeCommand) {
@@ -1121,6 +1146,89 @@ describe("handleCapabilityRoutes", () => {
       ok: true,
       sha: "abc123def456",
       diff: "diff --git a/file.ts b/file.ts",
+    });
+  });
+
+  it("returns 400 when fuzzy file search omits query", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/files/fuzzy-search",
+      url: new URL("http://localhost/api/files/fuzzy-search?root=/tmp/project"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing query parameter.",
+    });
+  });
+
+  it("returns 400 when fuzzy file search omits roots", async () => {
+    const result = await executeCapabilityRoute({
+      pathname: "/api/files/fuzzy-search",
+      url: new URL("http://localhost/api/files/fuzzy-search?query=main"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing root query parameter. Use repeated root query values.",
+    });
+  });
+
+  it("searches fuzzy files when adapter supports the method", async () => {
+    const fuzzyFileSearchSpy = vi.fn(
+      async (): Promise<AgentFuzzyFileSearchResult> => ({
+        files: [
+          {
+            root: "/tmp/project",
+            path: "apps/WebApplication/Source/Main.tsx",
+            fileName: "Main.tsx",
+            score: 0.94,
+            indices: [0, 1, 2],
+          },
+        ],
+      }),
+    );
+
+    const result = await executeCapabilityRoute({
+      pathname: "/api/files/fuzzy-search",
+      url: new URL(
+        "http://localhost/api/files/fuzzy-search?agentId=codex&query=main&root=/tmp/project&root=/tmp/project/packages&cancellationToken=token-1",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canSearchFuzzyFiles: true,
+          },
+          fuzzyFileSearch: fuzzyFileSearchSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(fuzzyFileSearchSpy).toHaveBeenCalledWith({
+      query: "main",
+      roots: ["/tmp/project", "/tmp/project/packages"],
+      cancellationToken: "token-1",
+    });
+    const parsedEnvelope = CapabilityFuzzyFileSearchEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      files: [
+        {
+          root: "/tmp/project",
+          path: "apps/WebApplication/Source/Main.tsx",
+          fileName: "Main.tsx",
+          score: 0.94,
+          indices: [0, 1, 2],
+        },
+      ],
     });
   });
 

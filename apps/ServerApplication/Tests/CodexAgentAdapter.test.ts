@@ -46,6 +46,7 @@ describe("CodexAgentAdapter", () => {
       canListSkills: true,
       canReadAccount: true,
       canReadAccountRateLimits: true,
+      canSearchFuzzyFiles: true,
       canExecuteCommand: true,
       canStartAccountLogin: true,
       canCancelAccountLogin: true,

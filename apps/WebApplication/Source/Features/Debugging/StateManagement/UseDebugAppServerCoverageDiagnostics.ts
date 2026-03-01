@@ -17,6 +17,7 @@ import {
   type DebugAppServerCoverageConfigBatchWriteResult,
   type DebugAppServerCoverageConfigValueWriteResult,
   type DebugAppServerCoverageFeedbackUploadResult,
+  type DebugAppServerCoverageFuzzyFileSearchResult,
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
@@ -41,6 +42,7 @@ import {
 import {
   runCommandExecutionAction,
   runFeedbackUploadAction,
+  runFuzzyFileSearchAction,
   runGitDiffToRemoteAction,
 } from "./DebugAppServerCoverageMutationActionRunners";
 
@@ -73,6 +75,7 @@ export interface DebugAppServerCoverageDiagnostics {
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
+  lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -91,6 +94,7 @@ export interface DebugAppServerCoverageDiagnostics {
   writeSkillsConfig: (skillPath: string, enabled: boolean) => void;
   exportRemoteSkill: (hazelnutId: string) => void;
   readGitDiffToRemote: (cwd: string) => void;
+  searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -239,6 +243,8 @@ export function useDebugAppServerCoverageDiagnostics(
     useState<DebugAppServerCoverageConfigValueWriteResult | null>(null);
   const [lastFeedbackUploadResult, setLastFeedbackUploadResult] =
     useState<DebugAppServerCoverageFeedbackUploadResult | null>(null);
+  const [lastFuzzyFileSearchResult, setLastFuzzyFileSearchResult] =
+    useState<DebugAppServerCoverageFuzzyFileSearchResult | null>(null);
   const [lastGitDiffToRemoteResult, setLastGitDiffToRemoteResult] =
     useState<DebugAppServerCoverageGitDiffToRemoteResult | null>(null);
   const requestSerialRef = useRef(0);
@@ -489,6 +495,22 @@ export function useDebugAppServerCoverageDiagnostics(
     [input.capabilityServerClient, isRunningCoverageAction],
   );
 
+  const searchFuzzyFiles = useCallback(
+    (query: string, roots: string[], cancellationToken?: string) => {
+      runFuzzyFileSearchAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        query,
+        roots,
+        ...(cancellationToken !== undefined ? { cancellationToken } : {}),
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastFuzzyFileSearchResult,
+      });
+    },
+    [input.capabilityServerClient, isRunningCoverageAction],
+  );
+
   const executeCommand = useCallback(
     (command: string[], timeoutMs?: number, cwd?: string) => {
       runCommandExecutionAction({
@@ -548,6 +570,7 @@ export function useDebugAppServerCoverageDiagnostics(
     lastConfigBatchWriteResult,
     lastConfigValueWriteResult,
     lastFeedbackUploadResult,
+    lastFuzzyFileSearchResult,
     lastGitDiffToRemoteResult,
     refreshCoverageDiagnostics,
     startAccountLogin,
@@ -560,6 +583,7 @@ export function useDebugAppServerCoverageDiagnostics(
     writeSkillsConfig,
     exportRemoteSkill,
     readGitDiffToRemote,
+    searchFuzzyFiles,
     executeCommand,
     uploadFeedback,
   };

@@ -26,6 +26,7 @@ import { buildCommandExecutionRequestParameters } from "./AppServerClientCommand
 import { buildConfigBatchWriteRequestParameters } from "./AppServerClientConfigBatchWriteRequestBuilders.js";
 import { buildConfigValueWriteRequestParameters } from "./AppServerClientConfigValueWriteRequestBuilders.js";
 import { buildFeedbackUploadRequestParameters } from "./AppServerClientFeedbackUploadRequestBuilders.js";
+import { buildFuzzyFileSearchRequestParameters } from "./AppServerClientFuzzyFileSearchRequestBuilders.js";
 import { buildGitDiffToRemoteRequestParameters } from "./AppServerClientGitDiffRequestBuilders.js";
 import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
 import {
@@ -350,6 +351,24 @@ export interface GitDiffToRemoteOptions {
 export interface GitDiffToRemoteResult {
   sha: string;
   diff: string;
+}
+
+export interface FuzzyFileSearchOptions {
+  query: string;
+  roots: string[];
+  cancellationToken?: string | null;
+}
+
+export interface FuzzyFileSearchMatch {
+  root: string;
+  path: string;
+  fileName: string;
+  score: number;
+  indices: number[] | null;
+}
+
+export interface FuzzyFileSearchResult {
+  files: FuzzyFileSearchMatch[];
 }
 
 export interface CommandExecutionOptions {
@@ -770,6 +789,21 @@ const AppServerGitDiffToRemoteResponseSchema = z
   .object({
     sha: z.string().min(1),
     diff: z.string(),
+  })
+  .passthrough();
+const AppServerFuzzyFileSearchResponseSchema = z
+  .object({
+    files: z.array(
+      z
+        .object({
+          root: z.string().min(1),
+          path: z.string().min(1),
+          file_name: z.string().min(1),
+          score: z.number(),
+          indices: z.array(z.number().int()).nullable(),
+        })
+        .passthrough(),
+    ),
   })
   .passthrough();
 const AppServerCommandExecResponseSchema = z
@@ -1318,6 +1352,27 @@ export class AppServerClient {
     return {
       sha: parsed.sha,
       diff: parsed.diff,
+    };
+  }
+
+  public async fuzzyFileSearch(options: FuzzyFileSearchOptions): Promise<FuzzyFileSearchResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.fuzzyFileSearch,
+      buildFuzzyFileSearchRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerFuzzyFileSearchResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.fuzzyFileSearch,
+    );
+    return {
+      files: parsed.files.map((fileMatch) => ({
+        root: fileMatch.root,
+        path: fileMatch.path,
+        fileName: fileMatch.file_name,
+        score: fileMatch.score,
+        indices: fileMatch.indices,
+      })),
     };
   }
 

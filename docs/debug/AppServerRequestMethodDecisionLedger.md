@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-03-01 06:45:00Z
+Last Updated (UTC): 2026-03-01 03:14:14Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -28,7 +28,7 @@ This ledger records recommended disposition for every upstream app-server client
 | `externalAgentConfig/import` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 | `feedback/upload` | Used now | Keep | Exposed through capability ownership and debug workspace feedback-upload diagnostics action. |
 | `forkConversation` | Not used | Do not adopt | Deprecated upstream request family. |
-| `fuzzyFileSearch` | Not used | Do not adopt | Deprecated upstream request family. |
+| `fuzzyFileSearch` | Used now | Keep | Exposed through capability ownership and debug workspace fuzzy-file-search diagnostics action/results. |
 | `fuzzyFileSearch/sessionStart` | Not used | Do not adopt for production | Experimental or test-focused surface. |
 | `fuzzyFileSearch/sessionStop` | Not used | Do not adopt for production | Experimental or test-focused surface. |
 | `fuzzyFileSearch/sessionUpdate` | Not used | Do not adopt for production | Experimental or test-focused surface. |
@@ -82,5 +82,5 @@ This ledger records recommended disposition for every upstream app-server client
 | `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
 
 Total methods: 74
-Used now: 43
-Not used: 31
+Used now: 44
+Not used: 30

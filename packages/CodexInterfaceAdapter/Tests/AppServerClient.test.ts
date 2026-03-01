@@ -1159,6 +1159,47 @@ describe("AppServerClient.gitDiffToRemote", () => {
   });
 });
 
+describe("AppServerClient.fuzzyFileSearch", () => {
+  it("sends fuzzyFileSearch request and maps file-match contracts", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      files: [
+        {
+          root: "/tmp/workspace",
+          path: "Source/Main.tsx",
+          file_name: "Main.tsx",
+          score: 0.98,
+          indices: [0, 1, 2],
+        },
+      ],
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.fuzzyFileSearch({
+      query: "main",
+      roots: ["/tmp/workspace"],
+      cancellationToken: "token-1",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("fuzzyFileSearch", {
+      query: "main",
+      roots: ["/tmp/workspace"],
+      cancellationToken: "token-1",
+    });
+    expect(result).toEqual({
+      files: [
+        {
+          root: "/tmp/workspace",
+          path: "Source/Main.tsx",
+          fileName: "Main.tsx",
+          score: 0.98,
+          indices: [0, 1, 2],
+        },
+      ],
+    });
+  });
+});
+
 describe("AppServerClient.writeConfigValue", () => {
   it("sends config/value/write payload and returns typed config write result", async () => {
     const transportDouble = createTransportDouble();

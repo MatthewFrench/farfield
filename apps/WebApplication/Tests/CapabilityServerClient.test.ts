@@ -33,6 +33,10 @@ vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationAp
   writeSkillsConfig: vi.fn(),
 }));
 
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageFuzzyFileSearchApi", () => ({
+  searchFuzzyFiles: vi.fn(),
+}));
+
 import {
   cancelAccountLogin,
   getAccount,
@@ -51,6 +55,7 @@ import {
   reloadMcpServerConfig,
   startAccountLogin,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
+import { searchFuzzyFiles } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageFuzzyFileSearchApi";
 import {
   executeCommand,
   exportRemoteSkill,
@@ -81,6 +86,7 @@ import {
   type CapabilityConfigValueWriteResponse,
   type CapabilityExperimentalFeaturesResponse,
   type CapabilityFeedbackUploadResponse,
+  type CapabilityFuzzyFileSearchResponse,
   type CapabilityGitDiffToRemoteResponse,
   type CapabilityHealthResponse,
   type CapabilityMcpServerOauthLoginResponse,
@@ -124,6 +130,7 @@ const AGENTS_RESPONSE: CapabilityAgentsResponse = {
         canListSkills: true,
         canReadAccount: true,
         canReadAccountRateLimits: true,
+        canSearchFuzzyFiles: true,
         canExecuteCommand: true,
         canStartAccountLogin: true,
         canCancelAccountLogin: true,
@@ -254,6 +261,19 @@ const GIT_DIFF_TO_REMOTE_RESPONSE: CapabilityGitDiffToRemoteResponse = {
   ok: true,
   sha: "abc123def456",
   diff: "diff --git a/file.ts b/file.ts",
+};
+
+const FUZZY_FILE_SEARCH_RESPONSE: CapabilityFuzzyFileSearchResponse = {
+  ok: true,
+  files: [
+    {
+      root: "/tmp/project",
+      path: "apps/WebApplication/Source/Main.tsx",
+      fileName: "Main.tsx",
+      score: 0.94,
+      indices: [0, 1, 2],
+    },
+  ],
 };
 
 const ACCOUNT_AUTH_STATUS_RESPONSE: CapabilityAccountAuthStatusResponse = {
@@ -402,6 +422,7 @@ describe("CapabilityServerClient", () => {
     vi.mocked(startMcpServerOauthLogin).mockResolvedValue(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
     vi.mocked(executeCommand).mockResolvedValue(COMMAND_EXECUTION_RESPONSE);
     vi.mocked(readGitDiffToRemote).mockResolvedValue(GIT_DIFF_TO_REMOTE_RESPONSE);
+    vi.mocked(searchFuzzyFiles).mockResolvedValue(FUZZY_FILE_SEARCH_RESPONSE);
     vi.mocked(readAccountAuthStatus).mockResolvedValue(ACCOUNT_AUTH_STATUS_RESPONSE);
     vi.mocked(readAccountUserInfo).mockResolvedValue(ACCOUNT_USER_INFO_RESPONSE);
     vi.mocked(uploadFeedback).mockResolvedValue(FEEDBACK_UPLOAD_RESPONSE);
@@ -487,6 +508,13 @@ describe("CapabilityServerClient", () => {
       actionId: "action-git-diff-to-remote",
       actionName: "read-git-diff-to-remote",
       cwd: "/tmp/project",
+    };
+    const fuzzyFileSearchOptions = {
+      actionId: "action-fuzzy-file-search",
+      actionName: "search-fuzzy-files",
+      query: "main",
+      roots: ["/tmp/project", "/tmp/project/packages"],
+      cancellationToken: "token-1",
     };
     const accountAuthStatusOptions = {
       actionId: "action-account-auth-status",
@@ -601,6 +629,8 @@ describe("CapabilityServerClient", () => {
       await capabilityServerClient.executeCommand(commandExecutionOptions);
     const gitDiffToRemoteResponse =
       await capabilityServerClient.readGitDiffToRemote(gitDiffToRemoteOptions);
+    const fuzzyFileSearchResponse =
+      await capabilityServerClient.searchFuzzyFiles(fuzzyFileSearchOptions);
     const accountAuthStatusResponse =
       await capabilityServerClient.readAuthStatus(accountAuthStatusOptions);
     const accountUserInfoResponse =
@@ -639,6 +669,7 @@ describe("CapabilityServerClient", () => {
     expect(startMcpServerOauthLogin).toHaveBeenCalledWith(mcpServerOauthLoginOptions);
     expect(executeCommand).toHaveBeenCalledWith(commandExecutionOptions);
     expect(readGitDiffToRemote).toHaveBeenCalledWith(gitDiffToRemoteOptions);
+    expect(searchFuzzyFiles).toHaveBeenCalledWith(fuzzyFileSearchOptions);
     expect(readAccountAuthStatus).toHaveBeenCalledWith(accountAuthStatusOptions);
     expect(readAccountUserInfo).toHaveBeenCalledWith(accountUserInfoOptions);
     expect(uploadFeedback).toHaveBeenCalledWith(feedbackUploadOptions);
@@ -666,6 +697,7 @@ describe("CapabilityServerClient", () => {
     expect(mcpServerOauthLoginResponse).toEqual(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
     expect(commandExecutionResponse).toEqual(COMMAND_EXECUTION_RESPONSE);
     expect(gitDiffToRemoteResponse).toEqual(GIT_DIFF_TO_REMOTE_RESPONSE);
+    expect(fuzzyFileSearchResponse).toEqual(FUZZY_FILE_SEARCH_RESPONSE);
     expect(accountAuthStatusResponse).toEqual(ACCOUNT_AUTH_STATUS_RESPONSE);
     expect(accountUserInfoResponse).toEqual(ACCOUNT_USER_INFO_RESPONSE);
     expect(feedbackUploadResponse).toEqual(FEEDBACK_UPLOAD_RESPONSE);

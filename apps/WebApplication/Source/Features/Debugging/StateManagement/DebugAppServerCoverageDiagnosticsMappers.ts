@@ -13,6 +13,7 @@ import type {
   CapabilityConfigWriteMergeStrategy,
   CapabilityExperimentalFeaturesResponse,
   CapabilityFeedbackUploadResponse,
+  CapabilityFuzzyFileSearchResponse,
   CapabilityGitDiffToRemoteResponse,
   CapabilityMcpServersResponse,
   CapabilityRemoteSkillsListResponse,
@@ -27,6 +28,7 @@ import type {
   DebugAppServerCoverageConfigValueWriteResult,
   DebugAppServerCoverageExperimentalFeature,
   DebugAppServerCoverageFeedbackUploadResult,
+  DebugAppServerCoverageFuzzyFileSearchResult,
   DebugAppServerCoverageGitDiffToRemoteResult,
   DebugAppServerCoverageMcpServerSummary,
   DebugAppServerCoveragePendingAccountLogin,
@@ -259,5 +261,24 @@ export function mapGitDiffToRemoteResult(
     sha: response.sha,
     diff: response.diff,
     readAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapFuzzyFileSearchResult(
+  response: CapabilityFuzzyFileSearchResponse,
+  query: string,
+  roots: string[],
+): DebugAppServerCoverageFuzzyFileSearchResult {
+  return {
+    query,
+    roots,
+    files: response.files.map((fileMatch) => ({
+      root: fileMatch.root,
+      path: fileMatch.path,
+      fileName: fileMatch.fileName,
+      score: fileMatch.score,
+      indices: fileMatch.indices,
+    })),
+    searchedAtIso8601: new Date().toISOString(),
   };
 }

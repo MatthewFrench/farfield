@@ -9,6 +9,8 @@ import {
   type ExportRemoteSkillResult,
   type FeedbackUploadOptions,
   type FeedbackUploadResult,
+  type FuzzyFileSearchOptions,
+  type FuzzyFileSearchResult,
   type GitDiffToRemoteOptions,
   type GitDiffToRemoteResult,
   type ListAppsOptions,
@@ -60,6 +62,8 @@ import type {
   AgentExportRemoteSkillInput,
   AgentExportRemoteSkillResult,
   AgentForkThreadInput,
+  AgentFuzzyFileSearchInput,
+  AgentFuzzyFileSearchResult,
   AgentGitDiffToRemoteInput,
   AgentGitDiffToRemoteResult,
   AgentListAppsInput,
@@ -332,6 +336,16 @@ function buildExportRemoteSkillOptions(
 function buildGitDiffToRemoteOptions(input: AgentGitDiffToRemoteInput): GitDiffToRemoteOptions {
   return {
     cwd: input.cwd,
+  };
+}
+
+function buildFuzzyFileSearchOptions(input: AgentFuzzyFileSearchInput): FuzzyFileSearchOptions {
+  return {
+    query: input.query,
+    roots: input.roots,
+    ...(input.cancellationToken !== undefined
+      ? { cancellationToken: input.cancellationToken }
+      : {}),
   };
 }
 
@@ -630,6 +644,16 @@ export class CodexThreadManagementOwner {
     this.ensureCodexAvailable();
     const result: GitDiffToRemoteResult = await this.runAppServerCall(() =>
       this.appClient.gitDiffToRemote(buildGitDiffToRemoteOptions(input)),
+    );
+    return result;
+  }
+
+  public async fuzzyFileSearch(
+    input: AgentFuzzyFileSearchInput,
+  ): Promise<AgentFuzzyFileSearchResult> {
+    this.ensureCodexAvailable();
+    const result: FuzzyFileSearchResult = await this.runAppServerCall(() =>
+      this.appClient.fuzzyFileSearch(buildFuzzyFileSearchOptions(input)),
     );
     return result;
   }

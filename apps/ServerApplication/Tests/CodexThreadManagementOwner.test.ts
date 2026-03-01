@@ -13,6 +13,8 @@ import {
   type FeedbackUploadOptions,
   type FeedbackUploadResult,
   type ForkThreadOptions,
+  type FuzzyFileSearchOptions,
+  type FuzzyFileSearchResult,
   type GitDiffToRemoteOptions,
   type GitDiffToRemoteResult,
   type ListAppsOptions,
@@ -122,6 +124,7 @@ class TestAppServerClient extends AppServerClient {
   public readonly readUserInfoCalls: Array<undefined> = [];
   public readonly uploadFeedbackCalls: FeedbackUploadOptions[] = [];
   public readonly gitDiffToRemoteCalls: GitDiffToRemoteOptions[] = [];
+  public readonly fuzzyFileSearchCalls: FuzzyFileSearchOptions[] = [];
   public readonly executeCommandCalls: CommandExecutionOptions[] = [];
   public readonly startAccountLoginCalls: LoginAccountOptions[] = [];
   public readonly cancelAccountLoginCalls: CancelAccountLoginOptions[] = [];
@@ -153,6 +156,7 @@ class TestAppServerClient extends AppServerClient {
   private readonly readUserInfoResult: ReadUserInfoResult;
   private readonly uploadFeedbackResult: FeedbackUploadResult;
   private readonly gitDiffToRemoteResult: GitDiffToRemoteResult;
+  private readonly fuzzyFileSearchResult: FuzzyFileSearchResult;
   private readonly executeCommandResult: CommandExecutionResult;
   private readonly startAccountLoginResult: LoginAccountResult;
   private readonly cancelAccountLoginResult: CancelAccountLoginResult;
@@ -183,6 +187,7 @@ class TestAppServerClient extends AppServerClient {
     readUserInfoResult?: ReadUserInfoResult;
     uploadFeedbackResult?: FeedbackUploadResult;
     gitDiffToRemoteResult?: GitDiffToRemoteResult;
+    fuzzyFileSearchResult?: FuzzyFileSearchResult;
     executeCommandResult?: CommandExecutionResult;
     startAccountLoginResult?: LoginAccountResult;
     cancelAccountLoginResult?: CancelAccountLoginResult;
@@ -266,6 +271,9 @@ class TestAppServerClient extends AppServerClient {
     this.gitDiffToRemoteResult = input?.gitDiffToRemoteResult ?? {
       sha: "abc123def456",
       diff: "diff --git a/file.ts b/file.ts",
+    };
+    this.fuzzyFileSearchResult = input?.fuzzyFileSearchResult ?? {
+      files: [],
     };
     this.executeCommandResult = input?.executeCommandResult ?? {
       exitCode: 0,
@@ -461,6 +469,13 @@ class TestAppServerClient extends AppServerClient {
   ): Promise<GitDiffToRemoteResult> {
     this.gitDiffToRemoteCalls.push(options);
     return this.gitDiffToRemoteResult;
+  }
+
+  public override async fuzzyFileSearch(
+    options: FuzzyFileSearchOptions,
+  ): Promise<FuzzyFileSearchResult> {
+    this.fuzzyFileSearchCalls.push(options);
+    return this.fuzzyFileSearchResult;
   }
 
   public override async executeCommand(
@@ -1328,6 +1343,48 @@ describe("CodexThreadManagementOwner", () => {
     expect(result).toEqual({
       sha: "abc123def456",
       diff: "diff --git a/file.ts b/file.ts",
+    });
+  });
+
+  it("searches fuzzy files through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      fuzzyFileSearchResult: {
+        files: [
+          {
+            root: "/tmp/workspace",
+            path: "apps/WebApplication/Source/Main.tsx",
+            fileName: "Main.tsx",
+            score: 0.94,
+            indices: [0, 1, 2],
+          },
+        ],
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.fuzzyFileSearch({
+      query: "main",
+      roots: ["/tmp/workspace", "/tmp/workspace/packages"],
+      cancellationToken: "token-1",
+    });
+
+    expect(appClient.fuzzyFileSearchCalls).toEqual([
+      {
+        query: "main",
+        roots: ["/tmp/workspace", "/tmp/workspace/packages"],
+        cancellationToken: "token-1",
+      },
+    ]);
+    expect(result).toEqual({
+      files: [
+        {
+          root: "/tmp/workspace",
+          path: "apps/WebApplication/Source/Main.tsx",
+          fileName: "Main.tsx",
+          score: 0.94,
+          indices: [0, 1, 2],
+        },
+      ],
     });
   });
 

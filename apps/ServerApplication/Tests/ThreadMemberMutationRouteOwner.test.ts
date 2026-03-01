@@ -76,6 +76,7 @@ function createAgentAdapter(input: {
       canListSkills: false,
       canReadAccount: false,
       canReadAccountRateLimits: false,
+      canSearchFuzzyFiles: false,
       canExecuteCommand: false,
       canStartAccountLogin: false,
       canCancelAccountLogin: false,

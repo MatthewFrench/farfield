@@ -209,6 +209,20 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         sha: "abc123def456",
         diff: "diff --git a/file.ts b/file.ts",
       });
+    const searchFuzzyFiles = vi
+      .spyOn(capabilityServerClient, "searchFuzzyFiles")
+      .mockResolvedValue({
+        ok: true,
+        files: [
+          {
+            root: "/tmp/project",
+            path: "apps/WebApplication/Source/Main.tsx",
+            fileName: "Main.tsx",
+            score: 0.94,
+            indices: [0, 1, 2],
+          },
+        ],
+      });
     const writeConfigValue = vi
       .spyOn(capabilityServerClient, "writeConfigValue")
       .mockResolvedValue({
@@ -296,6 +310,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       "v2",
     );
     latestDiagnostics.current?.readGitDiffToRemote("/tmp/project");
+    latestDiagnostics.current?.searchFuzzyFiles("main", ["/tmp/project"], "token-1");
     latestDiagnostics.current?.executeCommand(["pwd"], 1200, "/tmp/project");
     latestDiagnostics.current?.writeSkillsConfig(
       "/tmp/project/.codex/skills/checks/SKILL.md",
@@ -324,6 +339,12 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
       expect(readGitDiffToRemote).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
         cwd: "/tmp/project",
+      });
+      expect(searchFuzzyFiles).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        query: "main",
+        roots: ["/tmp/project"],
+        cancellationToken: "token-1",
       });
       expect(writeConfigValue).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -406,6 +427,20 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         sha: "abc123def456",
         diff: "diff --git a/file.ts b/file.ts",
         readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastFuzzyFileSearchResult).toEqual({
+        query: "main",
+        roots: ["/tmp/project"],
+        files: [
+          {
+            root: "/tmp/project",
+            path: "apps/WebApplication/Source/Main.tsx",
+            fileName: "Main.tsx",
+            score: 0.94,
+            indices: [0, 1, 2],
+          },
+        ],
+        searchedAtIso8601: expect.any(String),
       });
     });
 
