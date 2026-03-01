@@ -51,6 +51,7 @@ const BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY: ThreadSidebarRuntimeSummary = {
   rateLimits: null,
   apps: null,
   progress: null,
+  warning: null,
   tokenUsage: null,
   modelReroute: null,
 };

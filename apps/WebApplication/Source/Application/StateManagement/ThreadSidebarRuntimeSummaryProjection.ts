@@ -6,6 +6,7 @@ import {
 import {
   type ThreadRuntimeModelRerouteSummary,
   type ThreadRuntimeProgressSummary,
+  type ThreadRuntimeWarningSummary,
   type ThreadSidebarRuntimeSummary,
   type ThreadSidebarTokenUsageSummary,
 } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
@@ -13,6 +14,7 @@ import {
   type RuntimeModelRerouteEvent,
   type RuntimeThreadProgressEvent,
   type RuntimeThreadTokenUsageUpdate,
+  type RuntimeWarningEvent,
 } from "./RuntimeNotificationProjectionParser";
 
 /**
@@ -25,6 +27,7 @@ export function createInitialThreadSidebarRuntimeSummary(): ThreadSidebarRuntime
     rateLimits: null,
     apps: null,
     progress: null,
+    warning: null,
     tokenUsage: null,
     modelReroute: null,
   };
@@ -132,6 +135,18 @@ export function readThreadRuntimeProgressSummary(
   };
 }
 
+export function readThreadRuntimeWarningSummary(
+  event: RuntimeWarningEvent,
+): ThreadRuntimeWarningSummary {
+  return {
+    method: event.method,
+    summary: event.summary,
+    sequence: event.sequence,
+    receivedAtMilliseconds: event.receivedAtMilliseconds,
+    refreshedAtMilliseconds: Date.now(),
+  };
+}
+
 export function readLatestThreadTokenUsageUpdateForThread(
   updates: readonly RuntimeThreadTokenUsageUpdate[],
   selectedThreadId: string | null,
@@ -163,4 +178,10 @@ export function readLatestThreadProgressEventForThread(
   }
   const matchingEvents = events.filter((event) => event.threadId === selectedThreadId);
   return matchingEvents.at(-1) ?? null;
+}
+
+export function readLatestWarningEvent(
+  events: readonly RuntimeWarningEvent[],
+): RuntimeWarningEvent | null {
+  return events.at(-1) ?? null;
 }

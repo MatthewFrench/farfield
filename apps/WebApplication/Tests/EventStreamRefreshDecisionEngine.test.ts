@@ -329,6 +329,45 @@ describe("EventStreamRefreshDecisionEngine", () => {
     });
   });
 
+  it.each([
+    "configWarning",
+    "deprecationNotice",
+    "windows/worldWritableWarning",
+  ])("marks runtime-notification projection work when warning method %s is present", (methodName) => {
+    const engine = createEngine();
+    const decision = engine.readDecision({
+      activeTab: "chat",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 12,
+        event: {
+          type: "activity-history-appended",
+          entry: {
+            id: "entry-12",
+            at: "2026-02-26T00:00:00.000Z",
+            source: "app",
+            direction: "out",
+            payload: {
+              type: "action",
+              action: methodName,
+            },
+            meta: {
+              method: methodName,
+            },
+          },
+        },
+      }),
+    });
+
+    expect(decision).toEqual({
+      refreshCore: true,
+      refreshHistory: false,
+      refreshSelectedThread: false,
+      refreshNotificationProjections: true,
+      threadStreamDelta: null,
+    });
+  });
+
   it("skips selected-thread refresh for stream-state-changed history methods", () => {
     const engine = createEngine();
 

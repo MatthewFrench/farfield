@@ -1,7 +1,10 @@
 import { Loader2, Menu, Moon, PanelLeft, RefreshCcw, Settings2, Sun } from "lucide-react";
 import { Button } from "@/Components/UserInterface/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/UserInterface/Tooltip";
-import { type ThreadRuntimeModelRerouteSummary } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
+import {
+  type ThreadRuntimeModelRerouteSummary,
+  type ThreadRuntimeWarningSummary,
+} from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 
 const DEBUG_TAB = "debug";
@@ -69,6 +72,7 @@ export interface ApplicationHeaderBarProps {
   activeThreadAgentId: AgentId;
   activeAgentLabel: string;
   isGenerating: boolean;
+  runtimeWarningSummary: ThreadRuntimeWarningSummary | null;
   runtimeModelRerouteSummary: ThreadRuntimeModelRerouteSummary | null;
   isBusy: boolean;
   theme: string;
@@ -82,6 +86,10 @@ export interface ApplicationHeaderBarProps {
 
 function readModelRerouteBannerLabel(summary: ThreadRuntimeModelRerouteSummary): string {
   return `Model rerouted ${summary.fromModel} -> ${summary.toModel}`;
+}
+
+function readRuntimeWarningBannerLabel(summary: ThreadRuntimeWarningSummary): string {
+  return `Warning: ${summary.summary}`;
 }
 
 function buildSidebarOpenHandler(
@@ -113,6 +121,7 @@ export function ApplicationHeaderBar({
   activeThreadAgentId,
   activeAgentLabel,
   isGenerating,
+  runtimeWarningSummary,
   runtimeModelRerouteSummary,
   isBusy,
   theme,
@@ -173,6 +182,11 @@ export function ApplicationHeaderBar({
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <Loader2 size={9} className="animate-spin" />
               <span>generating</span>
+            </div>
+          )}
+          {runtimeWarningSummary !== null && (
+            <div data-testid="header-runtime-warning-banner" className="text-[11px] text-amber-500">
+              {readRuntimeWarningBannerLabel(runtimeWarningSummary)}
             </div>
           )}
           {runtimeModelRerouteSummary !== null && (

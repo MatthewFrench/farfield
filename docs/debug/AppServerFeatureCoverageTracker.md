@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 15:10:00Z
+Last Updated (UTC): 2026-03-01 21:12:00Z
 
 ## Purpose
 
@@ -63,7 +63,7 @@ As of the upstream snapshot above:
 8. Farfield now consumes `serverRequest/resolved` notifications through dedicated debug coverage diagnostics with strict typed event mapping and explicit pending-request refresh controls.
 9. Farfield now consumes fuzzy-session notifications (`fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`) through dedicated debug coverage diagnostics with strict typed session/result mapping and cursor-safe reads.
 10. Farfield now consumes `model/rerouted` notifications through dedicated debug coverage diagnostics with strict typed reroute mapping and explicit reason visibility, and projects selected-thread reroutes into a visible header runtime banner.
-11. Farfield now consumes warning notifications (`configWarning`, `deprecationNotice`, `windows/worldWritableWarning`) through dedicated debug coverage diagnostics with strict typed warning payload mapping and cursor-safe reads.
+11. Farfield now consumes warning notifications (`configWarning`, `deprecationNotice`, `windows/worldWritableWarning`) through dedicated debug coverage diagnostics with strict typed warning payload mapping and cursor-safe reads, and projects selected-thread warning summaries into a visible header warning banner.
 12. Farfield now consumes thread-lifecycle notifications (`thread/archived`, `thread/unarchived`, `thread/name/updated`, `thread/closed`, `thread/status/changed`) through dedicated debug coverage diagnostics with strict typed lifecycle/state mapping and thread-filtered reads.
 13. Farfield now consumes `error` notifications through dedicated debug coverage diagnostics with strict typed turn-error mapping and retry-state visibility.
 14. Farfield now consumes turn-lifecycle notifications (`turn/started`, `turn/completed`, `turn/plan/updated`, `turn/diff/updated`) through dedicated debug coverage diagnostics with strict typed lifecycle mapping and cursor-safe reads.
@@ -72,7 +72,7 @@ As of the upstream snapshot above:
 17. Farfield now consumes thread-progress notifications (`thread/started`, `thread/compacted`, `thread/tokenUsage/updated`) through dedicated debug coverage diagnostics with strict typed thread/token mapping and cursor-safe reads, and projects selected-thread progress plus token usage into sidebar runtime summary chips.
 18. Farfield now consumes thread-realtime notifications (`thread/realtime/started`, `thread/realtime/itemAdded`, `thread/realtime/outputAudio/delta`, `thread/realtime/error`, `thread/realtime/closed`) through dedicated debug coverage diagnostics with strict typed realtime payload mapping and cursor-safe reads.
 19. Farfield now consumes account/app/sandbox update notifications (`account/updated`, `account/rateLimits/updated`, `app/list/updated`, `windowsSandbox/setupCompleted`) through dedicated debug coverage diagnostics with strict typed update-state mapping and cursor-safe reads, and projects account/rate-limit/app-list updates into sidebar runtime summary chips with capability-gated initial hydration.
-20. Farfield runtime composition now projects notification-event reads for `thread/status/changed`, `thread/started`, `thread/compacted`, `thread/tokenUsage/updated`, and `model/rerouted` into product runtime surfaces (thread-row status badges, sidebar progress/token-usage chips, and header reroute banners) with strict schema parsing, deterministic selected-thread merges, and bounded read observability ownership.
+20. Farfield runtime composition now projects notification-event reads for `thread/status/changed`, `thread/started`, `thread/compacted`, `thread/tokenUsage/updated`, `model/rerouted`, `configWarning`, `deprecationNotice`, and `windows/worldWritableWarning` into product runtime surfaces (thread-row status badges, sidebar progress/token-usage chips, header reroute banners, and header warning banners) with strict schema parsing, deterministic selected-thread merges, and bounded read observability ownership.
 
 ## Canonical Coverage Artifacts
 

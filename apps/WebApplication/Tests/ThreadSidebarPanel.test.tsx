@@ -51,6 +51,7 @@ const BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY: ThreadSidebarRuntimeSummary = {
   rateLimits: null,
   apps: null,
   progress: null,
+  warning: null,
   tokenUsage: null,
   modelReroute: null,
 };
@@ -143,6 +144,7 @@ describe("ThreadSidebarPanel", () => {
           receivedAtMilliseconds: 1_700_000_000_550,
           refreshedAtMilliseconds: 1_700_000_000_560,
         },
+        warning: null,
         tokenUsage: {
           threadId: "thread-1",
           turnId: "turn-1",
@@ -188,6 +190,7 @@ describe("ThreadSidebarPanel", () => {
           receivedAtMilliseconds: 1_700_000_000_800,
           refreshedAtMilliseconds: 1_700_000_000_900,
         },
+        warning: null,
         tokenUsage: null,
         modelReroute: null,
       },

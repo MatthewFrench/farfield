@@ -11,6 +11,13 @@ interface RenderApplicationHeaderBarInput {
   onToggleSettingsTab?: () => void;
   onOpenMobileSidebar?: () => void;
   onOpenDesktopSidebar?: () => void;
+  runtimeWarningSummary?: {
+    method: "configWarning" | "deprecationNotice" | "windows/worldWritableWarning";
+    summary: string;
+    sequence: number;
+    receivedAtMilliseconds: number;
+    refreshedAtMilliseconds: number;
+  } | null;
   runtimeModelRerouteSummary?: {
     threadId: string;
     turnId: string;
@@ -35,6 +42,7 @@ function renderApplicationHeaderBar(input?: RenderApplicationHeaderBarInput): vo
         activeThreadAgentId="codex"
         activeAgentLabel="Codex"
         isGenerating={false}
+        runtimeWarningSummary={input?.runtimeWarningSummary ?? null}
         runtimeModelRerouteSummary={input?.runtimeModelRerouteSummary ?? null}
         isBusy={input?.isBusy ?? false}
         theme="light"
@@ -159,6 +167,22 @@ describe("ApplicationHeaderBar", () => {
 
     expect(screen.getByTestId("header-runtime-model-reroute-banner").textContent).toBe(
       "Model rerouted gpt-5 -> gpt-5-safe",
+    );
+  });
+
+  it("renders runtime warning banner when warning summary is present", () => {
+    renderApplicationHeaderBar({
+      runtimeWarningSummary: {
+        method: "configWarning",
+        summary: "Config file has an unknown key",
+        sequence: 18,
+        receivedAtMilliseconds: 1_700_000_000_700,
+        refreshedAtMilliseconds: 1_700_000_000_800,
+      },
+    });
+
+    expect(screen.getByTestId("header-runtime-warning-banner").textContent).toBe(
+      "Warning: Config file has an unknown key",
     );
   });
 });

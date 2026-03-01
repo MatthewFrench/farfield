@@ -107,12 +107,21 @@ describe("RuntimeNotificationProjectionParser", () => {
           },
           receivedAtMilliseconds: 8_105,
         },
+        {
+          sequence: 108,
+          method: "configWarning",
+          params: {
+            summary: "Config file has an unknown key",
+            details: null,
+          },
+          receivedAtMilliseconds: 8_107,
+        },
       ]),
     );
 
     expect(projection).toEqual({
-      processedEventCount: 8,
-      relevantEventCount: 8,
+      processedEventCount: 9,
+      relevantEventCount: 9,
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [
@@ -166,6 +175,14 @@ describe("RuntimeNotificationProjectionParser", () => {
           receivedAtMilliseconds: 8_105,
         },
       ],
+      warningEvents: [
+        {
+          method: "configWarning",
+          sequence: 108,
+          summary: "Config file has an unknown key",
+          receivedAtMilliseconds: 8_107,
+        },
+      ],
       shouldRefreshAccount: true,
       shouldRefreshAccountRateLimits: true,
       shouldRefreshApps: true,
@@ -213,6 +230,7 @@ describe("RuntimeNotificationProjectionParser", () => {
       nextSequence: 200,
       threadStatusUpdates: [],
       threadProgressEvents: [],
+      warningEvents: [],
       threadTokenUsageUpdates: [],
       modelRerouteEvents: [],
       shouldRefreshAccount: false,

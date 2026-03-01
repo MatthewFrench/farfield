@@ -244,7 +244,7 @@ function createAccountAndAppNotificationEventsResponse(): CapabilityNotification
   };
 }
 
-function createThreadProgressTokenUsageAndModelRerouteNotificationEventsResponse(): CapabilityNotificationEventsResponse {
+function createThreadProgressWarningTokenUsageAndModelRerouteNotificationEventsResponse(): CapabilityNotificationEventsResponse {
   return {
     ok: true,
     events: [
@@ -307,8 +307,17 @@ function createThreadProgressTokenUsageAndModelRerouteNotificationEventsResponse
         },
         receivedAtMilliseconds: 2_032,
       },
+      {
+        sequence: 64,
+        method: "configWarning",
+        params: {
+          summary: "Config file has an unknown key",
+          details: null,
+        },
+        receivedAtMilliseconds: 2_033,
+      },
     ],
-    nextSequence: 64,
+    nextSequence: 65,
     firstAvailableSequence: 0,
     resetRequired: false,
   };
@@ -699,7 +708,7 @@ describe("useEventStreamEffects", () => {
     expect(setThreadSidebarRuntimeSummary).toHaveBeenCalled();
   });
 
-  it("projects selected-thread progress token-usage and model-reroute summaries", async () => {
+  it("projects selected-thread progress/warning token-usage and model-reroute summaries", async () => {
     setDocumentVisibilityState("visible");
 
     const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
@@ -713,7 +722,7 @@ describe("useEventStreamEffects", () => {
     );
     input.setThreadSidebarRuntimeSummary = setThreadSidebarRuntimeSummary;
     vi.spyOn(input.capabilityServerClient, "readNotificationEvents").mockResolvedValue(
-      createThreadProgressTokenUsageAndModelRerouteNotificationEventsResponse(),
+      createThreadProgressWarningTokenUsageAndModelRerouteNotificationEventsResponse(),
     );
 
     render(<Harness input={input} />);
@@ -740,6 +749,7 @@ describe("useEventStreamEffects", () => {
         rateLimits: null,
         apps: null,
         progress: null,
+        warning: null,
         tokenUsage: null,
         modelReroute: null,
       }),
@@ -755,6 +765,13 @@ describe("useEventStreamEffects", () => {
         modelProvider: null,
         sequence: 63,
         receivedAtMilliseconds: 2_032,
+        refreshedAtMilliseconds: expect.any(Number),
+      },
+      warning: {
+        method: "configWarning",
+        summary: "Config file has an unknown key",
+        sequence: 64,
+        receivedAtMilliseconds: 2_033,
         refreshedAtMilliseconds: expect.any(Number),
       },
       tokenUsage: {

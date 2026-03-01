@@ -68,6 +68,19 @@ export interface ThreadRuntimeProgressSummary {
   refreshedAtMilliseconds: number;
 }
 
+export type ThreadRuntimeWarningMethod =
+  | "configWarning"
+  | "deprecationNotice"
+  | "windows/worldWritableWarning";
+
+export interface ThreadRuntimeWarningSummary {
+  method: ThreadRuntimeWarningMethod;
+  summary: string;
+  sequence: number;
+  receivedAtMilliseconds: number;
+  refreshedAtMilliseconds: number;
+}
+
 export type ThreadRuntimeModelRerouteReason = "highRiskCyberActivity";
 
 export interface ThreadRuntimeModelRerouteSummary {
@@ -86,6 +99,7 @@ export interface ThreadSidebarRuntimeSummary {
   rateLimits: ThreadSidebarRateLimitSummary | null;
   apps: ThreadSidebarAppsSummary | null;
   progress: ThreadRuntimeProgressSummary | null;
+  warning: ThreadRuntimeWarningSummary | null;
   tokenUsage: ThreadSidebarTokenUsageSummary | null;
   modelReroute: ThreadRuntimeModelRerouteSummary | null;
 }

@@ -34,8 +34,10 @@ import {
   readLatestModelRerouteEventForThread,
   readLatestThreadProgressEventForThread,
   readLatestThreadTokenUsageUpdateForThread,
+  readLatestWarningEvent,
   readThreadRuntimeModelRerouteSummary,
   readThreadRuntimeProgressSummary,
+  readThreadRuntimeWarningSummary,
   readThreadSidebarAccountSummary,
   readThreadSidebarAppsSummary,
   readThreadSidebarRateLimitSummary,
@@ -416,11 +418,15 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
                     runtimeNotificationProjection.threadProgressEvents,
                     scheduledRefreshSnapshot.selectedThreadId,
                   );
+                const latestWarningEvent = readLatestWarningEvent(
+                  runtimeNotificationProjection.warningEvents,
+                );
                 if (
                   runtimeNotificationProjection.resetRequired ||
                   latestTokenUsageUpdateForSelectedThread !== null ||
                   latestModelRerouteEventForSelectedThread !== null ||
-                  latestThreadProgressEventForSelectedThread !== null
+                  latestThreadProgressEventForSelectedThread !== null ||
+                  latestWarningEvent !== null
                 ) {
                   input.setThreadSidebarRuntimeSummary((previousSummary) => {
                     const nextTokenUsageSummary =
@@ -447,16 +453,24 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
                         : runtimeNotificationProjection.resetRequired
                           ? null
                           : previousSummary.progress;
+                    const nextWarningSummary =
+                      latestWarningEvent !== null
+                        ? readThreadRuntimeWarningSummary(latestWarningEvent)
+                        : runtimeNotificationProjection.resetRequired
+                          ? null
+                          : previousSummary.warning;
                     if (
                       nextTokenUsageSummary === previousSummary.tokenUsage &&
                       nextModelRerouteSummary === previousSummary.modelReroute &&
-                      nextThreadProgressSummary === previousSummary.progress
+                      nextThreadProgressSummary === previousSummary.progress &&
+                      nextWarningSummary === previousSummary.warning
                     ) {
                       return previousSummary;
                     }
                     return {
                       ...previousSummary,
                       progress: nextThreadProgressSummary,
+                      warning: nextWarningSummary,
                       tokenUsage: nextTokenUsageSummary,
                       modelReroute: nextModelRerouteSummary,
                     };

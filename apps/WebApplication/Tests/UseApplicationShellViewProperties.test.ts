@@ -230,6 +230,7 @@ function createUseApplicationShellViewPropertiesFixture() {
       rateLimits: null,
       apps: null,
       progress: null,
+      warning: null,
       tokenUsage: null,
       modelReroute: null,
     },
@@ -596,6 +597,7 @@ describe("useApplicationShellViewProperties", () => {
         refreshedAtMilliseconds: 1_700_000_000_500,
       },
       progress: null,
+      warning: null,
       tokenUsage: null,
       modelReroute: null,
     };
@@ -621,8 +623,38 @@ describe("useApplicationShellViewProperties", () => {
         refreshedAtMilliseconds: 1_700_000_000_500,
       },
       progress: null,
+      warning: null,
       tokenUsage: null,
       modelReroute: null,
+    });
+  });
+
+  it("maps runtime warning summary into header properties", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.threadSidebarRuntimeSummary = {
+      account: null,
+      rateLimits: null,
+      apps: null,
+      progress: null,
+      warning: {
+        method: "configWarning",
+        summary: "Config file has an unknown key",
+        sequence: 18,
+        receivedAtMilliseconds: 1_700_000_000_700,
+        refreshedAtMilliseconds: 1_700_000_000_800,
+      },
+      tokenUsage: null,
+      modelReroute: null,
+    };
+
+    const viewProperties = renderViewProperties(fixture.input);
+
+    expect(viewProperties.applicationHeaderBarProperties.runtimeWarningSummary).toEqual({
+      method: "configWarning",
+      summary: "Config file has an unknown key",
+      sequence: 18,
+      receivedAtMilliseconds: 1_700_000_000_700,
+      refreshedAtMilliseconds: 1_700_000_000_800,
     });
   });
 
@@ -633,6 +665,7 @@ describe("useApplicationShellViewProperties", () => {
       rateLimits: null,
       apps: null,
       progress: null,
+      warning: null,
       tokenUsage: null,
       modelReroute: {
         threadId: "thread-1",
