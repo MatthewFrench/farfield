@@ -141,6 +141,8 @@ export function readThreadRuntimeWarningSummary(
   return {
     method: event.method,
     summary: event.summary,
+    threadId: event.threadId,
+    isRetrying: event.isRetrying,
     sequence: event.sequence,
     receivedAtMilliseconds: event.receivedAtMilliseconds,
     refreshedAtMilliseconds: Date.now(),
@@ -182,6 +184,14 @@ export function readLatestThreadProgressEventForThread(
 
 export function readLatestWarningEvent(
   events: readonly RuntimeWarningEvent[],
+  selectedThreadId: string | null,
 ): RuntimeWarningEvent | null {
-  return events.at(-1) ?? null;
+  if (selectedThreadId === null || selectedThreadId.length === 0) {
+    return events.filter((event) => event.threadId === null).at(-1) ?? null;
+  }
+  return (
+    events
+      .filter((event) => event.threadId === null || event.threadId === selectedThreadId)
+      .at(-1) ?? null
+  );
 }

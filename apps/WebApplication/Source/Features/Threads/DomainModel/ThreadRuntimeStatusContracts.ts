@@ -71,11 +71,14 @@ export interface ThreadRuntimeProgressSummary {
 export type ThreadRuntimeWarningMethod =
   | "configWarning"
   | "deprecationNotice"
-  | "windows/worldWritableWarning";
+  | "windows/worldWritableWarning"
+  | "error";
 
 export interface ThreadRuntimeWarningSummary {
   method: ThreadRuntimeWarningMethod;
   summary: string;
+  threadId: string | null;
+  isRetrying: boolean;
   sequence: number;
   receivedAtMilliseconds: number;
   refreshedAtMilliseconds: number;

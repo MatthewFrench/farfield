@@ -16,6 +16,7 @@ const MODEL_REROUTED_NOTIFICATION_METHOD = "model/rerouted";
 const CONFIG_WARNING_NOTIFICATION_METHOD = "configWarning";
 const DEPRECATION_NOTICE_NOTIFICATION_METHOD = "deprecationNotice";
 const WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD = "windows/worldWritableWarning";
+const ERROR_NOTIFICATION_METHOD = "error";
 const ACCOUNT_UPDATED_NOTIFICATION_METHOD = "account/updated";
 const ACCOUNT_RATE_LIMITS_UPDATED_NOTIFICATION_METHOD = "account/rateLimits/updated";
 const APP_LIST_UPDATED_NOTIFICATION_METHOD = "app/list/updated";
@@ -145,6 +146,19 @@ const WindowsWorldWritableWarningParametersSchema = z
   })
   .strict();
 
+const ErrorNotificationParametersSchema = z
+  .object({
+    error: z
+      .object({
+        message: z.string().min(1),
+      })
+      .passthrough(),
+    willRetry: z.boolean(),
+    threadId: z.string().min(1),
+    turnId: z.string().min(1),
+  })
+  .strict();
+
 const ModelReroutedNotificationParametersSchema = z
   .object({
     threadId: z.string().min(1),
@@ -197,6 +211,8 @@ export interface RuntimeWarningEvent {
   method: ThreadRuntimeWarningMethod;
   sequence: number;
   summary: string;
+  threadId: string | null;
+  isRetrying: boolean;
   receivedAtMilliseconds: number;
 }
 
@@ -302,6 +318,8 @@ function mapConfigWarningEvent(
     method: CONFIG_WARNING_NOTIFICATION_METHOD,
     sequence: event.sequence,
     summary: parsedParameters.summary,
+    threadId: null,
+    isRetrying: false,
     receivedAtMilliseconds: event.receivedAtMilliseconds,
   };
 }
@@ -314,6 +332,8 @@ function mapDeprecationNoticeEvent(
     method: DEPRECATION_NOTICE_NOTIFICATION_METHOD,
     sequence: event.sequence,
     summary: parsedParameters.summary,
+    threadId: null,
+    isRetrying: false,
     receivedAtMilliseconds: event.receivedAtMilliseconds,
   };
 }
@@ -326,6 +346,22 @@ function mapWindowsWorldWritableWarningEvent(
     method: WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD,
     sequence: event.sequence,
     summary: "World-writable paths detected",
+    threadId: null,
+    isRetrying: false,
+    receivedAtMilliseconds: event.receivedAtMilliseconds,
+  };
+}
+
+function mapErrorEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeWarningEvent {
+  const parsedParameters = ErrorNotificationParametersSchema.parse(event.params);
+  return {
+    method: ERROR_NOTIFICATION_METHOD,
+    sequence: event.sequence,
+    summary: parsedParameters.error.message,
+    threadId: parsedParameters.threadId,
+    isRetrying: parsedParameters.willRetry,
     receivedAtMilliseconds: event.receivedAtMilliseconds,
   };
 }
@@ -392,6 +428,12 @@ export function readRuntimeNotificationProjection(
 
     if (event.method === WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD) {
       warningEvents.push(mapWindowsWorldWritableWarningEvent(event));
+      relevantEventCount += 1;
+      continue;
+    }
+
+    if (event.method === ERROR_NOTIFICATION_METHOD) {
+      warningEvents.push(mapErrorEvent(event));
       relevantEventCount += 1;
       continue;
     }

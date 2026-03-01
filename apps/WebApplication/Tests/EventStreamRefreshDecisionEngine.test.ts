@@ -333,7 +333,8 @@ describe("EventStreamRefreshDecisionEngine", () => {
     "configWarning",
     "deprecationNotice",
     "windows/worldWritableWarning",
-  ])("marks runtime-notification projection work when warning method %s is present", (methodName) => {
+    "error",
+  ])("marks runtime-notification projection work when runtime method %s is present", (methodName) => {
     const engine = createEngine();
     const decision = engine.readDecision({
       activeTab: "chat",

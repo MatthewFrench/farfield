@@ -420,6 +420,7 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
                   );
                 const latestWarningEvent = readLatestWarningEvent(
                   runtimeNotificationProjection.warningEvents,
+                  scheduledRefreshSnapshot.selectedThreadId,
                 );
                 if (
                   runtimeNotificationProjection.resetRequired ||

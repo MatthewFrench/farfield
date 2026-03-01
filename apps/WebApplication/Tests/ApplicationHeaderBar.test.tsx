@@ -12,8 +12,10 @@ interface RenderApplicationHeaderBarInput {
   onOpenMobileSidebar?: () => void;
   onOpenDesktopSidebar?: () => void;
   runtimeWarningSummary?: {
-    method: "configWarning" | "deprecationNotice" | "windows/worldWritableWarning";
+    method: "configWarning" | "deprecationNotice" | "windows/worldWritableWarning" | "error";
     summary: string;
+    threadId: string | null;
+    isRetrying: boolean;
     sequence: number;
     receivedAtMilliseconds: number;
     refreshedAtMilliseconds: number;
@@ -175,6 +177,8 @@ describe("ApplicationHeaderBar", () => {
       runtimeWarningSummary: {
         method: "configWarning",
         summary: "Config file has an unknown key",
+        threadId: null,
+        isRetrying: false,
         sequence: 18,
         receivedAtMilliseconds: 1_700_000_000_700,
         refreshedAtMilliseconds: 1_700_000_000_800,
@@ -184,5 +188,23 @@ describe("ApplicationHeaderBar", () => {
     expect(screen.getByTestId("header-runtime-warning-banner").textContent).toBe(
       "Warning: Config file has an unknown key",
     );
+  });
+
+  it("renders runtime error banner with retry context", () => {
+    renderApplicationHeaderBar({
+      runtimeWarningSummary: {
+        method: "error",
+        summary: "Turn failed to stream",
+        threadId: "thread-1",
+        isRetrying: true,
+        sequence: 20,
+        receivedAtMilliseconds: 1_700_000_000_900,
+        refreshedAtMilliseconds: 1_700_000_001_000,
+      },
+    });
+
+    const banner = screen.getByTestId("header-runtime-warning-banner");
+    expect(banner.textContent).toBe("Error: Turn failed to stream (retrying)");
+    expect(banner.className).toContain("text-red-500");
   });
 });

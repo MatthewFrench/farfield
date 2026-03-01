@@ -116,12 +116,25 @@ describe("RuntimeNotificationProjectionParser", () => {
           },
           receivedAtMilliseconds: 8_107,
         },
+        {
+          sequence: 109,
+          method: "error",
+          params: {
+            error: {
+              message: "Turn failed to stream",
+            },
+            willRetry: true,
+            threadId: "thread-1",
+            turnId: "turn-2",
+          },
+          receivedAtMilliseconds: 8_108,
+        },
       ]),
     );
 
     expect(projection).toEqual({
-      processedEventCount: 9,
-      relevantEventCount: 9,
+      processedEventCount: 10,
+      relevantEventCount: 10,
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [
@@ -180,7 +193,17 @@ describe("RuntimeNotificationProjectionParser", () => {
           method: "configWarning",
           sequence: 108,
           summary: "Config file has an unknown key",
+          threadId: null,
+          isRetrying: false,
           receivedAtMilliseconds: 8_107,
+        },
+        {
+          method: "error",
+          sequence: 109,
+          summary: "Turn failed to stream",
+          threadId: "thread-1",
+          isRetrying: true,
+          receivedAtMilliseconds: 8_108,
         },
       ],
       shouldRefreshAccount: true,

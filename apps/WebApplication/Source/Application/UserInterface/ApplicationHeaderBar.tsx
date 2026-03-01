@@ -89,7 +89,13 @@ function readModelRerouteBannerLabel(summary: ThreadRuntimeModelRerouteSummary):
 }
 
 function readRuntimeWarningBannerLabel(summary: ThreadRuntimeWarningSummary): string {
-  return `Warning: ${summary.summary}`;
+  const prefix = summary.method === "error" ? "Error" : "Warning";
+  const retrySuffix = summary.isRetrying ? " (retrying)" : "";
+  return `${prefix}: ${summary.summary}${retrySuffix}`;
+}
+
+function readRuntimeWarningBannerClassName(summary: ThreadRuntimeWarningSummary): string {
+  return summary.method === "error" ? "text-[11px] text-red-500" : "text-[11px] text-amber-500";
 }
 
 function buildSidebarOpenHandler(
@@ -185,7 +191,10 @@ export function ApplicationHeaderBar({
             </div>
           )}
           {runtimeWarningSummary !== null && (
-            <div data-testid="header-runtime-warning-banner" className="text-[11px] text-amber-500">
+            <div
+              data-testid="header-runtime-warning-banner"
+              className={readRuntimeWarningBannerClassName(runtimeWarningSummary)}
+            >
               {readRuntimeWarningBannerLabel(runtimeWarningSummary)}
             </div>
           )}

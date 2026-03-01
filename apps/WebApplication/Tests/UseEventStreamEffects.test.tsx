@@ -244,7 +244,7 @@ function createAccountAndAppNotificationEventsResponse(): CapabilityNotification
   };
 }
 
-function createThreadProgressWarningTokenUsageAndModelRerouteNotificationEventsResponse(): CapabilityNotificationEventsResponse {
+function createThreadProgressWarningErrorTokenUsageAndModelRerouteNotificationEventsResponse(): CapabilityNotificationEventsResponse {
   return {
     ok: true,
     events: [
@@ -316,8 +316,21 @@ function createThreadProgressWarningTokenUsageAndModelRerouteNotificationEventsR
         },
         receivedAtMilliseconds: 2_033,
       },
+      {
+        sequence: 65,
+        method: "error",
+        params: {
+          error: {
+            message: "Turn failed to stream",
+          },
+          willRetry: true,
+          threadId: "thread-1",
+          turnId: "turn-2",
+        },
+        receivedAtMilliseconds: 2_034,
+      },
     ],
-    nextSequence: 65,
+    nextSequence: 66,
     firstAvailableSequence: 0,
     resetRequired: false,
   };
@@ -708,7 +721,7 @@ describe("useEventStreamEffects", () => {
     expect(setThreadSidebarRuntimeSummary).toHaveBeenCalled();
   });
 
-  it("projects selected-thread progress/warning token-usage and model-reroute summaries", async () => {
+  it("projects selected-thread progress/warning-error token-usage and model-reroute summaries", async () => {
     setDocumentVisibilityState("visible");
 
     const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
@@ -722,7 +735,7 @@ describe("useEventStreamEffects", () => {
     );
     input.setThreadSidebarRuntimeSummary = setThreadSidebarRuntimeSummary;
     vi.spyOn(input.capabilityServerClient, "readNotificationEvents").mockResolvedValue(
-      createThreadProgressWarningTokenUsageAndModelRerouteNotificationEventsResponse(),
+      createThreadProgressWarningErrorTokenUsageAndModelRerouteNotificationEventsResponse(),
     );
 
     render(<Harness input={input} />);
@@ -768,10 +781,12 @@ describe("useEventStreamEffects", () => {
         refreshedAtMilliseconds: expect.any(Number),
       },
       warning: {
-        method: "configWarning",
-        summary: "Config file has an unknown key",
-        sequence: 64,
-        receivedAtMilliseconds: 2_033,
+        method: "error",
+        summary: "Turn failed to stream",
+        threadId: "thread-1",
+        isRetrying: true,
+        sequence: 65,
+        receivedAtMilliseconds: 2_034,
         refreshedAtMilliseconds: expect.any(Number),
       },
       tokenUsage: {

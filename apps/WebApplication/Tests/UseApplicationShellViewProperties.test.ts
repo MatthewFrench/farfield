@@ -639,6 +639,8 @@ describe("useApplicationShellViewProperties", () => {
       warning: {
         method: "configWarning",
         summary: "Config file has an unknown key",
+        threadId: null,
+        isRetrying: false,
         sequence: 18,
         receivedAtMilliseconds: 1_700_000_000_700,
         refreshedAtMilliseconds: 1_700_000_000_800,
@@ -652,6 +654,8 @@ describe("useApplicationShellViewProperties", () => {
     expect(viewProperties.applicationHeaderBarProperties.runtimeWarningSummary).toEqual({
       method: "configWarning",
       summary: "Config file has an unknown key",
+      threadId: null,
+      isRetrying: false,
       sequence: 18,
       receivedAtMilliseconds: 1_700_000_000_700,
       refreshedAtMilliseconds: 1_700_000_000_800,
