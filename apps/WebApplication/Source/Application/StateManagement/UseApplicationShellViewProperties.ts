@@ -92,11 +92,13 @@ export interface UseApplicationShellViewPropertiesInput {
   chatScrollStateCoordinator: ChatScrollStateCoordinator;
   setIsChatAtBottom: (nextIsAtBottom: boolean) => void;
   activeRequest: ChatWorkspacePaneProps["activeRequest"];
+  activeAuthTokenRefreshRequest?: ChatWorkspacePaneProps["activeAuthTokenRefreshRequest"];
   canSubmitUserInputForActiveAgent: boolean;
   answerDraft: ChatWorkspacePaneProps["answerDraft"];
   handleAnswerChange: ChatWorkspacePaneProps["onAnswerDraftChange"];
   submitPendingRequest: () => void | Promise<void>;
   skipPendingRequest: () => void | Promise<void>;
+  submitAuthTokenRefreshRequest?: ChatWorkspacePaneProps["onSubmitAuthTokenRefreshRequest"];
   selectedAgentLabel: string;
   runInterrupt: ChatWorkspacePaneProps["onInterrupt"];
   steerMessage: ChatWorkspacePaneProps["onSteerMessage"];
@@ -345,7 +347,7 @@ function buildDebugStatusBannersProperties(
 function buildChatWorkspacePaneProperties(
   input: UseApplicationShellViewPropertiesInput,
 ): ChatWorkspacePaneProps {
-  return {
+  const properties: ChatWorkspacePaneProps = {
     chatSurfaceState: input.chatSurfaceState,
     selectedThreadId: input.selectedThreadId,
     availableAgentIds: input.availableAgentIds,
@@ -369,6 +371,7 @@ function buildChatWorkspacePaneProperties(
       );
     },
     activeRequest: input.activeRequest,
+    activeAuthTokenRefreshRequest: input.activeAuthTokenRefreshRequest ?? null,
     canSubmitUserInputForActiveAgent: input.canSubmitUserInputForActiveAgent,
     answerDraft: input.answerDraft,
     onAnswerDraftChange: input.handleAnswerChange,
@@ -387,6 +390,15 @@ function buildChatWorkspacePaneProperties(
     onSendMessage: input.submitMessage,
     chatModeToolbarProperties: input.chatModeToolbarProperties,
   };
+
+  if (input.submitAuthTokenRefreshRequest) {
+    return {
+      ...properties,
+      onSubmitAuthTokenRefreshRequest: input.submitAuthTokenRefreshRequest,
+    };
+  }
+
+  return properties;
 }
 
 function buildDebugWorkspacePaneProperties(
@@ -611,6 +623,7 @@ export function useApplicationShellViewProperties(
     [
       input.activeAgentLabel,
       input.activeRequest,
+      input.activeAuthTokenRefreshRequest,
       input.answerDraft,
       input.availableAgentIds,
       input.canSubmitUserInputForActiveAgent,
@@ -634,6 +647,7 @@ export function useApplicationShellViewProperties(
       input.skipPendingRequest,
       input.steerMessage,
       input.submitMessage,
+      input.submitAuthTokenRefreshRequest,
       input.submitPendingRequest,
       input.turnCount,
       input.visibleChatItemsStep,

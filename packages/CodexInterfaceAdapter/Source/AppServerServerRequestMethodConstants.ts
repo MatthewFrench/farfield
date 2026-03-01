@@ -7,6 +7,9 @@ export const APP_SERVER_HANDLED_SERVER_REQUEST_METHODS = {
   fileChangeRequestApproval: "item/fileChange/requestApproval",
   toolRequestUserInput: "item/tool/requestUserInput",
   toolCall: "item/tool/call",
+  chatGptAuthTokensRefresh: "account/chatgptAuthTokens/refresh",
+  applyPatchApproval: "applyPatchApproval",
+  executeCommandApproval: "execCommandApproval",
 } as const;
 
 const HandledServerRequestMethodSet: ReadonlySet<string> = new Set(

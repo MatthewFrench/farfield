@@ -2,9 +2,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, Loader2 } from "lucide-react";
 import { ChatComposer } from "@/Components/ChatComposer";
 import { ConversationItem } from "@/Components/ConversationItem";
+import { PendingAuthTokenRefreshRequestCard } from "@/Components/PendingAuthTokenRefreshRequestCard";
 import { PendingRequestCard } from "@/Components/PendingRequestCard";
 import { Button } from "@/Components/UserInterface/Button";
 import { type FlattenedConversationItem } from "@/Features/Chat/DomainModel/ConversationItemFlattener";
+import { type PendingAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
 import { type PendingUserInputAnswerDraftByQuestionId } from "@/Features/Chat/DomainModel/PendingUserInputAnswerBuilder";
 import { type PendingUserInputRequest } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
@@ -101,11 +103,17 @@ export interface ChatWorkspacePaneProps {
   isChatAtBottom: boolean;
   onJumpToBottom: () => void;
   activeRequest: PendingUserInputRequest | null;
+  activeAuthTokenRefreshRequest?: PendingAuthTokenRefreshRequest | null;
   canSubmitUserInputForActiveAgent: boolean;
   answerDraft: PendingUserInputAnswerDraftByQuestionId;
   onAnswerDraftChange: (questionId: string, field: PendingRequestDraftField, value: string) => void;
   onSubmitPendingRequest: () => void;
   onSkipPendingRequest: () => void;
+  onSubmitAuthTokenRefreshRequest?: (
+    accessToken: string,
+    chatgptAccountId: string,
+    chatgptPlanType: string | null,
+  ) => void;
   isBusy: boolean;
   isGenerating: boolean;
   activeAgentLabel: string;
@@ -130,11 +138,13 @@ export function ChatWorkspacePane({
   isChatAtBottom,
   onJumpToBottom,
   activeRequest,
+  activeAuthTokenRefreshRequest,
   canSubmitUserInputForActiveAgent,
   answerDraft,
   onAnswerDraftChange,
   onSubmitPendingRequest,
   onSkipPendingRequest,
+  onSubmitAuthTokenRefreshRequest,
   isBusy,
   isGenerating,
   activeAgentLabel,
@@ -284,6 +294,15 @@ export function ChatWorkspacePane({
         />
         <div className="relative w-full px-0 md:px-2 lg:px-4 space-y-2">
           <AnimatePresence>
+            {activeAuthTokenRefreshRequest &&
+            canSubmitUserInputForActiveAgent &&
+            onSubmitAuthTokenRefreshRequest ? (
+              <PendingAuthTokenRefreshRequestCard
+                request={activeAuthTokenRefreshRequest}
+                onSubmit={onSubmitAuthTokenRefreshRequest}
+                isBusy={isBusy}
+              />
+            ) : null}
             {activeRequest && canSubmitUserInputForActiveAgent && (
               <PendingRequestCard
                 request={activeRequest}

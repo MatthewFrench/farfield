@@ -1,6 +1,8 @@
+import { ChatGptAuthTokensRefreshRequestMethod } from "@farfield/protocol";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { type PendingAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
 import {
   ChatWorkspacePane,
   type ChatWorkspacePaneProps,
@@ -58,6 +60,18 @@ const baseChatWorkspacePaneProperties: ChatWorkspacePaneProps = {
 function renderChatWorkspacePane(properties?: Partial<ChatWorkspacePaneProps>): void {
   cleanup();
   render(<ChatWorkspacePane {...baseChatWorkspacePaneProperties} {...properties} />);
+}
+
+function buildPendingAuthTokenRefreshRequest(): PendingAuthTokenRefreshRequest {
+  return {
+    method: ChatGptAuthTokensRefreshRequestMethod,
+    id: 91,
+    completed: false,
+    params: {
+      reason: "unauthorized",
+      previousAccountId: "account-previous",
+    },
+  };
 }
 
 describe("ChatWorkspacePane", () => {
@@ -159,5 +173,46 @@ describe("ChatWorkspacePane", () => {
     });
 
     expect(screen.getByPlaceholderText("Message OpenCode…")).toBeDefined();
+  });
+
+  it("renders auth-token refresh card when there is an active request and submit capability", () => {
+    renderChatWorkspacePane({
+      chatSurfaceState: "ready",
+      turnCount: 1,
+      canSubmitUserInputForActiveAgent: true,
+      activeAuthTokenRefreshRequest: buildPendingAuthTokenRefreshRequest(),
+      onSubmitAuthTokenRefreshRequest: () => {},
+    });
+
+    expect(screen.getByText("Auth token refresh request")).toBeDefined();
+    expect(screen.getByText(/Codex requested token refresh because of:/)).toBeDefined();
+    expect(screen.getByText("Previous account hint:")).toBeDefined();
+  });
+
+  it("submits auth-token refresh values from the request card", () => {
+    const onSubmitAuthTokenRefreshRequest = vi.fn();
+
+    renderChatWorkspacePane({
+      chatSurfaceState: "ready",
+      turnCount: 1,
+      canSubmitUserInputForActiveAgent: true,
+      activeAuthTokenRefreshRequest: buildPendingAuthTokenRefreshRequest(),
+      onSubmitAuthTokenRefreshRequest,
+      isBusy: false,
+    });
+
+    fireEvent.change(screen.getByLabelText("Access token"), {
+      target: { value: "  token-new  " },
+    });
+    fireEvent.change(screen.getByLabelText("ChatGPT account identifier"), {
+      target: { value: " account-new " },
+    });
+    fireEvent.change(screen.getByLabelText("Plan type (optional)"), {
+      target: { value: " pro " },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit refresh token" }));
+
+    expect(onSubmitAuthTokenRefreshRequest).toHaveBeenCalledWith("token-new", "account-new", "pro");
   });
 });

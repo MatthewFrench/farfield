@@ -1,10 +1,15 @@
-import { UserInputRequestMethod } from "@farfield/protocol";
+import {
+  ChatGptAuthTokensRefreshRequestMethod,
+  type ThreadConversationRequestResponse,
+  UserInputRequestMethod,
+} from "@farfield/protocol";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 
 const SEND_MESSAGE_ACTION_NAME = "send-message";
 const STEER_MESSAGE_ACTION_NAME = "steer-message";
 const SUBMIT_USER_INPUT_ACTION_NAME = "submit-user-input";
+const SUBMIT_AUTH_TOKEN_REFRESH_ACTION_NAME = "submit-auth-token-refresh";
 const SKIP_USER_INPUT_ACTION_NAME = "skip-user-input";
 const INTERRUPT_THREAD_ACTION_NAME = "interrupt-thread";
 
@@ -34,12 +39,7 @@ export interface ChatRequestActionChatClient {
     input: {
       threadId: string;
       requestId: number;
-      response: {
-        method: typeof UserInputRequestMethod;
-        payload: {
-          answers: Record<string, { answers: string[] }>;
-        };
-      };
+      response: ThreadConversationRequestResponse;
     },
     options?: ApiRequestOptions,
   ): Promise<void>;
@@ -93,6 +93,20 @@ export interface SubmitPendingUserInputActionInput {
 export interface SteerMessageActionInput {
   draft: string;
   selectedThreadId: string | null;
+  buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
+  onSetBusy: (isBusy: boolean) => void;
+  chatClient: ChatRequestActionChatClient;
+  onInvalidateActiveThreadQuery: () => void;
+  onRefreshThreadData: (threadId: string) => Promise<void>;
+  reportTrackedUserInterfaceError: (input: ChatRequestActionErrorReportInput) => Promise<void>;
+}
+
+export interface SubmitAuthTokenRefreshActionInput {
+  selectedThreadId: string | null;
+  requestId: number;
+  accessToken: string;
+  chatgptAccountId: string;
+  chatgptPlanType: string | null;
   buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
   onSetBusy: (isBusy: boolean) => void;
   chatClient: ChatRequestActionChatClient;
@@ -270,6 +284,50 @@ export class ChatRequestActionCoordinator {
     } catch (error) {
       await input.reportTrackedUserInterfaceError({
         operation: SKIP_USER_INPUT_ACTION_NAME,
+        actionId,
+        threadId: input.selectedThreadId,
+        error: toErrorMessage(error),
+        details: {
+          requestId: input.requestId,
+        },
+      });
+    } finally {
+      input.onSetBusy(false);
+    }
+  }
+
+  public async submitAuthTokenRefreshRequest(
+    input: SubmitAuthTokenRefreshActionInput,
+  ): Promise<void> {
+    if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
+      return;
+    }
+
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      SUBMIT_AUTH_TOKEN_REFRESH_ACTION_NAME,
+    );
+    input.onSetBusy(true);
+    try {
+      await input.chatClient.submitUserInput(
+        {
+          threadId: input.selectedThreadId,
+          requestId: input.requestId,
+          response: {
+            method: ChatGptAuthTokensRefreshRequestMethod,
+            payload: {
+              accessToken: input.accessToken,
+              chatgptAccountId: input.chatgptAccountId,
+              chatgptPlanType: input.chatgptPlanType,
+            },
+          },
+        },
+        requestOptions,
+      );
+      input.onInvalidateActiveThreadQuery();
+      await input.onRefreshThreadData(input.selectedThreadId);
+    } catch (error) {
+      await input.reportTrackedUserInterfaceError({
+        operation: SUBMIT_AUTH_TOKEN_REFRESH_ACTION_NAME,
         actionId,
         threadId: input.selectedThreadId,
         error: toErrorMessage(error),

@@ -82,9 +82,18 @@ const ToolCallRequestSchema = ServerRequestBaseSchema.extend({
   params: DynamicToolCallParamsSchema.passthrough(),
 }).passthrough();
 
+export const ChatGptAuthTokensRefreshRequestReasonSchema = z.literal("unauthorized");
+
+export const ChatGptAuthTokensRefreshRequestParamsSchema = z
+  .object({
+    previousAccountId: z.string().nullable().optional(),
+    reason: ChatGptAuthTokensRefreshRequestReasonSchema,
+  })
+  .passthrough();
+
 const ChatGptAuthTokensRefreshRequestSchema = ServerRequestBaseSchema.extend({
   method: z.literal(ChatGptAuthTokensRefreshRequestMethod),
-  params: JsonValueSchema,
+  params: ChatGptAuthTokensRefreshRequestParamsSchema,
 }).passthrough();
 
 const ApplyPatchApprovalRequestSchema = ServerRequestBaseSchema.extend({
@@ -128,12 +137,24 @@ export const CommandExecutionApprovalResponsePayloadSchema =
 export const FileChangeApprovalResponsePayloadSchema =
   FileChangeRequestApprovalResponseSchema.passthrough();
 export const ToolCallResponsePayloadSchema = DynamicToolCallResponseSchema.passthrough();
+export const ChatGptAuthTokensRefreshResponsePayloadSchema = z
+  .object({
+    accessToken: z.string(),
+    chatgptAccountId: z.string(),
+    chatgptPlanType: z.string().nullable().optional(),
+  })
+  .passthrough();
+export const ApplyPatchApprovalResponsePayloadSchema = JsonValueSchema;
+export const ExecuteCommandApprovalResponsePayloadSchema = JsonValueSchema;
 
 export const ThreadConversationResponseMethodValues = [
   CommandExecutionApprovalRequestMethod,
   FileChangeApprovalRequestMethod,
   UserInputRequestMethod,
   ToolCallRequestMethod,
+  ChatGptAuthTokensRefreshRequestMethod,
+  ApplyPatchApprovalRequestMethod,
+  ExecuteCommandApprovalRequestMethod,
 ] as const;
 
 const ThreadConversationRequestResponseVariantSchemas = [
@@ -161,6 +182,24 @@ const ThreadConversationRequestResponseVariantSchemas = [
       payload: ToolCallResponsePayloadSchema,
     })
     .strict(),
+  z
+    .object({
+      method: z.literal(ChatGptAuthTokensRefreshRequestMethod),
+      payload: ChatGptAuthTokensRefreshResponsePayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      method: z.literal(ApplyPatchApprovalRequestMethod),
+      payload: ApplyPatchApprovalResponsePayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      method: z.literal(ExecuteCommandApprovalRequestMethod),
+      payload: ExecuteCommandApprovalResponsePayloadSchema,
+    })
+    .strict(),
 ] as const;
 
 export const ThreadConversationRequestResponseSchema = z.discriminatedUnion(
@@ -178,6 +217,15 @@ export type FileChangeApprovalResponsePayload = z.infer<
   typeof FileChangeApprovalResponsePayloadSchema
 >;
 export type ToolCallResponsePayload = z.infer<typeof ToolCallResponsePayloadSchema>;
+export type ChatGptAuthTokensRefreshResponsePayload = z.infer<
+  typeof ChatGptAuthTokensRefreshResponsePayloadSchema
+>;
+export type ApplyPatchApprovalResponsePayload = z.infer<
+  typeof ApplyPatchApprovalResponsePayloadSchema
+>;
+export type ExecuteCommandApprovalResponsePayload = z.infer<
+  typeof ExecuteCommandApprovalResponsePayloadSchema
+>;
 export type ThreadConversationRequestResponse = z.infer<
   typeof ThreadConversationRequestResponseSchema
 >;

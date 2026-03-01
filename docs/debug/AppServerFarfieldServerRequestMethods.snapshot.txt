@@ -1,3 +1,6 @@
+account/chatgptAuthTokens/refresh
+applyPatchApproval
+execCommandApproval
 item/commandExecution/requestApproval
 item/fileChange/requestApproval
 item/tool/call

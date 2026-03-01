@@ -1,7 +1,9 @@
+import { ChatGptAuthTokensRefreshRequestMethod } from "@farfield/protocol";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { type MutableRefObject, useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
+import { type PendingAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
 import {
   PendingUserInputAnswerBuilder,
   type PendingUserInputAnswerDraftByQuestionId,
@@ -41,6 +43,7 @@ interface StatefulAnswerHarnessProps {
 interface TestInputOverrides {
   selectedThreadId?: string | null;
   activeRequest?: PendingUserInputRequest | null;
+  activeAuthTokenRefreshRequest?: PendingAuthTokenRefreshRequest | null;
   answerDraft?: PendingUserInputAnswerDraftByQuestionId;
   modes?: CollaborationModeActionModeOption[];
   isModeSyncing?: boolean;
@@ -136,6 +139,18 @@ function buildPendingUserInputRequest(): PendingUserInputRequest {
   };
 }
 
+function buildPendingAuthTokenRefreshRequest(): PendingAuthTokenRefreshRequest {
+  return {
+    method: ChatGptAuthTokensRefreshRequestMethod,
+    id: 72,
+    completed: false,
+    params: {
+      reason: "unauthorized",
+      previousAccountId: "account-existing",
+    },
+  };
+}
+
 function createChatClient(): ChatActionHandlersChatClient {
   return {
     sendMessage: vi.fn(async () => {}),
@@ -190,6 +205,7 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     modes: overrides.modes ?? DEFAULT_MODES,
     isModeSyncing: overrides.isModeSyncing ?? false,
     activeRequest: overrides.activeRequest ?? null,
+    activeAuthTokenRefreshRequest: overrides.activeAuthTokenRefreshRequest ?? null,
     answerDraft: overrides.answerDraft ?? {},
     setAnswerDraft,
     buildActionRequestOptions,
@@ -466,6 +482,86 @@ describe("UseChatActionHandlers", () => {
 
     expect(submitPendingUserInputSpy).not.toHaveBeenCalled();
     expect(skipPendingUserInputSpy).not.toHaveBeenCalled();
+  });
+
+  it("delegates auth-token-refresh request submission with the active auth request id", async () => {
+    const activeAuthTokenRefreshRequest = buildPendingAuthTokenRefreshRequest();
+    const { input, chatRequestActionCoordinator } = createTestInput({
+      activeAuthTokenRefreshRequest,
+    });
+    const submitAuthTokenRefreshRequestSpy = vi
+      .spyOn(chatRequestActionCoordinator, "submitAuthTokenRefreshRequest")
+      .mockImplementation(async (nextInput) => {
+        void nextInput;
+      });
+
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
+    render(
+      <HandlerHarness
+        input={input}
+        onHandlersReady={(handlers) => {
+          handlerState.current = handlers;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(handlerState.current).not.toBeNull();
+    });
+
+    const handlers = handlerState.current;
+    if (handlers === null || !handlers.submitAuthTokenRefreshRequest) {
+      throw new Error("expected auth-token-refresh handler to be ready");
+    }
+
+    await handlers.submitAuthTokenRefreshRequest("token-72", "account-72", "pro");
+
+    expect(submitAuthTokenRefreshRequestSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedThreadId: DEFAULT_THREAD_IDENTIFIER,
+        requestId: activeAuthTokenRefreshRequest.id,
+        accessToken: "token-72",
+        chatgptAccountId: "account-72",
+        chatgptPlanType: "pro",
+      }),
+    );
+  });
+
+  it("does not submit auth-token-refresh requests when there is no active auth request", async () => {
+    const { input, chatRequestActionCoordinator } = createTestInput({
+      activeAuthTokenRefreshRequest: null,
+    });
+    const submitAuthTokenRefreshRequestSpy = vi.spyOn(
+      chatRequestActionCoordinator,
+      "submitAuthTokenRefreshRequest",
+    );
+
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
+    render(
+      <HandlerHarness
+        input={input}
+        onHandlersReady={(handlers) => {
+          handlerState.current = handlers;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(handlerState.current).not.toBeNull();
+    });
+
+    const handlers = handlerState.current;
+    if (handlers === null || !handlers.submitAuthTokenRefreshRequest) {
+      throw new Error("expected auth-token-refresh handler to be ready");
+    }
+
+    await handlers.submitAuthTokenRefreshRequest("token-73", "account-73", null);
+
+    expect(submitAuthTokenRefreshRequestSpy).not.toHaveBeenCalled();
   });
 
   it("updates answer draft state for option and freeform fields while preserving existing values", async () => {

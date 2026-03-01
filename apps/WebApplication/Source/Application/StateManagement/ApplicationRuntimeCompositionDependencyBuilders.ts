@@ -1,3 +1,7 @@
+import {
+  readActiveAuthTokenRefreshRequest,
+  readPendingAuthTokenRefreshRequests,
+} from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
 import { type UseModeAndPendingRequestEffectsInput } from "@/Features/Chat/StateManagement/UseModeAndPendingRequestEffects";
 import { type UseSelectedThreadLifecycleEffectsInput } from "@/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects";
 import { type DebugActionHandlers } from "@/Features/Debugging/StateManagement/UseDebugActionHandlers";
@@ -279,6 +283,9 @@ export function buildApplicationChatFeatureCompositionInput(
       modes: applicationShellState.modes,
       isModeSyncing: applicationShellState.isModeSyncing,
       activeRequest: applicationDerivedState.activeRequest,
+      activeAuthTokenRefreshRequest: readActiveAuthTokenRefreshRequest(
+        applicationDerivedState.conversationState,
+      ),
       answerDraft: applicationShellState.answerDraft,
       setAnswerDraft: applicationShellState.setAnswerDraft,
       buildActionRequestOptions: runtimeRequestHandlers.buildActionRequestOptions,
@@ -319,7 +326,9 @@ export function buildApplicationChatFeatureCompositionInput(
       effortOptionsWithoutAssumedDefault:
         applicationDerivedState.effortOptionsWithoutAssumedDefault,
       isModeSyncing: applicationShellState.isModeSyncing,
-      pendingRequestCount: applicationDerivedState.pendingRequests.length,
+      pendingRequestCount:
+        applicationDerivedState.pendingRequests.length +
+        readPendingAuthTokenRefreshRequests(applicationDerivedState.conversationState).length,
       setSelectedModeKey: applicationShellState.setSelectedModeKey,
       setSelectedModelId: applicationShellState.setSelectedModelId,
       setSelectedReasoningEffort: applicationShellState.setSelectedReasoningEffort,

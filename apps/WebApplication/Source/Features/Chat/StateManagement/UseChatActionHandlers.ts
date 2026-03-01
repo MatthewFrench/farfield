@@ -1,6 +1,7 @@
 import { type Dispatch, type MutableRefObject, type SetStateAction, useCallback } from "react";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
+import { type PendingAuthTokenRefreshRequest } from "../DomainModel/PendingAuthTokenRefreshRequestSelector";
 import {
   createEmptyPendingUserInputAnswerDraft,
   PendingUserInputAnswerBuilder,
@@ -68,6 +69,7 @@ export interface UseChatActionHandlersInput {
   modes: CollaborationModeActionModeOption[];
   isModeSyncing: boolean;
   activeRequest: PendingUserInputRequest | null;
+  activeAuthTokenRefreshRequest?: PendingAuthTokenRefreshRequest | null;
   answerDraft: PendingUserInputAnswerDraftByQuestionId;
   setAnswerDraft: Dispatch<SetStateAction<PendingUserInputAnswerDraftByQuestionId>>;
   buildActionRequestOptions: (actionName: string) => ActionRequestOptions;
@@ -95,6 +97,11 @@ export interface ChatActionHandlers {
   applyModeDraft: (draft: ChatActionModeDraft) => Promise<void>;
   submitPendingRequest: () => Promise<void>;
   skipPendingRequest: () => Promise<void>;
+  submitAuthTokenRefreshRequest?: (
+    accessToken: string,
+    chatgptAccountId: string,
+    chatgptPlanType: string | null,
+  ) => Promise<void>;
   runInterrupt: () => Promise<void>;
   handleAnswerChange: (
     questionId: string,
@@ -286,6 +293,40 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.setIsBusy,
   ]);
 
+  const submitAuthTokenRefreshRequest = useCallback(
+    async (accessToken: string, chatgptAccountId: string, chatgptPlanType: string | null) => {
+      const activeAuthTokenRefreshRequest = input.activeAuthTokenRefreshRequest;
+      if (!activeAuthTokenRefreshRequest) {
+        return;
+      }
+
+      await input.chatRequestActionCoordinator.submitAuthTokenRefreshRequest({
+        selectedThreadId: input.selectedThreadId,
+        requestId: activeAuthTokenRefreshRequest.id,
+        accessToken,
+        chatgptAccountId,
+        chatgptPlanType,
+        buildActionRequestOptions: input.buildActionRequestOptions,
+        onSetBusy: input.setIsBusy,
+        chatClient: input.chatClient,
+        onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
+        onRefreshThreadData: refreshThreadData,
+        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+      });
+    },
+    [
+      input.activeAuthTokenRefreshRequest,
+      input.buildActionRequestOptions,
+      input.chatClient,
+      input.chatRequestActionCoordinator,
+      input.onInvalidateActiveThreadQuery,
+      refreshThreadData,
+      input.reportTrackedUserInterfaceError,
+      input.selectedThreadId,
+      input.setIsBusy,
+    ],
+  );
+
   const runInterrupt = useCallback(async () => {
     await input.chatRequestActionCoordinator.interruptThread({
       selectedThreadId: input.selectedThreadId,
@@ -327,6 +368,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     applyModeDraft,
     submitPendingRequest,
     skipPendingRequest,
+    submitAuthTokenRefreshRequest,
     runInterrupt,
     handleAnswerChange,
   };

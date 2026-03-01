@@ -437,6 +437,60 @@ describe("AppServerClient.submitServerRequestResponse", () => {
       },
     });
   });
+
+  it("accepts account/chatgptAuthTokens/refresh response payloads", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await client.submitServerRequestResponse(29, {
+      method: "account/chatgptAuthTokens/refresh",
+      payload: {
+        accessToken: "token-2",
+        chatgptAccountId: "account-2",
+        chatgptPlanType: "pro",
+      },
+    });
+
+    expect(transportDouble.respond).toHaveBeenCalledWith(29, {
+      method: "account/chatgptAuthTokens/refresh",
+      payload: {
+        accessToken: "token-2",
+        chatgptAccountId: "account-2",
+        chatgptPlanType: "pro",
+      },
+    });
+  });
+
+  it("accepts deprecated apply-patch and execute-command approval response payloads", async () => {
+    const transportDouble = createTransportDouble();
+    const client = new AppServerClient(transportDouble.transport);
+
+    await client.submitServerRequestResponse(31, {
+      method: "applyPatchApproval",
+      payload: {
+        decision: "allow",
+      },
+    });
+    await client.submitServerRequestResponse(32, {
+      method: "execCommandApproval",
+      payload: {
+        decision: "allow",
+      },
+    });
+
+    expect(transportDouble.respond).toHaveBeenNthCalledWith(1, 31, {
+      method: "applyPatchApproval",
+      payload: {
+        decision: "allow",
+      },
+    });
+    expect(transportDouble.respond).toHaveBeenNthCalledWith(2, 32, {
+      method: "execCommandApproval",
+      payload: {
+        decision: "allow",
+      },
+    });
+  });
 });
 
 describe("AppServerClient.notification and server-request reads", () => {

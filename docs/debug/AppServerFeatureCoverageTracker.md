@@ -313,14 +313,14 @@ Farfield app-server transport now supports server-request envelopes:
 
 1. `packages/CodexInterfaceAdapter/Source/JsonRpc.ts` classifies inbound `request` envelopes.
 2. `packages/CodexInterfaceAdapter/Source/AppServerTransport.ts` stores handled server requests and enforces method-matched typed response writes.
-3. Non-handled server-request methods are returned with deterministic JSON-RPC method-not-found errors.
+3. Current upstream methods are all explicitly handled; non-upstream or unknown methods still receive deterministic JSON-RPC method-not-found errors.
 
 ### Non-app-server Codex paths used by Farfield
 
 Some Farfield features are implemented through Desktop inter-process communication owners, not app-server request methods:
 
 1. `setCollaborationMode`
-2. `submitUserInput` (IPC path primary; app-server path now supports typed response submission for handled approval/user-input/tool-call requests)
+2. `submitUserInput` (IPC path primary; app-server path now supports typed response submission for handled approval/user-input/tool-call/auth-token-refresh requests)
 3. `interrupt`
 4. Live stream state projection and stream-event reads
 
@@ -347,14 +347,14 @@ Farfield implication:
 
 1. Farfield app-server message send path now uses `turn/start` for non-Desktop inter-process communication routes.
 2. Farfield now captures app-server notifications and exposes them in stream-event reads when IPC is unavailable.
-3. Farfield now supports handled server-request response flow (`item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, `item/tool/call`) through app-server transport ownership.
+3. Farfield now supports handled server-request response flow (`item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, `item/tool/call`, `account/chatgptAuthTokens/refresh`, `applyPatchApproval`, `execCommandApproval`) through app-server transport ownership.
 
 Idiomatically correct migration path (research outcome):
 
 1. Phase 1: Add request-owner support for `turn/start` and switch non-Desktop inter-process communication message-send path from `sendUserMessage` to `turn/start`. (Completed)
 2. Phase 2: Add app-server notification consumption in transport ownership and expose events through owned read APIs. (Completed)
 3. Phase 3: Add server-request envelope support with explicit handled-method policy and typed response submission contracts. (Completed)
-4. Phase 4: Expand handled server-request methods beyond approval/user-input/tool-call only when product workflows require them. (Planned)
+4. Phase 4: Expand handled server-request methods beyond approval/user-input/tool-call when product workflows require them. (Completed for current upstream server-request snapshot, including deprecated compatibility methods)
 
 ## Drift-Detection Research Outcome
 

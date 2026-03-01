@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ChatGptAuthTokensRefreshRequestMethod,
   parseThreadConversationRequestResponse,
   parseThreadConversationState,
   UserInputRequestMethod,
@@ -281,10 +282,33 @@ describe("codex-protocol thread contract hardening", () => {
         success: true,
       },
     });
+    const refreshResponse = parseThreadConversationRequestResponse({
+      method: ChatGptAuthTokensRefreshRequestMethod,
+      payload: {
+        accessToken: "token-1",
+        chatgptAccountId: "account-1",
+        chatgptPlanType: null,
+      },
+    });
+    const applyPatchApprovalResponse = parseThreadConversationRequestResponse({
+      method: "applyPatchApproval",
+      payload: {
+        decision: "allow",
+      },
+    });
+    const executeCommandApprovalResponse = parseThreadConversationRequestResponse({
+      method: "execCommandApproval",
+      payload: {
+        decision: "allow",
+      },
+    });
 
     expect(commandResponse.method).toBe("item/commandExecution/requestApproval");
     expect(fileChangeResponse.method).toBe("item/fileChange/requestApproval");
     expect(toolCallResponse.method).toBe("item/tool/call");
+    expect(refreshResponse.method).toBe(ChatGptAuthTokensRefreshRequestMethod);
+    expect(applyPatchApprovalResponse.method).toBe("applyPatchApproval");
+    expect(executeCommandApprovalResponse.method).toBe("execCommandApproval");
   });
 
   it("rejects thread request-response envelopes when payload does not match method schema", () => {

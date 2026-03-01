@@ -13,6 +13,7 @@ import {
   useMobileSidebarTouchHandlers,
 } from "@/Application/StateManagement/UseMobileSidebarTouchHandlers";
 import { type CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
+import { readActiveAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
 import { type ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
 import { type DebugActionHandlers } from "@/Features/Debugging/StateManagement/UseDebugActionHandlers";
 import {
@@ -261,11 +262,15 @@ function buildApplicationShellViewPropertiesInput(
     chatScrollStateCoordinator: input.chatScrollStateCoordinator,
     setIsChatAtBottom: applicationShellState.setIsChatAtBottom,
     activeRequest: applicationDerivedState.activeRequest,
+    activeAuthTokenRefreshRequest: readActiveAuthTokenRefreshRequest(
+      applicationDerivedState.conversationState,
+    ),
     canSubmitUserInputForActiveAgent: applicationDerivedState.canSubmitUserInputForActiveAgent,
     answerDraft: applicationShellState.answerDraft,
     handleAnswerChange: input.chatFeatureComposition.handleAnswerChange,
     submitPendingRequest: input.chatFeatureComposition.submitPendingRequest,
     skipPendingRequest: input.chatFeatureComposition.skipPendingRequest,
+    submitAuthTokenRefreshRequest: input.chatFeatureComposition.submitAuthTokenRefreshRequest,
     selectedAgentLabel: applicationDerivedState.selectedAgentLabel,
     runInterrupt: input.chatFeatureComposition.runInterrupt,
     steerMessage: input.chatFeatureComposition.steerMessage,

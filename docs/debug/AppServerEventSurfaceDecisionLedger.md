@@ -1,6 +1,6 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-02-28 13:34:20Z
+Last Updated (UTC): 2026-02-28 22:15:00Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
 
@@ -52,9 +52,9 @@ This ledger records recommended disposition for upstream app-server event and ca
 | `turn/started` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `windows/worldWritableWarning` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `windowsSandbox/setupCompleted` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
-| `account/chatgptAuthTokens/refresh` | server-to-client request | Not handled | Not now | Adopt only with explicit auth/integration requirement. |
-| `applyPatchApproval` | server-to-client request | Not handled | Do not adopt | Deprecated server-request path. |
-| `execCommandApproval` | server-to-client request | Not handled | Do not adopt | Deprecated server-request path. |
+| `account/chatgptAuthTokens/refresh` | server-to-client request | Used now | Keep | Farfield stores this request and validates typed auth-token refresh response submission through app-server transport. |
+| `applyPatchApproval` | server-to-client request | Used now | Keep (compatibility only) | Deprecated server-request path, but Farfield now keeps typed compatibility handling to avoid transport-level request drops. |
+| `execCommandApproval` | server-to-client request | Used now | Keep (compatibility only) | Deprecated server-request path, but Farfield now keeps typed compatibility handling to avoid transport-level request drops. |
 | `item/commandExecution/requestApproval` | server-to-client request | Used now | Keep | Farfield stores this request and validates typed response submission through app-server transport. |
 | `item/fileChange/requestApproval` | server-to-client request | Used now | Keep | Farfield stores this request and validates typed response submission through app-server transport. |
 | `item/tool/call` | server-to-client request | Used now | Keep | Farfield stores this request and validates typed response submission through app-server transport. |
