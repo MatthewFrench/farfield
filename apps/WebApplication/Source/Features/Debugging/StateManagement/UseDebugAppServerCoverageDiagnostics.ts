@@ -39,6 +39,7 @@ import {
   type DebugAppServerCoverageThreadRealtimeStartResult,
   type DebugAppServerCoverageThreadRealtimeStopResult,
   type DebugAppServerCoverageThreadStreamEventsResult,
+  type DebugAppServerCoverageWarningNotificationsResult,
   type DebugAppServerCoverageWindowsSandboxSetupMode,
   type DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
@@ -105,6 +106,7 @@ export interface DebugAppServerCoverageDiagnostics {
   lastFuzzyFileSearchSessionStopResult: DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null;
   lastFuzzySessionNotificationsResult: DebugAppServerCoverageFuzzySessionNotificationsResult | null;
   lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
+  lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -139,6 +141,7 @@ export interface DebugAppServerCoverageDiagnostics {
   readServerRequestResolvedEvents: (sinceSequence?: number | null) => void;
   readFuzzySessionNotifications: (sinceSequence?: number | null) => void;
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
+  readWarningNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;

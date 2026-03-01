@@ -8,6 +8,7 @@ import type {
   DebugAppServerCoveragePendingServerRequestsResult,
   DebugAppServerCoverageServerRequestResolvedEventsResult,
   DebugAppServerCoverageThreadStreamEventsResult,
+  DebugAppServerCoverageWarningNotificationsResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import { mapAuthCompletionEventsResult } from "./DebugAppServerCoverageAuthCompletionEventMappers";
 import { mapFuzzySessionNotificationsResult } from "./DebugAppServerCoverageFuzzySessionNotificationMappers";
@@ -16,6 +17,7 @@ import { mapNotificationEventsResult } from "./DebugAppServerCoverageNotificatio
 import { mapPendingServerRequestsResult } from "./DebugAppServerCoveragePendingServerRequestMappers";
 import { mapServerRequestResolvedEventsResult } from "./DebugAppServerCoverageServerRequestResolvedEventMappers";
 import { mapThreadStreamEventsResult } from "./DebugAppServerCoverageThreadStreamEventMappers";
+import { mapWarningNotificationsResult } from "./DebugAppServerCoverageWarningNotificationMappers";
 
 const COVERAGE_MUTATION_OPERATION_NAME = "debug-coverage-action";
 const COVERAGE_ACTION_ERROR_PREFIX = "Unable to run coverage action: ";
@@ -23,6 +25,7 @@ const COVERAGE_AUTH_COMPLETION_EVENTS_LIMIT = 200;
 const COVERAGE_SERVER_REQUEST_RESOLVED_EVENTS_LIMIT = 220;
 const COVERAGE_FUZZY_SESSION_NOTIFICATIONS_LIMIT = 240;
 const COVERAGE_MODEL_REROUTED_EVENTS_LIMIT = 260;
+const COVERAGE_WARNING_NOTIFICATIONS_LIMIT = 280;
 
 interface RunCoverageAsyncMutationInput {
   isRunningCoverageAction: boolean;
@@ -96,6 +99,17 @@ interface RunModelReroutedEventsReadMutationInput {
   sinceSequence?: number | null;
 }
 
+interface RunWarningNotificationsReadMutationInput {
+  capabilityServerClient: CapabilityServerClient;
+  isRunningCoverageAction: boolean;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastWarningNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageWarningNotificationsResult | null>
+  >;
+  sinceSequence?: number | null;
+}
+
 interface CreateReadNotificationEventsActionInput {
   capabilityServerClient: CapabilityServerClient;
   isRunningCoverageAction: boolean;
@@ -153,6 +167,16 @@ interface CreateReadModelReroutedEventsActionInput {
   setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
   setLastModelReroutedEventsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageModelReroutedEventsResult | null>
+  >;
+}
+
+interface CreateReadWarningNotificationsActionInput {
+  capabilityServerClient: CapabilityServerClient;
+  isRunningCoverageAction: boolean;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastWarningNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageWarningNotificationsResult | null>
   >;
 }
 
@@ -353,6 +377,35 @@ function runModelReroutedEventsReadMutation(input: RunModelReroutedEventsReadMut
   });
 }
 
+function runWarningNotificationsReadMutation(
+  input: RunWarningNotificationsReadMutationInput,
+): void {
+  const normalizedSinceSequence =
+    input.sinceSequence === undefined || input.sinceSequence === null ? null : input.sinceSequence;
+  if (
+    normalizedSinceSequence !== null &&
+    (!Number.isInteger(normalizedSinceSequence) || normalizedSinceSequence < 0)
+  ) {
+    return;
+  }
+
+  runCoverageAsyncMutation({
+    isRunningCoverageAction: input.isRunningCoverageAction,
+    setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+    setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+    run: async () => {
+      const response = await input.capabilityServerClient.readNotificationEvents({
+        actionName: COVERAGE_MUTATION_OPERATION_NAME,
+        limit: COVERAGE_WARNING_NOTIFICATIONS_LIMIT,
+        ...(normalizedSinceSequence !== null ? { sinceSequence: normalizedSinceSequence } : {}),
+      });
+      input.setLastWarningNotificationsResult(
+        mapWarningNotificationsResult(response, normalizedSinceSequence),
+      );
+    },
+  });
+}
+
 export function createReadNotificationEventsAction(input: CreateReadNotificationEventsActionInput) {
   return (sinceSequence?: number | null): void => {
     runNotificationEventsReadMutation({
@@ -421,6 +474,21 @@ export function createReadModelReroutedEventsAction(
       setIsRunningCoverageAction: input.setIsRunningCoverageAction,
       setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
       setLastModelReroutedEventsResult: input.setLastModelReroutedEventsResult,
+      ...(sinceSequence !== undefined ? { sinceSequence } : {}),
+    });
+  };
+}
+
+export function createReadWarningNotificationsAction(
+  input: CreateReadWarningNotificationsActionInput,
+) {
+  return (sinceSequence?: number | null): void => {
+    runWarningNotificationsReadMutation({
+      capabilityServerClient: input.capabilityServerClient,
+      isRunningCoverageAction: input.isRunningCoverageAction,
+      setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+      setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+      setLastWarningNotificationsResult: input.setLastWarningNotificationsResult,
       ...(sinceSequence !== undefined ? { sinceSequence } : {}),
     });
   };

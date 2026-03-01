@@ -177,6 +177,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastFuzzyFileSearchSessionStopResult: DebugWorkspacePaneProps["lastFuzzyFileSearchSessionStopResult"];
   lastFuzzySessionNotificationsResult: DebugWorkspacePaneProps["lastFuzzySessionNotificationsResult"];
   lastModelReroutedEventsResult: DebugWorkspacePaneProps["lastModelReroutedEventsResult"];
+  lastWarningNotificationsResult: DebugWorkspacePaneProps["lastWarningNotificationsResult"];
   lastGitDiffToRemoteResult: DebugWorkspacePaneProps["lastGitDiffToRemoteResult"];
   refreshCoverageDiagnostics: () => void;
   startAccountLogin: () => void;
@@ -213,6 +214,7 @@ export interface UseApplicationShellViewPropertiesInput {
   stopFuzzyFileSearchSession: (sessionId: string) => void;
   readFuzzySessionNotifications: DebugWorkspacePaneProps["onReadFuzzySessionNotifications"];
   readModelReroutedEvents: DebugWorkspacePaneProps["onReadModelReroutedEvents"];
+  readWarningNotifications: DebugWorkspacePaneProps["onReadWarningNotifications"];
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   uploadFeedback: (
     classification: string,
@@ -534,6 +536,7 @@ function buildDebugWorkspacePaneProperties(
     lastFuzzyFileSearchSessionStopResult: input.lastFuzzyFileSearchSessionStopResult,
     lastFuzzySessionNotificationsResult: input.lastFuzzySessionNotificationsResult,
     lastModelReroutedEventsResult: input.lastModelReroutedEventsResult,
+    lastWarningNotificationsResult: input.lastWarningNotificationsResult,
     lastGitDiffToRemoteResult: input.lastGitDiffToRemoteResult,
     onRefreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
     onStartAccountLogin: input.startAccountLogin,
@@ -564,6 +567,7 @@ function buildDebugWorkspacePaneProperties(
     onStopFuzzyFileSearchSession: input.stopFuzzyFileSearchSession,
     onReadFuzzySessionNotifications: input.readFuzzySessionNotifications,
     onReadModelReroutedEvents: input.readModelReroutedEvents,
+    onReadWarningNotifications: input.readWarningNotifications,
     onExecuteCommand: input.executeCommand,
     onUploadFeedback: input.uploadFeedback,
   };
@@ -790,6 +794,7 @@ export function useApplicationShellViewProperties(
       input.lastFuzzyFileSearchSessionStopResult,
       input.lastFuzzySessionNotificationsResult,
       input.lastModelReroutedEventsResult,
+      input.lastWarningNotificationsResult,
       input.lastGitDiffToRemoteResult,
       input.refreshCoverageDiagnostics,
       input.startAccountLogin,
@@ -819,6 +824,7 @@ export function useApplicationShellViewProperties(
       input.stopFuzzyFileSearchSession,
       input.readFuzzySessionNotifications,
       input.readModelReroutedEvents,
+      input.readWarningNotifications,
       input.executeCommand,
       input.uploadFeedback,
       input.replayHistoryEntryFromDetail,

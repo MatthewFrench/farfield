@@ -63,6 +63,7 @@ As of the upstream snapshot above:
 8. Farfield now consumes `serverRequest/resolved` notifications through dedicated debug coverage diagnostics with strict typed event mapping and explicit pending-request refresh controls.
 9. Farfield now consumes fuzzy-session notifications (`fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`) through dedicated debug coverage diagnostics with strict typed session/result mapping and cursor-safe reads.
 10. Farfield now consumes `model/rerouted` notifications through dedicated debug coverage diagnostics with strict typed reroute mapping and explicit reason visibility.
+11. Farfield now consumes warning notifications (`configWarning`, `deprecationNotice`, `windows/worldWritableWarning`) through dedicated debug coverage diagnostics with strict typed warning payload mapping and cursor-safe reads.
 
 ## Canonical Coverage Artifacts
 
@@ -306,6 +307,7 @@ Upstream publishes `46` notification methods. Farfield now captures these notifi
 6. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageServerRequestResolvedEventMappers.ts` projects `serverRequest/resolved` notification payloads into strict server-request completion diagnostics.
 7. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageFuzzySessionNotificationMappers.ts` projects `fuzzyFileSearch/sessionUpdated` and `fuzzyFileSearch/sessionCompleted` notification payloads into strict fuzzy-session diagnostics.
 8. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageModelReroutedEventMappers.ts` projects `model/rerouted` notification payloads into strict model-reroute diagnostics.
+9. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageWarningNotificationMappers.ts` projects `configWarning`, `deprecationNotice`, and `windows/worldWritableWarning` notification payloads into strict warning diagnostics.
 
 ### Server-to-client requests
 

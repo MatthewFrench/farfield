@@ -27,6 +27,7 @@ import {
   type DebugAppServerCoverageThreadRealtimeStartResult,
   type DebugAppServerCoverageThreadRealtimeStopResult,
   type DebugAppServerCoverageThreadStreamEventsResult,
+  type DebugAppServerCoverageWarningNotificationsResult,
   type DebugAppServerCoverageWindowsSandboxSetupMode,
   type DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
@@ -45,6 +46,7 @@ import { DebugAppServerCoveragePendingServerRequestsSection } from "./DebugAppSe
 import { DebugAppServerCoverageRealtimeAndWindowsSection } from "./DebugAppServerCoverageRealtimeAndWindowsSection";
 import { DebugAppServerCoverageServerRequestResolvedEventsSection } from "./DebugAppServerCoverageServerRequestResolvedEventsSection";
 import { DebugAppServerCoverageThreadStreamEventsSection } from "./DebugAppServerCoverageThreadStreamEventsSection";
+import { DebugAppServerCoverageWarningNotificationsSection } from "./DebugAppServerCoverageWarningNotificationsSection";
 
 export interface DebugAppServerCoveragePanelProps {
   isLoadingCoverageDiagnostics: boolean;
@@ -75,6 +77,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastFuzzyFileSearchSessionStopResult: DebugAppServerCoverageFuzzyFileSearchSessionStopResult | null;
   lastFuzzySessionNotificationsResult: DebugAppServerCoverageFuzzySessionNotificationsResult | null;
   lastModelReroutedEventsResult: DebugAppServerCoverageModelReroutedEventsResult | null;
+  lastWarningNotificationsResult: DebugAppServerCoverageWarningNotificationsResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
   onRefreshCoverageDiagnostics: () => void;
   onStartAccountLogin: () => void;
@@ -116,6 +119,7 @@ export interface DebugAppServerCoveragePanelProps {
   onStopFuzzyFileSearchSession: (sessionId: string) => void;
   onReadFuzzySessionNotifications: (sinceSequence?: number | null) => void;
   onReadModelReroutedEvents: (sinceSequence?: number | null) => void;
+  onReadWarningNotifications: (sinceSequence?: number | null) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
   onUploadFeedback: (
     classification: string,
@@ -165,6 +169,7 @@ export function DebugAppServerCoveragePanel({
   lastFuzzyFileSearchSessionStopResult,
   lastFuzzySessionNotificationsResult,
   lastModelReroutedEventsResult,
+  lastWarningNotificationsResult,
   lastGitDiffToRemoteResult,
   onRefreshCoverageDiagnostics,
   onStartAccountLogin,
@@ -195,6 +200,7 @@ export function DebugAppServerCoveragePanel({
   onStopFuzzyFileSearchSession,
   onReadFuzzySessionNotifications,
   onReadModelReroutedEvents,
+  onReadWarningNotifications,
   onExecuteCommand,
   onUploadFeedback,
 }: DebugAppServerCoveragePanelProps): React.JSX.Element {
@@ -208,7 +214,7 @@ export function DebugAppServerCoveragePanel({
             diagnostics plus config writes, remote skills import, external-agent config migration,
             realtime thread actions, notification and auth-completion reads, pending-request reads,
             windows sandbox setup actions, git diff reads, command execution, fuzzy file search, and
-            feedback upload coverage.
+            warning-notification diagnostics, and feedback upload coverage.
           </p>
         </div>
         <Button
@@ -688,6 +694,12 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastModelReroutedEventsResult={lastModelReroutedEventsResult}
             onReadModelReroutedEvents={onReadModelReroutedEvents}
+          />
+
+          <DebugAppServerCoverageWarningNotificationsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastWarningNotificationsResult={lastWarningNotificationsResult}
+            onReadWarningNotifications={onReadWarningNotifications}
           />
 
           <DebugAppServerCoverageFeedbackUploadSection

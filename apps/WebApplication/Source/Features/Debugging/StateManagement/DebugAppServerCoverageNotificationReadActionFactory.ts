@@ -7,6 +7,7 @@ import type {
   DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingServerRequestsResult,
   DebugAppServerCoverageServerRequestResolvedEventsResult,
+  DebugAppServerCoverageWarningNotificationsResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import {
   createReadAuthCompletionEventsAction,
@@ -15,6 +16,7 @@ import {
   createReadNotificationEventsAction,
   createReadPendingServerRequestsAction,
   createReadServerRequestResolvedEventsAction,
+  createReadWarningNotificationsAction,
 } from "./DebugAppServerCoverageMutationActionHelpers";
 
 interface NotificationCoverageReadActions {
@@ -23,6 +25,7 @@ interface NotificationCoverageReadActions {
   readServerRequestResolvedEvents: (sinceSequence?: number | null) => void;
   readFuzzySessionNotifications: (sinceSequence?: number | null) => void;
   readModelReroutedEvents: (sinceSequence?: number | null) => void;
+  readWarningNotifications: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
 }
 
@@ -45,6 +48,9 @@ interface CreateNotificationCoverageReadActionsInput {
   >;
   setLastModelReroutedEventsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageModelReroutedEventsResult | null>
+  >;
+  setLastWarningNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageWarningNotificationsResult | null>
   >;
   setLastPendingServerRequestsResult: Dispatch<
     SetStateAction<DebugAppServerCoveragePendingServerRequestsResult | null>
@@ -85,6 +91,10 @@ export function createNotificationCoverageReadActions(
     readModelReroutedEvents: createReadModelReroutedEventsAction({
       ...sharedActionInput,
       setLastModelReroutedEventsResult: input.setLastModelReroutedEventsResult,
+    }),
+    readWarningNotifications: createReadWarningNotificationsAction({
+      ...sharedActionInput,
+      setLastWarningNotificationsResult: input.setLastWarningNotificationsResult,
     }),
     readPendingServerRequests: createReadPendingServerRequestsAction({
       ...sharedActionInput,

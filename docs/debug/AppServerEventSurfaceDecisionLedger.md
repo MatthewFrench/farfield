@@ -1,9 +1,9 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-03-01 09:00:42Z
+Last Updated (UTC): 2026-03-01 09:36:18Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
-Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session/model-reroute diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`, and `model/rerouted`; per-method product workflows below remain tracked independently.
+Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request/fuzzy-session/model-reroute/warning diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, `serverRequest/resolved`, `fuzzyFileSearch/sessionUpdated`, `fuzzyFileSearch/sessionCompleted`, `model/rerouted`, `configWarning`, `deprecationNotice`, and `windows/worldWritableWarning`; per-method product workflows below remain tracked independently.
 
 | Method | Surface Type | Current Farfield State | Recommendation | Notes |
 | --- | --- | --- | --- | --- |
@@ -12,8 +12,8 @@ Farfield now exposes raw notification-event cursors in debug coverage diagnostic
 | `account/updated` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `app/list/updated` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `authStatusChange` | server-to-client notification | Not consumed | Do not adopt | Deprecated notification surface. |
-| `configWarning` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
-| `deprecationNotice` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
+| `configWarning` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated warning diagnostics surface validates summary/details/path/range payload mapping. |
+| `deprecationNotice` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated warning diagnostics surface validates deprecation summary/details payload mapping. |
 | `error` | server-to-client notification | Not consumed | Plan candidate | Useful for direct app-server failure visibility when app-server notifications are consumed. |
 | `fuzzyFileSearch/sessionCompleted` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated fuzzy-session diagnostics surface validates asynchronous session-completion notifications and cursor behavior. |
 | `fuzzyFileSearch/sessionUpdated` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated fuzzy-session diagnostics surface validates session-update notifications and result-count projection. |
@@ -51,7 +51,7 @@ Farfield now exposes raw notification-event cursors in debug coverage diagnostic
 | `turn/diff/updated` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `turn/plan/updated` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `turn/started` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
-| `windows/worldWritableWarning` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
+| `windows/worldWritableWarning` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated warning diagnostics surface validates sampled-path and scan-status payload mapping. |
 | `windowsSandbox/setupCompleted` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `account/chatgptAuthTokens/refresh` | server-to-client request | Used now | Keep | Farfield surfaces this request in chat with a dedicated auth-token refresh card and submits typed responses through app-server transport. |
 | `applyPatchApproval` | server-to-client request | Used now | Keep (compatibility only) | Deprecated server-request path, but Farfield now keeps typed compatibility handling and dedicated in-chat approval controls, including execpolicy-amendment decision submissions, to avoid transport-level request drops. |

@@ -352,6 +352,56 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     const readNotificationEvents = vi
       .spyOn(capabilityServerClient, "readNotificationEvents")
       .mockImplementation(async (input) => {
+        if (input.limit === 280) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 18,
+                method: "configWarning",
+                params: {
+                  summary: "Deprecated key in config",
+                  details: "Use model.default instead.",
+                  path: "/tmp/project/.codex/config.toml",
+                  range: {
+                    start: {
+                      line: 4,
+                      column: 5,
+                    },
+                    end: {
+                      line: 4,
+                      column: 22,
+                    },
+                  },
+                },
+                receivedAtMilliseconds: 17_720,
+              },
+              {
+                sequence: 19,
+                method: "deprecationNotice",
+                params: {
+                  summary: "Legacy shell command mode is deprecated",
+                  details: "Migrate to the command execution block interface.",
+                },
+                receivedAtMilliseconds: 17_730,
+              },
+              {
+                sequence: 20,
+                method: "windows/worldWritableWarning",
+                params: {
+                  samplePaths: ["/tmp/project", "/tmp/project/cache"],
+                  extraCount: 3,
+                  failedScan: false,
+                },
+                receivedAtMilliseconds: 17_740,
+              },
+            ],
+            nextSequence: 21,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 260) {
           return {
             ok: true,
@@ -581,6 +631,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readServerRequestResolvedEvents(13);
     latestDiagnostics.current?.readFuzzySessionNotifications(14);
     latestDiagnostics.current?.readModelReroutedEvents(16);
+    latestDiagnostics.current?.readWarningNotifications(18);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -725,6 +776,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 16,
         limit: 260,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 18,
+        limit: 280,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -1010,6 +1066,63 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             toModel: "gpt-5-mini",
             reason: "highRiskCyberActivity",
             receivedAtMilliseconds: 17_710,
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastWarningNotificationsResult).toEqual({
+        sinceSequence: 18,
+        eventCount: 3,
+        nextSequence: 21,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        methodCounts: [
+          {
+            method: "configWarning",
+            count: 1,
+          },
+          {
+            method: "deprecationNotice",
+            count: 1,
+          },
+          {
+            method: "windows/worldWritableWarning",
+            count: 1,
+          },
+        ],
+        events: [
+          {
+            method: "configWarning",
+            sequence: 18,
+            summary: "Deprecated key in config",
+            details: "Use model.default instead.",
+            path: "/tmp/project/.codex/config.toml",
+            range: {
+              start: {
+                line: 4,
+                column: 5,
+              },
+              end: {
+                line: 4,
+                column: 22,
+              },
+            },
+            receivedAtMilliseconds: 17_720,
+          },
+          {
+            method: "deprecationNotice",
+            sequence: 19,
+            summary: "Legacy shell command mode is deprecated",
+            details: "Migrate to the command execution block interface.",
+            receivedAtMilliseconds: 17_730,
+          },
+          {
+            method: "windows/worldWritableWarning",
+            sequence: 20,
+            samplePaths: ["/tmp/project", "/tmp/project/cache"],
+            extraCount: 3,
+            failedScan: false,
+            receivedAtMilliseconds: 17_740,
           },
         ],
         readAtIso8601: expect.any(String),

@@ -382,6 +382,69 @@ export interface DebugAppServerCoverageModelReroutedEventsResult {
   readAtIso8601: string;
 }
 
+export type DebugAppServerCoverageWarningNotificationMethod =
+  | "configWarning"
+  | "deprecationNotice"
+  | "windows/worldWritableWarning";
+
+export interface DebugAppServerCoverageWarningTextPosition {
+  line: number;
+  column: number;
+}
+
+export interface DebugAppServerCoverageWarningTextRange {
+  start: DebugAppServerCoverageWarningTextPosition;
+  end: DebugAppServerCoverageWarningTextPosition;
+}
+
+export interface DebugAppServerCoverageConfigWarningNotificationSummary {
+  method: "configWarning";
+  sequence: number;
+  summary: string;
+  details: string | null;
+  path: string | null;
+  range: DebugAppServerCoverageWarningTextRange | null;
+  receivedAtMilliseconds: number;
+}
+
+export interface DebugAppServerCoverageDeprecationNoticeNotificationSummary {
+  method: "deprecationNotice";
+  sequence: number;
+  summary: string;
+  details: string | null;
+  receivedAtMilliseconds: number;
+}
+
+export interface DebugAppServerCoverageWindowsWorldWritableWarningNotificationSummary {
+  method: "windows/worldWritableWarning";
+  sequence: number;
+  samplePaths: string[];
+  extraCount: number;
+  failedScan: boolean;
+  receivedAtMilliseconds: number;
+}
+
+export type DebugAppServerCoverageWarningNotificationSummary =
+  | DebugAppServerCoverageConfigWarningNotificationSummary
+  | DebugAppServerCoverageDeprecationNoticeNotificationSummary
+  | DebugAppServerCoverageWindowsWorldWritableWarningNotificationSummary;
+
+export interface DebugAppServerCoverageWarningNotificationMethodCount {
+  method: DebugAppServerCoverageWarningNotificationMethod;
+  count: number;
+}
+
+export interface DebugAppServerCoverageWarningNotificationsResult {
+  sinceSequence: number | null;
+  eventCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageWarningNotificationSummary[];
+  methodCounts: DebugAppServerCoverageWarningNotificationMethodCount[];
+  readAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"
