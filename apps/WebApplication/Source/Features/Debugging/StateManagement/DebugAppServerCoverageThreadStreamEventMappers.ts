@@ -2,6 +2,7 @@ import { type JsonValue } from "@farfield/protocol";
 import { z } from "zod";
 import type { CapabilityThreadStreamEventsResponse } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import type {
+  DebugAppServerCoverageThreadStreamEventMethodCount,
   DebugAppServerCoverageThreadStreamEventSummary,
   DebugAppServerCoverageThreadStreamEventsResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
@@ -121,11 +122,37 @@ function mapThreadStreamEventSummary(
   }
 }
 
+function mapMethodCounts(
+  eventSummaries: DebugAppServerCoverageThreadStreamEventSummary[],
+): DebugAppServerCoverageThreadStreamEventMethodCount[] {
+  const countsByMethod = new Map<string, number>();
+  for (const eventSummary of eventSummaries) {
+    if (eventSummary.method === null) {
+      continue;
+    }
+    const existingCount = countsByMethod.get(eventSummary.method) ?? 0;
+    countsByMethod.set(eventSummary.method, existingCount + 1);
+  }
+
+  return [...countsByMethod.entries()]
+    .map(([method, count]) => ({
+      method,
+      count,
+    }))
+    .sort((left, right) => {
+      if (left.count !== right.count) {
+        return right.count - left.count;
+      }
+      return left.method.localeCompare(right.method);
+    });
+}
+
 export function mapThreadStreamEventsResult(
   response: CapabilityThreadStreamEventsResponse,
   sinceSequence: number | null,
 ): DebugAppServerCoverageThreadStreamEventsResult {
   const eventSummaries = response.events.map((frame) => mapThreadStreamEventSummary(frame));
+  const methodCounts = mapMethodCounts(eventSummaries);
 
   return {
     threadId: response.threadId,
@@ -136,6 +163,7 @@ export function mapThreadStreamEventsResult(
     firstAvailableSequence: response.firstAvailableSequence,
     resetRequired: response.resetRequired,
     events: eventSummaries,
+    methodCounts,
     readAtIso8601: new Date().toISOString(),
   };
 }

@@ -225,6 +225,11 @@ export interface DebugAppServerCoverageThreadStreamEventSummary {
   preview: string;
 }
 
+export interface DebugAppServerCoverageThreadStreamEventMethodCount {
+  method: string;
+  count: number;
+}
+
 export interface DebugAppServerCoverageThreadStreamEventsResult {
   threadId: string;
   sinceSequence: number | null;
@@ -234,6 +239,7 @@ export interface DebugAppServerCoverageThreadStreamEventsResult {
   firstAvailableSequence: number;
   resetRequired: boolean;
   events: DebugAppServerCoverageThreadStreamEventSummary[];
+  methodCounts: DebugAppServerCoverageThreadStreamEventMethodCount[];
   readAtIso8601: string;
 }
 

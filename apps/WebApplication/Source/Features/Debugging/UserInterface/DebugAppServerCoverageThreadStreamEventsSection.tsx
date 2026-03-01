@@ -46,16 +46,37 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Thread Stream Events
         </h4>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          data-testid="debug-coverage-thread-stream-read"
-          disabled={isRunningCoverageAction}
-          onClick={runThreadStreamEventsRead}
-        >
-          Read Stream Events
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="debug-coverage-thread-stream-read-next-cursor"
+            disabled={isRunningCoverageAction || lastThreadStreamEventsResult === null}
+            onClick={() => {
+              if (lastThreadStreamEventsResult === null) {
+                return;
+              }
+
+              onReadThreadStreamEvents(
+                lastThreadStreamEventsResult.threadId,
+                lastThreadStreamEventsResult.nextSequence,
+              );
+            }}
+          >
+            Read From Next Cursor
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="debug-coverage-thread-stream-read"
+            disabled={isRunningCoverageAction}
+            onClick={runThreadStreamEventsRead}
+          >
+            Read Stream Events
+          </Button>
+        </div>
       </div>
       <div className="space-y-2">
         <label className="text-xs text-muted-foreground" htmlFor="debug-coverage-thread-stream-id">
@@ -116,6 +137,24 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
           <p>
             Read at: {new Date(lastThreadStreamEventsResult.readAtIso8601).toLocaleTimeString()}
           </p>
+          {lastThreadStreamEventsResult.methodCounts.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Method counts: none captured.</p>
+          ) : (
+            <div className="space-y-1">
+              <p>Method counts:</p>
+              <div className="flex flex-wrap gap-2">
+                {lastThreadStreamEventsResult.methodCounts.map((methodCount) => (
+                  <span
+                    key={methodCount.method}
+                    className="rounded border border-border/60 px-2 py-0.5 text-[11px]"
+                    data-testid={`debug-coverage-thread-stream-method-count-${methodCount.method}`}
+                  >
+                    {methodCount.method}: {String(methodCount.count)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           {lastThreadStreamEventsResult.events.length === 0 ? (
             <p className="text-xs text-muted-foreground">No frames in the returned stream batch.</p>
           ) : (

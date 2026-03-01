@@ -36,6 +36,12 @@ describe("DebugAppServerCoverageThreadStreamEventMappers", () => {
     expect(result.nextSequence).toBe(12);
     expect(result.firstAvailableSequence).toBe(3);
     expect(result.resetRequired).toBe(false);
+    expect(result.methodCounts).toEqual([
+      {
+        method: "turn/completed",
+        count: 1,
+      },
+    ]);
     expect(result.readAtIso8601).toEqual(expect.any(String));
     expect(result.events).toEqual([
       {
@@ -106,6 +112,16 @@ describe("DebugAppServerCoverageThreadStreamEventMappers", () => {
 
     expect(result.sinceSequence).toBeNull();
     expect(result.eventCount).toBe(4);
+    expect(result.methodCounts).toEqual([
+      {
+        method: "item/tool/call",
+        count: 1,
+      },
+      {
+        method: "turn/start",
+        count: 1,
+      },
+    ]);
     expect(result.events[0]).toEqual({
       frameType: "request",
       method: "item/tool/call",

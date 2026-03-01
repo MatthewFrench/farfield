@@ -687,6 +687,12 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         nextSequence: 8,
         firstAvailableSequence: 3,
         resetRequired: false,
+        methodCounts: [
+          {
+            method: "turn/completed",
+            count: 1,
+          },
+        ],
         events: [
           {
             frameType: "broadcast",
