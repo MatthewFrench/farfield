@@ -248,4 +248,76 @@ describe("DebugAppServerCoverageThreadStreamEventsSection", () => {
     expect(screen.getByText("No frames match the current method filter.")).toBeDefined();
     expect(screen.queryByText("broadcast • turn/completed")).toBeNull();
   });
+
+  it("filters rendered events by frame type and clears both filters", () => {
+    const readThreadStreamEventsSpy = vi.fn(
+      (_threadId: string, _sinceSequence?: number | null) => {},
+    );
+
+    render(
+      <DebugAppServerCoverageThreadStreamEventsSection
+        isRunningCoverageAction={false}
+        lastThreadStreamEventsResult={{
+          threadId: "thread-stream-frame-filter",
+          sinceSequence: null,
+          ownerClientId: "client-owner",
+          eventCount: 2,
+          nextSequence: 80,
+          firstAvailableSequence: 60,
+          resetRequired: false,
+          methodCounts: [
+            {
+              method: "item/tool/call",
+              count: 1,
+            },
+            {
+              method: "turn/completed",
+              count: 1,
+            },
+          ],
+          events: [
+            {
+              frameType: "request",
+              method: "item/tool/call",
+              requestId: "request-1",
+              sourceClientId: "client-router",
+              sequence: null,
+              receivedAtMilliseconds: null,
+              preview: '{"tool":"list_files"}',
+            },
+            {
+              frameType: "broadcast",
+              method: "turn/completed",
+              requestId: null,
+              sourceClientId: "client-codex",
+              sequence: 79,
+              receivedAtMilliseconds: 22_000,
+              preview: '{"turn":"completed"}',
+            },
+          ],
+          readAtIso8601: "2026-03-01T00:00:00.000Z",
+        }}
+        onReadThreadStreamEvents={readThreadStreamEventsSpy}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("debug-coverage-thread-stream-frame-type-filter"), {
+      target: { value: "request" },
+    });
+
+    expect(screen.getByText("Filtered events: 1 of 2")).toBeDefined();
+    expect(screen.getByText("request • item/tool/call")).toBeDefined();
+    expect(screen.queryByText("broadcast • turn/completed")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("debug-coverage-thread-stream-method-filter-clear"));
+    expect(
+      (screen.getByTestId("debug-coverage-thread-stream-method-filter") as HTMLInputElement).value,
+    ).toBe("");
+    expect(
+      (screen.getByTestId("debug-coverage-thread-stream-frame-type-filter") as HTMLSelectElement)
+        .value,
+    ).toBe("all");
+    expect(screen.queryByTestId("debug-coverage-thread-stream-filter-summary")).toBeNull();
+    expect(screen.getByText("broadcast • turn/completed")).toBeDefined();
+  });
 });

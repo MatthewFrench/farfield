@@ -1,11 +1,29 @@
 import { useState } from "react";
 import { Button } from "@/Components/UserInterface/Button";
-import { type DebugAppServerCoverageThreadStreamEventsResult } from "../DomainModel/DebugAppServerCoverageContracts";
+import {
+  type DebugAppServerCoverageThreadStreamEventFrameType,
+  type DebugAppServerCoverageThreadStreamEventsResult,
+} from "../DomainModel/DebugAppServerCoverageContracts";
 
 export interface DebugAppServerCoverageThreadStreamEventsSectionProps {
   isRunningCoverageAction: boolean;
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
   onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
+}
+
+const ALL_FRAME_TYPES_FILTER_VALUE = "all";
+
+function parseFrameTypeFilterValue(
+  value: string,
+  availableFrameTypes: readonly DebugAppServerCoverageThreadStreamEventFrameType[],
+): DebugAppServerCoverageThreadStreamEventFrameType | typeof ALL_FRAME_TYPES_FILTER_VALUE {
+  if (value === ALL_FRAME_TYPES_FILTER_VALUE) {
+    return ALL_FRAME_TYPES_FILTER_VALUE;
+  }
+  if (availableFrameTypes.includes(value as DebugAppServerCoverageThreadStreamEventFrameType)) {
+    return value as DebugAppServerCoverageThreadStreamEventFrameType;
+  }
+  return ALL_FRAME_TYPES_FILTER_VALUE;
 }
 
 /**
@@ -20,7 +38,11 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
   const [threadIdDraft, setThreadIdDraft] = useState("");
   const [sinceSequenceDraft, setSinceSequenceDraft] = useState("");
   const [methodFilterDraft, setMethodFilterDraft] = useState("");
+  const [frameTypeFilterDraft, setFrameTypeFilterDraft] = useState<
+    DebugAppServerCoverageThreadStreamEventFrameType | typeof ALL_FRAME_TYPES_FILTER_VALUE
+  >(ALL_FRAME_TYPES_FILTER_VALUE);
   const normalizedMethodFilter = methodFilterDraft.trim().toLowerCase();
+  const isFrameTypeFilterActive = frameTypeFilterDraft !== ALL_FRAME_TYPES_FILTER_VALUE;
 
   const runThreadStreamEventsRead = (): void => {
     const normalizedThreadIdentifier = threadIdDraft.trim();
@@ -47,10 +69,17 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
       ? []
       : lastThreadStreamEventsResult.events.filter((event) => {
           if (normalizedMethodFilter.length === 0) {
-            return true;
+            return !isFrameTypeFilterActive || event.frameType === frameTypeFilterDraft;
           }
-          return (event.method ?? "").toLowerCase().includes(normalizedMethodFilter);
+          const matchesMethod = (event.method ?? "").toLowerCase().includes(normalizedMethodFilter);
+          const matchesFrameType =
+            !isFrameTypeFilterActive || event.frameType === frameTypeFilterDraft;
+          return matchesMethod && matchesFrameType;
         });
+  const availableFrameTypes =
+    lastThreadStreamEventsResult === null
+      ? []
+      : [...new Set(lastThreadStreamEventsResult.events.map((event) => event.frameType))].sort();
 
   return (
     <div className="rounded-md border border-border bg-card p-3 space-y-2">
@@ -196,14 +225,42 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
                 variant="outline"
                 size="sm"
                 data-testid="debug-coverage-thread-stream-method-filter-clear"
-                disabled={methodFilterDraft.length === 0}
+                disabled={
+                  methodFilterDraft.length === 0 &&
+                  frameTypeFilterDraft === ALL_FRAME_TYPES_FILTER_VALUE
+                }
                 onClick={() => {
                   setMethodFilterDraft("");
+                  setFrameTypeFilterDraft(ALL_FRAME_TYPES_FILTER_VALUE);
                 }}
               >
                 Clear
               </Button>
             </div>
+            <label
+              className="text-xs text-muted-foreground"
+              htmlFor="debug-coverage-thread-stream-frame-type-filter"
+            >
+              Frame type filter (optional)
+            </label>
+            <select
+              id="debug-coverage-thread-stream-frame-type-filter"
+              data-testid="debug-coverage-thread-stream-frame-type-filter"
+              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+              value={frameTypeFilterDraft}
+              onChange={(event) => {
+                setFrameTypeFilterDraft(
+                  parseFrameTypeFilterValue(event.target.value, availableFrameTypes),
+                );
+              }}
+            >
+              <option value={ALL_FRAME_TYPES_FILTER_VALUE}>All frame types</option>
+              {availableFrameTypes.map((frameType) => (
+                <option key={frameType} value={frameType}>
+                  {frameType}
+                </option>
+              ))}
+            </select>
           </div>
           {lastThreadStreamEventsResult.methodCounts.length === 0 ? (
             <p className="text-xs text-muted-foreground">Method counts: none captured.</p>
@@ -242,6 +299,11 @@ export function DebugAppServerCoverageThreadStreamEventsSection({
             </div>
           )}
           {normalizedMethodFilter.length > 0 ? (
+            <p data-testid="debug-coverage-thread-stream-filter-summary">
+              Filtered events: {String(filteredEvents.length)} of{" "}
+              {String(lastThreadStreamEventsResult.events.length)}
+            </p>
+          ) : isFrameTypeFilterActive ? (
             <p data-testid="debug-coverage-thread-stream-filter-summary">
               Filtered events: {String(filteredEvents.length)} of{" "}
               {String(lastThreadStreamEventsResult.events.length)}
