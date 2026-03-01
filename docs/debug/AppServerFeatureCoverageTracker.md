@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 03:40:00Z
+Last Updated (UTC): 2026-03-01 04:11:15Z
 
 ## Purpose
 
@@ -53,9 +53,9 @@ As of the upstream snapshot above:
 
 ## Farfield Intersection Summary
 
-1. Farfield app-server method coverage at request-owner layer: `45 / 74` request methods (`60.8%`).
+1. Farfield app-server method coverage at request-owner layer: `49 / 74` request methods (`66.2%`).
 2. Farfield also uses protocol initialization handshake (`initialize`) in transport ownership.
-3. Effective request-method usage including transport-owned `initialize`: `46 / 74` (`62.2%`).
+3. Effective request-method usage including transport-owned `initialize`: `50 / 74` (`67.6%`).
 4. Farfield now captures app-server notification streams and exposes them through stream-event reads when IPC is unavailable.
 5. Farfield now handles app-server server-request methods `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, and `item/tool/call`.
 
@@ -81,6 +81,9 @@ As of the upstream snapshot above:
 | `thread/list` | Thread list loading, refresh, bootstrap readiness check | High | Owned route and adapter layering, strict parsing, explicit merge/cache owners | Keep current path |
 | `thread/loaded/list` | Loaded-in-memory status projection on thread list surfaces | High | Canonical v2 lifecycle signal now mapped through strict owner boundaries into list contracts | Keep current path |
 | `thread/read` | Open-thread hydration and selected-thread refresh | High | Contract parsing at boundary and owner-controlled read flow | Keep current path |
+| `thread/realtime/start` | Realtime conversation diagnostics start action with prompt and optional session id in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed prompt/session validation and deterministic start action mapping | Keep current path |
+| `thread/realtime/appendText` | Realtime conversation diagnostics append-text action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed append payload parsing and deterministic action mapping | Keep current path |
+| `thread/realtime/stop` | Realtime conversation diagnostics stop action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed thread identifier parsing and deterministic stop action mapping | Keep current path |
 | `thread/start` | Thread creation | High | Clear create ownership with strict request shaping | Keep current path |
 | `thread/fork` | Fork existing thread from row action menu | High | Owner-routed mutation with strict request parsing and scoped cache invalidation | Keep current path |
 | `thread/name/set` | Rename thread from row action menu | High | Owner-routed mutation with strict request parsing and scoped cache invalidation | Keep current path |
@@ -122,6 +125,7 @@ As of the upstream snapshot above:
 | `skills/config/write` | Skills enable or disable actions in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic write-result mapping for skill-state mutations | Keep current path |
 | `skills/remote/list` | Remote skills diagnostics in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed remote-skill query mapping for integration diagnostics | Keep current path |
 | `skills/remote/export` | Remote skill export action in debug workspace coverage panel | Medium-high | Strict capability route ownership with deterministic export-result mapping for remote skill import workflows | Keep current path |
+| `windowsSandbox/setupStart` | Windows sandbox setup diagnostics action in debug workspace coverage panel | Medium-high | Strict capability route ownership with typed setup-mode parsing and deterministic setup-start result mapping | Keep current path |
 
 ### Transport-owned request method
 
@@ -136,6 +140,9 @@ As of the upstream snapshot above:
 | `thread/list` | Active and archived thread list, bootstrap readiness check | `/api/threads` GET -> `ThreadCollectionRoutes` -> `CodexThreadManagementOwner.listThreads` -> `AppServerClient.listThreads` |
 | `thread/loaded/list` | Loaded-in-memory status projection for thread rows | `/api/threads` GET -> `ThreadCollectionRoutes` -> `CodexThreadManagementOwner.listLoadedThreads` -> `AppServerClient.listLoadedThreads` |
 | `thread/read` | Open thread and selected-thread refresh | `/api/threads/:threadId` GET -> `ThreadMemberReadRouteOwner` -> `CodexThreadManagementOwner.readThread` -> `AppServerClient.readThread` |
+| `thread/realtime/start` | Realtime conversation diagnostics start action | `/api/threads/realtime/start` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.startThreadRealtime` -> `AppServerClient.startThreadRealtime` |
+| `thread/realtime/appendText` | Realtime conversation diagnostics append-text action | `/api/threads/realtime/append-text` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.appendThreadRealtimeText` -> `AppServerClient.appendThreadRealtimeText` |
+| `thread/realtime/stop` | Realtime conversation diagnostics stop action | `/api/threads/realtime/stop` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.stopThreadRealtime` -> `AppServerClient.stopThreadRealtime` |
 | `thread/start` | Create thread | `/api/threads` POST -> `ThreadCollectionRoutes` -> `CodexThreadManagementOwner.createThread` -> `AppServerClient.startThread` |
 | `thread/fork` | Fork thread | `/api/threads/:threadId/fork` POST -> `ThreadMemberForkMutationRouteOwner` -> `CodexThreadManagementOwner.forkThread` -> `AppServerClient.forkThread` |
 | `thread/name/set` | Rename thread | `/api/threads/:threadId/name` POST -> `ThreadMemberNameMutationRouteOwner` -> `CodexThreadManagementOwner.setThreadName` -> `AppServerClient.setThreadName` |
@@ -178,10 +185,11 @@ As of the upstream snapshot above:
 | `skills/config/write` | Skills enable or disable diagnostics action | `/api/skills/config/write` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.writeSkillsConfig` -> `AppServerClient.writeSkillsConfig` |
 | `skills/remote/list` | Remote skills diagnostics | `/api/skills/remote/list` GET -> `CapabilityRoutes` -> `CodexThreadManagementOwner.listRemoteSkills` -> `AppServerClient.listRemoteSkills` |
 | `skills/remote/export` | Remote skill export diagnostics action | `/api/skills/remote/export` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.exportRemoteSkill` -> `AppServerClient.exportRemoteSkill` |
+| `windowsSandbox/setupStart` | Windows sandbox setup diagnostics action | `/api/windows-sandbox/setup-start` POST -> `CapabilityRoutes` -> `CodexThreadManagementOwner.startWindowsSandboxSetup` -> `AppServerClient.startWindowsSandboxSetup` |
 
 ## Upstream Methods Not Used by Farfield App-Server Path
 
-`29` request methods are not used by Farfield’s app-server client path:
+`25` request methods are not used by Farfield’s app-server client path:
 
 ```text
 addConversationListener
@@ -208,11 +216,7 @@ resumeConversation
 sendUserTurn
 setDefaultModel
 thread/realtime/appendAudio
-thread/realtime/appendText
-thread/realtime/start
-thread/realtime/stop
 sendUserMessage
-windowsSandbox/setupStart
 ```
 
 ## Full Non-Intersection Classification
@@ -259,12 +263,9 @@ No remaining methods in this category for the current upstream snapshot.
 
 ### Category F: Thread and Turn v2 Lifecycle Surfaces Not Yet Wired
 
-These are idiomatic modern surfaces upstream; some should be considered future migration targets.
+This remaining method is an idiomatic modern surface upstream and can be considered if audio-stream diagnostics become a product objective.
 
 1. `thread/realtime/appendAudio`
-2. `thread/realtime/appendText`
-3. `thread/realtime/start`
-4. `thread/realtime/stop`
 
 ### Category G: Experimental and Test-only Surfaces Not Intended for Production Flow
 
@@ -279,12 +280,12 @@ These are idiomatic modern surfaces upstream; some should be considered future m
 
 ### Category I: Miscellaneous Product Surface Not Yet Wired
 
-1. `windowsSandbox/setupStart`
+No remaining methods in this category for the current upstream snapshot.
 
 ## Classification Coverage Check
 
-1. Total non-intersection methods: `29`
-2. Total methods listed across Category A-I: `29`
+1. Total non-intersection methods: `25`
+2. Total methods listed across Category A-I: `25`
 3. Classification coverage: complete for this upstream snapshot
 
 ## Publish and Allowance Coverage Notes

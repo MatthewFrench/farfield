@@ -148,6 +148,10 @@ export interface UseApplicationShellViewPropertiesInput {
   lastConfigValueWriteResult: DebugWorkspacePaneProps["lastConfigValueWriteResult"];
   lastExternalAgentConfigDetectResult: DebugWorkspacePaneProps["lastExternalAgentConfigDetectResult"];
   lastExternalAgentConfigImportResult: DebugWorkspacePaneProps["lastExternalAgentConfigImportResult"];
+  lastThreadRealtimeStartResult: DebugWorkspacePaneProps["lastThreadRealtimeStartResult"];
+  lastThreadRealtimeAppendTextResult: DebugWorkspacePaneProps["lastThreadRealtimeAppendTextResult"];
+  lastThreadRealtimeStopResult: DebugWorkspacePaneProps["lastThreadRealtimeStopResult"];
+  lastWindowsSandboxSetupStartResult: DebugWorkspacePaneProps["lastWindowsSandboxSetupStartResult"];
   lastFeedbackUploadResult: DebugWorkspacePaneProps["lastFeedbackUploadResult"];
   lastFuzzyFileSearchResult: DebugWorkspacePaneProps["lastFuzzyFileSearchResult"];
   lastGitDiffToRemoteResult: DebugWorkspacePaneProps["lastGitDiffToRemoteResult"];
@@ -169,6 +173,10 @@ export interface UseApplicationShellViewPropertiesInput {
   exportRemoteSkill: (hazelnutId: string) => void;
   detectExternalAgentConfig: (includeHome: boolean, cwds: string[]) => void;
   importExternalAgentConfig: DebugWorkspacePaneProps["onImportExternalAgentConfig"];
+  startThreadRealtime: DebugWorkspacePaneProps["onStartThreadRealtime"];
+  appendThreadRealtimeText: DebugWorkspacePaneProps["onAppendThreadRealtimeText"];
+  stopThreadRealtime: DebugWorkspacePaneProps["onStopThreadRealtime"];
+  startWindowsSandboxSetup: DebugWorkspacePaneProps["onStartWindowsSandboxSetup"];
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -423,6 +431,10 @@ function buildDebugWorkspacePaneProperties(
     lastConfigValueWriteResult: input.lastConfigValueWriteResult,
     lastExternalAgentConfigDetectResult: input.lastExternalAgentConfigDetectResult,
     lastExternalAgentConfigImportResult: input.lastExternalAgentConfigImportResult,
+    lastThreadRealtimeStartResult: input.lastThreadRealtimeStartResult,
+    lastThreadRealtimeAppendTextResult: input.lastThreadRealtimeAppendTextResult,
+    lastThreadRealtimeStopResult: input.lastThreadRealtimeStopResult,
+    lastWindowsSandboxSetupStartResult: input.lastWindowsSandboxSetupStartResult,
     lastFeedbackUploadResult: input.lastFeedbackUploadResult,
     lastFuzzyFileSearchResult: input.lastFuzzyFileSearchResult,
     lastGitDiffToRemoteResult: input.lastGitDiffToRemoteResult,
@@ -438,6 +450,10 @@ function buildDebugWorkspacePaneProperties(
     onExportRemoteSkill: input.exportRemoteSkill,
     onDetectExternalAgentConfig: input.detectExternalAgentConfig,
     onImportExternalAgentConfig: input.importExternalAgentConfig,
+    onStartThreadRealtime: input.startThreadRealtime,
+    onAppendThreadRealtimeText: input.appendThreadRealtimeText,
+    onStopThreadRealtime: input.stopThreadRealtime,
+    onStartWindowsSandboxSetup: input.startWindowsSandboxSetup,
     onReadGitDiffToRemote: input.readGitDiffToRemote,
     onSearchFuzzyFiles: input.searchFuzzyFiles,
     onExecuteCommand: input.executeCommand,
@@ -638,6 +654,10 @@ export function useApplicationShellViewProperties(
       input.lastConfigValueWriteResult,
       input.lastExternalAgentConfigDetectResult,
       input.lastExternalAgentConfigImportResult,
+      input.lastThreadRealtimeStartResult,
+      input.lastThreadRealtimeAppendTextResult,
+      input.lastThreadRealtimeStopResult,
+      input.lastWindowsSandboxSetupStartResult,
       input.lastFeedbackUploadResult,
       input.lastFuzzyFileSearchResult,
       input.lastGitDiffToRemoteResult,
@@ -653,6 +673,10 @@ export function useApplicationShellViewProperties(
       input.exportRemoteSkill,
       input.detectExternalAgentConfig,
       input.importExternalAgentConfig,
+      input.startThreadRealtime,
+      input.appendThreadRealtimeText,
+      input.stopThreadRealtime,
+      input.startWindowsSandboxSetup,
       input.readGitDiffToRemote,
       input.searchFuzzyFiles,
       input.executeCommand,

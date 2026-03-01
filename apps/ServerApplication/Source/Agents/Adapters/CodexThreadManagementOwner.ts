@@ -43,6 +43,14 @@ import {
   type StartMcpServerOauthLoginResult,
   type StartReviewOptions,
   type StartThreadOptions,
+  type ThreadRealtimeAppendTextOptions,
+  type ThreadRealtimeAppendTextResult,
+  type ThreadRealtimeStartOptions,
+  type ThreadRealtimeStartResult,
+  type ThreadRealtimeStopOptions,
+  type ThreadRealtimeStopResult,
+  type WindowsSandboxSetupStartOptions,
+  type WindowsSandboxSetupStartResult,
   type WriteSkillsConfigResult,
 } from "@farfield/api";
 import type {
@@ -53,6 +61,8 @@ import type {
   AppServerStartThreadResponse,
 } from "@farfield/protocol";
 import type {
+  AgentAppendThreadRealtimeTextInput,
+  AgentAppendThreadRealtimeTextResult,
   AgentArchiveThreadInput,
   AgentCancelAccountLoginInput,
   AgentCancelAccountLoginResult,
@@ -104,8 +114,14 @@ import type {
   AgentStartAccountLoginResult,
   AgentStartMcpServerOauthLoginInput,
   AgentStartMcpServerOauthLoginResult,
+  AgentStartThreadRealtimeInput,
+  AgentStartThreadRealtimeResult,
   AgentStartThreadReviewInput,
   AgentStartThreadReviewResult,
+  AgentStartWindowsSandboxSetupInput,
+  AgentStartWindowsSandboxSetupResult,
+  AgentStopThreadRealtimeInput,
+  AgentStopThreadRealtimeResult,
   AgentUnarchiveThreadInput,
   AgentUnsubscribeThreadInput,
   AgentUnsubscribeThreadStatus,
@@ -123,6 +139,10 @@ import {
   buildExternalAgentConfigImportOptions,
   buildFeedbackUploadOptions,
   buildStartMcpServerOauthLoginOptions,
+  buildThreadRealtimeAppendTextOptions,
+  buildThreadRealtimeStartOptions,
+  buildThreadRealtimeStopOptions,
+  buildWindowsSandboxSetupStartOptions,
   buildWriteConfigBatchOptions,
   buildWriteConfigValueOptions,
   buildWriteSkillsConfigOptions,
@@ -784,6 +804,46 @@ export class CodexThreadManagementOwner {
     this.ensureCodexAvailable();
     const result: ExternalAgentConfigImportResult = await this.runAppServerCall(() =>
       this.appClient.importExternalAgentConfig(buildExternalAgentConfigImportOptions(input)),
+    );
+    return result;
+  }
+
+  public async startThreadRealtime(
+    input: AgentStartThreadRealtimeInput,
+  ): Promise<AgentStartThreadRealtimeResult> {
+    this.ensureCodexAvailable();
+    const result: ThreadRealtimeStartResult = await this.runAppServerCall(() =>
+      this.appClient.startThreadRealtime(buildThreadRealtimeStartOptions(input)),
+    );
+    return result;
+  }
+
+  public async appendThreadRealtimeText(
+    input: AgentAppendThreadRealtimeTextInput,
+  ): Promise<AgentAppendThreadRealtimeTextResult> {
+    this.ensureCodexAvailable();
+    const result: ThreadRealtimeAppendTextResult = await this.runAppServerCall(() =>
+      this.appClient.appendThreadRealtimeText(buildThreadRealtimeAppendTextOptions(input)),
+    );
+    return result;
+  }
+
+  public async stopThreadRealtime(
+    input: AgentStopThreadRealtimeInput,
+  ): Promise<AgentStopThreadRealtimeResult> {
+    this.ensureCodexAvailable();
+    const result: ThreadRealtimeStopResult = await this.runAppServerCall(() =>
+      this.appClient.stopThreadRealtime(buildThreadRealtimeStopOptions(input)),
+    );
+    return result;
+  }
+
+  public async startWindowsSandboxSetup(
+    input: AgentStartWindowsSandboxSetupInput,
+  ): Promise<AgentStartWindowsSandboxSetupResult> {
+    this.ensureCodexAvailable();
+    const result: WindowsSandboxSetupStartResult = await this.runAppServerCall(() =>
+      this.appClient.startWindowsSandboxSetup(buildWindowsSandboxSetupStartOptions(input)),
     );
     return result;
   }

@@ -92,6 +92,23 @@ import {
   writeConfigValue,
   writeSkillsConfig,
 } from "./CapabilityCoverageMutationApi";
+import {
+  type ApiThreadRealtimeAppendTextOptions,
+  type ApiThreadRealtimeAppendTextResponse,
+  type ApiThreadRealtimeStartOptions,
+  type ApiThreadRealtimeStartResponse,
+  type ApiThreadRealtimeStopOptions,
+  type ApiThreadRealtimeStopResponse,
+  appendThreadRealtimeText,
+  startThreadRealtime,
+  stopThreadRealtime,
+} from "./CapabilityCoverageThreadRealtimeApi";
+import {
+  type ApiWindowsSandboxSetupMode,
+  type ApiWindowsSandboxSetupStartOptions,
+  type ApiWindowsSandboxSetupStartResponse,
+  startWindowsSandboxSetup,
+} from "./CapabilityCoverageWindowsSandboxApi";
 
 export type CapabilityRequestOptions = ApiRequestOptions;
 export type CapabilityHealthResponse = ApiHealthResponse;
@@ -142,6 +159,15 @@ export type CapabilityExternalAgentConfigDetectOptions = ApiExternalAgentConfigD
 export type CapabilityExternalAgentConfigDetectResponse = ApiExternalAgentConfigDetectResponse;
 export type CapabilityExternalAgentConfigImportOptions = ApiExternalAgentConfigImportOptions;
 export type CapabilityExternalAgentConfigImportResponse = ApiExternalAgentConfigImportResponse;
+export type CapabilityThreadRealtimeStartOptions = ApiThreadRealtimeStartOptions;
+export type CapabilityThreadRealtimeStartResponse = ApiThreadRealtimeStartResponse;
+export type CapabilityThreadRealtimeAppendTextOptions = ApiThreadRealtimeAppendTextOptions;
+export type CapabilityThreadRealtimeAppendTextResponse = ApiThreadRealtimeAppendTextResponse;
+export type CapabilityThreadRealtimeStopOptions = ApiThreadRealtimeStopOptions;
+export type CapabilityThreadRealtimeStopResponse = ApiThreadRealtimeStopResponse;
+export type CapabilityWindowsSandboxSetupMode = ApiWindowsSandboxSetupMode;
+export type CapabilityWindowsSandboxSetupStartOptions = ApiWindowsSandboxSetupStartOptions;
+export type CapabilityWindowsSandboxSetupStartResponse = ApiWindowsSandboxSetupStartResponse;
 export type CapabilityListAppsOptions = ApiListAppsOptions;
 export type CapabilityAppsResponse = ApiAppsResponse;
 export type CapabilityListSkillsOptions = ApiListSkillsOptions;
@@ -267,6 +293,30 @@ export class CapabilityServerClient {
     input: CapabilityExternalAgentConfigImportOptions,
   ): Promise<CapabilityExternalAgentConfigImportResponse> {
     return importExternalAgentConfig(input);
+  }
+
+  public async startThreadRealtime(
+    input: CapabilityThreadRealtimeStartOptions,
+  ): Promise<CapabilityThreadRealtimeStartResponse> {
+    return startThreadRealtime(input);
+  }
+
+  public async appendThreadRealtimeText(
+    input: CapabilityThreadRealtimeAppendTextOptions,
+  ): Promise<CapabilityThreadRealtimeAppendTextResponse> {
+    return appendThreadRealtimeText(input);
+  }
+
+  public async stopThreadRealtime(
+    input: CapabilityThreadRealtimeStopOptions,
+  ): Promise<CapabilityThreadRealtimeStopResponse> {
+    return stopThreadRealtime(input);
+  }
+
+  public async startWindowsSandboxSetup(
+    input: CapabilityWindowsSandboxSetupStartOptions,
+  ): Promise<CapabilityWindowsSandboxSetupStartResponse> {
+    return startWindowsSandboxSetup(input);
   }
 
   public async executeCommand(

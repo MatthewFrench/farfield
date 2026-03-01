@@ -33,7 +33,9 @@ import type {
   AgentRemoteSkillsProductSurface,
   AgentStartAccountLoginResult,
   AgentStartMcpServerOauthLoginResult,
+  AgentStartWindowsSandboxSetupResult,
   AgentUploadFeedbackResult,
+  AgentWindowsSandboxSetupMode,
   AgentWriteConfigValueResult,
   AgentWriteSkillsConfigResult,
 } from "../../Agents/Types.js";
@@ -67,6 +69,10 @@ const CapabilityRoutePathnameByName = {
   skillsRemoteExport: "/api/skills/remote/export",
   externalAgentConfigDetect: "/api/external-agent-config/detect",
   externalAgentConfigImport: "/api/external-agent-config/import",
+  threadRealtimeStart: "/api/threads/realtime/start",
+  threadRealtimeAppendText: "/api/threads/realtime/append-text",
+  threadRealtimeStop: "/api/threads/realtime/stop",
+  windowsSandboxSetupStart: "/api/windows-sandbox/setup-start",
   models: "/api/models",
   collaborationModes: "/api/collaboration-modes",
   experimentalFeatures: "/api/experimental-features",
@@ -116,6 +122,10 @@ const CapabilityRouteQueryParameterByName = {
   timeoutSeconds: "timeoutSeconds",
   includeHome: "includeHome",
   migrationItems: "migrationItems",
+  prompt: "prompt",
+  sessionId: "sessionId",
+  text: "text",
+  mode: "mode",
 } as const;
 
 const CapabilityRouteLogEventByName = {
@@ -142,6 +152,10 @@ const CapabilityRouteLogEventByName = {
   skillsRemoteExportFailed: "skills-remote-export-failed",
   externalAgentConfigDetectFailed: "external-agent-config-detect-failed",
   externalAgentConfigImportFailed: "external-agent-config-import-failed",
+  threadRealtimeStartFailed: "thread-realtime-start-failed",
+  threadRealtimeAppendTextFailed: "thread-realtime-append-text-failed",
+  threadRealtimeStopFailed: "thread-realtime-stop-failed",
+  windowsSandboxSetupStartFailed: "windows-sandbox-setup-start-failed",
   modelsListTimeout: "models-list-timeout",
   collaborationModesListTimeout: "collaboration-modes-list-timeout",
   experimentalFeaturesListTimeout: "experimental-features-list-timeout",
@@ -229,6 +243,19 @@ const CapabilityRouteErrorMessagePrefixByName = {
   invalidExternalAgentConfigMigrationItems:
     "Invalid migrationItems query parameter. Expected JSON array of migration items.",
   failedToImportExternalAgentConfig: "Failed to import external agent config: ",
+  missingThreadRealtimeThreadId: "Missing threadId query parameter.",
+  missingThreadRealtimePrompt: "Missing prompt query parameter.",
+  missingThreadRealtimeText: "Missing text query parameter.",
+  invalidThreadRealtimeThreadId: "Invalid threadId query parameter.",
+  invalidThreadRealtimePrompt: "Invalid prompt query parameter.",
+  invalidThreadRealtimeText: "Invalid text query parameter.",
+  invalidThreadRealtimeSessionId: "Invalid sessionId query parameter.",
+  failedToStartThreadRealtime: "Failed to start thread realtime: ",
+  failedToAppendThreadRealtimeText: "Failed to append thread realtime text: ",
+  failedToStopThreadRealtime: "Failed to stop thread realtime: ",
+  missingWindowsSandboxMode: "Missing mode query parameter.",
+  invalidWindowsSandboxMode: "Invalid mode query parameter. Expected elevated or unelevated.",
+  failedToStartWindowsSandboxSetup: "Failed to start windows sandbox setup: ",
   failedToListModels: "Failed to list models: ",
   failedToListCollaborationModes: "Failed to list collaboration modes: ",
   failedToListExperimentalFeatures: "Failed to list experimental features: ",
@@ -259,6 +286,10 @@ const CapabilityRouteTimeoutLabelByName = {
   skillsRemoteExport: "skills remote export",
   externalAgentConfigDetect: "external agent config detect",
   externalAgentConfigImport: "external agent config import",
+  threadRealtimeStart: "thread realtime start",
+  threadRealtimeAppendText: "thread realtime append text",
+  threadRealtimeStop: "thread realtime stop",
+  windowsSandboxSetupStart: "windows sandbox setup start",
   modelsList: "models listing",
   collaborationModesList: "collaboration modes listing",
   experimentalFeaturesList: "experimental features listing",
@@ -388,6 +419,11 @@ type CapabilitySkillsRemoteExportResponseBody = AgentExportRemoteSkillResult & {
 type CapabilityExternalAgentConfigDetectResponseBody = AgentDetectExternalAgentConfigResult & {
   ok: true;
 };
+
+interface CapabilityWindowsSandboxSetupStartResponseBody {
+  ok: true;
+  started: boolean;
+}
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {
   if (error instanceof Error) {
@@ -659,6 +695,22 @@ function parseRemoteSkillsProductSurfaceQueryValue(
   return null;
 }
 
+function parseWindowsSandboxSetupModeQueryValue(
+  value: string | null,
+): AgentWindowsSandboxSetupMode | null {
+  if (value === null) {
+    return null;
+  }
+  const normalized = value.trim();
+  if (normalized === "elevated") {
+    return "elevated";
+  }
+  if (normalized === "unelevated") {
+    return "unelevated";
+  }
+  return null;
+}
+
 const CapabilityExternalAgentConfigMigrationItemSchema = z
   .object({
     itemType: z.enum(["AGENTS_MD", "CONFIG", "SKILLS", "MCP_SERVER_CONFIG"]),
@@ -885,6 +937,15 @@ function mapExternalAgentConfigDetectResponse(
   return {
     ok: true,
     ...result,
+  };
+}
+
+function mapWindowsSandboxSetupStartResponse(
+  result: AgentStartWindowsSandboxSetupResult,
+): CapabilityWindowsSandboxSetupStartResponseBody {
+  return {
+    ok: true,
+    started: result.started,
   };
 }
 
@@ -3131,6 +3192,439 @@ async function handleExternalAgentConfigImportRoute(
   return true;
 }
 
+async function handleThreadRealtimeStartRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.threadRealtimeStart,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const threadIdRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.threadId);
+  if (threadIdRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingThreadRealtimeThreadId,
+    });
+    return true;
+  }
+  const threadId = parseOptionalNonEmptyQueryValue(threadIdRaw);
+  if (threadId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidThreadRealtimeThreadId,
+    });
+    return true;
+  }
+
+  const promptRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.prompt);
+  if (promptRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingThreadRealtimePrompt,
+    });
+    return true;
+  }
+  const prompt = parseOptionalNonEmptyQueryValue(promptRaw);
+  if (prompt === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidThreadRealtimePrompt,
+    });
+    return true;
+  }
+
+  const sessionIdRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.sessionId);
+  const sessionId = parseOptionalNonEmptyQueryValue(sessionIdRaw);
+  if (sessionIdRaw !== null && sessionId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidThreadRealtimeSessionId,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canStartThreadRealtime ||
+    !adapter.startThreadRealtime
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToStartThreadRealtime}Thread realtime start is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    await withTimeout(
+      adapter.startThreadRealtime({
+        threadId,
+        prompt,
+        ...(sessionId !== null ? { sessionId } : {}),
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.threadRealtimeStart,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapMutationSuccessResponse());
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        threadId,
+        hasSessionId: sessionId !== null,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.threadRealtimeStartFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToStartThreadRealtime}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleThreadRealtimeAppendTextRoute(
+  deps: CapabilityRouteDependencies,
+): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.threadRealtimeAppendText,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const threadIdRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.threadId);
+  if (threadIdRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingThreadRealtimeThreadId,
+    });
+    return true;
+  }
+  const threadId = parseOptionalNonEmptyQueryValue(threadIdRaw);
+  if (threadId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidThreadRealtimeThreadId,
+    });
+    return true;
+  }
+
+  const textRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.text);
+  if (textRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingThreadRealtimeText,
+    });
+    return true;
+  }
+  const text = parseOptionalNonEmptyQueryValue(textRaw);
+  if (text === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidThreadRealtimeText,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canAppendThreadRealtimeText ||
+    !adapter.appendThreadRealtimeText
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToAppendThreadRealtimeText}Thread realtime text append is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    await withTimeout(
+      adapter.appendThreadRealtimeText({
+        threadId,
+        text,
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.threadRealtimeAppendText,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapMutationSuccessResponse());
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        threadId,
+        textLength: text.length,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.threadRealtimeAppendTextFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToAppendThreadRealtimeText}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleThreadRealtimeStopRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.threadRealtimeStop,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const threadIdRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.threadId);
+  if (threadIdRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingThreadRealtimeThreadId,
+    });
+    return true;
+  }
+  const threadId = parseOptionalNonEmptyQueryValue(threadIdRaw);
+  if (threadId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidThreadRealtimeThreadId,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canStopThreadRealtime ||
+    !adapter.stopThreadRealtime
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToStopThreadRealtime}Thread realtime stop is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    await withTimeout(
+      adapter.stopThreadRealtime({
+        threadId,
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.threadRealtimeStop,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.success, mapMutationSuccessResponse());
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        threadId,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.threadRealtimeStopFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToStopThreadRealtime}${message}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleWindowsSandboxSetupStartRoute(
+  deps: CapabilityRouteDependencies,
+): Promise<boolean> {
+  const {
+    req,
+    res,
+    pathname,
+    url,
+    capabilityListTimeoutMs,
+    registry,
+    parseAgentId,
+    withTimeout,
+    jsonResponse,
+  } = deps;
+
+  if (
+    !isCapabilityRouteRequest(
+      req.method,
+      pathname,
+      CapabilityRouteMethodByName.post,
+      CapabilityRoutePathnameByName.windowsSandboxSetupStart,
+    )
+  ) {
+    return false;
+  }
+
+  const requestedAgentRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.agentId);
+  const requestedAgentId = parseAgentId(requestedAgentRaw);
+  if (requestedAgentRaw !== null && requestedAgentRaw.length > 0 && requestedAgentId === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.invalidAgentId}${requestedAgentRaw}`,
+    });
+    return true;
+  }
+
+  const modeRaw = url.searchParams.get(CapabilityRouteQueryParameterByName.mode);
+  if (modeRaw === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.missingWindowsSandboxMode,
+    });
+    return true;
+  }
+  const mode = parseWindowsSandboxSetupModeQueryValue(modeRaw);
+  if (mode === null) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.badRequest, {
+      ok: false,
+      error: CapabilityRouteErrorMessagePrefixByName.invalidWindowsSandboxMode,
+    });
+    return true;
+  }
+
+  const resolvedAgentId = requestedAgentId ?? registry.resolveDefaultAgentId();
+  const adapter = resolvedAgentId === null ? null : registry.getAdapter(resolvedAgentId);
+  if (
+    !adapter ||
+    !adapter.isEnabled() ||
+    !adapter.capabilities.canStartWindowsSandboxSetup ||
+    !adapter.startWindowsSandboxSetup
+  ) {
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToStartWindowsSandboxSetup}Windows sandbox setup is unavailable for the selected agent.`,
+    });
+    return true;
+  }
+
+  try {
+    const result = await withTimeout(
+      adapter.startWindowsSandboxSetup({
+        mode,
+      }),
+      capabilityListTimeoutMs,
+      CapabilityRouteTimeoutLabelByName.windowsSandboxSetupStart,
+    );
+    jsonResponse(
+      res,
+      CapabilityRouteStatusCodeByName.success,
+      mapWindowsSandboxSetupStartResponse(result),
+    );
+  } catch (error) {
+    const message = toErrorMessage(error);
+    logger.warn(
+      {
+        agentId: resolvedAgentId,
+        mode,
+        error: message,
+      },
+      CapabilityRouteLogEventByName.windowsSandboxSetupStartFailed,
+    );
+    jsonResponse(res, CapabilityRouteStatusCodeByName.serviceUnavailable, {
+      ok: false,
+      error: `${CapabilityRouteErrorMessagePrefixByName.failedToStartWindowsSandboxSetup}${message}`,
+    });
+  }
+
+  return true;
+}
+
 async function handleModelsRoute(deps: CapabilityRouteDependencies): Promise<boolean> {
   const {
     req,
@@ -3517,7 +4011,9 @@ async function handleSkillsRoute(deps: CapabilityRouteDependencies): Promise<boo
  * `/api/account/login/cancel`, `/api/account/logout`,
  * `/api/config/batch/write`, `/api/config/value/write`, `/api/mcp-servers/oauth/login`, `/api/skills/config/write`,
  * `/api/skills/remote/list`, `/api/skills/remote/export`,
- * `/api/external-agent-config/detect`, `/api/external-agent-config/import`, `/api/models`,
+ * `/api/external-agent-config/detect`, `/api/external-agent-config/import`,
+ * `/api/threads/realtime/start`, `/api/threads/realtime/append-text`, `/api/threads/realtime/stop`,
+ * `/api/windows-sandbox/setup-start`, `/api/models`,
  * `/api/collaboration-modes`, `/api/experimental-features`,
  * `/api/mcp-servers`, `/api/apps`, `/api/skills`)
  * route dispatch with explicit adapter-to-response mapping.
@@ -3587,6 +4083,18 @@ export async function handleCapabilityRoutes(deps: CapabilityRouteDependencies):
     return true;
   }
   if (await handleExternalAgentConfigImportRoute(deps)) {
+    return true;
+  }
+  if (await handleThreadRealtimeStartRoute(deps)) {
+    return true;
+  }
+  if (await handleThreadRealtimeAppendTextRoute(deps)) {
+    return true;
+  }
+  if (await handleThreadRealtimeStopRoute(deps)) {
+    return true;
+  }
+  if (await handleWindowsSandboxSetupStartRoute(deps)) {
     return true;
   }
   if (await handleModelsRoute(deps)) {

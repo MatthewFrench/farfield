@@ -19,6 +19,11 @@ import type {
   CapabilityMcpServersResponse,
   CapabilityRemoteSkillsListResponse,
   CapabilitySkillsResponse,
+  CapabilityThreadRealtimeAppendTextResponse,
+  CapabilityThreadRealtimeStartResponse,
+  CapabilityThreadRealtimeStopResponse,
+  CapabilityWindowsSandboxSetupMode,
+  CapabilityWindowsSandboxSetupStartResponse,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import type {
   DebugAppServerCoverageAccount,
@@ -39,7 +44,11 @@ import type {
   DebugAppServerCoverageRemoteSkillSummary,
   DebugAppServerCoverageRequirements,
   DebugAppServerCoverageSkillEntry,
+  DebugAppServerCoverageThreadRealtimeAppendTextResult,
+  DebugAppServerCoverageThreadRealtimeStartResult,
+  DebugAppServerCoverageThreadRealtimeStopResult,
   DebugAppServerCoverageUserInfoSnapshot,
+  DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 
 function readAuthStatusLabel(authStatus: JsonValue): string {
@@ -216,6 +225,53 @@ export function mapExternalAgentConfigImportResult(
   return {
     itemCount,
     importedAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapThreadRealtimeStartResult(
+  _response: CapabilityThreadRealtimeStartResponse,
+  threadId: string,
+  prompt: string,
+  sessionId: string | null,
+): DebugAppServerCoverageThreadRealtimeStartResult {
+  return {
+    threadId,
+    prompt,
+    sessionId,
+    startedAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapThreadRealtimeAppendTextResult(
+  _response: CapabilityThreadRealtimeAppendTextResponse,
+  threadId: string,
+  text: string,
+): DebugAppServerCoverageThreadRealtimeAppendTextResult {
+  return {
+    threadId,
+    text,
+    appendedAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapThreadRealtimeStopResult(
+  _response: CapabilityThreadRealtimeStopResponse,
+  threadId: string,
+): DebugAppServerCoverageThreadRealtimeStopResult {
+  return {
+    threadId,
+    stoppedAtIso8601: new Date().toISOString(),
+  };
+}
+
+export function mapWindowsSandboxSetupStartResult(
+  response: CapabilityWindowsSandboxSetupStartResponse,
+  mode: CapabilityWindowsSandboxSetupMode,
+): DebugAppServerCoverageWindowsSandboxSetupStartResult {
+  return {
+    mode,
+    started: response.started,
+    startedAtIso8601: new Date().toISOString(),
   };
 }
 

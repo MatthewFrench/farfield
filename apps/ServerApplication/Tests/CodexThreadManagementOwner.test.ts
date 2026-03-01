@@ -51,7 +51,15 @@ import {
   type StartReviewOptions,
   type StartReviewResult,
   type StartThreadOptions,
+  type ThreadRealtimeAppendTextOptions,
+  type ThreadRealtimeAppendTextResult,
+  type ThreadRealtimeStartOptions,
+  type ThreadRealtimeStartResult,
+  type ThreadRealtimeStopOptions,
+  type ThreadRealtimeStopResult,
   type UnsubscribeThreadStatus,
+  type WindowsSandboxSetupStartOptions,
+  type WindowsSandboxSetupStartResult,
   type WriteSkillsConfigOptions,
   type WriteSkillsConfigResult,
 } from "@farfield/api";
@@ -124,6 +132,10 @@ class TestAppServerClient extends AppServerClient {
   public readonly exportRemoteSkillCalls: ExportRemoteSkillOptions[] = [];
   public readonly detectExternalAgentConfigCalls: ExternalAgentConfigDetectOptions[] = [];
   public readonly importExternalAgentConfigCalls: ExternalAgentConfigImportOptions[] = [];
+  public readonly startThreadRealtimeCalls: ThreadRealtimeStartOptions[] = [];
+  public readonly appendThreadRealtimeTextCalls: ThreadRealtimeAppendTextOptions[] = [];
+  public readonly stopThreadRealtimeCalls: ThreadRealtimeStopOptions[] = [];
+  public readonly startWindowsSandboxSetupCalls: WindowsSandboxSetupStartOptions[] = [];
   public readonly readAccountCalls: Array<ReadAccountOptions | undefined> = [];
   public readonly readAuthStatusCalls: Array<ReadAuthStatusOptions | undefined> = [];
   public readonly readAccountRateLimitsCalls: Array<undefined> = [];
@@ -158,6 +170,10 @@ class TestAppServerClient extends AppServerClient {
   private readonly exportRemoteSkillResult: ExportRemoteSkillResult;
   private readonly detectExternalAgentConfigResult: ExternalAgentConfigDetectResult;
   private readonly importExternalAgentConfigResult: ExternalAgentConfigImportResult;
+  private readonly startThreadRealtimeResult: ThreadRealtimeStartResult;
+  private readonly appendThreadRealtimeTextResult: ThreadRealtimeAppendTextResult;
+  private readonly stopThreadRealtimeResult: ThreadRealtimeStopResult;
+  private readonly startWindowsSandboxSetupResult: WindowsSandboxSetupStartResult;
   private readonly readAccountResult: ReadAccountResult;
   private readonly readAuthStatusResult: ReadAuthStatusResult;
   private readonly readAccountRateLimitsResult: ReadAccountRateLimitsResult;
@@ -191,6 +207,10 @@ class TestAppServerClient extends AppServerClient {
     exportRemoteSkillResult?: ExportRemoteSkillResult;
     detectExternalAgentConfigResult?: ExternalAgentConfigDetectResult;
     importExternalAgentConfigResult?: ExternalAgentConfigImportResult;
+    startThreadRealtimeResult?: ThreadRealtimeStartResult;
+    appendThreadRealtimeTextResult?: ThreadRealtimeAppendTextResult;
+    stopThreadRealtimeResult?: ThreadRealtimeStopResult;
+    startWindowsSandboxSetupResult?: WindowsSandboxSetupStartResult;
     readAccountResult?: ReadAccountResult;
     readAuthStatusResult?: ReadAuthStatusResult;
     readAccountRateLimitsResult?: ReadAccountRateLimitsResult;
@@ -256,6 +276,12 @@ class TestAppServerClient extends AppServerClient {
       items: [],
     };
     this.importExternalAgentConfigResult = input?.importExternalAgentConfigResult ?? {};
+    this.startThreadRealtimeResult = input?.startThreadRealtimeResult ?? {};
+    this.appendThreadRealtimeTextResult = input?.appendThreadRealtimeTextResult ?? {};
+    this.stopThreadRealtimeResult = input?.stopThreadRealtimeResult ?? {};
+    this.startWindowsSandboxSetupResult = input?.startWindowsSandboxSetupResult ?? {
+      started: true,
+    };
     this.readAccountResult = input?.readAccountResult ?? {
       account: null,
       requiresOpenaiAuth: false,
@@ -461,6 +487,34 @@ class TestAppServerClient extends AppServerClient {
   ): Promise<ExternalAgentConfigImportResult> {
     this.importExternalAgentConfigCalls.push(options);
     return this.importExternalAgentConfigResult;
+  }
+
+  public override async startThreadRealtime(
+    options: ThreadRealtimeStartOptions,
+  ): Promise<ThreadRealtimeStartResult> {
+    this.startThreadRealtimeCalls.push(options);
+    return this.startThreadRealtimeResult;
+  }
+
+  public override async appendThreadRealtimeText(
+    options: ThreadRealtimeAppendTextOptions,
+  ): Promise<ThreadRealtimeAppendTextResult> {
+    this.appendThreadRealtimeTextCalls.push(options);
+    return this.appendThreadRealtimeTextResult;
+  }
+
+  public override async stopThreadRealtime(
+    options: ThreadRealtimeStopOptions,
+  ): Promise<ThreadRealtimeStopResult> {
+    this.stopThreadRealtimeCalls.push(options);
+    return this.stopThreadRealtimeResult;
+  }
+
+  public override async startWindowsSandboxSetup(
+    options: WindowsSandboxSetupStartOptions,
+  ): Promise<WindowsSandboxSetupStartResult> {
+    this.startWindowsSandboxSetupCalls.push(options);
+    return this.startWindowsSandboxSetupResult;
   }
 
   public override async readAccount(options?: ReadAccountOptions): Promise<ReadAccountResult> {
@@ -1780,6 +1834,82 @@ describe("CodexThreadManagementOwner", () => {
       },
     ]);
     expect(result).toEqual({});
+  });
+
+  it("starts thread realtime through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    const result = await owner.startThreadRealtime({
+      threadId: "thread-1",
+      prompt: "Summarize this repository.",
+      sessionId: "session-1",
+    });
+
+    expect(appClient.startThreadRealtimeCalls).toEqual([
+      {
+        threadId: "thread-1",
+        prompt: "Summarize this repository.",
+        sessionId: "session-1",
+      },
+    ]);
+    expect(result).toEqual({});
+  });
+
+  it("appends thread realtime text through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    const result = await owner.appendThreadRealtimeText({
+      threadId: "thread-1",
+      text: "Continue with implementation details.",
+    });
+
+    expect(appClient.appendThreadRealtimeTextCalls).toEqual([
+      {
+        threadId: "thread-1",
+        text: "Continue with implementation details.",
+      },
+    ]);
+    expect(result).toEqual({});
+  });
+
+  it("stops thread realtime through codex management owner", async () => {
+    const appClient = new TestAppServerClient();
+    const owner = createOwner(appClient);
+
+    const result = await owner.stopThreadRealtime({
+      threadId: "thread-1",
+    });
+
+    expect(appClient.stopThreadRealtimeCalls).toEqual([
+      {
+        threadId: "thread-1",
+      },
+    ]);
+    expect(result).toEqual({});
+  });
+
+  it("starts windows sandbox setup through codex management owner", async () => {
+    const appClient = new TestAppServerClient({
+      startWindowsSandboxSetupResult: {
+        started: true,
+      },
+    });
+    const owner = createOwner(appClient);
+
+    const result = await owner.startWindowsSandboxSetup({
+      mode: "elevated",
+    });
+
+    expect(appClient.startWindowsSandboxSetupCalls).toEqual([
+      {
+        mode: "elevated",
+      },
+    ]);
+    expect(result).toEqual({
+      started: true,
+    });
   });
 
   it("prefers active profile config defaults and requests config without layers", async () => {

@@ -78,6 +78,12 @@ import {
   buildListRemoteSkillsRequestParameters,
 } from "./AppServerClientSkillsRemoteRequestBuilders.js";
 import {
+  buildThreadRealtimeAppendTextRequestParameters,
+  buildThreadRealtimeStartRequestParameters,
+  buildThreadRealtimeStopRequestParameters,
+} from "./AppServerClientThreadRealtimeRequestBuilders.js";
+import { buildWindowsSandboxSetupStartRequestParameters } from "./AppServerClientWindowsSandboxRequestBuilders.js";
+import {
   type AppServerPendingServerRequest,
   type AppServerReadNotificationEventsInput,
   type AppServerReadNotificationEventsResult,
@@ -548,6 +554,37 @@ export interface ExternalAgentConfigImportOptions {
 
 export interface ExternalAgentConfigImportResult {}
 
+export interface ThreadRealtimeStartOptions {
+  threadId: string;
+  prompt: string;
+  sessionId?: string | null;
+}
+
+export interface ThreadRealtimeStartResult {}
+
+export interface ThreadRealtimeAppendTextOptions {
+  threadId: string;
+  text: string;
+}
+
+export interface ThreadRealtimeAppendTextResult {}
+
+export interface ThreadRealtimeStopOptions {
+  threadId: string;
+}
+
+export interface ThreadRealtimeStopResult {}
+
+export type WindowsSandboxSetupMode = "elevated" | "unelevated";
+
+export interface WindowsSandboxSetupStartOptions {
+  mode: WindowsSandboxSetupMode;
+}
+
+export interface WindowsSandboxSetupStartResult {
+  started: boolean;
+}
+
 export interface ResumeThreadOptions {
   persistExtendedHistory?: boolean;
 }
@@ -933,6 +970,14 @@ const AppServerExternalAgentConfigDetectResponseSchema = z
   })
   .passthrough();
 const AppServerExternalAgentConfigImportResponseSchema = z.object({}).passthrough();
+const AppServerThreadRealtimeStartResponseSchema = z.object({}).passthrough();
+const AppServerThreadRealtimeAppendTextResponseSchema = z.object({}).passthrough();
+const AppServerThreadRealtimeStopResponseSchema = z.object({}).passthrough();
+const AppServerWindowsSandboxSetupStartResponseSchema = z
+  .object({
+    started: z.boolean(),
+  })
+  .passthrough();
 const AppServerThreadUnsubscribeResponseSchema = z
   .object({
     status: z.enum(["notLoaded", "notSubscribed", "unsubscribed"]),
@@ -1666,6 +1711,68 @@ export class AppServerClient {
       APP_SERVER_CLIENT_RESPONSE_CONTEXTS.importExternalAgentConfig,
     );
     return {};
+  }
+
+  public async startThreadRealtime(
+    options: ThreadRealtimeStartOptions,
+  ): Promise<ThreadRealtimeStartResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.startThreadRealtime,
+      buildThreadRealtimeStartRequestParameters(options),
+    );
+    parseAppServerResponse(
+      AppServerThreadRealtimeStartResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.startThreadRealtime,
+    );
+    return {};
+  }
+
+  public async appendThreadRealtimeText(
+    options: ThreadRealtimeAppendTextOptions,
+  ): Promise<ThreadRealtimeAppendTextResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.appendThreadRealtimeText,
+      buildThreadRealtimeAppendTextRequestParameters(options),
+    );
+    parseAppServerResponse(
+      AppServerThreadRealtimeAppendTextResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.appendThreadRealtimeText,
+    );
+    return {};
+  }
+
+  public async stopThreadRealtime(
+    options: ThreadRealtimeStopOptions,
+  ): Promise<ThreadRealtimeStopResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.stopThreadRealtime,
+      buildThreadRealtimeStopRequestParameters(options),
+    );
+    parseAppServerResponse(
+      AppServerThreadRealtimeStopResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.stopThreadRealtime,
+    );
+    return {};
+  }
+
+  public async startWindowsSandboxSetup(
+    options: WindowsSandboxSetupStartOptions,
+  ): Promise<WindowsSandboxSetupStartResult> {
+    const result = await this.transport.request(
+      APP_SERVER_CLIENT_METHODS.startWindowsSandboxSetup,
+      buildWindowsSandboxSetupStartRequestParameters(options),
+    );
+    const parsed = parseAppServerResponse(
+      AppServerWindowsSandboxSetupStartResponseSchema,
+      result,
+      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.startWindowsSandboxSetup,
+    );
+    return {
+      started: parsed.started,
+    };
   }
 
   public async startThread(options: StartThreadOptions): Promise<AppServerStartThreadResponse> {

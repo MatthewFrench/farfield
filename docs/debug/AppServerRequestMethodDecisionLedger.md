@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-03-01 03:40:00Z
+Last Updated (UTC): 2026-03-01 04:11:15Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -67,9 +67,9 @@ This ledger records recommended disposition for every upstream app-server client
 | `thread/name/set` | Used now | Keep | Thread rename action is routed through strict owner boundaries and typed app-server mapping. |
 | `thread/read` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `thread/realtime/appendAudio` | Not used | Not now | Adopt only if realtime conversation feature is a planned product objective. |
-| `thread/realtime/appendText` | Not used | Not now | Adopt only if realtime conversation feature is a planned product objective. |
-| `thread/realtime/start` | Not used | Not now | Adopt only if realtime conversation feature is a planned product objective. |
-| `thread/realtime/stop` | Not used | Not now | Adopt only if realtime conversation feature is a planned product objective. |
+| `thread/realtime/appendText` | Used now | Keep | Exposed through capability ownership and debug workspace realtime diagnostics append-text action. |
+| `thread/realtime/start` | Used now | Keep | Exposed through capability ownership and debug workspace realtime diagnostics start action. |
+| `thread/realtime/stop` | Used now | Keep | Exposed through capability ownership and debug workspace realtime diagnostics stop action. |
 | `thread/resume` | Used now | Keep | Current ownership and contracts align with present product behavior. |
 | `thread/rollback` | Used now | Keep | Thread rollback action is routed through strict owner boundaries and typed app-server mapping. |
 | `thread/start` | Used now | Keep | Current ownership and contracts align with present product behavior. |
@@ -79,8 +79,8 @@ This ledger records recommended disposition for every upstream app-server client
 | `turn/start` | Used now | Keep | Canonical send path for app-server mode in Farfield. |
 | `turn/steer` | Used now | Keep | Steering path now routes through strict owner boundaries with explicit in-progress turn precondition mapping. |
 | `userInfo` | Used now | Keep | Exposed through capability ownership and debug workspace legacy user-info diagnostics. |
-| `windowsSandbox/setupStart` | Not used | Not now | Adopt only with concrete product requirement and owner design. |
+| `windowsSandbox/setupStart` | Used now | Keep | Exposed through capability ownership and debug workspace windows-sandbox setup diagnostics action. |
 
 Total methods: 74
-Used now: 46
-Not used: 28
+Used now: 50
+Not used: 24

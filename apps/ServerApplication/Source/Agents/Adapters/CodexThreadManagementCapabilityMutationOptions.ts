@@ -6,13 +6,21 @@ import type {
   ExternalAgentConfigImportOptions,
   FeedbackUploadOptions,
   StartMcpServerOauthLoginOptions,
+  ThreadRealtimeAppendTextOptions,
+  ThreadRealtimeStartOptions,
+  ThreadRealtimeStopOptions,
+  WindowsSandboxSetupStartOptions,
   WriteSkillsConfigOptions,
 } from "@farfield/api";
 import type {
+  AgentAppendThreadRealtimeTextInput,
   AgentCommandExecutionInput,
   AgentDetectExternalAgentConfigInput,
   AgentImportExternalAgentConfigInput,
   AgentStartMcpServerOauthLoginInput,
+  AgentStartThreadRealtimeInput,
+  AgentStartWindowsSandboxSetupInput,
+  AgentStopThreadRealtimeInput,
   AgentUploadFeedbackInput,
   AgentWriteConfigBatchInput,
   AgentWriteConfigValueInput,
@@ -106,5 +114,40 @@ export function buildExternalAgentConfigImportOptions(
       description: migrationItem.description,
       cwd: migrationItem.cwd,
     })),
+  };
+}
+
+export function buildThreadRealtimeStartOptions(
+  input: AgentStartThreadRealtimeInput,
+): ThreadRealtimeStartOptions {
+  return {
+    threadId: input.threadId,
+    prompt: input.prompt,
+    ...(input.sessionId !== undefined ? { sessionId: input.sessionId } : {}),
+  };
+}
+
+export function buildThreadRealtimeAppendTextOptions(
+  input: AgentAppendThreadRealtimeTextInput,
+): ThreadRealtimeAppendTextOptions {
+  return {
+    threadId: input.threadId,
+    text: input.text,
+  };
+}
+
+export function buildThreadRealtimeStopOptions(
+  input: AgentStopThreadRealtimeInput,
+): ThreadRealtimeStopOptions {
+  return {
+    threadId: input.threadId,
+  };
+}
+
+export function buildWindowsSandboxSetupStartOptions(
+  input: AgentStartWindowsSandboxSetupInput,
+): WindowsSandboxSetupStartOptions {
+  return {
+    mode: input.mode,
   };
 }

@@ -13,6 +13,8 @@ import { z } from "zod";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import type {
   AgentAdapter,
+  AgentAppendThreadRealtimeTextInput,
+  AgentAppendThreadRealtimeTextResult,
   AgentCancelAccountLoginInput,
   AgentCancelAccountLoginResult,
   AgentCapabilities,
@@ -54,6 +56,12 @@ import type {
   AgentStartAccountLoginResult,
   AgentStartMcpServerOauthLoginInput,
   AgentStartMcpServerOauthLoginResult,
+  AgentStartThreadRealtimeInput,
+  AgentStartThreadRealtimeResult,
+  AgentStartWindowsSandboxSetupInput,
+  AgentStartWindowsSandboxSetupResult,
+  AgentStopThreadRealtimeInput,
+  AgentStopThreadRealtimeResult,
   AgentUploadFeedbackInput,
   AgentUploadFeedbackResult,
   AgentWriteConfigBatchInput,
@@ -267,6 +275,13 @@ const CapabilityExternalAgentConfigDetectEnvelopeSchema = z
   })
   .strict();
 
+const CapabilityWindowsSandboxSetupStartEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    started: z.boolean(),
+  })
+  .strict();
+
 const CapabilityCommandExecutionEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -430,6 +445,18 @@ interface MockAgentAdapterOptions {
   importExternalAgentConfig?: (
     input: AgentImportExternalAgentConfigInput,
   ) => Promise<AgentImportExternalAgentConfigResult>;
+  startThreadRealtime?: (
+    input: AgentStartThreadRealtimeInput,
+  ) => Promise<AgentStartThreadRealtimeResult>;
+  appendThreadRealtimeText?: (
+    input: AgentAppendThreadRealtimeTextInput,
+  ) => Promise<AgentAppendThreadRealtimeTextResult>;
+  stopThreadRealtime?: (
+    input: AgentStopThreadRealtimeInput,
+  ) => Promise<AgentStopThreadRealtimeResult>;
+  startWindowsSandboxSetup?: (
+    input: AgentStartWindowsSandboxSetupInput,
+  ) => Promise<AgentStartWindowsSandboxSetupResult>;
   listExperimentalFeatures?: () => Promise<AgentListExperimentalFeaturesResult>;
   listMcpServerStatuses?: () => Promise<AgentListMcpServerStatusesResult>;
   listApps?: () => Promise<AgentListAppsResult>;
@@ -481,6 +508,10 @@ function createDefaultCapabilities(overrides?: Partial<AgentCapabilities>): Agen
     canWriteSkillsConfig: false,
     canDetectExternalAgentConfig: false,
     canImportExternalAgentConfig: false,
+    canStartThreadRealtime: false,
+    canAppendThreadRealtimeText: false,
+    canStopThreadRealtime: false,
+    canStartWindowsSandboxSetup: false,
     canSetCollaborationMode: false,
     canSubmitUserInput: false,
     canReadLiveState: false,
@@ -616,6 +647,22 @@ function createMockAgentAdapter(options: MockAgentAdapterOptions): AgentAdapter 
 
   if (options.importExternalAgentConfig) {
     adapter.importExternalAgentConfig = options.importExternalAgentConfig;
+  }
+
+  if (options.startThreadRealtime) {
+    adapter.startThreadRealtime = options.startThreadRealtime;
+  }
+
+  if (options.appendThreadRealtimeText) {
+    adapter.appendThreadRealtimeText = options.appendThreadRealtimeText;
+  }
+
+  if (options.stopThreadRealtime) {
+    adapter.stopThreadRealtime = options.stopThreadRealtime;
+  }
+
+  if (options.startWindowsSandboxSetup) {
+    adapter.startWindowsSandboxSetup = options.startWindowsSandboxSetup;
   }
 
   if (options.listExperimentalFeatures) {
@@ -1971,6 +2018,166 @@ describe("handleCapabilityRoutes", () => {
     const parsedEnvelope = CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result));
     expect(parsedEnvelope).toEqual({
       ok: true,
+    });
+  });
+
+  it("returns 400 when thread realtime start omits prompt", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/threads/realtime/start",
+      url: new URL("http://localhost/api/threads/realtime/start?threadId=thread-1"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Missing prompt query parameter.",
+    });
+  });
+
+  it("starts thread realtime when adapter supports realtime start", async () => {
+    const startThreadRealtimeSpy = vi.fn(async (): Promise<AgentStartThreadRealtimeResult> => ({}));
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/threads/realtime/start",
+      url: new URL(
+        "http://localhost/api/threads/realtime/start?threadId=thread-1&prompt=Summarize%20repository%20status&sessionId=session-1",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canStartThreadRealtime: true,
+          },
+          startThreadRealtime: startThreadRealtimeSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(startThreadRealtimeSpy).toHaveBeenCalledWith({
+      threadId: "thread-1",
+      prompt: "Summarize repository status",
+      sessionId: "session-1",
+    });
+    const parsedEnvelope = CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+    });
+  });
+
+  it("appends thread realtime text when adapter supports realtime append", async () => {
+    const appendThreadRealtimeTextSpy = vi.fn(
+      async (): Promise<AgentAppendThreadRealtimeTextResult> => ({}),
+    );
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/threads/realtime/append-text",
+      url: new URL(
+        "http://localhost/api/threads/realtime/append-text?threadId=thread-1&text=Continue%20with%20implementation%20details",
+      ),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canAppendThreadRealtimeText: true,
+          },
+          appendThreadRealtimeText: appendThreadRealtimeTextSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(appendThreadRealtimeTextSpy).toHaveBeenCalledWith({
+      threadId: "thread-1",
+      text: "Continue with implementation details",
+    });
+    const parsedEnvelope = CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+    });
+  });
+
+  it("stops thread realtime when adapter supports realtime stop", async () => {
+    const stopThreadRealtimeSpy = vi.fn(async (): Promise<AgentStopThreadRealtimeResult> => ({}));
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/threads/realtime/stop",
+      url: new URL("http://localhost/api/threads/realtime/stop?threadId=thread-1"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canStopThreadRealtime: true,
+          },
+          stopThreadRealtime: stopThreadRealtimeSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(stopThreadRealtimeSpy).toHaveBeenCalledWith({
+      threadId: "thread-1",
+    });
+    const parsedEnvelope = CapabilityMutationSuccessEnvelopeSchema.parse(readRouteBody(result));
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+    });
+  });
+
+  it("returns 400 when windows sandbox setup mode is invalid", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/windows-sandbox/setup-start",
+      url: new URL("http://localhost/api/windows-sandbox/setup-start?mode=invalid"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    const parsedErrorResponse = FarfieldApiErrorResponseSchema.parse(readRouteBody(result));
+    expect(parsedErrorResponse).toEqual({
+      ok: false,
+      error: "Invalid mode query parameter. Expected elevated or unelevated.",
+    });
+  });
+
+  it("starts windows sandbox setup when adapter supports setup start", async () => {
+    const startWindowsSandboxSetupSpy = vi.fn(
+      async (): Promise<AgentStartWindowsSandboxSetupResult> => ({
+        started: true,
+      }),
+    );
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/windows-sandbox/setup-start",
+      url: new URL("http://localhost/api/windows-sandbox/setup-start?mode=elevated"),
+      adapters: [
+        createMockAgentAdapter({
+          id: "codex",
+          capabilities: {
+            canStartWindowsSandboxSetup: true,
+          },
+          startWindowsSandboxSetup: startWindowsSandboxSetupSpy,
+        }),
+      ],
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(200);
+    expect(startWindowsSandboxSetupSpy).toHaveBeenCalledWith({
+      mode: "elevated",
+    });
+    const parsedEnvelope = CapabilityWindowsSandboxSetupStartEnvelopeSchema.parse(
+      readRouteBody(result),
+    );
+    expect(parsedEnvelope).toEqual({
+      ok: true,
+      started: true,
     });
   });
 

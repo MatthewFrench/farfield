@@ -1617,6 +1617,84 @@ describe("AppServerClient.importExternalAgentConfig", () => {
   });
 });
 
+describe("AppServerClient.startThreadRealtime", () => {
+  it("sends thread/realtime/start payload", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.startThreadRealtime({
+      threadId: "thread-1",
+      prompt: "Summarize the repository health.",
+      sessionId: "session-1",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/realtime/start", {
+      threadId: "thread-1",
+      prompt: "Summarize the repository health.",
+      sessionId: "session-1",
+    });
+    expect(result).toEqual({});
+  });
+});
+
+describe("AppServerClient.appendThreadRealtimeText", () => {
+  it("sends thread/realtime/appendText payload", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.appendThreadRealtimeText({
+      threadId: "thread-1",
+      text: "Continue with concrete implementation details.",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/realtime/appendText", {
+      threadId: "thread-1",
+      text: "Continue with concrete implementation details.",
+    });
+    expect(result).toEqual({});
+  });
+});
+
+describe("AppServerClient.stopThreadRealtime", () => {
+  it("sends thread/realtime/stop payload", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({});
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.stopThreadRealtime({
+      threadId: "thread-1",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("thread/realtime/stop", {
+      threadId: "thread-1",
+    });
+    expect(result).toEqual({});
+  });
+});
+
+describe("AppServerClient.startWindowsSandboxSetup", () => {
+  it("sends windowsSandbox/setupStart payload and maps started response", async () => {
+    const transportDouble = createTransportDouble();
+    transportDouble.request.mockResolvedValue({
+      started: true,
+    });
+
+    const client = new AppServerClient(transportDouble.transport);
+    const result = await client.startWindowsSandboxSetup({
+      mode: "elevated",
+    });
+
+    expect(transportDouble.request).toHaveBeenCalledWith("windowsSandbox/setupStart", {
+      mode: "elevated",
+    });
+    expect(result).toEqual({
+      started: true,
+    });
+  });
+});
+
 describe("AppServerClient.listThreadsAll", () => {
   it("starts pagination from an explicit initial cursor", async () => {
     const transportDouble = createTransportDouble();

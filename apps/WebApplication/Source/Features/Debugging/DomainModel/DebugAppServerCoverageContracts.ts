@@ -93,6 +93,32 @@ export interface DebugAppServerCoverageExternalAgentConfigImportResult {
   importedAtIso8601: string;
 }
 
+export interface DebugAppServerCoverageThreadRealtimeStartResult {
+  threadId: string;
+  prompt: string;
+  sessionId: string | null;
+  startedAtIso8601: string;
+}
+
+export interface DebugAppServerCoverageThreadRealtimeAppendTextResult {
+  threadId: string;
+  text: string;
+  appendedAtIso8601: string;
+}
+
+export interface DebugAppServerCoverageThreadRealtimeStopResult {
+  threadId: string;
+  stoppedAtIso8601: string;
+}
+
+export type DebugAppServerCoverageWindowsSandboxSetupMode = "elevated" | "unelevated";
+
+export interface DebugAppServerCoverageWindowsSandboxSetupStartResult {
+  mode: DebugAppServerCoverageWindowsSandboxSetupMode;
+  started: boolean;
+  startedAtIso8601: string;
+}
+
 export interface DebugAppServerCoverageCommandExecutionResult {
   command: string[];
   exitCode: number;

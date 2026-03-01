@@ -14,6 +14,11 @@ import {
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
+  type DebugAppServerCoverageThreadRealtimeAppendTextResult,
+  type DebugAppServerCoverageThreadRealtimeStartResult,
+  type DebugAppServerCoverageThreadRealtimeStopResult,
+  type DebugAppServerCoverageWindowsSandboxSetupMode,
+  type DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "@/Features/Debugging/DomainModel/DebugAppServerCoverageContracts";
 import {
   type DebugIssue,
@@ -78,6 +83,10 @@ export interface DebugWorkspacePaneProps {
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   lastExternalAgentConfigDetectResult: DebugAppServerCoverageExternalAgentConfigDetectResult | null;
   lastExternalAgentConfigImportResult: DebugAppServerCoverageExternalAgentConfigImportResult | null;
+  lastThreadRealtimeStartResult: DebugAppServerCoverageThreadRealtimeStartResult | null;
+  lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
+  lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
+  lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
@@ -101,6 +110,10 @@ export interface DebugWorkspacePaneProps {
   onImportExternalAgentConfig: (
     migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[],
   ) => void;
+  onStartThreadRealtime: (threadId: string, prompt: string, sessionId?: string) => void;
+  onAppendThreadRealtimeText: (threadId: string, text: string) => void;
+  onStopThreadRealtime: (threadId: string) => void;
+  onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
   onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -159,6 +172,10 @@ export function DebugWorkspacePane({
   lastConfigValueWriteResult,
   lastExternalAgentConfigDetectResult,
   lastExternalAgentConfigImportResult,
+  lastThreadRealtimeStartResult,
+  lastThreadRealtimeAppendTextResult,
+  lastThreadRealtimeStopResult,
+  lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
   lastGitDiffToRemoteResult,
@@ -174,6 +191,10 @@ export function DebugWorkspacePane({
   onExportRemoteSkill,
   onDetectExternalAgentConfig,
   onImportExternalAgentConfig,
+  onStartThreadRealtime,
+  onAppendThreadRealtimeText,
+  onStopThreadRealtime,
+  onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
   onSearchFuzzyFiles,
   onExecuteCommand,
@@ -283,6 +304,10 @@ export function DebugWorkspacePane({
             lastConfigValueWriteResult={lastConfigValueWriteResult}
             lastExternalAgentConfigDetectResult={lastExternalAgentConfigDetectResult}
             lastExternalAgentConfigImportResult={lastExternalAgentConfigImportResult}
+            lastThreadRealtimeStartResult={lastThreadRealtimeStartResult}
+            lastThreadRealtimeAppendTextResult={lastThreadRealtimeAppendTextResult}
+            lastThreadRealtimeStopResult={lastThreadRealtimeStopResult}
+            lastWindowsSandboxSetupStartResult={lastWindowsSandboxSetupStartResult}
             lastFeedbackUploadResult={lastFeedbackUploadResult}
             lastFuzzyFileSearchResult={lastFuzzyFileSearchResult}
             lastGitDiffToRemoteResult={lastGitDiffToRemoteResult}
@@ -298,6 +323,10 @@ export function DebugWorkspacePane({
             onExportRemoteSkill={onExportRemoteSkill}
             onDetectExternalAgentConfig={onDetectExternalAgentConfig}
             onImportExternalAgentConfig={onImportExternalAgentConfig}
+            onStartThreadRealtime={onStartThreadRealtime}
+            onAppendThreadRealtimeText={onAppendThreadRealtimeText}
+            onStopThreadRealtime={onStopThreadRealtime}
+            onStartWindowsSandboxSetup={onStartWindowsSandboxSetup}
             onReadGitDiffToRemote={onReadGitDiffToRemote}
             onSearchFuzzyFiles={onSearchFuzzyFiles}
             onExecuteCommand={onExecuteCommand}

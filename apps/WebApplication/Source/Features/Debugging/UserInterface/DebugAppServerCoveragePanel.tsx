@@ -12,6 +12,11 @@ import {
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
+  type DebugAppServerCoverageThreadRealtimeAppendTextResult,
+  type DebugAppServerCoverageThreadRealtimeStartResult,
+  type DebugAppServerCoverageThreadRealtimeStopResult,
+  type DebugAppServerCoverageWindowsSandboxSetupMode,
+  type DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import { DebugAppServerCoverageCommandExecutionSection } from "./DebugAppServerCoverageCommandExecutionSection";
 import { DebugAppServerCoverageConfigBatchWriteSection } from "./DebugAppServerCoverageConfigBatchWriteSection";
@@ -20,6 +25,7 @@ import { DebugAppServerCoverageExternalAgentConfigSection } from "./DebugAppServ
 import { DebugAppServerCoverageFeedbackUploadSection } from "./DebugAppServerCoverageFeedbackUploadSection";
 import { DebugAppServerCoverageFuzzyFileSearchSection } from "./DebugAppServerCoverageFuzzyFileSearchSection";
 import { DebugAppServerCoverageGitDiffToRemoteSection } from "./DebugAppServerCoverageGitDiffToRemoteSection";
+import { DebugAppServerCoverageRealtimeAndWindowsSection } from "./DebugAppServerCoverageRealtimeAndWindowsSection";
 
 export interface DebugAppServerCoveragePanelProps {
   isLoadingCoverageDiagnostics: boolean;
@@ -33,6 +39,10 @@ export interface DebugAppServerCoveragePanelProps {
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   lastExternalAgentConfigDetectResult: DebugAppServerCoverageExternalAgentConfigDetectResult | null;
   lastExternalAgentConfigImportResult: DebugAppServerCoverageExternalAgentConfigImportResult | null;
+  lastThreadRealtimeStartResult: DebugAppServerCoverageThreadRealtimeStartResult | null;
+  lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
+  lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
+  lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
@@ -56,6 +66,10 @@ export interface DebugAppServerCoveragePanelProps {
   onImportExternalAgentConfig: (
     migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[],
   ) => void;
+  onStartThreadRealtime: (threadId: string, prompt: string, sessionId?: string) => void;
+  onAppendThreadRealtimeText: (threadId: string, text: string) => void;
+  onStopThreadRealtime: (threadId: string) => void;
+  onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
   onSearchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
   onExecuteCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -90,6 +104,10 @@ export function DebugAppServerCoveragePanel({
   lastConfigValueWriteResult,
   lastExternalAgentConfigDetectResult,
   lastExternalAgentConfigImportResult,
+  lastThreadRealtimeStartResult,
+  lastThreadRealtimeAppendTextResult,
+  lastThreadRealtimeStopResult,
+  lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
   lastGitDiffToRemoteResult,
@@ -105,6 +123,10 @@ export function DebugAppServerCoveragePanel({
   onExportRemoteSkill,
   onDetectExternalAgentConfig,
   onImportExternalAgentConfig,
+  onStartThreadRealtime,
+  onAppendThreadRealtimeText,
+  onStopThreadRealtime,
+  onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
   onSearchFuzzyFiles,
   onExecuteCommand,
@@ -118,7 +140,8 @@ export function DebugAppServerCoveragePanel({
           <p className="text-xs text-muted-foreground">
             Skills, apps, experimental features, MCP status, config requirements, and account
             diagnostics plus config writes, remote skills import, external-agent config migration,
-            git diff reads, command execution, fuzzy file search, and feedback upload coverage.
+            realtime thread actions, windows sandbox setup actions, git diff reads, command
+            execution, fuzzy file search, and feedback upload coverage.
           </p>
         </div>
         <Button
@@ -517,6 +540,18 @@ export function DebugAppServerCoveragePanel({
             lastExternalAgentConfigImportResult={lastExternalAgentConfigImportResult}
             onDetectExternalAgentConfig={onDetectExternalAgentConfig}
             onImportExternalAgentConfig={onImportExternalAgentConfig}
+          />
+
+          <DebugAppServerCoverageRealtimeAndWindowsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastThreadRealtimeStartResult={lastThreadRealtimeStartResult}
+            lastThreadRealtimeAppendTextResult={lastThreadRealtimeAppendTextResult}
+            lastThreadRealtimeStopResult={lastThreadRealtimeStopResult}
+            lastWindowsSandboxSetupStartResult={lastWindowsSandboxSetupStartResult}
+            onStartThreadRealtime={onStartThreadRealtime}
+            onAppendThreadRealtimeText={onAppendThreadRealtimeText}
+            onStopThreadRealtime={onStopThreadRealtime}
+            onStartWindowsSandboxSetup={onStartWindowsSandboxSetup}
           />
 
           <DebugAppServerCoverageCommandExecutionSection

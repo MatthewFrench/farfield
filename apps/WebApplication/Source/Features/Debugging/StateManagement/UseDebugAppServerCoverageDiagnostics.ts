@@ -24,6 +24,11 @@ import {
   type DebugAppServerCoverageGitDiffToRemoteResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoverageSnapshot,
+  type DebugAppServerCoverageThreadRealtimeAppendTextResult,
+  type DebugAppServerCoverageThreadRealtimeStartResult,
+  type DebugAppServerCoverageThreadRealtimeStopResult,
+  type DebugAppServerCoverageWindowsSandboxSetupMode,
+  type DebugAppServerCoverageWindowsSandboxSetupStartResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import {
   runConfigBatchWriteAction,
@@ -35,29 +40,19 @@ import {
   mapAuthStatus,
   mapExperimentalFeatures,
   mapMcpServers,
-  mapPendingAccountLogin,
   mapRateLimitSnapshot,
   mapRemoteSkills,
   mapRequirements,
   mapSkills,
   mapUserInfo,
 } from "./DebugAppServerCoverageDiagnosticsMappers";
-import {
-  runCommandExecutionAction,
-  runExternalAgentConfigDetectAction,
-  runExternalAgentConfigImportAction,
-  runFeedbackUploadAction,
-  runFuzzyFileSearchAction,
-  runGitDiffToRemoteAction,
-} from "./DebugAppServerCoverageMutationActionRunners";
+import { useDebugAppServerCoverageMutationDiagnostics } from "./UseDebugAppServerCoverageMutationDiagnostics";
 
 const COVERAGE_WORKSPACE_SECTION: DebugWorkspaceSection = "coverage";
 
 const COVERAGE_REQUEST_LIST_LIMIT = 100;
 const COVERAGE_REQUEST_OPERATION_NAME = "debug-coverage-refresh";
-const COVERAGE_MUTATION_OPERATION_NAME = "debug-coverage-action";
 const COVERAGE_ERROR_PREFIX = "Unable to load app-server coverage diagnostics: ";
-const COVERAGE_ACTION_ERROR_PREFIX = "Unable to run coverage action: ";
 const COVERAGE_REMOTE_SKILLS_HAZELNUT_SCOPE = "personal";
 const COVERAGE_REMOTE_SKILLS_PRODUCT_SURFACE = "codex";
 const COVERAGE_REMOTE_SKILLS_ENABLED = true;
@@ -81,6 +76,10 @@ export interface DebugAppServerCoverageDiagnostics {
   lastConfigValueWriteResult: DebugAppServerCoverageConfigValueWriteResult | null;
   lastExternalAgentConfigDetectResult: DebugAppServerCoverageExternalAgentConfigDetectResult | null;
   lastExternalAgentConfigImportResult: DebugAppServerCoverageExternalAgentConfigImportResult | null;
+  lastThreadRealtimeStartResult: DebugAppServerCoverageThreadRealtimeStartResult | null;
+  lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
+  lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
+  lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
   lastGitDiffToRemoteResult: DebugAppServerCoverageGitDiffToRemoteResult | null;
@@ -104,6 +103,10 @@ export interface DebugAppServerCoverageDiagnostics {
   importExternalAgentConfig: (
     migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[],
   ) => void;
+  startThreadRealtime: (threadId: string, prompt: string, sessionId?: string) => void;
+  appendThreadRealtimeText: (threadId: string, text: string) => void;
+  stopThreadRealtime: (threadId: string) => void;
+  startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
   searchFuzzyFiles: (query: string, roots: string[], cancellationToken?: string) => void;
   executeCommand: (command: string[], timeoutMs?: number, cwd?: string) => void;
@@ -131,9 +134,6 @@ interface RunCoverageDiagnosticsRefreshInput {
   setIsLoadingCoverageDiagnostics: Dispatch<SetStateAction<boolean>>;
   setCoverageDiagnosticsErrorMessage: Dispatch<SetStateAction<string>>;
   setCoverageDiagnosticsSnapshot: Dispatch<SetStateAction<DebugAppServerCoverageSnapshot | null>>;
-  setPendingAccountLogin: Dispatch<
-    SetStateAction<DebugAppServerCoveragePendingAccountLogin | null>
-  >;
 }
 
 function runCoverageDiagnosticsRefresh(input: RunCoverageDiagnosticsRefreshInput): void {
@@ -215,9 +215,6 @@ function runCoverageDiagnosticsRefresh(input: RunCoverageDiagnosticsRefreshInput
         remoteSkills: mapRemoteSkills(remoteSkillsResponse.data),
         refreshedAtIso8601: new Date().toISOString(),
       });
-      if (accountResponse.account !== null) {
-        input.setPendingAccountLogin(null);
-      }
     } catch (error) {
       if (requestSerialReference.current !== nextRequestSerial) {
         return;
@@ -239,29 +236,9 @@ export function useDebugAppServerCoverageDiagnostics(
   input: UseDebugAppServerCoverageDiagnosticsInput,
 ): DebugAppServerCoverageDiagnostics {
   const [isLoadingCoverageDiagnostics, setIsLoadingCoverageDiagnostics] = useState(false);
-  const [isRunningCoverageAction, setIsRunningCoverageAction] = useState(false);
   const [coverageDiagnosticsErrorMessage, setCoverageDiagnosticsErrorMessage] = useState("");
-  const [coverageActionErrorMessage, setCoverageActionErrorMessage] = useState("");
   const [coverageDiagnosticsSnapshot, setCoverageDiagnosticsSnapshot] =
     useState<DebugAppServerCoverageSnapshot | null>(null);
-  const [pendingAccountLogin, setPendingAccountLogin] =
-    useState<DebugAppServerCoveragePendingAccountLogin | null>(null);
-  const [lastCommandExecutionResult, setLastCommandExecutionResult] =
-    useState<DebugAppServerCoverageCommandExecutionResult | null>(null);
-  const [lastConfigBatchWriteResult, setLastConfigBatchWriteResult] =
-    useState<DebugAppServerCoverageConfigBatchWriteResult | null>(null);
-  const [lastConfigValueWriteResult, setLastConfigValueWriteResult] =
-    useState<DebugAppServerCoverageConfigValueWriteResult | null>(null);
-  const [lastExternalAgentConfigDetectResult, setLastExternalAgentConfigDetectResult] =
-    useState<DebugAppServerCoverageExternalAgentConfigDetectResult | null>(null);
-  const [lastExternalAgentConfigImportResult, setLastExternalAgentConfigImportResult] =
-    useState<DebugAppServerCoverageExternalAgentConfigImportResult | null>(null);
-  const [lastFeedbackUploadResult, setLastFeedbackUploadResult] =
-    useState<DebugAppServerCoverageFeedbackUploadResult | null>(null);
-  const [lastFuzzyFileSearchResult, setLastFuzzyFileSearchResult] =
-    useState<DebugAppServerCoverageFuzzyFileSearchResult | null>(null);
-  const [lastGitDiffToRemoteResult, setLastGitDiffToRemoteResult] =
-    useState<DebugAppServerCoverageGitDiffToRemoteResult | null>(null);
   const requestSerialRef = useRef(0);
 
   const refreshCoverageDiagnostics = useCallback(() => {
@@ -271,322 +248,12 @@ export function useDebugAppServerCoverageDiagnostics(
       setIsLoadingCoverageDiagnostics,
       setCoverageDiagnosticsErrorMessage,
       setCoverageDiagnosticsSnapshot,
-      setPendingAccountLogin,
     });
   }, [input.capabilityServerClient]);
-
-  const startAccountLogin = useCallback(() => {
-    if (isRunningCoverageAction) {
-      return;
-    }
-    setIsRunningCoverageAction(true);
-    setCoverageActionErrorMessage("");
-
-    void (async () => {
-      try {
-        const response = await input.capabilityServerClient.startAccountLogin({
-          actionName: COVERAGE_MUTATION_OPERATION_NAME,
-        });
-        setPendingAccountLogin(mapPendingAccountLogin(response));
-        refreshCoverageDiagnostics();
-      } catch (error) {
-        setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
-      } finally {
-        setIsRunningCoverageAction(false);
-      }
-    })();
-  }, [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics]);
-
-  const cancelAccountLogin = useCallback(() => {
-    if (isRunningCoverageAction || pendingAccountLogin === null) {
-      return;
-    }
-    setIsRunningCoverageAction(true);
-    setCoverageActionErrorMessage("");
-
-    void (async () => {
-      try {
-        await input.capabilityServerClient.cancelAccountLogin({
-          loginId: pendingAccountLogin.loginId,
-          actionName: COVERAGE_MUTATION_OPERATION_NAME,
-        });
-        setPendingAccountLogin(null);
-        refreshCoverageDiagnostics();
-      } catch (error) {
-        setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
-      } finally {
-        setIsRunningCoverageAction(false);
-      }
-    })();
-  }, [
-    input.capabilityServerClient,
-    isRunningCoverageAction,
-    pendingAccountLogin,
+  const coverageMutationDiagnosticsBundle = useDebugAppServerCoverageMutationDiagnostics({
+    capabilityServerClient: input.capabilityServerClient,
     refreshCoverageDiagnostics,
-  ]);
-
-  const logoutAccount = useCallback(() => {
-    if (isRunningCoverageAction) {
-      return;
-    }
-    setIsRunningCoverageAction(true);
-    setCoverageActionErrorMessage("");
-
-    void (async () => {
-      try {
-        await input.capabilityServerClient.logoutAccount({
-          actionName: COVERAGE_MUTATION_OPERATION_NAME,
-        });
-        setPendingAccountLogin(null);
-        refreshCoverageDiagnostics();
-      } catch (error) {
-        setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
-      } finally {
-        setIsRunningCoverageAction(false);
-      }
-    })();
-  }, [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics]);
-
-  const reloadMcpServerConfig = useCallback(() => {
-    if (isRunningCoverageAction) {
-      return;
-    }
-    setIsRunningCoverageAction(true);
-    setCoverageActionErrorMessage("");
-
-    void (async () => {
-      try {
-        await input.capabilityServerClient.reloadMcpServerConfig({
-          actionName: COVERAGE_MUTATION_OPERATION_NAME,
-        });
-        refreshCoverageDiagnostics();
-      } catch (error) {
-        setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
-      } finally {
-        setIsRunningCoverageAction(false);
-      }
-    })();
-  }, [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics]);
-
-  const startMcpServerOauthLogin = useCallback(
-    (serverName: string) => {
-      if (isRunningCoverageAction) {
-        return;
-      }
-      if (serverName.trim().length === 0) {
-        return;
-      }
-      setIsRunningCoverageAction(true);
-      setCoverageActionErrorMessage("");
-
-      void (async () => {
-        try {
-          const response = await input.capabilityServerClient.startMcpServerOauthLogin({
-            actionName: COVERAGE_MUTATION_OPERATION_NAME,
-            name: serverName,
-          });
-          if (typeof window.open === "function") {
-            window.open(response.authorizationUrl, "_blank", "noopener,noreferrer");
-          }
-          refreshCoverageDiagnostics();
-        } catch (error) {
-          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
-        } finally {
-          setIsRunningCoverageAction(false);
-        }
-      })();
-    },
-    [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics],
-  );
-
-  const writeConfigValue = useCallback(
-    (
-      keyPath: string,
-      value: string,
-      mergeStrategy: CapabilityConfigWriteMergeStrategy,
-      filePath?: string,
-      expectedVersion?: string,
-    ) => {
-      runConfigValueWriteAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        keyPath,
-        value,
-        mergeStrategy,
-        ...(filePath !== undefined ? { filePath } : {}),
-        ...(expectedVersion !== undefined ? { expectedVersion } : {}),
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastConfigValueWriteResult,
-      });
-    },
-    [input.capabilityServerClient, isRunningCoverageAction],
-  );
-
-  const writeConfigBatch = useCallback(
-    (edits: string, filePath?: string, expectedVersion?: string) => {
-      runConfigBatchWriteAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        edits,
-        ...(filePath !== undefined ? { filePath } : {}),
-        ...(expectedVersion !== undefined ? { expectedVersion } : {}),
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastConfigBatchWriteResult,
-      });
-    },
-    [input.capabilityServerClient, isRunningCoverageAction],
-  );
-
-  const writeSkillsConfig = useCallback(
-    (skillPath: string, enabled: boolean) => {
-      if (isRunningCoverageAction) {
-        return;
-      }
-      if (skillPath.trim().length === 0) {
-        return;
-      }
-      setIsRunningCoverageAction(true);
-      setCoverageActionErrorMessage("");
-
-      void (async () => {
-        try {
-          await input.capabilityServerClient.writeSkillsConfig({
-            actionName: COVERAGE_MUTATION_OPERATION_NAME,
-            path: skillPath,
-            enabled,
-          });
-          refreshCoverageDiagnostics();
-        } catch (error) {
-          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
-        } finally {
-          setIsRunningCoverageAction(false);
-        }
-      })();
-    },
-    [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics],
-  );
-
-  const exportRemoteSkill = useCallback(
-    (hazelnutId: string) => {
-      if (isRunningCoverageAction) {
-        return;
-      }
-      if (hazelnutId.trim().length === 0) {
-        return;
-      }
-      setIsRunningCoverageAction(true);
-      setCoverageActionErrorMessage("");
-
-      void (async () => {
-        try {
-          await input.capabilityServerClient.exportRemoteSkill({
-            actionName: COVERAGE_MUTATION_OPERATION_NAME,
-            hazelnutId,
-          });
-          refreshCoverageDiagnostics();
-        } catch (error) {
-          setCoverageActionErrorMessage(`${COVERAGE_ACTION_ERROR_PREFIX}${toErrorMessage(error)}`);
-        } finally {
-          setIsRunningCoverageAction(false);
-        }
-      })();
-    },
-    [input.capabilityServerClient, isRunningCoverageAction, refreshCoverageDiagnostics],
-  );
-
-  const detectExternalAgentConfig = useCallback(
-    (includeHome: boolean, cwds: string[]) => {
-      runExternalAgentConfigDetectAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        includeHome,
-        cwds,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastExternalAgentConfigDetectResult,
-      });
-    },
-    [input.capabilityServerClient, isRunningCoverageAction],
-  );
-
-  const importExternalAgentConfig = useCallback(
-    (migrationItems: DebugAppServerCoverageExternalAgentConfigMigrationItem[]) => {
-      runExternalAgentConfigImportAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        migrationItems,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastExternalAgentConfigImportResult,
-      });
-    },
-    [input.capabilityServerClient, isRunningCoverageAction],
-  );
-
-  const readGitDiffToRemote = useCallback(
-    (cwd: string) => {
-      runGitDiffToRemoteAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        cwd,
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastGitDiffToRemoteResult,
-      });
-    },
-    [input.capabilityServerClient, isRunningCoverageAction],
-  );
-
-  const searchFuzzyFiles = useCallback(
-    (query: string, roots: string[], cancellationToken?: string) => {
-      runFuzzyFileSearchAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        query,
-        roots,
-        ...(cancellationToken !== undefined ? { cancellationToken } : {}),
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastFuzzyFileSearchResult,
-      });
-    },
-    [input.capabilityServerClient, isRunningCoverageAction],
-  );
-
-  const executeCommand = useCallback(
-    (command: string[], timeoutMs?: number, cwd?: string) => {
-      runCommandExecutionAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        command,
-        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-        ...(cwd !== undefined ? { cwd } : {}),
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastCommandExecutionResult,
-      });
-    },
-    [input.capabilityServerClient, isRunningCoverageAction],
-  );
-
-  const uploadFeedback = useCallback(
-    (classification: string, includeLogs: boolean, reason?: string, threadId?: string) => {
-      runFeedbackUploadAction({
-        capabilityServerClient: input.capabilityServerClient,
-        isRunningCoverageAction,
-        classification,
-        includeLogs,
-        ...(reason !== undefined ? { reason } : {}),
-        ...(threadId !== undefined ? { threadId } : {}),
-        setIsRunningCoverageAction,
-        setCoverageActionErrorMessage,
-        setLastFeedbackUploadResult,
-      });
-    },
-    [input.capabilityServerClient, isRunningCoverageAction],
-  );
+  });
 
   useEffect(() => {
     if (input.debugWorkspaceSection !== COVERAGE_WORKSPACE_SECTION) {
@@ -603,36 +270,18 @@ export function useDebugAppServerCoverageDiagnostics(
     refreshCoverageDiagnostics,
   ]);
 
+  useEffect(() => {
+    if (coverageDiagnosticsSnapshot === null || coverageDiagnosticsSnapshot.account === null) {
+      return;
+    }
+    coverageMutationDiagnosticsBundle.clearPendingAccountLogin();
+  }, [coverageDiagnosticsSnapshot, coverageMutationDiagnosticsBundle.clearPendingAccountLogin]);
+
   return {
     isLoadingCoverageDiagnostics,
-    isRunningCoverageAction,
     coverageDiagnosticsErrorMessage,
-    coverageActionErrorMessage,
     coverageDiagnosticsSnapshot,
-    pendingAccountLogin,
-    lastCommandExecutionResult,
-    lastConfigBatchWriteResult,
-    lastConfigValueWriteResult,
-    lastExternalAgentConfigDetectResult,
-    lastExternalAgentConfigImportResult,
-    lastFeedbackUploadResult,
-    lastFuzzyFileSearchResult,
-    lastGitDiffToRemoteResult,
     refreshCoverageDiagnostics,
-    startAccountLogin,
-    cancelAccountLogin,
-    logoutAccount,
-    reloadMcpServerConfig,
-    startMcpServerOauthLogin,
-    writeConfigValue,
-    writeConfigBatch,
-    writeSkillsConfig,
-    exportRemoteSkill,
-    detectExternalAgentConfig,
-    importExternalAgentConfig,
-    readGitDiffToRemote,
-    searchFuzzyFiles,
-    executeCommand,
-    uploadFeedback,
+    ...coverageMutationDiagnosticsBundle.diagnostics,
   };
 }

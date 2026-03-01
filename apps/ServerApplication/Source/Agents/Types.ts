@@ -68,6 +68,10 @@ export interface AgentCapabilities {
   canWriteSkillsConfig: boolean;
   canDetectExternalAgentConfig: boolean;
   canImportExternalAgentConfig: boolean;
+  canStartThreadRealtime: boolean;
+  canAppendThreadRealtimeText: boolean;
+  canStopThreadRealtime: boolean;
+  canStartWindowsSandboxSetup: boolean;
   canSetCollaborationMode: boolean;
   canSubmitUserInput: boolean;
   canReadLiveState: boolean;
@@ -710,6 +714,37 @@ export interface AgentImportExternalAgentConfigInput {
 
 export interface AgentImportExternalAgentConfigResult {}
 
+export interface AgentStartThreadRealtimeInput {
+  threadId: string;
+  prompt: string;
+  sessionId?: string | null;
+}
+
+export interface AgentStartThreadRealtimeResult {}
+
+export interface AgentAppendThreadRealtimeTextInput {
+  threadId: string;
+  text: string;
+}
+
+export interface AgentAppendThreadRealtimeTextResult {}
+
+export interface AgentStopThreadRealtimeInput {
+  threadId: string;
+}
+
+export interface AgentStopThreadRealtimeResult {}
+
+export type AgentWindowsSandboxSetupMode = "elevated" | "unelevated";
+
+export interface AgentStartWindowsSandboxSetupInput {
+  mode: AgentWindowsSandboxSetupMode;
+}
+
+export interface AgentStartWindowsSandboxSetupResult {
+  started: boolean;
+}
+
 export interface AgentSetCollaborationModeResult {
   ownerClientId: string;
 }
@@ -783,6 +818,16 @@ export interface AgentAdapter {
   importExternalAgentConfig?(
     input: AgentImportExternalAgentConfigInput,
   ): Promise<AgentImportExternalAgentConfigResult>;
+  startThreadRealtime?(
+    input: AgentStartThreadRealtimeInput,
+  ): Promise<AgentStartThreadRealtimeResult>;
+  appendThreadRealtimeText?(
+    input: AgentAppendThreadRealtimeTextInput,
+  ): Promise<AgentAppendThreadRealtimeTextResult>;
+  stopThreadRealtime?(input: AgentStopThreadRealtimeInput): Promise<AgentStopThreadRealtimeResult>;
+  startWindowsSandboxSetup?(
+    input: AgentStartWindowsSandboxSetupInput,
+  ): Promise<AgentStartWindowsSandboxSetupResult>;
 
   listModels?(limit: number): Promise<AppServerListModelsResponse>;
   listCollaborationModes?(): Promise<AppServerCollaborationModeListResponse>;

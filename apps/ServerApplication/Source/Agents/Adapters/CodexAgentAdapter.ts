@@ -12,6 +12,8 @@ import type {
 } from "@farfield/protocol";
 import type {
   AgentAdapter,
+  AgentAppendThreadRealtimeTextInput,
+  AgentAppendThreadRealtimeTextResult,
   AgentCancelAccountLoginInput,
   AgentCancelAccountLoginResult,
   AgentCapabilities,
@@ -64,8 +66,14 @@ import type {
   AgentStartAccountLoginResult,
   AgentStartMcpServerOauthLoginInput,
   AgentStartMcpServerOauthLoginResult,
+  AgentStartThreadRealtimeInput,
+  AgentStartThreadRealtimeResult,
   AgentStartThreadReviewInput,
   AgentStartThreadReviewResult,
+  AgentStartWindowsSandboxSetupInput,
+  AgentStartWindowsSandboxSetupResult,
+  AgentStopThreadRealtimeInput,
+  AgentStopThreadRealtimeResult,
   AgentSubmitUserInputInput,
   AgentThreadLiveState,
   AgentThreadStreamEvents,
@@ -461,6 +469,30 @@ export class CodexAgentAdapter implements AgentAdapter {
     input: AgentImportExternalAgentConfigInput,
   ): Promise<AgentImportExternalAgentConfigResult> {
     return this.threadManagementOwner.importExternalAgentConfig(input);
+  }
+
+  public async startThreadRealtime(
+    input: AgentStartThreadRealtimeInput,
+  ): Promise<AgentStartThreadRealtimeResult> {
+    return this.threadManagementOwner.startThreadRealtime(input);
+  }
+
+  public async appendThreadRealtimeText(
+    input: AgentAppendThreadRealtimeTextInput,
+  ): Promise<AgentAppendThreadRealtimeTextResult> {
+    return this.threadManagementOwner.appendThreadRealtimeText(input);
+  }
+
+  public async stopThreadRealtime(
+    input: AgentStopThreadRealtimeInput,
+  ): Promise<AgentStopThreadRealtimeResult> {
+    return this.threadManagementOwner.stopThreadRealtime(input);
+  }
+
+  public async startWindowsSandboxSetup(
+    input: AgentStartWindowsSandboxSetupInput,
+  ): Promise<AgentStartWindowsSandboxSetupResult> {
+    return this.threadManagementOwner.startWindowsSandboxSetup(input);
   }
 
   public async readConfigDefaults(): Promise<AgentConfigDefaults> {

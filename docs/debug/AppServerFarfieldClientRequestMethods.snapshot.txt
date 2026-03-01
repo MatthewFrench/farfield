@@ -35,6 +35,9 @@ thread/list
 thread/loaded/list
 thread/name/set
 thread/read
+thread/realtime/appendText
+thread/realtime/start
+thread/realtime/stop
 thread/resume
 thread/rollback
 thread/start
@@ -44,3 +47,4 @@ turn/interrupt
 turn/start
 turn/steer
 userInfo
+windowsSandbox/setupStart

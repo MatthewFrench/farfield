@@ -178,6 +178,12 @@ function createUseApplicationShellViewPropertiesFixture() {
   const exportRemoteSkillSpy = vi.fn((_hazelnutId: string): void => {});
   const detectExternalAgentConfigSpy = vi.fn((_includeHome: boolean, _cwds: string[]): void => {});
   const importExternalAgentConfigSpy = vi.fn((): void => {});
+  const startThreadRealtimeSpy = vi.fn(
+    (_threadId: string, _prompt: string, _sessionId?: string): void => {},
+  );
+  const appendThreadRealtimeTextSpy = vi.fn((_threadId: string, _text: string): void => {});
+  const stopThreadRealtimeSpy = vi.fn((_threadId: string): void => {});
+  const startWindowsSandboxSetupSpy = vi.fn((_mode: "elevated" | "unelevated"): void => {});
   const setApiSessionTokenDraftSpy = vi.fn((): void => {});
   const setApiSessionBootstrapErrorSpy = vi.fn((): void => {});
   const submitApiSessionTokenSpy = vi.fn(async (): Promise<void> => {});
@@ -310,6 +316,10 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastConfigValueWriteResult: null,
     lastExternalAgentConfigDetectResult: null,
     lastExternalAgentConfigImportResult: null,
+    lastThreadRealtimeStartResult: null,
+    lastThreadRealtimeAppendTextResult: null,
+    lastThreadRealtimeStopResult: null,
+    lastWindowsSandboxSetupStartResult: null,
     lastFeedbackUploadResult: null,
     lastFuzzyFileSearchResult: null,
     lastGitDiffToRemoteResult: null,
@@ -329,6 +339,10 @@ function createUseApplicationShellViewPropertiesFixture() {
     exportRemoteSkill: exportRemoteSkillSpy,
     detectExternalAgentConfig: detectExternalAgentConfigSpy,
     importExternalAgentConfig: importExternalAgentConfigSpy,
+    startThreadRealtime: startThreadRealtimeSpy,
+    appendThreadRealtimeText: appendThreadRealtimeTextSpy,
+    stopThreadRealtime: stopThreadRealtimeSpy,
+    startWindowsSandboxSetup: startWindowsSandboxSetupSpy,
     apiSessionTokenDraft: "",
     setApiSessionTokenDraft: setApiSessionTokenDraftSpy,
     apiSessionBootstrapError: "invalid-token",
