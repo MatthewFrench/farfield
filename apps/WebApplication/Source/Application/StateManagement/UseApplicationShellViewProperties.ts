@@ -165,6 +165,7 @@ export interface UseApplicationShellViewPropertiesInput {
   lastThreadRealtimeAppendTextResult: DebugWorkspacePaneProps["lastThreadRealtimeAppendTextResult"];
   lastThreadRealtimeStopResult: DebugWorkspacePaneProps["lastThreadRealtimeStopResult"];
   lastThreadStreamEventsResult: DebugWorkspacePaneProps["lastThreadStreamEventsResult"];
+  lastAccountAndAppNotificationsResult: DebugWorkspacePaneProps["lastAccountAndAppNotificationsResult"];
   lastNotificationEventsResult: DebugWorkspacePaneProps["lastNotificationEventsResult"];
   lastAuthCompletionEventsResult: DebugWorkspacePaneProps["lastAuthCompletionEventsResult"];
   lastPendingServerRequestsResult: DebugWorkspacePaneProps["lastPendingServerRequestsResult"];
@@ -209,6 +210,7 @@ export interface UseApplicationShellViewPropertiesInput {
   appendThreadRealtimeText: DebugWorkspacePaneProps["onAppendThreadRealtimeText"];
   stopThreadRealtime: DebugWorkspacePaneProps["onStopThreadRealtime"];
   readThreadStreamEvents: DebugWorkspacePaneProps["onReadThreadStreamEvents"];
+  readAccountAndAppNotifications: DebugWorkspacePaneProps["onReadAccountAndAppNotifications"];
   readNotificationEvents: DebugWorkspacePaneProps["onReadNotificationEvents"];
   readAuthCompletionEvents: DebugWorkspacePaneProps["onReadAuthCompletionEvents"];
   readServerRequestResolvedEvents: DebugWorkspacePaneProps["onReadServerRequestResolvedEvents"];
@@ -538,6 +540,7 @@ function buildDebugWorkspacePaneProperties(
     lastThreadRealtimeAppendTextResult: input.lastThreadRealtimeAppendTextResult,
     lastThreadRealtimeStopResult: input.lastThreadRealtimeStopResult,
     lastThreadStreamEventsResult: input.lastThreadStreamEventsResult,
+    lastAccountAndAppNotificationsResult: input.lastAccountAndAppNotificationsResult,
     lastNotificationEventsResult: input.lastNotificationEventsResult,
     lastAuthCompletionEventsResult: input.lastAuthCompletionEventsResult,
     lastPendingServerRequestsResult: input.lastPendingServerRequestsResult,
@@ -576,6 +579,7 @@ function buildDebugWorkspacePaneProperties(
     onAppendThreadRealtimeText: input.appendThreadRealtimeText,
     onStopThreadRealtime: input.stopThreadRealtime,
     onReadThreadStreamEvents: input.readThreadStreamEvents,
+    onReadAccountAndAppNotifications: input.readAccountAndAppNotifications,
     onReadNotificationEvents: input.readNotificationEvents,
     onReadAuthCompletionEvents: input.readAuthCompletionEvents,
     onReadServerRequestResolvedEvents: input.readServerRequestResolvedEvents,
@@ -810,6 +814,7 @@ export function useApplicationShellViewProperties(
       input.lastThreadRealtimeAppendTextResult,
       input.lastThreadRealtimeStopResult,
       input.lastThreadStreamEventsResult,
+      input.lastAccountAndAppNotificationsResult,
       input.lastNotificationEventsResult,
       input.lastAuthCompletionEventsResult,
       input.lastPendingServerRequestsResult,
@@ -847,6 +852,7 @@ export function useApplicationShellViewProperties(
       input.appendThreadRealtimeText,
       input.stopThreadRealtime,
       input.readThreadStreamEvents,
+      input.readAccountAndAppNotifications,
       input.readNotificationEvents,
       input.readAuthCompletionEvents,
       input.readServerRequestResolvedEvents,

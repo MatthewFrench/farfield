@@ -1,5 +1,6 @@
 import { RefreshCcw } from "lucide-react";
 import { Button } from "@/Components/UserInterface/Button";
+import { type DebugAppServerCoverageAccountAndAppNotificationsResult } from "../DomainModel/DebugAppServerCoverageAccountAndAppNotificationContracts";
 import {
   type DebugAppServerCoverageAuthCompletionEventsResult,
   type DebugAppServerCoverageCommandExecutionResult,
@@ -38,6 +39,7 @@ import {
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import { type DebugAppServerCoverageThreadProgressNotificationsResult } from "../DomainModel/DebugAppServerCoverageThreadProgressContracts";
 import { type DebugAppServerCoverageThreadRealtimeNotificationsResult } from "../DomainModel/DebugAppServerCoverageThreadRealtimeNotificationContracts";
+import { DebugAppServerCoverageAccountAndAppNotificationsSection } from "./DebugAppServerCoverageAccountAndAppNotificationsSection";
 import { DebugAppServerCoverageAuthCompletionEventsSection } from "./DebugAppServerCoverageAuthCompletionEventsSection";
 import { DebugAppServerCoverageCommandExecutionSection } from "./DebugAppServerCoverageCommandExecutionSection";
 import { DebugAppServerCoverageConfigBatchWriteSection } from "./DebugAppServerCoverageConfigBatchWriteSection";
@@ -80,6 +82,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
+  lastAccountAndAppNotificationsResult: DebugAppServerCoverageAccountAndAppNotificationsResult | null;
   lastNotificationEventsResult: DebugAppServerCoverageNotificationEventsResult | null;
   lastPendingServerRequestsResult: DebugAppServerCoveragePendingServerRequestsResult | null;
   lastServerRequestResolvedEventsResult: DebugAppServerCoverageServerRequestResolvedEventsResult | null;
@@ -128,6 +131,7 @@ export interface DebugAppServerCoveragePanelProps {
   onAppendThreadRealtimeText: (threadId: string, text: string) => void;
   onStopThreadRealtime: (threadId: string) => void;
   onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
+  onReadAccountAndAppNotifications: (sinceSequence?: number | null) => void;
   onReadNotificationEvents: (sinceSequence?: number | null) => void;
   onReadAuthCompletionEvents: (sinceSequence?: number | null) => void;
   onReadServerRequestResolvedEvents: (sinceSequence?: number | null) => void;
@@ -186,6 +190,7 @@ export function DebugAppServerCoveragePanel({
   lastThreadRealtimeAppendTextResult,
   lastThreadRealtimeStopResult,
   lastThreadStreamEventsResult,
+  lastAccountAndAppNotificationsResult,
   lastNotificationEventsResult,
   lastPendingServerRequestsResult,
   lastServerRequestResolvedEventsResult,
@@ -223,6 +228,7 @@ export function DebugAppServerCoveragePanel({
   onAppendThreadRealtimeText,
   onStopThreadRealtime,
   onReadThreadStreamEvents,
+  onReadAccountAndAppNotifications,
   onReadNotificationEvents,
   onReadAuthCompletionEvents,
   onReadServerRequestResolvedEvents,
@@ -256,8 +262,9 @@ export function DebugAppServerCoveragePanel({
             diagnostics plus config writes, remote skills import, external-agent config migration,
             realtime thread actions, notification and auth-completion reads, pending-request reads,
             windows sandbox setup actions, git diff reads, command execution, fuzzy file search, and
-            warning, thread-lifecycle, thread-progress, thread-realtime, turn-lifecycle, item-delta,
-            item-lifecycle, and error-notification diagnostics, and feedback upload coverage.
+            warning, thread-lifecycle, thread-progress, thread-realtime, account/app/sandbox update,
+            turn-lifecycle, item-delta, item-lifecycle, and error-notification diagnostics, and
+            feedback upload coverage.
           </p>
         </div>
         <Button
@@ -676,6 +683,12 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastThreadStreamEventsResult={lastThreadStreamEventsResult}
             onReadThreadStreamEvents={onReadThreadStreamEvents}
+          />
+
+          <DebugAppServerCoverageAccountAndAppNotificationsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastAccountAndAppNotificationsResult={lastAccountAndAppNotificationsResult}
+            onReadAccountAndAppNotifications={onReadAccountAndAppNotifications}
           />
 
           <DebugAppServerCoverageNotificationEventsSection

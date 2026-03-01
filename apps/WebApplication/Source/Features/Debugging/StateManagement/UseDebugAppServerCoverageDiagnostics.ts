@@ -12,6 +12,7 @@ import type {
   CapabilityServerClient,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type DebugWorkspaceSection } from "@/Features/Debugging/DomainModel/DebugWorkspaceSectionContracts";
+import type { DebugAppServerCoverageAccountAndAppNotificationsResult } from "../DomainModel/DebugAppServerCoverageAccountAndAppNotificationContracts";
 import {
   type DebugAppServerCoverageAuthCompletionEventsResult,
   type DebugAppServerCoverageCommandExecutionResult,
@@ -90,6 +91,7 @@ export interface DebugAppServerCoverageDiagnostics {
   coverageDiagnosticsErrorMessage: string;
   coverageActionErrorMessage: string;
   coverageDiagnosticsSnapshot: DebugAppServerCoverageSnapshot | null;
+  lastAccountAndAppNotificationsResult: DebugAppServerCoverageAccountAndAppNotificationsResult | null;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
   lastAuthCompletionEventsResult: DebugAppServerCoverageAuthCompletionEventsResult | null;
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
@@ -150,6 +152,7 @@ export interface DebugAppServerCoverageDiagnostics {
   appendThreadRealtimeText: (threadId: string, text: string) => void;
   stopThreadRealtime: (threadId: string) => void;
   readThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
+  readAccountAndAppNotifications: (sinceSequence?: number | null) => void;
   readNotificationEvents: (sinceSequence?: number | null) => void;
   readAuthCompletionEvents: (sinceSequence?: number | null) => void;
   readServerRequestResolvedEvents: (sinceSequence?: number | null) => void;

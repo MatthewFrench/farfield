@@ -357,6 +357,8 @@ function buildApplicationShellViewPropertiesInput(
     lastThreadRealtimeAppendTextResult: debugCoverageDiagnostics.lastThreadRealtimeAppendTextResult,
     lastThreadRealtimeStopResult: debugCoverageDiagnostics.lastThreadRealtimeStopResult,
     lastThreadStreamEventsResult: debugCoverageDiagnostics.lastThreadStreamEventsResult,
+    lastAccountAndAppNotificationsResult:
+      debugCoverageDiagnostics.lastAccountAndAppNotificationsResult,
     lastNotificationEventsResult: debugCoverageDiagnostics.lastNotificationEventsResult,
     lastPendingServerRequestsResult: debugCoverageDiagnostics.lastPendingServerRequestsResult,
     lastServerRequestResolvedEventsResult:
@@ -404,6 +406,7 @@ function buildApplicationShellViewPropertiesInput(
     appendThreadRealtimeText: debugCoverageDiagnostics.appendThreadRealtimeText,
     stopThreadRealtime: debugCoverageDiagnostics.stopThreadRealtime,
     readThreadStreamEvents: debugCoverageDiagnostics.readThreadStreamEvents,
+    readAccountAndAppNotifications: debugCoverageDiagnostics.readAccountAndAppNotifications,
     readNotificationEvents: debugCoverageDiagnostics.readNotificationEvents,
     readAuthCompletionEvents: debugCoverageDiagnostics.readAuthCompletionEvents,
     readServerRequestResolvedEvents: debugCoverageDiagnostics.readServerRequestResolvedEvents,

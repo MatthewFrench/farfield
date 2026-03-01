@@ -2,6 +2,7 @@ import { Bug } from "lucide-react";
 import { Tabs } from "@/Components/UserInterface/Tabs";
 import { TabsList } from "@/Components/UserInterface/TabsList";
 import { TabsTrigger } from "@/Components/UserInterface/TabsTrigger";
+import { type DebugAppServerCoverageAccountAndAppNotificationsResult } from "@/Features/Debugging/DomainModel/DebugAppServerCoverageAccountAndAppNotificationContracts";
 import {
   type DebugAppServerCoverageAuthCompletionEventsResult,
   type DebugAppServerCoverageCommandExecutionResult,
@@ -108,6 +109,7 @@ export interface DebugWorkspacePaneProps {
   lastThreadRealtimeAppendTextResult: DebugAppServerCoverageThreadRealtimeAppendTextResult | null;
   lastThreadRealtimeStopResult: DebugAppServerCoverageThreadRealtimeStopResult | null;
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
+  lastAccountAndAppNotificationsResult: DebugAppServerCoverageAccountAndAppNotificationsResult | null;
   lastNotificationEventsResult: DebugAppServerCoverageNotificationEventsResult | null;
   lastAuthCompletionEventsResult: DebugAppServerCoverageAuthCompletionEventsResult | null;
   lastPendingServerRequestsResult: DebugAppServerCoveragePendingServerRequestsResult | null;
@@ -157,6 +159,7 @@ export interface DebugWorkspacePaneProps {
   onAppendThreadRealtimeText: (threadId: string, text: string) => void;
   onStopThreadRealtime: (threadId: string) => void;
   onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
+  onReadAccountAndAppNotifications: (sinceSequence?: number | null) => void;
   onReadNotificationEvents: (sinceSequence?: number | null) => void;
   onReadAuthCompletionEvents: (sinceSequence?: number | null) => void;
   onReadServerRequestResolvedEvents: (sinceSequence?: number | null) => void;
@@ -238,6 +241,7 @@ export function DebugWorkspacePane({
   lastThreadRealtimeAppendTextResult,
   lastThreadRealtimeStopResult,
   lastThreadStreamEventsResult,
+  lastAccountAndAppNotificationsResult,
   lastNotificationEventsResult,
   lastAuthCompletionEventsResult,
   lastPendingServerRequestsResult,
@@ -276,6 +280,7 @@ export function DebugWorkspacePane({
   onAppendThreadRealtimeText,
   onStopThreadRealtime,
   onReadThreadStreamEvents,
+  onReadAccountAndAppNotifications,
   onReadNotificationEvents,
   onReadAuthCompletionEvents,
   onReadServerRequestResolvedEvents,
@@ -408,6 +413,7 @@ export function DebugWorkspacePane({
             lastThreadRealtimeAppendTextResult={lastThreadRealtimeAppendTextResult}
             lastThreadRealtimeStopResult={lastThreadRealtimeStopResult}
             lastThreadStreamEventsResult={lastThreadStreamEventsResult}
+            lastAccountAndAppNotificationsResult={lastAccountAndAppNotificationsResult}
             lastNotificationEventsResult={lastNotificationEventsResult}
             lastAuthCompletionEventsResult={lastAuthCompletionEventsResult}
             lastPendingServerRequestsResult={lastPendingServerRequestsResult}
@@ -446,6 +452,7 @@ export function DebugWorkspacePane({
             onAppendThreadRealtimeText={onAppendThreadRealtimeText}
             onStopThreadRealtime={onStopThreadRealtime}
             onReadThreadStreamEvents={onReadThreadStreamEvents}
+            onReadAccountAndAppNotifications={onReadAccountAndAppNotifications}
             onReadNotificationEvents={onReadNotificationEvents}
             onReadAuthCompletionEvents={onReadAuthCompletionEvents}
             onReadServerRequestResolvedEvents={onReadServerRequestResolvedEvents}

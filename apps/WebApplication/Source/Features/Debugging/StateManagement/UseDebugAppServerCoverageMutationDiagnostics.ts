@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useState } from "react";
 import type {
   CapabilityConfigWriteMergeStrategy,
   CapabilityServerClient,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
+import type { DebugAppServerCoverageAccountAndAppNotificationsResult } from "../DomainModel/DebugAppServerCoverageAccountAndAppNotificationContracts";
 import type {
   DebugAppServerCoverageAuthCompletionEventsResult,
   DebugAppServerCoverageCommandExecutionResult,
@@ -68,6 +69,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   isRunningCoverageAction: boolean;
   coverageActionErrorMessage: string;
   pendingAccountLogin: DebugAppServerCoveragePendingAccountLogin | null;
+  lastAccountAndAppNotificationsResult: DebugAppServerCoverageAccountAndAppNotificationsResult | null;
   lastAuthCompletionEventsResult: DebugAppServerCoverageAuthCompletionEventsResult | null;
   lastCommandExecutionResult: DebugAppServerCoverageCommandExecutionResult | null;
   lastConfigBatchWriteResult: DebugAppServerCoverageConfigBatchWriteResult | null;
@@ -126,6 +128,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   appendThreadRealtimeText: (threadId: string, text: string) => void;
   stopThreadRealtime: (threadId: string) => void;
   readThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
+  readAccountAndAppNotifications: (sinceSequence?: number | null) => void;
   readNotificationEvents: (sinceSequence?: number | null) => void;
   readAuthCompletionEvents: (sinceSequence?: number | null) => void;
   readServerRequestResolvedEvents: (sinceSequence?: number | null) => void;
@@ -160,6 +163,116 @@ export interface DebugAppServerCoverageMutationDiagnosticsBundle {
   diagnostics: DebugAppServerCoverageMutationDiagnostics;
 }
 
+interface NotificationCoverageReadActionsBuilderInput {
+  capabilityServerClient: CapabilityServerClient;
+  isRunningCoverageAction: boolean;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastAccountAndAppNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageAccountAndAppNotificationsResult | null>
+  >;
+  setLastNotificationEventsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageNotificationEventsResult | null>
+  >;
+  setLastAuthCompletionEventsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageAuthCompletionEventsResult | null>
+  >;
+  setLastServerRequestResolvedEventsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageServerRequestResolvedEventsResult | null>
+  >;
+  setLastFuzzySessionNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageFuzzySessionNotificationsResult | null>
+  >;
+  setLastModelReroutedEventsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageModelReroutedEventsResult | null>
+  >;
+  setLastWarningNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageWarningNotificationsResult | null>
+  >;
+  setLastThreadLifecycleNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageThreadLifecycleNotificationsResult | null>
+  >;
+  setLastThreadProgressNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageThreadProgressNotificationsResult | null>
+  >;
+  setLastThreadRealtimeNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageThreadRealtimeNotificationsResult | null>
+  >;
+  setLastTurnLifecycleNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageTurnLifecycleNotificationsResult | null>
+  >;
+  setLastItemDeltaNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageItemDeltaNotificationsResult | null>
+  >;
+  setLastItemLifecycleNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageItemLifecycleNotificationsResult | null>
+  >;
+  setLastErrorNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageErrorNotificationsResult | null>
+  >;
+  setLastPendingServerRequestsResult: Dispatch<
+    SetStateAction<DebugAppServerCoveragePendingServerRequestsResult | null>
+  >;
+}
+
+function buildNotificationCoverageReadActions(input: NotificationCoverageReadActionsBuilderInput) {
+  return createNotificationCoverageReadActions({
+    capabilityServerClient: input.capabilityServerClient,
+    isRunningCoverageAction: input.isRunningCoverageAction,
+    setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+    setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+    setLastAccountAndAppNotificationsResult: input.setLastAccountAndAppNotificationsResult,
+    setLastNotificationEventsResult: input.setLastNotificationEventsResult,
+    setLastAuthCompletionEventsResult: input.setLastAuthCompletionEventsResult,
+    setLastServerRequestResolvedEventsResult: input.setLastServerRequestResolvedEventsResult,
+    setLastFuzzySessionNotificationsResult: input.setLastFuzzySessionNotificationsResult,
+    setLastModelReroutedEventsResult: input.setLastModelReroutedEventsResult,
+    setLastWarningNotificationsResult: input.setLastWarningNotificationsResult,
+    setLastThreadLifecycleNotificationsResult: input.setLastThreadLifecycleNotificationsResult,
+    setLastThreadProgressNotificationsResult: input.setLastThreadProgressNotificationsResult,
+    setLastThreadRealtimeNotificationsResult: input.setLastThreadRealtimeNotificationsResult,
+    setLastTurnLifecycleNotificationsResult: input.setLastTurnLifecycleNotificationsResult,
+    setLastItemDeltaNotificationsResult: input.setLastItemDeltaNotificationsResult,
+    setLastItemLifecycleNotificationsResult: input.setLastItemLifecycleNotificationsResult,
+    setLastErrorNotificationsResult: input.setLastErrorNotificationsResult,
+    setLastPendingServerRequestsResult: input.setLastPendingServerRequestsResult,
+  });
+}
+
+interface RunStartMcpServerOauthLoginMutationInput {
+  capabilityServerClient: CapabilityServerClient;
+  serverName: string;
+  isRunningCoverageAction: boolean;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  refreshCoverageDiagnostics: () => void;
+}
+
+function runStartMcpServerOauthLoginMutation(
+  input: RunStartMcpServerOauthLoginMutationInput,
+): void {
+  const normalizedServerName = input.serverName.trim();
+  if (normalizedServerName.length === 0) {
+    return;
+  }
+
+  runCoverageAsyncMutation({
+    isRunningCoverageAction: input.isRunningCoverageAction,
+    setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+    setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+    run: async () => {
+      const response = await input.capabilityServerClient.startMcpServerOauthLogin({
+        actionName: COVERAGE_MUTATION_OPERATION_NAME,
+        name: normalizedServerName,
+      });
+      if (typeof window.open === "function") {
+        window.open(response.authorizationUrl, "_blank", "noopener,noreferrer");
+      }
+      input.refreshCoverageDiagnostics();
+    },
+  });
+}
+
 export function useDebugAppServerCoverageMutationDiagnostics(
   input: UseDebugAppServerCoverageMutationDiagnosticsInput,
 ): DebugAppServerCoverageMutationDiagnosticsBundle {
@@ -167,6 +280,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
   const [coverageActionErrorMessage, setCoverageActionErrorMessage] = useState("");
   const [pendingAccountLogin, setPendingAccountLogin] =
     useState<DebugAppServerCoveragePendingAccountLogin | null>(null);
+  const [lastAccountAndAppNotificationsResult, setLastAccountAndAppNotificationsResult] =
+    useState<DebugAppServerCoverageAccountAndAppNotificationsResult | null>(null);
   const [lastAuthCompletionEventsResult, setLastAuthCompletionEventsResult] =
     useState<DebugAppServerCoverageAuthCompletionEventsResult | null>(null);
   const [lastCommandExecutionResult, setLastCommandExecutionResult] =
@@ -301,25 +416,13 @@ export function useDebugAppServerCoverageMutationDiagnostics(
 
   const startMcpServerOauthLogin = useCallback(
     (serverName: string) => {
-      const normalizedServerName = serverName.trim();
-      if (normalizedServerName.length === 0) {
-        return;
-      }
-
-      runCoverageAsyncMutation({
+      runStartMcpServerOauthLoginMutation({
+        capabilityServerClient: input.capabilityServerClient,
+        serverName,
         isRunningCoverageAction,
         setIsRunningCoverageAction,
         setCoverageActionErrorMessage,
-        run: async () => {
-          const response = await input.capabilityServerClient.startMcpServerOauthLogin({
-            actionName: COVERAGE_MUTATION_OPERATION_NAME,
-            name: normalizedServerName,
-          });
-          if (typeof window.open === "function") {
-            window.open(response.authorizationUrl, "_blank", "noopener,noreferrer");
-          }
-          input.refreshCoverageDiagnostics();
-        },
+        refreshCoverageDiagnostics: input.refreshCoverageDiagnostics,
       });
     },
     [input.capabilityServerClient, input.refreshCoverageDiagnostics, isRunningCoverageAction],
@@ -421,11 +524,12 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     setLastFeedbackUploadResult,
   });
 
-  const notificationCoverageReadActions = createNotificationCoverageReadActions({
+  const notificationCoverageReadActions = buildNotificationCoverageReadActions({
     capabilityServerClient: input.capabilityServerClient,
     isRunningCoverageAction,
     setIsRunningCoverageAction,
     setCoverageActionErrorMessage,
+    setLastAccountAndAppNotificationsResult,
     setLastNotificationEventsResult,
     setLastAuthCompletionEventsResult,
     setLastServerRequestResolvedEventsResult,
@@ -450,6 +554,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       isRunningCoverageAction,
       coverageActionErrorMessage,
       pendingAccountLogin,
+      lastAccountAndAppNotificationsResult,
       lastAuthCompletionEventsResult,
       lastCommandExecutionResult,
       lastConfigBatchWriteResult,

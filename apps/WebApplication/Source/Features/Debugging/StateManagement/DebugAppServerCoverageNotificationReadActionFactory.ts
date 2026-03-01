@@ -1,5 +1,6 @@
 import { type Dispatch, type SetStateAction } from "react";
 import type { CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
+import type { DebugAppServerCoverageAccountAndAppNotificationsResult } from "../DomainModel/DebugAppServerCoverageAccountAndAppNotificationContracts";
 import type {
   DebugAppServerCoverageAuthCompletionEventsResult,
   DebugAppServerCoverageErrorNotificationsResult,
@@ -16,6 +17,7 @@ import type {
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import type { DebugAppServerCoverageThreadProgressNotificationsResult } from "../DomainModel/DebugAppServerCoverageThreadProgressContracts";
 import type { DebugAppServerCoverageThreadRealtimeNotificationsResult } from "../DomainModel/DebugAppServerCoverageThreadRealtimeNotificationContracts";
+import { createReadAccountAndAppNotificationsAction } from "./DebugAppServerCoverageAccountAndAppNotificationReadAction";
 import { createReadErrorNotificationsAction } from "./DebugAppServerCoverageErrorNotificationReadAction";
 import { createReadItemDeltaNotificationsAction } from "./DebugAppServerCoverageItemDeltaNotificationReadAction";
 import { createReadItemLifecycleNotificationsAction } from "./DebugAppServerCoverageItemLifecycleNotificationReadAction";
@@ -34,6 +36,7 @@ import { createReadThreadRealtimeNotificationsAction } from "./DebugAppServerCov
 import { createReadTurnLifecycleNotificationsAction } from "./DebugAppServerCoverageTurnLifecycleNotificationReadAction";
 
 interface NotificationCoverageReadActions {
+  readAccountAndAppNotifications: (sinceSequence?: number | null) => void;
   readNotificationEvents: (sinceSequence?: number | null) => void;
   readAuthCompletionEvents: (sinceSequence?: number | null) => void;
   readServerRequestResolvedEvents: (sinceSequence?: number | null) => void;
@@ -55,6 +58,9 @@ interface CreateNotificationCoverageReadActionsInput {
   isRunningCoverageAction: boolean;
   setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
   setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastAccountAndAppNotificationsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageAccountAndAppNotificationsResult | null>
+  >;
   setLastNotificationEventsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageNotificationEventsResult | null>
   >;
@@ -114,6 +120,10 @@ export function createNotificationCoverageReadActions(
   };
 
   return {
+    readAccountAndAppNotifications: createReadAccountAndAppNotificationsAction({
+      ...sharedActionInput,
+      setLastAccountAndAppNotificationsResult: input.setLastAccountAndAppNotificationsResult,
+    }),
     readNotificationEvents: createReadNotificationEventsAction({
       ...sharedActionInput,
       setLastNotificationEventsResult: input.setLastNotificationEventsResult,

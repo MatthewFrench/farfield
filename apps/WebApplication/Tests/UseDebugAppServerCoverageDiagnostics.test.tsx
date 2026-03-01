@@ -670,6 +670,81 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
           };
         }
 
+        if (input.limit === 480) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 43,
+                method: "account/updated",
+                params: {
+                  authMode: "chatgpt",
+                },
+                receivedAtMilliseconds: 17_880,
+              },
+              {
+                sequence: 44,
+                method: "account/rateLimits/updated",
+                params: {
+                  rateLimits: {
+                    limitId: "rl-1",
+                    limitName: "GPT-5 Requests",
+                    primary: {
+                      usedPercent: 0.42,
+                      windowDurationMins: 60,
+                      resetsAt: 1_700_000_000,
+                    },
+                    secondary: null,
+                    credits: {
+                      hasCredits: true,
+                      unlimited: false,
+                      balance: "12.50",
+                    },
+                    planType: "pro",
+                  },
+                },
+                receivedAtMilliseconds: 17_885,
+              },
+              {
+                sequence: 45,
+                method: "app/list/updated",
+                params: {
+                  data: [
+                    {
+                      id: "app-1",
+                      name: "github",
+                      description: null,
+                      logoUrl: null,
+                      logoUrlDark: null,
+                      distributionChannel: "stable",
+                      branding: null,
+                      appMetadata: null,
+                      labels: null,
+                      installUrl: null,
+                      isAccessible: true,
+                      isEnabled: true,
+                    },
+                  ],
+                },
+                receivedAtMilliseconds: 17_890,
+              },
+              {
+                sequence: 46,
+                method: "windowsSandbox/setupCompleted",
+                params: {
+                  mode: "unelevated",
+                  success: true,
+                  error: null,
+                },
+                receivedAtMilliseconds: 17_895,
+              },
+            ],
+            nextSequence: 47,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 300) {
           return {
             ok: true,
@@ -1013,6 +1088,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readItemLifecycleNotifications(33);
     latestDiagnostics.current?.readThreadProgressNotifications(35);
     latestDiagnostics.current?.readThreadRealtimeNotifications(38);
+    latestDiagnostics.current?.readAccountAndAppNotifications(43);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -1197,6 +1273,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 38,
         limit: 460,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 43,
+        limit: 480,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -1987,6 +2068,82 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             errorMessage: null,
             closeReason: "session-ended",
             receivedAtMilliseconds: 17_875,
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastAccountAndAppNotificationsResult).toEqual({
+        sinceSequence: 43,
+        eventCount: 4,
+        nextSequence: 47,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        methodCounts: [
+          {
+            method: "account/rateLimits/updated",
+            count: 1,
+          },
+          {
+            method: "account/updated",
+            count: 1,
+          },
+          {
+            method: "app/list/updated",
+            count: 1,
+          },
+          {
+            method: "windowsSandbox/setupCompleted",
+            count: 1,
+          },
+        ],
+        events: [
+          {
+            method: "account/updated",
+            sequence: 43,
+            authMode: "chatgpt",
+            rateLimitName: null,
+            rateLimitPlanType: null,
+            appCount: null,
+            windowsSandboxMode: null,
+            windowsSandboxSuccess: null,
+            windowsSandboxError: null,
+            receivedAtMilliseconds: 17_880,
+          },
+          {
+            method: "account/rateLimits/updated",
+            sequence: 44,
+            authMode: null,
+            rateLimitName: "GPT-5 Requests",
+            rateLimitPlanType: "pro",
+            appCount: null,
+            windowsSandboxMode: null,
+            windowsSandboxSuccess: null,
+            windowsSandboxError: null,
+            receivedAtMilliseconds: 17_885,
+          },
+          {
+            method: "app/list/updated",
+            sequence: 45,
+            authMode: null,
+            rateLimitName: null,
+            rateLimitPlanType: null,
+            appCount: 1,
+            windowsSandboxMode: null,
+            windowsSandboxSuccess: null,
+            windowsSandboxError: null,
+            receivedAtMilliseconds: 17_890,
+          },
+          {
+            method: "windowsSandbox/setupCompleted",
+            sequence: 46,
+            authMode: null,
+            rateLimitName: null,
+            rateLimitPlanType: null,
+            appCount: null,
+            windowsSandboxMode: "unelevated",
+            windowsSandboxSuccess: true,
+            windowsSandboxError: null,
+            receivedAtMilliseconds: 17_895,
           },
         ],
         readAtIso8601: expect.any(String),

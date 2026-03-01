@@ -192,6 +192,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const readThreadStreamEventsSpy = vi.fn(
     (_threadId: string, _sinceSequence?: number | null): void => {},
   );
+  const readAccountAndAppNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readNotificationEventsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readAuthCompletionEventsSpy = vi.fn((_sinceSequence?: number | null): void => {});
   const readServerRequestResolvedEventsSpy = vi.fn((_sinceSequence?: number | null): void => {});
@@ -369,6 +370,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     lastItemLifecycleNotificationsResult: null,
     lastGitDiffToRemoteResult: null,
     lastThreadStreamEventsResult: null,
+    lastAccountAndAppNotificationsResult: null,
     lastNotificationEventsResult: null,
     lastAuthCompletionEventsResult: null,
     lastPendingServerRequestsResult: null,
@@ -401,6 +403,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     writeSkillsConfig: writeSkillsConfigSpy,
     exportRemoteSkill: exportRemoteSkillSpy,
     readThreadStreamEvents: readThreadStreamEventsSpy,
+    readAccountAndAppNotifications: readAccountAndAppNotificationsSpy,
     readNotificationEvents: readNotificationEventsSpy,
     readAuthCompletionEvents: readAuthCompletionEventsSpy,
     readServerRequestResolvedEvents: readServerRequestResolvedEventsSpy,

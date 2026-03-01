@@ -93,6 +93,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastThreadRealtimeAppendTextResult: null,
   lastThreadRealtimeStopResult: null,
   lastThreadStreamEventsResult: null,
+  lastAccountAndAppNotificationsResult: null,
   lastNotificationEventsResult: null,
   lastAuthCompletionEventsResult: null,
   lastPendingServerRequestsResult: null,
@@ -131,6 +132,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onAppendThreadRealtimeText: () => {},
   onStopThreadRealtime: () => {},
   onReadThreadStreamEvents: () => {},
+  onReadAccountAndAppNotifications: () => {},
   onReadNotificationEvents: () => {},
   onReadAuthCompletionEvents: () => {},
   onReadPendingServerRequests: () => {},
@@ -226,6 +228,7 @@ describe("DebugWorkspacePane", () => {
     expect(screen.getByTestId("debug-coverage-feedback-upload-run")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-fuzzy-session-start-run")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-thread-stream-read")).toBeDefined();
+    expect(screen.getByTestId("debug-coverage-account-app-notifications-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-auth-completion-events-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-server-request-resolved-events-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-fuzzy-session-notifications-read")).toBeDefined();
