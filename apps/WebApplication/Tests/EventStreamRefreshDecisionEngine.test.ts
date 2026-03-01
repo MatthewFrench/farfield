@@ -334,6 +334,8 @@ describe("EventStreamRefreshDecisionEngine", () => {
     "deprecationNotice",
     "windows/worldWritableWarning",
     "error",
+    "turn/started",
+    "turn/completed",
   ])("marks runtime-notification projection work when runtime method %s is present", (methodName) => {
     const engine = createEngine();
     const decision = engine.readDecision({

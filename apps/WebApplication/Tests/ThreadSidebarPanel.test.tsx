@@ -201,6 +201,34 @@ describe("ThreadSidebarPanel", () => {
     );
   });
 
+  it("renders turn-completed progress label when latest progress event is turn completion", () => {
+    renderThreadSidebarPanel({
+      viewport: "desktop",
+      threadSidebarRuntimeSummary: {
+        account: null,
+        rateLimits: null,
+        apps: null,
+        progress: {
+          method: "turn/completed",
+          threadId: "thread-1",
+          turnId: "turn-4",
+          preview: null,
+          modelProvider: null,
+          sequence: 20,
+          receivedAtMilliseconds: 1_700_000_000_950,
+          refreshedAtMilliseconds: 1_700_000_000_990,
+        },
+        warning: null,
+        tokenUsage: null,
+        modelReroute: null,
+      },
+    });
+
+    expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe(
+      "Progress turn completed",
+    );
+  });
+
   it("calls desktop close handler", () => {
     const onHideDesktopSidebar = vi.fn();
     renderThreadSidebarPanel({

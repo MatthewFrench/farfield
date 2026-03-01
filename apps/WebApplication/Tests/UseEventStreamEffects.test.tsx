@@ -329,8 +329,30 @@ function createThreadProgressWarningErrorTokenUsageAndModelRerouteNotificationEv
         },
         receivedAtMilliseconds: 2_034,
       },
+      {
+        sequence: 66,
+        method: "turn/started",
+        params: {
+          threadId: "thread-1",
+          turn: {
+            id: "turn-3",
+          },
+        },
+        receivedAtMilliseconds: 2_035,
+      },
+      {
+        sequence: 67,
+        method: "turn/completed",
+        params: {
+          threadId: "thread-1",
+          turn: {
+            id: "turn-3",
+          },
+        },
+        receivedAtMilliseconds: 2_036,
+      },
     ],
-    nextSequence: 66,
+    nextSequence: 68,
     firstAvailableSequence: 0,
     resetRequired: false,
   };
@@ -771,13 +793,13 @@ describe("useEventStreamEffects", () => {
       rateLimits: null,
       apps: null,
       progress: {
-        method: "thread/compacted",
+        method: "turn/completed",
         threadId: "thread-1",
-        turnId: "turn-2",
+        turnId: "turn-3",
         preview: null,
         modelProvider: null,
-        sequence: 63,
-        receivedAtMilliseconds: 2_032,
+        sequence: 67,
+        receivedAtMilliseconds: 2_036,
         refreshedAtMilliseconds: expect.any(Number),
       },
       warning: {

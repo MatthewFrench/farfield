@@ -55,7 +55,11 @@ export interface ThreadSidebarTokenUsageSummary {
   refreshedAtMilliseconds: number;
 }
 
-export type ThreadRuntimeProgressMethod = "thread/started" | "thread/compacted";
+export type ThreadRuntimeProgressMethod =
+  | "thread/started"
+  | "thread/compacted"
+  | "turn/started"
+  | "turn/completed";
 
 export interface ThreadRuntimeProgressSummary {
   method: ThreadRuntimeProgressMethod;

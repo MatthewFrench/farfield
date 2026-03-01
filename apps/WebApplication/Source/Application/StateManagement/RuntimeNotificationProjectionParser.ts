@@ -11,6 +11,8 @@ import {
 const THREAD_STATUS_CHANGED_NOTIFICATION_METHOD = "thread/status/changed";
 const THREAD_STARTED_NOTIFICATION_METHOD = "thread/started";
 const THREAD_COMPACTED_NOTIFICATION_METHOD = "thread/compacted";
+const TURN_STARTED_NOTIFICATION_METHOD = "turn/started";
+const TURN_COMPLETED_NOTIFICATION_METHOD = "turn/completed";
 const THREAD_TOKEN_USAGE_UPDATED_NOTIFICATION_METHOD = "thread/tokenUsage/updated";
 const MODEL_REROUTED_NOTIFICATION_METHOD = "model/rerouted";
 const CONFIG_WARNING_NOTIFICATION_METHOD = "configWarning";
@@ -103,6 +105,17 @@ const ThreadCompactedParametersSchema = z
   .object({
     threadId: z.string().min(1),
     turnId: z.string().min(1),
+  })
+  .strict();
+
+const TurnLifecycleParametersSchema = z
+  .object({
+    threadId: z.string().min(1),
+    turn: z
+      .object({
+        id: z.string().min(1),
+      })
+      .passthrough(),
   })
   .strict();
 
@@ -295,6 +308,36 @@ function mapThreadCompactedEvent(
   };
 }
 
+function mapTurnStartedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeThreadProgressEvent {
+  const parsedParameters = TurnLifecycleParametersSchema.parse(event.params);
+  return {
+    method: TURN_STARTED_NOTIFICATION_METHOD,
+    sequence: event.sequence,
+    threadId: parsedParameters.threadId,
+    turnId: parsedParameters.turn.id,
+    preview: null,
+    modelProvider: null,
+    receivedAtMilliseconds: event.receivedAtMilliseconds,
+  };
+}
+
+function mapTurnCompletedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeThreadProgressEvent {
+  const parsedParameters = TurnLifecycleParametersSchema.parse(event.params);
+  return {
+    method: TURN_COMPLETED_NOTIFICATION_METHOD,
+    sequence: event.sequence,
+    threadId: parsedParameters.threadId,
+    turnId: parsedParameters.turn.id,
+    preview: null,
+    modelProvider: null,
+    receivedAtMilliseconds: event.receivedAtMilliseconds,
+  };
+}
+
 function mapModelReroutedEvent(
   event: CapabilityNotificationEventsResponse["events"][number],
 ): RuntimeModelRerouteEvent {
@@ -404,6 +447,18 @@ export function readRuntimeNotificationProjection(
 
     if (event.method === THREAD_COMPACTED_NOTIFICATION_METHOD) {
       threadProgressEvents.push(mapThreadCompactedEvent(event));
+      relevantEventCount += 1;
+      continue;
+    }
+
+    if (event.method === TURN_STARTED_NOTIFICATION_METHOD) {
+      threadProgressEvents.push(mapTurnStartedEvent(event));
+      relevantEventCount += 1;
+      continue;
+    }
+
+    if (event.method === TURN_COMPLETED_NOTIFICATION_METHOD) {
+      threadProgressEvents.push(mapTurnCompletedEvent(event));
       relevantEventCount += 1;
       continue;
     }

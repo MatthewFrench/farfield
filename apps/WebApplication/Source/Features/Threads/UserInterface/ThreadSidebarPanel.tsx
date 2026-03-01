@@ -283,6 +283,15 @@ function readThreadSidebarProgressSummaryLabel(summary: ThreadSidebarRuntimeSumm
   if (summary.progress.method === "thread/started") {
     return "Progress started";
   }
+  if (summary.progress.method === "thread/compacted") {
+    return "Progress compacted";
+  }
+  if (summary.progress.method === "turn/started") {
+    return "Progress turn started";
+  }
+  if (summary.progress.method === "turn/completed") {
+    return "Progress turn completed";
+  }
   return "Progress compacted";
 }
 

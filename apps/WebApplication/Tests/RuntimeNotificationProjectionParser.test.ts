@@ -129,12 +129,34 @@ describe("RuntimeNotificationProjectionParser", () => {
           },
           receivedAtMilliseconds: 8_108,
         },
+        {
+          sequence: 110,
+          method: "turn/started",
+          params: {
+            threadId: "thread-1",
+            turn: {
+              id: "turn-3",
+            },
+          },
+          receivedAtMilliseconds: 8_109,
+        },
+        {
+          sequence: 111,
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: {
+              id: "turn-3",
+            },
+          },
+          receivedAtMilliseconds: 8_110,
+        },
       ]),
     );
 
     expect(projection).toEqual({
-      processedEventCount: 10,
-      relevantEventCount: 10,
+      processedEventCount: 12,
+      relevantEventCount: 12,
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [
@@ -164,6 +186,24 @@ describe("RuntimeNotificationProjectionParser", () => {
           preview: null,
           modelProvider: null,
           receivedAtMilliseconds: 8_106,
+        },
+        {
+          method: "turn/started",
+          sequence: 110,
+          threadId: "thread-1",
+          turnId: "turn-3",
+          preview: null,
+          modelProvider: null,
+          receivedAtMilliseconds: 8_109,
+        },
+        {
+          method: "turn/completed",
+          sequence: 111,
+          threadId: "thread-1",
+          turnId: "turn-3",
+          preview: null,
+          modelProvider: null,
+          receivedAtMilliseconds: 8_110,
         },
       ],
       threadTokenUsageUpdates: [
