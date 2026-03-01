@@ -314,6 +314,23 @@ export interface DebugAppServerCoverageAuthCompletionEventsResult {
   readAtIso8601: string;
 }
 
+export interface DebugAppServerCoverageServerRequestResolvedSummary {
+  sequence: number;
+  requestId: number;
+  threadId: string;
+  receivedAtMilliseconds: number;
+}
+
+export interface DebugAppServerCoverageServerRequestResolvedEventsResult {
+  sinceSequence: number | null;
+  eventCount: number;
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+  events: DebugAppServerCoverageServerRequestResolvedSummary[];
+  readAtIso8601: string;
+}
+
 export type DebugAppServerCoverageAccountPlanType =
   | "free"
   | "go"

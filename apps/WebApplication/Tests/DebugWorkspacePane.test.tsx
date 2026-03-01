@@ -96,6 +96,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   lastNotificationEventsResult: null,
   lastAuthCompletionEventsResult: null,
   lastPendingServerRequestsResult: null,
+  lastServerRequestResolvedEventsResult: null,
   lastWindowsSandboxSetupStartResult: null,
   lastFeedbackUploadResult: null,
   lastFuzzyFileSearchResult: null,
@@ -123,6 +124,7 @@ const baseDebugWorkspacePaneProperties: DebugWorkspacePaneProps = {
   onReadNotificationEvents: () => {},
   onReadAuthCompletionEvents: () => {},
   onReadPendingServerRequests: () => {},
+  onReadServerRequestResolvedEvents: () => {},
   onStartWindowsSandboxSetup: () => {},
   onReadGitDiffToRemote: () => {},
   onSearchFuzzyFiles: () => {},
@@ -205,5 +207,6 @@ describe("DebugWorkspacePane", () => {
     expect(screen.getByTestId("debug-coverage-fuzzy-session-start-run")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-thread-stream-read")).toBeDefined();
     expect(screen.getByTestId("debug-coverage-auth-completion-events-read")).toBeDefined();
+    expect(screen.getByTestId("debug-coverage-server-request-resolved-events-read")).toBeDefined();
   });
 });

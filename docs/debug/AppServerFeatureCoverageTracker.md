@@ -1,6 +1,6 @@
 # App-Server Feature Coverage Tracker
 
-Last Updated (UTC): 2026-03-01 08:44:28Z
+Last Updated (UTC): 2026-03-01 08:52:33Z
 
 ## Purpose
 
@@ -60,6 +60,7 @@ As of the upstream snapshot above:
 5. Farfield now handles all upstream app-server server-request methods (`item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/tool/requestUserInput`, `item/tool/call`, `account/chatgptAuthTokens/refresh`, `applyPatchApproval`, `execCommandApproval`) with typed response contracts and user-facing response controls for current product flows.
 6. Farfield now exposes pending unresolved app-server server-request snapshots through debug coverage diagnostics (`/api/server-requests/pending`) with strict typed request metadata and payload previews.
 7. Farfield now consumes auth-completion notifications (`mcpServer/oauthLogin/completed`, `account/login/completed`) through dedicated debug coverage diagnostics with strict typed event mapping and cursor-safe reads.
+8. Farfield now consumes `serverRequest/resolved` notifications through dedicated debug coverage diagnostics with strict typed event mapping and explicit pending-request refresh controls.
 
 ## Canonical Coverage Artifacts
 
@@ -300,6 +301,7 @@ Upstream publishes `46` notification methods. Farfield now captures these notifi
 3. `apps/ServerApplication/Source/Agents/Adapters/CodexThreadInteractionOwner.ts` maps thread-scoped notifications into stream-event reads when IPC is unavailable.
 4. `apps/ServerApplication/Source/Network/Routes/CapabilityRoutes.ts` exposes `/api/notifications/events` for direct notification cursor diagnostics.
 5. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageAuthCompletionEventMappers.ts` projects `mcpServer/oauthLogin/completed` and `account/login/completed` notification payloads into strict auth-completion diagnostics.
+6. `apps/WebApplication/Source/Features/Debugging/StateManagement/DebugAppServerCoverageServerRequestResolvedEventMappers.ts` projects `serverRequest/resolved` notification payloads into strict server-request completion diagnostics.
 
 ### Server-to-client requests
 

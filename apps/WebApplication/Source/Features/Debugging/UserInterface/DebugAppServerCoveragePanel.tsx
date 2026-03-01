@@ -17,6 +17,7 @@ import {
   type DebugAppServerCoverageNotificationEventsResult,
   type DebugAppServerCoveragePendingAccountLogin,
   type DebugAppServerCoveragePendingServerRequestsResult,
+  type DebugAppServerCoverageServerRequestResolvedEventsResult,
   type DebugAppServerCoverageSnapshot,
   type DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   type DebugAppServerCoverageThreadRealtimeAppendTextResult,
@@ -38,6 +39,7 @@ import { DebugAppServerCoverageGitDiffToRemoteSection } from "./DebugAppServerCo
 import { DebugAppServerCoverageNotificationEventsSection } from "./DebugAppServerCoverageNotificationEventsSection";
 import { DebugAppServerCoveragePendingServerRequestsSection } from "./DebugAppServerCoveragePendingServerRequestsSection";
 import { DebugAppServerCoverageRealtimeAndWindowsSection } from "./DebugAppServerCoverageRealtimeAndWindowsSection";
+import { DebugAppServerCoverageServerRequestResolvedEventsSection } from "./DebugAppServerCoverageServerRequestResolvedEventsSection";
 import { DebugAppServerCoverageThreadStreamEventsSection } from "./DebugAppServerCoverageThreadStreamEventsSection";
 
 export interface DebugAppServerCoveragePanelProps {
@@ -60,6 +62,7 @@ export interface DebugAppServerCoveragePanelProps {
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
   lastNotificationEventsResult: DebugAppServerCoverageNotificationEventsResult | null;
   lastPendingServerRequestsResult: DebugAppServerCoveragePendingServerRequestsResult | null;
+  lastServerRequestResolvedEventsResult: DebugAppServerCoverageServerRequestResolvedEventsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
@@ -97,6 +100,7 @@ export interface DebugAppServerCoveragePanelProps {
   onReadThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   onReadNotificationEvents: (sinceSequence?: number | null) => void;
   onReadAuthCompletionEvents: (sinceSequence?: number | null) => void;
+  onReadServerRequestResolvedEvents: (sinceSequence?: number | null) => void;
   onReadPendingServerRequests: () => void;
   onStartWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   onReadGitDiffToRemote: (cwd: string) => void;
@@ -144,6 +148,7 @@ export function DebugAppServerCoveragePanel({
   lastThreadStreamEventsResult,
   lastNotificationEventsResult,
   lastPendingServerRequestsResult,
+  lastServerRequestResolvedEventsResult,
   lastWindowsSandboxSetupStartResult,
   lastFeedbackUploadResult,
   lastFuzzyFileSearchResult,
@@ -170,6 +175,7 @@ export function DebugAppServerCoveragePanel({
   onReadThreadStreamEvents,
   onReadNotificationEvents,
   onReadAuthCompletionEvents,
+  onReadServerRequestResolvedEvents,
   onReadPendingServerRequests,
   onStartWindowsSandboxSetup,
   onReadGitDiffToRemote,
@@ -621,6 +627,13 @@ export function DebugAppServerCoveragePanel({
             isRunningCoverageAction={isRunningCoverageAction}
             lastAuthCompletionEventsResult={lastAuthCompletionEventsResult}
             onReadAuthCompletionEvents={onReadAuthCompletionEvents}
+          />
+
+          <DebugAppServerCoverageServerRequestResolvedEventsSection
+            isRunningCoverageAction={isRunningCoverageAction}
+            lastServerRequestResolvedEventsResult={lastServerRequestResolvedEventsResult}
+            onReadServerRequestResolvedEvents={onReadServerRequestResolvedEvents}
+            onReadPendingServerRequests={onReadPendingServerRequests}
           />
 
           <DebugAppServerCoveragePendingServerRequestsSection

@@ -4,16 +4,19 @@ import type {
   DebugAppServerCoverageAuthCompletionEventsResult,
   DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingServerRequestsResult,
+  DebugAppServerCoverageServerRequestResolvedEventsResult,
   DebugAppServerCoverageThreadStreamEventsResult,
 } from "../DomainModel/DebugAppServerCoverageContracts";
 import { mapAuthCompletionEventsResult } from "./DebugAppServerCoverageAuthCompletionEventMappers";
 import { mapNotificationEventsResult } from "./DebugAppServerCoverageNotificationEventMappers";
 import { mapPendingServerRequestsResult } from "./DebugAppServerCoveragePendingServerRequestMappers";
+import { mapServerRequestResolvedEventsResult } from "./DebugAppServerCoverageServerRequestResolvedEventMappers";
 import { mapThreadStreamEventsResult } from "./DebugAppServerCoverageThreadStreamEventMappers";
 
 const COVERAGE_MUTATION_OPERATION_NAME = "debug-coverage-action";
 const COVERAGE_ACTION_ERROR_PREFIX = "Unable to run coverage action: ";
 const COVERAGE_AUTH_COMPLETION_EVENTS_LIMIT = 200;
+const COVERAGE_SERVER_REQUEST_RESOLVED_EVENTS_LIMIT = 220;
 
 interface RunCoverageAsyncMutationInput {
   isRunningCoverageAction: boolean;
@@ -54,6 +57,17 @@ interface RunAuthCompletionEventsReadMutationInput {
   sinceSequence?: number | null;
 }
 
+interface RunServerRequestResolvedEventsReadMutationInput {
+  capabilityServerClient: CapabilityServerClient;
+  isRunningCoverageAction: boolean;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastServerRequestResolvedEventsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageServerRequestResolvedEventsResult | null>
+  >;
+  sinceSequence?: number | null;
+}
+
 interface CreateReadNotificationEventsActionInput {
   capabilityServerClient: CapabilityServerClient;
   isRunningCoverageAction: boolean;
@@ -81,6 +95,16 @@ interface CreateReadAuthCompletionEventsActionInput {
   setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
   setLastAuthCompletionEventsResult: Dispatch<
     SetStateAction<DebugAppServerCoverageAuthCompletionEventsResult | null>
+  >;
+}
+
+interface CreateReadServerRequestResolvedEventsActionInput {
+  capabilityServerClient: CapabilityServerClient;
+  isRunningCoverageAction: boolean;
+  setIsRunningCoverageAction: Dispatch<SetStateAction<boolean>>;
+  setCoverageActionErrorMessage: Dispatch<SetStateAction<string>>;
+  setLastServerRequestResolvedEventsResult: Dispatch<
+    SetStateAction<DebugAppServerCoverageServerRequestResolvedEventsResult | null>
   >;
 }
 
@@ -196,6 +220,35 @@ function runAuthCompletionEventsReadMutation(
   });
 }
 
+function runServerRequestResolvedEventsReadMutation(
+  input: RunServerRequestResolvedEventsReadMutationInput,
+): void {
+  const normalizedSinceSequence =
+    input.sinceSequence === undefined || input.sinceSequence === null ? null : input.sinceSequence;
+  if (
+    normalizedSinceSequence !== null &&
+    (!Number.isInteger(normalizedSinceSequence) || normalizedSinceSequence < 0)
+  ) {
+    return;
+  }
+
+  runCoverageAsyncMutation({
+    isRunningCoverageAction: input.isRunningCoverageAction,
+    setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+    setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+    run: async () => {
+      const response = await input.capabilityServerClient.readNotificationEvents({
+        actionName: COVERAGE_MUTATION_OPERATION_NAME,
+        limit: COVERAGE_SERVER_REQUEST_RESOLVED_EVENTS_LIMIT,
+        ...(normalizedSinceSequence !== null ? { sinceSequence: normalizedSinceSequence } : {}),
+      });
+      input.setLastServerRequestResolvedEventsResult(
+        mapServerRequestResolvedEventsResult(response, normalizedSinceSequence),
+      );
+    },
+  });
+}
+
 export function createReadNotificationEventsAction(input: CreateReadNotificationEventsActionInput) {
   return (sinceSequence?: number | null): void => {
     runNotificationEventsReadMutation({
@@ -219,6 +272,21 @@ export function createReadAuthCompletionEventsAction(
       setIsRunningCoverageAction: input.setIsRunningCoverageAction,
       setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
       setLastAuthCompletionEventsResult: input.setLastAuthCompletionEventsResult,
+      ...(sinceSequence !== undefined ? { sinceSequence } : {}),
+    });
+  };
+}
+
+export function createReadServerRequestResolvedEventsAction(
+  input: CreateReadServerRequestResolvedEventsActionInput,
+) {
+  return (sinceSequence?: number | null): void => {
+    runServerRequestResolvedEventsReadMutation({
+      capabilityServerClient: input.capabilityServerClient,
+      isRunningCoverageAction: input.isRunningCoverageAction,
+      setIsRunningCoverageAction: input.setIsRunningCoverageAction,
+      setCoverageActionErrorMessage: input.setCoverageActionErrorMessage,
+      setLastServerRequestResolvedEventsResult: input.setLastServerRequestResolvedEventsResult,
       ...(sinceSequence !== undefined ? { sinceSequence } : {}),
     });
   };

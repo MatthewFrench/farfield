@@ -1,9 +1,9 @@
 # App-Server Event Surface Decision Ledger
 
-Last Updated (UTC): 2026-03-01 08:44:28Z
+Last Updated (UTC): 2026-03-01 08:52:33Z
 
 This ledger records recommended disposition for upstream app-server event and callback surfaces.
-Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth-completion diagnostics for `account/login/completed` and `mcpServer/oauthLogin/completed`; per-method product workflows below remain tracked independently.
+Farfield now exposes raw notification-event cursors in debug coverage diagnostics (`/api/notifications/events`) and dedicated auth/server-request completion diagnostics for `account/login/completed`, `mcpServer/oauthLogin/completed`, and `serverRequest/resolved`; per-method product workflows below remain tracked independently.
 
 | Method | Surface Type | Current Farfield State | Recommendation | Notes |
 | --- | --- | --- | --- | --- |
@@ -32,7 +32,7 @@ Farfield now exposes raw notification-event cursors in debug coverage diagnostic
 | `mcpServer/oauthLogin/completed` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated auth-completion diagnostics surface validates MCP OAuth completion state and error messaging. |
 | `model/rerouted` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
 | `rawResponseItem/completed` | server-to-client notification | Not consumed | Not now | Adopt with explicit product requirement. |
-| `serverRequest/resolved` | server-to-client notification | Not consumed | Not now | Adopt when explicit server-request lifecycle feedback is required in product surfaces. Pending unresolved server-request snapshots are now readable in debug coverage diagnostics via `/api/server-requests/pending`. |
+| `serverRequest/resolved` | server-to-client notification | Consumed in debug coverage diagnostics | Keep for diagnostics | Dedicated server-request resolved diagnostics surface validates request completion signals and complements pending-request snapshots (`/api/server-requests/pending`). |
 | `sessionConfigured` | server-to-client notification | Not consumed | Do not adopt | Deprecated notification surface. |
 | `thread/archived` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |
 | `thread/closed` | server-to-client notification | Not consumed | Plan candidate | Useful if app-server path should provide live streamed progress in product surfaces. |

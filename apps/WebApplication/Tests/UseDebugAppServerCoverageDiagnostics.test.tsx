@@ -352,6 +352,26 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     const readNotificationEvents = vi
       .spyOn(capabilityServerClient, "readNotificationEvents")
       .mockImplementation(async (input) => {
+        if (input.limit === 220) {
+          return {
+            ok: true,
+            events: [
+              {
+                sequence: 14,
+                method: "serverRequest/resolved",
+                params: {
+                  threadId: "thread-realtime-1",
+                  requestId: 13,
+                },
+                receivedAtMilliseconds: 17_680,
+              },
+            ],
+            nextSequence: 15,
+            firstAvailableSequence: 3,
+            resetRequired: false,
+          };
+        }
+
         if (input.limit === 200) {
           return {
             ok: true,
@@ -498,6 +518,7 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
     latestDiagnostics.current?.readThreadStreamEvents("thread-realtime-1", 7);
     latestDiagnostics.current?.readNotificationEvents(7);
     latestDiagnostics.current?.readAuthCompletionEvents(12);
+    latestDiagnostics.current?.readServerRequestResolvedEvents(13);
     latestDiagnostics.current?.readPendingServerRequests();
     latestDiagnostics.current?.startWindowsSandboxSetup("unelevated");
     latestDiagnostics.current?.uploadFeedback(
@@ -627,6 +648,11 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
         actionName: "debug-coverage-action",
         sinceSequence: 12,
         limit: 200,
+      });
+      expect(readNotificationEvents).toHaveBeenCalledWith({
+        actionName: "debug-coverage-action",
+        sinceSequence: 13,
+        limit: 220,
       });
       expect(readPendingServerRequests).toHaveBeenCalledWith({
         actionName: "debug-coverage-action",
@@ -841,6 +867,22 @@ describe("useDebugAppServerCoverageDiagnostics", () => {
             status: "error",
             subject: "login-1",
             errorMessage: "User canceled login.",
+          },
+        ],
+        readAtIso8601: expect.any(String),
+      });
+      expect(latestDiagnostics.current?.lastServerRequestResolvedEventsResult).toEqual({
+        sinceSequence: 13,
+        eventCount: 1,
+        nextSequence: 15,
+        firstAvailableSequence: 3,
+        resetRequired: false,
+        events: [
+          {
+            sequence: 14,
+            requestId: 13,
+            threadId: "thread-realtime-1",
+            receivedAtMilliseconds: 17_680,
           },
         ],
         readAtIso8601: expect.any(String),

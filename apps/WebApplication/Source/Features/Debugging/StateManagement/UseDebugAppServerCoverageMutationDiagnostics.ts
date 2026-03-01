@@ -20,6 +20,7 @@ import type {
   DebugAppServerCoverageNotificationEventsResult,
   DebugAppServerCoveragePendingAccountLogin,
   DebugAppServerCoveragePendingServerRequestsResult,
+  DebugAppServerCoverageServerRequestResolvedEventsResult,
   DebugAppServerCoverageThreadRealtimeAppendAudioResult,
   DebugAppServerCoverageThreadRealtimeAppendTextResult,
   DebugAppServerCoverageThreadRealtimeAudioChunk,
@@ -38,6 +39,7 @@ import {
   createReadAuthCompletionEventsAction,
   createReadNotificationEventsAction,
   createReadPendingServerRequestsAction,
+  createReadServerRequestResolvedEventsAction,
   createReadThreadStreamEventsAction,
   runCoverageAsyncMutation,
 } from "./DebugAppServerCoverageMutationActionHelpers";
@@ -71,6 +73,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   lastThreadStreamEventsResult: DebugAppServerCoverageThreadStreamEventsResult | null;
   lastNotificationEventsResult: DebugAppServerCoverageNotificationEventsResult | null;
   lastPendingServerRequestsResult: DebugAppServerCoveragePendingServerRequestsResult | null;
+  lastServerRequestResolvedEventsResult: DebugAppServerCoverageServerRequestResolvedEventsResult | null;
   lastWindowsSandboxSetupStartResult: DebugAppServerCoverageWindowsSandboxSetupStartResult | null;
   lastFeedbackUploadResult: DebugAppServerCoverageFeedbackUploadResult | null;
   lastFuzzyFileSearchResult: DebugAppServerCoverageFuzzyFileSearchResult | null;
@@ -107,6 +110,7 @@ export interface DebugAppServerCoverageMutationDiagnostics {
   readThreadStreamEvents: (threadId: string, sinceSequence?: number | null) => void;
   readNotificationEvents: (sinceSequence?: number | null) => void;
   readAuthCompletionEvents: (sinceSequence?: number | null) => void;
+  readServerRequestResolvedEvents: (sinceSequence?: number | null) => void;
   readPendingServerRequests: () => void;
   startWindowsSandboxSetup: (mode: DebugAppServerCoverageWindowsSandboxSetupMode) => void;
   readGitDiffToRemote: (cwd: string) => void;
@@ -161,6 +165,8 @@ export function useDebugAppServerCoverageMutationDiagnostics(
     useState<DebugAppServerCoverageNotificationEventsResult | null>(null);
   const [lastPendingServerRequestsResult, setLastPendingServerRequestsResult] =
     useState<DebugAppServerCoveragePendingServerRequestsResult | null>(null);
+  const [lastServerRequestResolvedEventsResult, setLastServerRequestResolvedEventsResult] =
+    useState<DebugAppServerCoverageServerRequestResolvedEventsResult | null>(null);
   const [lastWindowsSandboxSetupStartResult, setLastWindowsSandboxSetupStartResult] =
     useState<DebugAppServerCoverageWindowsSandboxSetupStartResult | null>(null);
   const [lastFeedbackUploadResult, setLastFeedbackUploadResult] =
@@ -427,6 +433,7 @@ export function useDebugAppServerCoverageMutationDiagnostics(
       lastThreadStreamEventsResult,
       lastNotificationEventsResult,
       lastPendingServerRequestsResult,
+      lastServerRequestResolvedEventsResult,
       lastWindowsSandboxSetupStartResult,
       lastFeedbackUploadResult,
       lastFuzzyFileSearchResult,
@@ -469,6 +476,13 @@ export function useDebugAppServerCoverageMutationDiagnostics(
         setIsRunningCoverageAction,
         setCoverageActionErrorMessage,
         setLastAuthCompletionEventsResult,
+      }),
+      readServerRequestResolvedEvents: createReadServerRequestResolvedEventsAction({
+        capabilityServerClient: input.capabilityServerClient,
+        isRunningCoverageAction,
+        setIsRunningCoverageAction,
+        setCoverageActionErrorMessage,
+        setLastServerRequestResolvedEventsResult,
       }),
       readPendingServerRequests: createReadPendingServerRequestsAction({
         capabilityServerClient: input.capabilityServerClient,
