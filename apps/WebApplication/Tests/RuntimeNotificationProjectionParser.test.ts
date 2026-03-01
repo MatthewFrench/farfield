@@ -204,12 +204,36 @@ describe("RuntimeNotificationProjectionParser", () => {
           },
           receivedAtMilliseconds: 8_115,
         },
+        {
+          sequence: 117,
+          method: "thread/archived",
+          params: {
+            threadId: "thread-1",
+          },
+          receivedAtMilliseconds: 8_116,
+        },
+        {
+          sequence: 118,
+          method: "thread/unarchived",
+          params: {
+            threadId: "thread-1",
+          },
+          receivedAtMilliseconds: 8_117,
+        },
+        {
+          sequence: 119,
+          method: "thread/closed",
+          params: {
+            threadId: "thread-1",
+          },
+          receivedAtMilliseconds: 8_118,
+        },
       ]),
     );
 
     expect(projection).toEqual({
-      processedEventCount: 17,
-      relevantEventCount: 17,
+      processedEventCount: 20,
+      relevantEventCount: 20,
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [
@@ -340,6 +364,30 @@ describe("RuntimeNotificationProjectionParser", () => {
           isRetrying: false,
           receivedAtMilliseconds: 8_113,
         },
+        {
+          method: "thread/archived",
+          sequence: 117,
+          summary: "Thread archived",
+          threadId: "thread-1",
+          isRetrying: false,
+          receivedAtMilliseconds: 8_116,
+        },
+        {
+          method: "thread/unarchived",
+          sequence: 118,
+          summary: "Thread unarchived",
+          threadId: "thread-1",
+          isRetrying: false,
+          receivedAtMilliseconds: 8_117,
+        },
+        {
+          method: "thread/closed",
+          sequence: 119,
+          summary: "Thread closed",
+          threadId: "thread-1",
+          isRetrying: false,
+          receivedAtMilliseconds: 8_118,
+        },
       ],
       shouldRefreshAccount: true,
       shouldRefreshAccountRateLimits: true,
@@ -372,9 +420,10 @@ describe("RuntimeNotificationProjectionParser", () => {
       createNotificationEventsResponse([
         {
           sequence: 101,
-          method: "thread/archived",
+          method: "thread/name/updated",
           params: {
             threadId: "thread-1",
+            name: "Thread one",
           },
           receivedAtMilliseconds: 8_100,
         },

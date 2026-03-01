@@ -395,8 +395,16 @@ function createThreadProgressWarningErrorTokenUsageAndModelRerouteNotificationEv
         },
         receivedAtMilliseconds: 2_040,
       },
+      {
+        sequence: 72,
+        method: "thread/closed",
+        params: {
+          threadId: "thread-1",
+        },
+        receivedAtMilliseconds: 2_041,
+      },
     ],
-    nextSequence: 72,
+    nextSequence: 73,
     firstAvailableSequence: 0,
     resetRequired: false,
   };
@@ -847,12 +855,12 @@ describe("useEventStreamEffects", () => {
         refreshedAtMilliseconds: expect.any(Number),
       },
       warning: {
-        method: "thread/realtime/closed",
-        summary: "Closed (session ended)",
+        method: "thread/closed",
+        summary: "Thread closed",
         threadId: "thread-1",
         isRetrying: false,
-        sequence: 71,
-        receivedAtMilliseconds: 2_040,
+        sequence: 72,
+        receivedAtMilliseconds: 2_041,
         refreshedAtMilliseconds: expect.any(Number),
       },
       tokenUsage: {

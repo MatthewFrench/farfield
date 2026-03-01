@@ -5,6 +5,9 @@ import { type ThreadRuntimeWarningMethod } from "@/Features/Threads/DomainModel/
 export const CONFIG_WARNING_NOTIFICATION_METHOD = "configWarning";
 export const DEPRECATION_NOTICE_NOTIFICATION_METHOD = "deprecationNotice";
 export const WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD = "windows/worldWritableWarning";
+export const THREAD_ARCHIVED_NOTIFICATION_METHOD = "thread/archived";
+export const THREAD_UNARCHIVED_NOTIFICATION_METHOD = "thread/unarchived";
+export const THREAD_CLOSED_NOTIFICATION_METHOD = "thread/closed";
 export const THREAD_REALTIME_STARTED_NOTIFICATION_METHOD = "thread/realtime/started";
 export const THREAD_REALTIME_CLOSED_NOTIFICATION_METHOD = "thread/realtime/closed";
 export const THREAD_REALTIME_ERROR_NOTIFICATION_METHOD = "thread/realtime/error";
@@ -81,6 +84,12 @@ const ThreadRealtimeErrorParametersSchema = z
   .object({
     threadId: z.string().min(1),
     message: z.string().min(1),
+  })
+  .strict();
+
+const ThreadLifecycleParametersSchema = z
+  .object({
+    threadId: z.string().min(1),
   })
   .strict();
 
@@ -203,6 +212,45 @@ function mapThreadRealtimeErrorEvent(
   });
 }
 
+function mapThreadArchivedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeWarningEvent {
+  const parsedParameters = ThreadLifecycleParametersSchema.parse(event.params);
+  return createWarningEvent({
+    event,
+    method: THREAD_ARCHIVED_NOTIFICATION_METHOD,
+    summary: "Thread archived",
+    threadId: parsedParameters.threadId,
+    isRetrying: false,
+  });
+}
+
+function mapThreadUnarchivedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeWarningEvent {
+  const parsedParameters = ThreadLifecycleParametersSchema.parse(event.params);
+  return createWarningEvent({
+    event,
+    method: THREAD_UNARCHIVED_NOTIFICATION_METHOD,
+    summary: "Thread unarchived",
+    threadId: parsedParameters.threadId,
+    isRetrying: false,
+  });
+}
+
+function mapThreadClosedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeWarningEvent {
+  const parsedParameters = ThreadLifecycleParametersSchema.parse(event.params);
+  return createWarningEvent({
+    event,
+    method: THREAD_CLOSED_NOTIFICATION_METHOD,
+    summary: "Thread closed",
+    threadId: parsedParameters.threadId,
+    isRetrying: false,
+  });
+}
+
 export function mapRuntimeWarningEvent(
   event: CapabilityNotificationEventsResponse["events"][number],
 ): RuntimeWarningEvent | null {
@@ -232,6 +280,18 @@ export function mapRuntimeWarningEvent(
 
   if (event.method === THREAD_REALTIME_ERROR_NOTIFICATION_METHOD) {
     return mapThreadRealtimeErrorEvent(event);
+  }
+
+  if (event.method === THREAD_ARCHIVED_NOTIFICATION_METHOD) {
+    return mapThreadArchivedEvent(event);
+  }
+
+  if (event.method === THREAD_UNARCHIVED_NOTIFICATION_METHOD) {
+    return mapThreadUnarchivedEvent(event);
+  }
+
+  if (event.method === THREAD_CLOSED_NOTIFICATION_METHOD) {
+    return mapThreadClosedEvent(event);
   }
 
   return null;

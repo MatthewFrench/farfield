@@ -78,6 +78,9 @@ export type ThreadRuntimeWarningMethod =
   | "configWarning"
   | "deprecationNotice"
   | "windows/worldWritableWarning"
+  | "thread/archived"
+  | "thread/unarchived"
+  | "thread/closed"
   | "thread/realtime/started"
   | "thread/realtime/closed"
   | "error";
