@@ -351,8 +351,26 @@ function createThreadProgressWarningErrorTokenUsageAndModelRerouteNotificationEv
         },
         receivedAtMilliseconds: 2_036,
       },
+      {
+        sequence: 68,
+        method: "thread/realtime/started",
+        params: {
+          threadId: "thread-1",
+          sessionId: "session-1",
+        },
+        receivedAtMilliseconds: 2_037,
+      },
+      {
+        sequence: 69,
+        method: "thread/realtime/closed",
+        params: {
+          threadId: "thread-1",
+          reason: "session ended",
+        },
+        receivedAtMilliseconds: 2_038,
+      },
     ],
-    nextSequence: 68,
+    nextSequence: 70,
     firstAvailableSequence: 0,
     resetRequired: false,
   };
@@ -803,12 +821,12 @@ describe("useEventStreamEffects", () => {
         refreshedAtMilliseconds: expect.any(Number),
       },
       warning: {
-        method: "error",
-        summary: "Turn failed to stream",
+        method: "thread/realtime/closed",
+        summary: "Closed (session ended)",
         threadId: "thread-1",
-        isRetrying: true,
-        sequence: 65,
-        receivedAtMilliseconds: 2_034,
+        isRetrying: false,
+        sequence: 69,
+        receivedAtMilliseconds: 2_038,
         refreshedAtMilliseconds: expect.any(Number),
       },
       tokenUsage: {

@@ -89,13 +89,22 @@ function readModelRerouteBannerLabel(summary: ThreadRuntimeModelRerouteSummary):
 }
 
 function readRuntimeWarningBannerLabel(summary: ThreadRuntimeWarningSummary): string {
+  if (summary.method === "thread/realtime/started" || summary.method === "thread/realtime/closed") {
+    return `Realtime: ${summary.summary}`;
+  }
   const prefix = summary.method === "error" ? "Error" : "Warning";
   const retrySuffix = summary.isRetrying ? " (retrying)" : "";
   return `${prefix}: ${summary.summary}${retrySuffix}`;
 }
 
 function readRuntimeWarningBannerClassName(summary: ThreadRuntimeWarningSummary): string {
-  return summary.method === "error" ? "text-[11px] text-red-500" : "text-[11px] text-amber-500";
+  if (summary.method === "error") {
+    return "text-[11px] text-red-500";
+  }
+  if (summary.method === "thread/realtime/started" || summary.method === "thread/realtime/closed") {
+    return "text-[11px] text-sky-500";
+  }
+  return "text-[11px] text-amber-500";
 }
 
 function buildSidebarOpenHandler(

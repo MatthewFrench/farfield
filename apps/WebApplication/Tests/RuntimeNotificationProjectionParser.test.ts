@@ -151,12 +151,39 @@ describe("RuntimeNotificationProjectionParser", () => {
           },
           receivedAtMilliseconds: 8_110,
         },
+        {
+          sequence: 112,
+          method: "thread/realtime/started",
+          params: {
+            threadId: "thread-1",
+            sessionId: "session-1",
+          },
+          receivedAtMilliseconds: 8_111,
+        },
+        {
+          sequence: 113,
+          method: "thread/realtime/error",
+          params: {
+            threadId: "thread-1",
+            message: "Realtime stream interrupted",
+          },
+          receivedAtMilliseconds: 8_112,
+        },
+        {
+          sequence: 114,
+          method: "thread/realtime/closed",
+          params: {
+            threadId: "thread-1",
+            reason: "session ended",
+          },
+          receivedAtMilliseconds: 8_113,
+        },
       ]),
     );
 
     expect(projection).toEqual({
-      processedEventCount: 12,
-      relevantEventCount: 12,
+      processedEventCount: 15,
+      relevantEventCount: 15,
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [
@@ -244,6 +271,30 @@ describe("RuntimeNotificationProjectionParser", () => {
           threadId: "thread-1",
           isRetrying: true,
           receivedAtMilliseconds: 8_108,
+        },
+        {
+          method: "thread/realtime/started",
+          sequence: 112,
+          summary: "Started",
+          threadId: "thread-1",
+          isRetrying: false,
+          receivedAtMilliseconds: 8_111,
+        },
+        {
+          method: "error",
+          sequence: 113,
+          summary: "Realtime: Realtime stream interrupted",
+          threadId: "thread-1",
+          isRetrying: false,
+          receivedAtMilliseconds: 8_112,
+        },
+        {
+          method: "thread/realtime/closed",
+          sequence: 114,
+          summary: "Closed (session ended)",
+          threadId: "thread-1",
+          isRetrying: false,
+          receivedAtMilliseconds: 8_113,
         },
       ],
       shouldRefreshAccount: true,

@@ -5,8 +5,13 @@ import {
   type ThreadRuntimeModelRerouteReason,
   type ThreadRuntimeProgressMethod,
   type ThreadRuntimeStatusType,
-  type ThreadRuntimeWarningMethod,
 } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
+import {
+  mapRuntimeWarningEvent,
+  type RuntimeWarningEvent,
+} from "./RuntimeNotificationWarningEvents";
+
+export type { RuntimeWarningEvent } from "./RuntimeNotificationWarningEvents";
 
 const THREAD_STATUS_CHANGED_NOTIFICATION_METHOD = "thread/status/changed";
 const THREAD_STARTED_NOTIFICATION_METHOD = "thread/started";
@@ -15,10 +20,6 @@ const TURN_STARTED_NOTIFICATION_METHOD = "turn/started";
 const TURN_COMPLETED_NOTIFICATION_METHOD = "turn/completed";
 const THREAD_TOKEN_USAGE_UPDATED_NOTIFICATION_METHOD = "thread/tokenUsage/updated";
 const MODEL_REROUTED_NOTIFICATION_METHOD = "model/rerouted";
-const CONFIG_WARNING_NOTIFICATION_METHOD = "configWarning";
-const DEPRECATION_NOTICE_NOTIFICATION_METHOD = "deprecationNotice";
-const WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD = "windows/worldWritableWarning";
-const ERROR_NOTIFICATION_METHOD = "error";
 const ACCOUNT_UPDATED_NOTIFICATION_METHOD = "account/updated";
 const ACCOUNT_RATE_LIMITS_UPDATED_NOTIFICATION_METHOD = "account/rateLimits/updated";
 const APP_LIST_UPDATED_NOTIFICATION_METHOD = "app/list/updated";
@@ -119,59 +120,6 @@ const TurnLifecycleParametersSchema = z
   })
   .strict();
 
-const ConfigWarningParametersSchema = z
-  .object({
-    summary: z.string().min(1),
-    details: z.string().nullable(),
-    path: z.string().min(1).optional(),
-    range: z
-      .object({
-        start: z
-          .object({
-            line: z.number().int().positive(),
-            column: z.number().int().positive(),
-          })
-          .strict(),
-        end: z
-          .object({
-            line: z.number().int().positive(),
-            column: z.number().int().positive(),
-          })
-          .strict(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
-
-const DeprecationNoticeParametersSchema = z
-  .object({
-    summary: z.string().min(1),
-    details: z.string().nullable(),
-  })
-  .strict();
-
-const WindowsWorldWritableWarningParametersSchema = z
-  .object({
-    samplePaths: z.array(z.string().min(1)),
-    extraCount: z.number().int().nonnegative(),
-    failedScan: z.boolean(),
-  })
-  .strict();
-
-const ErrorNotificationParametersSchema = z
-  .object({
-    error: z
-      .object({
-        message: z.string().min(1),
-      })
-      .passthrough(),
-    willRetry: z.boolean(),
-    threadId: z.string().min(1),
-    turnId: z.string().min(1),
-  })
-  .strict();
-
 const ModelReroutedNotificationParametersSchema = z
   .object({
     threadId: z.string().min(1),
@@ -217,15 +165,6 @@ export interface RuntimeModelRerouteEvent {
   fromModel: string;
   toModel: string;
   reason: ThreadRuntimeModelRerouteReason;
-  receivedAtMilliseconds: number;
-}
-
-export interface RuntimeWarningEvent {
-  method: ThreadRuntimeWarningMethod;
-  sequence: number;
-  summary: string;
-  threadId: string | null;
-  isRetrying: boolean;
   receivedAtMilliseconds: number;
 }
 
@@ -308,27 +247,13 @@ function mapThreadCompactedEvent(
   };
 }
 
-function mapTurnStartedEvent(
+function mapTurnLifecycleEvent(
   event: CapabilityNotificationEventsResponse["events"][number],
+  method: "turn/started" | "turn/completed",
 ): RuntimeThreadProgressEvent {
   const parsedParameters = TurnLifecycleParametersSchema.parse(event.params);
   return {
-    method: TURN_STARTED_NOTIFICATION_METHOD,
-    sequence: event.sequence,
-    threadId: parsedParameters.threadId,
-    turnId: parsedParameters.turn.id,
-    preview: null,
-    modelProvider: null,
-    receivedAtMilliseconds: event.receivedAtMilliseconds,
-  };
-}
-
-function mapTurnCompletedEvent(
-  event: CapabilityNotificationEventsResponse["events"][number],
-): RuntimeThreadProgressEvent {
-  const parsedParameters = TurnLifecycleParametersSchema.parse(event.params);
-  return {
-    method: TURN_COMPLETED_NOTIFICATION_METHOD,
+    method,
     sequence: event.sequence,
     threadId: parsedParameters.threadId,
     turnId: parsedParameters.turn.id,
@@ -349,62 +274,6 @@ function mapModelReroutedEvent(
     fromModel: parsedParameters.fromModel,
     toModel: parsedParameters.toModel,
     reason: parsedParameters.reason,
-    receivedAtMilliseconds: event.receivedAtMilliseconds,
-  };
-}
-
-function mapConfigWarningEvent(
-  event: CapabilityNotificationEventsResponse["events"][number],
-): RuntimeWarningEvent {
-  const parsedParameters = ConfigWarningParametersSchema.parse(event.params);
-  return {
-    method: CONFIG_WARNING_NOTIFICATION_METHOD,
-    sequence: event.sequence,
-    summary: parsedParameters.summary,
-    threadId: null,
-    isRetrying: false,
-    receivedAtMilliseconds: event.receivedAtMilliseconds,
-  };
-}
-
-function mapDeprecationNoticeEvent(
-  event: CapabilityNotificationEventsResponse["events"][number],
-): RuntimeWarningEvent {
-  const parsedParameters = DeprecationNoticeParametersSchema.parse(event.params);
-  return {
-    method: DEPRECATION_NOTICE_NOTIFICATION_METHOD,
-    sequence: event.sequence,
-    summary: parsedParameters.summary,
-    threadId: null,
-    isRetrying: false,
-    receivedAtMilliseconds: event.receivedAtMilliseconds,
-  };
-}
-
-function mapWindowsWorldWritableWarningEvent(
-  event: CapabilityNotificationEventsResponse["events"][number],
-): RuntimeWarningEvent {
-  WindowsWorldWritableWarningParametersSchema.parse(event.params);
-  return {
-    method: WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD,
-    sequence: event.sequence,
-    summary: "World-writable paths detected",
-    threadId: null,
-    isRetrying: false,
-    receivedAtMilliseconds: event.receivedAtMilliseconds,
-  };
-}
-
-function mapErrorEvent(
-  event: CapabilityNotificationEventsResponse["events"][number],
-): RuntimeWarningEvent {
-  const parsedParameters = ErrorNotificationParametersSchema.parse(event.params);
-  return {
-    method: ERROR_NOTIFICATION_METHOD,
-    sequence: event.sequence,
-    summary: parsedParameters.error.message,
-    threadId: parsedParameters.threadId,
-    isRetrying: parsedParameters.willRetry,
     receivedAtMilliseconds: event.receivedAtMilliseconds,
   };
 }
@@ -452,13 +321,13 @@ export function readRuntimeNotificationProjection(
     }
 
     if (event.method === TURN_STARTED_NOTIFICATION_METHOD) {
-      threadProgressEvents.push(mapTurnStartedEvent(event));
+      threadProgressEvents.push(mapTurnLifecycleEvent(event, TURN_STARTED_NOTIFICATION_METHOD));
       relevantEventCount += 1;
       continue;
     }
 
     if (event.method === TURN_COMPLETED_NOTIFICATION_METHOD) {
-      threadProgressEvents.push(mapTurnCompletedEvent(event));
+      threadProgressEvents.push(mapTurnLifecycleEvent(event, TURN_COMPLETED_NOTIFICATION_METHOD));
       relevantEventCount += 1;
       continue;
     }
@@ -469,26 +338,9 @@ export function readRuntimeNotificationProjection(
       continue;
     }
 
-    if (event.method === CONFIG_WARNING_NOTIFICATION_METHOD) {
-      warningEvents.push(mapConfigWarningEvent(event));
-      relevantEventCount += 1;
-      continue;
-    }
-
-    if (event.method === DEPRECATION_NOTICE_NOTIFICATION_METHOD) {
-      warningEvents.push(mapDeprecationNoticeEvent(event));
-      relevantEventCount += 1;
-      continue;
-    }
-
-    if (event.method === WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD) {
-      warningEvents.push(mapWindowsWorldWritableWarningEvent(event));
-      relevantEventCount += 1;
-      continue;
-    }
-
-    if (event.method === ERROR_NOTIFICATION_METHOD) {
-      warningEvents.push(mapErrorEvent(event));
+    const warningEvent = mapRuntimeWarningEvent(event);
+    if (warningEvent !== null) {
+      warningEvents.push(warningEvent);
       relevantEventCount += 1;
       continue;
     }

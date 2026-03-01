@@ -5,6 +5,10 @@ const THREAD_ONLY_METHODS = [
   "thread-stream-state-changed",
   "thread-queued-followups-changed",
 ] as const;
+const RUNTIME_NOTIFICATION_METHODS_FOR_PROJECTION =
+  "configWarning,deprecationNotice,windows/worldWritableWarning,error,turn/started,turn/completed,thread/realtime/started,thread/realtime/closed,thread/realtime/error".split(
+    ",",
+  );
 
 function createEngine(): EventStreamRefreshDecisionEngine {
   return new EventStreamRefreshDecisionEngine(THREAD_ONLY_METHODS);
@@ -329,14 +333,9 @@ describe("EventStreamRefreshDecisionEngine", () => {
     });
   });
 
-  it.each([
-    "configWarning",
-    "deprecationNotice",
-    "windows/worldWritableWarning",
-    "error",
-    "turn/started",
-    "turn/completed",
-  ])("marks runtime-notification projection work when runtime method %s is present", (methodName) => {
+  it.each(
+    RUNTIME_NOTIFICATION_METHODS_FOR_PROJECTION,
+  )("marks runtime-notification projection work when runtime method %s is present", (methodName) => {
     const engine = createEngine();
     const decision = engine.readDecision({
       activeTab: "chat",

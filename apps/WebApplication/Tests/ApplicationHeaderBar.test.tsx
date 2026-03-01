@@ -12,7 +12,13 @@ interface RenderApplicationHeaderBarInput {
   onOpenMobileSidebar?: () => void;
   onOpenDesktopSidebar?: () => void;
   runtimeWarningSummary?: {
-    method: "configWarning" | "deprecationNotice" | "windows/worldWritableWarning" | "error";
+    method:
+      | "configWarning"
+      | "deprecationNotice"
+      | "windows/worldWritableWarning"
+      | "thread/realtime/started"
+      | "thread/realtime/closed"
+      | "error";
     summary: string;
     threadId: string | null;
     isRetrying: boolean;
@@ -206,5 +212,23 @@ describe("ApplicationHeaderBar", () => {
     const banner = screen.getByTestId("header-runtime-warning-banner");
     expect(banner.textContent).toBe("Error: Turn failed to stream (retrying)");
     expect(banner.className).toContain("text-red-500");
+  });
+
+  it("renders realtime runtime banner with realtime styling", () => {
+    renderApplicationHeaderBar({
+      runtimeWarningSummary: {
+        method: "thread/realtime/closed",
+        summary: "Closed (session ended)",
+        threadId: "thread-1",
+        isRetrying: false,
+        sequence: 21,
+        receivedAtMilliseconds: 1_700_000_001_100,
+        refreshedAtMilliseconds: 1_700_000_001_200,
+      },
+    });
+
+    const banner = screen.getByTestId("header-runtime-warning-banner");
+    expect(banner.textContent).toBe("Realtime: Closed (session ended)");
+    expect(banner.className).toContain("text-sky-500");
   });
 });
