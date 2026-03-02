@@ -24,6 +24,8 @@ const RUNTIME_REQUEST_ERROR_OPERATION = "runtime-request-error";
 const RUNTIME_REQUEST_ERROR_HANDLER_NAME =
   "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError";
 const API_TOKEN_AUTHENTICATION_ERROR_MESSAGE = "Unauthorized: missing or invalid X-Farfield-Token";
+const REQUEST_CANCELED_ERROR_MESSAGE =
+  "Request canceled for /api/threads/thread-1?includeTurns=true";
 const FUTURE_BOOTSTRAP_EXPIRY_ISO8601 = "2099-01-01T00:00:00.000Z";
 
 function RuntimeRequestHandlersHarness(
@@ -216,6 +218,49 @@ describe("useApplicationRuntimeRequestHandlers", () => {
     );
   });
 
+  it("suppresses error banners for request-canceled runtime failures", () => {
+    const harness = createRuntimeRequestHandlersHarness();
+    const runtimeRequestHandlers = mountRuntimeRequestHandlers(harness.input);
+
+    act(() => {
+      runtimeRequestHandlers.handleRuntimeRequestError(new Error(REQUEST_CANCELED_ERROR_MESSAGE));
+    });
+
+    const expectedDescriptor = resolveRuntimeRequestErrorDescriptor({
+      rawMessage: REQUEST_CANCELED_ERROR_MESSAGE,
+      defaultOperation: RUNTIME_REQUEST_ERROR_OPERATION,
+      actionId: "action-1",
+    });
+
+    expect(harness.buildActionRequestSpy).toHaveBeenCalledWith(RUNTIME_REQUEST_ERROR_OPERATION);
+    expect(harness.reportTrackedUserInterfaceErrorSpy).toHaveBeenCalledWith({
+      operation: expectedDescriptor.operation,
+      actionId: "action-1",
+      threadId: null,
+      error: expectedDescriptor.trackingErrorMessage,
+      details: {
+        handler: RUNTIME_REQUEST_ERROR_HANDLER_NAME,
+      },
+    });
+    expect(harness.setErrorMessage).not.toHaveBeenCalled();
+  });
+
+  it("deduplicates repeated runtime request failures with the same normalized message", () => {
+    const harness = createRuntimeRequestHandlersHarness();
+    const runtimeRequestHandlers = mountRuntimeRequestHandlers(harness.input);
+    const runtimeError = new Error(
+      "Request timed out for /api/events/session after 120000ms requestId req_deduped_1",
+    );
+
+    act(() => {
+      runtimeRequestHandlers.handleRuntimeRequestError(runtimeError);
+      runtimeRequestHandlers.handleRuntimeRequestError(runtimeError);
+    });
+
+    expect(harness.reportTrackedUserInterfaceErrorSpy).toHaveBeenCalledTimes(1);
+    expect(harness.setErrorMessage).toHaveBeenCalledTimes(1);
+  });
+
   it("clears token-required and bootstrap-error state after a ready bootstrap decision", async () => {
     const harness = createRuntimeRequestHandlersHarness({
       requiresApiSessionToken: true,
@@ -292,5 +337,45 @@ describe("useApplicationRuntimeRequestHandlers", () => {
         "setApiSessionBootstrapErrorMessage",
       ),
     );
+  });
+
+  it("reports bootstrap read failures through runtime-request-error ownership and returns not-ready", async () => {
+    const harness = createRuntimeRequestHandlersHarness();
+    const bootstrapError = new Error(
+      "Request timed out for /api/events/session after 120000ms requestId req_bootstrap_1",
+    );
+    harness.bootstrapWithRequestOptionsSpy.mockRejectedValue(bootstrapError);
+    const runtimeRequestHandlers = mountRuntimeRequestHandlers(harness.input);
+
+    let bootstrapReady = true;
+    await act(async () => {
+      bootstrapReady = await runtimeRequestHandlers.ensureApiSessionBootstrapped();
+    });
+
+    const expectedDescriptor = resolveRuntimeRequestErrorDescriptor({
+      rawMessage: bootstrapError.message,
+      defaultOperation: RUNTIME_REQUEST_ERROR_OPERATION,
+      actionId: "action-2",
+    });
+
+    expect(bootstrapReady).toBe(false);
+    expect(harness.buildActionRequestSpy).toHaveBeenNthCalledWith(
+      1,
+      STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
+    );
+    expect(harness.buildActionRequestSpy).toHaveBeenNthCalledWith(
+      2,
+      RUNTIME_REQUEST_ERROR_OPERATION,
+    );
+    expect(harness.reportTrackedUserInterfaceErrorSpy).toHaveBeenCalledWith({
+      operation: expectedDescriptor.operation,
+      actionId: "action-2",
+      threadId: null,
+      error: expectedDescriptor.trackingErrorMessage,
+      details: {
+        handler: RUNTIME_REQUEST_ERROR_HANDLER_NAME,
+      },
+    });
+    expect(harness.setErrorMessage).toHaveBeenCalledWith(expectedDescriptor.bannerErrorMessage);
   });
 });

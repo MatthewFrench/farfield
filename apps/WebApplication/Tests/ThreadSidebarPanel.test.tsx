@@ -99,18 +99,18 @@ function renderThreadSidebarPanel(input: {
 }
 
 describe("ThreadSidebarPanel", () => {
-  it("renders n-a runtime summary labels before notification projection reads complete", () => {
+  it("renders account type summary and hides non-available runtime summaries", () => {
     renderThreadSidebarPanel({
       viewport: "desktop",
     });
 
-    expect(screen.getByTestId("sidebar-runtime-account-summary").textContent).toBe("Account n/a");
-    expect(screen.getByTestId("sidebar-runtime-rate-limit-summary").textContent).toBe("Usage n/a");
-    expect(screen.getByTestId("sidebar-runtime-app-summary").textContent).toBe("Apps n/a");
-    expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe("Progress n/a");
-    expect(screen.getByTestId("sidebar-runtime-token-usage-summary").textContent).toBe(
-      "Tokens n/a",
+    expect(screen.getByTestId("sidebar-runtime-account-summary").textContent).toBe(
+      "Account Type n/a",
     );
+    expect(screen.queryByTestId("sidebar-runtime-rate-limit-summary")).toBeNull();
+    expect(screen.queryByTestId("sidebar-runtime-app-summary")).toBeNull();
+    expect(screen.queryByTestId("sidebar-runtime-progress-summary")).toBeNull();
+    expect(screen.queryByTestId("sidebar-runtime-token-usage-summary")).toBeNull();
   });
 
   it("renders projected runtime summary labels when data is available", () => {
@@ -160,10 +160,10 @@ describe("ThreadSidebarPanel", () => {
       },
     });
 
-    expect(screen.getByTestId("sidebar-runtime-account-summary").textContent).toBe("Account pro");
-    expect(screen.getByTestId("sidebar-runtime-rate-limit-summary").textContent).toBe(
-      "Usage 42% · pro",
+    expect(screen.getByTestId("sidebar-runtime-account-summary").textContent).toBe(
+      "Account Type pro",
     );
+    expect(screen.queryByTestId("sidebar-runtime-rate-limit-summary")).toBeNull();
     expect(screen.getByTestId("sidebar-runtime-app-summary").textContent).toBe("Apps 3");
     expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe(
       "Progress started",
@@ -255,6 +255,43 @@ describe("ThreadSidebarPanel", () => {
     expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe(
       "Progress turn diff updated",
     );
+  });
+
+  it("hides apps and token summaries when values are zero", () => {
+    renderThreadSidebarPanel({
+      viewport: "desktop",
+      threadSidebarRuntimeSummary: {
+        account: {
+          mode: "chatgpt",
+          planType: "pro",
+          email: "dev@example.com",
+          requiresOpenaiAuth: false,
+          refreshedAtMilliseconds: 1_700_000_000_100,
+        },
+        rateLimits: null,
+        apps: {
+          appCount: 0,
+          refreshedAtMilliseconds: 1_700_000_000_500,
+        },
+        progress: null,
+        warning: null,
+        tokenUsage: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          totalTokens: 0,
+          lastTotalTokens: 0,
+          modelContextWindow: 200_000,
+          usedPercent: 0,
+          sequence: 18,
+          receivedAtMilliseconds: 1_700_000_000_600,
+          refreshedAtMilliseconds: 1_700_000_000_700,
+        },
+        modelReroute: null,
+      },
+    });
+
+    expect(screen.queryByTestId("sidebar-runtime-app-summary")).toBeNull();
+    expect(screen.queryByTestId("sidebar-runtime-token-usage-summary")).toBeNull();
   });
 
   it("calls desktop close handler", () => {

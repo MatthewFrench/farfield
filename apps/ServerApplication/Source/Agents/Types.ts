@@ -923,6 +923,7 @@ export interface AgentAdapter {
   ): Promise<AgentNotificationEvents>;
   readPendingServerRequests?(): Promise<AgentPendingServerRequests>;
   isThreadNotLoadedError?(error: Error): boolean;
+  isConversationNotFoundError?(error: Error): boolean;
   listProjectDirectories?(): Promise<string[]>;
   readConfigDefaults?(): Promise<AgentConfigDefaults>;
 }

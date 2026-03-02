@@ -6,7 +6,7 @@ const THREAD_ONLY_METHODS = [
   "thread-queued-followups-changed",
 ] as const;
 const RUNTIME_NOTIFICATION_METHODS_FOR_PROJECTION =
-  "configWarning,deprecationNotice,windows/worldWritableWarning,error,turn/started,turn/completed,turn/plan/updated,turn/diff/updated,thread/realtime/started,thread/realtime/closed,thread/realtime/error,thread/archived,thread/unarchived,thread/closed".split(
+  "mcpServer/oauthLogin/completed,account/login/completed,serverRequest/resolved,configWarning,deprecationNotice,windows/worldWritableWarning,error,turn/started,turn/completed,turn/plan/updated,turn/diff/updated,thread/realtime/started,thread/realtime/closed,thread/realtime/error,thread/archived,thread/unarchived,thread/closed".split(
     ",",
   );
 
@@ -592,6 +592,32 @@ describe("EventStreamRefreshDecisionEngine", () => {
       refreshCore: true,
       refreshHistory: true,
       refreshSelectedThread: false,
+      refreshNotificationProjections: false,
+      threadStreamDelta: null,
+    });
+  });
+
+  it("refreshes selected thread when selected-thread delta payload is malformed", () => {
+    const engine = createEngine();
+
+    const decision = engine.readDecision({
+      activeTab: "debug",
+      selectedThreadId: "thread-1",
+      eventData: JSON.stringify({
+        sequence: 13,
+        event: {
+          type: "thread-stream-delta",
+          delta: {
+            threadId: "thread-1",
+          },
+        },
+      }),
+    });
+
+    expect(decision).toEqual({
+      refreshCore: false,
+      refreshHistory: true,
+      refreshSelectedThread: true,
       refreshNotificationProjections: false,
       threadStreamDelta: null,
     });

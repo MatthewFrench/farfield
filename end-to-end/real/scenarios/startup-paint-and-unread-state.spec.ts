@@ -93,6 +93,14 @@ function buildStreamEventsResponse(threadId: string) {
   };
 }
 
+function buildUnsubscribeThreadResponse(threadId: string) {
+  return {
+    ok: true,
+    threadId,
+    status: "notSubscribed",
+  } as const;
+}
+
 test("startup keeps dark paint and loading state is not replaced with empty messaging", async ({
   page,
   sentinel,
@@ -151,6 +159,7 @@ test("non-focused thread updates with explicit read signals stay read", async ({
 
   await page.route("**/api/threads**", async (route) => {
     const url = new URL(route.request().url());
+    const method = route.request().method();
     const pathSegments = url.pathname.split("/").filter((segment) => segment.length > 0);
 
     if (pathSegments.length === 2 && pathSegments[0] === "api" && pathSegments[1] === "threads") {
@@ -208,6 +217,15 @@ test("non-focused thread updates with explicit read signals stay read", async ({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify(buildStreamEventsResponse(threadId)),
+      });
+      return;
+    }
+
+    if (subresource === "unsubscribe" && method === "POST") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(buildUnsubscribeThreadResponse(threadId)),
       });
       return;
     }

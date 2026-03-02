@@ -12,6 +12,20 @@ export interface ThreadMemberUnsubscribeMutationRouteOwnerOptions {
   context: ThreadMemberResolvedRouteContext;
 }
 
+const ThreadMemberUnsubscribeRouteStatusCodeByName = {
+  success: 200,
+  badRequest: 400,
+} as const;
+
+const ThreadMemberUnsubscribeStatusByName = {
+  notLoaded: "notLoaded",
+} as const;
+
+const ThreadMemberUnsubscribeNotLoadedErrorPatterns = [
+  /thread not loaded/i,
+  /conversation not found/i,
+] as const;
+
 /**
  * Owns thread-unsubscribe mutation routing for canonical `/api/threads/:threadId/unsubscribe`.
  */
@@ -47,9 +61,9 @@ export class ThreadMemberUnsubscribeMutationRouteOwner {
       return false;
     }
 
-    const unsubscribeThread = adapter.unsubscribeThread;
+    const unsubscribeThread = adapter.unsubscribeThread?.bind(adapter);
     if (!unsubscribeThread) {
-      jsonResponse(this.dependencies.res, 400, {
+      jsonResponse(this.dependencies.res, ThreadMemberUnsubscribeRouteStatusCodeByName.badRequest, {
         ok: false,
         error: `Agent ${agentId} does not support thread unsubscribe`,
         threadId,
@@ -84,27 +98,107 @@ export class ThreadMemberUnsubscribeMutationRouteOwner {
         threadId,
         status,
       });
-      jsonResponse(this.dependencies.res, 200, {
+      jsonResponse(this.dependencies.res, ThreadMemberUnsubscribeRouteStatusCodeByName.success, {
         ok: true,
         threadId,
         status,
       });
     } catch (error) {
-      const message = pushActionErrorWithRequestContext(
-        ThreadMemberMutationActionByName.threadUnsubscribe,
-        error,
-        {
-          agentId,
-          threadId,
-        },
-      );
-      jsonResponse(this.dependencies.res, 500, {
-        ok: false,
-        error: message,
-        threadId,
-      });
+      const shouldTreatAsNotLoaded = this.shouldTreatAsNotLoaded(error);
+      if (!shouldTreatAsNotLoaded) {
+        pushActionErrorWithRequestContext(
+          ThreadMemberMutationActionByName.threadUnsubscribe,
+          error,
+          {
+            agentId,
+            threadId,
+          },
+        );
+      }
+      this.writeNotLoadedResponse();
     }
 
     return true;
+  }
+
+  private writeNotLoadedResponse(): void {
+    const {
+      pushActionEventWithRequestContext,
+      invalidateThreadListAggregationCache,
+      jsonResponse,
+      res,
+    } = this.dependencies;
+    const { agentId, threadId } = this.context;
+    const status = ThreadMemberUnsubscribeStatusByName.notLoaded;
+
+    pushActionEventWithRequestContext(
+      ThreadMemberMutationActionByName.threadUnsubscribe,
+      "success",
+      {
+        agentId,
+        threadId,
+        status,
+      },
+    );
+    invalidateThreadListAggregationCache("thread-unsubscribed", {
+      agentId,
+      threadId,
+      status,
+    });
+    jsonResponse(res, ThreadMemberUnsubscribeRouteStatusCodeByName.success, {
+      ok: true,
+      threadId,
+      status,
+    });
+  }
+
+  private shouldTreatAsNotLoaded<ErrorType>(error: ErrorType): boolean {
+    const errorMessage = this.readErrorMessage(error);
+    if (this.isKnownNotLoadedMessage(errorMessage)) {
+      return true;
+    }
+    if (error instanceof Error) {
+      return this.isNotLoadedCondition(error);
+    }
+    return false;
+  }
+
+  private isNotLoadedCondition(error: Error): boolean {
+    return this.isThreadNotLoadedError(error) || this.isConversationNotFoundError(error);
+  }
+
+  private isThreadNotLoadedError(error: Error): boolean {
+    const classifyThreadNotLoadedError = this.context.adapter.isThreadNotLoadedError?.bind(
+      this.context.adapter,
+    );
+    if (!classifyThreadNotLoadedError) {
+      return false;
+    }
+    return classifyThreadNotLoadedError(error);
+  }
+
+  private isConversationNotFoundError(error: Error): boolean {
+    const classifyConversationNotFoundError =
+      this.context.adapter.isConversationNotFoundError?.bind(this.context.adapter);
+    if (!classifyConversationNotFoundError) {
+      return false;
+    }
+    return classifyConversationNotFoundError(error);
+  }
+
+  private isKnownNotLoadedMessage(errorMessage: string): boolean {
+    return ThreadMemberUnsubscribeNotLoadedErrorPatterns.some((pattern) =>
+      pattern.test(errorMessage),
+    );
+  }
+
+  private readErrorMessage<ErrorType>(error: ErrorType): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === "string") {
+      return error;
+    }
+    return String(error);
   }
 }

@@ -82,6 +82,8 @@ function createBaseInput(): UseApplicationRefreshEffectsInput {
     loadCoreDataTracked: vi.fn(async (): Promise<void> => {}),
     loadArchivedThreads: vi.fn(async (): Promise<void> => {}),
     refreshCoreDataAndSelectedThread: vi.fn(async (): Promise<void> => {}),
+    refreshSelectedThreadIncrementalIfPresent: vi.fn(async (): Promise<void> => {}),
+    isGenerating: false,
     refreshPushClientState: vi.fn(async (): Promise<void> => {}),
     ensureFreshPushSettingsDiagnostics: vi.fn(async (): Promise<void> => {}),
     handleRuntimeRequestError: vi.fn(),
@@ -270,6 +272,41 @@ describe("useApplicationRefreshEffects", () => {
 
     await vi.advanceTimersByTimeAsync(CONNECTED_CORE_REFRESH_MINIMUM_INTERVAL_MILLISECONDS);
     expect(input.loadCoreDataTracked).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs selected-thread incremental watchdog refreshes while generation is in progress", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(0));
+    const input = createBaseInput();
+    input.selectedThreadId = "thread-live";
+    input.isGenerating = true;
+    input.eventsConnectedRef.current = true;
+    input.lastCoreRefreshAtRef.current = CONNECTED_REFRESH_SUPPRESSION_OFFSET_MILLISECONDS;
+
+    render(<Harness input={input} />);
+    await vi.advanceTimersByTimeAsync(DISCONNECTED_CORE_REFRESH_INTERVAL_MILLISECONDS);
+
+    expect(input.refreshSelectedThreadIncrementalIfPresent).toHaveBeenCalledTimes(1);
+    expect(input.loadCoreDataTracked).toHaveBeenCalledTimes(0);
+  });
+
+  it("routes selected-thread incremental watchdog refresh failures to runtime request error ownership", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(0));
+    const expectedError = new Error("selected-thread-incremental-refresh-failed");
+    const input = createBaseInput();
+    input.selectedThreadId = "thread-live";
+    input.isGenerating = true;
+    input.eventsConnectedRef.current = true;
+    input.lastCoreRefreshAtRef.current = CONNECTED_REFRESH_SUPPRESSION_OFFSET_MILLISECONDS;
+    input.refreshSelectedThreadIncrementalIfPresent = vi.fn(async (): Promise<void> => {
+      throw expectedError;
+    });
+
+    render(<Harness input={input} />);
+    await vi.advanceTimersByTimeAsync(DISCONNECTED_CORE_REFRESH_INTERVAL_MILLISECONDS);
+
+    expect(input.handleRuntimeRequestError).toHaveBeenCalledWith(expectedError);
   });
 
   it("skips watchdog refreshes while hidden and resumes after visibility returns", async () => {

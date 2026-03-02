@@ -1,9 +1,10 @@
-import { type Dispatch, type SetStateAction, useCallback } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useRef } from "react";
 import { WebShellSessionBootstrapClient } from "@/Application/DataAccess/WebShellSessionBootstrapClient";
 import { ApiAuthenticationErrorClassifier } from "@/Application/DomainModel/ApiAuthenticationErrorClassifier";
 import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
 import { STARTUP_CRITICAL_EVENTS_SESSION_OPERATION } from "@/Application/StateManagement/CoreDataStartupRequestProfile";
 import { UserInterfaceActionRequestBuilder } from "@/Application/StateManagement/UserInterfaceActionRequestBuilder";
+import { shouldIgnoreUiErrorMessage } from "@/Features/Debugging/StateManagement/TrackedUserInterfaceErrorPolicy";
 import {
   TrackedUserInterfaceErrorReporter,
   type TrackedUserInterfaceErrorReportInput,
@@ -22,6 +23,8 @@ const RUNTIME_REQUEST_ERROR_HANDLER_NAME =
   "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError";
 const RUNTIME_REQUEST_ERROR_HANDLER_DETAIL_KEY = "handler";
 const API_SESSION_BOOTSTRAP_EMPTY_ERROR_MESSAGE = "";
+const RUNTIME_REQUEST_ERROR_DEDUPLICATION_WINDOW_MILLISECONDS = 5_000;
+const RUNTIME_REQUEST_ERROR_DEDUPLICATION_MAXIMUM_ENTRIES = 200;
 
 interface RuntimeRequestErrorReportContract {
   operation: string;
@@ -29,6 +32,8 @@ interface RuntimeRequestErrorReportContract {
   trackingErrorMessage: string;
   bannerErrorMessage: string;
 }
+
+type RuntimeRequestErrorDeduplicationStore = Map<string, number>;
 
 interface ApiSessionTokenRequirementStateInput {
   setRequiresApiSessionToken: Dispatch<SetStateAction<boolean>>;
@@ -77,6 +82,59 @@ function createRuntimeRequestErrorReportContract(
   };
 }
 
+function buildRuntimeRequestErrorDeduplicationKey(
+  reportContract: RuntimeRequestErrorReportContract,
+): string {
+  return `${reportContract.operation}:${reportContract.trackingErrorMessage}`;
+}
+
+function pruneRuntimeRequestErrorDeduplicationStore(
+  deduplicationStore: RuntimeRequestErrorDeduplicationStore,
+  nowMilliseconds: number,
+): void {
+  for (const [deduplicationKey, recordedAtMilliseconds] of deduplicationStore.entries()) {
+    if (
+      nowMilliseconds - recordedAtMilliseconds >
+      RUNTIME_REQUEST_ERROR_DEDUPLICATION_WINDOW_MILLISECONDS
+    ) {
+      deduplicationStore.delete(deduplicationKey);
+    }
+  }
+
+  if (deduplicationStore.size <= RUNTIME_REQUEST_ERROR_DEDUPLICATION_MAXIMUM_ENTRIES) {
+    return;
+  }
+
+  const sortedEntries = [...deduplicationStore.entries()].sort((left, right) => left[1] - right[1]);
+  const overflowEntryCount =
+    deduplicationStore.size - RUNTIME_REQUEST_ERROR_DEDUPLICATION_MAXIMUM_ENTRIES;
+  for (let index = 0; index < overflowEntryCount; index += 1) {
+    const staleEntry = sortedEntries[index];
+    if (staleEntry === undefined) {
+      break;
+    }
+    deduplicationStore.delete(staleEntry[0]);
+  }
+}
+
+function shouldSuppressDuplicateRuntimeRequestError(
+  deduplicationStore: RuntimeRequestErrorDeduplicationStore,
+  deduplicationKey: string,
+  nowMilliseconds: number,
+): boolean {
+  pruneRuntimeRequestErrorDeduplicationStore(deduplicationStore, nowMilliseconds);
+  const previousRecordedAtMilliseconds = deduplicationStore.get(deduplicationKey);
+  deduplicationStore.set(deduplicationKey, nowMilliseconds);
+  if (previousRecordedAtMilliseconds === undefined) {
+    return false;
+  }
+
+  return (
+    nowMilliseconds - previousRecordedAtMilliseconds <=
+    RUNTIME_REQUEST_ERROR_DEDUPLICATION_WINDOW_MILLISECONDS
+  );
+}
+
 export interface UseApplicationRuntimeRequestHandlersInput {
   trackedUserInterfaceErrorReporter: TrackedUserInterfaceErrorReporter;
   userInterfaceActionRequestBuilder: UserInterfaceActionRequestBuilder;
@@ -100,6 +158,10 @@ export interface ApplicationRuntimeRequestHandlers {
 export function useApplicationRuntimeRequestHandlers(
   input: UseApplicationRuntimeRequestHandlersInput,
 ): ApplicationRuntimeRequestHandlers {
+  const runtimeRequestErrorDeduplicationStoreRef = useRef<RuntimeRequestErrorDeduplicationStore>(
+    new Map<string, number>(),
+  );
+
   const reportTrackedUserInterfaceError = useCallback(
     async (reportInput: TrackedUserInterfaceErrorReportInput): Promise<void> => {
       await input.trackedUserInterfaceErrorReporter.report(reportInput);
@@ -130,6 +192,17 @@ export function useApplicationRuntimeRequestHandlers(
         RUNTIME_REQUEST_ERROR_OPERATION,
       ).actionId;
       const runtimeRequestErrorReport = createRuntimeRequestErrorReportContract(message, actionId);
+      const deduplicationKey = buildRuntimeRequestErrorDeduplicationKey(runtimeRequestErrorReport);
+      const nowMilliseconds = Date.now();
+      const shouldSuppressRuntimeRequestError = shouldSuppressDuplicateRuntimeRequestError(
+        runtimeRequestErrorDeduplicationStoreRef.current,
+        deduplicationKey,
+        nowMilliseconds,
+      );
+      if (shouldSuppressRuntimeRequestError) {
+        return;
+      }
+
       void input.trackedUserInterfaceErrorReporter.report({
         operation: runtimeRequestErrorReport.operation,
         actionId: runtimeRequestErrorReport.actionId,
@@ -139,6 +212,9 @@ export function useApplicationRuntimeRequestHandlers(
           [RUNTIME_REQUEST_ERROR_HANDLER_DETAIL_KEY]: RUNTIME_REQUEST_ERROR_HANDLER_NAME,
         },
       });
+      if (shouldIgnoreUiErrorMessage(runtimeRequestErrorReport.trackingErrorMessage)) {
+        return;
+      }
       input.setErrorMessage(runtimeRequestErrorReport.bannerErrorMessage);
     },
     [
@@ -149,18 +225,25 @@ export function useApplicationRuntimeRequestHandlers(
       input.setApiSessionBootstrapErrorMessage,
       input.setErrorMessage,
       input.setRequiresApiSessionToken,
+      runtimeRequestErrorDeduplicationStoreRef,
     ],
   );
 
   const ensureApiSessionBootstrapped = useCallback(async (): Promise<boolean> => {
-    const bootstrapDecision = await input.apiSessionBootstrapCoordinator.ensureSession(() => {
-      const actionRequest = input.userInterfaceActionRequestBuilder.create(
-        STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
-      );
-      return input.webShellSessionBootstrapClient.bootstrapWithRequestOptions(
-        actionRequest.requestOptions,
-      );
-    });
+    let bootstrapDecision;
+    try {
+      bootstrapDecision = await input.apiSessionBootstrapCoordinator.ensureSession(() => {
+        const actionRequest = input.userInterfaceActionRequestBuilder.create(
+          STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
+        );
+        return input.webShellSessionBootstrapClient.bootstrapWithRequestOptions(
+          actionRequest.requestOptions,
+        );
+      });
+    } catch (error) {
+      handleRuntimeRequestError(error);
+      return false;
+    }
 
     if (bootstrapDecision.isReady) {
       applyApiSessionReadyState({
@@ -182,6 +265,7 @@ export function useApplicationRuntimeRequestHandlers(
   }, [
     input.apiSessionBootstrapCoordinator,
     input.apiSessionBootstrapErrorMessage.length,
+    handleRuntimeRequestError,
     input.requiresApiSessionToken,
     input.userInterfaceActionRequestBuilder,
     input.webShellSessionBootstrapClient,

@@ -15,8 +15,6 @@ const PROJECT_PATH_SEPARATOR = "/";
 const TRAILING_PROJECT_PATH_SEPARATOR_PATTERN = /\/+$/;
 const ACTIVE_THREAD_LIST_ENDPOINT =
   "/api/threads?limit=80&archived=false&all=true&maxPages=20&sortKey=updated_at";
-const ARCHIVED_THREAD_LIST_ENDPOINT =
-  "/api/threads?limit=80&archived=true&all=true&maxPages=20&sortKey=updated_at";
 
 const ProjectOrderingThreadSchema = z
   .object({
@@ -138,13 +136,9 @@ test("active project groups follow thread-derived project order", async ({ page,
   const activeThreadListResponse = ThreadListEnvelopeSchema.parse(
     await page.request.get(ACTIVE_THREAD_LIST_ENDPOINT).then((response) => response.json()),
   );
-  const archivedThreadListResponse = ThreadListEnvelopeSchema.parse(
-    await page.request.get(ARCHIVED_THREAD_LIST_ENDPOINT).then((response) => response.json()),
+  const projectOrderingThreads = activeThreadListResponse.data.map((thread) =>
+    ProjectOrderingThreadSchema.parse(thread),
   );
-  const projectOrderingThreads = [
-    ...activeThreadListResponse.data,
-    ...archivedThreadListResponse.data,
-  ].map((thread) => ProjectOrderingThreadSchema.parse(thread));
   const expectedProjectOrderMetadata = readExpectedProjectOrderMetadata(projectOrderingThreads);
   if (expectedProjectOrderMetadata.length === 0) {
     await expectNoUnexpectedClientErrors(sentinel);

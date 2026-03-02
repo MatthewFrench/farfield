@@ -32,6 +32,10 @@ const FarfieldServerRequestMethodSnapshotPath = path.join(
   process.cwd(),
   "docs/debug/AppServerFarfieldServerRequestMethods.snapshot.txt",
 );
+const RequestMethodDecisionLedgerPath = path.join(
+  process.cwd(),
+  "docs/debug/AppServerRequestMethodDecisionLedger.md",
+);
 
 const FarfieldClientMethodConstantsPath = path.join(
   process.cwd(),
@@ -65,9 +69,21 @@ const ExplicitMethodPattern = /^([A-Za-z][A-Za-z0-9_]*)\s*=>\s*"([^"]+)"/;
 const ImplicitMethodPattern = /^([A-Za-z][A-Za-z0-9_]*)\s*(?:\(|\{)/;
 const SerdeRenameAttributePattern = /^#\[\s*serde\(\s*rename\s*=\s*"([^"]+)"\s*\)\s*\]/;
 const StrumSerializeAttributePattern = /^#\[\s*strum\(\s*serialize\s*=\s*"([^"]+)"\s*\)\s*\]/;
+const DecisionLedgerRowPattern = /^\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|/;
+const DoNotAdoptRecommendationPrefix = "Do not adopt";
 
 const MethodNameSchema = z.string().trim().min(1);
 const MethodNameListSchema = z.array(MethodNameSchema);
+const MethodDecisionStateSchema = z.enum(["Used now", "Not used"]);
+const MethodDecisionRecommendationSchema = z.string().trim().min(1);
+const MethodDecisionRowSchema = z
+  .object({
+    method: MethodNameSchema,
+    state: MethodDecisionStateSchema,
+    recommendation: MethodDecisionRecommendationSchema,
+  })
+  .strict();
+const MethodDecisionRowListSchema = z.array(MethodDecisionRowSchema);
 
 function fail(message) {
   process.stderr.write(`[app-server-method-drift] ${message}\n`);
@@ -284,6 +300,83 @@ function assertSubset(description, subsetMethods, supersetMethods) {
   process.exit(1);
 }
 
+function parseRequestMethodDecisionLedgerRows(decisionLedgerSourceText) {
+  const parsedRows = [];
+  for (const rawLine of decisionLedgerSourceText.split(/\r?\n/)) {
+    const trimmedLine = rawLine.trim();
+    const decisionLedgerMatch = trimmedLine.match(DecisionLedgerRowPattern);
+    if (
+      !decisionLedgerMatch ||
+      decisionLedgerMatch[1] === undefined ||
+      decisionLedgerMatch[2] === undefined ||
+      decisionLedgerMatch[3] === undefined
+    ) {
+      continue;
+    }
+
+    parsedRows.push(
+      MethodDecisionRowSchema.parse({
+        method: decisionLedgerMatch[1],
+        state: decisionLedgerMatch[2].trim(),
+        recommendation: decisionLedgerMatch[3].trim(),
+      }),
+    );
+  }
+
+  const rows = MethodDecisionRowListSchema.parse(parsedRows);
+  if (rows.length === 0) {
+    fail("Unable to parse method rows from app-server request-method decision ledger");
+  }
+  return rows;
+}
+
+function assertNoDuplicateMethodDecisionRows(methodDecisionRows) {
+  const seenMethods = new Set();
+  const duplicateMethods = [];
+  for (const methodDecisionRow of methodDecisionRows) {
+    if (seenMethods.has(methodDecisionRow.method)) {
+      duplicateMethods.push(methodDecisionRow.method);
+      continue;
+    }
+    seenMethods.add(methodDecisionRow.method);
+  }
+
+  if (duplicateMethods.length === 0) {
+    return;
+  }
+
+  process.stderr.write(
+    "[app-server-method-drift] Decision ledger contains duplicate method rows\n",
+  );
+  for (const duplicateMethod of toSortedUniqueMethodList(duplicateMethods)) {
+    process.stderr.write(`- ${duplicateMethod}\n`);
+  }
+  process.exit(1);
+}
+
+function methodDecisionRecommendsDoNotAdopt(methodDecisionRow) {
+  return methodDecisionRow.recommendation.startsWith(DoNotAdoptRecommendationPrefix);
+}
+
+function readMethodDecisionMethodsByState(methodDecisionRows, state) {
+  return toSortedUniqueMethodList(
+    methodDecisionRows
+      .filter((methodDecisionRow) => methodDecisionRow.state === state)
+      .map((methodDecisionRow) => methodDecisionRow.method),
+  );
+}
+
+function readMethodDecisionMethodsByRecommendation(methodDecisionRows, shouldMatchDoNotAdopt) {
+  return toSortedUniqueMethodList(
+    methodDecisionRows
+      .filter(
+        (methodDecisionRow) =>
+          methodDecisionRecommendsDoNotAdopt(methodDecisionRow) === shouldMatchDoNotAdopt,
+      )
+      .map((methodDecisionRow) => methodDecisionRow.method),
+  );
+}
+
 async function readUpstreamCommonSource() {
   const overridePath = process.env[UpstreamCommonSourcePathEnvironmentVariableName];
   if (overridePath !== undefined && overridePath.trim().length > 0) {
@@ -336,15 +429,12 @@ async function main() {
 
   const { sourceText: upstreamCommonSourceText, sourceLabel: upstreamSourceLabel } =
     await readUpstreamCommonSource();
-  const upstreamExtractedClientRequestMethods = parseUpstreamClientRequestMethods(
-    upstreamCommonSourceText,
-  );
-  const upstreamExtractedServerNotificationMethods = parseUpstreamServerNotificationMethods(
-    upstreamCommonSourceText,
-  );
-  const upstreamExtractedServerRequestMethods = parseUpstreamServerRequestMethods(
-    upstreamCommonSourceText,
-  );
+  const upstreamExtractedClientRequestMethods =
+    parseUpstreamClientRequestMethods(upstreamCommonSourceText);
+  const upstreamExtractedServerNotificationMethods =
+    parseUpstreamServerNotificationMethods(upstreamCommonSourceText);
+  const upstreamExtractedServerRequestMethods =
+    parseUpstreamServerRequestMethods(upstreamCommonSourceText);
 
   const farfieldClientMethodConstantsSource = readTextOrFail(
     FarfieldClientMethodConstantsPath,
@@ -405,6 +495,64 @@ async function main() {
     upstreamServerRequestSnapshotMethods,
   );
 
+  const requestMethodDecisionLedgerSourceText = readTextOrFail(
+    RequestMethodDecisionLedgerPath,
+    "app-server request-method decision ledger",
+  );
+  const methodDecisionRows = parseRequestMethodDecisionLedgerRows(
+    requestMethodDecisionLedgerSourceText,
+  );
+  assertNoDuplicateMethodDecisionRows(methodDecisionRows);
+
+  const decisionLedgerMethods = toSortedUniqueMethodList(
+    methodDecisionRows.map((methodDecisionRow) => methodDecisionRow.method),
+  );
+  assertMethodListsEqual(
+    "App-server request-method decision ledger method list drift",
+    upstreamClientRequestSnapshotMethods,
+    decisionLedgerMethods,
+  );
+
+  const decisionLedgerUsedMethods = readMethodDecisionMethodsByState(
+    methodDecisionRows,
+    "Used now",
+  );
+  assertMethodListsEqual(
+    'App-server request-method decision ledger "Used now" list drift',
+    farfieldClientRequestSnapshotMethods,
+    decisionLedgerUsedMethods,
+  );
+
+  const keepMethods = readMethodDecisionMethodsByRecommendation(methodDecisionRows, false);
+  const doNotAdoptMethods = readMethodDecisionMethodsByRecommendation(methodDecisionRows, true);
+  const doNotAdoptUsedMethods = toSortedUniqueMethodList(
+    methodDecisionRows
+      .filter(
+        (methodDecisionRow) =>
+          methodDecisionRecommendsDoNotAdopt(methodDecisionRow) &&
+          methodDecisionRow.state === "Used now",
+      )
+      .map((methodDecisionRow) => methodDecisionRow.method),
+  );
+  if (doNotAdoptUsedMethods.length > 0) {
+    process.stderr.write(
+      '[app-server-method-drift] Anti-completion methods detected: methods marked "Do not adopt" are currently used\n',
+    );
+    for (const method of doNotAdoptUsedMethods) {
+      process.stderr.write(`- ${method}\n`);
+    }
+    process.exit(1);
+  }
+
+  const keepUsedMethods = keepMethods.filter((method) =>
+    decisionLedgerUsedMethods.includes(method),
+  );
+  const doNotAdoptUnusedMethods = doNotAdoptMethods.filter(
+    (method) => !decisionLedgerUsedMethods.includes(method),
+  );
+  const completionScoreNumerator = keepUsedMethods.length + doNotAdoptUnusedMethods.length;
+  const completionScoreDenominator = upstreamClientRequestSnapshotMethods.length;
+
   process.stdout.write(
     [
       "[app-server-method-drift] Method snapshots verified",
@@ -414,6 +562,10 @@ async function main() {
       `- upstream server-notification methods: ${String(upstreamServerNotificationSnapshotMethods.length)}`,
       `- upstream server-request methods: ${String(upstreamServerRequestSnapshotMethods.length)}`,
       `- Farfield server-request methods: ${String(farfieldServerRequestSnapshotMethods.length)}`,
+      `- keep methods: ${String(keepMethods.length)}`,
+      `- do-not-adopt methods: ${String(doNotAdoptMethods.length)}`,
+      `- completion score: ${String(completionScoreNumerator)} / ${String(completionScoreDenominator)}`,
+      `- anti-completion methods used: ${String(doNotAdoptUsedMethods.length)}`,
     ].join("\n") + "\n",
   );
 }

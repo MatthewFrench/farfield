@@ -19,6 +19,8 @@ const ApiErrorEnvelopeSchema = z
     error: z.string().min(1)
   })
   .strict();
+const THREAD_SNAPSHOT_REQUEST_TIMEOUT_MILLISECONDS = 30_000;
+const FETCH_ABORT_ERROR_NAME = "AbortError";
 
 function ensureDirectory(directoryPath) {
   fs.mkdirSync(directoryPath, { recursive: true });
@@ -54,13 +56,37 @@ function readHeaders() {
   };
 }
 
+async function fetchWithTimeout(input, init, timeoutMilliseconds) {
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => {
+    controller.abort();
+  }, timeoutMilliseconds);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === FETCH_ABORT_ERROR_NAME) {
+      throw new Error(
+        `Request timed out after ${String(timeoutMilliseconds)}ms for ${String(input)}`
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
 async function readThreadIdSnapshot(label, outputDirectoryPath) {
   const apiBaseUrl = readApiBaseUrl();
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${apiBaseUrl}/api/threads?limit=200&archived=false&all=true&maxPages=20`,
     {
       headers: readHeaders()
-    }
+    },
+    THREAD_SNAPSHOT_REQUEST_TIMEOUT_MILLISECONDS
   );
 
   const payload = await response.json();

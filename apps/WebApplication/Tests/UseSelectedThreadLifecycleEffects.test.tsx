@@ -217,4 +217,69 @@ describe("useSelectedThreadLifecycleEffects", () => {
       expect(lifecycle.unsubscribeThread).toHaveBeenCalledWith("thread-cleanup");
     });
   });
+
+  it("does not unsubscribe on callback-identity rerenders while thread selection is unchanged", async () => {
+    const lifecycle = createLifecycleInput("thread-stable");
+    lifecycle.loadSelectedThreadRef.current = vi.fn(async () => {});
+
+    const rendered = render(<LifecycleHarness input={lifecycle.input} />);
+    const replacementUnsubscribeThread = vi.fn(async (_threadId: string): Promise<void> => {});
+    const replacementHandleRuntimeRequestError = vi.fn<<ErrorType>(error: ErrorType) => void>();
+
+    rendered.rerender(
+      <LifecycleHarness
+        input={{
+          ...lifecycle.input,
+          unsubscribeThread: replacementUnsubscribeThread,
+          handleRuntimeRequestError: replacementHandleRuntimeRequestError,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(lifecycle.unsubscribeThread).toHaveBeenCalledTimes(0);
+      expect(replacementUnsubscribeThread).toHaveBeenCalledTimes(0);
+    });
+
+    rendered.unmount();
+
+    await waitFor(() => {
+      expect(lifecycle.unsubscribeThread).toHaveBeenCalledTimes(0);
+      expect(replacementUnsubscribeThread).toHaveBeenCalledWith("thread-stable");
+    });
+  });
+
+  it("deduplicates unsubscribe requests for the same thread while a previous unsubscribe is in flight", async () => {
+    const lifecycle = createLifecycleInput("thread-1");
+    lifecycle.loadSelectedThreadRef.current = vi.fn(async () => {});
+    const inFlightUnsubscribe = createDeferredVoidPromise();
+    lifecycle.unsubscribeThread.mockImplementation(async (_threadId: string) => {
+      return inFlightUnsubscribe.promise;
+    });
+
+    const rendered = render(<LifecycleHarness input={lifecycle.input} />);
+    lifecycle.selectedThreadIdRef.current = "thread-2";
+    rendered.rerender(
+      <LifecycleHarness
+        input={{
+          ...lifecycle.input,
+          selectedThreadId: "thread-2",
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(lifecycle.unsubscribeThread).toHaveBeenCalledTimes(1);
+    });
+    expect(lifecycle.unsubscribeThread).toHaveBeenLastCalledWith("thread-1");
+
+    lifecycle.selectedThreadIdRef.current = "thread-1";
+    rendered.unmount();
+
+    await waitFor(() => {
+      expect(lifecycle.unsubscribeThread).toHaveBeenCalledTimes(1);
+    });
+
+    inFlightUnsubscribe.resolve();
+  });
 });

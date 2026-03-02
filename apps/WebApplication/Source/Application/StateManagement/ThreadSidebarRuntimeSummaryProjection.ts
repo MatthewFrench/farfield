@@ -68,10 +68,26 @@ export function readThreadSidebarAccountSummary(
 export function readThreadSidebarRateLimitSummary(
   response: CapabilityAccountRateLimitsResponse,
 ): NonNullable<ThreadSidebarRuntimeSummary["rateLimits"]> {
+  const primaryWindow =
+    response.rateLimits?.primary === null || response.rateLimits?.primary === undefined
+      ? null
+      : {
+          usedPercent: response.rateLimits.primary.usedPercent,
+          windowDurationMinutes: response.rateLimits.primary.windowDurationMins,
+        };
+  const secondaryWindow =
+    response.rateLimits?.secondary === null || response.rateLimits?.secondary === undefined
+      ? null
+      : {
+          usedPercent: response.rateLimits.secondary.usedPercent,
+          windowDurationMinutes: response.rateLimits.secondary.windowDurationMins,
+        };
   return {
     limitId: response.rateLimits?.limitId ?? null,
     planType: response.rateLimits?.planType ?? null,
-    usedPercent: response.rateLimits?.primary?.usedPercent ?? null,
+    usedPercent: primaryWindow?.usedPercent ?? null,
+    primaryWindow,
+    secondaryWindow,
     refreshedAtMilliseconds: Date.now(),
   };
 }
@@ -140,6 +156,7 @@ export function readThreadRuntimeWarningSummary(
 ): ThreadRuntimeWarningSummary {
   return {
     method: event.method,
+    severity: event.severity,
     summary: event.summary,
     threadId: event.threadId,
     isRetrying: event.isRetrying,

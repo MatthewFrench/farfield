@@ -9,11 +9,13 @@ interface ThreadFixtureInput {
   id: string;
   preview?: string;
   displayName?: string;
+  lastUserMessage?: string;
   createdAt?: number;
   updatedAt?: number;
   cwd?: string;
   path?: string | null;
   hasUnreadTurn?: boolean | null;
+  latestActivityIsUserMessage?: boolean;
   removed?: boolean;
   projectRemoved?: boolean;
   projectState?: "active" | "removed";
@@ -36,11 +38,13 @@ function buildThread(input: ThreadFixtureInput): ThreadListItem {
     id: input.id,
     preview: input.preview ?? `preview-${input.id}`,
     displayName: input.displayName,
+    lastUserMessage: input.lastUserMessage,
     createdAt: input.createdAt ?? 100,
     updatedAt: input.updatedAt ?? 100,
     cwd: input.cwd,
     path: input.path,
     hasUnreadTurn: input.hasUnreadTurn,
+    latestActivityIsUserMessage: input.latestActivityIsUserMessage,
     removed: input.removed,
     projectRemoved: input.projectRemoved,
     projectState: input.projectState,
@@ -62,15 +66,30 @@ function buildProjectGroup(input: ProjectGroupFixtureInput): ThreadProjectGroup 
 }
 
 describe("ThreadGroupSelectors", () => {
-  it("prefers display names, trims preview labels, and falls back to a stable identifier prefix", () => {
-    const displayNameLabel = ThreadGroupSelectors.threadLabel(
+  it("prefers last user messages, then display names, then preview labels, and falls back to a stable identifier prefix", () => {
+    const userMessagePriorityLabel = ThreadGroupSelectors.threadLabel(
       buildThread({
         id: "thread-with-display-name",
         preview: "ignored-preview",
         displayName: "  Configure Caddy for Farfield site  ",
+        lastUserMessage: "  Last user message should win  ",
       }),
     );
-    const nonEmptyLabel = ThreadGroupSelectors.threadLabel(
+    const displayNameFallbackLabel = ThreadGroupSelectors.threadLabel(
+      buildThread({
+        id: "thread-with-display-name-only",
+        preview: "preview fallback",
+        displayName: "  Display name fallback  ",
+      }),
+    );
+    const userMessageLabel = ThreadGroupSelectors.threadLabel(
+      buildThread({
+        id: "thread-with-last-user-message",
+        preview: "preview fallback",
+        lastUserMessage: "  Last user instruction to run tests  ",
+      }),
+    );
+    const previewLabel = ThreadGroupSelectors.threadLabel(
       buildThread({
         id: "thread-with-label",
         preview: "  Thread Label  ",
@@ -83,8 +102,10 @@ describe("ThreadGroupSelectors", () => {
       }),
     );
 
-    expect(displayNameLabel).toBe("Configure Caddy for Farfield site");
-    expect(nonEmptyLabel).toBe("Thread Label");
+    expect(userMessagePriorityLabel).toBe("Last user message should win");
+    expect(displayNameFallbackLabel).toBe("Display name fallback");
+    expect(userMessageLabel).toBe("Last user instruction to run tests");
+    expect(previewLabel).toBe("Thread Label");
     expect(identifierLabel).toBe("thread 12345678");
   });
 
@@ -112,6 +133,12 @@ describe("ThreadGroupSelectors", () => {
           id: "thread-explicit-unread",
           updatedAt: 10,
           hasUnreadTurn: true,
+        }),
+        buildThread({
+          id: "thread-explicit-unread-user-activity",
+          updatedAt: 10,
+          hasUnreadTurn: true,
+          latestActivityIsUserMessage: true,
         }),
         buildThread({
           id: "thread-explicit-read",

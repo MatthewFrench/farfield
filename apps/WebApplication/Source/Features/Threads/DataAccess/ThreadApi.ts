@@ -14,6 +14,10 @@ import {
   request,
   requestInitWithOptions,
 } from "@/Shared/Transport/FarfieldHttpTransport";
+import {
+  OptionalThreadListTurnsSchema,
+  readThreadUserMessageProjectionFromTurns,
+} from "./ThreadLastUserMessageMapper";
 
 /**
  * Owns thread endpoint boundary parsing and wire-to-contract normalization for thread data access.
@@ -74,6 +78,7 @@ const ThreadListItemWireSchema = AppServerListThreadsResponseSchema.shape.data.e
       title: z.union([z.string(), z.null()]).optional(),
       threadName: z.union([z.string(), z.null()]).optional(),
       name: z.union([z.string(), z.null()]).optional(),
+      turns: OptionalThreadListTurnsSchema,
     })
     .passthrough(),
 );
@@ -83,6 +88,8 @@ const ThreadListItemContractSchema = z
     id: z.string().min(1),
     preview: z.string(),
     displayName: z.string().optional(),
+    lastUserMessage: z.string().optional(),
+    latestActivityIsUserMessage: z.boolean().optional(),
     createdAt: z.number().int().nonnegative(),
     updatedAt: z.number().int().nonnegative(),
     cwd: z.string().optional(),
@@ -135,10 +142,13 @@ function readThreadProjectRemovedState(value: ThreadListItemWire): boolean {
 }
 
 function mapThreadListItemWireToContract(value: ThreadListItemWire): ThreadListItemContract {
+  const threadUserMessageProjection = readThreadUserMessageProjectionFromTurns(value.turns);
   return {
     id: value.id,
     preview: value.preview,
     displayName: readThreadDisplayName(value),
+    lastUserMessage: threadUserMessageProjection.lastUserMessage,
+    latestActivityIsUserMessage: threadUserMessageProjection.latestActivityIsUserMessage,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     cwd: value.cwd,

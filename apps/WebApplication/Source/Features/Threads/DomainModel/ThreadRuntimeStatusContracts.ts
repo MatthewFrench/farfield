@@ -21,10 +21,17 @@ export type ThreadSidebarAccountPlanType =
   | "edu"
   | "unknown";
 
+export interface ThreadSidebarRateLimitWindowSummary {
+  usedPercent: number;
+  windowDurationMinutes: number | null;
+}
+
 export interface ThreadSidebarRateLimitSummary {
   limitId: string | null;
   planType: ThreadSidebarAccountPlanType | null;
   usedPercent: number | null;
+  primaryWindow?: ThreadSidebarRateLimitWindowSummary | null;
+  secondaryWindow?: ThreadSidebarRateLimitWindowSummary | null;
   refreshedAtMilliseconds: number;
 }
 
@@ -78,6 +85,9 @@ export type ThreadRuntimeWarningMethod =
   | "configWarning"
   | "deprecationNotice"
   | "windows/worldWritableWarning"
+  | "mcpServer/oauthLogin/completed"
+  | "account/login/completed"
+  | "serverRequest/resolved"
   | "thread/archived"
   | "thread/unarchived"
   | "thread/closed"
@@ -85,8 +95,11 @@ export type ThreadRuntimeWarningMethod =
   | "thread/realtime/closed"
   | "error";
 
+export type ThreadRuntimeWarningSeverity = "warning" | "error" | "realtime" | "info" | "success";
+
 export interface ThreadRuntimeWarningSummary {
   method: ThreadRuntimeWarningMethod;
+  severity: ThreadRuntimeWarningSeverity;
   summary: string;
   threadId: string | null;
   isRetrying: boolean;

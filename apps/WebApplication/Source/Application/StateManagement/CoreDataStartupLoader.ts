@@ -14,6 +14,7 @@ import {
 } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
+import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
 import type {
   CoreDataAgentDescriptor,
   CoreDataCapabilitySnapshot,
@@ -42,6 +43,10 @@ import {
 } from "./CoreDataStartupRequestProfile";
 
 const STARTUP_TAGGED_ERROR_PATTERN = /^[a-z][a-z0-9._-]{1,64}:\s*(.+)$/i;
+const STARTUP_DEFERRED_FAILED_TO_FETCH_PATTERN =
+  /^Request failed for \/.+: Failed to fetch status=n\/a$/i;
+const STARTUP_DEFERRED_EMPTY_JSON_RESPONSE_PATTERN =
+  /^Invalid JSON response from \/.+: empty response status=200 OK requestId .+$/i;
 const THREAD_LIST_UPDATED_AT_SORT_KEY = "updated_at" as const;
 // Yield one event-loop turn so critical startup reads can commit before non-critical hydration starts.
 const DEFERRED_STARTUP_NEXT_TURN_DELAY_MILLISECONDS = 0;
@@ -176,7 +181,21 @@ function applyDeferredStartupResult<ResultValue>(
     return;
   }
 
+  if (shouldIgnoreDeferredStartupFailure(input.result.reason)) {
+    return;
+  }
   input.reportDeferredStartupFailure(input.operation, input.result.reason);
+}
+
+function shouldIgnoreDeferredStartupFailure<ErrorType>(error: ErrorType): boolean {
+  if (error instanceof Error && isRequestCanceledError(error)) {
+    return true;
+  }
+  const message = toErrorMessage(error);
+  return (
+    STARTUP_DEFERRED_FAILED_TO_FETCH_PATTERN.test(message) ||
+    STARTUP_DEFERRED_EMPTY_JSON_RESPONSE_PATTERN.test(message)
+  );
 }
 
 async function readCapabilitySnapshot(
@@ -480,6 +499,9 @@ export class CoreDataStartupLoader {
         nextActiveThreadState: networkActiveThreadState,
       });
     } catch (error) {
+      if (shouldIgnoreDeferredStartupFailure(error)) {
+        return;
+      }
       reportDeferredStartupFailure(STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION, error);
     }
   }

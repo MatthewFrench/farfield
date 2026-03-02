@@ -61,6 +61,10 @@ export function ThreadListActiveSection({
     cancelThreadRename();
   }
 
+  function readThreadRenameDraft(thread: ThreadListPaneProperties["threads"][number]): string {
+    return (thread.displayName ?? ThreadGroupSelectors.threadLabel(thread)).trim();
+  }
+
   return (
     <div className="space-y-1">
       <div className="px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground/60 flex items-center justify-between">
@@ -148,7 +152,12 @@ export function ThreadListActiveSection({
                         properties.unreadThreadIds[thread.id] === true && !isSelected;
                       const threadRuntimeStatus =
                         properties.threadRuntimeStatusByThreadIdentifier[thread.id];
-                      const threadIsGenerating = isSelected && properties.isGenerating;
+                      const shouldRenderThreadRuntimeStatusBadge =
+                        threadRuntimeStatus !== undefined &&
+                        threadRuntimeStatus.statusType !== "notLoaded";
+                      const threadIsGenerating =
+                        threadRuntimeStatus?.statusType === "active" ||
+                        (isSelected && properties.isGenerating);
                       const canArchive =
                         thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
                       const canRollback =
@@ -163,7 +172,7 @@ export function ThreadListActiveSection({
                       return (
                         <div
                           key={thread.id}
-                          className="flex items-stretch gap-1 [content-visibility:auto] [contain-intrinsic-size:40px]"
+                          className="flex items-stretch gap-1 [content-visibility:auto] [contain-intrinsic-size:56px]"
                         >
                           {isRenamingThread ? (
                             <div
@@ -223,25 +232,39 @@ export function ThreadListActiveSection({
                               data-thread-id={thread.id}
                               onClick={() => properties.onSelectThread(thread.id)}
                               variant="ghost"
-                              className={`min-w-0 flex-1 h-auto flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 text-left text-[13px] tracking-tight font-normal transition-colors ${
+                              className={`relative min-w-0 flex-1 h-auto flex items-start gap-2 rounded-xl px-2.5 py-1.5 text-left text-[13px] tracking-tight font-normal whitespace-normal transition-colors ${
                                 isSelected
                                   ? "bg-muted/90 text-foreground shadow-sm"
                                   : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                               }`}
                             >
-                              <span className="min-w-0 flex-1 truncate leading-5">
-                                {ThreadGroupSelectors.threadLabel(thread)}
-                              </span>
-                              <span className="shrink-0 flex items-center gap-1.5">
+                              {hasUnread && (
                                 <span
-                                  data-testid={`thread-runtime-status-badge-${thread.id}`}
-                                  title={readThreadRuntimeStatusBadgeTitle(threadRuntimeStatus)}
-                                  className={`rounded-full px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${readThreadRuntimeStatusBadgeClasses(
-                                    threadRuntimeStatus,
-                                  )}`}
-                                >
-                                  {readThreadRuntimeStatusBadgeLabel(threadRuntimeStatus)}
+                                  data-testid={`thread-unread-indicator-${thread.id}`}
+                                  aria-label="Unread message"
+                                  title="Unread message"
+                                  className="absolute left-1 top-[11px] h-2 w-2 rounded-full bg-sky-500"
+                                />
+                              )}
+                              <span
+                                className={`min-w-0 flex-1 leading-4 ${hasUnread ? "pl-3.5" : ""}`}
+                              >
+                                <span className="line-clamp-2 break-words">
+                                  {ThreadGroupSelectors.threadLabel(thread)}
                                 </span>
+                              </span>
+                              <span className="shrink-0 flex items-center gap-1.5 pt-0.5">
+                                {shouldRenderThreadRuntimeStatusBadge && (
+                                  <span
+                                    data-testid={`thread-runtime-status-badge-${thread.id}`}
+                                    title={readThreadRuntimeStatusBadgeTitle(threadRuntimeStatus)}
+                                    className={`rounded-full px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${readThreadRuntimeStatusBadgeClasses(
+                                      threadRuntimeStatus,
+                                    )}`}
+                                  >
+                                    {readThreadRuntimeStatusBadgeLabel(threadRuntimeStatus)}
+                                  </span>
+                                )}
                                 {thread.isLoadedInMemory === true && (
                                   <span
                                     data-testid={`thread-loaded-indicator-${thread.id}`}
@@ -250,125 +273,125 @@ export function ThreadListActiveSection({
                                     className="h-2 w-2 rounded-full bg-emerald-500"
                                   />
                                 )}
-                                {hasUnread && (
-                                  <span
-                                    data-testid={`thread-unread-indicator-${thread.id}`}
-                                    aria-label="Unread message"
-                                    title="Unread message"
-                                    className="h-2 w-2 rounded-full bg-sky-500"
-                                  />
-                                )}
                                 {threadIsGenerating && (
                                   <Loader2
+                                    data-testid={`thread-generating-indicator-${thread.id}`}
                                     size={11}
                                     className="animate-spin text-muted-foreground/70"
                                   />
                                 )}
-                                {thread.updatedAt !== 0 && !Number.isNaN(thread.updatedAt) && (
-                                  <span className="text-[10px] text-muted-foreground/50">
-                                    {properties.formatDate(thread.updatedAt)}
-                                  </span>
-                                )}
                               </span>
                             </Button>
                           )}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                type="button"
-                                data-testid="thread-row-menu-trigger"
-                                data-thread-id={thread.id}
-                                variant="ghost"
-                                size="icon"
-                                className={`h-auto min-h-[34px] w-7 shrink-0 rounded-lg ${
-                                  isSelected
-                                    ? "bg-muted/90 text-foreground hover:bg-muted"
-                                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-                                }`}
-                                disabled={properties.isBusy || isRenamingThread}
+                          <div
+                            data-testid={`thread-row-meta-${thread.id}`}
+                            className="flex min-h-[34px] w-11 shrink-0 flex-col items-end justify-start gap-1 py-1"
+                          >
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  data-testid="thread-row-menu-trigger"
+                                  data-thread-id={thread.id}
+                                  variant="ghost"
+                                  size="icon"
+                                  className={`h-6 w-6 rounded-md ${
+                                    isSelected
+                                      ? "bg-muted/90 text-foreground hover:bg-muted"
+                                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                                  }`}
+                                  disabled={properties.isBusy || isRenamingThread}
+                                >
+                                  <MoreHorizontal size={13} />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" sideOffset={6}>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    beginThreadRename(thread.id, readThreadRenameDraft(thread));
+                                  }}
+                                  disabled={properties.isBusy}
+                                >
+                                  <Pencil size={13} />
+                                  Rename thread
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (canStartReview) {
+                                      properties.onStartThreadReview(thread.id);
+                                    }
+                                  }}
+                                  disabled={properties.isBusy || !canStartReview}
+                                >
+                                  <Search size={13} />
+                                  Start code review
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (canCompact) {
+                                      properties.onCompactThread(thread.id);
+                                    }
+                                  }}
+                                  disabled={properties.isBusy || !canCompact}
+                                >
+                                  <Minimize2 size={13} />
+                                  Compact context
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (canCleanBackgroundTerminals) {
+                                      properties.onCleanThreadBackgroundTerminals(thread.id);
+                                    }
+                                  }}
+                                  disabled={properties.isBusy || !canCleanBackgroundTerminals}
+                                >
+                                  <Trash2 size={13} />
+                                  Clean background terminals
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    properties.onForkThread(thread.id);
+                                  }}
+                                  disabled={properties.isBusy}
+                                >
+                                  <Copy size={13} />
+                                  Fork thread
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (canRollback) {
+                                      properties.onRollbackThread(thread.id);
+                                    }
+                                  }}
+                                  disabled={properties.isBusy || !canRollback}
+                                >
+                                  <Undo2 size={13} />
+                                  Undo last turn
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (canArchive) {
+                                      properties.onArchiveThread(thread.id);
+                                    }
+                                  }}
+                                  disabled={properties.isBusy || !canArchive}
+                                >
+                                  <Archive size={13} />
+                                  Archive thread
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                            {thread.updatedAt !== 0 && !Number.isNaN(thread.updatedAt) ? (
+                              <span
+                                data-testid={`thread-row-time-${thread.id}`}
+                                className="whitespace-nowrap text-right text-[9px] leading-none text-muted-foreground/50 sm:text-[10px]"
                               >
-                                <MoreHorizontal size={13} />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" sideOffset={6}>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  beginThreadRename(
-                                    thread.id,
-                                    ThreadGroupSelectors.threadLabel(thread),
-                                  );
-                                }}
-                                disabled={properties.isBusy}
-                              >
-                                <Pencil size={13} />
-                                Rename thread
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  if (canStartReview) {
-                                    properties.onStartThreadReview(thread.id);
-                                  }
-                                }}
-                                disabled={properties.isBusy || !canStartReview}
-                              >
-                                <Search size={13} />
-                                Start code review
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  if (canCompact) {
-                                    properties.onCompactThread(thread.id);
-                                  }
-                                }}
-                                disabled={properties.isBusy || !canCompact}
-                              >
-                                <Minimize2 size={13} />
-                                Compact context
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  if (canCleanBackgroundTerminals) {
-                                    properties.onCleanThreadBackgroundTerminals(thread.id);
-                                  }
-                                }}
-                                disabled={properties.isBusy || !canCleanBackgroundTerminals}
-                              >
-                                <Trash2 size={13} />
-                                Clean background terminals
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  properties.onForkThread(thread.id);
-                                }}
-                                disabled={properties.isBusy}
-                              >
-                                <Copy size={13} />
-                                Fork thread
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  if (canRollback) {
-                                    properties.onRollbackThread(thread.id);
-                                  }
-                                }}
-                                disabled={properties.isBusy || !canRollback}
-                              >
-                                <Undo2 size={13} />
-                                Undo last turn
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  if (canArchive) {
-                                    properties.onArchiveThread(thread.id);
-                                  }
-                                }}
-                                disabled={properties.isBusy || !canArchive}
-                              >
-                                <Archive size={13} />
-                                Archive thread
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                {properties.formatDate(thread.updatedAt)}
+                              </span>
+                            ) : (
+                              <span className="h-2.5" aria-hidden="true" />
+                            )}
+                          </div>
                         </div>
                       );
                     })}

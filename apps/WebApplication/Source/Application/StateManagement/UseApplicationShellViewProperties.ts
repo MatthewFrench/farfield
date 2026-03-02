@@ -4,6 +4,7 @@ import { type ApiSessionBootstrapOverlayProperties } from "@/Application/UserInt
 import { type ApplicationHeaderBarProps } from "@/Application/UserInterface/ApplicationHeaderBar";
 import { type CapabilityHealthResponse } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type ChatScrollStateCoordinator } from "@/Features/Chat/StateManagement/ChatScrollStateCoordinator";
+import { type RuntimeUsageSummaryLine } from "@/Features/Chat/UserInterface/ChatModeToolbar";
 import { type ChatWorkspacePaneProps } from "@/Features/Chat/UserInterface/ChatWorkspacePane";
 import {
   type RuntimeRequestErrorOperationMetric,
@@ -266,6 +267,10 @@ const EMPTY_ERROR_MESSAGE = "";
 const SIDEBAR_OPEN_STATE = true;
 const CHAT_AT_BOTTOM_STATE = true;
 const MINIMUM_ERROR_LENGTH = EMPTY_ERROR_MESSAGE.length;
+const RATE_LIMIT_USAGE_MAX_PERCENT = 100;
+const WEEKLY_RATE_LIMIT_WINDOW_DURATION_MINUTES = 10_080;
+const MINUTES_PER_HOUR = 60;
+const MINUTES_PER_DAY = 1_440;
 
 function invokeAsyncOwnerAction(action: AsyncOwnerAction): void {
   void action();
@@ -350,23 +355,87 @@ function buildApplicationHeaderBarProperties(
     isGenerating: input.isGenerating,
     runtimeWarningSummary: input.threadSidebarRuntimeSummary.warning,
     runtimeModelRerouteSummary: input.threadSidebarRuntimeSummary.modelReroute,
-    isBusy: input.isBusy,
-    theme: input.theme,
     onOpenMobileSidebar: () => {
       openSidebarWithChatTab(input.setActiveTab, input.setMobileSidebarOpen);
     },
     onOpenDesktopSidebar: () => {
       openSidebarWithChatTab(input.setActiveTab, input.setDesktopSidebarOpen);
     },
-    onRefresh: () => {
-      invokeAsyncOwnerAction(input.refreshCoreDataAndSelectedThread);
-    },
     onToggleSettingsTab: () => {
       input.setActiveTab(getNextActiveTabWhenTogglingSettings(input.activeTab));
     },
-    onToggleTheme: input.toggleTheme,
     renderAgentFavicon: input.renderAgentFavicon,
   };
+}
+
+function readUsageWindowLabel(windowDurationMinutes: number | null, defaultLabel: string): string {
+  if (windowDurationMinutes === null) {
+    return defaultLabel;
+  }
+
+  if (windowDurationMinutes === WEEKLY_RATE_LIMIT_WINDOW_DURATION_MINUTES) {
+    return "Weekly";
+  }
+
+  if (windowDurationMinutes >= MINUTES_PER_DAY && windowDurationMinutes % MINUTES_PER_DAY === 0) {
+    return `${String(windowDurationMinutes / MINUTES_PER_DAY)}d`;
+  }
+
+  if (windowDurationMinutes >= MINUTES_PER_HOUR && windowDurationMinutes % MINUTES_PER_HOUR === 0) {
+    return `${String(windowDurationMinutes / MINUTES_PER_HOUR)}h`;
+  }
+
+  return `${String(windowDurationMinutes)}m`;
+}
+
+function readUsageLeftPercent(usedPercent: number): number {
+  const nextLeftPercent = RATE_LIMIT_USAGE_MAX_PERCENT - usedPercent;
+  if (nextLeftPercent < 0) {
+    return 0;
+  }
+  if (nextLeftPercent > RATE_LIMIT_USAGE_MAX_PERCENT) {
+    return RATE_LIMIT_USAGE_MAX_PERCENT;
+  }
+  return nextLeftPercent;
+}
+
+function readRuntimeUsageSummaryLines(
+  summary: ThreadSidebarRuntimeSummary,
+): readonly RuntimeUsageSummaryLine[] | null {
+  if (summary.rateLimits === null) {
+    return null;
+  }
+
+  const usageLines: RuntimeUsageSummaryLine[] = [];
+
+  if (summary.rateLimits.primaryWindow !== null && summary.rateLimits.primaryWindow !== undefined) {
+    usageLines.push({
+      label: readUsageWindowLabel(
+        summary.rateLimits.primaryWindow.windowDurationMinutes,
+        "Primary",
+      ),
+      leftPercent: readUsageLeftPercent(summary.rateLimits.primaryWindow.usedPercent),
+    });
+  }
+
+  if (
+    summary.rateLimits.secondaryWindow !== null &&
+    summary.rateLimits.secondaryWindow !== undefined
+  ) {
+    usageLines.push({
+      label: readUsageWindowLabel(
+        summary.rateLimits.secondaryWindow.windowDurationMinutes,
+        "Secondary",
+      ),
+      leftPercent: readUsageLeftPercent(summary.rateLimits.secondaryWindow.usedPercent),
+    });
+  }
+
+  if (usageLines.length === 0) {
+    return null;
+  }
+
+  return usageLines;
 }
 
 function buildDebugStatusBannersProperties(
@@ -394,6 +463,7 @@ function buildDebugStatusBannersProperties(
 function buildChatWorkspacePaneProperties(
   input: UseApplicationShellViewPropertiesInput,
 ): ChatWorkspacePaneProps {
+  const runtimeUsageSummaryLines = readRuntimeUsageSummaryLines(input.threadSidebarRuntimeSummary);
   const properties: ChatWorkspacePaneProps = {
     chatSurfaceState: input.chatSurfaceState,
     selectedThreadId: input.selectedThreadId,
@@ -440,7 +510,10 @@ function buildChatWorkspacePaneProperties(
     onInterrupt: input.runInterrupt,
     onSteerMessage: input.steerMessage,
     onSendMessage: input.submitMessage,
-    chatModeToolbarProperties: input.chatModeToolbarProperties,
+    chatModeToolbarProperties: {
+      ...input.chatModeToolbarProperties,
+      runtimeUsageSummaryLines,
+    },
   };
 
   let nextProperties = properties;
@@ -673,6 +746,12 @@ function buildSettingsWorkspacePaneProperties(
   return {
     settingsWorkspaceSection: input.settingsWorkspaceSection,
     onSettingsWorkspaceSectionChange: input.setSettingsWorkspaceSection,
+    theme: input.theme,
+    isBusy: input.isBusy,
+    onRefreshData: () => {
+      invokeAsyncOwnerAction(input.refreshCoreDataAndSelectedThread);
+    },
+    onToggleTheme: input.toggleTheme,
     debugWorkspacePaneProperties: buildDebugWorkspacePaneProperties(input),
     pushNotificationsSettingsPaneProperties: buildPushNotificationsSettingsPaneProperties(input),
   };
@@ -714,9 +793,7 @@ export function useApplicationShellViewProperties(
       input.activeThreadAgentId,
       input.desktopSidebarOpen,
       input.hasSelectedThread,
-      input.isBusy,
       input.isGenerating,
-      input.refreshCoreDataAndSelectedThread,
       input.renderAgentFavicon,
       input.selectedThreadLabel,
       input.setActiveTab,
@@ -724,8 +801,6 @@ export function useApplicationShellViewProperties(
       input.setMobileSidebarOpen,
       input.threadSidebarRuntimeSummary.warning,
       input.threadSidebarRuntimeSummary.modelReroute,
-      input.theme,
-      input.toggleTheme,
     ],
   );
 
@@ -782,6 +857,7 @@ export function useApplicationShellViewProperties(
       input.submitFileChangeApprovalRequest,
       input.submitPendingRequest,
       input.submitToolCallRequestResponse,
+      input.threadSidebarRuntimeSummary.rateLimits,
       input.turnCount,
       input.visibleChatItemsStep,
       input.visibleConversationItems,
@@ -887,6 +963,8 @@ export function useApplicationShellViewProperties(
       input.isEnablingPushNotifications,
       input.isRefreshingPushSettings,
       input.isSendingPushTestNotification,
+      input.isBusy,
+      input.refreshCoreDataAndSelectedThread,
       input.selectedDebugIssue,
       input.selectedDebugIssueId,
       input.selectedHistoryDetailId,
@@ -916,8 +994,10 @@ export function useApplicationShellViewProperties(
       input.stopTraceFromDebugPanel,
       input.streamEventCards,
       input.streamEventCount,
+      input.theme,
       input.traceLabel,
       input.traceNote,
+      input.toggleTheme,
       input.waitForReplayResponse,
     ],
   );

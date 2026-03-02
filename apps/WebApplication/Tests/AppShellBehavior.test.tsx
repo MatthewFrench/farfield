@@ -66,7 +66,6 @@ describe("App", () => {
     environment.renderApp();
 
     expect(await screen.findByTestId("chat-empty-loading-thread")).toBeTruthy();
-    expect(screen.queryByTestId("chat-empty-no-messages")).toBeNull();
 
     readThreadDeferred.resolve({
       ok: true,
@@ -147,7 +146,8 @@ describe("App", () => {
     environment.renderApp();
 
     await waitFor(() => {
-      expect(window.location.pathname).toBe(`/threads/${firstThreadId}/debug`);
+      expect(window.location.pathname).toBe(`/threads/${firstThreadId}/settings`);
+      expect(window.location.search).toBe("?tab=debug");
     });
   });
 

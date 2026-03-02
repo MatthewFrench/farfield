@@ -1,4 +1,8 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
+
+const ThreadRowMenuActionAttemptLimit = 4;
+const ThreadRowMenuActionVisibilityTimeoutMilliseconds = 5_000;
+const ThreadRowMenuActionRetryDelayMilliseconds = 80;
 
 export async function openAppHome(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -19,11 +23,32 @@ export async function openSidebarIfHidden(page: Page): Promise<void> {
 }
 
 export async function openDebugTab(page: Page): Promise<void> {
-  await page.getByTestId("tab-debug").click();
+  const debugIssuesPanel = page.getByTestId("debug-issues-panel");
+  if (await hasVisibleLocator(debugIssuesPanel)) {
+    return;
+  }
+
+  const debugSettingsTab = page.getByTestId("settings-tab-debug");
+  if (!(await hasVisibleLocator(debugSettingsTab))) {
+    await page.getByTestId("tab-settings").click();
+  }
+
+  await page.getByTestId("settings-tab-debug").click();
 }
 
 export async function triggerHeaderRefresh(page: Page): Promise<void> {
+  const settingsPaneDebugTab = page.getByTestId("settings-tab-debug");
+  const settingsPaneWasOpen = await hasVisibleLocator(settingsPaneDebugTab);
+  if (!settingsPaneWasOpen) {
+    await page.getByTestId("tab-settings").click();
+    await expect(settingsPaneDebugTab).toBeVisible();
+  }
+
   await page.getByTestId("refresh-button").click();
+
+  if (!settingsPaneWasOpen) {
+    await page.getByTestId("tab-settings").click();
+  }
 }
 
 export async function openPreflightTab(page: Page): Promise<void> {
@@ -31,7 +56,7 @@ export async function openPreflightTab(page: Page): Promise<void> {
 }
 
 export async function selectFirstThreadIfAny(
-  page: Page
+  page: Page,
 ): Promise<{ selected: boolean; threadId?: string }> {
   const threadRows = page.getByTestId("thread-list-item");
   const count = await threadRows.count();
@@ -46,7 +71,7 @@ export async function selectFirstThreadIfAny(
 
   return {
     selected: true,
-    ...(threadId ? { threadId } : {})
+    ...(threadId ? { threadId } : {}),
   };
 }
 
@@ -59,8 +84,38 @@ export async function openThreadRowMenu(page: Page, threadId: string): Promise<v
 export async function clickThreadRowMenuAction(
   page: Page,
   threadId: string,
-  actionLabel: string
+  actionLabel: string,
 ): Promise<void> {
-  await openThreadRowMenu(page, threadId);
-  await page.getByRole("menuitem", { name: actionLabel }).click();
+  for (let attemptIndex = 0; attemptIndex < ThreadRowMenuActionAttemptLimit; attemptIndex += 1) {
+    await openThreadRowMenu(page, threadId);
+    const actionMenuItem = page.getByRole("menuitem", { name: actionLabel }).first();
+    try {
+      await expect(actionMenuItem).toBeVisible({
+        timeout: ThreadRowMenuActionVisibilityTimeoutMilliseconds,
+      });
+      await actionMenuItem.click({
+        timeout: ThreadRowMenuActionVisibilityTimeoutMilliseconds,
+      });
+      return;
+    } catch {
+      if (attemptIndex + 1 >= ThreadRowMenuActionAttemptLimit) {
+        throw new Error(
+          `Unable to click thread-row menu action "${actionLabel}" for thread "${threadId}" after ${String(ThreadRowMenuActionAttemptLimit)} attempts.`,
+        );
+      }
+
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(ThreadRowMenuActionRetryDelayMilliseconds);
+    }
+  }
+}
+
+async function hasVisibleLocator(locator: Locator): Promise<boolean> {
+  const count = await locator.count();
+  for (let index = 0; index < count; index += 1) {
+    if (await locator.nth(index).isVisible()) {
+      return true;
+    }
+  }
+  return false;
 }

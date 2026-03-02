@@ -2,6 +2,7 @@ import {
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
+  useCallback,
   useEffect,
   useRef,
 } from "react";
@@ -39,10 +40,55 @@ export interface UseSelectedThreadLifecycleEffectsInput {
 export function useSelectedThreadLifecycleEffects(
   input: UseSelectedThreadLifecycleEffectsInput,
 ): void {
+  const unsubscribeThreadRef = useRef(input.unsubscribeThread);
+  const handleRuntimeRequestErrorRef = useRef(input.handleRuntimeRequestError);
   const readNextSelectedThreadIdentifierAfterLoadFailureRef = useRef(
     input.readNextSelectedThreadIdentifierAfterLoadFailure,
   );
   const previousSelectedThreadIdentifierRef = useRef<string | null>(input.selectedThreadId);
+  const unsubscribeInFlightThreadIdentifiersRef = useRef<Set<string>>(new Set());
+
+  const requestThreadUnsubscribe = useCallback(
+    (threadIdentifier: string, reportInteractiveErrors: boolean): void => {
+      if (threadIdentifier.length === 0) {
+        return;
+      }
+
+      const unsubscribeInFlightThreadIdentifiers = unsubscribeInFlightThreadIdentifiersRef.current;
+      if (unsubscribeInFlightThreadIdentifiers.has(threadIdentifier)) {
+        return;
+      }
+
+      unsubscribeInFlightThreadIdentifiers.add(threadIdentifier);
+      void unsubscribeThreadRef
+        .current(threadIdentifier)
+        .catch((error) => {
+          if (!reportInteractiveErrors) {
+            return;
+          }
+          if (error instanceof Error && isRequestCanceledError(error)) {
+            return;
+          }
+          const message = toErrorMessage(error);
+          if (isThreadNotLoadedReadError(message)) {
+            return;
+          }
+          handleRuntimeRequestErrorRef.current(error);
+        })
+        .finally(() => {
+          unsubscribeInFlightThreadIdentifiers.delete(threadIdentifier);
+        });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    unsubscribeThreadRef.current = input.unsubscribeThread;
+  }, [input.unsubscribeThread]);
+
+  useEffect(() => {
+    handleRuntimeRequestErrorRef.current = input.handleRuntimeRequestError;
+  }, [input.handleRuntimeRequestError]);
 
   useEffect(() => {
     readNextSelectedThreadIdentifierAfterLoadFailureRef.current =
@@ -53,16 +99,15 @@ export function useSelectedThreadLifecycleEffects(
     return () => {
       const selectedThreadIdentifier = input.selectedThreadIdRef.current;
       if (selectedThreadIdentifier !== null && selectedThreadIdentifier.length > 0) {
-        void input.unsubscribeThread(selectedThreadIdentifier).catch(() => {
-          // Unmount teardown should not surface unsubscribe failures to interactive error banners.
-        });
+        // Unmount teardown should not surface unsubscribe failures to interactive error banners.
+        requestThreadUnsubscribe(selectedThreadIdentifier, false);
       }
       input.selectedThreadRefreshConcurrencyCoordinator.cancelActiveRefresh();
     };
   }, [
+    requestThreadUnsubscribe,
     input.selectedThreadIdRef,
     input.selectedThreadRefreshConcurrencyCoordinator,
-    input.unsubscribeThread,
   ]);
 
   useEffect(() => {
@@ -72,20 +117,11 @@ export function useSelectedThreadLifecycleEffects(
       previousSelectedThreadIdentifier !== null &&
       previousSelectedThreadIdentifier !== nextSelectedThreadIdentifier
     ) {
-      void input.unsubscribeThread(previousSelectedThreadIdentifier).catch((error) => {
-        if (error instanceof Error && isRequestCanceledError(error)) {
-          return;
-        }
-        const message = toErrorMessage(error);
-        if (isThreadNotLoadedReadError(message)) {
-          return;
-        }
-        input.handleRuntimeRequestError(error);
-      });
+      requestThreadUnsubscribe(previousSelectedThreadIdentifier, true);
     }
 
     previousSelectedThreadIdentifierRef.current = nextSelectedThreadIdentifier;
-  }, [input.handleRuntimeRequestError, input.selectedThreadId, input.unsubscribeThread]);
+  }, [requestThreadUnsubscribe, input.selectedThreadId]);
 
   useEffect(() => {
     const selectedThreadLoadTokenRef = input.selectedThreadLoadTokenRef;

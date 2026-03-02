@@ -67,6 +67,22 @@ describe("ThreadListCacheInvalidationOwner", () => {
     expect(cache.readStatistics().invalidationCount).toBe(1);
   });
 
+  it("invalidates only active cache scope for unsubscribe mutations", () => {
+    const cache = new ThreadListAggregationCache(1_000, 8);
+    const owner = new ThreadListCacheInvalidationOwner(cache);
+    const activeQuery = buildQuery({ archived: false });
+    const archivedQuery = buildQuery({ archived: true });
+
+    cache.write(activeQuery, buildSnapshot({ combinedTruncated: true }));
+    cache.write(archivedQuery, buildSnapshot({ combinedTruncated: false }));
+
+    owner.invalidate("thread-unsubscribed", { threadId: "thread-1" });
+
+    expect(cache.readFresh(activeQuery)).toBeNull();
+    expect(cache.readFresh(archivedQuery)).not.toBeNull();
+    expect(cache.readStatistics().invalidationCount).toBe(1);
+  });
+
   it("debounces repeated stream-state invalidations for the same thread while keeping per-thread isolation", () => {
     const cache = new ThreadListAggregationCache(1_000, 8);
     const nowMilliseconds = 10_000;

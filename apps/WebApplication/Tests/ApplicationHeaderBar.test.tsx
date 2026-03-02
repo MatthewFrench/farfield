@@ -6,8 +6,6 @@ import { TooltipProvider } from "@/Components/UserInterface/Tooltip";
 interface RenderApplicationHeaderBarInput {
   activeTab?: "chat" | "debug";
   desktopSidebarOpen?: boolean;
-  isBusy?: boolean;
-  onRefresh?: () => void;
   onToggleSettingsTab?: () => void;
   onOpenMobileSidebar?: () => void;
   onOpenDesktopSidebar?: () => void;
@@ -16,9 +14,16 @@ interface RenderApplicationHeaderBarInput {
       | "configWarning"
       | "deprecationNotice"
       | "windows/worldWritableWarning"
+      | "mcpServer/oauthLogin/completed"
+      | "account/login/completed"
+      | "serverRequest/resolved"
+      | "thread/archived"
+      | "thread/unarchived"
+      | "thread/closed"
       | "thread/realtime/started"
       | "thread/realtime/closed"
       | "error";
+    severity: "warning" | "error" | "realtime" | "info" | "success";
     summary: string;
     threadId: string | null;
     isRetrying: boolean;
@@ -52,13 +57,9 @@ function renderApplicationHeaderBar(input?: RenderApplicationHeaderBarInput): vo
         isGenerating={false}
         runtimeWarningSummary={input?.runtimeWarningSummary ?? null}
         runtimeModelRerouteSummary={input?.runtimeModelRerouteSummary ?? null}
-        isBusy={input?.isBusy ?? false}
-        theme="light"
         onOpenMobileSidebar={input?.onOpenMobileSidebar ?? (() => {})}
         onOpenDesktopSidebar={input?.onOpenDesktopSidebar ?? (() => {})}
-        onRefresh={input?.onRefresh ?? (() => {})}
         onToggleSettingsTab={input?.onToggleSettingsTab ?? (() => {})}
-        onToggleTheme={() => {}}
         renderAgentFavicon={() => null}
       />
     </TooltipProvider>,
@@ -66,19 +67,15 @@ function renderApplicationHeaderBar(input?: RenderApplicationHeaderBarInput): vo
 }
 
 describe("ApplicationHeaderBar", () => {
-  it("invokes refresh and settings toggle actions", () => {
-    const onRefresh = vi.fn();
+  it("invokes settings toggle action", () => {
     const onToggleSettingsTab = vi.fn();
 
     renderApplicationHeaderBar({
-      onRefresh,
       onToggleSettingsTab,
     });
 
-    fireEvent.click(screen.getByTestId("refresh-button"));
     fireEvent.click(screen.getByTestId("tab-settings"));
 
-    expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(onToggleSettingsTab).toHaveBeenCalledTimes(1);
   });
 
@@ -129,19 +126,6 @@ describe("ApplicationHeaderBar", () => {
     expect(onToggleSettingsTab).toHaveBeenCalledTimes(1);
   });
 
-  it("does not invoke refresh action while busy", () => {
-    const onRefresh = vi.fn();
-
-    renderApplicationHeaderBar({
-      isBusy: true,
-      onRefresh,
-    });
-
-    fireEvent.click(screen.getByTestId("refresh-button"));
-
-    expect(onRefresh).not.toHaveBeenCalled();
-  });
-
   it("opens desktop sidebar without toggling settings tab from chat view", () => {
     const onOpenDesktopSidebar = vi.fn();
     const onToggleSettingsTab = vi.fn();
@@ -182,6 +166,7 @@ describe("ApplicationHeaderBar", () => {
     renderApplicationHeaderBar({
       runtimeWarningSummary: {
         method: "configWarning",
+        severity: "warning",
         summary: "Config file has an unknown key",
         threadId: null,
         isRetrying: false,
@@ -200,6 +185,7 @@ describe("ApplicationHeaderBar", () => {
     renderApplicationHeaderBar({
       runtimeWarningSummary: {
         method: "error",
+        severity: "error",
         summary: "Turn failed to stream",
         threadId: "thread-1",
         isRetrying: true,
@@ -218,6 +204,7 @@ describe("ApplicationHeaderBar", () => {
     renderApplicationHeaderBar({
       runtimeWarningSummary: {
         method: "thread/realtime/closed",
+        severity: "realtime",
         summary: "Closed (session ended)",
         threadId: "thread-1",
         isRetrying: false,
@@ -230,5 +217,43 @@ describe("ApplicationHeaderBar", () => {
     const banner = screen.getByTestId("header-runtime-warning-banner");
     expect(banner.textContent).toBe("Realtime: Closed (session ended)");
     expect(banner.className).toContain("text-sky-500");
+  });
+
+  it("renders auth completion banner with success styling", () => {
+    renderApplicationHeaderBar({
+      runtimeWarningSummary: {
+        method: "mcpServer/oauthLogin/completed",
+        severity: "success",
+        summary: "MCP OAuth connected (github)",
+        threadId: null,
+        isRetrying: false,
+        sequence: 22,
+        receivedAtMilliseconds: 1_700_000_001_300,
+        refreshedAtMilliseconds: 1_700_000_001_400,
+      },
+    });
+
+    const banner = screen.getByTestId("header-runtime-warning-banner");
+    expect(banner.textContent).toBe("Auth: MCP OAuth connected (github)");
+    expect(banner.className).toContain("text-emerald-600");
+  });
+
+  it("renders server-request resolved banner with info styling", () => {
+    renderApplicationHeaderBar({
+      runtimeWarningSummary: {
+        method: "serverRequest/resolved",
+        severity: "info",
+        summary: "Server request #44 resolved",
+        threadId: "thread-1",
+        isRetrying: false,
+        sequence: 23,
+        receivedAtMilliseconds: 1_700_000_001_500,
+        refreshedAtMilliseconds: 1_700_000_001_600,
+      },
+    });
+
+    const banner = screen.getByTestId("header-runtime-warning-banner");
+    expect(banner.textContent).toBe("Request: Server request #44 resolved");
+    expect(banner.className).toContain("text-cyan-600");
   });
 });

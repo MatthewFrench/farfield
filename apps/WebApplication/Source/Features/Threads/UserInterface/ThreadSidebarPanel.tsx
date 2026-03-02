@@ -116,37 +116,37 @@ export function ThreadSidebarPanel({
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 -top-3 bottom-0 bg-gradient-to-t from-sidebar from-58% via-sidebar/88 via-80% to-transparent to-100%"
         />
-        <div className="relative z-10 mb-2 grid grid-cols-5 gap-2">
+        <div className="relative z-10 mb-2 flex flex-wrap gap-2">
           <div
             data-testid="sidebar-runtime-account-summary"
             className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
           >
             {readThreadSidebarAccountSummaryLabel(threadSidebarRuntimeSummary)}
           </div>
-          <div
-            data-testid="sidebar-runtime-rate-limit-summary"
-            className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
-          >
-            {readThreadSidebarRateLimitSummaryLabel(threadSidebarRuntimeSummary)}
-          </div>
-          <div
-            data-testid="sidebar-runtime-app-summary"
-            className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
-          >
-            {readThreadSidebarAppsSummaryLabel(threadSidebarRuntimeSummary)}
-          </div>
-          <div
-            data-testid="sidebar-runtime-progress-summary"
-            className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
-          >
-            {readThreadSidebarProgressSummaryLabel(threadSidebarRuntimeSummary)}
-          </div>
-          <div
-            data-testid="sidebar-runtime-token-usage-summary"
-            className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
-          >
-            {readThreadSidebarTokenUsageSummaryLabel(threadSidebarRuntimeSummary)}
-          </div>
+          {shouldShowThreadSidebarAppsSummary(threadSidebarRuntimeSummary) && (
+            <div
+              data-testid="sidebar-runtime-app-summary"
+              className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
+            >
+              {readThreadSidebarAppsSummaryLabel(threadSidebarRuntimeSummary)}
+            </div>
+          )}
+          {shouldShowThreadSidebarProgressSummary(threadSidebarRuntimeSummary) && (
+            <div
+              data-testid="sidebar-runtime-progress-summary"
+              className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
+            >
+              {readThreadSidebarProgressSummaryLabel(threadSidebarRuntimeSummary)}
+            </div>
+          )}
+          {shouldShowThreadSidebarTokenUsageSummary(threadSidebarRuntimeSummary) && (
+            <div
+              data-testid="sidebar-runtime-token-usage-summary"
+              className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-2 py-1 text-[10px] text-muted-foreground"
+            >
+              {readThreadSidebarTokenUsageSummaryLabel(threadSidebarRuntimeSummary)}
+            </div>
+          )}
         </div>
         <div className="relative z-10 flex items-center justify-between gap-2">
           <Tooltip>
@@ -242,43 +242,30 @@ function readSidebarHealthState(
   return SIDEBAR_HEALTH_STATE_PARTIAL;
 }
 
-function readThreadSidebarRateLimitSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {
-  if (summary.rateLimits === null) {
-    return "Usage n/a";
-  }
-  const usedPercentLabel =
-    summary.rateLimits.usedPercent === null ? "n/a" : `${String(summary.rateLimits.usedPercent)}%`;
-  const planTypeLabel = summary.rateLimits.planType ?? "n/a";
-  return `Usage ${usedPercentLabel} · ${planTypeLabel}`;
-}
-
 function readThreadSidebarAccountSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {
   if (summary.account === null) {
-    return "Account n/a";
+    return "Account Type n/a";
   }
 
   if (summary.account.mode === "signedOut") {
-    return summary.account.requiresOpenaiAuth ? "Account sign in" : "Account signed out";
+    return summary.account.requiresOpenaiAuth ? "Account Type sign in" : "Account Type signed out";
   }
 
   if (summary.account.mode === "apiKey") {
-    return "Account API key";
+    return "Account Type API key";
   }
 
   const planLabel = summary.account.planType ?? "unknown";
-  return `Account ${planLabel}`;
+  return `Account Type ${planLabel}`;
 }
 
 function readThreadSidebarAppsSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {
-  if (summary.apps === null) {
-    return "Apps n/a";
-  }
-  return `Apps ${String(summary.apps.appCount)}`;
+  return `Apps ${String(summary.apps?.appCount ?? 0)}`;
 }
 
 function readThreadSidebarProgressSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {
   if (summary.progress === null) {
-    return "Progress n/a";
+    return "";
   }
   if (summary.progress.method === "thread/started") {
     return "Progress started";
@@ -303,7 +290,7 @@ function readThreadSidebarProgressSummaryLabel(summary: ThreadSidebarRuntimeSumm
 
 function readThreadSidebarTokenUsageSummaryLabel(summary: ThreadSidebarRuntimeSummary): string {
   if (summary.tokenUsage === null) {
-    return "Tokens n/a";
+    return "";
   }
 
   if (summary.tokenUsage.modelContextWindow === null) {
@@ -313,4 +300,28 @@ function readThreadSidebarTokenUsageSummaryLabel(summary: ThreadSidebarRuntimeSu
   const usedPercentLabel =
     summary.tokenUsage.usedPercent === null ? "n/a" : `${String(summary.tokenUsage.usedPercent)}%`;
   return `Tokens ${usedPercentLabel}`;
+}
+
+function shouldShowThreadSidebarAppsSummary(summary: ThreadSidebarRuntimeSummary): boolean {
+  return summary.apps !== null && summary.apps.appCount > 0;
+}
+
+function shouldShowThreadSidebarProgressSummary(summary: ThreadSidebarRuntimeSummary): boolean {
+  return summary.progress !== null;
+}
+
+function shouldShowThreadSidebarTokenUsageSummary(summary: ThreadSidebarRuntimeSummary): boolean {
+  if (summary.tokenUsage === null) {
+    return false;
+  }
+
+  if (summary.tokenUsage.modelContextWindow === null) {
+    return summary.tokenUsage.totalTokens > 0;
+  }
+
+  if (summary.tokenUsage.usedPercent === null) {
+    return false;
+  }
+
+  return summary.tokenUsage.usedPercent > 0;
 }

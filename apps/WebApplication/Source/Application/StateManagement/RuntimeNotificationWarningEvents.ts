@@ -1,10 +1,17 @@
 import { z } from "zod";
 import { type CapabilityNotificationEventsResponse } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
-import { type ThreadRuntimeWarningMethod } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
+import {
+  type ThreadRuntimeWarningMethod,
+  type ThreadRuntimeWarningSeverity,
+} from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 
 export const CONFIG_WARNING_NOTIFICATION_METHOD = "configWarning";
 export const DEPRECATION_NOTICE_NOTIFICATION_METHOD = "deprecationNotice";
 export const WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD = "windows/worldWritableWarning";
+export const MCP_SERVER_OAUTH_LOGIN_COMPLETED_NOTIFICATION_METHOD =
+  "mcpServer/oauthLogin/completed";
+export const ACCOUNT_LOGIN_COMPLETED_NOTIFICATION_METHOD = "account/login/completed";
+export const SERVER_REQUEST_RESOLVED_NOTIFICATION_METHOD = "serverRequest/resolved";
 export const THREAD_ARCHIVED_NOTIFICATION_METHOD = "thread/archived";
 export const THREAD_UNARCHIVED_NOTIFICATION_METHOD = "thread/unarchived";
 export const THREAD_CLOSED_NOTIFICATION_METHOD = "thread/closed";
@@ -53,6 +60,29 @@ const WindowsWorldWritableWarningParametersSchema = z
   })
   .strict();
 
+const McpServerOauthLoginCompletedParametersSchema = z
+  .object({
+    name: z.string().min(1),
+    success: z.boolean(),
+    error: z.string().optional(),
+  })
+  .strict();
+
+const AccountLoginCompletedParametersSchema = z
+  .object({
+    loginId: z.string().min(1).nullable(),
+    success: z.boolean(),
+    error: z.string().nullable(),
+  })
+  .strict();
+
+const ServerRequestResolvedParametersSchema = z
+  .object({
+    threadId: z.string().min(1),
+    requestId: z.number().int().nonnegative(),
+  })
+  .strict();
+
 const ErrorNotificationParametersSchema = z
   .object({
     error: z
@@ -95,6 +125,7 @@ const ThreadLifecycleParametersSchema = z
 
 export interface RuntimeWarningEvent {
   method: ThreadRuntimeWarningMethod;
+  severity: ThreadRuntimeWarningSeverity;
   sequence: number;
   summary: string;
   threadId: string | null;
@@ -105,12 +136,14 @@ export interface RuntimeWarningEvent {
 function createWarningEvent(input: {
   event: CapabilityNotificationEventsResponse["events"][number];
   method: ThreadRuntimeWarningMethod;
+  severity: ThreadRuntimeWarningSeverity;
   summary: string;
   threadId: string | null;
   isRetrying: boolean;
 }): RuntimeWarningEvent {
   return {
     method: input.method,
+    severity: input.severity,
     sequence: input.event.sequence,
     summary: input.summary,
     threadId: input.threadId,
@@ -126,6 +159,7 @@ function mapConfigWarningEvent(
   return createWarningEvent({
     event,
     method: CONFIG_WARNING_NOTIFICATION_METHOD,
+    severity: "warning",
     summary: parsedParameters.summary,
     threadId: null,
     isRetrying: false,
@@ -139,6 +173,7 @@ function mapDeprecationNoticeEvent(
   return createWarningEvent({
     event,
     method: DEPRECATION_NOTICE_NOTIFICATION_METHOD,
+    severity: "warning",
     summary: parsedParameters.summary,
     threadId: null,
     isRetrying: false,
@@ -152,8 +187,94 @@ function mapWindowsWorldWritableWarningEvent(
   return createWarningEvent({
     event,
     method: WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD,
+    severity: "warning",
     summary: "World-writable paths detected",
     threadId: null,
+    isRetrying: false,
+  });
+}
+
+function readAuthFailureMessage(
+  defaultMessage: string,
+  message: string | null | undefined,
+): string {
+  if (message === undefined || message === null) {
+    return defaultMessage;
+  }
+  const normalizedMessage = message.trim();
+  return normalizedMessage.length > 0 ? normalizedMessage : defaultMessage;
+}
+
+function mapMcpServerOauthLoginCompletedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeWarningEvent {
+  const parsedParameters = McpServerOauthLoginCompletedParametersSchema.parse(event.params);
+  if (parsedParameters.success) {
+    return createWarningEvent({
+      event,
+      method: MCP_SERVER_OAUTH_LOGIN_COMPLETED_NOTIFICATION_METHOD,
+      severity: "success",
+      summary: `MCP OAuth connected (${parsedParameters.name})`,
+      threadId: null,
+      isRetrying: false,
+    });
+  }
+
+  const errorSummary = readAuthFailureMessage(
+    "OAuth login completed without a success status.",
+    parsedParameters.error,
+  );
+  return createWarningEvent({
+    event,
+    method: MCP_SERVER_OAUTH_LOGIN_COMPLETED_NOTIFICATION_METHOD,
+    severity: "error",
+    summary: `MCP OAuth failed (${parsedParameters.name}): ${errorSummary}`,
+    threadId: null,
+    isRetrying: false,
+  });
+}
+
+function mapAccountLoginCompletedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeWarningEvent {
+  const parsedParameters = AccountLoginCompletedParametersSchema.parse(event.params);
+  if (parsedParameters.success) {
+    const loginIdentifier =
+      parsedParameters.loginId === null ? "(no login id)" : parsedParameters.loginId;
+    return createWarningEvent({
+      event,
+      method: ACCOUNT_LOGIN_COMPLETED_NOTIFICATION_METHOD,
+      severity: "success",
+      summary: `Account login completed (${loginIdentifier})`,
+      threadId: null,
+      isRetrying: false,
+    });
+  }
+
+  const errorSummary = readAuthFailureMessage(
+    "Account login completed without a success status.",
+    parsedParameters.error,
+  );
+  return createWarningEvent({
+    event,
+    method: ACCOUNT_LOGIN_COMPLETED_NOTIFICATION_METHOD,
+    severity: "error",
+    summary: `Account login failed: ${errorSummary}`,
+    threadId: null,
+    isRetrying: false,
+  });
+}
+
+function mapServerRequestResolvedEvent(
+  event: CapabilityNotificationEventsResponse["events"][number],
+): RuntimeWarningEvent {
+  const parsedParameters = ServerRequestResolvedParametersSchema.parse(event.params);
+  return createWarningEvent({
+    event,
+    method: SERVER_REQUEST_RESOLVED_NOTIFICATION_METHOD,
+    severity: "info",
+    summary: `Server request #${String(parsedParameters.requestId)} resolved`,
+    threadId: parsedParameters.threadId,
     isRetrying: false,
   });
 }
@@ -165,6 +286,7 @@ function mapErrorEvent(
   return createWarningEvent({
     event,
     method: ERROR_NOTIFICATION_METHOD,
+    severity: "error",
     summary: parsedParameters.error.message,
     threadId: parsedParameters.threadId,
     isRetrying: parsedParameters.willRetry,
@@ -178,6 +300,7 @@ function mapThreadRealtimeStartedEvent(
   return createWarningEvent({
     event,
     method: THREAD_REALTIME_STARTED_NOTIFICATION_METHOD,
+    severity: "realtime",
     summary: "Started",
     threadId: parsedParameters.threadId,
     isRetrying: false,
@@ -193,6 +316,7 @@ function mapThreadRealtimeClosedEvent(
   return createWarningEvent({
     event,
     method: THREAD_REALTIME_CLOSED_NOTIFICATION_METHOD,
+    severity: "realtime",
     summary: closeSummary,
     threadId: parsedParameters.threadId,
     isRetrying: false,
@@ -206,6 +330,7 @@ function mapThreadRealtimeErrorEvent(
   return createWarningEvent({
     event,
     method: ERROR_NOTIFICATION_METHOD,
+    severity: "error",
     summary: `Realtime: ${parsedParameters.message}`,
     threadId: parsedParameters.threadId,
     isRetrying: false,
@@ -219,6 +344,7 @@ function mapThreadArchivedEvent(
   return createWarningEvent({
     event,
     method: THREAD_ARCHIVED_NOTIFICATION_METHOD,
+    severity: "warning",
     summary: "Thread archived",
     threadId: parsedParameters.threadId,
     isRetrying: false,
@@ -232,6 +358,7 @@ function mapThreadUnarchivedEvent(
   return createWarningEvent({
     event,
     method: THREAD_UNARCHIVED_NOTIFICATION_METHOD,
+    severity: "warning",
     summary: "Thread unarchived",
     threadId: parsedParameters.threadId,
     isRetrying: false,
@@ -245,6 +372,7 @@ function mapThreadClosedEvent(
   return createWarningEvent({
     event,
     method: THREAD_CLOSED_NOTIFICATION_METHOD,
+    severity: "warning",
     summary: "Thread closed",
     threadId: parsedParameters.threadId,
     isRetrying: false,
@@ -264,6 +392,18 @@ export function mapRuntimeWarningEvent(
 
   if (event.method === WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD) {
     return mapWindowsWorldWritableWarningEvent(event);
+  }
+
+  if (event.method === MCP_SERVER_OAUTH_LOGIN_COMPLETED_NOTIFICATION_METHOD) {
+    return mapMcpServerOauthLoginCompletedEvent(event);
+  }
+
+  if (event.method === ACCOUNT_LOGIN_COMPLETED_NOTIFICATION_METHOD) {
+    return mapAccountLoginCompletedEvent(event);
+  }
+
+  if (event.method === SERVER_REQUEST_RESOLVED_NOTIFICATION_METHOD) {
+    return mapServerRequestResolvedEvent(event);
   }
 
   if (event.method === ERROR_NOTIFICATION_METHOD) {

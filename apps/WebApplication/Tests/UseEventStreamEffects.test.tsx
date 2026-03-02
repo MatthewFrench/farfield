@@ -32,10 +32,16 @@ import {
   type DebugWorkspaceDataSnapshot,
 } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceDataReader";
 import { DebugWorkspaceStateStore } from "../Source/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
+import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
+import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
 import {
   type ThreadRuntimeStatusByThreadIdentifier,
   type ThreadSidebarRuntimeSummary,
 } from "../Source/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
+import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
+import { ThreadListStateController } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
+import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement/ThreadListStateStore";
+import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
 import { RequestCanceledError } from "../Source/Shared/Errors/RequestCanceledError";
 
 type DebugErrors = DebugErrorListResponse["data"];
@@ -44,6 +50,8 @@ type DebugHistory = DebugHistoryResponse["history"];
 const DEBUG_HISTORY_LIMIT = 50;
 const DEBUG_ERROR_LIST_LIMIT = 75;
 const IMMEDIATE_EVENT_REFRESH_DELAY_MILLISECONDS = 0;
+const THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS = 30_000;
+const THREAD_QUERY_CACHE_MAXIMUM_ENTRY_COUNT = 100;
 
 const CORE_AND_SELECTED_THREAD_REFRESH_FLAGS: EventRefreshFlags = {
   refreshCore: true,
@@ -135,6 +143,19 @@ function Harness(properties: HarnessProperties): React.JSX.Element {
 
 function createDispatchSpy<ValueType>(): Dispatch<SetStateAction<ValueType>> {
   return vi.fn();
+}
+
+function createThreadListStateController(): ThreadListStateController {
+  return new ThreadListStateController({
+    threadServerClient: new ThreadServerClient(),
+    threadQueryCache: new ThreadQueryCache(
+      THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS,
+      THREAD_QUERY_CACHE_MAXIMUM_ENTRY_COUNT,
+    ),
+    threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
+    threadListStateStore: new ThreadListStateStore(),
+    threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
+  });
 }
 
 function createDebugSnapshot(): DebugWorkspaceDataSnapshot {
@@ -410,6 +431,45 @@ function createThreadProgressWarningErrorTokenUsageAndModelRerouteNotificationEv
   };
 }
 
+function createAuthAndServerRequestResolvedNotificationEventsResponse(): CapabilityNotificationEventsResponse {
+  return {
+    ok: true,
+    events: [
+      {
+        sequence: 80,
+        method: "mcpServer/oauthLogin/completed",
+        params: {
+          name: "github",
+          success: true,
+        },
+        receivedAtMilliseconds: 2_101,
+      },
+      {
+        sequence: 81,
+        method: "serverRequest/resolved",
+        params: {
+          threadId: "thread-1",
+          requestId: 44,
+        },
+        receivedAtMilliseconds: 2_102,
+      },
+    ],
+    nextSequence: 82,
+    firstAvailableSequence: 0,
+    resetRequired: false,
+  };
+}
+
+function createResetRequiredNotificationEventsResponse(): CapabilityNotificationEventsResponse {
+  return {
+    ok: true,
+    events: [],
+    nextSequence: 90,
+    firstAvailableSequence: 10,
+    resetRequired: true,
+  };
+}
+
 function createAccountResponse(): CapabilityAccountResponse {
   return {
     ok: true,
@@ -485,6 +545,7 @@ function createBaseInput(
     eventRefreshScheduler: new EventRefreshScheduler(IMMEDIATE_EVENT_REFRESH_DELAY_MILLISECONDS),
     eventStreamConnectionCoordinator,
     eventStreamRefreshDecisionEngine: new EventStreamRefreshDecisionEngine(["history"]),
+    selectedThreadId: "thread-1",
     activeTabRef: { current: "chat" },
     selectedThreadIdRef: { current: "thread-1" },
     loadCoreDataTrackedRef: { current: loadCoreDataTracked },
@@ -495,6 +556,7 @@ function createBaseInput(
     debugWorkspaceStateStore: new DebugWorkspaceStateStore(),
     debugErrorsSignatureRef: { current: [] },
     eventsConnectedRef: { current: false },
+    threadListStateController: createThreadListStateController(),
     capabilityServerClient,
     selectedAgentId: "codex",
     canReadNotificationEvents: false,
@@ -817,8 +879,9 @@ describe("useEventStreamEffects", () => {
     const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
     await startInput.executeScheduledRefresh(NOTIFICATION_PROJECTION_ONLY_REFRESH_FLAGS);
 
-    const updateStateAction = setThreadSidebarRuntimeSummary.mock.calls
+    const updateStateAction = [...setThreadSidebarRuntimeSummary.mock.calls]
       .map((call) => call[0])
+      .reverse()
       .find(
         (
           action,
@@ -856,6 +919,7 @@ describe("useEventStreamEffects", () => {
       },
       warning: {
         method: "thread/closed",
+        severity: "warning",
         summary: "Thread closed",
         threadId: "thread-1",
         isRetrying: false,
@@ -885,6 +949,185 @@ describe("useEventStreamEffects", () => {
         refreshedAtMilliseconds: expect.any(Number),
       },
     });
+  });
+
+  it("projects auth completion and server-request resolved warnings into sidebar runtime summary", async () => {
+    setDocumentVisibilityState("visible");
+
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    input.canReadNotificationEvents = true;
+    const setThreadSidebarRuntimeSummary = vi.fn(
+      (_nextValue: SetStateAction<ThreadSidebarRuntimeSummary>): void => {},
+    );
+    input.setThreadSidebarRuntimeSummary = setThreadSidebarRuntimeSummary;
+    vi.spyOn(input.capabilityServerClient, "readNotificationEvents").mockResolvedValue(
+      createAuthAndServerRequestResolvedNotificationEventsResponse(),
+    );
+
+    render(<Harness input={input} />);
+
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
+    await startInput.executeScheduledRefresh(NOTIFICATION_PROJECTION_ONLY_REFRESH_FLAGS);
+
+    const updateStateAction = [...setThreadSidebarRuntimeSummary.mock.calls]
+      .map((call) => call[0])
+      .reverse()
+      .find(
+        (
+          action,
+        ): action is (previousValue: ThreadSidebarRuntimeSummary) => ThreadSidebarRuntimeSummary =>
+          typeof action === "function",
+      );
+    if (updateStateAction === undefined) {
+      throw new Error("Expected sidebar runtime summary update state action");
+    }
+
+    expect(
+      updateStateAction({
+        account: null,
+        rateLimits: null,
+        apps: null,
+        progress: null,
+        warning: null,
+        tokenUsage: null,
+        modelReroute: null,
+      }),
+    ).toEqual({
+      account: null,
+      rateLimits: null,
+      apps: null,
+      progress: null,
+      warning: {
+        method: "serverRequest/resolved",
+        severity: "info",
+        summary: "Server request #44 resolved",
+        threadId: "thread-1",
+        isRetrying: false,
+        sequence: 81,
+        receivedAtMilliseconds: 2_102,
+        refreshedAtMilliseconds: expect.any(Number),
+      },
+      tokenUsage: null,
+      modelReroute: null,
+    });
+  });
+
+  it("clears warning summary on reset-required projection reads", async () => {
+    setDocumentVisibilityState("visible");
+
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    input.canReadNotificationEvents = true;
+    const setThreadSidebarRuntimeSummary = vi.fn(
+      (_nextValue: SetStateAction<ThreadSidebarRuntimeSummary>): void => {},
+    );
+    input.setThreadSidebarRuntimeSummary = setThreadSidebarRuntimeSummary;
+    vi.spyOn(input.capabilityServerClient, "readNotificationEvents").mockResolvedValue(
+      createResetRequiredNotificationEventsResponse(),
+    );
+
+    render(<Harness input={input} />);
+
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
+    await startInput.executeScheduledRefresh(NOTIFICATION_PROJECTION_ONLY_REFRESH_FLAGS);
+
+    const updateStateAction = [...setThreadSidebarRuntimeSummary.mock.calls]
+      .map((call) => call[0])
+      .reverse()
+      .find(
+        (
+          action,
+        ): action is (previousValue: ThreadSidebarRuntimeSummary) => ThreadSidebarRuntimeSummary =>
+          typeof action === "function",
+      );
+    if (updateStateAction === undefined) {
+      throw new Error("Expected sidebar runtime summary update state action");
+    }
+
+    expect(
+      updateStateAction({
+        account: null,
+        rateLimits: null,
+        apps: null,
+        progress: null,
+        warning: {
+          method: "configWarning",
+          severity: "warning",
+          summary: "Config file has an unknown key",
+          threadId: null,
+          isRetrying: false,
+          sequence: 1,
+          receivedAtMilliseconds: 1_000,
+          refreshedAtMilliseconds: 1_500,
+        },
+        tokenUsage: null,
+        modelReroute: null,
+      }).warning,
+    ).toBeNull();
+  });
+
+  it("clears warning summary when selected thread changes", async () => {
+    setDocumentVisibilityState("visible");
+
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    const setThreadSidebarRuntimeSummary = vi.fn(
+      (_nextValue: SetStateAction<ThreadSidebarRuntimeSummary>): void => {},
+    );
+    input.setThreadSidebarRuntimeSummary = setThreadSidebarRuntimeSummary;
+
+    const { rerender } = render(<Harness input={input} />);
+    setThreadSidebarRuntimeSummary.mockClear();
+    input.selectedThreadId = "thread-2";
+    rerender(<Harness input={input} />);
+
+    await waitFor(() => {
+      expect(setThreadSidebarRuntimeSummary).toHaveBeenCalled();
+    });
+
+    const updateStateAction = [...setThreadSidebarRuntimeSummary.mock.calls]
+      .map((call) => call[0])
+      .reverse()
+      .find(
+        (
+          action,
+        ): action is (previousValue: ThreadSidebarRuntimeSummary) => ThreadSidebarRuntimeSummary =>
+          typeof action === "function",
+      );
+    if (updateStateAction === undefined) {
+      throw new Error("Expected sidebar runtime summary update state action");
+    }
+
+    expect(
+      updateStateAction({
+        account: null,
+        rateLimits: null,
+        apps: null,
+        progress: null,
+        warning: {
+          method: "thread/closed",
+          severity: "warning",
+          summary: "Thread closed",
+          threadId: "thread-1",
+          isRetrying: false,
+          sequence: 72,
+          receivedAtMilliseconds: 2_041,
+          refreshedAtMilliseconds: 2_041,
+        },
+        tokenUsage: null,
+        modelReroute: null,
+      }).warning,
+    ).toBeNull();
   });
 
   it("hydrates sidebar runtime summary on mount when capability reads are enabled", async () => {
@@ -925,6 +1168,36 @@ describe("useEventStreamEffects", () => {
     expect(listApps).toHaveBeenCalledWith({
       limit: 100,
     });
+  });
+
+  it("reports sidebar runtime hydration failures with readable operation-prefixed messages", async () => {
+    setDocumentVisibilityState("visible");
+
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    input.canReadAccount = true;
+    const handleRuntimeRequestError = vi.fn();
+    input.handleRuntimeRequestError = handleRuntimeRequestError;
+    vi.spyOn(input.capabilityServerClient, "readAccount").mockRejectedValue(
+      new Error("core.load: forced error banner regression"),
+    );
+
+    render(<Harness input={input} />);
+
+    await waitFor(() => {
+      expect(handleRuntimeRequestError).toHaveBeenCalledTimes(1);
+    });
+
+    const reportedError = handleRuntimeRequestError.mock.calls[0]?.[0];
+    expect(reportedError).toBeInstanceOf(Error);
+    if (!(reportedError instanceof Error)) {
+      throw new Error("Expected runtime error owner to receive an Error instance");
+    }
+    expect(reportedError.message).toContain("refresh-sidebar-runtime-summary:");
+    expect(reportedError.message).toContain("forced error banner regression");
   });
 
   it("suppresses canceled-request errors from runtime error reporting", async () => {

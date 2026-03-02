@@ -92,7 +92,9 @@
               {
                 "method": "account/chatgptAuthTokens/refresh",
                 "id": 13,
-                "params": {}
+                "params": {
+                  "reason": "unauthorized"
+                }
               },
               {
                 "method": "applyPatchApproval",
@@ -205,7 +207,9 @@
               "value": {
                 "method": "account/chatgptAuthTokens/refresh",
                 "id": 25,
-                "params": {}
+                "params": {
+                  "reason": "unauthorized"
+                }
               }
             },
             {

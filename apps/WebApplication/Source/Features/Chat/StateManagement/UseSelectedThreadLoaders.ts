@@ -114,21 +114,20 @@ interface ResolveReadThreadDeltaPreferenceInput {
   canReadLiveState: boolean;
   canReadStreamEvents: boolean;
   streamEventsSinceSequence: number | null;
-  hasPersistedSnapshot: boolean;
 }
 
 function shouldUseStreamDeltaRefreshWithoutReadThread(
   input: ResolveReadThreadDeltaPreferenceInput,
 ): boolean {
-  // Once we have a trusted baseline snapshot and a stream cursor, live-state + stream delta reads
-  // keep selected-thread state fresh without issuing a full read-thread request each refresh.
+  // Delta-only refresh is only safe once we have an established stream cursor.
+  // A persisted snapshot alone is not enough to guarantee model/mode convergence.
   if (!input.includeReadThread) {
     return false;
   }
   if (!input.canReadLiveState || !input.canReadStreamEvents) {
     return false;
   }
-  return input.hasPersistedSnapshot || input.streamEventsSinceSequence !== null;
+  return input.streamEventsSinceSequence !== null;
 }
 
 /**
@@ -191,7 +190,6 @@ export function useSelectedThreadLoaders(
         canReadLiveState: readCapabilities.canReadLiveState,
         canReadStreamEvents: readCapabilities.canReadStreamEvents,
         streamEventsSinceSequence,
-        hasPersistedSnapshot: persistedSnapshot !== null,
       })
         ? false
         : includeReadThread;

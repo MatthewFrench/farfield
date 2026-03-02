@@ -166,7 +166,7 @@ describe("EventStreamConnectionCoordinator", () => {
         refreshCore: true,
         refreshHistory: true,
         refreshSelectedThread: true,
-        refreshNotificationProjections: false,
+        refreshNotificationProjections: true,
       },
     ]);
     expect(connectionStatusChanges).toEqual([true]);

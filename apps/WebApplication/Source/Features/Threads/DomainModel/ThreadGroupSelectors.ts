@@ -36,9 +36,9 @@ const TRAILING_PROJECT_PATH_SEPARATOR_PATTERN = /\/+$/;
  */
 export class ThreadGroupSelectors {
   public static threadLabel(
-    thread: Pick<ThreadListItem, "id" | "preview" | "displayName">,
+    thread: Pick<ThreadListItem, "id" | "preview" | "displayName" | "lastUserMessage">,
   ): string {
-    const text = (thread.displayName ?? thread.preview).trim();
+    const text = (thread.lastUserMessage ?? thread.displayName ?? thread.preview).trim();
     if (text.length === 0) {
       return `${THREAD_LABEL_PREFIX}${thread.id.slice(0, THREAD_LABEL_IDENTIFIER_LENGTH)}`;
     }
@@ -71,6 +71,11 @@ export class ThreadGroupSelectors {
     const unreadThreadIdentifierEntries: Array<readonly [string, true]> = [];
     for (const thread of input.nextThreads) {
       if (thread.id === input.selectedThreadIdentifier) {
+        continue;
+      }
+
+      // A thread where the latest activity is a user-authored message is considered read.
+      if (ThreadGroupSelectors.readThreadLatestActivityIsUserMessage(thread)) {
         continue;
       }
 
@@ -270,6 +275,12 @@ export class ThreadGroupSelectors {
     thread: Pick<ThreadListItem, "hasUnreadTurn">,
   ): boolean | null {
     return thread.hasUnreadTurn ?? UNKNOWN_UNREAD_SIGNAL;
+  }
+
+  private static readThreadLatestActivityIsUserMessage(
+    thread: Pick<ThreadListItem, "latestActivityIsUserMessage">,
+  ): boolean {
+    return thread.latestActivityIsUserMessage === true;
   }
 
   private static normalizeOptionalProjectPath(value: string | null | undefined): string {

@@ -158,6 +158,12 @@ describe("handleThreadRoutes", () => {
       nextCursor: null,
       pages: 0,
       truncated: false,
+      orderedThreadIds: undefined,
+      sync: {
+        mode: "full",
+        sinceUpdatedAt: null,
+        snapshotUpdatedAt: 0,
+      },
     });
   });
 

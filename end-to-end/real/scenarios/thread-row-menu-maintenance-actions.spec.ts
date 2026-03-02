@@ -346,25 +346,19 @@ test("row-menu compact and clean actions keep row and runtime-summary identity s
   const sidebarRuntimeProgressSummary = page.getByTestId("sidebar-runtime-progress-summary");
   const sidebarRuntimeTokenUsageSummary = page.getByTestId("sidebar-runtime-token-usage-summary");
   await expect(threadRow).toBeVisible();
-  await expect(threadRuntimeStatusBadge).toHaveText("Not loaded");
-  await expect(sidebarRuntimeAccountSummary).toHaveText("Account pro");
-  await expect(sidebarRuntimeProgressSummary).toHaveText("Progress n/a");
-  await expect(sidebarRuntimeTokenUsageSummary).toHaveText("Tokens n/a");
+  await expect(threadRuntimeStatusBadge).toHaveCount(0);
+  await expect(sidebarRuntimeAccountSummary).toHaveText("Account Type pro");
+  await expect(sidebarRuntimeProgressSummary).toHaveCount(0);
+  await expect(sidebarRuntimeTokenUsageSummary).toHaveCount(0);
   await threadRow.click();
 
   await threadRow.evaluate((element, identityProbeValue) => {
     const threadRowElement = element as ThreadRowIdentityProbeElement;
     threadRowElement.__threadRowIdentityProbe__ = identityProbeValue;
   }, ThreadRowIdentityProbeValue);
-  const runtimeStatusBadgeBefore = await threadRuntimeStatusBadge.evaluateHandle((node) => node);
   const sidebarRuntimeAccountSummaryBefore = await sidebarRuntimeAccountSummary.evaluateHandle(
     (node) => node,
   );
-  const sidebarRuntimeProgressSummaryBefore = await sidebarRuntimeProgressSummary.evaluateHandle(
-    (node) => node,
-  );
-  const sidebarRuntimeTokenUsageSummaryBefore =
-    await sidebarRuntimeTokenUsageSummary.evaluateHandle((node) => node);
 
   await clickThreadRowMenuAction(page, ThreadIdentifier, "Compact context");
   await expect
@@ -414,19 +408,7 @@ test("row-menu compact and clean actions keep row and runtime-summary identity s
   );
   expect(cleanIdentityIsStable).toBe(true);
 
-  const runtimeStatusBadgeAfter = await threadRuntimeStatusBadge.evaluateHandle((node) => node);
-  const runtimeStatusBadgeIdentityIsStable = await runtimeStatusBadgeBefore.evaluate(
-    (previousNode, nextNode) => previousNode === nextNode,
-    runtimeStatusBadgeAfter,
-  );
-  expect(runtimeStatusBadgeIdentityIsStable).toBe(true);
   const sidebarRuntimeAccountSummaryAfter = await sidebarRuntimeAccountSummary.evaluateHandle(
-    (node) => node,
-  );
-  const sidebarRuntimeProgressSummaryAfter = await sidebarRuntimeProgressSummary.evaluateHandle(
-    (node) => node,
-  );
-  const sidebarRuntimeTokenUsageSummaryAfter = await sidebarRuntimeTokenUsageSummary.evaluateHandle(
     (node) => node,
   );
   const sidebarRuntimeAccountSummaryIdentityIsStable =
@@ -434,19 +416,7 @@ test("row-menu compact and clean actions keep row and runtime-summary identity s
       (previousNode, nextNode) => previousNode === nextNode,
       sidebarRuntimeAccountSummaryAfter,
     );
-  const sidebarRuntimeTokenUsageSummaryIdentityIsStable =
-    await sidebarRuntimeTokenUsageSummaryBefore.evaluate(
-      (previousNode, nextNode) => previousNode === nextNode,
-      sidebarRuntimeTokenUsageSummaryAfter,
-    );
-  const sidebarRuntimeProgressSummaryIdentityIsStable =
-    await sidebarRuntimeProgressSummaryBefore.evaluate(
-      (previousNode, nextNode) => previousNode === nextNode,
-      sidebarRuntimeProgressSummaryAfter,
-    );
   expect(sidebarRuntimeAccountSummaryIdentityIsStable).toBe(true);
-  expect(sidebarRuntimeTokenUsageSummaryIdentityIsStable).toBe(true);
-  expect(sidebarRuntimeProgressSummaryIdentityIsStable).toBe(true);
 
   await expectNoErrorBanner(page);
   await expectNoUnexpectedClientErrors(sentinel);

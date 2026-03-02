@@ -13,6 +13,11 @@ interface ModeOption {
   label: string;
 }
 
+export interface RuntimeUsageSummaryLine {
+  label: string;
+  leftPercent: number;
+}
+
 const MODEL_PLACEHOLDER_TEXT = "Model";
 const EFFORT_PLACEHOLDER_TEXT = "Effort";
 const PLAN_LABEL_TEXT = "Plan";
@@ -43,6 +48,7 @@ export interface ChatModeToolbarProps {
   effortOptionsWithoutAssumedDefault: string[];
   isModeSyncing: boolean;
   pendingRequestCount: number;
+  runtimeUsageSummaryLines?: readonly RuntimeUsageSummaryLine[] | null;
   onTogglePlanMode: () => void;
   onModelChange: (nextModelId: string) => void;
   onReasoningEffortChange: (nextReasoningEffort: string) => void;
@@ -65,6 +71,7 @@ export function ChatModeToolbar({
   effortOptionsWithoutAssumedDefault,
   isModeSyncing,
   pendingRequestCount,
+  runtimeUsageSummaryLines,
   onTogglePlanMode,
   onModelChange,
   onReasoningEffortChange,
@@ -149,6 +156,22 @@ export function ChatModeToolbar({
           </SelectContent>
         </Select>
       )}
+      {runtimeUsageSummaryLines !== null &&
+        runtimeUsageSummaryLines !== undefined &&
+        runtimeUsageSummaryLines.length > 0 && (
+          <span
+            data-testid="chat-mode-toolbar-runtime-usage-summary"
+            className="shrink-0 rounded-lg border border-border/70 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground leading-tight"
+          >
+            <span className="flex flex-col gap-0.5">
+              {runtimeUsageSummaryLines.map((line, lineIndex) => (
+                <span
+                  key={`${line.label}-${String(line.leftPercent)}-${String(lineIndex)}`}
+                >{`${line.label} left ${String(line.leftPercent)}%`}</span>
+              ))}
+            </span>
+          </span>
+        )}
       {canSetCollaborationMode && (
         <span
           data-testid="chat-mode-toolbar-mode-syncing"

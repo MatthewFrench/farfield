@@ -37,6 +37,7 @@ import {
 import { ThreadListStateStore } from "../Source/Features/Threads/StateManagement/ThreadListStateStore";
 import { ThreadRefreshConcurrencyCoordinator } from "../Source/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
 import type { AgentId, ApiRequestOptions } from "../Source/Shared/Contracts/ApiContracts";
+import { RequestCanceledError } from "../Source/Shared/Errors/RequestCanceledError";
 
 const THREAD_QUERY_CACHE_TIME_TO_LIVE_MILLISECONDS = 60_000;
 const THREAD_QUERY_CACHE_MAXIMUM_ENTRIES = 10;
@@ -419,6 +420,68 @@ describe("useCoreDataLoaders", () => {
     });
 
     expect(harness.setHealthMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not report deferred startup request-cancellation errors", async () => {
+    const harness = createHarness("chat");
+    vi.spyOn(harness.threadListStateController, "loadActiveThreadState").mockResolvedValue(
+      ACTIVE_THREAD_STATE,
+    );
+    vi.spyOn(harness.capabilityServerClient, "readHealthStatus").mockRejectedValue(
+      new RequestCanceledError("/api/health"),
+    );
+    vi.spyOn(harness.capabilityServerClient, "listAgents").mockResolvedValue(AGENTS_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "listCollaborationModes").mockResolvedValue(
+      COLLABORATION_MODES_RESPONSE,
+    );
+    vi.spyOn(harness.capabilityServerClient, "listModels").mockResolvedValue(MODELS_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "readConfigDefaults").mockResolvedValue(
+      CONFIG_DEFAULTS_RESPONSE,
+    );
+
+    const loaders = await renderHarness(harness.input);
+
+    await act(async () => {
+      await loaders.loadCoreData();
+    });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+
+    expect(vi.mocked(harness.input.handleRuntimeRequestError)).not.toHaveBeenCalled();
+  });
+
+  it("does not report deferred startup transport cancellations caused by startup churn", async () => {
+    const harness = createHarness("chat");
+    vi.spyOn(harness.threadListStateController, "loadActiveThreadState").mockResolvedValue(
+      ACTIVE_THREAD_STATE,
+    );
+    vi.spyOn(harness.capabilityServerClient, "readHealthStatus").mockRejectedValue(
+      new Error("Request failed for /api/health: Failed to fetch status=n/a"),
+    );
+    vi.spyOn(harness.capabilityServerClient, "listAgents").mockRejectedValue(
+      new Error(
+        "Invalid JSON response from /api/agents: empty response status=200 OK requestId req_123",
+      ),
+    );
+    vi.spyOn(harness.capabilityServerClient, "listCollaborationModes").mockResolvedValue(
+      COLLABORATION_MODES_RESPONSE,
+    );
+    vi.spyOn(harness.capabilityServerClient, "listModels").mockResolvedValue(MODELS_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "readConfigDefaults").mockResolvedValue(
+      CONFIG_DEFAULTS_RESPONSE,
+    );
+
+    const loaders = await renderHarness(harness.input);
+
+    await act(async () => {
+      await loaders.loadCoreData();
+    });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+
+    expect(vi.mocked(harness.input.handleRuntimeRequestError)).not.toHaveBeenCalled();
   });
 
   it("skips archived-thread refresh during tracked core refresh before archived surface is loaded", async () => {

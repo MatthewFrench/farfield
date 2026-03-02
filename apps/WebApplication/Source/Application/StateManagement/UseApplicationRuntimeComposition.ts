@@ -41,13 +41,16 @@ export function useApplicationRuntimeComposition(
 
   const runtimeCompositionContext = createApplicationRuntimeCompositionContext(input);
 
-  const { loadSelectedThreadIfPresentFromRuntimeState, refreshCoreDataAndSelectedThread } =
-    useApplicationRuntimeRefreshOrchestration({
-      applicationShellState: input.applicationShellState,
-      loadCoreDataTracked: input.coreDataLoaders.loadCoreDataTracked,
-      loadSelectedThreadTracked: input.loadSelectedThreadTracked,
-      handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError,
-    });
+  const {
+    loadSelectedThreadIfPresentFromRuntimeState,
+    refreshSelectedThreadIncrementalIfPresent,
+    refreshCoreDataAndSelectedThread,
+  } = useApplicationRuntimeRefreshOrchestration({
+    applicationShellState: input.applicationShellState,
+    loadCoreDataTracked: input.coreDataLoaders.loadCoreDataTracked,
+    loadSelectedThreadTracked: input.loadSelectedThreadTracked,
+    handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError,
+  });
 
   const pushFeatureComposition = useApplicationPushFeatureComposition(
     buildApplicationPushFeatureCompositionInput(runtimeCompositionContext, {
@@ -60,6 +63,7 @@ export function useApplicationRuntimeComposition(
   useApplicationRefreshEffects(
     buildApplicationRefreshEffectsInput(runtimeCompositionContext, {
       refreshCoreDataAndSelectedThread,
+      refreshSelectedThreadIncrementalIfPresent,
       refreshPushClientState: pushFeatureComposition.refreshPushClientState,
       ensureFreshPushSettingsDiagnostics: pushFeatureComposition.ensureFreshPushSettingsDiagnostics,
     }),

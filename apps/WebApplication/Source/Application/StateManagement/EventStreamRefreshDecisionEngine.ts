@@ -24,6 +24,9 @@ const THREAD_ARCHIVED_NOTIFICATION_METHOD = "thread/archived";
 const THREAD_UNARCHIVED_NOTIFICATION_METHOD = "thread/unarchived";
 const THREAD_CLOSED_NOTIFICATION_METHOD = "thread/closed";
 const MODEL_REROUTED_NOTIFICATION_METHOD = "model/rerouted";
+const MCP_SERVER_OAUTH_LOGIN_COMPLETED_NOTIFICATION_METHOD = "mcpServer/oauthLogin/completed";
+const ACCOUNT_LOGIN_COMPLETED_NOTIFICATION_METHOD = "account/login/completed";
+const SERVER_REQUEST_RESOLVED_NOTIFICATION_METHOD = "serverRequest/resolved";
 const CONFIG_WARNING_NOTIFICATION_METHOD = "configWarning";
 const DEPRECATION_NOTICE_NOTIFICATION_METHOD = "deprecationNotice";
 const WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD = "windows/worldWritableWarning";
@@ -48,6 +51,9 @@ const RUNTIME_NOTIFICATION_PROJECTION_METHODS = new Set([
   THREAD_UNARCHIVED_NOTIFICATION_METHOD,
   THREAD_CLOSED_NOTIFICATION_METHOD,
   MODEL_REROUTED_NOTIFICATION_METHOD,
+  MCP_SERVER_OAUTH_LOGIN_COMPLETED_NOTIFICATION_METHOD,
+  ACCOUNT_LOGIN_COMPLETED_NOTIFICATION_METHOD,
+  SERVER_REQUEST_RESOLVED_NOTIFICATION_METHOD,
   CONFIG_WARNING_NOTIFICATION_METHOD,
   DEPRECATION_NOTICE_NOTIFICATION_METHOD,
   WINDOWS_WORLD_WRITABLE_WARNING_NOTIFICATION_METHOD,
@@ -232,7 +238,9 @@ export class EventStreamRefreshDecisionEngine implements EventStreamRefreshDecis
           const fullEnvelopeResult =
             FarfieldEventStreamEnvelopeSchema.safeParse(parsedEventPayload);
           if (!fullEnvelopeResult.success) {
-            refreshCore = true;
+            // When the selected-thread delta payload is malformed, recover by pulling the selected
+            // thread snapshot instead of relying on this event payload.
+            refreshSelectedThread = true;
             refreshHistory = refreshHistoryForDebugTab;
           } else if (fullEnvelopeResult.data.event.type === EVENT_TYPE_THREAD_STREAM_DELTA) {
             threadStreamDelta = fullEnvelopeResult.data.event.delta;

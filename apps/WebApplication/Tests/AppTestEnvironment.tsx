@@ -26,6 +26,7 @@ import {
 type StructuredDataObject = { [key: string]: StructuredDataValue };
 
 const HISTORY_EVENT_TIMESTAMP_BASE_MILLISECONDS = Date.parse("2026-02-26T00:00:00.000Z");
+const SELECTED_THREAD_SNAPSHOT_CACHE_DATABASE_NAME = "farfield-selected-thread-snapshot-cache.v1";
 
 function buildHistoryEventTimestampIso(sequence: number): string {
   return new Date(HISTORY_EVENT_TIMESTAMP_BASE_MILLISECONDS + sequence * 1_000).toISOString();
@@ -194,6 +195,24 @@ function resetFixtures(): void {
   };
 }
 
+async function clearSelectedThreadSnapshotCacheDatabase(): Promise<void> {
+  if (typeof indexedDB === "undefined") {
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const deleteRequest = indexedDB.deleteDatabase(SELECTED_THREAD_SNAPSHOT_CACHE_DATABASE_NAME);
+    deleteRequest.onsuccess = () => {
+      resolve();
+    };
+    deleteRequest.onblocked = () => {
+      resolve();
+    };
+    deleteRequest.onerror = () => {
+      reject(deleteRequest.error ?? new Error("Failed to clear selected-thread snapshot cache."));
+    };
+  });
+}
+
 function installGlobals(): void {
   if (globalsInstalled) {
     return;
@@ -238,6 +257,15 @@ function installGlobals(): void {
     clear: vi.fn(() => {
       localStorageState.clear();
     }),
+  });
+
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    get: () => "visible",
+  });
+  Object.defineProperty(document, "hidden", {
+    configurable: true,
+    get: () => false,
   });
 
   vi.stubGlobal(
@@ -325,6 +353,64 @@ function installGlobals(): void {
         return createJsonResponse(configDefaultsFixture);
       }
 
+      if (pathname === "/api/config/requirements") {
+        return createJsonResponse({
+          ok: true,
+          requirements: null,
+        });
+      }
+
+      if (pathname === "/api/account") {
+        return createJsonResponse({
+          ok: true,
+          account: {
+            type: "chatgpt",
+            email: "test@example.com",
+            planType: "plus",
+          },
+          requiresOpenaiAuth: false,
+        });
+      }
+
+      if (pathname === "/api/account/rate-limits") {
+        return createJsonResponse({
+          ok: true,
+          rateLimits: null,
+          rateLimitsByLimitId: null,
+        });
+      }
+
+      if (pathname === "/api/apps") {
+        return createJsonResponse({
+          ok: true,
+          data: [],
+          nextCursor: null,
+        });
+      }
+
+      if (pathname === "/api/experimental-features") {
+        return createJsonResponse({
+          ok: true,
+          data: [],
+          nextCursor: null,
+        });
+      }
+
+      if (pathname === "/api/mcp-servers") {
+        return createJsonResponse({
+          ok: true,
+          data: [],
+          nextCursor: null,
+        });
+      }
+
+      if (pathname === "/api/skills") {
+        return createJsonResponse({
+          ok: true,
+          data: [],
+        });
+      }
+
       if (pathname === "/api/debug/trace/status") {
         return createJsonResponse({
           ok: true,
@@ -386,7 +472,8 @@ function installGlobals(): void {
 export function registerAppTestEnvironment(): AppTestEnvironment {
   installGlobals();
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await clearSelectedThreadSnapshotCacheDatabase();
     resetFixtures();
   });
 

@@ -1,4 +1,4 @@
-import { Loader2, Menu, Moon, PanelLeft, RefreshCcw, Settings2, Sun } from "lucide-react";
+import { Loader2, Menu, PanelLeft, Settings2 } from "lucide-react";
 import { Button } from "@/Components/UserInterface/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/UserInterface/Tooltip";
 import {
@@ -74,13 +74,9 @@ export interface ApplicationHeaderBarProps {
   isGenerating: boolean;
   runtimeWarningSummary: ThreadRuntimeWarningSummary | null;
   runtimeModelRerouteSummary: ThreadRuntimeModelRerouteSummary | null;
-  isBusy: boolean;
-  theme: string;
   onOpenMobileSidebar: () => void;
   onOpenDesktopSidebar: () => void;
-  onRefresh: () => void;
   onToggleSettingsTab: () => void;
-  onToggleTheme: () => void;
   renderAgentFavicon: (agentId: AgentId, label: string, className: string) => React.ReactNode;
 }
 
@@ -92,17 +88,40 @@ function readRuntimeWarningBannerLabel(summary: ThreadRuntimeWarningSummary): st
   if (summary.method === "thread/realtime/started" || summary.method === "thread/realtime/closed") {
     return `Realtime: ${summary.summary}`;
   }
-  const prefix = summary.method === "error" ? "Error" : "Warning";
+  if (summary.method === "serverRequest/resolved") {
+    return `Request: ${summary.summary}`;
+  }
+  if (
+    summary.method === "mcpServer/oauthLogin/completed" ||
+    summary.method === "account/login/completed"
+  ) {
+    const authPrefix = summary.severity === "error" ? "Auth error" : "Auth";
+    return `${authPrefix}: ${summary.summary}`;
+  }
+  const prefix =
+    summary.severity === "error"
+      ? "Error"
+      : summary.severity === "success"
+        ? "Success"
+        : summary.severity === "info"
+          ? "Info"
+          : "Warning";
   const retrySuffix = summary.isRetrying ? " (retrying)" : "";
   return `${prefix}: ${summary.summary}${retrySuffix}`;
 }
 
 function readRuntimeWarningBannerClassName(summary: ThreadRuntimeWarningSummary): string {
-  if (summary.method === "error") {
+  if (summary.severity === "error") {
     return "text-[11px] text-red-500";
   }
   if (summary.method === "thread/realtime/started" || summary.method === "thread/realtime/closed") {
     return "text-[11px] text-sky-500";
+  }
+  if (summary.severity === "success") {
+    return "text-[11px] text-emerald-600";
+  }
+  if (summary.severity === "info") {
+    return "text-[11px] text-cyan-600";
   }
   return "text-[11px] text-amber-500";
 }
@@ -138,13 +157,9 @@ export function ApplicationHeaderBar({
   isGenerating,
   runtimeWarningSummary,
   runtimeModelRerouteSummary,
-  isBusy,
-  theme,
   onOpenMobileSidebar,
   onOpenDesktopSidebar,
-  onRefresh,
   onToggleSettingsTab,
-  onToggleTheme,
   renderAgentFavicon,
 }: ApplicationHeaderBarProps): React.JSX.Element {
   const handleOpenMobileSidebar = buildSidebarOpenHandler(
@@ -220,27 +235,12 @@ export function ApplicationHeaderBar({
 
       <div className="flex items-center gap-0.5 shrink-0">
         <HeaderIconButton
-          onClick={onRefresh}
-          disabled={isBusy}
-          title="Refresh"
-          testId="refresh-button"
-        >
-          <RefreshCcw size={14} className={isBusy ? "animate-spin" : ""} aria-hidden="true" />
-        </HeaderIconButton>
-        <HeaderIconButton
           onClick={onToggleSettingsTab}
           active={activeTab === DEBUG_TAB}
           title="Settings"
           testId="tab-settings"
         >
           <Settings2 size={14} aria-hidden="true" />
-        </HeaderIconButton>
-        <HeaderIconButton onClick={onToggleTheme} title="Toggle theme">
-          {theme === "dark" ? (
-            <Sun size={14} aria-hidden="true" />
-          ) : (
-            <Moon size={14} aria-hidden="true" />
-          )}
         </HeaderIconButton>
       </div>
     </header>

@@ -176,10 +176,14 @@ export class ThreadListStateStore {
       thread.id,
       String(thread.updatedAt),
       thread.displayName ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
+      thread.lastUserMessage ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
       thread.preview,
       thread.agentId,
       thread.cwd ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
       thread.path ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
+      String(thread.hasUnreadTurn ?? null),
+      String(thread.latestActivityIsUserMessage ?? false),
+      String(thread.isLoadedInMemory ?? false),
     ].join(THREAD_SIGNATURE_SEGMENT_DELIMITER);
   }
 }

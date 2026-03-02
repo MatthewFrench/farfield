@@ -262,7 +262,7 @@ describe("handlePushRoutes", () => {
       const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
       pushSendStore.load();
       const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
-      const createdAt = "2026-02-26T00:00:00.000Z";
+      const createdAt = new Date().toISOString();
 
       const recordResult = await executePushRoute({
         method: PushRouteMethodByName.post,
@@ -349,7 +349,7 @@ describe("handlePushRoutes", () => {
       const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
       pushSendStore.load();
       const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
-      const createdAt = "2026-02-26T00:00:00.000Z";
+      const createdAt = new Date().toISOString();
 
       const recordResult = await executePushRoute({
         method: PushRouteMethodByName.post,

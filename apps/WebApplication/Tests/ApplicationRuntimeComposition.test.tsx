@@ -49,6 +49,7 @@ interface ApplicationRefreshEffectsCapture {
   ensureFreshPushSettingsDiagnostics: () => Promise<void>;
   loadCoreDataTracked: () => Promise<void>;
   refreshCoreDataAndSelectedThread: () => Promise<void>;
+  refreshSelectedThreadIncrementalIfPresent: () => Promise<void>;
 }
 
 interface ApplicationSynchronizationEffectsCapture {
@@ -676,8 +677,61 @@ describe("useApplicationRuntimeComposition", () => {
 
     expect(firstCoreLoader).toHaveBeenCalledTimes(1);
     expect(secondCoreLoader).toHaveBeenCalledTimes(1);
-    expect(firstSelectedThreadLoader).toHaveBeenCalledWith("thread-1");
-    expect(secondSelectedThreadLoader).toHaveBeenCalledWith("thread-2");
+    expect(firstSelectedThreadLoader).toHaveBeenCalledWith("thread-1", undefined);
+    expect(secondSelectedThreadLoader).toHaveBeenCalledWith("thread-2", undefined);
+  });
+
+  it("reads current selected-thread loader ref for incremental refresh invocations", async () => {
+    render(<RuntimeCompositionHarness />);
+    const harnessSnapshot = latestRuntimeHarnessSnapshot;
+    if (!harnessSnapshot) {
+      throw new Error("Expected runtime harness snapshot to be captured");
+    }
+    const refreshEffectsInput = applicationRefreshEffectsCapture;
+    if (!refreshEffectsInput) {
+      throw new Error("Expected refresh effects input to be captured");
+    }
+
+    const firstSelectedThreadLoader = vi.fn(
+      async (
+        _threadId: string,
+        _options?: {
+          includeTurns?: boolean;
+          includeReadThread?: boolean;
+        },
+      ): Promise<void> => {},
+    );
+    const secondSelectedThreadLoader = vi.fn(
+      async (
+        _threadId: string,
+        _options?: {
+          includeTurns?: boolean;
+          includeReadThread?: boolean;
+        },
+      ): Promise<void> => {},
+    );
+
+    harnessSnapshot.applicationShellState.loadSelectedThreadRef.current = firstSelectedThreadLoader;
+    harnessSnapshot.applicationShellState.selectedThreadIdRef.current = "thread-1";
+    await act(async (): Promise<void> => {
+      await refreshEffectsInput.refreshSelectedThreadIncrementalIfPresent();
+    });
+
+    harnessSnapshot.applicationShellState.loadSelectedThreadRef.current =
+      secondSelectedThreadLoader;
+    harnessSnapshot.applicationShellState.selectedThreadIdRef.current = "thread-2";
+    await act(async (): Promise<void> => {
+      await refreshEffectsInput.refreshSelectedThreadIncrementalIfPresent();
+    });
+
+    expect(firstSelectedThreadLoader).toHaveBeenCalledWith("thread-1", {
+      includeReadThread: true,
+      includeTurns: false,
+    });
+    expect(secondSelectedThreadLoader).toHaveBeenCalledWith("thread-2", {
+      includeReadThread: true,
+      includeTurns: false,
+    });
   });
 
   it("reports invariant violation when selected-thread loader ref is missing", async () => {

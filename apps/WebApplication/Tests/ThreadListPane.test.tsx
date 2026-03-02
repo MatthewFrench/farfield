@@ -192,8 +192,136 @@ describe("ThreadListPane", () => {
     expect(screen.getByTestId("thread-runtime-status-badge-thread_active_one").textContent).toBe(
       "Awaiting approval",
     );
-    expect(screen.getByTestId("thread-runtime-status-badge-thread_active_two").textContent).toBe(
-      "Not loaded",
+    expect(screen.queryByTestId("thread-runtime-status-badge-thread_active_two")).toBeNull();
+  });
+
+  it("shows a generating spinner for non-selected rows with active runtime status", () => {
+    cleanup();
+    render(
+      <ThreadListPane
+        {...createThreadListPaneProperties({
+          selectedThreadId: "thread_active_one",
+          isGenerating: false,
+          threadRuntimeStatusByThreadIdentifier: {
+            thread_active_two: {
+              sequence: 25,
+              statusType: "active",
+              activeFlags: [],
+              receivedAtMilliseconds: 8_500,
+            },
+          },
+        })}
+      />,
     );
+
+    expect(screen.queryByTestId("thread-generating-indicator-thread_active_two")).not.toBeNull();
+  });
+
+  it("prefers last user message text for active thread row titles", () => {
+    cleanup();
+    const firstActiveThread = ACTIVE_THREAD_ITEMS[0];
+    const firstActiveProjectGroup = ACTIVE_PROJECT_GROUPS[0];
+    if (firstActiveThread === undefined || firstActiveProjectGroup === undefined) {
+      throw new Error("Thread list test fixtures must include at least one active thread group.");
+    }
+    const threadWithLatestUserMessage: ThreadListItem = {
+      ...firstActiveThread,
+      id: "thread_with_latest_user_message",
+      preview: "Initial thread preview",
+      lastUserMessage: "Latest user request to refactor dashboard filters",
+    };
+    render(
+      <ThreadListPane
+        {...createThreadListPaneProperties({
+          threads: [threadWithLatestUserMessage],
+          activeProjectGroups: [
+            {
+              ...firstActiveProjectGroup,
+              key: "project:/Users/example/latest-user-message",
+              projectPath: "/Users/example/latest-user-message",
+              label: "latest-user-message",
+              threads: [threadWithLatestUserMessage],
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.queryByText("Latest user request to refactor dashboard filters")).not.toBeNull();
+    expect(screen.queryByText("Initial thread preview")).toBeNull();
+  });
+
+  it("falls back to metadata thread name when last user message is unavailable", () => {
+    cleanup();
+    const firstActiveThread = ACTIVE_THREAD_ITEMS[0];
+    const firstActiveProjectGroup = ACTIVE_PROJECT_GROUPS[0];
+    if (firstActiveThread === undefined || firstActiveProjectGroup === undefined) {
+      throw new Error("Thread list test fixtures must include at least one active thread group.");
+    }
+    const threadWithMetadataName: ThreadListItem = {
+      ...firstActiveThread,
+      id: "thread_with_metadata_name",
+      preview: "Preview fallback should not render",
+      displayName: "Metadata-provided thread name",
+      lastUserMessage: undefined,
+    };
+    render(
+      <ThreadListPane
+        {...createThreadListPaneProperties({
+          threads: [threadWithMetadataName],
+          activeProjectGroups: [
+            {
+              ...firstActiveProjectGroup,
+              key: "project:/Users/example/metadata-name",
+              projectPath: "/Users/example/metadata-name",
+              label: "metadata-name",
+              threads: [threadWithMetadataName],
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.queryByText("Metadata-provided thread name")).not.toBeNull();
+    expect(screen.queryByText("Preview fallback should not render")).toBeNull();
+  });
+
+  it("renders thread row labels with a two-line clamp style", () => {
+    cleanup();
+    render(<ThreadListPane {...createThreadListPaneProperties()} />);
+
+    const firstThreadRow = screen.getAllByTestId("thread-list-item")[0];
+    if (firstThreadRow === undefined) {
+      throw new Error("Expected at least one thread list row for wrapping assertions.");
+    }
+    const firstThreadLabel = screen.getByText("Payment bug investigation");
+    expect(firstThreadRow.className).toContain("whitespace-normal");
+    expect(firstThreadLabel.className).toContain("line-clamp-2");
+  });
+
+  it("renders row action menu above no-wrap time metadata", () => {
+    cleanup();
+    render(
+      <ThreadListPane
+        {...createThreadListPaneProperties({
+          isArchivedThreadsOpen: false,
+          formatDate: () => "1d ago",
+        })}
+      />,
+    );
+
+    const menuTriggerForFirstThread = screen
+      .getAllByTestId("thread-row-menu-trigger")
+      .find((element) => element.getAttribute("data-thread-id") === "thread_active_one");
+    if (menuTriggerForFirstThread === undefined) {
+      throw new Error("Expected menu trigger for first active thread.");
+    }
+    const firstThreadTime = screen.getByTestId("thread-row-time-thread_active_one");
+
+    expect(firstThreadTime.className).toContain("whitespace-nowrap");
+    expect(
+      menuTriggerForFirstThread.compareDocumentPosition(firstThreadTime) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
   });
 });

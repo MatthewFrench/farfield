@@ -62,6 +62,8 @@ function createAgentAdapter(input: {
   ) => Promise<void>;
   unsubscribeThread?: (value: AgentUnsubscribeThreadInput) => Promise<AgentUnsubscribeThreadStatus>;
   startThreadReview?: (value: AgentStartThreadReviewInput) => Promise<AgentStartThreadReviewResult>;
+  isThreadNotLoadedError?: (error: Error) => boolean;
+  isConversationNotFoundError?: (error: Error) => boolean;
 }): AgentAdapter {
   return {
     id: "codex",
@@ -187,6 +189,18 @@ function createAgentAdapter(input: {
       }
       return input.startThreadReview(inputValue);
     },
+    isThreadNotLoadedError(error: Error): boolean {
+      if (!input.isThreadNotLoadedError) {
+        return false;
+      }
+      return input.isThreadNotLoadedError(error);
+    },
+    isConversationNotFoundError(error: Error): boolean {
+      if (!input.isConversationNotFoundError) {
+        return false;
+      }
+      return input.isConversationNotFoundError(error);
+    },
   };
 }
 
@@ -238,6 +252,11 @@ function createContext(adapter: AgentAdapter): ThreadMemberResolvedRouteContext 
     adapter,
     agentId: "codex",
   };
+}
+
+interface ContextBoundUnsubscribeAdapter extends AgentAdapter {
+  observedThreadIds: string[];
+  unsubscribeThread(input: AgentUnsubscribeThreadInput): Promise<AgentUnsubscribeThreadStatus>;
 }
 
 describe("ThreadMemberMutationRouteOwner", () => {
@@ -872,6 +891,245 @@ describe("ThreadMemberMutationRouteOwner", () => {
       ok: true,
       threadId: "thread-1",
       status: "unsubscribed",
+    });
+  });
+
+  it("invokes unsubscribe mutation methods with adapter instance context", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const adapter: ContextBoundUnsubscribeAdapter = {
+      ...createAgentAdapter({
+        sendMessage: async () => {},
+      }),
+      observedThreadIds: [],
+      async unsubscribeThread(inputValue: AgentUnsubscribeThreadInput) {
+        this.observedThreadIds.push(inputValue.threadId);
+        return "unsubscribed";
+      },
+    };
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "unsubscribe"],
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(adapter.observedThreadIds).toEqual(["thread-1"]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
+      status: "unsubscribed",
+    });
+  });
+
+  it("normalizes unsubscribe thread-not-loaded errors into a notLoaded status response", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const adapter = createAgentAdapter({
+      sendMessage: async () => {},
+      unsubscribeThread: async () => {
+        throw new Error("thread not loaded in app-server");
+      },
+      isThreadNotLoadedError: (error) => error.message.includes("thread not loaded"),
+    });
+
+    const actionEvents: Array<{
+      action: string;
+      stage: "attempt" | "success" | "error";
+    }> = [];
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "unsubscribe"],
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: (action, stage) => {
+          actionEvents.push({ action, stage });
+        },
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(actionEvents).toEqual([
+      {
+        action: ThreadMemberMutationActionByName.threadUnsubscribe,
+        stage: "attempt",
+      },
+      {
+        action: ThreadMemberMutationActionByName.threadUnsubscribe,
+        stage: "success",
+      },
+    ]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
+      status: "notLoaded",
+    });
+  });
+
+  it("normalizes unsubscribe conversation-not-found errors into a notLoaded status response", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const adapter = createAgentAdapter({
+      sendMessage: async () => {},
+      unsubscribeThread: async () => {
+        throw new Error("conversation not found");
+      },
+      isConversationNotFoundError: (error) => error.message.includes("conversation not found"),
+    });
+
+    const actionEvents: Array<{
+      action: string;
+      stage: "attempt" | "success" | "error";
+    }> = [];
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "unsubscribe"],
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: (action, stage) => {
+          actionEvents.push({ action, stage });
+        },
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(actionEvents).toEqual([
+      {
+        action: ThreadMemberMutationActionByName.threadUnsubscribe,
+        stage: "attempt",
+      },
+      {
+        action: ThreadMemberMutationActionByName.threadUnsubscribe,
+        stage: "success",
+      },
+    ]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
+      status: "notLoaded",
+    });
+  });
+
+  it("normalizes unsubscribe errors with known not-loaded messages when classifier hooks are unavailable", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const adapter = createAgentAdapter({
+      sendMessage: async () => {},
+      unsubscribeThread: async () => {
+        throw new Error("conversation not found in app-server");
+      },
+    });
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "unsubscribe"],
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
+      status: "notLoaded",
+    });
+  });
+
+  it("normalizes unexpected unsubscribe failures into notLoaded status for client stability", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const adapter = createAgentAdapter({
+      sendMessage: async () => {},
+      unsubscribeThread: async () => {
+        throw new Error("transient unsubscribe transport failure");
+      },
+    });
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "unsubscribe"],
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
+      status: "notLoaded",
     });
   });
 

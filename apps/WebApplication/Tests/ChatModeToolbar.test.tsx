@@ -26,6 +26,7 @@ const baseChatModeToolbarProperties: ChatModeToolbarProps = {
   effortOptionsWithoutAssumedDefault: ["low", "high"],
   isModeSyncing: false,
   pendingRequestCount: 0,
+  runtimeUsageSummaryLines: null,
   onTogglePlanMode: () => {},
   onModelChange: () => {},
   onReasoningEffortChange: () => {},
@@ -53,6 +54,7 @@ interface ChatModeToolbarPropertyOverrides {
   effortOptionsWithoutAssumedDefault?: string[];
   isModeSyncing?: boolean;
   pendingRequestCount?: number;
+  runtimeUsageSummaryLines?: Array<{ label: string; leftPercent: number }> | null;
   onTogglePlanMode?: () => void;
   onModelChange?: (nextModelId: string) => void;
   onReasoningEffortChange?: (nextReasoningEffort: string) => void;
@@ -114,6 +116,34 @@ describe("ChatModeToolbar", () => {
     );
 
     expect(screen.queryByTestId("chat-mode-toolbar-pending-count")).toBeNull();
+  });
+
+  it("shows runtime usage summary when available", () => {
+    renderChatModeToolbar(
+      buildChatModeToolbarProperties({
+        runtimeUsageSummaryLines: [
+          { label: "5h", leftPercent: 58 },
+          { label: "Weekly", leftPercent: 73 },
+        ],
+      }),
+    );
+
+    expect(screen.getByTestId("chat-mode-toolbar-runtime-usage-summary").textContent).toContain(
+      "5h left 58%",
+    );
+    expect(screen.getByTestId("chat-mode-toolbar-runtime-usage-summary").textContent).toContain(
+      "Weekly left 73%",
+    );
+  });
+
+  it("hides runtime usage summary when unavailable", () => {
+    renderChatModeToolbar(
+      buildChatModeToolbarProperties({
+        runtimeUsageSummaryLines: null,
+      }),
+    );
+
+    expect(screen.queryByTestId("chat-mode-toolbar-runtime-usage-summary")).toBeNull();
   });
 
   it("disables model and reasoning controls when no thread is selected", () => {

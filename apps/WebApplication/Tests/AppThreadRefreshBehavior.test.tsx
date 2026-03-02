@@ -28,6 +28,7 @@ describe("App", () => {
   it("updates the picker when remote model changes with same updatedAt and turns", async () => {
     const threadId = "thread-1";
     let modelId = "gpt-old-codex";
+    environment.setPathname(`/threads/${threadId}`);
 
     environment.setThreadsFixture({
       ok: true,
@@ -256,6 +257,7 @@ describe("App", () => {
           preview: "updated thread",
           createdAt: 1700000001,
           updatedAt: 1700000000,
+          hasUnreadTurn: false,
           cwd: "/tmp/project",
           source: "opencode",
           agentId: "codex",
@@ -294,6 +296,7 @@ describe("App", () => {
           preview: "updated thread",
           createdAt: 1700000001,
           updatedAt: 1700000050,
+          hasUnreadTurn: true,
           cwd: "/tmp/project",
           source: "opencode",
           agentId: "codex",
@@ -312,6 +315,96 @@ describe("App", () => {
 
     const updatedThreadButton = await waitForThreadListItemByIdentifier(updatedId);
     fireEvent.click(updatedThreadButton);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId(`thread-unread-indicator-${updatedId}`)).toBeNull();
+    });
+  });
+
+  it("does not show unread marker when latest thread activity is a user message", async () => {
+    const selectedId = "thread-1";
+    const updatedId = "thread-2";
+    environment.setPathname(`/threads/${selectedId}`);
+
+    environment.setThreadsFixture({
+      ok: true,
+      data: [
+        {
+          id: selectedId,
+          preview: "selected thread",
+          createdAt: 1700000000,
+          updatedAt: 1700000000,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+        },
+        {
+          id: updatedId,
+          preview: "updated thread",
+          createdAt: 1700000001,
+          updatedAt: 1700000000,
+          hasUnreadTurn: true,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+        },
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false,
+    });
+
+    environment.setReadThreadResolver((threadId: string, _includeTurns: boolean) => ({
+      ok: true,
+      thread: environment.buildConversationStateFixture(threadId, "gpt-5.3-codex"),
+      agentId: "codex",
+    }));
+
+    environment.renderApp();
+
+    await waitForThreadListItemByIdentifier(selectedId);
+
+    environment.setThreadsFixture({
+      ok: true,
+      data: [
+        {
+          id: selectedId,
+          preview: "selected thread",
+          createdAt: 1700000000,
+          updatedAt: 1700000000,
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+        },
+        {
+          id: updatedId,
+          preview: "updated thread",
+          createdAt: 1700000001,
+          updatedAt: 1700000050,
+          hasUnreadTurn: true,
+          turns: [
+            {
+              id: "turn-user-1",
+              items: [
+                {
+                  id: "user-item-1",
+                  type: "userMessage",
+                  content: [{ type: "text", text: "user just replied in this thread" }],
+                },
+              ],
+            },
+          ],
+          cwd: "/tmp/project",
+          source: "opencode",
+          agentId: "codex",
+        },
+      ],
+      nextCursor: null,
+      pages: 1,
+      truncated: false,
+    });
+
+    environment.emitHistoryEventForThread(updatedId);
 
     await waitFor(() => {
       expect(screen.queryByTestId(`thread-unread-indicator-${updatedId}`)).toBeNull();

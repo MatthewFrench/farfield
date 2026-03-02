@@ -474,14 +474,13 @@ async function loadAdapterLoadedThreadIdentifierSet(input: {
   listThreadsTimeoutMs: number;
   withTimeout: ThreadCollectionRouteWithTimeout;
 }): Promise<Set<string> | null> {
-  const listLoadedThreads = input.adapter.listLoadedThreads;
-  if (listLoadedThreads === undefined) {
+  if (input.adapter.listLoadedThreads === undefined) {
     return null;
   }
 
   try {
     const loadedThreads = await input.withTimeout(
-      listLoadedThreads(),
+      input.adapter.listLoadedThreads(),
       input.listThreadsTimeoutMs,
       buildListLoadedThreadsTimeoutLabel(input.adapter.id),
     );

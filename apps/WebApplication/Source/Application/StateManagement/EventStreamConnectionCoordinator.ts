@@ -70,7 +70,7 @@ function readInitialRefreshFlags(snapshot: EventStreamConnectionSnapshot): Event
     refreshCore: true,
     refreshHistory: snapshot.activeTab === DEBUG_ACTIVE_TAB,
     refreshSelectedThread: Boolean(snapshot.selectedThreadId),
-    refreshNotificationProjections: false,
+    refreshNotificationProjections: true,
   };
 }
 

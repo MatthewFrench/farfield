@@ -13,6 +13,10 @@ const MISSING_CORE_DATA_LOADER_ERROR_MESSAGE =
   "Runtime refresh invariant violated: core-data loader is unavailable.";
 const MISSING_SELECTED_THREAD_LOADER_ERROR_MESSAGE =
   "Runtime refresh invariant violated: selected-thread loader is unavailable for active selection.";
+const SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS = {
+  includeReadThread: true,
+  includeTurns: false,
+} as const;
 
 type CoreDataLoadFunction = CoreDataLoaders["loadCoreDataTracked"];
 type SelectedThreadLoadFunction = SelectedThreadLoaders["loadSelectedThreadTracked"];
@@ -33,6 +37,7 @@ export interface UseApplicationRuntimeRefreshOrchestrationInput {
 
 export interface ApplicationRuntimeRefreshOrchestration {
   loadSelectedThreadIfPresentFromRuntimeState: () => Promise<void>;
+  refreshSelectedThreadIncrementalIfPresent: () => Promise<void>;
   refreshCoreDataAndSelectedThread: () => Promise<void>;
 }
 
@@ -48,6 +53,10 @@ function resolveCoreDataLoadFunction(
 async function refreshSelectedThreadIfPresent(
   selectedThreadIdentifier: string | null,
   loadSelectedThreadFunction: SelectedThreadLoadFunction | null,
+  options?: {
+    includeTurns?: boolean;
+    includeReadThread?: boolean;
+  },
 ): Promise<void> {
   if (selectedThreadIdentifier === null) {
     return;
@@ -55,7 +64,7 @@ async function refreshSelectedThreadIfPresent(
   if (loadSelectedThreadFunction === null) {
     throw new Error(MISSING_SELECTED_THREAD_LOADER_ERROR_MESSAGE);
   }
-  await loadSelectedThreadFunction(selectedThreadIdentifier);
+  await loadSelectedThreadFunction(selectedThreadIdentifier, options);
 }
 
 function completeRuntimeRefreshMeasurement(
@@ -86,6 +95,19 @@ export function useApplicationRuntimeRefreshOrchestration(
     }
     await input.loadSelectedThreadTracked(selectedThreadIdentifier);
   }, [input.applicationShellState.selectedThreadIdRef, input.loadSelectedThreadTracked]);
+
+  // Watchdog-selected thread refreshes use an incremental contract so UI recovers from missed
+  // stream deltas without repeatedly reloading full turn payloads.
+  const refreshSelectedThreadIncrementalIfPresent = useCallback(async (): Promise<void> => {
+    await refreshSelectedThreadIfPresent(
+      input.applicationShellState.selectedThreadIdRef.current,
+      input.applicationShellState.loadSelectedThreadRef.current,
+      SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS,
+    );
+  }, [
+    input.applicationShellState.loadSelectedThreadRef,
+    input.applicationShellState.selectedThreadIdRef,
+  ]);
 
   // Keep refresh ordering and loading-state transitions consistent for startup
   // and manual header refresh actions through one runtime-owned operation.
@@ -125,6 +147,7 @@ export function useApplicationRuntimeRefreshOrchestration(
 
   return {
     loadSelectedThreadIfPresentFromRuntimeState,
+    refreshSelectedThreadIncrementalIfPresent,
     refreshCoreDataAndSelectedThread,
   };
 }

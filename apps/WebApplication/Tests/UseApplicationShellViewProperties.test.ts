@@ -553,10 +553,11 @@ describe("useApplicationShellViewProperties", () => {
     cleanup();
   });
 
-  it("wires header actions to the expected owner callbacks", () => {
+  it("wires header and settings actions to the expected owner callbacks", () => {
     const fixture = createUseApplicationShellViewPropertiesFixture();
     const viewProperties = renderViewProperties(fixture.input);
     const headerProperties = viewProperties.applicationHeaderBarProperties;
+    const settingsProperties = viewProperties.settingsWorkspacePaneProperties;
 
     headerProperties.onOpenMobileSidebar();
     expect(fixture.setMobileSidebarOpenSpy).toHaveBeenCalledWith(true);
@@ -566,10 +567,10 @@ describe("useApplicationShellViewProperties", () => {
     expect(fixture.setDesktopSidebarOpenSpy).toHaveBeenCalledWith(true);
     expect(fixture.setActiveTabSpy).toHaveBeenLastCalledWith("chat");
 
-    headerProperties.onRefresh();
+    settingsProperties.onRefreshData();
     expect(fixture.refreshCoreDataAndSelectedThreadSpy).toHaveBeenCalledTimes(1);
 
-    headerProperties.onToggleTheme();
+    settingsProperties.onToggleTheme();
     expect(fixture.toggleThemeSpy).toHaveBeenCalledTimes(1);
 
     headerProperties.onToggleSettingsTab();
@@ -590,6 +591,11 @@ describe("useApplicationShellViewProperties", () => {
         limitId: "codex",
         planType: "pro",
         usedPercent: 42,
+        primaryWindow: {
+          usedPercent: 42,
+          windowDurationMinutes: 300,
+        },
+        secondaryWindow: null,
         refreshedAtMilliseconds: 1_700_000_000_000,
       },
       apps: {
@@ -616,6 +622,11 @@ describe("useApplicationShellViewProperties", () => {
         limitId: "codex",
         planType: "pro",
         usedPercent: 42,
+        primaryWindow: {
+          usedPercent: 42,
+          windowDurationMinutes: 300,
+        },
+        secondaryWindow: null,
         refreshedAtMilliseconds: 1_700_000_000_000,
       },
       apps: {
@@ -629,6 +640,47 @@ describe("useApplicationShellViewProperties", () => {
     });
   });
 
+  it("maps rate-limit summary into chat toolbar runtime usage lines", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.threadSidebarRuntimeSummary = {
+      account: null,
+      rateLimits: {
+        limitId: "codex",
+        planType: "pro",
+        usedPercent: 42,
+        primaryWindow: {
+          usedPercent: 42,
+          windowDurationMinutes: 300,
+        },
+        secondaryWindow: {
+          usedPercent: 12,
+          windowDurationMinutes: 10_080,
+        },
+        refreshedAtMilliseconds: 1_700_000_000_000,
+      },
+      apps: null,
+      progress: null,
+      warning: null,
+      tokenUsage: null,
+      modelReroute: null,
+    };
+
+    const viewProperties = renderViewProperties(fixture.input);
+
+    expect(
+      viewProperties.chatWorkspacePaneProperties.chatModeToolbarProperties.runtimeUsageSummaryLines,
+    ).toEqual([
+      {
+        label: "5h",
+        leftPercent: 58,
+      },
+      {
+        label: "Weekly",
+        leftPercent: 88,
+      },
+    ]);
+  });
+
   it("maps runtime warning summary into header properties", () => {
     const fixture = createUseApplicationShellViewPropertiesFixture();
     fixture.input.threadSidebarRuntimeSummary = {
@@ -638,6 +690,7 @@ describe("useApplicationShellViewProperties", () => {
       progress: null,
       warning: {
         method: "configWarning",
+        severity: "warning",
         summary: "Config file has an unknown key",
         threadId: null,
         isRetrying: false,
@@ -653,6 +706,7 @@ describe("useApplicationShellViewProperties", () => {
 
     expect(viewProperties.applicationHeaderBarProperties.runtimeWarningSummary).toEqual({
       method: "configWarning",
+      severity: "warning",
       summary: "Config file has an unknown key",
       threadId: null,
       isRetrying: false,

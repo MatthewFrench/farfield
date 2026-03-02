@@ -38,6 +38,8 @@ const ApiErrorEnvelopeSchema = z
     error: z.string().min(1)
   })
   .strict();
+const THREAD_BASELINE_FETCH_MAXIMUM_ATTEMPTS = 12;
+const THREAD_BASELINE_FETCH_RETRY_DELAY_MILLISECONDS = 500;
 
 function isManagedThreadAlreadyGone(errorMessage: string): boolean {
   return (
@@ -71,6 +73,26 @@ function isThreadMutationPath(pathname: string): boolean {
     pathname.endsWith("/user-input") ||
     pathname.endsWith("/interrupt")
   );
+}
+
+function shouldRetryThreadBaselineFetch(statusCode: number): boolean {
+  return statusCode === 429 || statusCode >= 500;
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+function readErrorMessage<ErrorType>(error: ErrorType): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  return String(error);
 }
 
 export class RealAppStateIsolationGuard {
@@ -192,18 +214,41 @@ export class RealAppStateIsolationGuard {
   }
 
   private async fetchThreadIds(): Promise<string[]> {
-    const response = await this.request.get(
-      "/api/threads?limit=200&archived=false&all=true&maxPages=20"
-    );
-    if (!response.ok()) {
-      throw new Error(
-        `Thread baseline fetch failed: GET /api/threads -> HTTP ${String(response.status())}`
-      );
+    for (
+      let attemptIndex = 0;
+      attemptIndex < THREAD_BASELINE_FETCH_MAXIMUM_ATTEMPTS;
+      attemptIndex += 1
+    ) {
+      const isFinalAttempt = attemptIndex + 1 >= THREAD_BASELINE_FETCH_MAXIMUM_ATTEMPTS;
+
+      try {
+        const response = await this.request.get(
+          "/api/threads?limit=200&archived=false&all=true&maxPages=20"
+        );
+        if (response.ok()) {
+          const payload = await response.json();
+          const parsed = ThreadListEnvelopeSchema.parse(payload);
+          return parsed.data.map((thread) => thread.id);
+        }
+
+        const statusCode = response.status();
+        if (isFinalAttempt || !shouldRetryThreadBaselineFetch(statusCode)) {
+          throw new Error(
+            `Thread baseline fetch failed: GET /api/threads -> HTTP ${String(statusCode)}`
+          );
+        }
+      } catch (error) {
+        if (isFinalAttempt) {
+          throw new Error(
+            `Thread baseline fetch failed: GET /api/threads -> ${readErrorMessage(error)}`
+          );
+        }
+      }
+
+      await delay(THREAD_BASELINE_FETCH_RETRY_DELAY_MILLISECONDS);
     }
 
-    const payload = await response.json();
-    const parsed = ThreadListEnvelopeSchema.parse(payload);
-    return parsed.data.map((thread) => thread.id);
+    throw new Error("Thread baseline fetch failed: exhausted retry attempts");
   }
 
   private async archiveManagedThreads(): Promise<void> {

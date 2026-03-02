@@ -25,6 +25,9 @@ interface StreamEventsResponse {
   resetRequired: boolean;
 }
 
+const STREAM_EVENTS_ROUTE_PATTERN = "**/api/threads/*/stream-events*";
+const THREAD_UNSUBSCRIBE_ROUTE_PATTERN = "**/api/threads/*/unsubscribe";
+
 function buildStreamEvent(method: string): StreamEventsResponse["events"][number] {
   return {
     type: "broadcast",
@@ -58,6 +61,14 @@ function readThreadIdFromStreamEventsPath(pathname: string): string | null {
   return decodeURIComponent(match[1]);
 }
 
+function buildUnsubscribeThreadResponse(threadId: string) {
+  return {
+    ok: true,
+    threadId,
+    status: "notSubscribed",
+  } as const;
+}
+
 test("debug stream cards keep retained node identity when retention windows shift", async ({
   page,
   sentinel,
@@ -67,7 +78,7 @@ test("debug stream cards keep retained node identity when retention windows shif
   );
   const appendedStreamEvent = buildStreamEvent("event-400");
 
-  await page.route("**/api/threads/*/stream-events?*", async (route) => {
+  await page.route(STREAM_EVENTS_ROUTE_PATTERN, async (route) => {
     const requestUrl = new URL(route.request().url());
     const threadId = readThreadIdFromStreamEventsPath(requestUrl.pathname);
     const sinceSequence = requestUrl.searchParams.get("sinceSequence");
@@ -122,41 +133,60 @@ test("debug stream cards keep retained node identity when retention windows shif
       ),
     });
   });
+  await page.route(THREAD_UNSUBSCRIBE_ROUTE_PATTERN, async (route) => {
+    const pathSegments = new URL(route.request().url()).pathname
+      .split("/")
+      .filter((segment) => segment.length > 0);
+    const threadIdSegment = pathSegments[2];
+    if (threadIdSegment === undefined) {
+      await route.continue();
+      return;
+    }
+    const threadId = decodeURIComponent(threadIdSegment);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(buildUnsubscribeThreadResponse(threadId)),
+    });
+  });
 
-  await openAppHome(page);
-  await openSidebarIfHidden(page);
-  const selection = await selectFirstThreadIfAny(page);
-  if (!selection.selected) {
-    await page.unroute("**/api/threads/*/stream-events?*");
-    return;
+  try {
+    await openAppHome(page);
+    await openSidebarIfHidden(page);
+    const selection = await selectFirstThreadIfAny(page);
+    if (!selection.selected) {
+      return;
+    }
+
+    await openDebugTab(page);
+    await page.getByRole("tab", { name: "Stream" }).click();
+    await expect(page.getByTestId("debug-stream-events-panel")).toBeVisible();
+    await expect(page.getByText("event-1").first()).toBeVisible();
+
+    const retainedCardBefore = await page
+      .getByText("event-1")
+      .first()
+      .evaluateHandle((node) => node.closest('[data-testid="stream-event-card"]'));
+
+    await triggerHeaderRefresh(page);
+    await expect(page.getByText("event-400").first()).toBeVisible();
+    await expect(page.getByText("event-0")).toHaveCount(0);
+
+    const retainedCardAfter = await page
+      .getByText("event-1")
+      .first()
+      .evaluateHandle((node) => node.closest('[data-testid="stream-event-card"]'));
+
+    const retainedCardIdentityIsStable = await retainedCardBefore.evaluate(
+      (previousNode, nextNode) => previousNode === nextNode,
+      retainedCardAfter,
+    );
+    expect(retainedCardIdentityIsStable).toBe(true);
+
+    await expectNoUnexpectedClientErrors(sentinel);
+    await expectNoUnexpectedWarningsOrErrors(sentinel);
+  } finally {
+    await page.unroute(STREAM_EVENTS_ROUTE_PATTERN);
+    await page.unroute(THREAD_UNSUBSCRIBE_ROUTE_PATTERN);
   }
-
-  await openDebugTab(page);
-  await page.getByRole("tab", { name: "Stream" }).click();
-  await expect(page.getByTestId("debug-stream-events-panel")).toBeVisible();
-  await expect(page.getByText("event-1").first()).toBeVisible();
-
-  const retainedCardBefore = await page
-    .getByText("event-1")
-    .first()
-    .evaluateHandle((node) => node.closest('[data-testid="stream-event-card"]'));
-
-  await triggerHeaderRefresh(page);
-  await expect(page.getByText("event-400").first()).toBeVisible();
-  await expect(page.getByText("event-0")).toHaveCount(0);
-
-  const retainedCardAfter = await page
-    .getByText("event-1")
-    .first()
-    .evaluateHandle((node) => node.closest('[data-testid="stream-event-card"]'));
-
-  const retainedCardIdentityIsStable = await retainedCardBefore.evaluate(
-    (previousNode, nextNode) => previousNode === nextNode,
-    retainedCardAfter,
-  );
-  expect(retainedCardIdentityIsStable).toBe(true);
-
-  await expectNoUnexpectedClientErrors(sentinel);
-  await expectNoUnexpectedWarningsOrErrors(sentinel);
-  await page.unroute("**/api/threads/*/stream-events?*");
 });

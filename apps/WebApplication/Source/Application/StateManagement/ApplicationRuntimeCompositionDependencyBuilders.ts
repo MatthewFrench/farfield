@@ -126,6 +126,7 @@ export function buildViewportShellEffectsInput(
 
 interface BuildApplicationRefreshEffectsInputDependencies {
   refreshCoreDataAndSelectedThread: () => Promise<void>;
+  refreshSelectedThreadIncrementalIfPresent: () => Promise<void>;
   refreshPushClientState: () => Promise<void>;
   ensureFreshPushSettingsDiagnostics: () => Promise<void>;
 }
@@ -171,6 +172,9 @@ export function buildApplicationRefreshEffectsInput(
     loadCoreDataTracked: coreDataLoaders.loadCoreDataTracked,
     loadArchivedThreads: coreDataLoaders.loadArchivedThreads,
     refreshCoreDataAndSelectedThread: dependencies.refreshCoreDataAndSelectedThread,
+    refreshSelectedThreadIncrementalIfPresent:
+      dependencies.refreshSelectedThreadIncrementalIfPresent,
+    isGenerating: applicationDerivedState.isGenerating,
     refreshPushClientState: dependencies.refreshPushClientState,
     ensureFreshPushSettingsDiagnostics: dependencies.ensureFreshPushSettingsDiagnostics,
     handleRuntimeRequestError: runtimeRequestHandlers.handleRuntimeRequestError,
@@ -225,6 +229,7 @@ export function buildEventStreamEffectsInput(
     eventRefreshScheduler: applicationOwnerDependencies.eventRefreshScheduler,
     eventStreamConnectionCoordinator: applicationOwnerDependencies.eventStreamConnectionCoordinator,
     eventStreamRefreshDecisionEngine: applicationOwnerDependencies.eventStreamRefreshDecisionEngine,
+    selectedThreadId: applicationShellState.selectedThreadId,
     activeTabRef: applicationShellState.activeTabRef,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
     loadCoreDataTrackedRef: applicationShellState.loadCoreDataTrackedRef,
@@ -233,6 +238,7 @@ export function buildEventStreamEffectsInput(
     debugWorkspaceStateStore: applicationOwnerDependencies.debugWorkspaceStateStore,
     debugErrorsSignatureRef: applicationShellState.debugErrorsSignatureRef,
     eventsConnectedRef: applicationShellState.eventsConnectedRef,
+    threadListStateController: applicationOwnerDependencies.threadListStateController,
     capabilityServerClient: applicationOwnerDependencies.capabilityServerClient,
     selectedAgentId: applicationShellState.selectedAgentId,
     canReadNotificationEvents:

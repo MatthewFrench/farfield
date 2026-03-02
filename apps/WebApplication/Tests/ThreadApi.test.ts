@@ -96,6 +96,119 @@ describe("ThreadApi", () => {
     expect(result.data[1]?.displayName).toBe("Name from title");
   });
 
+  it("maps lastUserMessage and latest-activity ownership from turns", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        data: [
+          {
+            id: "thread_last_user_message",
+            preview: "first question",
+            createdAt: 123,
+            updatedAt: 124,
+            cwd: "/tmp/workspace",
+            source: "opencode",
+            agentId: "codex",
+            turns: [
+              {
+                id: "turn_1",
+                items: [
+                  {
+                    id: "item_1",
+                    type: "userMessage",
+                    content: [{ type: "text", text: "initial question" }],
+                  },
+                ],
+              },
+              {
+                id: "turn_2",
+                items: [
+                  {
+                    id: "item_2",
+                    type: "agentMessage",
+                    text: "assistant answer",
+                  },
+                  {
+                    id: "item_3",
+                    type: "userMessage",
+                    content: [{ type: "text", text: "latest user ask" }],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: "thread_latest_activity_not_user",
+            preview: "question before assistant response",
+            createdAt: 130,
+            updatedAt: 131,
+            cwd: "/tmp/workspace",
+            source: "opencode",
+            agentId: "codex",
+            turns: [
+              {
+                id: "turn_1",
+                items: [
+                  {
+                    id: "item_4",
+                    type: "userMessage",
+                    content: [{ type: "text", text: "user question" }],
+                  },
+                  {
+                    id: "item_5",
+                    type: "agentMessage",
+                    text: "assistant response",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        nextCursor: null,
+      }),
+    );
+
+    const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
+
+    expect(result.data[0]?.lastUserMessage).toBe("latest user ask");
+    expect(result.data[0]?.latestActivityIsUserMessage).toBe(true);
+    expect(result.data[1]?.lastUserMessage).toBe("user question");
+    expect(result.data[1]?.latestActivityIsUserMessage).toBe(false);
+  });
+
+  it("rejects malformed userMessage turn items in thread list payloads", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        data: [
+          {
+            id: "thread_bad_user_message",
+            preview: "preview",
+            createdAt: 123,
+            updatedAt: 124,
+            cwd: "/tmp/workspace",
+            source: "opencode",
+            agentId: "codex",
+            turns: [
+              {
+                id: "turn_1",
+                items: [
+                  {
+                    id: "item_1",
+                    type: "userMessage",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        nextCursor: null,
+      }),
+    );
+
+    await expect(listThreads(DEFAULT_LIST_THREADS_OPTIONS)).rejects.toThrow(/content/);
+  });
+
   it("rejects thread list payloads when hasUnreadTurn is not a boolean", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({

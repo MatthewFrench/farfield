@@ -35,7 +35,15 @@ function createRepositoryFiles(input: {
   upstreamServerNotificationSnapshotText: string;
   upstreamServerRequestSnapshotText: string;
   farfieldServerRequestSnapshotText: string;
+  requestMethodDecisionLedgerText?: string;
 }) {
+  const requestMethodDecisionLedgerText =
+    input.requestMethodDecisionLedgerText ??
+    createDefaultRequestMethodDecisionLedgerText(
+      input.upstreamClientRequestSnapshotText,
+      input.farfieldClientRequestSnapshotText,
+    );
+
   return [
     {
       relativePath: "docs/debug/AppServerUpstreamClientRequestMethods.snapshot.txt",
@@ -58,6 +66,10 @@ function createRepositoryFiles(input: {
       content: input.farfieldServerRequestSnapshotText,
     },
     {
+      relativePath: "docs/debug/AppServerRequestMethodDecisionLedger.md",
+      content: requestMethodDecisionLedgerText,
+    },
+    {
       relativePath: "packages/CodexInterfaceAdapter/Source/AppServerClientMethodConstants.ts",
       content: [
         "export const APP_SERVER_CLIENT_METHODS = {",
@@ -68,7 +80,8 @@ function createRepositoryFiles(input: {
       ].join("\n"),
     },
     {
-      relativePath: "packages/CodexInterfaceAdapter/Source/AppServerServerRequestMethodConstants.ts",
+      relativePath:
+        "packages/CodexInterfaceAdapter/Source/AppServerServerRequestMethodConstants.ts",
       content: [
         "export const APP_SERVER_HANDLED_SERVER_REQUEST_METHODS = {",
         '  toolRequestUserInput: "item/tool/requestUserInput",',
@@ -108,15 +121,52 @@ function createRepositoryFiles(input: {
         "server_notification_definitions! {",
         '    ThreadStarted => "thread/started" (v2::ThreadStartedNotification),',
         '    TurnStarted => "turn/started" (v2::TurnStartedNotification),',
-        "    #[serde(rename = \"account/login/completed\")]",
-        "    #[ts(rename = \"account/login/completed\")]",
-        "    #[strum(serialize = \"account/login/completed\")]",
+        '    #[serde(rename = "account/login/completed")]',
+        '    #[ts(rename = "account/login/completed")]',
+        '    #[strum(serialize = "account/login/completed")]',
         "    AccountLoginCompleted(v2::AccountLoginCompletedNotification),",
         "}",
         "",
       ].join("\n"),
     },
   ] satisfies RepositoryFileInput[];
+}
+
+function parseMethodListFromSnapshotText(snapshotText: string): string[] {
+  return snapshotText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+function createDefaultRequestMethodDecisionLedgerText(
+  upstreamClientRequestSnapshotText: string,
+  farfieldClientRequestSnapshotText: string,
+): string {
+  const upstreamMethods = parseMethodListFromSnapshotText(upstreamClientRequestSnapshotText);
+  const farfieldMethodSet = new Set(
+    parseMethodListFromSnapshotText(farfieldClientRequestSnapshotText),
+  );
+
+  const rows = upstreamMethods
+    .map((method) => {
+      const state = farfieldMethodSet.has(method) ? "Used now" : "Not used";
+      return `| \`${method}\` | ${state} | Keep | Test decision row |`;
+    })
+    .join("\n");
+
+  return [
+    "# App-Server Request Method Decision Ledger",
+    "",
+    "## Test Fixture",
+    "",
+    "| Method | Current Farfield State | Recommendation | Notes |",
+    "| --- | --- | --- | --- |",
+    rows,
+    "",
+    `Total methods: ${String(upstreamMethods.length)}`,
+    "",
+  ].join("\n");
 }
 
 function runGovernanceScript(
@@ -165,7 +215,9 @@ describe("validate-app-server-method-drift-governance", { timeout: 15_000 }, () 
     const result = runGovernanceScript(repositoryPath, upstreamCommonSourcePath);
 
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("Upstream app-server client-request method snapshot drift mismatch");
+    expect(result.stderr).toContain(
+      "Upstream app-server client-request method snapshot drift mismatch",
+    );
     expect(result.stderr).toContain("+ turn/start");
   });
 
@@ -206,7 +258,73 @@ describe("validate-app-server-method-drift-governance", { timeout: 15_000 }, () 
     const result = runGovernanceScript(repositoryPath, upstreamCommonSourcePath);
 
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("Farfield app-server server-request method snapshot drift mismatch");
+    expect(result.stderr).toContain(
+      "Farfield app-server server-request method snapshot drift mismatch",
+    );
     expect(result.stderr).toContain("- item/tool/call");
+  });
+
+  it("fails when decision-ledger Used now rows drift from Farfield client-request methods", () => {
+    const repositoryPath = createRepositoryWithCleanup(
+      createRepositoryFiles({
+        upstreamClientRequestSnapshotText: "initialize\nthread/list\nturn/start\n",
+        farfieldClientRequestSnapshotText: "initialize\nthread/list\nturn/start\n",
+        upstreamServerNotificationSnapshotText:
+          "account/login/completed\nthread/started\nturn/started\n",
+        upstreamServerRequestSnapshotText: "item/tool/requestUserInput\n",
+        farfieldServerRequestSnapshotText: "item/tool/requestUserInput\n",
+        requestMethodDecisionLedgerText: [
+          "# App-Server Request Method Decision Ledger",
+          "",
+          "| Method | Current Farfield State | Recommendation | Notes |",
+          "| --- | --- | --- | --- |",
+          "| `initialize` | Used now | Keep | Test decision row |",
+          "| `thread/list` | Used now | Keep | Test decision row |",
+          "| `turn/start` | Not used | Keep | Test decision row |",
+          "",
+        ].join("\n"),
+      }),
+    );
+    const upstreamCommonSourcePath = path.join(repositoryPath, "fixtures/upstream-common.rs");
+
+    const result = runGovernanceScript(repositoryPath, upstreamCommonSourcePath);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      'App-server request-method decision ledger "Used now" list drift mismatch',
+    );
+    expect(result.stderr).toContain("- turn/start");
+  });
+
+  it("fails when decision-ledger marks do-not-adopt methods as used now", () => {
+    const repositoryPath = createRepositoryWithCleanup(
+      createRepositoryFiles({
+        upstreamClientRequestSnapshotText: "initialize\nthread/list\nturn/start\n",
+        farfieldClientRequestSnapshotText: "initialize\nthread/list\nturn/start\n",
+        upstreamServerNotificationSnapshotText:
+          "account/login/completed\nthread/started\nturn/started\n",
+        upstreamServerRequestSnapshotText: "item/tool/requestUserInput\n",
+        farfieldServerRequestSnapshotText: "item/tool/requestUserInput\n",
+        requestMethodDecisionLedgerText: [
+          "# App-Server Request Method Decision Ledger",
+          "",
+          "| Method | Current Farfield State | Recommendation | Notes |",
+          "| --- | --- | --- | --- |",
+          "| `initialize` | Used now | Keep | Test decision row |",
+          "| `thread/list` | Used now | Keep | Test decision row |",
+          "| `turn/start` | Used now | Do not adopt | Test decision row |",
+          "",
+        ].join("\n"),
+      }),
+    );
+    const upstreamCommonSourcePath = path.join(repositoryPath, "fixtures/upstream-common.rs");
+
+    const result = runGovernanceScript(repositoryPath, upstreamCommonSourcePath);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      'Anti-completion methods detected: methods marked "Do not adopt" are currently used',
+    );
+    expect(result.stderr).toContain("- turn/start");
   });
 });

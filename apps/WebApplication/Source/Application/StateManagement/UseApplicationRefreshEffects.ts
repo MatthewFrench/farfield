@@ -22,9 +22,15 @@ const LAST_VIEWED_THREAD_CLEAR_OPERATION = "last-viewed-thread:clear";
 
 function readNextWatchdogDelayMilliseconds(
   eventsConnected: boolean,
+  isGenerating: boolean,
   connectedMinimumIntervalMilliseconds: number,
   disconnectedIntervalMilliseconds: number,
 ): number {
+  if (isGenerating) {
+    // Keep a short watchdog cadence while a turn is in progress so selected-thread snapshots
+    // self-heal quickly when stream deltas are missed.
+    return disconnectedIntervalMilliseconds;
+  }
   return eventsConnected ? connectedMinimumIntervalMilliseconds : disconnectedIntervalMilliseconds;
 }
 
@@ -86,6 +92,8 @@ export interface UseApplicationRefreshEffectsInput {
   loadCoreDataTracked: () => Promise<void>;
   loadArchivedThreads: () => Promise<void>;
   refreshCoreDataAndSelectedThread: () => Promise<void>;
+  refreshSelectedThreadIncrementalIfPresent: () => Promise<void>;
+  isGenerating: boolean;
   refreshPushClientState: () => Promise<void>;
   ensureFreshPushSettingsDiagnostics: () => Promise<void>;
   handleRuntimeRequestError: <ErrorType>(error: ErrorType) => void;
@@ -302,6 +310,7 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
       scheduleNextWatchdog(
         readNextWatchdogDelayMilliseconds(
           input.eventsConnectedRef.current,
+          input.isGenerating,
           input.coreRefreshConnectedMinIntervalMs,
           input.coreRefreshIntervalMs,
         ),
@@ -328,6 +337,18 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
             input.handleRuntimeRequestError(error);
           }
         }
+
+        if (
+          input.isGenerating &&
+          input.selectedThreadId !== null &&
+          input.selectedThreadId.length > 0
+        ) {
+          try {
+            await input.refreshSelectedThreadIncrementalIfPresent();
+          } catch (error) {
+            input.handleRuntimeRequestError(error);
+          }
+        }
       }
 
       if (isDisposed()) {
@@ -350,8 +371,11 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
     input.coreRefreshIntervalMs,
     input.coreRefreshIntervalRef,
     input.eventsConnectedRef,
+    input.isGenerating,
+    input.refreshSelectedThreadIncrementalIfPresent,
     input.handleRuntimeRequestError,
     input.lastCoreRefreshAtRef,
     input.loadCoreDataTracked,
+    input.selectedThreadId,
   ]);
 }

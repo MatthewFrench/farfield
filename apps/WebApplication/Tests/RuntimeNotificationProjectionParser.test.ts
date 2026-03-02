@@ -228,12 +228,40 @@ describe("RuntimeNotificationProjectionParser", () => {
           },
           receivedAtMilliseconds: 8_118,
         },
+        {
+          sequence: 120,
+          method: "mcpServer/oauthLogin/completed",
+          params: {
+            name: "github",
+            success: true,
+          },
+          receivedAtMilliseconds: 8_119,
+        },
+        {
+          sequence: 121,
+          method: "account/login/completed",
+          params: {
+            loginId: "login-1",
+            success: false,
+            error: "missing callback token",
+          },
+          receivedAtMilliseconds: 8_120,
+        },
+        {
+          sequence: 122,
+          method: "serverRequest/resolved",
+          params: {
+            threadId: "thread-1",
+            requestId: 44,
+          },
+          receivedAtMilliseconds: 8_121,
+        },
       ]),
     );
 
     expect(projection).toEqual({
-      processedEventCount: 20,
-      relevantEventCount: 20,
+      processedEventCount: 23,
+      relevantEventCount: 23,
       resetRequired: false,
       nextSequence: 200,
       threadStatusUpdates: [
@@ -326,6 +354,7 @@ describe("RuntimeNotificationProjectionParser", () => {
       warningEvents: [
         {
           method: "configWarning",
+          severity: "warning",
           sequence: 108,
           summary: "Config file has an unknown key",
           threadId: null,
@@ -334,6 +363,7 @@ describe("RuntimeNotificationProjectionParser", () => {
         },
         {
           method: "error",
+          severity: "error",
           sequence: 109,
           summary: "Turn failed to stream",
           threadId: "thread-1",
@@ -342,6 +372,7 @@ describe("RuntimeNotificationProjectionParser", () => {
         },
         {
           method: "thread/realtime/started",
+          severity: "realtime",
           sequence: 112,
           summary: "Started",
           threadId: "thread-1",
@@ -350,6 +381,7 @@ describe("RuntimeNotificationProjectionParser", () => {
         },
         {
           method: "error",
+          severity: "error",
           sequence: 113,
           summary: "Realtime: Realtime stream interrupted",
           threadId: "thread-1",
@@ -358,6 +390,7 @@ describe("RuntimeNotificationProjectionParser", () => {
         },
         {
           method: "thread/realtime/closed",
+          severity: "realtime",
           sequence: 114,
           summary: "Closed (session ended)",
           threadId: "thread-1",
@@ -366,6 +399,7 @@ describe("RuntimeNotificationProjectionParser", () => {
         },
         {
           method: "thread/archived",
+          severity: "warning",
           sequence: 117,
           summary: "Thread archived",
           threadId: "thread-1",
@@ -374,6 +408,7 @@ describe("RuntimeNotificationProjectionParser", () => {
         },
         {
           method: "thread/unarchived",
+          severity: "warning",
           sequence: 118,
           summary: "Thread unarchived",
           threadId: "thread-1",
@@ -382,11 +417,39 @@ describe("RuntimeNotificationProjectionParser", () => {
         },
         {
           method: "thread/closed",
+          severity: "warning",
           sequence: 119,
           summary: "Thread closed",
           threadId: "thread-1",
           isRetrying: false,
           receivedAtMilliseconds: 8_118,
+        },
+        {
+          method: "mcpServer/oauthLogin/completed",
+          severity: "success",
+          sequence: 120,
+          summary: "MCP OAuth connected (github)",
+          threadId: null,
+          isRetrying: false,
+          receivedAtMilliseconds: 8_119,
+        },
+        {
+          method: "account/login/completed",
+          severity: "error",
+          sequence: 121,
+          summary: "Account login failed: missing callback token",
+          threadId: null,
+          isRetrying: false,
+          receivedAtMilliseconds: 8_120,
+        },
+        {
+          method: "serverRequest/resolved",
+          severity: "info",
+          sequence: 122,
+          summary: "Server request #44 resolved",
+          threadId: "thread-1",
+          isRetrying: false,
+          receivedAtMilliseconds: 8_121,
         },
       ],
       shouldRefreshAccount: true,

@@ -8,12 +8,14 @@ export type RealAppFixtures = {
   enforceStateIsolation: boolean;
   enforceRuntimeAvailabilityCheck: boolean;
   enforceDebugErrorEndpointReads: boolean;
+  enforceUnexpectedSignals: boolean;
 };
 
 export const test = base.extend<RealAppFixtures>({
   enforceStateIsolation: [true, { option: true }],
   enforceRuntimeAvailabilityCheck: [true, { option: true }],
   enforceDebugErrorEndpointReads: [true, { option: true }],
+  enforceUnexpectedSignals: [true, { option: true }],
   stateGuard: [
     async ({ page, playwright, enforceStateIsolation }, use) => {
       const apiBaseUrl = (process.env["E2E_REAL_API_URL"] ?? "http://127.0.0.1:4311").trim();
@@ -50,7 +52,13 @@ export const test = base.extend<RealAppFixtures>({
     { auto: true },
   ],
   sentinel: async (
-    { page, playwright, enforceRuntimeAvailabilityCheck, enforceDebugErrorEndpointReads },
+    {
+      page,
+      playwright,
+      enforceRuntimeAvailabilityCheck,
+      enforceDebugErrorEndpointReads,
+      enforceUnexpectedSignals,
+    },
     use,
     testInfo,
   ) => {
@@ -77,12 +85,25 @@ export const test = base.extend<RealAppFixtures>({
       enforceDebugErrorEndpointReads,
     });
 
+    let runtimeError: Error | null = null;
     try {
       await use(sentinel);
+
+      const shouldAssertUnexpectedSignals =
+        enforceUnexpectedSignals && testInfo.status === "passed";
+      if (shouldAssertUnexpectedSignals) {
+        await sentinel.assertNoUnexpectedSignals();
+      }
+    } catch (error) {
+      runtimeError = error instanceof Error ? error : new Error(String(error));
     } finally {
       await sentinel.writeSummary();
       await sentinel.dispose();
       await request.dispose();
+    }
+
+    if (runtimeError !== null) {
+      throw runtimeError;
     }
   },
 });

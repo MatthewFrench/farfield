@@ -5,6 +5,8 @@ export interface ThreadListItem {
   id: string;
   preview: string;
   displayName?: string | undefined;
+  lastUserMessage?: string | undefined;
+  latestActivityIsUserMessage?: boolean | undefined;
   createdAt: number;
   updatedAt: number;
   cwd?: string | undefined;
@@ -24,6 +26,8 @@ export const ThreadListItemSchema = z
     id: z.string().min(1),
     preview: z.string(),
     displayName: z.string().optional(),
+    lastUserMessage: z.string().optional(),
+    latestActivityIsUserMessage: z.boolean().optional(),
     createdAt: z.number().int().nonnegative(),
     updatedAt: z.number().int().nonnegative(),
     cwd: z.string().optional(),

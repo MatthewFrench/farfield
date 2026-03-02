@@ -1,6 +1,6 @@
 # App-Server Request Method Decision Ledger
 
-Last Updated (UTC): 2026-03-01 04:58:26Z
+Last Updated (UTC): 2026-03-02 01:18:42Z
 
 This ledger records recommended disposition for every upstream app-server client request method in the current tracked snapshot.
 
@@ -81,6 +81,13 @@ This ledger records recommended disposition for every upstream app-server client
 | `userInfo` | Used now | Keep | Exposed through capability ownership and debug workspace legacy user-info diagnostics. |
 | `windowsSandbox/setupStart` | Used now | Keep | Exposed through capability ownership and debug workspace windows-sandbox setup diagnostics action. |
 
+<!-- APP_SERVER_REQUEST_METRICS_START -->
 Total methods: 74
-Used now: 54
-Not used: 20
+Keep methods: 54
+Do-not-adopt methods: 20
+Keep methods used now: 54
+Do-not-adopt methods avoided (not used): 20
+Do-not-adopt methods used now (anti-completion): 0
+Policy completion score (`keep used + do-not-adopt avoided - do-not-adopt used`): 74 / 74
+Legacy raw usage metric (reference only): 54 / 74
+<!-- APP_SERVER_REQUEST_METRICS_END -->

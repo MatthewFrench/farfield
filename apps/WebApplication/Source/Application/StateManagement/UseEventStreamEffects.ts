@@ -21,14 +21,21 @@ import {
   type ThreadRuntimeStatusByThreadIdentifier,
   type ThreadSidebarRuntimeSummary,
 } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
+import { type ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
-import { type EventRefreshFlags, EventRefreshScheduler } from "./EventRefreshScheduler";
+import { EventRefreshScheduler } from "./EventRefreshScheduler";
 import { EventStreamConnectionCoordinator } from "./EventStreamConnectionCoordinator";
 import { type EventStreamRefreshDecisionReader } from "./EventStreamRefreshDecisionEngine";
+import {
+  isScheduledRefreshDocumentVisible,
+  readScheduledRefreshExecutionSnapshot,
+  shouldRefreshDebugWorkspace,
+} from "./EventStreamScheduledRefreshPolicy";
 import { readRuntimeNotificationProjection } from "./RuntimeNotificationProjectionParser";
 import { RuntimeNotificationReadObservabilityOwner } from "./RuntimeNotificationReadObservabilityOwner";
 import { applyRuntimeThreadStatusUpdates } from "./RuntimeThreadStatusStateReducer";
+import { RuntimeWarningBannerPolicyOwner } from "./RuntimeWarningBannerPolicyOwner";
 import {
   createInitialThreadSidebarRuntimeSummary,
   readLatestModelRerouteEventForThread,
@@ -37,54 +44,23 @@ import {
   readLatestWarningEvent,
   readThreadRuntimeModelRerouteSummary,
   readThreadRuntimeProgressSummary,
-  readThreadRuntimeWarningSummary,
   readThreadSidebarAccountSummary,
   readThreadSidebarAppsSummary,
   readThreadSidebarRateLimitSummary,
   readThreadSidebarTokenUsageSummary,
 } from "./ThreadSidebarRuntimeSummaryProjection";
 import type { SelectedThreadLoaderOptions } from "./UseCoreDataLoaders";
+import { useThreadSidebarRuntimeHydrationEffect } from "./UseThreadSidebarRuntimeHydrationEffect";
 
-const DOCUMENT_VISIBILITY_STATE_VISIBLE = "visible";
-const DEBUG_APPLICATION_TAB = "debug";
 const NOTIFICATION_EVENTS_REFRESH_LIMIT = 80;
 const SIDEBAR_APPS_LIST_LIMIT = 100;
-const SIDEBAR_RUNTIME_SUMMARY_REFRESH_OPERATION = "refresh-sidebar-runtime-summary";
 const SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS: SelectedThreadLoaderOptions = {
   includeReadThread: true,
   includeTurns: false,
 };
 
-interface ScheduledRefreshExecutionSnapshot {
-  activeTab: "chat" | "debug";
-  selectedThreadId: string | null;
-}
-
 interface RuntimeNotificationProjectionCursorState {
   nextSequence: number | null;
-}
-
-function isScheduledRefreshDocumentVisible(): boolean {
-  return document.visibilityState === DOCUMENT_VISIBILITY_STATE_VISIBLE;
-}
-
-function readScheduledRefreshExecutionSnapshot(
-  activeTabRef: MutableRefObject<"chat" | "debug">,
-  selectedThreadIdRef: MutableRefObject<string | null>,
-): ScheduledRefreshExecutionSnapshot {
-  return {
-    activeTab: activeTabRef.current,
-    selectedThreadId: selectedThreadIdRef.current,
-  };
-}
-
-function shouldRefreshDebugWorkspace(
-  refreshFlags: EventRefreshFlags,
-  activeTab: "chat" | "debug",
-): boolean {
-  return (
-    !refreshFlags.refreshCore && refreshFlags.refreshHistory && activeTab === DEBUG_APPLICATION_TAB
-  );
 }
 
 function createInitialRuntimeNotificationProjectionCursorState(): RuntimeNotificationProjectionCursorState {
@@ -108,74 +84,62 @@ function readNotificationEventsRequestOptions(input: {
   };
 }
 
-interface RefreshThreadSidebarRuntimeSummaryInput {
+interface UseRuntimeProjectionResetEffectInput {
   selectedAgentId: AgentId;
-  canReadAccount: boolean;
-  canReadAccountRateLimits: boolean;
-  canListApps: boolean;
-  capabilityServerClient: CapabilityServerClient;
+  setThreadRuntimeStatusByThreadIdentifier: Dispatch<
+    SetStateAction<ThreadRuntimeStatusByThreadIdentifier>
+  >;
   setThreadSidebarRuntimeSummary: Dispatch<SetStateAction<ThreadSidebarRuntimeSummary>>;
-  shouldCancel: () => boolean;
 }
 
-async function refreshThreadSidebarRuntimeSummary(
-  input: RefreshThreadSidebarRuntimeSummaryInput,
-): Promise<void> {
-  const refreshOperations: Promise<void>[] = [];
+function useRuntimeProjectionResetEffect(
+  input: UseRuntimeProjectionResetEffectInput,
+  runtimeNotificationProjectionCursorStateRef: MutableRefObject<RuntimeNotificationProjectionCursorState>,
+  runtimeWarningBannerPolicyOwnerRef: MutableRefObject<RuntimeWarningBannerPolicyOwner>,
+): void {
+  useEffect(() => {
+    const runtimeNotificationProjectionCursorState = runtimeNotificationProjectionCursorStateRef;
+    runtimeNotificationProjectionCursorState.current =
+      createInitialRuntimeNotificationProjectionCursorState();
+    runtimeWarningBannerPolicyOwnerRef.current.resetSelectedThread(null);
+    input.setThreadRuntimeStatusByThreadIdentifier(
+      createEmptyThreadRuntimeStatusByThreadIdentifier(),
+    );
+    input.setThreadSidebarRuntimeSummary(createInitialThreadSidebarRuntimeSummary());
+  }, [
+    input.selectedAgentId,
+    input.setThreadRuntimeStatusByThreadIdentifier,
+    input.setThreadSidebarRuntimeSummary,
+  ]);
+}
 
-  if (input.canReadAccount) {
-    const refreshAccountSummary = async (): Promise<void> => {
-      const accountResponse = await input.capabilityServerClient.readAccount({
-        agentId: input.selectedAgentId,
-      });
-      if (input.shouldCancel()) {
-        return;
+interface UseRuntimeWarningThreadSwitchEffectInput {
+  selectedThreadId: string | null;
+  setThreadSidebarRuntimeSummary: Dispatch<SetStateAction<ThreadSidebarRuntimeSummary>>;
+}
+
+function useRuntimeWarningThreadSwitchEffect(
+  input: UseRuntimeWarningThreadSwitchEffectInput,
+  runtimeWarningBannerPolicyOwnerRef: MutableRefObject<RuntimeWarningBannerPolicyOwner>,
+): void {
+  useEffect(() => {
+    const threadSwitchRequiresWarningClear =
+      runtimeWarningBannerPolicyOwnerRef.current.readThreadSwitchRequiresWarningClear(
+        input.selectedThreadId,
+      );
+    if (!threadSwitchRequiresWarningClear) {
+      return;
+    }
+    input.setThreadSidebarRuntimeSummary((previousSummary) => {
+      if (previousSummary.warning === null) {
+        return previousSummary;
       }
-      input.setThreadSidebarRuntimeSummary((previousSummary) => ({
+      return {
         ...previousSummary,
-        account: readThreadSidebarAccountSummary(accountResponse),
-      }));
-    };
-    refreshOperations.push(refreshAccountSummary());
-  }
-
-  if (input.canReadAccountRateLimits) {
-    const refreshRateLimitsSummary = async (): Promise<void> => {
-      const rateLimitsResponse = await input.capabilityServerClient.readAccountRateLimits({
-        agentId: input.selectedAgentId,
-      });
-      if (input.shouldCancel()) {
-        return;
-      }
-      input.setThreadSidebarRuntimeSummary((previousSummary) => ({
-        ...previousSummary,
-        rateLimits: readThreadSidebarRateLimitSummary(rateLimitsResponse),
-      }));
-    };
-    refreshOperations.push(refreshRateLimitsSummary());
-  }
-
-  if (input.canListApps) {
-    const refreshAppsSummary = async (): Promise<void> => {
-      const appsResponse = await input.capabilityServerClient.listApps({
-        limit: SIDEBAR_APPS_LIST_LIMIT,
-      });
-      if (input.shouldCancel()) {
-        return;
-      }
-      input.setThreadSidebarRuntimeSummary((previousSummary) => ({
-        ...previousSummary,
-        apps: readThreadSidebarAppsSummary(appsResponse),
-      }));
-    };
-    refreshOperations.push(refreshAppsSummary());
-  }
-
-  if (refreshOperations.length === 0) {
-    return;
-  }
-
-  await Promise.all(refreshOperations);
+        warning: null,
+      };
+    });
+  }, [input.selectedThreadId, input.setThreadSidebarRuntimeSummary]);
 }
 
 export interface UseEventStreamEffectsInput {
@@ -185,6 +149,7 @@ export interface UseEventStreamEffectsInput {
   eventRefreshScheduler: EventRefreshScheduler;
   eventStreamConnectionCoordinator: EventStreamConnectionCoordinator;
   eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionReader;
+  selectedThreadId: string | null;
   activeTabRef: MutableRefObject<"chat" | "debug">;
   selectedThreadIdRef: MutableRefObject<string | null>;
   loadCoreDataTrackedRef: MutableRefObject<(() => Promise<void>) | null>;
@@ -195,6 +160,7 @@ export interface UseEventStreamEffectsInput {
   debugWorkspaceStateStore: DebugWorkspaceStateStore;
   debugErrorsSignatureRef: MutableRefObject<string[]>;
   eventsConnectedRef: MutableRefObject<boolean>;
+  threadListStateController: ThreadListStateController;
   capabilityServerClient: CapabilityServerClient;
   selectedAgentId: AgentId;
   canReadNotificationEvents: boolean;
@@ -213,70 +179,180 @@ export interface UseEventStreamEffectsInput {
   handleRuntimeRequestError: <ErrorType>(error: ErrorType) => void;
 }
 
-export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
-  const runtimeNotificationProjectionCursorStateRef =
-    useRef<RuntimeNotificationProjectionCursorState>(
-      createInitialRuntimeNotificationProjectionCursorState(),
-    );
-  const runtimeNotificationReadObservabilityOwnerRef =
-    useRef<RuntimeNotificationReadObservabilityOwner>(
-      new RuntimeNotificationReadObservabilityOwner(),
-    );
+interface ApplyNotificationProjectionRefreshInput {
+  input: UseEventStreamEffectsInput;
+  selectedThreadId: string | null;
+  runtimeNotificationProjectionCursorStateRef: MutableRefObject<RuntimeNotificationProjectionCursorState>;
+  runtimeNotificationReadObservabilityOwnerRef: MutableRefObject<RuntimeNotificationReadObservabilityOwner>;
+  runtimeWarningBannerPolicyOwnerRef: MutableRefObject<RuntimeWarningBannerPolicyOwner>;
+}
 
-  useEffect(() => {
-    runtimeNotificationProjectionCursorStateRef.current =
-      createInitialRuntimeNotificationProjectionCursorState();
-    input.setThreadRuntimeStatusByThreadIdentifier(
-      createEmptyThreadRuntimeStatusByThreadIdentifier(),
+async function applyNotificationProjectionRefresh(
+  input: ApplyNotificationProjectionRefreshInput,
+): Promise<void> {
+  const runtimeNotificationProjectionCursorState =
+    input.runtimeNotificationProjectionCursorStateRef;
+  const runtimeNotificationProjectionCursorStateValue =
+    runtimeNotificationProjectionCursorState.current;
+  const notificationEventsResponse =
+    await input.input.capabilityServerClient.readNotificationEvents(
+      readNotificationEventsRequestOptions({
+        selectedAgentId: input.input.selectedAgentId,
+        notificationProjectionCursorState: runtimeNotificationProjectionCursorStateValue,
+      }),
     );
-    input.setThreadSidebarRuntimeSummary(createInitialThreadSidebarRuntimeSummary());
-  }, [
-    input.selectedAgentId,
-    input.setThreadRuntimeStatusByThreadIdentifier,
-    input.setThreadSidebarRuntimeSummary,
-  ]);
+  const runtimeNotificationProjection = readRuntimeNotificationProjection(
+    notificationEventsResponse,
+  );
+  runtimeNotificationProjectionCursorState.current = {
+    nextSequence: runtimeNotificationProjection.nextSequence,
+  };
 
-  useEffect(() => {
-    let shouldCancelRefresh = false;
+  input.input.setThreadRuntimeStatusByThreadIdentifier((previousThreadStatusByThreadId) => {
+    if (
+      runtimeNotificationProjection.resetRequired &&
+      runtimeNotificationProjection.threadStatusUpdates.length === 0
+    ) {
+      return Object.keys(previousThreadStatusByThreadId).length > 0
+        ? createEmptyThreadRuntimeStatusByThreadIdentifier()
+        : previousThreadStatusByThreadId;
+    }
 
-    const hydrateThreadSidebarRuntimeSummary = async (): Promise<void> => {
-      try {
-        await refreshThreadSidebarRuntimeSummary({
-          selectedAgentId: input.selectedAgentId,
-          canReadAccount: input.canReadAccount,
-          canReadAccountRateLimits: input.canReadAccountRateLimits,
-          canListApps: input.canListApps,
-          capabilityServerClient: input.capabilityServerClient,
-          setThreadSidebarRuntimeSummary: input.setThreadSidebarRuntimeSummary,
-          shouldCancel: () => shouldCancelRefresh,
+    const baselineThreadStatusByThreadIdentifier = runtimeNotificationProjection.resetRequired
+      ? createEmptyThreadRuntimeStatusByThreadIdentifier()
+      : previousThreadStatusByThreadId;
+
+    if (runtimeNotificationProjection.threadStatusUpdates.length === 0) {
+      return baselineThreadStatusByThreadIdentifier;
+    }
+
+    const updateResult = applyRuntimeThreadStatusUpdates({
+      previousStatusByThreadIdentifier: baselineThreadStatusByThreadIdentifier,
+      updates: runtimeNotificationProjection.threadStatusUpdates,
+    });
+
+    return updateResult.nextStatusByThreadIdentifier;
+  });
+
+  const latestTokenUsageUpdateForSelectedThread = readLatestThreadTokenUsageUpdateForThread(
+    runtimeNotificationProjection.threadTokenUsageUpdates,
+    input.selectedThreadId,
+  );
+  const latestModelRerouteEventForSelectedThread = readLatestModelRerouteEventForThread(
+    runtimeNotificationProjection.modelRerouteEvents,
+    input.selectedThreadId,
+  );
+  const latestThreadProgressEventForSelectedThread = readLatestThreadProgressEventForThread(
+    runtimeNotificationProjection.threadProgressEvents,
+    input.selectedThreadId,
+  );
+  const latestWarningEvent = readLatestWarningEvent(
+    runtimeNotificationProjection.warningEvents,
+    input.selectedThreadId,
+  );
+
+  if (
+    runtimeNotificationProjection.resetRequired ||
+    latestTokenUsageUpdateForSelectedThread !== null ||
+    latestModelRerouteEventForSelectedThread !== null ||
+    latestThreadProgressEventForSelectedThread !== null ||
+    latestWarningEvent !== null
+  ) {
+    input.input.setThreadSidebarRuntimeSummary((previousSummary) => {
+      const nextTokenUsageSummary =
+        latestTokenUsageUpdateForSelectedThread !== null
+          ? readThreadSidebarTokenUsageSummary(latestTokenUsageUpdateForSelectedThread)
+          : runtimeNotificationProjection.resetRequired
+            ? null
+            : previousSummary.tokenUsage;
+      const nextModelRerouteSummary =
+        latestModelRerouteEventForSelectedThread !== null
+          ? readThreadRuntimeModelRerouteSummary(latestModelRerouteEventForSelectedThread)
+          : runtimeNotificationProjection.resetRequired
+            ? null
+            : previousSummary.modelReroute;
+      const nextThreadProgressSummary =
+        latestThreadProgressEventForSelectedThread !== null
+          ? readThreadRuntimeProgressSummary(latestThreadProgressEventForSelectedThread)
+          : runtimeNotificationProjection.resetRequired
+            ? null
+            : previousSummary.progress;
+      const nextWarningSummary =
+        input.runtimeWarningBannerPolicyOwnerRef.current.readNextWarningSummary({
+          previousSummary: previousSummary.warning,
+          latestWarningEvent,
+          resetRequired: runtimeNotificationProjection.resetRequired,
         });
-      } catch (error) {
-        if (shouldCancelRefresh) {
-          return;
-        }
-        if (error instanceof Error && isRequestCanceledError(error)) {
-          return;
-        }
-        input.handleRuntimeRequestError({
-          operation: SIDEBAR_RUNTIME_SUMMARY_REFRESH_OPERATION,
-          error,
-        });
+
+      if (
+        nextTokenUsageSummary === previousSummary.tokenUsage &&
+        nextModelRerouteSummary === previousSummary.modelReroute &&
+        nextThreadProgressSummary === previousSummary.progress &&
+        nextWarningSummary === previousSummary.warning
+      ) {
+        return previousSummary;
       }
-    };
 
-    void hydrateThreadSidebarRuntimeSummary();
-    return () => {
-      shouldCancelRefresh = true;
-    };
-  }, [
-    input.selectedAgentId,
-    input.canReadAccount,
-    input.canReadAccountRateLimits,
-    input.canListApps,
-    input.capabilityServerClient,
-    input.setThreadSidebarRuntimeSummary,
-    input.handleRuntimeRequestError,
-  ]);
+      return {
+        ...previousSummary,
+        progress: nextThreadProgressSummary,
+        warning: nextWarningSummary,
+        tokenUsage: nextTokenUsageSummary,
+        modelReroute: nextModelRerouteSummary,
+      };
+    });
+  }
+
+  input.runtimeNotificationReadObservabilityOwnerRef.current.recordRead({
+    processedEventCount: runtimeNotificationProjection.processedEventCount,
+    relevantEventCount: runtimeNotificationProjection.relevantEventCount,
+    threadStatusUpdateCount: runtimeNotificationProjection.threadStatusUpdates.length,
+    requestedRateLimitRefresh: runtimeNotificationProjection.shouldRefreshAccountRateLimits,
+    requestedAppsRefresh: runtimeNotificationProjection.shouldRefreshApps,
+    resetRequired: runtimeNotificationProjection.resetRequired,
+  });
+
+  if (runtimeNotificationProjection.shouldRefreshAccount && input.input.canReadAccount) {
+    const accountResponse = await input.input.capabilityServerClient.readAccount({
+      agentId: input.input.selectedAgentId,
+    });
+    input.input.setThreadSidebarRuntimeSummary((previousSummary) => ({
+      ...previousSummary,
+      account: readThreadSidebarAccountSummary(accountResponse),
+    }));
+  }
+
+  if (
+    runtimeNotificationProjection.shouldRefreshAccountRateLimits &&
+    input.input.canReadAccountRateLimits
+  ) {
+    const rateLimitsResponse = await input.input.capabilityServerClient.readAccountRateLimits({
+      agentId: input.input.selectedAgentId,
+    });
+    input.input.setThreadSidebarRuntimeSummary((previousSummary) => ({
+      ...previousSummary,
+      rateLimits: readThreadSidebarRateLimitSummary(rateLimitsResponse),
+    }));
+  }
+
+  if (runtimeNotificationProjection.shouldRefreshApps && input.input.canListApps) {
+    const appsResponse = await input.input.capabilityServerClient.listApps({
+      limit: SIDEBAR_APPS_LIST_LIMIT,
+    });
+    input.input.setThreadSidebarRuntimeSummary((previousSummary) => ({
+      ...previousSummary,
+      apps: readThreadSidebarAppsSummary(appsResponse),
+    }));
+  }
+}
+
+function useEventStreamConnectionLifecycleEffect(
+  input: UseEventStreamEffectsInput,
+  runtimeNotificationProjectionCursorStateRef: MutableRefObject<RuntimeNotificationProjectionCursorState>,
+  runtimeNotificationReadObservabilityOwnerRef: MutableRefObject<RuntimeNotificationReadObservabilityOwner>,
+  runtimeWarningBannerPolicyOwnerRef: MutableRefObject<RuntimeWarningBannerPolicyOwner>,
+): void {
+  const runtimeNotificationProjectionCursorState = runtimeNotificationProjectionCursorStateRef;
 
   useEffect(() => {
     let shouldStopConnectionStart = false;
@@ -310,6 +386,7 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
               const refreshOperations: Array<Promise<void>> = [];
 
               if (flags.refreshCore) {
+                input.threadListStateController.invalidateActiveThreadQuery();
                 if (loadCoreDataFunction) {
                   refreshOperations.push(loadCoreDataFunction());
                 }
@@ -360,167 +437,14 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
               }
 
               if (flags.refreshNotificationProjections && input.canReadNotificationEvents) {
-                const runtimeNotificationProjectionCursorState =
-                  runtimeNotificationProjectionCursorStateRef.current;
-                const notificationEventsResponse =
-                  await input.capabilityServerClient.readNotificationEvents(
-                    readNotificationEventsRequestOptions({
-                      selectedAgentId: input.selectedAgentId,
-                      notificationProjectionCursorState: runtimeNotificationProjectionCursorState,
-                    }),
-                  );
-                const runtimeNotificationProjection = readRuntimeNotificationProjection(
-                  notificationEventsResponse,
-                );
-                runtimeNotificationProjectionCursorStateRef.current = {
-                  nextSequence: runtimeNotificationProjection.nextSequence,
-                };
-
-                input.setThreadRuntimeStatusByThreadIdentifier((previousThreadStatusByThreadId) => {
-                  if (
-                    runtimeNotificationProjection.resetRequired &&
-                    runtimeNotificationProjection.threadStatusUpdates.length === 0
-                  ) {
-                    return Object.keys(previousThreadStatusByThreadId).length > 0
-                      ? createEmptyThreadRuntimeStatusByThreadIdentifier()
-                      : previousThreadStatusByThreadId;
-                  }
-
-                  const baselineThreadStatusByThreadIdentifier =
-                    runtimeNotificationProjection.resetRequired
-                      ? createEmptyThreadRuntimeStatusByThreadIdentifier()
-                      : previousThreadStatusByThreadId;
-
-                  if (runtimeNotificationProjection.threadStatusUpdates.length === 0) {
-                    return baselineThreadStatusByThreadIdentifier;
-                  }
-
-                  const updateResult = applyRuntimeThreadStatusUpdates({
-                    previousStatusByThreadIdentifier: baselineThreadStatusByThreadIdentifier,
-                    updates: runtimeNotificationProjection.threadStatusUpdates,
-                  });
-
-                  return updateResult.nextStatusByThreadIdentifier;
+                await applyNotificationProjectionRefresh({
+                  input,
+                  selectedThreadId: scheduledRefreshSnapshot.selectedThreadId,
+                  runtimeNotificationProjectionCursorStateRef:
+                    runtimeNotificationProjectionCursorState,
+                  runtimeNotificationReadObservabilityOwnerRef,
+                  runtimeWarningBannerPolicyOwnerRef,
                 });
-
-                const latestTokenUsageUpdateForSelectedThread =
-                  readLatestThreadTokenUsageUpdateForThread(
-                    runtimeNotificationProjection.threadTokenUsageUpdates,
-                    scheduledRefreshSnapshot.selectedThreadId,
-                  );
-                const latestModelRerouteEventForSelectedThread =
-                  readLatestModelRerouteEventForThread(
-                    runtimeNotificationProjection.modelRerouteEvents,
-                    scheduledRefreshSnapshot.selectedThreadId,
-                  );
-                const latestThreadProgressEventForSelectedThread =
-                  readLatestThreadProgressEventForThread(
-                    runtimeNotificationProjection.threadProgressEvents,
-                    scheduledRefreshSnapshot.selectedThreadId,
-                  );
-                const latestWarningEvent = readLatestWarningEvent(
-                  runtimeNotificationProjection.warningEvents,
-                  scheduledRefreshSnapshot.selectedThreadId,
-                );
-                if (
-                  runtimeNotificationProjection.resetRequired ||
-                  latestTokenUsageUpdateForSelectedThread !== null ||
-                  latestModelRerouteEventForSelectedThread !== null ||
-                  latestThreadProgressEventForSelectedThread !== null ||
-                  latestWarningEvent !== null
-                ) {
-                  input.setThreadSidebarRuntimeSummary((previousSummary) => {
-                    const nextTokenUsageSummary =
-                      latestTokenUsageUpdateForSelectedThread !== null
-                        ? readThreadSidebarTokenUsageSummary(
-                            latestTokenUsageUpdateForSelectedThread,
-                          )
-                        : runtimeNotificationProjection.resetRequired
-                          ? null
-                          : previousSummary.tokenUsage;
-                    const nextModelRerouteSummary =
-                      latestModelRerouteEventForSelectedThread !== null
-                        ? readThreadRuntimeModelRerouteSummary(
-                            latestModelRerouteEventForSelectedThread,
-                          )
-                        : runtimeNotificationProjection.resetRequired
-                          ? null
-                          : previousSummary.modelReroute;
-                    const nextThreadProgressSummary =
-                      latestThreadProgressEventForSelectedThread !== null
-                        ? readThreadRuntimeProgressSummary(
-                            latestThreadProgressEventForSelectedThread,
-                          )
-                        : runtimeNotificationProjection.resetRequired
-                          ? null
-                          : previousSummary.progress;
-                    const nextWarningSummary =
-                      latestWarningEvent !== null
-                        ? readThreadRuntimeWarningSummary(latestWarningEvent)
-                        : runtimeNotificationProjection.resetRequired
-                          ? null
-                          : previousSummary.warning;
-                    if (
-                      nextTokenUsageSummary === previousSummary.tokenUsage &&
-                      nextModelRerouteSummary === previousSummary.modelReroute &&
-                      nextThreadProgressSummary === previousSummary.progress &&
-                      nextWarningSummary === previousSummary.warning
-                    ) {
-                      return previousSummary;
-                    }
-                    return {
-                      ...previousSummary,
-                      progress: nextThreadProgressSummary,
-                      warning: nextWarningSummary,
-                      tokenUsage: nextTokenUsageSummary,
-                      modelReroute: nextModelRerouteSummary,
-                    };
-                  });
-                }
-
-                runtimeNotificationReadObservabilityOwnerRef.current.recordRead({
-                  processedEventCount: runtimeNotificationProjection.processedEventCount,
-                  relevantEventCount: runtimeNotificationProjection.relevantEventCount,
-                  threadStatusUpdateCount: runtimeNotificationProjection.threadStatusUpdates.length,
-                  requestedRateLimitRefresh:
-                    runtimeNotificationProjection.shouldRefreshAccountRateLimits,
-                  requestedAppsRefresh: runtimeNotificationProjection.shouldRefreshApps,
-                  resetRequired: runtimeNotificationProjection.resetRequired,
-                });
-
-                if (runtimeNotificationProjection.shouldRefreshAccount && input.canReadAccount) {
-                  const accountResponse = await input.capabilityServerClient.readAccount({
-                    agentId: input.selectedAgentId,
-                  });
-                  input.setThreadSidebarRuntimeSummary((previousSummary) => ({
-                    ...previousSummary,
-                    account: readThreadSidebarAccountSummary(accountResponse),
-                  }));
-                }
-
-                if (
-                  runtimeNotificationProjection.shouldRefreshAccountRateLimits &&
-                  input.canReadAccountRateLimits
-                ) {
-                  const rateLimitsResponse =
-                    await input.capabilityServerClient.readAccountRateLimits({
-                      agentId: input.selectedAgentId,
-                    });
-                  input.setThreadSidebarRuntimeSummary((previousSummary) => ({
-                    ...previousSummary,
-                    rateLimits: readThreadSidebarRateLimitSummary(rateLimitsResponse),
-                  }));
-                }
-
-                if (runtimeNotificationProjection.shouldRefreshApps && input.canListApps) {
-                  const appsResponse = await input.capabilityServerClient.listApps({
-                    limit: SIDEBAR_APPS_LIST_LIMIT,
-                  });
-                  input.setThreadSidebarRuntimeSummary((previousSummary) => ({
-                    ...previousSummary,
-                    apps: readThreadSidebarAppsSummary(appsResponse),
-                  }));
-                }
               }
 
               if (refreshOperations.length > 0) {
@@ -574,6 +498,7 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
     input.eventStreamConnectionCoordinator,
     input.eventStreamRefreshDecisionEngine,
     input.eventsConnectedRef,
+    input.threadListStateController,
     input.capabilityServerClient,
     input.selectedAgentId,
     input.canReadNotificationEvents,
@@ -592,4 +517,41 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
     input.setDebugErrors,
     input.setHistory,
   ]);
+}
+
+export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
+  const runtimeNotificationProjectionCursorStateRef =
+    useRef<RuntimeNotificationProjectionCursorState>(
+      createInitialRuntimeNotificationProjectionCursorState(),
+    );
+  const runtimeNotificationReadObservabilityOwnerRef =
+    useRef<RuntimeNotificationReadObservabilityOwner>(
+      new RuntimeNotificationReadObservabilityOwner(),
+    );
+  const runtimeWarningBannerPolicyOwnerRef = useRef<RuntimeWarningBannerPolicyOwner>(
+    new RuntimeWarningBannerPolicyOwner(),
+  );
+  useRuntimeProjectionResetEffect(
+    {
+      selectedAgentId: input.selectedAgentId,
+      setThreadRuntimeStatusByThreadIdentifier: input.setThreadRuntimeStatusByThreadIdentifier,
+      setThreadSidebarRuntimeSummary: input.setThreadSidebarRuntimeSummary,
+    },
+    runtimeNotificationProjectionCursorStateRef,
+    runtimeWarningBannerPolicyOwnerRef,
+  );
+  useRuntimeWarningThreadSwitchEffect(
+    {
+      selectedThreadId: input.selectedThreadId,
+      setThreadSidebarRuntimeSummary: input.setThreadSidebarRuntimeSummary,
+    },
+    runtimeWarningBannerPolicyOwnerRef,
+  );
+  useThreadSidebarRuntimeHydrationEffect(input);
+  useEventStreamConnectionLifecycleEffect(
+    input,
+    runtimeNotificationProjectionCursorStateRef,
+    runtimeNotificationReadObservabilityOwnerRef,
+    runtimeWarningBannerPolicyOwnerRef,
+  );
 }

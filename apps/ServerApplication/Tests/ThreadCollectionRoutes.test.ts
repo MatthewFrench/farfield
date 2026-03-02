@@ -121,6 +121,11 @@ function createMockAgentAdapter(
   };
 }
 
+interface ContextBoundLoadedThreadsAdapter extends AgentAdapter {
+  loadedThreadIds: string[];
+  listLoadedThreads(): Promise<AgentListLoadedThreadsResult>;
+}
+
 function createCollectionRouteDependencies(input: {
   method?: ThreadCollectionRouteMethod;
   pathname?: string;
@@ -763,6 +768,57 @@ describe("handleThreadCollectionRoutes", () => {
           id: "thread_not_loaded",
           isLoadedInMemory: false,
         },
+        {
+          id: "thread_loaded",
+          isLoadedInMemory: true,
+        },
+      ],
+    });
+  });
+
+  it("calls listLoadedThreads with adapter context when provided as an instance method", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const adapter: ContextBoundLoadedThreadsAdapter = {
+      ...createMockAgentAdapter(
+        "codex",
+        async (): Promise<AgentListThreadsResult> => ({
+          data: [
+            {
+              id: "thread_loaded",
+              preview: "loaded",
+              createdAt: 1,
+              updatedAt: 2,
+            },
+          ],
+          nextCursor: null,
+        }),
+      ),
+      loadedThreadIds: ["thread_loaded"],
+      async listLoadedThreads(): Promise<AgentListLoadedThreadsResult> {
+        return {
+          data: this.loadedThreadIds,
+          nextCursor: null,
+        };
+      },
+    };
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        url: buildThreadCollectionRouteUrl("?limit=10"),
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+      }),
+    );
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toMatchObject({
+      ok: true,
+      data: [
         {
           id: "thread_loaded",
           isLoadedInMemory: true,

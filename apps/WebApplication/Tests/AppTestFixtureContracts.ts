@@ -27,6 +27,11 @@ export interface CapabilityFixture {
   canWriteSkillsConfig: boolean;
   canDetectExternalAgentConfig: boolean;
   canImportExternalAgentConfig: boolean;
+  canStartThreadRealtime: boolean;
+  canAppendThreadRealtimeAudio: boolean;
+  canAppendThreadRealtimeText: boolean;
+  canStopThreadRealtime: boolean;
+  canStartWindowsSandboxSetup: boolean;
   canSetCollaborationMode: boolean;
   canSubmitUserInput: boolean;
   canReadLiveState: boolean;
@@ -54,9 +59,33 @@ export interface ThreadListItemFixture {
   preview: string;
   createdAt: number;
   updatedAt: number;
+  hasUnreadTurn?: boolean;
   cwd?: string;
   source: "opencode";
   agentId: AgentIdentifier;
+  turns?: ThreadListTurnFixture[];
+}
+
+export type ThreadListTurnItemFixture =
+  | {
+      id: string;
+      type: "userMessage";
+      content: ThreadListUserMessageContentFixture[];
+    }
+  | {
+      id: string;
+      type: "agentMessage";
+      text: string;
+    };
+
+export type ThreadListUserMessageContentFixture = {
+  type: "text";
+  text: string;
+};
+
+export interface ThreadListTurnFixture {
+  id: string;
+  items: ThreadListTurnItemFixture[];
 }
 
 export interface ThreadListFixture {
@@ -229,6 +258,11 @@ export const CODEX_CAPABILITIES: CapabilityFixture = {
   canWriteSkillsConfig: true,
   canDetectExternalAgentConfig: true,
   canImportExternalAgentConfig: true,
+  canStartThreadRealtime: true,
+  canAppendThreadRealtimeAudio: true,
+  canAppendThreadRealtimeText: true,
+  canStopThreadRealtime: true,
+  canStartWindowsSandboxSetup: true,
   canSetCollaborationMode: true,
   canSubmitUserInput: true,
   canReadLiveState: true,
@@ -258,6 +292,11 @@ export const OPENCODE_CAPABILITIES: CapabilityFixture = {
   canWriteSkillsConfig: false,
   canDetectExternalAgentConfig: false,
   canImportExternalAgentConfig: false,
+  canStartThreadRealtime: false,
+  canAppendThreadRealtimeAudio: false,
+  canAppendThreadRealtimeText: false,
+  canStopThreadRealtime: false,
+  canStartWindowsSandboxSetup: false,
   canSetCollaborationMode: false,
   canSubmitUserInput: false,
   canReadLiveState: false,

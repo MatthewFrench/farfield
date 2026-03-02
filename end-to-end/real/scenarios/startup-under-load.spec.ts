@@ -1,14 +1,26 @@
-import {
-  openSidebarIfHidden,
-} from "../helpers/app-actions";
+import { expect, test } from "../fixtures/real-app.fixture";
+import { openSidebarIfHidden } from "../helpers/app-actions";
 import {
   expectNoErrorBanner,
-  expectThreadListSettled
+  expectNoFailedApiResponses,
+  expectNoUnexpectedClientErrors,
+  expectNoUnexpectedWarningsOrErrors,
+  expectThreadListSettled,
 } from "../helpers/app-assertions";
 import {
-  expect,
-  test
-} from "../fixtures/real-app.fixture";
+  assertReadinessBudget,
+  assertRenderPerformanceBudget,
+  installPerformanceProbe,
+  logPerformanceProbeSnapshot,
+  measureElapsedMilliseconds,
+  readPerformanceProbeSnapshot,
+} from "../helpers/performance-probe";
+
+const STARTUP_UNDER_LOAD_READY_BUDGET_MILLISECONDS = 10_000;
+const STARTUP_UNDER_LOAD_MAX_CUMULATIVE_LAYOUT_SHIFT = 0.25;
+const STARTUP_UNDER_LOAD_MAX_LONG_TASK_COUNT = 32;
+const STARTUP_UNDER_LOAD_MAX_LONG_TASK_DURATION_MILLISECONDS = 2_000;
+const STARTUP_UNDER_LOAD_MAX_FIRST_CONTENTFUL_PAINT_MILLISECONDS = 7_000;
 
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => {
@@ -16,7 +28,12 @@ function delay(milliseconds: number): Promise<void> {
   });
 }
 
-test("startup remains interactive when deferred startup requests are slow", async ({ page, sentinel }) => {
+test("startup remains interactive when deferred startup requests are slow", async ({
+  page,
+  sentinel,
+}) => {
+  await installPerformanceProbe(page);
+
   const deferredDelayMs = 6_000;
 
   await page.route("**/api/events/session", async (route) => {
@@ -27,8 +44,8 @@ test("startup remains interactive when deferred startup requests are slow", asyn
         ok: true,
         authRequired: false,
         bootstrapped: true,
-        expiresAt: null
-      })
+        expiresAt: null,
+      }),
     });
   });
 
@@ -48,9 +65,9 @@ test("startup remains interactive when deferred startup requests are slow", asyn
           lastError: null,
           historyCount: 0,
           threadOwnerCount: 0,
-          pushSubscriptionCount: 0
-        }
-      })
+          pushSubscriptionCount: 0,
+        },
+      }),
     });
   });
 
@@ -73,13 +90,13 @@ test("startup remains interactive when deferred startup requests are slow", asyn
               canSetCollaborationMode: true,
               canSubmitUserInput: true,
               canReadLiveState: true,
-              canReadStreamEvents: true
+              canReadStreamEvents: true,
             },
-            projectDirectories: []
-          }
+            projectDirectories: [],
+          },
         ],
-        defaultAgentId: "codex"
-      })
+        defaultAgentId: "codex",
+      }),
     });
   });
 
@@ -96,11 +113,11 @@ test("startup remains interactive when deferred startup requests are slow", asyn
             mode: "default",
             model: null,
             reasoning_effort: "medium",
-            developer_instructions: null
-          }
+            developer_instructions: null,
+          },
         ],
-        nextCursor: null
-      })
+        nextCursor: null,
+      }),
     });
   });
 
@@ -122,17 +139,17 @@ test("startup remains interactive when deferred startup requests are slow", asyn
             supportedReasoningEfforts: [
               {
                 reasoningEffort: "medium",
-                description: "Balanced"
-              }
+                description: "Balanced",
+              },
             ],
             inputModalities: ["text"],
             supportsPersonality: true,
             isDefault: true,
-            hidden: false
-          }
+            hidden: false,
+          },
         ],
-        nextCursor: null
-      })
+        nextCursor: null,
+      }),
     });
   });
 
@@ -145,17 +162,40 @@ test("startup remains interactive when deferred startup requests are slow", asyn
         ok: true,
         agentId: "codex",
         model: "gpt-5.3-codex",
-        reasoningEffort: "medium"
-      })
+        reasoningEffort: "medium",
+      }),
     });
   });
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const startupReadinessElapsedMilliseconds = await measureElapsedMilliseconds(async () => {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("app-shell")).toBeVisible();
+    await openSidebarIfHidden(page);
+    await expectThreadListSettled(page, sentinel);
+  });
+  assertReadinessBudget({
+    label: "startup-under-load",
+    elapsedMilliseconds: startupReadinessElapsedMilliseconds,
+    maximumMilliseconds: STARTUP_UNDER_LOAD_READY_BUDGET_MILLISECONDS,
+  });
 
-  await expect(page.getByTestId("app-shell")).toBeVisible();
-  await openSidebarIfHidden(page);
-  await expectThreadListSettled(page, sentinel);
+  const performanceSnapshot = await readPerformanceProbeSnapshot(page);
+  logPerformanceProbeSnapshot("startup-under-load", performanceSnapshot);
+  assertRenderPerformanceBudget({
+    label: "startup-under-load",
+    snapshot: performanceSnapshot,
+    maximumCumulativeLayoutShift: STARTUP_UNDER_LOAD_MAX_CUMULATIVE_LAYOUT_SHIFT,
+    maximumLongTaskCount: STARTUP_UNDER_LOAD_MAX_LONG_TASK_COUNT,
+    maximumLongTaskTotalDurationMilliseconds:
+      STARTUP_UNDER_LOAD_MAX_LONG_TASK_DURATION_MILLISECONDS,
+    maximumFirstContentfulPaintMilliseconds:
+      STARTUP_UNDER_LOAD_MAX_FIRST_CONTENTFUL_PAINT_MILLISECONDS,
+  });
+
   await expectNoErrorBanner(page);
+  await expectNoUnexpectedClientErrors(sentinel);
+  await expectNoFailedApiResponses(sentinel);
+  await expectNoUnexpectedWarningsOrErrors(sentinel);
 
   await page.unroute("**/api/events/session");
   await page.unroute("**/api/health");
