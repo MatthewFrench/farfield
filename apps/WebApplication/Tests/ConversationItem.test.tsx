@@ -132,4 +132,17 @@ describe("ConversationItem", () => {
 
     expect(responseTextContainer.textContent).toBe("first, second\nthird");
   });
+
+  it("renders image-view items with local-image route sources", () => {
+    renderConversationItem({
+      item: {
+        id: "image-view-item",
+        type: "imageView",
+        path: "/tmp/viewed image.png",
+      },
+    });
+
+    const image = screen.getByRole("img", { name: "Viewed image: /tmp/viewed image.png" });
+    expect(image.getAttribute("src")).toBe("/api/files/local-image?path=%2Ftmp%2Fviewed+image.png");
+  });
 });

@@ -71,7 +71,6 @@ describe("ChatRequestActionCoordinator", () => {
       reportTrackedUserInterfaceError,
     } = createActionCallbacks();
     const markedThreads: string[] = [];
-    const clearedThreads: string[] = [];
     const selectedThreads: string[] = [];
     const chatClient = createChatClient();
     const threadMutationClient = createThreadMutationClient();
@@ -87,9 +86,6 @@ describe("ChatRequestActionCoordinator", () => {
       },
       onMarkThreadPendingMaterialization: (threadId) => {
         markedThreads.push(threadId);
-      },
-      onClearThreadPendingMaterialization: (threadId) => {
-        clearedThreads.push(threadId);
       },
       chatClient,
       threadMutationClient,
@@ -108,7 +104,6 @@ describe("ChatRequestActionCoordinator", () => {
     );
     expect(markedThreads).toEqual([DEFAULT_THREAD_ID]);
     expect(selectedThreads).toEqual([DEFAULT_THREAD_ID]);
-    expect(clearedThreads).toEqual([DEFAULT_THREAD_ID]);
     expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
     expect(onRefreshThreadData).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
     expect(onRefreshThreadData).toHaveBeenCalledTimes(1);
@@ -126,7 +121,6 @@ describe("ChatRequestActionCoordinator", () => {
     } = createActionCallbacks();
     const onThreadSelected = vi.fn();
     const onMarkThreadPendingMaterialization = vi.fn();
-    const onClearThreadPendingMaterialization = vi.fn();
     const chatClient = createChatClient();
     const threadMutationClient = createThreadMutationClient();
 
@@ -138,7 +132,6 @@ describe("ChatRequestActionCoordinator", () => {
       onSetBusy,
       onThreadSelected,
       onMarkThreadPendingMaterialization,
-      onClearThreadPendingMaterialization,
       chatClient,
       threadMutationClient,
       onInvalidateActiveThreadQuery,
@@ -148,7 +141,6 @@ describe("ChatRequestActionCoordinator", () => {
 
     expect(onThreadSelected).not.toHaveBeenCalled();
     expect(onMarkThreadPendingMaterialization).not.toHaveBeenCalled();
-    expect(onClearThreadPendingMaterialization).not.toHaveBeenCalled();
     expect(threadMutationClient.createThread).not.toHaveBeenCalled();
     expect(chatClient.sendMessage).not.toHaveBeenCalled();
     expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();

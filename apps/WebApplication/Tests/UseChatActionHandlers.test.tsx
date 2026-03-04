@@ -291,7 +291,6 @@ describe("UseChatActionHandlers", () => {
       .mockImplementation(async (nextInput) => {
         nextInput.onMarkThreadPendingMaterialization(CREATED_THREAD_IDENTIFIER);
         nextInput.onThreadSelected(CREATED_THREAD_IDENTIFIER);
-        nextInput.onClearThreadPendingMaterialization(CREATED_THREAD_IDENTIFIER);
       });
 
     const handlerState: { current: ChatActionHandlers | null } = {
@@ -324,12 +323,10 @@ describe("UseChatActionHandlers", () => {
       }),
     );
     expect(markPendingSpy).toHaveBeenCalledWith(CREATED_THREAD_IDENTIFIER);
-    expect(clearPendingSpy).toHaveBeenCalledWith(CREATED_THREAD_IDENTIFIER);
+    expect(clearPendingSpy).not.toHaveBeenCalled();
     expect(setSelectedThreadId).toHaveBeenCalledWith(CREATED_THREAD_IDENTIFIER);
     expect(selectedThreadIdRef.current).toBe(CREATED_THREAD_IDENTIFIER);
-    expect(pendingThreadMaterializationCoordinator.isPending(CREATED_THREAD_IDENTIFIER)).toBe(
-      false,
-    );
+    expect(pendingThreadMaterializationCoordinator.isPending(CREATED_THREAD_IDENTIFIER)).toBe(true);
   });
 
   it("delegates mode draft application with the current owner state", async () => {

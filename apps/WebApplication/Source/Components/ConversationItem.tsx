@@ -1,6 +1,7 @@
 import type { TurnItemSchema } from "@farfield/protocol";
 import { memo } from "react";
 import type { z } from "zod";
+import { resolveLocalImageSourceForRender } from "@/Features/Chat/DomainModel/LocalImageSourceResolver";
 import { CommandBlock } from "./CommandBlock";
 import { DiffBlock } from "./DiffBlock";
 import { MarkdownText } from "./MarkdownText";
@@ -99,6 +100,13 @@ const PLAN_STEP_STATUS_CLASS =
 const PLAN_STEP_TEXT_CLASS = "whitespace-pre-wrap break-words";
 const NOTICE_PANEL_CLASS =
   "rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground";
+const IMAGE_VIEW_PANEL_CLASS = "my-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3";
+const IMAGE_VIEW_TITLE_CLASS =
+  "text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2";
+const IMAGE_VIEW_IMAGE_CLASS =
+  "max-h-[26rem] w-auto max-w-full rounded-lg border border-border/60 bg-background";
+const IMAGE_VIEW_PATH_CLASS =
+  "mt-2 text-xs text-muted-foreground whitespace-pre-wrap break-all leading-relaxed";
 
 function isToolBlockType(type: TurnItem["type"] | undefined): boolean {
   return type !== undefined && TOOL_BLOCK_TYPES.includes(type);
@@ -155,6 +163,21 @@ function renderSectionPanel(title: string, content: string) {
 
 function renderNoticePanel(content: string) {
   return <div className={NOTICE_PANEL_CLASS}>{content}</div>;
+}
+
+function renderImageViewPanel(path: string) {
+  return (
+    <div className={IMAGE_VIEW_PANEL_CLASS}>
+      <div className={IMAGE_VIEW_TITLE_CLASS}>{VIEWED_IMAGE_PREFIX}</div>
+      <img
+        src={resolveLocalImageSourceForRender(path)}
+        alt={`${VIEWED_IMAGE_PREFIX} ${path}`}
+        loading="lazy"
+        className={IMAGE_VIEW_IMAGE_CLASS}
+      />
+      <div className={IMAGE_VIEW_PATH_CLASS}>{path}</div>
+    </div>
+  );
 }
 
 function assertNever(value: never): never {
@@ -332,7 +355,7 @@ function ConversationItemComponent({
       );
 
     case "imageView":
-      return renderNoticePanel(`${VIEWED_IMAGE_PREFIX} ${item.path}`);
+      return renderImageViewPanel(item.path);
 
     case "enteredReviewMode":
       return renderNoticePanel(`${ENTERED_REVIEW_MODE_PREFIX} ${item.review}`);

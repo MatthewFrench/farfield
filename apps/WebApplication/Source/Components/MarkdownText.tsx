@@ -1,12 +1,16 @@
 import { memo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { resolveLocalImageSourceForRender } from "@/Features/Chat/DomainModel/LocalImageSourceResolver";
 import { CodeSnippet } from "./CodeSnippet";
 
 const DEFAULT_CODE_LANGUAGE = "text";
 const CODE_LANGUAGE_CLASS_PREFIX = "language-";
 const TRAILING_BLOCK_NEWLINE_PATTERN = /\n$/;
 const INLINE_CODE_CLASS_NAME = "rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em]";
+const MARKDOWN_IMAGE_CLASS_NAME =
+  "my-3 max-h-[28rem] max-w-full rounded-lg border border-border/60";
+const MARKDOWN_IMAGE_DEFAULT_ALT_TEXT = "Thread image";
 
 export interface MarkdownTextProps {
   text: string;
@@ -48,6 +52,20 @@ const components: Components = {
       <CodeSnippet
         code={code.replace(TRAILING_BLOCK_NEWLINE_PATTERN, "")}
         language={detectLanguage(className)}
+      />
+    );
+  },
+  img: ({ src, alt }) => {
+    if (src === undefined || src.length === 0) {
+      return null;
+    }
+
+    return (
+      <img
+        src={resolveLocalImageSourceForRender(src)}
+        alt={alt ?? MARKDOWN_IMAGE_DEFAULT_ALT_TEXT}
+        loading="lazy"
+        className={MARKDOWN_IMAGE_CLASS_NAME}
       />
     );
   },

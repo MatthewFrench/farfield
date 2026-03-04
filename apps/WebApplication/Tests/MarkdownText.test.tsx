@@ -61,4 +61,20 @@ describe("MarkdownText", () => {
     expect(block.getAttribute("data-language")).toBe("text");
     expect(block.textContent).toBe("plain block");
   });
+
+  it("rewrites local absolute image paths through the local-image route", () => {
+    render(<MarkdownText text={"![Local image](/tmp/screenshot.png)"} />);
+
+    const image = screen.getByRole("img", { name: "Local image" });
+
+    expect(image.getAttribute("src")).toBe("/api/files/local-image?path=%2Ftmp%2Fscreenshot.png");
+  });
+
+  it("keeps remote image URLs unchanged", () => {
+    render(<MarkdownText text={"![Remote image](https://example.com/screenshot.png)"} />);
+
+    const image = screen.getByRole("img", { name: "Remote image" });
+
+    expect(image.getAttribute("src")).toBe("https://example.com/screenshot.png");
+  });
 });

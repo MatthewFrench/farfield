@@ -1,7 +1,10 @@
 const THREAD_NOT_LOADED_READ_ERROR_PATTERN = /thread not loaded in app-server/i;
+const THREAD_NOT_MATERIALIZED_READ_ERROR_PATTERN =
+  /includeTurns is unavailable before first user message/i;
 const TRANSIENT_READ_ERROR_PATTERNS = [
   /failed to load rollout .* is empty/i,
   THREAD_NOT_LOADED_READ_ERROR_PATTERN,
+  THREAD_NOT_MATERIALIZED_READ_ERROR_PATTERN,
   /conversation not found/i,
 ] as const;
 

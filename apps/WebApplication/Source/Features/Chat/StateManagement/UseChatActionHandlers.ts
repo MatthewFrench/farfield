@@ -276,10 +276,6 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.pendingThreadMaterializationCoordinator.markPending(threadId);
   };
 
-  const clearThreadPendingMaterialization = (threadId: string): void => {
-    input.pendingThreadMaterializationCoordinator.clearPending(threadId);
-  };
-
   const submitMessage = useCallback(
     async (draft: string) => {
       await input.chatRequestActionCoordinator.sendMessage({
@@ -290,7 +286,6 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
         onSetBusy: input.setIsBusy,
         onThreadSelected: handleThreadSelected,
         onMarkThreadPendingMaterialization: markThreadPendingMaterialization,
-        onClearThreadPendingMaterialization: clearThreadPendingMaterialization,
         chatClient: input.chatClient,
         threadMutationClient: input.threadMutationClient,
         onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
@@ -302,7 +297,6 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       input.buildActionRequestOptions,
       input.chatClient,
       input.chatRequestActionCoordinator,
-      clearThreadPendingMaterialization,
       handleThreadSelected,
       markThreadPendingMaterialization,
       input.onInvalidateActiveThreadQuery,

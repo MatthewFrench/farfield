@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo } from "react";
+import { readRunningTerminalCount } from "@/Features/Chat/DomainModel/RunningTerminalCountSelector";
 import { toErrorBannerDetails } from "@/Features/Debugging/DomainModel/ErrorBannerDetailsParser";
 import {
   readActiveAgentCapabilities,
@@ -38,7 +39,6 @@ import { useFlatConversationItemsDerivedState } from "./UseFlatConversationItems
 import { useThreadListPresentationDerivedState } from "./UseThreadListPresentationDerivedState";
 
 const DEFAULT_SELECTED_AGENT_LABEL = "Agent";
-const UNKNOWN_COMMIT_LABEL = "unknown";
 const MINIMUM_VISIBLE_CHAT_ITEM_INDEX = 0;
 
 function readRecentTraceSummaries(
@@ -64,6 +64,75 @@ function readDebugHistoryEntryListItems(
     source: historyEntry.source,
     direction: historyEntry.direction,
   }));
+}
+
+function readPendingRequests(
+  conversationState: ApplicationDerivedState["conversationState"],
+  pendingUserInputRequestSelector: UseApplicationDerivedStateInput["pendingUserInputRequestSelector"],
+): ApplicationDerivedState["pendingRequests"] {
+  if (!conversationState) {
+    return [];
+  }
+  return pendingUserInputRequestSelector.readPendingUserInputRequests(conversationState);
+}
+
+function readHistoryDetailPayloadText(
+  historyDetail: UseApplicationDerivedStateInput["historyDetail"],
+): string {
+  if (!historyDetail) {
+    return "";
+  }
+  return JSON.stringify(historyDetail.fullPayload, null, 2);
+}
+
+function readRunningTerminalCountFromConversationState(
+  conversationState: ApplicationDerivedState["deferredConversationState"],
+): number {
+  return readRunningTerminalCount(conversationState);
+}
+
+function readActiveRequest(
+  pendingRequests: ApplicationDerivedState["pendingRequests"],
+  selectedRequestId: UseApplicationDerivedStateInput["selectedRequestId"],
+): ApplicationDerivedState["activeRequest"] {
+  return readActiveRequestSelection({
+    pendingRequests,
+    selectedRequestId,
+  });
+}
+
+function readSelectedThread(
+  threads: UseApplicationDerivedStateInput["threads"],
+  selectedThreadId: UseApplicationDerivedStateInput["selectedThreadId"],
+): ApplicationDerivedState["selectedThread"] {
+  return threads.find((thread) => thread.id === selectedThreadId) ?? null;
+}
+
+function readSurfaceDerivation(input: {
+  selectedThreadId: UseApplicationDerivedStateInput["selectedThreadId"];
+  isCoreLoading: UseApplicationDerivedStateInput["isCoreLoading"];
+  isSelectedThreadLoading: UseApplicationDerivedStateInput["isSelectedThreadLoading"];
+  threadCount: number;
+  turnCount: number;
+  errorMessage: UseApplicationDerivedStateInput["errorMessage"];
+}): {
+  threadListState: ApplicationDerivedState["threadListState"];
+  chatSurfaceState: ApplicationDerivedState["chatSurfaceState"];
+  errorBannerDetails: ApplicationDerivedState["errorBannerDetails"];
+} {
+  return {
+    threadListState: readThreadListState({
+      isCoreLoading: input.isCoreLoading,
+      threadCount: input.threadCount,
+    }),
+    chatSurfaceState: readChatSurfaceState({
+      selectedThreadId: input.selectedThreadId,
+      isCoreLoading: input.isCoreLoading,
+      isSelectedThreadLoading: input.isSelectedThreadLoading,
+      turnCount: input.turnCount,
+    }),
+    errorBannerDetails: toErrorBannerDetails(input.errorMessage),
+  };
 }
 
 export function useApplicationDerivedState(
@@ -138,7 +207,7 @@ export function useApplicationDerivedState(
   }
 
   const selectedThread = useMemo(
-    () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
+    () => readSelectedThread(threads, selectedThreadId),
     [selectedThreadId, threads],
   );
 
@@ -172,12 +241,17 @@ export function useApplicationDerivedState(
     });
   }, [conversationSyncSignatureBuilder, liveState?.conversationState, readThreadState?.thread]);
 
-  const pendingRequests = useMemo<ApplicationDerivedState["pendingRequests"]>(() => {
-    if (!conversationState) {
-      return [];
-    }
-    return pendingUserInputRequestSelector.readPendingUserInputRequests(conversationState);
-  }, [conversationState, pendingUserInputRequestSelector]);
+  const pendingRequests = useMemo<ApplicationDerivedState["pendingRequests"]>(
+    () => readPendingRequests(conversationState, pendingUserInputRequestSelector),
+    [conversationState, pendingUserInputRequestSelector],
+  );
+
+  const deferredConversationState = useDeferredValue(conversationState);
+
+  const runningTerminalCount = useMemo(
+    () => readRunningTerminalCountFromConversationState(deferredConversationState),
+    [deferredConversationState],
+  );
 
   const liveStateReductionError = useMemo<
     ApplicationDerivedState["liveStateReductionError"]
@@ -189,12 +263,10 @@ export function useApplicationDerivedState(
     return errorState;
   }, [liveState?.liveStateError]);
 
-  const activeRequest = useMemo<ApplicationDerivedState["activeRequest"]>(() => {
-    return readActiveRequestSelection({
-      pendingRequests,
-      selectedRequestId,
-    });
-  }, [pendingRequests, selectedRequestId]);
+  const activeRequest = useMemo<ApplicationDerivedState["activeRequest"]>(
+    () => readActiveRequest(pendingRequests, selectedRequestId),
+    [pendingRequests, selectedRequestId],
+  );
 
   const activeThreadAgentId = useMemo<ApplicationDerivedState["activeThreadAgentId"]>(
     () => readActiveThreadAgentId({ selectedThread, selectedAgentId }),
@@ -217,19 +289,11 @@ export function useApplicationDerivedState(
     isSelectedThreadLoading,
   });
 
-  const historyDetailPayloadText = useMemo(() => {
-    if (!historyDetail) {
-      return "";
-    }
-    return JSON.stringify(historyDetail.fullPayload, null, 2);
-  }, [historyDetail]);
+  const historyDetailPayloadText = readHistoryDetailPayloadText(historyDetail);
 
   const recentTraceSummaries = useMemo(() => readRecentTraceSummaries(traceStatus), [traceStatus]);
 
-  const debugHistoryEntryListItems = useMemo(
-    () => readDebugHistoryEntryListItems(history),
-    [history],
-  );
+  const debugHistoryEntryListItems = readDebugHistoryEntryListItems(history);
 
   const activeAgentLabel = readActiveAgentLabel({
     activeAgentDescriptor,
@@ -313,24 +377,18 @@ export function useApplicationDerivedState(
     [appDefaultModel, modelOptions],
   );
 
-  const deferredConversationState = useDeferredValue(conversationState);
   const turns = deferredConversationState?.turns ?? [];
   const lastTurn = turns[turns.length - 1];
   const isGenerating = conversationItemFlattener.isTurnInProgressStatus(lastTurn?.status);
 
-  const threadListState = readThreadListState({
-    isCoreLoading,
-    threadCount: threads.length,
-  });
-
-  const chatSurfaceState = readChatSurfaceState({
+  const { threadListState, chatSurfaceState, errorBannerDetails } = readSurfaceDerivation({
     selectedThreadId,
     isCoreLoading,
     isSelectedThreadLoading,
+    threadCount: threads.length,
     turnCount: turns.length,
+    errorMessage,
   });
-
-  const errorBannerDetails = useMemo(() => toErrorBannerDetails(errorMessage), [errorMessage]);
 
   const {
     debugErrorIssues,
@@ -374,7 +432,6 @@ export function useApplicationDerivedState(
     [firstVisibleChatItemIndex, flatConversationItems],
   );
 
-  const commitLabel = health?.state.gitCommit ?? UNKNOWN_COMMIT_LABEL;
   const { codexConfigured, openCodeConnected, allSystemsReady, hasAnySystemFailure } =
     readAgentConnectivityAndSystemHealth({
       agentsById,
@@ -396,6 +453,7 @@ export function useApplicationDerivedState(
     archivedThreadIds,
     archivedSectionThreadCount,
     conversationState,
+    runningTerminalCount,
     pendingRequests,
     liveStateReductionError,
     activeRequest,
@@ -436,7 +494,7 @@ export function useApplicationDerivedState(
     firstVisibleChatItemIndex,
     hasHiddenChatItems,
     visibleConversationItems,
-    commitLabel,
+    commitLabel: health?.state.gitCommit ?? "unknown",
     codexConfigured,
     openCodeConnected,
     allSystemsReady,

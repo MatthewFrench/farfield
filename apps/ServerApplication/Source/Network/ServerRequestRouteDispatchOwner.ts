@@ -19,6 +19,7 @@ import { handleAgentRoutes } from "./Routes/AgentRoutes.js";
 import { handleCapabilityRoutes } from "./Routes/CapabilityRoutes.js";
 import type { DebugRouteDependencies } from "./Routes/DebugRoutes.js";
 import { handleDebugRoutes } from "./Routes/DebugRoutes.js";
+import { handleLocalImageRoutes } from "./Routes/LocalImageRoutes.js";
 import { handlePushRoutes } from "./Routes/PushRoutes.js";
 import { handleRuntimeRoutes, type RuntimeStateSnapshotReader } from "./Routes/RuntimeRoutes.js";
 import type { ThreadRouteDependencies } from "./Routes/ThreadRoutes.js";
@@ -144,6 +145,18 @@ export class ServerRequestRouteDispatchOwner {
         registry: this.deps.registry,
         configuredAgentIds: this.deps.configuredAgentIds,
         buildAgentDescriptor: this.deps.buildAgentDescriptor,
+        jsonResponse: this.deps.jsonResponse,
+      })
+    ) {
+      return true;
+    }
+
+    if (
+      await handleLocalImageRoutes({
+        req: input.req,
+        res: input.res,
+        pathname: input.pathname,
+        url: input.url,
         jsonResponse: this.deps.jsonResponse,
       })
     ) {

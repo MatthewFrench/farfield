@@ -84,7 +84,6 @@ export interface SendMessageActionInput {
   onSetBusy: (isBusy: boolean) => void;
   onThreadSelected: (threadId: string) => void;
   onMarkThreadPendingMaterialization: (threadId: string) => void;
-  onClearThreadPendingMaterialization: (threadId: string) => void;
   chatClient: ChatRequestActionChatClient;
   threadMutationClient: ChatRequestActionThreadMutationClient;
   onInvalidateActiveThreadQuery: () => void;
@@ -246,7 +245,6 @@ export class ChatRequestActionCoordinator {
       }
 
       await input.chatClient.sendMessage({ threadId, text: input.draft }, requestOptions);
-      input.onClearThreadPendingMaterialization(threadId);
       input.onInvalidateActiveThreadQuery();
       await input.onRefreshThreadData(threadId);
     } catch (error) {
